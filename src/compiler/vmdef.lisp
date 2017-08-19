@@ -26,8 +26,8 @@
            (error "~S is not a defined storage class." x))))
 (defun sb-or-lose (x)
   (the sb
-       (dolist (sb *backend-sb-list*
-                (error "~S is not a defined storage base." x))
+       (dovector (sb *backend-sbs*
+                     (error "~S is not a defined storage base." x))
          (when (eq (sb-name sb) x)
            (return sb)))))
 

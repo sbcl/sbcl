@@ -228,7 +228,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                "*BACKEND-BYTE-ORDER*" "*BACKEND-DISASSEM-PARAMS*"
                "+BACKEND-INTERNAL-ERRORS+" "*BACKEND-PAGE-BYTES*"
                "*BACKEND-REGISTER-SAVE-PENALTY*"
-               "*BACKEND-SB-LIST*"
+               "*BACKEND-SBS*" ; storage bases
                "*BACKEND-SC-NAMES*" "*BACKEND-SC-NUMBERS*"
                "*BACKEND-SUBFEATURES*"
                "*BACKEND-T-PRIMITIVE-TYPE*"

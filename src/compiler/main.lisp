@@ -361,7 +361,8 @@ Examples:
   ;; This binding could just as well be in WITH-IR1-NAMESPACE, but
   ;; since it's primarily a debugging tool, it's nicer to have
   ;; a wider unique scope by ID.
-  `(let ((*compiler-ir-obj-map* (make-compiler-ir-obj-map)))
+  `(let ((*compiler-ir-obj-map* (make-compiler-ir-obj-map))
+         (*finite-sbs* ,(finite-sbs-ctor-form)))
      (unwind-protect
          (let ((*warnings-p* nil)
                (*failure-p* nil))

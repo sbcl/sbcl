@@ -170,7 +170,7 @@
 ;;; conflicts and reset the current size to the initial size.
 (defun init-sb-vectors (component)
   (let ((nblocks (ir2-block-count component)))
-    (dolist (sb *backend-sb-list*)
+    (dovector (sb *backend-sbs*)
       (unless (eq (sb-kind sb) :non-packed)
         (let* ((conflicts (finite-sb-conflicts sb))
                (always-live (finite-sb-always-live sb))
@@ -859,7 +859,7 @@
 ;;; Set the LIVE-TNS vectors in all :FINITE SBs to represent the TNs
 ;;; live at the end of BLOCK.
 (defun init-live-tns (block)
-  (dolist (sb *backend-sb-list*)
+  (dovector (sb *backend-sbs*)
     (when (eq (sb-kind sb) :finite)
       (fill (finite-sb-live-tns sb) nil)))
 
@@ -1536,13 +1536,15 @@
 ;;; done nothing to improve the reentrance or threadsafety of the
 ;;; compiler; it still fails to be callable from several threads at
 ;;; the same time.
+;;; But (FIXME) - we should not make new arrays here, just clear the old
+;;; because new ones are made on each call to COMPILE or COMPILE-FILE.
 ;;;
 ;;; Brief experiments indicate that during a compilation cycle this
 ;;; causes about 10% more consing, and takes about 1%-2% more time.
 ;;;
 ;;; -- CSR, 2004-04-12
 (defun clean-up-pack-structures ()
-  (dolist (sb *backend-sb-list*)
+  (dovector (sb *backend-sbs*)
     (unless (eq (sb-kind sb) :non-packed)
       (let ((size (sb-size sb)))
         (fill (finite-sb-always-live sb) nil)

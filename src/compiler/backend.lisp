@@ -39,9 +39,9 @@
 (defvar *backend-sc-numbers* (make-array sc-number-limit :initial-element nil))
 (declaim (type sc-vector *backend-sc-numbers*))
 
-;;; a list of all the SBs defined, so that we can easily iterate over them
-(defglobal *backend-sb-list* ())
-(declaim (type list *backend-sb-list*))
+;;; a vector of all the SBs defined, so that we can easily iterate over them
+(defglobal *backend-sbs* #())
+(declaim (type simple-vector *backend-sbs*))
 
 ;;; translation from template names to template structures
 (defglobal *backend-template-names* (make-hash-table :test 'eq))

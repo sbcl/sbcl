@@ -45,36 +45,46 @@
      (aver (not (logtest size (1- size-alignment))))
      (aver (not (logtest size-increment (1- size-alignment))))))
 
-  (let ((sb (if (eq kind :non-packed)
-                 (make-sb :name name :kind kind)
-                 (make-finite-sb :name name :kind kind :size size
-                                 :size-increment size-increment
-                                 :size-alignment size-alignment))))
-    `(progn
-       (/show0 "in DEFINE-STORAGE-BASE")
-       ;; DEFINE-STORAGE-CLASS need the storage bases while building
+  `(progn
+       ;; DEFINE-STORAGE-CLASS needs the storage bases while building
        ;; the cross-compiler, but to eval this during cross-compilation
        ;; would kill the cross-compiler.
-       (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-         (let ((sb (copy-structure ',sb)))
-           (setf *backend-sb-list*
-                 (cons sb (remove ',name *backend-sb-list* :key #'sb-name)))))
-       ,@(unless (eq kind :non-packed)
-           `((let ((res (sb-or-lose ',name)))
-               (/show0 "not :NON-PACKED, i.e. hairy case")
-               (setf (finite-sb-always-live res)
-                     (make-array ',size :initial-element #*))
-               (/show0 "doing second SETF")
-               (setf (finite-sb-conflicts res)
-                     (make-array ',size :initial-element '#()))
-               (/show0 "doing third SETF")
-               (setf (finite-sb-live-tns res)
-                     (make-array ',size :initial-element nil))
-               (/show0 "doing fourth SETF")
-               (setf (finite-sb-always-live-count res)
-                     (make-array ',size :initial-element 0)))))
-       (/show0 "finished with DEFINE-STORAGE-BASE expansion")
-       ',name)))
+     (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
+       (unless (find ',name *backend-sbs* :key 'sb-name)
+         (let* ((index (length *backend-sbs*))
+                (sbs (make-array (1+ index))))
+           (replace sbs *backend-sbs*)
+           (setf (aref sbs index)
+                 ,(if (eq kind :non-packed)
+                      `(make-sb :%index index :name ',name :kind ,kind)
+                      `(make-finite-sb :%index index :name ',name
+                                       :kind ,kind :size ,size
+                                       :size-increment ,size-increment
+                                       :size-alignment ,size-alignment)))
+           (setf *backend-sbs* sbs))))
+     ',name))
+
+(defun finite-sbs-ctor-form ()
+  `(vector
+    ,@(loop for sb across *backend-sbs*
+            for index from 0
+            collect
+            (if (eq (sb-kind sb) :non-packed)
+                0
+                ;; These "proxy" objects don't really need to be instances of
+                ;; FINITE-SB.  Not all slots of them are accessed.
+                (let ((size (sb-size sb)))
+                  `(make-finite-sb
+                    :%index ,(sb-%index sb)
+                    :name ',(sb-name sb)
+                    :kind ,(sb-kind sb)
+                    :size ,(sb-size sb)
+                    :size-increment ,(finite-sb-size-increment sb)
+                    :size-alignment ,(finite-sb-size-alignment sb)
+                    :always-live (make-array ,size :initial-element #*)
+                    :conflicts (make-array ,size :initial-element #())
+                    :live-tns (make-array ,size :initial-element nil)
+                    :always-live-count (make-array ,size :initial-element 0)))))))
 
 ;;; Define a storage class NAME that uses the named Storage-Base.
 ;;; NUMBER is a small, non-negative integer that is used as an alias.
