@@ -108,6 +108,7 @@
 (defvar *eval-tlf-index*)
 (defvar *dynamic-counts-tn*)
 (defvar *elsewhere*)
+(defvar *elsewhere-label*)
 (defvar *event-info*)
 (defvar *event-note-threshold*)
 (defvar *failure-p*)

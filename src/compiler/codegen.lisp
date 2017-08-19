@@ -53,12 +53,6 @@
 (defun callee-return-pc-tn (2env)
   (ir2-physenv-return-pc-pass 2env))
 
-;;;; specials used during code generation
-
-(defvar *code-segment* nil)
-(defvar *elsewhere* nil)
-(defvar *elsewhere-label* nil)
-
 ;;;; noise to emit an instruction trace
 
 (defvar *prev-segment*)
