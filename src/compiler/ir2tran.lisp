@@ -356,10 +356,12 @@
                    (entry-info (lambda-info xep) :exit-if-null)
                    (tn (entry-info-closure-tn entry-info) :exit-if-null)
                    (closure (physenv-closure (get-lambda-physenv xep)))
+                   #!-x86-64
                    (entry (make-load-time-constant-tn :entry xep)))
           (let ((this-env (node-physenv call))
                 (leaf-dx-p (and dx-p (leaf-dynamic-extent leaf))))
-            (vop make-closure call 2block entry
+            (aver (entry-info-offset entry-info))
+            (vop make-closure call 2block #!-x86-64 entry
                  (entry-info-offset entry-info) (length closure)
                  leaf-dx-p tn)
             (loop for what in closure and n from 0 do

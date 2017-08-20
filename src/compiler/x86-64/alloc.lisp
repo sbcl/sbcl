@@ -281,9 +281,8 @@
               result fdefn-raw-addr-slot other-pointer-lowtag))))
 
 (define-vop (make-closure)
-  (:args (function :to :save :scs (descriptor-reg)))
+  ; (:args (function :to :save :scs (descriptor-reg)))
   (:info label length stack-allocate-p)
-  (:ignore label)
   (:temporary (:sc any-reg) temp)
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
@@ -302,8 +301,7 @@
     ;; This is due to scav_closure() assuming that it can always subtract
     ;; FUN_RAW_ADDR_OFFSET from closure->fun to obtain a Lisp object,
     ;; without any precheck for whether that word is currently 0.
-    (inst lea temp (make-ea-for-object-slot function simple-fun-code-offset
-                                            fun-pointer-lowtag))
+    (inst lea temp (make-fixup nil :closure label))
     (storew temp result closure-fun-slot fun-pointer-lowtag))))
 
 ;;; The compiler likes to be able to directly make value cells.

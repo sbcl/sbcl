@@ -1199,6 +1199,13 @@
     (fixup
      (typecase (fixup-offset thing)
        (label
+        (when (eq (fixup-flavor thing) :closure)
+          ;; A closure entry label points to a simple-fun header word, and not
+          ;; the first executable instruction. To get the proper entry address,
+          ;; make 'remaining-bytes' negative so that the origin of the offset
+          ;; calculation appears as if earlier in the instruction stream by
+          ;; exactly 6 words. The computed EA will come out right.
+          (decf remaining-bytes (* n-word-bytes simple-fun-code-offset)))
         (emit-label-rip segment thing reg remaining-bytes))
        (t
         (emit-mod-reg-r/m-byte segment #b00 reg #b100)
