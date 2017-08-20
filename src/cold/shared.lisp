@@ -211,6 +211,10 @@
           ":SB-LINKABLE-RUNTIME not supported on selected architecture")
          ("(and sb-linkable-runtime (not (or darwin linux win32)))"
           ":SB-LINKABLE-RUNTIME not supported on selected operating system")
+         ("(and sb-elf-core (not x86-64))"
+          ":SB-ELF-CORE not supported on selected architecture")
+         ("(and sb-elf-core (not linux))"
+          ":SB-ELF-CORE not supported on selected operating system")
          ("(and sb-eval sb-fasteval)"
           ;; It sorta kinda works to have both, but there should be no need,
           ;; and it's not really supported.

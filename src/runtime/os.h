@@ -181,8 +181,11 @@ extern void os_deallocate(os_vm_address_t addr, os_vm_size_t len);
 
 #define os_trunc_size_to_page(size) \
     (os_vm_size_t)(((uword_t)(size))&~(os_vm_page_size-1))
+#define round_mult(n, mult)            \
+    ({ typeof (mult) m_ = (mult) - 1;  \
+        (((n) + m_) &~ m_);})
 #define os_round_up_size_to_page(size) \
-    os_trunc_size_to_page((size)+(os_vm_page_size-1))
+    round_mult((size), os_vm_page_size)
 
 /* KLUDGE: The errno error reporting system is an ugly nonreentrant
  * botch which nonetheless wasn't too painful in the old days.

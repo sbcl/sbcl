@@ -64,7 +64,7 @@ COMMON_SRC = alloc.c backtrace.c breakpoint.c coreparse.c dynbind.c     \
 	largefile.c monitor.c murmur_hash.c os-common.c parse.c print.c \
 	purify.c pthread-futex.c regnames.c run-program.c runtime.c     \
 	safepoint.c save.c sc-offset.c search.c thread.c time.c         \
-	validate.c var-io.c vars.c wrap.c
+	validate.c var-io.c vars.c wrap.c sbcl_elf.c
 
 C_SRC = $(COMMON_SRC) ${ARCH_SRC} ${OS_SRC} ${GC_SRC}
 
@@ -74,9 +74,17 @@ OBJS = $(C_SRC:.c=.o) $(ASSEM_SRC:.S=.o)
 
 LIBS = ${OS_LIBS} -lm
 
+ifdef LISP_FEATURE_SB_ELF_CORE
+  LIBELF_DIR := libelf
+include $(LIBELF_DIR)/build.mk
+  CPPFLAGS += -I$(LIBELF_INCLUDES)
+  LINKFLAGS += -L$(LIBELF_DIR)
+  LIBS += -l$(LIBELF_LIBNAME)
+endif
+
 targets: $(TARGET) $(OBJTARGET) sbcl.nm sbcl.mk
 
-$(TARGET): $(LIBSBCL)
+$(TARGET): $(LIBSBCL) $(LIBELF_LIB)
 	$(CC) ${LINKFLAGS} -o $@ $(USE_LIBSBCL) $(LIBS)
 
 # ld -r -o sbcl.o works on Linux, but not on other platforms.
@@ -85,11 +93,15 @@ $(TARGET): $(LIBSBCL)
 sbcl.o: $(OBJS)
 	$(LD) $(__LDFLAGS__) -r -o $@ $^
 
-libsbcl.a: $(OBJS)
-	rm -f $@ ; ar rcs $@ $^
+libsbcl.a: $(OBJS) $(LIBELF_LIB)
+	rm -f $@ ; ar rcs $@ $(OBJS) $(LIBELF_OBJS)
 
 sbcl.mk:
-	( echo 'CC=$(CC)' ; \
+	( echo '# Parameters:' ; \
+	  echo '#   OUTPUT: the output binary path' ; \
+	  echo '#   CORE:   the ELF core file path' ; \
+	  echo '' ; \
+	  echo 'CC=$(CC)' ; \
 	  echo 'LD=$(LD)' ; \
 	  echo 'CFLAGS=$(CFLAGS)' ; \
 	  echo 'ASFLAGS=$(ASFLAGS)' ; \
@@ -100,6 +112,13 @@ sbcl.mk:
 	  if [ -n '$(LISP_FEATURE_SB_LINKABLE_RUNTIME)' ] ; then \
 	    echo 'LIBSBCL=$(LIBSBCL)' ; \
 	    echo 'USE_LIBSBCL=$(USE_LIBSBCL)' ; \
+	    echo '' ; \
+	    echo '# The current directory of this Makefile fragment' ; \
+	    echo '__CURDIR__ := $$(dir $$(abspath $$(lastword $$(MAKEFILE_LIST))))' ; \
+	    echo '' ; \
+	    echo 'sbcl_elf:' ; \
+	    echo '	$$(CC) $$(LINKFLAGS) -L$$(__CURDIR__)libelf -Wl,@$$(CORE).lds \' ; \
+	    echo '	-o $$(OUTPUT) $$(__CURDIR__)$$(LIBSBCL) $$(CORE) $$(LIBS)' ; \
 	  fi ; \
 	  : ) > $@
 
@@ -116,7 +135,7 @@ sbcl.h: $(wildcard genesis/*.h)
 TAGS tags: $(SRCS)
 	etags $(SRCS) || true
 
-clean:
+clean: $(LIBELF_CLEAN)
 	-rm -f *.[do] $(TARGET) sbcl.nm sbcl.h core *.tmp $(OS_CLEAN_FILES)
 
 %.d: %.c sbcl.h

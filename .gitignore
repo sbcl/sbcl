@@ -1,6 +1,7 @@
 *.d
 *.dSYM
 *.o
+*.lds
 *.a
 *.fasl
 *.FASL

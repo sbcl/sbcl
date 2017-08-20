@@ -4332,7 +4332,7 @@ char gc_coalesce_string_literals = 0;
 /* Do a non-conservative GC, and then save a core with the initial
  * function being set to the value of 'lisp_init_function' */
 void
-gc_and_save(char *filename, boolean prepend_runtime,
+gc_and_save(char *filename, boolean prepend_runtime, boolean c_linkable_core,
             boolean save_runtime_options, boolean compressed,
             int compression_level, int application_type)
 {
@@ -4342,13 +4342,6 @@ gc_and_save(char *filename, boolean prepend_runtime,
     extern void coalesce_similar_objects();
     extern struct lisp_startup_options lisp_startup_options;
     boolean verbose = !lisp_startup_options.noinform;
-
-    file = prepare_to_save(filename, prepend_runtime, &runtime_bytes,
-                           &runtime_size);
-    if (file == NULL)
-       return;
-
-    conservative_stack = 0;
 
     /* The filename might come from Lisp, and be moved by the now
      * non-conservative GC. */
@@ -4376,15 +4369,34 @@ gc_and_save(char *filename, boolean prepend_runtime,
     gencgc_alloc_start_page = -1;
     collect_garbage(HIGHEST_NORMAL_GENERATION+1);
 
-    if (prepend_runtime)
-        save_runtime_to_filehandle(file, runtime_bytes, runtime_size,
-                                   application_type);
+    if (c_linkable_core) {
+#ifdef LISP_FEATURE_SB_ELF_CORE
+        conservative_stack = 0;
+        /* The dumper doesn't know that pages need to be zeroed before use. */
+        zero_all_free_pages();
+        save_elf_core(filename, lisp_init_function);
+#else
+        lose("Attempt to save ELF core without enabling :SB-ELF-CORE\n");
+#endif
+    } else {
+        file = prepare_to_save(filename, prepend_runtime, &runtime_bytes,
+                               &runtime_size);
+        if (file == NULL)
+            return;
 
-    /* The dumper doesn't know that pages need to be zeroed before use. */
-    zero_all_free_pages();
-    save_to_filehandle(file, filename, lisp_init_function,
-                       prepend_runtime, save_runtime_options,
-                       compressed ? compression_level : COMPRESSION_LEVEL_NONE);
+        conservative_stack = 0;
+
+        if (prepend_runtime)
+            save_runtime_to_filehandle(file, runtime_bytes, runtime_size,
+                                       application_type);
+
+        /* The dumper doesn't know that pages need to be zeroed before use. */
+        zero_all_free_pages();
+        save_to_filehandle(file, filename, lisp_init_function,
+                           prepend_runtime, save_runtime_options,
+                           compressed ? compression_level : COMPRESSION_LEVEL_NONE);
+    }
+
     /* Oops. Save still managed to fail. Since we've mangled the stack
      * beyond hope, there's not much we can do.
      * (beyond FUNCALLing lisp_init_function, but I suspect that's
