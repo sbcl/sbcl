@@ -238,9 +238,14 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                    boolean save_runtime_options,
                    int core_compression_level)
 {
-    struct thread *th;
+    struct thread *th = all_threads;
     os_vm_offset_t core_start_pos;
     boolean verbose = !lisp_startup_options.noinform;
+
+    // Since SB-IMPL::DEINIT already checked for exactly 1 thread,
+    // losing here probably can't happen.
+    if (th->next)
+        lose("Can't save image with more than one executing thread");
 
 #ifdef LISP_FEATURE_X86_64
     untune_asm_routines_for_microarch();
@@ -253,11 +258,9 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
         printf("[undoing binding stack and other enclosing state... ");
         fflush(stdout);
     }
-    for_each_thread(th) {       /* XXX really? */
-        unbind_to_here((lispobj *)th->binding_stack_start,th);
-        SetSymbolValue(CURRENT_CATCH_BLOCK, 0,th);
-        SetSymbolValue(CURRENT_UNWIND_PROTECT_BLOCK, 0,th);
-    }
+    unbind_to_here((lispobj *)th->binding_stack_start,th);
+    SetSymbolValue(CURRENT_CATCH_BLOCK, 0,th);
+    SetSymbolValue(CURRENT_UNWIND_PROTECT_BLOCK, 0,th);
     if (verbose) printf("done]\n");
 #ifdef LISP_FEATURE_IMMOBILE_CODE
     // It's better to wait to defrag until after the binding stack is undone,
