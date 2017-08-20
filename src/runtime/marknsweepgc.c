@@ -1251,7 +1251,7 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
     address = IMMOBILE_VARYOBJ_SUBSPACE_START;
     n_pages = (varyobj_len + IMMOBILE_CARD_BYTES - 1) / IMMOBILE_CARD_BYTES;
     lispobj* obj = (lispobj*)address;
-    lispobj* space_limit = (lispobj*)(address + varyobj_len);
+    lispobj* __attribute__((unused)) space_limit = (lispobj*)(address + varyobj_len);
     int n_words;
     low_page_index_t last_page = 0;
     // coreparse() already set immobile_space_free_pointer
@@ -1289,7 +1289,7 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
         limit[0] = SIMPLE_ARRAY_FIXNUM_WIDETAG;
         limit[1] = make_fixnum((remainder >> WORD_SHIFT) - 2);
         int size = sizetab[SIMPLE_ARRAY_FIXNUM_WIDETAG](limit);
-        lispobj* padded_end = limit + size;
+        lispobj* __attribute__((unused)) padded_end = limit + size;
         gc_assert(!((uword_t)padded_end & (IMMOBILE_CARD_BYTES-1)));
     }
     // Write-protect the pages occupied by the core file.
