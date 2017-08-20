@@ -2125,10 +2125,9 @@ core and return a descriptor to it."
               ;; Absolute fixups on x86-64 do not refer to this code component,
               ;; because we have RIP-relative addressing, but references to
               ;; other immobile-space objects must be recorded.
-              ;; :STATIC-CALL absolute fixups are not saved because static space
-              ;; won't move, but :NAMED-CALL fixups are saved.
               #!+x86-64
-              (member flavor '(:named-call :layout :immobile-object)))
+              (member flavor '(:named-call :layout :immobile-object
+                               :static-call)))
              (:relative ; (used for arguments to X86 relative CALL instruction)
               (setf (bvref-32 gspace-data gspace-byte-offset)
                     (the (signed-byte 32)

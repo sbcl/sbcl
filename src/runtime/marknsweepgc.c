@@ -2249,14 +2249,30 @@ void fixup_immobile_refs(lispobj (*fixup_lispobj)(lispobj),
             if (fixed != ptr)
                 *fixup_where = fixed;
         } else {
-            gc_assert(IMMOBILE_SPACE_START <= ptr &&
-                      ptr < (IMMOBILE_SPACE_START+IMMOBILE_FIXEDOBJ_SUBSPACE_SIZE));
-            // It's an absolute interior pointer. search_immobile_space() works
-            // at this point, because the page attributes on the pointee's page are valid
-            lispobj* obj = search_immobile_space((void*)ptr);
-            if (forwarding_pointer_p(obj)) {
-                lispobj fpval = forwarding_pointer_value(obj);
-                *fixup_where = (int)(long)native_pointer(fpval) + (ptr - (lispobj)obj);
+            // If defragmenting, there will be forwarding-pointers.
+            // When doing heap relocation at startup, there will not be,
+            // so no fixups will be made, which is ok for the time being.
+            // This will need a complete rewrite for space relocation.
+            lispobj* header_addr;
+            if (ptr < IMMOBILE_VARYOBJ_SUBSPACE_START) {
+                // It's an absolute interior pointer to a symbol value slot
+                // or an fdefn raw address slot.
+                header_addr = search_immobile_space((void*)ptr);
+                gc_assert(header_addr);
+                if (forwarding_pointer_p(header_addr)) {
+                    lispobj fpval = forwarding_pointer_value(header_addr);
+                    *fixup_where = (int)(long)native_pointer(fpval)
+                        + (ptr - (lispobj)header_addr);
+                }
+            } else {
+                // It must be the entrypoint to a static [sic] function.
+                header_addr = (lispobj*)(ptr - offsetof(struct simple_fun, code));
+                if (forwarding_pointer_p(header_addr)) {
+                    lispobj fpval = forwarding_pointer_value(header_addr);
+                    gc_assert(widetag_of(*tempspace_addr(native_pointer(fpval)))
+                              == SIMPLE_FUN_WIDETAG);
+                    *fixup_where = fpval + FUN_RAW_ADDR_OFFSET;
+                }
             }
         }
     }

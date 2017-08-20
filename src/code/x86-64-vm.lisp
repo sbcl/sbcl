@@ -59,10 +59,10 @@
   ;;  (1) :NAMED-CALL occurs in both :RELATIVE and :ABSOLUTE kinds.
   ;;      We can ignore the :RELATIVE kind.
   ;;  (2) :STATIC-CALL fixups point to immobile space, not static space.
-  ;;      We don't record them.
   #!+immobile-space
   (when (and (eq kind :absolute)
-             (member flavor '(:named-call :layout :immobile-object)))
+             (member flavor '(:named-call :layout :immobile-object ; -> fixedobj subspace
+                              :static-call))) ; -> varyobj subspace
     (let ((fixups (%code-fixups code)))
       ;; Sanctifying the code component will compact these into a bignum.
       (setf (%code-fixups code) (cons offset (if (eql fixups 0) nil fixups)))))
