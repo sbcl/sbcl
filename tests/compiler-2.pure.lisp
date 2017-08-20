@@ -215,7 +215,8 @@
                   :skipped-on '(not (and :x86-64 :immobile-space)))
   (let ((addr-of-pathname-layout
          (write-to-string
-          (sb-kernel:get-lisp-obj-address (sb-kernel:find-layout 'pathname))))
+          (sb-kernel:get-lisp-obj-address (sb-kernel:find-layout 'pathname))
+          :base 16 :radix t))
         (count 0))
     ;; The constant should appear in two CMP instructions
     (dolist (line (split-string
