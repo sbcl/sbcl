@@ -44,6 +44,18 @@
 (defclass pattern-gf/1 (standard-generic-function) ()
   (:metaclass funcallable-standard-class))
 
+(defmethod sb-pcl:specializer-type-specifier
+    ((proto-generic-function pattern-gf/1)
+     (proto-method t)
+     (specializer pattern-specializer))
+  (labels ((to-type (pattern)
+             (cond
+               ((null pattern) 't)
+               ((atom pattern) `(eql ,pattern))
+               (t `(cons ,(to-type (car pattern))
+                         ,(to-type (cdr pattern)))))))
+    (to-type (pattern specializer))))
+
 (defun matchesp (arg pattern)
   (cond
     ((null pattern) t)
