@@ -111,7 +111,8 @@
 
 (define-vop (make-closure)
   (:args (function :to :save :scs (descriptor-reg)))
-  (:info length stack-allocate-p)
+  (:info label length stack-allocate-p)
+  (:ignore label)
   (:temporary (:sc non-descriptor-reg) pa-flag)
   (:temporary (:scs (interior-reg)) lip)
   (:results (result :scs (descriptor-reg)))
