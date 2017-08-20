@@ -1077,6 +1077,7 @@
 
   ;; currently active source variables
   (current-valid-locations nil :type (or null (vector bit))))
+(declaim (freeze-type disassem-state))
 (defmethod print-object ((dstate disassem-state) stream)
   (print-unreadable-object (dstate stream :type t)
     (format stream

@@ -1996,23 +1996,34 @@
       t)))
 
 (defun maybe-note-static-symbol (address dstate)
-  (dovector (symbol sb!vm:+static-symbols+)
-    (when (= (get-lisp-obj-address symbol) address)
-      (return (note (lambda (s) (prin1 symbol s)) dstate))))
-  ;; Guess whether 'address' is an immobile-space symbol by looking at
-  ;; code header constants. If it matches any constant, assume that it
-  ;; is a use of the constant.  This has false positives of course,
-  ;; as does MAYBE-NOTE-STATIC-SYMBOL in general - any random immediate
-  ;; used in an unboxed context, such as an ADD instruction,
-  ;; might be seen as an address.
-  #!+immobile-space
-  (unless (eql address 0)
-    (let ((code (seg-code (dstate-segment dstate))))
-      (when code
-        (loop for i downfrom (1- (code-header-words code)) to sb!vm:code-constants-offset
-              for const = (code-header-ref code i)
-              when (eql (get-lisp-obj-address const) address)
-              return (note (lambda (s) (prin1-quoted-short const s)) dstate))))))
+  (declare (type disassem-state dstate))
+  (when (or (not (typep address `(unsigned-byte ,sb!vm:n-machine-word-bits)))
+            (eql address 0))
+    (return-from maybe-note-static-symbol))
+  (let ((symbol
+         (block found
+           (when (eq address sb!vm::nil-value)
+             (return-from found nil))
+           (when (< address (sap-int sb!vm:*static-space-free-pointer*))
+             (dovector (symbol sb!vm:+static-symbols+)
+               (when (= (get-lisp-obj-address symbol) address)
+                 (return-from found symbol))))
+           ;; Guess whether 'address' is an immobile-space symbol by looking at
+           ;; code header constants. If it matches any constant, assume that it
+           ;; is a use of the constant.  This has false positives of course,
+           ;; as does MAYBE-NOTE-STATIC-SYMBOL in general - any random immediate
+           ;; used in an unboxed context, such as an ADD instruction,
+           ;; might be wrongly construed as an address.
+           #!+immobile-space
+           (let ((code (seg-code (dstate-segment dstate))))
+             (when code
+               (loop for i downfrom (1- (code-header-words code))
+                     to sb!vm:code-constants-offset
+                     for const = (code-header-ref code i)
+                     when (eql (get-lisp-obj-address const) address)
+                     do (return-from found const))))
+           (return-from maybe-note-static-symbol))))
+    (note (lambda (s) (prin1 symbol s)) dstate)))
 
 (defun get-internal-error-name (errnum)
   (cadr (svref sb!c:+backend-internal-errors+ errnum)))
