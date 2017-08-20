@@ -124,7 +124,7 @@
   (if (or #!+immobile-space (maybe-note-lisp-callee value dstate)
           (maybe-note-assembler-routine value nil dstate)
           (maybe-note-static-symbol value dstate))
-      (write value :stream stream :base 16 :radix t)
+      (princ16 value stream)
       (princ value stream)))
 
 ;;; Return either a MACHINE-EA or a register (a fixnum).

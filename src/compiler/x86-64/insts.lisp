@@ -195,8 +195,9 @@
                  (setf width :dword))
                (read-signed-suffix (width-bits width) dstate))
   :printer (lambda (value stream dstate)
-             (maybe-note-static-symbol value dstate)
-             (princ value stream)))
+             (if (maybe-note-static-symbol value dstate)
+                 (princ16 value stream)
+                 (princ value stream))))
 
 (define-arg-type signed-imm-data/asm-routine
   :type 'signed-imm-data
