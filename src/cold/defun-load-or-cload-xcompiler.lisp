@@ -126,8 +126,7 @@
             slot-makunbound
             make-load-form-saving-slots
             sb!ext:run-program
-            sb!kernel::choose-code-component-order
-            sb!kernel:profile-deinit)
+            sb!kernel::choose-code-component-order)
           ;; CLOS implementation
           '(sb!mop:class-finalized-p
             sb!mop:class-prototype

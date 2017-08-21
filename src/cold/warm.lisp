@@ -150,7 +150,8 @@
                 #+sb-traceroot "SRC;CODE;TRACEROOT"
 
                 #+immobile-code "SRC;CODE;IMMOBILE-CODE"
-                "SRC;CODE;REPACK-XREF"))
+                "SRC;CODE;REPACK-XREF"
+                "SRC;CODE;SAVE"))
       (sb-c::*handled-conditions* sb-c::*handled-conditions*))
  (declare (special *compile-files-p*))
  (proclaim '(sb-ext:muffle-conditions
