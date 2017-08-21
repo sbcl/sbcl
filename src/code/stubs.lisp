@@ -38,7 +38,6 @@
   (def %closure-fun)
   (def %closure-index-ref (closure index))
   (def sb-c::vector-length)
-  (def allocate-vector (type length words))
   (def make-array-header (type rank))
   (def code-instructions)
   (def code-header-ref (code-obj index))

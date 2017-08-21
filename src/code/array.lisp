@@ -1796,3 +1796,7 @@ function to be removed without further warning."
                                   :element-type (array-element-type array))
            (array-dimensions array)))
   array)
+
+;;; Why is this needed for ARM and not x86 ???
+(defun allocate-vector (type length words)
+  (allocate-vector type length words))
