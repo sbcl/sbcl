@@ -896,7 +896,7 @@ gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *all
     if (gencgc_zero_check) {
         lispobj *p;
         for (p = alloc_region->start_addr;
-             p < alloc_region->end_addr; p++) {
+             (void*)p < alloc_region->end_addr; p++) {
             if (*p != 0) {
                 lose("The new region is not zero at %p (start=%p, end=%p).\n",
                      p, alloc_region->start_addr, alloc_region->end_addr);

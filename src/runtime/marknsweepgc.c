@@ -1257,7 +1257,7 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
     // coreparse() already set immobile_space_free_pointer
     lispobj* limit = immobile_space_free_pointer;
     gc_assert(limit != 0 /* would be zero if not mmapped yet */
-              && limit < space_limit);
+              && limit <= space_limit);
     for ( ; obj < limit ; obj += n_words ) {
         gc_assert(other_immediate_lowtag_p(obj[0]));
         n_words = sizetab[widetag_of(*obj)](obj);

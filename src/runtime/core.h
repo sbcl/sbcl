@@ -15,21 +15,20 @@
 #include "sbcl.h"
 #include "runtime.h"
 
-struct ndir_entry {
-#ifndef LISP_FEATURE_ALPHA
-    sword_t identifier;
-    sword_t nwords;
-    sword_t data_page;
-    sword_t address;
-    sword_t page_count;
+#ifdef LISP_FEATURE_ALPHA
+typedef u32 core_entry_elt_t;
 #else
-    u32 identifier;
-    u32 nwords;
-    u32 data_page;
-    u32 address;
-    u32 page_count;
+typedef sword_t core_entry_elt_t;
 #endif
+
+struct ndir_entry {
+    core_entry_elt_t identifier;
+    core_entry_elt_t nwords;
+    core_entry_elt_t data_page;
+    core_entry_elt_t address;
+    core_entry_elt_t page_count;
 };
+#define NDIR_ENTRY_LENGTH (sizeof (struct ndir_entry)/sizeof (core_entry_elt_t))
 
 /* Tri-state flag to determine whether we attempt to mark pages
  * as targets for virtual memory deduplication (ala MADV_MERGEABLE

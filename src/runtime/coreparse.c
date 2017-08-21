@@ -560,11 +560,11 @@ void relocate_heap(lispobj* want, lispobj* got, uword_t len)
 int merge_core_pages = -1;
 
 static void
-process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
+process_directory(int count, struct ndir_entry *entry,
+                  int fd, os_vm_offset_t file_offset)
 {
     extern void immobile_space_coreparse(uword_t,uword_t);
     extern void write_protect_immobile_space();
-    struct ndir_entry *entry;
 
     struct {
         uword_t len; // length in pages
@@ -586,7 +586,7 @@ process_directory(int fd, lispobj *ptr, int count, os_vm_offset_t file_offset)
 #endif
     };
 
-    for (entry = (struct ndir_entry *) ptr; --count>= 0; ++entry) {
+    for ( ; --count>= 0; ++entry) {
         sword_t id = entry->identifier;
         uword_t addr = (os_vm_page_size * entry->address);
         int compressed = id & DEFLATED_CORE_SPACE_ID_FLAG;
@@ -707,11 +707,7 @@ lispobj
 load_core_file(char *file, os_vm_offset_t file_offset)
 {
     void *header;
-#ifndef LISP_FEATURE_ALPHA
-    uword_t val, *ptr;
-#else
-    u32 val, *ptr;
-#endif
+    core_entry_elt_t val, *ptr;
     os_vm_size_t len, remaining_len;
     int fd = open_binary(file, O_RDONLY);
     ssize_t count;
@@ -792,16 +788,8 @@ load_core_file(char *file, os_vm_offset_t file_offset)
 
         case NEW_DIRECTORY_CORE_ENTRY_TYPE_CODE:
             SHOW("NEW_DIRECTORY_CORE_ENTRY_TYPE_CODE case");
-            process_directory(fd,
-                              ptr,
-#ifndef LISP_FEATURE_ALPHA
-                              remaining_len / (sizeof(struct ndir_entry) /
-                                               sizeof(lispobj)),
-#else
-                              remaining_len / (sizeof(struct ndir_entry) /
-                                               sizeof(u32)),
-#endif
-                              file_offset);
+            process_directory(remaining_len / NDIR_ENTRY_LENGTH,
+                              (struct ndir_entry*)ptr, fd, file_offset);
             break;
 
         case INITIAL_FUN_CORE_ENTRY_TYPE_CODE:
