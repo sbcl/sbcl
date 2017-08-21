@@ -749,8 +749,12 @@ create_thread_struct(lispobj initial_function) {
     SetSymbolValue(ALIEN_STACK_POINTER,(lispobj)th->alien_stack_pointer,th);
 #endif
 #endif
-    bind_variable(CURRENT_CATCH_BLOCK,make_fixnum(0),th);
-    bind_variable(CURRENT_UNWIND_PROTECT_BLOCK,make_fixnum(0),th);
+    /* Catch and uwp blocks can be initialized with 'set' instead of 'bind'.
+     * They're similarly set to 0 on save, and there are no unbind actions
+     * that are relevant to these. (And btw they start out as NO_TLS_VALUE
+     * which would crash if not otherwise bound or assigned) */
+    set_current_catch_block(th, 0);
+    set_current_uwp_block(th, 0);
     bind_variable(FREE_INTERRUPT_CONTEXT_INDEX,make_fixnum(0),th);
     bind_variable(INTERRUPT_PENDING, NIL,th);
     bind_variable(INTERRUPTS_ENABLED,T,th);

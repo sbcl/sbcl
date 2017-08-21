@@ -417,10 +417,9 @@ backtrace_cmd(char **ptr)
 static void
 catchers_cmd(char **ptr)
 {
-    struct catch_block *catch;
     struct thread *thread=arch_os_get_current_thread();
-
-    catch = (struct catch_block *)SymbolValue(CURRENT_CATCH_BLOCK,thread);
+    struct catch_block *catch = (struct catch_block *)
+        get_current_catch_block(thread);
 
     if (catch == NULL)
         printf("There are no active catchers!\n");

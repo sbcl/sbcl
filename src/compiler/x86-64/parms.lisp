@@ -144,12 +144,10 @@
 
 (defconstant-eqx +static-symbols+
  `#(,@+common-static-symbols+
-    *alien-stack-pointer*
-
+    #!-sb-thread *alien-stack-pointer*    ; a thread slot if #!+sb-thread
      ;; interrupt handling
-     *pseudo-atomic-bits*
-
-     *binding-stack-pointer*)
+    #!-sb-thread *pseudo-atomic-bits*     ; ditto
+    #!-sb-thread *binding-stack-pointer*) ; ditto
   #'equalp)
 
 ;;; FIXME: with #!+immobile-space, this should be the empty list,

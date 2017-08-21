@@ -239,6 +239,18 @@ static inline lispobj FdefnFun(lispobj fdefn)
 #  endif
 #endif
 
+#ifdef CURRENT_CATCH_BLOCK
+#define get_current_catch_block(thread) SymbolValue(CURRENT_CATCH_BLOCK,thread)
+#define set_current_catch_block(thread, val) \
+   SetSymbolValue(CURRENT_CATCH_BLOCK, val, thread)
+#define set_current_uwp_block(thread, val) \
+   SetSymbolValue(CURRENT_UNWIND_PROTECT_BLOCK, val, thread)
+#else
+#define get_current_catch_block(thread) thread->current_catch_block
+#define set_current_catch_block(thread, val) thread->current_catch_block = val
+#define set_current_uwp_block(thread, val) thread->current_unwind_protect_block = val
+#endif
+
 #if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_GCC_TLS)
 extern __thread struct thread *current_thread;
 #endif

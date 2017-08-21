@@ -149,15 +149,15 @@
     #!+immobile-space *immobile-freelist*
 
     ;; things needed for non-local-exit
-    *current-catch-block*
-    *current-unwind-protect-block*
+    #!-(and x86-64 sb-thread) *current-catch-block* ; a thread slot otherwise
+    #!-(and x86-64 sb-thread) *current-unwind-protect-block* ; ditto
 
     #!+hpux *c-lra*
 
     ;; stack pointers
-    *binding-stack-start*
-    *control-stack-start*
-    *control-stack-end*
+    #!-sb-thread *binding-stack-start* ; a thread slot if #!+sb-thread
+    #!-sb-thread *control-stack-start* ; ditto
+    #!-sb-thread *control-stack-end*   ; ditto
 
     ;; interrupt handling
     *alloc-signal*
