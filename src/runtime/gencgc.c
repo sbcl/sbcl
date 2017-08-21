@@ -894,9 +894,9 @@ gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *all
 
     /* we can do this after releasing free_pages_lock */
     if (gencgc_zero_check) {
-        word_t *p;
-        for (p = (word_t *)alloc_region->start_addr;
-             p < (word_t *)alloc_region->end_addr; p++) {
+        lispobj *p;
+        for (p = alloc_region->start_addr;
+             p < alloc_region->end_addr; p++) {
             if (*p != 0) {
                 lose("The new region is not zero at %p (start=%p, end=%p).\n",
                      p, alloc_region->start_addr, alloc_region->end_addr);
@@ -1429,7 +1429,7 @@ gc_alloc_with_region(sword_t nbytes,int page_type_flag, struct alloc_region *my_
  * Bignums and vectors may have shrunk. If the object is not copied
  * the space needs to be reclaimed, and the page_tables corrected. */
 static lispobj
-general_copy_large_object(lispobj object, word_t nwords, boolean boxedp)
+general_copy_large_object(lispobj object, sword_t nwords, boolean boxedp)
 {
     lispobj *new;
     page_index_t first_page;

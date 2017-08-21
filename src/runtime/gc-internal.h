@@ -142,7 +142,7 @@ gc_general_alloc(sword_t nbytes, int page_type_flag, int quick_p)
     return gc_alloc_with_region(nbytes, page_type_flag, my_region, quick_p);
 }
 #else
-extern void *gc_general_alloc(word_t nbytes,int page_type_flag,int quick_p);
+extern void *gc_general_alloc(sword_t nbytes,int page_type_flag,int quick_p);
 #endif
 
 #define CHECK_COPY_PRECONDITIONS(object, nwords) \

@@ -708,7 +708,7 @@ load_core_file(char *file, os_vm_offset_t file_offset)
 {
     void *header;
 #ifndef LISP_FEATURE_ALPHA
-    word_t val, *ptr;
+    uword_t val, *ptr;
 #else
     u32 val, *ptr;
 #endif
@@ -743,6 +743,7 @@ load_core_file(char *file, os_vm_offset_t file_offset)
     }
     SHOW("found CORE_MAGIC");
 
+#define WORD_FMTX OS_VM_SIZE_FMTX
     while (val != END_CORE_ENTRY_TYPE_CODE) {
         val = *ptr++;
         len = *ptr++;

@@ -65,7 +65,7 @@ tv_diff(struct timeval *x, struct timeval *y)
 #endif
 
 void *
-gc_general_alloc(word_t bytes, int page_type_flag, int quick_p) {
+gc_general_alloc(sword_t bytes, int page_type_flag, int quick_p) {
     lispobj *new=new_space_free_pointer;
     new_space_free_pointer+=(bytes/N_WORD_BYTES);
     return new;
