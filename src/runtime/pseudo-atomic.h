@@ -182,7 +182,12 @@ clear_pseudo_atomic_interrupted(struct thread *thread)
      = (lispobj*) ((uword_t) dynamic_space_free_pointer | flag_PseudoAtomicInterrupted))
 #endif
 
-#endif
+#else /* CHENEYGC */
+
+#define set_alloc_pointer(value) dynamic_space_free_pointer = (lispobj*)(value)
+#define get_alloc_pointer() (dynamic_space_free_pointer)
+
+#endif /* defined(LISP_FEATURE_GENCGC) */
 
 #if defined LISP_FEATURE_ARM || defined LISP_FEATURE_ARM64
 #define set_alloc_pointer(value)                \
