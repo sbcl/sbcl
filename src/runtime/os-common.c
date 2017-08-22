@@ -176,10 +176,9 @@ void os_link_runtime()
     for (j = 0 ; j < n ; ++j)
     {
         lispobj item = symbols->data[j];
-        symbol_name = CONS(item)->car;
-        datap = CONS(item)->cdr != NIL;
-        namechars = (void*)(intptr_t)
-            (VECTOR(symbol_name)->data);
+        datap = lowtag_of(item) == LIST_POINTER_LOWTAG;
+        symbol_name = datap ? CONS(item)->car : item;
+        namechars = (void*)(intptr_t)(VECTOR(symbol_name)->data);
         result = os_dlsym_default(namechars);
         odxprint(runtime_link, "linking %s => %p", namechars, result);
 

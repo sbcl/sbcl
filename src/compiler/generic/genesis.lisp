@@ -2159,20 +2159,13 @@ core and return a descriptor to it."
                   kind :static-call))))
 
 #!+sb-dynamic-core
-(progn
-  (defparameter *dyncore-address* sb!vm::linkage-table-space-start)
-  (defparameter *dyncore-linkage-keys* nil)
-  (defparameter *dyncore-table* (make-hash-table :test 'equal))
-
-  (defun dyncore-note-symbol (symbol-name datap)
-    "Register a symbol and return its address in proto-linkage-table."
-    (let ((key (cons symbol-name datap)))
-      (symbol-macrolet ((entry (gethash key *dyncore-table*)))
-        (or entry
-            (setf entry
-                  (prog1 *dyncore-address*
-                    (push key *dyncore-linkage-keys*)
-                    (incf *dyncore-address* sb!vm::linkage-table-entry-size))))))))
+(defun dyncore-note-symbol (symbol-name datap)
+  "Register a symbol and return its address in proto-linkage-table."
+  (+ sb!vm:linkage-table-space-start
+     (* sb!vm:linkage-table-entry-size
+        (ensure-gethash (if datap (list symbol-name) symbol-name)
+                        *cold-foreign-symbol-table*
+                        (hash-table-count *cold-foreign-symbol-table*)))))
 
 ;;; *COLD-FOREIGN-SYMBOL-TABLE* becomes *!INITIAL-FOREIGN-SYMBOLS* in
 ;;; the core. When the core is loaded, !LOADER-COLD-INIT uses this to
@@ -2182,18 +2175,19 @@ core and return a descriptor to it."
   (flet ((to-core (list transducer target-symbol)
            (cold-set target-symbol (vector-in-core (mapcar transducer list)))))
     #!-sb-dynamic-core
+    ;; Sort by name
     (to-core (sort (%hash-table-alist *cold-foreign-symbol-table*) #'string< :key #'car)
              (lambda (symbol)
                (cold-cons (set-readonly (base-string-to-core (car symbol)))
                           (number-to-core (cdr symbol))))
              '*!initial-foreign-symbols*)
     #!+sb-dynamic-core
-    ;; Linkage table is recomputed by Lisp, so foreign symbols have to be listed
-    ;; in the proper order, which is the reverse of the currently stored order.
-    (to-core (nreverse *dyncore-linkage-keys*)
-             (lambda (symbol)
-               (cold-cons (set-readonly (base-string-to-core (car symbol)))
-                          (cdr symbol)))
+    ;; Sort by index into linkage table
+    (to-core (sort (%hash-table-alist *cold-foreign-symbol-table*) #'< :key #'cdr)
+             (lambda (pair &aux (key (car pair))
+                                (sym (set-readonly (base-string-to-core
+                                                    (if (listp key) (car key) key)))))
+               (if (listp key) (cold-list sym) sym))
              'sb!vm::+required-runtime-c-symbols+)
     (to-core (sort (copy-list *cold-assembler-routines*) #'string< :key #'car)
              (lambda (rtn)

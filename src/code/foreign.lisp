@@ -133,10 +133,10 @@ if the symbol isn't found."
     (when (<= sb!vm:linkage-table-space-start
               addr
               sb!vm:linkage-table-space-end)
-      (dohash ((name-and-datap table-addr) *linkage-info* :locked t)
-        (when (and (<= table-addr addr)
-                   (< addr (+ table-addr sb!vm:linkage-table-entry-size)))
-          (return-from sap-foreign-symbol (car name-and-datap)))))
+      (dohash ((key table-addr) *linkage-info* :locked t)
+        (let ((datap (listp key)))
+          (when (<= table-addr addr (+ table-addr (1- sb!vm:linkage-table-entry-size)))
+            (return-from sap-foreign-symbol (if datap (car key) key))))))
     #!+os-provides-dladdr
     (with-alien ((info (struct dl-info
                                (filename c-string)

@@ -38,29 +38,26 @@
         (arch-write-linkage-table-ref reloc target)
         (arch-write-linkage-table-jmp reloc target))))
 
-;;; Add the linkage information about a foreign symbol in the
-;;; persistent table, and write the linkage-table entry.
-(defun link-foreign-symbol (name datap)
-  (/show0 "link-foreign-symbol")
-  (let ((table-address (+ (* (hash-table-count *linkage-info*)
-                             sb!vm:linkage-table-entry-size)
-                          sb!vm:linkage-table-space-start))
-        (real-address (ensure-dynamic-foreign-symbol-address name datap)))
-    (aver real-address)
-    (unless (< table-address sb!vm:linkage-table-space-end)
-      (error "Linkage-table full (~D entries): cannot link ~S."
-             (hash-table-count *linkage-info*)
-             name))
-    (write-linkage-table-entry table-address real-address datap)
-    (setf (gethash (cons (logically-readonlyize name) datap) *linkage-info*)
-          table-address)))
-
 ;;; Add a foreign linkage entry if none exists, return the address
 ;;; in the linkage table.
 (defun ensure-foreign-symbol-linkage (name datap)
-  (with-locked-system-table (*linkage-info*)
-    (or (gethash (cons name datap) *linkage-info*)
-        (link-foreign-symbol name datap))))
+  (let ((key (if datap (list name) name))
+        (ht *linkage-info*))
+    (or (with-locked-system-table (ht)
+          (or (gethash key ht)
+              (let ((real-address
+                     (ensure-dynamic-foreign-symbol-address name datap)))
+                (aver real-address)
+                (let ((table-address
+                       (+ (* (hash-table-count ht) sb!vm:linkage-table-entry-size)
+                          sb!vm:linkage-table-space-start)))
+                  (when (< table-address sb!vm:linkage-table-space-end)
+                    (write-linkage-table-entry table-address real-address datap)
+                    (let ((str (logically-readonlyize name)))
+                      (setf (gethash (if datap (list str) str) ht)
+                            table-address)))))))
+        (error "Linkage-table full (~D entries): cannot link ~S."
+               (hash-table-count ht) name))))
 
 ;;; Update the linkage-table. Called during initialization after all
 ;;; shared libraries have been reopened, and after a previously loaded
@@ -69,9 +66,9 @@
 ;;; FIXME: Should figure out how to write only those entries that need
 ;;; updating.
 (defun update-linkage-table ()
-  (dohash ((name-and-datap table-address) *linkage-info* :locked t)
-    (let* ((name (car name-and-datap))
-           (datap (cdr name-and-datap))
+  (dohash ((key table-address) *linkage-info* :locked t)
+    (let* ((datap (listp key))
+           (name (if datap (car key) key))
            (real-address
             (ensure-dynamic-foreign-symbol-address name datap)))
       (aver (and table-address real-address))

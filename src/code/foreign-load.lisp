@@ -170,6 +170,7 @@ Experimental."
   #!-hpux
   (dlclose-or-lose))
 
+;;; These tables are synchronized by the lock on *LINKAGE-INFO*
 (let ((symbols (make-hash-table :test #'equal))
       (undefineds (make-hash-table :test #'equal)))
   (defun ensure-dynamic-foreign-symbol-address (symbol &optional datap)
