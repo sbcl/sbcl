@@ -740,7 +740,7 @@ load_core_file(char *file, os_vm_offset_t file_offset)
     SHOW("found CORE_MAGIC");
 
 #define WORD_FMTX OS_VM_SIZE_FMTX
-    while (val != END_CORE_ENTRY_TYPE_CODE) {
+    for ( ; val != END_CORE_ENTRY_TYPE_CODE ; ptr += remaining_len) {
         val = *ptr++;
         len = *ptr++;
         remaining_len = len - 2; /* (-2 to cancel the two ++ operations) */
@@ -756,20 +756,11 @@ load_core_file(char *file, os_vm_offset_t file_offset)
         case BUILD_ID_CORE_ENTRY_TYPE_CODE:
             SHOW("BUILD_ID_CORE_ENTRY_TYPE_CODE case");
             {
-                os_vm_size_t i;
-
-                FSHOW((stderr, "build_id[]=\"%s\"\n", build_id));
-                FSHOW((stderr, "remaining_len = %d\n", remaining_len));
-                if (remaining_len != strlen((const char *)build_id))
-                    goto losing_build_id;
-                for (i = 0; i < remaining_len; ++i) {
-                    FSHOW((stderr, "ptr[%d] = char = %d, expected=%d\n",
-                           i, ptr[i], build_id[i]));
-                    if (ptr[i] != build_id[i])
-                        goto losing_build_id;
-                }
-                break;
-            losing_build_id:
+                os_vm_size_t stringlen = *ptr++;
+                --remaining_len;
+                gc_assert(remaining_len * sizeof (core_entry_elt_t) >= stringlen);
+                if (sizeof build_id == stringlen+1 && !memcmp(ptr, build_id, stringlen))
+                    break;
                 /* .core files are not binary-compatible between
                  * builds because we can't easily detect whether the
                  * sources were patched between the time the
@@ -779,10 +770,9 @@ load_core_file(char *file, os_vm_offset_t file_offset)
                  * (We could easily detect whether version.lisp-expr
                  * was changed, but people experimenting with patches
                  * don't necessarily update version.lisp-expr.) */
-
-                fprintf(stderr, "core was built for runtime '");
-                for (i = 0; i < remaining_len; ++i) putc(ptr[i], stderr);
-                fprintf(stderr, "' but this is '%s'\n", build_id);
+                fprintf(stderr,
+                        "core was built for runtime \"%.*s\" but this is \"%s\"\n",
+                        (int)stringlen, (char*)ptr, build_id);
                 lose("can't load .core for different runtime, sorry\n");
             }
 
@@ -850,9 +840,6 @@ load_core_file(char *file, os_vm_offset_t file_offset)
         default:
             lose("unknown core file entry: 0x%"WORD_FMTX"\n", val);
         }
-
-        ptr += remaining_len;
-        FSHOW((stderr, "/new ptr=0x%"WORD_FMTX"\n", ptr));
     }
     SHOW("about to free(header)");
     free(header);

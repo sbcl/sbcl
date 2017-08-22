@@ -44,6 +44,8 @@
 # include <zlib.h>
 #endif
 
+#define GENERAL_WRITE_FAILURE_MSG "error writing to core file"
+
 /* write_runtime_options uses a simple serialization scheme that
  * consists of one word of magic, one word indicating whether options
  * are actually saved, and one word per struct field. */
@@ -72,7 +74,7 @@ static void
 write_lispobj(lispobj obj, FILE *file)
 {
     if (1 != fwrite(&obj, sizeof(lispobj), 1, file)) {
-        perror("Error writing to file");
+        perror(GENERAL_WRITE_FAILURE_MSG);
     }
 }
 
@@ -87,7 +89,7 @@ write_bytes_to_file(FILE * file, char *addr, long bytes, int compression)
                 addr += count;
             }
             else {
-                perror("error writing to core file");
+                perror(GENERAL_WRITE_FAILURE_MSG);
                 lose("core file is incomplete or corrupt\n");
             }
         }
@@ -120,7 +122,7 @@ write_bytes_to_file(FILE * file, char *addr, long bytes, int compression)
                 if (count > 0) {
                     written += count;
                 } else {
-                    perror("error writing to core file");
+                    perror(GENERAL_WRITE_FAILURE_MSG);
                     lose("core file is incomplete or corrupt\n");
                 }
             }
@@ -140,7 +142,7 @@ write_bytes_to_file(FILE * file, char *addr, long bytes, int compression)
     }
 
     if (fflush(file) != 0) {
-      perror("error writing to core file");
+      perror(GENERAL_WRITE_FAILURE_MSG);
       lose("core file is incomplete or corrupt\n");
     }
 };
@@ -289,17 +291,20 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     core_start_pos = ftell(file);
     write_lispobj(CORE_MAGIC, file);
 
+    int stringlen = strlen((const char *)build_id);
+    int string_words = CEILING(stringlen, sizeof (core_entry_elt_t))
+        / sizeof (core_entry_elt_t);
+    int pad = string_words * sizeof (core_entry_elt_t) - stringlen;
+    /* Write 3 word entry header: a word for entry-type-code, a word for
+     * the total length in words, and a word for the string length */
     write_lispobj(BUILD_ID_CORE_ENTRY_TYPE_CODE, file);
-    write_lispobj(/* (We're writing the word count of the entry here, and the 2
-          * term is one word for the leading BUILD_ID_CORE_ENTRY_TYPE_CODE
-          * word and one word where we store the count itself.) */
-         2 + strlen((const char *)build_id),
-         file);
-    {
-        unsigned char *p;
-        for (p = (unsigned char *)build_id; *p; ++p)
-            write_lispobj(*p, file);
-    }
+    write_lispobj(3 + string_words, file);
+    write_lispobj(stringlen, file);
+    int nwrote = fwrite(build_id, 1, stringlen, file);
+    /* Write padding bytes to align to core_entry_elt_t */
+    while (pad--) nwrote += (fputc(0xff, file) != EOF);
+    if (nwrote != (int)(sizeof (core_entry_elt_t) * string_words))
+        perror(GENERAL_WRITE_FAILURE_MSG);
 
     write_lispobj(NEW_DIRECTORY_CORE_ENTRY_TYPE_CODE, file);
     write_lispobj(/* (word count = N spaces described by 5 words each, plus the

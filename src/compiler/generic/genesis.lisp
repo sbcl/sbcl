@@ -3484,19 +3484,16 @@ initially undefined function references:~2%")
       (write-word core-magic)
 
       ;; Write the build ID.
-      (write-word build-id-core-entry-type-code)
-      (let ((build-id (with-open-file (s "output/build-id.tmp")
-                        (read s))))
+      (binding* ((build-id (with-open-file (s "output/build-id.tmp") (read s)))
+                 ((nwords padding) (ceiling (length build-id) sb!vm:n-word-bytes)))
         (declare (type simple-string build-id))
-        (/show build-id (length build-id))
-        ;; Write length of build ID record: BUILD-ID-CORE-ENTRY-TYPE-CODE
-        ;; word, this length word, and one word for each char of BUILD-ID.
-        (write-word (+ 2 (length build-id)))
-        (dovector (char build-id)
-          ;; (We write each character as a word in order to avoid
-          ;; having to think about word alignment issues in the
-          ;; sbcl-0.7.8 version of coreparse.c.)
-          (write-word (sb!xc:char-code char))))
+        ;; Write BUILD-ID-CORE-ENTRY-TYPE-CODE, the length of the header,
+        ;; length of the string, then base string chars + maybe padding.
+        (write-word build-id-core-entry-type-code)
+        (write-word (+ 3 nwords)) ; 3 = fixed overhead including this word
+        (write-word (length build-id))
+        (dovector (char build-id) (write-byte (sb!xc:char-code char) *core-file*))
+        (dotimes (j (- padding)) (write-byte #xff *core-file*)))
 
       ;; Write the New Directory entry header.
       (write-word new-directory-core-entry-type-code)
