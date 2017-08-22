@@ -464,8 +464,6 @@
 (declaim (special *!cold-toplevels* *!cold-defconstants*
                   *!cold-defuns* *cold-methods*))
 
-;;; foreign symbol references
-(defparameter *cold-foreign-undefined-symbols* nil)
 
 ;;;; miscellaneous stuff to read and write the core memory
 
@@ -1966,6 +1964,7 @@ core and return a descriptor to it."
 
 ;; Read the sbcl.nm file to find the addresses for foreign-symbols in
 ;; the C runtime.
+#!-sb-dynamic-core
 (defun load-cold-foreign-symbol-table (filename)
   (/show "load-cold-foreign-symbol-table" filename)
   (with-open-file (file filename)
@@ -2033,6 +2032,7 @@ core and return a descriptor to it."
                               value)))))))))
   (values))     ;; PROGN
 
+#!-sb-dynamic-core
 (defun cold-foreign-symbol-address (name)
   (declare (ignorable name))
   #!+crossbuild-test #xf00fa8 ; any random 4-octet-aligned value should do
@@ -2777,17 +2777,13 @@ core and return a descriptor to it."
   (let* ((kind (pop-stack))
          (code-object (pop-stack))
          (len (read-byte-arg (fasl-input-stream)))
-         (sym (make-string len)))
-    (read-string-as-bytes (fasl-input-stream) sym)
-    #!+sb-dynamic-core
-    (let ((offset (read-word-arg (fasl-input-stream)))
-          (value (dyncore-note-symbol sym nil)))
-      (cold-fixup code-object offset value kind :foreign)) ; and re-push code-object
-    #!- (and) (format t "Bad non-plt fixup: ~S~S~%" sym code-object)
-    #!-sb-dynamic-core
-    (let ((offset (read-word-arg (fasl-input-stream)))
-          (value (cold-foreign-symbol-address sym)))
-      (cold-fixup code-object offset value kind :foreign)))) ; and re-push code-object
+         (sym (make-string len))
+         (dummy (read-string-as-bytes (fasl-input-stream) sym))
+         (offset (read-word-arg (fasl-input-stream)))
+         (value #!+sb-dynamic-core (dyncore-note-symbol sym nil)
+                #!-sb-dynamic-core (cold-foreign-symbol-address sym)))
+    (declare (ignore dummy))
+    (cold-fixup code-object offset value kind :foreign))) ; and re-push code-object
 
 #!+linkage-table
 (define-cold-fop (fop-foreign-dataref-fixup)
