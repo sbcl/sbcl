@@ -16,6 +16,8 @@
 
 #define COMPRESSION_LEVEL_NONE INT_MIN
 
+void do_destructive_cleanup_before_save(lispobj init_function);
+
 extern FILE* open_core_for_saving(char *filename);
 extern void *load_runtime(char *runtime_path, size_t *size_out);
 extern FILE *prepare_to_save(char *filename, boolean prepend_runtime, void **runtime_bytes, size_t *runtime_size);

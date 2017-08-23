@@ -40,6 +40,14 @@
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
 
+#ifdef LISP_FEATURE_GENCGC
+# include "gencgc.h"
+#endif
+
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+# include "marknsweepgc.h"
+#endif
+
 #ifdef LISP_FEATURE_SB_CORE_COMPRESSION
 # include <zlib.h>
 #endif
@@ -224,25 +232,9 @@ open_core_for_saving(char *filename)
     return fopen(filename, "wb");
 }
 
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-extern void prepare_immobile_space_for_save();
-#  define N_SPACES_TO_SAVE 5
-#  ifdef LISP_FEATURE_IMMOBILE_CODE
-lispobj code_component_order;
-extern void defrag_immobile_space(lispobj,boolean);
-#  endif
-#else
-#  define N_SPACES_TO_SAVE 3
-#endif
-boolean
-save_to_filehandle(FILE *file, char *filename, lispobj init_function,
-                   boolean make_executable,
-                   boolean save_runtime_options,
-                   int core_compression_level)
-{
+void
+smash_enclosing_state(boolean verbose) {
     struct thread *th = all_threads;
-    os_vm_offset_t core_start_pos;
-    boolean verbose = !lisp_startup_options.noinform;
 
     // Since SB-IMPL::DEINIT already checked for exactly 1 thread,
     // losing here probably can't happen.
@@ -264,22 +256,26 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     write_TLS(CURRENT_CATCH_BLOCK, 0, th); // If set to 0 on start, why here too?
     write_TLS(CURRENT_UNWIND_PROTECT_BLOCK, 0, th);
     if (verbose) printf("done]\n");
-#ifdef LISP_FEATURE_IMMOBILE_CODE
-    // It's better to wait to defrag until after the binding stack is undone,
-    // because we explicitly don't fixup code refs from stacks.
-    // i.e. if there *were* something on the binding stack that cared that code
-    // moved, it would be wrong. This way we can be sure we don't care.
-    if (code_component_order) {
-        // Assert that defrag will not move the init_function
-        gc_assert(!immobile_space_p(init_function));
-        if (verbose) {
-            printf("[defragmenting immobile space... ");
-            fflush(stdout);
-        }
-        defrag_immobile_space(code_component_order, verbose);
-        if (verbose) printf("done]\n");
-    }
+}
+
+void
+do_destructive_cleanup_before_save(lispobj init_function)
+{
+    boolean verbose = !lisp_startup_options.noinform;
+    // Preparing to save.
+    smash_enclosing_state(verbose);
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    prepare_immobile_space_for_save(init_function, verbose);
 #endif
+}
+
+boolean
+save_to_filehandle(FILE *file, char *filename, lispobj init_function,
+                   boolean make_executable,
+                   boolean save_runtime_options,
+                   int core_compression_level)
+{
+    boolean verbose = !lisp_startup_options.noinform;
 
     /* (Now we can actually start copying ourselves into the output file.) */
 
@@ -288,7 +284,7 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
         fflush(stdout);
     }
 
-    core_start_pos = ftell(file);
+    os_vm_offset_t core_start_pos = ftell(file);
     write_lispobj(CORE_MAGIC, file);
 
     int stringlen = strlen((const char *)build_id);
@@ -309,7 +305,7 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     write_lispobj(NEW_DIRECTORY_CORE_ENTRY_TYPE_CODE, file);
     write_lispobj(/* (word count = N spaces described by 5 words each, plus the
           * entry type code, plus this count itself) */
-         (5*N_SPACES_TO_SAVE)+2, file);
+         (5 * MAX_CORE_SPACE_ID) + 2, file);
     output_space(file,
                  READ_ONLY_CORE_SPACE_ID,
                  (lispobj *)READ_ONLY_SPACE_START,
@@ -325,10 +321,9 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
 #ifdef LISP_FEATURE_GENCGC
     /* Flush the current_region, updating the tables. */
     gc_alloc_update_all_page_tables(1);
-    update_dynamic_space_free_pointer();
+    gc_assert(get_alloc_pointer() == (lispobj*)(page_address(find_last_free_page())));
 #endif
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    prepare_immobile_space_for_save();
     output_space(file,
                  IMMOBILE_FIXEDOBJ_CORE_SPACE_ID,
                  (lispobj *)IMMOBILE_SPACE_START,
@@ -417,7 +412,6 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     if (verbose) printf("done]\n");
     exit(0);
 }
-#undef N_SPACES_TO_SAVE
 
 /* Check if the build_id for the current runtime is present in a
  * buffer. */
@@ -590,6 +584,7 @@ save(char *filename, lispobj init_function, boolean prepend_runtime,
     if (prepend_runtime)
         save_runtime_to_filehandle(file, runtime_bytes, runtime_size, application_type);
 
+    do_destructive_cleanup_before_save(init_function);
     return save_to_filehandle(file, filename, init_function, prepend_runtime,
                               save_runtime_options,
                               compressed ? compressed : COMPRESSION_LEVEL_NONE);

@@ -3623,9 +3623,8 @@ maybe_verify:
     }
 }
 
-/* Update last_free_page, then SymbolValue(ALLOCATION_POINTER). */
-sword_t
-update_dynamic_space_free_pointer(void)
+page_index_t
+find_last_free_page(void)
 {
     page_index_t last_page = -1, i;
 
@@ -3633,10 +3632,14 @@ update_dynamic_space_free_pointer(void)
         if (page_bytes_used(i) != 0)
             last_page = i;
 
-    last_free_page = last_page+1;
+    /* The last free page is actually the first available page */
+    return last_page + 1;
+}
 
-    set_alloc_pointer((lispobj)(page_address(last_free_page)));
-    return 0; /* dummy value: return something ... */
+void
+update_dynamic_space_free_pointer(void)
+{
+    set_alloc_pointer((lispobj)(page_address(find_last_free_page())));
 }
 
 static void
@@ -4494,6 +4497,8 @@ gc_and_save(char *filename, boolean prepend_runtime,
 
     /* The dumper doesn't know that pages need to be zeroed before use. */
     zero_all_free_pages();
+    do_destructive_cleanup_before_save(lisp_init_function);
+
     save_to_filehandle(file, filename, lisp_init_function,
                        prepend_runtime, save_runtime_options,
                        compressed ? compression_level : COMPRESSION_LEVEL_NONE);

@@ -52,6 +52,7 @@
 #include "forwarding-ptr.h"
 #include "pseudo-atomic.h"
 #include "var-io.h"
+#include "marknsweepgc.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -71,6 +72,8 @@ FILE * logfile;
 #else
 #  define dprintf(arg)
 #endif
+
+void defrag_immobile_space(int* components, boolean verbose);
 
 unsigned asm_routines_end;
 
@@ -1340,12 +1343,14 @@ void prepare_immobile_space_for_final_gc()
     }
 }
 
+int* code_component_order;
+
 // Now once again promote all objects to pseudo-static just prior to save.
 // 'coreparse' makes all pages in regular dynamic space pseudo-static.
 // But since immobile objects store their generation, it must be done at save,
 // or else it would have to be done on image restart
 // which would require writing to a lot of pages for no reason.
-void prepare_immobile_space_for_save()
+void prepare_immobile_space_for_save(lispobj init_function, boolean verbose)
 {
     // Don't use the page attributes now - defrag doesn't update them.
     lispobj* obj = (lispobj*)IMMOBILE_SPACE_START;
@@ -1369,6 +1374,21 @@ void prepare_immobile_space_for_save()
                    (nwords * N_WORD_BYTES) - offsetof(struct code, constants));
         } else
             assign_generation(obj, PSEUDO_STATIC_GENERATION);
+    }
+
+    // It's better to wait to defrag until after the binding stack is undone,
+    // because we explicitly don't fixup code refs from stacks.
+    // i.e. if there *were* something on the binding stack that cared that code
+    // moved, it would be wrong. This way we can be sure we don't care.
+    if (code_component_order) {
+        // Assert that defrag will not move the init_function
+        gc_assert(!immobile_space_p(init_function));
+        if (verbose) {
+            printf("[defragmenting immobile space... ");
+            fflush(stdout);
+        }
+        defrag_immobile_space(code_component_order, verbose);
+        if (verbose) printf("done]\n");
     }
 }
 

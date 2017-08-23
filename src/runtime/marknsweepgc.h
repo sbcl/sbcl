@@ -9,9 +9,11 @@
  * files for more information.
  */
 
-#ifndef __GENCGC_H__
-#define __GENCGC_H__
+#ifndef _MARKNSWEEPGC_H_
+#define _MARKNSWEEPGC_H_
+#include <limits.h>
+#include "core.h"
 
-page_index_t find_last_free_page(void);
+void prepare_immobile_space_for_save(lispobj init_function, boolean verbose);
 
-#endif /* __GENCGC_H__ */
+#endif // _MARKNSWEEPGC_H_
