@@ -650,7 +650,7 @@
          ;; present in the input X physically.  RLWINM as used below would
          ;; mask these out with 0 even for negative inputs.
          (inst srawi res x phantom-bits)
-         (inst rlwinm res x
+         (inst rlwinm res res
                (mod (- 32 posn (- phantom-bits)) 32)
                (- 32 size n-fixnum-tag-bits)
                (- 31 n-fixnum-tag-bits)))

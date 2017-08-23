@@ -6535,3 +6535,10 @@
     (test '(cons 1 . 2))
     (test '((lambda (x) x) . 1))
     (test '(let () . 1))))
+
+(with-test (:name :ldb-rlwinm)
+  (assert (= (funcall (checked-compile `(lambda (x)
+                                          (declare (fixnum x))
+                                          (ldb (byte 13 19) x)))
+                      -3560597)
+             8185)))
