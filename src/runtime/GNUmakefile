@@ -113,8 +113,9 @@ sbcl.h: $(wildcard genesis/*.h)
 
 # || true because we don't want the build to break if etags isn't there.
 # ...but it's still nice to have it done by default.
-TAGS tags: $(SRCS)
-	etags $(SRCS) || true
+HEADERS=$(wildcard *.h genesis/*.h)
+TAGS tags: $(SRCS) $(HEADERS)
+	etags $(SRCS) $(HEADERS) || true
 
 clean:
 	-rm -f *.[do] $(TARGET) sbcl.nm sbcl.h core *.tmp $(OS_CLEAN_FILES)
