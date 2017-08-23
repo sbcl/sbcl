@@ -3812,7 +3812,12 @@ void gc_allocate_ptes()
      * the page structures correctly. There used to be a separate
      * initialization loop (now commented out; see below) but that was
      * unnecessary and did hurt startup time. */
-    page_table = calloc(page_table_pages, sizeof(struct page));
+    printf("Will alloc 50000 page table entries\n");
+    page_table = calloc(50000, sizeof(struct page));
+    gc_assert(page_table);
+    free(page_table);
+    printf("Will alloc %d bytes for %d page tables\n", page_table_pages * sizeof(struct page), page_table_pages);
+    page_table = os_allocate(page_table_pages * sizeof(struct page));
     gc_assert(page_table);
 
     hopscotch_init();

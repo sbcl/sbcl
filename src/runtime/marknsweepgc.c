@@ -1256,6 +1256,7 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
     low_page_index_t last_page = 0;
     // coreparse() already set immobile_space_free_pointer
     lispobj* limit = immobile_space_free_pointer;
+    printf("limit=0x%x space_limit=0x%x\n", limit, space_limit);
     gc_assert(limit != 0 /* would be zero if not mmapped yet */
               && limit <= space_limit);
     for ( ; obj < limit ; obj += n_words ) {
