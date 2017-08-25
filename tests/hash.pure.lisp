@@ -130,3 +130,11 @@
                      (complex sb-ext:single-float-negative-infinity 0)
                      (complex sb-ext:double-float-negative-infinity 0)))
       (assert (eql (gethash v table) -1)))))
+
+(with-test (:name (:hash equalp pathname))
+  (let* ((map (make-hash-table :test 'equalp))
+	 (key  #P"some/path/"))
+    (setf (gethash key map) "my-value")
+    (format (make-broadcast-stream) "Printing: ~A~%" key)
+    (assert (remhash key map))
+    (assert (= 0 (hash-table-count map)))))

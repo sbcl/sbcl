@@ -22,6 +22,8 @@ changes relative to sbcl-1.3.20:
     instead of :FOREIGN for objects in immobile space.
   * bug fix: dotted lists in special forms and function call forms signal
     an appropriate error
+  * bug fix: EQUALP hash tables with pathname keys now ignore internal slots.
+    (lp#1712944, reported by Jason Miller)
 
 changes in sbcl-1.3.20 relative to sbcl-1.3.19:
   * minor incompatible change: DEF{GENERIC,METHOD} no longer accept some

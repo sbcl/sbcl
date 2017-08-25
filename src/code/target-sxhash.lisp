@@ -363,6 +363,7 @@
   (typecase key
     (array (array-psxhash key depthoid))
     (hash-table (hash-table-psxhash key))
+    (pathname (sxhash key))
     (structure-object (structure-object-psxhash key depthoid))
     (cons (list-psxhash key depthoid))
     (number (number-psxhash key))
