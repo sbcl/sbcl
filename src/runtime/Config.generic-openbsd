@@ -16,3 +16,10 @@ ifdef LISP_FEATURE_SB_THREAD
 CFLAGS += -pthread
 OS_LIBS += -pthread
 endif
+
+ifneq ($(shell $(CC) -dM -E - < /dev/null 2>/dev/null | grep -e '__clang__'),)
+CFLAGS += -fno-pie
+LINKFLAGS += -Wl,-nopie
+LDFLAGS += -nopie
+__LDFLAGS__ += -nopie
+endif
