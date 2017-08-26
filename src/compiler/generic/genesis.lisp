@@ -1667,8 +1667,9 @@ core and return a descriptor to it."
 ;;; Establish initial values for magic symbols.
 ;;;
 (defun finish-symbols ()
-  (cold-set 'sb!vm::*current-catch-block*          (make-fixnum-descriptor 0))
-  (cold-set 'sb!vm::*current-unwind-protect-block* (make-fixnum-descriptor 0))
+  #!+sb-thread
+  (progn (ensure-symbol-tls-index 'sb!vm::*current-catch-block*)
+         (ensure-symbol-tls-index 'sb!vm::*current-unwind-protect-block*))
 
   (cold-set '*free-interrupt-context-index* (make-fixnum-descriptor 0))
 
