@@ -242,7 +242,7 @@ static inline lispobj FdefnFun(lispobj fdefn)
 #ifdef CURRENT_CATCH_BLOCK
 #define get_current_catch_block(thread) SymbolValue(CURRENT_CATCH_BLOCK,thread)
 /* Using per_thread_value here rather than SetSymbolValue assigns into TLS
- * despite the thread-local value being NO_TLS _VALUE prior to assignment. */
+ * despite the thread-local value being NO_TLS_VALUE prior to assignment. */
 #define set_current_catch_block(thread, val) \
    per_thread_value(SYMBOL(CURRENT_CATCH_BLOCK),thread) = val
 #define set_current_uwp_block(thread, val) \

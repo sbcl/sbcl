@@ -133,7 +133,7 @@
 
 (with-test (:name (:hash equalp pathname))
   (let* ((map (make-hash-table :test 'equalp))
-	 (key  #P"some/path/"))
+         (key  #P"some/path/"))
     (setf (gethash key map) "my-value")
     (format (make-broadcast-stream) "Printing: ~A~%" key)
     (assert (remhash key map))
