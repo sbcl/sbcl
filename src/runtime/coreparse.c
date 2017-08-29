@@ -291,63 +291,6 @@ static void inflate_core_bytes(int fd, os_vm_offset_t offset,
 static lispobj expected_range_start, expected_range_end;
 static sword_t heap_adjustment;
 
-/* Define this in CFLAGS as 1 to deliberately mess up the mapped address */
-#ifndef MOCK_MMAP_FAILURE
-#define MOCK_MMAP_FAILURE 0
-#endif
-
-#if !MOCK_MMAP_FAILURE
-#define maybe_fuzz_address(x) x
-#else
-/// "Pseudo-randomly" alter requested address for testing purposes so that
-/// we can test interesting scenarios such as:
-///  - partially overlapping ranges for the desired and actual space
-///  - aligned to OS page but misaligned for GC card
-#define maybe_fuzz_address(x) fuzz_address(x)
-#include <time.h>
-#include <stdio.h>
-#include <stdlib.h>
-uword_t fuzz_address(uword_t addr)
-{
-    char * pathname;
-    FILE * f;
-    char line[100];
-    int line_number, i;
-
-    if ((pathname = getenv("SBCL_FAKE_MMAP_INSTRUCTION_FILE")) == NULL) {
-        fprintf(stderr, "WARNING: image built with MOCK_MMAP_FAILURE\n");
-        fprintf(stderr, "         but no mock configuration data found.\n");
-        exit(1);
-    }
-    if ((f = fopen(pathname, "r+")) == NULL) {
-        // If the file can't be found, don't silently ignore it,
-        // because if the relocator "worked" you don't want to get all happy
-        // that it worked only to find that it didn't actually perform relocation.
-        fprintf(stderr, "Could not read 'fakemap' file\n");
-        exit(1);
-    }
-    ignore_value(fgets(line, sizeof line, f));
-    line_number = atoi(line);
-    uword_t result = 0;
-    for (i = 0 ; i <= line_number ; ++i) {
-        boolean ok;
-        ok = fgets(line, sizeof line, f) != NULL && line[0] != '\n';
-        if (i == line_number - 1)
-            result = strtol(line, 0, 16);
-        if (!ok) {
-            // fprintf(stderr, "*** Rewinding fake mmap instructions\n");
-            line_number = 0;
-            break;
-        }
-    }
-    rewind(f);
-    fprintf(f, "%02d", 1+line_number);
-    fclose(f);
-    fprintf(stderr, "//dynamic space @ %p\n", (void*)result);
-    return result;
-}
-#endif
-
 static inline boolean needs_adjusting(lispobj x)
 {
   return (expected_range_start <= x && x < expected_range_end);
@@ -621,7 +564,7 @@ process_directory(int count, struct ndir_entry *entry,
             if (fail)
                 lose("core/runtime address mismatch: %s_SPACE_START", names[id-1]);
         }
-        spaces[id].base = (uword_t)addr;
+        spaces[id].base = addr;
         uword_t len = os_vm_page_size * entry->page_count;
         spaces[id].len = len;
         if (id == DYNAMIC_CORE_SPACE_ID && len > dynamic_space_size) {
@@ -634,8 +577,7 @@ process_directory(int count, struct ndir_entry *entry,
 #ifdef LISP_FEATURE_RELOCATABLE_HEAP
             // Try to map at address requested by the core file.
             if (id == DYNAMIC_CORE_SPACE_ID) {
-                addr = (uword_t)os_validate(MOVABLE,
-                                            (os_vm_address_t)maybe_fuzz_address(addr),
+                addr = (uword_t)os_validate(MOVABLE, (os_vm_address_t)addr,
                                             dynamic_space_size);
                 aligned_start = CEILING(addr, GENCGC_CARD_BYTES);
                 /* Misalignment can happen only if card size exceeds OS page.
