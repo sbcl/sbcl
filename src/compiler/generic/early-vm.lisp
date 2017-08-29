@@ -82,11 +82,11 @@
   (max (- (expt 2 double-float-digits)) sb!xc:most-negative-fixnum))
 
 ;;;; Point where continuous area starting at dynamic-space-start bumps into
-;;;; next space.
-#!+gencgc
+;;;; next space. Computed for genesis/constants.h, not used in Lisp.
+#!+(and gencgc (host-feature sb-xc-host))
 (defconstant max-dynamic-space-end
     (let ((stop (1- (ash 1 n-word-bits)))
-          (start default-dynamic-space-start))
+          (start dynamic-space-start))
       (dolist (other-start (list read-only-space-start static-space-start
                                  #!+linkage-table
                                  linkage-table-space-start))

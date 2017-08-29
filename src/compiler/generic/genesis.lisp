@@ -2911,8 +2911,8 @@ core and return a descriptor to it."
       (check sb!vm:read-only-space-start sb!vm:read-only-space-end :read-only)
       (check sb!vm:static-space-start sb!vm:static-space-end :static)
       #!+gencgc
-      (check sb!vm:default-dynamic-space-start
-             (+ sb!vm:default-dynamic-space-start sb!vm:default-dynamic-space-size)
+      (check sb!vm:dynamic-space-start
+             (+ sb!vm:dynamic-space-start sb!vm:default-dynamic-space-size)
              :dynamic)
       #!+immobile-space
       ;; Must be a multiple of 32 because it makes the math a nicer
@@ -3610,7 +3610,7 @@ initially undefined function references:~2%")
                                                sb!vm:immobile-fixedobj-subspace-size)))
            (*dynamic*   (make-gspace :dynamic
                                      dynamic-core-space-id
-                                     #!+gencgc sb!vm:default-dynamic-space-start
+                                     #!+gencgc sb!vm:dynamic-space-start
                                      #!-gencgc sb!vm:dynamic-0-space-start))
            (*nil-descriptor*)
            (*simple-vector-0-descriptor*)

@@ -150,13 +150,12 @@
 
 ;;;; MAP-ALLOCATED-OBJECTS
 
+#!+(and relocatable-heap gencgc)
+(define-alien-variable ("DYNAMIC_SPACE_START" dynamic-space-start) unsigned-long)
 #!-sb-fluid
 (declaim (inline current-dynamic-space-start))
 (defun current-dynamic-space-start ()
-  #!+(and gencgc relocatable-heap)
-  (extern-alien "DYNAMIC_SPACE_START" unsigned-long)
-  #!+(and gencgc (not relocatable-heap))
-  sb!vm:dynamic-space-start
+  #!+gencgc sb!vm:dynamic-space-start
   #!-gencgc (extern-alien "current_dynamic_space" unsigned-long))
 
 #!+(or x86 x86-64)

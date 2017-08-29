@@ -74,6 +74,7 @@
                (small-space-spread #x100000)
                ;; traditional margin between spaces
                (margin-size          #x1000))
+  (declare (ignorable dynamic-space-start*)) ; might be unused in make-host-2
   (let* ((spaces '(read-only static
                    #!+linkage-table linkage-table
                    #!+immobile-space immobile))
@@ -112,8 +113,9 @@
        #!+immobile-space
        (defconstant immobile-fixedobj-subspace-size
          ,(- immobile-space-size immobile-code-space-size))
-       (defconstant default-dynamic-space-start ,(or dynamic-space-start* ptr))
-       #!-relocatable-heap (defconstant dynamic-space-start default-dynamic-space-start)
+       #!+(or (not relocatable-heap) (host-feature sb-xc-host))
+       (#!+relocatable-heap defparameter #!-relocatable-heap defconstant
+            dynamic-space-start ,(or dynamic-space-start* ptr))
        (defconstant default-dynamic-space-size
          (or ,(!read-dynamic-space-size)
              ,default-dynamic-space-size*
