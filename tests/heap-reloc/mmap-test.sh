@@ -7,5 +7,5 @@ LD_PRELOAD=./preload.so ../../run-sbcl.sh \
   --eval '(setf (extern-alien "gencgc_verbose" int) 1)' \
   --eval '(gc :full t)' \
   --eval '(exit)'
+(LD_PRELOAD=`pwd`/preload.so ; cd .. ; ./run-tests.sh core.test.sh)
 rm preload.so
-

@@ -322,7 +322,7 @@ static void fixup_space(lispobj* where, uword_t len)
     lispobj header_word;
     int widetag;
     long nwords;
-    lispobj layout, layout_slots_adjustp, bitmap;
+    lispobj layout, adjusted_layout, bitmap;
     struct code* code;
 
     for ( ; where < end ; where += nwords ) {
@@ -344,23 +344,26 @@ static void fixup_space(lispobj* where, uword_t len)
             //   then the word points to read-only space hence needs no adjustment.
             layout = (widetag == FUNCALLABLE_INSTANCE_WIDETAG) ?
                 fin_layout(where) : instance_layout(where);
-            // Possibly adjust, but do not alter the in-memory value of, this layout.
-            // instance_scan_interleaved() on this instance will actually adjust
-            // the layout slot if needed.
-            bitmap = LAYOUT(adjust_word(layout))->bitmap;
+            adjusted_layout = adjust_word(layout);
+            // Do not alter the layout as stored in the instance if non-compact
+            // header. instance_scan() will do it if necessary.
+#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
+            if (adjusted_layout != layout)
+                // This can't happen yet. Compact headers point to immobile space
+                set_instance_layout(where, adjusted_layout)
+#endif
+            bitmap = LAYOUT(adjusted_layout)->bitmap;
 
-            // If the layout of this instance resides at a higher address
-            // than the instance itself, then the layout's pointer slots were
-            // not fixed up yet. This is true regardless of whether the core
-            // was mapped at a higher or lower address than desired.
-            // i.e. If we haven't yet scanned the layout in this fixup pass, and if
-            // it resides in the expected dynamic space range, then it needs adjusting.
-            layout_slots_adjustp = layout > (lispobj)where && needs_adjusting(layout);
-
-            // If the layout has not itself been adjusted, then its bitmap,
-            // if not a fixnum, needs (nondestructive) adjustment.
-            if (!fixnump(bitmap) && layout_slots_adjustp)
+            // If the post-adjustment address of 'layout' is higher than 'where',
+            // then the layout's pointer slots need adjusting.
+            // This is true regardless of whether the core was mapped at a higher
+            // or lower address than desired.
+            if (is_lisp_pointer(bitmap) && adjusted_layout > (lispobj)where) {
+                // Do not write back the adjusted bitmap pointer. Each heap word
+                // must be touched at most once. When the layout itself gets scanned,
+                // the bitmap slot will be rewritten if needed.
                 bitmap = adjust_word(bitmap);
+            }
 
             instance_scan(adjust_pointers, where+1, nwords-1, bitmap);
             continue;
