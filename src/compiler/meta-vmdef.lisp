@@ -1820,7 +1820,8 @@
     (collect ((clauses))
       (do ((cases forms (rest cases)))
           ((null cases)
-           (clauses `(t (unknown-sc-case ,n-tn))))
+           (clauses `(t (locally (declare (optimize (safety 0))) ;; avoid NIL-FUN-RETURNED-ERROR
+                          (unknown-sc-case ,n-tn)))))
         (let ((case (first cases)))
           (when (atom case)
             (error "illegal SC-CASE clause: ~S" case))
