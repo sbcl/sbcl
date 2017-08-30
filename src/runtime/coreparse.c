@@ -350,7 +350,7 @@ static void fixup_space(lispobj* where, uword_t len)
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
             if (adjusted_layout != layout)
                 // This can't happen yet. Compact headers point to immobile space
-                set_instance_layout(where, adjusted_layout)
+                set_instance_layout(where, adjusted_layout);
 #endif
             bitmap = LAYOUT(adjusted_layout)->bitmap;
 
