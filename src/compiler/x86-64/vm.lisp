@@ -411,7 +411,7 @@
                           ;; FIXME: It'd be good to have the special
                           ;; variables here be named with the *FOO*
                           ;; convention.
-                          (forms `(defparameter ,tn-name
+                          (forms `(defglobal ,tn-name
                                     (make-random-tn :kind :normal
                                                     :sc (sc-or-lose ',sc-name)
                                                     :offset
@@ -443,7 +443,7 @@
 ;; A register that's never used by the code generator, and can therefore
 ;; be used as an assembly temporary in cases where a VOP :TEMPORARY can't
 ;; be used.
-(defparameter temp-reg-tn r11-tn)
+(defglobal temp-reg-tn r11-tn)
 
 ;;; TNs for registers used to pass arguments
 (defparameter *register-arg-tns*
@@ -451,8 +451,8 @@
             (symbol-value (symbolicate register-arg-name "-TN")))
           *register-arg-names*))
 
-(defparameter thread-base-tn
-  (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg )
+(defglobal thread-base-tn
+  (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg)
                   :offset r12-offset))
 
 ;;; If value can be represented as an immediate constant, then return
