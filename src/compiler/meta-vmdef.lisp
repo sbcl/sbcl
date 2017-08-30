@@ -1820,8 +1820,7 @@
     (collect ((clauses))
       (do ((cases forms (rest cases)))
           ((null cases)
-           (clauses `(t (error "unknown SC to SC-CASE for ~S:~%  ~S" ,n-tn
-                               (sc-name (tn-sc ,n-tn))))))
+           (clauses `(t (unknown-sc-case ,n-tn))))
         (let ((case (first cases)))
           (when (atom case)
             (error "illegal SC-CASE clause: ~S" case))
@@ -1839,6 +1838,9 @@
       `(let* ((,n-tn ,tn)
               (,n-sc (sc-number (tn-sc ,n-tn))))
          (cond ,@(clauses))))))
+
+(defun unknown-sc-case (tn)
+  (error "unknown SC to SC-CASE for ~S:~%  ~S" tn (sc-name (tn-sc tn))))
 
 ;;; Return true if TNs SC is any of the named SCs, false otherwise.
 (defmacro sc-is (tn &rest scs)
