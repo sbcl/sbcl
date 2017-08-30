@@ -1436,7 +1436,6 @@
              (defun-name (op-encoder-name sym-name t))
              (segment-name (car lambda-list))
              (vop-name nil)
-             (postits (gensym "POSTITS-"))
              (emitter nil)
              (decls nil)
              (attributes nil)
@@ -1486,16 +1485,8 @@
                               ,,@options) pdefs)))
           (t
            (error "unknown option: ~S" option)))))
-    (unless vop-name
-      (setq vop-name (make-symbol "VOP")))
     (when emitter
-      (push `(let ((hook (segment-inst-hook ,segment-name)))
-               (when hook
-                 (multiple-value-call hook ,segment-name ,vop-name ,sym-name
-                                      ,@arg-reconstructor)))
-            emitter)
-      (push `(dolist (postit ,postits)
-               (emit-back-patch ,segment-name 0 postit))
+      (push `(multiple-value-call #'instruction-hooks ,sym-name ,@arg-reconstructor)
             emitter)
       (unless cost (setf cost 1))
       #!+sb-dyncount
@@ -1516,19 +1507,19 @@
                       (schedule-pending-instructions ,segment-name))
                     ,@emitter))
             (let ((flet-name
-                   (gensym (concatenate 'string "EMIT-" sym-name "-INST-")))
+                    (gensym (concatenate 'string "EMIT-" sym-name "-INST-")))
                   (inst-name (gensym "INST-")))
               (setf emitter `((flet ((,flet-name (,segment-name)
                                        ,@emitter))
                                 (if (segment-run-scheduler ,segment-name)
                                     (let ((,inst-name
-                                           (make-instruction
-                                            (incf (segment-inst-number
-                                                   ,segment-name))
-                                            #',flet-name
-                                            (instruction-attributes
-                                             ,@attributes)
-                                            (progn ,@delay))))
+                                            (make-instruction
+                                             (incf (segment-inst-number
+                                                    ,segment-name))
+                                             #',flet-name
+                                             (instruction-attributes
+                                              ,@attributes)
+                                             (progn ,@delay))))
                                       ,@(when dependencies
                                           `((note-dependencies
                                                 (,segment-name ,inst-name)
@@ -1544,11 +1535,21 @@
              ,@(when decls
                  `((declare ,@decls)))
              (let* ((,segment-name **current-segment**)
-                    (,vop-name **current-vop**)
-                    (,postits (segment-postits ,segment-name)))
-               (setf (segment-postits ,segment-name) nil)
+                    ,@(and vop-name
+                           `((,vop-name **current-vop**))))
                ,@emitter)
              (values))))))
+
+(defun instruction-hooks (&rest args)
+  (let* ((segment **current-segment**)
+         (vop **current-vop**)
+         (postits (segment-postits segment)))
+    (setf (segment-postits segment) nil)
+    (dolist (postit postits)
+      (emit-back-patch segment 0 postit))
+    (let ((hook (segment-inst-hook segment)))
+      (when hook
+        (apply hook segment vop args)))))
 
 (defmacro define-instruction-macro (name lambda-list &body body)
   `(defmacro ,(op-encoder-name name t) ,lambda-list ,@body))
