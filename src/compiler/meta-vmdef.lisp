@@ -495,30 +495,24 @@
 
 ;;; Return a time spec describing a time during the evaluation of a
 ;;; VOP, used to delimit operand and temporary lifetimes. The
-;;; representation is a cons whose CAR is the number of the evaluation
-;;; phase and the CDR is the sub-phase. The sub-phase is 0 in the
-;;; :LOAD and :SAVE phases.
+;;; representation is a fixnum [phase][16-bit sub-phase].
+;;; The sub-phase is 0 in the :LOAD and :SAVE phases.
 (defun parse-time-spec (spec)
   (let ((dspec (if (atom spec) (list spec 0) spec)))
     (unless (and (= (length dspec) 2)
                  (typep (second dspec) 'unsigned-byte))
       (error "malformed time specifier: ~S" spec))
-
-    (cons (case (first dspec)
-            (:load 0)
-            (:argument 1)
-            (:eval 2)
-            (:result 3)
-            (:save 4)
-            (t
-             (error "unknown phase in time specifier: ~S" spec)))
-          (second dspec))))
-
-;;; Return true if the time spec X is the same or later time than Y.
-(defun time-spec-order (x y)
-  (or (> (car x) (car y))
-      (and (= (car x) (car y))
-           (>= (cdr x) (cdr y)))))
+    (let ((phase (case (first dspec)
+                   (:load 0)
+                   (:argument 1)
+                   (:eval 2)
+                   (:result 3)
+                   (:save 4)
+                   (t
+                    (error "unknown phase in time specifier: ~S" spec))) )
+          (sub-phase (second dspec)))
+      (+ (ash phase 16)
+         sub-phase))))
 
 ;;;; generation of emit functions
 
@@ -592,8 +586,8 @@
                                   (lambda (x y)
                                     (let ((x-time (car x))
                                           (y-time (car y)))
-                                      (if (time-spec-order x-time y-time)
-                                          (if (time-spec-order y-time x-time)
+                                      (if (>= x-time y-time)
+                                          (if (>= y-time x-time)
                                               (and (not (cdr x)) (cdr y))
                                               nil)
                                           t)))
@@ -924,10 +918,10 @@
             (t
              (error "unknown temporary option: ~S" opt))))
 
-        (unless (and (time-spec-order (operand-parse-dies res)
-                                      (operand-parse-born res))
-                     (not (time-spec-order (operand-parse-born res)
-                                           (operand-parse-dies res))))
+        (unless (and (>= (operand-parse-dies res)
+                         (operand-parse-born res))
+                     (< (operand-parse-born res)
+                        (operand-parse-dies res)))
           (error "Temporary lifetime doesn't begin before it ends: ~S" spec))
 
         (unless (operand-parse-sc res)
