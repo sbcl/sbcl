@@ -221,7 +221,8 @@
              (setf (svref (sc-load-costs to-sc) num) ',cost)))))
 
      (defun ,name ,lambda-list
-       (sb!assem:assemble (*code-segment* ,(first lambda-list))
+       (declare (ignorable ,(car lambda-list)))
+       (sb!assem:assemble ()
          ,@body))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -749,6 +750,7 @@
           ((:more-argument :more-result))))
 
       `(named-lambda (vop ,(vop-parse-name parse)) (,n-vop)
+         (declare (ignorable ,n-vop))
          (let* (,@(access-operands (vop-parse-args parse)
                                    (vop-parse-more-args parse)
                                    `(vop-args ,n-vop))
@@ -770,8 +772,8 @@
                   ,@(binds))
            (declare (ignore ,@(vop-parse-ignores parse)))
            ,@(loads)
-           (sb!assem:assemble (*code-segment* ,n-vop)
-                              ,@(vop-parse-body parse))
+           (assemble ()
+             ,@(vop-parse-body parse))
            ,@(saves))))))
 
 (defvar *parse-vop-operand-count*)

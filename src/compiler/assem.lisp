@@ -1143,36 +1143,31 @@
   "Execute BODY (as a progn) with SEGMENT as the current segment."
   (flet ((label-name-p (thing)
            (and thing (symbolp thing))))
-    (let* ((seg-var (gensym "SEGMENT-"))
-           (vop-var (gensym "VOP-"))
-           (visible-labels (remove-if-not #'label-name-p body))
+    (let* ((visible-labels (remove-if-not #'label-name-p body))
            (inherited-labels
-            (multiple-value-bind (expansion expanded)
-                (#+sb-xc-host cl:macroexpand
-                 #-sb-xc-host %macroexpand '..inherited-labels.. env)
-              (if expanded (copy-list expansion) nil)))
+             (multiple-value-bind (expansion expanded)
+                 (#+sb-xc-host cl:macroexpand
+                  #-sb-xc-host %macroexpand '..inherited-labels.. env)
+               (if expanded (copy-list expansion) nil)))
            (new-labels
-            (sort (append labels
-                          (set-difference visible-labels
-                                          inherited-labels))
-                  #'string<))
+             (sort (append labels
+                           (set-difference visible-labels
+                                           inherited-labels))
+                   #'string<))
            (nested-labels
-            (sort (set-difference (append inherited-labels new-labels)
-                                  visible-labels)
-                  #'string<)))
+             (sort (set-difference (append inherited-labels new-labels)
+                                   visible-labels)
+                   #'string<)))
       (when (intersection labels inherited-labels)
         (error "duplicate nested labels: ~S"
                (intersection labels inherited-labels)))
-      `(let* ((,seg-var ,(or segment '**current-segment**))
-              (,vop-var ,(or vop '**current-vop**))
-              ,@(when segment
-                      `((**current-segment** ,seg-var)))
+      `(let* (,@(when segment
+                  `((**current-segment** ,segment)))
               ,@(when vop
-                      `((**current-vop** ,vop-var)))
+                  `((**current-vop** ,vop)))
               ,@(mapcar (lambda (name)
                           `(,name (gen-label)))
                         new-labels))
-         (declare (ignorable ,vop-var ,seg-var))
          (symbol-macrolet (,@(when (or inherited-labels nested-labels)
                                `((..inherited-labels.. ,nested-labels))))
            ,@(mapcar (lambda (form)
