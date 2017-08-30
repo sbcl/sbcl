@@ -348,10 +348,6 @@
   (info-args () :type list)
   ;; an efficiency note associated with this VOP
   (note nil :type (or string null))
-  ;; a list of the names of the Effects and Affected attributes for
-  ;; this VOP
-  (effects '#1=(any) :type list)
-  (affected '#1# :type list)
   ;; a list of the names of functions this VOP is a translation of and
   ;; the policy that allows this translation to be done. :FAST is a
   ;; safe default, since it isn't a safe policy.
@@ -381,8 +377,6 @@
   (variant-vars :test variant-vars)
   (info-args :test info-args)
   (note :test note)
-  effects
-  affected
   translate
   ltn-policy
   (save-p :test save-p)
@@ -987,10 +981,6 @@
             (setf (vop-parse-cost parse)
                   (vop-spec-arg spec 'unsigned-byte 1 nil))
           (setf (vop-parse-body parse) (cddr spec)))
-        (:effects
-         (setf (vop-parse-effects parse) (rest spec)))
-        (:affected
-         (setf (vop-parse-affected parse) (rest spec)))
         (:info
          (setf (vop-parse-info-args parse) (rest spec)))
         (:ignore
@@ -1412,8 +1402,6 @@
       :ltn-policy ',(vop-parse-ltn-policy parse)
       :save-p ',(vop-parse-save-p parse)
       :move-args ',(vop-parse-move-args parse)
-      :effects (vop-attributes ,@(vop-parse-effects parse))
-      :affected (vop-attributes ,@(vop-parse-affected parse))
       ,@(make-costs-and-restrictions parse)
       ,@(make-emit-function-and-friends parse)
       ,@(inherit-vop-info :generator-function iparse
@@ -1516,12 +1504,6 @@
 ;;;     the body, so code may be emitted by using the local INST macro.
 ;;;     During the evaluation of the body, the names of the operands
 ;;;     and temporaries are bound to the actual TNs.
-;;;
-;;; :EFFECTS Effect*
-;;; :AFFECTED Effect*
-;;;     Specifies the side effects that this VOP has and the side
-;;;     effects that effect its execution. If unspecified, these
-;;;     default to the worst case.
 ;;;
 ;;; :INFO Name*
 ;;;     Define some magic arguments that are passed directly to the code

@@ -14,9 +14,7 @@
 ;;;; unary operations.
 
 (define-vop (fast-safe-arith-op)
-  (:policy :fast-safe)
-  (:effects)
-  (:affected))
+  (:policy :fast-safe))
 
 (define-vop (fixnum-unop fast-safe-arith-op)
   (:args (x :scs (any-reg)))
@@ -661,8 +659,6 @@
 (define-vop (fast-conditional)
   (:conditional)
   (:info target not-p)
-  (:effects)
-  (:affected)
   (:policy :fast-safe))
 
 (define-vop (fast-conditional/fixnum fast-conditional)

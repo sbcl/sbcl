@@ -43,8 +43,6 @@
   (:results (y :scs (sap-reg)
                :load-if (not (location= x y))))
   (:note "SAP move")
-  (:effects)
-  (:affected)
   (:generator 0
     (move y x)))
 (define-move-vop sap-move :move

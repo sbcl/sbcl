@@ -42,8 +42,6 @@
             :load-if (not (location= x y))))
   (:results (y :scs (character-reg)
                :load-if (not (location= x y))))
-  (:effects)
-  (:affected)
   (:generator 0
     (move x y)))
 (define-move-vop character-move :move

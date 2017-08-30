@@ -125,8 +125,6 @@
                                    (eql (tn-value x) 0))))))
   (:results (y :scs (any-reg descriptor-reg control-stack)
                :load-if (not (location= x y))))
-  (:effects)
-  (:affected)
   (:generator 0
     (let ((x (if (and (sc-is x immediate)
                       (eql (tn-value x) 0))
@@ -418,8 +416,6 @@
             :load-if (not (location= x y))))
   (:results (y :scs (signed-reg unsigned-reg)
                :load-if (not (location= x y))))
-  (:effects)
-  (:affected)
   (:note "word integer move")
   (:generator 0
     (move y x)))

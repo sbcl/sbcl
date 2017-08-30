@@ -562,10 +562,6 @@
 ;;; virtual operation. We include TEMPLATE so that functions with a
 ;;; direct VOP equivalent can be translated easily.
 (def!struct (vop-info (:include template) (:copier nil))
-  ;; side effects of this VOP and side effects that affect the value
-  ;; of this VOP
-  (effects (missing-arg) :type attributes)
-  (affected (missing-arg) :type attributes)
   ;; If true, causes special casing of TNs live after this VOP that
   ;; aren't results:
   ;; -- If T, all such TNs that are allocated in a SC with a defined

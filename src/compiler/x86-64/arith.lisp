@@ -32,9 +32,7 @@
 ;;;; unary operations
 
 (define-vop (fast-safe-arith-op)
-  (:policy :fast-safe)
-  (:effects)
-  (:affected))
+  (:policy :fast-safe))
 
 (define-vop (fixnum-unop fast-safe-arith-op)
   (:args (x :scs (any-reg) :target res))
@@ -1200,8 +1198,6 @@ constant shift greater than word length")))
 (define-vop (fast-conditional)
   (:conditional :e)
   (:info)
-  (:effects)
-  (:affected)
   (:policy :fast-safe))
 
 (define-vop (fast-conditional/fixnum fast-conditional)

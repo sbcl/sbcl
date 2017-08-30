@@ -68,8 +68,6 @@
                         (and (sc-is x any-reg descriptor-reg immediate)
                              (sc-is y control-stack))))))
   (:temporary (:sc unsigned-reg) temp)
-  (:effects)
-  (:affected)
   (:generator 0
     (if (and (sc-is x immediate)
              (sc-is y any-reg descriptor-reg control-stack))
@@ -332,8 +330,6 @@
                (not (or (location= x y)
                         (and (sc-is x signed-reg unsigned-reg)
                              (sc-is y signed-stack unsigned-stack))))))
-  (:effects)
-  (:affected)
   (:note "word integer move")
   (:generator 0
     (move y x)))
