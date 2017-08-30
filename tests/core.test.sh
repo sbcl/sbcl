@@ -46,6 +46,22 @@ run_sbcl_with_core "$tmpcore" --no-userinit --no-sysinit \
 EOF
 check_status_maybe_lose "Basic SAVE-LISP-AND-DIE" $? 21 "(saved core ran)"
 
+# Expose potential failure that could happen in save-lisp-and-die in an image
+# that was restarted from one that underwent number coalescing during a
+# previous save-lisp-and-die: A bignum as a layout bitmap can be forwarded
+# while using that bignum as the bitmap to decide what to scan in that selfsame
+# instance. Aside from random failure, this could be detected by enabling
+# 'verify_gens' which printed "Ptr sees free page" after GC failed to scavenge
+# all pointer slots. I believe that it was a coincidence that my test croaked
+# specifically while scanning layout-of-layout. It could have been any
+# structure having a slot holding a bignum EQ to its own layout-bitmap.
+run_sbcl --load ../heap-reloc/embiggen.lisp <<EOF
+  #+gencgc (setf (extern-alien "verify_gens" char) 0)
+  (save-lisp-and-die "$tmpcore")
+EOF
+run_sbcl_with_core "$tmpcore" --no-userinit --no-sysinit --eval "(exit)"
+check_status_maybe_lose "Crash GC" $? 0 "(saved core ran)"
+
 # In sbcl-0.9.8 saving cores with callbacks didn't work on gencgc platforms
 run_sbcl <<EOF
   (defun bar ()

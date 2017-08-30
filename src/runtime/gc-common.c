@@ -629,9 +629,6 @@ instance_scan(void (*proc)(lispobj*, sword_t),
   } else { /* huge bitmap */
       struct bignum * bitmap;
       bitmap = (struct bignum*)native_pointer(layout_bitmap);
-      if (forwarding_pointer_p((lispobj*)bitmap))
-          bitmap = (struct bignum*)
-            native_pointer(forwarding_pointer_value((lispobj*)bitmap));
       for (index = 0; index < nslots ; index++)
           if (bignum_logbitp_inline(index, bitmap))
               proc(instance_slots + index, 1);
@@ -658,10 +655,16 @@ scav_instance(lispobj *where, lispobj header)
     sword_t nslots = instance_length(header) | 1;
     if (lbitmap == make_fixnum(-1))
         scavenge(where+1, nslots);
-    else if (!fixnump(lbitmap))
+    else if (!fixnump(lbitmap)) {
+        /* It is conceivable that 'lbitmap' points to from_space, AND that it
+         * is stored in one of the slots of the instance about to be scanned.
+         * If so, then forwarding it will deposit new bits into its first
+         * one or two words, rendering it bogus for use as the instance's bitmap.
+         * So scavenge it up front to fix its address */
+        scav1(&lbitmap, lbitmap);
         instance_scan((void(*)(lispobj*,sword_t))scavenge,
                       where+1, nslots, lbitmap);
-    else {
+    } else {
         sword_t bitmap = (sword_t)lbitmap >> N_FIXNUM_TAG_BITS; // signed integer!
         sword_t n = nslots;
         lispobj obj;

@@ -73,7 +73,7 @@ void *mmap64(void *addr, size_t length, int prot, int flags, int fd, off64_t off
 {
     if (verbose)
         fprintf(stderr, "//mmap64 @ %p for %ld, fd=%d\n", addr, length, fd);
-    void *(*real_mmap64)() = dlsym(RTLD_NEXT, "mmap");
+    void *(*real_mmap64)() = dlsym(RTLD_NEXT, "mmap64");
     return real_mmap64(maybe_fuzz(addr,length), length, prot, flags, fd, offset);
 }
 #endif
