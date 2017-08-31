@@ -234,10 +234,8 @@ page_ends_contiguous_block_p(page_index_t page_index, generation_index_t gen)
             (page_bytes_used(page_index) < GENCGC_CARD_BYTES)
             /* page is last allocated page */
             || ((page_index + 1) >= last_free_page)
-            /* next page free */
-            || page_free_p(page_index + 1)
             /* next page contains no data */
-            || (page_bytes_used(page_index + 1) == 0)
+            || !page_bytes_used(page_index + 1)
             /* next page is in different generation */
             || (page_table[page_index + 1].gen != gen)
             /* next page starts its own contiguous block */
@@ -395,8 +393,7 @@ count_generation_pages(generation_index_t generation)
     page_index_t count = 0;
 
     for (i = 0; i < last_free_page; i++)
-        if (!page_free_p(i)
-            && (page_table[i].gen == generation))
+        if (!page_free_p(i) && page_table[i].gen == generation)
             count++;
     return count;
 }
@@ -408,8 +405,7 @@ count_dont_move_pages(void)
     page_index_t i;
     page_index_t count = 0;
     for (i = 0; i < last_free_page; i++) {
-        if (!page_free_p(i)
-            && (page_table[i].dont_move != 0)) {
+        if (!page_free_p(i) && page_table[i].dont_move) {
             ++count;
         }
     }
@@ -425,8 +421,7 @@ count_generation_bytes_allocated (generation_index_t gen)
     page_index_t i;
     os_vm_size_t result = 0;
     for (i = 0; i < last_free_page; i++) {
-        if (!page_free_p(i)
-            && (page_table[i].gen == gen))
+        if (!page_free_p(i) && page_table[i].gen == gen)
             result += page_bytes_used(i);
     }
     return result;
@@ -2184,8 +2179,7 @@ update_page_write_prot(page_index_t page)
         /* Check that it's in the dynamic space */
         if ((index = find_page_index(ptr)) != -1) {
             if (/* Does it point to a younger or the temp. generation? */
-                (!page_free_p(index)
-                 && (page_bytes_used(index) != 0)
+                ((page_bytes_used(index) != 0)
                  && ((page_table[index].gen < gen)
                      || (page_table[index].gen == SCRATCH_GENERATION)))
 
@@ -2370,8 +2364,7 @@ scavenge_generations(generation_index_t from, generation_index_t to)
     /* Check that none of the write_protected pages in this generation
      * have been written to. */
     for (i = 0; i < page_table_pages; i++) {
-        if (!page_free_p(i)
-            && (page_bytes_used(i) != 0)
+        if ((page_bytes_used(i) != 0)
             && (page_table[i].gen == generation)
             && (page_table[i].write_protected_cleared != 0)) {
             FSHOW((stderr, "/scavenge_generation() %d\n", generation));
@@ -2610,8 +2603,7 @@ scavenge_newspace_generation(generation_index_t generation)
         /* Check that none of the write_protected pages in this generation
          * have been written to. */
         for (i = 0; i < page_table_pages; i++) {
-            if (!page_free_p(i)
-                && (page_bytes_used(i) != 0)
+            if ((page_bytes_used(i) != 0)
                 && (page_table[i].gen == generation)
                 && (page_table[i].write_protected_cleared != 0)
                 && (page_table[i].dont_move == 0)) {
@@ -2637,8 +2629,7 @@ unprotect_oldspace(void)
     uword_t region_bytes = 0;
 
     for (i = 0; i < last_free_page; i++) {
-        if (!page_free_p(i)
-            && (page_bytes_used(i) != 0)
+        if ((page_bytes_used(i) != 0)
             && (page_table[i].gen == from_space)) {
 
             /* Remove any write-protection. We should be able to rely
@@ -2684,8 +2675,7 @@ free_oldspace(void)
     do {
         /* Find a first page for the next region of pages. */
         while ((first_page < last_free_page)
-               && (page_free_p(first_page)
-                   || (page_bytes_used(first_page) == 0)
+               && ((page_bytes_used(first_page) == 0)
                    || (page_table[first_page].gen != from_space)))
             first_page++;
 
@@ -2707,7 +2697,6 @@ free_oldspace(void)
             last_page++;
         }
         while ((last_page < last_free_page)
-               && !page_free_p(last_page)
                && (page_bytes_used(last_page) != 0)
                && (page_table[last_page].gen == from_space));
 
@@ -2953,9 +2942,7 @@ walk_generation(uword_t (*proc)(lispobj*,lispobj*,uword_t),
     int genmask = generation >= 0 ? 1 << generation : ~0;
 
     for (i = 0; i < last_free_page; i++) {
-        if (!page_free_p(i)
-            && (page_bytes_used(i) != 0)
-            && ((1 << page_table[i].gen) & genmask)) {
+        if ((page_bytes_used(i) != 0) && ((1 << page_table[i].gen) & genmask)) {
             page_index_t last_page;
 
             /* This should be the start of a contiguous block */
@@ -3526,7 +3513,7 @@ update_dynamic_space_free_pointer(void)
     page_index_t last_page = -1, i;
 
     for (i = 0; i < last_free_page; i++)
-        if (!page_free_p(i) && (page_bytes_used(i) != 0))
+        if (page_bytes_used(i) != 0)
             last_page = i;
 
     last_free_page = last_page+1;
