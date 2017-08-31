@@ -683,10 +683,13 @@
                          (if load-p
                              `(,(cdr (first funs)) ,n-vop ,tn ,load-tn)
                              `(,(cdr (first funs)) ,n-vop ,load-tn ,tn)))))
-          (if (eq (operand-parse-load op) t)
-              `(when ,load-tn ,form)
-              `(when (eq ,load-tn ,(operand-parse-name op))
-                 ,form)))
+          (cond (load-p
+                 form)
+                ((eq (operand-parse-load op) t)
+                 `(when ,load-tn ,form))
+                (t
+                 `(when (eq ,load-tn ,(operand-parse-name op))
+                    ,form))))
         `(when ,load-tn
            (error "load TN allocated, but no move function?~@
                    VM definition is inconsistent, recompile and try again.")))))
@@ -697,9 +700,15 @@
 (defun decide-to-load (parse op)
   (let ((load (operand-parse-load op))
         (load-tn (operand-parse-load-tn op))
-        (temp (operand-parse-temp op)))
+        (temp (operand-parse-temp op))
+        (loads (and (eq (operand-parse-kind op) :argument)
+                    (call-move-fun parse op t))))
     (if (eq load t)
-        `(or ,load-tn (tn-ref-tn ,temp))
+        `(cond (,load-tn
+                ,loads
+                ,load-tn)
+               (t
+                (tn-ref-tn ,temp)))
         (collect ((binds)
                   (ignores))
           (dolist (x (vop-parse-operands parse))
@@ -707,12 +716,14 @@
               (let ((name (operand-parse-name x)))
                 (binds `(,name (tn-ref-tn ,(operand-parse-temp x))))
                 (ignores name))))
-          `(if (and ,load-tn
-                    (let ,(binds)
-                      (declare (ignorable ,@(ignores)))
-                      ,load))
-               ,load-tn
-               (tn-ref-tn ,temp))))))
+          `(cond ((and ,load-tn
+                       (let ,(binds)
+                         (declare (ignorable ,@(ignores)))
+                         ,load))
+                  ,loads
+                  ,load-tn)
+                 (t
+                  (tn-ref-tn ,temp)))))))
 
 ;;; Make a lambda that parses the VOP TN-REFS, does automatic operand
 ;;; loading, and runs the appropriate code generator.
@@ -733,9 +744,8 @@
                     (binds `(,(operand-parse-load-tn op)
                              (tn-ref-load-tn ,temp)))
                     (binds `(,name ,(decide-to-load parse op)))
-                    (if (eq (operand-parse-kind op) :argument)
-                        (loads (call-move-fun parse op t))
-                        (saves (call-move-fun parse op nil))))
+                    (when (eq (operand-parse-kind op) :result)
+                      (saves (call-move-fun parse op nil))))
                    (t
                     (binds `(,name (tn-ref-tn ,temp)))))))
           (:temporary
