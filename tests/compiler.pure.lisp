@@ -4991,7 +4991,7 @@
                            (sb-c::fun-info-or-lose dvr))
               for (nil second-arg third-arg) = (sb-c::vop-info-arg-types info)
               unless (or (typep second-arg '(cons (eql :constant)))
-                         (find '(integer 0 0) third-arg :test 'equal)
+                         (equal third-arg '(:constant . (integer 0 0)))
                          (equal second-arg
                                 `(:or ,(sb-c::primitive-type-or-lose
                                         'sb-vm::positive-fixnum)
@@ -5008,7 +5008,7 @@
                            (sb-c::fun-info-or-lose dvr))
               for (nil second-arg third-arg) = (sb-c::vop-info-arg-types info)
               unless (or (typep second-arg '(cons (eql :constant)))
-                         (find '(integer 0 0) third-arg :test 'equal)
+                         (equal third-arg '(:constant . (integer 0 0)))
                          (equal second-arg
                                 `(:or ,(sb-c::primitive-type-or-lose
                                         'sb-vm::positive-fixnum)

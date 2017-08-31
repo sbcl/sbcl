@@ -474,24 +474,18 @@
                      (eq mem type))
              (return t))))
         (:constant
-         (cond (lvar
-                ;; Can't use constant-lvar-p, because it returns T for
-                ;; things for which the derived type is an EQL type,
-                ;; but there may be already a variable allocated for
-                ;; it, which can cause problems when there's a closure
-                ;; over it.
-                ;; See  :vop-on-eql-type test in compiler.pure for an example.
-                ;;
-                ;; And the value is already loaded into a register,
-                ;; which is usually cheaper/more compactly encoded
-                ;; than a constant.
-                (and (constant-lvar-p lvar)
-                     (funcall (second restr) (lvar-value lvar))))
-               (tn
-                (and (eq (tn-kind tn) :constant)
-                     (funcall (second restr) (tn-value tn))))
-               (t
-                (error "Neither LVAR nor TN supplied.")))))))
+         (flet ((type-p (value type)
+                  (if (typep type '(cons (eql satisfies)))
+                      (funcall (second type) value)
+                      (sb!xc:typep value type))))
+          (cond (lvar
+                 (and (constant-lvar-p lvar)
+                      (type-p (lvar-value lvar) (cdr restr))))
+                (tn
+                 (and (eq (tn-kind tn) :constant)
+                      (type-p (tn-value tn) (cdr restr))))
+                (t
+                 (error "Neither LVAR nor TN supplied."))))))))
 
 ;;; Check that the argument type restriction for TEMPLATE are
 ;;; satisfied in call. If an argument's TYPE-CHECK is :NO-CHECK and
@@ -694,7 +688,7 @@
                               (ecase (car x)
                                 (:or `(:or .,(mapcar #'primitive-type-name
                                                      (cdr x))))
-                                (:constant `(:constant ,(third x))))))
+                                (:constant `(:constant . ,(cdr x))))))
                         (template-arg-types template))))
       (:conditional
        (funcall frob "conditional in a non-conditional context"))

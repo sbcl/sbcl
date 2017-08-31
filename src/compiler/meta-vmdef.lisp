@@ -1318,13 +1318,7 @@
                                 `(primitive-type-or-lose ',type))
                               (rest type))))
            (:constant
-            ``(:constant ,(named-lambda (vop-arg-typep) (x)
-                              ;; Can't handle SATISFIES during XC
-                              ,(if (and (consp (second type))
-                                        (eq (caadr type) 'satisfies))
-                                   `(,(cadadr type) x)
-                                   `(sb!xc:typep x ',(second type))))
-                         ,',(second type)))))))
+            ``(:constant . ,',(second type)))))))
 
 (defun specify-operand-types (types ops more-ops)
   (if (eq types :unspecified)

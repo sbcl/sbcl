@@ -214,7 +214,7 @@
                         (ecase (first x)
                           (:or `(or ,@(mapcar #'primitive-type-specifier
                                               (rest x))))
-                          (:constant `(constant-arg ,(third x)))))))
+                          (:constant `(constant-arg ,(cdr x)))))))
              `(,@(mapcar #'frob types)
                ,@(when more-types
                    `(&rest ,(frob more-types)))))))
