@@ -210,14 +210,18 @@
     ;; TODO: SET could be shorter for any known wired-tls symbol.
     (define-vop (set)
       (:args (symbol :scs (descriptor-reg))
-             (value :scs (descriptor-reg any-reg)))
+             (value :scs (descriptor-reg any-reg)
+                    :load-if (or (not (sc-is value immediate))
+                                 (not (typep (encode-value-if-immediate value)
+                                             '(or (signed-byte 32) fixup))))))
       (:temporary (:sc descriptor-reg) cell)
       (:generator 4
         ;; Compute the address into which to store. CMOV can only move into
         ;; a register, so we can't conditionally move into the TLS and
         ;; conditionally move in the opposite flag sense to the symbol.
         (compute-virtual-symbol)
-        (inst mov (access-value-slot cell) value)))
+        (inst mov (access-value-slot cell)
+              (encode-value-if-immediate value))))
 
   ;; With Symbol-Value, we check that the value isn't the trap object. So
   ;; Symbol-Value of NIL is NIL.
