@@ -1616,8 +1616,6 @@
                             *compiler-error-context*))
   (values))
 
-(defvar *deletion-ignored-objects* '(t nil))
-
 ;;; Return true if we can find OBJ in FORM, NIL otherwise. We bound
 ;;; our recursion so that we don't get lost in circular structures. We
 ;;; ignore the car of forms if they are a symbol (to prevent confusing
@@ -1673,7 +1671,7 @@
                              (let ((pkg (symbol-package first)))
                                (and pkg
                                     (not (eq pkg (symbol-package :end))))))
-                         (not (member first *deletion-ignored-objects*))
+                         (not (member first '(t nil)))
                          (not (typep first '(or fixnum character)))
                          (every (lambda (x)
                                   (present-in-form first x 0))
