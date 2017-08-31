@@ -1949,7 +1949,7 @@ wipe_nonpinned_words()
         }
         // Handle the following range.
         lispobj word = *obj;
-        size_t nwords = is_cons_half(word) ? 2 : sizetab[widetag_of(word)](obj);
+        size_t nwords = OBJECT_SIZE(word, obj);
         uword_t range_start = (uword_t)(obj + nwords);
         uword_t range_end = this_page_end;
         // There is always an i+1'th key due to the sentinel value.
