@@ -153,6 +153,7 @@
 ;;; decision.
 
 (defun allocation-dynamic-extent (alloc-tn size lowtag)
+  (aver (not (location= alloc-tn rsp-tn)))
   (inst sub rsp-tn size)
   ;; see comment in x86/macros.lisp implementation of this
   ;; However that comment seems inapplicable here because:
@@ -162,19 +163,17 @@
   ;; - The real issue is that it's not obvious that the stack is
   ;;   16-byte-aligned at *all* times. Maybe it is, maybe it isn't.
   (inst and rsp-tn #.(lognot lowtag-mask))
-  (aver (not (location= alloc-tn rsp-tn)))
   (inst lea alloc-tn (make-ea :byte :base rsp-tn :disp lowtag))
   (values))
 
 ;;; This macro should only be used inside a pseudo-atomic section,
 ;;; which should also cover subsequent initialization of the
 ;;; object.
-(defun allocation-tramp (alloc-tn size lowtag
-                         &optional (result-tn alloc-tn))
+(defun allocation-tramp (result-tn size lowtag)
   (cond ((typep size '(and integer (not (signed-byte 32))))
          ;; MOV accepts large immediate operands, PUSH does not
-         (inst mov alloc-tn size)
-         (inst push alloc-tn))
+         (inst mov result-tn size)
+         (inst push result-tn))
         (t
          (inst push size)))
   ;; This really would be better if it recognized TEMP-REG-TN as the "good" case
@@ -184,7 +183,7 @@
   (let* ((to-r11 (location= result-tn r11-tn))
          (f (make-fixup (if to-r11 "alloc_to_r11" "alloc_tramp") :foreign)))
     (inst call (cond #!+immobile-code (sb!c::*code-is-immobile* f)
-                     (t (inst mov alloc-tn f) alloc-tn)))
+                     (t (inst mov result-tn f) result-tn)))
     (unless to-r11
       (inst pop result-tn)))
   (when lowtag
@@ -196,6 +195,8 @@
   (when dynamic-extent
     (allocation-dynamic-extent alloc-tn size lowtag)
     (return-from allocation (values)))
+  (aver (and (not (location= alloc-tn temp-reg-tn))
+             (or (integerp size) (not (location= size temp-reg-tn)))))
   (let ((NOT-INLINE (gen-label))
         (DONE (gen-label))
         ;; Yuck.
@@ -203,42 +204,30 @@
         ;; thread->alloc_region.free_pointer
         (free-pointer
          #!+sb-thread
-         (make-ea :qword
-                  :base thread-base-tn :scale 1
+         (make-ea :qword :base thread-base-tn
                   :disp (* n-word-bytes thread-alloc-region-slot))
          #!-sb-thread
-         (make-ea :qword
-                  :scale 1 :disp
-                  (make-fixup "boxed_region" :foreign)))
+         (make-ea :qword :disp (make-fixup "boxed_region" :foreign)))
         ;; thread->alloc_region.end_addr
         (end-addr
          #!+sb-thread
-         (make-ea :qword
-                  :base thread-base-tn :scale 1
+         (make-ea :qword :base thread-base-tn
                   :disp (* n-word-bytes (1+ thread-alloc-region-slot)))
          #!-sb-thread
-         (make-ea :qword
-                  :scale 1 :disp
-                  (make-fixup "boxed_region" :foreign 8))))
+         (make-ea :qword :disp (make-fixup "boxed_region" :foreign 8))))
     (cond ((or in-elsewhere
-               #!+gencgc
                ;; large objects will never be made in a per-thread region
                (and (integerp size)
                     (>= size large-object-size)))
            (allocation-tramp alloc-tn size lowtag))
           (t
            (inst mov temp-reg-tn free-pointer)
-           (cond ((tn-p size)
-                  (if (location= alloc-tn size)
-                      (inst add alloc-tn temp-reg-tn)
-                      (inst lea alloc-tn
-                            (make-ea :qword :base temp-reg-tn :index size))))
-                 ((typep size '(signed-byte 31))
-                  (inst lea alloc-tn
-                        (make-ea :qword :base temp-reg-tn :disp size)))
-                 (t ; a doozy - 'disp' in an EA is too small for this size
-                  (inst mov alloc-tn temp-reg-tn)
-                  (inst add alloc-tn (constantize size))))
+           (cond ((integerp size)
+                  (inst lea alloc-tn (make-ea :qword :base temp-reg-tn :disp size)))
+                 ((location= alloc-tn size)
+                  (inst add alloc-tn temp-reg-tn))
+                 (t
+                  (inst lea alloc-tn (make-ea :qword :base temp-reg-tn :index size))))
            (inst cmp alloc-tn end-addr)
            (inst jmp :a NOT-INLINE)
            (inst mov free-pointer alloc-tn)
@@ -249,10 +238,10 @@
            (assemble (*elsewhere*)
              (emit-label NOT-INLINE)
              (cond ((numberp size)
-                    (allocation-tramp alloc-tn size nil temp-reg-tn))
+                    (allocation-tramp temp-reg-tn size nil))
                    (t
                     (inst sub alloc-tn free-pointer)
-                    (allocation-tramp alloc-tn alloc-tn nil temp-reg-tn)))
+                    (allocation-tramp temp-reg-tn alloc-tn nil)))
              (inst jmp DONE))))
     (values)))
 

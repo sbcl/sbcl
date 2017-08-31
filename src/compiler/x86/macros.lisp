@@ -188,6 +188,7 @@
 ;;; overhead.
 
 (defun allocation-dynamic-extent (alloc-tn size lowtag)
+  (aver (not (location= alloc-tn esp-tn)))
   (inst sub esp-tn size)
   ;; FIXME: SIZE _should_ be double-word aligned (suggested but
   ;; unfortunately not enforced by PAD-DATA-BLOCK and
@@ -196,7 +197,6 @@
   ;; unneccessary and could be removed.  If not, explain why.  -- CSR,
   ;; 2004-03-30
   (inst and esp-tn (lognot lowtag-mask))
-  (aver (not (location= alloc-tn esp-tn)))
   (inst lea alloc-tn (make-ea :byte :base esp-tn :disp lowtag))
   (values))
 
