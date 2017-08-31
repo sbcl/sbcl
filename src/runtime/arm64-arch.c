@@ -170,7 +170,7 @@ void arch_write_linkage_table_jmp(char *reloc_addr, void *target_addr)
   *inst_ptr++ = inst;
 
   // address
-  *(unsigned long *)inst_ptr++ = target_addr;
+  *(unsigned long *)inst_ptr++ = (unsigned long)target_addr;
 
   os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - reloc_addr);
 }
