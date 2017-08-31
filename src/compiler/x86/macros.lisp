@@ -311,6 +311,9 @@
   (cond
     (dynamic-extent
      (allocation-dynamic-extent alloc-tn size lowtag))
+    ;; Inline allocation can't work if (and (not sb-thread) sb-dynamic-core)
+    ;; because boxed_region points to the linkage table, not the alloc region.
+    #!+(or sb-thread (not sb-dynamic-core))
     ((or (null inline) (policy inline (>= speed space)))
      (allocation-inline alloc-tn size))
     (t
