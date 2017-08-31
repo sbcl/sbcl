@@ -77,6 +77,7 @@
 
   ;; Return a new object that has 1 more slot than CLOSURE,
   ;; and frob its header bit signifying that it is named.
+  (declaim (ftype (sfunction (closure) closure) nameify-closure))
   (defun nameify-closure (closure)
     (declare (closure closure))
     (let* ((n-words (get-closure-length closure)) ; excluding header
@@ -87,7 +88,10 @@
            (copy #!-(or x86 x86-64)
                  (sb!vm::%copy-closure n-words (%closure-fun closure))
                  #!+(or x86 x86-64)
-                 (with-pinned-objects ((%closure-fun closure))
+                 ;; CLOSURE was tested on entry as (SATISFIES CLOSUREP) which,
+                 ;; sadly, does not imply FUNCTIONP of the object
+                 ;; because the type system is not smart enough.
+                 (with-pinned-objects ((%closure-fun (truly-the function closure)))
                    ;; %CLOSURE-CALLEE manifests as a fixnum which remains
                    ;; valid across GC due to %CLOSURE-FUN being pinned
                    ;; until after the new closure is made.
@@ -99,10 +103,12 @@
                         by sb!vm:n-word-bytes
               do (setf (sap-ref-lispobj sap ofs) (%closure-index-ref closure i)))
         (setf (closure-header-word copy) ; Update the header
-              (logior #!+(and immobile-space 64-bit) (ash sb!vm:function-layout 32)
+              ;; Closure copy lost its high header bits, so OR them in again.
+              (logior #!+(and immobile-space 64-bit)
+                      (ash sb!vm:function-layout 32)
                       +closure-header-namedp+
                       (closure-header-word copy))))
-      copy))
+      (truly-the closure copy)))
 
   ;; Rename a closure. Doing so changes its identity unless it was already named.
   (defun set-closure-name (closure new-name)
