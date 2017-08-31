@@ -141,14 +141,12 @@ void* os_dlopen(char* name, int flags) {
 /* When this feature is enabled, the special category of /static/ foreign
  * symbols disappears. Foreign fixups are resolved to linkage table locations
  * during genesis, and for each of them a record is added to
- * REQUIRED_RUNTIME_C_SYMBOLS list, of the form (cons name datap).
- *
- * Name is a base-string of a symbol name, and non-nil datap marks data
- * references.
+ * REQUIRED_FOREIGN_SYMBOLS vector, of the form "name" for a function reference,
+ * or ("name") for a data reference. "name" is a base-string.
  *
  * Before any code in lisp image can be called, we have to resolve all
  * references to runtime foreign symbols that used to be static, adding linkage
- * table entry for each element of REQUIRED_RUNTIME_C_SYMBOLS.
+ * table entry for each element of REQUIRED_FOREIGN_SYMBOLS.
  */
 
 #ifndef LISP_FEATURE_WIN32
@@ -171,7 +169,7 @@ void os_link_runtime()
     void* result;
     int n = 0, m = 0, j;
 
-    struct vector* symbols = VECTOR(SymbolValue(REQUIRED_RUNTIME_C_SYMBOLS,0));
+    struct vector* symbols = VECTOR(SymbolValue(REQUIRED_FOREIGN_SYMBOLS,0));
     n = fixnum_value(symbols->length);
     for (j = 0 ; j < n ; ++j)
     {

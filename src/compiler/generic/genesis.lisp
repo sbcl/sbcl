@@ -2189,7 +2189,7 @@ core and return a descriptor to it."
                                 (sym (set-readonly (base-string-to-core
                                                     (if (listp key) (car key) key)))))
                (if (listp key) (cold-list sym) sym))
-             'sb!vm::+required-runtime-c-symbols+)
+             'sb!vm::+required-foreign-symbols+)
     (to-core (sort (copy-list *cold-assembler-routines*) #'string< :key #'car)
              (lambda (rtn)
                (cold-cons (cold-intern (car rtn)) (number-to-core (cdr rtn))))

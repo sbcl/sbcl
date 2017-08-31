@@ -185,7 +185,7 @@
     #!+(and sb-thread ppc) *tls-index-lock*
 
     ;; dynamic runtime linking support
-    #!+sb-dynamic-core +required-runtime-c-symbols+
+    #!+sb-dynamic-core +required-foreign-symbols+
 
     ;; non-x86oid gencgc object pinning
     #!+(and gencgc (not (or x86 x86-64)))
