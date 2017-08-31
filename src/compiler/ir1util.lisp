@@ -526,13 +526,16 @@
                  (lvar-good-for-dx-p (trivial-lambda-var-ref-lvar use) dx component))))))
 
 (defun lvar-good-for-dx-p (lvar dx &optional component)
-  (let ((uses (lvar-uses lvar))) ; TODO use ENSURE-LIST? or is it too slow?
-    (if (listp uses)
-        (when uses
-          (every (lambda (use)
-                   (use-good-for-dx-p use dx component))
-                 uses))
-        (use-good-for-dx-p uses dx component))))
+  (let ((uses (lvar-uses lvar)))
+    (cond
+      ((null uses)
+       nil)
+      ((consp uses)
+       (every (lambda (use)
+                (use-good-for-dx-p use dx component))
+              uses))
+      (t
+       (use-good-for-dx-p uses dx component)))))
 
 (defun known-dx-combination-p (use dx)
   (and (eq (combination-kind use) :known)
@@ -661,7 +664,7 @@
                     (handle-nested-dynamic-extent-lvars
                      dx other recheck-component)))))))
       (cons (cons dx lvar)
-            (if (listp uses) ; TODO use ENSURE-LIST? or is it too slow?
+            (if (listp uses)
                 (loop for use in uses
                       when (use-good-for-dx-p use dx recheck-component)
                       nconc (recurse use))
