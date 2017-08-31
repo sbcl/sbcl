@@ -222,24 +222,7 @@
       (unless (or firstp (minusp disp))
         (write-char #\+ stream))
       (cond ((eq (machine-ea-base value) :rip)
-             (princ disp stream)
-             (unless (eq mode :compute)
-               (let ((addr (+ disp (dstate-next-addr dstate))))
-                 ;; The origin is zero when disassembling into a trace-file.
-                 ;; Don't crash on account of it.
-                 (when (plusp addr)
-                   (or (nth-value
-                        1 (note-code-constant-absolute addr dstate width))
-                       (maybe-note-assembler-routine addr nil dstate)
-                       ;; Show the absolute address and maybe the contents.
-                       (note (format nil "[#x~x]~@[ = ~x~]"
-                                     addr
-                                     (case width
-                                       (:qword
-                                        (unboxed-constant-ref
-                                         dstate
-                                         (+ (dstate-next-offs dstate) disp)))))
-                             dstate))))))
+             (princ disp stream))
             (firstp
                (princ16 disp stream)
                (or (minusp disp)
@@ -252,6 +235,24 @@
             (t
              (princ disp stream))))
     (write-char #\] stream)
+    (when (and (eq (machine-ea-base value) :rip) (neq mode :compute))
+      ;; Always try to print the EA as a note
+      (let ((addr (+ disp (dstate-next-addr dstate))))
+        ;; The origin is zero when disassembling into a trace-file.
+        ;; Don't crash on account of it.
+        (when (plusp addr)
+          (or (nth-value
+               1 (note-code-constant-absolute addr dstate width))
+              (maybe-note-assembler-routine addr nil dstate)
+              ;; Show the absolute address and maybe the contents.
+              (note (format nil "[#x~x]~@[ = ~x~]"
+                            addr
+                            (case width
+                              (:qword
+                               (unboxed-constant-ref
+                                dstate
+                                (+ (dstate-next-offs dstate) disp)))))
+                    dstate)))))
     #!+sb-thread
     (when (and (eql base-reg #.(ash (tn-offset sb!vm::thread-base-tn) -1))
                (not index-reg) ; no index
