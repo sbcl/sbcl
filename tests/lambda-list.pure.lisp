@@ -262,7 +262,7 @@
   (assert-signal (sb-c::parse-ds-lambda-list '(a &optional (b c &key)))
                  style-warning))
 
-(with-test (:name :ds-bind-list-checkers)
+(with-test (:name (destructuring-bind :list-checkers))
   (labels ((gen-check (lambda-list macro-context)
              (sb-c::emit-ds-bind-check (sb-c::parse-ds-lambda-list lambda-list)
                                        :ignore macro-context nil))
@@ -289,7 +289,7 @@
 
 ;; The same lambda lists and test inputs are each run two different ways.
 (macrolet ((with-test-ll ((name lambda-list) &body body)
-             `(with-test (:name (:ds-bind-shape ,name))
+             `(with-test (:name (destructuring-bind :shape ,name))
                 (let ((fun
                        (lambda (args)
                          (sb-int:binding*
