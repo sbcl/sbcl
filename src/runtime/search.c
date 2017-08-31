@@ -57,23 +57,20 @@ lispobj* search_for_symbol(char *name, lispobj start, lispobj end)
     lispobj* where = (lispobj*)start;
     lispobj* limit = (lispobj*)end;
     struct symbol *symbol;
-    int namelen = strlen(name);
+    lispobj namelen = make_fixnum(strlen(name));
 
     while (where < limit) {
         lispobj word = *where;
         if (widetag_of(word) == SYMBOL_WIDETAG &&
-            lowtag_of((symbol = (struct symbol *)where)->name)
-            == OTHER_POINTER_LOWTAG) {
+            lowtag_of((symbol = (struct symbol *)where)->name) == OTHER_POINTER_LOWTAG) {
             struct vector *symbol_name = VECTOR(symbol->name);
             if (gc_managed_addr_p((lispobj)symbol_name) &&
-                /* FIXME: Broken with more than one type of string
-                   (i.e. even broken given (VECTOR NIL) */
                 ((widetag_of(symbol_name->header) == SIMPLE_BASE_STRING_WIDETAG
-                  && fixnum_value(symbol_name->length) == namelen
+                  && symbol_name->length == namelen
                   && !strcmp((char *)symbol_name->data, name))
 #ifdef LISP_FEATURE_SB_UNICODE
                  || (widetag_of(symbol_name->header) == SIMPLE_CHARACTER_STRING_WIDETAG
-                     && fixnum_value(symbol_name->length) == namelen
+                     && symbol_name->length == namelen
                      && !strcmp_ucs4_ascii((uint32_t*)symbol_name->data, name))
 #endif
                  ))

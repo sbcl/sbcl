@@ -1482,7 +1482,7 @@ lispobj alloc_layout(lispobj slots)
     struct vector* v = VECTOR(slots);
     // If INSTANCE_DATA_START is 0, subtract 1 word for the header.
     // If 1, subtract 2 words: 1 for the header and 1 for the layout.
-    if (fixnum_value(v->length) != (LAYOUT_SIZE - INSTANCE_DATA_START - 1))
+    if (v->length != make_fixnum(LAYOUT_SIZE - INSTANCE_DATA_START - 1))
         lose("bad arguments to alloc_layout");
     struct instance* l = (struct instance*)
       alloc_immobile_obj(MAKE_ATTR(LAYOUT_ALIGN / N_WORD_BYTES,

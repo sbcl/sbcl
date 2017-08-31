@@ -905,7 +905,7 @@ static boolean __attribute__((unused)) sym_stringeq(lispobj sym, const char *str
 {
     struct vector* name = VECTOR(SYMBOL(sym)->name);
     return widetag_of(name->header) == SIMPLE_BASE_STRING_WIDETAG
-        && fixnum_value(name->length) == len
+        && name->length == make_fixnum(len)
         && !strcmp((char*)name->data, string);
 }
 

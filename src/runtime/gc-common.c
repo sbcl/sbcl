@@ -1169,10 +1169,9 @@ scan_weak_hash_table_chain (struct hash_table *hash_table, lispobj *prev,
         gc_assert(key != empty_symbol);
         gc_assert(value != empty_symbol);
         if (!alivep_test(key, value)) {
-            unsigned count = fixnum_value(hash_table->number_entries);
-            gc_assert(count > 0);
+            gc_assert(hash_table->number_entries > 0);
             *prev = next;
-            hash_table->number_entries = make_fixnum(count - 1);
+            hash_table->number_entries -= make_fixnum(1);
             next_vector[index] = fixnum_value(hash_table->next_free_kv);
             hash_table->next_free_kv = make_fixnum(index);
             kv_vector[2 * index] = empty_symbol;
