@@ -23,10 +23,8 @@
 
 #ifdef LISP_FEATURE_SB_THREAD
 # define THREAD_PA_BITS(thread) thread->pseudo_atomic_bits
-# define THREAD_PA_BITS_ADDR(thread) &thread->pseudo_atomic_bits
 #else
-# define THREAD_PA_BITS(thread) SymbolValue(PSEUDO_ATOMIC_BITS, thread)
-# define THREAD_PA_BITS_ADDR(thread) SymbolValueAddress(PSEUDO_ATOMIC_BITS, thread)
+# define THREAD_PA_BITS(thread) SYMBOL(PSEUDO_ATOMIC_BITS)->value
 #endif
 
 #if defined(LISP_FEATURE_X86)
@@ -44,7 +42,7 @@ get_pseudo_atomic_atomic(struct thread *thread)
 static inline void
 set_pseudo_atomic_atomic(struct thread *thread)
 {
-    lispobj *p = THREAD_PA_BITS_ADDR(thread);
+    lispobj *p = &THREAD_PA_BITS(thread);
     if (*p)
         lose("set_pseudo_atomic_atomic: pseudo atomic bits is %d.", *p);
     __asm__ __volatile__
@@ -57,7 +55,7 @@ set_pseudo_atomic_atomic(struct thread *thread)
 static inline void
 clear_pseudo_atomic_atomic(struct thread *thread)
 {
-    lispobj *p = THREAD_PA_BITS_ADDR(thread);
+    lispobj *p = &THREAD_PA_BITS(thread);
     __asm__ __volatile__
         ("and" LISPOBJ_ASM_SUFFIX " %0,%1"
          :
@@ -76,7 +74,7 @@ set_pseudo_atomic_interrupted(struct thread *thread)
 {
     if (!get_pseudo_atomic_atomic(thread))
         lose("set_pseudo_atomic_interrupted not in pseudo atomic");
-    lispobj *p = THREAD_PA_BITS_ADDR(thread);
+    lispobj *p = &THREAD_PA_BITS(thread);
     __asm__ __volatile__
         ("or" LISPOBJ_ASM_SUFFIX " %0,%1"
          :
@@ -89,7 +87,7 @@ clear_pseudo_atomic_interrupted(struct thread *thread)
 {
     if (get_pseudo_atomic_atomic(thread))
         lose("clear_pseudo_atomic_interrupted in pseudo atomic");
-    lispobj *p = THREAD_PA_BITS_ADDR(thread);
+    lispobj *p = &THREAD_PA_BITS(thread);
     __asm__ __volatile__
         ("and" LISPOBJ_ASM_SUFFIX " %0,%1"
          :

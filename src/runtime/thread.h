@@ -149,17 +149,6 @@ tls_index_of(struct symbol *symbol) // untagged pointer
   ((union per_thread_data *)th)->dynamic_values[tls_index_of(sym)>>WORD_SHIFT]
 #endif
 
-static inline lispobj *
-SymbolValueAddress(u64 tagged_symbol_pointer, void *thread)
-{
-    struct symbol *sym= SYMBOL(tagged_symbol_pointer);
-    if(thread && tls_index_of(sym)) {
-        lispobj *r = &per_thread_value(sym, thread);
-        if((*r)!=NO_TLS_VALUE_MARKER_WIDETAG) return r;
-    }
-    return &sym->value;
-}
-
 static inline lispobj
 SymbolValue(u64 tagged_symbol_pointer, void *thread)
 {
