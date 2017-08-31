@@ -225,11 +225,7 @@ static char* deduce_thread_pc(struct thread* th, void** addr)
     if (th != arch_os_get_current_thread()) {
         int i = fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,th));
         os_context_t *c = th->interrupt_contexts[i-1];
-#ifdef LISP_FEATURE_64_BIT
-        fp = (uword_t*)*os_context_register_addr(c,reg_RBP);
-#else
-        fp = (uword_t*)*os_context_register_addr(c,reg_EBP);
-#endif
+        fp = (uword_t*)*os_context_register_addr(c,reg_FP);
     }
     while (1) {
         if ((uword_t*)addr < fp)

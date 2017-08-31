@@ -38,5 +38,6 @@
 
 #define REGNAMES "EAX", "ECX", "EDX", "EBX", "ESP", "EBP", "ESI", "EDI", "UESP"
 
-/* reg_SP = the register used by Lisp as stack pointer */
+/* reg_SP = stack pointer, reg_FP = frame pointer */
 #define reg_SP reg_ESP
+#define reg_FP reg_EBP
