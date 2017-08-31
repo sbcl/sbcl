@@ -226,7 +226,7 @@ statistics are appended to it."
                         (new-usage 0)
                         (start-time (get-internal-run-time)))
                     (collect-garbage gen)
-                    (setf *gc-epoch* (cons nil nil))
+                    (setf *gc-epoch* (cons 0 0))
                     (let ((run-time (- (get-internal-run-time) start-time)))
                       ;; KLUDGE: Sometimes we see the second getrusage() call
                       ;; return a smaller value than the first, which can
