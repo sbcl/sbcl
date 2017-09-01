@@ -45,6 +45,7 @@
 
 (defmethod reader-method-class
     ((class typechecking-reader-class) direct-slot &rest args)
+  (declare (ignore args))
   (find-class 'typechecking-reader-method))
 
 (defclass testclass25 ()
