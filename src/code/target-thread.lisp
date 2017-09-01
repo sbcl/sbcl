@@ -1789,6 +1789,12 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
 ;;; should probably discuss with a professional psychiatrist first
 #!+sb-thread
 (progn
+
+  (sb!ext:defglobal sb!vm::*free-tls-index* 0)
+  ;; Keep in sync with 'compiler/generic/parms.lisp'
+  #!+ppc ; only PPC uses a separate symbol for the TLS index lock
+  (!defglobal sb!vm::*tls-index-lock* 0)
+
   (defun %thread-sap (thread)
     (let ((thread-sap (alien-sap (extern-alien "all_threads" (* t))))
           (target (thread-os-thread thread)))

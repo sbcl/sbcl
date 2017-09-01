@@ -179,7 +179,6 @@
 
  ("src/code/target-error" :not-host)
 
- ("src/compiler/early-backend")
  ;; "src/code/toplevel.lisp" is the first to need this. It's generated
  ;; automatically by grovel_headers.c, i.e. it's not under source control.
  ("output/stuff-groveled-from-headers" :not-host)
