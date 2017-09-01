@@ -243,6 +243,7 @@
 
 (with-test (:name :linkage-table-bogosity :skipped-on '(not :sb-dynamic-core))
   (let ((strings (map 'list (lambda (x) (if (consp x) (car x) x))
-                      sb-vm::+required-foreign-symbols+)))
+                      #+sb-dynamic-core sb-vm::+required-foreign-symbols+
+                      #-sb-dynamic-core '())))
     (assert (= (length (remove-duplicates strings :test 'string=))
                (length strings)))))
