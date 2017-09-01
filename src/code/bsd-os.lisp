@@ -94,10 +94,6 @@
 
     (values utime stime majflt)))
 
-;;; Return the system page size.
-(defun get-page-size ()
-  (sysctl :int ctl-hw hw-pagesize))
-
 ;;; support for CL:MACHINE-VERSION defined OAOO elsewhere
 (defun get-machine-version ()
   (or #!+darwin (sysctlbyname :str "machdep.cpu.brand_string")

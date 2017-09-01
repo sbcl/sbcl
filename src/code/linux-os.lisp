@@ -41,10 +41,6 @@
       (error "Unix system call getrusage failed: ~A." (strerror utime)))
     (values utime stime majflt)))
 
-;;; Return the system page size.
-(defun get-page-size ()
-  sb!c:*backend-page-bytes*)
-
 ;;; support for CL:MACHINE-VERSION defined OAOO elsewhere
 (defun get-machine-version ()
   (or

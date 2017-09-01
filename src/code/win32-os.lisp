@@ -38,13 +38,6 @@
   (sb!win32:with-process-times (creation-time exit-time kernel-time user-time)
     (values (floor user-time 10) (floor kernel-time 10) 0)))
 
-;;; Return the system page size.
-(defun get-page-size ()
-  ;; probably should call getpagesize()
-  ;; FIXME: Or we could just get rid of this, since the uses of it look
-  ;; disposable.
-  4096)
-
 ;;; support for CL:MACHINE-VERSION defined OAOO elsewhere
 (defun get-machine-version ()
   nil)

@@ -3434,7 +3434,7 @@ initially undefined function references:~2%")
     (force-output)
 
     ;; Note: It is assumed that the GSPACE allocation routines always
-    ;; allocate whole pages (of size *target-page-size*) and that any
+    ;; allocate whole pages (of size *backend-page-bytes*) and that any
     ;; empty gspace between the free pointer and the end of page will
     ;; be zero-filled. This will always be true under Mach on machines
     ;; where the page size is equal. (RT is 4K, PMAX is 4K, Sun 3 is
