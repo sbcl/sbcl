@@ -25,9 +25,12 @@
 
 ;;; In case of a parse error we want to get a condition of type TYPE-ERROR,
 ;;; because ANSI says so. (This used to be PARSE-ERROR.)
-(assert
-  (typep (grab-condition (logical-pathname "demo0::bla;file.lisp"))
-         'type-error))
+(with-test (:name (logical-pathname :signals type-error))
+  (mapc (lambda (namestring)
+          (assert-error (logical-pathname namestring) type-error))
+        '("demo0::bla;file.lisp"
+          "FOO.txt"
+          "SYS:%")))
 
 ;;; some things SBCL-0.6.9 used not to parse correctly:
 ;;;
@@ -209,7 +212,7 @@
   (setf (logical-pathname-translations "scratch")
         '(("**;*.*.*" "/usr/local/doc/**/*"))))
 
-(with-test (:name (:merge-pathname 1))
+(with-test (:name (merge-pathnames 1))
   (loop for (expected-result . params) in
         `( ;; trivial merge
           (#P"/usr/local/doc/foo" #p"foo" #p"/usr/local/doc/")
@@ -358,7 +361,7 @@
 
 ;;; BUG 330: "PARSE-NAMESTRING should accept namestrings as the
 ;;; default argument" ...and streams as well
-(with-test (:name :parse-namestring/stream)
+(with-test (:name (parse-namestring stream))
   (assert (equal (parse-namestring "foo" nil "/")
                  (parse-namestring "foo" nil #P"/")))
   (let ((test "parse-namestring-test.tmp"))
@@ -376,7 +379,7 @@
 
 ;;; ENOUGH-NAMESTRING should probably not fail when the namestring in
 ;;; question has a :RELATIVE pathname.
-(with-test (:name :enough-namestring)
+(with-test (:name enough-namestring)
   (assert (equal (enough-namestring #p"foo" #p"./") "foo")))
 
 ;;; bug reported by Artem V. Andreev: :WILD not handled in unparsing
@@ -426,7 +429,7 @@
 
 ;;; construct native namestrings even if the directory is empty (means
 ;;; that same as if (:relative))
-(with-test (:name :native-namestring)
+(with-test (:name (sb-ext:native-namestring 1))
   (assert (equal (sb-ext:native-namestring (make-pathname :directory '(:relative)
                                                           :name "foo"
                                                           :type "txt"))
@@ -486,7 +489,7 @@
 ;;; non-NIL strings in NATIVE-NAMESTRING implementations.  Revised by
 ;;; RMK 2007-11-28, attempting to preserve the apparent intended
 ;;; denotation of SBCL's then-current pathname implementation.
-(with-test (:name (:native-namestring 2))
+(with-test (:name (sb-ext:native-namestring 2))
   (assert (equal
            (loop with components = (list nil :unspecific "" "a")
                  for name in components
@@ -513,7 +516,7 @@
   #|""         |#     "C:\\tmp\\"   "C:\\tmp\\"   "C:\\tmp\\."  "C:\\tmp\\.a"
   #|"a"        |#     "C:\\tmp\\a"  "C:\\tmp\\a"  "C:\\tmp\\a." "C:\\tmp\\a.a"))))
 
-(with-test (:name :delete-file-logical-pathname)
+(with-test (:name (delete-file logical-pathname))
   (setf (logical-pathname-translations "SB-TEST")
         (list (list "**;*.*.*" (make-pathname :name :wild
                                               :type :wild
@@ -525,14 +528,6 @@
     (assert (probe-file test))
     (assert (delete-file test))
     (assert (not (probe-file test)))))
-
-(with-test (:name :logical-pathname-type-error)
-  (assert (eq :type-error-ok
-              (handler-case (logical-pathname "FOO.txt")
-                (type-error () :type-error-ok))))
-  (assert (eq :type-error-ok
-              (handler-case (logical-pathname "SYS:%")
-                (type-error () :type-error-ok)))))
 
 ;;; Reported by Willem Broekema: Reading #p"\\\\" caused an error due
 ;;; to insufficient sanity in input testing in EXTRACT-DEVICE (in
@@ -600,7 +595,7 @@
   ;; * / :WILD
   (assert (equal (pathname-directory #p"\\*/") '(:relative "*"))))
 
-(with-test (:name :ensure-directories-exist-with-odd-d-p-d)
+(with-test (:name (ensure-directories-exist :with-odd-d-p-d))
   (let ((*default-pathname-defaults* #p"/tmp/foo"))
     (ensure-directories-exist "/")))
 
@@ -626,14 +621,14 @@
     (assert (not (probe-file shallow)))))
 
 #+unix
-(with-test (:name :simplify-namestring)
+(with-test (:name sb-int:simplify-namestring)
   (assert (string= (sb-int:simplify-namestring "./a/b/../c/")
                    "a/c/")))
 
 (with-test (:name :back-and-truename)
   (probe-file (make-pathname :directory '(:absolute "a" "b" :back))))
 
-(with-test (:name (:parse-namestring :displaced))
+(with-test (:name (parse-namestring :displaced))
   (let* ((string "abc")
          (disp (make-array 0 :element-type (array-element-type string)
                              :displaced-to string
@@ -643,7 +638,7 @@
       (assert (equal path #P""))
       (assert (zerop pos)))))
 
-(with-test (:name (:parse-native-namestring :displaced))
+(with-test (:name (sb-ext:parse-native-namestring :displaced))
   (let* ((string "abc")
          (disp (make-array 0 :element-type (array-element-type string)
                              :displaced-to string
