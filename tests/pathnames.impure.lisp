@@ -331,33 +331,30 @@
 ;;; ensure print-read consistency (or print-not-readable-error) on
 ;;; pathnames:
 (with-test (:name :print/read-consistency)
-  (let ((pathnames (list
-                    (make-pathname :name "foo" :type "txt" :version :newest)
-                    (make-pathname :name "foo" :type "txt" :version 1)
-                    (make-pathname :name "foo" :type ".txt")
-                    (make-pathname :name "foo." :type "txt")
-                    (make-pathname :name "\\" :type "txt")
-                    (make-pathname :name "^" :type "txt")
-                    (make-pathname :name "foo*" :type "txt")
-                    (make-pathname :name "foo[" :type "txt")
-                    (parse-namestring "SCRATCH:FOO.TXT.1")
-                    (parse-namestring "SCRATCH:FOO.TXT.NEWEST")
-                    (parse-namestring "SCRATCH:FOO.TXT"))))
-    (dolist (p pathnames)
-      (print p)
-      (handler-case
-          (let* ((*print-readably* t)
-                 (new (read-from-string (format nil "~S" p))))
-            (unless (equal new p)
-              (let ((*print-readably* nil))
-                (error "oops: host:~S device:~S dir:~S version:~S~% ->~%~
+  (dolist (p (list (make-pathname :name "foo" :type "txt" :version :newest)
+                   (make-pathname :name "foo" :type "txt" :version 1)
+                   (make-pathname :name "foo" :type ".txt")
+                   (make-pathname :name "foo." :type "txt")
+                   (make-pathname :name "\\" :type "txt")
+                   (make-pathname :name "^" :type "txt")
+                   (make-pathname :name "foo*" :type "txt")
+                   (make-pathname :name "foo[" :type "txt")
+                   (parse-namestring "SCRATCH:FOO.TXT.1")
+                   (parse-namestring "SCRATCH:FOO.TXT.NEWEST")
+                   (parse-namestring "SCRATCH:FOO.TXT")))
+    (handler-case
+        (let* ((*print-readably* t)
+               (new (read-from-string (format nil "~S" p))))
+          (unless (equal new p)
+            (let ((*print-readably* nil))
+              (error "oops: host:~S device:~S dir:~S version:~S~% ->~%~
                              host:~S device:~S dir:~S version:~S"
-                       (pathname-host p) (pathname-device p)
-                       (pathname-directory p) (pathname-version p)
-                       (pathname-host new) (pathname-device new)
-                       (pathname-directory new) (pathname-version new)))))
-        (print-not-readable ()
-          nil)))))
+                     (pathname-host p) (pathname-device p)
+                     (pathname-directory p) (pathname-version p)
+                     (pathname-host new) (pathname-device new)
+                     (pathname-directory new) (pathname-version new)))))
+      (print-not-readable ()
+        nil))))
 
 ;;; BUG 330: "PARSE-NAMESTRING should accept namestrings as the
 ;;; default argument" ...and streams as well
