@@ -427,7 +427,13 @@
     (lose '((1 ((2)) 3)))
     (lose '((1 ((2))) wat))
     (lose '((1 ((2))) (wat))))
-  )
+
+  ;; () as nested destructuring lambda list.
+  (with-test-ll (:nil-as-nested-ds-lambda-list (a () b))
+    (win '(1 () 3) '(1 3))
+    (lose '(1 2))
+    (lose '(1 2 3))
+    (lose '(1 (2) 3))))
 
 (with-test (:name :arg-count-error-tail-calls-error)
  (assert

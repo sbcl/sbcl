@@ -398,7 +398,9 @@
                          :silent silent :condition-class condition-class)
    (declare (ignore env) (notinline mapcar))
    (labels ((parse (list)
-              (if (atom list) list (parse-ds-lambda-list list :silent silent)))
+              (if (listp list)
+                  (parse-ds-lambda-list list :silent silent)
+                  list))
             (parse* (list arg-specifier)
               (let ((parse (parse list)))
                 (when (and (not silent) (vectorp parse)) ; is destructuring
