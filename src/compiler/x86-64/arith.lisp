@@ -1254,12 +1254,10 @@ constant shift greater than word length")))
                          (:generator ,cost
                           (emit-optimized-test-inst x
                            ,(case suffix
-                             (-c/fixnum
-                              `(constantize (fixnumize y)))
-                             ((-c/signed -c/unsigned)
-                              `(constantize y))
-                             (t
-                              'y)))))))))
+                             (-c/fixnum `(constantize (fixnumize y)))
+                             ((-c/signed -c/unsigned) `(constantize y))
+                             (t 'y))
+                           nil)))))))
   (define-logtest-vops))
 
 (defknown %logbitp (integer unsigned-byte) boolean

@@ -572,27 +572,34 @@
                value)
          (move result value)))))
 
-;;; Emit the most compact form of the test immediate instruction,
-;;; using an 8 bit test when the immediate is only 8 bits and the
-;;; value is one of the four low registers (rax, rbx, rcx, rdx) or the
-;;; control stack.
-(defun emit-optimized-test-inst (x y)
-  (typecase y
-    ((unsigned-byte 7)
-     ;; If we knew that the sign bit would not be tested, this could
-     ;; handle (unsigned-byte 8) constants. But since we don't know,
-     ;; we assume that it's not ok to change the test such that the S flag
-     ;; comes out possibly differently.
-     (let ((offset (tn-offset x)))
-       (cond ((and (sc-is x any-reg descriptor-reg signed-reg unsigned-reg)
-                   (or (= offset rax-offset) (= offset rbx-offset)
-                       (= offset rcx-offset) (= offset rdx-offset)))
-              (inst test (reg-in-size x :byte) y))
-             ((sc-is x control-stack)
-              (inst test (make-ea :byte :base rbp-tn
-                                  :disp (frame-byte-offset offset))
-                    y))
-             (t
-              (inst test x y)))))
-    (t
-     (inst test x y))))
+;;; Emit the most compact form of the test immediate instruction
+;;; by using the smallest operand size that is the large enough to hold
+;;; the immediate value Y. The operand size makes no difference since the result
+;;; of the implied AND is not written back to a register. However, if the msb
+;;; (the sign bit) of the immediate at a smaller size is 1 but at its true size
+;;; (always a :QWORD) is 0, the S flag value could come out 1 instead of 0.
+;;; SIGN-BIT-MATTERS specifies that a shorter operand size must not be selected
+;;; if doing so could affect whether the sign flag comes out the same.
+;;; e.g. if EDX is #xff, "TEST EDX, #x80" indicates a non-negative result
+;;; whereas "TEST DL, #x80" indicates a negative result.
+(defun emit-optimized-test-inst (x y sign-bit-matters)
+  (let* ((size-override
+          (cond ((or (typep y '(unsigned-byte 7))
+                     (and (typep y '(unsigned-byte 8)) (not sign-bit-matters)))
+                 :byte)
+                ((or (typep y '(unsigned-byte 15))
+                     (and (typep y '(unsigned-byte 16)) (not sign-bit-matters)))
+                 :word)
+                ((or (typep y '(unsigned-byte 31))
+                     (and (typep y '(unsigned-byte 32)) (not sign-bit-matters)))
+                 :dword)))
+         (offset (tn-offset x))
+         (modified-x
+          (when size-override
+            (cond ((sc-is x control-stack)
+                   ;; TODO: a 7- or 8-bit pattern that does not span bytes
+                   ;; should be testable as a :BYTE by suitably altering :DISP.
+                   (make-ea size-override :base rbp-tn :disp (frame-byte-offset offset)))
+                  ((sc-is x any-reg descriptor-reg signed-reg unsigned-reg)
+                   (reg-in-size x size-override))))))
+    (inst test (or modified-x x) y)))
