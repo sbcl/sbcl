@@ -137,7 +137,9 @@
                                                'sb-int:attempt-resync)))
            ;; The failure mode is an infinite loop, add a timeout to
            ;; detetct it.
-           (sb-ext:timeout (lambda () (error "Timeout"))))
+           (sb-ext:timeout (lambda (condition)
+                             (declare (ignore condition))
+                             (error "Timeout"))))
         (sb-ext:with-timeout 5
           (dotimes (i 80)
             (assert (equal (read-line s nil s)
@@ -155,7 +157,9 @@
                                               (invoke-restart
                                                'sb-int:force-end-of-file)))
            ;; The failure mode is an infinite loop, add a timeout to detetct it.
-           (sb-ext:timeout (lambda () (error "Timeout"))))
+           (sb-ext:timeout (lambda (condition)
+                             (declare (ignore condition))
+                             (error "Timeout"))))
         (sb-ext:with-timeout 5
           (dotimes (i 40)
             (assert (equal (read-line s nil s)
