@@ -158,17 +158,6 @@
 # define MAYBE_FS(addr) %fs:addr
 #endif
 
-/* gas can't parse 4096LU; redefine */
-#if BACKEND_PAGE_BYTES == 4096
-# undef BACKEND_PAGE_BYTES
-# define BACKEND_PAGE_BYTES 4096
-#elif BACKEND_PAGE_BYTES == 32768
-# undef BACKEND_PAGE_BYTES
-# define BACKEND_PAGE_BYTES 32768
-#else
-# error BACKEND_PAGE_BYTES mismatch
-#endif
-
 /* OAOOM because we don't have the C headers here */
 #define THREAD_CSP_PAGE_SIZE BACKEND_PAGE_BYTES
 

@@ -6,14 +6,13 @@
       #!+little-endian :little-endian
       #!+big-endian :big-endian)
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
   ;; Can be in the range 4K-64K
-  (setf *backend-page-bytes* 65536))
+(defconstant +backend-page-bytes+ 65536)
 
 ;;; The size in bytes of GENCGC cards, i.e. the granularity at which
 ;;; writes to old generations are logged.  With mprotect-based write
 ;;; barriers, this must be a multiple of the OS page size.
-(defconstant gencgc-card-bytes *backend-page-bytes*)
+(defconstant gencgc-card-bytes +backend-page-bytes+)
 ;;; The minimum size of new allocation regions.  While it doesn't
 ;;; currently make a lot of sense to have a card size lower than
 ;;; the alloc granularity, it will, once we are smarter about finding
@@ -21,7 +20,7 @@
 (defconstant gencgc-alloc-granularity 0)
 ;;; The minimum size at which we release address ranges to the OS.
 ;;; This must be a multiple of the OS page size.
-(defconstant gencgc-release-granularity *backend-page-bytes*)
+(defconstant gencgc-release-granularity +backend-page-bytes+)
 
 ;;; null-tn will be used for setting it, just check the lowtag
 #!+sb-thread

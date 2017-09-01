@@ -3114,7 +3114,7 @@ core and return a descriptor to it."
   ;; I'm not really sure why this is in SB!C, since it seems
   ;; conceptually like something that belongs to SB!VM. In any case,
   ;; it's needed C-side.
-  (format t "#define BACKEND_PAGE_BYTES ~DLU~%" sb!c:*backend-page-bytes*)
+  (format t "#define BACKEND_PAGE_BYTES ~D~%" sb!c:+backend-page-bytes+)
 
   (terpri)
 
@@ -3421,11 +3421,11 @@ initially undefined function references:~2%")
   (force-output *core-file*)
   (let* ((posn (file-position *core-file*))
          (bytes (* (gspace-free-word-index gspace) sb!vm:n-word-bytes))
-         (pages (ceiling bytes sb!c:*backend-page-bytes*))
-         (total-bytes (* pages sb!c:*backend-page-bytes*)))
+         (pages (ceiling bytes sb!c:+backend-page-bytes+))
+         (total-bytes (* pages sb!c:+backend-page-bytes+)))
 
     (file-position *core-file*
-                   (* sb!c:*backend-page-bytes* (1+ *data-page*)))
+                   (* sb!c:+backend-page-bytes+ (1+ *data-page*)))
     (format t
             "writing ~S byte~:P [~S page~:P] from ~S~%"
             total-bytes
@@ -3434,7 +3434,7 @@ initially undefined function references:~2%")
     (force-output)
 
     ;; Note: It is assumed that the GSPACE allocation routines always
-    ;; allocate whole pages (of size *backend-page-bytes*) and that any
+    ;; allocate whole pages (of size +backend-page-bytes+) and that any
     ;; empty gspace between the free pointer and the end of page will
     ;; be zero-filled. This will always be true under Mach on machines
     ;; where the page size is equal. (RT is 4K, PMAX is 4K, Sun 3 is
@@ -3456,7 +3456,7 @@ initially undefined function references:~2%")
     (write-word (gspace-free-word-index gspace))
     (write-word *data-page*)
     (multiple-value-bind (floor rem)
-        (floor (gspace-byte-address gspace) sb!c:*backend-page-bytes*)
+        (floor (gspace-byte-address gspace) sb!c:+backend-page-bytes+)
       (aver (zerop rem))
       (write-word floor))
     (write-word pages)

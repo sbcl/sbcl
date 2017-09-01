@@ -285,17 +285,6 @@ x:
 	
 #endif
 
-/* gas can't parse nnnnLU; redefine */
-#if BACKEND_PAGE_BYTES == 65536
-# undef BACKEND_PAGE_BYTES
-# define BACKEND_PAGE_BYTES 65536
-#elif BACKEND_PAGE_BYTES == 4096
-# undef BACKEND_PAGE_BYTES
-# define BACKEND_PAGE_BYTES 4096
-#else
-# error BACKEND_PAGE_BYTES mismatch
-#endif
-
 #ifdef LISP_FEATURE_SB_SAFEPOINT
 /* OAOOM because we don't have the C headers here. */
 # define THREAD_CSP_PAGE_SIZE 4096

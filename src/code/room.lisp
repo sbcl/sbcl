@@ -680,7 +680,7 @@
 ;;; This notion of page-size is completely arbitrary - it affects 2 things:
 ;;; (1) how much output to print "per page" in print-allocated-objects
 ;;; (2) sb-sprof deciding how many regions [sic] were made if #+cheneygc
-(defun get-page-size () sb!c:*backend-page-bytes*)
+(defun get-page-size () sb!c:+backend-page-bytes+)
 
 (defun print-allocated-objects (space &key (percent 0) (pages 5)
                                       type larger smaller count

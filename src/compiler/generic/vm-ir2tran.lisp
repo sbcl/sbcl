@@ -318,10 +318,9 @@
          ;; a vector object should fit in one page -- otherwise it might go past
          ;; stack guard pages.
          (values-subtypep (lvar-derived-type words)
-                          (load-time-value
-                           (specifier-type `(integer 0 ,(- (/ sb!vm::*backend-page-bytes*
-                                                              sb!vm:n-word-bytes)
-                                                           sb!vm:vector-data-offset))))))))
+                          (specifier-type
+                           `(integer 0 ,(- (/ +backend-page-bytes+ sb!vm:n-word-bytes)
+                                           sb!vm:vector-data-offset)))))))
 
   (defoptimizer (allocate-vector ltn-annotate) ((type length words) call ltn-policy)
     (declare (ignore type length words))
@@ -385,9 +384,8 @@
         ;; could be removed, because allocation would never miss the guard page
         ;; if it tries to consume too much stack space.
         (values-subtypep (lvar-derived-type length)
-                         (load-time-value
-                          (specifier-type `(integer 0 ,(/ sb!vm::*backend-page-bytes*
-                                                          sb!vm:n-word-bytes 2)))))))
+                         (specifier-type
+                          `(integer 0 ,(/ +backend-page-bytes+ sb!vm:n-word-bytes 2))))))
   (defoptimizer (%make-list ltn-annotate) ((length element) call ltn-policy)
     (declare (ignore length element))
     (vectorish-ltn-annotate-helper call ltn-policy

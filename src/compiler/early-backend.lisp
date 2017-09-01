@@ -9,10 +9,6 @@
 
 (in-package "SB!C")
 
-;;; the maximum number of bytes per page on this system (used by GENESIS)
-(defvar *backend-page-bytes* 0)
-(declaim (type index *backend-page-bytes*))
-
 #!+sb-thread
 (progn
   (defglobal sb!vm::*free-tls-index* 0)

@@ -24,7 +24,7 @@
 
 #!+gencgc
 (defconstant large-object-size
-  (* 4 (max *backend-page-bytes* gencgc-card-bytes
+  (* 4 (max +backend-page-bytes+ gencgc-card-bytes
             gencgc-alloc-granularity)))
 
 
