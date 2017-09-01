@@ -1312,16 +1312,16 @@ core and return a descriptor to it."
               (number-to-core (layout-depthoid warm-layout))
               (number-to-core (layout-bitmap warm-layout))))))
     (let* ((t-layout   (chill-layout 't))
+           (fun-layout (chill-layout 'function t-layout))
            (s-o-layout (chill-layout 'structure-object t-layout)))
       (setf *layout-layout* (chill-layout 'layout t-layout s-o-layout))
-      (dolist (layout (list t-layout s-o-layout *layout-layout*))
+      (dolist (layout (list t-layout fun-layout s-o-layout *layout-layout*))
         (set-instance-layout layout *layout-layout*))
-      (chill-layout 'function t-layout)
+      (chill-layout 'package t-layout s-o-layout)
       (let* ((sequence (chill-layout 'sequence t-layout))
              (list     (chill-layout 'list t-layout sequence))
              (symbol   (chill-layout 'symbol t-layout)))
-        (chill-layout 'null t-layout sequence list symbol))
-      (chill-layout 'package t-layout s-o-layout))))
+        (chill-layout 'null t-layout sequence list symbol)))))
 
 ;;;; interning symbols in the cold image
 
@@ -1641,6 +1641,15 @@ core and return a descriptor to it."
   ;; Establish the value of T.
   (let ((t-symbol (cold-intern t :gspace *static*)))
     (cold-set t-symbol t-symbol))
+
+  ;; Establish the value of SB-VM:FUNCTION-LAYOUT
+  #!+(and immobile-space 64-bit)
+  (let ((address-bits (descriptor-bits (gethash 'function *cold-layouts*))))
+    (aver (eql address-bits sb!vm:function-layout))
+    (write-wordindexed/raw (cold-intern 'sb!vm:function-layout)
+                           sb!vm:symbol-value-slot
+                           (ash address-bits 32)))
+
   (dolist (sym sb!vm::+c-callable-fdefns+)
     (cold-fdefinition-object (cold-intern sym) nil *static*))
 

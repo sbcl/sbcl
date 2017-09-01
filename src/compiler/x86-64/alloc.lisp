@@ -294,7 +294,8 @@
                   fun-pointer-lowtag)
       (storew* #!-immobile-space header ; write the widetag and size
                #!+immobile-space        ; ... plus the layout pointer
-               (progn (inst mov temp (logior (ash function-layout 32) header))
+               (progn (inst mov temp header)
+                      (inst or temp (static-symbol-value-ea 'function-layout))
                       temp)
                result 0 fun-pointer-lowtag (not stack-allocate-p)))
     ;; These two instructions are within the scope of PSEUDO-ATOMIC.

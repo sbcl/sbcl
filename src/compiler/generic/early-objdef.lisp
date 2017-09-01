@@ -308,6 +308,17 @@
 #!+(and immobile-space (not immobile-symbols))
 (defconstant +initial-core-symbol-bit+ 8) ; bit index, not bit value
 
+#!+immobile-space
+(progn
+  ;; FUNCTION-LAYOUT is a fixnum whose bits are ORed in "as-is" with the
+  ;; low half of a closure header to form the full header word.
+  #-sb-xc-host (defglobal function-layout 0) ; set by genesis
+
+  ;; The cross-compiler stores FUNCTION-LAYOUT in a more obvious way.
+  #+sb-xc-host
+  (defconstant function-layout ; kludge - verified by genesis
+    (logior (+ immobile-space-start 256) instance-pointer-lowtag)))
+
 #|
 ;; Run this in the SB-VM or SB!VM package once for each target feature combo.
 (defun rewrite-widetag-comments ()

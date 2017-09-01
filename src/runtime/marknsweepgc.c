@@ -681,8 +681,10 @@ scavenge_immobile_roots(generation_index_t min_gen, generation_index_t max_gen)
 #include "genesis/layout.h"
 #define LAYOUT_SIZE (sizeof (struct layout)/N_WORD_BYTES)
 #define LAYOUT_ALIGN 256 /*bytes*/
-#define LAYOUT_OF_LAYOUT  ((IMMOBILE_SPACE_START+2*LAYOUT_ALIGN)|INSTANCE_POINTER_LOWTAG)
-#define LAYOUT_OF_PACKAGE ((IMMOBILE_SPACE_START+8*LAYOUT_ALIGN)|INSTANCE_POINTER_LOWTAG)
+/// First 5 layouts: T, FUNCTION, STRUCTURE-OBJECT, LAYOUT, PACKAGE
+/// (These #defines ought to be emitted by genesis)
+#define LAYOUT_OF_LAYOUT  ((IMMOBILE_SPACE_START+3*LAYOUT_ALIGN)|INSTANCE_POINTER_LOWTAG)
+#define LAYOUT_OF_PACKAGE ((IMMOBILE_SPACE_START+4*LAYOUT_ALIGN)|INSTANCE_POINTER_LOWTAG)
 
 // As long as Lisp doesn't have any native allocators (vops and whatnot)
 // it doesn't need to access these values.

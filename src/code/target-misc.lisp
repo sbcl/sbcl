@@ -105,7 +105,7 @@
         (setf (closure-header-word copy) ; Update the header
               ;; Closure copy lost its high header bits, so OR them in again.
               (logior #!+(and immobile-space 64-bit)
-                      (ash sb!vm:function-layout 32)
+                      (get-lisp-obj-address sb!vm:function-layout)
                       +closure-header-namedp+
                       (closure-header-word copy))))
       (truly-the closure copy)))
