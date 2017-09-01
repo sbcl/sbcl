@@ -317,11 +317,16 @@
 ;;; had difficulty with non-FILE-STREAM stream arguments to pathname
 ;;; functions (they would cause memory protection errors).  Make sure
 ;;; that those errors are gone:
-(with-test (:name (:string-streams-as-pathnames 1))
-  (assert-error (pathname (make-string-input-stream "FOO"))
-                type-error)
-  (assert-error (merge-pathnames (make-string-output-stream))
-                type-error))
+(with-test (:name (string-stream :not-a pathname))
+  (flet ((test (form)
+           (multiple-value-bind (fun failurep warnings)
+               (checked-compile
+                `(lambda () ,form) :allow-warnings 'sb-int:type-warning)
+             (declare (ignore failurep))
+             (assert (= 1 (length warnings)))
+             (assert-error (funcall fun) type-error))))
+    (test '(pathname (make-string-input-stream "FOO")))
+    (test '(merge-pathnames (make-string-output-stream)))))
 
 ;;; ensure print-read consistency (or print-not-readable-error) on
 ;;; pathnames:

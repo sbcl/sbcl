@@ -1188,10 +1188,10 @@
 (defknown make-two-way-stream (stream stream) stream (unsafely-flushable))
 (defknown make-echo-stream (stream stream) stream (flushable))
 (defknown make-string-input-stream (string &optional index sequence-end)
-  stream
+  sb!impl::string-input-stream
   (flushable))
-(defknown make-string-output-stream
-    (&key (:element-type type-specifier)) sb!impl::string-output-stream
+(defknown make-string-output-stream (&key (:element-type type-specifier))
+  sb!impl::string-output-stream
   (flushable))
 (defknown get-output-stream-string (stream) simple-string ())
 (defknown streamp (t) boolean (movable foldable flushable))
