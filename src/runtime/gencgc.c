@@ -4309,6 +4309,12 @@ prepare_for_final_gc ()
             generations[HIGHEST_NORMAL_GENERATION].bytes_allocated += used;
         }
     }
+#ifdef PINNED_OBJECTS
+    struct thread *th;
+    for_each_thread(th) {
+        SetTlSymbolValue(PINNED_OBJECTS, NIL, th);
+    }
+#endif
 }
 
 /* Set this switch to 1 for coalescing of strings dumped to fasl,
