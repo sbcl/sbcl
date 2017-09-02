@@ -677,7 +677,7 @@ build_fake_control_stack_frames(struct thread *th,os_context_t *context)
         }
     } else
 #elif defined (LISP_FEATURE_ARM)
-        access_control_frame_pointer(th) =
+        access_control_frame_pointer(th) = (lispobj*)
             SymbolValue(CONTROL_STACK_POINTER, th);
 #elif defined (LISP_FEATURE_ARM64)
     access_control_frame_pointer(th) =

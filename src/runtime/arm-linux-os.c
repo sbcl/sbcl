@@ -47,7 +47,7 @@ int arch_os_thread_init(struct thread *thread) {
      * swapped stacks, require that the control stack contain only
      * boxed data, and expands upwards while the C stack expands
      * downwards. */
-    sigstack.ss_sp=((void *) thread)+dynamic_values_bytes;
+    sigstack.ss_sp=((char *) thread)+dynamic_values_bytes;
     sigstack.ss_flags=0;
     sigstack.ss_size = 32*SIGSTKSZ;
     if(sigaltstack(&sigstack,0)<0)
@@ -68,7 +68,7 @@ os_context_register_addr(os_context_t *context, int offset)
      * Rather than do a big switch/case and all that, just take the
      * address of the first one (R0) and treat it as the start of an
      * array. */
-    return &(&context->uc_mcontext.arm_r0)[offset];
+    return (os_context_register_t*)&(&context->uc_mcontext.arm_r0)[offset];
 }
 
 os_context_register_t *
