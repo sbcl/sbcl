@@ -540,7 +540,7 @@ attach_os_thread(init_thread_data *scribble)
      * at least try to suppress GC before consing, and hope that it
      * works: */
     // Just stomp on the value already set by create_thread_struct()
-    per_thread_value(SYMBOL(GC_INHIBIT), th) = T;
+    write_TLS(GC_INHIBIT, T, th);
 
     uword_t stacksize
         = (uword_t) th->control_stack_end - (uword_t) th->control_stack_start;
@@ -766,10 +766,6 @@ create_thread_struct(lispobj initial_function) {
     th->interrupt_data->allocation_trap_context = 0;
 #endif
 
-    /* setq_variable() assigns directly into TLS causing the symbol to
-     * be thread-local without saving a prior value on the binding stack.
-     * (Not to be confused with variables in 'vars.c') */
-#define setq_variable(symbol, value) per_thread_value(SYMBOL(symbol), th) = value
 #include "genesis/thread-init.inc"
 #ifdef LISP_FEATURE_SB_THREAD
     /* If a symbol assigned above had a TLS index of 0, then it'll
@@ -864,7 +860,7 @@ os_thread_t create_thread(lispobj initial_function) {
     os_thread_t kid_tid = 0;
 
     /* Must defend against async unwinds. */
-    if (SymbolValue(INTERRUPTS_ENABLED, thread) != NIL)
+    if (read_TLS(INTERRUPTS_ENABLED, thread) != NIL)
         lose("create_thread is not safe when interrupts are enabled.\n");
 
     /* Assuming that a fresh thread struct has no lisp objects in it,

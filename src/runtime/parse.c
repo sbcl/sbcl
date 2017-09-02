@@ -282,7 +282,7 @@ lispobj parse_lispobj(char **ptr)
             int regnum;
             os_context_t *context;
 
-            free_ici = fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,thread));
+            free_ici = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,thread));
 
             if (free_ici == 0) {
                 printf("Variable ``%s'' is not valid -- there is no current interrupt context.\n", token);

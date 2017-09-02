@@ -538,13 +538,13 @@ write_heap_exhaustion_report(FILE *file, long available, long requested,
     write_generation_stats(file);
     fprintf(file, "GC control variables:\n");
     fprintf(file, "   *GC-INHIBIT* = %s\n   *GC-PENDING* = %s\n",
-            SymbolValue(GC_INHIBIT,thread)==NIL ? "false" : "true",
-            (SymbolValue(GC_PENDING, thread) == T) ?
-            "true" : ((SymbolValue(GC_PENDING, thread) == NIL) ?
+            read_TLS(GC_INHIBIT,thread)==NIL ? "false" : "true",
+            (read_TLS(GC_PENDING, thread) == T) ?
+            "true" : ((read_TLS(GC_PENDING, thread) == NIL) ?
                       "false" : "in progress"));
 #ifdef LISP_FEATURE_SB_THREAD
     fprintf(file, "   *STOP-FOR-GC-PENDING* = %s\n",
-            SymbolValue(STOP_FOR_GC_PENDING,thread)==NIL ? "false" : "true");
+            read_TLS(STOP_FOR_GC_PENDING,thread)==NIL ? "false" : "true");
 #endif
 }
 
@@ -1271,7 +1271,7 @@ gc_heap_exhausted_error_or_lose (sword_t available, sword_t requested)
          * WITHOUT-INTERRUPTS which may lead to a deadlock without
          * running out of the heap. So at this point all bets are
          * off. */
-        if (SymbolValue(INTERRUPTS_ENABLED,thread) == NIL)
+        if (read_TLS(INTERRUPTS_ENABLED,thread) == NIL)
             corruption_warning_and_maybe_lose
                 ("Signalling HEAP-EXHAUSTED in a WITHOUT-INTERRUPTS.");
         /* available and requested should be double word aligned, thus
@@ -3267,7 +3267,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
 #  ifndef LISP_FEATURE_WIN32
             if (th != arch_os_get_current_thread()) {
                 long k = fixnum_value(
-                    SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,th));
+                    read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
                 while (k > 0)
                     preserve_context_registers((void(*)(os_context_register_t))preserve_pointer,
                                                th->interrupt_contexts[--k]);
@@ -3281,7 +3281,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
                 esp = (void **)((void *)&raise);
             } else {
                 void **esp1;
-                free=fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,th));
+                free=fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
                 for(i=free-1;i>=0;i--) {
                     os_context_t *c=th->interrupt_contexts[i];
                     esp1 = (void **) *os_context_register_addr(c,reg_SP);
@@ -3309,7 +3309,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
      * the same mechanism is used for objects pinned for use by alien
      * code. */
     for_each_thread(th) {
-        lispobj pin_list = SymbolTlValue(PINNED_OBJECTS,th);
+        lispobj pin_list = read_TLS(PINNED_OBJECTS,th);
         while (pin_list != NIL) {
             preserve_pointer((void*)(CONS(pin_list)->car));
             pin_list = CONS(pin_list)->cdr;
@@ -4004,11 +4004,11 @@ general_alloc_internal(sword_t nbytes, int page_type_flag, struct alloc_region *
         /* Don't flood the system with interrupts if the need to gc is
          * already noted. This can happen for example when SUB-GC
          * allocates or after a gc triggered in a WITHOUT-GCING. */
-        if (SymbolValue(GC_PENDING,thread) == NIL) {
+        if (read_TLS(GC_PENDING,thread) == NIL) {
             /* set things up so that GC happens when we finish the PA
              * section */
-            SetSymbolValue(GC_PENDING,T,thread);
-            if (SymbolValue(GC_INHIBIT,thread) == NIL) {
+            write_TLS(GC_PENDING,T,thread);
+            if (read_TLS(GC_INHIBIT,thread) == NIL) {
 #ifdef LISP_FEATURE_SB_SAFEPOINT
                 thread_register_gc_trigger();
 #else
@@ -4033,13 +4033,13 @@ general_alloc_internal(sword_t nbytes, int page_type_flag, struct alloc_region *
 
 #ifndef LISP_FEATURE_WIN32
     /* for sb-prof, and not supported on Windows yet */
-    alloc_signal = SymbolValue(ALLOC_SIGNAL,thread);
+    alloc_signal = read_TLS(ALLOC_SIGNAL,thread);
     if ((alloc_signal & FIXNUM_TAG_MASK) == 0) {
         if ((sword_t) alloc_signal <= 0) {
-            SetSymbolValue(ALLOC_SIGNAL, T, thread);
+            write_TLS(ALLOC_SIGNAL, T, thread);
             raise(SIGPROF);
         } else {
-            SetSymbolValue(ALLOC_SIGNAL,
+            write_TLS(ALLOC_SIGNAL,
                            alloc_signal - (1 << N_FIXNUM_TAG_BITS),
                            thread);
         }
@@ -4312,7 +4312,7 @@ prepare_for_final_gc ()
 #ifdef PINNED_OBJECTS
     struct thread *th;
     for_each_thread(th) {
-        SetTlSymbolValue(PINNED_OBJECTS, NIL, th);
+        write_TLS(PINNED_OBJECTS, NIL, th);
     }
 #endif
 }

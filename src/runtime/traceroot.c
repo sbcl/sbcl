@@ -223,7 +223,7 @@ static char* deduce_thread_pc(struct thread* th, void** addr)
     char* return_pc = 0;
 
     if (th != arch_os_get_current_thread()) {
-        int i = fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,th));
+        int i = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
         os_context_t *c = th->interrupt_contexts[i-1];
         fp = (uword_t*)*os_context_register_addr(c,reg_FP);
     }
@@ -260,7 +260,7 @@ static struct thread* deduce_thread(void (*context_scanner)(),
             esp = (void **)((void *)&pointer);
         else {
             void **esp1;
-            free = fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,th));
+            free = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
             for(i=free-1;i>=0;i--) {
                 os_context_t *c=th->interrupt_contexts[i];
                 esp1 = (void **) *os_context_register_addr(c,reg_SP);

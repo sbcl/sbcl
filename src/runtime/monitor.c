@@ -373,7 +373,7 @@ print_context_cmd(char **ptr)
     int free_ici;
     struct thread *thread=arch_os_get_current_thread();
 
-    free_ici = fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,thread));
+    free_ici = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,thread));
 
     if (more_p(ptr)) {
         int index;

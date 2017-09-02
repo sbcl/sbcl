@@ -172,7 +172,15 @@
 
 (defconstant-eqx +common-static-symbols+
   `(t
-    ,@(mapcar (lambda (x) (car (ensure-list x))) !per-thread-c-interface-symbols)
+    ;; These symbols are accessed from C only through TLS,
+    ;; never the symbol-value slot
+    #!-sb-thread ,@(mapcar (lambda (x) (car (ensure-list x)))
+                           !per-thread-c-interface-symbols)
+
+    ;; sb-safepoint in addition to accessing this symbol via TLS,
+    ;; uses the symbol itself as a value. Kinda weird.
+    #!+sb-safepoint *in-without-gcing*
+
     #!+immobile-space *immobile-freelist* ; not per-thread (yet...)
 
     ;; things needed for non-local-exit

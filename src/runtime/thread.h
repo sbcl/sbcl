@@ -173,20 +173,18 @@ SetSymbolValue(u64 tagged_symbol_pointer,lispobj val, void *thread)
     sym->value = val;
 }
 
-static inline lispobj
-SymbolTlValue(u64 tagged_symbol_pointer, void *thread)
-{
-    struct symbol *sym= SYMBOL(tagged_symbol_pointer);
-    return per_thread_value(sym, thread);
-}
-
-static inline void
-SetTlSymbolValue(u64 tagged_symbol_pointer,lispobj val, void *thread)
-{
-    struct symbol *sym= SYMBOL(tagged_symbol_pointer);
-    // dynbind asserts that there is a tls_index in multithread runtime
-    per_thread_value(sym, thread) = val;
-}
+#ifdef LISP_FEATURE_SB_THREAD
+/* write_TLS assigns directly into TLS causing the symbol to
+ * be thread-local without saving a prior value on the binding stack. */
+# define write_TLS(sym, val, thread) \
+   *(lispobj*)(sym##_tlsindex + \
+               (char*)((union per_thread_data*)thread)->dynamic_values) = val
+# define read_TLS(sym, thread) \
+   *(lispobj*)(sym##_tlsindex + (char*)((union per_thread_data*)thread)->dynamic_values)
+#else
+# define write_TLS(sym, val, thread) SYMBOL(sym)->value = val
+# define read_TLS(sym, thread) SYMBOL(sym)->value
+#endif
 
 #define StaticSymbolFunction(x) FdefnFun(x##_FDEFN)
 /* Return 'fun' given a tagged pointer to an fdefn. */

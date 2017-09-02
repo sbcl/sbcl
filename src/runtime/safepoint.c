@@ -221,11 +221,11 @@ static inline gc_phase_t gc_phase_next(gc_phase_t old) {
 
 static inline gc_phase_t thread_gc_phase(struct thread* p)
 {
-    boolean inhibit = (SymbolTlValue(GC_INHIBIT,p)==T)||
-        (SymbolTlValue(IN_WITHOUT_GCING,p)==IN_WITHOUT_GCING);
+    boolean inhibit = (read_TLS(GC_INHIBIT,p)==T)||
+        (read_TLS(IN_WITHOUT_GCING,p)==IN_WITHOUT_GCING);
 
     boolean inprogress =
-        (SymbolTlValue(GC_PENDING,p)!=T&& SymbolTlValue(GC_PENDING,p)!=NIL);
+        (read_TLS(GC_PENDING,p)!=T&& read_TLS(GC_PENDING,p)!=NIL);
 
     return
         inprogress ? (gc_state.collector && (gc_state.collector != p)
@@ -240,7 +240,7 @@ static inline void thread_gc_promote(struct thread* p, gc_phase_t cur, gc_phase_
         gc_state.phase_wait[cur]++;
     }
     if (cur != GC_NONE)
-        SetTlSymbolValue(STOP_FOR_GC_PENDING,T,p);
+        write_TLS(STOP_FOR_GC_PENDING,T,p);
 }
 
 /* set_thread_csp_access -- alter page permissions for not-in-Lisp
@@ -308,13 +308,13 @@ static inline void gc_notify_final()
 static inline void gc_done()
 {
     struct thread *self = arch_os_get_current_thread(), *p;
-    boolean inhibit = (SymbolTlValue(GC_INHIBIT,self)==T);
+    boolean inhibit = (read_TLS(GC_INHIBIT,self)==T);
 
     odxprint(safepoints,"%s","global denotification");
     pthread_mutex_lock(&all_threads_lock);
     for_each_thread(p) {
-        if (inhibit && (SymbolTlValue(GC_PENDING,p)==T))
-            SetTlSymbolValue(GC_PENDING,NIL,p);
+        if (inhibit && (read_TLS(GC_PENDING,p)==T))
+            write_TLS(GC_PENDING,NIL,p);
         set_thread_csp_access(p,1);
     }
     pthread_mutex_unlock(&all_threads_lock);
@@ -388,7 +388,7 @@ thread_register_gc_trigger()
     struct thread *self = arch_os_get_current_thread();
     gc_state_lock();
     if (gc_state.phase == GC_NONE &&
-        SymbolTlValue(IN_SAFEPOINT,self)!=T &&
+        read_TLS(IN_SAFEPOINT,self)!=T &&
         thread_gc_phase(self)==GC_NONE) {
         gc_advance(GC_FLIGHT,GC_NONE);
     }
@@ -404,9 +404,9 @@ thread_may_gc()
      * Note that we are in a safepoint here, which is always outside of PA. */
 
     struct thread *self = arch_os_get_current_thread();
-    return (SymbolValue(GC_INHIBIT, self) == NIL
-            && (SymbolTlValue(GC_PENDING, self) == T ||
-                SymbolTlValue(GC_PENDING, self) == NIL));
+    return (read_TLS(GC_INHIBIT, self) == NIL
+            && (read_TLS(GC_PENDING, self) == T ||
+                read_TLS(GC_PENDING, self) == NIL));
 }
 
 #ifdef LISP_FEATURE_SB_THRUPTION
@@ -432,13 +432,13 @@ thread_may_thrupt(os_context_t *ctx)
      * 4) No GC pending; it takes precedence.
      * Note that we are in a safepoint here, which is always outside of PA. */
 
-    if (SymbolValue(INTERRUPTS_ENABLED, self) == NIL)
+    if (read_TLS(INTERRUPTS_ENABLED, self) == NIL)
         return 0;
 
-    if (SymbolValue(GC_PENDING, self) != NIL)
+    if (read_TLS(GC_PENDING, self) != NIL)
         return 0;
 
-    if (SymbolValue(STOP_FOR_GC_PENDING, self) != NIL)
+    if (read_TLS(STOP_FOR_GC_PENDING, self) != NIL)
         return 0;
 
 #ifdef LISP_FEATURE_WIN32
@@ -448,11 +448,11 @@ thread_may_thrupt(os_context_t *ctx)
     /* ctx is NULL if the caller wants to ignore the sigmask. */
     if (ctx && deferrables_blocked_p(os_context_sigmask_addr(ctx)))
         return 0;
-    if (SymbolValue(INTERRUPT_PENDING, self) != NIL)
+    if (read_TLS(INTERRUPT_PENDING, self) != NIL)
         return 0;
 #endif
 
-    if (SymbolValue(RESTART_CLUSTERS, self) == NIL)
+    if (read_TLS(RESTART_CLUSTERS, self) == NIL)
         /* This special case prevents TERMINATE-THREAD from hitting
          * during INITIAL-THREAD-FUNCTION before it's ready.  Curiously,
          * deferrables are already unblocked there.  Further
@@ -481,9 +481,9 @@ check_pending_thruptions(os_context_t *ctx)
 
     if (!thread_may_thrupt(ctx))
         return 0;
-    if (SymbolValue(THRUPTION_PENDING, p) == NIL)
+    if (read_TLS(THRUPTION_PENDING, p) == NIL)
         return 0;
-    SetSymbolValue(THRUPTION_PENDING, NIL, p);
+    write_TLS(THRUPTION_PENDING, NIL, p);
 
 #ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     int was_in_lisp = !foreign_function_call_active_p(p);
@@ -538,7 +538,7 @@ on_stack_p(struct thread *th, void *esp)
 int
 on_altstack_p(struct thread *th, void *esp)
 {
-    void *start = (void *)th+dynamic_values_bytes;
+    void *start = (char *)th+dynamic_values_bytes;
     void *end = (char *)start + 32*SIGSTKSZ;
     return start <= esp && esp < end;
 }
@@ -565,25 +565,25 @@ check_pending_gc(os_context_t *ctx)
     int done = 0;
     sigset_t sigset;
 
-    if ((SymbolValue(IN_SAFEPOINT,self) == T) &&
-        ((SymbolValue(GC_INHIBIT,self) == NIL) &&
-         (SymbolValue(GC_PENDING,self) == NIL))) {
-        SetSymbolValue(IN_SAFEPOINT,NIL,self);
+    if ((read_TLS(IN_SAFEPOINT,self) == T) &&
+        ((read_TLS(GC_INHIBIT,self) == NIL) &&
+         (read_TLS(GC_PENDING,self) == NIL))) {
+        write_TLS(IN_SAFEPOINT,NIL,self);
     }
-    if (thread_may_gc() && (SymbolValue(IN_SAFEPOINT, self) == NIL)) {
-        if ((SymbolTlValue(GC_PENDING, self) == T)) {
+    if (thread_may_gc() && (read_TLS(IN_SAFEPOINT, self) == NIL)) {
+        if ((read_TLS(GC_PENDING, self) == T)) {
             lispobj gc_happened = NIL;
 
             bind_variable(IN_SAFEPOINT,T,self);
             block_deferrable_signals(&sigset);
-            if(SymbolTlValue(GC_PENDING,self)==T)
+            if(read_TLS(GC_PENDING,self)==T)
                 gc_happened = funcall0(StaticSymbolFunction(SUB_GC));
             unbind(self);
             thread_sigmask(SIG_SETMASK,&sigset,NULL);
             if (gc_happened == T) {
                 /* POST_GC wants to enable interrupts */
-                if (SymbolValue(INTERRUPTS_ENABLED,self) == T ||
-                    SymbolValue(ALLOW_WITH_INTERRUPTS,self) == T) {
+                if (read_TLS(INTERRUPTS_ENABLED,self) == T ||
+                    read_TLS(ALLOW_WITH_INTERRUPTS,self) == T) {
                     odxprint(misc, "going to call POST_GC");
                     funcall0(StaticSymbolFunction(POST_GC));
                 }
@@ -603,9 +603,9 @@ void thread_in_lisp_raised(os_context_t *ctxptr)
     gc_state_lock();
 
     if (gc_state.phase == GC_FLIGHT &&
-        SymbolTlValue(GC_PENDING,self)==T &&
+        read_TLS(GC_PENDING,self)==T &&
         thread_gc_phase(self)==GC_NONE &&
-        thread_may_gc() && SymbolTlValue(IN_SAFEPOINT,self)!=T) {
+        thread_may_gc() && read_TLS(IN_SAFEPOINT,self)!=T) {
         set_csp_from_context(self, ctxptr);
         gc_advance(GC_QUIET,GC_FLIGHT);
         set_thread_csp_access(self,1);
@@ -613,7 +613,7 @@ void thread_in_lisp_raised(os_context_t *ctxptr)
             gc_advance(GC_NONE,GC_QUIET);
         } else {
             *self->csp_around_foreign_call = 0;
-            SetTlSymbolValue(GC_PENDING,T,self);
+            write_TLS(GC_PENDING,T,self);
         }
         gc_state_unlock();
         check_pending_gc(ctxptr);
@@ -627,7 +627,7 @@ void thread_in_lisp_raised(os_context_t *ctxptr)
     }
     phase = thread_gc_phase(self);
     if (phase == GC_NONE) {
-        SetTlSymbolValue(STOP_FOR_GC_PENDING,NIL,self);
+        write_TLS(STOP_FOR_GC_PENDING,NIL,self);
         set_thread_csp_access(self,1);
         set_csp_from_context(self, ctxptr);
         if (gc_state.phase <= GC_SETTLED)
@@ -642,7 +642,7 @@ void thread_in_lisp_raised(os_context_t *ctxptr)
 #endif
     } else {
         gc_advance(phase,gc_state.phase);
-        SetTlSymbolValue(STOP_FOR_GC_PENDING,T,self);
+        write_TLS(STOP_FOR_GC_PENDING,T,self);
         gc_state_unlock();
     }
 }
@@ -662,7 +662,7 @@ void thread_in_safety_transition(os_context_t *ctxptr)
     } else {
         gc_phase_t phase = thread_gc_phase(self);
         if (phase == GC_NONE) {
-            SetTlSymbolValue(STOP_FOR_GC_PENDING,NIL,self);
+            write_TLS(STOP_FOR_GC_PENDING,NIL,self);
             set_csp_from_context(self, ctxptr);
             if (gc_state.phase <= GC_SETTLED)
                 gc_advance(phase,gc_state.phase);
@@ -671,7 +671,7 @@ void thread_in_safety_transition(os_context_t *ctxptr)
             *self->csp_around_foreign_call = 0;
         } else {
             gc_advance(phase,gc_state.phase);
-            SetTlSymbolValue(STOP_FOR_GC_PENDING,T,self);
+            write_TLS(STOP_FOR_GC_PENDING,T,self);
         }
         gc_state_unlock();
     }
@@ -728,7 +728,7 @@ gc_stop_the_world()
     }
     set_thread_csp_access(self,1);
     gc_state_unlock();
-    SetTlSymbolValue(STOP_FOR_GC_PENDING,NIL,self);
+    write_TLS(STOP_FOR_GC_PENDING,NIL,self);
 }
 
 
@@ -737,7 +737,7 @@ void gc_start_the_world()
     odxprint(safepoints,"%s","start the world");
     gc_state_lock();
     gc_state.collector = NULL;
-    SetSymbolValue(IN_WITHOUT_GCING,IN_WITHOUT_GCING,
+    write_TLS(IN_WITHOUT_GCING,IN_WITHOUT_GCING,
                      arch_os_get_current_thread());
     gc_advance(GC_NONE,GC_COLLECT);
     gc_state_unlock();
@@ -764,13 +764,13 @@ wake_thread_win32(struct thread *thread)
 
     wake_thread_io(thread);
 
-    if (SymbolTlValue(THRUPTION_PENDING,thread)==T)
+    if (read_TLS(THRUPTION_PENDING,thread)==T)
         return;
 
-    SetTlSymbolValue(THRUPTION_PENDING,T,thread);
+    write_TLS(THRUPTION_PENDING,T,thread);
 
-    if ((SymbolTlValue(GC_PENDING,thread)==T)||
-        (SymbolTlValue(STOP_FOR_GC_PENDING,thread)==T))
+    if ((read_TLS(GC_PENDING,thread)==T)||
+        (read_TLS(STOP_FOR_GC_PENDING,thread)==T))
         return;
 
     wake_thread_io(thread);
@@ -797,7 +797,7 @@ wake_thread_posix(os_thread_t os_thread)
     /* Must not and need not attempt to signal ourselves while we're the
      * STW initiator. */
     if (self->os_thread == os_thread) {
-        SetTlSymbolValue(THRUPTION_PENDING,T,self);
+        write_TLS(THRUPTION_PENDING,T,self);
         WITH_GC_AT_SAFEPOINTS_ONLY()
             while (check_pending_thruptions(0 /* ignore the sigmask */))
                 ;
@@ -822,9 +822,9 @@ wake_thread_posix(os_thread_t os_thread)
                     found = 1;
 
                     odxprint(safepoints, "wake_thread_posix: found");
-                    SetTlSymbolValue(THRUPTION_PENDING,T,thread);
-                    if (SymbolTlValue(GC_PENDING,thread) == T
-                        || SymbolTlValue(STOP_FOR_GC_PENDING,thread) == T)
+                    write_TLS(THRUPTION_PENDING,T,thread);
+                    if (read_TLS(GC_PENDING,thread) == T
+                        || read_TLS(STOP_FOR_GC_PENDING,thread) == T)
                         break;
 
                     if (os_get_csp(thread)) {
@@ -850,7 +850,7 @@ wake_thread_posix(os_thread_t os_thread)
         pthread_mutex_lock(&all_threads_lock);
         for_each_thread (thread)
             if (thread->os_thread == os_thread) {
-                SetTlSymbolValue(THRUPTION_PENDING,T,thread);
+                write_TLS(THRUPTION_PENDING,T,thread);
                 found = 1;
                 break;
             }

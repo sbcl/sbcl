@@ -901,9 +901,7 @@ core and return a descriptor to it."
 ;; by the fasloader on demand.
 #!+sb-thread
 (defvar *known-tls-symbols*
-    ;; FIXME: no mechanism exists to determine which static symbols C code will
-    ;; dynamically bind. TLS is a finite resource, and wasting indices for all
-    ;; static symbols isn't the best idea. This list was hand-made with 'grep'.
+    ;; FIXME: mostly redundant with SB!VM::!PER-THREAD-C-INTERFACE-SYMBOLS now
                   '(sb!vm:*alloc-signal*
                     sb!sys:*allow-with-interrupts*
                     sb!vm:*current-catch-block*
@@ -1638,6 +1636,12 @@ core and return a descriptor to it."
               nil
               offset-found
               offset-wanted))))
+
+  ;; Assign TLS indices of C interface symbols
+  #!+sb-thread
+  (dolist (binding sb!vm::!per-thread-c-interface-symbols)
+    (ensure-symbol-tls-index (car (ensure-list binding))))
+
   ;; Establish the value of T.
   (let ((t-symbol (cold-intern t :gspace *static*)))
     (cold-set t-symbol t-symbol))
@@ -1676,10 +1680,6 @@ core and return a descriptor to it."
 ;;; Establish initial values for magic symbols.
 ;;;
 (defun finish-symbols ()
-  #!+sb-thread
-  (dolist (binding sb!vm::!per-thread-c-interface-symbols)
-    (ensure-symbol-tls-index (car (ensure-list binding))))
-
   (cold-set '*!initial-layouts*
             (vector-in-core
              (mapcar (lambda (layout)
@@ -3284,7 +3284,7 @@ core and return a descriptor to it."
 
 (defun write-thread-init (stream)
   (dolist (binding sb!vm::!per-thread-c-interface-symbols)
-    (format stream "setq_variable(~A, ~A);~%"
+    (format stream "write_TLS(~A, ~A, th);~%" ; KLUDGE: 'th' is a thread
             (c-symbol-name (if (listp binding) (car binding) binding) "*")
             (if (listp binding) (second binding)))))
 
@@ -3304,6 +3304,15 @@ core and return a descriptor to it."
                  sb!vm:n-word-bytes
                  sb!vm:other-pointer-lowtag
                  (if symbol (sb!vm:static-symbol-offset symbol) 0)))))
+  #!+sb-thread
+  (dolist (binding sb!vm::!per-thread-c-interface-symbols)
+    (let* ((symbol (car (ensure-list binding)))
+           (c-symbol (c-symbol-name symbol "*")))
+      (unless (member symbol sb!vm::+common-static-symbols+)
+        ;; So that "#ifdef thing" works, but not as a C expression
+        (format stream "#define ~A (*)~%" c-symbol))
+      (format stream "#define ~A_tlsindex 0x~X~%"
+              c-symbol (ensure-symbol-tls-index symbol))))
   (loop for symbol in sb!vm::+c-callable-fdefns+
         for index from 0
         do

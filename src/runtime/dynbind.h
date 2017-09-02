@@ -12,7 +12,12 @@
 #ifndef _DYNBIND_H_
 #define _DYNBIND_H_
 
+#ifdef LISP_FEATURE_SB_THREAD
+#define bind_variable(sym, val, th) bind_tls_cell(sym##_tlsindex, val, th)
+extern void bind_tls_cell(unsigned index, lispobj value, void *thread);
+#else
 extern void bind_variable(lispobj symbol, lispobj value,void *thread);
+#endif
 extern void unbind(void *thread);
 extern void unbind_to_here(lispobj *bsp,void *thread);
 

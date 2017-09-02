@@ -1428,7 +1428,7 @@ boolean
 maybe_gc(os_context_t *context)
 {
     lispobj gc_happened;
-    struct thread *thread = arch_os_get_current_thread();
+    __attribute__((unused)) struct thread *thread = arch_os_get_current_thread();
     boolean were_in_lisp = !foreign_function_call_active_p(thread);
 
     if (were_in_lisp) {
@@ -1492,8 +1492,8 @@ maybe_gc(os_context_t *context)
          * them. POST-GC has a similar check, but we don't want to
          * unlock deferrables in that case and get a pending interrupt
          * here. */
-        ((SymbolValue(INTERRUPTS_ENABLED,thread) != NIL) ||
-         (SymbolValue(ALLOW_WITH_INTERRUPTS,thread) != NIL))) {
+        ((read_TLS(INTERRUPTS_ENABLED,thread) != NIL) ||
+         (read_TLS(ALLOW_WITH_INTERRUPTS,thread) != NIL))) {
 #ifndef LISP_FEATURE_WIN32
         sigset_t *context_sigmask = os_context_sigmask_addr(context);
         if (!deferrables_blocked_p(context_sigmask)) {
@@ -1848,7 +1848,7 @@ scavenge_interrupt_contexts(struct thread *th)
     int i, index;
     os_context_t *context;
 
-    index = fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,th));
+    index = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
 
 #if defined(DEBUG_PRINT_CONTEXT_INDEX)
     printf("Number of active contexts: %d\n", index);

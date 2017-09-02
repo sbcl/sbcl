@@ -29,48 +29,35 @@
 /* Specially bind SYMBOL to VALUE. In a multithreaded build, SYMBOL must already
    have been assigned a thread-local storage index. See *KNOWN-TLS-SYMBOLS* in
    compiler/generic/genesis for the symbols whose indices are pre-assigned. */
+#ifdef LISP_FEATURE_SB_THREAD
+#define value_address(thing, thread) \
+  (lispobj*)(thing + (char*)((union per_thread_data *)thread)->dynamic_values)
+void bind_tls_cell(unsigned symbol, lispobj value, void *th)
+#else
+#define value_address(thing, thread) &SYMBOL(thing)->value
 void bind_variable(lispobj symbol, lispobj value, void *th)
+#endif
 {
     struct binding *binding;
-    struct thread *thread=(struct thread *)th;
+    __attribute__((unused)) struct thread *thread = (struct thread *)th;
     binding = (struct binding *)get_binding_stack_pointer(thread);
     set_binding_stack_pointer(thread,binding+1);
-#ifdef LISP_FEATURE_SB_THREAD
-    {
-        struct symbol *sym=(struct symbol *)native_pointer(symbol);
-        // We could provide a c-callable static Lisp function to assign TLS
-        // indices if anyone really needs dynamic binding of dynamic symbols.
-        binding->symbol = tls_index_of(sym);
-        if(!binding->symbol)
-            lose("Oops! Static symbol missing from *KNOWN-TLS-SYMBOLS*");
-        binding->value = SymbolTlValue(symbol, thread);
-    }
-#else
     binding->symbol = symbol;
-    binding->value = SymbolTlValue(symbol, thread);
-#endif
-    SetTlSymbolValue(symbol, value, thread);
+    lispobj* where = value_address(symbol, thread);
+    binding->value = *where;
+    *where = value;
 }
 
 void
 unbind(void *th)
 {
-    struct thread *thread=(struct thread *)th;
+     __attribute__((unused)) struct thread *thread = (struct thread *)th;
     struct binding *binding;
-    lispobj symbol;
 
     binding = ((struct binding *)get_binding_stack_pointer(thread)) - 1;
 
-    /* On sb-thread, it's actually a tls-index */
-    symbol = binding->symbol;
-
-#ifdef LISP_FEATURE_SB_THREAD
-
-    ((union per_thread_data *)thread)->dynamic_values[(symbol) >> WORD_SHIFT]
-        = binding->value;
-#else
-    SetSymbolValue(symbol, binding->value, thread);
-#endif
+    /* On sb-thread, 'binding->symbol' is actually a tls-index */
+    *value_address(binding->symbol, thread) = binding->value;
 
     binding->symbol = 0;
     binding->value = 0;
@@ -81,7 +68,7 @@ unbind(void *th)
 void
 unbind_to_here(lispobj *bsp,void *th)
 {
-    struct thread *thread=(struct thread *)th;
+     __attribute__((unused)) struct thread *thread = (struct thread *)th;
     struct binding *target = (struct binding *)bsp;
     struct binding *binding = (struct binding *)get_binding_stack_pointer(thread);
     lispobj symbol;
@@ -92,12 +79,7 @@ unbind_to_here(lispobj *bsp,void *th)
         symbol = binding->symbol;
         if (symbol) {
             if (symbol != UNBOUND_MARKER_WIDETAG) {
-#ifdef LISP_FEATURE_SB_THREAD
-                ((union per_thread_data *)thread)->dynamic_values[(symbol) >> WORD_SHIFT]
-                    = binding->value;
-#else
-                SetSymbolValue(symbol, binding->value, thread);
-#endif
+                *value_address(symbol, thread) = binding->value;
             }
             binding->symbol = 0;
             binding->value = 0;

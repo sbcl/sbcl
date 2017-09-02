@@ -368,7 +368,7 @@ previous_info(struct call_info *info)
     lra = info->lra;
     if (lra == NIL) {
         /* We were interrupted. Find the correct signal context. */
-        free_ici = fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,thread));
+        free_ici = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,thread));
         while (free_ici-- > 0) {
             os_context_t *context =
                 thread->interrupt_contexts[free_ici];
@@ -529,14 +529,14 @@ describe_thread_state(void)
 #endif
 #endif
     printf("Specials:\n");
-    printf(" *GC-INHIBIT* = %s\n", (SymbolValue(GC_INHIBIT, thread) == T) ? "T" : "NIL");
+    printf(" *GC-INHIBIT* = %s\n", (read_TLS(GC_INHIBIT, thread) == T) ? "T" : "NIL");
     printf(" *GC-PENDING* = %s\n",
-           (SymbolValue(GC_PENDING, thread) == T) ?
-           "T" : ((SymbolValue(GC_PENDING, thread) == NIL) ?
+           (read_TLS(GC_PENDING, thread) == T) ?
+           "T" : ((read_TLS(GC_PENDING, thread) == NIL) ?
                   "NIL" : ":IN-PROGRESS"));
-    printf(" *INTERRUPTS-ENABLED* = %s\n", (SymbolValue(INTERRUPTS_ENABLED, thread) == T) ? "T" : "NIL");
+    printf(" *INTERRUPTS-ENABLED* = %s\n", (read_TLS(INTERRUPTS_ENABLED, thread) == T) ? "T" : "NIL");
 #ifdef STOP_FOR_GC_PENDING
-    printf(" *STOP-FOR-GC-PENDING* = %s\n", (SymbolValue(STOP_FOR_GC_PENDING, thread) == T) ? "T" : "NIL");
+    printf(" *STOP-FOR-GC-PENDING* = %s\n", (read_TLS(STOP_FOR_GC_PENDING, thread) == T) ? "T" : "NIL");
 #endif
     printf("Pending handler = %p\n", data->pending_handler);
 }
@@ -602,7 +602,7 @@ void
 lisp_backtrace(int nframes)
 {
     struct thread *thread=arch_os_get_current_thread();
-    int free_ici = fixnum_value(SymbolValue(FREE_INTERRUPT_CONTEXT_INDEX,thread));
+    int free_ici = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,thread));
 
     if (free_ici) {
         os_context_t *context = thread->interrupt_contexts[free_ici - 1];
