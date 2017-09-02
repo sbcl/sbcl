@@ -539,7 +539,8 @@ attach_os_thread(init_thread_data *scribble)
      * tempting to just perform such unsafe allocation though.  So let's
      * at least try to suppress GC before consing, and hope that it
      * works: */
-    bind_variable(GC_INHIBIT, T, th);
+    // Just stomp on the value already set by create_thread_struct()
+    per_thread_value(SYMBOL(GC_INHIBIT), th) = T;
 
     uword_t stacksize
         = (uword_t) th->control_stack_end - (uword_t) th->control_stack_start;
@@ -755,26 +756,6 @@ create_thread_struct(lispobj initial_function) {
      * which would crash if not otherwise bound or assigned) */
     set_current_catch_block(th, 0);
     set_current_uwp_block(th, 0);
-    bind_variable(FREE_INTERRUPT_CONTEXT_INDEX,make_fixnum(0),th);
-    bind_variable(INTERRUPT_PENDING, NIL,th);
-    bind_variable(INTERRUPTS_ENABLED,T,th);
-    bind_variable(ALLOW_WITH_INTERRUPTS,T,th);
-    bind_variable(GC_PENDING,NIL,th);
-    bind_variable(ALLOC_SIGNAL,NIL,th);
-#ifdef PINNED_OBJECTS
-    bind_variable(PINNED_OBJECTS,NIL,th);
-#endif
-#ifdef LISP_FEATURE_SB_THREAD
-    bind_variable(STOP_FOR_GC_PENDING,NIL,th);
-#endif
-#if defined(LISP_FEATURE_SB_SAFEPOINT)
-    bind_variable(GC_SAFE,NIL,th);
-    bind_variable(IN_SAFEPOINT,NIL,th);
-#endif
-#ifdef LISP_FEATURE_SB_THRUPTION
-    bind_variable(THRUPTION_PENDING,NIL,th);
-    bind_variable(RESTART_CLUSTERS,NIL,th);
-#endif
 #ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     access_control_stack_pointer(th)=th->control_stack_start;
 #endif
@@ -783,6 +764,17 @@ create_thread_struct(lispobj initial_function) {
     th->interrupt_data->gc_blocked_deferrables = 0;
 #ifdef GENCGC_IS_PRECISE
     th->interrupt_data->allocation_trap_context = 0;
+#endif
+
+    /* setq_variable() assigns directly into TLS causing the symbol to
+     * be thread-local without saving a prior value on the binding stack.
+     * (Not to be confused with variables in 'vars.c') */
+#define setq_variable(symbol, value) per_thread_value(SYMBOL(symbol), th) = value
+#include "genesis/thread-init.inc"
+#ifdef LISP_FEATURE_SB_THREAD
+    /* If a symbol assigned above had a TLS index of 0, then it'll
+     * mess up th->no_tls_value_marker. Fail now if that happened. */
+    gc_assert(th->no_tls_value_marker == NO_TLS_VALUE_MARKER_WIDETAG);
 #endif
     th->no_tls_value_marker=initial_function;
 

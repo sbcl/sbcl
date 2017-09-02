@@ -1419,6 +1419,11 @@ session."
   ;; accessible to users to secure their own libraries.
   ;;   --njf, 2006-07-15
   ;;
+  ;; FIXME: because #<"main thread"> does not come through here, the global
+  ;; values of these symbols matter. That's bad! It would be nicer for codegen
+  ;; if these symbols (and some others) never required testing for
+  ;; NO-TLS-VALUE-MARKER and potential fallback to loading symbol-global-value.
+  ;;
   ;; As it is, this lambda must not cons until we are ready to run
   ;; GC. Be very careful.
   (let* ((*current-thread* thread)
@@ -1432,7 +1437,8 @@ session."
          (sb!impl::*token-buf-pool* nil)
          (sb!impl::*ignored-package-locks* :invalid)
          (sb!impl::*descriptor-handlers* nil)) ; serve-event
-    ;; Binding from C
+    ;; *ALLOC-SIGNAL* is made thread-local by create_thread_struct()
+    ;; so this assigns into TLS, not the global value.
     (setf sb!vm:*alloc-signal* *default-alloc-signal*)
     (setf (thread-os-thread thread) (current-thread-os-thread))
     (with-mutex ((thread-result-lock thread))

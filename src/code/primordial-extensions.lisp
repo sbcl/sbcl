@@ -257,6 +257,10 @@
             (pop-rabbit)
             (pop turtle)))))
 
+(declaim (inline ensure-list))
+(defun ensure-list (thing)
+  (if (listp thing) thing (list thing)))
+
 ;;; Helpers for defining error-signalling NOP's for "not supported
 ;;; here" operations.
 (defmacro define-unsupported-fun (name &optional

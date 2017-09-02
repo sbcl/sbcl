@@ -48,10 +48,12 @@
 ;;;    (foo))
 ;;; provided that the first branch is true "often enough".
 
-(!defvar *interrupts-enabled* t)
-(!defvar *interrupt-pending* nil)
-#!+sb-thruption (!defvar *thruption-pending* nil)
-(!defvar *allow-with-interrupts* t)
+;;; These 4 symbols are initialized by create_thread_struct()
+(defvar *interrupts-enabled*)
+(defvar *interrupt-pending*)
+#!+sb-thruption (defvar *thruption-pending*)
+(defvar *allow-with-interrupts*)
+
 ;;; This is to support signal handlers that want to return to the
 ;;; interrupted context without leaving anything extra on the stack. A
 ;;; simple

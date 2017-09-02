@@ -146,9 +146,34 @@
     sb!unix::signal-handler-callback)
   #'equal)
 
+;;; Static symbols that C code must be able to assign to,
+;;; as contrasted with static for other reasons such as:
+;;;  - garbage collections roots (namely NIL)
+;;;  - other symbols that Lisp codegen must hardwire (T)
+;;;  - static for efficiency of access but need not be
+(defconstant-eqx !per-thread-c-interface-symbols
+  `((*free-interrupt-context-index* 0)
+    (sb!unix::*allow-with-interrupts* t)
+    (sb!unix::*interrupts-enabled* t)
+    *alloc-signal*
+    sb!unix::*interrupt-pending*
+    #!+sb-thruption sb!unix::*thruption-pending*
+    #!+sb-thruption sb!impl::*restart-clusters*
+    *in-without-gcing*
+    *gc-inhibit*
+    *gc-pending*
+    #!+sb-safepoint sb!impl::*gc-safe*
+    #!+sb-safepoint sb!impl::*in-safepoint*
+    #!+sb-thread *stop-for-gc-pending*
+    ;; non-x86oid gencgc object pinning
+    #!+(and gencgc (not (or x86 x86-64))) *pinned-objects*
+    )
+  #'equal)
+
 (defconstant-eqx +common-static-symbols+
   `(t
-    #!+immobile-space *immobile-freelist*
+    ,@(mapcar (lambda (x) (car (ensure-list x))) !per-thread-c-interface-symbols)
+    #!+immobile-space *immobile-freelist* ; not per-thread (yet...)
 
     ;; things needed for non-local-exit
     #!-(and x86-64 sb-thread) *current-catch-block* ; a thread slot otherwise
@@ -161,24 +186,9 @@
     #!-sb-thread *control-stack-start* ; ditto
     #!-sb-thread *control-stack-end*   ; ditto
 
-    ;; interrupt handling
-    *alloc-signal*
-    *free-interrupt-context-index*
-    sb!unix::*allow-with-interrupts*
-    sb!unix::*interrupts-enabled*
-    sb!unix::*interrupt-pending*
-    #!+sb-thruption sb!unix::*thruption-pending*
-    #!+sb-thruption sb!impl::*restart-clusters*
-    *in-without-gcing*
-    *gc-inhibit*
-    *gc-pending*
-    #!-sb-thread
-    *stepping*
-    #!+sb-safepoint sb!impl::*gc-safe*
-    #!+sb-safepoint sb!impl::*in-safepoint*
+    #!-sb-thread *stepping*
 
     ;; threading support
-    #!+sb-thread *stop-for-gc-pending*
     #!+sb-thread *free-tls-index*
     ;; Keep in sync with 'compiler/early-backend.lisp':
     ;;  "only PPC uses a separate symbol for the TLS index lock"
@@ -186,10 +196,6 @@
 
     ;; dynamic runtime linking support
     #!+sb-dynamic-core +required-foreign-symbols+
-
-    ;; non-x86oid gencgc object pinning
-    #!+(and gencgc (not (or x86 x86-64)))
-    *pinned-objects*
 
     ;; for looking up assembler routine by name
     ;; and patching them on runtime startup

@@ -1677,10 +1677,8 @@ core and return a descriptor to it."
 ;;;
 (defun finish-symbols ()
   #!+sb-thread
-  (progn (ensure-symbol-tls-index 'sb!vm::*current-catch-block*)
-         (ensure-symbol-tls-index 'sb!vm::*current-unwind-protect-block*))
-
-  (cold-set '*free-interrupt-context-index* (make-fixnum-descriptor 0))
+  (dolist (binding sb!vm::!per-thread-c-interface-symbols)
+    (ensure-symbol-tls-index (car (ensure-list binding))))
 
   (cold-set '*!initial-layouts*
             (vector-in-core
@@ -3284,6 +3282,12 @@ core and return a descriptor to it."
                            sb!vm:instance-pointer-lowtag))
     (format t "~%#endif /* LANGUAGE_ASSEMBLY */~2%")))
 
+(defun write-thread-init (stream)
+  (dolist (binding sb!vm::!per-thread-c-interface-symbols)
+    (format stream "setq_variable(~A, ~A);~%"
+            (c-symbol-name (if (listp binding) (car binding) binding) "*")
+            (if (listp binding) (second binding)))))
+
 (defun write-static-symbols (stream)
   (dolist (symbol (cons nil (coerce sb!vm:+static-symbols+ 'list)))
     ;; FIXME: It would be nice to use longer names than NIL and
@@ -3784,6 +3788,10 @@ initially undefined function references:~2%")
                          sb!c::compiled-debug-info sb!c::compiled-debug-fun))
           (out-to (string-downcase class)
             (write-structure-object (layout-info (find-layout class)) stream)))
+        (with-open-file (stream (format nil "~A/thread-init.inc" c-header-dir-name)
+                                :direction :output :if-exists :supersede)
+          (write-boilerplate stream) ; no inclusion guard, it's not a ".h" file
+          (write-thread-init stream))
         (out-to "static-symbols" (write-static-symbols stream))
         (out-to "sc-offset" (write-sc-offset-coding stream)))
 
