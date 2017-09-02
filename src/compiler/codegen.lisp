@@ -264,19 +264,19 @@
       (do ((vop (ir2-block-start-vop block) (vop-next vop)))
           ((null vop))
         (let ((gen (vop-info-generator-function (vop-info vop))))
-          (cond ((not gen)
-                 (format t
-                         "missing generator for ~S~%"
-                         (template-name (vop-info vop))))
-                #!+arm64
-                ((and (vop-next vop)
-                      (eq (vop-name vop)
-                          (vop-name (vop-next vop)))
-                      (memq (vop-name vop) '(move move-operand sb!vm::move-arg))
-                      (sb!vm::load-store-two-words vop (vop-next vop)))
-                 (setf vop (vop-next vop)))
-                (t
-                 (assemble (*code-segment* vop)
+          (assemble (*code-segment* vop)
+            (cond ((not gen)
+                   (format t
+                           "missing generator for ~S~%"
+                           (template-name (vop-info vop))))
+                  #!+arm64
+                  ((and (vop-next vop)
+                        (eq (vop-name vop)
+                            (vop-name (vop-next vop)))
+                        (memq (vop-name vop) '(move move-operand sb!vm::move-arg))
+                        (sb!vm::load-store-two-words vop (vop-next vop)))
+                   (setf vop (vop-next vop)))
+                  (t
                    (funcall gen vop)))))))
     (append-segment *code-segment* *elsewhere*)
     (setf *elsewhere* nil)
