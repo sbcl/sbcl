@@ -430,6 +430,7 @@
   (:args (x :target y :scs (double-int-carg-reg) :load-if nil)
          (fp :scs (any-reg) :load-if (not (sc-is y double-int-carg-reg))))
   (:results (y :scs (double-int-carg-reg) :load-if nil))
+  (:ignore fp)
   (:generator 2
     (unless (location= x y)
       (error "Huh? why did it do that?"))))
