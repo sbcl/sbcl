@@ -245,6 +245,52 @@
 (defun reset-inst-ids ()
   (clrhash *inst-ids*)
   (setf *next-inst-id* 0))
+;;;
+
+;;; This holds the current segment while assembling. Use ASSEMBLE to
+;;; change it.
+(defvar **current-segment**)
+;;; Just like **CURRENT-SEGMENT** except this holds the current vop.
+;;; This is used only to keep track of which vops emit which insts.
+(defvar **current-vop** nil)
+
+(defmacro assemble ((&optional segment vop &key labels) &body body
+                    &environment env)
+  "Execute BODY (as a progn) with SEGMENT as the current segment."
+  (flet ((label-name-p (thing)
+           (and thing (symbolp thing))))
+    (let* ((visible-labels (remove-if-not #'label-name-p body))
+           (inherited-labels
+             (multiple-value-bind (expansion expanded)
+                 (#+sb-xc-host cl:macroexpand
+                  #-sb-xc-host %macroexpand '..inherited-labels.. env)
+               (if expanded (copy-list expansion) nil)))
+           (new-labels
+             (sort (append labels
+                           (set-difference visible-labels
+                                           inherited-labels))
+                   #'string<))
+           (nested-labels
+             (sort (set-difference (append inherited-labels new-labels)
+                                   visible-labels)
+                   #'string<)))
+      (when (intersection labels inherited-labels)
+        (error "duplicate nested labels: ~S"
+               (intersection labels inherited-labels)))
+      `(let* (,@(when segment
+                  `((**current-segment** ,segment)))
+              ,@(when vop
+                  `((**current-vop** ,vop)))
+              ,@(mapcar (lambda (name)
+                          `(,name (gen-label)))
+                        new-labels))
+         (symbol-macrolet (,@(when (or inherited-labels nested-labels)
+                               `((..inherited-labels.. ,nested-labels))))
+           ,@(mapcar (lambda (form)
+                       (if (label-name-p form)
+                           `(emit-label ,form)
+                           form))
+                     body))))))
 
 ;;;; the scheduler itself
 
@@ -541,10 +587,11 @@
 
     ;; Now call the emitters, but turn the scheduler off for the duration.
     (setf (segment-run-scheduler segment) nil)
-    (dolist (inst results)
-      (if (eq inst :nop)
-          (sb!c:emit-nop segment)
-          (funcall (inst-emitter inst) segment)))
+    (assemble (segment)
+     (dolist (inst results)
+       (if (eq inst :nop)
+           (sb!c:emit-nop segment)
+           (funcall (inst-emitter inst) segment))))
     (setf (segment-run-scheduler segment) t))
 
   ;; Clear out any residue left over.
@@ -1130,52 +1177,6 @@
 
 
 ;;;; interface to the rest of the compiler
-
-;;; This holds the current segment while assembling. Use ASSEMBLE to
-;;; change it.
-(defvar **current-segment**)
-;;; Just like **CURRENT-SEGMENT** except this holds the current vop.
-;;; This is used only to keep track of which vops emit which insts.
-(defvar **current-vop** nil)
-
-(defmacro assemble ((&optional segment vop &key labels) &body body
-                    &environment env)
-  "Execute BODY (as a progn) with SEGMENT as the current segment."
-  (flet ((label-name-p (thing)
-           (and thing (symbolp thing))))
-    (let* ((visible-labels (remove-if-not #'label-name-p body))
-           (inherited-labels
-             (multiple-value-bind (expansion expanded)
-                 (#+sb-xc-host cl:macroexpand
-                  #-sb-xc-host %macroexpand '..inherited-labels.. env)
-               (if expanded (copy-list expansion) nil)))
-           (new-labels
-             (sort (append labels
-                           (set-difference visible-labels
-                                           inherited-labels))
-                   #'string<))
-           (nested-labels
-             (sort (set-difference (append inherited-labels new-labels)
-                                   visible-labels)
-                   #'string<)))
-      (when (intersection labels inherited-labels)
-        (error "duplicate nested labels: ~S"
-               (intersection labels inherited-labels)))
-      `(let* (,@(when segment
-                  `((**current-segment** ,segment)))
-              ,@(when vop
-                  `((**current-vop** ,vop)))
-              ,@(mapcar (lambda (name)
-                          `(,name (gen-label)))
-                        new-labels))
-         (symbol-macrolet (,@(when (or inherited-labels nested-labels)
-                               `((..inherited-labels.. ,nested-labels))))
-           ,@(mapcar (lambda (form)
-                       (if (label-name-p form)
-                           `(emit-label ,form)
-                           form))
-                     body))))))
-
 (defun op-encoder-name (string-designator &optional create)
   (let ((conflictp
          ;; This kludge avoids interning instruction encoder names in lowercase
