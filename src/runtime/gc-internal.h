@@ -1,5 +1,15 @@
 /*
  * garbage collection - shared definitions for modules "inside" the GC system
+ * FIXME: despite the preceding remark, this header is total mashup of things
+ * that are "internal to GC" vs "for all SBCL-internal C code" as opposed to
+ * gc.h which is some kind of external API though it's unclear for what,
+ * since hardly anything includes it.
+ * We need at least 1 new header for truly private bits of the GC.
+ * It's very scary that 15 other C files believe that they need this header.
+ * It would be less scary if "internal" meant "stuff intended for everything
+ * else internal to SBCL", and "gc-private.h" held support functions such as
+ * weak_pointer_breakable_p(), though it's hard to tell for sure
+ * what will work without actually doing such a refactor
  */
 
 /*
@@ -21,12 +31,6 @@
 #include "genesis/weak-pointer.h"
 #include "thread.h"
 #include "interr.h"
-
-#ifdef LISP_FEATURE_GENCGC
-#include "gencgc-internal.h"
-#else
-#include "cheneygc-internal.h"
-#endif
 
 /// Enable extra debug-only checks if DEBUG
 #ifdef DEBUG
@@ -55,6 +59,12 @@ do {                                                                   \
 
 #define gc_abort()                                                     \
   lose("GC invariant lost, file \"%s\", line %d\n", __FILE__, __LINE__)
+
+#ifdef LISP_FEATURE_GENCGC
+#include "gencgc-internal.h"
+#else
+#include "cheneygc-internal.h"
+#endif
 
 #define CEILING(x,y) (((x) + ((y) - 1)) & (~((y) - 1)))
 
@@ -227,12 +237,6 @@ void gencgc_apply_code_fixups(struct code *old_code, struct code *new_code);
 #endif
 
 #include "fixnump.h"
-
-#ifdef LISP_FEATURE_GENCGC
-#include "gencgc-internal.h"
-#else
-#include "cheneygc-internal.h"
-#endif
 
 #if N_WORD_BITS == 32
 # define SIMPLE_ARRAY_WORD_WIDETAG SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG

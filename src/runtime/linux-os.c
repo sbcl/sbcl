@@ -49,12 +49,7 @@
 
 #include "validate.h"
 #include "thread.h"
-#include "gc.h"
-#if defined LISP_FEATURE_GENCGC
-#include "gencgc-internal.h"
-#else
-#include "cheneygc-internal.h"
-#endif
+#include "gc-internal.h"
 #include <fcntl.h>
 #ifdef LISP_FEATURE_SB_WTIMER
 # include <sys/timerfd.h>

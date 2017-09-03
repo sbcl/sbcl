@@ -32,7 +32,6 @@
 #include "print.h"
 #include "arch.h"
 #include "interr.h"
-#include "gc.h"
 #include "search.h"
 #include "purify.h"
 #include "globals.h"
