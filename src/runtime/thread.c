@@ -750,12 +750,6 @@ create_thread_struct(lispobj initial_function) {
     SetSymbolValue(ALIEN_STACK_POINTER,(lispobj)th->alien_stack_pointer,th);
 #endif
 #endif
-    /* Catch and uwp blocks can be initialized with 'set' instead of 'bind'.
-     * They're similarly set to 0 on save, and there are no unbind actions
-     * that are relevant to these. (And btw they start out as NO_TLS_VALUE
-     * which would crash if not otherwise bound or assigned) */
-    set_current_catch_block(th, 0);
-    set_current_uwp_block(th, 0);
 #ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     access_control_stack_pointer(th)=th->control_stack_start;
 #endif

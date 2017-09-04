@@ -261,8 +261,8 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
         fflush(stdout);
     }
     unbind_to_here((lispobj *)th->binding_stack_start,th);
-    set_current_catch_block(th, 0);
-    set_current_uwp_block(th, 0);
+    write_TLS(CURRENT_CATCH_BLOCK, 0, th); // If set to 0 on start, why here too?
+    write_TLS(CURRENT_UNWIND_PROTECT_BLOCK, 0, th);
     if (verbose) printf("done]\n");
 #ifdef LISP_FEATURE_IMMOBILE_CODE
     // It's better to wait to defrag until after the binding stack is undone,

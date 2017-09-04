@@ -153,12 +153,12 @@
 ;;;  - static for efficiency of access but need not be
 (defconstant-eqx !per-thread-c-interface-symbols
   `((*free-interrupt-context-index* 0)
-    (sb!unix::*allow-with-interrupts* t)
-    (sb!unix::*interrupts-enabled* t)
+    (sb!sys:*allow-with-interrupts* t)
+    (sb!sys:*interrupts-enabled* t)
     *alloc-signal*
-    sb!unix::*interrupt-pending*
-    #!+sb-thruption sb!unix::*thruption-pending*
-    #!+sb-thruption sb!impl::*restart-clusters*
+    sb!sys:*interrupt-pending*
+    #!+sb-thruption sb!sys:*thruption-pending*
+    #!+sb-thruption sb!kernel:*restart-clusters*
     *in-without-gcing*
     *gc-inhibit*
     *gc-pending*
@@ -167,6 +167,9 @@
     #!+sb-thread *stop-for-gc-pending*
     ;; non-x86oid gencgc object pinning
     #!+(and gencgc (not (or x86 x86-64))) *pinned-objects*
+    ;; things needed for non-local-exit
+    (*current-catch-block* 0)
+    (*current-unwind-protect-block* 0)
     )
   #'equal)
 
@@ -176,16 +179,17 @@
     ;; never the symbol-value slot
     #!-sb-thread ,@(mapcar (lambda (x) (car (ensure-list x)))
                            !per-thread-c-interface-symbols)
+    ;; NLX variables are thread slots on x86-64.  A static sym is needed
+    ;; for arm64, ppc, and x86 because we haven't implemented TLS index fixups,
+    ;; so must lookup the TLS index given the symbol.
+    #!+(and sb-thread (not x86-64)) ,@'(*current-catch-block*
+                                        *current-unwind-protect-block*)
 
     ;; sb-safepoint in addition to accessing this symbol via TLS,
     ;; uses the symbol itself as a value. Kinda weird.
     #!+sb-safepoint *in-without-gcing*
 
     #!+immobile-space *immobile-freelist* ; not per-thread (yet...)
-
-    ;; things needed for non-local-exit
-    #!-(and x86-64 sb-thread) *current-catch-block* ; a thread slot otherwise
-    #!-(and x86-64 sb-thread) *current-unwind-protect-block* ; ditto
 
     #!+hpux *c-lra*
 

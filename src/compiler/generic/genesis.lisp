@@ -720,7 +720,7 @@ core and return a descriptor to it."
      ;; 64-bit platforms have immediate single-floats.
      #!+64-bit
      (make-random-descriptor (logior (ash (single-float-bits x) 32)
-                                     sb!vm::single-float-widetag))
+                                     sb!vm:single-float-widetag))
      #!-64-bit
      (let ((des (allocate-header+object *dynamic*
                                          (1- sb!vm:single-float-size)
@@ -857,7 +857,7 @@ core and return a descriptor to it."
 ;; of MAX-INTERRUPTS by moving the thread base register up by TLS-SIZE words,
 ;; using negative offsets for all dynamically assigned indices.
 (defvar *genesis-tls-counter*
-  (+ 1 sb!vm::max-interrupts
+  (+ 1 sb!vm:max-interrupts
      (sb!vm:primitive-object-size
       (find 'sb!vm::thread sb!vm:*primitive-objects*
             :key #'sb!vm:primitive-object-name))))
@@ -889,35 +889,6 @@ core and return a descriptor to it."
           (cold-assign-tls-index cold-sym tls-index)))
       tls-index)))
 
-;; A table of special variable names which get known TLS indices.
-;; Some of them are mapped onto 'struct thread' and have pre-determined offsets.
-;; Others are static symbols used with bind_variable() in the C runtime,
-;; and might not, in the absence of this table, get an index assigned by genesis
-;; depending on whether the cross-compiler used the BIND vop on them.
-;; Indices for those static symbols can be chosen arbitrarily, which is to say
-;; the value doesn't matter but must update the tls-counter correctly.
-;; All symbols other than the ones in this table get the indices assigned
-;; by the fasloader on demand.
-#!+sb-thread
-(defvar *known-tls-symbols*
-    ;; FIXME: mostly redundant with SB!VM::!PER-THREAD-C-INTERFACE-SYMBOLS now
-                  '(sb!vm:*alloc-signal*
-                    sb!sys:*allow-with-interrupts*
-                    sb!vm:*current-catch-block*
-                    sb!vm::*current-unwind-protect-block*
-                    sb!kernel:*free-interrupt-context-index*
-                    sb!kernel:*gc-inhibit*
-                    sb!kernel:*gc-pending*
-                    sb!impl::*gc-safe*
-                    sb!impl::*in-safepoint*
-                    sb!sys:*interrupt-pending*
-                    sb!sys:*interrupts-enabled*
-                    sb!vm::*pinned-objects*
-                    sb!kernel:*restart-clusters*
-                    sb!kernel:*stop-for-gc-pending*
-                    #!+sb-thruption
-                    sb!sys:*thruption-pending*))
-
 (defvar *cold-symbol-gspace* (or #!+immobile-space '*immobile-fixedobj* '*dynamic*))
 
 ;;; Allocate (and initialize) a symbol.
@@ -932,16 +903,6 @@ core and return a descriptor to it."
                        (set-readonly (base-string-to-core name *dynamic*)))
     (write-wordindexed symbol sb!vm:symbol-package-slot *nil-descriptor*)
     symbol))
-
-#!+sb-thread
-(defun assign-tls-index-if-needed (symbol cold-symbol)
-  (let ((index (info :variable :wired-tls symbol)))
-    (cond ((integerp index) ; thread slot
-           (cold-assign-tls-index cold-symbol index))
-          ((memq symbol *known-tls-symbols*)
-           ;; symbols without which the C runtime could not start
-           (shiftf index *genesis-tls-counter* (1+ *genesis-tls-counter*))
-           (cold-assign-tls-index cold-symbol (ash index sb!vm:word-shift))))))
 
 ;;; Set the cold symbol value of SYMBOL-OR-SYMBOL-DES, which can be either a
 ;;; descriptor of a cold symbol or (in an abbreviation for the
@@ -1568,7 +1529,10 @@ core and return a descriptor to it."
           (record-accessibility
            (or access (nth-value 1 (find-symbol (symbol-name symbol) package)))
            pkg-info handle package symbol))
-        #!+sb-thread (assign-tls-index-if-needed symbol handle)
+        #!+sb-thread
+        (let ((index (info :variable :wired-tls symbol)))
+          (when (integerp index) ; thread slot
+            (cold-assign-tls-index handle index)))
         (when (eq package *keyword-package*)
           (cold-set handle handle))
         handle)))
