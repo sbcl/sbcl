@@ -275,8 +275,8 @@ from_space_p(lispobj obj)
 extern page_index_t last_free_page;
 extern boolean gencgc_partial_pickup;
 
-#endif
-
 extern uword_t
 walk_generation(uword_t (*proc)(lispobj*,lispobj*,uword_t),
                 generation_index_t generation, uword_t extra);
+
+#endif /* _GENCGC_INTERNAL_H_*/
