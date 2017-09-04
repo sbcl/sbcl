@@ -406,7 +406,8 @@
     (when (and same-name-p
                (not (or more minimal)))
       (setf flags (logior flags compiled-debug-var-same-name-p)))
-    #!+64-bit
+    #!+64-bit ; FIXME: fails if SB-VM:N-FIXNUM-TAG-BITS is 3
+              ; which early-vm.lisp claims to work
     (cond (indirect
            (setf (ldb (byte 27 8) flags) (tn-sc-offset tn))
            (when save-tn
