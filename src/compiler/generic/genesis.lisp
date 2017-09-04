@@ -312,18 +312,15 @@
     (setf (gspace-free-word-index gspace) new-free-word-index)
     old-free-word-index))
 
-;; align256p is true if we need to force objects on this page to 256-byte
+;; layoutp is true if we need to force objects on this page to LAYOUT-ALIGN
 ;; boundaries. This doesn't need to be generalized - everything of type
-;; INSTANCE is either on its natural alignment, or 256-byte.
+;; INSTANCE is either on its natural alignment, or the layout alignment.
 ;; [See doc/internals-notes/compact-instance for why you might want it at all]
 ;; PAGE-KIND is a heuristic for placement of symbols
 ;; based on being interned/uninterned/likely-special-variable.
-(defun make-page-attributes (align256p page-kind)
+(defun make-page-attributes (layoutp page-kind)
   (declare (type (or null (integer 0 3)) page-kind))
-  (logior (ash (or page-kind 0) 1) (if align256p 1 0)))
-(defun immobile-obj-spacing-words (page-attributes)
-  (if (logbitp 0 page-attributes)
-      (/ 256 sb!vm:n-word-bytes)))
+  (logior (ash (or page-kind 0) 1) (if layoutp 1 0)))
 
 (defun gspace-claim-n-bytes (gspace specified-n-bytes page-attributes)
   (declare (ignorable page-attributes))
@@ -346,7 +343,8 @@
              (destructuring-bind (page-word-index . page-base-index) found
                (let ((next-word
                       (+ page-word-index
-                         (or (immobile-obj-spacing-words page-attributes)
+                         (if (logbitp 0 page-attributes)
+                             (/ sb!vm:layout-align sb!vm:n-word-bytes)
                              n-words))))
                  (if (> next-word (- page-n-words n-words))
                      ;; no more objects fit on this page
@@ -556,16 +554,17 @@
 
 ;;; There are three kinds of blocks of memory in the type system:
 ;;; * Boxed objects (cons cells, structures, etc): These objects have no
-;;;   header as all slots are descriptors.
+;;;   header as all slots, or almost all slots, are descriptors.
+;;;   This also includes code objects, which are mostly non-descriptors.
 ;;; * Unboxed objects (bignums): There is a single header word that contains
 ;;;   the length.
 ;;; * Vector objects: There is a header word with the type, then a word for
 ;;;   the length, then the data.
-(defun allocate-object (gspace length lowtag &optional align256p)
+(defun allocate-object (gspace length lowtag &optional layoutp)
   "Allocate LENGTH words in GSPACE and return a new descriptor of type LOWTAG
   pointing to them."
   (allocate-cold-descriptor gspace (ash length sb!vm:word-shift) lowtag
-                            (make-page-attributes align256p 0)))
+                            (make-page-attributes layoutp 0)))
 (defun allocate-header+object (gspace length widetag)
   "Allocate LENGTH words plus a header word in GSPACE and
   return an ``other-pointer'' descriptor to them. Initialize the header word
@@ -696,7 +695,7 @@ core and return a descriptor to it."
 (defun write-double-float-bits (address index x)
   (let ((high-bits (double-float-high-bits x))
         (low-bits (double-float-low-bits x)))
-    (ecase sb!vm::n-word-bits
+    (ecase sb!vm:n-word-bits
       (32
        (ecase sb!c:*backend-byte-order*
          (:little-endian
@@ -3038,7 +3037,7 @@ core and return a descriptor to it."
                                      (tailwise-equal name suffix))
                                    suffixes)
                          (record-with-translated-name priority large))))
-              (maybe-record-with-translated-name '("-LOWTAG") 0)
+              (maybe-record-with-translated-name '("-LOWTAG"  "-ALIGN") 0)
               (maybe-record-with-translated-name '("-WIDETAG" "-SHIFT") 1)
               (maybe-record-with-munged-name "-FLAG" "flag_" 2)
               (maybe-record-with-munged-name "-TRAP" "trap_" 3)

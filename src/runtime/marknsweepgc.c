@@ -680,7 +680,6 @@ scavenge_immobile_roots(generation_index_t min_gen, generation_index_t max_gen)
 
 #include "genesis/layout.h"
 #define LAYOUT_SIZE (sizeof (struct layout)/N_WORD_BYTES)
-#define LAYOUT_ALIGN 256 /*bytes*/
 /// First 5 layouts: T, FUNCTION, STRUCTURE-OBJECT, LAYOUT, PACKAGE
 /// (These #defines ought to be emitted by genesis)
 #define LAYOUT_OF_LAYOUT  ((IMMOBILE_SPACE_START+3*LAYOUT_ALIGN)|INSTANCE_POINTER_LOWTAG)
@@ -705,14 +704,12 @@ void set_immobile_space_hints()
   // to scavenge() is gotten from the page attributes, and scavenge asserts
   // that the ending address is aligned to a doubleword boundary as expected.
 
-  // LAYOUTs are 256-byte-aligned so that the low byte contains no information.
-  // This makes it possible to recover a layout pointer from an instance header
-  // by simply changing the low byte to instance-pointer-lowtag.
-  // As a test of objects using larger-than-required alignment,
-  // the 64-bit implementation uses 256-byte alignment for layouts,
-  // even though the header can store all bits of the layout pointer.
-  // The 32-bit implementation would also need somewhere different to store
-  // the generation byte of each layout, which is a minor annoyance.
+  // For 32-bit immobile space, LAYOUTs must be 256-byte-aligned so that the
+  // low byte of a pointer contains no information, and a layout pointer can
+  // be stored in the high 3 bytes point of an instance header.
+  // instance-length can be recovered from the layout, and need not be stored
+  // in each instance. Representation change in rev 092af9c078c made
+  // things more difficult, but not impossible.
   layout_page_hint = get_freeish_page(0, MAKE_ATTR(LAYOUT_ALIGN / N_WORD_BYTES, // spacing
                                                    CEILING(LAYOUT_SIZE,2),
                                                    0));

@@ -3068,6 +3068,7 @@ structure representations"
                "INTERIOR-REG-SC-NUMBER" "INTERNAL-ERROR-ARGS"
                "INTERRUPTED-FLAG"
                #!+gencgc "LARGE-OBJECT-SIZE"
+               "LAYOUT-ALIGN"
                "LIST-ALLOCATED-OBJECTS" "LIST-POINTER-LOWTAG"
                ;; FIXME: Possibly these other parameters (see
                ;; compiler/{x86,sparc}/parms.lisp) should be defined
