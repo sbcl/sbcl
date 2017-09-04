@@ -86,7 +86,7 @@ copy_object(lispobj object, sword_t nwords)
     return gc_general_copy_object(object, nwords, BOXED_PAGE_FLAG);
 }
 
-static sword_t scav_lose(lispobj *where, lispobj object); /* forward decl */
+static void (*scav_ptr[4])(lispobj *where, lispobj object); /* forward decl */
 
 static inline void scav1(lispobj* object_ptr, lispobj object)
 {
@@ -116,7 +116,7 @@ static inline void scav1(lispobj* object_ptr, lispobj object)
     if (forwarding_pointer_p(ptr)) \
         *object_ptr = LOW_WORD(forwarding_pointer_value(ptr)); \
     else /* Scavenge that pointer. */ \
-        (void)scavtab[widetag_of(object)](object_ptr, object); \
+        scav_ptr[(object>>(N_LOWTAG_BITS-2))&3](object_ptr, object); \
     }
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     page_index_t page;

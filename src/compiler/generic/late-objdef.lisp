@@ -156,6 +156,7 @@ static inline lispobj compute_lispobj(lispobj* base_addr) {
                     ;; trailing comma on the last item is OK in C
                     collect (subseq contents i (+ i 64))))))
   (let ((scavtab  (make-array 256 :initial-element nil))
+        (ptrtab   (make-array 4   :initial-element nil))
         (transtab (make-array 64  :initial-element nil))
         (sizetab  (make-array 256 :initial-element nil)))
     (dotimes (i 256)
@@ -168,6 +169,8 @@ static inline lispobj compute_lispobj(lispobj* base_addr) {
                                    (#.fun-pointer-lowtag      "fun")
                                    (#.other-pointer-lowtag    "other"))))
                (when pointer-kind
+                 (setf (svref ptrtab (ldb (byte 2 (- sb!vm:n-lowtag-bits 2)) i))
+                       pointer-kind)
                  (setf (svref scavtab i) (format nil "~A_pointer" pointer-kind)
                        (svref sizetab i) "pointer"))))))
     (dolist (entry *scav/trans/size*)
@@ -186,6 +189,9 @@ static inline lispobj compute_lispobj(lispobj* base_addr) {
              (format stream "~%};~%")))
       (write-table "sword_t (*scavtab[256])(lispobj *where, lispobj object)"
                    "scav_" scavtab)
+      (format stream "static void (*scav_ptr[4])(lispobj *where, lispobj object)~
+ = {~{~%  (void(*)(lispobj*,lispobj))scav_~A_pointer~^,~}~%};~%"
+              (coerce ptrtab 'list))
       (write-table "static lispobj (*transother[64])(lispobj object)"
                    "trans_" transtab)
       (format stream "#define size_pointer size_immediate~%")
