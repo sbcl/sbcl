@@ -164,6 +164,8 @@ extern void *gc_general_alloc(sword_t nbytes,int page_type_flag,int quick_p);
     gc_dcheck(lowtag_of(copy) == lowtag); \
     gc_dcheck(!from_space_p(copy));
 
+#define note_transported_object(old, new) /* do nothing */
+
 static inline lispobj
 gc_general_copy_object(lispobj object, long nwords, int page_type_flag)
 {
@@ -176,6 +178,8 @@ gc_general_copy_object(lispobj object, long nwords, int page_type_flag)
 
     /* Copy the object. */
     memcpy(new,native_pointer(object),nwords*N_WORD_BYTES);
+
+    note_transported_object(object, new);
 
     return make_lispobj(new, lowtag_of(object));
 }
