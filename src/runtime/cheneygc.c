@@ -177,6 +177,7 @@ collect_garbage(generation_index_t ignore)
     print_garbage(from_space, from_space_free_pointer);
 #endif
 
+    scan_binding_stack();
     /* Scan the weak pointers. */
 #ifdef PRINTNOISE
     printf("Scanning weak hash tables ...\n");

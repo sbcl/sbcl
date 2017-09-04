@@ -193,6 +193,7 @@ extern sword_t scavenge(lispobj *start, sword_t n_words);
 extern void scavenge_interrupt_contexts(struct thread *thread);
 extern void scav_weak_hash_tables(void);
 extern void scav_binding_stack(lispobj*, lispobj*);
+extern void scan_binding_stack(void);
 extern void scan_weak_hash_tables(void);
 extern void scan_weak_pointers(void);
 

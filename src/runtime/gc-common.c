@@ -193,18 +193,45 @@ sword_t scavenge(lispobj *start, sword_t n_words)
 
 void scav_binding_stack(lispobj* where, lispobj* end)
 {
-#ifdef LISP_FEATURE_SB_THREAD
-    // The binding stack stores TLS indices where symbols would be,
-    // and there's no reason to scavenge those words since they're fixnums.
-    // This means a symbol can not be enlivened if it exists *solely* on
-    // the binding stack - which is, practically speaking, impossible.
-    lispobj *object_ptr;
-    for (object_ptr = where; object_ptr < end; object_ptr += 2) {
-        lispobj object = *object_ptr;
-        if (is_lisp_pointer(object)) scav1(object_ptr, object);
+    /* The binding stack consists of pairs of words, each holding a value and
+     * either a TLS index (if threads), or symbol (if no threads).
+     * Here we scavenge only the entries' values.
+     *
+     * Were the TLS index scavenged, it can never cause a symbol to move,
+     * let alone be considered live. So we are bug-for-bug compatible regardless
+     * of +/- sb-thread if a symbol would otherwise be garbage at this point.
+     * As a practical matter, it is technically impossible for a symbol's only
+     * reason for livenesss to be the binding stack. Nonetheless it is best to
+     * enforce behavioral consistency whether or not the platform has threads.
+     *
+     * Bindings of compile-time known symbols is fairly easy to reason about.
+     * Code headers point to symbols, therefore code objects retains symbols.
+     * The edge case of a PROGV binding of a freshly made symbol (via MAKE-SYMBOL)
+     * is interesting. Indeed we preserve the symbol because PROGV places a reference
+     * on the control stack, thereby either pinning or scavenging as the case may be.
+     * If it did not, we would need a map from TLS index to symbol, updated if
+     * a symbol moves, allowing death of a symbol only when no binding entry
+     * mentions that index. Such complication is unnecessary at present.
+     */
+    struct binding* binding = (struct binding*)where;
+    for ( ; (lispobj*)binding < end; ++binding )
+        if (is_lisp_pointer(binding->value))
+            scav1(&binding->value, binding->value);
+}
+void scan_binding_stack()
+{
+#ifndef LISP_FEATURE_SB_THREAD
+    struct thread* th;
+    for_each_thread(th) { /* 'all' is exactly one */
+        struct binding *binding = (struct binding*)th->binding_stack_start;
+        lispobj *end = (lispobj*)get_binding_stack_pointer(th);
+        for ( ; (lispobj*)binding < end; ++binding ) {
+            if (is_lisp_pointer(binding->symbol) &&
+                forwarding_pointer_p(native_pointer(binding->symbol)))
+                binding->symbol =
+                  forwarding_pointer_value(native_pointer(binding->symbol));
+        }
     }
-#else
-    scavenge(where, end - where);
 #endif
 }
 
