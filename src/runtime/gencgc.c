@@ -4347,6 +4347,18 @@ gc_and_save(char *filename, boolean prepend_runtime,
      * non-conservative GC. */
     filename = strdup(filename);
 
+    /* We're committed to process death at this point, and interrupts can not
+     * possibly be handled in Lisp. Let the installed handler closures become
+     * garbage, since new ones will be made by ENABLE-INTERRUPT on restart */
+#ifndef LISP_FEATURE_WIN32
+    {
+        int i;
+        for (i=0; i<NSIG; ++i)
+            if (lowtag_of(interrupt_handlers[i].lisp) == FUN_POINTER_LOWTAG)
+                interrupt_handlers[i].lisp = 0;
+    }
+#endif
+
     /* Collect twice: once into relatively high memory, and then back
      * into low memory. This compacts the retained data into the lower
      * pages, minimizing the size of the core file.
@@ -4365,6 +4377,8 @@ gc_and_save(char *filename, boolean prepend_runtime,
     if (gc_coalesce_string_literals && verbose)
         printf("done]\n");
 
+    /* FIXME: now that relocate_heap() works, can we just memmove() everything
+     * down and perform a relocation instead of a collection? */
     prepare_for_final_gc();
     gencgc_alloc_start_page = -1;
     collect_garbage(HIGHEST_NORMAL_GENERATION+1);
