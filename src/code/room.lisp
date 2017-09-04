@@ -310,12 +310,14 @@
   ;; blown past our endpoint.
   (aver (<= (get-lisp-obj-address start)
             (get-lisp-obj-address end)))
-  (unless (= start end)
-    (multiple-value-bind
-          (obj typecode size)
-        (reconstitute-object start)
-      (aver (zerop (logand n-lowtag-bits size)))
-      (let ((next-start
+  (unless (eq start end) ; avoid GENERIC=
+    (multiple-value-bind (obj typecode size) (reconstitute-object start)
+      ;; SIZE is almost surely a fixnum. Non-fixnum would mean at least
+      ;; a 512MB object if 32-bit words, and is inconceivable if 64-bit.
+      (aver (not (logtest (the word size) lowtag-mask)))
+      (funcall fun obj typecode size)
+      (map-objects-in-range
+             fun
              ;; This special little dance is to add a number of octets
              ;; (and it had best be a number evenly divisible by our
              ;; allocation granularity) to an unboxed, aligned address
@@ -323,9 +325,8 @@
              (%make-lisp-obj
               (mask-field (byte #.n-word-bits 0)
                           (+ (get-lisp-obj-address start)
-                             size)))))
-        (funcall fun obj typecode size)
-        (map-objects-in-range fun next-start end)))))
+                             size)))
+             end))))
 
 ;;; Access to the GENCGC page table for better precision in
 ;;; MAP-ALLOCATED-OBJECTS
