@@ -14,10 +14,8 @@
 
 ;;;; type format database
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-
-  (def!struct (room-info (:constructor make-room-info (name kind))
-                         (:copier nil))
+(defstruct (room-info (:constructor make-room-info (name kind))
+                      (:copier nil))
     ;; the name of this type
     (name nil :type symbol :read-only t)
     ;; kind of type (how to reconstitute an object)
@@ -25,108 +23,87 @@
           :type (member :other :tiny-other :closure :instance :list
                         :code :vector-nil :weak-pointer)
           :read-only t))
-  (!set-load-form-method room-info (:xc))
 
-  (defun room-info-type-name (info)
+(defun room-info-type-name (info)
     (if (specialized-array-element-type-properties-p info)
         (saetp-primitive-type-name info)
-        (room-info-name info))))
+        (room-info-name info)))
 
-(eval-when (:compile-toplevel :execute)
+(defun !compute-room-infos ()
+  (let ((infos (make-array 256 :initial-element nil)))
+    (dolist (obj *primitive-objects*)
+      (let ((widetag (primitive-object-widetag obj))
+            (lowtag (primitive-object-lowtag obj))
+            (name (primitive-object-name obj)))
+        (when (and (eq lowtag 'other-pointer-lowtag)
+                   (not (member widetag '(t nil)))
+                   (not (eq name 'weak-pointer)))
+          (setf (svref infos (symbol-value widetag))
+                (make-room-info name (if (member name '(fdefn symbol))
+                                         :tiny-other
+                                         :other))))))
 
-(defvar *meta-room-info* (make-array 256 :initial-element nil))
+    (dolist (code (list #!+sb-unicode complex-character-string-widetag
+                        complex-base-string-widetag simple-array-widetag
+                        complex-bit-vector-widetag complex-vector-widetag
+                        complex-array-widetag complex-vector-nil-widetag))
+      (setf (svref infos code)
+            (make-room-info 'array-header :other)))
 
-(dolist (obj *primitive-objects*)
-  (let ((widetag (primitive-object-widetag obj))
-        (lowtag (primitive-object-lowtag obj))
-        (name (primitive-object-name obj)))
-    (when (and (eq lowtag 'other-pointer-lowtag)
-               (not (member widetag '(t nil)))
-               (not (eq name 'weak-pointer)))
-      (setf (svref *meta-room-info* (symbol-value widetag))
-            (make-room-info name (if (member name '(fdefn symbol))
-                                     :tiny-other
-                                     :other))))))
+    (setf (svref infos bignum-widetag)
+          (make-room-info 'bignum :other))
 
-(dolist (code (list #!+sb-unicode complex-character-string-widetag
-                    complex-base-string-widetag simple-array-widetag
-                    complex-bit-vector-widetag complex-vector-widetag
-                    complex-array-widetag complex-vector-nil-widetag))
-  (setf (svref *meta-room-info* code)
-        (make-room-info 'array-header :other)))
+    (setf (svref infos closure-widetag)
+          (make-room-info 'closure :closure))
 
-(setf (svref *meta-room-info* bignum-widetag)
-      (make-room-info 'bignum :other))
+    (dotimes (i (length *specialized-array-element-type-properties*))
+      (let ((saetp (aref *specialized-array-element-type-properties* i)))
+        (when (saetp-specifier saetp) ;; SIMPLE-ARRAY-NIL is a special case.
+          (setf (svref infos (saetp-typecode saetp)) saetp))))
 
-(setf (svref *meta-room-info* closure-widetag)
-      (make-room-info 'closure :closure))
+    (setf (svref infos simple-array-nil-widetag)
+          (make-room-info 'simple-array-nil :vector-nil))
 
-(dotimes (i (length *specialized-array-element-type-properties*))
-  (let ((saetp (aref *specialized-array-element-type-properties* i)))
-    (when (saetp-specifier saetp) ;; SIMPLE-ARRAY-NIL is a special case.
-      (setf (svref *meta-room-info* (saetp-typecode saetp)) saetp))))
+    (setf (svref infos code-header-widetag)
+          (make-room-info 'code :code))
 
-(setf (svref *meta-room-info* simple-array-nil-widetag)
-      (make-room-info 'simple-array-nil :vector-nil))
+    (setf (svref infos instance-widetag)
+          (make-room-info 'instance :instance))
 
-(setf (svref *meta-room-info* code-header-widetag)
-      (make-room-info 'code :code))
+    (setf (svref infos funcallable-instance-widetag)
+          (make-room-info 'funcallable-instance :closure))
 
-(setf (svref *meta-room-info* instance-widetag)
-      (make-room-info 'instance :instance))
+    (setf (svref infos weak-pointer-widetag)
+          (make-room-info 'weak-pointer :weak-pointer))
 
-(setf (svref *meta-room-info* funcallable-instance-widetag)
-      (make-room-info 'funcallable-instance :closure))
+    (let ((cons-info (make-room-info 'cons :list)))
+      ;; A cons consists of two words, both of which may be either a
+      ;; pointer or immediate data.  According to the runtime this means
+      ;; either a fixnum, a character, an unbound-marker, a single-float
+      ;; on a 64-bit system, or a pointer.
+      (dotimes (i (ash 1 (- n-widetag-bits n-fixnum-tag-bits)))
+        (setf (svref infos (ash i n-fixnum-tag-bits)) cons-info))
 
-(setf (svref *meta-room-info* weak-pointer-widetag)
-      (make-room-info 'weak-pointer :weak-pointer))
+      (dotimes (i (ash 1 (- n-widetag-bits n-lowtag-bits)))
+        (setf (svref infos (logior (ash i n-lowtag-bits) instance-pointer-lowtag))
+              cons-info)
+        (setf (svref infos (logior (ash i n-lowtag-bits) list-pointer-lowtag))
+              cons-info)
+        (setf (svref infos (logior (ash i n-lowtag-bits) fun-pointer-lowtag))
+              cons-info)
+        (setf (svref infos (logior (ash i n-lowtag-bits) other-pointer-lowtag))
+              cons-info))
 
-(let ((cons-info (make-room-info 'cons :list)))
-  ;; A cons consists of two words, both of which may be either a
-  ;; pointer or immediate data.  According to the runtime this means
-  ;; either a fixnum, a character, an unbound-marker, a single-float
-  ;; on a 64-bit system, or a pointer.
-  (dotimes (i (ash 1 (- n-widetag-bits n-fixnum-tag-bits)))
-    (setf (svref *meta-room-info* (ash i n-fixnum-tag-bits)) cons-info))
+      (setf (svref infos character-widetag) cons-info)
 
-  (dotimes (i (ash 1 (- n-widetag-bits n-lowtag-bits)))
-    (setf (svref *meta-room-info* (logior (ash i n-lowtag-bits)
-                                          instance-pointer-lowtag))
-          cons-info)
-    (setf (svref *meta-room-info* (logior (ash i n-lowtag-bits)
-                                          list-pointer-lowtag))
-          cons-info)
-    (setf (svref *meta-room-info* (logior (ash i n-lowtag-bits)
-                                          fun-pointer-lowtag))
-          cons-info)
-    (setf (svref *meta-room-info* (logior (ash i n-lowtag-bits)
-                                          other-pointer-lowtag))
-          cons-info))
+      (setf (svref infos unbound-marker-widetag) cons-info)
 
-  (setf (svref *meta-room-info* character-widetag) cons-info)
+      ;; Single-floats are immediate data on 64-bit systems.
+      #!+64-bit (setf (svref infos single-float-widetag) cons-info))
 
-  (setf (svref *meta-room-info* unbound-marker-widetag) cons-info)
+    infos))
 
-  ;; Single-floats are immediate data on 64-bit systems.
-  #!+64-bit
-  (setf (svref *meta-room-info* single-float-widetag) cons-info))
-
-) ; EVAL-WHEN
-
-(define-load-time-global *room-info*
-  ;; SAETP instances don't dump properly from XC (or possibly
-  ;; normally), and we'd rather share structure with the master copy
-  ;; if we can anyway, so...
-  (make-array 256
-              :initial-contents
-              #.`(list
-                  ,@(map 'list
-                         (lambda (info)
-                           (if (specialized-array-element-type-properties-p info)
-                               `(aref *specialized-array-element-type-properties*
-                                      ,(position info *specialized-array-element-type-properties*))
-                               info))
-                         *meta-room-info*))))
+(define-load-time-global *room-info* (!compute-room-infos))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
