@@ -879,7 +879,7 @@
               #!+immobile-code
               (when (eq (make-lisp-obj
                          (alien-funcall
-                          (extern-alien "fdefn_raw_referent" (function unsigned unsigned))
+                          (extern-alien "fdefn_callee_lispobj" (function unsigned unsigned))
                           (logandc2 (get-lisp-obj-address this) lowtag-mask)))
                         object)
                 (return-from ref-p t))

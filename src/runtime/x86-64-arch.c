@@ -560,7 +560,7 @@ arch_set_fp_modes(unsigned int mxcsr)
 ///     it resemble a simple-fun in terms of call convention, or
 /// (3) a code-component with no simple-fun within it, that makes
 ///     closures and other funcallable-instances look like simple-funs.
-lispobj fdefn_raw_referent(struct fdefn* fdefn) {
+lispobj fdefn_callee_lispobj(struct fdefn* fdefn) {
     extern unsigned ASM_ROUTINES_END;
     if (((lispobj)fdefn->raw_addr & 0xFE) == 0xE8) {  // looks good
         unsigned int raw_fun = (int)(long)&fdefn->raw_addr + 5 // length of "JMP rel32"

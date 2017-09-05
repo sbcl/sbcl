@@ -167,12 +167,10 @@ static int find_ref(lispobj* source, lispobj target)
         })
         scan_limit = code_header_words(header);
         break;
-#ifdef LISP_FEATURE_IMMOBILE_CODE
     case FDEFN_WIDETAG:
-        check_ptr(3, fdefn_raw_referent((struct fdefn*)source));
+        check_ptr(3, fdefn_callee_lispobj((struct fdefn*)source));
         scan_limit = 3;
         break;
-#endif
     }
     for(i=1; i<scan_limit; ++i) check_ptr(i, source[i]);
     return -1;
@@ -611,13 +609,11 @@ static void trace1(lispobj object,
                 widetag_of(*native_pointer(ptr)) == CLOSURE_WIDETAG)
                 target -= FUN_RAW_ADDR_OFFSET;
             break;
-#ifdef LISP_FEATURE_IMMOBILE_CODE
         case 3:
             if (lowtag_of(ptr) == OTHER_POINTER_LOWTAG &&
                 widetag_of(FDEFN(ptr)->header) == FDEFN_WIDETAG)
-                target = fdefn_raw_referent((struct fdefn*)native_pointer(ptr));
+                target = fdefn_callee_lispobj((struct fdefn*)native_pointer(ptr));
             break;
-#endif
         }
         target = canonical_obj(target);
         struct layer* next_layer = top_layer->next;
@@ -712,12 +708,10 @@ static uword_t build_refs(lispobj* where, lispobj* end,
             })
             scan_limit = code_header_words(header);
             break;
-#ifdef LISP_FEATURE_IMMOBILE_CODE
         case FDEFN_WIDETAG:
-            check_ptr(fdefn_raw_referent((struct fdefn*)where));
+            check_ptr(fdefn_callee_lispobj((struct fdefn*)where));
             scan_limit = 3;
             break;
-#endif
         default:
             if (!(other_immediate_lowtag_p(widetag) && lowtag_for_widetag[widetag>>2]))
               lose("Unknown widetag %x\n", widetag);

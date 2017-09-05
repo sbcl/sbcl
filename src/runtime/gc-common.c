@@ -755,7 +755,7 @@ scav_fdefn(lispobj *where, lispobj object)
             fdefn->raw_addr = (char *)simple_fun + FUN_RAW_ADDR_OFFSET;
     }
 #elif defined(LISP_FEATURE_X86_64)
-    lispobj obj = fdefn_raw_referent(fdefn);
+    lispobj obj = fdefn_callee_lispobj(fdefn);
     if (obj) {
         lispobj new = obj;
         scavenge(&new, 1); // enliven

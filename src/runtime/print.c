@@ -792,12 +792,8 @@ static void print_otherptr(lispobj obj)
         break;
 
     case FDEFN_WIDETAG:
-#ifdef LISP_FEATURE_IMMOBILE_CODE
         print_slots(fdefn_slots, 2, ptr);
-        print_obj("entry: ", fdefn_raw_referent((struct fdefn*)(ptr-1)));
-#else
-        print_slots(fdefn_slots, count & SHORT_HEADER_MAX_WORDS, ptr);
-#endif
+        print_obj("entry: ", fdefn_callee_lispobj((struct fdefn*)(ptr-1)));
         break;
 
     default:

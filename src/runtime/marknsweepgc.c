@@ -813,14 +813,12 @@ fixedobj_points_to_younger_p(lispobj* obj, int n_words,
   lispobj lbitmap;
 
   switch (widetag) {
-#ifdef LISP_FEATURE_IMMOBILE_CODE
   case FDEFN_WIDETAG:
     // the seemingly silly use of an array is because points_to_younger_p()
     // expects to get address ranges, not individual objects
-    funobj[0] = fdefn_raw_referent((struct fdefn*)obj);
+    funobj[0] = fdefn_callee_lispobj((struct fdefn*)obj);
     return range_points_to_younger_p(funobj, funobj+1, gen, keep_gen, new_gen)
         || range_points_to_younger_p(obj+1, obj+3, gen, keep_gen, new_gen);
-#endif
   case INSTANCE_WIDETAG:
   case FUNCALLABLE_INSTANCE_WIDETAG:
     layout[0] = instance_layout(obj); // same as above
@@ -1644,7 +1642,7 @@ static void adjust_fdefn_entrypoint(lispobj* where, int displacement,
     struct fdefn* fdefn = (struct fdefn*)where;
     int callee_adjust = 0;
     // Get the tagged object referred to by the fdefn_raw_addr.
-    lispobj callee_old = fdefn_raw_referent(fdefn_old);
+    lispobj callee_old = fdefn_callee_lispobj(fdefn_old);
     // If it's the undefined function trampoline, or the referent
     // did not move, then the callee_adjust stays 0.
     // Otherwise we adjust the rel32 field by the change in callee address.

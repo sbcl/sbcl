@@ -2806,7 +2806,7 @@ verify_range(lispobj *start, size_t words)
     for ( ; start < end ; start += count) {
         count = 1;
         lispobj thing = *start;
-        lispobj __attribute__((unused)) pointee;
+        lispobj callee;
 
         if (is_lisp_pointer(thing)) {
             page_index_t page_index = find_page_index((void*)thing);
@@ -2916,14 +2916,12 @@ verify_range(lispobj *start, size_t words)
                 count = nheader_words + code_instruction_words(code->code_size);
                 break;
                 }
-#ifdef LISP_FEATURE_IMMOBILE_CODE
             case FDEFN_WIDETAG:
                 verify_range(start + 1, 2);
-                pointee = fdefn_raw_referent((struct fdefn*)start);
-                verify_range(&pointee, 1);
+                callee = fdefn_callee_lispobj((struct fdefn*)start);
+                verify_range(&callee, 1);
                 count = CEILING(sizeof (struct fdefn)/sizeof(lispobj), 2);
                 break;
-#endif
         }
     }
 }

@@ -255,10 +255,31 @@ instance_scan(void (*proc)(), lispobj *instance_ptr, sword_t n_words, lispobj bi
 #include "genesis/bignum.h"
 extern boolean positive_bignum_logbitp(int,struct bignum*);
 
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
+#ifndef LISP_FEATURE_IMMOBILE_SPACE
+
+/* The callee_lispobj of an fdefn is the value in the 'raw_addr' slot to which
+ * control transfer occurs, but cast as a simple-fun or code component.
+ * It can momentarily disagree with the 'fun' slot when assigning a new value.
+ * Pointer tracing should almost always examine both slots, as scav_fdefn() does.
+ * If the raw_addr value points to read-only space, the callee is just raw_addr
+ * itself, which either looks like a simple-fun or a fixnum depending on platform.
+ * It is not critical that this exceptional situation be consistent by having
+ * a pointer lowtag because it only affects print_otherptr() and verify_space()
+ * neither of which materially impact garbage collection. */
+
+static inline boolean points_to_readonly_space(uword_t ptr) {
+    return READ_ONLY_SPACE_START <= ptr && ptr < READ_ONLY_SPACE_END;
+}
+static inline lispobj fdefn_callee_lispobj(struct fdefn *fdefn) {
+    return (lispobj)
+        (fdefn->raw_addr -
+         (points_to_readonly_space((uword_t)fdefn->raw_addr) ? 0 : FUN_RAW_ADDR_OFFSET));
+}
+
+#else
 
 extern void fixup_immobile_refs(lispobj (*)(lispobj), lispobj, struct code*);
-extern lispobj fdefn_raw_referent(struct fdefn *fdefn);
+extern lispobj fdefn_callee_lispobj(struct fdefn *fdefn);
 
 static inline boolean immobile_space_p(lispobj obj)
 {
