@@ -175,8 +175,61 @@
          "~@<attempt to use VALUES-LIST on a dotted list: ~2I~_~S~:>"
          :format-arguments (list list)))
 
+(defun restart-unbound (symbol context)
+  (multiple-value-bind (tn-offset pc-offset)
+      (sb!c::decode-restart-location context)
+    (labels ((retry-value (value)
+               (multiple-value-bind (type defined)
+                   (info :variable :type symbol)
+                 (if (and defined
+                          (not (ctypep value type)))
+                     (try (make-condition 'retry-unbound-variable
+                                          :name symbol
+                                          :format-control
+                                          "Type mismatch when restarting unbound symbol error:~@
+                                           ~s is not of type ~s"
+                                          :format-arguments (list value (type-specifier type))))
+                     value)))
+             (set-value (value &optional set-symbol)
+               (sb!di::sub-set-debug-var-slot
+                nil tn-offset (retry-value value)
+                *current-internal-error-context*)
+               (sb!vm::incf-context-pc *current-internal-error-context*
+                                       pc-offset)
+               (when set-symbol
+                 (set symbol value))
+               (return-from restart-unbound))
+             (retry-evaluation ()
+               (if (boundp symbol)
+                   (set-value (symbol-value symbol))
+                   (try (make-condition 'retry-unbound-variable
+                                        :name symbol
+                                        :format-control "~s is still unbound"
+                                        :format-arguments (list symbol)))))
+             (try (condition)
+               (cond (t
+                      (restart-case (error condition)
+                        (continue ()
+                          :report (lambda (stream)
+                                    (format stream "Retry using ~s." symbol))
+                          (retry-evaluation))
+                        (use-value (value)
+                          :report (lambda (stream)
+                                    (format stream "Use specified value."))
+                          :interactive read-evaluated-form
+                          (set-value value))
+                        (store-value (value)
+                          :report (lambda (stream)
+                                    (format stream "Set specified value and use it."))
+                          :interactive read-evaluated-form
+                          (set-value value t)))))))
+      (try (make-condition 'unbound-variable :name symbol)))))
+
 (deferr unbound-symbol-error (symbol)
-  (error 'unbound-variable :name symbol))
+  (let* ((context (sb!di:error-context)))
+    (if context
+        (restart-unbound symbol context)
+        (error 'unbound-variable :name symbol))))
 
 (deferr invalid-unwind-error ()
   (error 'simple-control-error

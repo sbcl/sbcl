@@ -592,6 +592,9 @@
              "The variable ~S is unbound."
              (cell-error-name condition)))))
 
+(define-condition retry-unbound-variable
+    (simple-condition unbound-variable) ())
+
 (define-condition undefined-function (cell-error) ()
   (:report
    (lambda (condition stream)

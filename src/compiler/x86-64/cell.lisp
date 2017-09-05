@@ -255,9 +255,12 @@
           (inst cmp (reg-in-size value :dword) no-tls-value-marker-widetag)
           (inst cmov :e value (access-value-slot symbol-reg)))
         (when check-boundp
-          (inst cmp (reg-in-size value :dword) unbound-marker-widetag)
-          (inst jmp :e (generate-error-code vop 'unbound-symbol-error
-                                            symbol-reg)))))
+          (assemble ()
+            (inst cmp (reg-in-size value :dword) unbound-marker-widetag)
+            (let ((*location-context* (make-restart-location RETRY value)))
+              (inst jmp :e (generate-error-code vop 'unbound-symbol-error
+                                                symbol-reg)))
+            RETRY))))
 
     (define-vop (fast-symbol-value symbol-value)
     ;; KLUDGE: not really fast, in fact, because we're going to have to
