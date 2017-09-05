@@ -310,7 +310,7 @@ lispobj alloc_immobile_obj(int page_attributes, lispobj header, int* hint)
   int spacing_in_bytes = OBJ_SPACING(page_attributes) << WORD_SHIFT;
 
   page = *hint;
-  gc_dcheck(low_page_address(page) < immobile_fixedobj_free_pointer);
+  gc_dcheck(low_page_address(page) < (void*)immobile_fixedobj_free_pointer);
   do {
       page_data = low_page_address(page);
       obj_ptr = page_data + fixedobj_pages[page].free_index;

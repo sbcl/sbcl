@@ -503,6 +503,7 @@ static inline unsigned int bitmask_of_width(int n) {
 /* Add key/val to 'ht'. 'val' is ignored for a hash-set */
 int hopscotch_insert(tableptr ht, uword_t key, sword_t val)
 {
+    gc_dcheck(key);
     // 'desired_index' is where 'key' logically belongs, but it
     // may physically go in any cell to the right up to (range-1) away.
     int desired_index = hash(ht, key) & ht->mask;
@@ -642,6 +643,7 @@ int hopscotch_containsp(tableptr ht, uword_t key)
 /* Return the value associated with 'key', or 'notfound' if not found */
 sword_t hopscotch_get(tableptr ht, uword_t key, sword_t notfound)
 {
+    gc_dcheck(key);
     int index = hash(ht, key) & ht->mask;
     unsigned bits = get_hop_mask(ht, index);
     int __attribute__((unused)) probes = 0;
@@ -672,6 +674,7 @@ found0:
  * the key was inserted, or zero if the key existed. */
 int hopscotch_put(tableptr ht, uword_t key, sword_t val)
 {
+    gc_dcheck(key);
     int index = hash(ht, key) & ht->mask;
     unsigned bits = get_hop_mask(ht, index);
     int __attribute__((unused)) probes = 0;
