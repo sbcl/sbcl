@@ -1327,6 +1327,7 @@ possibly temporarily, because it might be used internally."
                "FORCE" "DELAY" "PROMISE-READY-P"
                "FIND-RESTART-OR-CONTROL-ERROR"
                "LOAD-AS-SOURCE"
+               "DESCRIPTOR-SAP"
 
                ;; These could be moved back into SB!EXT if someone has
                ;; compelling reasons, but hopefully we can get by

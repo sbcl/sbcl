@@ -841,11 +841,11 @@ Experimental: interface subject to change."
                  ;; FIXME: Check other stacks as well.
                  #+sb-thread
                  (dolist (thread (sb-thread:list-all-threads))
-                   (let ((c-start (sb-di::descriptor-sap
+                   (let ((c-start (sb-int:descriptor-sap
                                    (sb-thread::%symbol-value-in-thread
                                     'sb-vm:*control-stack-start*
                                     thread)))
-                         (c-end (sb-di::descriptor-sap
+                         (c-end (sb-int:descriptor-sap
                                  (sb-thread::%symbol-value-in-thread
                                   'sb-vm:*control-stack-end*
                                   thread))))

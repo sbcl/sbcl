@@ -319,7 +319,6 @@
 
  ;; needs "backend"
  ("src/compiler/target/backend-parms")
- ("src/code/room" :not-host) ; needs GENCGC-CARD-BYTES
 
  ("src/code/force-delayed-defbangconstants")
  ("src/code/defmacro")

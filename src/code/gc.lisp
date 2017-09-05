@@ -13,6 +13,20 @@
 
 ;;;; DYNAMIC-USAGE and friends
 
+#!+(and relocatable-heap gencgc)
+(define-alien-variable ("DYNAMIC_SPACE_START" sb!vm:dynamic-space-start) unsigned-long)
+#!-sb-fluid
+(declaim (inline current-dynamic-space-start))
+(defun current-dynamic-space-start ()
+  #!+gencgc sb!vm:dynamic-space-start
+  #!-gencgc (extern-alien "current_dynamic_space" unsigned-long))
+
+#!+(or x86 x86-64)
+(progn
+  (declaim (inline dynamic-space-free-pointer))
+  (defun dynamic-space-free-pointer ()
+    (extern-alien "dynamic_space_free_pointer" system-area-pointer)))
+
 #!-sb-fluid
 (declaim (inline dynamic-usage))
 #!+gencgc
@@ -24,96 +38,25 @@
              (- (sap-int (sb!c::dynamic-space-free-pointer))
                 (current-dynamic-space-start))))
 
-#!+immobile-space
-(defun immobile-space-usage ()
-  (binding* (((nil fixed-hole-bytes fixed-used-bytes)
-              (sb!vm::immobile-fragmentation-information :fixed))
-             ((nil variable-hole-bytes variable-used-bytes)
-              (sb!vm::immobile-fragmentation-information :variable))
-             (total-used-bytes (+ fixed-used-bytes variable-used-bytes))
-             (total-hole-bytes (+ fixed-hole-bytes variable-hole-bytes)))
-    (values total-used-bytes total-hole-bytes)))
-
 (defun static-space-usage ()
   (- (sap-int sb!vm:*static-space-free-pointer*) sb!vm:static-space-start))
 
 (defun read-only-space-usage ()
   (- (sap-int sb!vm:*read-only-space-free-pointer*) sb!vm:read-only-space-start))
 
+;;; Convert the descriptor into a SAP. The bits all stay the same, we just
+;;; change our notion of what we think they are.
+(declaim (inline descriptor-sap))
+(defun descriptor-sap (x) (int-sap (get-lisp-obj-address x)))
+
 (defun control-stack-usage ()
   #!-stack-grows-downward-not-upward
-  (- (sap-int (sb!c::control-stack-pointer-sap))
-     (sap-int (sb!di::descriptor-sap sb!vm:*control-stack-start*)))
+  (sap- (control-stack-pointer-sap) (descriptor-sap sb!vm:*control-stack-start*))
   #!+stack-grows-downward-not-upward
-  (- (sap-int (sb!di::descriptor-sap sb!vm:*control-stack-end*))
-     (sap-int (sb!c::control-stack-pointer-sap))))
+  (sap- (descriptor-sap sb!vm:*control-stack-end*) (control-stack-pointer-sap)))
 
 (defun binding-stack-usage ()
-  (- (sap-int (sb!c::binding-stack-pointer-sap))
-     (sap-int (sb!di::descriptor-sap sb!vm:*binding-stack-start*))))
-
-;;;; ROOM
-
-(defun room-minimal-info ()
-  (multiple-value-bind (names name-width
-                        used-bytes used-bytes-width
-                        overhead-bytes)
-      (loop for (nil name function) in sb!vm::**spaces**
-            for (space-used-bytes space-overhead-bytes)
-               = (multiple-value-list (funcall function))
-            collect name into names
-            collect space-used-bytes into used-bytes
-            collect space-overhead-bytes into overhead-bytes
-            maximizing (length name) into name-maximum
-            maximizing space-used-bytes into used-bytes-maximum
-            finally (return (values
-                             names name-maximum
-                             used-bytes (decimal-with-grouped-digits-width
-                                         used-bytes-maximum)
-                             overhead-bytes)))
-    (loop for name in names
-          for space-used-bytes in used-bytes
-          for space-overhead-bytes in overhead-bytes
-          do (format t "~V@<~A usage is:~> ~V:D bytes~@[ (~:D bytes ~
-                        overhead)~].~%"
-                     (+ name-width 10) name used-bytes-width space-used-bytes
-                     space-overhead-bytes)))
-  #!+sb-thread
-  (format t "Control and binding stack usage is for the current thread ~
-             only.~%")
-  (format t "Garbage collection is currently ~:[enabled~;DISABLED~].~%"
-          *gc-inhibit*))
-
-(defun room-intermediate-info ()
-  (room-minimal-info)
-  (sb!vm:memory-usage :count-spaces '(:dynamic #!+immobile-space :immobile)
-                      :print-spaces t
-                      :cutoff 0.05f0
-                      :print-summary nil))
-
-(defun room-maximal-info ()
-  (let ((spaces '(:dynamic #!+immobile-space :immobile :static)))
-    (room-minimal-info)
-    (sb!vm:memory-usage :count-spaces spaces)
-    (dolist (space spaces)
-      (sb!vm:instance-usage space :top-n 10))))
-
-(defun room (&optional (verbosity :default))
-  "Print to *STANDARD-OUTPUT* information about the state of internal
-  storage and its management. The optional argument controls the
-  verbosity of output. If it is T, ROOM prints out a maximal amount of
-  information. If it is NIL, ROOM prints out a minimal amount of
-  information. If it is :DEFAULT or it is not supplied, ROOM prints out
-  an intermediate amount of information."
-  (fresh-line)
-  (ecase verbosity
-    ((t)
-     (room-maximal-info))
-    ((nil)
-     (room-minimal-info))
-    (:default
-     (room-intermediate-info)))
-  (values))
+  (sap- (binding-stack-pointer-sap) (descriptor-sap sb!vm:*binding-stack-start*)))
 
 ;;;; GET-BYTES-CONSED
 

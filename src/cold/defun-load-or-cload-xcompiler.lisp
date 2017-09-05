@@ -126,6 +126,8 @@
             slot-makunbound
             make-load-form-saving-slots
             sb!ext:run-program
+            sb!vm::map-allocated-objects
+            sb!vm::map-objects-in-range
             sb!kernel::choose-code-component-order)
           ;; CLOS implementation
           '(sb!mop:class-finalized-p

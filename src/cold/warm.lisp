@@ -63,6 +63,7 @@
 ;;; afterwards.
 (let ((early-srcs
               '("SRC;CODE;WARM-ERROR"
+                "SRC;CODE;ROOM" ; for MAP-ALLOCATED-OBJECTS
                 ;; We re-nickname SB-SEQUENCE as SEQUENCE now.
                 ;; It could be done in genesis, but not earlier,
                 ;; since the host has a package of that name.

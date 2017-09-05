@@ -16,6 +16,10 @@
 (deftype simple-fun ()
   '(satisfies simple-fun-p))
 
+(declaim (inline code-header-words))
+(defun code-header-words (code)
+  (logand (get-header-data code) sb!vm:short-header-max-words))
+
 ;;; Extract halves of SIMPLE-FUN-INFO, which is a string if it holds
 ;;; documentation, a SIMPLE-VECTOR if XREFS,
 ;;; or (CONS STRING SIMPLE-VECTOR) for both, or NIL if neither.
