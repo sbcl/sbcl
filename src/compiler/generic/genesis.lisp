@@ -3470,7 +3470,7 @@ initially undefined function references:~2%")
       (write-word core-magic)
 
       ;; Write the build ID.
-      (binding* ((build-id (with-open-file (s "output/build-id.tmp") (read s)))
+      (binding* ((build-id (with-open-file (s "output/build-id.inc") (read s)))
                  ((nwords padding) (ceiling (length build-id) sb!vm:n-word-bytes)))
         (declare (type simple-string build-id))
         ;; Write BUILD-ID-CORE-ENTRY-TYPE-CODE, the length of the header,

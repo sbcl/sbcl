@@ -56,7 +56,7 @@
 #endif
 
 unsigned char build_id[] =
-#include "../../output/build-id.tmp"
+#include "../../output/build-id.inc"
 ;
 
 int
