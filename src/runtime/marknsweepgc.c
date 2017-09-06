@@ -73,7 +73,7 @@ FILE * logfile;
 #  define dprintf(arg)
 #endif
 
-unsigned ASM_ROUTINES_END;
+unsigned asm_routines_end;
 
 // Inclusive bounds on highest in-use pages per subspace.
 low_page_index_t max_used_fixedobj_page, max_used_varyobj_page;
@@ -1303,7 +1303,7 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
         code = (struct code*)
           (lispobj*)code + sizetab[CODE_HEADER_WIDETAG]((lispobj*)code);
     }
-    ASM_ROUTINES_END = (unsigned)(uword_t)code;
+    asm_routines_end = (unsigned)(uword_t)code;
 }
 
 // Demote pseudo-static to highest normal generation
@@ -1627,7 +1627,7 @@ static lispobj adjust_fun_entrypoint(lispobj raw_addr)
     // Do not examine the word where the header would be,
     // since it could confuse adjust_words() by having a bit pattern
     // resembling a FP. (It doesn't, but better safe than sorry)
-    if (raw_addr < ASM_ROUTINES_END) return raw_addr;
+    if (raw_addr < asm_routines_end) return raw_addr;
     lispobj simple_fun = raw_addr - FUN_RAW_ADDR_OFFSET;
     adjust_words(&simple_fun, 1);
     return simple_fun + FUN_RAW_ADDR_OFFSET;

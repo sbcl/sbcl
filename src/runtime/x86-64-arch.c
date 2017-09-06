@@ -550,7 +550,7 @@ arch_set_fp_modes(unsigned int mxcsr)
 /// (3) a code-component with no simple-fun within it, that makes
 ///     closures and other funcallable-instances look like simple-funs.
 lispobj fdefn_callee_lispobj(struct fdefn* fdefn) {
-    extern unsigned ASM_ROUTINES_END;
+    extern unsigned asm_routines_end;
     if (((lispobj)fdefn->raw_addr & 0xFE) == 0xE8) {  // looks good
         unsigned int raw_fun = (int)(long)&fdefn->raw_addr + 5 // length of "JMP rel32"
           + *(int*)((char*)&fdefn->raw_addr + 1);
@@ -559,7 +559,7 @@ lispobj fdefn_callee_lispobj(struct fdefn* fdefn) {
           // If the target is an assembly routine, there is no simple-fun
           // that corresponds to the entry point. The code is kept live
           // by *ASSEMBLER-OBJECTS*. Otherwise, return the simple-fun.
-          return raw_fun < ASM_ROUTINES_END ? 0 : raw_fun - FUN_RAW_ADDR_OFFSET;
+          return raw_fun < asm_routines_end ? 0 : raw_fun - FUN_RAW_ADDR_OFFSET;
         case 0x48: // embedded funcallable instance trampoline
           return (raw_fun - (4<<WORD_SHIFT)) | FUN_POINTER_LOWTAG;
         case 0x90: // general closure/fin trampoline
