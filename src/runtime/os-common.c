@@ -161,7 +161,7 @@ os_dlsym_default(char *name)
 
 void os_link_runtime()
 {
-    void *link_target = (void*)(intptr_t)LINKAGE_TABLE_SPACE_START;
+    char *link_target = (char*)(intptr_t)LINKAGE_TABLE_SPACE_START;
     void *validated_end = link_target;
     lispobj symbol_name;
     char *namechars;
@@ -195,7 +195,7 @@ void os_link_runtime()
             m++;
         }
 
-        link_target = (void*)(((uintptr_t)link_target)+LINKAGE_TABLE_ENTRY_SIZE);
+        link_target += LINKAGE_TABLE_ENTRY_SIZE;
     }
     odxprint(runtime_link, "%d total symbols linked, %d undefined",
              n, m);
