@@ -137,8 +137,7 @@ void* os_dlopen(char* name, int flags) {
 }
 #endif
 
-#if defined(LISP_FEATURE_SB_DYNAMIC_CORE)
-/* When this feature is enabled, the special category of /static/ foreign
+/* When :SB-DYNAMIC-CORE is enabled, the special category of /static/ foreign
  * symbols disappears. Foreign fixups are resolved to linkage table locations
  * during genesis, and for each of them a record is added to
  * REQUIRED_FOREIGN_SYMBOLS vector, of the form "name" for a function reference,
@@ -149,7 +148,7 @@ void* os_dlopen(char* name, int flags) {
  * table entry for each element of REQUIRED_FOREIGN_SYMBOLS.
  */
 
-#ifndef LISP_FEATURE_WIN32
+#if defined(LISP_FEATURE_SB_DYNAMIC_CORE) && !defined(LISP_FEATURE_WIN32)
 void *
 os_dlsym_default(char *name)
 {
@@ -161,6 +160,9 @@ os_dlsym_default(char *name)
 
 void os_link_runtime()
 {
+    extern void write_protect_immobile_space();
+
+#ifdef LISP_FEATURE_SB_DYNAMIC_CORE
     char *link_target = (char*)(intptr_t)LINKAGE_TABLE_SPACE_START;
     void *validated_end = link_target;
     lispobj symbol_name;
@@ -199,8 +201,20 @@ void os_link_runtime()
     }
     odxprint(runtime_link, "%d total symbols linked, %d undefined",
              n, m);
+#endif /* LISP_FEATURE_SB_DYNAMIC_CORE */
+
+#ifdef LISP_FEATURE_X86_64
+    extern void arch_os_link_runtime();
+    arch_os_link_runtime();
+#endif
+
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    /* Delayed until after dynamic space has been mapped, fixups made,
+     * and/or immobile-space linkage entries written,
+     * since it was too soon earlier to handle write faults. */
+    write_protect_immobile_space();
+#endif
 }
-#endif  /* sb-dynamic-core */
 
 #ifndef LISP_FEATURE_WIN32
 

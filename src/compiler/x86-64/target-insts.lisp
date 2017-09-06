@@ -577,4 +577,11 @@
                                1 disp new-disp))))))
          seg dstate)))
     (setf (sb!vm::fdefn-has-static-callers fdefn) 0))) ; Clear static link flag
+
+(defun sb!disassem::compute-extra-asm-routines (hash)
+  (setf (gethash (+ (gethash 'sb!vm::alloc-tramp sb!fasl:*assembler-routines*)
+                    sb!vm:linkage-table-entry-size)
+                 hash)
+        'sb!vm::alloc-to-r11))
+
 ) ; end PROGN

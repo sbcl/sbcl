@@ -510,7 +510,6 @@ process_directory(int count, struct ndir_entry *entry,
                   int fd, os_vm_offset_t file_offset)
 {
     extern void immobile_space_coreparse(uword_t,uword_t);
-    extern void write_protect_immobile_space();
 
     struct {
         uword_t len; // length in pages
@@ -640,11 +639,6 @@ process_directory(int count, struct ndir_entry *entry,
 #endif
 #ifdef LISP_FEATURE_X86_64
         tune_asm_routines_for_microarch(); // before WPing immobile space
-#endif
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-        /* Delayed until after dynamic space has been mapped so that writes
-         * to immobile space due to core relocation don't fault. */
-        write_protect_immobile_space();
 #endif
 }
 

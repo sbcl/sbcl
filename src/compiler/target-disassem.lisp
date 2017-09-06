@@ -1803,6 +1803,8 @@
           #!+immobile-code (sb!vm::function-raw-address name)
           #!-immobile-code (+ sb!vm::nil-value (sb!vm::static-fun-offset name))
           do (setf (gethash address addr->name) name))
+    #!+immobile-code
+    (compute-extra-asm-routines addr->name)
     ;; Not really a routine, but it uses the similar logic for annotations
     #!+sb-safepoint
     (setf (gethash sb!vm::gc-safepoint-page-addr addr->name)

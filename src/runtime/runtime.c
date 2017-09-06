@@ -717,9 +717,7 @@ main(int argc, char *argv[], char *envp[])
     if (!disable_lossage_handler_p)
         enable_lossage_handler();
 
-#ifdef LISP_FEATURE_SB_DYNAMIC_CORE
     os_link_runtime();
-#endif
 #ifdef LISP_FEATURE_HPUX
     /* -1 = CLOSURE_FUN_OFFSET, 23 = SIMPLE_FUN_CODE_OFFSET, we are
      * not in LANGUAGE_ASSEMBLY so we cant reach them. */

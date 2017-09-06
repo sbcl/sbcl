@@ -180,10 +180,18 @@
   ;; rather than specializing on R11, which just happens to be the temp reg.
   ;; But the assembly routine is hand-written, not generated, and it has to match,
   ;; so there's not much that can be done to generalize it.
-  (let* ((to-r11 (location= result-tn r11-tn))
-         (f (make-fixup (if to-r11 "alloc_to_r11" "alloc_tramp") :foreign)))
-    (inst call (cond #!+immobile-code (sb!c::*code-is-immobile* f)
-                     (t (inst mov result-tn f) result-tn)))
+  (let ((to-r11 (location= result-tn r11-tn)))
+    #!+immobile-code
+    (let ((fixup
+           (make-fixup 'alloc-tramp :assembly-routine
+                       (if to-r11 sb!vm:linkage-table-entry-size 0))))
+      (inst call (cond (sb!c::*code-is-immobile* fixup)
+                       (t (progn (inst mov result-tn fixup) result-tn)))))
+    #!-immobile-code
+    (progn
+      (inst mov result-tn
+            (make-fixup (if to-r11 "alloc_to_r11" "alloc_tramp") :foreign))
+      (inst call result-tn))
     (unless to-r11
       (inst pop result-tn)))
   (when lowtag

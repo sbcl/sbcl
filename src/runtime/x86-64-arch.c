@@ -9,6 +9,7 @@
  * files for more information.
  */
 
+# define _GNU_SOURCE /* needed for RTLD_DEFAULT from dlfcn.h */
 #include <stdio.h>
 
 #include "sbcl.h"
@@ -27,8 +28,13 @@
 #include "thread.h"
 #include "pseudo-atomic.h"
 
+#include "genesis/code.h"
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
+
+#if defined(LISP_FEATURE_OS_PROVIDES_DLOPEN) && !defined(LISP_FEATURE_WIN32)
+# include <dlfcn.h>
+#endif
 
 #define BREAKPOINT_INST 0xcc    /* INT3 */
 #define UD2_INST 0x0b0f         /* UD2 */
@@ -541,7 +547,9 @@ arch_set_fp_modes(unsigned int mxcsr)
     asm ("ldmxcsr %0" : : "m" (temp));
 }
 
-#ifdef LISP_FEATURE_IMMOBILE_CODE
+#ifndef LISP_FEATURE_IMMOBILE_CODE
+void arch_os_link_runtime() {}
+#else
 /// Return the Lisp object that fdefn's raw_addr slot jumps to.
 /// This will either be:
 /// (1) a simple-fun,
@@ -568,5 +576,20 @@ lispobj fdefn_callee_lispobj(struct fdefn* fdefn) {
     } else if (fdefn->raw_addr == 0)
         return 0;
     lose("Can't decode fdefn raw addr @ %p: %p\n", fdefn, fdefn->raw_addr);
+}
+
+void arch_os_link_runtime()
+{
+    struct code* code = (struct code*)(IMMOBILE_SPACE_START +
+                                       IMMOBILE_FIXEDOBJ_SUBSPACE_SIZE);
+    char* link_target = (char*)code->constants;
+    // I wish it were possible to assert that this is the correct code object
+    // about to be touched, but I don't see what else to assert.
+    gc_assert(code->code_size >= make_fixnum(2*LINKAGE_TABLE_ENTRY_SIZE));
+    arch_write_linkage_table_jmp(link_target,
+                                 dlsym(RTLD_DEFAULT, "alloc_tramp"));
+    link_target += LINKAGE_TABLE_ENTRY_SIZE,
+    arch_write_linkage_table_jmp(link_target,
+                                 dlsym(RTLD_DEFAULT, "alloc_to_r11"));
 }
 #endif
