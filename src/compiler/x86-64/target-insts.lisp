@@ -175,6 +175,21 @@
     (when (= (symbol-tls-index sym) index)
       (return sym))))
 
+;;; Return contents of memory if either it refers to an unboxed code constant
+;;; or is RIP-relative with a displacement of 0.
+(defun unboxed-constant-ref (dstate segment-offset addr disp)
+  (or  (and (eql disp 0)
+            ;; Assume this is safe to read, since we're disassembling
+            ;; from the memory just a few bytes preceding 'addr'.
+            (sap-ref-word (int-sap addr) 0))
+       (let* ((seg (dstate-segment dstate))
+              (code-offset
+               (sb!disassem::segment-offs-to-code-offs segment-offset seg))
+              (unboxed-range (sb!disassem::seg-unboxed-data-range seg)))
+         (or (and unboxed-range
+                  (<= (car unboxed-range) code-offset (cdr unboxed-range))
+                  (sap-ref-word (dstate-segment-sap dstate) segment-offset))))))
+
 ;;; Prints a memory reference to STREAM. VALUE is a list of
 ;;; (BASE-REG OFFSET INDEX-REG INDEX-SCALE), where any component may be
 ;;; missing or nil to indicate that it's not used or has the obvious
@@ -245,13 +260,14 @@
                1 (note-code-constant-absolute addr dstate width))
               (maybe-note-assembler-routine addr nil dstate)
               ;; Show the absolute address and maybe the contents.
-              (note (format nil "[#x~x]~@[ = ~x~]"
+              (note (format nil "[#x~x]~@[ = #x~x~]"
                             addr
                             (case width
                               (:qword
                                (unboxed-constant-ref
                                 dstate
-                                (+ (dstate-next-offs dstate) disp)))))
+                                (+ (dstate-next-offs dstate) disp)
+                                addr disp))))
                     dstate)))))
     #!+sb-thread
     (when (and (eql base-reg #.(ash (tn-offset sb!vm::thread-base-tn) -1))
@@ -331,17 +347,6 @@
        (when (stringp value) (setq fmt "= ~A"))))
     (when addr
       (note (lambda (s) (format s fmt addr)) dstate))))
-
-(defun unboxed-constant-ref (dstate segment-offset)
-  (let* ((seg (dstate-segment dstate))
-         (code-offset
-          (sb!disassem::segment-offs-to-code-offs segment-offset seg))
-         (unboxed-range (sb!disassem::seg-unboxed-data-range seg)))
-    (and unboxed-range
-         (<= (car unboxed-range) code-offset (cdr unboxed-range))
-         (sap-ref-int (dstate-segment-sap dstate)
-                      segment-offset n-word-bytes
-                      (dstate-byte-order dstate)))))
 
 ;;;; interrupt instructions
 
