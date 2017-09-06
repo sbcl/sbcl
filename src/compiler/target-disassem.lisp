@@ -1783,7 +1783,7 @@
                (t
                 (values nil nil)))))))
 
-(defvar *assembler-routines-by-addr* nil)
+(defglobal *assembler-routines-by-addr* nil)
 
 ;;; Build an address-name hash-table from the name-address hash
 (defun invert-address-hash (htable &optional (addr-hash (make-hash-table)))

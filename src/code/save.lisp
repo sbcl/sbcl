@@ -288,6 +288,8 @@ sufficiently motivated to do lengthy fixes."
   (deinit-finalizers)
   (fill *pathnames* nil)
   (drop-all-hash-caches)
+  ;; Must clear this cache if asm routines are movable.
+  (setq sb-disassem::*assembler-routines-by-addr* nil)
   (os-deinit)
   ;; Do this last, to have some hope of printing if we need to.
   (stream-deinit)
