@@ -1785,34 +1785,29 @@
 
 (defglobal *assembler-routines-by-addr* nil)
 
-;;; Build an address-name hash-table from the name-address hash
-(defun invert-address-hash (htable &optional (addr-hash (make-hash-table)))
-  (maphash (lambda (name address)
-             (setf (gethash address addr-hash) name))
-           htable)
-  addr-hash)
-
 ;;; Return the name of the primitive Lisp assembler routine or foreign
 ;;; symbol located at ADDRESS, or NIL if there isn't one.
-(defun find-assembler-routine (address)
+(defun find-assembler-routine (address &aux (addr->name *assembler-routines-by-addr*))
   (declare (type address address))
-  (when (null *assembler-routines-by-addr*)
-    (setf *assembler-routines-by-addr*
-          (invert-address-hash sb!fasl:*assembler-routines*))
+  (when (null addr->name)
+    (setf addr->name (make-hash-table) *assembler-routines-by-addr* addr->name)
+    (flet ((invert (name->addr)
+             (maphash (lambda (name address)
+                        (setf (gethash address addr->name) name))
+                      name->addr)))
+       (invert sb!fasl:*assembler-routines*)
     #!-sb-dynamic-core
-    (setf *assembler-routines-by-addr*
-          (invert-address-hash *static-foreign-symbols*
-                               *assembler-routines-by-addr*))
+       (invert *static-foreign-symbols*))
     (loop for name across sb!vm:+static-fdefns+
           for address =
           #!+immobile-code (sb!vm::function-raw-address name)
           #!-immobile-code (+ sb!vm::nil-value (sb!vm::static-fun-offset name))
-          do (setf (gethash address *assembler-routines-by-addr*) name))
+          do (setf (gethash address addr->name) name))
     ;; Not really a routine, but it uses the similar logic for annotations
     #!+sb-safepoint
-    (setf (gethash sb!vm::gc-safepoint-page-addr *assembler-routines-by-addr*)
+    (setf (gethash sb!vm::gc-safepoint-page-addr addr->name)
           "safepoint"))
-  (gethash address *assembler-routines-by-addr*))
+  (gethash address addr->name))
 
 ;;;; some handy function for machine-dependent code to use...
 
