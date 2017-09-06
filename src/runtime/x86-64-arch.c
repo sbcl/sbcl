@@ -471,23 +471,12 @@ arch_install_interrupt_handlers()
 void
 arch_write_linkage_table_jmp(char *reloc_addr, void *target_addr)
 {
-    uword_t addr = (uword_t)target_addr;
-    int i;
-
-    *reloc_addr++ = 0xFF; /* Opcode for near jump to absolute reg/mem64. */
-    *reloc_addr++ = 0x25; /* ModRM #b00 100 101, i.e. RIP-relative. */
-    *reloc_addr++ = 0x00; /* 32-bit displacement field = 0 */
-    *reloc_addr++ = 0x00; /* ... */
-    *reloc_addr++ = 0x00; /* ... */
-    *reloc_addr++ = 0x00; /* ... */
-
-    for (i = 0; i < 8; i++) {
-        *reloc_addr++ = addr & 0xff;
-        addr >>= 8;
-    }
-
+    reloc_addr[0] = 0xFF; /* Opcode for near jump to absolute reg/mem64. */
+    reloc_addr[1] = 0x25; /* ModRM #b00 100 101, i.e. RIP-relative. */
+    *(uint32_t*)(reloc_addr+2) = 0; /* 32-bit displacement field = 0 */
+    *(uword_t *)(reloc_addr+6) = (uword_t)target_addr;
     /* write a nop for good measure. */
-    *reloc_addr = 0x90;
+    reloc_addr[14] = 0x90;
 }
 
 void
