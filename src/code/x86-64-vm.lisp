@@ -25,16 +25,20 @@
 (defun fixup-code-object (code offset fixup kind &optional flavor)
   (declare (type index offset) (ignorable flavor))
   (without-gcing
-    (let ((sap (code-instructions code)))
+      (let* ((sap (code-instructions code))
+             (fixup (+ (if (eq kind :absolute64)
+                           (signed-sap-ref-64 sap offset)
+                           (signed-sap-ref-32 sap offset))
+                       fixup)))
       (ecase kind
         (:absolute64
          ;; Word at sap + offset contains a value to be replaced by
          ;; adding that value to fixup.
-         (setf (sap-ref-64 sap offset) (+ fixup (sap-ref-64 sap offset))))
+         (setf (sap-ref-64 sap offset) fixup))
         (:absolute
          ;; Word at sap + offset contains a value to be replaced by
          ;; adding that value to fixup.
-         (setf (sap-ref-32 sap offset) (+ fixup (signed-sap-ref-32 sap offset))))
+         (setf (sap-ref-32 sap offset) fixup))
         (:relative
          ;; Fixup is the actual address wanted.
          ;; Replace word with value to add to that loc to get there.
