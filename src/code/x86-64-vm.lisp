@@ -259,9 +259,13 @@
 ;;; Find an immobile FDEFN or FUNCTION given an interior pointer to it.
 #!+immobile-space
 (defun find-called-object (address)
-  (let ((obj (alien-funcall (extern-alien "search_all_gc_spaces"
-                                          (function unsigned unsigned))
-                            address)))
+  ;; The ADDRESS [sic] is actually any immediate operand to MOV,
+  ;; which in general decodes as a *signed* integer. So ignore negative values.
+  (let ((obj (if (typep address 'sb!ext:word)
+                 (alien-funcall (extern-alien "search_all_gc_spaces"
+                                              (function unsigned unsigned))
+                                address)
+                 0)))
       (unless (eql obj 0)
         (case (sap-ref-8 (int-sap obj) 0)
          (#.fdefn-widetag
