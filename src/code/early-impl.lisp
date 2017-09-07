@@ -14,7 +14,7 @@
 ;;;
 ;;; FIXME: These should be listed once and only once, instead of
 ;;; listed here and then listed separately (and by now, 2001-06-06,
-;;; slightly differently) elsewhere.
+;;; slightly differently) elsewhere. (Maybe this is resolved?)
 (declaim (special *posix-argv*
                   *core-string*
                   *stdin*

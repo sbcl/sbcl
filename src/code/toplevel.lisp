@@ -12,24 +12,6 @@
 ;;;; files for more information.
 
 (in-package "SB!IMPL")
-
-;;;; magic specials initialized by GENESIS
-
-;;; FIXME: The DEFVAR here is redundant with the (DECLAIM (SPECIAL ..))
-;;; of all static symbols in early-impl.lisp.
-(progn
-  (defvar sb!vm::*current-catch-block*)
-  (defvar sb!vm::*current-unwind-protect-block*)
-  #!+hpux (defvar sb!vm::*c-lra*)
-  (defvar *free-interrupt-context-index*))
-
-;;; specials initialized by !COLD-INIT
-
-;;; FIXME: These could be converted to DEFVARs.
-(declaim (special *allow-with-interrupts*
-                  *interrupts-enabled*
-                  *interrupt-pending*
-                  #!+sb-thruption *thruption-pending*))
 
 ;;;; default initfiles
 
