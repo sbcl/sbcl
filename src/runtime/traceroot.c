@@ -628,6 +628,7 @@ static void trace1(lispobj object,
         }
     }
     fprintf(file, "%p.\n", (void*)target);
+    fflush(file);
 }
 
 static void record_ptr(lispobj* source, lispobj target,
