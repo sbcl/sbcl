@@ -143,18 +143,15 @@
                   ;; COMPILE-FILE or LOAD or OPTIMIZE which justifies this
                   ;; behavior. Hmm. -- WHN 2001-04-06
                   (sb!c::*policy* sb!c::*policy*))
-             (return-from load
                (if faslp
-                   (prog1 (load-as-fasl stream verbose print)
-                     ;; Try to ameliorate immobile heap fragmentation
-                     ;; in case somehow nontoplevel code is garbage.
-                     #!+immobile-code (gc))
+                   (load-as-fasl stream verbose print)
                    (sb!c:with-compiler-error-resignalling
                      (load-as-source stream :verbose verbose
-                                            :print print)))))))
+                                            :print print))))))
     ;; Case 1: stream.
     (when (streamp pathspec)
       (return-from load (load-stream pathspec (fasl-header-p pathspec))))
+
     (let ((pathname (pathname pathspec)))
       ;; Case 2: Open as binary, try to process as a fasl.
       (with-open-stream
@@ -184,6 +181,7 @@
           (when (and (or should-be-fasl-p (not (eql 0 (file-length stream))))
                      (fasl-header-p stream :errorp should-be-fasl-p))
             (return-from load (load-stream stream t)))))
+
       ;; Case 3: Open using the given external format, process as source.
       (with-open-file (stream pathname :external-format external-format
                               :class 'form-tracking-stream)
