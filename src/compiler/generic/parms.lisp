@@ -65,7 +65,8 @@
     (small-spaces-start
           &key ((:dynamic-space-start dynamic-space-start*))
                ((:default-dynamic-space-size default-dynamic-space-size*))
-               #!+immobile-space (immobile-space-size (* 128 1024 1024))
+               #!+immobile-space
+               ((:immobile-space-size immobile-space-size*) (* 128 1024 1024))
                #!+immobile-space (immobile-code-space-size (* 104 1024 1024))
                ;; Smallest os_validate()able alignment; used as safepoint
                ;; page size.  Default suitable for POSIX platforms.
@@ -75,20 +76,33 @@
                ;; traditional margin between spaces
                (margin-size          #x1000))
   (declare (ignorable dynamic-space-start*)) ; might be unused in make-host-2
-  (let* ((spaces '(read-only static
+  (flet ((defconstantish (relocatable symbol value)
+           (if (not relocatable) ; easy case
+               `(defconstant ,symbol ,value)
+               ;; Genesis needs to know the gspace start, but it's not constant.
+               ;; This value will not be exposed to C code.
+               #+sb-xc-host `(defparameter ,symbol ,value)
+               ;; Ideally the #-sb-xc-host code be a DEFINE-ALIEN-VARIABLE,
+               ;; but can't be due to dependency order problem.
+               )))
+    (let*
+        ((spaces '(read-only static
                    #!+linkage-table linkage-table
                    #!+immobile-space immobile))
          (ptr small-spaces-start)
          safepoint-address
          (small-space-forms
           (loop for (space next-space) on spaces appending
-                (let* ((next-start
+                (let* ((relocatable
+                        ;; TODO: immobile and linkage-table should be relocatable
+                        #!+relocatable-heap (member space '(#| immobile |#)))
+                       (next-start
                         (+ ptr (cond #!+immobile-space
                                      ((eq space 'immobile)
                                       ;; We subtract margin-size when
                                       ;; computing FOO-SPACE-END,
                                       ;; so add it in here to compensate.
-                                      (+ immobile-space-size margin-size))
+                                      (+ immobile-space-size* margin-size))
                                      (t
                                       small-space-spread))))
                        (end next-start))
@@ -96,12 +110,16 @@
                     ;; margin becomes safepoint page; substract margin again.
                     (decf end alignment)
                     (setf safepoint-address end))
-                  (prog1
-                      `((defconstant ,(symbolicate space "-SPACE-START")
-                            ,ptr)
-                        (defconstant ,(symbolicate space "-SPACE-END")
-                            ,(- end margin-size)))
-                    (setf ptr next-start)))))
+                  (let* ((start-sym (symbolicate space "-SPACE-START"))
+                         (start-val ptr)
+                         (end-val (- end margin-size)))
+                    (setf ptr next-start)
+                    `(,(defconstantish relocatable start-sym start-val)
+                      ,(if relocatable
+                           `(defconstant ,(symbolicate space "-SPACE-SIZE")
+                              ,(- end-val start-val))
+                           `(defconstant ,(symbolicate space "-SPACE-END")
+                              ,end-val)))))))
          (safepoint-page-forms
           (list #!+sb-safepoint
                 `(defconstant gc-safepoint-page-addr ,safepoint-address)))
@@ -112,16 +130,15 @@
        ,@small-space-forms
        #!+immobile-space
        (defconstant immobile-fixedobj-subspace-size
-         ,(- immobile-space-size immobile-code-space-size))
-       #!+(or (not relocatable-heap) (host-feature sb-xc-host))
-       (#!+relocatable-heap defparameter #!-relocatable-heap defconstant
-            dynamic-space-start ,(or dynamic-space-start* ptr))
+         ,(- immobile-space-size* immobile-code-space-size))
+       ,(defconstantish (or #!+relocatable-heap t) 'dynamic-space-start
+          (or dynamic-space-start* ptr))
        (defconstant default-dynamic-space-size
          (or ,(!read-dynamic-space-size)
              ,default-dynamic-space-size*
              (ecase n-word-bits
                (32 (expt 2 29))
-               (64 (expt 2 30))))))))
+               (64 (expt 2 30)))))))))
 
 (defconstant-eqx +c-callable-fdefns+
   '(sub-gc
