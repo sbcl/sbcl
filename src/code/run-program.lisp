@@ -162,27 +162,30 @@
   `(sb-thread::with-system-mutex (*active-processes-lock*)
      ,@body))
 
+(deftype process-status ()
+  '(member :running :stopped :exited :signaled))
+
 (defstruct (process (:copier nil))
-  pid                 ; PID of child process
-  %status             ; either :RUNNING, :STOPPED, :EXITED, or :SIGNALED
-  %exit-code          ; either exit code or signal
-  core-dumped         ; T if a core image was dumped
-  #-win32 pty         ; stream to child's pty, or NIL
-  input               ; stream to child's input, or NIL
-  output              ; stream from child's output, or NIL
-  error               ; stream from child's error output, or NIL
-  status-hook         ; closure to call when PROC changes status
-  plist               ; a place for clients to stash things
-  cookie              ; list of the number of pipes from the subproc
+  (pid     nil :type word :read-only t) ; PID of child process
+  (%status nil :type process-status)
+  %exit-code                            ; either exit code or signal
+  core-dumped                           ; T if a core image was dumped
+  #-win32 pty                           ; stream to child's pty, or NIL
+  input                                 ; stream to child's input, or NIL
+  output                                ; stream from child's output, or NIL
+  error                                 ; stream from child's error output, or NIL
+  status-hook                           ; closure to call when PROC changes status
+  plist                                 ; a place for clients to stash things
+  (cookie nil :type cons :read-only t)  ; list of the number of pipes from the subproc
   #+win32
-  copiers)            ; list of sb-win32::io-copier
+  copiers)                              ; list of sb-win32::io-copier
 
 (defmethod print-object ((process process) stream)
   (print-unreadable-object (process stream :type t)
     (let ((status (process-status process)))
-     (if (eq :exited status)
-         (format stream "~S ~S" status (process-%exit-code process))
-         (format stream "~S ~S" (process-pid process) status)))
+      (if (eq :exited status)
+          (format stream "~S ~S" status (process-%exit-code process))
+          (format stream "~S ~S" (process-pid process) status)))
     process))
 
 #+win32
