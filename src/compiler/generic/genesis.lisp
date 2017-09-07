@@ -3126,7 +3126,6 @@ core and return a descriptor to it."
   (format stream "#define INTERNAL_ERROR_NARGS {~{~S~^, ~}}~2%"
           (map 'list #'cddr sb!c:+backend-internal-errors+)))
 
-#!+sb-ldb
 (defun write-tagnames-h (out)
   (labels
       ((pretty-name (symbol strip)
@@ -3745,7 +3744,6 @@ initially undefined function references:~2%")
         (out-to "constants" (write-constants-h stream))
         (out-to "errnames" (write-errnames-h stream))
         (out-to "gc-tables" (sb!vm::write-gc-tables stream))
-        #!+sb-ldb
         (out-to "tagnames" (write-tagnames-h stream))
         (let ((structs (sort (copy-list sb!vm:*primitive-objects*) #'string<
                              :key #'sb!vm:primitive-object-name)))

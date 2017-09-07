@@ -448,7 +448,13 @@ main(int argc, char *argv[], char *envp[])
 
     /* other command line options */
     boolean end_runtime_options = 0;
-    boolean disable_lossage_handler_p = 0;
+    boolean disable_lossage_handler_p
+#if defined(LISP_FEATURE_SB_LDB)
+        = 0;
+#else
+        = 1;
+#endif
+
     boolean debug_environment_p = 0;
 
     lispobj initial_function;

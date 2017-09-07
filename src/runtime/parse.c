@@ -23,8 +23,6 @@
 #endif
 #include "runtime.h"
 
-#if defined(LISP_FEATURE_SB_LDB)
-
 #include "globals.h"
 #include "vars.h"
 #include "parse.h"
@@ -328,5 +326,3 @@ lispobj parse_lispobj(char **ptr)
 
     return result;
 }
-
-#endif /* defined(LISP_FEATURE_SB_LDB) */

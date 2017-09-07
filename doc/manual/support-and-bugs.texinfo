@@ -114,9 +114,10 @@ send a useful bug report then:
 
 @item
 @cindex ldb
-Compile SBCL with ldb support (feature @code{:sb-ldb}, see
-@file{base-target-features.lisp-expr}) and change @code{#define QSHOW_SIGNAL 0} to
-@code{#define QSHOW_SIGNAL 1} in @file{src/runtime/runtime.h}.
+Compile SBCL with ldb enabled (feature @code{:sb-ldb}, see
+@file{base-target-features.lisp-expr}) and change @code{#define
+QSHOW_SIGNAL 0} to @code{#define QSHOW_SIGNAL 1} in
+@file{src/runtime/runtime.h}.
 
 @item
 Isolate a smallish test case, run it.

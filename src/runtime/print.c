@@ -207,9 +207,6 @@ fshow_fun(void __attribute__((__unused__)) *ignored,
     va_end(args);
 }
 
-/* This file can be skipped if we're not supporting LDB. */
-#if defined(LISP_FEATURE_SB_LDB)
-
 #include "monitor.h"
 #include "vars.h"
 #include "os.h"
@@ -964,13 +961,3 @@ void safely_show_lstring(struct vector * string, int quotes, FILE *s)
     fprintf(s, "#<[widetag=%02X]>", widetag_of(string->header));
   }
 }
-
-#else
-
-void
-brief_print(lispobj obj)
-{
-    printf("lispobj 0x%lx\n", (unsigned long)obj);
-}
-
-#endif /* defined(LISP_FEATURE_SB_LDB) */
