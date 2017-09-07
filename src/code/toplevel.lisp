@@ -29,13 +29,13 @@
 (defun userinit-pathname ()
   (merge-pathnames ".sbclrc" (user-homedir-pathname)))
 
-(defvar *sysinit-pathname-function* #'sysinit-pathname
+(define-load-time-global *sysinit-pathname-function* #'sysinit-pathname
   "Designator for a function of zero arguments called to obtain a
 pathname designator for the default sysinit file, or NIL. If the
 function returns NIL, no sysinit file is used unless one has been
 specified on the command-line.")
 
-(defvar *userinit-pathname-function* #'userinit-pathname
+(define-load-time-global *userinit-pathname-function* #'userinit-pathname
   "Designator for a function of zero arguments called to obtain a
 pathname designator or a stream for the default userinit file, or NIL.
 If the function returns NIL, no userinit file is used unless one has
@@ -236,27 +236,6 @@ any non-negative real number."
             (force-output stream))))
       :next))
   (values))
-
-(defun process-init-file (specified-pathname kind)
-  (multiple-value-bind (context default-function)
-      (ecase kind
-        (:system
-         (values "sysinit" *sysinit-pathname-function*))
-        (:user
-         (values "userinit" *userinit-pathname-function*)))
-    (if specified-pathname
-        (with-open-file (stream (parse-native-namestring specified-pathname)
-                                :if-does-not-exist nil)
-          (if stream
-              (load-as-source stream :context context)
-              (cerror "Ignore missing init file"
-                      "The specified ~A file ~A was not found."
-                      context specified-pathname)))
-        (let ((default (funcall default-function)))
-          (when default
-            (with-open-file (stream (pathname default) :if-does-not-exist nil)
-              (when stream
-                (load-as-source stream :context context))))))))
 
 (defun process-eval/load-options (options)
   (/show0 "handling --eval and --load options")
@@ -460,11 +439,24 @@ any non-negative real number."
       ;; helpful to let the user reach the REPL in order to help
       ;; figure out what's going on.)
       (restart-case
-          (progn
+          (flet ((process-init-file (kind specified-pathname default-function)
+                   (awhen (or specified-pathname (funcall default-function))
+                     (with-open-file (stream (if specified-pathname
+                                                 (parse-native-namestring it)
+                                                 (pathname it))
+                                             :if-does-not-exist nil)
+                       (cond (stream
+                              (dx-flet ((thunk ()
+                                          (load-as-source stream :context kind)))
+                                (sb!fasl::call-with-load-bindings #'thunk stream)))
+                             (specified-pathname
+                              (cerror "Ignore missing init file"
+                                      "The specified ~A file ~A was not found."
+                                      kind specified-pathname)))))))
             (unless no-sysinit
-              (process-init-file sysinit :system))
+              (process-init-file "sysinit" sysinit *sysinit-pathname-function*))
             (unless no-userinit
-              (process-init-file userinit :user))
+              (process-init-file "userinit" userinit *userinit-pathname-function*))
             (when finally-quit
               (push (list :quit) reversed-options))
             (process-eval/load-options (nreverse reversed-options))

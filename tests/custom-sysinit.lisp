@@ -13,5 +13,9 @@
 
 (write-line "/loading custom sysinit")
 
+;;; *load-pathname* and *load-truename* shouldn't be NIL
+(assert (string= (pathname-name *load-pathname*) "custom-sysinit"))
+(assert *load-truename*)
+
 (defun sysinit-21 ()
   21)

@@ -13,5 +13,9 @@
 
 (write-line "/loading custom userinit")
 
+;;; *load-pathname* and *load-truename* shouldn't be NIL
+(assert (string= (pathname-name *load-pathname*) "custom-userinit"))
+(assert *load-truename*)
+
 (defun userinit-quit (x)
   (sb-ext:exit :code x))

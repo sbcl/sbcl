@@ -105,18 +105,7 @@
 ;; LOADing a non-compiled file. Check whether this bug exists in SBCL
 ;; and fix it if so.
 
-(defun load (pathspec &key (verbose *load-verbose*) (print *load-print*)
-             (if-does-not-exist t) (external-format :default))
-  "Load the file given by FILESPEC into the Lisp environment, returning
-   T on success."
-  (flet ((load-stream (stream faslp)
-           (when (and (fd-stream-p stream)
-                      (eq (sb!impl::fd-stream-fd-type stream) :directory))
-             (error 'simple-file-error
-                    :pathname (pathname stream)
-                    :format-control
-                    "Can't LOAD a directory: ~s."
-                    :format-arguments (list (pathname stream))))
+(defun call-with-load-bindings (function stream)
            (let* (;; Bindings required by ANSI.
                   (*readtable* *readtable*)
                   (*package* (sane-package))
@@ -134,6 +123,23 @@
                                        (file-error () nil))))
                   ;; Bindings used internally.
                   (*load-depth* (1+ *load-depth*))
+                  )
+             (funcall function)))
+
+(defun load (pathspec &key (verbose *load-verbose*) (print *load-print*)
+             (if-does-not-exist t) (external-format :default))
+  "Load the file given by FILESPEC into the Lisp environment, returning
+   T on success."
+  (flet ((load-stream (stream faslp)
+           (when (and (fd-stream-p stream)
+                      (eq (sb!impl::fd-stream-fd-type stream) :directory))
+             (error 'simple-file-error
+                    :pathname (pathname stream)
+                    :format-control
+                    "Can't LOAD a directory: ~s."
+                    :format-arguments (list (pathname stream))))
+           (dx-flet ((thunk ()
+                       (let (
                   ;; KLUDGE: I can't find in the ANSI spec where it says
                   ;; that DECLAIM/PROCLAIM of optimization policy should
                   ;; have file scope. CMU CL did this, and it seems
@@ -142,12 +148,14 @@
                   ;; scope, and I can't find anything under PROCLAIM or
                   ;; COMPILE-FILE or LOAD or OPTIMIZE which justifies this
                   ;; behavior. Hmm. -- WHN 2001-04-06
-                  (sb!c::*policy* sb!c::*policy*))
-               (if faslp
-                   (load-as-fasl stream verbose print)
-                   (sb!c:with-compiler-error-resignalling
-                     (load-as-source stream :verbose verbose
-                                            :print print))))))
+                             (sb!c::*policy* sb!c::*policy*))
+                         (if faslp
+                             (load-as-fasl stream verbose print)
+                             (sb!c:with-compiler-error-resignalling
+                                 (load-as-source stream :verbose verbose
+                                                        :print print))))))
+             (call-with-load-bindings #'thunk stream))))
+
     ;; Case 1: stream.
     (when (streamp pathspec)
       (return-from load (load-stream pathspec (fasl-header-p pathspec))))
