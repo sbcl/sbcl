@@ -259,9 +259,9 @@
 ;;; Find an immobile FDEFN or FUNCTION given an interior pointer to it.
 #!+immobile-space
 (defun find-called-object (address)
-  (when (<= immobile-space-start address immobile-space-end)
-    (let ((obj (alien-funcall (extern-alien "search_immobile_space" (function long long))
-                              address)))
+  (let ((obj (alien-funcall (extern-alien "search_all_gc_spaces"
+                                          (function unsigned unsigned))
+                            address)))
       (unless (eql obj 0)
         (case (sap-ref-8 (int-sap obj) 0)
          (#.fdefn-widetag
@@ -276,7 +276,7 @@
                           (ash simple-fun-code-offset word-shift)
                           (- fun-pointer-lowtag))
                        address)
-                    (return f)))))))))))
+                    (return f))))))))))
 
 ;;; Compute the PC that FDEFN will jump to when called.
 #!+immobile-code

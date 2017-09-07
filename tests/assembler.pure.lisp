@@ -133,3 +133,20 @@
                                        :stream s))
     (assert (search "FS LOCK OR [#x20100400], R8B"
                     (get-output-stream-string s)))))
+
+(with-test (:name :disassemble-static-fdefn :skipped-on '(not :x86-64))
+  (assert (< (get-lisp-obj-address (sb-kernel::find-fdefn 'sb-impl::sub-gc))
+             sb-vm:static-space-end))
+  ;; Cause SUB-GC to become un-statically-linked
+  (progn (trace sb-impl::sub-gc) (untrace))
+  (let ((lines
+         (split-string (with-output-to-string (s)
+                         (disassemble 'sb-impl::gc :stream s))
+                       #\Newline))
+        (found))
+    ;; Check that find-called-object looked in static space for FDEFNs
+    (dolist (line lines)
+      (when (and (search "CALL" line)
+                 (search "#<FDEFN SUB-GC>" line))
+        (setq found t)))
+    (assert found)))

@@ -19,10 +19,10 @@ forwarding_pointer_p(lispobj *pointer) {
     // This was in response to 044e22192c25578efceedba042554dc9a96124c6
     // which caused cheneygc to break. But now the latter revision has been
     // reverted due to performance degradation in gencgc.
-    // The right fix is probably that search_spaces() should use its own
+    // The right fix is probably for gc_search_all_spaces() to use a
     // special version of gc_search_space for ldb. That is unfortunately
     // made difficult by the call chain:
-    //   search_spaces() -> search_{foo}_space() -> gc_search_space().
+    //   search_all_gc_spaces() -> search_{foo}_space() -> gc_search_space().
     // which requires informing gc_search_space() to be more careful,
     // and similarly forwarding_pointer_p().
     return (is_lisp_pointer(first_word)

@@ -1299,7 +1299,7 @@ size_lose(lispobj *where)
 #include "genesis/gc-tables.h"
 
 
-static lispobj *search_spaces(void *pointer)
+lispobj *search_all_gc_spaces(void *pointer)
 {
     lispobj *start;
     if (((start = search_dynamic_space(pointer)) != NULL) ||
@@ -1317,7 +1317,7 @@ static lispobj *search_spaces(void *pointer)
 lispobj *
 component_ptr_from_pc(lispobj *pc)
 {
-    lispobj *object = search_spaces(pc);
+    lispobj *object = search_all_gc_spaces(pc);
 
     if (object != NULL && widetag_of(*object) == CODE_HEADER_WIDETAG)
         return object;
@@ -1444,7 +1444,7 @@ properly_tagged_p_internal(lispobj pointer, lispobj *start_addr)
 int
 valid_lisp_pointer_p(lispobj pointer)
 {
-    lispobj *start = search_spaces((void*)pointer);
+    lispobj *start = search_all_gc_spaces((void*)pointer);
     if (start != NULL)
         return properly_tagged_descriptor_p((void*)pointer, start);
     return 0;
