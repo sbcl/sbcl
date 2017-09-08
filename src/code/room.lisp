@@ -11,6 +11,8 @@
 
 (in-package "SB-VM")
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (export 'sb-sys::get-page-size "SB-SYS"))
 
 ;;;; type format database
 
