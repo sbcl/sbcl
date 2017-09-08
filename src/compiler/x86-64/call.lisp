@@ -861,19 +861,24 @@
 
                ,(if (eq named :direct)
                     #!+immobile-code
-                    `(let ((target
-                             (if (and (sb!c::code-immobile-p node)
-                                      (not step-instrumenting))
-                                 (make-fixup fun :named-call)
-                                 (progn
-                                   ;; RAX-TN was not declared as a temp var,
-                                   ;; however it's sole purpose at this point is
-                                   ;; for function call, so even if it was used
-                                   ;; to compute a stack argument, it's free now.
-                                   ;; If the call hits the undefined fun trap,
-                                   ;; RAX will get loaded regardless.
-                                   (inst mov rax-tn (make-fixup fun :named-call))
-                                   rax-tn))))
+                    `(let* ((fixup (make-fixup
+                                    fun
+                                    (if (static-fdefn-offset fun)
+                                        :static-call
+                                        :named-call)))
+                            (target
+                              (if (and (sb!c::code-immobile-p node)
+                                       (not step-instrumenting))
+                                  fixup
+                                  (progn
+                                    ;; RAX-TN was not declared as a temp var,
+                                    ;; however it's sole purpose at this point is
+                                    ;; for function call, so even if it was used
+                                    ;; to compute a stack argument, it's free now.
+                                    ;; If the call hits the undefined fun trap,
+                                    ;; RAX will get loaded regardless.
+                                    (inst mov rax-tn fixup)
+                                    rax-tn))))
                        (inst ,(if (eq return :tail) 'jmp 'call) target))
                     #!-immobile-code
                     `(inst ,(if (eq return :tail) 'jmp 'call)
