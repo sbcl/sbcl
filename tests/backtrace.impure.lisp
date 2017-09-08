@@ -247,13 +247,13 @@
   (with-test (:name (:backtrace :divide-by-zero :bug-346)
                     :skipped-on :interpreter)
     (assert-backtrace (lambda () (test #'optimized))
-                      `((/ 42 &rest)
+                      `((sb-kernel::integer-/-integer 42 &rest)
                         ((flet test :in ,*p*) ,#'optimized))))
 
   (with-test (:name (:backtrace :divide-by-zero :bug-356)
                     :skipped-on :interpreter)
     (assert-backtrace (lambda () (test #'not-optimized))
-                      `((/ 42 &rest)
+                      `((sb-kernel::integer-/-integer 42 &rest)
                         ((flet not-optimized :in ,*p*))
                         ((flet test :in ,*p*) ,#'not-optimized)))))
 

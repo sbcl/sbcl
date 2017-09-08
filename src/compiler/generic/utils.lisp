@@ -49,13 +49,13 @@
 ;;; for the static function NAME.
 (defun static-fdefn-offset (name)
   (let ((static-fun-index
-         (or (position name #.(concatenate 'vector +c-callable-fdefns+ +static-fdefns+))
-             (error "~S isn't a static function." name))))
-    (+ (* (length +static-symbols+) (pad-data-block symbol-size))
-       (pad-data-block (1- symbol-size))
-       (- list-pointer-lowtag)
-       (* static-fun-index (pad-data-block fdefn-size))
-       other-pointer-lowtag)))
+          (position name #.(concatenate 'vector +c-callable-fdefns+ +static-fdefns+))))
+    (and static-fun-index
+         (+ (* (length +static-symbols+) (pad-data-block symbol-size))
+            (pad-data-block (1- symbol-size))
+            (- list-pointer-lowtag)
+            (* static-fun-index (pad-data-block fdefn-size))
+            other-pointer-lowtag))))
 
 ;;; Return absolute address of the 'fun' slot in static fdefn NAME.
 (defun static-fdefn-fun-addr (name)

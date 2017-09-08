@@ -860,29 +860,33 @@
                (note-this-location vop :call-site)
 
                ,(if (eq named :direct)
+                    #!+immobile-code
                     `(let ((target
-                            (if (and (sb!c::code-immobile-p node)
-                                     (not step-instrumenting))
-                                (make-fixup fun :named-call)
-                                (progn
-                                  ;; RAX-TN was not declared as a temp var,
-                                  ;; however it's sole purpose at this point is
-                                  ;; for function call, so even if it was used
-                                  ;; to compute a stack argument, it's free now.
-                                  ;; If the call hits the undefined fun trap,
-                                  ;; RAX will get loaded regardless.
-                                  (inst mov rax-tn (make-fixup fun :named-call))
-                                  rax-tn))))
+                             (if (and (sb!c::code-immobile-p node)
+                                      (not step-instrumenting))
+                                 (make-fixup fun :named-call)
+                                 (progn
+                                   ;; RAX-TN was not declared as a temp var,
+                                   ;; however it's sole purpose at this point is
+                                   ;; for function call, so even if it was used
+                                   ;; to compute a stack argument, it's free now.
+                                   ;; If the call hits the undefined fun trap,
+                                   ;; RAX will get loaded regardless.
+                                   (inst mov rax-tn (make-fixup fun :named-call))
+                                   rax-tn))))
                        (inst ,(if (eq return :tail) 'jmp 'call) target))
+                    #!-immobile-code
+                    `(inst ,(if (eq return :tail) 'jmp 'call)
+                           (make-ea :qword :disp
+                                    (+ nil-value (static-fun-offset fun))))
                     `(inst ,(if (eq return :tail) 'jmp 'call)
                            (make-ea :qword :base rax
-                              :disp ,(if named
-                                         '(- (* fdefn-raw-addr-slot
-                                                n-word-bytes)
-                                             other-pointer-lowtag)
-                                       '(- (* closure-fun-slot n-word-bytes)
-                                           fun-pointer-lowtag)))))
-
+                                           :disp ,(if named
+                                                      '(- (* fdefn-raw-addr-slot
+                                                           n-word-bytes)
+                                                        other-pointer-lowtag)
+                                                      '(- (* closure-fun-slot n-word-bytes)
+                                                        fun-pointer-lowtag)))))
                ,@(ecase return
                    (:fixed
                     '((default-unknown-values vop values nvals node)))
@@ -894,13 +898,19 @@
 
   (define-full-call call nil :fixed nil)
   (define-full-call call-named t :fixed nil)
+  #!-immobile-code
+  (define-full-call static-call-named :direct :fixed nil)
   (define-full-call multiple-call nil :unknown nil)
   (define-full-call multiple-call-named t :unknown nil)
   (define-full-call tail-call nil :tail nil)
   (define-full-call tail-call-named t :tail nil)
+  #!-immobile-code
+  (define-full-call static-tail-call-named :direct :tail nil)
 
   (define-full-call call-variable nil :fixed t)
   (define-full-call multiple-call-variable nil :unknown t))
+
+
 
 ;;; This is defined separately, since it needs special code that BLT's
 ;;; the arguments down. All the real work is done in the assembly
