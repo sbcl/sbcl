@@ -1233,7 +1233,11 @@ and the number of 0 bits if INTEGER is negative."
     (1 (abs (the integer (fast-&rest-nth 0 integers))))
     (otherwise
      (do ((result (fast-&rest-nth 0 integers)
-                  (gcd result (the integer (fast-&rest-nth i integers))))
+                  ;; Call TWO-ARG-GCD directly, because self calls are
+                  ;; recognized before REWRITE-FULL-CALL can act,
+                  ;; because GCD has no templates to prevent self
+                  ;; call optimization.
+                  (two-arg-gcd result (the integer (fast-&rest-nth i integers))))
           (i 1 (1+ i)))
          ((>= i (length integers))
           result)
@@ -1248,7 +1252,7 @@ and the number of 0 bits if INTEGER is negative."
     (1 (abs (the integer (fast-&rest-nth 0 integers))))
     (otherwise
      (do ((result (fast-&rest-nth 0 integers)
-                  (lcm result (the integer (fast-&rest-nth i integers))))
+                  (two-arg-lcm result (the integer (fast-&rest-nth i integers))))
           (i 1 (1+ i)))
          ((>= i (length integers))
           result)

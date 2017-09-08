@@ -197,8 +197,7 @@
     (do-nodes (node nil block)
       (when (and (combination-p node)
                  (eq (combination-kind node) :known))
-        (let ((comination-name (lvar-fun-name (combination-fun node) t))
-              (args (combination-args node)))
+        (let ((comination-name (lvar-fun-name (combination-fun node) t)))
           (map-callable-arguments
            (lambda (lvar &key arg-count no-function-conversion &allow-other-keys)
              ;; TODO: handle CASTS.
@@ -227,15 +226,19 @@
                           ref
                           (let ((*compiler-error-context* node))
                             (find-free-fun replacement "ir1-finalize"))))))))))
-           node)
-          (let ((two-arg (cadr (assoc comination-name *two-arg-functions*)))
-                (ref (lvar-uses (combination-fun node))))
-            (when (and two-arg
-                       (ref-p ref)
-                       (= (length args) 2))
-              (change-ref-leaf
-               ref
-               (find-free-fun two-arg "ir1-finalize")))))))))
+           node))))))
+
+(defun rewrite-full-call (combination)
+  (let ((comination-name (lvar-fun-name (combination-fun combination) t))
+        (args (combination-args combination)))
+    (let ((two-arg (cadr (assoc comination-name *two-arg-functions*)))
+          (ref (lvar-uses (combination-fun combination))))
+      (when (and two-arg
+                 (ref-p ref)
+                 (= (length args) 2))
+        (change-ref-leaf
+         ref
+         (find-free-fun two-arg "rewrite-full-call"))))))
 
 ;;; Do miscellaneous things that we want to do once all optimization
 ;;; has been done:

@@ -182,7 +182,6 @@
   (declare (type combination call))
   (let ((kind (basic-combination-kind call))
         (info (basic-combination-fun-info call)))
-    (annotate-fun-lvar (basic-combination-fun call))
 
     (dolist (arg (basic-combination-args call))
       (unless (lvar-info arg)
@@ -200,8 +199,9 @@
        (when (eq kind :error)
          (setf (basic-combination-kind call) :full))
        (setf (basic-combination-info call) :full)
+       (rewrite-full-call call)
        (flush-full-call-tail-transfer call))))
-
+  (annotate-fun-lvar (basic-combination-fun call))
   (values))
 
 ;;; Annotate an lvar for unknown multiple values:
@@ -824,22 +824,24 @@
       ;; to implement an out-of-line version in terms of inline
       ;; transforms or VOPs or whatever.
       (unless template
-        (when (let ((funleaf (physenv-lambda (node-physenv call))))
-                (and (leaf-has-source-name-p funleaf)
-                     (eq (lvar-fun-name (combination-fun call))
-                         (leaf-source-name funleaf))
-                     (let ((info (basic-combination-fun-info call)))
-                       (not (or (fun-info-ir2-convert info)
-                                (ir1-attributep (fun-info-attributes info)
-                                                recursive))))))
-          (let ((*compiler-error-context* call))
-            (compiler-warn "~@<recursion in known function definition~2I ~
+        (let ((name (lvar-fun-name (combination-fun call))))
+          (ltn-default-call call)
+          (when (let ((funleaf (physenv-lambda (node-physenv call))))
+                  (and (leaf-has-source-name-p funleaf)
+                       ;; Don't complain if REWRITE-FULL-CALL actually changes the function
+                       (eq name (lvar-fun-name (combination-fun call)))
+                       (eq name (leaf-source-name funleaf))
+                       (let ((info (basic-combination-fun-info call)))
+                         (not (or (fun-info-ir2-convert info)
+                                  (ir1-attributep (fun-info-attributes info)
+                                                  recursive))))))
+            (let ((*compiler-error-context* call))
+              (compiler-warn "~@<recursion in known function definition~2I ~
                             ~_policy=~S ~_arg types=~S~:>"
-                           (lexenv-policy (node-lexenv call))
-                           (mapcar (lambda (arg)
-                                     (type-specifier (lvar-type arg)))
-                                   args))))
-        (ltn-default-call call)
+                             (lexenv-policy (node-lexenv call))
+                             (mapcar (lambda (arg)
+                                       (type-specifier (lvar-type arg)))
+                                     args)))))
         (return-from ltn-analyze-known-call (values)))
       (setf (basic-combination-info call) template)
       (setf (node-tail-p call) nil)
