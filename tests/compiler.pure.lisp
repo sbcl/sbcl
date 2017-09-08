@@ -6542,3 +6542,14 @@
                                           (ldb (byte 13 19) x)))
                       -3560597)
              8185)))
+
+(with-test (:name :logand-transform)
+  (assert (= (funcall
+              (checked-compile
+               '(lambda (b)
+                 (catch 'ct1
+                   (flet ((%f (&key (y (throw 'ct1 1)))
+                            (return-from %f y)))
+                     (logand (%f) b)))))
+              1)
+             1)))

@@ -3355,7 +3355,7 @@
   (and (/= x -1)
        (1- (integer-length (logxor x (1+ x))))))
 
-(deftransform logand ((x y) (* (constant-arg t)) *)
+(deftransform logand ((x y) (* (constant-arg integer)) *)
   "fold identity operation"
   (let* ((y (lvar-value y))
          (width (or (least-zero-bit y) '*)))
