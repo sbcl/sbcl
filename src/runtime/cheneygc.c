@@ -153,7 +153,8 @@ collect_garbage(generation_index_t ignore)
     scavenge_control_stack(th);
 
     scav_binding_stack((lispobj*)th->binding_stack_start,
-                       (lispobj*)get_binding_stack_pointer(th));
+                       (lispobj*)get_binding_stack_pointer(th),
+                       0);
 
 #ifdef PRINTNOISE
     printf("Scavenging static space %p - %p (%d words) ...\n",
@@ -182,7 +183,7 @@ collect_garbage(generation_index_t ignore)
 #ifdef PRINTNOISE
     printf("Scanning weak hash tables ...\n");
 #endif
-    scan_weak_hash_tables();
+    scan_weak_hash_tables(weak_ht_alivep_funs);
 
     /* Scan the weak pointers. */
 #ifdef PRINTNOISE
@@ -263,7 +264,7 @@ scavenge_newspace(void)
                 here,new_space_free_pointer); */
         next = new_space_free_pointer;
         heap_scavenge(here, next);
-        scav_weak_hash_tables();
+        scav_weak_hash_tables(weak_ht_alivep_funs, gc_scav_pair);
         here = next;
     }
     /* printf("done with newspace\n"); */

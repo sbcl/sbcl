@@ -59,9 +59,7 @@
 #include "genesis/layout.h"
 #include "gencgc.h"
 #include "hopscotch.h"
-#ifdef GENCGC_IS_PRECISE
-#include "genesis/cons.h" /* for accessing *pinned-objects* */
-#endif
+#include "genesis/cons.h"
 #include "forwarding-ptr.h"
 
 /* forward declarations */
@@ -1596,22 +1594,10 @@ copy_unboxed_object(lispobj object, sword_t nwords)
 static sword_t
 scav_weak_pointer(lispobj *where, lispobj object)
 {
-    /* Since we overwrite the 'next' field, we have to make
-     * sure not to do so for pointers already in the list.
-     * Instead of searching the list of weak_pointers each
-     * time, we ensure that next is always NULL when the weak
-     * pointer isn't in the list, and not NULL otherwise.
-     * Since we can't use NULL to denote end of list, we
-     * use a pointer back to the same weak_pointer.
-     */
     struct weak_pointer * wp = (struct weak_pointer*)where;
 
-    if (NULL == wp->next && weak_pointer_breakable_p(wp)) {
-        wp->next = weak_pointers;
-        weak_pointers = wp;
-        if (NULL == wp->next)
-            wp->next = wp;
-    }
+    if (!wp->next && weak_pointer_breakable_p(wp))
+        add_to_weak_pointer_list(wp);
 
     /* Do not let GC scavenge the value slot of the weak pointer.
      * (That is why it is a weak pointer.) */
@@ -1667,12 +1653,11 @@ conservative_root_p(void *addr, page_index_t addr_page_index)
 {
     /* quick check 1: Address is quite likely to have been invalid. */
     struct page* page = &page_table[addr_page_index];
-    if (page->gen != from_space ||
+    if (((uword_t)addr & (GENCGC_CARD_BYTES - 1)) > page_bytes_used(addr_page_index) ||
 #ifdef LISP_FEATURE_SEGREGATED_CODE
         (!is_lisp_pointer((lispobj)addr) && page->allocated != CODE_PAGE_FLAG) ||
 #endif
-        ((uword_t)addr & (GENCGC_CARD_BYTES - 1)) > page_bytes_used(addr_page_index) ||
-        (page->large_object && page->dont_move))
+        (page->gen != from_space || (page->large_object && page->dont_move)))
         return 0;
     gc_assert(!(page->allocated & OPEN_REGION_PAGE_FLAG));
 
@@ -2511,7 +2496,7 @@ scavenge_newspace_generation(generation_index_t generation)
      * is O(W^2+N) as Bruno Haible warns in
      * http://www.haible.de/bruno/papers/cs/weak/WeakDatastructures-writeup.html
      * see "Implementation 2". */
-    scav_weak_hash_tables();
+    scav_weak_hash_tables(weak_ht_alivep_funs, gc_scav_pair);
 
     /* Flush the current regions updating the tables. */
     gc_alloc_update_all_page_tables(0);
@@ -2564,7 +2549,7 @@ scavenge_newspace_generation(generation_index_t generation)
             /* Record all new areas now. */
             record_new_objects = 2;
 
-            scav_weak_hash_tables();
+            scav_weak_hash_tables(weak_ht_alivep_funs, gc_scav_pair);
 
             /* Flush the current regions updating the tables. */
             gc_alloc_update_all_page_tables(0);
@@ -2581,7 +2566,7 @@ scavenge_newspace_generation(generation_index_t generation)
                 heap_scavenge(start, (lispobj*)((char*)start + size));
             }
 
-            scav_weak_hash_tables();
+            scav_weak_hash_tables(weak_ht_alivep_funs, gc_scav_pair);
 
             /* Flush the current regions updating the tables. */
             gc_alloc_update_all_page_tables(0);
@@ -3400,7 +3385,8 @@ garbage_collect_generation(generation_index_t generation, int raise)
         struct thread *th;
         for_each_thread(th) {
             scav_binding_stack((lispobj*)th->binding_stack_start,
-                               (lispobj*)get_binding_stack_pointer(th));
+                               (lispobj*)get_binding_stack_pointer(th),
+                               0);
 #ifdef LISP_FEATURE_SB_THREAD
             /* do the tls as well */
             sword_t len;
@@ -3470,7 +3456,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
 #endif
 
     scan_binding_stack();
-    scan_weak_hash_tables();
+    scan_weak_hash_tables(weak_ht_alivep_funs);
     scan_weak_pointers();
     wipe_nonpinned_words();
 #ifdef LISP_FEATURE_IMMOBILE_SPACE

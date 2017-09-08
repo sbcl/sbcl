@@ -195,11 +195,17 @@ extern struct hash_table *weak_hash_tables; /* in gc-common.c */
 extern void heap_scavenge(lispobj *start, lispobj *limit);
 extern sword_t scavenge(lispobj *start, sword_t n_words);
 extern void scavenge_interrupt_contexts(struct thread *thread);
-extern void scav_weak_hash_tables(void);
-extern void scav_binding_stack(lispobj*, lispobj*);
+extern void scav_weak_hash_tables(int (*[5])(lispobj,lispobj),
+                                  void (*)(lispobj*));
+extern void scav_binding_stack(lispobj*, lispobj*, void(*)(lispobj));
 extern void scan_binding_stack(void);
-extern void scan_weak_hash_tables(void);
+extern void scan_weak_hash_tables(int (*[5])(lispobj,lispobj));
 extern void scan_weak_pointers(void);
+extern void scav_hash_table_entries (struct hash_table *hash_table,
+                                     int (*[5])(lispobj,lispobj),
+                                     void (*)(lispobj*));
+extern int (*weak_ht_alivep_funs[5])(lispobj,lispobj);
+extern void gc_scav_pair(lispobj where[2]);
 
 lispobj  copy_large_unboxed_object(lispobj object, sword_t nwords);
 lispobj  copy_unboxed_object(lispobj object, sword_t nwords);

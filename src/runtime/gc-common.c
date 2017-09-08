@@ -182,7 +182,7 @@ static inline void scav1(lispobj* object_ptr, lispobj object)
 #endif
 }
 
-static inline void scav_pair(lispobj where[2])
+inline void gc_scav_pair(lispobj where[2])
 {
     lispobj object = where[0];
     if (is_lisp_pointer(object))
@@ -204,7 +204,7 @@ void heap_scavenge(lispobj *start, lispobj *end)
             /* It's some sort of header object or another. */
             object_ptr += (scavtab[widetag_of(object)])(object_ptr, object);
         else {  // it's a cons
-            scav_pair(object_ptr);
+            gc_scav_pair(object_ptr);
             object_ptr += 2;
         }
     }
@@ -227,7 +227,7 @@ sword_t scavenge(lispobj *start, sword_t n_words)
     return n_words;
 }
 
-void scav_binding_stack(lispobj* where, lispobj* end)
+void scav_binding_stack(lispobj* where, lispobj* end, void (*fun)(lispobj))
 {
     /* The binding stack consists of pairs of words, each holding a value and
      * either a TLS index (if threads), or symbol (if no threads).
@@ -250,9 +250,16 @@ void scav_binding_stack(lispobj* where, lispobj* end)
      * mentions that index. Such complication is unnecessary at present.
      */
     struct binding* binding = (struct binding*)where;
-    for ( ; (lispobj*)binding < end; ++binding )
-        if (is_lisp_pointer(binding->value))
-            scav1(&binding->value, binding->value);
+    if (fun) { // call the specified function
+        for ( ; (lispobj*)binding < end; ++binding )
+            if (is_lisp_pointer(binding->value))
+                fun(binding->value);
+
+    } else {   // call scav1
+        for ( ; (lispobj*)binding < end; ++binding )
+            if (is_lisp_pointer(binding->value))
+                scav1(&binding->value, binding->value);
+    }
 }
 void scan_binding_stack()
 {
@@ -1029,34 +1036,8 @@ static inline int pointer_survived_gc_yet(lispobj obj)
 #endif
 }
 
-static int survived_gc_yet_KEY(lispobj key, lispobj value) {
-    return !is_lisp_pointer(key) || pointer_survived_gc_yet(key);
-}
-static int survived_gc_yet_VALUE(lispobj key, lispobj value) {
-    return !is_lisp_pointer(value) || pointer_survived_gc_yet(value);
-}
-static int survived_gc_yet_AND(lispobj key, lispobj value) {
-    int key_nonpointer = !is_lisp_pointer(key);
-    int val_nonpointer = !is_lisp_pointer(value);
-    if (key_nonpointer && val_nonpointer) return 1;
-    return (key_nonpointer || pointer_survived_gc_yet(key))
-        && (val_nonpointer || pointer_survived_gc_yet(value));
-}
-static int survived_gc_yet_OR(lispobj key, lispobj value) {
-    int key_nonpointer = !is_lisp_pointer(key);
-    int val_nonpointer = !is_lisp_pointer(value);
-    if (key_nonpointer || val_nonpointer) return 1;
-    // Both MUST be pointers
-    return pointer_survived_gc_yet(key) || pointer_survived_gc_yet(value);
-}
-
-static int (*weak_hash_entry_alivep_fun[5])(lispobj,lispobj) = {
-    NULL,
-    survived_gc_yet_KEY,
-    survived_gc_yet_VALUE,
-    survived_gc_yet_AND,
-    survived_gc_yet_OR
-};
+#define HT_ENTRY_LIVENESS_FUN_ARRAY_NAME weak_ht_alivep_funs
+#include "weak-hash-pred.inc"
 
 /* Return the beginning of data in ARRAY (skipping the header and the
  * length) or NULL if it isn't an array of the specified widetag after
@@ -1078,8 +1059,9 @@ get_array_data (lispobj array, int widetag, uword_t *length)
  * the empty marker at index 1 were scavenged by scav_vector that
  * either called this function directly or arranged for it to be
  * called later by pushing the hash table onto weak_hash_tables. */
-static void
-scav_hash_table_entries (struct hash_table *hash_table)
+void scav_hash_table_entries (struct hash_table *hash_table,
+                              int (*alivep[5])(lispobj,lispobj),
+                              void (*scav_entry)(lispobj*))
 {
     lispobj *kv_vector;
     uword_t kv_length;
@@ -1123,15 +1105,14 @@ scav_hash_table_entries (struct hash_table *hash_table)
         lose("unexpected empty-hash-table-slot marker: %p\n", empty_symbol);
 
     /* Work through the KV vector. */
-    int (*alivep_test)(lispobj,lispobj)
-        = weak_hash_entry_alivep_fun[fixnum_value(hash_table->_weakness)];
+    int (*alivep_test)(lispobj,lispobj) = alivep[fixnum_value(hash_table->_weakness)];
 #define SCAV_ENTRIES(aliveness_predicate) \
     for (i = 1; i < next_vector_length; i++) {                                 \
         lispobj old_key = kv_vector[2*i];                                      \
         lispobj __attribute__((unused)) value = kv_vector[2*i+1];              \
         if (aliveness_predicate) {                                             \
             /* Scavenge the key and value. */                                  \
-            scav_pair(&kv_vector[2*i]);                                        \
+            scav_entry(&kv_vector[2*i]);                                       \
             /* If an EQ-based key has moved, mark the hash-table for rehash */ \
             if (!hash_vector || hash_vector[i] == MAGIC_HASH_VECTOR_VALUE) {   \
                 lispobj new_key = kv_vector[2*i];                              \
@@ -1196,7 +1177,7 @@ scav_vector (lispobj *where, lispobj object)
     }
 
     if (!hash_table->_weakness) {
-        scav_hash_table_entries(hash_table);
+        scav_hash_table_entries(hash_table, weak_ht_alivep_funs, gc_scav_pair);
     } else {
         /* Delay scavenging of this table by pushing it onto
          * weak_hash_tables (if it's not there already) for the weak
@@ -1211,14 +1192,15 @@ scav_vector (lispobj *where, lispobj object)
 }
 
 void
-scav_weak_hash_tables (void)
+scav_weak_hash_tables (int (*alivep[5])(lispobj,lispobj),
+                       void (*scavenger)(lispobj*))
 {
     struct hash_table *table;
 
     /* Scavenge entries whose triggers are known to survive. */
     for (table = weak_hash_tables; table != NULL;
          table = (struct hash_table *)table->next_weak_hash_table) {
-        scav_hash_table_entries(table);
+        scav_hash_table_entries(table, alivep, scavenger);
     }
 }
 
@@ -1255,7 +1237,8 @@ scan_weak_hash_table_chain (struct hash_table *hash_table, lispobj *prev,
 }
 
 static void
-scan_weak_hash_table (struct hash_table *hash_table)
+scan_weak_hash_table (struct hash_table *hash_table,
+                      int (*alivep[5])(lispobj,lispobj))
 {
     lispobj *kv_vector;
     lispobj *index_vector;
@@ -1264,8 +1247,7 @@ scan_weak_hash_table (struct hash_table *hash_table)
     uword_t next_vector_length = 0; /* prevent warning */
     lispobj *hash_vector;
     lispobj empty_symbol;
-    int (*alivep_test)(lispobj,lispobj) =
-        weak_hash_entry_alivep_fun[fixnum_value(hash_table->_weakness)];
+    int (*alivep_test)(lispobj,lispobj) = alivep[fixnum_value(hash_table->_weakness)];
     uword_t i;
 
     kv_vector = get_array_data(hash_table->table,
@@ -1288,14 +1270,14 @@ scan_weak_hash_table (struct hash_table *hash_table)
 
 /* Remove dead entries from weak hash tables. */
 void
-scan_weak_hash_tables (void)
+scan_weak_hash_tables (int (*alivep[5])(lispobj,lispobj))
 {
     struct hash_table *table, *next;
 
     for (table = weak_hash_tables; table != NULL; table = next) {
         next = (struct hash_table *)table->next_weak_hash_table;
         table->next_weak_hash_table = NIL;
-        scan_weak_hash_table(table);
+        scan_weak_hash_table(table, alivep);
     }
 
     weak_hash_tables = NULL;
