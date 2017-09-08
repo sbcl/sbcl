@@ -435,7 +435,7 @@
 
 (define-instruction-format
     (add-sub-ext-reg 32
-     :default-printer '(:name :tab rd ", " rn ", " extend)
+     :default-printer '(:name :tab rd ", " rn ", " rm extend)
      :include add-sub)
   (op2 :field (byte 8 21) :value #b01011001)
   (extend :fields (list (byte 3 13) (byte 3 10)) :type 'extend)
@@ -545,7 +545,7 @@
   (:printer add-sub-imm ((op #b11) (rd #b11111))
             '('cmp :tab rn ", " imm shift))
   (:printer add-sub-ext-reg ((op #b11) (rd #b11111))
-            '('cmp :tab rn ", " extend))
+            '('cmp :tab rn ", " rm extend))
   (:printer add-sub-shift-reg ((op #b11) (rd #b11111))
             '('cmp :tab rn ", " rm shift))
   (:printer add-sub-shift-reg ((op #b11) (rn #b11111))
