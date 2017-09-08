@@ -14,13 +14,15 @@
 
 ;;;; type format database
 
-(defstruct (room-info (:constructor make-room-info (name kind))
+(defstruct (room-info (:constructor make-room-info (mask name kind))
                       (:copier nil))
+    ;; the mask applied to HeaderValue to compute object size
+    (mask 0 :type (and fixnum unsigned-byte))
     ;; the name of this type
     (name nil :type symbol :read-only t)
     ;; kind of type (how to reconstitute an object)
     (kind (missing-arg)
-          :type (member :other :tiny-other :closure :instance :list
+          :type (member :other :closure :instance :list
                         :code :vector-nil :weak-pointer)
           :read-only t))
 
@@ -30,7 +32,8 @@
         (room-info-name info)))
 
 (defun !compute-room-infos ()
-  (let ((infos (make-array 256 :initial-element nil)))
+  (let ((infos (make-array 256 :initial-element nil))
+        (default-size-mask (mask-field (byte 23 0) -1)))
     (dolist (obj *primitive-objects*)
       (let ((widetag (primitive-object-widetag obj))
             (lowtag (primitive-object-lowtag obj))
@@ -39,22 +42,24 @@
                    (not (member widetag '(t nil)))
                    (not (eq name 'weak-pointer)))
           (setf (svref infos (symbol-value widetag))
-                (make-room-info name (if (member name '(fdefn symbol))
-                                         :tiny-other
-                                         :other))))))
+                (make-room-info (if (member name '(fdefn symbol))
+                                    #xFF
+                                    default-size-mask)
+                                name :other)))))
 
     (dolist (code (list #+sb-unicode complex-character-string-widetag
                         complex-base-string-widetag simple-array-widetag
                         complex-bit-vector-widetag complex-vector-widetag
                         complex-array-widetag complex-vector-nil-widetag))
       (setf (svref infos code)
-            (make-room-info 'array-header :other)))
+            (make-room-info default-size-mask 'array-header :other)))
 
     (setf (svref infos bignum-widetag)
-          (make-room-info 'bignum :other))
+          (make-room-info (ash most-positive-word (- n-widetag-bits))
+                          'bignum :other))
 
     (setf (svref infos closure-widetag)
-          (make-room-info 'closure :closure))
+          (make-room-info 0 'closure :closure))
 
     (dotimes (i (length *specialized-array-element-type-properties*))
       (let ((saetp (aref *specialized-array-element-type-properties* i)))
@@ -62,21 +67,21 @@
           (setf (svref infos (saetp-typecode saetp)) saetp))))
 
     (setf (svref infos simple-array-nil-widetag)
-          (make-room-info 'simple-array-nil :vector-nil))
+          (make-room-info 0 'simple-array-nil :vector-nil))
 
     (setf (svref infos code-header-widetag)
-          (make-room-info 'code :code))
+          (make-room-info 0 'code :code))
 
     (setf (svref infos instance-widetag)
-          (make-room-info 'instance :instance))
+          (make-room-info 0 'instance :instance))
 
     (setf (svref infos funcallable-instance-widetag)
-          (make-room-info 'funcallable-instance :closure))
+          (make-room-info 0 'funcallable-instance :closure))
 
     (setf (svref infos weak-pointer-widetag)
-          (make-room-info 'weak-pointer :weak-pointer))
+          (make-room-info 0 'weak-pointer :weak-pointer))
 
-    (let ((cons-info (make-room-info 'cons :list)))
+    (let ((cons-info (make-room-info 0 'cons :list)))
       ;; A cons consists of two words, both of which may be either a
       ;; pointer or immediate data.  According to the runtime this means
       ;; either a fixnum, a character, an unbound-marker, a single-float
@@ -229,19 +234,14 @@
           (:other
            (values (tagged-object other-pointer-lowtag)
                    widetag
-                   (boxed-size header-value)))
-
-          (:tiny-other
-           (values (tagged-object other-pointer-lowtag)
-                   widetag
-                   (boxed-size (logand header-value #xFF))))
+                   (boxed-size (logand header-value (room-info-mask info)))))
 
           (:vector-nil
            (values (tagged-object other-pointer-lowtag)
                    simple-array-nil-widetag
                    (* 2 n-word-bytes)))
 
-          (:weak-pointer
+          (:weak-pointer ; FIXME: why??? It's just a boxed object, isn't it?
            (values (tagged-object other-pointer-lowtag)
                    weak-pointer-widetag
                    (round-to-dualword
@@ -255,11 +255,7 @@
                      (round-to-dualword
                       (+ (* (logand header-value short-header-max-words)
                             n-word-bytes)
-                         (%code-code-size (truly-the code-component c)))))))
-          (t
-           #+nil ; unreachable
-           (error "Unrecognized room-info-kind ~S in reconstitute-object"
-                  (room-info-kind info)))))))))
+                         (%code-code-size (truly-the code-component c)))))))))))))
 
 ;;; Iterate over all the objects in the contiguous block of memory
 ;;; with the low address at START and the high address just before

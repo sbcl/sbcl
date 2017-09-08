@@ -35,7 +35,7 @@
   (lambda (entry)
     (cons (symbol-value (symbolicate (car entry) "-WIDETAG"))
           (cdr entry)))
-  `((bignum "unboxed")
+  `((bignum "unboxed" "unboxed" "bignum")
     (ratio "boxed" "ratio_or_complex" "boxed")
     (single-float ,(or #!+64-bit "immediate" "unboxed"))
     (double-float "unboxed")

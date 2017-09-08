@@ -67,10 +67,46 @@ os_vm_size_t bytes_consed_between_gcs = 12*1024*1024;
 /// These sizing macros return the number of *payload* words,
 /// exclusive of the object header word. Payload length is always
 /// an odd number so that total word count is an even number.
-#define BOXED_NWORDS(obj) (HeaderValue(obj) | 1)
-// Payload count expressed in 15 bits
+
+/* Each size category is designed to allow 1 bit for a GC mark bit,
+ * possibly some flag bits, and the payload length in words.
+ * There are three size categories for most non-vector objects,
+ * differing in how many flag bits versus size bits there are.
+ * The GC mark bit is always in bit index 31 of the header regardless of
+ * machine word size.  Bit index 31 is chosen for consistency between 32-bit
+ * and 64-bit machines. It is a natural choice for 32-bit headers by avoiding
+ * intererence with other header fields. It is also chosen for 64-bit headers
+ * because the upper 32 bits of headers for some objects are already occupied
+ * by other data: symbol TLS index, instance layout, etc.
+ */
+
+/* The largest payload count is expressed in 23 bits. These objects
+ * can't reside in immobile space as there is no room for generation bits.
+ * All sorts of objects fall into this category, but mostly due to inertia.
+ * There are no non-vector boxed objects whose size should be so large.
+ * Header:   size |    tag
+ *          -----   ------
+ *        23 bits | 8 bits
+ */
+#define BOXED_NWORDS(obj) ((HeaderValue(obj) & 0x7FFFFF) | 1)
+
+/* Medium-sized payload count is expressed in 15 bits. Objects in this category
+ * may reside in immobile space: CODE, CLOSURE, INSTANCE, FUNCALLABLE-INSTANCE.
+ * FIXME: explain why is this 15 bits and not 16 bits. Is there a reason?
+ * Header:  gen# |    size |    tag
+ *         -----   -------   ------
+ *        8 bits | 15 bits | 8 bits
+ */
 #define SHORT_BOXED_NWORDS(obj) ((HeaderValue(obj) & SHORT_HEADER_MAX_WORDS) | 1)
-// Payload count expressed in 8 bits
+
+/* Tiny payload count is expressed in 8 bits. Objects in this size category
+ * can reside in immobile space: SYMBOL, FDEFN.
+ * Header:  gen# | flags |   size |    tag
+ *         -----   ------  ------   ------
+ *        8 bits   8 bits  8 bits | 8 bits
+ * FDEFN  flag bits: 1 bit for statically-linked
+ * SYMBOL flag bits: 1 bit for present in initial core image
+ */
 #define TINY_BOXED_NWORDS(obj) ((HeaderValue(obj) & 0xFF) | 1)
 
 /*
@@ -732,6 +768,13 @@ scav_funinstance(lispobj *where, lispobj header)
 DEF_SCAV_BOXED(boxed, BOXED_NWORDS)
 DEF_SCAV_BOXED(short_boxed, SHORT_BOXED_NWORDS)
 DEF_SCAV_BOXED(tiny_boxed, TINY_BOXED_NWORDS)
+
+/* Bignums have no GC mark bit. (N_WORD_BITS - N_WIDETAG_BITS) bits of the
+ * header hold the size. This would allow a 64MiB bignum for 32-bit words,
+ * which seems insanely large, but theoretically possible */
+static sword_t size_bignum(lispobj *where) {
+    return 1 + (HeaderValue(*where) | 1);
+}
 
 /* Note: on the sparc we don't have to do anything special for fdefns, */
 /* 'cause the raw-addr has a function lowtag. */
