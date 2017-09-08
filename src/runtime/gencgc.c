@@ -1657,7 +1657,8 @@ conservative_root_p(void *addr, page_index_t addr_page_index)
 #ifdef LISP_FEATURE_SEGREGATED_CODE
         (!is_lisp_pointer((lispobj)addr) && page->allocated != CODE_PAGE_FLAG) ||
 #endif
-        (page->gen != from_space || (page->large_object && page->dont_move)))
+        (compacting_p() && (page->gen != from_space ||
+                            (page->large_object && page->dont_move))))
         return 0;
     gc_assert(!(page->allocated & OPEN_REGION_PAGE_FLAG));
 
@@ -2038,6 +2039,11 @@ preserve_pointer(void *addr)
     if (addr_page_index == -1
         || (object_start = conservative_root_p(addr, addr_page_index)) == 0)
         return;
+    if (!compacting_p()) {
+        /* Just mark it.  No distinction between large and small objects. */
+        gc_mark_obj(compute_lispobj(object_start));
+        return;
+    }
 #endif
 
     /* (Now that we know that addr_page_index is in range, it's
@@ -3143,10 +3149,10 @@ garbage_collect_generation(generation_index_t generation, int raise)
     page_index_t i;
     struct thread *th;
 
-    gc_assert(generation <= HIGHEST_NORMAL_GENERATION);
+    gc_assert(generation <= PSEUDO_STATIC_GENERATION);
 
     /* The oldest generation can't be raised. */
-    gc_assert((generation != HIGHEST_NORMAL_GENERATION) || (raise == 0));
+    gc_assert(!raise || generation < HIGHEST_NORMAL_GENERATION);
 
     /* Check if weak hash tables were processed in the previous GC. */
     gc_assert(weak_hash_tables == NULL);
@@ -3163,25 +3169,27 @@ garbage_collect_generation(generation_index_t generation, int raise)
     }
 
     /* Set the global src and dest. generations */
-    from_space = generation;
-    if (raise)
-        new_space = generation+1;
-    else
-        new_space = SCRATCH_GENERATION;
+    if (generation < PSEUDO_STATIC_GENERATION) {
+
+        from_space = generation;
+        if (raise)
+            new_space = generation+1;
+        else
+            new_space = SCRATCH_GENERATION;
 
     /* Change to a new space for allocation, resetting the alloc_start_page */
-    gc_alloc_generation = new_space;
+        gc_alloc_generation = new_space;
 #ifdef LISP_FEATURE_SEGREGATED_CODE
-    bzero(generations[new_space].alloc_start_page_,
-          sizeof generations[new_space].alloc_start_page_);
+        bzero(generations[new_space].alloc_start_page_,
+              sizeof generations[new_space].alloc_start_page_);
 #else
-    generations[new_space].alloc_start_page = 0;
-    generations[new_space].alloc_unboxed_start_page = 0;
-    generations[new_space].alloc_large_start_page = 0;
+        generations[new_space].alloc_start_page = 0;
+        generations[new_space].alloc_unboxed_start_page = 0;
+        generations[new_space].alloc_large_start_page = 0;
 #endif
 
 #ifdef PIN_GRANULARITY_LISPOBJ
-    hopscotch_reset(&pinned_objects);
+        hopscotch_reset(&pinned_objects);
 #endif
     /* Before any pointers are preserved, the dont_move flags on the
      * pages need to be cleared. */
@@ -3190,18 +3198,38 @@ garbage_collect_generation(generation_index_t generation, int raise)
      * This will also obviate the extra test at the comment
      * "dont_move is cleared lazily" in move_pinned_pages_to_newspace().
      */
-    for (i = 0; i < last_free_page; i++)
-        if(page_table[i].gen==from_space) {
-            page_table[i].dont_move = 0;
-        }
+        for (i = 0; i < last_free_page; i++)
+            if(page_table[i].gen==from_space)
+                page_table[i].dont_move = 0;
 
     /* Un-write-protect the old-space pages. This is essential for the
      * promoted pages as they may contain pointers into the old-space
      * which need to be scavenged. It also helps avoid unnecessary page
      * faults as forwarding pointers are written into them. They need to
      * be un-protected anyway before unmapping later. */
-    if (ENABLE_PAGE_PROTECTION)
-        unprotect_oldspace();
+        if (ENABLE_PAGE_PROTECTION)
+            unprotect_oldspace();
+
+    } else { // "full" [sic] GC
+
+        extern void prepare_for_full_mark_phase();
+        /* This is a full mark-and-sweep of all generations without compacting
+         * and without returning free space to the allocator. The intent is to
+         * break chains of objects causing accidental reachability.
+         * Subsequent GC cycles will compact and reclaims space as usual. */
+        if (ENABLE_PAGE_PROTECTION) {
+            // Unprotect everything
+            for (i = 0; i < last_free_page; i++)
+                if (page_bytes_used(i))
+                    page_table[i].write_protected = 0;
+            os_protect(page_address(0), npage_bytes(last_free_page),
+                       OS_VM_PROT_ALL);
+        }
+        from_space = new_space = -1;
+        // Allocate pages from dynamic space for the work queue.
+        prepare_for_full_mark_phase();
+
+    }
 
     /* Scavenge the stacks' conservative roots. */
 
@@ -3318,7 +3346,8 @@ garbage_collect_generation(generation_index_t generation, int raise)
      * before we start to scavenge (and thus relocate) objects,
      * relocate the pinned pages to newspace, so that the scavenger
      * will not attempt to relocate their contents. */
-    move_pinned_pages_to_newspace();
+    if (compacting_p())
+        move_pinned_pages_to_newspace();
 
     /* Scavenge all the rest of the roots. */
 
@@ -3354,8 +3383,12 @@ garbage_collect_generation(generation_index_t generation, int raise)
     for (i = 0; i < NSIG; i++) {
         union interrupt_handler handler = interrupt_handlers[i];
         if (!ARE_SAME_HANDLER(handler.c, SIG_IGN) &&
-            !ARE_SAME_HANDLER(handler.c, SIG_DFL)) {
-            scavenge((lispobj *)(interrupt_handlers + i), 1);
+            !ARE_SAME_HANDLER(handler.c, SIG_DFL) &&
+            is_lisp_pointer(handler.lisp)) {
+            if (compacting_p())
+                scavenge((lispobj *)(interrupt_handlers + i), 1);
+            else
+                gc_mark_obj(handler.lisp);
         }
     }
     /* Scavenge the binding stacks. */
@@ -3364,15 +3397,26 @@ garbage_collect_generation(generation_index_t generation, int raise)
         for_each_thread(th) {
             scav_binding_stack((lispobj*)th->binding_stack_start,
                                (lispobj*)get_binding_stack_pointer(th),
-                               0);
+                               compacting_p() ? 0 : gc_mark_obj);
 #ifdef LISP_FEATURE_SB_THREAD
             /* do the tls as well */
             sword_t len;
             len=(SymbolValue(FREE_TLS_INDEX,0) >> WORD_SHIFT) -
                 (sizeof (struct thread))/(sizeof (lispobj));
-            scavenge((lispobj *) (th+1),len);
+            if (compacting_p())
+                scavenge((lispobj *) (th+1), len);
+            else
+                gc_mark_range((lispobj *) (th+1), len);
 #endif
         }
+    }
+
+    if (!compacting_p()) {
+        extern void execute_full_mark_phase();
+        extern void execute_full_sweep_phase();
+        execute_full_mark_phase();
+        execute_full_sweep_phase();
+        return;
     }
 
     /* Scavenge static space. */
@@ -3575,6 +3619,7 @@ void
 collect_garbage(generation_index_t last_gen)
 {
     generation_index_t gen = 0, i;
+    boolean gc_mark_only = 0;
     int raise, more = 0;
     int gen_to_wp;
     /* The largest value of last_free_page seen since the time
@@ -3586,7 +3631,12 @@ collect_garbage(generation_index_t last_gen)
 
     gc_active_p = 1;
 
-    if (last_gen > HIGHEST_NORMAL_GENERATION+1) {
+    if (last_gen == 1+PSEUDO_STATIC_GENERATION) {
+        // Pseudostatic space undergoes a non-moving collection
+        last_gen = PSEUDO_STATIC_GENERATION;
+        gc_mark_only = 1;
+    } else if (last_gen > 1+PSEUDO_STATIC_GENERATION) {
+        // This is a completely non-obvious thing to do, but whatever...
         FSHOW((stderr,
                "/collect_garbage: last_gen = %d, doing a level 0 GC\n",
                last_gen));
@@ -3610,6 +3660,11 @@ collect_garbage(generation_index_t last_gen)
        (not touched on every object allocation) so do it now */
     update_immobile_nursery_bits();
 #endif
+
+    if (gc_mark_only) {
+        garbage_collect_generation(PSEUDO_STATIC_GENERATION, 0);
+        goto finish;
+    }
 
     do {
         /* Collect the generation. */
@@ -3737,8 +3792,9 @@ collect_garbage(generation_index_t last_gen)
         high_water_mark = 0;
     }
 
-    gc_active_p = 0;
     large_allocation = 0;
+ finish:
+    gc_active_p = 0;
 
 #ifdef LISP_FEATURE_SB_TRACEROOT
     if (gc_object_watcher) {

@@ -50,6 +50,7 @@ set_forwarding_pointer(lispobj *pointer, lispobj newspace_copy) {
   // Unfortunately this also implies we can't assert
   // that we're operating on a not-yet-forwarded object here.
 #ifdef LISP_FEATURE_GENCGC
+    gc_dcheck(compacting_p());
     pointer[0]=0x01;
     pointer[1]=newspace_copy;
 #else

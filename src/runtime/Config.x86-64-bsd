@@ -23,9 +23,9 @@ CFLAGS += -fno-omit-frame-pointer
 LINKFLAGS += -Wl,--export-dynamic
 
 ifdef LISP_FEATURE_IMMOBILE_SPACE
-  GC_SRC = gencgc.c traceroot.c marknsweepgc.c
+  GC_SRC = fullcgc.c gencgc.c traceroot.c marknsweepgc.c
 else
-  GC_SRC = gencgc.c traceroot.c
+  GC_SRC = fullcgc.c gencgc.c traceroot.c
 endif
 
 # Nothing to do for after-grovel-headers.

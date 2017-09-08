@@ -455,6 +455,7 @@ void immobile_space_preserve_pointer(void* addr)
     if (page_index < 0)
         return;
 
+#define GEN_MATCH(expr) (!compacting_p() || (expr & (1<<from_space)))
     lispobj* object_start;
     int valid = 0;
 
@@ -465,7 +466,7 @@ void immobile_space_preserve_pointer(void* addr)
         // final page, we won't accidentally find that.
         lispobj* scan_start;
         valid = addr < (void*)immobile_space_free_pointer
-            && (varyobj_page_gens_augmented(page_index) & (1<<from_space)) != 0
+            && (GEN_MATCH(varyobj_page_gens_augmented(page_index)))
             && (scan_start = varyobj_scan_start(page_index)) <= (lispobj*)addr
             && (object_start = gc_search_space(scan_start, addr)) != 0
             /* gc_search_space can return filler objects, unlike
@@ -473,7 +474,7 @@ void immobile_space_preserve_pointer(void* addr)
             && !immobile_filler_p(object_start)
             && (instruction_ptr_p(addr, object_start)
                 || properly_tagged_descriptor_p(addr, object_start));
-    } else if (fixedobj_pages[page_index].gens & (1<<from_space)) {
+    } else if (GEN_MATCH(fixedobj_pages[page_index].gens)) {
         int obj_spacing = (page_obj_align(page_index) << WORD_SHIFT);
         int obj_index = ((uword_t)addr & (IMMOBILE_CARD_BYTES-1)) / obj_spacing;
         dprintf((logfile,"Pointer %p is to immobile page %d, object %d\n",
@@ -484,11 +485,16 @@ void immobile_space_preserve_pointer(void* addr)
             && (lispobj*)addr < object_start + page_obj_size(page_index)
             && properly_tagged_descriptor_p(addr, object_start);
     }
-    if (valid && __immobile_obj_gen_bits(object_start) == from_space) {
+    if (valid && (!compacting_p() ||
+                  __immobile_obj_gen_bits(object_start) == from_space)) {
         dprintf((logfile,"immobile obj @ %p (<- %p) is conservatively live\n",
                  header_addr, addr));
-        enliven_immobile_obj(object_start, 0);
+        if (compacting_p())
+            enliven_immobile_obj(object_start, 0);
+        else
+            gc_mark_obj(compute_lispobj(object_start));
     }
+#undef GEN_MATCH
 }
 
 // Loop over the newly-live objects, scavenging them for pointers.
@@ -2009,7 +2015,8 @@ void defrag_immobile_space(int* components, boolean verbose)
         lispobj* limit = (lispobj*)((char*)obj + IMMOBILE_CARD_BYTES);
         for ( ; obj < limit ; obj = (lispobj*)((char*)obj + obj_spacing) ) {
             lispobj word = *obj;
-            if (fixnump(word)) continue;
+            if (fixnump(word) || immobile_filler_p(obj))
+                continue;
             char** alloc_ptr;
             int lowtag = OTHER_POINTER_LOWTAG;
             int widetag = widetag_of(word);
@@ -2058,7 +2065,8 @@ void defrag_immobile_space(int* components, boolean verbose)
         lispobj* obj = low_page_address(page_index);
         lispobj* limit = (lispobj*)((char*)obj + IMMOBILE_CARD_BYTES);
         for ( ; obj < limit ; obj = (lispobj*)((char*)obj + obj_spacing) ) {
-            if (fixnump(*obj)) continue;
+            if (fixnump(*obj) || immobile_filler_p(obj))
+                continue;
             gc_assert(forwarding_pointer_p(obj));
             lispobj* new = native_pointer(forwarding_pointer_value(obj));
             switch (widetag_of(*tempspace_addr(new))) {

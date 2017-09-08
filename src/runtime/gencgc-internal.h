@@ -230,10 +230,14 @@ sword_t update_dynamic_space_free_pointer(void);
 void gc_alloc_update_page_tables(int page_type_flag, struct alloc_region *alloc_region);
 void gc_alloc_update_all_page_tables(int);
 void gc_set_region_empty(struct alloc_region *region);
+void gc_mark_range(lispobj*start, long count);
+void gc_mark_obj(lispobj);
 
 /*
  * predicates
  */
+
+#define compacting_p() (from_space>=0)
 
 /* Find the page index within the page_table for the given
  * address. Return -1 on failure. */
@@ -253,6 +257,7 @@ find_page_index(void *addr)
 static inline boolean pinned_p(lispobj obj, page_index_t page)
 {
     extern struct hopscotch_table pinned_objects;
+    gc_dcheck(compacting_p());
     return page_table[page].has_pins
         && hopscotch_containsp(&pinned_objects, obj);
 }
@@ -266,6 +271,7 @@ static inline boolean pinned_p(lispobj obj, page_index_t page)
 static boolean __attribute__((unused))
 from_space_p(lispobj obj)
 {
+    gc_dcheck(compacting_p());
     page_index_t page_index = find_page_index((void*)obj);
     return page_index >= 0
         && page_table[page_index].gen == from_space

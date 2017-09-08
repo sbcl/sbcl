@@ -42,12 +42,12 @@ ifdef LISP_FEATURE_SB_CORE_COMPRESSION
   OS_LIBS += -lz
 endif
 
-CFLAGS += -fno-omit-frame-pointer
+CFLAGS += -fno-omit-frame-pointer -momit-leaf-frame-pointer
 
 ifdef LISP_FEATURE_IMMOBILE_SPACE
-  GC_SRC = gencgc.c traceroot.c marknsweepgc.c
+  GC_SRC = fullcgc.c gencgc.c traceroot.c marknsweepgc.c
 else
-  GC_SRC = gencgc.c traceroot.c
+  GC_SRC = fullcgc.c gencgc.c traceroot.c
 endif
 
 ifdef LISP_FEATURE_SB_LINKABLE_RUNTIME

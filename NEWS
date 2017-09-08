@@ -3,6 +3,9 @@ changes relative to sbcl-1.3.21:
   * minor incompatible change: DESTRUCTURING-BIND treats non-toplevel () as
     nested empty pattern. This seems to be what the standard mandates, so
     conforming code should not be affected.
+  * ehancement: (GC :GEN 7) with gencgc will zero-fill dead pseudo-static
+    objects so that they do not spuriously cause reachability of objects that
+    would have been otherwise dead.
   * bug fix: *LOAD-PATHNAME* and *LOAD-TRUENAME* are bound to pathnames
     when processing a sysinit or userinit file
   * bug fix: save-lisp-and-die is able to collect more garbage on non-x86oid

@@ -13,6 +13,7 @@
 
 extern lispobj *from_space;
 extern lispobj *from_space_free_pointer;
+#define compacting_p() (1) /* always */
 
 extern lispobj *new_space;
 extern lispobj *new_space_free_pointer;
