@@ -328,7 +328,7 @@ void prepare_for_full_mark_phase()
     // will reside on fraction*N different pages, which guides us as to how many
     // hash table entries are needed.
     hopscotch_create(&mark_bits, HOPSCOTCH_HASH_FUN_DEFAULT,
-                     8, /* 8 bytes per value */
+                     N_WORD_BYTES, /* table values are machine words */
                      65536, /* initial size */
                      0);
 
@@ -375,7 +375,7 @@ void execute_full_mark_phase()
     (double)((a.field.tv_sec-b.field.tv_sec)*1000000 + \
              (a.field.tv_usec-b.field.tv_usec)) / 1000000.0
     fprintf(stderr,
-            "Mark phase: %d pages used, HT-count=%d, ET=%f+%f sys+usr\n",
+            "[Mark phase: %d pages used, HT-count=%d, ET=%f+%f sys+usr]\n",
             (int)(page_table_pages - free_page), mark_bits.count,
             timediff(before, after, ru_stime), timediff(before, after, ru_utime));
 }
@@ -405,6 +405,7 @@ __attribute__((unused)) static int gen_of(lispobj* obj) {
 #endif
     int page = find_page_index(obj);
     if (page >= 0) return page_table[page].gen;
+    lose("gen_of");
     return -1;
 }
 
@@ -432,9 +433,10 @@ FILE *sweeplog;
 static inline
 uword_t sweep(lispobj* where, lispobj* end, uword_t arg)
 {
-    long zeroed = 0;
+    long zeroed[7]; // one count per generation
     sword_t nwords;
 
+    memset(zeroed, 0, sizeof zeroed);
     // TODO: consecutive dead objects on same page should be merged.
     for ( ; where < end ; where += nwords ) {
         lispobj header = *where;
@@ -445,7 +447,7 @@ uword_t sweep(lispobj* where, lispobj* end, uword_t arg)
                cons:
                     LOG_GARBAGE(2);
                     where[0] = where[1] = 0;
-                    zeroed += 2;
+                    zeroed[gen_of(where)] += 2;
                 }
             }
         } else {
@@ -475,33 +477,47 @@ uword_t sweep(lispobj* where, lispobj* end, uword_t arg)
                     code->header = header;
                     code->code_size = make_fixnum((nwords - 2) * N_WORD_BYTES);
                     memset(where+2, 0, (nwords - 2) * N_WORD_BYTES);
-                    zeroed += nwords;
+                    zeroed[gen_of(where)] += nwords;
                 }
             }
         }
     }
-    *(long*)arg += zeroed;
+    long* totals = (long*)arg;
+    totals[0] += zeroed[0];
+    totals[1] += zeroed[1];
+    totals[2] += zeroed[2];
+    totals[3] += zeroed[3];
+    totals[4] += zeroed[4];
+    totals[5] += zeroed[5];
+    totals[6] += zeroed[6];
     return 0;
 }
 
 void execute_full_sweep_phase()
 {
+    long words_zeroed[7]; // One count per generation
+
     scan_weak_hash_tables(alivep_funs);
     smash_weak_pointers();
-    long words_zeroed = 0;
-#ifdef LOG_SWEEP_ACIONS
+
+#ifdef LOG_SWEEP_ACTIONS
     sweeplog = fopen("/tmp/sweep.log", "a");
     fprintf(sweeplog, "-- begin sweep --\n");
 #endif
 
+    memset(words_zeroed, 0, sizeof words_zeroed);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     sweep((lispobj*)IMMOBILE_SPACE_START, immobile_fixedobj_free_pointer,
-          (uword_t)&words_zeroed);
+          (uword_t)words_zeroed);
     sweep((lispobj*)IMMOBILE_VARYOBJ_SUBSPACE_START, immobile_space_free_pointer,
-          (uword_t)&words_zeroed);
+          (uword_t)words_zeroed);
 #endif
-    walk_generation(sweep, -1, (uword_t)&words_zeroed);
-    fprintf(stderr, "Sweep phase: %ld words zeroed\n", words_zeroed);
+    walk_generation(sweep, -1, (uword_t)words_zeroed);
+    fprintf(stderr, "[Sweep phase: ");
+    int i;
+    for(i=6;i>=0;--i)
+        fprintf(stderr, "%ld%s", words_zeroed[i], i?"+":"");
+    fprintf(stderr, " words zeroed]\n");
     hopscotch_destroy(&mark_bits);
 #ifdef LOG_SWEEP_ACTIONS
     fclose(sweeplog);

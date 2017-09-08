@@ -777,11 +777,16 @@ DEF_SCAV_BOXED(boxed, BOXED_NWORDS)
 DEF_SCAV_BOXED(short_boxed, SHORT_BOXED_NWORDS)
 DEF_SCAV_BOXED(tiny_boxed, TINY_BOXED_NWORDS)
 
-/* Bignums have no GC mark bit. (N_WORD_BITS - N_WIDETAG_BITS) bits of the
- * header hold the size. This would allow a 64MiB bignum for 32-bit words,
- * which seems insanely large, but theoretically possible */
+/* In a 32-bit word, bignums have no GC mark bit.
+ * All (N_WORD_BITS - N_WIDETAG_BITS) bits of the header hold the size.
+ * This would allow a 64MiB bignum, which is theoretically possible.
+ * 64-bit words use bit index 63 as the mark bit. */
 static sword_t size_bignum(lispobj *where) {
+#ifdef LISP_FEATURE_64_BIT
+    return 1 + ((*where << 1 >> (1+N_WIDETAG_BITS)) | 1);
+#else
     return 1 + (HeaderValue(*where) | 1);
+#endif
 }
 
 /* Note: on the sparc we don't have to do anything special for fdefns, */
