@@ -1187,26 +1187,4 @@
   (:translate sb!bignum:%ashl)
   (:generator 1
     (inst lsl result digit count)))
-
-;;;; Static functions.
 
-(define-static-fun two-arg-gcd (x y) :translate gcd)
-(define-static-fun two-arg-lcm (x y) :translate lcm)
-
-(define-static-fun two-arg-+ (x y) :translate +)
-(define-static-fun two-arg-- (x y) :translate -)
-(define-static-fun two-arg-* (x y) :translate *)
-(define-static-fun two-arg-/ (x y) :translate /)
-
-(define-static-fun two-arg-< (x y) :translate <)
-(define-static-fun two-arg-> (x y) :translate >)
-(define-static-fun two-arg-= (x y) :translate =)
-
-(define-static-fun two-arg-and (x y) :translate logand)
-(define-static-fun two-arg-ior (x y) :translate logior)
-(define-static-fun two-arg-xor (x y) :translate logxor)
-(define-static-fun two-arg-eqv (x y) :translate logeqv)
-
-(define-static-fun eql (x y) :translate eql)
-
-(define-static-fun %negate (x) :translate %negate)

@@ -1043,7 +1043,7 @@
         (let ((name (lvar-fun-name lvar t)))
           (aver name)
           (values (cond #!+(or immobile-code
-                               #.(cl:if (cl:gethash 'sb!vm::static-tail-call-named
+                               #.(cl:if (cl:gethash 'sb!c:static-tail-call-named
                                                     sb!c::*backend-template-names*)
                                         '(:and)
                                         '(:or)))
@@ -1099,12 +1099,12 @@
                   (nil)
                   nargs (emit-step-p node)))
             #!+(and (not immobile-code)
-                    #.(cl:if (cl:gethash 'sb!vm::static-tail-call-named
+                    #.(cl:if (cl:gethash 'sb!c:static-tail-call-named
                                          sb!c::*backend-template-names*)
                              '(:and)
                              '(:or)))
             ((eq fun-tn named)
-             (vop* sb!vm::static-tail-call-named node block
+             (vop* static-tail-call-named node block
                    (old-fp return-pc pass-refs) ; args
                    (nil)                        ; results
                    nargs named (emit-step-p node)))
@@ -1153,12 +1153,12 @@
                (vop* call node block (fp fun-tn args) (loc-refs)
                      arg-locs nargs nvals (emit-step-p node)))
               #!+(and (not immobile-code)
-                      #.(cl:if (cl:gethash 'sb!vm::static-call-named
+                      #.(cl:if (cl:gethash 'sb!c:static-call-named
                                            sb!c::*backend-template-names*)
                                '(:and)
                                '(:or)))
               ((eq fun-tn named)
-               (vop* sb!vm::static-call-named node block
+               (vop* static-call-named node block
                      (fp args)
                      (loc-refs)
                      arg-locs nargs named nvals
@@ -1182,14 +1182,26 @@
            (loc-refs (reference-tn-list locs t)))
       (multiple-value-bind (fun-tn named)
           (fun-lvar-tn node block (basic-combination-fun node))
-        (if named
-            (vop* multiple-call-named node block
+        (cond ((not named)
+               (vop* multiple-call node block (fp fun-tn args) (loc-refs)
+                  arg-locs nargs (emit-step-p node)))
+              #!+(and (not immobile-code)
+                      #.(cl:if (cl:gethash 'sb!c:static-multiple-call-named
+                                           sb!c::*backend-template-names*)
+                               '(:and)
+                               '(:or)))
+              ((eq fun-tn named)
+               (vop* static-multiple-call-named node block
+                  (fp args)
+                  (loc-refs)
+                  arg-locs nargs named
+                  (emit-step-p node)))
+              (t
+               (vop* multiple-call-named node block
                   (fp #!-immobile-code fun-tn args)     ; args
                   (loc-refs)                            ; results
                   arg-locs nargs #!+immobile-code named ; info
-                  (emit-step-p node))
-            (vop* multiple-call node block (fp fun-tn args) (loc-refs)
-                  arg-locs nargs (emit-step-p node))))))
+                  (emit-step-p node)))))))
   (values))
 
 ;;; stuff to check in PONDER-FULL-CALL

@@ -767,9 +767,12 @@
       ,@(unless (eq return :tail)
           '((new-fp :scs (any-reg) :to :eval)))
 
-      ,(if named
-           '(name :target name-pass)
-           '(arg-fun :target lexenv))
+      ,@(case named
+         ((nil)
+          '((arg-fun :target lexenv)))
+         (:direct)
+         (t
+          '((name :target name-pass))))
 
       ,@(when (eq return :tail)
           '((old-fp)
@@ -788,6 +791,7 @@
      (:vop-var vop)
      (:info ,@(unless (or variable (eq return :tail)) '(arg-locs))
             ,@(unless variable '(nargs))
+            ,@(when (eq named :direct) '(fun))
             ,@(when (eq return :fixed) '(nvals))
             step-instrumenting)
 
@@ -799,13 +803,14 @@
          (:tail 'old-fp)
          (:unknown 'r0-temp)))
 
-     (:temporary (:sc descriptor-reg :offset lexenv-offset
-                      :from (:argument ,(if (eq return :tail) 0 1))
-                      :to :eval)
-                 ,(if named 'name-pass 'lexenv))
+     ,@(unless (eq named :direct)
+         `((:temporary (:sc descriptor-reg :offset lexenv-offset
+                        :from (:argument ,(if (eq return :tail) 0 1))
+                        :to :eval)
+                       ,(if named 'name-pass 'lexenv))
+           (:temporary (:scs (descriptor-reg) :to :eval)
+                       function)))
 
-     (:temporary (:scs (descriptor-reg) :to :eval)
-               function)
      (:temporary (:sc any-reg :offset nargs-offset :to :eval)
                  nargs-pass)
 
@@ -907,45 +912,50 @@
                       (note-this-location vop :step-before-vop)
                       (inst brk single-step-around-trap)
                       STEP-DONE-LABEL))))
-
-
-           ,@(if named
-                 `((sc-case name
-                     (descriptor-reg (move name-pass name))
-                     (control-stack
-                      (load-stack-tn name-pass name)
-                      (do-next-filler))
-                     (constant
-                      (load-constant vop name name-pass)
-                      (do-next-filler)))
-                   (do-next-filler)
-                   (insert-step-instrumenting))
-                 `((sc-case arg-fun
-                     (descriptor-reg (move lexenv arg-fun))
-                     (control-stack
-                      (load-stack-tn lexenv arg-fun)
-                      (do-next-filler))
-                     (constant
-                      (load-constant vop arg-fun lexenv)
-                      (do-next-filler)))
-                   (insert-step-instrumenting)
-                   (loadw function lexenv closure-fun-slot
-                          fun-pointer-lowtag)
-                   (do-next-filler)))
+           (declare (ignorable #'insert-step-instrumenting))
+           ,@(case named
+               ((t)
+                `((sc-case name
+                    (descriptor-reg (move name-pass name))
+                    (control-stack
+                     (load-stack-tn name-pass name)
+                     (do-next-filler))
+                    (constant
+                     (load-constant vop name name-pass)
+                     (do-next-filler)))
+                  (do-next-filler)
+                  (insert-step-instrumenting)))
+               ((nil)
+                `((sc-case arg-fun
+                    (descriptor-reg (move lexenv arg-fun))
+                    (control-stack
+                     (load-stack-tn lexenv arg-fun)
+                     (do-next-filler))
+                    (constant
+                     (load-constant vop arg-fun lexenv)
+                     (do-next-filler)))
+                  (insert-step-instrumenting)
+                  (loadw function lexenv closure-fun-slot
+                      fun-pointer-lowtag)
+                  (do-next-filler))))
            (loop
              (if filler
                  (do-next-filler)
                  (return)))
-           ,@(if named
-                 ;; raw-addr is an untagged pointer to the function,
-                 ;; need to pair it up with the tagged pointer for the GC to see
-                 `((loadw function name-pass fdefn-fun-slot
-                       other-pointer-lowtag)
-                   (loadw lip name-pass fdefn-raw-addr-slot
-                       other-pointer-lowtag))
-                 `((inst add lip function
-                         (- (ash simple-fun-code-offset word-shift)
-                            fun-pointer-lowtag))))
+           ,@(ecase named
+               ;; raw-addr is an untagged pointer to the function,
+               ;; need to pair it up with the tagged pointer for the GC to see
+               ((t)
+                `((loadw function name-pass fdefn-fun-slot
+                      other-pointer-lowtag)
+                  (loadw lip name-pass fdefn-raw-addr-slot
+                      other-pointer-lowtag)))
+               (:direct
+                `((inst ldr lip (@ null-tn (load-store-offset (static-fun-offset fun))))))
+               ((nil)
+                `((inst add lip function
+                        (- (ash simple-fun-code-offset word-shift)
+                           fun-pointer-lowtag)))))
 
            (note-this-location vop :call-site)
            (inst br lip))
@@ -968,10 +978,13 @@
 
 (define-full-call call nil :fixed nil)
 (define-full-call call-named t :fixed nil)
+(define-full-call static-call-named :direct :fixed nil)
 (define-full-call multiple-call nil :unknown nil)
 (define-full-call multiple-call-named t :unknown nil)
+(define-full-call static-multiple-call-named :direct :unknown nil)
 (define-full-call tail-call nil :tail nil)
 (define-full-call tail-call-named t :tail nil)
+(define-full-call static-tail-call-named :direct :tail nil)
 
 (define-full-call call-variable nil :fixed t)
 (define-full-call multiple-call-variable nil :unknown t)
