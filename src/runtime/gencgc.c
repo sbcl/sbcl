@@ -2796,12 +2796,6 @@ verify_range(lispobj *start, sword_t words, uword_t flags)
 
         if (is_lisp_pointer(thing)) {
             page_index_t page_index = find_page_index((void*)thing);
-            boolean to_readonly_space =
-                (READ_ONLY_SPACE_START <= thing &&
-                 thing < (lispobj)read_only_space_free_pointer);
-            boolean to_static_space =
-                (STATIC_SPACE_START <= thing &&
-                 thing < (lispobj)static_space_free_pointer);
             boolean to_immobile_space = 0;
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
             to_immobile_space =
@@ -2814,10 +2808,9 @@ verify_range(lispobj *start, sword_t words, uword_t flags)
             /* Does it point to the dynamic space? */
             if (page_index != -1) {
                 /* If it's within the dynamic space it should point to a used page. */
-                if (page_free_p(page_index))
-                    lose ("Ptr %p @ %p sees free page.\n", thing, start);
                 if ((thing & (GENCGC_CARD_BYTES-1)) >= page_bytes_used(page_index))
-                    lose ("Ptr %p @ %p sees unallocated space.\n", thing, start);
+                    lose ("Ptr %p @ %p sees %s.\n", thing, start,
+                          page_free_p(page_index) ? "free page" : "unallocated space");
                 /* Check that it doesn't point to a forwarding pointer! */
                 if (*native_pointer(thing) == 0x01) {
                     lose("Ptr %p @ %p sees forwarding ptr.\n", thing, start);
@@ -2833,22 +2826,17 @@ verify_range(lispobj *start, sword_t words, uword_t flags)
                 if (!other_immediate_lowtag_p(*native_pointer(thing))
                     || immobile_filler_p(native_pointer(thing)))
                     lose("Ptr %p @ %p sees trashed object.\n", (void*)thing, start);
-            } else {
-                extern char __attribute__((unused)) funcallable_instance_tramp;
-                /* Verify that it points to another valid space. */
-                if (!to_readonly_space && !to_static_space
-                    && !is_in_stack_space(thing)) {
-                    lose("Ptr %p @ %p sees junk.\n", thing, start);
-                }
             }
-            /* If dynamic-space -> dynamic-space and paranoid,
+            /* If any-space -> dynamic-space and paranoid,
              * or any space -> immobile-space or immobile-space -> any space,
-             * then search for the pointee.
+             * then search for the pointee.  If the pointer points to a stack,
+             * we can only hope that the frame hasn't been clobbered,
+             * or that the object containing this pointer is unreachable.
              * Currently only 1 flag in 'flags' - whether to be paranoid.
              */
             if ((page_index >= 0 && (flags != 0)) ||
                 (is_in_immobile_space || to_immobile_space))
-                if (!valid_lisp_pointer_p(thing))
+                if (!valid_lisp_pointer_p(thing) && !is_in_stack_space(thing))
                     lose("Ptr %p @ %p sees junk.\n", thing, start);
             continue;
         }
