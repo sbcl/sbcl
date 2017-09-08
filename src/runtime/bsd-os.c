@@ -42,9 +42,7 @@
 #include <signal.h>
 /* #include <sys/sysinfo.h> */
 #include "validate.h"
-#if defined LISP_FEATURE_GENCGC
-#include "gencgc-internal.h"
-#endif
+#include "gc-internal.h"
 
 #if defined(LISP_FEATURE_SB_WTIMER) && !defined(LISP_FEATURE_DARWIN)
 # include <sys/event.h>
