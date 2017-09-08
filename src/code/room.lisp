@@ -105,24 +105,23 @@
 
 (define-load-time-global *room-info* (!compute-room-infos))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
+(defconstant-eqx +heap-spaces+
+  '((:dynamic   "Dynamic space"   sb-kernel:dynamic-usage)
+    #+immobile-space
+    (:immobile  "Immobile space"  sb-kernel::immobile-space-usage)
+    (:read-only "Read-only space" sb-kernel::read-only-space-usage)
+    (:static    "Static space"    sb-kernel::static-space-usage))
+  #'equal)
 
-  (defglobal **heap-spaces**
-    #1='((:dynamic   "Dynamic space"   sb-kernel:dynamic-usage)
-         #+immobile-space
-         (:immobile  "Immobile space"  sb-kernel::immobile-space-usage)
-         (:read-only "Read-only space" sb-kernel::read-only-space-usage)
-         (:static    "Static space"    sb-kernel::static-space-usage)))
+(defconstant-eqx +stack-spaces+
+  '((:control-stack "Control stack" sb-kernel::control-stack-usage)
+    (:binding-stack "Binding stack" sb-kernel::binding-stack-usage))
+  #'equal)
 
-  (defglobal **stack-spaces**
-    #2='((:control-stack "Control stack" sb-kernel::control-stack-usage)
-         (:binding-stack "Binding stack" sb-kernel::binding-stack-usage)))
+(defconstant-eqx +all-spaces+ (append +heap-spaces+ +stack-spaces+) #'equal)
 
-  (defglobal **spaces**
-      (append #1# #2#)))
-
-(deftype spaces ()
-  `(member ,@(mapcar #'first **heap-spaces**)))
+(defconstant-eqx +heap-space-keywords+ (mapcar #'first +heap-spaces+) #'equal)
+(deftype spaces () `(member . ,+heap-space-keywords+))
 
 
 ;;;; MAP-ALLOCATED-OBJECTS
@@ -632,9 +631,7 @@
 (defun memory-usage (&key print-spaces (count-spaces '(:dynamic #+immobile-space :immobile))
                           (print-summary t) cutoff)
   (declare (type (or single-float null) cutoff))
-  (let* ((spaces (if (eq count-spaces t)
-                     (mapcar #'first **heap-spaces**)
-                     count-spaces))
+  (let* ((spaces (if (eq count-spaces t) +heap-space-keywords+ count-spaces))
          (totals (mapcar (lambda (space)
                            (cons space (type-breakdown space)))
                          spaces)))
@@ -936,7 +933,7 @@
   (multiple-value-bind (names name-width
                         used-bytes used-bytes-width
                         overhead-bytes)
-      (loop for (nil name function) in sb-vm::**spaces**
+      (loop for (nil name function) in +all-spaces+
             for (space-used-bytes space-overhead-bytes)
                = (multiple-value-list (funcall function))
             collect name into names
@@ -964,17 +961,17 @@
 
 (defun room-intermediate-info ()
   (room-minimal-info)
-  (sb-vm:memory-usage :count-spaces '(:dynamic #+immobile-space :immobile)
-                      :print-spaces t
-                      :cutoff 0.05f0
-                      :print-summary nil))
+  (memory-usage :count-spaces '(:dynamic #+immobile-space :immobile)
+                :print-spaces t
+                :cutoff 0.05f0
+                :print-summary nil))
 
 (defun room-maximal-info ()
   (let ((spaces '(:dynamic #+immobile-space :immobile :static)))
     (room-minimal-info)
-    (sb-vm:memory-usage :count-spaces spaces)
+    (memory-usage :count-spaces spaces)
     (dolist (space spaces)
-      (sb-vm:instance-usage space :top-n 10))))
+      (instance-usage space :top-n 10))))
 
 (defun room (&optional (verbosity :default))
   "Print to *STANDARD-OUTPUT* information about the state of internal
