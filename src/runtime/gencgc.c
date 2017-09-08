@@ -2777,11 +2777,12 @@ static void
 verify_range(lispobj *start, sword_t words, uword_t flags)
 {
     extern int valid_lisp_pointer_p(lispobj);
-    int is_in_readonly_space =
+    boolean is_in_readonly_space =
         (READ_ONLY_SPACE_START <= (uword_t)start &&
          start < read_only_space_free_pointer);
+    boolean is_in_immobile_space = 0;
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    int is_in_immobile_space =
+    is_in_immobile_space =
         (IMMOBILE_SPACE_START <= (uword_t)start &&
          start < immobile_space_free_pointer);
 #endif
@@ -2795,14 +2796,15 @@ verify_range(lispobj *start, sword_t words, uword_t flags)
 
         if (is_lisp_pointer(thing)) {
             page_index_t page_index = find_page_index((void*)thing);
-            sword_t to_readonly_space =
+            boolean to_readonly_space =
                 (READ_ONLY_SPACE_START <= thing &&
                  thing < (lispobj)read_only_space_free_pointer);
-            sword_t to_static_space =
+            boolean to_static_space =
                 (STATIC_SPACE_START <= thing &&
                  thing < (lispobj)static_space_free_pointer);
+            boolean to_immobile_space = 0;
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-            sword_t to_immobile_space =
+            to_immobile_space =
                 (IMMOBILE_SPACE_START <= thing &&
                  thing < (lispobj)immobile_fixedobj_free_pointer) ||
                 (IMMOBILE_VARYOBJ_SUBSPACE_START <= thing &&
@@ -2826,36 +2828,11 @@ verify_range(lispobj *start, sword_t words, uword_t flags)
                     lose("ptr to dynamic space %p from RO space %x\n",
                          thing, start);
                 }
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-                // verify all immobile space -> dynamic space pointers
-                if (is_in_immobile_space && !valid_lisp_pointer_p(thing)) {
-                    lose("Ptr %p @ %p sees junk.\n", thing, start);
-                }
-#endif
-                /* Does it point to a plausible object? This check slows
-                 * it down a lot (so it's commented out).
-                 *
-                 * "a lot" is serious: it ate 50 minutes cpu time on
-                 * my duron 950 before I came back from lunch and
-                 * killed it.
-                 *
-                 *   FIXME: Add a variable to enable this
-                 * dynamically. */
-                /*
-                if (!valid_lisp_pointer_p((lispobj *)thing) {
-                    lose("ptr %p to invalid object %p\n", thing, start);
-                }
-                */
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
             } else if (to_immobile_space) {
                 // the object pointed to must not have been discarded as garbage
                 if (!other_immediate_lowtag_p(*native_pointer(thing))
                     || immobile_filler_p(native_pointer(thing)))
                     lose("Ptr %p @ %p sees trashed object.\n", (void*)thing, start);
-                // verify all pointers to immobile space
-                if (!valid_lisp_pointer_p(thing))
-                    lose("Ptr %p @ %p sees junk.\n", thing, start);
-#endif
             } else {
                 extern char __attribute__((unused)) funcallable_instance_tramp;
                 /* Verify that it points to another valid space. */
@@ -2864,6 +2841,15 @@ verify_range(lispobj *start, sword_t words, uword_t flags)
                     lose("Ptr %p @ %p sees junk.\n", thing, start);
                 }
             }
+            /* If dynamic-space -> dynamic-space and paranoid,
+             * or any space -> immobile-space or immobile-space -> any space,
+             * then search for the pointee.
+             * Currently only 1 flag in 'flags' - whether to be paranoid.
+             */
+            if ((page_index >= 0 && (flags != 0)) ||
+                (is_in_immobile_space || to_immobile_space))
+                if (!valid_lisp_pointer_p(thing))
+                    lose("Ptr %p @ %p sees junk.\n", thing, start);
             continue;
         }
         int widetag = widetag_of(thing);
@@ -2920,9 +2906,9 @@ static uword_t verify_space(lispobj start, lispobj* end, uword_t flags) {
 static void verify_dynamic_space();
 
 static void
-verify_gc(void)
+verify_gc(boolean paranoid)
 {
-   uword_t flags = 0;
+    uword_t flags = paranoid;
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 #  ifdef __linux__
     // Try this verification if marknsweep was compiled with extra debugging.
@@ -3506,7 +3492,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
         if (gencgc_verbose) {
             SHOW("verifying");
         }
-        verify_gc();
+        verify_gc(0);
     }
 
     /* Set the new gc trigger for the GCed generation. */

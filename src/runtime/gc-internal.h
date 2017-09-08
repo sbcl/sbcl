@@ -284,6 +284,8 @@ static inline lispobj fdefn_callee_lispobj(struct fdefn *fdefn) {
          (points_to_readonly_space((uword_t)fdefn->raw_addr) ? 0 : FUN_RAW_ADDR_OFFSET));
 }
 
+static inline boolean immobile_filler_p(lispobj* obj) { return 0; }
+
 #else
 
 extern void fixup_immobile_refs(lispobj (*)(lispobj), lispobj, struct code*);

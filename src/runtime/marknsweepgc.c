@@ -2186,7 +2186,7 @@ void defrag_immobile_space(int* components, boolean verbose)
     // It's easy to mess things up, so assert correctness before saving a core.
     printf("verifying defrag\n");
     page_attributes_valid = 0;
-    verify_gc();
+    verify_gc(0);
     printf("verify passed\n");
 #endif
     free(fixedobj_tempspace.start);
