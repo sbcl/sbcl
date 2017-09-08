@@ -680,28 +680,29 @@ boolean positive_bignum_logbitp(int index, struct bignum* bignum)
 // Helper function for stepping through the tagged slots of an instance in
 // scav_instance and verify_space.
 void
-instance_scan(void (*proc)(lispobj*, sword_t),
+instance_scan(void (*proc)(lispobj*, sword_t, uword_t),
               lispobj *instance_slots,
               sword_t nslots, /* number of payload words */
-              lispobj layout_bitmap)
+              lispobj layout_bitmap,
+              uword_t arg)
 {
   sword_t index;
 
   if (fixnump(layout_bitmap)) {
       if (layout_bitmap == make_fixnum(-1))
-          proc(instance_slots, nslots);
+          proc(instance_slots, nslots, arg);
       else {
           sword_t bitmap = (sword_t)layout_bitmap >> N_FIXNUM_TAG_BITS; // signed integer!
           for (index = 0; index < nslots ; index++, bitmap >>= 1)
               if (bitmap & 1)
-                  proc(instance_slots + index, 1);
+                  proc(instance_slots + index, 1, arg);
       }
   } else { /* huge bitmap */
       struct bignum * bitmap;
       bitmap = (struct bignum*)native_pointer(layout_bitmap);
       for (index = 0; index < nslots ; index++)
           if (bignum_logbitp_inline(index, bitmap))
-              proc(instance_slots + index, 1);
+              proc(instance_slots + index, 1, arg);
   }
 }
 
@@ -732,8 +733,8 @@ scav_instance(lispobj *where, lispobj header)
          * one or two words, rendering it bogus for use as the instance's bitmap.
          * So scavenge it up front to fix its address */
         scav1(&lbitmap, lbitmap);
-        instance_scan((void(*)(lispobj*,sword_t))scavenge,
-                      where+1, nslots, lbitmap);
+        instance_scan((void(*)(lispobj*,sword_t,uword_t))scavenge,
+                      where+1, nslots, lbitmap, 0);
     } else {
         sword_t bitmap = (sword_t)lbitmap >> N_FIXNUM_TAG_BITS; // signed integer!
         sword_t n = nslots;

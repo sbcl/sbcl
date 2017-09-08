@@ -256,7 +256,9 @@ void gencgc_apply_code_fixups(struct code *old_code, struct code *new_code);
 #endif
 
 extern void
-instance_scan(void (*proc)(), lispobj *instance_ptr, sword_t n_words, lispobj bitmap);
+instance_scan(void (*proc)(lispobj*, sword_t, uword_t),
+              lispobj *instance_ptr, sword_t n_words,
+              lispobj bitmap, uword_t arg);
 
 #include "genesis/bignum.h"
 extern boolean positive_bignum_logbitp(int,struct bignum*);

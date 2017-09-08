@@ -305,7 +305,7 @@ static inline lispobj adjust_word(lispobj word)
 
 // Adjust the words in range [where,where+n_words)
 // skipping any words that have non-pointer nature.
-static void adjust_pointers(lispobj *where, long n_words)
+static void adjust_pointers(lispobj *where, sword_t n_words, uword_t arg)
 {
     long i;
     for (i=0;i<n_words;++i) {
@@ -328,7 +328,7 @@ static void fixup_space(lispobj* where, uword_t len)
     for ( ; where < end ; where += nwords ) {
         header_word = *where;
         if (is_cons_half(header_word)) {
-            adjust_pointers(where, 2);
+            adjust_pointers(where, 2, 0);
             nwords = 2;
             continue;
         }
@@ -365,10 +365,10 @@ static void fixup_space(lispobj* where, uword_t len)
                 bitmap = adjust_word(bitmap);
             }
 
-            instance_scan(adjust_pointers, where+1, nwords-1, bitmap);
+            instance_scan(adjust_pointers, where+1, nwords-1, bitmap, 0);
             continue;
         case FDEFN_WIDETAG:
-            adjust_pointers(where+1, 2);
+            adjust_pointers(where+1, 2, 0);
             // 'raw_addr' doesn't satisfy is_lisp_pointer() for x86,
             // so adjust_pointers() would ignore it. Force adjustment if
             // it points to dynamic space. For x86-64 with IMMOBILE_CODE,
@@ -384,12 +384,12 @@ static void fixup_space(lispobj* where, uword_t len)
             continue;
         case CODE_HEADER_WIDETAG:
             // Fixup the constant pool. The word at where+1 is a fixnum.
-            adjust_pointers(where+2, code_header_words(header_word)-2);
+            adjust_pointers(where+2, code_header_words(header_word)-2, 0);
             // Fixup all embedded simple-funs
             code = (struct code*)where;
             for_each_simple_fun(i, f, code, 1, {
                 f->self = adjust_word(f->self);
-                adjust_pointers(SIMPLE_FUN_SCAV_START(f), SIMPLE_FUN_SCAV_NWORDS(f));
+                adjust_pointers(SIMPLE_FUN_SCAV_START(f), SIMPLE_FUN_SCAV_NWORDS(f), 0);
             });
             // Compute the address where the code "was" as the first argument
             gencgc_apply_code_fixups((struct code*)((char*)where - heap_adjustment),
@@ -418,7 +418,7 @@ static void fixup_space(lispobj* where, uword_t len)
                         !(fixnum_value(v->length) & 1) &&  // length must be even
                         lowtag_of(v->data[0]) == INSTANCE_POINTER_LOWTAG);
               lispobj* data = (lispobj*)v->data;
-              adjust_pointers(&data[0], 1); // adjust the hash-table structure
+              adjust_pointers(&data[0], 1, 0); // adjust the hash-table structure
               boolean needs_rehash = 0;
               int i;
               // Adjust the elements, checking for need to rehash.
@@ -481,7 +481,7 @@ static void fixup_space(lispobj* where, uword_t len)
           else
               lose("Unrecognized heap object: @%p: %lx\n", where, header_word);
         }
-        adjust_pointers(where+1, nwords-1);
+        adjust_pointers(where+1, nwords-1, 0);
     }
 }
 

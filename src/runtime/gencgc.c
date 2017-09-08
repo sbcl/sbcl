@@ -2774,7 +2774,7 @@ is_in_stack_space(lispobj ptr)
 // usually related to dynamic space pointing to the stack of a
 // dead thread, but there may be other reasons as well.
 static void
-verify_range(lispobj *start, size_t words)
+verify_range(lispobj *start, sword_t words, uword_t flags)
 {
     extern int valid_lisp_pointer_p(lispobj);
     int is_in_readonly_space =
@@ -2882,7 +2882,8 @@ verify_range(lispobj *start, size_t words)
                 if (instance_layout(start)) {
                     sword_t nslots = instance_length(thing) | 1;
                     instance_scan(verify_range, start+1, nslots,
-                                  LAYOUT(instance_layout(start))->bitmap);
+                                  LAYOUT(instance_layout(start))->bitmap,
+                                  0);
                     count = 1 + nslots;
                 }
                 break;
@@ -2891,27 +2892,28 @@ verify_range(lispobj *start, size_t words)
                 struct code *code = (struct code *) start;
                 sword_t nheader_words = code_header_words(code->header);
                 /* Scavenge the boxed section of the code data block */
-                verify_range(start + 1, nheader_words - 1);
+                verify_range(start + 1, nheader_words - 1, 0);
 
                 /* Scavenge the boxed section of each function
                  * object in the code data block. */
                 for_each_simple_fun(i, fheaderp, code, 1, {
                     verify_range(SIMPLE_FUN_SCAV_START(fheaderp),
-                                 SIMPLE_FUN_SCAV_NWORDS(fheaderp)); });
+                                 SIMPLE_FUN_SCAV_NWORDS(fheaderp),
+                                 0); });
                 count = nheader_words + code_instruction_words(code->code_size);
                 break;
                 }
             case FDEFN_WIDETAG:
-                verify_range(start + 1, 2);
+                verify_range(start + 1, 2, 0);
                 callee = fdefn_callee_lispobj((struct fdefn*)start);
-                verify_range(&callee, 1);
+                verify_range(&callee, 1, 0);
                 count = CEILING(sizeof (struct fdefn)/sizeof(lispobj), 2);
                 break;
         }
     }
 }
-static uword_t verify_space(lispobj start, lispobj* end) {
-    verify_range((lispobj*)start, end-(lispobj*)start);
+static uword_t verify_space(lispobj start, lispobj* end, uword_t flags) {
+    verify_range((lispobj*)start, end-(lispobj*)start, flags);
     return 0;
 }
 
@@ -2920,6 +2922,7 @@ static void verify_dynamic_space();
 static void
 verify_gc(void)
 {
+   uword_t flags = 0;
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 #  ifdef __linux__
     // Try this verification if marknsweep was compiled with extra debugging.
@@ -2927,16 +2930,17 @@ verify_gc(void)
     extern void __attribute__((weak)) check_varyobj_pages();
     if (&check_varyobj_pages) check_varyobj_pages();
 #  endif
-    verify_space(IMMOBILE_SPACE_START, immobile_fixedobj_free_pointer);
-    verify_space(IMMOBILE_VARYOBJ_SUBSPACE_START, immobile_space_free_pointer);
+    verify_space(IMMOBILE_SPACE_START, immobile_fixedobj_free_pointer, flags);
+    verify_space(IMMOBILE_VARYOBJ_SUBSPACE_START, immobile_space_free_pointer, flags);
 #endif
     struct thread *th;
     for_each_thread(th) {
         verify_space((lispobj)th->binding_stack_start,
-                     (lispobj*)get_binding_stack_pointer(th));
+                     (lispobj*)get_binding_stack_pointer(th),
+                     flags);
     }
-    verify_space(READ_ONLY_SPACE_START, read_only_space_free_pointer);
-    verify_space(STATIC_SPACE_START, static_space_free_pointer);
+    verify_space(READ_ONLY_SPACE_START, read_only_space_free_pointer, flags);
+    verify_space(STATIC_SPACE_START, static_space_free_pointer, flags);
     verify_dynamic_space();
 }
 

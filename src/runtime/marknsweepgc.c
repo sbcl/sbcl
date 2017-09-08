@@ -1611,7 +1611,7 @@ static lispobj* defrag_search_varyobj_subspace(lispobj addr)
     lose("Can't find jump target");
 }
 
-static void adjust_words(lispobj *where, sword_t n_words)
+static void adjust_words(lispobj *where, sword_t n_words, uword_t arg)
 {
     int i;
     for (i=0;i<n_words;++i) {
@@ -1629,7 +1629,7 @@ static lispobj adjust_fun_entrypoint(lispobj raw_addr)
     // resembling a FP. (It doesn't, but better safe than sorry)
     if (raw_addr < asm_routines_end) return raw_addr;
     lispobj simple_fun = raw_addr - FUN_RAW_ADDR_OFFSET;
-    adjust_words(&simple_fun, 1);
+    adjust_words(&simple_fun, 1, 0);
     return simple_fun + FUN_RAW_ADDR_OFFSET;
 }
 
@@ -1706,7 +1706,7 @@ static void fixup_space(lispobj* where, size_t n_words)
         gc_assert(!forwarding_pointer_p(where));
         header_word = *where;
         if (is_cons_half(header_word)) {
-            adjust_words(where, 2); // A cons.
+            adjust_words(where, 2, 0); // A cons.
             where += 2;
             continue;
         }
@@ -1723,16 +1723,17 @@ static void fixup_space(lispobj* where, size_t n_words)
         case INSTANCE_WIDETAG:
           instance_scan(adjust_words, where+1,
                         instance_length(header_word) | 1,
-                        fix_object_layout(where)->bitmap);
+                        fix_object_layout(where)->bitmap,
+                        0);
           break;
         case CODE_HEADER_WIDETAG:
           // Fixup the constant pool.
-          adjust_words(where+1, code_header_words(header_word)-1);
+          adjust_words(where+1, code_header_words(header_word)-1, 0);
           // Fixup all embedded simple-funs
           code = (struct code*)where;
           for_each_simple_fun(i, f, code, 1, {
               f->self = adjust_fun_entrypoint(f->self);
-              adjust_words(SIMPLE_FUN_SCAV_START(f), SIMPLE_FUN_SCAV_NWORDS(f));
+              adjust_words(SIMPLE_FUN_SCAV_START(f), SIMPLE_FUN_SCAV_NWORDS(f), 0);
           });
           if (code->fixups)
               fixup_immobile_refs(follow_fp, code->fixups, code);
@@ -1744,10 +1745,10 @@ static void fixup_space(lispobj* where, size_t n_words)
         case FUNCALLABLE_INSTANCE_WIDETAG:
 #endif
           // skip the trampoline word at where[1]
-          adjust_words(where+2, size-2);
+          adjust_words(where+2, size-2, 0);
           break;
         case FDEFN_WIDETAG:
-          adjust_words(where+1, 2);
+          adjust_words(where+1, 2, 0);
           // If fixed-size objects (hence FDEFNs) are movable, then fixing the
           // raw address can not be done here, because it is impossible to compute
           // the absolute jump target - we don't know what the fdefn's original
@@ -1805,7 +1806,7 @@ static void fixup_space(lispobj* where, size_t n_words)
           // Use the sizing functions for generality.
           // Symbols can contain strange header bytes,
           // and vectors might have a padding word, etc.
-          adjust_words(where+1, size-1);
+          adjust_words(where+1, size-1, 0);
           break;
         }
         where += size;
