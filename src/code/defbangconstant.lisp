@@ -76,7 +76,7 @@
   (#+sb-xc-host defmacro
    #-sb-xc-host sb!xc:defmacro
     defconstant-eqx (symbol expr eqx &optional doc)
-      `(def!constant ,symbol
+      `(,(or #+sb-xc-host 'def!constant 'defconstant) ,symbol
          (%defconstant-eqx-value ',symbol ,expr ,eqx)
          ,@(when doc (list doc)))))
 
