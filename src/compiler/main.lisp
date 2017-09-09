@@ -13,10 +13,6 @@
 
 (in-package "SB!C")
 
-;;; Whether reference to a thing which cannot be defined causes a full
-;;; warning.
-(defvar *flame-on-necessarily-undefined-thing* nil)
-
 (defvar *check-consistency* nil)
 
 ;;; Set to NIL to disable loop analysis for register allocation.
@@ -271,10 +267,8 @@ Examples:
                   (warnings (undefined-warning-warnings undef))
                   (undefined-warning-count (undefined-warning-count undef)))
               (dolist (*compiler-error-context* warnings)
-                (if #-sb-xc-host (and (member kind '(:function :type))
-                                      (name-reserved-by-ansi-p name kind)
-                                      *flame-on-necessarily-undefined-thing*)
-                    #+sb-xc-host nil
+                (if (and (member kind '(:function :type))
+                         (name-reserved-by-ansi-p name kind))
                     (ecase kind
                       (:function
                        (compiler-warn

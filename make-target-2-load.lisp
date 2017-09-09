@@ -199,7 +199,6 @@
 ;;; The call to CTYPE-OF-CACHE-CLEAR is probably redundant.
 ;;; SAVE-LISP-AND-DIE calls DEINIT which calls DROP-ALL-HASH-CACHES.
 (sb-kernel::ctype-of-cache-clear)
-(setq sb-c::*flame-on-necessarily-undefined-thing* t)
 
 ;;; Clean up stray symbols from the CL-USER package.
 (with-package-iterator (iter "CL-USER" :internal :external)
