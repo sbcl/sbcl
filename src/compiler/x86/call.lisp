@@ -729,9 +729,9 @@
                (:args
                ,@(unless (eq return :tail)
                    '((new-fp :scs (any-reg) :to (:argument 1))))
-
-               (fun :scs (descriptor-reg control-stack)
-                    :target eax :to (:argument 0))
+               ,@(unless (eq named :direct)
+                   '((fun :scs (descriptor-reg control-stack)
+                          :target eax :to (:argument 0))))
 
                ,@(when (eq return :tail)
                    '((old-fp)
@@ -751,6 +751,7 @@
                (:info
                ,@(unless (or variable (eq return :tail)) '(arg-locs))
                ,@(unless variable '(nargs))
+               ,@(when (eq named :direct) '(fun))
                ,@(when (eq return :fixed) '(nvals))
                step-instrumenting)
 
@@ -764,12 +765,13 @@
                ;; with the real function and invoke the real function
                ;; for closures. Non-closures do not need this value,
                ;; so don't care what shows up in it.
-               (:temporary
-               (:sc descriptor-reg
-                    :offset eax-offset
-                    :from (:argument 0)
-                    :to :eval)
-               eax)
+               ,@(unless (eq named :direct)
+                   '((:temporary
+                      (:sc descriptor-reg
+                       :offset eax-offset
+                       :from (:argument 0)
+                       :to :eval)
+                      eax)))
 
                ;; We pass the number of arguments in ECX.
                (:temporary (:sc unsigned-reg :offset ecx-offset :to :eval) ecx)
@@ -804,9 +806,8 @@
                ;; This has to be done before the frame pointer is
                ;; changed! EAX stores the 'lexical environment' needed
                ;; for closures.
-               (move eax fun)
-
-
+               ,@(unless (eq named :direct)
+                   '((move eax fun)))
                ,@(if variable
                      ;; For variable call, compute the number of
                      ;; arguments and move some of the arguments to
@@ -889,8 +890,7 @@
                           (storew ebp-tn new-fp
                                   (frame-word-offset ocfp-save-offset))
 
-                          (move ebp-tn new-fp) ; NB - now on new stack frame.
-                          )))
+                          (move ebp-tn new-fp))))  ; NB - now on new stack frame.
 
                (when step-instrumenting
                  (emit-single-step-test)
@@ -901,11 +901,16 @@
                (note-this-location vop :call-site)
 
                (inst ,(if (eq return :tail) 'jmp 'call)
-                     ,(if named
-                          '(make-ea-for-object-slot eax fdefn-raw-addr-slot
-                                                    other-pointer-lowtag)
-                          '(make-ea-for-object-slot eax closure-fun-slot
-                                                    fun-pointer-lowtag)))
+                     ,(case named
+                        (:direct
+                         '(make-ea :dword :disp
+                           (+ nil-value (static-fun-offset fun))))
+                        ((t)
+                         '(make-ea-for-object-slot eax fdefn-raw-addr-slot
+                           other-pointer-lowtag))
+                        ((nil)
+                         '(make-ea-for-object-slot eax closure-fun-slot
+                           fun-pointer-lowtag))))
                ,@(ecase return
                    (:fixed
                     '((default-unknown-values vop values nvals node)))
@@ -917,10 +922,13 @@
 
   (define-full-call call nil :fixed nil)
   (define-full-call call-named t :fixed nil)
+  (define-full-call static-call-named :direct :fixed nil)
   (define-full-call multiple-call nil :unknown nil)
   (define-full-call multiple-call-named t :unknown nil)
+  (define-full-call static-multiple-call-named :direct :unknown nil)
   (define-full-call tail-call nil :tail nil)
   (define-full-call tail-call-named t :tail nil)
+  (define-full-call static-tail-call-named :direct :tail nil)
 
   (define-full-call call-variable nil :fixed t)
   (define-full-call multiple-call-variable nil :unknown t))

@@ -1867,18 +1867,6 @@ constant shift greater than word length")))
     (move ecx count)
     (inst shl result :cl)))
 
-;;;; static functions
-
-(define-static-fun two-arg-/ (x y) :translate /)
-
-(define-static-fun two-arg-gcd (x y) :translate gcd)
-(define-static-fun two-arg-lcm (x y) :translate lcm)
-
-(define-static-fun two-arg-and (x y) :translate logand)
-(define-static-fun two-arg-ior (x y) :translate logior)
-(define-static-fun two-arg-xor (x y) :translate logxor)
-
-
 ;;; Support for the Mersenne Twister, MT19937, random number generator
 ;;; due to Matsumoto and Nishimura.
 ;;;
