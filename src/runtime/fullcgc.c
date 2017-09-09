@@ -424,7 +424,8 @@ FILE *sweeplog;
 #ifdef LOG_SWEEP_ACTIONS
 # define LOG_GARBAGE(size) \
    if (sweeplog) \
-     fprintf(sweeplog, "%5d %d %p: %lx %lx\n", (int)size, gen_of(where), \
+     fprintf(sweeplog, "%5d %d %p: %"OBJ_FMTX" %"OBJ_FMTX"\n", \
+             (int)size, gen_of(where), \
              (void*)compute_lispobj(where), where[0], where[1]);
 #else
 # define LOG_GARBAGE(size)
@@ -468,7 +469,7 @@ uword_t sweep(lispobj* where, lispobj* end, uword_t arg)
             if (!live) {
                 // Turn the object into either a (0 . 0) cons
                 // or an unboxed filler depending on size.
-                if (nwords < 2)
+                if (nwords <= 2) // could be SAP, SIMPLE-ARRAY-NIL, 1-word bignum, etc
                     goto cons;
                 struct code* code  = (struct code*)where;
                 lispobj header = 2<<N_WIDETAG_BITS | CODE_HEADER_WIDETAG;
