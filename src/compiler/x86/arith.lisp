@@ -214,6 +214,8 @@
   (:note "inline (unsigned-byte 32) arithmetic")
   (:translate logior)
   (:generator 3
+    (when (location= r x)
+      (rotatef x y))
     (move r y)
     (inst or r x)))
 
@@ -226,6 +228,8 @@
   (:note "inline (unsigned-byte 32) arithmetic")
   (:translate logior)
   (:generator 3
+    (when (location= r y)
+      (rotatef x y))
     (move r x)
     (inst or r y)))
 
