@@ -183,13 +183,6 @@
                             :key #'dsd-name)))
   (funcall #'(setf slot-value) 'character dsd 'sb-kernel::default))
 
-;;; Lock internal packages
-#+sb-package-locks
-(dolist (p (list-all-packages))
-  (unless (member p (mapcar #'find-package '("KEYWORD" "CL-USER")))
-    (sb-ext:lock-package p)))
-
-"done with warm.lisp, about to SAVE-LISP-AND-DIE"
 ;;; Even if /SHOW output was wanted during build, it's probably
 ;;; not wanted by default after build is complete. (And if it's
 ;;; wanted, it can easily be turned back on.)
@@ -199,11 +192,6 @@
 ;;; The call to CTYPE-OF-CACHE-CLEAR is probably redundant.
 ;;; SAVE-LISP-AND-DIE calls DEINIT which calls DROP-ALL-HASH-CACHES.
 (sb-kernel::ctype-of-cache-clear)
-
-;;; Clean up stray symbols from the CL-USER package.
-(with-package-iterator (iter "CL-USER" :internal :external)
-  (loop (multiple-value-bind (winp symbol) (iter)
-          (if winp (unintern symbol "CL-USER") (return)))))
 
 ;;; In case there is xref data for internals, repack it here to
 ;;; achieve a more compact encoding.
@@ -215,10 +203,22 @@
 ;;; from the same SBCL build, REPACK-XREF is of no use after the
 ;;; target image has been built.
 #+sb-xref-for-internals (sb-c::repack-xref :verbose 1)
-(with-unlocked-packages (#:sb-c)
-  (fmakunbound 'sb-c::repack-xref))
+(fmakunbound 'sb-c::repack-xref)
+
+;;; Lock internal packages
+#+sb-package-locks
+(dolist (p (list-all-packages))
+  (unless (member p (mapcar #'find-package '("KEYWORD" "CL-USER")))
+    (sb-ext:lock-package p)))
+
+;;; Clean up stray symbols from the CL-USER package.
+(with-package-iterator (iter "CL-USER" :internal :external)
+  (loop (multiple-value-bind (winp symbol) (iter)
+          (if winp (unintern symbol "CL-USER") (return)))))
 
 #+immobile-code (setq sb-c::*compile-to-memory-space* :dynamic)
 #+sb-fasteval (setq sb-ext:*evaluator-mode* :interpret)
 ;; See comments in 'readtable.lisp'
 (setf (readtable-base-char-preference *readtable*) :symbols)
+
+"done with warm.lisp, about to SAVE-LISP-AND-DIE"
