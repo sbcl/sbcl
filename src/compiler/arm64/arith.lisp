@@ -408,8 +408,8 @@
     (inst b END)
     LEFT
     (inst cmp temp n-word-bits)
-    (inst csinv temp temp zr-tn :lt)
-    (inst lsl result number temp)
+    (inst csel result number zr-tn :lt)
+    (inst lsl result result temp)
     END))
 
 (define-vop (fast-ash/signed=>signed fast-ash/signed/unsigned)
@@ -443,16 +443,16 @@
                 (:result-types ,type)
                 (:policy :fast-safe)
                 (:generator ,cost
-                  (let ((amount (cond (cut
-                                       (inst cmp amount n-word-bits)
-                                       ;; Only the first 6 bits count for shifts.
-                                       ;; This sets all bits to 1 if AMOUNT is larger than 63,
-                                       ;; cutting the amount to 63.
-                                       (inst csinv tmp-tn amount zr-tn :lt)
-                                       tmp-tn)
-                                      (t
-                                       amount))))
-                    (inst lsl result number amount))))))
+                  (cond (cut
+                         (inst cmp amount n-word-bits)
+                         (cond ((location= amount result)
+                                (inst csel tmp-tn number zr-tn :lt)
+                                (inst lsl result tmp-tn amount))
+                               (t
+                                (inst csel result number zr-tn :lt)
+                                (inst lsl result result amount))))
+                        (t
+                         (inst lsl result number amount)))))))
   ;; FIXME: There's the opportunity for a sneaky optimization here, I
   ;; think: a FAST-ASH-LEFT-C/FIXNUM=>SIGNED vop.  -- CSR, 2003-09-03
   (def fast-ash-left/fixnum=>fixnum any-reg tagged-num any-reg 2)

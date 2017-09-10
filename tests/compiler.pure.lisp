@@ -6553,3 +6553,11 @@
                      (logand (%f) b)))))
               1)
              1)))
+
+(with-test (:name :left-ash-cut-amount)
+  (assert
+   (zerop (funcall (checked-compile `(lambda (b z)
+                                       (declare (type fixnum b)
+                                                (type (and fixnum unsigned-byte) z))
+                                       (ldb (byte 64 0) (ash b z))))
+                   -1 70))))
