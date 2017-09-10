@@ -117,17 +117,21 @@ evaluated expressions.
     (format stream "~&~{~S~%~}" result-list)))
 
 (defun tty-display-inspected-parts (description named-p elements stream)
-  (format stream "~%~A" description)
-  (let ((index 0))
-    (dolist (element elements)
-      (if named-p
-          (destructuring-bind (name . value) element
-            (format stream "~W. ~A: ~W~%" index name
-                    (if (eq value *inspect-unbound-object-marker*)
-                        "unbound"
-                        value)))
-          (format stream "~W. ~W~%" index element))
-      (incf index))))
+  (let ((*suppress-print-errors*
+         (if (subtypep 'serious-condition *suppress-print-errors*)
+             *suppress-print-errors*
+             'serious-condition)))
+    (format stream "~%~A" description)
+    (loop for element in elements
+       for index from 0
+       do (multiple-value-bind (value name)
+              (if named-p
+                  (values (cdr element) (car element))
+                  element)
+            (format stream "~W. ~@[~A: ~]~W~%"
+                    index name (if (eq value *inspect-unbound-object-marker*)
+                                   "unbound"
+                                   value))))))
 
 ;;;; INSPECTED-PARTS
 
