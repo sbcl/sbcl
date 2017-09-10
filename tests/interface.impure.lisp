@@ -82,83 +82,6 @@
 
       ;; fle-eval should still be an interpreted function.
       (assert (interpreted-function-p (symbol-function 'fle-eval))))))
-
-
-;;; support for DESCRIBE tests
-(defstruct to-be-described a b)
-(defclass forward-describe-class (forward-describe-ref) (a))
-(let ((sb-ext:*evaluator-mode* :compile))
-  (eval `(let (x) (defun closure-to-describe () (incf x)))))
-
-(with-test (:name (describe :empty-gf))
-  (assert-no-signal
-   (silently (describe (make-instance 'generic-function)))
-   warning)
-  (assert-signal
-   (silently (describe (make-instance 'standard-generic-function)))
-   warning))
-
-;;; DESCRIBE should run without signalling an error.
-(with-test (:name (describe :no-error))
- (silently
-  (describe (make-to-be-described))
-  (describe 12)
-  (describe "a string")
-  (describe 'symbolism)
-  (describe (find-package :cl))
-  (describe '(a list))
-  (describe #(a vector))
-;; bug 824974
-  (describe 'closure-to-describe)))
-
-;;; The DESCRIBE-OBJECT methods for built-in CL stuff should do
-;;; FRESH-LINE and TERPRI neatly.
-(with-test (:name (describe fresh-line terpri))
-  (dolist (i (list (make-to-be-described :a 14) 12 "a string"
-                   #0a0 #(1 2 3) #2a((1 2) (3 4)) 'sym :keyword
-                   (find-package :keyword) (list 1 2 3)
-                   nil (cons 1 2) (make-hash-table)
-                   (let ((h (make-hash-table)))
-                     (setf (gethash 10 h) 100
-                           (gethash 11 h) 121)
-                     h)
-                   (make-condition 'simple-error)
-                   (make-condition 'simple-error :format-control "fc")
-                   #'car #'make-to-be-described (lambda (x) (+ x 11))
-                   (constantly 'foo) #'(setf to-be-described-a)
-                   #'describe-object (find-class 'to-be-described)
-                   (find-class 'forward-describe-class)
-                   (find-class 'forward-describe-ref) (find-class 'cons)))
-    (let ((s (with-output-to-string (s)
-               (write-char #\x s)
-               (describe i s))))
-      (macrolet ((check (form)
-                   `(or ,form
-                        (error "misbehavior in DESCRIBE of ~S:~%   ~S" i ',form))))
-        (check (char= #\x (char s 0)))
-        ;; one leading #\NEWLINE from FRESH-LINE or the like, no more
-        (check (char= #\newline (char s 1)))
-        (check (char/= #\newline (char s 2)))
-        ;; one trailing #\NEWLINE from TERPRI or the like, no more
-        (let ((n (length s)))
-          (check (char= #\newline (char s (- n 1))))
-          (check (char/= #\newline (char s (- n 2)))))))))
-
-(with-test (:name (describe :argument-precedence-order))
-  ;; Argument precedence order information is only interesting for two
-  ;; or more required parameters.
-  (assert (not (search "Argument precedence order"
-                       (with-output-to-string (stream)
-                         (describe #'class-name stream)))))
-  (assert (search "Argument precedence order"
-                  (with-output-to-string (stream)
-                    (describe #'add-method stream)))))
-
-(with-test (:name (describe sb-kernel:funcallable-instance))
-  (assert (search "Slots with :INSTANCE allocation"
-                  (with-output-to-string (stream)
-                    (describe #'class-name stream)))))
-
 
 ;;; Tests of documentation on types and classes
 

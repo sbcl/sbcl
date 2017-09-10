@@ -45,16 +45,6 @@
   (assert (< 0
              (length (apropos-list "" "SB-VM" t))
              (length (apropos-list "" "SB-VM")))))
-
-;;; DESCRIBE shouldn't fail on rank-0 arrays (bug reported and fixed
-;;; by Lutz Euler sbcl-devel 2002-12-03)
-(with-test (:name (describe array :rank 0))
-  (flet ((test (array)
-           (assert (plusp (length (with-output-to-string (stream)
-                                    (describe array stream)))))))
-    (test #0a0)
-    (test #(1 2 3))
-    (test #2a((1 2) (3 4)))))
 
 ;;; TYPEP, SUBTYPEP, UPGRADED-ARRAY-ELEMENT-TYPE and
 ;;; UPGRADED-COMPLEX-PART-TYPE should be able to deal with NIL as an
