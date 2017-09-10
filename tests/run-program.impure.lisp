@@ -359,3 +359,21 @@
                        #+win32 '("/c" "cd")
                        :search t
                        :output :bad)))
+
+(with-test (:name (sb-ext:run-program :stop+continue) :skipped-on (not :linux))
+  (let ((process (sb-ext:run-program "cat" '()
+                                     :search t :input :stream :wait nil)))
+    (flet ((kill-and-check-status (signal expected-status)
+             (sb-ext:process-kill process signal)
+             (loop :repeat 500
+                :when (eq (sb-ext:process-status process) expected-status)
+                :do (return)
+                :do (sleep 1/100)
+                :finally (error "~@<Process ~A did not change its ~
+                                 status to ~S within five seconds.~@:>"
+                                process expected-status))))
+      (kill-and-check-status sb-posix:sigstop :stopped)
+      (kill-and-check-status sb-posix:sigcont :continued)
+      (kill-and-check-status sb-posix:sigkill :signaled)
+      (process-wait process)
+      (assert (not (process-alive-p process))))))

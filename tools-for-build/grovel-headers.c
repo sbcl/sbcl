@@ -222,6 +222,7 @@ main(int argc, char *argv[])
     printf("\n");
 
     printf(";;; for wait3(2) in run-program.lisp\n");
+    defconstant("wcontinued", WCONTINUED);
     defconstant("wnohang", WNOHANG);
     defconstant("wuntraced", WUNTRACED);
     printf("\n");

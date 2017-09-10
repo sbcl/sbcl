@@ -6,6 +6,8 @@ changes relative to sbcl-1.3.21:
   * ehancement: (GC :GEN 7) with gencgc will zero-fill dead pseudo-static
     objects so that they do not spuriously cause reachability of objects that
     would have been otherwise dead.
+  * enhancement: PROCESS-STATUS now tracks stopped and continued processes
+    properly (also fixes lp#1624941, based on patch by Elias Pipping).
   * bug fix: *LOAD-PATHNAME* and *LOAD-TRUENAME* are bound to pathnames
     when processing a sysinit or userinit file
   * bug fix: save-lisp-and-die is able to collect more garbage on non-x86oid

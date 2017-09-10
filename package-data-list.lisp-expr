@@ -2879,7 +2879,8 @@ no guarantees of interface stability."
                "UNIX-UNLINK" "UNIX-WRITE"
                "WINSIZE"
                "WRITEGRP" "WRITEOTH" "WRITEOWN" "WS-COL" "WS-ROW" "WS-XPIXEL"
-               "WS-YPIXEL" "WNOHANG" "WSTOPPED" "WUNTRACED" "W_OK" "X_OK"
+               "WS-YPIXEL" "WCONTINUED" "WNOHANG" "WSTOPPED" "WUNTRACED"
+               "W_OK" "X_OK"
 
                ;; signals
                "SIGALRM" "SIGBUS" "SIGCHLD" "SIGCONT" "SIGEMT" "SIGFPE"

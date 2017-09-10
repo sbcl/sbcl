@@ -478,6 +478,9 @@ int get_h_errno()
 }
 
 /* From SB-POSIX, wait-macros */
+int wifcontinued(int status) {
+    return WIFCONTINUED(status);
+}
 int wifexited(int status) {
     return WIFEXITED(status);
 }
@@ -496,8 +499,6 @@ int wifstopped(int status) {
 int wstopsig(int status) {
     return WSTOPSIG(status);
 }
-/* FIXME: POSIX also defines WIFCONTINUED, but that appears not to
-   exist on at least Linux... */
 #endif  /* !LISP_FEATURE_WIN32 */
 
 /* From SB-POSIX, stat-macros */

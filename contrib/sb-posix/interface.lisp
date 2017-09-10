@@ -457,7 +457,6 @@ not supported."
  (define-call "wtermsig" int never-fails (status int))
  (define-call "wifstopped" boolean never-fails (status int))
  (define-call "wstopsig" int never-fails (status int))
- #+nil ; see alien/waitpid-macros.c
  (define-call "wifcontinued" boolean never-fails (status int)))
 
 ;;; mmap, msync

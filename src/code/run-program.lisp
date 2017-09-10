@@ -112,7 +112,7 @@
   (options int))
 
 #-win32
-(defun waitpid (pid &optional do-not-hang check-for-stopped)
+(defun waitpid (pid &optional do-not-hang check-for-stopped check-for-continued)
   "Return any available status information on child process with PID."
   (multiple-value-bind (pid status)
       (c-waitpid pid
@@ -121,12 +121,18 @@
                              0)
                          (if check-for-stopped
                              sb-unix:wuntraced
+                             0)
+                         (if check-for-continued
+                             sb-unix:wcontinued
                              0)))
     (cond ((or (minusp pid)
                (zerop pid))
            nil)
-          ((eql (ldb (byte 8 0) status)
-                sb-unix:wstopped)
+          ((and check-for-continued (wifcontinued status))
+           (values pid
+                   :continued
+                   sb-unix:sigcont))
+          ((and check-for-stopped (wifstopped status))
            (values pid
                    :stopped
                    (ldb (byte 8 8) status)))
@@ -147,6 +153,14 @@
                          :signaled)
                      signal
                      (not (zerop (ldb (byte 1 7) status)))))))))
+
+#-win32
+(define-alien-routine wifcontinued boolean
+  (status int))
+
+#-win32
+(define-alien-routine wifstopped boolean
+  (status int))
 
 ;;;; process control stuff
 (define-load-time-global *active-processes* nil
@@ -163,7 +177,7 @@
      ,@body))
 
 (deftype process-status ()
-  '(member :running :stopped :exited :signaled))
+  '(member :running :stopped :continued :exited :signaled))
 
 (defstruct (process (:copier nil))
   (pid     nil :type word :read-only t) ; PID of child process
@@ -201,7 +215,7 @@
 
 (defun process-status (process)
   "Return the current status of PROCESS.  The result is one of :RUNNING,
-   :STOPPED, :EXITED, or :SIGNALED."
+   :STOPPED, :CONTINUED, :EXITED, or :SIGNALED."
   (get-processes-status-changes)
   (process-%status process))
 
@@ -235,7 +249,7 @@ PROCESS."
   #-win32
   (loop
       (case (process-status process)
-        (:running)
+        (:running :continued)
         (:stopped
          (when check-for-stopped
            (return)))
@@ -289,6 +303,7 @@ PROCESS."
   "Return T if PROCESS is still alive, NIL otherwise."
   (let ((status (process-status process)))
     (if (or (eq status :running)
+            (eq status :continued)
             (eq status :stopped))
         t
         nil)))
@@ -326,14 +341,15 @@ status slot."
                          ;; WAIT, WAITPID usage impossible due to the
                          ;; race with the SIGCHLD signal handler.
                          (multiple-value-bind (pid what code core)
-                             (waitpid (process-pid proc) t t)
+                             (waitpid (process-pid proc) t t t)
                            (when pid
                              (setf (process-%status proc) what)
                              (setf (process-%exit-code proc) code)
-                             (setf (process-core-dumped proc) core)
-                             (when (process-status-hook proc)
-                               (push proc exited))
-                             t)))
+                             (when (member what '(:exited :signaled))
+                               (setf (process-core-dumped proc) core)
+                               (when (process-status-hook proc)
+                                 (push proc exited))
+                               t))))
                        #+win32
                        (lambda (proc)
                          (let ((pid (process-pid proc)))
