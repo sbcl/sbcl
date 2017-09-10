@@ -103,3 +103,8 @@
   (assert (search "Slots with :INSTANCE allocation"
                   (with-output-to-string (stream)
                     (describe #'class-name stream)))))
+
+(with-test (:name (describe class))
+  (assert (search "Class precedence-list:"
+                  (with-output-to-string (stream)
+                    (describe (find-class 'standard-class) stream)))))

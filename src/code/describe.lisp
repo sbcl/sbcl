@@ -371,7 +371,7 @@
 (defun describe-class (name class stream)
   (binding* ((by-name (not class))
              ((name class) (if class
-                               (values (class-name class) name)
+                               (values (class-name class) class)
                                (values name (find-class name nil)))))
     (when class
       (let ((metaclass-name (class-name (class-of class))))
@@ -441,7 +441,7 @@
 (defun describe-instance (object stream)
   (let* ((class (class-of object))
          (slotds (sb-mop:class-slots class))
-         (max-slot-name-length 0)
+         (max-slot-name-length 30)
          (plist nil))
 
     ;; Figure out a good width for the slot-name column.
@@ -450,13 +450,12 @@
                    (max max-slot-name-length (length (symbol-name name))))))
       (dolist (slotd slotds)
         (adjust-slot-name-length (sb-mop:slot-definition-name slotd))
-        (push slotd (getf plist (sb-mop:slot-definition-allocation slotd))))
-      (setf max-slot-name-length  (min (+ max-slot-name-length 3) 30)))
+        (push slotd (getf plist (sb-mop:slot-definition-allocation slotd)))))
 
     ;; Now that we know the width, we can print.
     (flet ((describe-slot (name value)
-             (format stream "~%  ~A~VT = ~A" name max-slot-name-length
-                     (prin1-to-line value))))
+             (format stream "~%  ~VA = ~A"
+                     max-slot-name-length name (prin1-to-line value))))
       (doplist (allocation slots) plist
         (format stream "~%Slots with ~S allocation:" allocation)
         (dolist (slotd (nreverse slots))

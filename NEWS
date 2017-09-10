@@ -8,6 +8,7 @@ changes relative to sbcl-1.3.21:
     would have been otherwise dead.
   * enhancement: PROCESS-STATUS now tracks stopped and continued processes
     properly (also fixes lp#1624941, based on patch by Elias Pipping).
+  * bug fix: DESCRIBE works on classes like it used to.
   * bug fix: *LOAD-PATHNAME* and *LOAD-TRUENAME* are bound to pathnames
     when processing a sysinit or userinit file
   * bug fix: save-lisp-and-die is able to collect more garbage on non-x86oid
