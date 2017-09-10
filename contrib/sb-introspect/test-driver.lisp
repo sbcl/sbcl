@@ -388,14 +388,11 @@
   (setq *print-array* nil)
   (defvar *large-array* (make-array (* sb-vm:gencgc-card-bytes 4)
                                     :element-type '(unsigned-byte 8)))
-  (sb-ext:gc) ; Array won't move to a large boxed page until GC'd
+  (sb-ext:gc :gen 1) ; Array won't move to a large boxed page until GC'd
   (deftest* (allocation-information.5)
-      (or (tai *large-array* :heap
-               `(:space :dynamic :generation 0 :boxed nil :pinned nil :large t)
-               :ignore (list :page :write-protected))
           (tai *large-array* :heap
                `(:space :dynamic :generation 1 :boxed nil :pinned nil :large t)
-               :ignore (list :page :write-protected)))
+               :ignore (list :page :write-protected))
       t))
 
 #.(if (and (eq sb-ext:*evaluator-mode* :compile) (member :sb-thread *features*))
