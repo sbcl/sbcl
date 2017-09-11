@@ -2776,28 +2776,38 @@ is_in_stack_space(lispobj ptr)
     return 0;
 }
 
+struct verify_state {
+    lispobj *object_start, *object_end;
+    uword_t flags;
+    generation_index_t object_gen;
+};
+
 // NOTE: This function can produces false failure indications,
 // usually related to dynamic space pointing to the stack of a
 // dead thread, but there may be other reasons as well.
 static void
-verify_range(lispobj *start, sword_t words, uword_t flags)
+verify_range(lispobj *where, sword_t words, struct verify_state *state)
 {
     extern int valid_lisp_pointer_p(lispobj);
     boolean is_in_readonly_space =
-        (READ_ONLY_SPACE_START <= (uword_t)start &&
-         start < read_only_space_free_pointer);
+        (READ_ONLY_SPACE_START <= (uword_t)where &&
+         where < read_only_space_free_pointer);
     boolean is_in_immobile_space = 0;
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     is_in_immobile_space =
-        (IMMOBILE_SPACE_START <= (uword_t)start &&
-         start < immobile_space_free_pointer);
+        (IMMOBILE_SPACE_START <= (uword_t)where &&
+         where < immobile_space_free_pointer);
 #endif
 
-    lispobj *end = start + words;
+    lispobj *end = where + words;
     size_t count;
-    for ( ; start < end ; start += count) {
+    for ( ; where < end ; where += count) {
+        if (where > state->object_end) {
+            state->object_start = where;
+            state->object_end = where + OBJECT_SIZE(*where, where) - 1;
+        }
         count = 1;
-        lispobj thing = *start;
+        lispobj thing = *where;
         lispobj callee;
 
         if (is_lisp_pointer(thing)) {
@@ -2815,23 +2825,27 @@ verify_range(lispobj *start, sword_t words, uword_t flags)
             if (page_index != -1) {
                 /* If it's within the dynamic space it should point to a used page. */
                 if ((thing & (GENCGC_CARD_BYTES-1)) >= page_bytes_used(page_index))
-                    lose ("Ptr %p @ %p sees %s.\n", thing, start,
+                    lose ("Ptr %p @ %p sees %s.\n", thing, where,
                           page_free_p(page_index) ? "free page" : "unallocated space");
                 /* Check that it doesn't point to a forwarding pointer! */
                 if (*native_pointer(thing) == 0x01) {
-                    lose("Ptr %p @ %p sees forwarding ptr.\n", thing, start);
+                    lose("Ptr %p @ %p sees forwarding ptr.\n", thing, where);
                 }
+                /* If it's within the dynamic space it should point to a used page. */
+                if ((thing & (GENCGC_CARD_BYTES-1)) >= page_bytes_used(page_index))
+                    lose ("Ptr %p @ %p sees %s.\n", thing, where,
+                          page_free_p(page_index) ? "free page" : "unallocated space");
                 /* Check that its not in the RO space as it would then be a
                  * pointer from the RO to the dynamic space. */
                 if (is_in_readonly_space) {
                     lose("ptr to dynamic space %p from RO space %x\n",
-                         thing, start);
+                         thing, where);
                 }
             } else if (to_immobile_space) {
                 // the object pointed to must not have been discarded as garbage
                 if (!other_immediate_lowtag_p(*native_pointer(thing))
                     || immobile_filler_p(native_pointer(thing)))
-                    lose("Ptr %p @ %p sees trashed object.\n", (void*)thing, start);
+                    lose("Ptr %p @ %p sees trashed object.\n", thing, where);
             }
             /* If any-space -> dynamic-space and paranoid,
              * or any space -> immobile-space or immobile-space -> any space,
@@ -2840,10 +2854,10 @@ verify_range(lispobj *start, sword_t words, uword_t flags)
              * or that the object containing this pointer is unreachable.
              * Currently only 1 flag in 'flags' - whether to be paranoid.
              */
-            if ((page_index >= 0 && (flags != 0)) ||
+            if ((page_index >= 0 && (state->flags != 0)) ||
                 (is_in_immobile_space || to_immobile_space))
                 if (!valid_lisp_pointer_p(thing) && !is_in_stack_space(thing))
-                    lose("Ptr %p @ %p sees junk.\n", thing, start);
+                    lose("Ptr %p @ %p sees junk.\n", thing, where);
             continue;
         }
         int widetag = widetag_of(thing);
@@ -2851,58 +2865,61 @@ verify_range(lispobj *start, sword_t words, uword_t flags)
             /* skip immediates */
         } else if (!(other_immediate_lowtag_p(widetag)
                      && lowtag_for_widetag[widetag>>2])) {
-            lose("Unhandled widetag %p at %p\n", widetag, start);
+            lose("Unhandled widetag %p at %p\n", widetag, where);
         } else if (unboxed_obj_widetag_p(widetag)) {
-            count = sizetab[widetag](start);
+            count = sizetab[widetag](where);
         } else switch(widetag) {
                     /* boxed or partially boxed objects */
             // FIXME: x86-64 can have partially unboxed FINs. The raw words
             // are at the moment valid fixnums by blind luck.
             case INSTANCE_WIDETAG:
-                if (instance_layout(start)) {
+                if (instance_layout(where)) {
                     sword_t nslots = instance_length(thing) | 1;
-                    instance_scan(verify_range, start+1, nslots,
-                                  LAYOUT(instance_layout(start))->bitmap,
-                                  0);
+                    instance_scan((void (*)(lispobj*, sword_t, uword_t))verify_range,
+                                  where+1, nslots,
+                                  LAYOUT(instance_layout(where))->bitmap,
+                                  (uintptr_t)state);
                     count = 1 + nslots;
                 }
                 break;
             case CODE_HEADER_WIDETAG:
                 {
-                struct code *code = (struct code *) start;
+                struct code *code = (struct code *) where;
                 sword_t nheader_words = code_header_words(code->header);
                 /* Scavenge the boxed section of the code data block */
-                verify_range(start + 1, nheader_words - 1, 0);
+                verify_range(where + 1, nheader_words - 1, state);
 
                 /* Scavenge the boxed section of each function
                  * object in the code data block. */
                 for_each_simple_fun(i, fheaderp, code, 1, {
                     verify_range(SIMPLE_FUN_SCAV_START(fheaderp),
                                  SIMPLE_FUN_SCAV_NWORDS(fheaderp),
-                                 0); });
+                                 state); });
                 count = nheader_words + code_instruction_words(code->code_size);
                 break;
                 }
             case FDEFN_WIDETAG:
-                verify_range(start + 1, 2, 0);
-                callee = fdefn_callee_lispobj((struct fdefn*)start);
-                verify_range(&callee, 1, 0);
+                verify_range(where + 1, 2, state);
+                callee = fdefn_callee_lispobj((struct fdefn*)where);
+                verify_range(&callee, 1, state);
                 count = CEILING(sizeof (struct fdefn)/sizeof(lispobj), 2);
                 break;
         }
     }
 }
 static uword_t verify_space(lispobj start, lispobj* end, uword_t flags) {
-    verify_range((lispobj*)start, end-(lispobj*)start, flags);
+    struct verify_state state;
+    memset(&state, 0, sizeof state);
+    state.flags = flags;
+    verify_range((lispobj*)start, end-(lispobj*)start, &state);
     return 0;
 }
 
 static void verify_dynamic_space();
 
 static void
-verify_gc(boolean paranoid)
+verify_gc(uword_t flags)
 {
-    uword_t flags = paranoid;
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 #  ifdef __linux__
     // Try this verification if marknsweep was compiled with extra debugging.
