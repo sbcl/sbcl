@@ -292,6 +292,30 @@ static inline void add_to_weak_pointer_list(struct weak_pointer *wp) {
     weak_pointers = wp;
 }
 
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+struct fixedobj_page { // 12 bytes per page
+    union immobile_page_attr {
+      int packed;
+      struct {
+        unsigned char flags;
+        /* space per object in Lisp words. Can exceed obj_size
+           to align on a larger boundary */
+        unsigned char obj_align;
+        unsigned char obj_size; /* in Lisp words, incl. header */
+        /* Which generations have data on this page */
+        unsigned char gens_; // a bitmap
+      } parts;
+    } attr;
+    int free_index; // index is in bytes. 4 bytes
+    short int prior_gc_free_word_index; // index is in words. 2 bytes
+    /* page index of next page with same attributes */
+    short int page_link; // 2 bytes
+};
+extern struct fixedobj_page *fixedobj_pages;
+#define fixedobj_page_obj_align(i) (fixedobj_pages[i].attr.parts.obj_align<<WORD_SHIFT)
+#define fixedobj_page_obj_size(i) fixedobj_pages[i].attr.parts.obj_size
+#endif
+
 extern page_index_t last_free_page;
 extern boolean gencgc_partial_pickup;
 

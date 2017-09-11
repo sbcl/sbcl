@@ -344,8 +344,10 @@ void prepare_for_full_mark_phase()
 
 void execute_full_mark_phase()
 {
+#if HAVE_GETRUSAGE
     struct rusage before, after;
     getrusage(RUSAGE_SELF, &before);
+#endif
     lispobj* where = (lispobj*)STATIC_SPACE_START;
     lispobj* end = static_space_free_pointer;
     while (where < end) {
@@ -370,6 +372,7 @@ void execute_full_mark_phase()
             goto again;
         }
     }
+#if HAVE_GETRUSAGE
     getrusage(RUSAGE_SELF, &after);
 #define timediff(b,a,field) \
     (double)((a.field.tv_sec-b.field.tv_sec)*1000000 + \
@@ -378,6 +381,7 @@ void execute_full_mark_phase()
             "[Mark phase: %d pages used, HT-count=%d, ET=%f+%f sys+usr]\n",
             (int)(page_table_pages - free_page), mark_bits.count,
             timediff(before, after, ru_stime), timediff(before, after, ru_utime));
+#endif
 }
 
 static void smash_weak_pointers()
@@ -398,17 +402,6 @@ static void smash_weak_pointers()
     }
 }
 
-__attribute__((unused)) static int gen_of(lispobj* obj) {
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-    if (immobile_space_p((lispobj)obj))
-        return immobile_obj_gen_bits(obj);
-#endif
-    int page = find_page_index(obj);
-    if (page >= 0) return page_table[page].gen;
-    lose("gen_of");
-    return -1;
-}
-
 __attribute__((unused)) static char *fillerp(lispobj* where)
 {
     page_index_t page;
@@ -422,17 +415,56 @@ __attribute__((unused)) static char *fillerp(lispobj* where)
 FILE *sweeplog;
 
 #ifdef LOG_SWEEP_ACTIONS
-# define LOG_GARBAGE(size) \
-   if (sweeplog) \
-     fprintf(sweeplog, "%5d %d %p: %"OBJ_FMTX" %"OBJ_FMTX"\n", \
-             (int)size, gen_of(where), \
-             (void*)compute_lispobj(where), where[0], where[1]);
+# define NOTE_GARBAGE(gen,addr,nwords,tally) \
+  { tally[gen] += nwords; \
+    if (sweeplog) \
+     fprintf(sweeplog, "%5d %d #x%"OBJ_FMTX": %"OBJ_FMTX" %"OBJ_FMTX"\n", \
+             (int)nwords, gen_or_lose(addr), compute_lispobj(addr), \
+             addr[0], addr[1]); }
 #else
-# define LOG_GARBAGE(size)
+# define NOTE_GARBAGE(gen,addr,nwords,tally) tally[gen] += nwords
 #endif
 
-static inline
-uword_t sweep(lispobj* where, lispobj* end, uword_t arg)
+#define INCREMENT_TOTALS(subtotals) \
+    totals[0] += subtotals[0]; \
+    totals[1] += subtotals[1]; \
+    totals[2] += subtotals[2]; \
+    totals[3] += subtotals[3]; \
+    totals[4] += subtotals[4]; \
+    totals[5] += subtotals[5]; \
+    totals[6] += subtotals[6]
+
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+static void sweep_fixedobj_pages(long totals[7])
+{
+    long zeroed[7]; // one count per generation
+    low_page_index_t page;
+
+    memset(zeroed, 0, sizeof zeroed);
+    for (page = find_immobile_page_index((void*)(immobile_fixedobj_free_pointer-1));
+         page >= 0;
+         --page) {
+        char *page_base = (char*)IMMOBILE_SPACE_START + page * IMMOBILE_CARD_BYTES;
+        int obj_spacing = fixedobj_page_obj_align(page);
+        int nwords = fixedobj_page_obj_size(page);
+        lispobj *obj = (lispobj*)page_base;
+        lispobj *limit = (lispobj*)(page_base + IMMOBILE_CARD_BYTES - obj_spacing);
+        for ( ; obj <= limit ; obj = (lispobj*)((char*)obj + obj_spacing) ) {
+            lispobj header = *obj;
+            if (fixnump(header)) { // is a hole
+            } else if (header & MARK_BIT) { // live object
+                *obj = header ^ MARK_BIT;
+            } else {
+                NOTE_GARBAGE(__immobile_obj_gen_bits(obj), obj, nwords, zeroed);
+                memset(obj, 0, nwords * N_WORD_BYTES);
+            }
+        }
+    }
+    INCREMENT_TOTALS(zeroed);
+}
+#endif
+
+static uword_t sweep(lispobj* where, lispobj* end, uword_t arg)
 {
     long zeroed[7]; // one count per generation
     sword_t nwords;
@@ -446,9 +478,10 @@ uword_t sweep(lispobj* where, lispobj* end, uword_t arg)
             if (!cons_markedp((lispobj)where)) {
                 if (where[0] | where[1]) {
                cons:
-                    LOG_GARBAGE(2);
+                    gc_dcheck(!immobile_space_p((lispobj)where));
+                    NOTE_GARBAGE(page_table[find_page_index(where)].gen,
+                                 where, 2, zeroed);
                     where[0] = where[1] = 0;
-                    zeroed[gen_of(where)] += 2;
                 }
             }
         } else {
@@ -474,11 +507,11 @@ uword_t sweep(lispobj* where, lispobj* end, uword_t arg)
                 struct code* code  = (struct code*)where;
                 lispobj header = 2<<N_WIDETAG_BITS | CODE_HEADER_WIDETAG;
                 if (code->header != header) {
-                    LOG_GARBAGE(nwords);
+                    NOTE_GARBAGE(page_table[find_page_index(where)].gen,
+                                 where, nwords, zeroed);
                     code->header = header;
                     code->code_size = make_fixnum((nwords - 2) * N_WORD_BYTES);
                     memset(where+2, 0, (nwords - 2) * N_WORD_BYTES);
-                    zeroed[gen_of(where)] += nwords;
                 }
             }
         }
@@ -508,11 +541,12 @@ void execute_full_sweep_phase()
 
     memset(words_zeroed, 0, sizeof words_zeroed);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    sweep((lispobj*)IMMOBILE_SPACE_START, immobile_fixedobj_free_pointer,
-          (uword_t)words_zeroed);
+    sweep_fixedobj_pages(words_zeroed);
+    if (sweeplog) fprintf(sweeplog, "-- varyobj pages --\n");
     sweep((lispobj*)IMMOBILE_VARYOBJ_SUBSPACE_START, immobile_space_free_pointer,
           (uword_t)words_zeroed);
 #endif
+    if (sweeplog) fprintf(sweeplog, "-- dynamic space --\n");
     walk_generation(sweep, -1, (uword_t)words_zeroed);
     fprintf(stderr, "[Sweep phase: ");
     int i;

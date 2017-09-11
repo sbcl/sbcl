@@ -2831,10 +2831,6 @@ verify_range(lispobj *where, sword_t words, struct verify_state *state)
                 if (*native_pointer(thing) == 0x01) {
                     lose("Ptr %p @ %p sees forwarding ptr.\n", thing, where);
                 }
-                /* If it's within the dynamic space it should point to a used page. */
-                if ((thing & (GENCGC_CARD_BYTES-1)) >= page_bytes_used(page_index))
-                    lose ("Ptr %p @ %p sees %s.\n", thing, where,
-                          page_free_p(page_index) ? "free page" : "unallocated space");
                 /* Check that its not in the RO space as it would then be a
                  * pointer from the RO to the dynamic space. */
                 if (is_in_readonly_space) {
@@ -3433,7 +3429,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
         extern void execute_full_sweep_phase();
         execute_full_mark_phase();
         execute_full_sweep_phase();
-        return;
+        goto maybe_verify;
     }
 
     /* Scavenge static space. */
@@ -3537,13 +3533,6 @@ garbage_collect_generation(generation_index_t generation, int raise)
     generations[generation].alloc_large_start_page = 0;
 #endif
 
-    if (generation >= verify_gens) {
-        if (gencgc_verbose) {
-            SHOW("verifying");
-        }
-        verify_gc(0);
-    }
-
     /* Set the new gc trigger for the GCed generation. */
     generations[generation].gc_trigger =
         generations[generation].bytes_allocated
@@ -3554,6 +3543,13 @@ garbage_collect_generation(generation_index_t generation, int raise)
     else
         ++generations[generation].num_gc;
 
+maybe_verify:
+    if (generation >= verify_gens) {
+        if (gencgc_verbose) {
+            SHOW("verifying");
+        }
+        verify_gc(0);
+    }
 }
 
 /* Update last_free_page, then SymbolValue(ALLOCATION_POINTER). */
@@ -3766,9 +3762,6 @@ collect_garbage(generation_index_t last_gen)
         }
         write_protect_generation_pages(gen_to_wp);
     }
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-    write_protect_immobile_space();
-#endif
 
     /* Set gc_alloc() back to generation 0. The current regions should
      * be flushed after the above GCs. */
@@ -3811,6 +3804,9 @@ collect_garbage(generation_index_t last_gen)
 
     large_allocation = 0;
  finish:
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    write_protect_immobile_space();
+#endif
     gc_active_p = 0;
 
 #ifdef LISP_FEATURE_SB_TRACEROOT
