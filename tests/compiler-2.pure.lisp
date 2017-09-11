@@ -247,3 +247,10 @@
                       #-sb-dynamic-core '())))
     (assert (= (length (remove-duplicates strings :test 'string=))
                (length strings)))))
+
+(with-test (:name :no-style-warning-for-inline-cl-fun)
+  (assert (not (nth-value
+                1 (compile nil '(lambda (x)
+                                 (declare (optimize (speed 3)) (inline length)
+                                          (muffle-conditions compiler-note))
+                                 (length x)))))))
