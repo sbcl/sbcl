@@ -419,7 +419,7 @@ FILE *sweeplog;
   { tally[gen] += nwords; \
     if (sweeplog) \
      fprintf(sweeplog, "%5d %d #x%"OBJ_FMTX": %"OBJ_FMTX" %"OBJ_FMTX"\n", \
-             (int)nwords, gen_or_lose(addr), compute_lispobj(addr), \
+             (int)nwords, gen, compute_lispobj(addr), \
              addr[0], addr[1]); }
 #else
 # define NOTE_GARBAGE(gen,addr,nwords,tally) tally[gen] += nwords
@@ -444,8 +444,10 @@ static void sweep_fixedobj_pages(long totals[7])
     for (page = find_immobile_page_index((void*)(immobile_fixedobj_free_pointer-1));
          page >= 0;
          --page) {
-        char *page_base = (char*)IMMOBILE_SPACE_START + page * IMMOBILE_CARD_BYTES;
         int obj_spacing = fixedobj_page_obj_align(page);
+        if (!obj_spacing)
+            continue;
+        char *page_base = (char*)IMMOBILE_SPACE_START + page * IMMOBILE_CARD_BYTES;
         int nwords = fixedobj_page_obj_size(page);
         lispobj *obj = (lispobj*)page_base;
         lispobj *limit = (lispobj*)(page_base + IMMOBILE_CARD_BYTES - obj_spacing);
