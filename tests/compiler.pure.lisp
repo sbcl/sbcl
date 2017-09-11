@@ -6561,3 +6561,16 @@
                                                 (type (and fixnum unsigned-byte) z))
                                        (ldb (byte 64 0) (ash b z))))
                    -1 70))))
+
+(with-test (:name :stp-load-fp-tn)
+  (assert (= (funcall
+              (checked-compile
+               `(sb-int:named-lambda ,(gensym) (a)
+                  (declare (optimize (debug 2)))
+                  (max
+                   (handler-case
+                       (locally (declare (notinline values))
+                         (values a a a a a a a a a a a)))
+                   1)))
+              1)
+             1)))
