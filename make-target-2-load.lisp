@@ -205,6 +205,16 @@
 #+sb-xref-for-internals (sb-c::repack-xref :verbose 1)
 (fmakunbound 'sb-c::repack-xref)
 
+#+(or x86 x86-64) ; Crashes on other platforms still :-(
+(progn
+  (load "src/code/shaketree")
+  (sb-impl::shake-packages
+   (lambda (symbol)
+     ;; Retain all symbols satisfying this predicate
+     (or (sb-kernel:symbol-info symbol)
+         (and (boundp symbol) (not (keywordp symbol))))))
+  (unintern 'sb-impl::shake-packages 'sb-impl))
+
 ;;; Lock internal packages
 #+sb-package-locks
 (dolist (p (list-all-packages))
