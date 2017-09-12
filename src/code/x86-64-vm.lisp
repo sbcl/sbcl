@@ -54,19 +54,19 @@
                   ;; so add 4 bytes for the size of the displacement itself.
                   (- fixup
                      (the (unsigned-byte 64) (+ (sap-int sap) offset 4))))))))))
-  ;; An absolute fixup is stored in the code header if it
+  ;; An absolute fixup is stored in the code header's %FIXUPS slot if it
   ;; references an immobile-space (but not static-space) object.
   ;; This needn't be inside WITHOUT-GCING, because code fixups will point
   ;; only to objects that don't move except during save-lisp-and-die.
   ;; So there is no race with GC here.
   ;; Note that:
-  ;;  (1) :NAMED-CALL occurs in both :RELATIVE and :ABSOLUTE kinds.
+  ;;  (1) Call fixups occur in both :RELATIVE and :ABSOLUTE kinds.
   ;;      We can ignore the :RELATIVE kind.
   ;;  (2) :STATIC-CALL fixups point to immobile space, not static space.
   #!+immobile-space
   (when (and (eq kind :absolute)
              (member flavor '(:named-call :layout :immobile-object ; -> fixedobj subspace
-                              :static-call))) ; -> varyobj subspace
+                              :assembly-routine :static-call))) ; -> varyobj subspace
     (let ((fixups (%code-fixups code)))
       ;; Sanctifying the code component will compact these into a bignum.
       (setf (%code-fixups code) (cons offset (if (eql fixups 0) nil fixups)))))

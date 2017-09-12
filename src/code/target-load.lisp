@@ -269,6 +269,7 @@
 (defvar *!initial-assembler-routines*)
 
 (defun !loader-cold-init ()
-  (/show0 "/!loader-cold-init")
   (dovector (routine *!initial-assembler-routines*)
-    (setf (gethash (car routine) *assembler-routines*) (cdr routine))))
+    (destructuring-bind (name code offset) routine
+      (setf (gethash name *assembler-routines*)
+            (sap-int (sap+ (code-instructions code) offset))))))

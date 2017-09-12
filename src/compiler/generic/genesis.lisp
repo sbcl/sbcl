@@ -2023,17 +2023,9 @@ core and return a descriptor to it."
 (defvar *cold-assembler-fixups*)
 (defvar *cold-static-call-fixups*)
 
-(defun record-cold-assembler-routine (name address)
-  (/xhow "in RECORD-COLD-ASSEMBLER-ROUTINE" name address)
-  (push (cons name address)
-        *cold-assembler-routines*))
-
 (defun lookup-assembler-reference (symbol &optional (errorp t))
-  (let ((value (cdr (assoc symbol *cold-assembler-routines*))))
-    (unless value
-      (when errorp
-        (error "Assembler routine ~S not defined." symbol)))
-    value))
+  (or (cadr (assoc symbol *cold-assembler-routines*))
+      (and errorp (error "Assembler routine ~S not defined." symbol))))
 
 ;;; Unlike in the target, FOP-KNOWN-FUN sometimes has to backpatch.
 (defvar *deferred-known-fun-refs*)
@@ -2098,7 +2090,7 @@ core and return a descriptor to it."
               ;; other immobile-space objects must be recorded.
               #!+x86-64
               (member flavor '(:named-call :layout :immobile-object
-                               :static-call)))
+                               :assembly-routine :static-call)))
              (:relative ; (used for arguments to X86 relative CALL instruction)
               (setf (bvref-32 gspace-data gspace-byte-offset)
                     (the (signed-byte 32)
@@ -2162,7 +2154,8 @@ core and return a descriptor to it."
              'sb!vm::+required-foreign-symbols+)
     (to-core (sort (copy-list *cold-assembler-routines*) #'string< :key #'car)
              (lambda (rtn)
-               (cold-cons (cold-intern (car rtn)) (number-to-core (cdr rtn))))
+               (cold-list (cold-intern (first rtn))
+                          (third rtn) (number-to-core (fourth rtn))))
              '*!initial-assembler-routines*)))
 
 
@@ -2798,13 +2791,19 @@ core and return a descriptor to it."
     des))
 
 (define-cold-fop (fop-assembler-routine)
-  (let* ((routine (pop-stack))
-         (des (pop-stack))
-         (offset (calc-offset des (read-word-arg (fasl-input-stream)))))
-    (record-cold-assembler-routine
-     routine
-     (+ (logandc2 (descriptor-bits des) sb!vm:lowtag-mask) offset))
-    des))
+  (let* ((name (pop-stack))
+         (code-component (pop-stack))
+         (offset (read-word-arg (fasl-input-stream))))
+    (push (list name
+                ;; Compute the value to write at the fixup location
+                (+ (logandc2 (descriptor-bits code-component) sb!vm:lowtag-mask)
+                   (calc-offset code-component offset))
+                ;; Store the bits to correctly compute *ASSEMBLER-ROUTINES*
+                ;; even if the routines are loaded at a differet address
+                ;; from expected (which implies not readonly space)
+                code-component offset)
+          *cold-assembler-routines*)
+    code-component))
 
 (define-cold-fop (fop-assembler-fixup)
   (let* ((routine (pop-stack))
@@ -3317,9 +3316,8 @@ core and return a descriptor to it."
   (let ((*print-pretty* nil)
         (*print-case* :upcase))
     (format t "assembler routines defined in core image:~2%")
-    (dolist (routine (sort (copy-list *cold-assembler-routines*) #'<
-                           :key #'cdr))
-      (format t "~8,'0X: ~S~%" (cdr routine) (car routine)))
+    (dolist (routine (sort (copy-list *cold-assembler-routines*) #'< :key #'cadr))
+      (format t "~8,'0X: ~S~%" (cadr routine) (car routine)))
     (let ((fdefns nil)
           (funs nil)
           (undefs nil))
