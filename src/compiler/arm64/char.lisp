@@ -110,3 +110,27 @@
 (define-vop (fast-char</character character-compare)
   (:translate char<)
   (:conditional :lt))
+
+(defun char-immediate (char)
+  (add-sub-immediate (sb!xc:char-code char)))
+
+(define-vop (character-compare/c)
+  (:args (x :scs (character-reg)))
+  (:arg-types character (:constant (satisfies char-immediate)))
+  (:info y)
+  (:policy :fast-safe)
+  (:note "inline constant comparison")
+  (:generator 2
+    (inst cmp x (sb!xc:char-code y))))
+
+(define-vop (fast-char=/character/c character-compare/c)
+  (:translate char=)
+  (:conditional :eq))
+
+(define-vop (fast-char>/character/c character-compare/c)
+  (:translate char>)
+  (:conditional :gt))
+
+(define-vop (fast-char</character/c character-compare/c)
+  (:translate char<)
+  (:conditional :lt))
