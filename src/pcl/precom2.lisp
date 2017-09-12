@@ -24,3 +24,7 @@
 (in-package "SB-PCL")
 
 (precompile-random-code-segments pcl)
+
+(defun !unintern-symbols ()
+  '("SB-PCL"
+    *pcl-package*))
