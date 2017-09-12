@@ -308,29 +308,26 @@ variable: an unreadable object representing the error is printed instead.")
                    (output-ugly-object stream object))))
            (handle-it (stream)
              (if *suppress-print-errors*
-                 (handler-bind ((condition
-                                  (lambda (condition) nil
-                                    (when (typep condition *suppress-print-errors*)
-                                      (cond (*in-print-error*
-                                             (write-string "(error printing " stream)
-                                             (write-string *in-print-error* stream)
-                                             (write-string ")" stream))
-                                            (t
-                                             ;; Give outer handlers a chance.
-                                             (with-simple-restart
-                                                 (continue "Suppress the error.")
-                                               (signal condition))
-                                             (let ((*print-readably* nil)
-                                                   (*print-escape* t))
-                                               (write-string
-                                                "#<error printing a " stream)
-                                               (let ((*in-print-error* "type"))
-                                                 (output-object (type-of object) stream))
-                                               (write-string ": " stream)
-                                               (let ((*in-print-error* "condition"))
-                                                 (output-object condition stream))
-                                               (write-string ">" stream))))
-                                      (return-from handle-it object)))))
+                 (handler-bind
+                     ((condition
+                       (lambda (condition)
+                         (when (typep condition *suppress-print-errors*)
+                           (cond (*in-print-error*
+                                  (write-string "(error printing " stream)
+                                  (write-string *in-print-error* stream)
+                                  (write-string ")" stream))
+                                 (t
+                                  (let ((*print-readably* nil)
+                                        (*print-escape* t))
+                                    (write-string
+                                     "#<error printing a " stream)
+                                    (let ((*in-print-error* "type"))
+                                      (output-object (type-of object) stream))
+                                    (write-string ": " stream)
+                                    (let ((*in-print-error* "condition"))
+                                      (output-object condition stream))
+                                    (write-string ">" stream))))
+                           (return-from handle-it object)))))
                    (print-it stream))
                  (print-it stream)))
            (check-it (stream)

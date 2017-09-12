@@ -606,3 +606,39 @@
                                  (make-string 49 :initial-element #\z)
                                  "...\"")
                     backtrace))))
+
+(defclass cannot-print-this () ())
+(defmethod print-object ((object cannot-print-this) stream)
+  (error "No go!"))
+
+(with-test (:name (sb-debug:print-backtrace :no-error print-object))
+  ;; Errors during printing objects used to be suppressed in a way
+  ;; that required outer condition handlers to behave in a specific
+  ;; way.
+  (handler-bind ((error (lambda (condition)
+                          (error "~@<~S signaled ~A.~@:>"
+                                 'sb-debug:print-backtrace condition))))
+    (with-output-to-string (stream)
+      (labels ((foo (n x)
+                 (when (plusp n)
+                   (foo (1- n) x))
+                 (when (zerop n)
+                   (sb-debug:print-backtrace :count 100 :stream stream
+                                             :emergency-best-effort t))))
+        (foo 100 (make-instance 'cannot-print-this))))))
+
+(with-test (:name (sb-debug:print-backtrace :no-error :circles))
+  ;; Errors during printing objects used to be suppressed in a way
+  ;; that required outer condition handlers to behave in a specific
+  ;; way.
+  (handler-bind ((error (lambda (condition)
+                          (error "~@<~S signaled ~A.~@:>"
+                                 'sb-debug:print-backtrace condition))))
+    (with-output-to-string (stream)
+      (labels ((foo (n x)
+                 (when (plusp n)
+                   (foo (1- n) x))
+                 (when (zerop n)
+                   (sb-debug:print-backtrace :count 100 :stream stream))))
+        (foo 100 (let ((list (list t)))
+                   (nconc list list)))))))

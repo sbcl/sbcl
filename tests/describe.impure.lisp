@@ -56,6 +56,19 @@
   (assert-non-empty-output (describe #(1 2 3)))
   (assert-non-empty-output (describe #2a((1 2) (3 4)))))
 
+(defclass cannot-print-this () ())
+(defmethod print-object ((object cannot-print-this) stream)
+  (error "No go!"))
+
+(with-test (:name (describe :no-error print-object))
+  ;; Errors during printing objects used to be suppressed in a way
+  ;; that required outer condition handlers to behave in a specific
+  ;; way.
+  (handler-bind ((error (lambda (condition)
+                          (error "~@<~S signaled ~A.~@:>"
+                                 'describe condition))))
+    (assert-non-empty-output (describe (make-instance 'cannot-print-this)))))
+
 ;;; The DESCRIBE-OBJECT methods for built-in CL stuff should do
 ;;; FRESH-LINE and TERPRI neatly.
 (with-test (:name (describe fresh-line terpri))
