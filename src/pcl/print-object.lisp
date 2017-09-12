@@ -55,7 +55,7 @@
       (print-unreadable-object (method stream :type t :identity t)
         (let ((generic-function (method-generic-function method))
               (*print-length* 50))
-          (format stream "~:[~*~;~/sb-impl::print-symbol-with-prefix/ ~]~{~S ~}~:S"
+          (format stream "~:[~*~;~/sb-ext:print-symbol-with-prefix/ ~]~{~S ~}~:S"
                   generic-function
                   (and generic-function
                        (generic-function-name generic-function))
@@ -69,7 +69,7 @@
   (if (slot-boundp method '%generic-function)
       (print-unreadable-object (method stream :type t :identity t)
         (let ((generic-function (method-generic-function method)))
-          (format stream "~/sb-impl::print-symbol-with-prefix/, slot:~S, ~:S"
+          (format stream "~/sb-ext:print-symbol-with-prefix/, slot:~S, ~:S"
                   (and generic-function
                        (generic-function-name generic-function))
                   (accessor-method-slot-name method)
@@ -91,7 +91,7 @@
          (let ((name (slot-value instance 'name)))
            (print-unreadable-object
                (instance stream :type t :identity (not properly-named-p))
-             (format stream "~/sb-impl::print-symbol-with-prefix/~:[~:; ~:S~]"
+             (format stream "~/sb-ext:print-symbol-with-prefix/~:[~:; ~:S~]"
                      name extra-p extra))))
         ((not extra-p) ; case (2): empty body to avoid an extra space
          (print-unreadable-object (instance stream :type t :identity t)))

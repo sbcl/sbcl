@@ -118,7 +118,7 @@
            (if (valid-function-name-p x)
                (if (fboundp x)
                    (fdefinition x)
-                   (warn "~/sb-impl::print-symbol-with-prefix/ is ~
+                   (warn "~/sb-ext:print-symbol-with-prefix/ is ~
                           undefined, not tracing." x))
                (warn "~S is not a valid function name, not tracing." x))))
     (multiple-value-bind (res named-p)

@@ -890,7 +890,7 @@
   (:report
    (lambda (condition stream)
      (format stream "~@<Implicitly creating new generic function ~
-                     ~/sb-impl::print-symbol-with-prefix/.~:@>"
+                     ~/sb-ext:print-symbol-with-prefix/.~:@>"
              (implicit-generic-function-name condition)))))
 
 (define-condition extension-failure (reference-condition simple-error)
@@ -1167,7 +1167,7 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
                                                    simple-error)
   ()
   (:default-initargs
-   :format-control  "Symbol ~/sb-impl:print-symbol-with-prefix/ cannot ~
+   :format-control  "Symbol ~/sb-ext:print-symbol-with-prefix/ cannot ~
                      be both the name of a type and the name of a ~
                      declaration"
    :references '((:ansi-cl :section (3 8 21)))))
@@ -1253,21 +1253,21 @@ handled by any other handler, it will be muffled.")
 (define-condition redefinition-with-defun (function-redefinition-warning)
   ()
   (:report (lambda (warning stream)
-             (format stream "redefining ~/sb-impl::print-symbol-with-prefix/ ~
+             (format stream "redefining ~/sb-ext:print-symbol-with-prefix/ ~
                              in DEFUN"
                      (redefinition-warning-name warning)))))
 
 (define-condition redefinition-with-defmacro (function-redefinition-warning)
   ()
   (:report (lambda (warning stream)
-             (format stream "redefining ~/sb-impl::print-symbol-with-prefix/ ~
+             (format stream "redefining ~/sb-ext:print-symbol-with-prefix/ ~
                              in DEFMACRO"
                      (redefinition-warning-name warning)))))
 
 (define-condition redefinition-with-defgeneric (redefinition-warning)
   ()
   (:report (lambda (warning stream)
-             (format stream "redefining ~/sb-impl::print-symbol-with-prefix/ ~
+             (format stream "redefining ~/sb-ext:print-symbol-with-prefix/ ~
                              in DEFGENERIC"
                      (redefinition-warning-name warning)))))
 
@@ -1600,7 +1600,7 @@ conditions."))
   ;; warm load. (!CALL-A-METHOD does not understand method qualifiers)
   (define-deprecation-warning early-deprecation-warning style-warning nil
      "~%~@<~:@_In future~@[ ~A~] versions ~
-      ~/sb-impl:print-symbol-with-prefix/ will signal a full warning ~
+      ~/sb-ext:print-symbol-with-prefix/ will signal a full warning ~
       at compile-time.~:@>"
     "This warning is signaled when the use of a variable,
 function, type, etc. in :EARLY deprecation is detected at
@@ -1609,7 +1609,7 @@ error.")
 
   (define-deprecation-warning late-deprecation-warning warning t
      "~%~@<~:@_In future~@[ ~A~] versions ~
-      ~/sb-impl:print-symbol-with-prefix/ will signal a runtime ~
+      ~/sb-ext:print-symbol-with-prefix/ will signal a runtime ~
       error.~:@>"
     "This warning is signaled when the use of a variable,
 function, type, etc. in :LATE deprecation is detected at
@@ -1618,7 +1618,7 @@ error.")
 
   (define-deprecation-warning final-deprecation-warning warning t
      "~%~@<~:@_~*An error will be signaled at runtime for ~
-      ~/sb-impl:print-symbol-with-prefix/.~:@>"
+      ~/sb-ext:print-symbol-with-prefix/.~:@>"
     "This warning is signaled when the use of a variable,
 function, type, etc. in :FINAL deprecation is detected at
 compile-time. An error will be signaled at run-time."))

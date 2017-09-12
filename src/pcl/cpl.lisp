@@ -196,7 +196,7 @@
 (defun cpl-error (class format-string &rest format-args)
   (error "While computing the class precedence list of the class ~A.~%~A"
           (if (class-name class)
-              (format nil "named ~/sb-impl::print-symbol-with-prefix/"
+              (format nil "named ~/sb-ext:print-symbol-with-prefix/"
                       (class-name class))
               class)
           (apply #'format nil format-string format-args)))
@@ -204,7 +204,7 @@
 (defun cpl-forward-referenced-class-error (class forward-class)
   (flet ((class-or-name (class)
            (if (class-name class)
-               (format nil "named ~/sb-impl::print-symbol-with-prefix/"
+               (format nil "named ~/sb-ext:print-symbol-with-prefix/"
                        (class-name class))
                class)))
     (if (eq class forward-class)
@@ -254,7 +254,7 @@
   (flet ((class-or-name (cpd)
            (let ((class (cpd-class cpd)))
              (if (class-name class)
-                 (format nil "named ~/sb-impl::print-symbol-with-prefix/"
+                 (format nil "named ~/sb-ext:print-symbol-with-prefix/"
                          (class-name class))
                  class))))
     (mapcar

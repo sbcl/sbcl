@@ -1044,7 +1044,7 @@ implementation it is ~S." *!default-package-use-list*)
    (lambda (c s)
      (format s "~@<~S ~S causes name-conflicts in ~S between the ~
                 following symbols: ~2I~@:_~
-                ~{~/sb-impl::print-symbol-with-prefix/~^, ~}~:@>"
+                ~{~/sb-ext:print-symbol-with-prefix/~^, ~}~:@>"
              (name-conflict-function c)
              (name-conflict-datum c)
              (package-error-package c)
@@ -1114,7 +1114,7 @@ implementation it is ~S." *!default-package-use-list*)
                    (*print-pretty* t))
               (format *query-io* "~&~@<Select a symbol to be made accessible in ~
                               package ~A:~2I~@:_~{~{~V,' D. ~
-                              ~/sb-impl::print-symbol-with-prefix/~}~@:_~}~
+                              ~/sb-ext:print-symbol-with-prefix/~}~@:_~}~
                               ~@:>"
                       (package-name package)
                       (loop for s in symbols

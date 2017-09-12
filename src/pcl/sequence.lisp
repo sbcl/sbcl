@@ -22,9 +22,9 @@
      (let ((operation (sequence::protocol-unimplemented-operation condition))
            (datum (type-error-datum condition)))
        (format stream "~@<The operation ~
-                       ~/sb-impl:print-symbol-with-prefix/ is not ~
+                       ~/sb-ext:print-symbol-with-prefix/ is not ~
                        implemented for ~A which is an instance of the ~
-                       ~/sb-impl:print-symbol-with-prefix/ subclass ~
+                       ~/sb-ext:print-symbol-with-prefix/ subclass ~
                        ~S.~@:>"
                operation datum 'sequence (class-of datum)))))
   (:documentation

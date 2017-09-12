@@ -131,7 +131,7 @@
                             (function :function)
                             (variable :variable)
                             (type     :type)))))
-        (format t "- ~8A ~/sb-impl::print-symbol-with-prefix/~56T~
+        (format t "- ~8A ~/sb-ext:print-symbol-with-prefix/~56T~
                      ~9@A/~:[??????????~:;~:*~/cl-user::print-universal-time/~] ~
                      ~6A ~
                      -> ~6A ~:[??????????~:;~:*~/cl-user::print-universal-time/~]~%~

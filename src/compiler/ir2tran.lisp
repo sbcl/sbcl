@@ -2101,7 +2101,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
       (when (and (eq kind :unknown)
                  (sb!impl::package-lock-violation-p (symbol-package symbol) symbol))
         (let ((*compiler-error-context* node))
-          (compiler-warn "violating package lock on ~/sb-impl:print-symbol-with-prefix/"
+          (compiler-warn "violating package lock on ~/sb-ext:print-symbol-with-prefix/"
                          symbol))))))
 
 (defoptimizer (restart-point ir2-convert) ((location) node block)

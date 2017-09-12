@@ -51,7 +51,7 @@
            (funcall signal-via
                     #+xc-host "~@<~/sb!impl:print-symbol-with-prefix/ names a ~
                                ~A, and cannot be used in ~A.~:@>"
-                    #-xc-host "~@<~/sb-impl:print-symbol-with-prefix/ names a ~
+                    #-xc-host "~@<~/sb-ext:print-symbol-with-prefix/ names a ~
                               ~A, and cannot be used in ~A.~:@>"
                     name kind context)))
     (let ((kind (info :variable :kind name)))

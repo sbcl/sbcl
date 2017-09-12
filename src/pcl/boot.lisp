@@ -423,7 +423,7 @@ bootstrapping.
 (defun check-method-lambda (method-lambda context)
   (unless (typep method-lambda '(cons (eql lambda)))
     (error "~@<The METHOD-LAMBDA argument to ~
-            ~/sb-impl:print-symbol-with-prefix/, ~S, is not a lambda ~
+            ~/sb-ext:print-symbol-with-prefix/, ~S, is not a lambda ~
             form.~@:>"
            context method-lambda))
   method-lambda)
@@ -1982,7 +1982,7 @@ bootstrapping.
 (defun generic-clobbers-function (fun-name)
   (cerror "Replace the function binding"
           'simple-program-error
-          :format-control "~@<~/sb-impl:print-symbol-with-prefix/ ~
+          :format-control "~@<~/sb-ext:print-symbol-with-prefix/ ~
                            already names an ordinary function or a ~
                            macro.~@:>"
           :format-arguments (list fun-name)))

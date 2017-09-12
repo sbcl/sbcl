@@ -808,7 +808,7 @@ unless :NAMED is also specified.")))
       ;;x#-sb-xc-host
       ;;x(when (and (fboundp accessor-name)
       ;;x           (not (accessor-inherited-data accessor-name defstruct)))
-      ;;x  (style-warn "redefining ~/sb-impl::print-symbol-with-prefix/ ~
+      ;;x  (style-warn "redefining ~/sb-ext:print-symbol-with-prefix/ ~
       ;;                in DEFSTRUCT" accessor-name)))
       ;; which was done until sbcl-0.8.11.18 or so, is wrong: it causes
       ;; a warning at MACROEXPAND time, when instead the warning should

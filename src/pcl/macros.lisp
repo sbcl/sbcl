@@ -78,7 +78,7 @@
   ((sb-kernel::name :type (satisfies legal-class-name-p)))
   (:report (lambda (condition stream)
              (format stream "~@<There is no class named ~
-                             ~/sb-impl:print-symbol-with-prefix/.~@:>"
+                             ~/sb-ext:print-symbol-with-prefix/.~@:>"
                      (sb-kernel::cell-error-name condition)))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)

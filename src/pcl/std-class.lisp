@@ -367,7 +367,7 @@
                   (cond
                     ((eq class-or-name name)
                      (error "~@<Class named ~
-                             ~/sb-impl::print-symbol-with-prefix/ ~
+                             ~/sb-ext:print-symbol-with-prefix/ ~
                              specified as its own ~(~A~)class.~@:>"
                             class-or-name which))
                     ((find-class class-or-name (eq which :meta)))
@@ -1031,7 +1031,7 @@
           (style-warn
            "~@<slot names with the same SYMBOL-NAME but ~
                   different SYMBOL-PACKAGE (possible package problem) ~
-                  for class ~S:~4I~@:_~<~@{~/sb-impl::print-symbol-with-prefix/~^~:@_~}~:>~@:>"
+                  for class ~S:~4I~@:_~<~@{~/sb-ext:print-symbol-with-prefix/~^~:@_~}~:>~@:>"
            class dupes)))
     (let* ((slot-name (slot-definition-name (car slots)))
            (oslots (and (not (eq (symbol-package slot-name)
@@ -1489,7 +1489,7 @@
     (restart-case
         (bad-type value slot-type
                   "~@<Error during ~A. Current value in slot ~
-                   ~/sb-impl::print-symbol-with-prefix/ of an instance ~
+                   ~/sb-ext:print-symbol-with-prefix/ of an instance ~
                    of ~S is ~S, which does not match the new slot type ~
                    ~S in class ~S.~:@>"
                   context slot-name old-class value slot-type new-class)
@@ -1498,7 +1498,7 @@
         :report (lambda (stream)
                   (format stream "~@<Specify a new value to by used ~
                                   for slot ~
-                                  ~/sb-impl::print-symbol-with-prefix/ ~
+                                  ~/sb-ext:print-symbol-with-prefix/ ~
                                   instead of ~S.~@:>"
                           slot-name value))
         (setf value new-value))))

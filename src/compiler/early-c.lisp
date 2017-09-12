@@ -230,7 +230,7 @@ the stack without triggering overflow protection.")
     (style-warn 'asterisks-around-lexical-variable-name
                 :format-control
                 "using the lexical binding of the symbol ~
-                 ~/sb-impl::print-symbol-with-prefix/, not the~@
+                 ~/sb-ext:print-symbol-with-prefix/, not the~@
                  dynamic binding"
                 :format-arguments (list symbol)))
   (values))

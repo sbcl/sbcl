@@ -1427,11 +1427,11 @@ NOTE: This interface is experimental and subject to change."
   ;; I don't think this is callable during cross-compilation, is it?
   (apply #'format stream
          "~#[~;~
-             Use ~/sb-impl:print-symbol-with-prefix/ instead.~;~
-             Use ~/sb-impl:print-symbol-with-prefix/ or ~
-             ~/sb-impl:print-symbol-with-prefix/ instead.~:;~
+             Use ~/sb-ext:print-symbol-with-prefix/ instead.~;~
+             Use ~/sb-ext:print-symbol-with-prefix/ or ~
+             ~/sb-ext:print-symbol-with-prefix/ instead.~:;~
              Use~@{~#[~; or~] ~
-             ~/sb-impl:print-symbol-with-prefix/~^,~} instead.~
+             ~/sb-ext:print-symbol-with-prefix/~^,~} instead.~
            ~]"
          replacements))
 

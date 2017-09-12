@@ -127,7 +127,7 @@
           (format t "; Updating most frequently cross-referenced names~%")
           (pprint-logical-block (*standard-output* new-names :per-line-prefix ";   ")
             (format t "~:[no cross references~;~:*~
-                       ~{~/sb-impl:print-symbol-with-prefix/~^ ~:_~}~]"
+                       ~{~/sb-ext:print-symbol-with-prefix/~^ ~:_~}~]"
                     (coerce new-names 'list)))
           (terpri))
         (setf **most-common-xref-names-by-index** (coerce new-names 'vector))

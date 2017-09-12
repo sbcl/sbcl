@@ -214,7 +214,7 @@
           (declare (ignore warnings-p))
           (labels ((fail (kind conditions &optional allowed-type)
                      (error "~@<Compilation of ~S signaled ~A~P:~
-                             ~{~@:_~@:_~{~/sb-impl:print-symbol-with-prefix/: ~A~}~}~
+                             ~{~@:_~@:_~{~/sb-ext:print-symbol-with-prefix/: ~A~}~}~
                              ~@[~@:_~@:_Allowed type is ~S.~]~@:>"
                             form kind (length conditions)
                             (mapcar (lambda (condition)
