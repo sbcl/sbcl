@@ -2250,11 +2250,24 @@ void fixup_immobile_refs(lispobj (*fixup_lispobj)(lispobj),
                     *fixup_where = (int)(long)native_pointer(fpval)
                         + (ptr - (lispobj)header_addr);
                 }
-            } else {
-                // It must be the entrypoint to a static [sic] function.
+            } else if (ptr > asm_routines_end) {
+              /* Carefully avoid looking at assembler routines, which precede
+               * all other code in immobile code space. As currently implemented,
+               * defragmentation deposits a FP into the code header for those
+               * routines, each "forwarding" to itself, since it won't move.
+               * A dynamic space call is emitted as "MOV Rnn, {addr} ; CALL Rnn"
+               * where #x{addr} is exactly 6 words beyond the header word
+               * for the first routine, which happens to be ALLOC-TO-R11.
+               * Dereferencing (ptr-offsetof(struct simple_fun, code)) for that
+               * would see a forwarding pointer and try to assert that the called
+               * object is a simple-fun. Don't do it!
+               * If calling a second or later routine within an assembler component,
+               * it doesn't even make sense to read the word at ptr-N because
+               * the bits are random-ish. So even more emphatically don't do that. */
                 header_addr = (lispobj*)(ptr - offsetof(struct simple_fun, code));
                 if (forwarding_pointer_p(header_addr)) {
                     lispobj fpval = forwarding_pointer_value(header_addr);
+                    // It must be the entrypoint to a static [sic] function.
                     gc_assert(widetag_of(*tempspace_addr(native_pointer(fpval)))
                               == SIMPLE_FUN_WIDETAG);
                     *fixup_where = fpval + FUN_RAW_ADDR_OFFSET;
