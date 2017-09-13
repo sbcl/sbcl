@@ -208,10 +208,12 @@
 ;;; Return T if FUN can't be called without loading RAX with its descriptor.
 ;;; This is true of any funcallable instance which is not a GF, and closures.
 (defun fun-requires-simplifying-trampoline-p (fun)
-  (cond ((funcallable-instance-p fun)
+  (cond ((not (sb!kernel::immobile-space-obj-p fun)) t) ; always
+        ((funcallable-instance-p fun)
          ;; A funcallable-instance with no raw slots has no machine
          ;; code within it, and thus requires an external trampoline.
-         (zerop (layout-bitmap (%funcallable-instance-layout fun))))
+         (eql (layout-bitmap (%funcallable-instance-layout fun))
+              sb!kernel::+layout-all-tagged+))
         (t
          (closurep fun))))
 
@@ -227,8 +229,7 @@
            (values function))
   (unless (eql (sb!vm::fdefn-has-static-callers fdefn) 0)
     (sb!vm::remove-static-links fdefn))
-  (let ((trampoline (when (or (>= (get-lisp-obj-address fun) (ash 1 32))
-                              (fun-requires-simplifying-trampoline-p fun))
+  (let ((trampoline (when (fun-requires-simplifying-trampoline-p fun)
                       (fun-immobilize fun)))) ; a newly made CODE object
     (with-pinned-objects (fdefn trampoline fun)
       (binding* (((fun-entry-addr nop-byte)
