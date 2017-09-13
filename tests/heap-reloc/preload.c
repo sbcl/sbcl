@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <dlfcn.h>
 
-static int verbose;
+static int verbose=1;
 
 // For LISP_FEATURE_64_BIT
 #include "../../src/runtime/genesis/config.h"
@@ -49,31 +49,36 @@ void* fuzz(void* addr)
     rewind(f);
     fprintf(f, "%02d", 1+line_number);
     fclose(f);
-    fprintf(stderr, "//dynamic space @ %p\n", (void*)result);
     return result;
 }
 
-void *maybe_fuzz(void* addr, size_t length)
-{
-    if (length >= 1024*1024*1024)
-        return fuzz(addr);
-    return addr;
-}
+// Fuzzer has to guess whether this was a relocatable request based on size
+// because we eschew the MAP_FIXED flag in all cases.
+#define CALL_REAL_FUN() \
+  if (addr && (length == 1024*1024*1024 || length == 128*1024*1024)) { \
+    void *changed_addr = fuzz(addr); \
+    void *got = realfun(changed_addr, length, prot, flags, fd, offset); \
+    if (verbose) \
+      fprintf(stderr, got==changed_addr ?                               \
+              "//Fuzzed %p into %p successfully\n":                     \
+              "//Tried fuzzing %p into %p but actually got %p\n",       \
+              addr, changed_addr, got);                                 \
+    return got; } else { return realfun(addr, length, prot, flags, fd, offset); }
 
 void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset)
 {
-    if (verbose)
+    if (verbose>1)
         fprintf(stderr, "//mmap @ %p for %ld, fd=%d\n", addr, length, fd);
-    void *(*real_mmap)() = dlsym(RTLD_NEXT, "mmap");
-    return real_mmap(maybe_fuzz(addr,length), length, prot, flags, fd, offset);
+    void *(*realfun)() = dlsym(RTLD_NEXT, "mmap");
+    CALL_REAL_FUN();
 }
 
 #ifdef LISP_FEATURE_64_BIT
 void *mmap64(void *addr, size_t length, int prot, int flags, int fd, off64_t offset)
 {
-    if (verbose)
+    if (verbose>1)
         fprintf(stderr, "//mmap64 @ %p for %ld, fd=%d\n", addr, length, fd);
-    void *(*real_mmap64)() = dlsym(RTLD_NEXT, "mmap64");
-    return real_mmap64(maybe_fuzz(addr,length), length, prot, flags, fd, offset);
+    void *(*realfun)() = dlsym(RTLD_NEXT, "mmap64");
+    CALL_REAL_FUN();
 }
 #endif
