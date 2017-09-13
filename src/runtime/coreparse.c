@@ -533,7 +533,7 @@ process_directory(int count, struct ndir_entry *entry,
 
     for ( ; --count>= 0; ++entry) {
         sword_t id = entry->identifier;
-        uword_t addr = (os_vm_page_size * entry->address);
+        uword_t addr = (1024 * entry->address); // multiplier as per core.h
         int compressed = id & DEFLATED_CORE_SPACE_ID_FLAG;
         id -= compressed;
         if (id < 1 || id > MAX_CORE_SPACE_ID)

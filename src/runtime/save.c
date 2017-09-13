@@ -210,7 +210,7 @@ output_space(FILE *file, int id, lispobj *addr, lispobj *end,
                                     core_compression_level);
 
     write_lispobj(data, file);
-    write_lispobj((uword_t)addr / os_vm_page_size, file);
+    write_lispobj((uword_t)addr / 1024, file); // units as per core.h
     write_lispobj((bytes + os_vm_page_size - 1) / os_vm_page_size, file);
 }
 

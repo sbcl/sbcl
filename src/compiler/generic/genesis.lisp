@@ -3438,7 +3438,7 @@ initially undefined function references:~2%")
     (write-word (gspace-free-word-index gspace))
     (write-word *data-page*)
     (multiple-value-bind (floor rem)
-        (floor (gspace-byte-address gspace) sb!c:+backend-page-bytes+)
+        (floor (gspace-byte-address gspace) 1024) ; units as per core.h
       (aver (zerop rem))
       (write-word floor))
     (write-word pages)
