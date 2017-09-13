@@ -476,7 +476,7 @@ check_pending_thruptions(os_context_t *ctx)
      * "signal". */
     if (pself->pending_signal_set)
         if (__sync_fetch_and_and(&pself->pending_signal_set,0))
-            SetSymbolValue(THRUPTION_PENDING, T, p);
+            write_TLS(THRUPTION_PENDING, T, p);
 #endif
 
     if (!thread_may_thrupt(ctx))
