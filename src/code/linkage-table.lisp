@@ -45,17 +45,18 @@
         (ht *linkage-info*))
     (or (with-locked-system-table (ht)
           (or (gethash key ht)
-              (let ((real-address
-                     (ensure-dynamic-foreign-symbol-address name datap)))
+              (let* ((real-address
+                      (ensure-dynamic-foreign-symbol-address name datap))
+                     (table-base sb!vm:linkage-table-space-start)
+                     (table-address
+                      (+ (* (hash-table-count ht) sb!vm:linkage-table-entry-size)
+                         table-base)))
                 (aver real-address)
-                (let ((table-address
-                       (+ (* (hash-table-count ht) sb!vm:linkage-table-entry-size)
-                          sb!vm:linkage-table-space-start)))
-                  (when (< table-address sb!vm:linkage-table-space-end)
-                    (write-linkage-table-entry table-address real-address datap)
-                    (let ((str (logically-readonlyize name)))
-                      (setf (gethash (if datap (list str) str) ht)
-                            table-address)))))))
+                (when (< table-address sb!vm:linkage-table-space-end)
+                  (write-linkage-table-entry table-address real-address datap)
+                  (let ((str (logically-readonlyize name)))
+                    (setf (gethash (if datap (list str) str) ht)
+                          table-address))))))
         (error "Linkage-table full (~D entries): cannot link ~S."
                (hash-table-count ht) name))))
 
