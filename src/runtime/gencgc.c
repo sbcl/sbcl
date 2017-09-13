@@ -2778,6 +2778,7 @@ is_in_stack_space(lispobj ptr)
 
 struct verify_state {
     lispobj *object_start, *object_end;
+    lispobj *virtual_where;
     uword_t flags;
     generation_index_t object_gen;
 };
@@ -2825,11 +2826,13 @@ verify_range(lispobj *where, sword_t words, struct verify_state *state)
             if (page_index != -1) {
                 /* If it's within the dynamic space it should point to a used page. */
                 if ((thing & (GENCGC_CARD_BYTES-1)) >= page_bytes_used(page_index))
-                    lose ("Ptr %p @ %p sees %s.\n", thing, where,
+                    lose ("Ptr %p @ %p sees %s.\n", thing,
+                          state->virtual_where ? state->virtual_where : where,
                           page_free_p(page_index) ? "free page" : "unallocated space");
                 /* Check that it doesn't point to a forwarding pointer! */
                 if (*native_pointer(thing) == 0x01) {
-                    lose("Ptr %p @ %p sees forwarding ptr.\n", thing, where);
+                    lose("Ptr %p @ %p sees forwarding ptr.\n", thing,
+                         state->virtual_where ? state->virtual_where : where);
                 }
                 /* Check that its not in the RO space as it would then be a
                  * pointer from the RO to the dynamic space. */
@@ -2841,7 +2844,8 @@ verify_range(lispobj *where, sword_t words, struct verify_state *state)
                 // the object pointed to must not have been discarded as garbage
                 if (!other_immediate_lowtag_p(*native_pointer(thing))
                     || immobile_filler_p(native_pointer(thing)))
-                    lose("Ptr %p @ %p sees trashed object.\n", thing, where);
+                    lose("Ptr %p @ %p sees trashed object.\n", thing,
+                         state->virtual_where ? state->virtual_where : where);
             }
             /* If any-space -> dynamic-space and paranoid,
              * or any space -> immobile-space or immobile-space -> any space,
@@ -2870,6 +2874,8 @@ verify_range(lispobj *where, sword_t words, struct verify_state *state)
             // are at the moment valid fixnums by blind luck.
             case INSTANCE_WIDETAG:
                 if (instance_layout(where)) {
+                    /* FIXME: verify the layout pointer before trying to use it,
+                     * or else you might crash! */
                     sword_t nslots = instance_length(thing) | 1;
                     instance_scan((void (*)(lispobj*, sword_t, uword_t))verify_range,
                                   where+1, nslots,
@@ -2897,7 +2903,11 @@ verify_range(lispobj *where, sword_t words, struct verify_state *state)
             case FDEFN_WIDETAG:
                 verify_range(where + 1, 2, state);
                 callee = fdefn_callee_lispobj((struct fdefn*)where);
+                /* For a more intelligible error, don't say that the word that
+                 * contains an errant pointer is in stack space if it isn't. */
+                state->virtual_where = where + 3;
                 verify_range(&callee, 1, state);
+                state->virtual_where = 0;
                 count = CEILING(sizeof (struct fdefn)/sizeof(lispobj), 2);
                 break;
         }
@@ -2913,9 +2923,10 @@ static uword_t verify_space(lispobj start, lispobj* end, uword_t flags) {
 
 static void verify_dynamic_space();
 
-static void
-verify_gc(uword_t flags)
+void verify_gc(uword_t flags)
 {
+    int verbose = flags & 2;
+    flags -= verbose;
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 #  ifdef __linux__
     // Try this verification if marknsweep was compiled with extra debugging.
@@ -2923,17 +2934,27 @@ verify_gc(uword_t flags)
     extern void __attribute__((weak)) check_varyobj_pages();
     if (&check_varyobj_pages) check_varyobj_pages();
 #  endif
+    if (verbose)
+        printf("Verifying immobile space\n");
     verify_space(IMMOBILE_SPACE_START, immobile_fixedobj_free_pointer, flags);
     verify_space(IMMOBILE_VARYOBJ_SUBSPACE_START, immobile_space_free_pointer, flags);
 #endif
     struct thread *th;
+    if (verbose)
+        printf("Verifying binding stacks\n");
     for_each_thread(th) {
         verify_space((lispobj)th->binding_stack_start,
                      (lispobj*)get_binding_stack_pointer(th),
                      flags);
     }
+    if (verbose)
+        printf("Verifying RO space\n");
     verify_space(READ_ONLY_SPACE_START, read_only_space_free_pointer, flags);
+    if (gencgc_verbose)
+        printf("Verifying static space\n");
     verify_space(STATIC_SPACE_START, static_space_free_pointer, flags);
+    if (verbose)
+        printf("Verifying dynamic space\n");
     verify_dynamic_space();
 }
 
