@@ -88,8 +88,7 @@
                      (sb!vm::function-raw-address name))
                     (:symbol-tls-index
                      (ensure-symbol-tls-index (the symbol name))))))
-      (sb!vm:fixup-code-object code position value kind
-                               #!+x86-64 flavor))))
+      (sb!vm:fixup-code-object code position value kind flavor))))
 
 ;;; Stick a reference to the function FUN in CODE-OBJECT at index I. If the
 ;;; function hasn't been compiled yet, make a note in the patch table.

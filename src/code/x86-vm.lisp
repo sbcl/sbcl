@@ -22,8 +22,9 @@
 ;;;
 ;;; Add a fixup offset to the vector of fixup offsets for the given
 ;;; code object.
-(defun fixup-code-object (code offset fixup kind)
+(defun fixup-code-object (code offset fixup kind &optional flavor)
   (declare (type index offset))
+  (declare (ignore flavor))
   (without-gcing
    (when
      (let* ((obj-start-addr (logandc2 (get-lisp-obj-address code) sb!vm:lowtag-mask))

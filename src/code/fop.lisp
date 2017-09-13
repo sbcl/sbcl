@@ -656,7 +656,7 @@
     (sb!vm:fixup-code-object code-object
                              (read-word-arg (fasl-input-stream))
                              (sb!vm::function-raw-address name)
-                             kind)
+                             kind :static-call)
     code-object))
 
 (!define-fop 147 :not-host (fop-foreign-fixup (code-object kind))
@@ -674,7 +674,7 @@
     (unless found
       (error "undefined assembler routine: ~S" routine))
     (sb!vm:fixup-code-object code-object (read-word-arg (fasl-input-stream))
-                             value kind))
+                             value kind :assembly-routine))
   code-object)
 
 (!define-fop 149 :not-host (fop-code-object-fixup (code-object kind))

@@ -10,8 +10,9 @@
 ;;;; FIXUP-CODE-OBJECT
 
 (!with-bigvec-or-sap
-(defun fixup-code-object (code offset fixup kind)
+(defun fixup-code-object (code offset fixup kind &optional flavor)
   (declare (type index offset))
+  (declare (ignore flavor))
   (unless (zerop (rem offset 4))
     (error "Unaligned instruction?  offset=#x~X." offset))
   (without-gcing
