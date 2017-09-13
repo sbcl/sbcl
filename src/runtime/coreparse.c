@@ -512,7 +512,7 @@ process_directory(int count, struct ndir_entry *entry,
     extern void immobile_space_coreparse(uword_t,uword_t);
 
     struct {
-        uword_t len; // length in pages
+        uword_t len; // length in bytes, as an integral multiple of os_vm_page_size
         uword_t base;
         lispobj** pfree_pointer; // pointer to x_free_pointer
     } spaces[MAX_CORE_SPACE_ID+1] = {

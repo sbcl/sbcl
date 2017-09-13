@@ -1203,6 +1203,9 @@ static inline int immobile_obj_spacing(lispobj header_word, lispobj *obj,
         return actual_size; // in words
 }
 
+// Signify that scan_start is initially not reliable
+static int page_attributes_valid;
+
 // Set the characteristics of each used page at image startup time.
 void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
 {
@@ -1212,7 +1215,7 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
     gc_init_immobile();
 
     address = IMMOBILE_SPACE_START;
-    n_pages = (fixedobj_len + IMMOBILE_CARD_BYTES - 1) / IMMOBILE_CARD_BYTES;
+    n_pages = fixedobj_len / IMMOBILE_CARD_BYTES;
     for (page = 0 ; page < n_pages ; ++page) {
         lispobj* page_data = low_page_address(page);
         for (word_idx = 0 ; word_idx < WORDS_PER_PAGE ; ++word_idx) {
@@ -1232,15 +1235,14 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
         }
     }
     address = IMMOBILE_VARYOBJ_SUBSPACE_START;
-    n_pages = (varyobj_len + IMMOBILE_CARD_BYTES - 1) / IMMOBILE_CARD_BYTES;
+    n_pages = varyobj_len / IMMOBILE_CARD_BYTES;
     lispobj* obj = (lispobj*)address;
-    lispobj* __attribute__((unused)) space_limit = (lispobj*)(address + varyobj_len);
     int n_words;
     low_page_index_t last_page = 0;
     // coreparse() already set immobile_space_free_pointer
     lispobj* limit = immobile_space_free_pointer;
     gc_assert(limit != 0 /* would be zero if not mmapped yet */
-              && limit <= space_limit);
+              && limit <= (lispobj*)(address + varyobj_len));
     for ( ; obj < limit ; obj += n_words ) {
         gc_assert(other_immediate_lowtag_p(obj[0]));
         n_words = sizetab[widetag_of(*obj)](obj);
@@ -1290,6 +1292,7 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
           (lispobj*)code + sizetab[CODE_HEADER_WIDETAG]((lispobj*)code);
     }
     asm_routines_end = (unsigned)(uword_t)code;
+    page_attributes_valid = 1;
 }
 
 // Demote pseudo-static to highest normal generation
@@ -1397,7 +1400,6 @@ int immobile_space_handle_wp_violation(void* fault_addr)
 }
 
 // Find the object that encloses pointer.
-static int page_attributes_valid = 1; // For verify_space() after defrag
 lispobj *
 search_immobile_space(void *pointer)
 {
@@ -2214,6 +2216,8 @@ void verify_immobile_page_protection(int keep_gen, int new_gen)
 
 // Fixup immediate values that encode Lisp object addresses
 // in immobile space.
+// TODO: remove the fixup_lispobj function; this doesn't generalize
+// as originally thought. coreparse has its own way of doing things.
 #include "forwarding-ptr.h"
 #ifdef LISP_FEATURE_X86_64
 void fixup_immobile_refs(lispobj (*fixup_lispobj)(lispobj),
@@ -2235,10 +2239,6 @@ void fixup_immobile_refs(lispobj (*fixup_lispobj)(lispobj),
             if (fixed != ptr)
                 *fixup_where = fixed;
         } else {
-            // If defragmenting, there will be forwarding-pointers.
-            // When doing heap relocation at startup, there will not be,
-            // so no fixups will be made, which is ok for the time being.
-            // This will need a complete rewrite for space relocation.
             lispobj* header_addr;
             if (ptr < IMMOBILE_VARYOBJ_SUBSPACE_START) {
                 // It's an absolute interior pointer to a symbol value slot
