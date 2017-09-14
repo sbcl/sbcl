@@ -69,12 +69,12 @@
     #.(- 62 (floor (log sb!xc:internal-time-units-per-second 2)))))
 
 (sb!xc:deftype bignum-element-type () 'sb!vm:word)
-;;; FIXME: see also DEFCONSTANT MAXIMUM-BIGNUM-LENGTH in
-;;; src/code/bignum.lisp.  -- CSR, 2004-07-19
-(sb!xc:deftype bignum-index ()
-  '(mod #.(1- (ash 1 (- sb!vm:n-word-bits sb!vm:n-widetag-bits)))))
-(sb!xc:deftype bignum-length ()
-  '(unsigned-byte #.(- sb!vm:n-word-bits sb!vm:n-widetag-bits)))
+(defconstant maximum-bignum-length
+  ;; Compute number of bits in the maximum length's representation
+  ;; leaving one bit for a GC mark bit.
+  (ldb (byte (- sb!vm:n-word-bits sb!vm:n-widetag-bits 1) 0) -1))
+(sb!xc:deftype bignum-index () `(mod ,maximum-bignum-length))
+(sb!xc:deftype bignum-length () `(mod ,(1+ maximum-bignum-length)))
 
 ;;; an index into an integer
 (sb!xc:deftype bit-index ()
