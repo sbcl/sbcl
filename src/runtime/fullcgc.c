@@ -425,22 +425,13 @@ FILE *sweeplog;
 # define NOTE_GARBAGE(gen,addr,nwords,tally) tally[gen] += nwords
 #endif
 
-#define INCREMENT_TOTALS(subtotals) \
-    totals[0] += subtotals[0]; \
-    totals[1] += subtotals[1]; \
-    totals[2] += subtotals[2]; \
-    totals[3] += subtotals[3]; \
-    totals[4] += subtotals[4]; \
-    totals[5] += subtotals[5]; \
-    totals[6] += subtotals[6]
-
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-static void sweep_fixedobj_pages(long totals[7])
+#ifndef LISP_FEATURE_IMMOBILE_SPACE
+#define __immobile_obj_gen_bits(x) (lose("No page index?"),0)
+#else
+static void sweep_fixedobj_pages(long *zeroed)
 {
-    long zeroed[7]; // one count per generation
     low_page_index_t page;
 
-    memset(zeroed, 0, sizeof zeroed);
     for (page = find_immobile_page_index((void*)(immobile_fixedobj_free_pointer-1));
          page >= 0;
          --page) {
@@ -462,16 +453,14 @@ static void sweep_fixedobj_pages(long totals[7])
             }
         }
     }
-    INCREMENT_TOTALS(zeroed);
 }
 #endif
 
 static uword_t sweep(lispobj* where, lispobj* end, uword_t arg)
 {
-    long zeroed[7]; // one count per generation
+    long *zeroed = (long*)arg; // one count per generation
     sword_t nwords;
 
-    memset(zeroed, 0, sizeof zeroed);
     // TODO: consecutive dead objects on same page should be merged.
     for ( ; where < end ; where += nwords ) {
         lispobj header = *where;
@@ -509,8 +498,10 @@ static uword_t sweep(lispobj* where, lispobj* end, uword_t arg)
                 struct code* code  = (struct code*)where;
                 lispobj header = 2<<N_WIDETAG_BITS | CODE_HEADER_WIDETAG;
                 if (code->header != header) {
-                    NOTE_GARBAGE(page_table[find_page_index(where)].gen,
-                                 where, nwords, zeroed);
+                    page_index_t page = find_page_index(where);
+                    int gen = page >= 0 ? page_table[page].gen
+                      : __immobile_obj_gen_bits(where);
+                    NOTE_GARBAGE(gen, where, nwords, zeroed);
                     code->header = header;
                     code->code_size = make_fixnum((nwords - 2) * N_WORD_BYTES);
                     memset(where+2, 0, (nwords - 2) * N_WORD_BYTES);
@@ -518,20 +509,12 @@ static uword_t sweep(lispobj* where, lispobj* end, uword_t arg)
             }
         }
     }
-    long* totals = (long*)arg;
-    totals[0] += zeroed[0];
-    totals[1] += zeroed[1];
-    totals[2] += zeroed[2];
-    totals[3] += zeroed[3];
-    totals[4] += zeroed[4];
-    totals[5] += zeroed[5];
-    totals[6] += zeroed[6];
     return 0;
 }
 
 void execute_full_sweep_phase()
 {
-    long words_zeroed[7]; // One count per generation
+    long words_zeroed[1+PSEUDO_STATIC_GENERATION]; // One count per generation
 
     scan_weak_hash_tables(alivep_funs);
     smash_weak_pointers();
