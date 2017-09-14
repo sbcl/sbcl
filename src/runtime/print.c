@@ -433,15 +433,14 @@ static void brief_struct(lispobj obj)
     extern struct vector * instance_classoid_name(lispobj*);
     struct vector * classoid_name;
     classoid_name = instance_classoid_name((lispobj*)instance);
+    lispobj layout = instance_layout((lispobj*)instance);
     if ( classoid_name ) {
         char * namestring = simple_base_stringize(classoid_name);
-        printf("#<ptr to %"OBJ_FMTX" %s instance>",
-               (uintptr_t)instance_layout((lispobj*)instance), namestring);
+        printf("#<ptr to %"OBJ_FMTX" %s instance>", layout, namestring);
         if ( namestring != (char*)classoid_name->data )
             free(namestring);
     } else {
-        printf("#<ptr to %"OBJ_FMTX" instance>",
-               (uintptr_t)instance_layout((lispobj*)instance));
+        printf("#<ptr to %"OBJ_FMTX" instance>", layout);
     }
 }
 

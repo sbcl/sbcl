@@ -284,6 +284,7 @@ static inline uword_t instance_length(lispobj header)
 #ifndef LISP_FEATURE_COMPACT_INSTANCE_HEADER
 # define instance_layout(instance_ptr) (instance_ptr)[1]
 #elif defined(LISP_FEATURE_64_BIT) && defined(LISP_FEATURE_LITTLE_ENDIAN)
+  // so that this stays an lvalue, it can't be cast to lispobj
 # define instance_layout(instance_ptr) ((uint32_t*)(instance_ptr))[1]
 #else
 # error "No instance_layout() defined"
