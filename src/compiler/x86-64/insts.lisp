@@ -2606,10 +2606,9 @@
 (define-instruction simple-fun-header-word (segment)
   (:emitter
    (emit-header-data segment
-                     (logior #!+immobile-space
-                             (progn #-sb-xc-host (get-lisp-obj-address function-layout)
-                                    #+sb-xc-host (ash function-layout 32))
-                             simple-fun-widetag))))
+                     (logior simple-fun-widetag
+                             #!+(and compact-instance-header (host-feature sb-xc-host))
+                             (ash function-layout 32)))))
 
 
 ;;;; Instructions required to do floating point operations using SSE
