@@ -51,7 +51,7 @@
     DONE
     (move result rax)))
 
-#!+immobile-space
+#!+compact-instance-header
 ;; ~20 instructions vs. 35
 (define-vop (layout-of) ; no translation
     (:policy :fast-safe)

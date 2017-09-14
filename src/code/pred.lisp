@@ -190,10 +190,10 @@
 #-sb-xc-host
 (defun layout-of (x)
   (declare (optimize (speed 3) (safety 0)))
-  #!+(and immobile-space x86-64)
+  #!+(and compact-instance-header x86-64)
   (values (%primitive layout-of x
                       (load-time-value sb!kernel::**built-in-class-codes** t)))
-  #!-(and immobile-space x86-64)
+  #!-(and compact-instance-header x86-64)
   (cond ((%instancep x) (%instance-layout x))
         ((funcallable-instance-p x) (%funcallable-instance-layout x))
         ;; Compiler can dump literal layouts, which handily sidesteps
