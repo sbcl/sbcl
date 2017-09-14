@@ -206,16 +206,14 @@
   (define-binop logxor 2 xor))
 
 (define-vop (fast-logior-unsigned-signed=>signed fast-safe-arith-op)
-  (:args (x :scs (unsigned-reg))
+  (:args (x :scs (unsigned-reg) :to (:result 1))
          (y :target r :scs (signed-reg)))
   (:arg-types unsigned-num signed-num)
-  (:results (r :scs (signed-reg) :from (:argument 1)))
+  (:results (r :scs (signed-reg)))
   (:result-types signed-num)
   (:note "inline (unsigned-byte 32) arithmetic")
   (:translate logior)
   (:generator 3
-    (when (location= r x)
-      (rotatef x y))
     (move r y)
     (inst or r x)))
 
@@ -228,8 +226,6 @@
   (:note "inline (unsigned-byte 32) arithmetic")
   (:translate logior)
   (:generator 3
-    (when (location= r y)
-      (rotatef x y))
     (move r x)
     (inst or r y)))
 
