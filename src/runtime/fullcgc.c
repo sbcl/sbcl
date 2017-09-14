@@ -26,11 +26,13 @@
 #endif
 
 
-/* Headered objects other than bignum use this bit to record liveness.
- * Bignums do not because all header bytes are used for the length */
+/* Most headered objects use MARK_BIT to record liveness.
+ * Bignums always use the leftmost bit regardless of word size */
 #define MARK_BIT ((uword_t)1 << 31)
 #ifdef LISP_FEATURE_64_BIT
 #define BIGNUM_MARK_BIT ((uword_t)1 << 63)
+#else
+#define BIGNUM_MARK_BIT MARK_BIT
 #endif
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
@@ -132,10 +134,8 @@ static lispobj gc_dequeue()
     return object;
 }
 
-/* The 'mark_bits' hash table serves two purposes:
- * 1. it maps a page address to a block of mark bits for headerless objects (conses)
- * 2. it holds objects whose header has no room for a mark bit
- */
+/* The 'mark_bits' hashtable maps a page address to a block of mark bits
+ * for headerless objects (conses) */
 struct hopscotch_table mark_bits;
 
 static inline uword_t compute_page_key(lispobj cons) {
@@ -162,11 +162,7 @@ static inline int pointer_survived_gc_yet(lispobj pointer)
         return cons_markedp(pointer);
     lispobj header = *native_pointer(pointer);
     if (widetag_of(header) == BIGNUM_WIDETAG)
-#ifdef BIGNUM_MARK_BIT
         return (header & BIGNUM_MARK_BIT) != 0;
-#else
-        return hopscotch_containsp(&mark_bits, pointer);
-#endif
     if (widetag_of(header) == SIMPLE_FUN_WIDETAG)
         header = *fun_code_header(native_pointer(pointer));
     return (header & MARK_BIT) != 0;
@@ -181,11 +177,7 @@ void __mark_obj(lispobj pointer)
         lispobj* base = native_pointer(pointer);
         lispobj header = *base;
         if (widetag_of(header) == BIGNUM_WIDETAG) {
-#ifdef BIGNUM_MARK_BIT
             *base |= BIGNUM_MARK_BIT;
-#else
-            hopscotch_put(&mark_bits, pointer, 1);
-#endif
             return; // don't enqueue - no pointers
         } else {
             if (widetag_of(header) == SIMPLE_FUN_WIDETAG) {
@@ -477,20 +469,11 @@ static uword_t sweep(lispobj* where, lispobj* end, uword_t arg)
             }
         } else {
             nwords = sizetab[widetag_of(header)](where);
-            boolean live = 0;
-            if (widetag_of(header) != BIGNUM_WIDETAG) {
-                if ((live = ((header & MARK_BIT) != 0)))
-                    *where = header ^ MARK_BIT;
-            } else {
-#ifdef BIGNUM_MARK_BIT
-                if ((live = ((header & BIGNUM_MARK_BIT) != 0)))
-                    *where = header ^ BIGNUM_MARK_BIT;
-#else
-                live = hopscotch_containsp(&mark_bits,
-                         make_lispobj(where,OTHER_POINTER_LOWTAG));
-#endif
-            }
-            if (!live) {
+            lispobj markbit =
+              widetag_of(header) != BIGNUM_WIDETAG ? MARK_BIT : BIGNUM_MARK_BIT;
+            if (header & markbit)
+                *where = header ^ markbit;
+            else {
                 // Turn the object into either a (0 . 0) cons
                 // or an unboxed filler depending on size.
                 if (nwords <= 2) // could be SAP, SIMPLE-ARRAY-NIL, 1-word bignum, etc

@@ -69,7 +69,7 @@
     #.(- 62 (floor (log sb!xc:internal-time-units-per-second 2)))))
 
 (sb!xc:deftype bignum-element-type () 'sb!vm:word)
-(defconstant maximum-bignum-length
+(def!constant maximum-bignum-length
   ;; Compute number of bits in the maximum length's representation
   ;; leaving one bit for a GC mark bit.
   (ldb (byte (- sb!vm:n-word-bits sb!vm:n-widetag-bits 1) 0) -1))
