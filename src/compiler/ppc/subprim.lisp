@@ -41,7 +41,3 @@
 
       (emit-label done)
       (move result count))))
-
-
-(define-static-fun length (object) :translate length)
-

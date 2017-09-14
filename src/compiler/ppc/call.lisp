@@ -576,10 +576,12 @@ default-value-8
      (:args
       ,@(unless (eq return :tail)
           '((new-fp :scs (any-reg) :to :eval)))
-
-      ,(if named
-           '(name :target name-pass)
-           '(arg-fun :target lexenv))
+      ,@(case named
+          ((nil)
+           '((arg-fun :target lexenv)))
+          (:direct)
+          (t
+           '((name :target name-pass))))
 
       ,@(when (eq return :tail)
           '((old-fp :target old-fp-pass)
@@ -598,6 +600,7 @@ default-value-8
     (:vop-var vop)
     (:info ,@(unless (or variable (eq return :tail)) '(arg-locs))
            ,@(unless variable '(nargs))
+           ,@(when (eq named :direct) '(fun))
            ,@(when (eq return :fixed) '(nvals))
            step-instrumenting)
 
@@ -618,17 +621,21 @@ default-value-8
                   :to (:result 0))
                  return-pc-pass)
 
-     ,(if named
-          `(:temporary (:sc descriptor-reg :offset fdefn-offset ; -dan
-                            :from (:argument ,(if (eq return :tail) 0 1))
-                            :to :eval)
-                       name-pass)
-          `(:temporary (:sc descriptor-reg :offset lexenv-offset
-                            :from (:argument ,(if (eq return :tail) 0 1))
-                            :to :eval)
-                       lexenv))
-     (:temporary (:scs (descriptor-reg) :from (:argument 0) :to :eval)
-                 function)
+     ,@(case named
+         ((t)
+          `((:temporary (:sc descriptor-reg :offset fdefn-offset
+                         :from (:argument ,(if (eq return :tail) 0 1))
+                         :to :eval)
+                        name-pass)))
+         ((nil)
+          `((:temporary (:sc descriptor-reg :offset lexenv-offset
+                         :from (:argument ,(if (eq return :tail) 0 1))
+                         :to :eval)
+                        lexenv))))
+
+     ,@(unless (eq named :direct)
+         '((:temporary (:scs (descriptor-reg) :from (:argument 0) :to :eval)
+            function)))
      (:temporary (:sc any-reg :offset nargs-offset :to :eval)
                  nargs-pass)
 
@@ -743,52 +750,56 @@ default-value-8
                                         (ash (reg-tn-encoding callable-tn)
                                              5)))
                     (emit-label step-done-label))))
-           ,@(if named
-                 `((sc-case name
-                     (descriptor-reg (move name-pass name))
-                     (control-stack
-                      (loadw name-pass cfp-tn (tn-offset name))
-                      (do-next-filler))
-                     (constant
-                      (loadw name-pass code-tn (tn-offset name)
-                             other-pointer-lowtag)
-                      (do-next-filler)))
-                   ;; The step instrumenting must be done after
-                   ;; FUNCTION is loaded, but before ENTRY-POINT is
-                   ;; calculated.
-                   (insert-step-instrumenting name-pass)
-                   ;; The raw-addr (ENTRY-POINT) will be one of:
-                   ;; closure-tramp, undefined-tramp, or somewhere
-                   ;; within a simple-fun object.  If the latter, then
-                   ;; it is essential (due to it being an interior
-                   ;; pointer) that the function itself be in a
-                   ;; register before the raw-addr is loaded.
-                   (sb!assem:without-scheduling ()
-                     (loadw function name-pass fdefn-fun-slot
-                            other-pointer-lowtag)
-                     (loadw entry-point name-pass fdefn-raw-addr-slot
-                            other-pointer-lowtag))
-                   (do-next-filler))
-                 `((sc-case arg-fun
-                     (descriptor-reg (move lexenv arg-fun))
-                     (control-stack
-                      (loadw lexenv cfp-tn (tn-offset arg-fun))
-                      (do-next-filler))
-                     (constant
-                      (loadw lexenv code-tn (tn-offset arg-fun)
-                             other-pointer-lowtag)
-                      (do-next-filler)))
-                   (loadw function lexenv closure-fun-slot
-                    fun-pointer-lowtag)
-                   (do-next-filler)
-                   ;; The step instrumenting must be done before
-                   ;; after FUNCTION is loaded, but before ENTRY-POINT
-                   ;; is calculated.
-                   (insert-step-instrumenting function)
-                   (inst addi entry-point function
-                    (- (ash simple-fun-code-offset word-shift)
-                     fun-pointer-lowtag))
-                   ))
+           (declare (ignorable #'insert-step-instrumenting))
+           ,@(case named
+               ((t)
+                `((sc-case name
+                    (descriptor-reg (move name-pass name))
+                    (control-stack
+                     (loadw name-pass cfp-tn (tn-offset name))
+                     (do-next-filler))
+                    (constant
+                     (loadw name-pass code-tn (tn-offset name)
+                         other-pointer-lowtag)
+                     (do-next-filler)))
+                  ;; The step instrumenting must be done after
+                  ;; FUNCTION is loaded, but before ENTRY-POINT is
+                  ;; calculated.
+                  (insert-step-instrumenting name-pass)
+                  ;; The raw-addr (ENTRY-POINT) will be one of:
+                  ;; closure-tramp, undefined-tramp, or somewhere
+                  ;; within a simple-fun object.  If the latter, then
+                  ;; it is essential (due to it being an interior
+                  ;; pointer) that the function itself be in a
+                  ;; register before the raw-addr is loaded.
+                  (sb!assem:without-scheduling ()
+                    (loadw function name-pass fdefn-fun-slot
+                        other-pointer-lowtag)
+                    (loadw entry-point name-pass fdefn-raw-addr-slot
+                        other-pointer-lowtag))
+                  (do-next-filler)))
+               ((nil)
+                `((sc-case arg-fun
+                    (descriptor-reg (move lexenv arg-fun))
+                    (control-stack
+                     (loadw lexenv cfp-tn (tn-offset arg-fun))
+                     (do-next-filler))
+                    (constant
+                     (loadw lexenv code-tn (tn-offset arg-fun)
+                         other-pointer-lowtag)
+                     (do-next-filler)))
+                  (loadw function lexenv closure-fun-slot
+                      fun-pointer-lowtag)
+                  (do-next-filler)
+                  ;; The step instrumenting must be done before
+                  ;; after FUNCTION is loaded, but before ENTRY-POINT
+                  ;; is calculated.
+                  (insert-step-instrumenting function)
+                  (inst addi entry-point function
+                        (- (ash simple-fun-code-offset word-shift)
+                           fun-pointer-lowtag))))
+               (:direct
+                `((inst lwz entry-point null-tn (static-fun-offset fun)))))
            (loop
              (if filler
                  (do-next-filler)
@@ -817,13 +828,15 @@ default-value-8
                   (load-stack-tn cur-nfp nfp-save))))
              (:tail))))))
 
-
 (define-full-call call nil :fixed nil)
 (define-full-call call-named t :fixed nil)
+(define-full-call static-call-named :direct :fixed nil)
 (define-full-call multiple-call nil :unknown nil)
 (define-full-call multiple-call-named t :unknown nil)
+(define-full-call static-multiple-call-named :direct :unknown nil)
 (define-full-call tail-call nil :tail nil)
 (define-full-call tail-call-named t :tail nil)
+(define-full-call static-tail-call-named :direct :tail nil)
 
 (define-full-call call-variable nil :fixed t)
 (define-full-call multiple-call-variable nil :unknown t)
