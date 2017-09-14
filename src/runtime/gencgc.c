@@ -2874,13 +2874,12 @@ verify_range(lispobj *where, sword_t words, struct verify_state *state)
             // are at the moment valid fixnums by blind luck.
             case INSTANCE_WIDETAG:
                 if (instance_layout(where)) {
-                    /* FIXME: verify the layout pointer before trying to use it,
-                     * or else you might crash! */
                     sword_t nslots = instance_length(thing) | 1;
+                    lispobj bitmap = LAYOUT(instance_layout(where))->bitmap;
+                    gc_assert(fixnump(bitmap)
+                              || widetag_of(*native_pointer(bitmap))==BIGNUM_WIDETAG);
                     instance_scan((void (*)(lispobj*, sword_t, uword_t))verify_range,
-                                  where+1, nslots,
-                                  LAYOUT(instance_layout(where))->bitmap,
-                                  (uintptr_t)state);
+                                  where+1, nslots, bitmap, (uintptr_t)state);
                     count = 1 + nslots;
                 }
                 break;
@@ -2895,7 +2894,7 @@ verify_range(lispobj *where, sword_t words, struct verify_state *state)
                  * object in the code data block. */
                 for_each_simple_fun(i, fheaderp, code, 1, {
 #if defined(LISP_FEATURE_COMPACT_INSTANCE_HEADER)
-                    lispobj layout = instance_layout((lispobj*)fheaderp);
+                    lispobj layout = function_layout((lispobj*)fheaderp);
                     gc_assert(!layout || layout == SYMBOL(FUNCTION_LAYOUT)->value >> 32);
 #endif
                     verify_range(SIMPLE_FUN_SCAV_START(fheaderp),

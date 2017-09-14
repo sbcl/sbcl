@@ -710,11 +710,10 @@ instance_scan(void (*proc)(lispobj*, sword_t, uword_t),
 static sword_t
 scav_instance(lispobj *where, lispobj header)
 {
-    lispobj* layout = (lispobj*)instance_layout(where);
     lispobj lbitmap = make_fixnum(-1);
 
-    if (layout) {
-        layout = native_pointer((lispobj)layout);
+    if (instance_layout(where)) {
+        lispobj *layout = native_pointer(instance_layout(where));
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
         if (__immobile_obj_gen_bits(layout) == from_space)
             enliven_immobile_obj(layout, 1);

@@ -1645,8 +1645,17 @@ static void adjust_fdefn_entrypoint(lispobj* where, int displacement,
 #endif
 }
 
-// Fix the layout of OBJ, and return the layout's address in tempspace.
-struct layout* fix_object_layout(lispobj* obj)
+/* Fix the layout of OBJ, and return the layout's address in tempspace.
+ * If compact headers, store the layout back into the object.
+ * If non-compact headers, DO NOT store the layout back into the object,
+ * because that will be done when instance_scan() touches all slots.
+ * If it were wrongly done now, then the following (real example) happens:
+ *   instance @ 0x1000000000 has layout pointer 0x203cb483.
+ *   layout @ 0x203cb483 forwards to 0x2030c483.
+ *   object _currently_ at 0x2030c480 (NOT a layout) forwards to 0x203c39cf.
+ * so the instance winds up with a non-layout in its layout after
+ * instance_scan() forwards that slot "again". */
+static struct layout* fix_object_layout(lispobj* obj)
 {
     // This works on instances, funcallable instances (and/or closures)
     // but the latter only if the layout is in the header word.
@@ -1661,7 +1670,9 @@ struct layout* fix_object_layout(lispobj* obj)
     if (layout == 0) return 0;
     if (forwarding_pointer_p(native_pointer(layout))) { // usually
         layout = forwarding_pointer_value(native_pointer(layout));
-        set_instance_layout(obj, layout);
+#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
+        instance_layout(obj) = layout;
+#endif
     }
     struct layout* native_layout = (struct layout*)tempspace_addr(LAYOUT(layout));
     gc_assert(widetag_of(native_layout->header) == INSTANCE_WIDETAG);

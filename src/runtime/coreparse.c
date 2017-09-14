@@ -343,14 +343,14 @@ static void fixup_space(lispobj* where, uword_t len)
             // - If the instance does not have a self-contained trampoline,
             //   then the word points to read-only space hence needs no adjustment.
             layout = (widetag == FUNCALLABLE_INSTANCE_WIDETAG) ?
-                fin_layout(where) : instance_layout(where);
+                funinstance_layout(where) : instance_layout(where);
             adjusted_layout = adjust_word(layout);
             // Do not alter the layout as stored in the instance if non-compact
             // header. instance_scan() will do it if necessary.
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
             if (adjusted_layout != layout)
                 // This can't happen yet. Compact headers point to immobile space
-                set_instance_layout(where, adjusted_layout);
+                instance_layout(where) = adjusted_layout;
 #endif
             bitmap = LAYOUT(adjusted_layout)->bitmap;
 

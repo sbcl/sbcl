@@ -280,23 +280,14 @@ static inline uword_t instance_length(lispobj header)
 {
   return HEADER_VALUE_MASKED(header);
 }
-static inline lispobj instance_layout(lispobj* instance_ptr) // native ptr
-{
-#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-  return instance_ptr[0] >> 32; // the high half of the header is the layout
+/* Define an assignable instance_layout() macro taking a native pointer */
+#ifndef LISP_FEATURE_COMPACT_INSTANCE_HEADER
+# define instance_layout(instance_ptr) (instance_ptr)[1]
+#elif defined(LISP_FEATURE_64_BIT) && defined(LISP_FEATURE_LITTLE_ENDIAN)
+# define instance_layout(instance_ptr) ((uint32_t*)(instance_ptr))[1]
 #else
-  return instance_ptr[1]; // the word following the header is the layout
+# error "No instance_layout() defined"
 #endif
-}
-static inline lispobj fin_layout(lispobj* instance_ptr) // native ptr
-{
-#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-  return instance_ptr[0] >> 32; // the high half of the header is the layout
-#else
-  // first 4 words are: header, trampoline, fin-fun, layout
-  return instance_ptr[3];
-#endif
-}
 
 /* Is the Lisp object obj something with pointer nature (as opposed to
  * e.g. a fixnum or character or unbound marker)? */

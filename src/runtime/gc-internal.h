@@ -260,6 +260,30 @@ instance_scan(void (*proc)(lispobj*, sword_t, uword_t),
               lispobj *instance_ptr, sword_t n_words,
               lispobj bitmap, uword_t arg);
 
+#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
+static inline lispobj funinstance_layout(lispobj* funinstance_ptr) { // native ptr
+    return instance_layout(funinstance_ptr);
+}
+static inline lispobj function_layout(lispobj* fun_ptr) { // native ptr
+    return instance_layout(fun_ptr);
+}
+static inline void set_function_layout(lispobj* fun_ptr, lispobj layout) {
+    instance_layout(fun_ptr) = layout;
+}
+#else
+static inline lispobj funinstance_layout(lispobj* instance_ptr) { // native ptr
+    // first 4 words are: header, trampoline, fin-fun, layout
+    return instance_ptr[3];
+}
+// No layout in simple-fun or closure, because there are no free bits
+static inline lispobj function_layout(lispobj* fun_ptr) { // native ptr
+    return 0;
+}
+static inline void set_function_layout(lispobj* fun_ptr, lispobj layout) {
+    lose("Can't assign layout");
+}
+#endif
+
 #include "genesis/bignum.h"
 extern boolean positive_bignum_logbitp(int,struct bignum*);
 
@@ -342,9 +366,6 @@ static inline int __immobile_obj_gen_bits(lispobj* pointer) // native pointer
 static inline boolean immobile_filler_p(lispobj* obj) {
   return *(int*)obj == (2<<N_WIDETAG_BITS | CODE_HEADER_WIDETAG);
 }
-
-#define set_instance_layout(instance_ptr,layout) \
-  instance_ptr[0] = (layout << 32) | (instance_ptr[0] & 0xFFFFFFFF)
 
 #endif /* immobile space */
 
