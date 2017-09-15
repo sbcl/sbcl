@@ -6574,3 +6574,13 @@
                    1)))
               1)
              1)))
+
+#+sb-unicode
+(with-test (:name :immediate-char-=)
+  (assert (eql
+           (funcall
+            (checked-compile `(lambda (x)
+                                (declare (type (member #\U9925 #\UBC19E) x))
+                                (the (member #\UBC19E) x)))
+            #\UBC19E)
+           #\UBC19E)))

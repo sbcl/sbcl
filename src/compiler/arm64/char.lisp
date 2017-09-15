@@ -111,12 +111,12 @@
   (:translate char<)
   (:conditional :lt))
 
-(defun char-immediate (char)
-  (add-sub-immediate (sb!xc:char-code char)))
+(defun char-immediate-p (char)
+  (add-sub-immediate-p (sb!xc:char-code char)))
 
 (define-vop (character-compare/c)
   (:args (x :scs (character-reg)))
-  (:arg-types character (:constant (satisfies char-immediate)))
+  (:arg-types character (:constant (satisfies char-immediate-p)))
   (:info y)
   (:policy :fast-safe)
   (:note "inline constant comparison")
