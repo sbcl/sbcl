@@ -401,6 +401,10 @@ catch_exception_raise(mach_port_t exception_port,
     }
 
     backup_thread_state = thread_state;
+
+    /* The ABI has a 128-byte red zone. */
+    stack_allocate(&thread_state, 128);
+
     open_stack_allocation(&thread_state);
     /* Reserve a 256 byte zone for signal handlers
      * to use on the interrupted thread stack.
