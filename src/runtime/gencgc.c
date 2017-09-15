@@ -670,6 +670,9 @@ static void
 zero_dirty_pages(page_index_t start, page_index_t end) {
     page_index_t i, j;
 
+#ifdef READ_PROTECT_FREE_PAGES
+    os_protect(page_address(start), npage_bytes(1+end-start), OS_VM_PROT_ALL);
+#endif
     for (i = start; i <= end; i++) {
         if (!page_need_to_zero(i)) continue;
         for (j = i+1; (j <= end) && page_need_to_zero(j) ; j++)
@@ -868,12 +871,6 @@ gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *all
     }
     ret = thread_mutex_unlock(&free_pages_lock);
     gc_assert(ret == 0);
-
-#ifdef READ_PROTECT_FREE_PAGES
-    os_protect(page_address(first_page),
-               npage_bytes(1+last_page-first_page),
-               OS_VM_PROT_ALL);
-#endif
 
     /* If the first page was only partial, don't check whether it's
      * zeroed (it won't be) and don't zero it (since the parts that
@@ -1225,12 +1222,6 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
     }
     ret = thread_mutex_unlock(&free_pages_lock);
     gc_assert(ret == 0);
-
-#ifdef READ_PROTECT_FREE_PAGES
-    os_protect(page_address(first_page),
-               npage_bytes(1+last_page-first_page),
-               OS_VM_PROT_ALL);
-#endif
 
     zero_dirty_pages(first_page, last_page);
 
@@ -4348,16 +4339,14 @@ gc_set_region_empty(struct alloc_region *region)
 }
 
 static void
-zero_all_free_pages()
+zero_all_free_pages() /* called only by gc_and_save() */
 {
     page_index_t i;
 
     for (i = 0; i < last_free_page; i++) {
         if (page_free_p(i)) {
 #ifdef READ_PROTECT_FREE_PAGES
-            os_protect(page_address(i),
-                       GENCGC_CARD_BYTES,
-                       OS_VM_PROT_ALL);
+            os_protect(page_address(i), GENCGC_CARD_BYTES, OS_VM_PROT_ALL);
 #endif
             zero_pages(i, i);
         }
