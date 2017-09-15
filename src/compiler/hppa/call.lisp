@@ -584,7 +584,6 @@ default-value-8
 ;;; more arg, but there is no new-FP, since the arguments have been set up in
 ;;; the current frame.
 ;;;
-
 (macrolet ((define-full-call (name named return variable)
   (aver (not (and variable (eq return :tail))))
   `(define-vop (,name
@@ -593,10 +592,12 @@ default-value-8
      (:args
       ,@(unless (eq return :tail)
           '((new-fp :scs (any-reg) :to :eval)))
-
-      ,(if named
-           '(name :target name-pass)
-           '(arg-fun :target lexenv))
+      ,@(case named
+          ((nil)
+           '((arg-fun :target lexenv)))
+          (:direct)
+          (t
+           '((name :target name-pass))))
 
       ,@(when (eq return :tail)
           '((ocfp :target ocfp-pass)
@@ -615,6 +616,7 @@ default-value-8
      (:vop-var vop)
      (:info ,@(unless (or variable (eq return :tail)) '(arg-locs))
             ,@(unless variable '(nargs))
+            ,@(when (eq named :direct) '(fun))
             ,@(when (eq return :fixed) '(nvals))
             step-instrumenting)
 
@@ -635,18 +637,19 @@ default-value-8
                   :to :eval)
                  return-pc-pass)
 
-     ,@(if named
-         `((:temporary (:sc descriptor-reg :offset fdefn-offset
-                        :from (:argument ,(if (eq return :tail) 0 1))
-                        :to :eval)
-                       name-pass))
-
-         `((:temporary (:sc descriptor-reg :offset lexenv-offset
-                        :from (:argument ,(if (eq return :tail) 0 1))
-                        :to :eval)
-                       lexenv)
-           (:temporary (:scs (descriptor-reg) :from (:argument 0) :to :eval)
-                       function)))
+     ,@(case named
+         ((t)
+          `((:temporary (:sc descriptor-reg :offset fdefn-offset
+                         :from (:argument ,(if (eq return :tail) 0 1))
+                         :to :eval)
+                        name-pass)))
+         ((nil)
+          `((:temporary (:sc descriptor-reg :offset lexenv-offset
+                         :from (:argument ,(if (eq return :tail) 0 1))
+                         :to :eval)
+                        lexenv)
+            (:temporary (:scs (descriptor-reg) :from (:argument 0) :to :eval)
+                        function))))
 
      (:temporary (:sc any-reg :offset nargs-offset :to :eval)
                  nargs-pass)
@@ -760,49 +763,54 @@ default-value-8
                                           (ash (reg-tn-encoding callable-tn)
                                                5)))
                     (emit-label step-done-label))))
-           ,@(if named
-                 `((sc-case name
-                     (descriptor-reg (move name name-pass))
-                     (control-stack
-                      (inst ldw (ash (tn-offset name) word-shift)
-                                cfp-tn name-pass)
-                      (do-next-filler))
-                     (constant
-                      (inst ldw (- (ash (tn-offset name) word-shift)
-                                   other-pointer-lowtag)
-                                code-tn name-pass)
-                      (do-next-filler)))
-                   ;; The step instrumenting must be done after
-                   ;; FUNCTION is loaded, but before ENTRY-POINT is
-                   ;; calculated.
-                   (insert-step-instrumenting name-pass)
-                   (inst ldw (- (ash fdefn-raw-addr-slot word-shift)
-                                other-pointer-lowtag)
-                             name-pass entry-point)
-                   (do-next-filler))
-                 `((sc-case arg-fun
-                     (descriptor-reg
-                       (move arg-fun lexenv))
-                     (control-stack
-                      (inst ldw (ash (tn-offset arg-fun) word-shift)
-                                cfp-tn lexenv)
-                      (do-next-filler))
-                     (constant
-                      (inst ldw
-                            (- (ash (tn-offset arg-fun) word-shift)
-                               other-pointer-lowtag) code-tn lexenv)
-                      (do-next-filler)))
-                   (inst ldw (- (ash closure-fun-slot word-shift)
+           (declare (ignorable #'insert-step-instrumenting))
+           ,@(case named
+               ((t)
+                `((sc-case name
+                    (descriptor-reg (move name name-pass))
+                    (control-stack
+                     (inst ldw (ash (tn-offset name) word-shift)
+                           cfp-tn name-pass)
+                     (do-next-filler))
+                    (constant
+                     (inst ldw (- (ash (tn-offset name) word-shift)
+                                  other-pointer-lowtag)
+                           code-tn name-pass)
+                     (do-next-filler)))
+                  ;; The step instrumenting must be done after
+                  ;; FUNCTION is loaded, but before ENTRY-POINT is
+                  ;; calculated.
+                  (insert-step-instrumenting name-pass)
+                  (inst ldw (- (ash fdefn-raw-addr-slot word-shift)
+                               other-pointer-lowtag)
+                        name-pass entry-point)
+                  (do-next-filler)))
+               ((nil)
+                `((sc-case arg-fun
+                    (descriptor-reg
+                     (move arg-fun lexenv))
+                    (control-stack
+                     (inst ldw (ash (tn-offset arg-fun) word-shift)
+                           cfp-tn lexenv)
+                     (do-next-filler))
+                    (constant
+                     (inst ldw
+                           (- (ash (tn-offset arg-fun) word-shift)
+                              other-pointer-lowtag) code-tn lexenv)
+                     (do-next-filler)))
+                  (inst ldw (- (ash closure-fun-slot word-shift)
+                               fun-pointer-lowtag)
+                        lexenv function)
+                  (do-next-filler)
+                  ;; The step instrumenting must be done before
+                  ;; after FUNCTION is loaded, but before ENTRY-POINT
+                  ;; is calculated.
+                  (insert-step-instrumenting function)
+                  (inst addi (- (ash simple-fun-code-offset word-shift)
                                 fun-pointer-lowtag)
-                             lexenv function)
-                   (do-next-filler)
-                   ;; The step instrumenting must be done before
-                   ;; after FUNCTION is loaded, but before ENTRY-POINT
-                   ;; is calculated.
-                   (insert-step-instrumenting function)
-                   (inst addi (- (ash simple-fun-code-offset word-shift)
-                                 fun-pointer-lowtag)
-                              function entry-point)))
+                        function entry-point)))
+               (:direct
+                `((inst ldw (static-fun-offset fun) null-tn entry-point))))
            (loop
              (if (cdr filler)
                  (do-next-filler)
@@ -830,10 +838,13 @@ default-value-8
 
   (define-full-call call nil :fixed nil)
   (define-full-call call-named t :fixed nil)
+  (define-full-call static-call-named :direct :fixed nil)
   (define-full-call multiple-call nil :unknown nil)
   (define-full-call multiple-call-named t :unknown nil)
+  (define-full-call static-multiple-call-named :direct :unknown nil)
   (define-full-call tail-call nil :tail nil)
   (define-full-call tail-call-named t :tail nil)
+  (define-full-call static-tail-call-named :direct :tail nil)
 
   (define-full-call call-variable nil :fixed t)
   (define-full-call multiple-call-variable nil :unknown t))

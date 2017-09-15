@@ -37,5 +37,3 @@
 
     DONE
     (move count result)))
-
-(define-static-fun length (object) :translate length)
