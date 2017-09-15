@@ -573,10 +573,12 @@ default-value-8
      (:args
       ,@(unless (eq return :tail)
           '((new-fp :scs (any-reg) :to :eval)))
-
-      ,(if named
-           '(name :target name-pass)
-           '(arg-fun :target lexenv))
+      ,@(case named
+          ((nil)
+           '((arg-fun :target lexenv)))
+          (:direct)
+          (t
+           '((name :target name-pass))))
 
       ,@(when (eq return :tail)
           '((ocfp :target ocfp-pass)
@@ -595,6 +597,7 @@ default-value-8
      (:vop-var vop)
      (:info ,@(unless (or variable (eq return :tail)) '(arg-locs))
             ,@(unless variable '(nargs))
+            ,@(when (eq named :direct) '(fun))
             ,@(when (eq return :fixed) '(nvals))
             step-instrumenting)
 
@@ -618,19 +621,20 @@ default-value-8
                   :to :eval)
                  return-pc-pass)
 
-     ,@(if named
-         `((:temporary (:sc descriptor-reg :offset fdefn-offset
-                        :from (:argument ,(if (eq return :tail) 0 1))
-                        :to :eval)
-                       name-pass))
-
-         `((:temporary (:sc descriptor-reg :offset lexenv-offset
-                        :from (:argument ,(if (eq return :tail) 0 1))
-                        :to :eval)
-                       lexenv)
-           #!-gengc
-           (:temporary (:scs (descriptor-reg) :from (:argument 0) :to :eval)
-                       function)))
+     ,@(case named
+         ((t)
+          `((:temporary (:sc descriptor-reg :offset fdefn-offset
+                         :from (:argument ,(if (eq return :tail) 0 1))
+                         :to :eval)
+                        name-pass)))
+         ((nil)
+          `((:temporary (:sc descriptor-reg :offset lexenv-offset
+                         :from (:argument ,(if (eq return :tail) 0 1))
+                         :to :eval)
+                        lexenv)
+            #!-gengc
+            (:temporary (:scs (descriptor-reg) :from (:argument 0) :to :eval)
+                        function))))
 
      (:temporary (:sc any-reg :offset nargs-offset :to :eval)
                  nargs-pass)
@@ -729,50 +733,53 @@ default-value-8
                                          (move new-fp cfp-tn)
                                          (move csp-tn cfp-tn))))))
                       ((nil))))))
-
-           ,@(if named
-                 `((sc-case name
-                     (descriptor-reg (move name name-pass))
-                     (control-stack
-                      (inst ldl name-pass
-                            (ash (tn-offset name) word-shift) cfp-tn)
-                      (do-next-filler))
-                     (constant
-                      (inst ldl name-pass
-                            (- (ash (tn-offset name) word-shift)
-                               other-pointer-lowtag) code-tn)
-                      (do-next-filler)))
-                   (inst ldl entry-point
-                         (- (ash fdefn-raw-addr-slot word-shift)
-                            other-pointer-lowtag) name-pass)
-                   (do-next-filler))
-                 `((sc-case arg-fun
-                     (descriptor-reg (move arg-fun lexenv))
-                     (control-stack
-                      (inst ldl lexenv
-                            (ash (tn-offset arg-fun) word-shift) cfp-tn)
-                      (do-next-filler))
-                     (constant
-                      (inst ldl lexenv
-                            (- (ash (tn-offset arg-fun) word-shift)
-                               other-pointer-lowtag) code-tn)
-                      (do-next-filler)))
-                   #!-gengc
-                   (inst ldl function
-                         (- (ash closure-fun-slot word-shift)
-                            fun-pointer-lowtag) lexenv)
-                   #!-gengc
-                   (do-next-filler)
-                   #!-gengc
-                   (inst addq function
-                         (- (ash simple-fun-code-offset word-shift)
-                            fun-pointer-lowtag) entry-point)
-                   #!+gengc
-                   (inst ldl entry-point
-                         (- (ash closure-entry-point-slot word-shift)
-                            fun-pointer-lowtag) lexenv)
-                   #!+gengc
-                   (do-next-filler)))
+           ,@(case named
+               ((t)
+                `((sc-case name
+                    (descriptor-reg (move name name-pass))
+                    (control-stack
+                     (inst ldl name-pass
+                           (ash (tn-offset name) word-shift) cfp-tn)
+                     (do-next-filler))
+                    (constant
+                     (inst ldl name-pass
+                           (- (ash (tn-offset name) word-shift)
+                              other-pointer-lowtag) code-tn)
+                     (do-next-filler)))
+                  (inst ldl entry-point
+                        (- (ash fdefn-raw-addr-slot word-shift)
+                           other-pointer-lowtag) name-pass)
+                  (do-next-filler)))
+               ((nil)
+                `((sc-case arg-fun
+                    (descriptor-reg (move arg-fun lexenv))
+                    (control-stack
+                     (inst ldl lexenv
+                           (ash (tn-offset arg-fun) word-shift) cfp-tn)
+                     (do-next-filler))
+                    (constant
+                     (inst ldl lexenv
+                           (- (ash (tn-offset arg-fun) word-shift)
+                              other-pointer-lowtag) code-tn)
+                     (do-next-filler)))
+                  #!-gengc
+                  (inst ldl function
+                        (- (ash closure-fun-slot word-shift)
+                           fun-pointer-lowtag) lexenv)
+                  #!-gengc
+                  (do-next-filler)
+                  #!-gengc
+                  (inst addq function
+                        (- (ash simple-fun-code-offset word-shift)
+                           fun-pointer-lowtag) entry-point)
+                  #!+gengc
+                  (inst ldl entry-point
+                        (- (ash closure-entry-point-slot word-shift)
+                           fun-pointer-lowtag) lexenv)
+                  #!+gengc
+                  (do-next-filler)))
+               (:direct
+                `((inst ldl entry-point (static-fun-offset fun) null-tn))))
            (loop
              (if (cdr filler)
                  (do-next-filler)
@@ -798,10 +805,13 @@ default-value-8
 
 (define-full-call call nil :fixed nil)
 (define-full-call call-named t :fixed nil)
+(define-full-call static-call-named :direct :fixed nil)
 (define-full-call multiple-call nil :unknown nil)
 (define-full-call multiple-call-named t :unknown nil)
+(define-full-call static-multiple-call-named :direct :unknown nil)
 (define-full-call tail-call nil :tail nil)
 (define-full-call tail-call-named t :tail nil)
+(define-full-call static-tail-call-named :direct :tail nil)
 
 (define-full-call call-variable nil :fixed t)
 (define-full-call multiple-call-variable nil :unknown t)
