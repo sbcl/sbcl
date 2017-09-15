@@ -521,7 +521,6 @@
  ("src/compiler/target/system")
  ("src/compiler/target/char")
  ("src/compiler/target/memory")
- ("src/compiler/target/static-fn")
  ("src/compiler/target/arith"
   ;; KLUDGE: for ppc and sparc this appears to be necessary, as it
   ;; used to be for array VOPs for X86 until ca. 0.8.5.24 when CSR's

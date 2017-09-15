@@ -1042,12 +1042,7 @@
     (if (eq (ir2-lvar-kind 2lvar) :delayed)
         (let ((name (lvar-fun-name lvar t)))
           (aver name)
-          (values (cond #!+(or immobile-code
-                               #.(cl:if (cl:gethash 'sb!c:static-tail-call-named
-                                                    sb!c::*backend-template-names*)
-                                        '(:and)
-                                        '(:or)))
-                        ((sb!vm::static-fdefn-offset name)
+          (values (cond ((sb!vm::static-fdefn-offset name)
                          name)
                         (t
                          ;; Named call to an immobile fdefn from an immobile component
@@ -1098,11 +1093,7 @@
                   (fun-tn old-fp return-pc pass-refs)
                   (nil)
                   nargs (emit-step-p node)))
-            #!+(and (not immobile-code)
-                    #.(cl:if (cl:gethash 'sb!c:static-tail-call-named
-                                         sb!c::*backend-template-names*)
-                             '(:and)
-                             '(:or)))
+            #!-immobile-code
             ((eq fun-tn named)
              (vop* static-tail-call-named node block
                    (old-fp return-pc pass-refs) ; args
@@ -1152,11 +1143,7 @@
         (cond ((not named)
                (vop* call node block (fp fun-tn args) (loc-refs)
                      arg-locs nargs nvals (emit-step-p node)))
-              #!+(and (not immobile-code)
-                      #.(cl:if (cl:gethash 'sb!c:static-call-named
-                                           sb!c::*backend-template-names*)
-                               '(:and)
-                               '(:or)))
+              #!-immobile-code
               ((eq fun-tn named)
                (vop* static-call-named node block
                      (fp args)
@@ -1185,11 +1172,7 @@
         (cond ((not named)
                (vop* multiple-call node block (fp fun-tn args) (loc-refs)
                   arg-locs nargs (emit-step-p node)))
-              #!+(and (not immobile-code)
-                      #.(cl:if (cl:gethash 'sb!c:static-multiple-call-named
-                                           sb!c::*backend-template-names*)
-                               '(:and)
-                               '(:or)))
+              #!-immobile-code
               ((eq fun-tn named)
                (vop* static-multiple-call-named node block
                   (fp args)
