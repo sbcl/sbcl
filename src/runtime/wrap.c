@@ -479,7 +479,11 @@ int get_h_errno()
 
 /* From SB-POSIX, wait-macros */
 int wifcontinued(int status) {
+#ifdef WIFCONTINUED
     return WIFCONTINUED(status);
+#else
+    return 0;
+#endif
 }
 int wifexited(int status) {
     return WIFEXITED(status);

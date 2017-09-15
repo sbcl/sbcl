@@ -16,6 +16,8 @@ changes relative to sbcl-1.3.21:
   * bug fix: save-lisp-and-die is able to collect more garbage on non-x86oid
     gencgc targets.
   * bug fix: fixed out-of-bounds array read in optimized POSITION on bit-vectors
+  * bug fix: signal emulation respects the 128-byte stack red zone on x86-64
+    macOS.
 
 changes in sbcl-1.3.21 relative to sbcl-1.3.20:
   * minor incompatible change: the CLOBBER-IT restart for defstruct redefintion
