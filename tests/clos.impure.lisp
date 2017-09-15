@@ -95,102 +95,102 @@
 ;;; DEFGENERIC lambda lists are subject to various limitations, as per
 ;;; section 3.4.2 of the ANSI spec. Since Alexey Dejneka's patch for
 ;;; bug 191-b ca. sbcl-0.7.22, these limitations should be enforced.
-(with-test (:name (defgeneric :lambda-list))
-  (labels ((coerce-to-boolean (x)
-             (if x t nil))
-           (test-case (lambda-list
-                       &optional
-                       expected-failure-p expected-warnings-p message)
-             (declare (type boolean expected-failure-p))
-             #+nil (format t "~&trying ~S~%" lambda-list)
-             (let ((*error-output* (make-string-output-stream) ))
-               (multiple-value-bind (fun warnings-p failure-p)
-                   (compile nil `(lambda () (defgeneric ,(gensym) ,lambda-list)))
-                 (declare (ignore fun))
-                 (assert (eq (coerce-to-boolean failure-p) expected-failure-p))
-                 (assert (eq (coerce-to-boolean warnings-p) expected-warnings-p))
-                 (when message
-                   (assert (search message (get-output-stream-string
-                                            *error-output*))))))))
-    ;; basic sanity
-    (test-case '("a" #p"b")
-               t t "Required argument is not a symbol: \"a\"")
-    (test-case '())
-    (test-case '(x))
-    ;; repeated names and keywords
-    (test-case '(x x)
-               t t "The variable X occurs more than once")
-    (test-case '(x &rest x)
-               t t "The variable X occurs more than once")
-    (test-case '(&optional x x)
-               t t "The variable X occurs more than once")
-    (test-case '(&key x ((:y x)))
-               t t "The variable X occurs more than once")
-    (test-case '(&key x ((:x y)))
-               t t "The keyword :X occurs more than once")
-    (test-case '(&key ((:x a)) ((:x b)))
-               t t "The keyword :X occurs more than once")
-    ;; illegal variable names
-    (test-case '(:pi)
-               t t ":PI is a keyword and cannot be used")
-    (test-case '(pi)
-               t t "COMMON-LISP:PI names a defined constant")
-    ;; forbidden default or supplied-p for &OPTIONAL or &KEY arguments
-    (test-case '(x &optional (y 0))
-               t t "Invalid &OPTIONAL argument specifier (Y 0)")
-    (test-case '(x &optional y))
-    (test-case '(x y &key (z :z z-p))
-               t t "Invalid &KEY argument specifier (Z :Z Z-P)")
-    (test-case '(x y &key z))
-    (test-case '(x &optional (y 0) &key z)
-               t t "Invalid &OPTIONAL argument specifier (Y 0)")
-    (test-case '(x &optional y &key z)
-               nil t "&OPTIONAL and &KEY found in the same lambda list")
-    (test-case '(x &optional y &key (z :z))
-               t t "Invalid &KEY argument specifier (Z :Z)")
-    (test-case '(x &optional y &key z)
-               nil t "&OPTIONAL and &KEY found in the same lambda list")
-    (test-case '(&optional &key (k :k k-p))
-               t t "Invalid &KEY argument specifier (K :K K-P)")
-    (test-case '(&optional &key k))
-    ;; forbidden &AUX
-    (test-case '(x y z &optional a &aux g h)
-               t t "&AUX is not allowed in a generic function lambda list")
-    (test-case '(x y z &optional a))
-    (test-case '(x &aux)
-               t t "&AUX is not allowed in a generic function lambda list")
-    (test-case '(x))
-    ;; also can't use bogoDEFMETHODish type-qualifier-ish decorations
-    ;; on required arguments
-    (test-case '((arg t))
-               t t "Required argument is not a symbol: (ARG T)")
-    (test-case '(arg))))
-
-(with-test (:name (defmethod :lambda-list))
-  (flet ((test-case (lambda-list messages)
-           (multiple-value-bind
-                 (fun failure-p warnings style-warnings notes errors)
-               (checked-compile `(lambda () (defmethod ,(gensym) ,lambda-list))
-                                :allow-failure t)
-             (declare (ignore fun warnings style-warnings notes))
-             (assert failure-p)
-             (assert (= (length messages) (length errors)))
+(flet ((test-case (operator lambda-list
+                   &optional expect-failure-p expect-warnings-p &rest messages)
+         (multiple-value-bind
+               (fun failure-p warnings style-warnings notes errors)
+             (checked-compile `(lambda () (,operator ,(gensym) ,lambda-list))
+                              :allow-failure expect-failure-p
+                              :allow-warnings expect-warnings-p
+                              :allow-style-warnings expect-warnings-p)
+           (declare (ignore fun notes))
+           (let ((warnings (append style-warnings warnings)))
+             (when expect-failure-p (assert failure-p))
+             (when expect-warnings-p (assert warnings))
+             (assert (= (length messages) (+ (length warnings) (length errors))))
              (loop for message in messages
-                for error in errors
-                do (assert (search message (princ-to-string error)))))))
+                for error in (append warnings errors)
+                do (assert (search message (princ-to-string error))))))))
+
+  (with-test (:name (defgeneric :lambda-list))
     (mapc
-     (lambda (spec) (apply #'test-case spec))
+     (lambda (spec) (apply #'test-case 'defgeneric spec))
+     '(;; basic sanity
+       (("a" #p"b")
+        t nil "Required argument is not a symbol: \"a\"")
+       (())
+       ((x))
+       ;; repeated names and keywords
+       ((x x)
+        t nil "The variable X occurs more than once")
+       ((x &rest x)
+        t nil "The variable X occurs more than once")
+       ((&optional x x)
+        t nil "The variable X occurs more than once")
+       ((&key x ((:y x)))
+        t nil "The variable X occurs more than once")
+       ((&key x ((:x y)))
+        t nil "The keyword :X occurs more than once")
+       ((&key ((:x a)) ((:x b)))
+        t nil "The keyword :X occurs more than once")
+       ;; illegal variable names
+       ((:pi)
+        t nil ":PI is a keyword and cannot be used")
+       ((pi)
+        t nil "COMMON-LISP:PI names a defined constant")
+       ;; forbidden default or supplied-p for &OPTIONAL or &KEY arguments
+       ((x &optional (y 0))
+        t nil "Invalid &OPTIONAL argument specifier (Y 0)")
+       ((x &optional y))
+       ((x y &key (z :z z-p))
+        t nil "Invalid &KEY argument specifier (Z :Z Z-P)")
+       ((x y &key z))
+       ((x &optional (y 0) &key z)
+        t t
+        "&OPTIONAL and &KEY found in the same lambda list"
+        "Invalid &OPTIONAL argument specifier (Y 0)")
+       ((x &optional y &key z)
+        nil t "&OPTIONAL and &KEY found in the same lambda list")
+       ((x &optional y &key (z :z))
+        t t
+        "&OPTIONAL and &KEY found in the same lambda list"
+        "Invalid &KEY argument specifier (Z :Z)")
+       ((&optional &key (k :k k-p))
+        t nil "Invalid &KEY argument specifier (K :K K-P)")
+       ((&optional &key k))
+       ;; forbidden &AUX
+       ((x y z &optional a &aux g h)
+        t nil "&AUX is not allowed in a generic function lambda list")
+       ((x y z &optional a))
+       ((x &aux)
+        t nil "&AUX is not allowed in a generic function lambda list")
+       ;; also can't use bogoDEFMETHODish type-qualifier-ish decorations
+       ;; on required arguments
+       (((arg t))
+        t nil "Required argument is not a symbol: (ARG T)"))))
+
+  (with-test (:name (defmethod :lambda-list))
+    (mapc
+     (lambda (spec) (apply #'test-case 'defmethod spec))
      '(;; Invalid specialized required argument
-       (((x t t))         ("arg is not a non-NIL symbol or a list of two elements: (X T T)"))
+       (((x t t))
+        t nil "arg is not a non-NIL symbol or a list of two elements: (X T T)")
        ;; Repeated names and keywords
-       (((x t) (x t))     ("The variable X occurs more than once"))
-       (((x t) &rest x)   ("The variable X occurs more than once"))
-       ((&optional x x)   ("The variable X occurs more than once"))
-       ((&key x ((:y x))) ("The variable X occurs more than once"))
-       ((&key x ((:x y))) ("The keyword :X occurs more than once"))
+       (((x t) (x t))
+        t nil "The variable X occurs more than once")
+       (((x t) &rest x)
+        t nil "The variable X occurs more than once")
+       ((&optional x x)
+        t nil "The variable X occurs more than once")
+       ((&key x ((:y x)))
+        t nil "The variable X occurs more than once")
+       ((&key x ((:x y)))
+        t nil "The keyword :X occurs more than once")
        ;; Illegal variable names
-       (((:pi t))         (":PI is a keyword and cannot be used"))
-       (((pi t))          ("COMMON-LISP:PI names a defined constant"))))))
+       (((:pi t))
+        t nil ":PI is a keyword and cannot be used")
+       (((pi t))
+        t nil "COMMON-LISP:PI names a defined constant")))))
 
 
 ;;; Explicit :metaclass option with structure-class and
