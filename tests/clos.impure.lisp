@@ -134,6 +134,8 @@
        ((&key ((:x a)) ((:x b)))
         t nil "The keyword :X occurs more than once")
        ;; illegal variable names
+       ((nil)
+        t nil "NIL cannot be used")
        ((:pi)
         t nil ":PI is a keyword and cannot be used")
        ((pi)
@@ -187,6 +189,8 @@
        ((&key x ((:x y)))
         t nil "The keyword :X occurs more than once")
        ;; Illegal variable names
+       (((nil t))
+        t nil "NIL cannot be used")
        (((:pi t))
         t nil ":PI is a keyword and cannot be used")
        (((pi t))

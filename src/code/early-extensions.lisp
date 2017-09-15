@@ -893,7 +893,7 @@ NOTE: This interface is experimental and subject to change."
 ;;; Is NAME a legal variable/function name?
 (declaim (inline legal-variable-name-p))
 (defun legal-variable-name-p (name)
-  (typep name '(and symbol (not keyword))))
+  (typep name '(and symbol (not keyword) (not null))))
 
 (declaim (inline legal-fun-name-p))
 (defun legal-fun-name-p (name)
