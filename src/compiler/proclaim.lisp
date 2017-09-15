@@ -210,7 +210,8 @@
             software version name replacement))
          (setf (info :function :deprecated name) info))
         (variable
-         ;; TODO (check-variable-name name "deprecated variable declaration")
+         (check-variable-name
+          name :context "deprecated variable declaration" :signal-via #'error)
          (when (eq state :final)
            (sb!impl::setup-variable-in-final-deprecation
             software version name replacement))
@@ -316,11 +317,11 @@
            (multiple-value-bind (state software version)
                (check-deprecation-declaration state since form)
              (mapc (lambda (thing)
+                     (process-deprecation-declaration thing state software version)
                      (destructuring-bind (namespace name &rest rest) thing
                        (declare (ignore rest))
                        (store-location
-                        name :key (deprecation-location-key namespace)))
-                     (process-deprecation-declaration thing state software version))
+                        name :key (deprecation-location-key namespace))))
                    things))))
         (declaration
          (map-args #'process-declaration-declaration form))

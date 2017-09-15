@@ -79,8 +79,11 @@
           (deprecated :early 1)
           (deprecated :early ("1"))
           (deprecated :early ("a" "b" "c"))
-          (deprecated :early 1 (function))
-          (deprecated :early 1 (unsupported-namespace name))))
+          (deprecated :early "1" (function))
+          (deprecated :early "1" (unsupported-namespace name))
+          (deprecated :early "1" (variable 1))
+          (deprecated :early "1" (variable nil))
+          (deprecated :early "1" (variable :foo))))
 
   ;; These should work.
   (mapc (lambda (declaration)
