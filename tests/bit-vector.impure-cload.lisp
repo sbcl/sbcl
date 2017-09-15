@@ -107,3 +107,22 @@
                         (position t b)))))
     (assert (not (funcall f1 #*010101)))
     (assert (not (funcall f2 #*101010)))))
+
+;;; BIT-POSITION would access 1 word beyond a bit-vector's final word
+;;; which could crash if the next page of memory was not readable.
+;;; To produce such a sitution, create a bit-vector at the end of static space,
+;;; relying on the fact that there should be a gap to the following space.
+;;; (Indeed this test reliably crashed prior to the fix for overrun)
+(with-test (:name :bit-position-overrun)
+  (let* ((n-bytes (* 4 sb-vm:n-word-bytes))
+         (addr (- sb-vm:static-space-end n-bytes))
+         (n-bits (* 2 sb-vm:n-word-bits)))
+    (setf (sb-sys:sap-ref-word (sb-sys:int-sap addr) 0) sb-vm:simple-bit-vector-widetag)
+    (setf (sb-sys:sap-ref-word (sb-sys:int-sap addr) sb-vm:n-word-bytes)
+          (ash n-bits sb-vm:n-fixnum-tag-bits))
+    (multiple-value-bind (object widetag size)
+        (sb-vm::reconstitute-object (ash addr (- sb-vm:n-fixnum-tag-bits)))
+      (declare (ignore widetag))
+      (assert (simple-bit-vector-p object))
+      (assert (= size n-bytes))
+      (assert (not (sb-kernel:%bit-position/1 object nil 0 n-bits))))))

@@ -621,6 +621,24 @@
                          (index start end)
                          (optimize (speed 3) (safety 0)))
                 (unless (= start end)
+                  ;; We use the traditional approach of scanning:
+                  ;;  (1) some number of bits (<= n-word-bits) initially,
+                  ;;  (2) then a whole number of intervening words,
+                  ;;  (3) then some number of trailing bits.
+                  ;; We combine two of the three scans, depending on FROM-END.
+                  ;; If FROM-END is true, we do (3) as one step, then (1) and (2).
+                  ;; If FROM-END is false, we do (1) as one step, then (2) and (3).
+                  ;; So first we calculate FIRST-BITS and LAST-BITS as the number
+                  ;; of "boundary" bits on each end. These values will never
+                  ;; be exactly N-WORD-BITS, though logically they should allow that.
+                  ;; Instead the convention is slightly odd. It does exactly the
+                  ;; right thing for START-MASK: compute a bit mask having anywhere
+                  ;; between 1 and N-WORD-BITS (inclusive) consecutive 1s, starting
+                  ;; from the appropriate end. END-MASK is weird: instead of getting
+                  ;; all 1s in the limiting case, it gets all 0s, and a LAST-WORD
+                  ;; value that is 1 too high.  Perhaps somebody smarter than I could
+                  ;; do this "correctly" with FLOOR and CEILING, but this code
+                  ;; compiles very efficiently and I don't want to disturb it much.
                   (let* ((last-word (ash end (- +bit-position-base-shift+)))
                          (last-bits (logand end +bit-position-base-mask+))
                          (first-word (ash start (- +bit-position-base-shift+)))
@@ -661,8 +679,18 @@
                       (declare (inline start-bit end-bit found get-word))
                       (if from-end
                           ;; Back to front
+                          ;; When the upper bound aligns exactly to a word, END-MASK
+                          ;; is 0, and LAST-WORD is 1 higher than the number of words
+                          ;; to scan. Reading it could overrun the vector's bound,
+                          ;; so detect and avoid that case.
+                          ;; This is actually simpler and clearer than adjusting
+                          ;; the loop indices, because the remainder of the loop
+                          ;; is right in the backwards scan, and the termination
+                          ;; condition is always FIRST-WORD inclusive.
                           (let* ((word-offset last-word)
-                                 (word (logand end-mask (get-word word-offset))))
+                                 (word (if (eql end-mask 0)
+                                           0
+                                           (logand end-mask (get-word word-offset)))))
                             (declare (word word)
                                      (index word-offset))
                             (unless (zerop word)
@@ -692,6 +720,15 @@
                               (unless (zerop word)
                                 (found (start-bit word) word-offset)))
                             (incf word-offset)
+                            ;; Boundary condition: if END-MASK is zero, then LAST-WORD
+                            ;; is an exclusive bound on word index to read. Otherwise,
+                            ;; when nonzero, LAST-WORD is the *inclusive* bound.
+                            ;; The loop works correctly with this assignment to END-MASK,
+                            ;; and it doesn't upset the compiler in the least -
+                            ;; it still uses unboxed reads and compares throughout.
+                            (when (eql end-mask 0)
+                              (setq end-mask sb!ext:most-positive-word)
+                              (decf last-word)) ; make it an inclusive bound
                             (loop
                               (when (> word-offset last-word)
                                 (return-from ,name nil))
