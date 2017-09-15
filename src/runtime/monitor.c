@@ -355,7 +355,7 @@ print_context(os_context_t *context)
         brief_print((lispobj)(*os_context_register_addr(context,i)));
 #endif
     }
-#ifdef LISP_FEATURE_DARWIN
+#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_PPC)
     printf("DAR:\t\t 0x%08lx\n", (unsigned long)(*os_context_register_addr(context, 41)));
     printf("DSISR:\t\t 0x%08lx\n", (unsigned long)(*os_context_register_addr(context, 42)));
 #endif
