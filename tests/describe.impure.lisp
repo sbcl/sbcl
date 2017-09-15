@@ -121,3 +121,14 @@
   (assert (search "Class precedence-list:"
                   (with-output-to-string (stream)
                     (describe (find-class 'standard-class) stream)))))
+
+(proclaim '(declaration my-declaration))
+
+(with-test (:name (describe declaration))
+  (flet ((test (name expected-description)
+           (assert (search expected-description
+                           (with-output-to-string (stream)
+                             (describe name stream))))))
+    (test 'inline "INLINE names a standard declaration.")
+    (test 'sb-ext:deprecated "DEPRECATED names an SBCL-specific declaration.")
+    (test 'my-declaration "MY-DECLARATION names a user-defined declaration.")))

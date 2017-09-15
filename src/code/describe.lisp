@@ -301,6 +301,9 @@
   ;; Type specifier
   (describe-type symbol stream)
 
+  ;; Declaration specifier
+  (describe-declaration symbol stream)
+
   (awhen (sb-c::policy-quality-name-p symbol)
     (pprint-logical-block (stream nil)
       (pprint-newline :mandatory stream)
@@ -737,4 +740,29 @@
                 (error () (values nil nil)))
             (when ok
               (format stream "~@:_Expansion: ~S" expansion)))))
+      (terpri stream))))
+
+(defun describe-declaration (name stream)
+  (let ((kind (cond
+                ((member name '(ignore ignorable
+                                dynamic-extent
+                                special
+                                type ftype
+                                optimize
+                                inline notineline
+                                declaration))
+                 "a standard")
+                ((member name '(global always-bound
+                                freeze-type
+                                muffle-conditions unmuffle-conditions
+                                disable-package-locks enable-package-locks
+                                maybe-inline
+                                deprecated))
+                 "an SBCL-specific")
+                ((info :declaration :recognized name)
+                 "a user-defined"))))
+    (when kind
+      (pprint-newline :mandatory stream)
+      (pprint-logical-block (stream nil)
+        (format stream "~@:_~A names ~A declaration." name kind))
       (terpri stream))))
