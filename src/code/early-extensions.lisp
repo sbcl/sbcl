@@ -58,27 +58,21 @@
 (def!type index-or-minus-1 () `(integer -1 (,sb!xc:array-dimension-limit)))
 
 ;;; A couple of VM-related types that are currently used only on the
-;;; alpha platform. -- CSR, 2002-06-24
-(def!type unsigned-byte-with-a-bite-out (s bite)
-  (cond ((eq s '*) 'integer)
-        ((and (integerp s) (> s 0))
-         (let ((bound (ash 1 s)))
-           `(integer 0 ,(- bound bite 1))))
-        (t
-         (error "Bad size specified for UNSIGNED-BYTE type specifier: ~
-                  ~/sb!impl:print-type-specifier/."
-                s))))
+;;; alpha and mips platforms. -- CSR, 2002-06-24
+(def!type unsigned-byte-with-a-bite-out (size bite)
+  (unless (typep size '(integer 1))
+    (error "Bad size for the ~S type specifier: ~S."
+           'unsigned-byte-with-a-bite-out size))
+  (let ((bound (ash 1 size)))
+    `(integer 0 ,(- bound bite 1))))
 
-;;; Motivated by the mips port. -- CSR, 2002-08-22
-(def!type signed-byte-with-a-bite-out (s bite)
-  (cond ((eq s '*) 'integer)
-        ((and (integerp s) (> s 1))
-         (let ((bound (ash 1 (1- s))))
-           `(integer ,(- bound) ,(- bound bite 1))))
-        (t
-         (error "Bad size specified for SIGNED-BYTE type specifier: ~
-                  ~/sb!impl:print-type-specifier/."
-                s))))
+(def!type signed-byte-with-a-bite-out (size bite)
+  (unless (typep size '(integer 2))
+    (error "Bad size for ~S type specifier: ~S."
+            'signed-byte-with-a-bite-out size))
+  (let ((bound (ash 1 (1- size))))
+    `(integer ,(- bound) ,(- bound bite 1))))
+
 ;;; The smallest power of two that is equal to or greater than X.
 (declaim (inline power-of-two-ceiling))
 (defun power-of-two-ceiling (x)
