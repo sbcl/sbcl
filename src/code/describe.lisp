@@ -260,7 +260,8 @@
     (unless (typep x 'simple-array)
       (format s "~%Adjustable: ~A" (if (adjustable-array-p x) "yes" "no"))
       (multiple-value-bind (to offset) (array-displacement x)
-        (if (format s "~%Displaced-to: ~A~%Displaced-offset: ~S"
+        (if to
+            (format s "~%Displaced-to: ~A~%Displaced-offset: ~S"
                     (prin1-to-line to)
                     offset)
             (format s "~%Displaced: no"))))

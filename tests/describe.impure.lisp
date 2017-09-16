@@ -132,3 +132,12 @@
     (test 'inline "INLINE names a standard declaration.")
     (test 'sb-ext:deprecated "DEPRECATED names an SBCL-specific declaration.")
     (test 'my-declaration "MY-DECLARATION names a user-defined declaration.")))
+
+(with-test (:name (describe array :displaced-to))
+  (assert (search "Displaced: no"
+                  (with-output-to-string (stream)
+                    (describe (make-array 1 :adjustable t) stream))))
+  (assert (search "Displaced-to: #<"
+                  (with-output-to-string (stream)
+                    (describe (make-array 1 :displaced-to (make-array 1))
+                              stream)))))
