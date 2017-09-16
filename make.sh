@@ -69,12 +69,18 @@ $SBCL_XC_HOST < tools-for-build/canonicalize-whitespace.lisp || exit 1
 # --host-location=user@host-machine:<rsync path to host sbcl directory>
 # and the make-target-*.sh scripts will take care of transferring the
 # necessary files.
-TIME=`command -v time || true`
-$TIME sh make-host-1.sh
-$TIME sh make-target-1.sh
-$TIME sh make-host-2.sh
-$TIME sh make-target-2.sh
-$TIME sh make-target-contrib.sh
+maybetime() {
+    if command -v time > /dev/null ; then
+        time $@
+    else
+        $@
+    fi
+}
+maybetime sh make-host-1.sh
+maybetime sh make-target-1.sh
+maybetime sh make-host-2.sh
+maybetime sh make-target-2.sh
+maybetime sh make-target-contrib.sh
 
 NCONTRIBS=`find contrib -name Makefile -print | wc -l`
 NPASSED=`find obj/asdf-cache -name test-passed.test-report -print | wc -l`
