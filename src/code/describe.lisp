@@ -91,9 +91,9 @@
         (*print-circle* t)
         (*print-pretty* t)
         (*suppress-print-errors*
-          (if (subtypep 'serious-condition *suppress-print-errors*)
-              *suppress-print-errors*
-              'serious-condition)))
+         (if (subtypep 'serious-condition *suppress-print-errors*)
+             *suppress-print-errors*
+             'serious-condition)))
     ;; Until sbcl-0.8.0.x, we did
     ;;   (FRESH-LINE STREAM)
     ;;   (PPRINT-LOGICAL-BLOCK (STREAM NIL)
@@ -116,7 +116,7 @@
     ;; ANSI's example of DESCRIBE-OBJECT does its own final TERPRI.
     (values)))
 
-;;;; DESCRIBE-OBJECT
+;;;; DESCRIBE-OBJECT Protocol
 ;;;;
 ;;;; Style guide:
 ;;;;
@@ -137,40 +137,32 @@
 ;;;; * The newline policy that gets the whitespace right is for
 ;;;;   each block to both start and end with a newline.
 
-(defgeneric object-self-string (x))
+(defgeneric describe-object (object stream))
 
-(defmethod object-self-string (x)
-  (prin1-to-line x))
+(defgeneric object-self-string (object))
 
-(defmethod object-self-string ((x symbol))
+(defgeneric object-type-string (object))
+
+;;; Methods for builtin objects
+
+(defmethod object-self-string ((object t))
+  (prin1-to-line object))
+
+(defmethod object-self-string ((object symbol))
   (let ((*package* (find-package :keyword)))
-    (prin1-to-string x)))
+    (prin1-to-string object)))
 
-(defgeneric object-type-string (x))
-
-(defmethod object-type-string (x)
-  (let ((type (class-name-or-class (class-of x))))
+(defmethod object-type-string ((object t))
+  (let ((type (class-name-or-class (class-of object))))
     (if (symbolp type)
         (string-downcase type)
         (prin1-to-string type))))
 
-(defmethod object-type-string ((x cons))
-  (if (listp (cdr x)) "list" "cons"))
+(defmethod object-type-string ((object cons))
+  (if (listp (cdr object)) "list" "cons"))
 
-(defmethod object-type-string ((x hash-table))
-  "hash-table")
-
-(defmethod object-type-string ((x condition))
-  "condition")
-
-(defmethod object-type-string ((x structure-object))
-  "structure-object")
-
-(defmethod object-type-string ((x standard-object))
-  "standard-object")
-
-(defmethod object-type-string ((x function))
-  (typecase x
+(defmethod object-type-string ((object function))
+  (typecase object
     (simple-fun "compiled function")
     (closure "compiled closure")
     ((or #+sb-fasteval sb-interpreter:interpreted-function
@@ -178,109 +170,112 @@
     (generic-function "generic-function")
     (t "funcallable-instance")))
 
-(defmethod object-type-string ((x stream))
-  "stream")
+(defmethod object-type-string ((object array))
+  (cond
+    ((or (stringp object) (bit-vector-p object))
+     (format nil "~@[simple-~*~]~A"
+             (typep object 'simple-array)
+             (typecase object
+               (base-string "base-string")
+               (string "string")
+               (t "bit-vector"))))
+    ((simple-vector-p object)
+     "simple-vector")
+    (t
+     (format nil "~@[simple ~*~]~@[specialized ~*~]~:[array~;vector~]"
+             (typep object 'simple-array)
+             (neq t (array-element-type object))
+             (vectorp object)))))
 
-(defmethod object-type-string ((x sb-gray:fundamental-stream))
-  "gray stream")
-
-(defmethod object-type-string ((x package))
-  "package")
-
-(defmethod object-type-string ((x array))
-  (cond ((or (stringp x) (bit-vector-p x))
-         (format nil "~@[simple-~*~]~A"
-                 (typep x 'simple-array)
-                 (typecase x
-                   (base-string "base-string")
-                   (string "string")
-                   (t "bit-vector"))))
-        (t
-         (if (simple-vector-p x)
-             "simple-vector"
-             (format nil "~@[simple ~*~]~@[specialized ~*~]~:[array~;vector~]"
-                     (typep x 'simple-array)
-                     (neq t (array-element-type x))
-                     (vectorp x))))))
-
-(defmethod object-type-string ((x character))
-  (typecase x
+(defmethod object-type-string ((object character))
+  (typecase object
     (standard-char "standard-char")
     (base-char "base-char")
     #+sb-unicode (t "character"))) ; unreachable if no unicode
 
-(defun print-standard-describe-header (x stream)
-  (format stream "~&~A~%  [~A]~%"
-          (object-self-string x)
-          (object-type-string x)))
+(macrolet ((def (class &optional (string (string-downcase (class-name (find-class class)))))
+             `(defmethod object-type-string ((object ,class))
+                ,string)))
 
-(defgeneric describe-object (x stream))
+  (def hash-table)
+  (def condition)
+  (def structure-object)
+  (def standard-object)
+  (def stream)
+  (def sb-gray:fundamental-stream "gray stream")
+  (def package))
+
+(defun print-standard-describe-header (object stream)
+  (format stream "~&~A~%  [~A]~%"
+          (object-self-string object)
+          (object-type-string object)))
 
 ;;; Catch-all.
 
-(defmethod describe-object ((x t) s)
-  (print-standard-describe-header x s))
+(defmethod describe-object ((object t) stream)
+  (print-standard-describe-header object stream))
 
-(defmethod describe-object ((x cons) s)
-  (print-standard-describe-header x s)
-  (describe-function x nil s))
+(defmethod describe-object ((object cons) stream)
+  (print-standard-describe-header object stream)
+  (describe-function object nil stream))
 
-(defmethod describe-object ((x function) s)
-  (print-standard-describe-header x s)
-  (describe-function nil x s)
-  (when (funcallable-instance-p x)
-    (describe-instance x s)))
+(defmethod describe-object ((object function) stream)
+  (print-standard-describe-header object stream)
+  (describe-function nil object stream)
+  (when (funcallable-instance-p object)
+    (describe-instance object stream)))
 
-(defmethod describe-object ((x class) s)
-  (print-standard-describe-header x s)
-  (describe-class nil x s)
-  (describe-instance x s))
+(defmethod describe-object ((object class) stream)
+  (print-standard-describe-header object stream)
+  (describe-class nil object stream)
+  (describe-instance object stream))
 
-(defmethod describe-object ((x sb-pcl::slot-object) s)
-  (print-standard-describe-header x s)
-  (describe-instance x s))
+(defmethod describe-object ((object sb-pcl::slot-object) stream)
+  (print-standard-describe-header object stream)
+  (describe-instance object stream))
 
-(defmethod describe-object ((x character) s)
-  (print-standard-describe-header x s)
-  (format s "~%Char-code: ~S" (char-code x))
-  (format s "~%Char-name: ~A" (char-name x)))
+(defmethod describe-object ((object character) stream)
+  (print-standard-describe-header object stream)
+  (format stream "~%Char-code: ~S~%Char-name: ~A"
+          (char-code object) (char-name object)))
 
-(defmethod describe-object ((x array) s)
-  (print-standard-describe-header x s)
-  (format s "~%Element-type: ~/sb-impl:print-type-specifier/"
-          (array-element-type x))
-  (if (vectorp x)
-      (if (array-has-fill-pointer-p x)
-          (format s "~%Fill-pointer: ~S~%Size: ~S"
-                  (fill-pointer x)
-                  (array-total-size x))
-          (format s "~%Length: ~S" (length x)))
-      (format s "~%Dimensions: ~S" (array-dimensions x)))
+(defmethod describe-object ((object array) stream)
+  (print-standard-describe-header object stream)
+  (format stream "~%Element-type: ~/sb-impl:print-type-specifier/"
+          (array-element-type object))
+  (cond
+    ((not (vectorp object))
+     (format stream "~%Dimensions: ~S" (array-dimensions object)))
+    ((array-has-fill-pointer-p object)
+     (format stream "~%Fill-pointer: ~S~%Size: ~S"
+             (fill-pointer object)
+             (array-total-size object)))
+    (t
+     (format stream "~%Length: ~S" (length object))))
   (let ((*print-array* nil))
-    (unless (typep x 'simple-array)
-      (format s "~%Adjustable: ~A" (if (adjustable-array-p x) "yes" "no"))
-      (multiple-value-bind (to offset) (array-displacement x)
+    (unless (typep object 'simple-array)
+      (format stream "~%Adjustable: ~:[no~;yes~]" (adjustable-array-p object))
+      (multiple-value-bind (to offset) (array-displacement object)
         (if to
-            (format s "~%Displaced-to: ~A~%Displaced-offset: ~S"
-                    (prin1-to-line to)
-                    offset)
-            (format s "~%Displaced: no"))))
-    (when (and (not (array-displacement x)) (array-header-p x))
-      (format s "~%Storage vector: ~A"
-              (prin1-to-line (array-storage-vector x))))
-    (terpri s)))
+            (format stream "~%Displaced-to: ~A~%Displaced-offset: ~S"
+                    (prin1-to-line to) offset)
+            (format stream "~%Displaced: no"))))
+    (when (and (not (array-displacement object)) (array-header-p object))
+      (format stream "~%Storage vector: ~A"
+              (prin1-to-line (array-storage-vector object))))
+    (terpri stream)))
 
-(defmethod describe-object ((x hash-table) s)
-  (print-standard-describe-header x s)
+(defmethod describe-object ((object hash-table) stream)
+  (print-standard-describe-header object stream)
   ;; Don't print things which are already apparent from the printed
   ;; representation -- COUNT, TEST, and WEAKNESS
-  (format s "~%Occupancy: ~,1F" (float (/ (hash-table-count x)
-                                          (hash-table-size x))))
-  (format s "~%Rehash-threshold: ~S" (hash-table-rehash-threshold x))
-  (format s "~%Rehash-size: ~S" (hash-table-rehash-size x))
-  (format s "~%Size: ~S" (hash-table-size x))
-  (format s "~%Synchronized: ~A" (if (hash-table-synchronized-p x) "yes" "no"))
-  (terpri s))
+  (format stream "~%Occupancy: ~,1F" (float (/ (hash-table-count object)
+                                               (hash-table-size object))))
+  (format stream "~%Rehash-threshold: ~S" (hash-table-rehash-threshold object))
+  (format stream "~%Rehash-size: ~S" (hash-table-rehash-size object))
+  (format stream "~%Size: ~S" (hash-table-size object))
+  (format stream "~%Synchronized: ~:[no~;yes~]" (hash-table-synchronized-p object))
+  (terpri stream))
 
 (defmethod describe-object ((symbol symbol) stream)
   (print-standard-describe-header symbol stream)
@@ -326,10 +321,10 @@
                   (prin1-to-line value :columns 2 :reserve 5))))
       (terpri stream))))
 
-(defmethod describe-object ((package package) stream)
-  (print-standard-describe-header package stream)
+(defmethod describe-object ((object package) stream)
+  (print-standard-describe-header object stream)
   (pprint-logical-block (stream nil)
-    (describe-documentation package t stream)
+    (describe-documentation object t stream)
     (flet ((humanize (list)
              (sort (mapcar (lambda (x)
                              (if (packagep x)
@@ -340,25 +335,25 @@
            (out (label list)
              (describe-stuff label list stream :escape nil)))
       (let ((exports nil))
-        (do-external-symbols (ext package)
+        (do-external-symbols (ext object)
           (push ext exports))
         #+sb-package-locks
-        (let ((implemented (humanize (package-implemented-by-list package)))
-              (implements (humanize (package-implements-list package)))
-              (this (list (package-name package))))
-          (when (package-locked-p package)
+        (let ((implemented (humanize (package-implemented-by-list object)))
+              (implements (humanize (package-implements-list object)))
+              (this (list (package-name object))))
+          (when (package-locked-p object)
             (format stream "~@:_Locked."))
           (when (set-difference implemented this :test #'string=)
             (out "Implemented-by-list" implemented))
           (when (set-difference implements this :test #'string=)
             (out "Implements-list" implements)))
-        (out "Nicknames" (humanize (package-nicknames package)))
-        (out "Use-list" (humanize (package-use-list package)))
-        (out "Used-by-list" (humanize (package-used-by-list package)))
-        (out "Shadows" (humanize (package-shadowing-symbols package)))
+        (out "Nicknames" (humanize (package-nicknames object)))
+        (out "Use-list" (humanize (package-use-list object)))
+        (out "Used-by-list" (humanize (package-used-by-list object)))
+        (out "Shadows" (humanize (package-shadowing-symbols object)))
         (out "Exports" (humanize exports))
         (format stream "~@:_~S internal symbols."
-                (package-internal-symbol-count package))))
+                (package-internal-symbol-count object))))
     (terpri stream)))
 
 ;;;; Helpers to deal with shared functionality
