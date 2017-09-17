@@ -405,3 +405,7 @@
 (with-test (:name (adjoin :folding))
   (flet ((%f () (adjoin 'x '(a b))))
     (assert (not (eq (%f) (%f))))))
+
+(with-test (:name (butlast :dotted))
+  (assert (null (butlast '(1 2 . 3) 4)))
+  (assert (null (nbutlast (list* 1 2 3) 4))))
