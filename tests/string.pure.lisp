@@ -185,20 +185,14 @@
       (test 'aref 2)
       (test 'row-major-aref 1))))
 
-(with-test (:name :two-arg-string-equal)
-  (assert (funcall
-           (checked-compile
-            (lambda (x y)
-              (string-equal x y)))
-           "a"
-           (make-array 1 :element-type 'character
-                         :displaced-to "bA"
-                         :displaced-index-offset 1)))
-  (assert (not (funcall
-                (checked-compile
-                 (lambda (x y)
-                   (string-not-equal x y)))
-                "a"
-                (make-array 1 :element-type 'character
-                              :displaced-to "bA"
-                              :displaced-index-offset 1)))))
+(with-test (:name (string-equal :two-arg))
+  (flet ((check (function expected)
+           (assert (eq (funcall
+                        (checked-compile `(lambda (x y) (,function x y)))
+                        "a"
+                        (make-array 1 :element-type 'character
+                                    :displaced-to "bA"
+                                    :displaced-index-offset 1))
+                       expected))))
+    (check 'string-equal     t)
+    (check 'string-not-equal nil)))

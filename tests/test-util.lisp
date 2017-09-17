@@ -184,6 +184,9 @@
                         (allow-notes t)
                         (allow-compiler-errors allow-failure)
                         condition-transform)
+  (when (functionp form)
+    (error "~@<~S is a function, not a form.~@:>" form))
+
   (let ((warnings '())
         (style-warnings '())
         (notes '())
