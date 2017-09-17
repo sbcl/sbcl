@@ -84,6 +84,25 @@
             (t
              line)))))
 
+(defun call-as-describe-block (thunk stream format-control format-arguments)
+  (pprint-logical-block (stream nil)
+    (pprint-newline :mandatory stream)
+    (when format-control
+      (apply #'format stream format-control format-arguments)
+      (pprint-indent :block 2 stream))
+    (when thunk
+      (funcall thunk stream)))
+  (terpri stream))
+
+(defmacro describe-block ((stream-symbol
+                           &optional format-control &rest format-arguments)
+                          &body body)
+  `(call-as-describe-block
+    ,(if body
+         `(lambda (,stream-symbol) ,@body)
+         nil)
+    ,stream-symbol ,format-control (list ,@format-arguments)))
+
 (defun describe (object &optional (stream-designator *standard-output*))
   "Print a description of OBJECT to STREAM-DESIGNATOR."
   (let ((stream (out-stream-from-designator stream-designator))
@@ -301,29 +320,22 @@
   (describe-declaration symbol stream)
 
   (awhen (sb-c::policy-quality-name-p symbol)
-    (pprint-logical-block (stream nil)
-      (pprint-newline :mandatory stream)
-      (pprint-indent :block 2 stream)
-      (format stream "~A names a~:[ dependent~;n~] optimization policy quality:"
-              symbol (minusp it))
-      (describe-documentation symbol 'optimize stream t))
-    (terpri stream))
+    (describe-block (stream "~A names a~:[ dependent~;n~] optimization policy quality:"
+                            symbol (minusp it))
+      (describe-documentation symbol 'optimize stream t)))
 
   ;; Print out properties.
   (let ((plist (symbol-plist symbol)))
     (when plist
-      (pprint-logical-block (stream nil)
-        (format stream "~%Symbol-plist:")
-        (pprint-indent :block 2 stream)
+      (describe-block (stream "Symbol-plist:")
         (doplist (key value) plist
           (format stream "~@:_~A -> ~A"
                   (prin1-to-line key :columns 2 :reserve 5)
-                  (prin1-to-line value :columns 2 :reserve 5))))
-      (terpri stream))))
+                  (prin1-to-line value :columns 2 :reserve 5)))))))
 
 (defmethod describe-object ((object package) stream)
   (print-standard-describe-header object stream)
-  (pprint-logical-block (stream nil)
+  (describe-block (stream)
     (describe-documentation object t stream)
     (flet ((humanize (list)
              (sort (mapcar (lambda (x)
@@ -353,8 +365,7 @@
         (out "Shadows" (humanize (package-shadowing-symbols object)))
         (out "Exports" (humanize exports))
         (format stream "~@:_~S internal symbols."
-                (package-internal-symbol-count object))))
-    (terpri stream)))
+                (package-internal-symbol-count object))))))
 
 ;;;; Helpers to deal with shared functionality
 
@@ -374,11 +385,8 @@
                                (values name (find-class name nil)))))
     (when class
       (let ((metaclass-name (class-name (class-of class))))
-        (pprint-logical-block (stream nil)
-          (when by-name
-            (format stream "~@:_~A names the ~(~A~) ~S:"
-                    name metaclass-name class)
-            (pprint-indent :block 2 stream))
+        (describe-block (stream (when by-name "~A names the ~(~A~) ~S:")
+                                name metaclass-name class)
           (describe-deprecation 'type name stream)
           (describe-documentation class t stream)
           (when (sb-mop:class-finalized-p class)
@@ -433,9 +441,7 @@
                                             ;; FIXME: does this get the prefix right?
                                             (quiet-doc slotd t)))
                                     slots))
-                    (format stream "~@:_No direct slots."))))
-          (pprint-indent :block 0 stream)
-          (pprint-newline :mandatory stream))))))
+                    (format stream "~@:_No direct slots.")))))))))
 
 (defun describe-instance (object stream)
   (let* ((class (class-of object))
@@ -497,9 +503,7 @@
                 (:alien "an alien variable"))))
     (when (and (eq kind :unknown) (not (boundp name)))
       (return-from describe-variable))
-    (pprint-logical-block (stream nil)
-      (format stream "~@:_~A names ~A:" name wot)
-      (pprint-indent :block 2 stream)
+    (describe-block (stream "~A names ~A:" name wot)
       (describe-deprecation 'variable name stream)
       (when (eq (info :variable :where-from name) :declared)
         (format stream "~@:_Declared type: ~/sb-impl:print-type/"
@@ -522,8 +526,7 @@
          (format stream "~:@_Value: ~S" (symbol-value name)))
         ((not (eq kind :unknown))
          (format stream "~:@_Currently unbound.")))
-      (describe-documentation name 'variable stream)
-      (terpri stream))))
+      (describe-documentation name 'variable stream))))
 
 (defun describe-lambda-list (lambda-list stream)
   (let ((*print-circle* nil)
@@ -575,9 +578,7 @@
         (when (legal-fun-name-p name)
           (multiple-value-bind (from sure) (info :function :where-from name)
             (when (or (eq :declared from) (and sure (eq :assumed from)))
-              (pprint-logical-block (stream nil)
-                (format stream "~%~A names an undefined function" name)
-                (pprint-indent :block 2 stream)
+              (describe-block (stream "~A names an undefined function" name)
                 (format stream "~@:_~:(~A~) type: ~/sb-impl:print-type/"
                         from (proclaimed-ftype name))))))
         ;; Defined.
@@ -638,10 +639,7 @@
                                   (info :function :inlinep name)
                                   (info :function :inline-expansion-designator
                                         name)))))))
-          (pprint-logical-block (stream nil)
-            (unless function
-              (format stream "~%~A names ~A:" name what)
-              (pprint-indent :block 2 stream))
+          (describe-block (stream (unless function "~A names ~A:") name what)
             (describe-deprecation 'function name stream)
             (describe-lambda-list lambda-list stream)
             (when argument-precedence-order
@@ -683,37 +681,27 @@
                                   fun (sb-mop:method-specializers method)))
                          (pprint-indent :block 4 stream)
                          (describe-documentation method t stream nil))))))
-            (describe-function-source fun stream)
-            (terpri stream)))))
+            (describe-function-source fun stream)))))
   (unless function
     (awhen (and (legal-fun-name-p name) (compiler-macro-function name))
-      (pprint-logical-block (stream nil)
-        (format stream "~@:_~A has a compiler-macro:" name)
-        (pprint-indent :block 2 stream)
+      (describe-block (stream "~A has a compiler-macro:" name)
         (describe-documentation it t stream)
-        (describe-function-source it stream))
-      (terpri stream))
+        (describe-function-source it stream)))
     (when (and (consp name) (eq 'setf (car name)) (not (cddr name)))
       (let* ((name2 (second name))
              (expander (info :setf :expander name2)))
         (cond ((typep expander '(and symbol (not null)))
-               (pprint-logical-block (stream nil)
-                 (format stream "~&~A has setf-expansion: ~S"
-                         name expander)
-                 (pprint-indent :block 2 stream)
-                 (describe-documentation name2 'setf stream))
-               (terpri stream))
+               (describe-block (stream "~A has setf-expansion: ~S"
+                                       name expander)
+                 (describe-documentation name2 'setf stream)))
               (expander
                (when (listp expander)
                  (setq expander (cdr expander)))
-               (pprint-logical-block (stream nil)
-                 (format stream "~&~A has a complex setf-expansion:"
-                         name)
-                 (pprint-indent :block 2 stream)
+               (describe-block (stream "~A has a complex setf-expansion:"
+                                       name)
                  (describe-lambda-list (%fun-lambda-list expander) stream)
                  (describe-documentation name2 'setf stream t)
-                 (describe-function-source expander stream))
-               (terpri stream)))))
+                 (describe-function-source expander stream))))))
     (when (symbolp name)
       (describe-function `(setf ,name) nil stream))))
 
@@ -722,11 +710,8 @@
          (fun (and kind (info :type :expander name)))
          (fun (if (listp fun) (car fun) fun)))
     (when fun
-      (pprint-newline :mandatory stream)
-      (pprint-logical-block (stream nil)
-        (format stream "~@:_~A names a ~@[primitive~* ~]type-specifier:"
-                name (eq kind :primitive))
-        (pprint-indent :block 2 stream)
+      (describe-block (stream "~A names a ~@[primitive~* ~]type-specifier:"
+                              name (eq kind :primitive))
         (describe-deprecation 'type name stream)
         (describe-documentation name 'type stream (eq t fun))
         (when (functionp fun)
@@ -735,8 +720,7 @@
               (handler-case (typexpand-1 name)
                 (error () (values nil nil)))
             (when ok
-              (format stream "~@:_Expansion: ~S" expansion)))))
-      (terpri stream))))
+              (format stream "~@:_Expansion: ~S" expansion))))))))
 
 (defun describe-declaration (name stream)
   (let ((kind (cond
@@ -758,7 +742,4 @@
                 ((info :declaration :recognized name)
                  "a user-defined"))))
     (when kind
-      (pprint-newline :mandatory stream)
-      (pprint-logical-block (stream nil)
-        (format stream "~@:_~A names ~A declaration." name kind))
-      (terpri stream))))
+      (describe-block (stream "~A names ~A declaration." name kind)))))
