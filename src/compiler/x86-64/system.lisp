@@ -57,7 +57,7 @@
     (:policy :fast-safe)
     (:args (object :scs (descriptor-reg))
            (layouts :scs (constant)))
-    (:temporary (:sc unsigned-reg :offset rax-offset :target result) rax)
+    (:temporary (:sc unsigned-reg :offset rax-offset) rax)
     (:results (result :scs (descriptor-reg)))
     (:generator 6
       ;; Lowtag: #b0011 instance
@@ -82,14 +82,14 @@
       IMM-OR-LIST
       (inst cmp  object nil-value)
       (inst jmp  :eq NULL)
-      (inst xor  (reg-in-size rax :dword) #b1111) ; restore it
-      (inst and  (reg-in-size rax :dword) #xff)
+      (inst movzx (reg-in-size rax :dword) (reg-in-size object :byte))
       LOAD-FROM-VECTOR
       (inst mov  result layouts)
-      (inst mov  result (make-ea :qword :base result
-                                 :index rax :scale 8
-                                 :disp (+ (ash vector-data-offset word-shift)
-                                          (- other-pointer-lowtag))))
+      (inst mov  (reg-in-size result :dword)
+            (make-ea :dword :base result
+                            :index rax :scale 8
+                            :disp (+ (ash vector-data-offset word-shift)
+                                     (- other-pointer-lowtag))))
       (inst jmp  done)
       NULL
       (inst mov  result (make-fixup (find-layout 'null) :layout))
