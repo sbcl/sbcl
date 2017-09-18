@@ -23,10 +23,20 @@
 (defun constant-lvar-p (thing)
   (declare (type (or lvar null) thing))
   (and (lvar-p thing)
-       (or (let ((use (principal-lvar-use thing)))
-             (and (ref-p use) (constant-p (ref-leaf use))))
-           ;; check for EQL types and singleton numeric types
-           (values (type-singleton-p (lvar-type thing))))))
+       (let* ((type (lvar-type thing))
+              (principal-lvar (principal-lvar thing))
+              (principal-use (lvar-uses principal-lvar))
+              leaf)
+         (or (and (ref-p principal-use)
+                  (constant-p (setf leaf (ref-leaf principal-use)))
+                  ;; LEAF may be a CONSTANT behind a cast that will
+                  ;; later turn out to be of the wrong type.
+                  ;; And ir1-transforms suffer from this because
+                  ;; they expect LVAR-VALUE to be of a restricted type.
+                  (or (not (lvar-reoptimize principal-lvar))
+                      (ctypep (constant-value leaf) type)))
+             ;; check for EQL types and singleton numeric types
+             (values (type-singleton-p type))))))
 
 ;;; Return the constant value for an LVAR whose only use is a constant
 ;;; node.
@@ -2392,4 +2402,3 @@
 
   (unless do-not-optimize
     (setf (node-reoptimize cast) nil)))
-

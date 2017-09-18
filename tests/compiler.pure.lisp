@@ -6584,3 +6584,15 @@
                                 (the (member #\UBC19E) x)))
             #\UBC19E)
            #\UBC19E)))
+
+(with-test (:name (compile * :constant-behind-cast :lp-1717971]))
+  (let ((fun (checked-compile
+              `(lambda (x)
+                 (declare (type integer x))
+                 (declare (optimize (debug 1) (safety 0) (space 3) (compilation-speed 0)))
+                 (catch 'ct5
+                   (* (flet ((%f (&key (x (throw 'ct5 123)))
+                               (the integer x)))
+                        (%f))
+                      x))))))
+    (assert (eql (funcall fun 45) 123))))
