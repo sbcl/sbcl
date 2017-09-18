@@ -463,7 +463,8 @@ void immobile_space_preserve_pointer(void* addr)
         object_start = (lispobj*)(page_start_addr + obj_index * obj_spacing);
         valid = !fixnump(*object_start)
             && (lispobj*)addr < object_start + fixedobj_page_obj_size(page_index)
-            && properly_tagged_descriptor_p(addr, object_start);
+            && (properly_tagged_descriptor_p(addr, object_start)
+                || widetag_of(*object_start) == FUNCALLABLE_INSTANCE_WIDETAG);
     }
     if (valid && (!compacting_p() ||
                   __immobile_obj_gen_bits(object_start) == from_space)) {
