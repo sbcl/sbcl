@@ -32,6 +32,8 @@
 #include "thread.h"
 #include "interr.h"
 
+extern const char *widetag_names[];
+
 /// Enable extra debug-only checks if DEBUG
 #ifdef DEBUG
 # define gc_dcheck(ex) gc_assert(ex)

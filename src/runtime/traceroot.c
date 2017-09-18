@@ -72,7 +72,6 @@ static int gen_of(lispobj obj) {
 const char* classify_obj(lispobj ptr)
 {
     extern lispobj* instance_classoid_name(lispobj*);
-    extern char *widetag_names[];
 
     lispobj* name; // a Lisp string
     switch(lowtag_of(ptr)) {
