@@ -1888,9 +1888,13 @@ wipe_nonpinned_words()
     printf("Sorted pin list:\n");
     for (i = 0; i < n_pins; ++i) {
       lispobj* obj = (lispobj*)pinned_objects.keys[i];
-      if (!is_cons_half(*obj))
-           printf("%p: %5d words\n", obj, (int)sizetab[widetag_of(*obj)](obj));
-      else printf("%p: CONS\n", obj);
+      lispobj word = *obj;
+      int widetag = widetag_of(word);
+      if (is_cons_half(word))
+          printf("%p: (cons)\n", obj);
+      else
+          printf("%p: %d words (%s)\n", obj,
+                 (int)sizetab[widetag](obj), widetag_names[widetag>>2]);
     }
 #endif
     // Each entry in the pinned objects demarcates two ranges to be cleared:
