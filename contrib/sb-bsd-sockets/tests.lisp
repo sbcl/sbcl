@@ -273,7 +273,6 @@
       t)
   t)
 
-
 ;;; these require that the internet (or bits of it, at least) is available
 
 #+internet-available
@@ -443,28 +442,26 @@
       result)
   :ok)
 
-(defmacro with-client-and-server ((server-socket-var client-socket-var) &body body)
-  (let ((listen-socket (gensym "LISTEN-SOCKET")))
-    `(let ((,listen-socket (make-instance 'inet-socket
-                                          :type :stream
-                                          :protocol :tcp))
-           (,client-socket-var (make-instance 'inet-socket
-                                              :type :stream
-                                              :protocol :tcp))
-           (,server-socket-var))
-      (unwind-protect
-           (progn
-             (setf (sockopt-reuse-address ,listen-socket) t)
-             (socket-bind ,listen-socket (make-inet-address "127.0.0.1") 0)
-             (socket-listen ,listen-socket 5)
-             (socket-connect ,client-socket-var (make-inet-address "127.0.0.1")
-                             (nth-value 1 (socket-name ,listen-socket)))
-             (setf ,server-socket-var (socket-accept ,listen-socket))
-             ,@body)
-        (socket-close ,client-socket-var)
-        (socket-close ,listen-socket)
-        (when ,server-socket-var
-          (socket-close ,server-socket-var))))))
+(defmacro with-client-and-server (((socket-class &rest common-initargs)
+                                   (listen-socket-var &rest listen-address)
+                                   (client-socket-var &rest client-address)
+                                   server-socket-var)
+                                  &body body)
+  `(let ((,listen-socket-var (make-instance ',socket-class ,@common-initargs))
+         (,client-socket-var (make-instance ',socket-class ,@common-initargs))
+         (,server-socket-var))
+     (unwind-protect
+          (progn
+            (setf (sockopt-reuse-address ,listen-socket-var) t)
+            (socket-bind ,listen-socket-var ,@listen-address)
+            (socket-listen ,listen-socket-var 5)
+            (socket-connect ,client-socket-var ,@client-address)
+            (setf ,server-socket-var (socket-accept ,listen-socket-var))
+            ,@body)
+       (socket-close ,client-socket-var)
+       (socket-close ,listen-socket-var)
+       (when ,server-socket-var
+         (socket-close ,server-socket-var)))))
 
 ;; For stream sockets, make sure a shutdown of the output direction
 ;; translates into an END-OF-FILE on the other end, no matter which
@@ -474,18 +471,23 @@
 (macrolet
     ((define-shutdown-test (name who-shuts-down who-reads element-type direction)
        `(deftest ,name
-          (with-client-and-server (client server)
-            (socket-shutdown ,who-shuts-down :direction ,direction)
-            (handler-case
-                (sb-ext:with-timeout 2
-                  (,(if (eql element-type 'character)
-                        'read-char 'read-byte)
-                   (socket-make-stream
-                    ,who-reads :input t :output t
-                    :element-type ',element-type)))
-              (end-of-file ()
-                :ok)
-              (sb-ext:timeout () :timeout)))
+          (let ((address (make-inet-address "127.0.0.1")))
+            (with-client-and-server
+                ((inet-socket :protocol :tcp :type :stream)
+                 (listener address 0)
+                 (client   address (nth-value 1 (socket-name listener)))
+                 server)
+              (socket-shutdown ,who-shuts-down :direction ,direction)
+              (handler-case
+                  (sb-ext:with-timeout 2
+                    (,(if (eql element-type 'character)
+                          'read-char 'read-byte)
+                      (socket-make-stream
+                       ,who-reads :input t :output t
+                       :element-type ',element-type)))
+                (end-of-file ()
+                  :ok)
+                (sb-ext:timeout () :timeout))))
           :ok))
      (define-shutdown-tests (direction)
        (flet ((make-name (name)
@@ -503,3 +505,13 @@
 
   (define-shutdown-tests :output)
   (define-shutdown-tests :io))
+
+#+linux
+(deftest abstract.socket-peername
+    (let ((address "J9dbfDNuVewDs"))
+      (with-client-and-server ((local-abstract-socket :type :stream)
+                               (listener address)
+                               (client address)
+                               server)
+        (string= (sb-ext:octets-to-string (socket-peername client)) address)))
+  t)

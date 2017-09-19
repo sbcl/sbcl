@@ -40,26 +40,38 @@ in the abstract namespace."))
 
 (defmethod make-sockaddr-for ((socket local-abstract-socket)
                               &optional sockaddr &rest address)
-  (check-type address (or null (cons (or string pathname) null)))
-  (let ((path (first address))
-        (sockaddr (or sockaddr (sockint::allocate-sockaddr-un-abstract)))
-        (len 0))
-    (setf (sockint::sockaddr-un-abstract-family sockaddr) sockint::af-local)
-    ;; First byte of the path is always 0.
-    (setf (sb-alien:deref (sockint::sockaddr-un-abstract-path sockaddr) 0) 0)
+  (check-type address (or null
+                          (cons (or (vector (unsigned-byte 8)) string pathname)
+                                null)))
 
-    (when path
-      (when (stringp path)
-        (setf path (sb-ext:string-to-octets path)))
-      (setf len (min (- sockint::size-of-sockaddr-un-abstract 3) (length path)))
-      ;; We fill in the rest of the path starting at index 1.
-      (loop for i from 0 below len
-            do (setf (sb-alien:deref (sockint::sockaddr-un-abstract-path
-                                      sockaddr)
-                                     (1+ i))
-                     (elt path i))))
+  (let* ((path (first address))
+         (path/octets (etypecase path
+                        (pathname (sb-ext:string-to-octets
+                                   (sb-ext:native-namestring path)))
+                        (string (sb-ext:string-to-octets path))
+                        (t path))))
+    (when (and path/octets
+               (> (length path/octets)
+                  (- sockint::size-of-sockaddr-un-abstract 3)))
+      (error "~@<Path is two long for the AF_LOCAL abstract namespace: ~
+              ~S.~@:>"
+             path))
 
-    (values sockaddr (+ 3 len))))
+    (let ((sockaddr (or sockaddr (sockint::allocate-sockaddr-un-abstract))))
+      (setf (sockint::sockaddr-un-abstract-family sockaddr) sockint::af-local)
+      ;; First byte of the path is always 0.
+      (setf (sb-alien:deref (sockint::sockaddr-un-abstract-path sockaddr) 0) 0)
+      (cond
+        (path/octets
+         ;; We fill in the rest of the path starting at index 1.
+         (loop for octet across path/octets
+            for i from 1
+            do (setf (sb-alien:deref
+                      (sockint::sockaddr-un-abstract-path sockaddr) i)
+                     octet))
+         (values sockaddr (+ 2 1 (length path/octets))))
+        (t
+         (values sockaddr sockint::size-of-sockaddr-un-abstract))))))
 
 (defmethod free-sockaddr-for ((socket local-abstract-socket) sockaddr)
   (sockint::free-sockaddr-un-abstract sockaddr))
@@ -67,17 +79,18 @@ in the abstract namespace."))
 (defmethod size-of-sockaddr ((socket local-abstract-socket))
   sockint::size-of-sockaddr-un-abstract)
 
-(defmethod bits-of-sockaddr ((socket local-abstract-socket) sockaddr)
+(defmethod bits-of-sockaddr ((socket local-abstract-socket) sockaddr
                              &optional
                              (size sockint::size-of-sockaddr-un-abstract))
   "Return the contents of the local socket address SOCKADDR."
-  (let* ((path-len (- size 3))
-         (path (make-array `(,path-len)
-                           :element-type '(unsigned-byte 8)
-                           :initial-element 0)))
-    ;; Exclude the first byte (it's always null) of the address.
-    (loop for i from 1 to path-len
-          do (setf (elt path (1- i))
-                   (sb-alien:deref (sockint::sockaddr-un-abstract-path sockaddr)
-                                   i)))
-    path))
+  (when (> size 2)
+    (let* ((path-length (- size 2 1))
+           (path (make-array path-length
+                             :element-type '(unsigned-byte 8)
+                             :initial-element 0)))
+      ;; Exclude the first byte (it's always null) of the address.
+      (loop for i from 1 to path-length
+         do (setf (aref path (1- i))
+                  (sb-alien:deref
+                   (sockint::sockaddr-un-abstract-path sockaddr) i)))
+      path)))
