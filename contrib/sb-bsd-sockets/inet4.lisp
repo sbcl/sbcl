@@ -99,11 +99,12 @@ Examples:
 (defmethod size-of-sockaddr ((socket inet-socket))
   sockint::size-of-sockaddr-in)
 
-(defmethod bits-of-sockaddr ((socket inet-socket) sockaddr)
+(defmethod bits-of-sockaddr ((socket inet-socket) sockaddr &optional size)
   "Returns address and port of SOCKADDR as multiple values"
   (declare (type (sb-alien:alien
                   (* (sb-alien:struct sb-bsd-sockets-internal::sockaddr-in)))
-                 sockaddr))
+                 sockaddr)
+           (ignore size))
   (let ((vector (make-array 4 :element-type '(unsigned-byte 8))))
     (loop for i below 4
           do (setf (aref vector i)

@@ -119,13 +119,17 @@ directly instantiated.")))
 
 (defmethod socket-peername ((socket socket))
   (with-socket-fd-and-addr (fd sockaddr size) socket
-    (socket-error-case ("getpeername" (sockint::getpeername fd sockaddr size))
-        (bits-of-sockaddr socket sockaddr))))
+    (socket-error-case ("getpeername"
+                        (sockint::getpeername fd sockaddr size)
+                        (result actual-size))
+        (bits-of-sockaddr socket sockaddr actual-size))))
 
 (defmethod socket-name ((socket socket))
   (with-socket-fd-and-addr (fd sockaddr size) socket
-    (socket-error-case ("getsockname" (sockint::getsockname fd sockaddr size))
-        (bits-of-sockaddr socket sockaddr))))
+    (socket-error-case ("getsockname"
+                        (sockint::getsockname fd sockaddr size)
+                       (result actual-size))
+        (bits-of-sockaddr socket sockaddr actual-size))))
 
 ;;; There are a whole bunch of interesting things you can do with a
 ;;; socket that don't really map onto "do stream io", especially in

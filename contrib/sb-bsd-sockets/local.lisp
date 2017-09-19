@@ -19,7 +19,7 @@ also known as unix-domain sockets."))
     (setf (sockint::sockaddr-un-family sockaddr) sockint::af-local)
     (when filename
       (setf (sockint::sockaddr-un-path sockaddr) filename))
-    sockaddr))
+    (values sockaddr sockint::size-of-sockaddr-un)))
 
 (defmethod free-sockaddr-for ((socket local-socket) sockaddr)
   (sockint::free-sockaddr-un sockaddr))
@@ -27,8 +27,9 @@ also known as unix-domain sockets."))
 (defmethod size-of-sockaddr ((socket local-socket))
   sockint::size-of-sockaddr-un)
 
-(defmethod bits-of-sockaddr ((socket local-socket) sockaddr)
+(defmethod bits-of-sockaddr ((socket local-socket) sockaddr &optional size)
   "Return the file name of the local socket address SOCKADDR."
+  (declare (ignore size))
   (let ((name (sockint::sockaddr-un-path sockaddr)))
     (unless (zerop (length name)) name)))
 
@@ -67,8 +68,10 @@ in the abstract namespace."))
   sockint::size-of-sockaddr-un-abstract)
 
 (defmethod bits-of-sockaddr ((socket local-abstract-socket) sockaddr)
+                             &optional
+                             (size sockint::size-of-sockaddr-un-abstract))
   "Return the contents of the local socket address SOCKADDR."
-  (let* ((path-len (- sockint::size-of-sockaddr-un-abstract 3))
+  (let* ((path-len (- size 3))
          (path (make-array `(,path-len)
                            :element-type '(unsigned-byte 8)
                            :initial-element 0)))

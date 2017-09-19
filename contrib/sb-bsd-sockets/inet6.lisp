@@ -107,11 +107,12 @@ malformed."
 (defmethod size-of-sockaddr ((socket inet6-socket))
   sockint::size-of-sockaddr-in6)
 
-(defmethod bits-of-sockaddr ((socket inet6-socket) sockaddr)
+(defmethod bits-of-sockaddr ((socket inet6-socket) sockaddr &optional size)
   "Returns address and port of SOCKADDR as multiple values"
+  (declare (ignore size))
   (values
    (coerce (loop for i from 0 below 16
-                 collect (sb-alien:deref (sockint::sockaddr-in6-addr sockaddr) i))
+              collect (sb-alien:deref (sockint::sockaddr-in6-addr sockaddr) i))
            '(vector (unsigned-byte 8) 16))
    (+ (* 256 (sb-alien:deref (sockint::sockaddr-in6-port sockaddr) 0))
       (sb-alien:deref (sockint::sockaddr-in6-port sockaddr) 1))))

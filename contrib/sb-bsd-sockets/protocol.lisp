@@ -12,7 +12,7 @@ When SOCKADDR is passed, it is used instead of a new object."))
    "Deallocate the socket address object SOCKADDR that was created for
 SOCKET."))
 
-(defgeneric bits-of-sockaddr (socket sockaddr)
+(defgeneric bits-of-sockaddr (socket sockaddr &optional size)
   (:documentation
    "Return as multiple values protocol-dependent bits of parameter
 SOCKADDR, e.g. the host/port if SOCKET is an inet socket."))
