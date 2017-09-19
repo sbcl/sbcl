@@ -51,6 +51,18 @@
            '(x))
   t)
 
+(deftest macro-lambda-list.3
+    (equal (function-lambda-list (defmacro macro-lambda-list.1-m (x &optional (b "abc"))
+                                   `(x b)))
+           '(x &optional (b "abc")))
+  t)
+
+(deftest macro-lambda-list.4
+    (equal (function-lambda-list (defmacro macro-lambda-list.1-m (x &key (b "abc"))
+                                   `(x b)))
+           '(x &key (b "abc")))
+  t)
+
 (deftest definition-source.1
     (values (consp (find-definition-sources-by-name 'vectorp :vop))
             (consp (find-definition-sources-by-name 'check-type :macro)))

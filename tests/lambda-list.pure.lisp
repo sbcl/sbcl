@@ -183,11 +183,11 @@
          '((&body foo) (&whole (a . d) x y)))
 
     (try '(&optional a ((bb1 bb2) (f)) (c 'c) (d 'd dsp) &aux foo (baz))
-         '(&optional a ((bb1 bb2)) (c 'c) (d 'd)))
+         '(&optional a ((bb1 bb2)) (c) (d)))
 
     (try '(&key ((:bork (zook mook)) def bsp) (e 'e esp)
                 ((:name fred)) (color x csp))
-         '(&key ((:bork (zook mook))) (e 'e) ((:name fred)) (color)))
+         '(&key ((:bork (zook mook))) (e) ((:name fred)) (color)))
 
     (try '(x &optional (y) (((&whole (&whole w z . r) &body b) (c)) (def)))
          ;;                           ^ this &WHOLE variable is irrelevant
@@ -209,8 +209,8 @@
     ;; This asserts that sharing works during re-construction.
     (let ((parse (sb-c::parse-ds-lambda-list '(((a)))))
           (cache (list nil)))
-      (assert (eq (sb-c::unparse-ds-lambda-list parse cache)
-                  (sb-c::unparse-ds-lambda-list parse cache))))))
+      (assert (eq (sb-c::unparse-ds-lambda-list parse :cache cache)
+                  (sb-c::unparse-ds-lambda-list parse :cache cache))))))
 
 (with-test (:name :macro-lambda-list)
   ;; This only parses the surface level, which suffices to check for

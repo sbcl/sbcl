@@ -526,18 +526,7 @@
 ;;; Produce a destructuring lambda list from its internalized representation,
 ;;; excluding any parts that don't constrain the shape of the expected input.
 ;;; &AUX, supplied-p vars, and defaults do not impose shape constraints.
-;;;
-;;; However as a special case, some constant defaults are retained mainly for
-;;; backward-compatibility.
-;;; The reason for it is that a test in SB-INTROSPECT checks the lambda list
-;;; of type ARRAY, which has explicit '* defaults. They're explicit
-;;; because of a bug or deficiency in !DEF-TYPE-TRANSLATOR which does not
-;;; adhere to the convention that DEFTYPE-like lambda lists use '* as implicit
-;;; defaults for everything unless stated otherwise.
-;;; So really the '* should have been superfluous in the lambda list,
-;;; but I'm also not convinced that changing the test case is the right thing.
-;;;
-(defun unparse-ds-lambda-list (parsed-lambda-list &optional cache)
+(defun unparse-ds-lambda-list (parsed-lambda-list &key cache (remove-defaults t))
   (cond ((symbolp parsed-lambda-list) parsed-lambda-list)
         ((cdr (assq parsed-lambda-list (cdr cache))))
         (t
@@ -549,12 +538,9 @@
                           (cons (recurse (car spec)) (maybe-default spec))))
                     (maybe-default (spec)
                       (let ((def (cdr spec)))
-                        (when (and def (typep (car def)
-                                              '(or (cons (eql quote))
-                                                   (member t)
-                                                   keyword number)))
+                        (when (and def (not remove-defaults))
                           (list (car def))))) ; Remove any supplied-p var.
-                    (recurse (x) (unparse-ds-lambda-list x cache))
+                    (recurse (x) (unparse-ds-lambda-list x :cache cache))
                     (memoize (input output)
                       (when cache (push (cons input output) (cdr cache)))
                       output))
@@ -722,7 +708,7 @@
 ;;;
 (defun emit-ds-bind-check (parsed-lambda-list input macro-context memo-table)
   (with-ds-lambda-list-parts (llks nil req opt rest keys) parsed-lambda-list
-    (let* ((display (unparse-ds-lambda-list parsed-lambda-list memo-table))
+    (let* ((display (unparse-ds-lambda-list parsed-lambda-list :cache memo-table))
            (pattern `',(if macro-context (cons macro-context display) display))
            (min (length req))
            (max (+ min (length opt)))
@@ -1145,7 +1131,7 @@
                 (values
                  (or ll
                      ;; Normalize the lambda list by unparsing.
-                     `(lambda-list ,(unparse-ds-lambda-list parse)))
+                     `(lambda-list ,(unparse-ds-lambda-list parse :remove-defaults nil)))
                  (if ll
                      (loop for (declare . declarations) in decls
                            collect (list* declare
