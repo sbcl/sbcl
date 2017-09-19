@@ -1981,6 +1981,8 @@
 
 (defknown sb!pcl::pcl-instance-p (t) boolean
   (movable foldable flushable))
+(defknown sb!impl::new-instance-hash-code ()
+  (and unsigned-byte fixnum (not (eql 0))))
 
 ;; FIXME: should T be be (OR INSTANCE FUNCALLABLE-INSTANCE) etc?
 (defknown slot-value (t symbol) t (any))

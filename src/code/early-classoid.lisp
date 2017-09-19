@@ -153,7 +153,10 @@
   ;; the number of top level descriptor cells in each instance
   ;; For [FUNCALLABLE-]STANDARD-OBJECT instances, this is the slot vector
   ;; length, not the primitive object length.
-  (length 0 :type index)
+  ;; I tried making a structure of this many slots, and the compiler blew up;
+  ;; so it's fair to say this limit is sufficient for practical purposes,
+  ;; Let's be consistent here between the two choices of word size.
+  (length 0 :type (unsigned-byte 28)) ; smaller than SB-INT:INDEX
   ;; If this layout has some kind of compiler meta-info, then this is
   ;; it. If a structure, then we store the DEFSTRUCT-DESCRIPTION here.
   (info nil :type (or null defstruct-description))

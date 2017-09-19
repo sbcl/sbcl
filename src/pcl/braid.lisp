@@ -47,6 +47,7 @@
                  (:amop :function set-funcallable-instance-function))))
 
 (defun allocate-standard-funcallable-instance (wrapper)
+  (declare (layout wrapper))
   (let* ((slots (make-array (layout-length wrapper) :initial-element +slot-unbound+))
          (fin (cond #+(and compact-instance-header immobile-code)
                     ((not (eql (layout-bitmap wrapper) -1))
@@ -56,9 +57,10 @@
                        (setf (%funcallable-instance-layout f) wrapper)
                        (sb-vm::%set-fin-trampoline f)))
                     (t
-                     (let ((f (%make-standard-funcallable-instance
-                               slots
-                               #-compact-instance-header (sb-impl::new-instance-hash-code))))
+                     (let ((f (truly-the funcallable-instance
+                               (%make-standard-funcallable-instance
+                                slots
+                                #-compact-instance-header (sb-impl::new-instance-hash-code)))))
                        (setf (%funcallable-instance-layout f) wrapper)
                        f)))))
     #+compact-instance-header
