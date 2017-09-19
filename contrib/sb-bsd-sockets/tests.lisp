@@ -507,6 +507,19 @@
   (define-shutdown-tests :io))
 
 #+linux
+(deftest abstract.smoke
+    (let* ((address "J9dbfDNuVewDs")
+           (message "message")
+           (buffer (make-string (length message))))
+      (with-client-and-server ((local-abstract-socket :type :stream)
+                               (listener address)
+                               (client address)
+                               server)
+        (socket-send client message nil)
+        (string= (socket-receive server buffer nil) message)))
+  t)
+
+#+linux
 (deftest abstract.socket-peername
     (let ((address "J9dbfDNuVewDs"))
       (with-client-and-server ((local-abstract-socket :type :stream)
