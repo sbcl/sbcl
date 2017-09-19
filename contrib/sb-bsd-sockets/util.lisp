@@ -2,8 +2,9 @@
 
 ;;; System call helpers
 
+(declaim (inline interrupted-p))
 (defun interrupted-p (errno)
-  (member errno `(,sockint::EAGAIN ,sockint::EINTR) :test #'=))
+  (or (= errno sockint::EAGAIN) (= errno sockint::EINTR)))
 
 (defmacro syscall-error-case ((form result-var test-form errno-form)
                               &optional no-error-form
