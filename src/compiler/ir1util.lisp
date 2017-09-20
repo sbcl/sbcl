@@ -1391,7 +1391,8 @@
       ;; have one.
       (let ((policy (lexenv-%policy *lexenv*)))
         (dolist (functional functionals)
-          (when (and (policy= policy (lexenv-%policy (functional-lexenv functional)))
+          (when (and (neq (functional-kind functional) :deleted)
+                     (policy= policy (lexenv-%policy (functional-lexenv functional)))
                      (eq (lambda-component
                           (lambda-home
                            (if (lambda-p functional)
