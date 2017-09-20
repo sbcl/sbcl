@@ -2764,6 +2764,9 @@ is_in_stack_space(lispobj ptr)
      * to a thread stack space.  This would be faster if the thread
      * structures had page-table entries as if they were part of
      * the heap space. */
+    /* Actually, no, how would that be faster?
+     * If you have to examine thread structures, you have to examine
+     * them all. This demands something like a binary search tree */
     struct thread *th;
     for_each_thread(th) {
         if ((th->control_stack_start <= (lispobj *)ptr) &&
@@ -2778,15 +2781,22 @@ struct verify_state {
     lispobj *object_start, *object_end;
     lispobj *virtual_where;
     uword_t flags;
+    int errors;
     generation_index_t object_gen;
 };
+
+#define VERIFY_VERBOSE    1
+/* AGGRESSIVE = always call valid_lisp_pointer_p() on pointers.
+ * Otherwise, do only a quick check that widetag/lowtag correspond */
+#define VERIFY_AGGRESSIVE 2
+/* VERIFYING_foo indicates internal state, not a caller's option */
+#define VERIFYING_HEAP_OBJECTS 8
 
 // NOTE: This function can produces false failure indications,
 // usually related to dynamic space pointing to the stack of a
 // dead thread, but there may be other reasons as well.
-#define VERIFYING_STACK 8
 static void
-verify_range(lispobj *where, sword_t words, struct verify_state *state)
+verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
 {
     extern int valid_lisp_pointer_p(lispobj);
     boolean is_in_readonly_space =
@@ -2799,11 +2809,11 @@ verify_range(lispobj *where, sword_t words, struct verify_state *state)
          where < immobile_space_free_pointer);
 #endif
 
-    lispobj *end = where + words;
+    lispobj *end = where + nwords;
     size_t count;
     for ( ; where < end ; where += count) {
         // Keep track of object boundaries, unless verifying a non-heap space.
-        if (where > state->object_end && !(state->flags & VERIFYING_STACK)) {
+        if (where > state->object_end && (state->flags & VERIFYING_HEAP_OBJECTS)) {
             state->object_start = where;
             state->object_end = where + OBJECT_SIZE(*where, where) - 1;
         }
@@ -2822,42 +2832,61 @@ verify_range(lispobj *where, sword_t words, struct verify_state *state)
                  thing < (lispobj)immobile_space_free_pointer);
 #endif
 
+    /* unlike lose(), fprintf detects format mismatch, hence the casts */
+#define FAIL_IF(what, why) if (what) { \
+    if (++state->errors > 25) lose("Too many errors"); \
+    else fprintf(stderr, "Ptr %p @ %"OBJ_FMTX" sees %s\n", \
+                 (void*)(uintptr_t)thing, \
+                 (uword_t)(state->virtual_where ? state->virtual_where : where), \
+                 why); }
+
             /* Does it point to the dynamic space? */
             if (page_index != -1) {
                 /* If it's within the dynamic space it should point to a used page. */
-                if ((thing & (GENCGC_CARD_BYTES-1)) >= page_bytes_used(page_index))
-                    lose ("Ptr %p @ %p sees %s.\n", thing,
-                          state->virtual_where ? state->virtual_where : where,
-                          page_free_p(page_index) ? "free page" : "unallocated space");
+                FAIL_IF(page_free_p(page_index), "free page");
+                FAIL_IF(!(page_table[page_index].allocated & OPEN_REGION_PAGE_FLAG)
+                        && (thing & (GENCGC_CARD_BYTES-1)) >= page_bytes_used(page_index),
+                        "unallocated space");
                 /* Check that it doesn't point to a forwarding pointer! */
-                if (*native_pointer(thing) == 0x01) {
-                    lose("Ptr %p @ %p sees forwarding ptr.\n", thing,
-                         state->virtual_where ? state->virtual_where : where);
-                }
+                FAIL_IF(*native_pointer(thing) == 0x01, "forwarding ptr");
                 /* Check that its not in the RO space as it would then be a
                  * pointer from the RO to the dynamic space. */
-                if (is_in_readonly_space) {
-                    lose("ptr to dynamic space %p from RO space %x\n",
-                         thing, where);
-                }
+                FAIL_IF(is_in_readonly_space, "dynamic space from RO space");
             } else if (to_immobile_space) {
                 // the object pointed to must not have been discarded as garbage
-                if (!other_immediate_lowtag_p(*native_pointer(thing))
-                    || immobile_filler_p(native_pointer(thing)))
-                    lose("Ptr %p @ %p sees trashed object.\n", thing,
-                         state->virtual_where ? state->virtual_where : where);
+                FAIL_IF(!other_immediate_lowtag_p(*native_pointer(thing)) ||
+                        immobile_filler_p(native_pointer(thing)),
+                        "trashed object");
             }
-            /* If any-space -> dynamic-space and paranoid,
-             * or any space -> immobile-space or immobile-space -> any space,
-             * then search for the pointee.  If the pointer points to a stack,
-             * we can only hope that the frame hasn't been clobbered,
-             * or that the object containing this pointer is unreachable.
-             * Currently only 1 flag in 'flags' - whether to be paranoid.
-             */
-            if ((page_index >= 0 && (state->flags != 0)) ||
-                (is_in_immobile_space || to_immobile_space))
-                if (!valid_lisp_pointer_p(thing) && !is_in_stack_space(thing))
-                    lose("Ptr %p @ %p sees junk.\n", thing, where);
+            /* Any pointer that points to non-static space is examined further.
+             * You might think this should scan stacks first as a quick out,
+             * but that would take time proportional to the number of threads. */
+            if (page_index >= 0 || to_immobile_space) {
+                int valid;
+                /* If aggressive, or to/from immobile space, do a full search
+                 * (as entailed by valid_lisp_pointer_p) */
+                if ((state->flags & VERIFY_AGGRESSIVE)
+                    || (is_in_immobile_space || to_immobile_space))
+                    valid = valid_lisp_pointer_p(thing);
+                else {
+                    /* Efficiently decide whether 'thing' is plausible.
+                     * This MUST NOT use properly_tagged_descriptor_p() which
+                     * assumes a known good object base address, and would
+                     * "dangerously" scan a code component for embedded funs. */
+                    int lowtag = lowtag_of(thing);
+                    if (lowtag == LIST_POINTER_LOWTAG)
+                        valid = is_cons_half(CONS(thing)->car)
+                             && is_cons_half(CONS(thing)->cdr);
+                    else {
+                        lispobj word = *native_pointer(thing);
+                        valid = other_immediate_lowtag_p(word) &&
+                            lowtag_for_widetag[widetag_of(word)>>2] == lowtag;
+                    }
+                }
+                /* If 'thing' points to a stack, we can only hope that the frame
+                 * not clobbered, or the object at 'where' is unreachable. */
+                FAIL_IF(!valid && !is_in_stack_space(thing), "junk");
+            }
             continue;
         }
         int widetag = widetag_of(thing);
@@ -2921,19 +2950,30 @@ static uword_t verify_space(lispobj start, lispobj* end, uword_t flags) {
     memset(&state, 0, sizeof state);
     state.flags = flags;
     verify_range((lispobj*)start, end-(lispobj*)start, &state);
+    if (state.errors) lose("verify failed: %d error(s)", state.errors);
     return 0;
 }
-
+static uword_t verify_gen_aux(lispobj start, lispobj* end, struct verify_state* state)
+{
+    verify_range((lispobj*)start, end-(lispobj*)start, state);
+    return 0;
+}
 static void verify_generation(generation_index_t generation, uword_t flags)
 {
-    walk_generation((uword_t(*)(lispobj*,lispobj*,uword_t))verify_space,
-                    generation, flags);
+    struct verify_state state;
+    memset(&state, 0, sizeof state);
+    state.flags = flags;
+    walk_generation((uword_t(*)(lispobj*,lispobj*,uword_t))verify_gen_aux,
+                    generation, (uword_t)&state);
+    if (state.errors) lose("verify failed: %d error(s)", state.errors);
 }
 
 void verify_gc(uword_t flags)
 {
-    int verbose = flags & 2;
-    flags -= verbose;
+    int verbose = flags & VERIFY_VERBOSE;
+
+    flags |= VERIFYING_HEAP_OBJECTS;
+
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 #  ifdef __linux__
     // Try this verification if marknsweep was compiled with extra debugging.
@@ -2952,12 +2992,12 @@ void verify_gc(uword_t flags)
     for_each_thread(th) {
         verify_space((lispobj)th->binding_stack_start,
                      (lispobj*)get_binding_stack_pointer(th),
-                     VERIFYING_STACK | flags);
+                     flags ^ VERIFYING_HEAP_OBJECTS);
 #ifdef LISP_FEATURE_SB_THREAD
         verify_space((lispobj)(th+1),
                      (lispobj*)(SymbolValue(FREE_TLS_INDEX,0)
                                 + (char*)((union per_thread_data*)th)->dynamic_values),
-                     VERIFYING_STACK | flags);
+                     flags ^ VERIFYING_HEAP_OBJECTS);
 #endif
     }
     if (verbose)
