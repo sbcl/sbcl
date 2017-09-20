@@ -2188,9 +2188,8 @@ update_page_write_prot(page_index_t page)
             // looks like fun-header-widetag. We can't naively back up to the
             // underlying code object since the alleged header might not be one.
             int obj_gen = gen; // Make comparison fail if we fall through
-            if (lowtag_of((lispobj)ptr) != FUN_POINTER_LOWTAG) {
-                obj_gen = __immobile_obj_generation(native_pointer((lispobj)ptr));
-            } else if (widetag_of(header) == SIMPLE_FUN_WIDETAG) {
+            if (lowtag_of((lispobj)ptr) == FUN_POINTER_LOWTAG &&
+                widetag_of(header) == SIMPLE_FUN_WIDETAG) {
                 lispobj* code = fun_code_header((lispobj)ptr - FUN_POINTER_LOWTAG);
                 // This is a heuristic, since we're not actually looking for
                 // an object boundary. Precise scanning of 'page' would obviate
@@ -2198,13 +2197,15 @@ update_page_write_prot(page_index_t page)
                 if ((lispobj)code >= IMMOBILE_VARYOBJ_SUBSPACE_START
                     && widetag_of(*code) == CODE_HEADER_WIDETAG)
                     obj_gen = __immobile_obj_generation(code);
+            } else {
+                obj_gen = __immobile_obj_generation(native_pointer((lispobj)ptr));
             }
             // A bogus generation number implies a not-really-pointer,
             // but it won't cause misbehavior.
             if (obj_gen < gen || obj_gen == SCRATCH_GENERATION) {
                 wp_it = 0;
                 break;
-           }
+            }
         }
 #endif
     }
