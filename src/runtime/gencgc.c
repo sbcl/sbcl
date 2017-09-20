@@ -112,6 +112,8 @@ boolean pre_verify_gen_0 = 0;
 boolean gencgc_zero_check = 0;
 
 /* Should we check that the free space is zero filled? */
+/* Don't use this - you'll get more mileage out of READ_PROTECT_FREE_PAGES,
+ * because we zero-fill lazily. This switch should probably be removed. */
 boolean gencgc_enable_verify_zero_fill = 0;
 
 /* When loading a core, don't do a full scan of the memory for the
@@ -2781,6 +2783,7 @@ struct verify_state {
 // NOTE: This function can produces false failure indications,
 // usually related to dynamic space pointing to the stack of a
 // dead thread, but there may be other reasons as well.
+#define VERIFYING_STACK 8
 static void
 verify_range(lispobj *where, sword_t words, struct verify_state *state)
 {
@@ -2798,7 +2801,8 @@ verify_range(lispobj *where, sword_t words, struct verify_state *state)
     lispobj *end = where + words;
     size_t count;
     for ( ; where < end ; where += count) {
-        if (where > state->object_end) {
+        // Keep track of object boundaries, unless verifying a non-heap space.
+        if (where > state->object_end && !(state->flags & VERIFYING_STACK)) {
             state->object_start = where;
             state->object_end = where + OBJECT_SIZE(*where, where) - 1;
         }
@@ -2919,7 +2923,11 @@ static uword_t verify_space(lispobj start, lispobj* end, uword_t flags) {
     return 0;
 }
 
-static void verify_dynamic_space();
+static void verify_generation(generation_index_t generation, uword_t flags)
+{
+    walk_generation((uword_t(*)(lispobj*,lispobj*,uword_t))verify_space,
+                    generation, flags);
+}
 
 void verify_gc(uword_t flags)
 {
@@ -2943,17 +2951,23 @@ void verify_gc(uword_t flags)
     for_each_thread(th) {
         verify_space((lispobj)th->binding_stack_start,
                      (lispobj*)get_binding_stack_pointer(th),
-                     flags);
+                     VERIFYING_STACK | flags);
+#ifdef LISP_FEATURE_SB_THREAD
+        verify_space((lispobj)(th+1),
+                     (lispobj*)(SymbolValue(FREE_TLS_INDEX,0)
+                                + (char*)((union per_thread_data*)th)->dynamic_values),
+                     VERIFYING_STACK | flags);
+#endif
     }
     if (verbose)
         printf("Verifying RO space\n");
     verify_space(READ_ONLY_SPACE_START, read_only_space_free_pointer, flags);
-    if (gencgc_verbose)
+    if (verbose)
         printf("Verifying static space\n");
     verify_space(STATIC_SPACE_START, static_space_free_pointer, flags);
     if (verbose)
         printf("Verifying dynamic space\n");
-    verify_dynamic_space();
+    verify_generation(-1, flags);
 }
 
 /* Call 'proc' with pairs of addresses demarcating ranges in the
@@ -2994,11 +3008,6 @@ walk_generation(uword_t (*proc)(lispobj*,lispobj*,uword_t),
         }
     }
     return 0;
-}
-static void verify_generation(generation_index_t generation)
-{
-    walk_generation((uword_t(*)(lispobj*,lispobj*,uword_t))verify_space,
-                    generation, 0);
 }
 
 /* Check that all the free space is zero filled. */
@@ -3042,14 +3051,6 @@ gencgc_verify_zero_fill(void)
     gc_alloc_update_all_page_tables(1);
     SHOW("verifying zero fill");
     verify_zero_fill();
-}
-
-static void
-verify_dynamic_space(void)
-{
-    verify_generation(-1);
-    if (gencgc_enable_verify_zero_fill)
-        verify_zero_fill();
 }
 
 /* Write-protect all the dynamic boxed pages in the given generation. */
@@ -3681,7 +3682,7 @@ collect_garbage(generation_index_t last_gen)
     /* Verify the new objects created by Lisp code. */
     if (pre_verify_gen_0) {
         FSHOW((stderr, "pre-checking generation 0\n"));
-        verify_generation(0);
+        verify_generation(0, 0);
     }
 
     if (gencgc_verbose > 1)
