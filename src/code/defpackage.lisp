@@ -69,7 +69,7 @@
          (unless (typep optval '(cons t null))
            (error 'simple-program-error
                   :format-control "~S expects a single argument. Got ~S"
-                  :format-arguments (list (cdr option))))
+                  :format-arguments (list (car option) (cdr option))))
          (push optname seen)
          (setq optval (car optval))))
       (case optname
