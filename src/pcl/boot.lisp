@@ -2454,11 +2454,11 @@ bootstrapping.
     ;; trusted anymore, the warning is still not quite as interesting.
     (when (and (eq :declared (info :function :where-from fun-name))
                (not (csubtypep gf-type (setf old-type (proclaimed-ftype fun-name)))))
-      (style-warn "~@<Generic function ~S clobbers an earlier ~S proclamation ~S ~
-                   for the same name with ~S.~:@>"
-                  fun-name 'ftype
-                  (type-specifier old-type)
-                  (type-specifier gf-type)))
+      (style-warn "~@<Generic function ~
+                   ~/sb-ext:print-symbol-with-prefix/ clobbers an ~
+                   earlier ~S proclamation ~/sb-ext:print-type/ for ~
+                   the same name with ~/sb-ext:print-type/.~:@>"
+                   fun-name 'ftype old-type gf-type))
     (setf (info :function :type fun-name) gf-type
           (info :function :where-from fun-name) :defined-method)
     fun-name))

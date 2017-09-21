@@ -87,10 +87,11 @@
                (unless (defined-ftype-matches-declared-ftype-p
                          defined-ftype declared-ftype)
                  (compiler-style-warn
-                  "~@<The previously declared FTYPE~2I ~_~S~I ~_~
-                   conflicts with the definition type ~2I~_~S~:>"
-                  (type-specifier declared-ftype)
-                  (type-specifier defined-ftype)))))
+                  "~@<The previously declared FTYPE~
+                   ~2I ~_~/sb!impl:print-type/~I ~_~
+                   conflicts with the definition type ~
+                   ~2I~_~/sb!impl:print-type/~:>"
+                  declared-ftype defined-ftype))))
             (:defined
              (setf (info :function :type source-name) defined-ftype)))))))
   (values))
