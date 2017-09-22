@@ -54,3 +54,15 @@
   (with-compiled-and-interpreted-format ()
     (assert-error (format* "~2@*" '()) format-error-with-control-string)
     (assert-error (format* "~1:*" '()) format-error-with-control-string)))
+
+(with-test (:name :encapsulated-~/-formatter)
+  (let ((s (make-string-output-stream)))
+    (declare (notinline format))
+    (sb-int:encapsulate 'sb-ext:print-symbol-with-prefix 'test
+                        (lambda (f stream obj &rest args)
+                          (write-string "{{" stream)
+                          (apply f stream obj args)
+                          (write-string "}}" stream)))
+    (format s "~/sb-ext:print-symbol-with-prefix/" 'cl-user::test)
+    (sb-int:unencapsulate 'sb-ext:print-symbol-with-prefix 'test)
+    (assert (string= "{{COMMON-LISP-USER::TEST}}" (get-output-stream-string s)))))
