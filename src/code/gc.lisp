@@ -156,7 +156,7 @@ statistics are appended to it."
 
 (define-load-time-global *already-in-gc* (sb!thread:make-mutex :name "GC lock"))
 
-(defun sub-gc (&key (gen 0))
+(defun sub-gc (gen)
   (cond (*gc-inhibit*
          (setf *gc-pending* t)
          nil)
@@ -299,7 +299,7 @@ If GEN is provided, it can be used to specify the oldest generation
 guaranteed to be collected."
   #!-gencgc (declare (ignore full))
   (let (#!+gencgc (gen (if full sb!vm:+pseudo-static-generation+ gen)))
-    (when (eq t (sub-gc :gen gen))
+    (when (eq t (sub-gc gen))
       (post-gc))))
 
 (define-alien-routine scrub-control-stack void)

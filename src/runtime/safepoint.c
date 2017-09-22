@@ -577,7 +577,7 @@ check_pending_gc(os_context_t *ctx)
             bind_variable(IN_SAFEPOINT,T,self);
             block_deferrable_signals(&sigset);
             if(read_TLS(GC_PENDING,self)==T)
-                gc_happened = funcall0(StaticSymbolFunction(SUB_GC));
+                gc_happened = funcall1(StaticSymbolFunction(SUB_GC), 0);
             unbind(self);
             thread_sigmask(SIG_SETMASK,&sigset,NULL);
             if (gc_happened == T) {

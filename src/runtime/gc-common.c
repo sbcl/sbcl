@@ -1521,7 +1521,7 @@ maybe_gc(os_context_t *context)
      * the heap in SUB-GC are ways to lose. Of course, deferrables
      * cannot be unblocked because there may be a pending handler, or
      * we may even be in a WITHOUT-INTERRUPTS. */
-    gc_happened = funcall0(StaticSymbolFunction(SUB_GC));
+    gc_happened = funcall1(StaticSymbolFunction(SUB_GC), 0);
     FSHOW((stderr, "/maybe_gc: gc_happened=%s\n",
            (gc_happened == NIL)
            ? "NIL"
