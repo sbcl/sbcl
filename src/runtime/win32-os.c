@@ -827,7 +827,7 @@ static inline boolean local_thread_stack_address_p(os_vm_address_t address)
  */
 
 os_vm_address_t
-os_validate(boolean movable, os_vm_address_t addr, os_vm_size_t len)
+os_validate(int movable, os_vm_address_t addr, os_vm_size_t len)
 {
     MEMORY_BASIC_INFORMATION mem_info;
 

@@ -307,7 +307,7 @@ static void * under_2gb_free_pointer=DYNAMIC_1_SPACE_END;
 #endif
 
 os_vm_address_t
-os_validate(boolean movable, os_vm_address_t addr, os_vm_size_t len)
+os_validate(int movable, os_vm_address_t addr, os_vm_size_t len)
 {
     int flags =  MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE;
     os_vm_address_t actual;

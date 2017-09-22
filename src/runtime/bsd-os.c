@@ -125,7 +125,7 @@ os_context_sigmask_addr(os_context_t *context)
 }
 
 os_vm_address_t
-os_validate(boolean movable, os_vm_address_t addr, os_vm_size_t len)
+os_validate(int movable, os_vm_address_t addr, os_vm_size_t len)
 {
     int flags = MAP_PRIVATE | MAP_ANON;
 

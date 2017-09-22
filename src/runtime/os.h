@@ -88,14 +88,13 @@ extern void os_install_interrupt_handlers(void);
  * and simplify if the difference isn't too large. */
 extern void os_zero(os_vm_address_t addr, os_vm_size_t length);
 
-/* It looks as though this function allocates 'len' bytes at 'addr',
+/* Allocate 'len' bytes at 'addr',
  * or at an OS-chosen address if 'addr' is zero.
- *
- * FIXME: There was some documentation for these functions in
- * "hp-ux.c" in the old CMU CL code. Perhaps move/merge it in here. */
-#define MOVABLE 1
+ * If 'movable' then 'addr' is a preference, not a requirement. */
 #define NOT_MOVABLE 0
-extern os_vm_address_t os_validate(boolean movable,
+#define MOVABLE 1
+#define MOVABLE_LOW 2
+extern os_vm_address_t os_validate(int movable,
                                    os_vm_address_t addr,
                                    os_vm_size_t len);
 
