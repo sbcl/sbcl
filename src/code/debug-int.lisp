@@ -576,6 +576,7 @@
 ;;; to any object on a specified page.
 ;;;
 (defun code-header-from-pc (pc)
+  (declare (system-area-pointer pc))
   (without-gcing
    (let ((component-ptr
           (sb!alien:alien-funcall (sb!alien:extern-alien
