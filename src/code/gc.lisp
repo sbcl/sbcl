@@ -38,6 +38,14 @@
              (- (sap-int (sb!c::dynamic-space-free-pointer))
                 (current-dynamic-space-start))))
 
+#!+immobile-space
+(progn
+  (defun immobile-space-addr-p (addr)
+    (declare (type word addr))
+    (<= sb!vm:immobile-space-start addr sb!vm:immobile-space-end))
+  (defun immobile-space-obj-p (obj)
+    (immobile-space-addr-p (get-lisp-obj-address obj))))
+
 (defun static-space-usage ()
   (- (sap-int sb!vm:*static-space-free-pointer*) sb!vm:static-space-start))
 

@@ -2096,6 +2096,8 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "%DENOMINATOR"
                "%OTHER-POINTER-P"
                "%OTHER-POINTER-SUBTYPE-P"
+               "IMMOBILE-SPACE-ADDR-P"
+               "IMMOBILE-SPACE-OBJ-P"
 
                "STANDARD-CLASSOID" "CLASSOID-OF"
                "MAKE-STANDARD-CLASSOID"

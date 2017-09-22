@@ -426,9 +426,7 @@
                     (scan-function (car list)
                                    (if (cdr list) (cadr list) text-end)
                                    ;; Look for transfers into immobile code
-                                   (lambda (jmp-targ-addr)
-                                     (<= sb!vm:immobile-space-start
-                                         jmp-targ-addr sb!vm:immobile-space-end))))
+                                   #'immobile-space-addr-p))
                   (sort (remove-if-not (lambda (address)
                                          (<= text-origin address text-end))
                                        asm-routines) #'<))
@@ -516,7 +514,7 @@
                                 (dstate-next-addr dstate)))))
                  (when (and (fdefn-p fdefn)
                             (let ((callee (fdefn-fun fdefn)))
-                              (and (sb!kernel::immobile-space-obj-p callee)
+                              (and (immobile-space-obj-p callee)
                                    (not (sb!vm::fun-requires-simplifying-trampoline-p callee))
                                    (match-p (%fun-name callee)
                                             callees exclude-callees))))

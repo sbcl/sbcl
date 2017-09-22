@@ -140,12 +140,10 @@
   ;; Except that symbols which existed at SBCL build time must be.
   #+(and immobile-space (not immobile-symbols))
   (do-all-symbols (symbol)
-    (sb-sys:with-pinned-objects (symbol)
-      (let ((addr (sb-kernel:get-lisp-obj-address symbol)))
-        (when (<= sb-vm:immobile-space-start addr sb-vm:immobile-space-end)
-          (sb-kernel:set-header-data
+    (when (sb-kernel:immobile-space-obj-p symbol)
+      (sb-kernel:set-header-data
            symbol (logior (sb-kernel:get-header-data symbol)
-                          (ash 1 sb-vm::+initial-core-symbol-bit+)))))))
+                          (ash 1 sb-vm::+initial-core-symbol-bit+)))))
 
   ;; A symbol whose INFO slot underwent any kind of manipulation
   ;; such that it now has neither properties nor globaldb info,

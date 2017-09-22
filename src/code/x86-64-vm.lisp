@@ -16,10 +16,6 @@
 
 ;;;; :CODE-OBJECT fixups
 
-#!+immobile-space
-(defun sb!kernel::immobile-space-obj-p (obj)
-  (<= immobile-space-start (get-lisp-obj-address obj) immobile-space-end))
-
 ;;; This gets called by LOAD to resolve newly positioned objects
 ;;; with things (like code instructions) that have to refer to them.
 (defun fixup-code-object (code offset fixup kind &optional flavor)
@@ -45,7 +41,7 @@
          ;; In the #!-immobile-code case, there's nothing to assert.
          ;; Relative fixups pretty much can't happen.
          #!+immobile-code
-         (unless (<= immobile-space-start (get-lisp-obj-address code) immobile-space-end)
+         (unless (immobile-space-obj-p code)
            (error "Can't compute fixup relative to movable object ~S" code))
          (setf (signed-sap-ref-32 sap offset)
                (etypecase fixup
@@ -208,7 +204,7 @@
 ;;; Return T if FUN can't be called without loading RAX with its descriptor.
 ;;; This is true of any funcallable instance which is not a GF, and closures.
 (defun fun-requires-simplifying-trampoline-p (fun)
-  (cond ((not (sb!kernel::immobile-space-obj-p fun)) t) ; always
+  (cond ((not (immobile-space-obj-p fun)) t) ; always
         ((funcallable-instance-p fun)
          ;; A funcallable-instance with no raw slots has no machine
          ;; code within it, and thus requires an external trampoline.

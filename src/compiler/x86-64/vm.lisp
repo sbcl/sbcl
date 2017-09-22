@@ -478,7 +478,7 @@
                #!+(and (not (host-feature sb-xc-host)) immobile-space (not immobile-symbols))
                (or (logbitp +initial-core-symbol-bit+ (get-header-data value))
                    (and (sb!c::core-object-p sb!c::*compile-object*)
-                        (typep (get-lisp-obj-address value) '(signed-byte 32))))
+                        (immobile-space-obj-p value)))
 
                (static-symbol-p value))
        (sc-number-or-lose 'immediate)))

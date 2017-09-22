@@ -119,14 +119,14 @@
   ;; If somebody tries (TRACE LENGTH) for example, it should not cause
   ;; compilations to fail on account of LENGTH becoming a closure.
   (defun sb!vm::function-raw-address (name &aux (fun (fdefinition name)))
-    (let ((addr (and fun (get-lisp-obj-address fun))))
-      (cond ((not addr)
-             (error "Can't statically link to undefined function ~S" name))
-            ((not (<= sb!vm:immobile-space-start addr sb!vm:immobile-space-end))
-             (error "Can't statically link to ~S: code is movable" name))
-            ((neq (fun-subtype fun) sb!vm:simple-fun-widetag)
-             (error "Can't statically link to ~S: non-simple function" name))
-            (t
+    (cond ((not fun)
+           (error "Can't statically link to undefined function ~S" name))
+          ((not (immobile-space-obj-p fun))
+           (error "Can't statically link to ~S: code is movable" name))
+          ((neq (fun-subtype fun) sb!vm:simple-fun-widetag)
+           (error "Can't statically link to ~S: non-simple function" name))
+          (t
+           (let ((addr (get-lisp-obj-address fun)))
              (sap-ref-word (int-sap addr)
                            (- (ash sb!vm:simple-fun-self-slot sb!vm:word-shift)
                               sb!vm:fun-pointer-lowtag))))))
