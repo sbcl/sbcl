@@ -3193,8 +3193,8 @@ structure representations"
                          "DYNAMIC-1-SPACE-START"
                          "DYNAMIC-1-SPACE-END")
                #!+immobile-space("IMMOBILE-CARD-BYTES"
+                                 "IMMOBILE-SPACE-SIZE"
                                  "IMMOBILE-SPACE-START"
-                                 "IMMOBILE-SPACE-END"
                                  "IMMOBILE-FIXEDOBJ-SUBSPACE-SIZE"
                                  "*IMMOBILE-FIXEDOBJ-FREE-POINTER*"
                                  "*IMMOBILE-SPACE-FREE-POINTER*")

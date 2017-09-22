@@ -342,8 +342,6 @@ void enliven_immobile_obj(lispobj*,int);
 #define IMMOBILE_OBJ_VISITED_FLAG    0x10
 #define IMMOBILE_OBJ_GENERATION_MASK 0x0f // mask off the VISITED flag
 
-#define IMMOBILE_VARYOBJ_SUBSPACE_START (IMMOBILE_SPACE_START+IMMOBILE_FIXEDOBJ_SUBSPACE_SIZE)
-
 // Note: this does not work on a SIMPLE-FUN
 // because a simple-fun header does not contain a generation.
 #define __immobile_obj_generation(x) (__immobile_obj_gen_bits(x) & IMMOBILE_OBJ_GENERATION_MASK)

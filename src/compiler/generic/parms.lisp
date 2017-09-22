@@ -95,7 +95,7 @@
           (loop for (space next-space) on spaces appending
                 (let* ((relocatable
                         ;; TODO: immobile and linkage-table should be relocatable
-                        #!+relocatable-heap (member space '(#| immobile |#)))
+                        #!+relocatable-heap (member space '(immobile)))
                        (next-start
                         (+ ptr (cond #!+immobile-space
                                      ((eq space 'immobile)

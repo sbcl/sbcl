@@ -26,6 +26,7 @@
 
 #ifdef LISP_FEATURE_RELOCATABLE_HEAP
 uword_t DYNAMIC_SPACE_START;
+uword_t IMMOBILE_SPACE_START, IMMOBILE_VARYOBJ_SUBSPACE_START;
 #endif
 
 static void
@@ -78,7 +79,7 @@ allocate_spaces(void)
     ensure_space( (lispobj *)LINKAGE_TABLE_SPACE_START,
                   LINKAGE_TABLE_SPACE_SIZE);
 #endif
-#if defined(IMMOBILE_SPACE_START) /*&& !defined(LISP_FEATURE_RELOCATABLE_HEAP)*/
+#if defined(IMMOBILE_SPACE_START) && !defined(LISP_FEATURE_RELOCATABLE_HEAP)
     ensure_space((lispobj *)IMMOBILE_SPACE_START, IMMOBILE_SPACE_SIZE);
 #endif
 

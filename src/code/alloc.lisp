@@ -292,9 +292,11 @@
                              (+ found remaining)))))) ; Consume the upper piece
               ;; 3. Extend the frontier.
               (let* ((addr (sap-int *immobile-space-free-pointer*))
-                     (free-ptr (+ addr n-bytes)))
+                     (free-ptr (+ addr n-bytes))
+                      (limit (+ immobile-space-start
+                                (- immobile-space-size immobile-card-bytes))))
                 ;; The last page can't be used, because GC uses it as scratch space.
-                (when (> free-ptr (- immobile-space-end immobile-card-bytes))
+                (when (> free-ptr limit)
                   (format t "~&Immobile space exhausted~%")
                   (sb!impl::%halt))
                 (set-immobile-space-free-pointer free-ptr)
