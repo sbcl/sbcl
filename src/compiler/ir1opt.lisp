@@ -711,15 +711,24 @@
            (consequent  (if-consequent  node))
            (alternative (if-alternative node))
            (victim
-            (cond ((constant-lvar-p test)
-                   (if (lvar-value test) alternative consequent))
-                  ((not (types-equal-or-intersect type (specifier-type 'null)))
-                   alternative)
-                  ((type= type (specifier-type 'null))
-                   consequent)
-                  ((or (eq consequent alternative) ; Can this happen?
-                       (cblocks-equivalent-p alternative consequent))
-                   alternative))))
+             (cond ((constant-lvar-p test)
+                    (if (lvar-value test) alternative consequent))
+                   ((not (types-equal-or-intersect type (specifier-type 'null)))
+                    alternative)
+                   ((type= type (specifier-type 'null))
+                    consequent)
+                   ((or (eq consequent alternative) ; Can this happen?
+                        (cblocks-equivalent-p alternative consequent))
+                    ;; Even if the references are the same they can have
+                    ;; different derived types based on the TEST
+                    ;; Don't lose the second type when killing it.
+                    (let ((consequent-ref (block-start-node consequent)))
+                      (derive-node-type consequent-ref
+                                        (values-type-union
+                                         (node-derived-type consequent-ref)
+                                         (node-derived-type (block-start-node alternative)))
+                                        :from-scratch t))
+                    alternative))))
       (when victim
         (kill-if-branch-1 node test block victim)
         (return-from ir1-optimize-if (values))))

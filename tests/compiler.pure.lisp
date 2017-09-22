@@ -6596,3 +6596,21 @@
                         (%f))
                       x))))))
     (assert (eql (funcall fun 45) 123))))
+
+(with-test (:name :ifs-with-refs-to-the-same-var-but-different-types)
+  (assert (funcall (checked-compile `(lambda (a b)
+                                       (declare (type fixnum b a))
+                                       (setf a -1)
+                                       (plusp (if (<= a b)
+                                                  b
+                                                  (if nil
+                                                      b
+                                                      b)))))
+                   1 2))
+  (assert (funcall (checked-compile `(lambda (a b)
+                                       (declare (type integer b a))
+                                       (setf a -1)
+                                       (plusp (if (<= a b)
+                                                  b
+                                                  (+ b 0)))))
+                   1 2)))
