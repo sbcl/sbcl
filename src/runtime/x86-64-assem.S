@@ -262,6 +262,11 @@ LsingleValue:
 	op(0);op(1);op(2);op(3);op(4);op(5);op(6);op(7); \
     op(8);op(9);op(10);op(11);op(12);op(13);op(14);op(15);
 
+#define push_regs_a_c_d_si_di_8_9_10 \
+ push %rax; push %rcx; push %rdx; push %rsi; push %rdi; push %r8; push %r9; push %r10
+#define pop_regs_10_9_8_di_si_d_c_a \
+ pop %r10; pop %r9; pop %r8; pop %rdi; pop %rsi; pop %rdx; pop %rcx; pop %rax
+        
 	.text
 	.align	align_16byte,0x90
 	.globl  GNAME(alloc_tramp)
@@ -275,28 +280,14 @@ GNAME(alloc_tramp):
 	map_all_xmm(stkxmmsave)
 	# Doing rax twice is to maintain 16-byte stack alignment.
 	push    %rax
-	push	%rax
-	push	%rcx
-	push	%rdx
-	push	%rsi
-	push	%rdi
-	push	%r8
-	push	%r9
-	push	%r10
+	push_regs_a_c_d_si_di_8_9_10
 	push	%r11
 	# r12 through r15 are callee-saved
 	mov	16(%rbp),%rdi
 	call	GNAME(alloc)
 	mov	%rax,16(%rbp)
 	pop	%r11
-	pop	%r10
-	pop	%r9
-	pop	%r8
-	pop	%rdi
-	pop	%rsi
-	pop	%rdx
-	pop	%rcx
-	pop	%rax
+	pop_regs_10_9_8_di_si_d_c_a
 	pop	%rax # corresponds to "extra" push
 	map_all_xmm(stkxmmload)
 	mov	%rbp,%rsp
@@ -315,31 +306,12 @@ GNAME(alloc_to_r11):
 	and	$-32,%rsp
 	sub	$16*16,%rsp
 	map_all_xmm(stkxmmsave)
-	# Doing rax twice is to maintain 16-byte stack alignment.
-	push    %rax
-	push	%rax
-	push	%rcx
-	push	%rdx
-	push	%rsi
-	push	%rdi
-	push	%r8
-	push	%r9
-	push	%r10
-	push	%r11
+	push_regs_a_c_d_si_di_8_9_10
 	# r12 through r15 are callee-saved
 	mov	16(%rbp),%rdi
 	call	GNAME(alloc)
 	mov	%rax,%r11       # move to result register
-	pop	%rax            # dummy. %rax gets popped again later
-	pop	%r10
-	pop	%r9
-	pop	%r8
-	pop	%rdi
-	pop	%rsi
-	pop	%rdx
-	pop	%rcx
-	pop	%rax
-	pop	%rax # corresponds to "extra" push
+	pop_regs_10_9_8_di_si_d_c_a
 	map_all_xmm(stkxmmload)
 	mov	%rbp,%rsp
 	pop	%rbp
