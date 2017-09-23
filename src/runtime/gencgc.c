@@ -2837,7 +2837,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
     if (++state->errors > 25) lose("Too many errors"); \
     else fprintf(stderr, "Ptr %p @ %"OBJ_FMTX" sees %s\n", \
                  (void*)(uintptr_t)thing, \
-                 (uword_t)(state->virtual_where ? state->virtual_where : where), \
+                 (lispobj)(state->virtual_where ? state->virtual_where : where), \
                  why); }
 
             /* Does it point to the dynamic space? */

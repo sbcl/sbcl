@@ -281,14 +281,6 @@ static void inflate_core_bytes(int fd, os_vm_offset_t offset,
 # undef ZLIB_BUFFER_SIZE
 #endif
 
-#ifndef LISP_FEATURE_RELOCATABLE_HEAP
-#define adjust_word(x) x
-#else
-#include "genesis/gc-tables.h"
-#include "genesis/hash-table.h"
-#include "genesis/layout.h"
-#include "genesis/vector.h"
-
 struct heap_adjust {
     /* range[0] is immobile space, range [1] is dynamic space */
     struct range {
@@ -296,6 +288,15 @@ struct heap_adjust {
         sword_t delta;
     } range[2];
 };
+
+#ifndef LISP_FEATURE_RELOCATABLE_HEAP
+#define adjust_word(ignore,thing) thing
+#define relocate_heap(ignore)
+#else
+#include "genesis/gc-tables.h"
+#include "genesis/hash-table.h"
+#include "genesis/layout.h"
+#include "genesis/vector.h"
 
 static inline sword_t calc_adjustment(struct heap_adjust* adj, lispobj x)
 {
