@@ -47,10 +47,16 @@
   (or #+sbcl
       (let ((envvar (sb-ext:posix-getenv "SBCL_MAKE_PARALLEL")))
         (when envvar
+          (require :sb-posix)
           (parse-make-host-parallelism envvar)))))
 
 (defun make-host-1-parallelism () (car *make-host-parallelism*))
 (defun make-host-2-parallelism () (cdr *make-host-parallelism*))
+
+#+sbcl
+(let ((f (multiple-value-bind (sym access) (find-symbol "OS-EXIT" "SB-SYS")
+           (if (eq access :external) sym 'sb-unix:unix-exit))))
+  (defun exit-process (arg) (funcall f arg)))
 
 ;;; If TRUE, then COMPILE-FILE is being invoked only to process
 ;;; :COMPILE-TOPLEVEL forms, not to produce an output file.

@@ -17,8 +17,6 @@
 (defvar *target-object-file-names*)
 
 ;;; Evaluate compile-time effects only
-(when (make-host-2-parallelism)
-  (require :sb-posix))
 #+#.(cl:if (cl:find-package "SB-POSIX") '(and) '(or))
 (defun parallel-make-host-2 (max-jobs)
   (let ((reversed-target-object-file-names nil)
@@ -37,10 +35,7 @@
             (when (zerop pid)
               (target-compile-stem stem flags)
               ;; FIXME: convey exit code based on COMPILE result.
-              #.(if (eq :external
-                        (nth-value 1 (find-symbol "OS-EXIT" :sb-sys)))
-                    `(,(find-symbol "OS-EXIT" :sb-sys) 0)
-                    `(sb-unix:unix-exit 0)))
+              (sb-cold::exit-process 0))
             (push pid subprocess-list))
           (incf subprocess-count)
           ;; Cause the compile-time effects from this file

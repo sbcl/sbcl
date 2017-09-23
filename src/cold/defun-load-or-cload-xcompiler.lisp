@@ -18,8 +18,6 @@
 ;;; The table is populated later in this file.
 (defparameter *undefined-fun-whitelist* (make-hash-table :test 'equal))
 
-(when (make-host-1-parallelism)
-  (require :sb-posix))
 #+#.(cl:if (cl:find-package "SB-POSIX") '(and) '(or))
 (defun parallel-make-host-1 (max-jobs)
   (let ((subprocess-count 0)
@@ -38,10 +36,7 @@
               (in-host-compilation-mode
                (lambda () (compile-stem stem flags :host-compile)))
               ;; FIXME: convey exit code based on COMPILE result.
-              #.(if (eq :external
-                        (nth-value 1 (find-symbol "OS-EXIT" :sb-sys)))
-                    `(,(find-symbol "OS-EXIT" :sb-sys) 0)
-                    `(sb-unix:unix-exit 0)))
+              (sb-cold::exit-process 0))
             (push pid subprocess-list)
             (incf subprocess-count)
             ;; Do not wait for the compile to finish. Just load as source.
