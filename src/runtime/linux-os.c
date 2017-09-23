@@ -317,8 +317,10 @@ os_validate(int movable, os_vm_address_t addr, os_vm_size_t len)
         addr=under_2gb_free_pointer;
     }
 #endif
+#ifdef MAP_32BIT
     if (movable & MOVABLE_LOW)
         flags |= MAP_32BIT;
+#endif
     actual = mmap(addr, len, OS_VM_PROT_ALL, flags, -1, 0);
     if (actual == MAP_FAILED) {
         perror("mmap");
