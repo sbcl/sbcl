@@ -156,11 +156,6 @@
                                       (read-from-file customizer-file-name))
                              #'identity)))
         (funcall customizer default-features)))
-(let ((*print-length* nil)
-      (*print-level* nil))
-  (format t
-          "target features *SHEBANG-FEATURES*=~%~@<~S~:>~%"
-          *shebang-features*))
 
 (defvar *shebang-backend-subfeatures*
   (let* ((default-subfeatures nil)
@@ -170,11 +165,13 @@
                                   (read-from-file customizer-file-name))
                          #'identity)))
     (funcall customizer default-subfeatures)))
-(let ((*print-length* nil)
-      (*print-level* nil))
-  (format t
-          "target backend-subfeatures *SHEBANG-BACKEND-FEATURES*=~@<~S~:>~%"
-          *shebang-backend-subfeatures*))
+
+(progn (write-string "target *FEATURES* = ")
+       (write *shebang-features* :pretty nil :length nil)
+       (terpri)
+       (write-string "*shebang-backend-subfeatures* = ")
+       (write *shebang-backend-subfeatures* :pretty nil :length nil)
+       (terpri))
 
 ;;; Call for effect of signaling an error if no target picked.
 (target-platform-name)
