@@ -202,6 +202,11 @@
          (!cold-lose "bogus operation in *!COLD-TOPLEVELS*")))))
   (/show0 "done with loop over cold toplevel forms and fixups")
 
+  ;; Precise GC seems to think these symbols are live during the final GC
+  ;; which in turn enlivens a bunch of other "*!foo*" symbols.
+  ;; Setting them to NIL helps a little bit.
+  (setq *!cold-defuns* nil *!cold-defconstants* nil *!cold-toplevels* nil)
+
   ;; Now that L-T-V forms have executed, the symbol output chooser works.
   (setf (symbol-function 'choose-symbol-out-fun) real-choose-symbol-out-fun)
 
