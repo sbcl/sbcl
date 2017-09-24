@@ -556,7 +556,7 @@ void relocate_heap(struct heap_adjust* adj)
     SYMBOL(FUNCTION_LAYOUT)->value = \
         adjust_word(adj, SYMBOL(FUNCTION_LAYOUT)->value >> 32) << 32;
 #endif
-    relocate_space(DYNAMIC_SPACE_START, dynamic_space_free_pointer, adj);
+    relocate_space(DYNAMIC_SPACE_START, (lispobj*)get_alloc_pointer(), adj);
     lispobj asmroutines = SYMBOL(ASSEMBLER_ROUTINES)->value;
     if (lowtag_of(asmroutines) == INSTANCE_POINTER_LOWTAG) {
         /* Adjust the values in SB-FASL::*ASSEMBLER-ROUTINES*.
