@@ -168,6 +168,12 @@ static inline int pointer_survived_gc_yet(lispobj pointer)
     return (header & MARK_BIT) != 0;
 }
 
+#ifdef RETURN_PC_WIDETAG
+#define embedded_obj_p(tag) tag==RETURN_PC_WIDETAG || tag==SIMPLE_FUN_WIDETAG
+#else
+#define embedded_obj_p(tag) tag==SIMPLE_FUN_WIDETAG
+#endif
+
 void __mark_obj(lispobj pointer)
 {
     gc_dcheck(is_lisp_pointer(pointer));
@@ -180,7 +186,7 @@ void __mark_obj(lispobj pointer)
             *base |= BIGNUM_MARK_BIT;
             return; // don't enqueue - no pointers
         } else {
-            if (widetag_of(header) == SIMPLE_FUN_WIDETAG) {
+            if (embedded_obj_p(widetag_of(header))) {
                 base = fun_code_header(base);
                 pointer = make_lispobj(base, OTHER_POINTER_LOWTAG);
                 header = *base;
@@ -285,10 +291,14 @@ static void trace_object(lispobj* where)
             return;
         }
         break;
+#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+    /* on x86[-64], closure->fun is a fixnum-qua-pointer. Convert it to a lisp
+     * pointer to mark it, but not on platforms where it's already a descriptor */
     case CLOSURE_WIDETAG:
         gc_mark_obj(((struct closure*)where)->fun - FUN_RAW_ADDR_OFFSET);
         scan_from = 2;
         break; // scan slots normally
+#endif
     case CODE_HEADER_WIDETAG:
         for_each_simple_fun(i, fun, (struct code*)where, 0, {
             gc_mark_range(SIMPLE_FUN_SCAV_START(fun),

@@ -203,7 +203,6 @@
 #+sb-xref-for-internals (sb-c::repack-xref :verbose 1)
 (fmakunbound 'sb-c::repack-xref)
 
-#+(or x86 x86-64) ; Crashes on other platforms still :-(
 (progn
   (load "src/code/shaketree")
   (sb-impl::shake-packages

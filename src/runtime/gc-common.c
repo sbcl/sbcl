@@ -1663,6 +1663,11 @@ scrub_thread_control_stack(struct thread *th)
 void
 scavenge_control_stack(struct thread *th)
 {
+    if (!compacting_p()) {
+        long nwords = (lispobj*)access_control_stack_pointer(th) - th->control_stack_start;
+        gc_mark_range(th->control_stack_start, nwords);
+        return;
+    }
     lispobj *object_ptr;
 
     /* In order to properly support dynamic-extent allocation of
@@ -1676,6 +1681,9 @@ scavenge_control_stack(struct thread *th)
      * the compiler isn't allowed to store unboxed objects on the
      * control stack.  -- AB, 2011-Dec-02 */
 
+    /* FIXME: I believe that this loop could be replaced by scavenge(),
+     * as it can not "... blow past the end" on header words,
+     * the way that heap_scavenge() might */
     for (object_ptr = th->control_stack_start;
          object_ptr < access_control_stack_pointer(th);
          object_ptr++) {
@@ -1874,7 +1882,7 @@ scavenge_interrupt_context(os_context_t * context)
 
         boxed_reg = os_context_register_addr(context, boxed_registers[i]);
         datum = *boxed_reg;
-        scavenge(&datum, 1);
+        if (compacting_p()) scavenge(&datum, 1); else gc_mark_obj(datum);
         *boxed_reg = datum;
     }
 
