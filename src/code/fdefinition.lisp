@@ -123,7 +123,7 @@
        (tagbody retry
           (let ((fdefn (,lookup-fn name)))
             (when fdefn
-              (let ((f (fdefn-fun  (truly-the fdefn fdefn))))
+              (let ((f (fdefn-fun (truly-the fdefn fdefn))))
                 ;; If STRICTLY-FUNCTIONP is true, we make sure not to return an error
                 ;; trampoline. This extra check ensures that full calls such as
                 ;; (MAPCAR 'OR '()) signal an error that OR isn't a function.
@@ -142,7 +142,8 @@
                     (restart-case (error 'undefined-function :name name)
                       (continue ()
                         :report (lambda (stream)
-                                  (format stream "Retry using ~s." name)))
+                                  (format stream "Retry using ~s." name))
+                        name)
                       (use-value (value)
                         :report (lambda (stream)
                                   (format stream "Use specified function"))
