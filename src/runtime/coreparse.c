@@ -330,7 +330,8 @@ static void adjust_pointers(lispobj *where, sword_t n_words, struct heap_adjust*
 }
 
 #include "var-io.h"
-static void adjust_code_refs(struct heap_adjust* adj, lispobj fixups, struct code* code)
+static void __attribute__((unused))
+adjust_code_refs(struct heap_adjust* adj, lispobj fixups, struct code* code)
 {
     struct varint_unpacker unpacker;
     varint_unpacker_init(&unpacker, fixups);
@@ -610,10 +611,13 @@ process_directory(int count, struct ndir_entry *entry,
 
 #ifndef LISP_FEATURE_RELOCATABLE_HEAP
         int enforce_address = 1;
-#else
-        // Only enforce other spaces' addresses
+#elif defined(LISP_FEATURE_IMMOBILE_SPACE)
+        // Enforce address of readonly, static, immobile varyobj
         int enforce_address = id != DYNAMIC_CORE_SPACE_ID
           && id != IMMOBILE_FIXEDOBJ_CORE_SPACE_ID;
+#else
+        // Enforce address of readonly and static spaces.
+        int enforce_address = id != DYNAMIC_CORE_SPACE_ID;
 #endif
         if (enforce_address) {
             int fail;
