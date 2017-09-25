@@ -153,6 +153,12 @@ static inline int cons_markedp(lispobj pointer) {
     return (bits[index / 8] >> (index % 8)) & 1;
 }
 
+#ifdef RETURN_PC_WIDETAG
+#define embedded_obj_p(tag) tag==RETURN_PC_WIDETAG || tag==SIMPLE_FUN_WIDETAG
+#else
+#define embedded_obj_p(tag) tag==SIMPLE_FUN_WIDETAG
+#endif
+
 /* Return true if OBJ has already survived the current GC. */
 static inline int pointer_survived_gc_yet(lispobj pointer)
 {
@@ -163,16 +169,10 @@ static inline int pointer_survived_gc_yet(lispobj pointer)
     lispobj header = *native_pointer(pointer);
     if (widetag_of(header) == BIGNUM_WIDETAG)
         return (header & BIGNUM_MARK_BIT) != 0;
-    if (widetag_of(header) == SIMPLE_FUN_WIDETAG)
+    if (embedded_obj_p(widetag_of(header)))
         header = *fun_code_header(native_pointer(pointer));
     return (header & MARK_BIT) != 0;
 }
-
-#ifdef RETURN_PC_WIDETAG
-#define embedded_obj_p(tag) tag==RETURN_PC_WIDETAG || tag==SIMPLE_FUN_WIDETAG
-#else
-#define embedded_obj_p(tag) tag==SIMPLE_FUN_WIDETAG
-#endif
 
 void __mark_obj(lispobj pointer)
 {
