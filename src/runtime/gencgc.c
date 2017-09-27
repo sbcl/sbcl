@@ -2923,7 +2923,8 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                  * object in the code data block. */
                 for_each_simple_fun(i, fheaderp, code, 1, {
 #if defined(LISP_FEATURE_COMPACT_INSTANCE_HEADER)
-                    lispobj layout = function_layout((lispobj*)fheaderp);
+                    lispobj __attribute__((unused)) layout =
+                        function_layout((lispobj*)fheaderp);
                     gc_assert(!layout || layout == SYMBOL(FUNCTION_LAYOUT)->value >> 32);
 #endif
                     verify_range(SIMPLE_FUN_SCAV_START(fheaderp),
