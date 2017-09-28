@@ -151,7 +151,7 @@
         for i from 0
         for opt in optional
         do (cond ((eq opt *empty-type*)
-                  (return (values required (subseq optional i) rest)))
+                  (return (values required (subseq optional 0 i) rest)))
                  ((and (not keyp) (neq opt rest))
                   (setq last-not-rest i)))
         finally (return (values required

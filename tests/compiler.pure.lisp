@@ -6614,3 +6614,17 @@
                                                   b
                                                   (+ b 0)))))
                    1 2)))
+
+(with-test (:name :unequal-n-values-type-intersection)
+  (assert (equal (multiple-value-list
+                  (funcall (checked-compile
+                            `(lambda ()
+                               (let ((b 0))
+                                 (unwind-protect
+                                      (if (and
+                                           (random (setf b 2))
+                                           (eql b 0))
+                                          (case (dpb b (byte 0 0) -25)
+                                            ((3) (values 1 2 3)))
+                                          (values 0 0))))))))
+                 '(0 0))))
