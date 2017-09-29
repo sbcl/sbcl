@@ -6628,3 +6628,11 @@
                                             ((3) (values 1 2 3)))
                                           (values 0 0))))))))
                  '(0 0))))
+#+sb-unicode
+(with-test (:name :base-char-weakinging)
+  (assert-error (funcall (checked-compile
+                          `(lambda (x)
+                             (declare (optimize (safety 1) (speed 3)))
+                             (the base-char x)))
+                         (code-char 252))
+                type-error))
