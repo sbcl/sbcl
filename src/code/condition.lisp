@@ -521,16 +521,16 @@
        (:struct
         (format nil "when setting slot ~s of structure ~s"
                 (cddr context) (cadr context)))
-       (:bind
-        (format nil "when binding ~s"
-                (cdr context)))
        (t context)))
-    ((eql aref)
+    ((eql :aref)
      (let (*print-circle*)
        (format nil "when setting an element of (ARRAY ~s)"
                type)))
     ((eql :ftype)
      "from the function type declaration.")
+    ((and symbol
+          (not null))
+     (format nil "when binding ~s" context))
     (t
      context)))
 
