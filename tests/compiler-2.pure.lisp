@@ -254,3 +254,13 @@
                                  (declare (optimize (speed 3)) (inline length)
                                           (muffle-conditions compiler-note))
                                  (length x)))))))
+
+(with-test (:name :deleted-return-use)
+  (assert (= (funcall (checked-compile `(lambda ()
+                                          (block nil
+                                            (return 345)
+                                            (let ((a (catch 'x)))
+                                              (flet ((%f (a &optional b)
+                                                       a))
+                                                (%f 0 (%f 123))))))))
+             345)))

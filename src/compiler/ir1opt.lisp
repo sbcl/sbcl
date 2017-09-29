@@ -625,15 +625,17 @@
         (let ((use-home (node-home-lambda use)))
           (cond ((or (eq (functional-kind use-home) :deleted)
                      (block-delete-p (node-block use))))
-                ((and (basic-combination-p use)
-                      (eq (basic-combination-kind use) :local))
+                ((not (and (basic-combination-p use)
+                           (eq (basic-combination-kind use) :local)))
+                 (use-union (node-derived-type use)))
+                ((or (eq (functional-kind (combination-lambda use)) :deleted)
+                     (block-delete-p (lambda-block (combination-lambda use)))))
+                (t
                  (aver (eq (lambda-tail-set use-home)
                            (lambda-tail-set (combination-lambda use))))
                  (when (combination-p use)
                    (when (nth-value 1 (maybe-convert-tail-local-call use))
-                     (return-from find-result-type t))))
-                (t
-                 (use-union (node-derived-type use))))))
+                     (return-from find-result-type t)))))))
       (let ((int
              ;; (values-type-intersection
              ;; (continuation-asserted-type result) ; FIXME -- APD, 2002-01-26
