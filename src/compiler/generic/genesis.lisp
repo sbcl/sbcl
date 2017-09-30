@@ -2951,6 +2951,10 @@ core and return a descriptor to it."
   (format t "#endif /* LANGUAGE_ASSEMBLY */~2%")
   (terpri))
 
+(defvar +c-literal-64bit+
+  #!+(and win32 x86-64) "LLU" ; "long" is 32 bits, "long long" is 64 bits
+  #!-(and win32 x86-64) "LU") ; "long" is 64 bits
+
 (defun write-constants-h (*standard-output*)
   ;; writing entire families of named constants
   (let ((constants nil))
@@ -2991,10 +2995,7 @@ core and return a descriptor to it."
                      ;; machinery for new-style SBCL Lisp-to-C naming
                      (record-with-translated-name (priority large)
                        (record (c-name name) priority
-                               (if large
-                                   #!+(and win32 x86-64) "LLU"
-                                   #!-(and win32 x86-64) "LU"
-                                   "")))
+                               (if large +c-literal-64bit+ "")))
                      (maybe-record-with-translated-name (suffixes priority &key large)
                        (when (some (lambda (suffix)
                                      (tailwise-equal name suffix))
@@ -3034,12 +3035,7 @@ core and return a descriptor to it."
             constants))
     ;; One more symbol that doesn't fit into the code above.
     (let ((c 'sb!impl::+magic-hash-vector-value+))
-      (push (list (c-symbol-name c)
-                  9
-                  (symbol-value c)
-                  #!+(and win32 x86-64) "LLU"
-                  #!-(and win32 x86-64) "LU"
-                  nil)
+      (push (list (c-symbol-name c) 9 (symbol-value c) +c-literal-64bit+ nil)
             constants))
     ;; And still one more
     #!+64-bit
