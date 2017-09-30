@@ -211,7 +211,7 @@
 (define-source-transform atom (x)
   `(not (consp ,x)))
 
-#!+(and sb-unicode (not x86-64))
+#!+(and sb-unicode (not (or x86-64 arm64)))
 (define-source-transform base-char-p (x)
   `(typep ,x 'base-char))
 ;; CONS is implemented as (and list (not (eql nil))) where the 'and' is
@@ -431,7 +431,7 @@
     (or (and (= (length pairs) 1)
              (= (caar pairs) 0)
              (cond
-               #!+(and sb-unicode x86-64)
+               #!+(and sb-unicode (or x86-64 arm64))
                ((= (cdar pairs) (1- base-char-code-limit))
                 `(base-char-p ,object))
                ((= (cdar pairs) (1- sb!xc:char-code-limit))

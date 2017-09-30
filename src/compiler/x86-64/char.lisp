@@ -221,9 +221,10 @@
   (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 4
-              (inst lea (reg-in-size temp :dword)
-                    (make-ea :dword :base value :disp (- character-widetag)))
-              (inst test (reg-in-size temp :dword) (lognot #x7F00))))
+    (inst lea (reg-in-size temp :dword)
+          (make-ea :dword :base value :disp (- character-widetag)))
+    (inst test (reg-in-size temp :dword) (lognot #x7F00))))
+
 #!+sb-unicode
 (define-vop (base-char-p-character)
   (:args (value :scs (any-reg)))
