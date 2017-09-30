@@ -145,6 +145,7 @@ the stack without triggering overflow protection.")
 ;;; This lock is seized in the compiler, and related areas -- like the
 ;;; classoid/layout/class system.
 (defglobal **world-lock** nil)
+#-sb-xc-host
 (!cold-init-forms
  (setf **world-lock** (sb!thread:make-mutex :name "World Lock")))
 (!defun-from-collected-cold-init-forms !world-lock-cold-init)

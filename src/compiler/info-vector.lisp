@@ -96,7 +96,7 @@
   (storage (make-info-storage 30) :type simple-vector)
   (comparator #'equal :type function)
   (hash-function #'globaldb-sxhashoid :type function)
-  (mutex (sb!thread:make-mutex))
+  (mutex #-sb-xc-host (sb!thread:make-mutex))
   ;; COUNT is always at *least* as large as the key count.
   ;; If no insertions are in progress, it is exactly right.
   (count 0 :type word))

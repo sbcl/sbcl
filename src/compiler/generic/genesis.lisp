@@ -2881,7 +2881,7 @@ core and return a descriptor to it."
       (check sb!vm:static-space-start sb!vm:static-space-end :static)
       #!+gencgc
       (check sb!vm:dynamic-space-start
-             (+ sb!vm:dynamic-space-start sb!vm:default-dynamic-space-size)
+             (+ sb!vm:dynamic-space-start sb!vm::default-dynamic-space-size)
              :dynamic)
       #!+immobile-space
       ;; Must be a multiple of 32 because it makes the math a nicer
@@ -3067,6 +3067,15 @@ core and return a descriptor to it."
           (format t "#define ~A ~A~A /* 0x~X ~@[ -- ~A ~]*/~%" name value suffix value doc))))
     (terpri))
 
+  (format t "#define BACKEND_PAGE_BYTES ~D~%" sb!c:+backend-page-bytes+)
+  #!+gencgc ; value never needed in Lisp, so therefore not a defconstant
+  (format t "#define GENCGC_CARD_SHIFT ~D~%"
+           (1- (integer-length sb!vm:gencgc-card-bytes)))
+  ;; symbol intentionally internal to sb-vm so that it won't add a #define
+  (format t "#ifndef DEFAULT_DYNAMIC_SPACE_SIZE
+#define DEFAULT_DYNAMIC_SPACE_SIZE ~D /* ~:*0x~X */
+#endif~2%" sb!vm::default-dynamic-space-size)
+
   ;; writing information about internal errors
   ;; Assembly code needs only the constants for UNDEFINED_[ALIEN_]FUN_ERROR
   ;; but to avoid imparting that knowledge here, we'll expose all error
@@ -3075,11 +3084,6 @@ core and return a descriptor to it."
         for i from 0
         when (stringp description)
         do (format t "#define ~A ~D~%" (c-symbol-name name) i))
-
-  ;; I'm not really sure why this is in SB!C, since it seems
-  ;; conceptually like something that belongs to SB!VM. In any case,
-  ;; it's needed C-side.
-  (format t "#define BACKEND_PAGE_BYTES ~D~%" sb!c:+backend-page-bytes+)
 
   (terpri)
 
@@ -3159,8 +3163,7 @@ core and return a descriptor to it."
              (multiple-value-bind (ofs bit) (floor b 8)
                (setf (aref array-type-bits ofs) (ash 1 bit)))))
       (dovector (saetp sb!vm:*specialized-array-element-type-properties*)
-        (unless (or (typep (sb!vm:saetp-ctype saetp) 'character-set-type)
-                    (eq (sb!vm:saetp-specifier saetp) t))
+        (unless (member (sb!vm:saetp-specifier saetp) '(character base-char t))
           (toggle (sb!vm:saetp-typecode saetp))
           (awhen (sb!vm:saetp-complex-typecode saetp) (toggle it)))))
     (format out

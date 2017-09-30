@@ -256,7 +256,10 @@
 ;;; flags which can be used to describe properties of source files
 (defparameter
   *expected-stem-flags*
-  '(;; meaning: This file is not to be compiled when building the
+  '(;; meaning: This file is needed to generate C headers if doing so
+    ;; independently of make-host-1
+    :c-headers
+    ;; meaning: This file is not to be compiled when building the
     ;; cross-compiler which runs on the host ANSI Lisp. ("not host
     ;; code", i.e. does not execute on host -- but may still be
     ;; cross-compiled by the host, so that it executes on the target)
