@@ -4,9 +4,6 @@
 typedef struct ucontext os_context_t;
 typedef long os_context_register_t;
 
-static inline os_context_t *arch_os_get_context(void **void_context)
-{
-    return (os_context_t *) *void_context;
-}
+#include "arch-os-generic.inc"
 
 #endif /* _X86_64_SOLARIS_OS_H */

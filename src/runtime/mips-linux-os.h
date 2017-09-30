@@ -4,10 +4,7 @@
 typedef ucontext_t os_context_t;
 typedef unsigned long long os_context_register_t;
 
-static inline os_context_t *arch_os_get_context(void **void_context)
-{
-    return (os_context_t *) *void_context;
-}
+#include "arch-os-generic.inc"
 
 unsigned int os_context_fp_control(os_context_t *context);
 void os_restore_fp_control(os_context_t *context);

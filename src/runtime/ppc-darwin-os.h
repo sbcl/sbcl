@@ -4,11 +4,8 @@
 #include "darwin-os.h"
 
 typedef unsigned int os_context_register_t;
+#include "arch-os-generic.inc"
 
-static inline os_context_t *arch_os_get_context(void **void_context)
-{
-    return (os_context_t *) *void_context;
-}
 /* On OS X 10.5, the field names for the thread state have changed and
  * now are prepended with __. Use some #define hackery to deal with
  * this.

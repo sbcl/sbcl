@@ -18,10 +18,7 @@ typedef struct os_context {
 
 typedef long os_context_register_t;
 
-static inline os_context_t *arch_os_get_context(void **void_context)
-{
-    return (os_context_t *) *void_context;
-}
+#include "arch-os-generic.inc"
 
 unsigned long os_context_fp_control(os_context_t *context);
 #define RESTORE_FP_CONTROL_FROM_CONTEXT

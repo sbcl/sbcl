@@ -10,10 +10,7 @@ typedef struct os_context_t {
 
 typedef long os_context_register_t;
 
-static inline os_context_t *arch_os_get_context(void **void_context)
-{
-    return (os_context_t *) *void_context;
-}
+#include "arch-os-generic.inc"
 
 static inline DWORD NT_GetLastError() {
     DWORD result;

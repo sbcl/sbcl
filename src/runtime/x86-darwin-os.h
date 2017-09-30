@@ -8,10 +8,7 @@
 
 typedef int os_context_register_t;
 
-static inline os_context_t *arch_os_get_context(void **void_context)
-{
-    return (os_context_t *) *void_context;
-}
+#include "arch-os-generic.inc"
 
 void set_data_desc_size(data_desc_t* desc, unsigned long size);
 void set_data_desc_addr(data_desc_t* desc, void* addr);
