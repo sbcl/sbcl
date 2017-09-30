@@ -210,7 +210,8 @@
 
 (define-source-transform atom (x)
   `(not (consp ,x)))
-#!+sb-unicode
+
+#!+(and sb-unicode (not x86-64))
 (define-source-transform base-char-p (x)
   `(typep ,x 'base-char))
 ;; CONS is implemented as (and list (not (eql nil))) where the 'and' is
@@ -427,18 +428,22 @@
 
 (defun source-transform-character-set-typep (object type)
   (let ((pairs (character-set-type-pairs type)))
-    (if (and (= (length pairs) 1)
-            (= (caar pairs) 0)
-            (= (cdar pairs) (1- sb!xc:char-code-limit)))
-       `(characterp ,object)
-       (once-only ((n-obj object))
-         (let ((n-code (gensym "CODE")))
-           `(and (characterp ,n-obj)
-                 (let ((,n-code (sb!xc:char-code ,n-obj)))
-                   (or
-                    ,@(loop for pair in pairs
-                            collect
-                            `(<= ,(car pair) ,n-code ,(cdr pair)))))))))))
+    (or (and (= (length pairs) 1)
+             (= (caar pairs) 0)
+             (cond
+               #!+(and sb-unicode x86-64)
+               ((= (cdar pairs) (1- base-char-code-limit))
+                `(base-char-p ,object))
+               ((= (cdar pairs) (1- sb!xc:char-code-limit))
+                `(characterp ,object))))
+        (once-only ((n-obj object))
+          (let ((n-code (gensym "CODE")))
+            `(and (characterp ,n-obj)
+                  (let ((,n-code (sb!xc:char-code ,n-obj)))
+                    (or
+                     ,@(loop for pair in pairs
+                             collect
+                             `(<= ,(car pair) ,n-code ,(cdr pair)))))))))))
 
 #!+sb-simd-pack
 (defun source-transform-simd-pack-typep (object type)

@@ -210,3 +210,38 @@
 (define-vop (fast-char>/character/c character-compare/c)
   (:translate char>)
   (:conditional :a))
+
+#!+sb-unicode
+(define-vop (base-char-p)
+  (:args (value :scs (any-reg descriptor-reg)))
+  (:arg-types *)
+  (:translate base-char-p)
+  (:temporary (:sc unsigned-reg :from (:argument 0)) temp)
+  (:conditional :z)
+  (:save-p :compute-only)
+  (:policy :fast-safe)
+  (:generator 4
+              (inst lea (reg-in-size temp :dword)
+                    (make-ea :dword :base value :disp (- character-widetag)))
+              (inst test (reg-in-size temp :dword) (lognot #x7F00))))
+#!+sb-unicode
+(define-vop (base-char-p-character)
+  (:args (value :scs (any-reg)))
+  (:arg-types character)
+  (:translate base-char-p)
+  (:conditional :z)
+  (:save-p :compute-only)
+  (:policy :fast-safe)
+  (:generator 3
+    (inst test (reg-in-size value :dword) (lognot #x7FFF))))
+
+#!+sb-unicode
+(define-vop (base-char-p-character-reg)
+  (:args (value :scs (character-reg)))
+  (:arg-types character)
+  (:translate base-char-p)
+  (:conditional :l)
+  (:save-p :compute-only)
+  (:policy :fast-safe)
+  (:generator 2
+    (inst cmp (reg-in-size value :dword) base-char-code-limit)))
