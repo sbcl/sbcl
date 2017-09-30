@@ -142,7 +142,7 @@ static inline lispobj compute_lispobj(lispobj* base_addr) {
     (dolist (entry *scav/trans/size*)
       (destructuring-bind (widetag scav &rest ignore) entry
         (declare (ignore ignore))
-        (unless (eq scav "immediate")
+        (unless (string= scav "immediate")
           (setf (aref a (ash widetag -2))
                 (case widetag
                   (#.instance-widetag instance-pointer-lowtag)

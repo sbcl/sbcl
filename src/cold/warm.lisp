@@ -13,6 +13,9 @@
 
 ;;;; general warm init compilation policy
 
+(assert (zerop (deref (extern-alien "lowtag_for_widetag" (array char 64))
+                      (ash sb-vm:character-widetag -2))))
+
 (proclaim '(optimize (compilation-speed 1)
                      (debug #+sb-show 2 #-sb-show 1)
                      (inhibit-warnings 2)
