@@ -212,16 +212,21 @@
 
 ;;; Allocate a partial frame for passing stack arguments in a full
 ;;; call. NARGS is the number of arguments passed. We allocate at
-;;; least 3 slots, because the XEP noise is going to want to use them
+;;; least 2 slots, because the XEP noise is going to want to use them
 ;;; before it can extend the stack.
 (define-vop (allocate-full-call-frame)
   (:info nargs)
   (:results (res :scs (any-reg)))
   (:generator 2
-    (inst lea res (make-ea :qword :base rsp-tn
-                           :disp (- (* sp->fp-offset n-word-bytes))))
-    (inst sub rsp-tn (* (max nargs (sb!c::sb-size (sb-or-lose 'stack)))
-                        n-word-bytes))))
+    (let ((fp-offset (* sp->fp-offset n-word-bytes))
+          (stack-size (* (max nargs (sb!c::sb-size (sb-or-lose 'stack)))
+                         n-word-bytes)))
+      (cond ((= fp-offset stack-size)
+             (inst sub rsp-tn stack-size)
+             (inst mov res rsp-tn))
+            (t
+             (inst lea res (make-ea :qword :base rsp-tn :disp (- fp-offset)))
+             (inst sub rsp-tn stack-size))))))
 
 ;;; Emit code needed at the return-point from an unknown-values call
 ;;; for a fixed number of values. Values is the head of the TN-REF
