@@ -144,8 +144,14 @@ os_validate(int movable, os_vm_address_t addr, os_vm_size_t len)
      * OpenBSD says:
        Except for MAP_FIXED mappings, the system will never replace existing mappings. */
 
-    if (!movable && addr)
+    if (addr && movable != MOVABLE) {
+        /* MOVABLE_LOW will use MAP_FIXED because if you don't,
+         * there is no chance of getting the hinted address */
         flags |= MAP_FIXED;
+#ifdef MAP_EXCL /* I think every *BSD has this but I'm not sure */
+        flags |= MAP_EXCL;
+#endif
+    }
 
 #ifdef __NetBSD__
     if (addr) {
@@ -177,6 +183,8 @@ os_validate(int movable, os_vm_address_t addr, os_vm_size_t len)
         addr = mmap(addr, len, OS_VM_PROT_ALL, flags, -1, 0);
     }
 
+    /* FIXME: if MOVABLE_LOW, probe for other possible addresses,
+     * since the combination of (MAP_FIXED | MAP_EXCL) won't */
     if (addr == MAP_FAILED) {
         perror("mmap");
         return NULL;
