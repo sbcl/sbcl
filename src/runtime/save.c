@@ -375,6 +375,12 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
         write_lispobj(PAGE_TABLE_CORE_ENTRY_TYPE_CODE, file);
         write_lispobj(4, file);
         write_lispobj(rounded_size, file);
+        /* Clear unwritten bytes in the malloc'd range. They're probably zero
+         * because malloc of large blocks is usually just an mmap(),
+         * but we can't be certain the memory was freshly allocated */
+        char* clear_from = (char*)&ptes[last_free_page];
+        char* clear_to = data + rounded_size;
+        memset(clear_from, 0, clear_to-clear_from);
         sword_t offset = write_bytes(file, data, rounded_size, core_start_pos);
         write_lispobj(offset, file);
     }
