@@ -215,7 +215,9 @@
   ;; at the same location as the new stack pointer
   (if (and nargs
            (= (* sp->fp-offset n-word-bytes)
-              (* (max nargs
+              (* (max (if (> nargs register-arg-count)
+                          nargs
+                          0)
                       (sb!c::sb-size (sb-or-lose 'stack)))
                  n-word-bytes)))
       (make-wired-tn *fixnum-primitive-type* any-reg-sc-number rsp-offset)
@@ -230,7 +232,10 @@
   (:results (res :scs (any-reg)))
   (:generator 2
     (let ((fp-offset (* sp->fp-offset n-word-bytes))
-          (stack-size (* (max nargs (sb!c::sb-size (sb-or-lose 'stack)))
+          (stack-size (* (max (if (> nargs register-arg-count)
+                                  nargs
+                                  0)
+                              (sb!c::sb-size (sb-or-lose 'stack)))
                          n-word-bytes)))
       (cond ((= fp-offset stack-size)
              (inst sub rsp-tn stack-size)
