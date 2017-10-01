@@ -891,7 +891,8 @@ function with the same specifier already exists.")
 we don't create new wrappers if one for the same specifier already exists.")
 
 (define-load-time-global *alien-callback-trampolines*
-    (make-array 32 :fill-pointer 0 :adjustable t)
+    (make-array 32 :fill-pointer 0 :adjustable t
+                :initial-element #'invalid-alien-callback)
   "Lisp trampoline store: assembler wrappers contain indexes to this, and
 ENTER-ALIEN-CALLBACK pulls the corresponding trampoline out and calls it.")
 
@@ -943,7 +944,8 @@ ENTER-ALIEN-CALLBACK pulls the corresponding trampoline out and calls it.")
     `(lambda (args-pointer result-pointer function)
        ;; KLUDGE: the SAP shouldn't be consed but they are, don't
        ;; bother anyone about that sad fact
-       (declare (muffle-conditions compiler-note))
+       (declare (muffle-conditions compiler-note)
+                (optimize speed))
        ;; FIXME: the saps are not gc safe
        (let ((args-sap (int-sap
                         (sb!kernel:get-lisp-obj-address args-pointer)))
@@ -1036,7 +1038,9 @@ ENTER-ALIEN-CALLBACK pulls the corresponding trampoline out and calls it.")
         (error "Unsupported callback argument type: ~A" type))))
 
 (defun enter-alien-callback (index return arguments)
-  (funcall (aref *alien-callback-trampolines* index)
+  (funcall (truly-the function
+                      (svref (sb!kernel:%array-data *alien-callback-trampolines*)
+                             index))
            return
            arguments))
 
