@@ -23,6 +23,7 @@
 #include "validate.h"
 #include "sbcl.h"
 #include "genesis/closure.h"
+#include "genesis/fdefn.h"
 #include "genesis/static-symbols.h"
 #include "genesis/thread.h"
 	
@@ -200,7 +201,7 @@ Lstack:
 	cmp	$2,%rcx
 	je	Ldone
 	mov	16(%rbx),%rsi	# arg2
-Ldone:	
+Ldone:
 	shl	$(N_FIXNUM_TAG_BITS),%rcx	# (fixnumize num-args)
 	/* Registers rax, rcx, rdx, rdi, and rsi are now live. */
 	xor	%rbx,%rbx	# available
@@ -209,7 +210,6 @@ Ldone:
 	push	%rbp            # Dummy for return address
 	push	%rbp		# fp in save location S1
 	mov	%rsp,%rbp	# The current sp marks start of new frame.
-	sub	$8,%rsp	        # Ensure 3 slots are allocated, two above.
 
 Lcall:
 	call	*CLOSURE_FUN_OFFSET(%rax)
@@ -242,6 +242,52 @@ LsingleValue:
 #endif
 	ret
 	SIZE(GNAME(call_into_lisp))
+
+#ifdef LISP_FEATURE_SB_THREAD
+	.text	
+	.globl  GNAME(funcall_alien_callback)
+	TYPE(GNAME(funcall_alien_callback))
+	.align	align_16byte,0x90
+GNAME(funcall_alien_callback):
+/* Specialized call_into_lisp for callbacks
+   rdi arg1
+   rsi arg2
+   rdx arg0
+   rcx thread
+*/
+        
+	push	%rbp		# Save old frame pointer.
+	mov	%rsp,%rbp	# Establish new frame.
+
+	push	%rbx  	# these regs are callee-saved according to C
+	push	%r12	# so must be preserved and restored when 
+	push	%r13    # the lisp function returns
+	push	%r14    #
+	push	%r15    #
+
+        mov     %rcx,%r12
+        mov     $(3 << N_FIXNUM_TAG_BITS),%rcx
+
+	/* Alloc new frame. */
+        push	%rbp            # Dummy for return address
+	push	%rbp		# fp in save location S1
+        mov	%rsp,%rbp
+        mov     (ENTER_ALIEN_CALLBACK_FDEFN+FDEFN_FUN_OFFSET),%rax
+	call	*CLOSURE_FUN_OFFSET(%rax)
+
+/* Restore C regs */
+	pop	%r15
+	pop	%r14
+	pop	%r13
+	pop	%r12
+	pop	%rbx
+
+	leave
+
+	ret
+	SIZE(GNAME(funcall_alien_callback))
+#endif
+ 
 
 /* Our call-site does not take care of caller-saved xmm registers, so it
  * falls to us spill them beforing hopping into C.

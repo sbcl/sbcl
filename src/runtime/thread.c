@@ -562,6 +562,12 @@ detach_os_thread(init_thread_data *scribble)
     free_thread_struct(th);
 }
 
+#if defined(LISP_FEATURE_X86_64) && !defined(LISP_FEATURE_WIN32)
+extern void funcall_alien_callback(lispobj arg1, lispobj arg2, lispobj arg0,
+                                   struct thread* thread)
+  __attribute__((sysv_abi));
+#endif
+
 void
 callback_wrapper_trampoline(
 #if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
@@ -596,8 +602,11 @@ callback_wrapper_trampoline(
     WITH_GC_AT_SAFEPOINTS_ONLY()
 #endif
     {
-       funcall3(StaticSymbolFunction(ENTER_ALIEN_CALLBACK), arg0, arg1, arg2);
-
+#if defined(LISP_FEATURE_X86_64) && !defined(LISP_FEATURE_WIN32)
+        funcall_alien_callback(arg1, arg2, arg0, th);
+#else
+        funcall3(StaticSymbolFunction(ENTER_ALIEN_CALLBACK), arg0,arg1,arg2);
+#endif
     }
 }
 #endif /* LISP_FEATURE_SB_THREAD */
