@@ -210,6 +210,17 @@
                            :disp (- (* sp->fp-offset n-word-bytes))))
     (inst sub rsp-tn (* n-word-bytes (sb-allocated-size 'stack)))))
 
+(defun make-stack-pointer-tn (&optional nargs)
+  ;; Avoid using a temporary register if the new frame pointer will be
+  ;; at the same location as the new stack pointer
+  (if (and nargs
+           (= (* sp->fp-offset n-word-bytes)
+              (* (max nargs
+                      (sb!c::sb-size (sb-or-lose 'stack)))
+                 n-word-bytes)))
+      (make-wired-tn *fixnum-primitive-type* any-reg-sc-number rsp-offset)
+      (make-normal-tn *fixnum-primitive-type*)))
+
 ;;; Allocate a partial frame for passing stack arguments in a full
 ;;; call. NARGS is the number of arguments passed. We allocate at
 ;;; least 2 slots, because the XEP noise is going to want to use them
@@ -223,7 +234,7 @@
                          n-word-bytes)))
       (cond ((= fp-offset stack-size)
              (inst sub rsp-tn stack-size)
-             (inst mov res rsp-tn))
+             (move res rsp-tn))
             (t
              (inst lea res (make-ea :qword :base rsp-tn :disp (- fp-offset)))
              (inst sub rsp-tn stack-size))))))

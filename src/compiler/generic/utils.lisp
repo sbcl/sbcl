@@ -124,7 +124,9 @@
    (make-representation-tn *fixnum-primitive-type* any-reg-sc-number)
    env))
 
-(defun make-stack-pointer-tn ()
+#!-x86-64
+(defun make-stack-pointer-tn (&optional nargs)
+  (declare (ignore nargs))
   (make-normal-tn *fixnum-primitive-type*))
 
 (defun make-number-stack-pointer-tn ()
