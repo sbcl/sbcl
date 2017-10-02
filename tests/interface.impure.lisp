@@ -20,12 +20,12 @@
   `(let ((*standard-output* (make-broadcast-stream))) ,@things))
 
 ;; Interpreted closure is a problem for COMPILE
-(with-test (:name :disassemble :skipped-on :interpreter)
-;;; DISASSEMBLE shouldn't fail on closures or unpurified functions
+(with-test (:name (disassemble function) :skipped-on :interpreter)
+  ;; DISASSEMBLE shouldn't fail on closures or unpurified functions
   (defun disassemble-fun (x) x)
   (silently (disassemble 'disassemble-fun)))
 
-(with-test (:name :disassemble-closure :skipped-on :interpreter)
+(with-test (:name (disassemble :closure) :skipped-on :interpreter)
   (let ((x 1)) (defun disassemble-closure (y) (if y (setq x y) x)))
   (silently (disassemble 'disassemble-closure)))
 
@@ -37,7 +37,7 @@
   (import 'sb-interpreter:interpreted-function-p))
 
 #+(or sb-eval sb-fasteval)
-(with-test (:name :disassemble-interpreted)
+(with-test (:name (disassemble :interpreted))
     ;; Nor should it fail on interpreted functions
     (let ((sb-ext:*evaluator-mode* :interpret))
       (eval `(defun disassemble-eval (x) x))
@@ -49,7 +49,7 @@
     ;; is not installed.)"
     (assert (interpreted-function-p (symbol-function 'disassemble-eval))))
 
-(with-test (:name :disassemble-generic)
+(with-test (:name (disassemble generic-function))
   ;; nor should it fail on generic functions or other funcallable instances
   (defgeneric disassemble-generic (x))
   (silently (disassemble 'disassemble-generic))
@@ -62,7 +62,7 @@
 
 (let ((x 1)) (defun fle-closure (y) (if y (setq x y) x)))
 
-(with-test (:name :function-lambda-expression)
+(with-test (:name function-lambda-expression)
   (flet ((fle-name (x)
            (nth-value 2 (function-lambda-expression x))))
     (assert (eql (fle-name #'fle-fun) 'fle-fun))
@@ -362,7 +362,7 @@
   (setf (documentation 'bug-643958-test 'function) "bar")
   (assert (equal "bar" (documentation 'bug-643958-test 'function))))
 
-(with-test (:name :endianness-in-features)
+(with-test (:name (:endianness :in *features*))
   (assert
    (or (member :big-endian *features*)
        (member :little-endian *features*))))

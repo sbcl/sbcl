@@ -228,7 +228,7 @@
 
 ;;; This tests that the x86-64 disasembler does not crash
 ;;; on LEA with a rip-relative operand and no label.
-(with-test (:name :disassemble-no-labels
+(with-test (:name (disassemble :no-labels)
                   :skipped-on '(not :x86-64))
   (let* ((lines
           (split-string
@@ -270,14 +270,14 @@
 (with-test (:name :bug-1095483)
   (assert-error (fboundp '(cas "foo"))))
 
-(with-test (:name :sleep-return-value)
+(with-test (:name (sleep :return-value))
   (assert (equal (multiple-value-list
                   (funcall
                    (checked-compile `(lambda ()
                                        (sleep 0.1)))))
                  '(nil))))
 
-(with-test (:name :time-no-print-length-abbreviation)
+(with-test (:name (time :no *print-length* :abbreviation))
   (let ((s (make-string-output-stream)))
     (let ((*trace-output* s))
       (time (progn)))
