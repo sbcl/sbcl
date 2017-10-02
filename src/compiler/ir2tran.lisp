@@ -596,19 +596,22 @@
            (list results) (type (or lvar null) lvar))
   (when lvar
     (let ((2lvar (lvar-info lvar)))
-      (ecase (ir2-lvar-kind 2lvar)
-        (:fixed
-         (let ((locs (ir2-lvar-locs 2lvar)))
-           (unless (eq locs results)
-             (move-results-coerced node block results locs))))
-        (:unknown
-         (let* ((nvals (length results))
-                (locs (make-standard-value-tns nvals)))
-           (move-results-coerced node block results locs)
-           (vop* push-values node block
-                 ((reference-tn-list locs nil))
-                 ((reference-tn-list (ir2-lvar-locs 2lvar) t))
-                 nvals))))))
+      ;; If LVAR flows through a CAST which is unused it won't get
+      ;; deleted and won't be annotated
+      (when 2lvar
+        (ecase (ir2-lvar-kind 2lvar)
+          (:fixed
+           (let ((locs (ir2-lvar-locs 2lvar)))
+             (unless (eq locs results)
+               (move-results-coerced node block results locs))))
+          (:unknown
+           (let* ((nvals (length results))
+                  (locs (make-standard-value-tns nvals)))
+             (move-results-coerced node block results locs)
+             (vop* push-values node block
+                   ((reference-tn-list locs nil))
+                   ((reference-tn-list (ir2-lvar-locs 2lvar) t))
+                   nvals)))))))
   (values))
 
 ;;; CAST

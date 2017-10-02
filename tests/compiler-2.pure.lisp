@@ -285,3 +285,17 @@
                            b)
                        (+ c)))))))
             3 -7))))
+
+(with-test (:name :move-lvar-result-through-unused-cast)
+  (assert (=
+           (funcall
+            (checked-compile `(lambda ()
+                                (declare (optimize (debug 0)))
+                                (labels ((f (a b)
+                                           a b)
+                                         (x ()
+                                           (apply #'f (list 2 3))))
+                                  (declare (notinline f))
+                                  (the integer (x)))
+                                132)))
+           132)))
