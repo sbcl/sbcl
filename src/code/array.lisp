@@ -973,7 +973,11 @@ of specialized arrays is supported."
                       (aver (typep specifier '(or list symbol)))
                       (setf (aref table typecode) specifier)
                       (when complex-typecode
-                        (setf (aref table complex-typecode) specifier)))))
+                        (setf (aref table complex-typecode) specifier))))
+                  (setf (aref table sb!vm:simple-array-widetag) nil
+                        (aref table sb!vm:complex-vector-widetag) nil
+                        (aref table sb!vm:complex-array-widetag) nil)
+                  table)
                 t)))
     (let ((result (aref table widetag)))
       (if result
