@@ -264,3 +264,24 @@
                                                        a))
                                                 (%f 0 (%f 123))))))))
              345)))
+
+(with-test (:name :shift-right-transform-nil-type)
+  (assert (=
+           (funcall
+            (checked-compile
+             `(lambda (b c)
+                (declare (type (integer -10 -6) c)
+                         (optimize (debug 2)))
+                (catch 'c
+                  (flet ((f1 (a &optional (b (shiftf b 0)) c d)
+                           (declare (ignore a b c d))
+                           (throw 'c 780)))
+                    (flet ((f2 (a b)
+                             (f1 a b 0)))
+                      (ash
+                       (f1 (if t
+                               c
+                               (f1 (f2 1 0) 0))
+                           b)
+                       (+ c)))))))
+            3 -7))))
