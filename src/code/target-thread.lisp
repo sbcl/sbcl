@@ -1020,11 +1020,11 @@ must be held by this thread during this call."
   "Semaphore type. The fact that a SEMAPHORE is a STRUCTURE-OBJECT
 should be considered an implementation detail, and may change in the
 future."
-  (name    nil :type (or null thread-name))
+  (name    nil :type (or null thread-name) :read-only t)
   (%count    0 :type (integer 0))
   (waitcount 0 :type sb!vm:word)
-  (mutex (make-mutex))
-  (queue (make-waitqueue)))
+  (mutex (make-mutex :name "semaphore lock") :read-only t)
+  (queue (make-waitqueue) :read-only t))
 
 (setf (fdocumentation 'semaphore-name 'function)
       "The name of the semaphore INSTANCE. Setfable."
