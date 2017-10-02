@@ -195,20 +195,19 @@
 
 (defun cdf-encode-locs (start-pc elsewhere-pc closure-save
                         #!+unwind-to-frame-and-call-vop bsp-save)
-  (dx-let ((storage (make-array (* 5 4) :element-type '(unsigned-byte 8))))
-    (let ((bytes (make-array (* 5 4) :fill-pointer 0 :displaced-to storage
-                             :element-type '(unsigned-byte 8))))
-      ;; ELSEWHERE is encoded first to simplify the C backtrace logic,
-      ;; which does not need access to any of the subsequent fields.
-      (write-var-integer elsewhere-pc bytes)
-      (write-var-integer start-pc bytes)
-      #!+unwind-to-frame-and-call-vop
-      (write-var-integer (if bsp-save (1+ bsp-save) 0) bytes)
-      ;; More often the BSP-SAVE is non-null than CLOSURE-SAVE is non-null,
-      ;; so the encoding is potentially smaller with CLOSURE-SAVE being last.
-      (when closure-save
-        (write-var-integer (1+ closure-save) bytes))
-      (integer-from-octets bytes))))
+  (dx-let ((bytes (make-array (* 5 4) :fill-pointer 0
+                                      :element-type '(unsigned-byte 8))))
+    ;; ELSEWHERE is encoded first to simplify the C backtrace logic,
+    ;; which does not need access to any of the subsequent fields.
+    (write-var-integer elsewhere-pc bytes)
+    (write-var-integer start-pc bytes)
+    #!+unwind-to-frame-and-call-vop
+    (write-var-integer (if bsp-save (1+ bsp-save) 0) bytes)
+    ;; More often the BSP-SAVE is non-null than CLOSURE-SAVE is non-null,
+    ;; so the encoding is potentially smaller with CLOSURE-SAVE being last.
+    (when closure-save
+      (write-var-integer (1+ closure-save) bytes))
+    (integer-from-octets bytes)))
 
 (defun cdf-decode-locs (cdf)
   (let ((encoding (compiled-debug-fun-encoded-locs cdf))
