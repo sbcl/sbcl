@@ -122,6 +122,25 @@ futex_init()
     }
 }
 
+/* Try to guess the name of the mutex for this futex, based on knowing
+ * the two pertinent Lisp object types (WAITQUEUE and MUTEX) that use a futex.
+ * Callable from a C debugger */
+#include "genesis/vector.h"
+char* futex_name(int *lock_word)
+{
+    // If there is a Lisp string at lock_word-1 or -2, return that.
+    // Otherwise return NULL.
+    lispobj name = *(lock_word - 1);
+    struct vector* v = (struct vector*)native_pointer(name);
+    if (lowtag_of(name) == OTHER_POINTER_LOWTAG && widetag_of(v->header) == SIMPLE_BASE_STRING_WIDETAG)
+        return (char*)(v->data);
+    name = *(lock_word - 2);
+    v = (struct vector*)native_pointer(name);
+    if (lowtag_of(name) == OTHER_POINTER_LOWTAG && widetag_of(v->header) == SIMPLE_BASE_STRING_WIDETAG)
+        return (char*)(v->data);
+    return 0;
+}
+
 int
 futex_wait(int *lock_word, int oldval, long sec, unsigned long usec)
 {
