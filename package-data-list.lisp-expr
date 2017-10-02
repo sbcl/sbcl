@@ -422,7 +422,10 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
 
                ;; for SB-COVER
                "*CODE-COVERAGE-INFO*" "CODE-COVERAGE-RECORD-MARKED"
-               "CLEAR-CODE-COVERAGE" "RESET-CODE-COVERAGE"))
+               "CLEAR-CODE-COVERAGE" "RESET-CODE-COVERAGE"
+               ;; for SB-INTROSPECT
+               "MAP-PACKED-XREF-DATA" "MAP-SIMPLE-FUNS"
+               ))
 
    #s(sb-cold:package-data
       :name "SB!DEBUG"

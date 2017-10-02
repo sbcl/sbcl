@@ -603,10 +603,10 @@ value."
 
 (defun collect-xref (wanted-kind wanted-name)
   (let ((result '()))
-    (sb-c::map-simple-funs
+    (sb-c:map-simple-funs
      (lambda (name fun)
        (sb-int:binding* ((xrefs (sb-kernel:%simple-fun-xrefs fun) :exit-if-null))
-         (sb-c::map-packed-xref-data
+         (sb-c:map-packed-xref-data
           (lambda (xref-kind xref-name xref-form-number)
             (when (and (eq xref-kind wanted-kind)
                        (equal xref-name wanted-name))
