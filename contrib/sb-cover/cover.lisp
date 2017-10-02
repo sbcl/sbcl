@@ -28,11 +28,11 @@
 into the database when the FASL files (produced by compiling
 STORE-COVERAGE-DATA optimization policy set to 3) are loaded again into the
 image."
-  (sb-c::clear-code-coverage))
+  (sb-c:clear-code-coverage))
 
 (defun reset-coverage ()
   "Reset all coverage data back to the `Not executed` state."
-  (sb-c::reset-code-coverage))
+  (sb-c:reset-code-coverage))
 
 (defun save-coverage ()
   "Returns an opaque representation of the current code coverage state.
@@ -40,7 +40,7 @@ The only operation that may be done on the state is passing it to
 RESTORE-COVERAGE. The representation is guaranteed to be readably printable.
 A representation that has been printed and read back will work identically
 in RESTORE-COVERAGE."
-  (loop for file being the hash-keys of sb-c::*code-coverage-info*
+  (loop for file being the hash-keys of sb-c:*code-coverage-info*
         using (hash-value states)
         collect (cons file states)))
 
@@ -48,7 +48,7 @@ in RESTORE-COVERAGE."
   "Restore the code coverage data back to an earlier state produced by
 SAVE-COVERAGE."
   (loop for (file . states) in coverage-state
-        do (let ((image-states (gethash file sb-c::*code-coverage-info*))
+        do (let ((image-states (gethash file sb-c:*code-coverage-info*))
                  (table (make-hash-table :test 'equal)))
              (when image-states
                (loop for cons in image-states
@@ -409,7 +409,7 @@ table.summary tr.subheading td { text-align: left; font-weight: bold; padding-le
            unless (member (caar record) '(:then :else))
            collect (list mode
                          (car record)
-                         (if (sb-c::code-coverage-record-marked record)
+                         (if (sb-c:code-coverage-record-marked record)
                              1
                              2))))
     (:branch
@@ -419,7 +419,7 @@ table.summary tr.subheading td { text-align: left; font-weight: bold; padding-le
            (when (member (car path) '(:then :else))
              (setf (gethash (cdr path) hash)
                    (logior (gethash (cdr path) hash 0)
-                           (ash (if (sb-c::code-coverage-record-marked record)
+                           (ash (if (sb-c:code-coverage-record-marked record)
                                     1
                                     2)
                                 (if (eql (car path) :then)

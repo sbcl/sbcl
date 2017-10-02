@@ -960,18 +960,19 @@
 ;;; instrumentation. If not, just return the original START
 ;;; ctran. Otherwise insert code coverage instrumentation after
 ;;; START, and return the new ctran.
-(defun instrument-coverage (start mode form)
+(defun instrument-coverage (start mode form
+                            &aux (metadata *compiler-coverage-metadata*))
   ;; We don't actually use FORM for anything, it's just convenient to
   ;; have around when debugging the instrumentation.
   (declare (ignore form))
-  (if (and (policy *lexenv* (> store-coverage-data 0))
-           *code-coverage-records*
+  (if (and metadata
+           (policy *lexenv* (> store-coverage-data 0))
            *allow-instrumenting*)
       (let ((path (source-path-original-source *current-path*)))
         (when mode
           (push mode path))
         (if (member (ctran-block start)
-                    (gethash path *code-coverage-blocks*))
+                    (gethash path (code-coverage-blocks metadata)))
             ;; If this source path has already been instrumented in
             ;; this block, don't instrument it again.
             start
@@ -979,12 +980,12 @@
                    ;; Get an interned record cons for the path. A cons
                    ;; with the same object identity must be used for
                    ;; each instrument for the same block.
-                   (ensure-gethash path *code-coverage-records*
+                   (ensure-gethash path (code-coverage-records metadata)
                                    (cons path +code-coverage-unmarked+)))
                   (next (make-ctran))
                   (*allow-instrumenting* nil))
               (push (ctran-block start)
-                    (gethash path *code-coverage-blocks*))
+                    (gethash path (code-coverage-blocks metadata)))
               (ir1-convert start next nil
                            `(locally
                                 (declare (optimize speed

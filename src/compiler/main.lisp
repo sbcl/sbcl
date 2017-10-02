@@ -91,12 +91,15 @@
 
 (defvar *fopcompile-label-counter*)
 
+(defvar *compiler-coverage-metadata*)
+(declaim (type (or (cons hash-table hash-table) null) *compiler-coverage-metadata*))
+(declaim (inline code-coverage-records code-coverage-blocks))
 ;; Used during compilation to map code paths to the matching
 ;; instrumentation conses.
-(defvar *code-coverage-records* nil)
+(defun code-coverage-records (x) (car x))
 ;; Used during compilation to keep track of with source paths have been
 ;; instrumented in which blocks.
-(defvar *code-coverage-blocks* nil)
+(defun code-coverage-blocks (x) (cdr x))
 ;; Stores the code coverage instrumentation results. Keys are namestrings, the
 ;; value is a list of (CONS PATH STATE), where STATE is +CODE-COVERAGE-UNMARKED+
 ;; for a path that has not been visited, and T for one that has.
@@ -1694,8 +1697,8 @@ necessary, since type inference may take arbitrarily long to converge.")
         (sb!xc:*compile-file-truename* nil) ; SUB-SUB-COMPILE-FILE
         (*policy* *policy*)
         (*macro-policy* *macro-policy*)
-        (*code-coverage-records* (make-hash-table :test 'equal))
-        (*code-coverage-blocks* (make-hash-table :test 'equal))
+        (*compiler-coverage-metadata* (cons (make-hash-table :test 'equal)
+                                            (make-hash-table :test 'equal)))
         (*handled-conditions* *handled-conditions*)
         (*disabled-package-locks* *disabled-package-locks*)
         (*lexenv* (make-null-lexenv))
@@ -1721,19 +1724,20 @@ necessary, since type inference may take arbitrarily long to converge.")
                 (setf (sb!fasl::fasl-output-source-info *compile-object*)
                       (debug-source-for-info info))
                 (sub-sub-compile-file info)
-                (unless (zerop (hash-table-count *code-coverage-records*))
+                (let ((code-coverage-records (code-coverage-records *compiler-coverage-metadata*)))
+                  (unless (zerop (hash-table-count code-coverage-records))
                   ;; Dump the code coverage records into the fasl.
-                  (with-source-paths
+                   (with-source-paths
                     (fopcompile `(record-code-coverage
                                   ',(namestring *compile-file-pathname*)
                                   ',(let (list)
                                       (maphash (lambda (k v)
                                                  (declare (ignore k))
                                                  (push v list))
-                                               *code-coverage-records*)
+                                               code-coverage-records)
                                       list))
                                 nil
-                                nil)))
+                                nil))))
                 (finish-block-compilation)
                 nil))))
       ;; Some errors are sufficiently bewildering that we just fail

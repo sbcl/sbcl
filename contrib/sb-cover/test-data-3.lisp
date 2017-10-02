@@ -1,4 +1,4 @@
-(declaim (optimize sb-c::store-coverage-data))
+(declaim (optimize sb-c:store-coverage-data))
 
 (defun test-1 ()
   (print '((1 3 1))))

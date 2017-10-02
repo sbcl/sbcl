@@ -418,7 +418,11 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                "WITH-COMPILER-ERROR-RESIGNALLING"
                "WITH-SOURCE-LOCATION"
 
-               "BRANCH-IF"))
+               "BRANCH-IF"
+
+               ;; for SB-COVER
+               "*CODE-COVERAGE-INFO*" "CODE-COVERAGE-RECORD-MARKED"
+               "CLEAR-CODE-COVERAGE" "RESET-CODE-COVERAGE"))
 
    #s(sb-cold:package-data
       :name "SB!DEBUG"
