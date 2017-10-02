@@ -1452,6 +1452,7 @@ general_copy_large_object(lispobj object, sword_t nwords, boolean boxedp)
         next_page = first_page;
         remaining_bytes = nwords*N_WORD_BYTES;
 
+        /* FIXME: can we share code with maybe_adjust_large_object ? */
         while (remaining_bytes > GENCGC_CARD_BYTES) {
             gc_assert(page_table[next_page].gen == from_space);
             gc_assert(page_table[next_page].large_object);
@@ -2020,21 +2021,21 @@ preserve_pointer(void *addr)
         return;
     }
 #endif
-    page_index_t addr_page_index = find_page_index(addr);
+    page_index_t page = find_page_index(addr);
 
 #ifdef GENCGC_IS_PRECISE
     /* If we're in precise gencgc (non-x86oid as of this writing) then
      * we are only called on valid object pointers in the first place,
      * so we just have to do a bounds-check against the heap, a
      * generation check, and the already-pinned check. */
-    if (addr_page_index == -1
-        || (page_table[addr_page_index].gen != from_space)
-        || page_table[addr_page_index].dont_move)
+    if (page == -1
+        || (page_table[page].gen != from_space)
+        || page_table[page].dont_move)
         return;
 #else
     lispobj *object_start;
-    if (addr_page_index == -1
-        || (object_start = conservative_root_p(addr, addr_page_index)) == 0)
+    if (page == -1
+        || (object_start = conservative_root_p(addr, page)) == 0)
         return;
     if (!compacting_p()) {
         /* Just mark it.  No distinction between large and small objects. */
@@ -2043,9 +2044,7 @@ preserve_pointer(void *addr)
     }
 #endif
 
-    /* (Now that we know that addr_page_index is in range, it's
-     * safe to index into page_table[] with it.) */
-    unsigned int region_allocation = page_table[addr_page_index].allocated;
+    unsigned int region_allocation = page_table[page].allocated;
 
     /* Find the beginning of the region.  Note that there may be
      * objects in the region preceding the one that we were passed a
@@ -2055,9 +2054,9 @@ preserve_pointer(void *addr)
 #if 0
     /* I think this'd work just as well, but without the assertions.
      * -dan 2004.01.01 */
-    page_index_t first_page = find_page_index(page_scan_start(addr_page_index))
+    page_index_t first_page = find_page_index(page_scan_start(page))
 #else
-    page_index_t first_page = addr_page_index;
+    page_index_t first_page = page;
     while (!page_starts_contiguous_block_p(first_page)) {
         --first_page;
         /* Do some checks. */
@@ -2105,7 +2104,7 @@ preserve_pointer(void *addr)
 #endif
 
     /* Check that the page is now static. */
-    gc_assert(page_table[addr_page_index].dont_move != 0);
+    gc_assert(page_table[page].dont_move != 0);
 }
 
 
