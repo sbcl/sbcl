@@ -105,7 +105,6 @@
 (defvar *current-path*)
 (defvar *current-component*)
 (defvar *delayed-ir1-transforms*)
-(defvar *eval-tlf-index*)
 (defvar *dynamic-counts-tn*)
 (defvar *elsewhere*)
 (defvar *elsewhere-label*)
