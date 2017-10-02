@@ -903,32 +903,42 @@ static boolean __attribute__((unused)) sym_stringeq(lispobj sym, const char *str
         && !strcmp((char*)name->data, string);
 }
 
-/* Return the value of SB-THREAD::*ALL-THREADS*
- * This does not need to be particularly efficient.
- */
-static const char __attribute__((unused)) all_threads_sym[] = "*ALL-THREADS*";
-static lispobj all_lisp_threads()
+/* Find the C string 'name' in 'table', a package-hashtable.
+ * This does not need to be particularly efficient. No hashing is involved. */
+static struct symbol* find_symbol_or_lose(char name[], lispobj table, int* hint)
 {
-#ifdef ENTER_FOREIGN_CALLBACK
-    // Starting with a known static symbol in SB-THREAD::, get the SB-THREAD package
-    // and find *ALL-THREADS* (which isn't static). Fewer static symbols is better.
-    struct symbol*   sym = SYMBOL(ENTER_FOREIGN_CALLBACK);
-    struct package*  pkg = (struct package*)native_pointer(sym->package);
-    struct instance* internals = (struct instance*)native_pointer(pkg->internal_symbols);
-    struct vector*   cells = (struct vector*)
-        native_pointer(internals->slots[INSTANCE_DATA_START]);
+    int namelen = strlen(name);
+    struct vector* cells = (struct vector*)
+        native_pointer(((struct instance*)native_pointer(table))
+                       ->slots[INSTANCE_DATA_START]);
     int cells_length = fixnum_value(cells->length);
-    static int index = 0;
+    int index = *hint;
+    if (index >= cells_length)
+        index = 0; // safeguard against vector shrinkage
     int initial_index = index;
     do {
         lispobj thing = cells->data[index];
         if (lowtag_of(thing) == OTHER_POINTER_LOWTAG
             && widetag_of(SYMBOL(thing)->header) == SYMBOL_WIDETAG
-            && sym_stringeq(thing, all_threads_sym, strlen(all_threads_sym)))
-          return SYMBOL(thing)->value;
+            && sym_stringeq(thing, name, namelen)) {
+            *hint = index;
+            return SYMBOL(thing);
+        }
         index = (index + 1) % cells_length;
     } while (index != initial_index);
-    lose("Can't find *ALL-THREADS*");
+    lose("Can't find %s", name);
+}
+
+static lispobj sb_thread_all_threads()
+{
+#ifdef ENTER_FOREIGN_CALLBACK_FDEFN
+    // Starting with a known static fdefn in SB-THREAD::, get the SB-THREAD package
+    // and find *ALL-THREADS* (which isn't static). Fewer static symbols is better.
+    struct symbol*   sym = SYMBOL(FDEFN(ENTER_FOREIGN_CALLBACK_FDEFN)->name);
+    struct package*  pkg = (struct package*)native_pointer(sym->package);
+    static int hint = 0;
+    sym = find_symbol_or_lose("*ALL-THREADS*", pkg->internal_symbols, &hint);
+    return sym->value;
 #endif
     return NIL;
 }
@@ -940,7 +950,7 @@ static lispobj all_lisp_threads()
 
 struct vector* lisp_thread_name(os_thread_t os_thread)
 {
-    lispobj list = all_lisp_threads();
+    lispobj list = sb_thread_all_threads();
     while (list != NIL) {
         struct instance* lisp_thread = (struct instance*)native_pointer(CONS(list)->car);
         list = CONS(list)->cdr;

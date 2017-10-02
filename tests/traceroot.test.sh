@@ -72,8 +72,12 @@ EOF
 #      ->(g5,FOO)0x1002c825d3[1]->(g5,cons)0x1002c83427[0]
 #      ->(g5,simple vector)0x1002c83b9f[3]->(g5,cons)0x1002c84377[0]->0x1002c848c7.
 
+# Should be able to identify a specific Lisp thread
+# May or may not work for other than x86-64
+thread=`run_sbcl --eval '(or #+(and sb-thread x86-64) (princ "\"main thread\":"))' --quit`
+
 win1=`awk '/C stack.+TEST1.+cons.+FOO.+cons.+vector.+cons/{print "win\n"}' $tmpfilename`
-win2=`awk '/TLS:\*FRED/{print "win\n"}' $tmpfilename`
+win2=`awk '/'"${thread}"'TLS:\*FRED/{print "win\n"}' $tmpfilename`
 win3=`awk '/bindings:\*FRED/{print "win\n"}' $tmpfilename`
 
 test z$win1 = zwin -a z$win2 = zwin -a z$win3 = zwin && exit $EXIT_TEST_WIN
