@@ -15,7 +15,7 @@
 
 ;;; We track pred/succ info at the IR2-block level, extrapolating
 ;;; most of the data from IR1 to initialise.
-(declaim (type hash-table *block-info*))
+(declaim (type hash-table *2block-info*))
 ;;; For blocks it's a cons with (pred . succ)
 ;;; For labels it maps to the label block
 (defvar *2block-info*)
