@@ -1022,7 +1022,8 @@
                        (:displaced-index-offset index))
     array (flushable))
 
-(defknown fill-data-vector (vector list sequence) t ())
+(defknown fill-data-vector (vector list sequence) vector ()
+  :result-arg 0)
 
 ;; INITIAL-CONTENTS is the first argument to FILL-ARRAY because
 ;; of the possibility of source-transforming it for various recognized

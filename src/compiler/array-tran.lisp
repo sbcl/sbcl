@@ -662,9 +662,6 @@
                      (not simple-array))
                `(simple-array
                  ,(sb!vm:saetp-specifier saetp) (,(or c-length '*)))))
-         (header-form (and complex
-                           `(make-array-header ,(or (sb!vm:saetp-complex-typecode saetp)
-                                                    sb!vm:complex-vector-widetag) 1)))
          (data-alloc-form
            `(truly-the ,data-result-spec
                        (allocate-vector ,typecode
@@ -694,34 +691,42 @@
                     (let* ((constant-fill-pointer-p (constant-lvar-p fill-pointer))
                            (fill-pointer-value (and constant-fill-pointer-p
                                                     (lvar-value fill-pointer))))
-                      `(let* ((header ,header-form)
-                              (data ,data-alloc-form)
-                              (data ,(or data-wrapper 'data))
-                              (length (the index ,(or c-length 'length))))
-                         (setf (%array-fill-pointer header)
-                               ,(cond ((eq fill-pointer-value t)
-                                       'length)
-                                      (fill-pointer-value)
-                                      ((and fill-pointer
-                                            (not constant-fill-pointer-p))
-                                       `(cond ((or (eq fill-pointer t)
-                                                   (null fill-pointer))
-                                               length)
-                                              ((> fill-pointer length)
-                                               (error "Invalid fill-pointer ~a" fill-pointer))
-                                              (t
-                                               fill-pointer)))
-                                      (t
-                                       'length)))
-                         (setf (%array-fill-pointer-p header)
-                               ,(and fill-pointer
-                                     `(and fill-pointer t)))
-                         (setf (%array-available-elements header) length)
-                         (setf (%array-data header) data)
-                         (setf (%array-displaced-p header) nil)
-                         (setf (%array-displaced-from header) nil)
-                         (setf (%array-dimension header 0) length)
-                         (truly-the ,result-spec header))))
+                      `(let ((length (the index ,(or c-length 'length))))
+                         (truly-the
+                          ,result-spec
+                          (make-array-header* ,(or (sb!vm:saetp-complex-typecode saetp)
+                                                   sb!vm:complex-vector-widetag)
+                                              ;; fill-pointer
+                                              ,(cond ((eq fill-pointer-value t)
+                                                      'length)
+                                                     (fill-pointer-value)
+                                                     ((and fill-pointer
+                                                           (not constant-fill-pointer-p))
+                                                      `(cond ((or (eq fill-pointer t)
+                                                                  (null fill-pointer))
+                                                              length)
+                                                             ((> fill-pointer length)
+                                                              (error "Invalid fill-pointer ~a" fill-pointer))
+                                                             (t
+                                                              fill-pointer)))
+                                                     (t
+                                                      'length))
+                                              ;; fill-pointer-p
+                                              ,(and fill-pointer
+                                                    `(and fill-pointer t))
+                                              ;; elements
+                                              length
+                                              ;; data
+                                              (let ((data ,data-alloc-form))
+                                                ,(or data-wrapper 'data))
+                                              ;; displacement
+                                              0
+                                              ;; displaced-p
+                                              nil
+                                              ;; displaced-from
+                                              nil
+                                              ;; dimensions
+                                              length)))))
                    (data-wrapper
                     (subst data-alloc-form 'data data-wrapper))
                    (t
@@ -1014,30 +1019,34 @@
                                      (lvar-value element-type)))
                                    (t '*))
                             ,(make-list rank :initial-element '*))))
-               `(let ((header (make-array-header ,(if complex
-                                                      sb!vm:complex-array-widetag
-                                                      sb!vm:simple-array-widetag)
-                                                 ,rank))
-                      (data (make-array ,total-size
-                                        ,@(when element-type
-                                            '(:element-type element-type))
-                                        ,@(when initial-element
-                                            '(:initial-element initial-element)))))
-                  ,@(when initial-contents
-                      ;; FIXME: This is could be open coded at least a bit too
-                      `((fill-data-vector data ',dims initial-contents)))
-                  (setf (%array-fill-pointer header) ,total-size)
-                  (setf (%array-fill-pointer-p header) nil)
-                  (setf (%array-available-elements header) ,total-size)
-                  (setf (%array-data header) data)
-                  (setf (%array-displaced-p header) nil)
-                  (setf (%array-displaced-from header) nil)
-                  ,@(let ((axis -1))
-                      (mapcar (lambda (dim)
-                                `(setf (%array-dimension header ,(incf axis))
-                                       ,dim))
-                              dims))
-                  (truly-the ,spec header))))))))
+               `(truly-the ,spec
+                           (make-array-header* ,(if complex
+                                                    sb!vm:complex-array-widetag
+                                                    sb!vm:simple-array-widetag)
+                                               ;; fill-pointer
+                                               ,total-size
+                                               ;; fill-pointer-p
+                                               nil
+                                               ;; elements
+                                               ,total-size
+                                               ;; data
+                                               (let ((data (make-array ,total-size
+                                                                       ,@(when element-type
+                                                                           '(:element-type element-type))
+                                                                       ,@(when initial-element
+                                                                           '(:initial-element initial-element)))))
+                                                 ,(if initial-contents
+                                                      ;; FIXME: This is could be open coded at least a bit too
+                                                      `(fill-data-vector data ',dims initial-contents)
+                                                      'data))
+                                               ;; displacement
+                                               0
+                                               ;; displaced-p
+                                               nil
+                                               ;; displaced-from
+                                               nil
+                                               ;; dimensions
+                                               ,@dims))))))))
 
 (deftransform make-array ((dims &key element-type initial-element initial-contents
                                      adjustable fill-pointer)

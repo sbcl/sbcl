@@ -267,15 +267,16 @@
 ;;; An array header for simple non-unidimensional arrays is a fixed alloc,
 ;;; because the rank has to be known.
 ;;; (There are no compile-time optimizations for unknown rank arrays)
-(defoptimizer (make-array-header* ir2-convert) ((&rest args) node block)
+(defoptimizer (make-array-header* ir2-convert) ((widetag &rest args) node block)
   (let ((n-args (length args)))
+    ;; Remove the widetag lvar
+    (pop (basic-combination-args node))
     (ir2-convert-fixed-allocation
      node block 'make-array
      ;; Each argument fills in one slot of the array header.
      ;; Add one word for the primitive object's header word.
      (1+ n-args)
-     ;; MAKE-ARRAY optimizations will not kick in for complex arrays.
-     sb!vm:simple-array-widetag
+     (lvar-value widetag)
      sb!vm:other-pointer-lowtag
      (loop for i from 1 to n-args collect `(:arg . ,i)))))
 
@@ -397,7 +398,8 @@
 ;;; given the mandatory slots for a simple array of rank 0 or > 1.
 (defun make-array-header-inits (storage n-elements dimensions)
   (macrolet ((expand ()
-               `(list* ,@(mapcar (lambda (slot)
+               `(list* sb!vm:simple-array-widetag
+                       ,@(mapcar (lambda (slot)
                                    (ecase (slot-name slot)
                                      (data           'storage)
                                      (fill-pointer   'n-elements)
@@ -411,3 +413,11 @@
                                                  :key 'primitive-object-name))))
                        dimensions)))
     (expand)))
+
+;;; This order is used by SB-C::TRANSFORM-MAKE-ARRAY-VECTOR
+(assert (equal (mapcar #'slot-name
+                       (primitive-object-slots
+                        (find 'array *primitive-objects*
+                              :key 'primitive-object-name)))
+               '(fill-pointer fill-pointer-p elements data
+                 displacement displaced-p displaced-from dimensions)))

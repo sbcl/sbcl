@@ -1,6 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.4.0:
   * optimization: faster foreign callbacks.
+  * enhancement: complex arrays can be stack allocated.
 
 changes in sbcl-1.4.0 relative to sbcl-1.3.21:
   * minor incompatible change: DESTRUCTURING-BIND treats non-toplevel () as

@@ -2982,7 +2982,8 @@ many elements are copied."
     (symbol-macrolet ((this-dimension (car dims)))
       (body (axis dims contents) (null dims)
             (frob 0 dimensions initial-contents)
-            (frob (1+ axis) (cdr dims) content))))
+            (frob (1+ axis) (cdr dims) content)))
+    vector)
 
   ;; Identical to FILL-DATA-VECTOR but avoid reference
   ;; to DIMENSIONS as a list except in case of error.
