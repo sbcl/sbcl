@@ -964,7 +964,7 @@ of specialized arrays is supported."
   "Return the type of the elements of the array"
   (let ((widetag (%other-pointer-widetag array))
         (table (load-time-value
-                (let ((table (make-array 256 :initial-element nil)))
+                (let ((table (make-array 256 :initial-element :invalid)))
                   (dotimes (i (length sb!vm:*specialized-array-element-type-properties*) table)
                     (let* ((saetp (aref sb!vm:*specialized-array-element-type-properties* i))
                            (typecode (sb!vm:saetp-typecode saetp))
