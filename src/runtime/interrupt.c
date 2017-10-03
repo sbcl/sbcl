@@ -279,7 +279,6 @@ boolean
 all_signals_blocked_p(sigset_t *sigset, sigset_t *sigset2,
                                 const char *name)
 {
-#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     int i;
     boolean has_blocked = 0, has_unblocked = 0;
     sigset_t current;
@@ -303,7 +302,6 @@ all_signals_blocked_p(sigset_t *sigset, sigset_t *sigset2,
         return 1;
     else
         return 0;
-#endif
 }
 
 
@@ -351,9 +349,6 @@ sigset_t deferrable_sigset;
 sigset_t blockable_sigset;
 sigset_t gc_sigset;
 
-#endif
-
-#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
 boolean
 deferrables_blocked_p(sigset_t *sigset)
 {
