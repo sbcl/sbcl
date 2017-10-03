@@ -68,7 +68,7 @@
 #include "genesis/simple-fun.h"
 #include "genesis/cons.h"
 
-#if defined(LISP_FEATURE_UNIX) && !defined(LISP_FEATURE_HPUX)
+#if defined(LISP_FEATURE_UNIX) && !defined(LISP_FEATURE_HPUX) && !defined(LISP_FEATURE_X86)
 /* The so-called workaround below for "silly behavior" is bogus.
  * By using that code, memory sanitizers will rightly complain if you have a
  * sigset_t in a local variable whose initialization was done via incomplete
