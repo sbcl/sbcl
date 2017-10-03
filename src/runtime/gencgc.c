@@ -230,7 +230,9 @@ page_starts_contiguous_block_p(page_index_t page_index)
 static inline boolean
 page_ends_contiguous_block_p(page_index_t page_index, generation_index_t gen)
 {
-    return (/* page doesn't fill block */
+#if DEBUG
+    boolean answer =
+           (/* page doesn't fill block */
             (page_bytes_used(page_index) < GENCGC_CARD_BYTES)
             /* page is last allocated page */
             || ((page_index + 1) >= last_free_page)
@@ -240,6 +242,22 @@ page_ends_contiguous_block_p(page_index_t page_index, generation_index_t gen)
             || (page_table[page_index + 1].gen != gen)
             /* next page starts its own contiguous block */
             || (page_starts_contiguous_block_p(page_index + 1)));
+    gc_assert(page_starts_contiguous_block_p(page_index+1) == answer);
+#endif
+    return page_starts_contiguous_block_p(page_index+1);
+}
+
+/* We maintain the invariant that pages with FREE_PAGE_FLAG have
+ * scan_start of zero, to optimize page_ends_contiguous_block_p().
+ * Clear all other flags as well, since they don't mean anything,
+ * and a store is simpler than a bitwise operation */
+static inline void reset_page_flags(page_index_t page) {
+    page_table[page].scan_start_offset_ = 0;
+    // Any C compiler worth its salt should merge these into one store
+    page_table[page].allocated = page_table[page].write_protected
+        = page_table[page].write_protected_cleared
+        = page_table[page].dont_move = page_table[page].has_pins
+        = page_table[page].large_object = 0;
 }
 
 /// External function for calling from Lisp.
@@ -1114,13 +1132,13 @@ gc_alloc_update_page_tables(int page_type_flag, struct alloc_region *alloc_regio
          * there are 0 bytes_used. */
         page_table[first_page].allocated &= ~(OPEN_REGION_PAGE_FLAG);
         if (page_bytes_used(first_page) == 0)
-            page_table[first_page].allocated = FREE_PAGE_FLAG;
+            reset_page_flags(first_page);
     }
 
     /* Unallocate any unused pages. */
     while (next_page <= alloc_region->last_page) {
         gc_assert(page_bytes_used(next_page) == 0);
-        page_table[next_page].allocated = FREE_PAGE_FLAG;
+        reset_page_flags(next_page);
         next_page++;
     }
     ret = thread_mutex_unlock(&free_pages_lock);
@@ -1517,7 +1535,7 @@ general_copy_large_object(lispobj object, sword_t nwords, boolean boxedp)
             gc_assert(!page_table[next_page].write_protected);
 
             old_bytes_used = page_bytes_used(next_page);
-            page_table[next_page].allocated = FREE_PAGE_FLAG;
+            reset_page_flags(next_page);
             set_page_bytes_used(next_page, 0);
             bytes_freed += old_bytes_used;
             next_page++;
@@ -1799,7 +1817,7 @@ maybe_adjust_large_object(page_index_t first_page)
         gc_assert(!page_table[next_page].write_protected);
 
         old_bytes_used = page_bytes_used(next_page);
-        page_table[next_page].allocated = FREE_PAGE_FLAG;
+        reset_page_flags(next_page);
         set_page_bytes_used(next_page, 0);
         bytes_freed += old_bytes_used;
         next_page++;
@@ -2687,7 +2705,7 @@ free_oldspace(void)
             bytes_freed += page_bytes_used(last_page);
             generations[page_table[last_page].gen].bytes_allocated -=
                 page_bytes_used(last_page);
-            page_table[last_page].allocated = FREE_PAGE_FLAG;
+            reset_page_flags(last_page);
             set_page_bytes_used(last_page, 0);
             /* Should already be unprotected by unprotect_oldspace(). */
             gc_assert(!page_table[last_page].write_protected);
@@ -3923,11 +3941,23 @@ void gc_allocate_ptes()
     if (bytes_consed_between_gcs < (1024*1024))
         bytes_consed_between_gcs = 1024*1024;
 
-    /* The page_table must be allocated using "calloc" to initialize
-     * the page structures correctly. There used to be a separate
-     * initialization loop (now commented out; see below) but that was
-     * unnecessary and did hurt startup time. */
-    page_table = calloc(page_table_pages, sizeof(struct page));
+    /* The page_table is allocated using "calloc" to zero-initialize it.
+     * The C library typically implements this efficiently with mmap() if the
+     * size is large enough.  To further avoid touching each page structure
+     * until first use, FREE_PAGE_FLAG must be 0, statically asserted here:
+     */
+    {
+      /* Compile time assertion: If triggered, declares an array
+       * of dimension -1 forcing a syntax error. The intent of the
+       * assignment is to avoid an "unused variable" warning. */
+      char __attribute__((unused)) assert_free_page_flag_0[(FREE_PAGE_FLAG) ? -1 : 1];
+    }
+    /* An extra struct exists as the end as a sentinel. Its 'scan_start_offset'
+     * and 'bytes_used' must be zero.
+     * Doing so avoids testing in page_ends_contiguous_block_p() whether the
+     * next page_index is within bounds, and whether that page contains data.
+     */
+    page_table = calloc(1+page_table_pages, sizeof(struct page));
     gc_assert(page_table);
 
     hopscotch_init();
@@ -3937,40 +3967,6 @@ void gc_allocate_ptes()
 #endif
 
     scavtab[WEAK_POINTER_WIDETAG] = scav_weak_pointer;
-
-    /* The page structures are initialized implicitly when page_table
-     * is allocated with "calloc" above. Formerly we had the following
-     * explicit initialization here (comments converted to C99 style
-     * for readability as C's block comments don't nest):
-     *
-     * // Initialize each page structure.
-     * for (i = 0; i < page_table_pages; i++) {
-     *     // Initialize all pages as free.
-     *     page_table[i].allocated = FREE_PAGE_FLAG;
-     *     page_table[i].bytes_used = 0;
-     *
-     *     // Pages are not write-protected at startup.
-     *     page_table[i].write_protected = 0;
-     * }
-     *
-     * Without this loop the image starts up much faster when dynamic
-     * space is large -- which it is on 64-bit platforms already by
-     * default -- and when "calloc" for large arrays is implemented
-     * using copy-on-write of a page of zeroes -- which it is at least
-     * on Linux. In this case the pages that page_table_pages is stored
-     * in are mapped and cleared not before the corresponding part of
-     * dynamic space is used. For example, this saves clearing 16 MB of
-     * memory at startup if the page size is 4 KB and the size of
-     * dynamic space is 4 GB.
-     * FREE_PAGE_FLAG must be 0 for this to work correctly which is
-     * asserted below: */
-    {
-      /* Compile time assertion: If triggered, declares an array
-       * of dimension -1 forcing a syntax error. The intent of the
-       * assignment is to avoid an "unused variable" warning. */
-      char assert_free_page_flag_0[(FREE_PAGE_FLAG) ? -1 : 1];
-      assert_free_page_flag_0[0] = assert_free_page_flag_0[0];
-    }
 
     bytes_allocated = 0;
 

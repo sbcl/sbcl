@@ -73,7 +73,7 @@ struct page {
      * of the page.  Lower values here are better, 0 is ideal.  This
      * is useful for determining where to start when scanning forward
      * through a heap page (either for conservative root validation or
-     * for scavenging).
+     * for scavenging). MUST be 0 for unallocated pages.
      */
 #ifdef CONDENSED_PAGE_TABLE
     // The low bit of the offset indicates the scale factor:
@@ -88,8 +88,7 @@ struct page {
 
     /* the number of bytes of this page that are used. This may be less
      * than the actual bytes used for pages within the current
-     * allocation regions. It should be 0 for all unallocated pages (not
-     * hard to achieve).
+     * allocation regions. MUST be 0 for unallocated pages.
      * When read, the low bit has to be masked off.
      */
     page_bytes_t bytes_used_;
@@ -104,8 +103,7 @@ struct page {
          * Constants for this field are defined in gc-internal.h, the
          * xxx_PAGE_FLAG definitions.
          *
-         * If the page is free the following slots are invalid, except
-         * for the bytes_used which must be zero. */
+         * If the page is free, all the following fields are zero. */
         allocated :3,
         /* This is set when the page is write-protected. This should
          * always reflect the actual write_protect status of a page.
