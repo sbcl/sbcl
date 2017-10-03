@@ -351,13 +351,13 @@
             t)
       cast)))
 
-(defun assert-function-designator-lvar-type (lvar type arg-count caller policy)
+(defun assert-function-designator-lvar-type (lvar type arg-count caller)
   (declare (type lvar lvar) (type ctype type))
   (let ((internal-lvar (make-lvar))
         (dest (lvar-dest lvar)))
     (substitute-lvar internal-lvar lvar)
     (let ((cast (insert-function-designator-cast-before dest lvar type arg-count
-                                                        caller policy)))
+                                                        caller *policy*)))
       (use-lvar cast internal-lvar))))
 
 
@@ -2308,17 +2308,9 @@
       (let ((lvar (node-lvar cast)))
         (when (and (or (not (bound-cast-p cast))
                        (bound-cast-derived cast))
+                   (not (function-designator-cast-p cast))
                    (values-subtypep (lvar-derived-type value)
                                     (cast-asserted-type cast)))
-          (when (and (function-designator-cast-p cast)
-                     lvar)
-            (let ((*valid-fun-use-name* (function-designator-cast-caller cast))
-                  (*lossage-fun* #'compiler-warn)
-                  (*compiler-error-context* cast))
-              (valid-callable-argument lvar
-                                       :arg-count
-                                       (function-designator-cast-arg-count cast))))
-
           (delete-cast cast)
           (return-from ir1-optimize-cast t))
 

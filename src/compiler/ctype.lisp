@@ -285,15 +285,17 @@
                             (assert-function-designator-lvar-type lvar
                                                                   (specifier-type '(or function symbol))
                                                                   arg-count
-                                                                  *valid-fun-use-name*
-                                                                  *policy*))
+                                                                  *valid-fun-use-name*))
                           (return-from lvar-fun-type nil))))
          (type (cond ((fun-type-p lvar-type)
                       lvar-type)
                      ((symbolp fun-name)
                       (proclaimed-ftype fun-name))
                      (t
-                      leaf))))
+                      (let ((info (functional-info leaf)))
+                        (if info
+                            (specifier-type (entry-info-type info))
+                            leaf))))))
     (values type fun-name leaf)))
 
 (defun callable-argument-lossage-kind (fun-name leaf soft hard)
@@ -312,9 +314,10 @@
     (multiple-value-bind (type fun-name leaf) (lvar-fun-type lvar arg-count)
       (when type
         (let ((*lossage-fun*
-                (callable-argument-lossage-kind fun-name leaf
-                                                #'compiler-style-warn
-                                                *lossage-fun*)))
+                (and *lossage-fun*
+                     (callable-argument-lossage-kind fun-name leaf
+                                                     #'compiler-style-warn
+                                                     *lossage-fun*))))
           (multiple-value-bind (min max optional)
               (fun-arg-limits type)
             (cond
@@ -343,9 +346,15 @@
                 arg-count max)
                (return-from valid-callable-argument))))
           (when args
-            (valid-arguments-to-callable fun-name args arg-lvars
-                                         (fun-type-first-n-types type arg-count)
-                                         unknown-keys)))))))
+            (if (functional-p type)
+                (and *valid-callable-argument-assert-unknown-lvars*
+                     (assert-function-designator-lvar-type lvar
+                                                           (specifier-type '(or function symbol))
+                                                           arg-count
+                                                           *valid-fun-use-name*))
+                (valid-arguments-to-callable fun-name args arg-lvars
+                                             (fun-type-first-n-types type arg-count)
+                                             unknown-keys))))))))
 
 (defun validate-test-and-test-not (combination)
   (let* ((comination-name (lvar-fun-name (combination-fun combination) t))
