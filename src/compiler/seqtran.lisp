@@ -365,7 +365,7 @@
                (let ((mapper (%fun-name (svref sb!impl::%%vector-map-into-funs%%
                                                (sb!vm:saetp-typecode saetp)))))
                  `(progn (,mapper result 0 (length result)
-                                  (the (function * ())
+                                  (the (function * ,(sb!vm:saetp-specifier saetp))
                                        (%coerce-callable-to-fun fun)) seqs)
                          result))))
             (t
