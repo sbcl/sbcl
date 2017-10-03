@@ -299,3 +299,15 @@
                                   (the integer (x)))
                                 132)))
            132)))
+(defun compiles-with-warning (lambda)
+  (assert (nth-value 2 (checked-compile lambda :allow-warnings t))))
+
+(with-test (:name (:type-conflict funcall :external-lambda))
+  (compiles-with-warning `(lambda ()
+                            (let ((x (lambda (x) (declare (fixnum x)) x)))
+                              (funcall x 'a)))))
+
+(with-test (:name (:type-conflict :callable :external-lambda))
+  (compiles-with-warning `(lambda ()
+                            (let ((x (lambda (x) (declare (fixnum x)) x)))
+                              (find-if x "abca")))))
