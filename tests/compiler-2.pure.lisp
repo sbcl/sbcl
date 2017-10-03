@@ -311,3 +311,8 @@
   (compiles-with-warning `(lambda ()
                             (let ((x (lambda (x) (declare (fixnum x)) x)))
                               (find-if x "abca")))))
+
+(with-test (:name (:type-conflict :map :result-type))
+  (compiles-with-warning `(lambda (str)
+                            (map 'string (lambda (x) (declare (ignore x)) nil)
+                                 str))))

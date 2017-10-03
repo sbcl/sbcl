@@ -823,7 +823,7 @@
 ;;; ancestor source form of all the uses (if it can be found),
 ;;; followed by all the uses' source forms.
 (defun lvar-all-sources (lvar)
-  (let ((use (lvar-uses lvar)))
+  (let ((use (principal-lvar-use lvar)))
     (if (listp use)
         (let ((forms  '())
               (path   (node-source-path (first use))))

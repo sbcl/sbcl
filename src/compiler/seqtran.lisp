@@ -364,7 +364,9 @@
                  (give-up-ir1-transform "Uknown upgraded array element type of the result"))
                (let ((mapper (%fun-name (svref sb!impl::%%vector-map-into-funs%%
                                                (sb!vm:saetp-typecode saetp)))))
-                 `(progn (,mapper result 0 (length result) (%coerce-callable-to-fun fun) seqs)
+                 `(progn (,mapper result 0 (length result)
+                                  (the (function * ())
+                                       (%coerce-callable-to-fun fun)) seqs)
                          result))))
             (t
              (%give-up))))))
