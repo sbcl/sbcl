@@ -20,11 +20,13 @@
 #include "sbcl.h"
 #include "runtime.h"
 
-#ifdef LISP_FEATURE_RELOCATABLE_HEAP
+#if defined(LISP_FEATURE_RELOCATABLE_HEAP) && defined(LISP_FEATURE_GENCGC)
 extern uword_t DYNAMIC_SPACE_START;
-extern uword_t IMMOBILE_SPACE_START, IMMOBILE_VARYOBJ_SUBSPACE_START;
 #endif
+#if defined(LISP_FEATURE_RELOCATABLE_HEAP) && defined(LISP_FEATURE_IMMOBILE_SPACE)
+extern uword_t IMMOBILE_SPACE_START, IMMOBILE_VARYOBJ_SUBSPACE_START;
 #define IMMOBILE_SPACE_END (IMMOBILE_SPACE_START+IMMOBILE_SPACE_SIZE)
+#endif
 
 #if defined(LISP_FEATURE_GENCGC) && !defined(ENABLE_PAGE_PROTECTION)
 /* Should we use page protection to help avoid the scavenging of pages

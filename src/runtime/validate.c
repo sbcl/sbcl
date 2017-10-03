@@ -24,8 +24,10 @@
 #include "validate.h"
 #include "interr.h"                     /* for declaration of lose */
 
-#ifdef LISP_FEATURE_RELOCATABLE_HEAP
+#if defined(LISP_FEATURE_RELOCATABLE_HEAP) && defined(LISP_FEATURE_GENCGC)
 uword_t DYNAMIC_SPACE_START;
+#endif
+#if defined(LISP_FEATURE_RELOCATABLE_HEAP) && defined(LISP_FEATURE_IMMOBILE_SPACE)
 uword_t IMMOBILE_SPACE_START, IMMOBILE_VARYOBJ_SUBSPACE_START;
 #endif
 
