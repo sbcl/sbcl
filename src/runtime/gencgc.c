@@ -1635,7 +1635,7 @@ search_dynamic_space(void *pointer)
     return gc_search_space(start, pointer);
 }
 
-#ifndef GENCGC_IS_PRECISE
+#if !GENCGC_IS_PRECISE
 // Return the starting address of the object containing 'addr'
 // if and only if the object is one which would be evacuated from 'from_space'
 // were it allowed to be either discarded as garbage or moved.
@@ -1888,7 +1888,8 @@ wipe_nonpinned_words()
     // Order by ascending address, stopping short of the sentinel.
     gc_heapsort_uwords(pinned_objects.keys, n_pins);
 #if 0
-    printf("Sorted pin list:\n");
+    if(n_pins)
+        printf("Sorted pin list:\n");
     for (i = 0; i < n_pins; ++i) {
       lispobj* obj = (lispobj*)pinned_objects.keys[i];
       lispobj word = *obj;
@@ -2022,20 +2023,28 @@ preserve_pointer(void *addr)
     }
 #endif
     page_index_t page = find_page_index(addr);
+    lispobj *object_start;
 
-#ifdef GENCGC_IS_PRECISE
+#if GENCGC_IS_PRECISE
     /* If we're in precise gencgc (non-x86oid as of this writing) then
      * we are only called on valid object pointers in the first place,
      * so we just have to do a bounds-check against the heap, a
      * generation check, and the already-pinned check. */
-    if (page == -1
-        || (page_table[page].gen != from_space)
-        || page_table[page].dont_move)
+    if (page < 0 ||
+        (compacting_p() && (page_table[page].gen != from_space ||
+                            (page_table[page].large_object &&
+                             page_table[page].dont_move))))
         return;
+     object_start = native_pointer((lispobj)addr);
+     switch (widetag_of(*object_start)) {
+     case SIMPLE_FUN_WIDETAG:
+#ifdef RETURN_PC_WIDETAG
+     case RETURN_PC_WIDETAG:
+#endif
+         object_start = fun_code_header(object_start);
+     }
 #else
-    lispobj *object_start;
-    if (page == -1
-        || (object_start = conservative_root_p(addr, page)) == 0)
+    if (page < 0 || (object_start = conservative_root_p(addr, page)) == NULL)
         return;
     if (!compacting_p()) {
         /* Just mark it.  No distinction between large and small objects. */
@@ -3135,7 +3144,7 @@ write_protect_generation_pages(generation_index_t generation)
     }
 }
 
-#ifndef GENCGC_IS_PRECISE
+#if !GENCGC_IS_PRECISE
 static void
 preserve_context_registers (void (*proc)(os_context_register_t), os_context_t *c)
 {
@@ -3321,7 +3330,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
      * initiates GC.  If you ever call GC from inside an altstack
      * handler, you will lose. */
 
-#ifndef GENCGC_IS_PRECISE
+#if !GENCGC_IS_PRECISE
     /* And if we're saving a core, there's no point in being conservative. */
     if (conservative_stack) {
         for_each_thread(th) {
@@ -3425,7 +3434,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
 
     /* Scavenge all the rest of the roots. */
 
-#ifdef GENCGC_IS_PRECISE
+#if GENCGC_IS_PRECISE
     /*
      * If not x86, we need to scavenge the interrupt context(s) and the
      * control stack.
@@ -4132,7 +4141,7 @@ general_alloc_internal(sword_t nbytes, int page_type_flag, struct alloc_region *
                 thread_register_gc_trigger();
 #else
                 set_pseudo_atomic_interrupted(thread);
-#ifdef GENCGC_IS_PRECISE
+#if GENCGC_IS_PRECISE
                 /* PPC calls alloc() from a trap
                  * look up the most context if it's from a trap. */
                 {

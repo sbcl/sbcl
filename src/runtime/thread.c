@@ -765,7 +765,7 @@ create_thread_struct(lispobj initial_function) {
 
     th->interrupt_data->pending_handler = 0;
     th->interrupt_data->gc_blocked_deferrables = 0;
-#ifdef GENCGC_IS_PRECISE
+#if GENCGC_IS_PRECISE
     th->interrupt_data->allocation_trap_context = 0;
 #endif
 

@@ -52,13 +52,11 @@ int gencgc_handle_wp_violation(void *);
   typedef unsigned short page_bytes_t;
 #endif
 
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
-/* It is possible to enable fine-grained object pinning
- * (versus page-level pinning) for any backend using gengc.
- * The only "cost" is an extra test in from_space_p()
- * which may or may not be worth it.
- * But partial evacuation of pages is a generally nice feature */
-#  define PIN_GRANULARITY_LISPOBJ
+/* Define this as 0 on the cc invocation if you need to test without it.
+ * While the x86 requires object-based pins, the precise backends don't,
+ * though should generally prefer object pinning over page pinning */
+#ifndef PIN_GRANULARITY_LISPOBJ
+#define PIN_GRANULARITY_LISPOBJ 1
 #endif
 
 /* Note that this structure is also used from Lisp-side in
@@ -254,12 +252,27 @@ find_page_index(void *addr)
 }
 
 #ifdef PIN_GRANULARITY_LISPOBJ
+#ifndef GENCGC_IS_PRECISE
+#error "GENCGC_IS_PRECISE must be #defined as 0 or 1"
+#endif
 static inline boolean pinned_p(lispobj obj, page_index_t page)
 {
     extern struct hopscotch_table pinned_objects;
     gc_dcheck(compacting_p());
+#if !GENCGC_IS_PRECISE
     return page_table[page].has_pins
         && hopscotch_containsp(&pinned_objects, obj);
+#else
+    /* There is almost never anything in the hashtable on precise platforms */
+    if (!pinned_objects.count || !page_table[page].has_pins) return 0;
+# ifdef RETURN_PC_WIDETAG
+    /* Conceivably there could be a precise GC without RETURN-PC objects */
+    if (widetag_of(*native_pointer(obj)) == RETURN_PC_WIDETAG)
+        obj = make_lispobj(fun_code_header(native_pointer(obj)),
+                           OTHER_POINTER_LOWTAG);
+# endif
+    return hopscotch_containsp(&pinned_objects, obj);
+#endif
 }
 #else
 #  define pinned_p(obj, page) (0)

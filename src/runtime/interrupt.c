@@ -595,7 +595,7 @@ check_interrupt_context_or_lose(os_context_t *context)
     sigset_t *sigset = os_context_sigmask_addr(context);
     /* On PPC pseudo_atomic_interrupted is cleared when coming out of
      * handle_allocation_trap. */
-#if defined(LISP_FEATURE_GENCGC) && !defined(GENCGC_IS_PRECISE)
+#if defined(LISP_FEATURE_GENCGC) && !GENCGC_IS_PRECISE
     int interrupts_enabled = (read_TLS(INTERRUPTS_ENABLED,thread) != NIL);
     int gc_inhibit = (read_TLS(GC_INHIBIT,thread) != NIL);
     int gc_pending = (read_TLS(GC_PENDING,thread) == T);

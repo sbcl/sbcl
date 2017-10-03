@@ -433,6 +433,8 @@ extern char *copied_string (char *string);
  * the naive way: */
 #if defined(LISP_FEATURE_GENCGC) && !defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
 # define GENCGC_IS_PRECISE 1
+#else
+# define GENCGC_IS_PRECISE 0
 #endif
 
 void *os_dlsym_default(char *name);
