@@ -316,3 +316,7 @@
   (compiles-with-warning `(lambda (str)
                             (map 'string (lambda (x) (declare (ignore x)) nil)
                                  str))))
+
+(with-test (:name (:type-conflict :by-name))
+  (compiles-with-warning `(lambda (str)
+                            (map 'string 'evenp str))))

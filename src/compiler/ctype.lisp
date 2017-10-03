@@ -260,15 +260,25 @@
 (defun lvar-fun-type (lvar &optional arg-count)
   ;; Handle #'function,  'function and (lambda (x y))
   (let* ((use (principal-lvar-use lvar))
+         (lvar-type (lvar-type lvar))
          (leaf (if (ref-p use)
                    (ref-leaf use)
-                   (return-from lvar-fun-type (lvar-type lvar))))
+                   (return-from lvar-fun-type lvar-type)))
          (defined-type (and (global-var-p leaf)
-                            (global-var-defined-type leaf)))
+                            (case (global-var-where-from leaf)
+                              (:declared
+                               (global-var-type leaf))
+                              ((:defined :defined-here)
+                               (if (and (defined-fun-p leaf)
+                                        (eq (defined-fun-inlinep leaf) :notinline))
+                                   lvar-type
+                                   (proclaimed-ftype (global-var-%source-name leaf))))
+                              (t
+                               (global-var-defined-type leaf)))))
          (lvar-type (if (and defined-type
                              (neq defined-type *universal-type*))
                         defined-type
-                        (lvar-type lvar)))
+                        lvar-type))
          (fun-name (cond ((or (fun-type-p lvar-type)
                               (functional-p leaf))
                           (cond ((constant-lvar-p lvar)
