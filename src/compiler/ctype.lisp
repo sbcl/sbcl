@@ -399,66 +399,74 @@
 
 (defun valid-arguments-to-callable (fun args arg-lvars types
                                     unknown-keys)
-  (if (typep args '(cons (cons (eql sequences))))
-      (loop for n in (cdar args)
-            do (valid-arguments-to-callable fun `((sequence ,n)) arg-lvars types unknown-keys))
-      (loop with key-fun
-            for arg in args
-            for expected-type in types
-            for sequencep = (and (consp arg)
-                                 (eql (car arg) 'sequence))
-            for n = (if sequencep
-                        (cadr arg)
-                        arg)
-            for lvar-type* = (lvar-type (nth n arg-lvars))
-            for lvar-type = (if sequencep
-                                (destructuring-bind (&key key) (cddr arg)
-                                  (let ((key (and (not unknown-keys)
-                                                  (or (not key)
-                                                      (loop for (key value) on (nthcdr key arg-lvars) by #'cddr
-                                                            unless (keywordp key) return nil
-                                                            when (eq key :key)
-                                                            return value
-                                                            finally (return t)))))
-                                        type)
-                                    (cond ((member key '(t identity))
-                                           (and (array-type-p lvar-type*)
-                                                (array-type-element-type lvar-type*)))
-                                          ((and (lvar-p key)
-                                                (setf (values type key-fun) (lvar-fun-type key))
-                                                (fun-type-p type)
-                                                (neq key-fun 'identity))
-                                           (single-value-type (fun-type-returns type))))))
-                                lvar-type*)
-            when (and lvar-type
-                      (neq lvar-type *wild-type*)
-                      (eq (type-intersection expected-type lvar-type)
-                          *empty-type*))
-            do (if sequencep
-                   (if (and key-fun
-                            (neq key-fun 'identity))
-                       (note-lossage
-                        "The function ~S called by ~S with the results~%of the :key function ~s of type ~S~%which conflict with ~S."
-                        fun
-                        *valid-fun-use-name*
-                        key-fun
-                        (type-specifier lvar-type)
-                        (type-specifier expected-type))
-                       (note-lossage
-                        "The function ~S called by ~S with the elements~%of the ~:R argument of type ~S~%which conflict with ~S."
-                        fun
-                        *valid-fun-use-name*
-                        n
-                        (type-specifier lvar-type*)
-                        (type-specifier expected-type)))
-                   (note-lossage
-                    "The function ~S called by ~S with the ~:R argument of type ~S,~%which conflicts with ~S."
-                    fun
-                    *valid-fun-use-name*
-                    n
-                    (type-specifier lvar-type*)
-                    (type-specifier expected-type)))
-               (return))))
+  (typecase args
+    ((cons (cons (eql sequences)))
+     (loop for n in (cdar args)
+           do (valid-arguments-to-callable fun `((sequence ,n)) arg-lvars types unknown-keys)))
+    ((cons (eql rest-sequences))
+     (valid-arguments-to-callable fun
+                                  (loop for n from (cadr args)
+                                        for () in (nthcdr (cadr args) arg-lvars)
+                                        collect `(sequence ,n))
+                                  arg-lvars types unknown-keys))
+    (t
+     (loop with key-fun
+           for arg in args
+           for expected-type in types
+           for sequencep = (and (consp arg)
+                                (eql (car arg) 'sequence))
+           for n = (if sequencep
+                       (cadr arg)
+                       arg)
+           for lvar-type* = (lvar-type (nth n arg-lvars))
+           for lvar-type = (if sequencep
+                               (destructuring-bind (&key key) (cddr arg)
+                                 (let ((key (and (not unknown-keys)
+                                                 (or (not key)
+                                                     (loop for (key value) on (nthcdr key arg-lvars) by #'cddr
+                                                           unless (keywordp key) return nil
+                                                           when (eq key :key)
+                                                           return value
+                                                           finally (return t)))))
+                                       type)
+                                   (cond ((member key '(t identity))
+                                          (and (array-type-p lvar-type*)
+                                               (array-type-element-type lvar-type*)))
+                                         ((and (lvar-p key)
+                                               (setf (values type key-fun) (lvar-fun-type key))
+                                               (fun-type-p type)
+                                               (neq key-fun 'identity))
+                                          (single-value-type (fun-type-returns type))))))
+                               lvar-type*)
+           when (and lvar-type
+                     (neq lvar-type *wild-type*)
+                     (eq (type-intersection expected-type lvar-type)
+                         *empty-type*))
+           do (if sequencep
+                  (if (and key-fun
+                           (neq key-fun 'identity))
+                      (note-lossage
+                       "The function ~S called by ~S with the results~%of the :key function ~s of type ~S~%which conflict with ~S."
+                       fun
+                       *valid-fun-use-name*
+                       key-fun
+                       (type-specifier lvar-type)
+                       (type-specifier expected-type))
+                      (note-lossage
+                       "The function ~S called by ~S with the elements~%of the ~:R argument of type ~S~%which conflict with ~S."
+                       fun
+                       *valid-fun-use-name*
+                       (1+ n)
+                       (type-specifier lvar-type*)
+                       (type-specifier expected-type)))
+                  (note-lossage
+                   "The function ~S called by ~S with the ~:R argument of type ~S,~%which conflicts with ~S."
+                   fun
+                   *valid-fun-use-name*
+                   n
+                   (type-specifier lvar-type*)
+                   (type-specifier expected-type)))
+              (return)))))
 
 (defun check-structure-constructor-call (call dd ctor-ll-parts)
   (destructuring-bind (&optional req opt rest keys aux)

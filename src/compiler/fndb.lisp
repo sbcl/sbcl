@@ -541,17 +541,17 @@
     vector
   (flushable))
 
-(defknown map (type-specifier (callable &rest) sequence &rest sequence)
+(defknown map (type-specifier (callable &rest :args (rest-sequences 2)) sequence &rest sequence)
   consed-sequence (call)
 ; :DERIVE-TYPE 'TYPE-SPEC-ARG1 ? Nope... (MAP NIL ...) returns NULL, not NIL.
   )
-(defknown %map (type-specifier callable &rest sequence) consed-sequence (call))
+(defknown %map (type-specifier (callable &rest :args (rest-sequences 2)) &rest sequence) consed-sequence (call))
 (defknown %map-for-effect-arity-1 (callable sequence) null (call))
 (defknown %map-to-list-arity-1 (callable sequence) list (flushable call))
 (defknown %map-to-simple-vector-arity-1 (callable sequence) simple-vector
   (flushable call))
 
-(defknown map-into (sequence (callable &rest) &rest sequence)
+(defknown map-into (sequence (callable &rest :args (rest-sequences 2)) &rest sequence)
   sequence
   (call)
   :derive-type #'result-type-first-arg
