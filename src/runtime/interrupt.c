@@ -68,18 +68,6 @@
 #include "genesis/simple-fun.h"
 #include "genesis/cons.h"
 
-#if defined(LISP_FEATURE_UNIX) && !defined(LISP_FEATURE_HPUX) && !defined(LISP_FEATURE_X86)
-/* The so-called workaround below for "silly behavior" is bogus.
- * By using that code, memory sanitizers will rightly complain if you have a
- * sigset_t in a local variable whose initialization was done via incomplete
- * copying of another, and then pass the sigset to sigaction(), which reads
- * every byte of its input as far as the sanitizer is concerned.
- * The kernel structure matches the C library in every place I looked.
- * HPUX differs though, because its os_context_sigmask_addr() is different,
- * so maybe that's why the code did something different? */
-static inline void
-sigcopyset(sigset_t *new, sigset_t *old) { *new = *old; }
-#else
 /*
  * This is a workaround for some slightly silly Linux/GNU Libc
  * behaviour: glibc defines sigset_t to support 1024 signals, which is
@@ -89,6 +77,7 @@ sigcopyset(sigset_t *new, sigset_t *old) { *new = *old; }
  * stack by the kernel, so copying a libc-sized sigset_t into it will
  * overflow and cause other data on the stack to be corrupted */
 /* FIXME: do not rely on NSIG being a multiple of 8 */
+/* See https://sourceware.org/bugzilla/show_bug.cgi?id=1780 */
 
 #ifdef LISP_FEATURE_WIN32
 # define REAL_SIGSET_SIZE_BYTES (4)
@@ -101,7 +90,6 @@ sigcopyset(sigset_t *new, sigset_t *old)
 {
     memcpy(new, old, REAL_SIGSET_SIZE_BYTES);
 }
-#endif
 
 /* When we catch an internal error, should we pass it back to Lisp to
  * be handled in a high-level way? (Early in cold init, the answer is
