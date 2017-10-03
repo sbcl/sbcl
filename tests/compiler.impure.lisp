@@ -718,42 +718,43 @@
 (assert (= (bug219-b-aux2 1)
            (if *bug219-b-expanded-p* 3 1)))
 
-;;; bug 224: failure in unreachable code deletion
-(defmacro do-optimizations (&body body)
-  `(dotimes (.speed. 4)
-     (dotimes (.space. 4)
-       (dotimes (.debug. 4)
-         (dotimes (.compilation-speed. 4)
-           (proclaim `(optimize (speed , .speed.) (space , .space.)
-                                (debug , .debug.)
-                                (compilation-speed , .compilation-speed.)))
-           ,@body)))))
-
 (with-test (:name (:unreachable-code locally declare :bug-224))
-  (do-optimizations
-    (checked-compile
-     (read-from-string
-      "(lambda ()
-         (#:localy (declare (optimize (safety 3)))
-           (ignore-errors (progn (values-list (car (list '(1 . 2)))) t))))")
-     :allow-failure t :allow-style-warnings t)))
+  (map-optimize-declarations
+   (lambda (declaration)
+     (multiple-value-bind (fun failure-p warnings style-warnings)
+         (checked-compile
+          `(lambda ()
+             (declare (optimize ,@declaration))
+             (,(gensym "LOCALY") (declare (optimize (safety 3)))
+              (ignore-errors (progn (values-list (car (list '(1 . 2)))) t))))
+          :allow-failure t :allow-style-warnings t)
+       (declare (ignore fun warnings))
+       (assert failure-p)
+       (assert (= (length style-warnings) 1))))
+   :safety nil))
 
 (with-test (:name (:unreachable-code error labels :bug-224))
-  (do-optimizations
-    (checked-compile
-     '(lambda ()
-       (labels ((ext ()
-                  (tagbody
-                     (labels ((i1 () (list (i2) (i2)))
-                              (i2 () (list (int) (i1)))
-                              (int () (go :exit)))
-                       (list (i1) (i1) (i1)))
-                   :exit (return-from ext))))
-         (list (error "nih") (ext) (ext)))))))
+  (map-optimize-declarations
+   (lambda (declaration)
+     (checked-compile `(lambda ()
+                         (declare (optimize ,@declaration))
+                         (labels ((ext ()
+                                    (tagbody
+                                       (labels ((i1 () (list (i2) (i2)))
+                                                (i2 () (list (int) (i1)))
+                                                (int () (go :exit)))
+                                         (list (i1) (i1) (i1)))
+                                     :exit (return-from ext))))
+                           (list (error "nih") (ext) (ext))))))
+   :safety nil))
 
 (with-test (:name (:unreachable-code error let :bug-224))
-  (do-optimizations
-    (checked-compile '(lambda (x) (let ((y (error ""))) (list x y))))))
+  (map-optimize-declarations
+    (lambda (declaration)
+      (checked-compile `(lambda (x)
+                          (declare (optimize ,@declaration))
+                          (let ((y (error ""))) (list x y)))))
+    :safety nil))
 
 ;;; bug 223: invalid moving of global function name referencing
 (defun bug223-int (n)

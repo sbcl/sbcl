@@ -88,20 +88,18 @@
                         (vector (signed-byte 4))
                         list-backed-sequence))
       (dolist (declaredness '(nil t))
-        (dolist (optimization '(((speed 3) (space 0))
-                                ((speed 2) (space 2))
-                                ((speed 1) (space 2))
-                                ((speed 0) (space 1))))
-          (let ((seq (make-sequence-for-type seq-type))
-                (lambda-expr `(lambda (seq)
-                                (declare (sb-ext:muffle-conditions
-                                          sb-ext:compiler-note))
-                                ,@(when declaredness
-                                    `((declare (type ,seq-type seq))))
-                                (declare (optimize ,@optimization))
-                                ,snippet)))
-            (when (not seq)
-              (return))
+        (map-optimize-declarations
+         (lambda (optimization)
+           (let ((seq (make-sequence-for-type seq-type))
+                 (lambda-expr `(lambda (seq)
+                                 (declare (sb-ext:muffle-conditions
+                                           sb-ext:compiler-note))
+                                 ,@(when declaredness
+                                     `((declare (type ,seq-type seq))))
+                                 (declare (optimize ,@optimization))
+                                 ,snippet)))
+             (when (not seq)
+               (return))
             ;(format t "~&~S~%" lambda-expr)
             (let ((fun (checked-compile lambda-expr)))
               ;(format t "~&~S ~S~%~S~%~S ~S~%"
@@ -114,7 +112,8 @@
                        snippet
                        seq-type
                        declaredness
-                       optimization)))))))))
+                       optimization)))))
+         :safety nil :debug nil :compilation-speed nil)))))
 (defun for-every-seq (base-seq snippets)
   (dolist (snippet snippets)
     (for-every-seq-1 base-seq snippet)))

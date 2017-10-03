@@ -4,6 +4,12 @@
            #:really-invoke-debugger
            #:*break-on-failure* #:*break-on-expected-failure*
            #:make-kill-thread #:make-join-thread
+
+           ;; MAP-OPTIMIZATION-*
+           #:map-optimization-quality-combinations
+           #:map-optimize-declarations
+
+           ;; CHECKED-COMPILE and friends
            #:checked-compile #:checked-compile-capturing-source-paths
            #:checked-compile-condition-source-paths
            #:runtime #:split-string #:shuffle))
@@ -153,6 +159,107 @@
 
 (defun skipped-p (skipped-on)
   (sb-impl::featurep skipped-on))
+
+;;;; MAP-{OPTIMIZATION-QUALITY-COMBINATIONS,OPTIMIZE-DECLARATIONS}
+
+(sb-int:defconstant-eqx +optimization-quality-names+
+    '(speed safety debug compilation-speed space) #'equal)
+
+(sb-int:defconstant-eqx +optimization-quality-keywords+
+    '(:speed :safety :debug :compilation-speed :space) #'equal)
+
+(deftype optimization-quality-range-designator ()
+  '(or (eql nil)                                ; skip quality
+       (cons (or (eql nil) (integer 0 3)) list) ; list of values, nil means skip
+       (eql t)))                                ; all values
+
+;;; Call FUNCTION with the specified combinations of optimization
+;;; quality values.
+;;;
+;;; MAP-OPTIMIZATION-QUALITY-COMBINATIONS calls FUNCTION with keyword
+;;; argument thus expecting a lambda list of the form
+;;;
+;;;   (&key speed safety debug compilation-speed space)
+;;;
+;;; or any subset compatible with the generated combinations.
+;;;
+;;; MAP-OPTIMIZE-DECLARATIONS calls FUNCTION with a list intended to
+;;; be spliced into a DECLARE form like this:
+;;;
+;;;   (lambda (quality-values)
+;;;     `(declare (optimize ,@quality-values)))
+;;;
+;;; The set of combinations is controlled via keyword arguments
+;;;
+;;;   :FILTER FILTER-FUNCTION
+;;;     A function that should be called with optimization quality
+;;;     keyword arguments and whose return value controls whether
+;;;     FUNCTION should be called for the given combination.
+;;;
+;;;   (:SPEED | :SAFETY | :DEBUG | :COMPILATION-SPEED | :SPACE) SPEC
+;;;     Specify value range for the given optimization quality. SPEC
+;;;     can be
+;;;
+;;;       NIL
+;;;         Omit the quality.
+;;;
+;;;       T
+;;;         Generate all values (0, 1, 2, 3) for the quality.
+;;;
+;;;       (NIL | (INTEGER 0 3))*
+;;;         Generate the specified values. A "value" of NIL omits the
+;;;         quality from the combination.
+;;;
+(declaim (ftype (function #.`(function
+                              &key
+                              ,@(mapcar #'list +optimization-quality-keywords+
+                                        '#1=(optimization-quality-range-designator . #1#))
+                              (:filter function)))
+                map-optimization-quality-combinations
+                map-optimize-declarations))
+(defun map-optimization-quality-combinations
+    (function &key (speed t) (safety t) (debug t) (compilation-speed t) (space t)
+                   filter)
+  (labels ((map-quantity-values (values thunk)
+             (typecase values
+               ((eql t)
+                (dotimes (i 4) (funcall thunk i)))
+               (cons
+                (map nil thunk values))))
+           (one-quality (qualities specs values)
+             (let ((quality (first qualities))
+                   (spec    (first specs)))
+               (cond
+                 ((not quality)
+                  (when (or (not filter) (apply filter values))
+                    (apply function values)))
+                 ((not spec)
+                  (one-quality (rest qualities) (rest specs) values))
+                 (t
+                  (map-quantity-values
+                   spec
+                   (lambda (value)
+                     (one-quality (rest qualities) (rest specs)
+                                  (if value
+                                      (list* quality value values)
+                                      values)))))))))
+    (one-quality +optimization-quality-keywords+
+                 (list speed safety debug compilation-speed space)
+                 '())))
+
+(defun map-optimize-declarations
+    (function &rest args
+              &key speed safety debug compilation-speed space filter)
+  (declare (ignore speed safety debug compilation-speed space filter))
+  (apply #'map-optimization-quality-combinations
+         (lambda (&rest args &key &allow-other-keys)
+           (funcall function (loop for name in +optimization-quality-names+
+                                for keyword in +optimization-quality-keywords+
+                                for value = (getf args keyword)
+                                when value collect (list name value))))
+         args))
+
+;;;; CHECKED-COMPILE
 
 ;;; Compile FORM capturing and muffling all [style-]warnings and notes
 ;;; and return six values: 1) the compiled function 2) a Boolean
