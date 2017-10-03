@@ -262,10 +262,12 @@
   (let* ((use (principal-lvar-use lvar))
          (leaf (if (ref-p use)
                    (ref-leaf use)
-                   (return-from lvar-fun-type nil)))
+                   (return-from lvar-fun-type (lvar-type lvar))))
          (defined-type (and (global-var-p leaf)
                             (global-var-defined-type leaf)))
-         (lvar-type (or defined-type
+         (lvar-type (if (and defined-type
+                             (neq defined-type *universal-type*))
+                        defined-type
                         (lvar-type lvar)))
          (fun-name (cond ((or (fun-type-p lvar-type)
                               (functional-p leaf))
@@ -286,16 +288,18 @@
                                                                   (specifier-type '(or function symbol))
                                                                   arg-count
                                                                   *valid-fun-use-name*))
-                          (return-from lvar-fun-type nil))))
+                          (return-from lvar-fun-type lvar-type))))
          (type (cond ((fun-type-p lvar-type)
                       lvar-type)
                      ((symbolp fun-name)
                       (proclaimed-ftype fun-name))
-                     (t
+                     ((functional-p leaf)
                       (let ((info (functional-info leaf)))
                         (if info
                             (specifier-type (entry-info-type info))
-                            leaf))))))
+                            lvar-type)))
+                     (t
+                      lvar-type))))
     (values type fun-name leaf)))
 
 (defun callable-argument-lossage-kind (fun-name leaf soft hard)
@@ -312,7 +316,7 @@
 (defun valid-callable-argument (lvar &key arg-count args arg-lvars unknown-keys &allow-other-keys)
   (when arg-count
     (multiple-value-bind (type fun-name leaf) (lvar-fun-type lvar arg-count)
-      (when type
+      (when leaf
         (let ((*lossage-fun*
                 (and *lossage-fun*
                      (callable-argument-lossage-kind fun-name leaf
@@ -345,16 +349,16 @@
                 *valid-fun-use-name*
                 arg-count max)
                (return-from valid-callable-argument))))
-          (when args
-            (if (functional-p type)
-                (and *valid-callable-argument-assert-unknown-lvars*
-                     (assert-function-designator-lvar-type lvar
-                                                           (specifier-type '(or function symbol))
-                                                           arg-count
-                                                           *valid-fun-use-name*))
-                (valid-arguments-to-callable fun-name args arg-lvars
-                                             (fun-type-first-n-types type arg-count)
-                                             unknown-keys))))))))
+          (cond ((not args))
+                ((fun-type-p type)
+                 (valid-arguments-to-callable fun-name args arg-lvars
+                                              (fun-type-first-n-types type arg-count)
+                                              unknown-keys))
+                (*valid-callable-argument-assert-unknown-lvars*
+                 (assert-function-designator-lvar-type lvar
+                                                       (specifier-type '(or function symbol))
+                                                       arg-count
+                                                       *valid-fun-use-name*))))))))
 
 (defun validate-test-and-test-not (combination)
   (let* ((comination-name (lvar-fun-name (combination-fun combination) t))
@@ -1220,7 +1224,7 @@ and no value was provided for it." name))))))))))
 ;;; Call FUN with (arg-lvar arg-type)
 (defun map-combination-args-and-types (fun call)
   (declare (type function fun) (type combination call))
-  (binding* ((type (lvar-type (combination-fun call)))
+  (binding* ((type (lvar-fun-type (combination-fun call)))
              (nil (fun-type-p type) :exit-if-null)
              (args (combination-args call)))
     (dolist (req (fun-type-required type))

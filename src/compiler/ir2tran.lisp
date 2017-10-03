@@ -625,7 +625,8 @@
         (atype (cast-asserted-type cast)))
     (cond ((function-designator-cast-p cast)
            (multiple-value-bind (type name leaf) (lvar-fun-type value)
-             (when type
+             (when (and (fun-type-p type)
+                        leaf)
                (let ((*valid-fun-use-name* (function-designator-cast-caller cast))
                      (*lossage-fun* (callable-argument-lossage-kind name
                                                                     leaf
@@ -646,7 +647,8 @@
                                               (function-designator-cast-arg-count cast)))))))
           ((fun-type-p atype)
            (multiple-value-bind (type name leaf) (lvar-fun-type value)
-             (when (fun-type-p type)
+             (when (and (fun-type-p type)
+                        leaf)
                (let ((int (type-intersection type atype)))
                  (when (or (memq *empty-type* (fun-type-required int))
                            (and (eq (fun-type-returns int) *empty-type*)

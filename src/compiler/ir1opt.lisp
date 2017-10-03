@@ -1272,7 +1272,8 @@
        (multiple-value-bind (leaf info)
            (let* ((uses (lvar-uses fun-lvar))
                   (leaf (when (ref-p uses) (ref-leaf uses))))
-             (validate-call-type call (lvar-type fun-lvar) leaf))
+             (validate-call-type call (or (lvar-fun-type fun-lvar)
+                                          (lvar-type fun-lvar)) leaf))
          (cond ((functional-p leaf)
                 (convert-call-if-possible
                  (lvar-uses (basic-combination-fun call))
