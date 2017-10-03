@@ -296,20 +296,25 @@
                       leaf))))
     (values type fun-name leaf)))
 
+(defun callable-argument-lossage-kind (fun-name leaf soft hard)
+  (if (and (neq (leaf-where-from leaf) :defined-here)
+           (not (and (functional-p leaf)
+                     (or (lambda-p leaf)
+                         (member (functional-kind leaf)
+                                 '(:toplevel-xep)))))
+           (or (not fun-name)
+               (not (info :function :info fun-name))))
+      soft
+      hard))
+
 (defun valid-callable-argument (lvar &key arg-count args arg-lvars unknown-keys &allow-other-keys)
   (when arg-count
     (multiple-value-bind (type fun-name leaf) (lvar-fun-type lvar arg-count)
       (when type
-        (let* ((*lossage-fun*
-                 (if (and (neq (leaf-where-from leaf) :defined-here)
-                          (not (and (functional-p leaf)
-                                    (or (lambda-p leaf)
-                                        (member (functional-kind leaf)
-                                                '(:toplevel-xep)))))
-                          (or (not fun-name)
-                              (not (info :function :info fun-name))))
-                     #'compiler-style-warn
-                     *lossage-fun*)))
+        (let ((*lossage-fun*
+                (callable-argument-lossage-kind fun-name leaf
+                                                #'compiler-style-warn
+                                                *lossage-fun*)))
           (multiple-value-bind (min max optional)
               (fun-arg-limits type)
             (cond
@@ -1339,46 +1344,54 @@ and no value was provided for it." name))))))))))
                                         (car values)
                                         atype)))))
 
-(defoptimizer (%compile-time-type-error ir2-convert)
-    ((objects atype dtype detail code-context cast-context) node block)
-  (declare (ignore objects code-context))
+(defun %compile-time-type-error-warn (node atype dtype detail
+                                      &key cast-context
+                                           (condition 'type-warning))
   (let ((*compiler-error-context* node))
-    (setf (node-source-path node)
-          (cdr (node-source-path node)))
-    (let ((atype (lvar-value atype))
-          (dtype (lvar-value dtype))
-          (detail (lvar-value detail)))
-      (cond ((eq atype nil))
-            ((eq (lvar-value cast-context) :ftype)
-             (warn 'type-warning
-                   :format-control
-                   "~@<Derived type of ~S is ~2I~_~S, ~
+    (cond ((eq atype nil))
+          ((eq cast-context :ftype)
+           (warn condition
+                 :format-control
+                 "~@<Derived type of ~S is ~2I~_~S, ~
                     ~I~_conflicting with the declared function return type ~
                     ~2I~_~/sb!impl:print-type-specifier/.~@:>"
-                   :format-arguments (list detail dtype atype)))
-            ((singleton-p detail)
-             (let ((detail (first detail)))
-               (if (constantp detail)
-                   (warn 'type-warning
-                         :format-control
-                         "~@<Constant ~2I~_~S ~Iconflicts with its ~
+                 :format-arguments (list detail dtype atype)))
+          ((singleton-p detail)
+           (let ((detail (first detail)))
+             (if (constantp detail)
+                 (warn condition
+                       :format-control
+                       "~@<Constant ~2I~_~S ~Iconflicts with its ~
                             asserted type ~
                             ~2I~_~/sb!impl::print-type-specifier/.~@:>"
-                         :format-arguments (list (eval detail) atype))
-                   (warn 'type-warning
-                         :format-control
-                         "~@<Derived type of ~S is ~2I~_~S, ~
+                       :format-arguments (list (eval detail) atype))
+                 (warn condition
+                       :format-control
+                       "~@<Derived type of ~S is ~2I~_~S, ~
                             ~I~_conflicting with its asserted type ~
                             ~2I~_~/sb!impl:print-type-specifier/.~@:>"
-                         :format-arguments (list detail dtype atype)))))
-            (t
-             (warn 'type-warning
-                   :format-control
-                   "~@<Derived type of ~2I~_~{~S~^~#[~; and ~:;, ~
+                       :format-arguments (list detail dtype atype)))))
+          (t
+           (warn condition
+                 :format-control
+                 "~@<Derived type of ~2I~_~{~S~^~#[~; and ~:;, ~
                       ~]~} ~I~_in ~2I~_~S ~I~_is ~
                       ~2I~_~/sb!impl:print-type-specifier/, ~
                       ~I~_conflicting with their asserted type ~
                       ~2I~_~/sb!impl:print-type-specifier/.~@:>"
-                   :format-arguments (list (rest detail) (first detail)
-                                           dtype atype)))))
-    (ir2-convert-full-call node block)))
+                 :format-arguments (list (rest detail) (first detail)
+                                         dtype atype))))))
+
+
+(defoptimizer (%compile-time-type-error ir2-convert)
+    ((objects atype dtype detail code-context cast-context) node block)
+  (declare (ignore objects code-context))
+  ;; Remove %COMPILE-TIME-TYPE-ERROR bits
+  (setf (node-source-path node)
+        (cdr (node-source-path node)))
+  (%compile-time-type-error-warn node
+                                 (lvar-value atype)
+                                 (lvar-value dtype)
+                                 (lvar-value detail)
+                                 :cast-context (lvar-value cast-context))
+  (ir2-convert-full-call node block))

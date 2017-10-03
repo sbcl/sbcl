@@ -193,10 +193,13 @@
 ;;; type weakenings, then look for any predicate that is cheaper.
 (defun maybe-weaken-check (type policy)
   (declare (type ctype type))
-  (ecase (policy policy type-check)
-    (0 *wild-type*)
-    (2 (weaken-values-type type))
-    (3 type)))
+  (if (fun-type-p type)
+      ;; Can't do much funcational type checking at run-time
+      (specifier-type 'function)
+      (ecase (policy policy type-check)
+        (0 *wild-type*)
+        (2 (weaken-values-type type))
+        (3 type))))
 
 ;;; LVAR is an lvar we are doing a type check on and TYPES is a list
 ;;; of types that we are checking its values against. If we have

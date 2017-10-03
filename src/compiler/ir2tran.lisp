@@ -614,6 +614,32 @@
                    nvals)))))))
   (values))
 
+;;; Doing this during IR2 conversion and not in ir1-optimize-cast
+;;; because of possible function redefinition and the need to signal a
+;;; style-warning and not a full warning.
+;;; If the cast is not deleted after a warning is signalled then it
+;;; might get signalled multiple times, and IR2 conversion happens
+;;; only once.
+(defun check-functional-cast (cast)
+  (let ((value (cast-value cast))
+        (atype (cast-asserted-type cast)))
+    (when (fun-type-p atype)
+      (multiple-value-bind (type name leaf) (lvar-fun-type value)
+        (when (fun-type-p type)
+          (let ((int (type-intersection type atype)))
+            (when (or (memq *empty-type* (fun-type-required int))
+                      (and (eq (fun-type-returns int) *empty-type*)
+                           (neq (fun-type-returns type) *empty-type*)))
+              (%compile-time-type-error-warn cast
+                                             (type-specifier atype)
+                                             (type-specifier type)
+                                             (lvar-all-sources value)
+                                             :condition
+                                             (callable-argument-lossage-kind name
+                                                                             leaf
+                                                                             'type-style-warning
+                                                                             'type-warning)))))))))
+
 ;;; CAST
 (defun ir2-convert-cast (node block)
   (declare (type cast node)
@@ -622,6 +648,7 @@
              (2lvar (lvar-info lvar))
              (value (cast-value node))
              (2value (lvar-info value)))
+    (check-functional-cast node)
     (ecase (ir2-lvar-kind 2lvar)
       (:unused)
       ((:unknown :fixed)

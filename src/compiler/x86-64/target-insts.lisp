@@ -391,7 +391,7 @@
         (jmp-inst (find-inst #b11101001 (get-inst-space)))
         (call-inst (find-inst #b11101000 (get-inst-space)))
         (seg (sb!disassem::%make-segment
-              :sap-maker #'error :virtual-location 0))
+              :sap-maker (lambda () (error "Bad sap maker")) :virtual-location 0))
         (dstate (make-dstate)))
     (flet ((scan-function (fun-entry-addr fun-end-addr predicate)
              (setf (seg-virtual-location seg) fun-entry-addr
