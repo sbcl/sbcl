@@ -3068,13 +3068,15 @@ core and return a descriptor to it."
     (terpri))
 
   (format t "#define BACKEND_PAGE_BYTES ~D~%" sb!c:+backend-page-bytes+)
-  #!+gencgc ; value never needed in Lisp, so therefore not a defconstant
-  (format t "#define GENCGC_CARD_SHIFT ~D~%"
-           (1- (integer-length sb!vm:gencgc-card-bytes)))
-  ;; symbol intentionally internal to sb-vm so that it won't add a #define
-  (format t "#ifndef DEFAULT_DYNAMIC_SPACE_SIZE
+  #!+gencgc
+  (progn
+    ;; value never needed in Lisp, so therefore not a defconstant
+    (format t "#define GENCGC_CARD_SHIFT ~D~%"
+            (1- (integer-length sb!vm:gencgc-card-bytes)))
+    ;; symbol intentionally internal to sb-vm so that it won't add a #define
+    (format t "#ifndef DEFAULT_DYNAMIC_SPACE_SIZE
 #define DEFAULT_DYNAMIC_SPACE_SIZE ~D /* ~:*0x~X */
-#endif~2%" sb!vm::default-dynamic-space-size)
+#endif~2%" sb!vm::default-dynamic-space-size))
 
   ;; writing information about internal errors
   ;; Assembly code needs only the constants for UNDEFINED_[ALIEN_]FUN_ERROR
