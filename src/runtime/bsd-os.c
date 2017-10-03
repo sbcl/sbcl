@@ -127,7 +127,7 @@ os_context_sigmask_addr(os_context_t *context)
 os_vm_address_t
 os_validate(int movable, os_vm_address_t addr, os_vm_size_t len)
 {
-    int flags = MAP_PRIVATE | MAP_ANON;
+    int flags = 0;
 
     /* FIXME: use of MAP_FIXED here looks decidedly wrong! (and not what we do
      * in linux-os.c). Granted there are differences between *BSD and Linux,
@@ -144,14 +144,25 @@ os_validate(int movable, os_vm_address_t addr, os_vm_size_t len)
      * OpenBSD says:
        Except for MAP_FIXED mappings, the system will never replace existing mappings. */
 
-    if (addr && movable != MOVABLE) {
-        /* MOVABLE_LOW will use MAP_FIXED because if you don't,
-         * there is no chance of getting the hinted address */
-        flags |= MAP_FIXED;
-#ifdef MAP_EXCL /* I think every *BSD has this but I'm not sure */
-        flags |= MAP_EXCL;
+    switch (movable) {
+    case MOVABLE_LOW:
+#ifdef MAP_32BIT
+        flags = MAP_32BIT;
+        break;
 #endif
+        /* Unless we have MAP_32BIT, use MAP_FIXED because if you don't,
+         * there is little chance of getting the hinted address. That in itself
+         * is ok, unless mapped above 2GB, which, sadly, is always the case.
+         * (It may not be on OpenBSD which defines MAP_TRYFIXED as using
+         * the hint address, and moreover that it "is the default behavior") */
+        // FALLTHROUGH_INTENDED
+    case NOT_MOVABLE:
+        flags = MAP_FIXED;
     }
+#ifdef MAP_EXCL // not defined in OpenBSD, NetBSD, DragonFlyBSD
+    if (flags & MAP_FIXED) flags |= MAP_EXCL;
+#endif
+    flags |= MAP_PRIVATE | MAP_ANON;
 
 #ifdef __NetBSD__
     if (addr) {
@@ -183,7 +194,7 @@ os_validate(int movable, os_vm_address_t addr, os_vm_size_t len)
         addr = mmap(addr, len, OS_VM_PROT_ALL, flags, -1, 0);
     }
 
-    /* FIXME: if MOVABLE_LOW, probe for other possible addresses,
+    /* FIXME: if MAP_FIXED and MOVABLE_LOW, probe for other possible addresses,
      * since the combination of (MAP_FIXED | MAP_EXCL) won't */
     if (addr == MAP_FAILED) {
         perror("mmap");
