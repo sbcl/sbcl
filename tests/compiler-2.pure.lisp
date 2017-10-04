@@ -320,6 +320,7 @@
 (with-test (:name (:type-conflict :by-name))
   (compiles-with-warning `(lambda (str)
                             (map 'string 'evenp str))))
+
 (with-test (:name (:type-conflict :callable :reporting))
   (multiple-value-bind (fun failure-p warnings)
       (checked-compile '(lambda (x) (map-into (make-string 10) #'evenp x))
@@ -329,3 +330,8 @@
     (assert (= (length warnings) 1))
     (search "Derived type of EVENP is"
             (princ-to-string (first warnings)))))
+
+(with-test (:name (:type-conflict :string-union-type))
+  (compiles-with-warning
+   `(lambda (x)
+      (find-if #'evenp (the string x)))))
