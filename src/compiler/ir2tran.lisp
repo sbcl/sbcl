@@ -658,7 +658,7 @@
                    (%compile-time-type-error-warn cast
                                                   (type-specifier atype)
                                                   (type-specifier type)
-                                                  (lvar-all-sources value)
+                                                  (list name)
                                                   :condition
                                                   (callable-argument-lossage-kind name
                                                                                   leaf
