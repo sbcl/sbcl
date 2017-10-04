@@ -1571,21 +1571,28 @@ copy_unboxed_object(lispobj object, sword_t nwords)
  * weak pointers
  */
 
-/* XX This is a hack adapted from cgc.c. These don't work too
- * efficiently with the gencgc as a list of the weak pointers is
- * maintained within the objects which causes writes to the pages. A
- * limited attempt is made to avoid unnecessary writes, but this needs
- * a re-think. */
-/* FIXME: now that we have non-Lisp hashtables in the GC, it might make sense
- * to stop chaining weak pointers through a slot in the object, as a remedy to
- * the above concern. It would also shorten the object by 2 words. */
 static sword_t
 scav_weak_pointer(lispobj *where, lispobj object)
 {
     struct weak_pointer * wp = (struct weak_pointer*)where;
 
-    if (!wp->next && weak_pointer_breakable_p(wp))
+    if (!wp->next && weak_pointer_breakable_p(wp)) {
+        /* All weak pointers refer to objects at least as old as themselves,
+         * because there is no slot setter for WEAK-POINTER-VALUE.
+         * (i.e. You can't reference an object that didn't already exist,
+         * assuming that users don't stuff a new value in via low-level hacks)
+         * A weak pointer is breakable only if it points to an object in the
+         * condemned generation, which must be as young as, or younger than
+         * the weak pointer itself. Per the initial claim, it can't be younger.
+         * So it must be in the same generation. Therefore, if the pointee
+         * is condemned, the pointer itself must be condemned. Hence it must
+         * not be on a write-protected page. Assert this, to be sure.
+         * (This assertion is compiled out in a normal build,
+         * so even if incorrect, it should be relatively harmless)
+         */
+        gc_dcheck(!page_table[find_page_index(wp)].write_protected);
         add_to_weak_pointer_list(wp);
+    }
 
     /* Do not let GC scavenge the value slot of the weak pointer.
      * (That is why it is a weak pointer.) */
