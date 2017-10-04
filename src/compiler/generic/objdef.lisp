@@ -144,8 +144,8 @@
 
 ;;; The header contains the size of slots and constants in words.
 (!define-primitive-object (code :type code-component
-                               :lowtag other-pointer-lowtag
-                               :widetag t)
+                                :lowtag other-pointer-lowtag
+                                :widetag code-header-widetag)
   ;; This is the size of instructions in bytes, not aligned.
   ;; Adding the size from the header and aligned code-size will yield
   ;; the total size of the code-object.
