@@ -1016,40 +1016,33 @@ add_new_area(page_index_t first_page, size_t offset, size_t size)
 void
 gc_alloc_update_page_tables(int page_type_flag, struct alloc_region *alloc_region)
 {
-    boolean more;
-    page_index_t first_page;
-    page_index_t next_page;
-    os_vm_size_t bytes_used;
-    os_vm_size_t region_size;
-    os_vm_size_t byte_cnt;
-    page_bytes_t orig_first_page_bytes_used;
-    int ret;
-
-
-    first_page = alloc_region->first_page;
-
     /* Catch an unused alloc_region. */
-    if ((first_page == 0) && (alloc_region->last_page == -1))
+    if (alloc_region->last_page == -1)
         return;
 
-    next_page = first_page+1;
+    page_index_t first_page = alloc_region->first_page;
+    page_index_t next_page = first_page+1;
+    char *page_base = page_address(first_page);
+    char *free_pointer = alloc_region->free_pointer;
 
-    ret = thread_mutex_lock(&free_pages_lock);
+    // page_bytes_used() can be done without holding a lock. Nothing else
+    // affects the usage on the first page of a region owned by this thread.
+    page_bytes_t orig_first_page_bytes_used = page_bytes_used(first_page);
+    gc_assert(alloc_region->start_addr == page_base + orig_first_page_bytes_used);
+
+    int ret = thread_mutex_lock(&free_pages_lock);
     gc_assert(ret == 0);
-    if (alloc_region->free_pointer != alloc_region->start_addr) {
-        /* some bytes were allocated in the region */
-        orig_first_page_bytes_used = page_bytes_used(first_page);
 
-        gc_assert(alloc_region->start_addr ==
-                  (page_address(first_page) + page_bytes_used(first_page)));
+    // Mark the region as closed on its first page.
+    page_table[first_page].allocated &= ~(OPEN_REGION_PAGE_FLAG);
+
+    if (free_pointer != alloc_region->start_addr) {
+        /* some bytes were allocated in the region */
 
         /* All the pages used need to be updated */
 
         /* Update the first page. */
-
-        /* If the page was free then set up the gen, and
-         * scan_start_offset. */
-        if (page_bytes_used(first_page) == 0)
+        if (!orig_first_page_bytes_used)
             gc_assert(page_starts_contiguous_block_p(first_page));
         page_table[first_page].allocated &= ~(OPEN_REGION_PAGE_FLAG);
 
@@ -1061,24 +1054,20 @@ gc_alloc_update_page_tables(int page_type_flag, struct alloc_region *alloc_regio
         gc_assert(page_table[first_page].gen == gc_alloc_generation);
         gc_assert(page_table[first_page].large_object == 0);
 
-        byte_cnt = 0;
-
         /* Calculate the number of bytes used in this page. This is not
          * always the number of new bytes, unless it was free. */
-        more = 0;
-        if ((bytes_used = addr_diff(alloc_region->free_pointer,
-                                    page_address(first_page)))
-            >GENCGC_CARD_BYTES) {
+        os_vm_size_t bytes_used = addr_diff(free_pointer, page_base);
+        boolean more;
+        if ((more = (bytes_used > GENCGC_CARD_BYTES)))
             bytes_used = GENCGC_CARD_BYTES;
-            more = 1;
-        }
         set_page_bytes_used(first_page, bytes_used);
-        byte_cnt += bytes_used;
 
+        /* 'region_size' will be the sum of new bytes consumed by the region,
+         * EXCLUDING any part of the first page already in use,
+         * and any unused part of the final used page */
+        os_vm_size_t region_size = bytes_used - orig_first_page_bytes_used;
 
-        /* All the rest of the pages should be free. We need to set
-         * their scan_start_offset pointer to the start of the
-         * region, and set the bytes_used. */
+        /* All the rest of the pages should be accounted for. */
         while (more) {
             page_table[next_page].allocated &= ~(OPEN_REGION_PAGE_FLAG);
 #ifdef LISP_FEATURE_SEGREGATED_CODE
@@ -1089,29 +1078,25 @@ gc_alloc_update_page_tables(int page_type_flag, struct alloc_region *alloc_regio
             gc_assert(page_bytes_used(next_page) == 0);
             gc_assert(page_table[next_page].gen == gc_alloc_generation);
             gc_assert(page_table[next_page].large_object == 0);
+            page_base += GENCGC_CARD_BYTES;
             gc_assert(page_scan_start_offset(next_page) ==
-                      addr_diff(page_address(next_page),
-                                alloc_region->start_addr));
+                      addr_diff(page_base, alloc_region->start_addr));
 
             /* Calculate the number of bytes used in this page. */
-            more = 0;
-            if ((bytes_used = addr_diff(alloc_region->free_pointer,
-                                        page_address(next_page)))>GENCGC_CARD_BYTES) {
+            bytes_used = addr_diff(free_pointer, page_base);
+            if ((more = (bytes_used > GENCGC_CARD_BYTES)))
                 bytes_used = GENCGC_CARD_BYTES;
-                more = 1;
-            }
             set_page_bytes_used(next_page, bytes_used);
-            byte_cnt += bytes_used;
+            region_size += bytes_used;
 
             next_page++;
         }
 
-        region_size = addr_diff(alloc_region->free_pointer,
-                                alloc_region->start_addr);
+        // Now 'next_page' is 1 page beyond those fully accounted for.
+        gc_assert(addr_diff(free_pointer, alloc_region->start_addr) == region_size);
+        // Update the global totals
         bytes_allocated += region_size;
         generations[gc_alloc_generation].bytes_allocated += region_size;
-
-        gc_assert((byte_cnt- orig_first_page_bytes_used) == region_size);
 
         /* Set the generations alloc restart page to the last page of
          * the region. */
@@ -1121,18 +1106,9 @@ gc_alloc_update_page_tables(int page_type_flag, struct alloc_region *alloc_regio
         if (BOXED_PAGE_FLAG & page_type_flag)
             add_new_area(first_page,orig_first_page_bytes_used, region_size);
 
-        /*
-        FSHOW((stderr,
-               "/gc_alloc_update_page_tables update %d bytes to gen %d\n",
-               region_size,
-               gc_alloc_generation));
-        */
-    } else {
-        /* There are no bytes allocated. Unallocate the first_page if
-         * there are 0 bytes_used. */
-        page_table[first_page].allocated &= ~(OPEN_REGION_PAGE_FLAG);
-        if (page_bytes_used(first_page) == 0)
-            reset_page_flags(first_page);
+    } else if (!orig_first_page_bytes_used) {
+        /* The first page is completely unused. Unallocate it */
+        reset_page_flags(first_page);
     }
 
     /* Unallocate any unused pages. */
