@@ -23,9 +23,8 @@
     ;; the name of this type
     (name nil :type symbol :read-only t)
     ;; kind of type (how to reconstitute an object)
-    (kind (missing-arg)
-          :type (member :other :closure :instance :list
-                        :code :vector-nil :weak-pointer)
+    (kind nil
+          :type (member :other :closure :instance :list :code :vector-nil)
           :read-only t))
 
 (defun room-info-type-name (info)
@@ -41,8 +40,7 @@
             (lowtag (primitive-object-lowtag obj))
             (name (primitive-object-name obj)))
         (when (and (eq lowtag 'other-pointer-lowtag)
-                   (not (member widetag '(t nil)))
-                   (not (eq name 'weak-pointer)))
+                   (not (member widetag '(t nil))))
           (setf (svref infos (symbol-value widetag))
                 (make-room-info (if (member name '(fdefn symbol))
                                     #xFF
@@ -57,7 +55,9 @@
             (make-room-info default-size-mask 'array-header :other)))
 
     (setf (svref infos bignum-widetag)
-          (make-room-info (ash most-positive-word (- n-widetag-bits))
+          ;; Lose 1 more bit than n-widetag-bits because fullcgc robs 1 bit,
+          ;; not that this is expected to work concurrently with gc.
+          (make-room-info (ash most-positive-word (- (1+ n-widetag-bits)))
                           'bignum :other))
 
     (setf (svref infos closure-widetag)
@@ -79,9 +79,6 @@
 
     (setf (svref infos funcallable-instance-widetag)
           (make-room-info 0 'funcallable-instance :closure))
-
-    (setf (svref infos weak-pointer-widetag)
-          (make-room-info 0 'weak-pointer :weak-pointer))
 
     (let ((cons-info (make-room-info 0 'cons :list)))
       ;; A cons consists of two words, both of which may be either a
@@ -242,13 +239,6 @@
            (values (tagged-object other-pointer-lowtag)
                    simple-array-nil-widetag
                    (* 2 n-word-bytes)))
-
-          (:weak-pointer ; FIXME: why??? It's just a boxed object, isn't it?
-           (values (tagged-object other-pointer-lowtag)
-                   weak-pointer-widetag
-                   (round-to-dualword
-                    (* weak-pointer-size
-                       n-word-bytes))))
 
           (:code
            (let ((c (tagged-object other-pointer-lowtag)))
