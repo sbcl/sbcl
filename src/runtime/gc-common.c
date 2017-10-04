@@ -824,7 +824,7 @@ static sword_t
 scav_unboxed(lispobj *where, lispobj object)
 {
     sword_t length = HeaderValue(object) + 1;
-    return CEILING(length, 2);
+    return ALIGN_UP(length, 2);
 }
 
 static lispobj
@@ -832,7 +832,7 @@ trans_unboxed(lispobj object)
 {
     gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG);
     sword_t length = HeaderValue(*native_pointer(object)) + 1;
-    return copy_unboxed_object(object, CEILING(length, 2));
+    return copy_unboxed_object(object, ALIGN_UP(length, 2));
 }
 
 static lispobj
@@ -864,14 +864,14 @@ trans_vector(lispobj object)
     gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG);
 
     sword_t length = fixnum_value(VECTOR(object)->length);
-    return copy_large_object(object, CEILING(length + 2, 2));
+    return copy_large_object(object, ALIGN_UP(length + 2, 2));
 }
 
 static sword_t
 size_vector(lispobj *where)
 {
     sword_t length = fixnum_value(((struct vector*)where)->length);
-    return CEILING(length + 2, 2);
+    return ALIGN_UP(length + 2, 2);
 }
 
 static inline uword_t
@@ -882,7 +882,7 @@ NWORDS(uword_t x, uword_t n_bits)
     if(n_bits <= N_WORD_BITS) {
         uword_t elements_per_word = N_WORD_BITS/n_bits;
 
-        return CEILING(x, elements_per_word)/elements_per_word;
+        return ALIGN_UP(x, elements_per_word)/elements_per_word;
     }
     else {
         /* FIXME: should have some sort of assertion that N_WORD_BITS
@@ -896,16 +896,16 @@ NWORDS(uword_t x, uword_t n_bits)
 #define DEF_SPECIALIZED_VECTOR(name, nwords) \
   static sword_t __attribute__((unused)) scav_##name(lispobj *where, lispobj header) { \
     sword_t length = fixnum_value(((struct vector*)where)->length); \
-    return CEILING(nwords + 2, 2); \
+    return ALIGN_UP(nwords + 2, 2); \
   } \
   static lispobj __attribute__((unused)) trans_##name(lispobj object) { \
     gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG); \
     sword_t length = fixnum_value(VECTOR(object)->length); \
-    return copy_large_unboxed_object(object, CEILING(nwords + 2, 2)); \
+    return copy_large_unboxed_object(object, ALIGN_UP(nwords + 2, 2)); \
   } \
   static sword_t __attribute__((unused)) size_##name(lispobj *where) { \
     sword_t length = fixnum_value(((struct vector*)where)->length); \
-    return CEILING(nwords + 2, 2); \
+    return ALIGN_UP(nwords + 2, 2); \
   }
 
 DEF_SPECIALIZED_VECTOR(vector_nil, 0*length)
@@ -1139,7 +1139,7 @@ scav_vector (lispobj *where, lispobj object)
     if ((HeaderValue(object) & 0xFF) == subtype_VectorNormal) {
  normal:
       scavenge(where + 2, kv_length);
-      return CEILING(kv_length + 2, 2);
+      return ALIGN_UP(kv_length + 2, 2);
     }
 
     /* Scavenge element 0, which may be a hash-table structure. */
@@ -1190,7 +1190,7 @@ scav_vector (lispobj *where, lispobj object)
         }
     }
 
-    return (CEILING(kv_length + 2, 2));
+    return (ALIGN_UP(kv_length + 2, 2));
 }
 
 void

@@ -292,7 +292,7 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     write_lispobj(CORE_MAGIC, file);
 
     int stringlen = strlen((const char *)build_id);
-    int string_words = CEILING(stringlen, sizeof (core_entry_elt_t))
+    int string_words = ALIGN_UP(stringlen, sizeof (core_entry_elt_t))
         / sizeof (core_entry_elt_t);
     int pad = string_words * sizeof (core_entry_elt_t) - stringlen;
     /* Write 3 word entry header: a word for entry-type-code, a word for
@@ -357,7 +357,7 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     {
         size_t true_size = sizeof last_free_page
             + (last_free_page * sizeof(struct corefile_pte));
-        size_t rounded_size = CEILING(true_size, os_vm_page_size);
+        size_t rounded_size = ALIGN_UP(true_size, os_vm_page_size);
         char* data = successful_malloc(rounded_size);
         *(page_index_t*)data = last_free_page;
         struct corefile_pte *ptes = (struct corefile_pte*)(data + sizeof(page_index_t));

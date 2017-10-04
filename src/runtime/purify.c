@@ -352,7 +352,7 @@ ptrans_returnpc(lispobj thing, lispobj header)
     return new + (thing - code);
 }
 
-#define WORDS_PER_CONS CEILING(sizeof(struct cons) / sizeof(lispobj), 2)
+#define WORDS_PER_CONS ALIGN_UP(sizeof(struct cons) / sizeof(lispobj), 2)
 
 static lispobj
 ptrans_list(lispobj thing, boolean constant)
@@ -529,7 +529,7 @@ pscav(lispobj *addr, long nwords, boolean constant)
 #endif
               case SAP_WIDETAG:
                 /* It's an unboxed simple object. */
-                count = CEILING(HeaderValue(thing)+1, 2);
+                count = ALIGN_UP(HeaderValue(thing)+1, 2);
                 break;
 
               case SIMPLE_VECTOR_WIDETAG:

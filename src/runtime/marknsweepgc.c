@@ -697,13 +697,13 @@ void set_immobile_space_hints()
   // in each instance. Representation change in rev 092af9c078c made
   // things more difficult, but not impossible.
   layout_page_hint = get_freeish_page(0, MAKE_ATTR(LAYOUT_ALIGN / N_WORD_BYTES, // spacing
-                                                   CEILING(LAYOUT_SIZE,2),
+                                                   ALIGN_UP(LAYOUT_SIZE,2),
                                                    0));
-  symbol_page_hint = get_freeish_page(0, MAKE_ATTR(CEILING(SYMBOL_SIZE,2),
-                                                   CEILING(SYMBOL_SIZE,2),
+  symbol_page_hint = get_freeish_page(0, MAKE_ATTR(ALIGN_UP(SYMBOL_SIZE,2),
+                                                   ALIGN_UP(SYMBOL_SIZE,2),
                                                    0));
-  fdefn_page_hint = get_freeish_page(0, MAKE_ATTR(CEILING(FDEFN_SIZE,2),
-                                                  CEILING(FDEFN_SIZE,2),
+  fdefn_page_hint = get_freeish_page(0, MAKE_ATTR(ALIGN_UP(FDEFN_SIZE,2),
+                                                  ALIGN_UP(FDEFN_SIZE,2),
                                                   0));
 }
 
@@ -848,7 +848,7 @@ varyobj_points_to_younger_p(lispobj* obj, int gen, int keep_gen, int new_gen,
     } else if (widetag == SIMPLE_VECTOR_WIDETAG) {
         sword_t length = fixnum_value(((struct vector *)obj)->length);
         begin = obj + 2; // skip the header and length
-        end = obj + CEILING(length + 2, 2);
+        end = obj + ALIGN_UP(length + 2, 2);
     } else if (unboxed_obj_widetag_p(widetag)) {
         return 0;
     } else {
@@ -1471,7 +1471,7 @@ lispobj alloc_layout(lispobj slots)
         lose("bad arguments to alloc_layout");
     struct instance* l = (struct instance*)
       alloc_immobile_obj(MAKE_ATTR(LAYOUT_ALIGN / N_WORD_BYTES,
-                                   CEILING(LAYOUT_SIZE,2),
+                                   ALIGN_UP(LAYOUT_SIZE,2),
                                    0),
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
                          (LAYOUT_OF_LAYOUT << 32) |
@@ -1498,8 +1498,8 @@ lispobj alloc_sym(lispobj name)
     // logic, we don't distinguish them when allocating,
     // on the theory that contiguous allocations are preferable anyway.
     struct symbol* s = (struct symbol*)
-      alloc_immobile_obj(MAKE_ATTR(CEILING(SYMBOL_SIZE,2), // spacing
-                                   CEILING(SYMBOL_SIZE,2), // size
+      alloc_immobile_obj(MAKE_ATTR(ALIGN_UP(SYMBOL_SIZE,2), // spacing
+                                   ALIGN_UP(SYMBOL_SIZE,2), // size
                                    0),
                          (SYMBOL_SIZE-1)<<8 | SYMBOL_WIDETAG,
                          &symbol_page_hint);
@@ -1515,8 +1515,8 @@ lispobj alloc_sym(lispobj name)
 lispobj alloc_fdefn(lispobj name)
 {
     struct fdefn* f = (struct fdefn*)
-      alloc_immobile_obj(MAKE_ATTR(CEILING(FDEFN_SIZE,2), // spacing
-                                   CEILING(FDEFN_SIZE,2), // size
+      alloc_immobile_obj(MAKE_ATTR(ALIGN_UP(FDEFN_SIZE,2), // spacing
+                                   ALIGN_UP(FDEFN_SIZE,2), // size
                                    0),
                          (FDEFN_SIZE-1)<<8 | FDEFN_WIDETAG,
                          &fdefn_page_hint);
@@ -1534,8 +1534,8 @@ lispobj alloc_generic_function(lispobj slots)
     // GFs have no C header file to represent the layout, which is 6 words:
     //   header, entry-point, fin-function, slots, raw data (x2)
     lispobj* obj = (lispobj*)
-      alloc_immobile_obj(MAKE_ATTR(CEILING(GF_SIZE,2), // spacing
-                                   CEILING(GF_SIZE,2), // size
+      alloc_immobile_obj(MAKE_ATTR(ALIGN_UP(GF_SIZE,2), // spacing
+                                   ALIGN_UP(GF_SIZE,2), // size
                                    0),
                          // 5 payload words following the header
                          ((GF_SIZE-1)<<8) | FUNCALLABLE_INSTANCE_WIDETAG,
@@ -1817,7 +1817,7 @@ int* immobile_space_relocs;
 
 static int calc_n_pages(int n_objects, int words_per_object)
 {
-  words_per_object = CEILING(words_per_object, 2);
+  words_per_object = ALIGN_UP(words_per_object, 2);
   int objects_per_page = WORDS_PER_PAGE / words_per_object;
   return (n_objects + objects_per_page - 1) / objects_per_page;
 }

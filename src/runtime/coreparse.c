@@ -655,7 +655,7 @@ process_directory(int count, struct ndir_entry *entry,
             if (id == DYNAMIC_CORE_SPACE_ID) {
                 addr = (uword_t)os_validate(MOVABLE, (os_vm_address_t)addr,
                                             dynamic_space_size);
-                aligned_start = CEILING(addr, GENCGC_CARD_BYTES);
+                aligned_start = ALIGN_UP(addr, GENCGC_CARD_BYTES);
                 /* Misalignment can happen only if card size exceeds OS page.
                  * Drop one card to avoid overrunning the allocated space */
                 if (aligned_start > addr) // not card-aligned

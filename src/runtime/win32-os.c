@@ -58,7 +58,7 @@
 
 #include "validate.h"
 #include "thread.h"
-#include "cpputil.h"
+#include "align.h"
 
 #ifndef LISP_FEATURE_SB_THREAD
 /* dummy definition to reduce ifdef clutter */

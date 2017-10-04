@@ -36,7 +36,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "thread.h"             /* dynamic_values_bytes */
-#include "cpputil.h"            /* PTR_ALIGN... */
+#include "align.h"              /* PTR_ALIGN... */
 
 #include "validate.h"
 

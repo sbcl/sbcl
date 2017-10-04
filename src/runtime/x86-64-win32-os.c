@@ -36,7 +36,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "thread.h"             /* dynamic_values_bytes */
-#include "cpputil.h"
+#include "align.h"
 
 #include "validate.h"
 size_t os_vm_page_size;

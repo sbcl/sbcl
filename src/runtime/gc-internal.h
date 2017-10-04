@@ -68,7 +68,7 @@ do {                                                                   \
 #include "cheneygc-internal.h"
 #endif
 
-#define CEILING(x,y) (((x) + ((y) - 1)) & (~((y) - 1)))
+#include "align.h"
 
 /* FIXME: Shouldn't this be defined in sbcl.h? */
 
@@ -370,7 +370,7 @@ static inline boolean immobile_filler_p(lispobj* obj) {
 #endif /* immobile space */
 
 #define WEAK_POINTER_NWORDS \
-        CEILING((sizeof(struct weak_pointer) / sizeof(lispobj)), 2)
+        ALIGN_UP((sizeof(struct weak_pointer) / sizeof(lispobj)), 2)
 
 static inline boolean weak_pointer_breakable_p(struct weak_pointer *wp)
 {

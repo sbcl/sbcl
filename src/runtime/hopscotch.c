@@ -157,7 +157,7 @@ static char* cached_allocate(os_vm_size_t nbytes)
     // Round up, since the OS will give more than asked if the request is
     // not a multiple of the mmap granularity, which we'll assume is 4K.
     // (It doesn't actually matter.)
-    nbytes = CEILING(nbytes, hh_allocation_granularity);
+    nbytes = ALIGN_UP(nbytes, hh_allocation_granularity);
     char* result = os_allocate(nbytes);
     gc_assert(result);
     result += ALLOCATION_OVERHEAD;

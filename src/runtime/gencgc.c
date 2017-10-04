@@ -2950,7 +2950,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                 state->virtual_where = where + 3;
                 verify_range(&callee, 1, state);
                 state->virtual_where = 0;
-                count = CEILING(sizeof (struct fdefn)/sizeof(lispobj), 2);
+                count = ALIGN_UP(sizeof (struct fdefn)/sizeof(lispobj), 2);
                 break;
         }
     }
