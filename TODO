@@ -109,10 +109,6 @@ DRAGONFLY
   Hint: Comment out call to os_invalidate in perform_thread_post_mortem
   and threads will work, but space will not be freed, of course.
 
-FUNCTION NAMES
-
-  We'd like to be able to (SETF %FUNCTION-NAME) on a closure.
-
 UNDEFINED FUNCTION / VARIABLE RESTARTS
 
   You know, like Allegro is reputed to have.

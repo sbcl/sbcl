@@ -92,10 +92,11 @@ os_vm_size_t bytes_consed_between_gcs = 12*1024*1024;
 
 /* Medium-sized payload count is expressed in 15 bits. Objects in this category
  * may reside in immobile space: CODE, CLOSURE, INSTANCE, FUNCALLABLE-INSTANCE.
- * FIXME: explain why is this 15 bits and not 16 bits. Is there a reason?
- * Header:  gen# |    size |    tag
- *         -----   -------   ------
- *        8 bits | 15 bits | 8 bits
+ * The single data bit is used as a closure's NAMED flag.
+ *
+ * Header:  gen# |  data |     size |    tag
+ *         -----   -----    -------   ------
+ *        8 bits | 1 bit |  15 bits | 8 bits
  */
 #define SHORT_BOXED_NWORDS(obj) ((HeaderValue(obj) & SHORT_HEADER_MAX_WORDS) | 1)
 

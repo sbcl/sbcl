@@ -131,9 +131,14 @@
 
 ;;; Return the data from the header of object, which for GET-HEADER-DATA
 ;;; must be an other-pointer, and for GET-CLOSURE-LENGTH a fun-pointer.
-(defknown (get-header-data get-closure-length) (t)
+(defknown (get-header-data) (t)
     (unsigned-byte #.(- sb!vm:n-word-bits sb!vm:n-widetag-bits))
   (flushable))
+;;; Closures have at least a trampoline word (length can't be 0),
+;;; and only 15 bits in which to express the payload size.
+(defknown (get-closure-length) (t) (integer 1 #.sb!vm:short-header-max-words)
+  (flushable))
+
 ;;; This unconventional setter returns its first arg, not the newval.
 (defknown set-header-data
     (t (unsigned-byte #.(- sb!vm:n-word-bits sb!vm:n-widetag-bits))) t)

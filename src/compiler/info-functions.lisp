@@ -218,7 +218,8 @@ only."
                       'special-form-function
                       'undefined-function)
                   :name symbol))
-         fun-name)))
+          t
+          fun-name)))
     ;; For immobile-code, do something slightly different: fmakunbound,
     ;; then assign the fdefn-fun slot to avoid consing a new closure trampoline.
     #!+immobile-code

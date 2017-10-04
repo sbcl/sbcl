@@ -1451,6 +1451,7 @@ NOTE: This interface is experimental and subject to change."
          (lambda (&rest args)
            (declare (ignore args))
            (deprecation-error software version 'function name replacement-spec))
+         t
          name)))
 
 (defun setup-variable-in-final-deprecation

@@ -131,6 +131,7 @@
             sb!mop:eql-specializer-object
             sb!mop:finalize-inheritance
             sb!mop:generic-function-name
+            (setf sb!mop:generic-function-name)
             sb!mop:slot-definition-allocation
             sb!mop:slot-definition-name
             sb!pcl::%force-cache-flushes

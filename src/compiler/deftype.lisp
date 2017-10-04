@@ -12,7 +12,7 @@
 (defun constant-type-expander (name expansion)
   (declare (optimize safety))
   ;; Dummy implementation of SET-CLOSURE-NAME for the host.
-  (flet (#+sb-xc-host (set-closure-name (f name) (declare (ignore name)) f))
+  (flet (#+sb-xc-host (set-closure-name (f junk name) (declare (ignore junk name)) f))
     (set-closure-name
      (lambda (whole)
        ;; NB: It does not in general work to set the lambda-list of a closure,
@@ -24,6 +24,7 @@
                   :kind 'deftype :name (car whole) :args (cdr whole)
                   :lambda-list '() :minimum 0 :maximum 0)
            expansion))
+     t
      `(type-expander ,name))))
 
 ;; Can't have a function called SIMPLE-TYPE-ERROR or TYPE-ERROR...

@@ -63,120 +63,145 @@
     (sb!interpreter:interpreted-function (sb!interpreter:%fun-type function))
     (t (%simple-fun-type (%fun-fun function)))))
 
-(defconstant +closure-header-namedp+ #x800000)
-(macrolet ((closure-header-word (closure)
+(define-load-time-global **closure-names**
+    (make-hash-table :test 'eq :weakness :key :synchronized t))
+
+(macrolet ((namedp-bit () #x800000)
+           (%closure-index-set (closure index val)
+             ;; Use the identical convention as %CLOSURE-INDEX-REF for the index.
+             ;; There are no closure slot setters, and in fact SLOT-SET
+             ;; does not exist in a variant that takes a non-constant index.
+             `(setf (sap-ref-lispobj (int-sap (get-lisp-obj-address ,closure))
+                                     (+ (ash sb!vm:closure-info-offset sb!vm:word-shift)
+                                        (ash ,index sb!vm:word-shift)
+                                        (- sb!vm:fun-pointer-lowtag)))
+                    ,val))
+           (closure-header-word (closure)
              `(sap-ref-word (int-sap (get-lisp-obj-address ,closure))
                             (- sb!vm:fun-pointer-lowtag))))
+
+  ;;; Assign CLOSURE a NEW-NAME and return the closure (NOT the new name!).
+  ;;; If PERMIT-COPY is true, this function may return a copy of CLOSURE
+  ;;; to avoid using a global hashtable. We prefer to store the name in the
+  ;;; closure itself, which is possible in two cases:
+  ;;; (1) if the closure has a padding slot due to alignment constraints,
+  ;;;     the padding slot holds the name.
+  ;;; (2) if it doesn't, but the caller does not care about identity,
+  ;;;     then a copy of the closure with extra slots reduces to case (1).
+  (defun set-closure-name (closure permit-copy new-name)
+    (declare (closure closure))
+    (let ((payload-len (get-closure-length (truly-the function closure)))
+          (namedp (logtest (with-pinned-objects (closure)
+                             (closure-header-word closure))
+                           (namedp-bit))))
+      (when (and (not namedp) permit-copy (oddp payload-len))
+        ;; PAYLOAD-LEN includes the trampoline, so the number of slots we would
+        ;; pass to %COPY-CLOSURE is 1 less than that, were it not for
+        ;; the fact that we actually want to create 1 additional slot.
+        ;; So in effect, asking for PAYLOAD-LEN does exactly the right thing.
+        (let ((copy #!-(or x86 x86-64)
+                    (sb!vm::%copy-closure payload-len (%closure-fun closure))
+                    #!+(or x86 x86-64)
+                    (with-pinned-objects ((%closure-fun closure))
+                      ;; %CLOSURE-CALLEE manifests as a fixnum which remains
+                      ;; valid across GC due to %CLOSURE-FUN being pinned
+                      ;; until after the new closure is made.
+                      (sb!vm::%copy-closure payload-len
+                                            (sb!vm::%closure-callee closure)))))
+          (with-pinned-objects (copy)
+            (loop with sap = (int-sap (get-lisp-obj-address copy))
+                  for i from 0 below (1- payload-len)
+                  for ofs from (- (ash 2 sb!vm:word-shift) sb!vm:fun-pointer-lowtag)
+                  by sb!vm:n-word-bytes
+                  do (setf (sap-ref-lispobj sap ofs) (%closure-index-ref closure i)))
+            (setf (closure-header-word copy) ; Update the header
+                  ;; Closure copy lost its high header bits, so OR them in again.
+                  (logior #!+(and immobile-space 64-bit)
+                          (get-lisp-obj-address sb!vm:function-layout)
+                          (namedp-bit)
+                          (closure-header-word copy)))
+            ;; We copy only if there was no padding, which means that adding 1 slot
+            ;; physically added 2 slots. You might think that the name goes in the
+            ;; first new slot, followed by padding. Nope! Take an example of a
+            ;; closure header specifying 3 words, which we increase to 4 words,
+            ;; which is 5 with the header, which is 6 aligned to a doubleword:
+            ;;   word 0: 2030008300800435
+            ;;   word 1: 0000001001A0B280             ] words the closure's fun
+            ;;   word 2: 00000000203AA39F = #<thing1> ] "should" use given
+            ;;   word 3: 00000000203AA51F = #<thing2> ] 4 payload slots.
+            ;;   word 4: 0000000000000000 = 0         ]
+            ;;   word 5: 00000010019E2B9F = NAME    <-- name goes here
+            ;; This makes CLOSURE-NAME consistent (which is to say, work at all).
+            (%closure-index-set copy payload-len new-name)
+            (return-from set-closure-name copy))))
+      (unless (with-pinned-objects (closure)
+                (unless namedp ; Set the header bit
+                  (setf (closure-header-word closure)
+                        (logior (namedp-bit) (closure-header-word closure))))
+                (when (evenp payload-len)
+                  (%closure-index-set closure (1- payload-len) new-name)
+                  t))
+        (setf (gethash closure **closure-names**) new-name)))
+    closure)
+
+  ;;; Access the name of CLOSURE. Secondary value is whether it had a name.
+  ;;; Following the convention established by SET-CLOSURE-NAME,
+  ;;; an even-length payload takes the last slot for the name,
+  ;;; and an odd-length payload uses the global hashtable.
   (defun closure-name (closure)
     (declare (closure closure))
-    (if (logtest (with-pinned-objects (closure) (closure-header-word closure))
-                 +closure-header-namedp+)
-        ;; GET-CLOSURE-LENGTH counts the 'fun' slot
-        (values (%closure-index-ref closure (- (get-closure-length closure) 2)) t)
-        (values nil nil)))
-
-  ;; Return a new object that has 1 more slot than CLOSURE,
-  ;; and frob its header bit signifying that it is named.
-  (declaim (ftype (sfunction (closure) closure) nameify-closure))
-  (defun nameify-closure (closure)
-    (declare (closure closure))
-    (let* ((n-words (get-closure-length closure)) ; excluding header
-           ;; N-WORDS includes the trampoline, so the number of slots we would
-           ;; pass to %COPY-CLOSURE is 1 less than that, were it not for
-           ;; the fact that we actually want to create 1 additional slot.
-           ;; So in effect, asking for N-WORDS does exactly the right thing.
-           (copy #!-(or x86 x86-64)
-                 (sb!vm::%copy-closure n-words (%closure-fun closure))
-                 #!+(or x86 x86-64)
-                 ;; CLOSURE was tested on entry as (SATISFIES CLOSUREP) which,
-                 ;; sadly, does not imply FUNCTIONP of the object
-                 ;; because the type system is not smart enough.
-                 (with-pinned-objects ((%closure-fun (truly-the function closure)))
-                   ;; %CLOSURE-CALLEE manifests as a fixnum which remains
-                   ;; valid across GC due to %CLOSURE-FUN being pinned
-                   ;; until after the new closure is made.
-                   (sb!vm::%copy-closure n-words (sb!vm::%closure-callee closure)))))
-      (with-pinned-objects (copy)
-        (loop with sap = (int-sap (get-lisp-obj-address copy))
-              for i from 0 below (1- n-words)
-              for ofs from (- (ash 2 sb!vm:word-shift) sb!vm:fun-pointer-lowtag)
-                        by sb!vm:n-word-bytes
-              do (setf (sap-ref-lispobj sap ofs) (%closure-index-ref closure i)))
-        (setf (closure-header-word copy) ; Update the header
-              ;; Closure copy lost its high header bits, so OR them in again.
-              (logior #!+(and immobile-space 64-bit)
-                      (get-lisp-obj-address sb!vm:function-layout)
-                      +closure-header-namedp+
-                      (closure-header-word copy))))
-      (truly-the closure copy)))
-
-  ;; Rename a closure. Doing so changes its identity unless it was already named.
-  (defun set-closure-name (closure new-name)
-    (declare (closure closure))
-    (unless (logtest (with-pinned-objects (closure) (closure-header-word closure))
-                     +closure-header-namedp+)
-      (setq closure (nameify-closure closure)))
-    ;; There are no closure slot setters, and in fact SLOT-SET
-    ;; does not exist in a variant that takes a non-constant index.
     (with-pinned-objects (closure)
-      (setf (sap-ref-lispobj (int-sap (get-lisp-obj-address closure))
-                             (- (ash (get-closure-length closure) sb!vm:word-shift)
-                                sb!vm:fun-pointer-lowtag)) new-name))
-    closure))
+      (if (not (logtest (closure-header-word closure) (namedp-bit)))
+          (values nil nil)
+          ;; CLOSUREP doesn't imply FUNCTIONP, so GET-CLOSURE-LENGTH
+          ;; issues an additional check. Silly.
+          (let ((len (get-closure-length (truly-the function closure))))
+            ;; GET-CLOSURE-LENGTH counts the 'fun' slot in the length,
+            ;; but %CLOSURE-INDEX-REF starts indexing from the value slots.
+            (if (oddp len)
+                (gethash closure **closure-names**) ; returns name and T
+                (values (%closure-index-ref closure (1- len)) t)))))))
 
 ;;; a SETFable function to return the associated debug name for FUN
 ;;; (i.e., the third value returned from CL:FUNCTION-LAMBDA-EXPRESSION),
 ;;; or NIL if there's none
 (defun %fun-name (function)
   (case (fun-subtype function)
-    (#.sb!vm:funcallable-instance-widetag
-     (let (#!+(or sb-eval sb-fasteval)
-           (layout (%funcallable-instance-layout function)))
-       ;; We know that funcallable-instance-p is true,
-       ;; and so testing via TYPEP would be wasteful.
-       (cond #!+sb-eval
-             ((eq layout #.(find-layout 'sb!eval:interpreted-function))
-              (return-from %fun-name
-                (sb!eval:interpreted-function-debug-name function)))
-             #!+sb-fasteval
-             ((eq layout #.(find-layout 'sb!interpreter:interpreted-function))
-               (return-from %fun-name
-                 (sb!interpreter:proto-fn-name
-                  (sb!interpreter:fun-proto-fn
-                   (truly-the sb!interpreter:interpreted-function function)))))
-             ((classoid-cell-typep #.(find-classoid-cell 'standard-generic-function)
-                                   function)
-              (return-from %fun-name
-                (sb!mop:generic-function-name function))))))
     (#.sb!vm:closure-widetag
-     (multiple-value-bind (name namedp) (closure-name function)
+     (multiple-value-bind (name namedp) (closure-name (truly-the closure function))
        (when namedp
-         (return-from %fun-name name)))))
+         (return-from %fun-name name))))
+    (#.sb!vm:funcallable-instance-widetag
+     (typecase (truly-the funcallable-instance function)
+       (generic-function
+        (return-from %fun-name
+          (sb!mop:generic-function-name function)))
+       #!+sb-eval
+       (sb!eval:interpreted-function
+        (return-from %fun-name (sb!eval:interpreted-function-debug-name function)))
+       #!+sb-fasteval
+       (sb!interpreter:interpreted-function
+        (return-from %fun-name
+          (sb!interpreter:proto-fn-name (sb!interpreter:fun-proto-fn function)))))))
   (%simple-fun-name (%fun-fun function)))
 
 (defun (setf %fun-name) (new-value function)
-  (typecase function
-    #!+sb-eval
-    (sb!eval:interpreted-function
-     (setf (sb!eval:interpreted-function-debug-name function) new-value))
-    #!+sb-fasteval
-    (sb!interpreter:interpreted-function
-     (setf (sb!interpreter:proto-fn-name (sb!interpreter:fun-proto-fn function))
-           new-value))
-    (generic-function
-     ;; STANDARD-GENERIC-FUNCTION definitely has a NAME,
-     ;; but other subtypes of GENERIC-FUNCTION could as well.
-     (when (slot-exists-p function 'sb!pcl::name)
-       (setf (slot-value function 'sb!pcl::name) new-value)))
-    ;; This does not set the name of an un-named closure because doing so
-    ;; is not a side-effecting operation that it ought to be.
-    ;; In contrast, SB-PCL::SET-FUN-NAME specifically says that only if the
-    ;; argument fun is a funcallable instance must it retain its identity.
-    ;; That function *is* allowed to cons a new closure to name it.
-    ((or simple-fun closure)
-     (if (and (closurep function) (nth-value 1 (closure-name function)))
-         (set-closure-name function new-value)
-         (setf (%simple-fun-name (%fun-fun function)) new-value))))
+  (case (fun-subtype function)
+    (#.sb!vm:closure-widetag
+     (set-closure-name (truly-the closure function) nil new-value))
+    (#.sb!vm:simple-fun-widetag
+     (setf (%simple-fun-name function) new-value))
+    (t
+     (typecase (truly-the funcallable-instance function)
+       (generic-function
+        (setf (sb!mop:generic-function-name function) new-value))
+       #!+sb-eval
+       (sb!eval:interpreted-function
+        (setf (sb!eval:interpreted-function-debug-name function) new-value))
+       #!+sb-fasteval
+       (sb!interpreter:interpreted-function
+        (setf (sb!interpreter:proto-fn-name (sb!interpreter:fun-proto-fn function))
+              new-value)))))
   new-value)
 
 (defun %fun-doc (function)
