@@ -3608,8 +3608,11 @@ garbage_collect_generation(generation_index_t generation, int raise)
     sweep_immobile_space(raise);
 #endif
 
-    /* Flush the current regions, updating the tables. */
-    gc_alloc_update_all_page_tables(0);
+    gc_assert(boxed_region.last_page < 0);
+    gc_assert(unboxed_region.last_page < 0);
+#ifdef LISP_FEATURE_SEGREGATED_CODE
+    gc_assert(gc_alloc_regions[2].last_page < 0);
+#endif
 #ifdef PIN_GRANULARITY_LISPOBJ
     hopscotch_log_stats(&pinned_objects, "pins");
 #endif
