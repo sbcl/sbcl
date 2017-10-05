@@ -361,11 +361,6 @@
     (tai 42s0 :immediate nil)
   t)
 
-;;; Skip the whole damn test on GENCGC PPC -- the combination is just
-;;; too flaky for this to make too much sense.  GENCGC SPARC almost
-;;; certainly exhibits the same behavior patterns (or antipatterns) as
-;;; GENCGC PPC.
-;;;
 ;;; -- It appears that this test can also fail due to systematic issues
 ;;; (possibly with the C compiler used) which we cannot detect based on
 ;;; *features*.  Until this issue has been fixed, I am marking this test
@@ -376,16 +371,12 @@
 (deftest* (allocation-information.4
            ;; Ignored as per the comment above, even though it seems
            ;; unlikely that this is the right condition.
-           :fails-on (or :win32 (and (or :ppc :sparc) :gencgc)))
+           :fails-on (or :win32 (and :sparc :gencgc)))
     #+gencgc
     (tai (make-list 1) :heap
-         ;; FIXME: This is the canonical GENCGC result. On PPC we sometimes get
-         ;; :LARGE T, which doesn't seem right -- but ignore that for now.
-         ;; Also the :write-protected value NIL, indicating that the page
-         ;; has been written, seems ok to me, so ignore that too.
-         `(:space :dynamic :generation 0
+         `(:space :dynamic :generation 0 :write-protected nil
            :boxed t :pinned nil :large nil)
-         :ignore (list :page :write-protected #+ppc :large))
+         :ignore (list :page))
     #-gencgc
     (tai :cons :heap
          ;; FIXME: Figure out what's the right cheney-result. SPARC at least
@@ -395,12 +386,12 @@
   t)
 
 
-#+(and gencgc x86-64 (not win32))
+#+(and gencgc (or x86-64 ppc) (not win32))
 (progn
   (setq *print-array* nil)
   (defvar *large-array* (make-array (* sb-vm:gencgc-card-bytes 4)
                                     :element-type '(unsigned-byte 8)))
-  (sb-ext:gc :gen 1) ; Array won't move to a large boxed page until GC'd
+  (sb-ext:gc :gen 1) ; Array won't move to a large unboxed page until GC'd
   (deftest* (allocation-information.5)
           (tai *large-array* :heap
                `(:space :dynamic :generation 1 :boxed nil :pinned nil :large t)

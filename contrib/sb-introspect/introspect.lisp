@@ -799,9 +799,7 @@ Experimental: interface subject to change."
                       #.(if (= sb-vm:n-word-bits 64) 'single-float (values))))
       (values :immediate nil)
       (let ((plist
-             (sb-sys:without-gcing
-               ;; Disable GC so the object cannot move to another page while
-               ;; we have the address.
+             (sb-sys:with-pinned-objects (object)
                (let* ((addr (sb-kernel:get-lisp-obj-address object))
                       (space
                        (cond ((< sb-vm:read-only-space-start addr
@@ -820,17 +818,38 @@ Experimental: interface subject to change."
                  (when space
                    #+gencgc
                    (if (eq :dynamic space)
-                       (let ((index (sb-vm::find-page-index addr)))
-                         (symbol-macrolet ((page (sb-alien:deref sb-vm::page-table index)))
-                           (let* ((flags (sb-alien:slot page 'sb-vm::flags))
-                                  (allocated (ldb (byte 3 0) flags)))
-                             (list :space space
-                                   :generation (sb-alien:slot page 'sb-vm::gen)
-                                   :write-protected (logbitp 3 flags)
-                                   :boxed (logbitp 0 allocated)
-                                   :pinned (logbitp 5 flags)
-                                   :large (logbitp 7 flags)
-                                   :page index))))
+                       (symbol-macrolet ((page (sb-alien:deref sb-vm::page-table index)))
+                         ;; No wonder #+big-endian failed introspection tests-
+                         ;; bits are packed in the opposite order. And thankfully,
+                         ;; this fix seems not to depend on whether the numbering
+                         ;; scheme is MSB 0 or LSB 0, afaict.
+                         (let* ((index (sb-vm::find-page-index addr))
+                                (flags (sb-alien:slot page 'sb-vm::flags))
+                                .
+                                ;; The unused fields WP-CLR and PINS are
+                                ;; to make it easier for the human to count.
+                                #+big-endian
+                                ((allocated (ldb (byte 3 5) flags))
+                                 (wp        (logbitp 4 flags))
+                                 (wp-clr    (logbitp 3 flags))
+                                 (dontmove  (logbitp 2 flags))
+                                 (pins      (logbitp 1 flags))
+                                 (large     (logbitp 0 flags)))
+                                #+little-endian
+                                ((allocated (ldb (byte 3 0) flags))
+                                 (wp        (logbitp 3 flags))
+                                 (wp-clr    (logbitp 4 flags))
+                                 (dontmove  (logbitp 5 flags))
+                                 (pins      (logbitp 6 flags))
+                                 (large     (logbitp 7 flags))))
+                           (declare (ignore wp-clr pins))
+                           (list :space space
+                                 :generation (sb-alien:slot page 'sb-vm::gen)
+                                 :write-protected wp
+                                 :boxed (logbitp 0 allocated)
+                                 :pinned dontmove
+                                 :large large
+                                 :page index)))
                        (list :space space))
                    #-gencgc
                    (list :space space))))))
