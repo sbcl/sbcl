@@ -974,7 +974,8 @@ One of :WARN, :ERROR or :NONE.")
              (dolist (arg (basic-combination-args node))
                (if arg
                    (print-lvar arg)
-                   (format t "<none> ")))))
+                   (format t "<none> "))))
+           (format t "{derived ~a}" (type-specifier (basic-combination-derived-type node))))
           (cset
            (write-string "set ")
            (print-leaf (set-var node))
