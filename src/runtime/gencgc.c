@@ -1276,6 +1276,7 @@ page_extensible_p(page_index_t index, generation_index_t gen, int allocated) {
         && !page_table[index].large_object
         && !page_table[index].write_protected
         && !page_table[index].dont_move;
+    return result;
 #else
     /* Test all 5 conditions above as a single comparison against a mask.
      * (The C compiler doesn't understand how to do that)
