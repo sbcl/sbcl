@@ -1862,6 +1862,10 @@ static void
 wipe_nonpinned_words()
 {
     void gc_heapsort_uwords(uword_t*, int);
+
+    if (!pinned_objects.count)
+        return;
+
     // Loop over the keys in pinned_objects and pack them densely into
     // the same array - pinned_objects.keys[] - but skip any simple-funs.
     // Admittedly this is abstraction breakage.
@@ -1889,8 +1893,7 @@ wipe_nonpinned_words()
     // Order by ascending address, stopping short of the sentinel.
     gc_heapsort_uwords(pinned_objects.keys, n_pins);
 #if 0
-    if(n_pins)
-        printf("Sorted pin list:\n");
+    printf("Sorted pin list:\n");
     for (i = 0; i < n_pins; ++i) {
       lispobj* obj = (lispobj*)pinned_objects.keys[i];
       lispobj word = *obj;
@@ -2047,12 +2050,13 @@ preserve_pointer(void *addr)
 #else
     if (page < 0 || (object_start = conservative_root_p(addr, page)) == NULL)
         return;
+#endif
+
     if (!compacting_p()) {
         /* Just mark it.  No distinction between large and small objects. */
         gc_mark_obj(compute_lispobj(object_start));
         return;
     }
-#endif
 
     unsigned int region_allocation = page_table[page].allocated;
 
