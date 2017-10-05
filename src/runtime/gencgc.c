@@ -2574,7 +2574,7 @@ scavenge_newspace_generation(generation_index_t generation)
                 page_index_t page = (*previous_new_areas)[i].page;
                 size_t offset = (*previous_new_areas)[i].offset;
                 size_t size = (*previous_new_areas)[i].size;
-                gc_assert(size % N_WORD_BYTES == 0);
+                gc_assert(size % (2*N_WORD_BYTES) == 0);
                 lispobj *start = (lispobj*)(page_address(page) + offset);
                 heap_scavenge(start, (lispobj*)((char*)start + size));
             }
