@@ -1163,7 +1163,7 @@ One of :WARN, :ERROR or :NONE.")
         (format t "~&~A...~%" condition))))
   (values))
 
-(defvar *list-conflicts-table* (make-hash-table :test 'eq))
+(defvar *list-conflicts-table*)
 
 ;;; Add all ALWAYS-LIVE TNs in BLOCK to the conflicts. TN is ignored
 ;;; when it appears in the global conflicts.
