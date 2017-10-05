@@ -335,3 +335,8 @@
   (compiles-with-warning
    `(lambda (x)
       (find-if #'evenp (the string x)))))
+
+(with-test (:name :type-across-hairy-lambda-transforms)
+  (assert (subtypep (sb-kernel:%simple-fun-type (lambda (x) (find 1 (the vector x))))
+                    '(function * (values (or (integer 1 1) null) &optional)))))
+

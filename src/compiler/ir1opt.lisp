@@ -1492,9 +1492,17 @@
                       res
                       :debug-name (debug-name 'lambda-inlined source-name)
                       :system-lambda t))
+            (type (node-derived-type call))
             (ref (lvar-use (combination-fun call))))
         (change-ref-leaf ref new-fun)
         (setf (combination-kind call) :full)
+        ;; Don't lose the original derived type
+        (let ((return (lambda-return (main-entry new-fun))))
+          (when return
+            (do-uses (node (return-result
+                            (lambda-return (main-entry new-fun))))
+              (derive-node-type node type))))
+
         (locall-analyze-component *current-component*))))
   (values))
 
