@@ -2598,11 +2598,6 @@ scavenge_newspace_generation(generation_index_t generation)
             /* Record all new areas now. */
             record_new_objects = 2;
 
-            scav_weak_hash_tables(weak_ht_alivep_funs, gc_scav_pair);
-
-            /* Flush the current regions updating the tables. */
-            gc_alloc_update_all_page_tables(0);
-
         } else {
 
             /* Work through previous_new_areas. */
@@ -2615,11 +2610,12 @@ scavenge_newspace_generation(generation_index_t generation)
                 heap_scavenge(start, (lispobj*)((char*)start + size));
             }
 
-            scav_weak_hash_tables(weak_ht_alivep_funs, gc_scav_pair);
-
-            /* Flush the current regions updating the tables. */
-            gc_alloc_update_all_page_tables(0);
         }
+
+        scav_weak_hash_tables(weak_ht_alivep_funs, gc_scav_pair);
+
+        /* Flush the current regions updating the tables. */
+        gc_alloc_update_all_page_tables(0);
 
         current_new_areas_index = new_areas_index;
 
