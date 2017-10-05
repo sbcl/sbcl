@@ -1323,11 +1323,15 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t bytes,
         }
 
         gc_assert(!page_table[first_page].write_protected);
+        /* page_free_p() can legally be used at index 'page_table_pages'
+         * because the array dimension is 1+page_table_pages */
         for (last_page = first_page+1;
-             ((last_page < page_table_pages) &&
-              page_free_p(last_page) &&
-              (bytes_found < nbytes_goal));
+             bytes_found < nbytes_goal &&
+               page_free_p(last_page) && last_page < page_table_pages;
              last_page++) {
+            /* page_free_p() implies 0 bytes used, thus GENCGC_CARD_BYTES available.
+             * It also implies !write_protected, and if the OS's conception were
+             * otherwise, lossage would routinely occur in the fault handler) */
             bytes_found += GENCGC_CARD_BYTES;
             gc_assert(0 == page_bytes_used(last_page));
             gc_assert(!page_table[last_page].write_protected);
