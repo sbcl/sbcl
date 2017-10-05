@@ -990,26 +990,6 @@ constant shift greater than word length")))
   integer
   (foldable flushable movable))
 
-(defoptimizer (%lea derive-type) ((base index scale disp))
-  (when (and (constant-lvar-p scale)
-             (constant-lvar-p disp))
-    (let ((scale (lvar-value scale))
-          (disp (lvar-value disp))
-          (base-type (lvar-type base))
-          (index-type (lvar-type index)))
-      (when (and (numeric-type-p base-type)
-                 (numeric-type-p index-type))
-        (let ((base-lo (numeric-type-low base-type))
-              (base-hi (numeric-type-high base-type))
-              (index-lo (numeric-type-low index-type))
-              (index-hi (numeric-type-high index-type)))
-          (make-numeric-type :class 'integer
-                             :complexp :real
-                             :low (when (and base-lo index-lo)
-                                    (+ base-lo (* index-lo scale) disp))
-                             :high (when (and base-hi index-hi)
-                                     (+ base-hi (* index-hi scale) disp))))))))
-
 (defun %lea (base index scale disp)
   (+ base (* index scale) disp))
 
@@ -2020,13 +2000,14 @@ constant shift greater than word length")))
 
 (in-package "SB!C")
 
-(defun *-transformer (y)
+(defun *-transformer (y node)
   (cond
     ((= y (ash 1 (integer-length y)))
      ;; there's a generic transform for y = 2^k
      (give-up-ir1-transform))
     ((member y '(3 5 9))
      ;; we can do these multiplications directly using LEA
+     (delay-ir1-transform node :constraint)
      `(%lea x x ,(1- y) 0))
     (t
      ;; A normal 64-bit multiplication takes 4 cycles on Athlon 64/Opteron.
@@ -2042,29 +2023,29 @@ constant shift greater than word length")))
 (deftransform * ((x y)
                  ((unsigned-byte 64) (constant-arg (unsigned-byte 64)))
                  (unsigned-byte 64)
-                 :important nil)
+                 :important nil
+                 :node node)
   "recode as leas, shifts and adds"
-  (let ((y (lvar-value y)))
-    (*-transformer y)))
+  (*-transformer (lvar-value y) node))
 (deftransform sb!vm::*-mod64
     ((x y) ((unsigned-byte 64) (constant-arg (unsigned-byte 64)))
      (unsigned-byte 64)
-     :important nil)
+     :important nil
+     :node node)
   "recode as leas, shifts and adds"
-  (let ((y (lvar-value y)))
-    (*-transformer y)))
+  (*-transformer (lvar-value y) node))
 
 (deftransform * ((x y)
                  (fixnum (constant-arg (unsigned-byte 64)))
                  fixnum
-                 :important nil)
+                 :important nil
+                 :node node)
   "recode as leas, shifts and adds"
-  (let ((y (lvar-value y)))
-    (*-transformer y)))
+  (*-transformer (lvar-value y) node))
 (deftransform sb!vm::*-modfx
     ((x y) (fixnum (constant-arg (unsigned-byte 64)))
      fixnum
-     :important nil)
+     :important nil
+     :node node)
   "recode as leas, shifts and adds"
-  (let ((y (lvar-value y)))
-    (*-transformer y)))
+  (*-transformer (lvar-value y) node))

@@ -340,3 +340,12 @@
   (assert (subtypep (sb-kernel:%simple-fun-type (lambda (x) (find 1 (the vector x))))
                     '(function * (values (or (integer 1 1) null) &optional)))))
 
+(with-test (:name :lea-type-derivation)
+  (assert (= (funcall
+              (checked-compile `(lambda (b)
+                                  (declare ((integer -3755795408964870057
+                                                     -3391381516052960895)
+                                            b))
+                                  (ldb (byte 22 10) (* b 9))))
+              -3391381516052980893)
+             2826685)))
