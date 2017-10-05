@@ -863,21 +863,16 @@ gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *all
     if (page_bytes_used(first_page)) {
         gc_assert(page_table[first_page].allocated == page_type_flag);
         gc_assert(page_table[first_page].gen == gc_alloc_generation);
-        gc_assert(page_table[first_page].large_object == 0);
+        gc_dcheck(page_table[first_page].large_object == 0);
     } else {
         page_table[first_page].allocated = page_type_flag;
         page_table[first_page].gen = gc_alloc_generation;
-        page_table[first_page].large_object = 0;
-        set_page_scan_start_offset(first_page, 0);
     }
     page_table[first_page].allocated |= OPEN_REGION_PAGE_FLAG;
 
     for (i = first_page+1; i <= last_page; i++) {
         page_table[i].allocated = page_type_flag;
         page_table[i].gen = gc_alloc_generation;
-        page_table[i].large_object = 0;
-        /* This may not be necessary for unboxed regions (think it was
-         * broken before!) */
         set_page_scan_start_offset(i,
             addr_diff(page_address(i), alloc_region->start_addr));
         page_table[i].allocated |= OPEN_REGION_PAGE_FLAG;
@@ -1160,7 +1155,6 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
     page_table[first_page].allocated = page_type_flag;
     page_table[first_page].gen = gc_alloc_generation;
     page_table[first_page].large_object = 1;
-    set_page_scan_start_offset(first_page, 0);
 
     byte_cnt = 0;
 
@@ -1196,8 +1190,6 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
             more = 1;
         }
         set_page_bytes_used(next_page, bytes_used);
-        page_table[next_page].write_protected=0;
-        page_table[next_page].dont_move=0;
         byte_cnt += bytes_used;
         next_page++;
     }
@@ -1302,7 +1294,7 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t bytes,
     while (first_page < page_table_pages) {
         bytes_found = 0;
         if (page_free_p(first_page)) {
-                gc_assert(0 == page_bytes_used(first_page));
+                gc_dcheck(0 == page_bytes_used(first_page));
                 bytes_found = GENCGC_CARD_BYTES;
         } else if (small_object &&
                    (page_table[first_page].allocated == page_type_flag) &&
@@ -1322,7 +1314,7 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t bytes,
             continue;
         }
 
-        gc_assert(!page_table[first_page].write_protected);
+        gc_dcheck(!page_table[first_page].write_protected);
         /* page_free_p() can legally be used at index 'page_table_pages'
          * because the array dimension is 1+page_table_pages */
         for (last_page = first_page+1;
@@ -1333,8 +1325,8 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t bytes,
              * It also implies !write_protected, and if the OS's conception were
              * otherwise, lossage would routinely occur in the fault handler) */
             bytes_found += GENCGC_CARD_BYTES;
-            gc_assert(0 == page_bytes_used(last_page));
-            gc_assert(!page_table[last_page].write_protected);
+            gc_dcheck(0 == page_bytes_used(last_page));
+            gc_dcheck(!page_table[last_page].write_protected);
         }
 
         if (bytes_found > most_bytes_found) {
