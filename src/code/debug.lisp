@@ -788,17 +788,6 @@ the current thread are replaced with dummy objects which can safely escape."
    of this variable to the function because it binds *DEBUGGER-HOOK* to NIL
    around the invocation.")
 
-(defvar *invoke-debugger-hook* nil
-  "This is either NIL or a designator for a function of two arguments,
-   to be run when the debugger is about to be entered.  The function is
-   run with *INVOKE-DEBUGGER-HOOK* bound to NIL to minimize recursive
-   errors, and receives as arguments the condition that triggered
-   debugger entry and the previous value of *INVOKE-DEBUGGER-HOOK*
-
-   This mechanism is an SBCL extension similar to the standard *DEBUGGER-HOOK*.
-   In contrast to *DEBUGGER-HOOK*, it is observed by INVOKE-DEBUGGER even when
-   called by BREAK.")
-
 ;;; These are bound on each invocation of INVOKE-DEBUGGER.
 (defvar *debug-restarts*)
 (defvar *debug-condition*)
@@ -1005,7 +994,7 @@ the current thread are replaced with dummy objects which can safely escape."
 ;;; this function is for use in *INVOKE-DEBUGGER-HOOK* when ordinary
 ;;; ANSI behavior has been suppressed by the "--disable-debugger"
 ;;; command-line option
-(defun debugger-disabled-hook (condition previous-hook)
+(defun debugger-disabled-hook (condition previous-hook &key (quit t))
   (declare (ignore previous-hook))
   ;; There is no one there to interact with, so report the
   ;; condition and terminate the program.
@@ -1073,7 +1062,8 @@ the current thread are replaced with dummy objects which can safely escape."
             (format *error-output*
                     "~%unhandled condition in --disable-debugger mode, quitting~%")
             (finish-output *error-output*)
-            (failure-quit))
+            (when quit
+              (failure-quit)))
         (condition ()
           ;; We IGNORE-ERRORS here because even %PRIMITIVE PRINT can
           ;; fail when our output streams are blown away, as e.g. when

@@ -1249,6 +1249,17 @@ on this semaphore, then N of them is woken up."
     (when *session*
       (%delete-thread-from-session thread *session*))))
 
+(defvar sb!ext:*invoke-debugger-hook* nil
+  "This is either NIL or a designator for a function of two arguments,
+   to be run when the debugger is about to be entered.  The function is
+   run with *INVOKE-DEBUGGER-HOOK* bound to NIL to minimize recursive
+   errors, and receives as arguments the condition that triggered
+   debugger entry and the previous value of *INVOKE-DEBUGGER-HOOK*
+
+   This mechanism is an SBCL extension similar to the standard *DEBUGGER-HOOK*.
+   In contrast to *DEBUGGER-HOOK*, it is observed by INVOKE-DEBUGGER even when
+   called by BREAK.")
+
 (defun %exit-other-threads ()
   ;; Grabbing this lock prevents new threads from
   ;; being spawned, and guarantees that *ALL-THREADS*
@@ -1260,6 +1271,11 @@ on this semaphore, then N of them is woken up."
           (current *current-thread*)
           (joinees nil)
           (main nil))
+      ;; Don't invoke the debugger on errors in cleanup forms in unwind-protect
+      (setf sb!ext:*invoke-debugger-hook*
+            (lambda (c h)
+              (sb!debug::debugger-disabled-hook c h :quit nil)
+              (abort-thread :allow-exit t)))
       (dolist (thread (list-all-threads))
         (cond ((eq thread current))
               ((main-thread-p thread)
