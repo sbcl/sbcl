@@ -93,6 +93,8 @@ struct page {
      */
     page_bytes_t bytes_used_;
 
+    // !!! If bit positions are changed, be sure to reflect the changes into
+    // page_extensible_p() as well as ALLOCATION-INFORMATION in sb-introspect
     unsigned char
         /*  000 free
          *  ?01 boxed data

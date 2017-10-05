@@ -1258,6 +1258,45 @@ gc_heap_exhausted_error_or_lose (sword_t available, sword_t requested)
     }
 }
 
+/* Test whether page 'index' can continue a non-large-object region
+ * having specified 'gen' and 'allocated' values. */
+static inline boolean
+page_extensible_p(page_index_t index, generation_index_t gen, int allocated) {
+#ifdef LISP_FEATURE_BIG_ENDIAN /* TODO: implement the simpler test */
+    /* Counterintuitively, gcc prefers to see sequential tests of the bitfields,
+     * versus one test "!(p.large_object | p.write_protected | p.dont_move)".
+     * When expressed as separate tests, it figures out that this can be optimized
+     * as an AND. On the other hand, by attempting to *force* it to do that,
+     * it shifts each field to the right to line them all up at bit index 0 to
+     * test that 1 bit, which is a literal rendering of the user-written code.
+     */
+    boolean result =
+           page_table[index].allocated == allocated
+        && page_table[index].gen == gen
+        && !page_table[index].large_object
+        && !page_table[index].write_protected
+        && !page_table[index].dont_move;
+#else
+    /* Test all 5 conditions above as a single comparison against a mask.
+     * (The C compiler doesn't understand how to do that)
+     * Any bit that has a 1 in this mask must match the desired input.
+     * The two 0 bits are for "has_pins" and "write_protected_cleared".
+     * has_pins is irrelevant- it won't be 1 except during gc.
+     * wp_cleared is probably 0, but needs to be masked out to be sure.
+     * All other flag bits must be zero to pass the test.
+     *
+     *    large -\     /-- WP
+     *            v   v
+     * #b11111111_10101111
+     *              ^  ^^^
+     *       !move /      \ allocated
+     *
+     * The flags reside at 1 byte prior to 'gen' in the page structure.
+     */
+    return (*(int16_t*)(&page_table[index].gen-1) & 0xFFAF) == ((gen<<8)|allocated);
+#endif
+}
+
 page_index_t
 gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t bytes,
                       int page_type_flag)
@@ -1297,11 +1336,7 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t bytes,
                 gc_dcheck(0 == page_bytes_used(first_page));
                 bytes_found = GENCGC_CARD_BYTES;
         } else if (small_object &&
-                   (page_table[first_page].allocated == page_type_flag) &&
-                   (!page_table[first_page].large_object) &&
-                   (page_table[first_page].gen == gc_alloc_generation) &&
-                   (!page_table[first_page].write_protected) &&
-                   (!page_table[first_page].dont_move)) {
+                   page_extensible_p(first_page, gc_alloc_generation, page_type_flag)) {
             bytes_found = GENCGC_CARD_BYTES - page_bytes_used(first_page);
             if (bytes_found < nbytes) {
                 if (bytes_found > most_bytes_found)
