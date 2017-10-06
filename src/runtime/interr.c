@@ -189,7 +189,7 @@ void skip_internal_error (os_context_t *context) {
     if (code > sizeof(internal_error_nargs)) {
         printf("Unknown error code %d at %p\n", code, (void*)*os_context_pc_addr(context));
     }
-    printf("%d\n", code);
+
     ptr += internal_error_nargs[code];
     *((unsigned char **)os_context_pc_addr(context)) = ptr;
 }
