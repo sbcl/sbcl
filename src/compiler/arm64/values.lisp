@@ -105,7 +105,7 @@
     (inst add csp-tn csp-tn n-word-bytes)
     (storew temp csp-tn -1)
     (test-type list LOOP nil (list-pointer-lowtag) :temp ndescr)
-    (error-call vop 'bogus-arg-to-values-list-error list)
+    (cerror-call vop 'bogus-arg-to-values-list-error list)
 
     DONE
     (inst sub count csp-tn start)

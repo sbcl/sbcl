@@ -89,7 +89,7 @@
     (pushw list cons-car-slot list-pointer-lowtag)
     (loadw list list cons-cdr-slot list-pointer-lowtag)
     (%test-lowtag list LOOP nil list-pointer-lowtag)
-    (error-call vop 'bogus-arg-to-values-list-error list)
+    (cerror-call vop 'bogus-arg-to-values-list-error list)
 
     DONE
     (inst mov count start)              ; start is high address

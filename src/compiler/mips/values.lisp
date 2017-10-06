@@ -135,7 +135,7 @@
     (inst xor ndescr list-pointer-lowtag)
     (inst beq ndescr loop)
     (inst nop)
-    (error-call vop 'bogus-arg-to-values-list-error list)
+    (cerror-call vop 'bogus-arg-to-values-list-error list)
 
     DONE
     (inst subu count csp-tn start)))

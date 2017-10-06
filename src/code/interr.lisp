@@ -190,12 +190,13 @@
          :format-arguments (list name nargs)))
 
 (deferr bogus-arg-to-values-list-error (list)
-  (error 'simple-type-error
-         :datum list
-         :expected-type 'list
-         :format-control
-         "~@<attempt to use VALUES-LIST on a dotted list: ~2I~_~S~:>"
-         :format-arguments (list list)))
+  (with-simple-restart (continue "Ignore the last CDR")
+    (error 'simple-type-error
+           :datum list
+           :expected-type 'list
+           :format-control
+           "~@<attempt to use VALUES-LIST on a dotted list: ~2I~_~S~:>"
+           :format-arguments (list list))))
 
 (defun restart-unbound (symbol context)
   (multiple-value-bind (tn-offset pc-offset)
