@@ -231,8 +231,11 @@ page_starts_contiguous_block_p(page_index_t page_index)
 static inline boolean
 page_ends_contiguous_block_p(page_index_t page_index, generation_index_t gen)
 {
+    // There is *always* a next page in the page table.
+    boolean answer = page_bytes_used(page_index) < GENCGC_CARD_BYTES
+                  || page_starts_contiguous_block_p(page_index+1);
 #if DEBUG
-    boolean answer =
+    boolean safe_answer =
            (/* page doesn't fill block */
             (page_bytes_used(page_index) < GENCGC_CARD_BYTES)
             /* page is last allocated page */
@@ -243,9 +246,9 @@ page_ends_contiguous_block_p(page_index_t page_index, generation_index_t gen)
             || (page_table[page_index + 1].gen != gen)
             /* next page starts its own contiguous block */
             || (page_starts_contiguous_block_p(page_index + 1)));
-    gc_assert(page_starts_contiguous_block_p(page_index+1) == answer);
+    gc_assert(answer == safe_answer);
 #endif
-    return page_starts_contiguous_block_p(page_index+1);
+    return answer;
 }
 
 /* We maintain the invariant that pages with FREE_PAGE_FLAG have
@@ -2125,67 +2128,25 @@ preserve_pointer(void *addr)
         return;
     }
 
-    unsigned int region_allocation = page_table[page].allocated;
+    page_index_t first_page = find_page_index(object_start);
+    size_t nwords = OBJECT_SIZE(*object_start, object_start);
+    page_index_t last_page = find_page_index(object_start + nwords - 1);
 
-    /* Find the beginning of the region.  Note that there may be
-     * objects in the region preceding the one that we were passed a
-     * pointer to: if this is the case, we will write-protect all the
-     * previous objects' pages too.     */
-
-#if 0
-    /* I think this'd work just as well, but without the assertions.
-     * -dan 2004.01.01 */
-    page_index_t first_page = find_page_index(page_scan_start(page))
-#else
-    page_index_t first_page = page;
-    while (!page_starts_contiguous_block_p(first_page)) {
-        --first_page;
-        /* Do some checks. */
-        gc_assert(page_bytes_used(first_page) == GENCGC_CARD_BYTES);
-        gc_assert(page_table[first_page].gen == from_space);
-        gc_assert(page_table[first_page].allocated == region_allocation);
-    }
-#endif
-
-    /* Adjust any large objects before promotion as they won't be
-     * copied after promotion. */
-    if (page_table[first_page].large_object) {
-        maybe_adjust_large_object(first_page);
-        /* It may have moved to unboxed pages. */
-        region_allocation = page_table[first_page].allocated;
-    }
-
-    /* Now work forward until the end of this contiguous area is found,
-     * marking all pages as dont_move. */
-    page_index_t i;
-    for (i = first_page; ;i++) {
-        gc_assert(page_table[i].allocated == region_allocation);
+    for (page = first_page; page <= last_page; ++page) {
+        /* Oldspace pages were unprotected at start of GC.
+         * Assert this here, because the previous logic used to,
+         * and page protection bugs are scary */
+        gc_assert(!page_table[page].write_protected);
 
         /* Mark the page static. */
-        page_table[i].dont_move = 1;
-
-        /* It is essential that the pages are not write protected as
-         * they may have pointers into the old-space which need
-         * scavenging. They shouldn't be write protected at this
-         * stage. */
-        gc_assert(!page_table[i].write_protected);
-
-        /* Check whether this is the last page in this contiguous block.. */
-        if (page_ends_contiguous_block_p(i, from_space))
-            break;
+        page_table[page].dont_move = 1;
+        page_table[page].has_pins = !page_table[page].large_object;
     }
 
-#ifdef PIN_GRANULARITY_LISPOBJ
-    /* Do not do this for multi-page objects.  Those pages do not need
-     * object wipeout anyway. */
-    if (i == first_page) { // single-page object
+    if (page_table[first_page].large_object)
+        maybe_adjust_large_object(first_page);
+    else
         pin_object(object_start);
-        page_table[i].has_pins = 1;
-    }
-#endif
-
-    /* Check that the page is now static. */
-    gc_assert(page_table[page].dont_move != 0);
 }
 
 
