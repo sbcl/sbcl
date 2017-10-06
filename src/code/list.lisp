@@ -1310,37 +1310,25 @@
       (:list (setf (cdr temp) (list res)
                    temp (cdr temp))))))
 
-(defun mapc (function list &rest more-lists)
-  "Apply FUNCTION to successive elements of lists. Return the second argument."
-  (declare (explicit-check))
-  (map1 function (cons list more-lists) nil t))
-
-(defun mapcar (function list &rest more-lists)
-  "Apply FUNCTION to successive elements of LIST. Return list of FUNCTION
-   return values."
-  (declare (explicit-check))
-  (map1 function (cons list more-lists) :list t))
-
-(defun mapcan (function list &rest more-lists)
-  "Apply FUNCTION to successive elements of LIST. Return NCONC of FUNCTION
-   results."
-  (declare (explicit-check))
-  (map1 function (cons list more-lists) :nconc t))
-
-(defun mapl (function list &rest more-lists)
-  "Apply FUNCTION to successive CDRs of list. Return the second argument."
-  (declare (explicit-check))
-  (map1 function (cons list more-lists) nil nil))
-
-(defun maplist (function list &rest more-lists)
-  "Apply FUNCTION to successive CDRs of list. Return list of results."
-  (declare (explicit-check))
-  (map1 function (cons list more-lists) :list nil))
-
-(defun mapcon (function list &rest more-lists)
-  "Apply FUNCTION to successive CDRs of lists. Return NCONC of results."
-  (declare (explicit-check))
-  (map1 function (cons list more-lists) :nconc nil))
+(macrolet ((define-list-map (name accumulate take-car
+                             return-value-description)
+             (let ((documentation
+                     (format nil "Apply FUNCTION to successive tuples ~
+                                  of ~A of LIST and MORE-LISTS.~%~
+                                  Return ~A."
+                             (if take-car "elements" "CDRs")
+                             return-value-description)))
+               `(defun ,name (function list &rest more-lists)
+                  ,documentation
+                  (declare (explicit-check))
+                  (dx-let ((lists (list* list more-lists)))
+                    (map1 function lists ,accumulate ,take-car))))))
+  (define-list-map mapc    nil    t   "LIST")
+  (define-list-map mapcar  :list  t   "list of FUNCTION return values")
+  (define-list-map mapcan  :nconc t   "NCONC of FUNCTION return values")
+  (define-list-map mapl    nil    nil "LIST")
+  (define-list-map maplist :list  nil "list of results")
+  (define-list-map mapcon  :nconc nil "NCONC of results"))
 
 ;;;; Specialized versions
 
