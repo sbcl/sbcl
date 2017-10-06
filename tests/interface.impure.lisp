@@ -62,6 +62,11 @@
 
 (let ((x 1)) (defun fle-closure (y) (if y (setq x y) x)))
 
+(defclass non-standard-generic-function (generic-function) ()
+  (:metaclass sb-mop:funcallable-standard-class))
+(defmethod sb-mop:generic-function-name ((generic-function non-standard-generic-function))
+  'name)
+
 (with-test (:name function-lambda-expression)
   (flet ((fle-name (x)
            (nth-value 2 (function-lambda-expression x))))
@@ -71,7 +76,7 @@
     (function-lambda-expression
      (make-instance 'sb-mop:funcallable-standard-object))
     (function-lambda-expression
-     (make-instance 'generic-function))
+     (make-instance 'non-standard-generic-function))
     (function-lambda-expression
      (make-instance 'standard-generic-function))
     #+(or sb-eval sb-fasteval)

@@ -21,12 +21,18 @@
                             ,@forms)))))
 
 (defstruct to-be-described a b)
+
 (defclass forward-describe-class (forward-describe-ref) (a))
+
+(defclass non-standard-generic-function (generic-function) ()
+  (:metaclass sb-mop:funcallable-standard-class))
+(defmethod sb-mop:generic-function-name ((generic-function non-standard-generic-function))
+  'name)
 
 (with-test (:name (describe :empty-gf))
   (assert-no-signal
    (assert-non-empty-output
-    (describe (make-instance 'generic-function)))
+    (describe (make-instance 'non-standard-generic-function)))
    warning)
   (assert-signal
    (assert-non-empty-output
