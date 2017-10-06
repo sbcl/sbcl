@@ -294,6 +294,7 @@
                           (invoke-restart (find-restart 'sb-kernel::replace-function c) 'list))))
     (assert (equal (eval '(cons 324)) '(324)))))
 
+#+x86-64
 (with-test (:name :restart-invalid-arg-counts.2)
   (handler-bind ((error (lambda (c)
                           (invoke-restart (find-restart 'sb-kernel::call-form c) 123))))
