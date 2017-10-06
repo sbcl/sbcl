@@ -152,4 +152,10 @@
                         (ir2-component-constants (component-info component))))
   (values))
 
+(defun error-call (vop error-code &rest values)
+  "Cause an error.  ERROR-CODE is the error to cause."
+  (emit-error-break vop error-trap (error-number-or-lose error-code) values))
 
+(defun cerror-call (vop error-code &rest values)
+  "Cause a continuable error.  ERROR-CODE is the error to cause."
+  (emit-error-break vop cerror-trap (error-number-or-lose error-code) values))

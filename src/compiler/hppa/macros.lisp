@@ -197,18 +197,6 @@ initializes the object."
     (encode-internal-error-args values)
     (emit-alignment word-shift)))
 
-(defun error-call (vop error-code &rest values)
-  "Cause an error.  ERROR-CODE is the error to cause."
-  (emit-error-break vop error-trap (error-number-or-lose error-code) values))
-
-
-(defun cerror-call (vop label error-code &rest values)
-  "Cause a continuable error.  If the error is continued, execution resumes at
-  LABEL."
-  (without-scheduling ()
-    (inst b label)
-    (emit-error-break vop cerror-trap (error-number-or-lose error-code) values)))
-
 (defun generate-error-code (vop error-code &rest values)
   "Generate-Error-Code Error-code Value*
   Emit code for an error with the specified Error-Code and context Values."
@@ -217,20 +205,6 @@ initializes the object."
       (emit-label start-lab)
       (apply #'error-call vop error-code values)
       start-lab)))
-
-(defmacro generate-cerror-code (vop error-code &rest values)
-  "Generate-CError-Code Error-code Value*
-  Emit code for a continuable error with the specified Error-Code and
-  context Values.  If the error is continued, execution resumes after
-  the GENERATE-CERROR-CODE form."
-  (assemble ()
-    (let ((continue (gen-label)))
-      (emit-label continue)
-      (assemble (*elsewhere*)
-        (let ((error (gen-label)))
-          (emit-label error)
-          (apply #'cerror-call vop continue error-code values)
-          error)))))
 
 ;;;; PSEUDO-ATOMIC
 
