@@ -39,7 +39,9 @@ int gencgc_handle_wp_violation(void *);
   //   gen               = 1
   // If bytes_used takes 4 bytes, then the above is 10 bytes which is padded to
   // 12, which is still an improvement over the 16 that it would have been.
-# define CONDENSED_PAGE_TABLE
+# define CONDENSED_PAGE_TABLE 1
+#else
+# define CONDENSED_PAGE_TABLE 0
 #endif
 
 #if GENCGC_CARD_BYTES > USHRT_MAX
@@ -75,7 +77,7 @@ struct page {
      * through a heap page (either for conservative root validation or
      * for scavenging). MUST be 0 for unallocated pages.
      */
-#ifdef CONDENSED_PAGE_TABLE
+#if CONDENSED_PAGE_TABLE
     // The low bit of the offset indicates the scale factor:
     // 0 = double-lispwords, 1 = gc cards. Large objects are card-aligned,
     // and this representation allows for a 32TB contiguous block using 32K
@@ -142,65 +144,6 @@ struct __attribute__((packed)) corefile_pte {
   uword_t sso; // scan start offset
   page_bytes_t bytes_used;
 };
-
-#ifndef CONDENSED_PAGE_TABLE
-
-// 32-bit doesn't need magic to reduce the size of scan_start_offset.
-#define set_page_scan_start_offset(index,val) \
-  page_table[index].scan_start_offset_ = val
-#define page_scan_start_offset(index) page_table[index].scan_start_offset_
-
-#else
-
-/// A "condensed" offset reduces page table size, which improves scan locality.
-/// As stored, the offset is scaled down either by card size or double-lispwords.
-/// If the offset is the maximum, then we must check if the page pointed to by
-/// that offset is actually the start of a region, and retry if not.
-/// For debugging the iterative algorithm it helps to use a max value
-/// that is less than UINT_MAX to get a pass/fail more quickly.
-
-//#define SCAN_START_OFS_MAX 0x3fff
-#define SCAN_START_OFS_MAX UINT_MAX
-
-#define page_scan_start_offset(index) \
-  (page_table[index].scan_start_offset_ != SCAN_START_OFS_MAX \
-    ? (os_vm_size_t)(page_table[index].scan_start_offset_ & ~1) \
-       << ((page_table[index].scan_start_offset_ & 1)?(GENCGC_CARD_SHIFT-1):WORD_SHIFT) \
-    : scan_start_offset_iterated(index))
-
-static os_vm_size_t __attribute__((unused))
-scan_start_offset_iterated(page_index_t index)
-{
-    // The low bit of the MAX is the 'scale' bit. The max pages we can look
-    // backwards is therefore the max shifted right by 1 bit.
-    page_index_t tot_offset_in_pages = 0;
-    unsigned int offset;
-    do {
-        page_index_t lookback_page = index - tot_offset_in_pages;
-        offset = page_table[lookback_page].scan_start_offset_;
-        tot_offset_in_pages += offset >> 1;
-    } while (offset == SCAN_START_OFS_MAX);
-    return (os_vm_size_t)tot_offset_in_pages << GENCGC_CARD_SHIFT;
-}
-
-/// This is a macro, but it could/should be an inline function.
-/// Problem is that we need gc_assert() which is in gc-internal,
-/// and it's easy enough for GC to flip around some stuff, but then
-/// you have a different problem that more things get messed up,
-/// such as {foo}-os.c. Basically we have inclusion order issues
-/// that nobody ever bothers to deal with, in addition to the fact
-/// that a something-internal header is *directly* included by others.
-/// (Indirect inclusion should be allowed, direct should not be)
-#define set_page_scan_start_offset(index, ofs) \
-  { os_vm_size_t ofs_ = ofs; \
-    unsigned int lsb_ = ofs_!=0 && !(ofs_ & (GENCGC_CARD_BYTES-1)); \
-    os_vm_size_t scaled_ = \
-     (ofs_ >> (lsb_ ? GENCGC_CARD_SHIFT-1 : WORD_SHIFT)) | lsb_; \
-    if (scaled_ > SCAN_START_OFS_MAX) \
-     { gc_assert(lsb_ == 1); scaled_ = SCAN_START_OFS_MAX; } \
-    page_table[index].scan_start_offset_ = scaled_; }
-
-#endif
 
 /// There is some additional cleverness that could potentially be had -
 /// the "need_to_zero" bit (a/k/a "page dirty") is obviously 1 if the page

@@ -350,23 +350,14 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
 
 #ifdef LISP_FEATURE_GENCGC
     {
+        extern void gc_store_corefile_ptes(struct corefile_pte*);
         size_t true_size = sizeof last_free_page
             + (last_free_page * sizeof(struct corefile_pte));
         size_t rounded_size = ALIGN_UP(true_size, os_vm_page_size);
         char* data = successful_malloc(rounded_size);
         *(page_index_t*)data = last_free_page;
         struct corefile_pte *ptes = (struct corefile_pte*)(data + sizeof(page_index_t));
-        page_index_t i;
-        for (i = 0; i < last_free_page; i++) {
-                /* Thanks to alignment requirements, the two low bits
-                 * are always zero, so we can use them to store the
-                 * allocation type -- region is always closed, so only
-                 * the two low bits of allocation flags matter. */
-                uword_t word = page_scan_start_offset(i);
-                gc_assert((word & 0x03) == 0);
-                ptes[i].sso = word | (0x03 & page_table[i].allocated);
-                ptes[i].bytes_used = page_bytes_used(i);
-        }
+        gc_store_corefile_ptes(ptes);
         write_lispobj(PAGE_TABLE_CORE_ENTRY_TYPE_CODE, file);
         write_lispobj(4, file);
         write_lispobj(rounded_size, file);

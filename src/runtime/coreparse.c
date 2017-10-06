@@ -846,6 +846,8 @@ load_core_file(char *file, os_vm_offset_t file_offset)
         case PAGE_TABLE_CORE_ENTRY_TYPE_CODE:
         {
             extern void gc_allocate_ptes();
+            extern boolean gc_load_corefile_ptes(char data[], ssize_t,
+                                                 page_index_t, page_index_t*);
             // Allocation of PTEs is delayed 'til now so that calloc() doesn't
             // consume addresses that would have been taken by a mapped space.
             gc_allocate_ptes();
@@ -863,30 +865,9 @@ load_core_file(char *file, os_vm_offset_t file_offset)
             gc_assert(bytes_read == sizeof npages);
             remaining -= sizeof npages;
             while ((bytes_read = read(fd, data,
-                                      remaining < chunksize ? remaining : chunksize)) > 0) {
-
-                int i = 0;
+                                      remaining < chunksize ? remaining : chunksize)) > 0
+                   && gc_load_corefile_ptes(data, bytes_read, npages, &page))
                 remaining -= bytes_read;
-                while (bytes_read) {
-                    bytes_read -= sizeof(struct corefile_pte);
-                    /* Ignore all zeroes. The size of the page table
-                     * core entry was rounded up to os_vm_page_size
-                     * during the save, and might now have more
-                     * elements than the page table.
-                     *
-                     * The low bits of each word are allocation flags.
-                     */
-                    struct corefile_pte pte;
-                    memcpy(&pte, data+i*sizeof (struct corefile_pte), sizeof pte);
-                    set_page_bytes_used(page, pte.bytes_used);
-                    set_page_scan_start_offset(page, pte.sso & ~0x03);
-                    page_table[page].allocated = pte.sso & 0x03;
-                    if (++page == npages) // break out of both loops
-                        goto done;
-                    i++;
-                }
-            }
-          done:
 
             gencgc_partial_pickup = 1;
             break;

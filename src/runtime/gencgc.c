@@ -45,6 +45,7 @@
 #include "arch.h"
 #include "gc.h"
 #include "gc-internal.h"
+#include "gencgc-private.h"
 #include "thread.h"
 #include "pseudo-atomic.h"
 #include "alloc.h"
@@ -4542,4 +4543,44 @@ gc_and_save(char *filename, boolean prepend_runtime,
      * (beyond FUNCALLing lisp_init_function, but I suspect that's
      * going to be rather unsatisfactory too... */
     lose("Attempt to save core after non-conservative GC failed.\n");
+}
+
+/* Convert corefile ptes to corresponding 'struct page' */
+boolean gc_load_corefile_ptes(char data[], ssize_t bytes_read,
+                              page_index_t npages, page_index_t* ppage)
+{
+    page_index_t page = *ppage;
+    int i = 0;
+    struct corefile_pte pte;
+
+    while (bytes_read) {
+        bytes_read -= sizeof(struct corefile_pte);
+        memcpy(&pte, data+i*sizeof (struct corefile_pte), sizeof pte);
+        set_page_bytes_used(page, pte.bytes_used);
+        // Low 2 bits of the corefile_pte hold the 'allocated' flag.
+        // The other bits become the scan_start_offset
+        set_page_scan_start_offset(page, pte.sso & ~0x03);
+        page_table[page].allocated = pte.sso & 0x03;
+        if (++page == npages)
+            return 0; // No more to go
+        ++i;
+    }
+    *ppage = page;
+    return 1; // More to go
+}
+
+/* Prepare the array of corefile_ptes for save */
+void gc_store_corefile_ptes(struct corefile_pte *ptes)
+{
+    page_index_t i;
+    for (i = 0; i < last_free_page; i++) {
+        /* Thanks to alignment requirements, the two low bits
+         * are always zero, so we can use them to store the
+         * allocation type -- region is always closed, so only
+         * the two low bits of allocation flags matter. */
+        uword_t word = page_scan_start_offset(i);
+        gc_assert((word & 0x03) == 0);
+        ptes[i].sso = word | (0x03 & page_table[i].allocated);
+        ptes[i].bytes_used = page_bytes_used(i);
+    }
 }
