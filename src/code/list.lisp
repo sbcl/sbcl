@@ -1328,7 +1328,7 @@
   (map1 function (cons list more-lists) :nconc t))
 
 (defun mapl (function list &rest more-lists)
-  "Apply FUNCTION to successive CDRs of list. Return NIL."
+  "Apply FUNCTION to successive CDRs of list. Return the second argument."
   (declare (explicit-check))
   (map1 function (cons list more-lists) nil nil))
 
