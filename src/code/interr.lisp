@@ -158,9 +158,31 @@
   (error 'undefined-alien-function-error))
 
 (deferr invalid-arg-count-error (nargs)
-  (error 'simple-program-error
-         :format-control "invalid number of arguments: ~S"
-         :format-arguments (list nargs)))
+  (restart-case
+      (error 'simple-program-error
+             :format-control "invalid number of arguments: ~S"
+             :format-arguments (list nargs))
+    #!+x86-64
+    (replace-function (value)
+      :report (lambda (stream)
+                (format stream "Call a different function with the same arguments"))
+      :interactive read-evaluated-form
+      (sb!vm::context-call-function *current-internal-error-context*
+                                    (fdefinition value)))
+    #!+x86-64
+    (call-form (form)
+      :report (lambda (stream)
+                (format stream "Call a different form"))
+      :interactive read-evaluated-form
+      (sb!vm::context-call-function *current-internal-error-context*
+                                    (lambda ()
+                                      ;; Don't invoke the compiler in
+                                      ;; case it's dealing with an
+                                      ;; error within the compiler
+                                      (let (#!+(or sb-eval sb-fasteval)
+                                            (*evaluator-mode* :interpret))
+                                        (eval form)))
+                                    0))))
 
 (deferr local-invalid-arg-count-error (nargs name)
   (error 'simple-program-error

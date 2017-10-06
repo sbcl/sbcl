@@ -236,20 +236,9 @@
  ;; 2002-02-05
  ("src/code/sc-offset" :c-headers)
 
- ;; KLUDGE: I'd prefer to have this done with a "code/target" softlink
- ;; instead of a bunch of reader macros. -- WHN 19990308
  ("src/code/share-vm" :not-host)
- #!+sparc ("src/code/sparc-vm")
- #!+hppa  ("src/code/hppa-vm")
- #!+x86   ("src/code/x86-vm"   :not-host)
- #!+x86-64("src/code/x86-64-vm"   :not-host)
- #!+ppc   ("src/code/ppc-vm")
- #!+alpha ("src/code/alpha-vm")
- #!+mips  ("src/code/mips-vm")
- #!+arm   ("src/code/arm-vm")
- #!+arm64 ("src/code/arm64-vm")
 
- #!-win32 ("src/code/target-signal" :not-host) ; needs OS-CONTEXT-T from x86-vm
+ #!-win32 ("src/code/target-signal" :not-host) ; needs OS-CONTEXT-T from share-vm
  #!+win32 ("src/code/target-exception" :not-host)
 
  ("src/code/bignum"     :not-host)
@@ -333,6 +322,18 @@
 
  ;; for e.g. DESCRIPTOR-REG, needed by primtype.lisp
  ("src/compiler/target/vm" :c-headers)
+
+ ;; KLUDGE: I'd prefer to have this done with a "code/target" softlink
+ ;; instead of a bunch of reader macros. -- WHN 19990308
+ #!+sparc ("src/code/sparc-vm")
+ #!+hppa  ("src/code/hppa-vm")
+ #!+x86   ("src/code/x86-vm"   :not-host)
+ #!+x86-64("src/code/x86-64-vm"   :not-host)
+ #!+ppc   ("src/code/ppc-vm")
+ #!+alpha ("src/code/alpha-vm")
+ #!+mips  ("src/code/mips-vm")
+ #!+arm   ("src/code/arm-vm")
+ #!+arm64 ("src/code/arm64-vm")
 
  ;; RANDOM-LAYOUT-CLOS-HASH (in 'class') uses RANDOM, the transform for which
  ;; uses GENERATE-RANDOM-EXPR-FOR-POWER-OF-2 which becomes BIG-RANDOM-CHUNK,

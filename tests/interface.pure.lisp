@@ -288,3 +288,13 @@
 (with-test (:name :split-seconds-for-sleep)
   (assert (< (nth-value 1 (sb-impl::split-seconds-for-sleep 7.2993028420866d7))
              1000000000)))
+#+x86-64
+(with-test (:name :restart-invalid-arg-counts.1)
+  (handler-bind ((error (lambda (c)
+                          (invoke-restart (find-restart 'sb-kernel::replace-function c) 'list))))
+    (assert (equal (eval '(cons 324)) '(324)))))
+
+(with-test (:name :restart-invalid-arg-counts.2)
+  (handler-bind ((error (lambda (c)
+                          (invoke-restart (find-restart 'sb-kernel::call-form c) 123))))
+    (assert (= (eval '(cons 1)) 123))))

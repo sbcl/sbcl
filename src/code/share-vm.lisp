@@ -46,12 +46,19 @@
     (declare (type (alien (* unsigned)) addr))
     (int-sap (deref addr))))
 
-(declaim (inline set-context-pc))
+(declaim (inline incf-context-pc))
 (defun incf-context-pc (context offset)
   (declare (type (alien (* os-context-t)) context))
   (let ((addr (context-pc-addr context)))
     (declare (type (alien (* unsigned)) addr))
-        (setf (deref addr) (+ (deref addr) offset))))
+    (setf (deref addr) (+ (deref addr) offset))))
+
+(declaim (inline set-context-pc))
+(defun set-context-pc (context new)
+  (declare (type (alien (* os-context-t)) context))
+  (let ((addr (context-pc-addr context)))
+    (declare (type (alien (* unsigned)) addr))
+    (setf (deref addr) new)))
 
 (declaim (inline context-register-addr))
 (define-alien-routine ("os_context_register_addr" context-register-addr)

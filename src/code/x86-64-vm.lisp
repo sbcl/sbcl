@@ -286,3 +286,20 @@
                (- other-pointer-lowtag)
                (ash fdefn-raw-addr-slot word-shift))))
     (+ pc 5 (signed-sap-ref-32 (int-sap pc) 1)))) ; 5 = length of JMP
+
+;;; Undo the effects of XEP-ALLOCATE-FRAME
+;;; and point PC to FUNCTION
+(defun context-call-function (context function &optional arg-count)
+  (with-pinned-objects (function)
+    (let ((rsp (decf (context-register context rsp-offset) n-word-bytes))
+          (rbp (context-register context rbp-offset))
+          (fun-addr (get-lisp-obj-address function)))
+      (setf (sap-ref-word (int-sap rsp) 0)
+            (sap-ref-word (int-sap rbp) 8))
+      (when arg-count
+        (setf (context-register context rcx-offset)
+              (get-lisp-obj-address arg-count)))
+      (setf (context-register context rax-offset) fun-addr)
+      (set-context-pc context (sap-ref-word (int-sap fun-addr)
+                                            (- (ash simple-fun-self-slot word-shift)
+                                               fun-pointer-lowtag))))))
