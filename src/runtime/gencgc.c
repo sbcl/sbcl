@@ -1875,22 +1875,12 @@ scavenge_pinned_ranges()
     }
 }
 
-/* Create an array of fixnum to consume the space between 'from' and 'to' */
-static void deposit_filler(uword_t from, uword_t to)
-{
-    if (to > from) {
-        lispobj* where = (lispobj*)from;
-        sword_t nwords = (to - from) >> WORD_SHIFT;
-        where[0] = SIMPLE_ARRAY_WORD_WIDETAG;
-        where[1] = make_fixnum(nwords - 2);
-    }
-}
-
-/* Zero out the byte ranges on small object pages marked dont_move,
- * carefully skipping over objects in the pin hashtable.
- * TODO: by recording an additional bit per page indicating whether
- * there is more than one pinned object on it, we could avoid qsort()
- * except in the case where there is more than one. */
+/* Deposit filler objects (numeric arrays) on small object pinned pages
+ * from the page start to the first pinned object and in between pairs
+ * of pinned objects. Zero-fill bytes following the last pinned object.
+ * Also ensure that no scan_start_offset points to a page in
+ * oldspace that will be freed.
+ */
 static void
 wipe_nonpinned_words()
 {
@@ -1914,68 +1904,112 @@ wipe_nonpinned_words()
                 pinned_objects.keys[n_pins++] = (uword_t)obj;
         }
     }
-    // Store a sentinel at the end. Even if n_pins = table capacity (unlikely),
-    // it is safe to write one more word, because the hops[] array immediately
-    // follows the keys[] array in memory.  At worst, 2 elements of hops[]
-    // are clobbered, which is irrelevant since the table has already been
-    // rendered unusable by stealing its key array for a different purpose.
-    pinned_objects.keys[n_pins] = 0;
     // Don't touch pinned_objects.count in case the reset function uses it
     // to decide how to resize for next use (which it doesn't, but could).
     gc_n_stack_pins = n_pins;
     // Order by ascending address, stopping short of the sentinel.
     gc_heapsort_uwords(pinned_objects.keys, n_pins);
 #if 0
-    printf("Sorted pin list:\n");
+    fprintf(stderr, "Sorted pin list:\n");
     for (i = 0; i < n_pins; ++i) {
       lispobj* obj = (lispobj*)pinned_objects.keys[i];
       lispobj word = *obj;
       int widetag = widetag_of(word);
       if (is_cons_half(word))
-          printf("%p: (cons)\n", obj);
+          fprintf(stderr, "%p: (cons)\n", obj);
       else
-          printf("%p: %d words (%s)\n", obj,
-                 (int)sizetab[widetag](obj), widetag_names[widetag>>2]);
+          fprintf(stderr, "%p: %d words (%s)\n", obj,
+                  (int)sizetab[widetag](obj), widetag_names[widetag>>2]);
     }
 #endif
-    // Each entry in the pinned objects demarcates two ranges to be cleared:
-    // - the range preceding it back to either the page start, or prior object.
-    // - the range after it, up to the lesser of page bytes used or next object.
-    uword_t preceding_object = 0;
-    uword_t this_page_end = 0;
-#define page_base_address(x) (x&~(GENCGC_CARD_BYTES-1))
+
+#define page_base(x) ALIGN_DOWN(x, GENCGC_CARD_BYTES)
+// This macro asserts that space accounting happens exactly
+// once per affected page (a page with any pins, no matter how many)
+#define adjust_gen_usage(i) \
+            gc_assert(page_table[i].has_pins); \
+            page_table[i].has_pins = 0; \
+            bytes_moved += page_bytes_used(i); \
+            page_table[i].gen = new_space
+
+    // Store a sentinel at the end. Even if n_pins = table capacity (unlikely),
+    // it is safe to write one more word, because the hops[] array immediately
+    // follows the keys[] array in memory.  At worst, 2 elements of hops[]
+    // are clobbered, which is irrelevant since the table has already been
+    // rendered unusable by stealing its key array for a different purpose.
+    pinned_objects.keys[n_pins] = ~(uword_t)0;
+
+    // Each pinned object begets two ranges of bytes to be turned into filler:
+    // - the range preceding it back to its page start or predecessor object
+    // - the range after it, up to the lesser of page bytes used or successor object
+
+    // Prime the loop
+    uword_t fill_from = page_base(pinned_objects.keys[0]);
+    os_vm_size_t bytes_moved = 0; // i.e. virtually moved
+    os_vm_size_t bytes_freed = 0; // bytes after last pinned object per page
+
     for (i = 0; i < n_pins; ++i) {
-        // Handle the preceding range. If this object is on the same page as
-        // its predecessor, then intervening bytes were already zeroed.
-        // If not, then start a new page and do some bookkeeping.
         lispobj* obj = (lispobj*)pinned_objects.keys[i];
-        uword_t this_page_base = page_base_address((uword_t)obj);
-        /* printf("i=%d obj=%p base=%p\n", i, obj, (void*)this_page_base); */
-        if (this_page_base > page_base_address(preceding_object)) {
-            deposit_filler(this_page_base, (lispobj)obj);
-            // Move the page to newspace
-            page_index_t page = find_page_index(obj);
-            int used = page_bytes_used(page);
-            this_page_end = this_page_base + used;
-            /* printf("    Clearing %p .. %p (limit=%p)\n",
-               (void*)this_page_base, obj, (void*)this_page_end); */
-            generations[new_space].bytes_allocated += used;
-            generations[page_table[page].gen].bytes_allocated -= used;
-            page_table[page].gen = new_space;
-            page_table[page].has_pins = 0;
+        page_index_t begin_page_index = find_page_index(obj);
+        // Create an unboxed array occupying space from 'fill_from' up to but
+        // excluding 'obj'. If obj directly abuts its predecessor then don't.
+        if ((uword_t)obj > fill_from) {
+            lispobj* filler = (lispobj*)fill_from;
+            int nwords = obj - filler;
+            filler[0] = SIMPLE_ARRAY_WORD_WIDETAG;
+            filler[1] = make_fixnum(nwords - 2);
         }
-        // Handle the following range.
-        lispobj word = *obj;
-        size_t nwords = OBJECT_SIZE(word, obj);
-        uword_t range_start = (uword_t)(obj + nwords);
-        uword_t range_end = this_page_end;
-        // There is always an i+1'th key due to the sentinel value.
-        if (page_base_address(pinned_objects.keys[i+1]) == this_page_base)
-            range_end = pinned_objects.keys[i+1];
-        /* printf("    Clearing %p .. %p\n", (void*)range_start, (void*)range_end); */
-        deposit_filler(range_start, range_end);
-        preceding_object = (uword_t)obj;
+        if (fill_from == page_base((uword_t)obj)) {
+            adjust_gen_usage(begin_page_index);
+            // This pinned object started a new page of pins.
+            // scan_start must not see any page prior to this page,
+            // as those might be in oldspace and about to be marked free.
+            set_page_scan_start_offset(begin_page_index, 0);
+        }
+        // If 'obj' spans pages, move its successive page(s) to newspace and
+        // ensure that those pages' scan_starts point at the same address
+        // that this page's scan start does, which could be this page or earlier.
+        size_t nwords = OBJECT_SIZE(*obj, obj);
+        lispobj* obj_end = obj + nwords; // non-inclusive address bound
+        page_index_t end_page_index = find_page_index(obj_end - 1); // inclusive bound
+
+        if (end_page_index > begin_page_index) {
+            char *scan_start = page_scan_start(begin_page_index);
+            page_index_t index;
+            for (index = begin_page_index + 1; index <= end_page_index; ++index) {
+                set_page_scan_start_offset(index,
+                                           addr_diff(page_address(index), scan_start));
+                adjust_gen_usage(index);
+            }
+        }
+        // Compute page base address of last page touched by this obj.
+        uword_t obj_end_pageaddr = page_base((uword_t)obj_end - 1);
+        // See if there's another pinned object on this page.
+        // There is always a next object, due to the sentinel.
+        if (pinned_objects.keys[i+1] < obj_end_pageaddr + GENCGC_CARD_BYTES) {
+            // Next object starts within the same page.
+            fill_from = (uword_t)obj_end;
+        } else {
+            // Next pinned object does not start on the same page this obj ends on.
+            // Any bytes following 'obj' up to its page end are garbage.
+            uword_t page_end = obj_end_pageaddr + page_bytes_used(end_page_index);
+            long nbytes = page_end - (uword_t)obj_end;
+            gc_assert(nbytes >= 0);
+            if (nbytes) {
+                // Bytes beyond a page's highest used byte must be zero.
+                memset(obj_end, 0, nbytes);
+                bytes_freed += nbytes;
+                set_page_bytes_used(end_page_index,
+                                    (uword_t)obj_end - obj_end_pageaddr);
+            }
+            fill_from = page_base(pinned_objects.keys[i+1]);
+        }
     }
+    generations[from_space].bytes_allocated -= bytes_moved;
+    generations[new_space].bytes_allocated += bytes_moved - bytes_freed;
+    bytes_allocated -= bytes_freed;
+#undef adjust_gen_usage
+#undef page_base
 }
 
 /* Add 'object' to the hashtable, and if the object is a code component,
