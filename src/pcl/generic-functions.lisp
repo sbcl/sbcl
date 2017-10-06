@@ -36,15 +36,15 @@
 
 (defgeneric eql-specializer-object (eql-specializer))
 
-(defgeneric generic-function-declarations (standard-generic-function))
+(defgeneric generic-function-declarations (generic-function))
 
-(defgeneric generic-function-method-class (standard-generic-function))
+(defgeneric generic-function-method-class (generic-function))
 
-(defgeneric generic-function-method-combination (standard-generic-function))
+(defgeneric generic-function-method-combination (generic-function))
 
-(defgeneric generic-function-methods (standard-generic-function))
+(defgeneric generic-function-methods (generic-function))
 
-(defgeneric generic-function-name (standard-generic-function))
+(defgeneric generic-function-name (generic-function))
 
 (defgeneric gf-arg-info (standard-generic-function))
 
@@ -207,9 +207,9 @@
 
 (defgeneric function-keywords (method))
 
-(defgeneric generic-function-argument-precedence-order (gf))
+(defgeneric generic-function-argument-precedence-order (generic-function))
 
-(defgeneric generic-function-lambda-list (gf))
+(defgeneric generic-function-lambda-list (generic-function))
 
 (defgeneric generic-function-pretty-arglist (generic-function))
 
