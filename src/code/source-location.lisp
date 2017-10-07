@@ -102,9 +102,14 @@
      ((and src (not (string= (car (last dir)) "output")))
       (format nil "SYS:~{~:@(~A~);~}~:@(~A~).~:@(~A~)"
               (subseq dir src) (pathname-name untruename) type))
-     (t (aver (string-equal (car (last dir)) "output"))
-        (aver (string-equal (pathname-name untruename) "stuff-groveled-from-headers"))
-        (format nil "SYS:OUTPUT;STUFF-GROVELED-FROM-HEADERS.~:@(~A~)" type)))))
+     ((and (string-equal (car (last dir)) "output")
+           (string-equal (pathname-name untruename) "stuff-groveled-from-headers"))
+      (format nil "SYS:OUTPUT;STUFF-GROVELED-FROM-HEADERS.~:@(~A~)" type))
+     (t
+      #+sb-xc-host-interactive
+      (namestring untruename)
+      #-sb-xc-host-interactive
+      (error "Don't know how to handle ~a untruename" untruename)))))
 
 (defun make-file-info-namestring (name file-info)
   #+sb-xc-host (declare (ignore name))

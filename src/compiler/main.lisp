@@ -1899,17 +1899,19 @@ SPEED and COMPILATION-SPEED optimization values, and the
                   (open-fasl-output coutput-file-name
                                     (namestring input-pathname))))
           (when trace-file
-            (let* ((default-trace-file-pathname
-                     (make-pathname :type "trace" :defaults input-pathname))
-                   (trace-file-pathname
-                    (if (eql trace-file t)
-                        default-trace-file-pathname
-                        (merge-pathnames trace-file
-                                         default-trace-file-pathname))))
-              (setf *compiler-trace-output*
-                    (open trace-file-pathname
-                          :if-exists :supersede
-                          :direction :output))))
+            (if (streamp trace-file)
+                (setf *compiler-trace-output* trace-file)
+                (let* ((default-trace-file-pathname
+                         (make-pathname :type "trace" :defaults input-pathname))
+                       (trace-file-pathname
+                         (if (eql trace-file t)
+                             default-trace-file-pathname
+                             (merge-pathnames trace-file
+                                              default-trace-file-pathname))))
+                  (setf *compiler-trace-output*
+                        (open trace-file-pathname
+                              :if-exists :supersede
+                              :direction :output)))))
 
           (when sb!xc:*compile-verbose*
             (print-compile-start-note source-info))
