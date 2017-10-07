@@ -647,7 +647,8 @@
         (ecase (tn-kind tn)
           ((:normal :debug-environment)
            (setf (sbit live (tn-local-number tn)) 0))
-          (:environment :component))))
+          (:environment :component)
+          (:unused))))
     live))
 
 ;;; This is used to determine whether a :DEBUG-ENVIRONMENT TN should

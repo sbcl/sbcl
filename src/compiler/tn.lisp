@@ -153,6 +153,10 @@
     (push-in tn-next res (ir2-component-restricted-tns component))
     res))
 
+(defun make-unused-tn ()
+  (make-tn (incf (ir2-component-global-tn-counter (component-info *component-being-compiled*)))
+           :unused nil nil))
+
 ;;; Make TN be live throughout PHYSENV. Return TN. In the DEBUG case,
 ;;; the TN is treated normally in blocks in the environment which
 ;;; reference the TN, allowing targeting to/from the TN. This results
@@ -295,9 +299,10 @@
 (defun reference-tn (tn write-p)
   (declare (type tn tn) (type boolean write-p))
   (let ((res (make-tn-ref tn write-p)))
-    (if write-p
-        (push-in tn-ref-next res (tn-writes tn))
-        (push-in tn-ref-next res (tn-reads tn)))
+    (unless (eql (tn-kind tn) :unused)
+      (if write-p
+         (push-in tn-ref-next res (tn-writes tn))
+         (push-in tn-ref-next res (tn-reads tn))))
     res))
 
 ;;; Make TN-REFS to reference each TN in TNs, linked together by

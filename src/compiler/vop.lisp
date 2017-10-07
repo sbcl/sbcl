@@ -914,10 +914,12 @@
   ;;    as :NORMAL, but then at the end merges the conflict info into
   ;;    the original TN and replaces all uses of the alias with the
   ;;    original TN. SAVE-TN holds the aliased TN.
+  ;;   :UNUSED
+  ;;    Unused result
   (kind (missing-arg)
         :type (member :normal :environment :debug-environment
                       :save :save-once :specified-save :load :constant
-                      :component :alias))
+                      :component :alias :unused))
   ;; the primitive-type for this TN's value. Null in restricted or
   ;; wired TNs.
   (primitive-type nil :type (or primitive-type null))

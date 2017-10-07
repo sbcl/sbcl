@@ -242,7 +242,11 @@
 (defun annotate-fixed-values-lvar (lvar types)
   (declare (type lvar lvar) (list types))
   (let ((info (make-ir2-lvar nil)))
-    (setf (ir2-lvar-locs info) (mapcar #'make-normal-tn types))
+    (setf (ir2-lvar-locs info)
+          (loop for type in types
+                collect (if type
+                            (make-normal-tn type)
+                            (make-unused-tn))))
     (setf (lvar-info lvar) info)
     (when (lvar-dynamic-extent lvar)
       (aver (proper-list-of-length-p types 1))
@@ -312,7 +316,13 @@
         (annotate-fixed-values-lvar
          (first args)
          (mapcar (lambda (var)
-                   (primitive-type (basic-var-type var)))
+                   (cond
+                     ;; Needs support from the CALL VOPs, default-unknown-values specifically
+                     #!+x86-64
+                     ((not (lambda-var-refs var))
+                      nil)
+                     (t
+                      (primitive-type (basic-var-type var)))))
                  (lambda-vars
                   (ref-leaf (lvar-use (basic-combination-fun call))))))
         (let ((types (mapcar (lambda (var)

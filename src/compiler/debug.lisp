@@ -1045,7 +1045,8 @@ One of :WARN, :ERROR or :NONE.")
           (t
            (format stream "t~D" (tn-id tn))))
     (when (and (tn-sc tn) (tn-offset tn))
-      (format stream "[~A]" (location-print-name tn)))))
+      (format stream "[~A]" (location-print-name tn)))
+    (format stream " ~s" (tn-kind tn))))
 
 ;;; Print the TN-REFs representing some operands to a VOP, linked by
 ;;; TN-REF-ACROSS.

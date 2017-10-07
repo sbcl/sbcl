@@ -17,6 +17,8 @@
 ;;; Move X to Y unless they are EQ.
 (defun emit-move (node block x y)
   (declare (type node node) (type ir2-block block) (type tn x y))
+  (aver (neq (tn-kind x) :unused))
+  (aver (neq (tn-kind y) :unused))
   (unless (eq x y)
     (vop move node block x y))
   (values))
@@ -482,7 +484,8 @@
     (aver (= nlocs (length ptypes)))
 
     (mapcar (lambda (from to-type)
-              (if (eq (tn-primitive-type from) to-type)
+              (if (or (eq (tn-kind from) :unused)
+                      (eq (tn-primitive-type from) to-type))
                   from
                   (let ((temp (make-normal-tn to-type)))
                     (emit-move node block from temp)
@@ -572,7 +575,8 @@
   (let ((nsrc (length src))
         (ndest (length dest)))
     (mapc (lambda (from to)
-            (unless (eq from to)
+            (unless (or (eq from to)
+                        (eq (tn-kind to) :unused))
               (emit-move node block from to)))
           (if (> ndest nsrc)
               (append src (make-list (- ndest nsrc)
@@ -798,10 +802,11 @@
                    (do ((loc locs (cdr loc))
                         (rtypes rtypes (cdr rtypes)))
                        ((null loc) t)
-                     (unless (operand-restriction-ok
-                              (car rtypes)
-                              (tn-primitive-type (car loc))
-                              :t-ok nil)
+                     (unless (and (neq (tn-kind (car loc)) :unused)
+                                  (operand-restriction-ok
+                                   (car rtypes)
+                                   (tn-primitive-type (car loc))
+                                   :t-ok nil))
                        (return nil))))
               locs
               (lvar-result-tns
@@ -1190,7 +1195,20 @@
   (multiple-value-bind (fp args arg-locs nargs)
       (ir2-convert-full-call-args node block)
     (let* ((lvar (node-lvar node))
-           (locs (standard-result-tns lvar))
+           #!+x86-64
+           to-move
+           (locs #!-x86-64
+                 (standard-result-tns lvar)
+                 #!+x86-64
+                 (and lvar
+                      (loop for loc in (ir2-lvar-locs (lvar-info lvar))
+                            for i from 0
+                            collect (if (or (eql (tn-kind loc) :unused)
+                                            (>= i sb!vm::register-arg-count))
+                                        loc
+                                        (let ((std (standard-arg-location i)))
+                                          (push (cons loc std) to-move)
+                                          std)))))
            (loc-refs (reference-tn-list locs t))
            (nvals (length locs)))
       (multiple-value-bind (fun-tn named)
@@ -1211,7 +1229,12 @@
                      (loc-refs)                        ; results
                      arg-locs nargs #!+immobile-code named nvals ; info
                      (emit-step-p node))))
-        (move-lvar-result node block locs lvar))))
+        #!-x86-64
+        (move-lvar-result node block locs lvar)
+        #!+x86-64
+        (loop for (to . from) in to-move
+              unless (eq from to)
+              do (emit-move node block from to)))))
   (values))
 
 ;;; Do full call when unknown values are desired.
