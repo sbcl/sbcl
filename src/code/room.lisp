@@ -255,29 +255,27 @@
 ;;; object's total size in bytes, including any header and padding.
 ;;; START and END are untagged, aligned memory addresses interpreted
 ;;; as FIXNUMs (unlike SAPs or tagged addresses, these will not cons).
-(defun map-objects-in-range (fun start end)
+(defun map-objects-in-range (fun start end &optional (strict-bound t))
   (declare (type function fun))
-  ;; If START is (unsigned) greater than END, then we have somehow
-  ;; blown past our endpoint.
-  (aver (<= (get-lisp-obj-address start)
-            (get-lisp-obj-address end)))
-  (unless (eq start end) ; avoid GENERIC=
-    (multiple-value-bind (obj typecode size) (reconstitute-object start)
+  (named-let iter ((start start))
+  (cond
+    ((< (get-lisp-obj-address start) (get-lisp-obj-address end))
+     (multiple-value-bind (obj typecode size) (reconstitute-object start)
       ;; SIZE is almost surely a fixnum. Non-fixnum would mean at least
       ;; a 512MB object if 32-bit words, and is inconceivable if 64-bit.
       (aver (not (logtest (the word size) lowtag-mask)))
       (funcall fun obj typecode size)
-      (map-objects-in-range
-             fun
              ;; This special little dance is to add a number of octets
              ;; (and it had best be a number evenly divisible by our
              ;; allocation granularity) to an unboxed, aligned address
              ;; masquerading as a fixnum.  Without consing.
-             (%make-lisp-obj
+      (iter (%make-lisp-obj
               (mask-field (byte #.n-word-bits 0)
                           (+ (get-lisp-obj-address start)
-                             size)))
-             end))))
+                             size))))))
+    (strict-bound
+     ;; If START is not eq to END, then we have blown past our endpoint.
+     (aver (eq start end))))))
 
 ;;; Access to the GENCGC page table for better precision in
 ;;; MAP-ALLOCATED-OBJECTS
@@ -339,6 +337,45 @@
   (do-rest-arg ((subspace) subspaces)
     (multiple-value-bind (start end) (immobile-subspace-bounds subspace)
       (map-objects-in-range function start end)))))
+
+#|
+MAP-ALLOCATED-OBJECTS is fundamentally unsafe to use if the user-supplied
+function allocates anything. Consider what can happens when LAST-FREE-PAGE [sic]
+points to a partially filled page, and one more object is created extending
+an allocation region that began on the formerly "last" page:
+
+   0x10027cfff0: 0x00000000000000d9     <-- this was Lisp's view of
+   0x10027cfff8: 0x0000000000000006         the last page (page 1273)
+   ---- page boundary ----
+   0x10027d0000: 0x0000001000005ecf     <-- last_free_page moves here (page 1274)
+   0x10027d0008: 0x00000000000000ba
+   0x10027d0010: 0x0000000000000040
+   0x10027d0018: 0x0000000000000000
+
+Lisp did not think that the page starting at 0x10027d0000 was allocated,
+so it believes the stopping point is page 1273.  When we read the bytes-used
+on that page, we see a totally full page, but do not consider adjoining any
+additional pages into the contiguous block.
+However the object, a vector, that started on page 1273 ends on page 1274,
+causing MAP-OBJECTS-IN-RANGE to assert that it overran 0x10027d0000.
+
+We could try a few things to mitigate this:
+* Try to "chase" the value of last-free-page.  This is literally impossible -
+  it's a moving target, and it's extremely likely to exhaust memory doing so,
+  especially if the supplied lambda is an interpreted function.
+  (Each object scanned causes consing of more bytes, and we never
+  "catch up" to the moving last-free-page)
+
+* If the page that we're looking at is full but the FINALLY clause is hit,
+  don't stop looking for more pages in that one case. Instead keep looking
+  for the end of the contiguous block, but stop as soon any potential
+  stopping point is found; don't chase last-free-page.  This is tricky
+  as well and just about as infeasible.
+
+* Pass a flag to MAP-OBJECTS-IN-RANGE specifying that it's OK to
+  surpass the expected bound - silently accept our fate.
+  This is what we do since it's simple, and seems to work.
+|#
 
 ;;; Iterate over all the objects allocated in each of the SPACES, calling FUN
 ;;; with the object, the object's type code, and the object's total size in
@@ -441,7 +478,7 @@
                (setf end next-page-addr))
           else do (incf end page-size)
 
-          finally (map-objects-in-range fun start end))))))
+          finally (map-objects-in-range fun start end nil))))))
   (do-rest-arg ((space) spaces)
     (if (eq space :dynamic)
         (without-gcing (do-1-space space))
