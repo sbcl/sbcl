@@ -1302,6 +1302,11 @@ page_extensible_p(page_index_t index, generation_index_t gen, int allocated) {
 #endif
 }
 
+/* Search for at least nbytes of space, possibly picking up any
+ * remaining space on the tail of a page that was not fully used.
+ *
+ * Non-small allocations are guaranteed to be page-aligned.
+ */
 page_index_t
 gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t bytes,
                       int page_type_flag)
@@ -1312,6 +1317,13 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t bytes,
     os_vm_size_t nbytes_goal = nbytes;
     os_vm_size_t bytes_found = 0;
     os_vm_size_t most_bytes_found = 0;
+    /* Note that this definition of "small" is not the complement
+     * of "large" as used in gc_alloc_large(). That's fine.
+     * The constraint we must respect is that a large object
+     * MUST NOT share any of its pages with another object.
+     * It should also be page-aligned, though that's not a restriction
+     * per se, but a fairly obvious consequence of not sharing.
+     */
     boolean small_object = nbytes < GENCGC_CARD_BYTES;
     /* FIXME: assert(free_pages_lock is held); */
 
@@ -1326,29 +1338,15 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t bytes,
     /* FIXME: This is on bytes instead of nbytes pending cleanup of
      * long from the interface. */
     gc_assert(bytes>=0);
-    /* Search for a page with at least nbytes of space. We prefer
-     * not to split small objects on multiple pages, to reduce the
-     * number of contiguous allocation regions spaning multiple
-     * pages: this helps avoid excessive conservativism.
-     *
-     * For other objects, we guarantee that they start on their own
-     * page boundary.
-     */
     first_page = restart_page;
     while (first_page < page_table_pages) {
         bytes_found = 0;
         if (page_free_p(first_page)) {
-                gc_dcheck(0 == page_bytes_used(first_page));
-                bytes_found = GENCGC_CARD_BYTES;
+            gc_dcheck(!page_bytes_used(first_page));
+            bytes_found = GENCGC_CARD_BYTES;
         } else if (small_object &&
                    page_extensible_p(first_page, gc_alloc_generation, page_type_flag)) {
             bytes_found = GENCGC_CARD_BYTES - page_bytes_used(first_page);
-            if (bytes_found < nbytes) {
-                if (bytes_found > most_bytes_found)
-                    most_bytes_found = bytes_found;
-                first_page++;
-                continue;
-            }
         } else {
             first_page++;
             continue;
