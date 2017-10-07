@@ -234,7 +234,7 @@ page_ends_contiguous_block_p(page_index_t page_index, generation_index_t gen)
     // There is *always* a next page in the page table.
     boolean answer = page_bytes_used(page_index) < GENCGC_CARD_BYTES
                   || page_starts_contiguous_block_p(page_index+1);
-#if DEBUG
+#ifdef DEBUG
     boolean safe_answer =
            (/* page doesn't fill block */
             (page_bytes_used(page_index) < GENCGC_CARD_BYTES)
@@ -2621,7 +2621,7 @@ scavenge_newspace_generation(generation_index_t generation)
     /* Turn off recording of areas allocated by gc_alloc(). */
     record_new_objects = 0;
 
-#if SC_NS_GEN_CK
+#ifdef SC_NS_GEN_CK
     {
         page_index_t i;
         /* Check that none of the write_protected pages in this generation
