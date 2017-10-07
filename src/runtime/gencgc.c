@@ -291,7 +291,7 @@ addr_diff(void *x, void *y)
  */
 struct generation {
 
-#ifdef LISP_FEATURE_SEGREGATED_CODE
+#if SEGREGATED_CODE
     // A distinct start page per nonzero value of 'page_type_flag'.
     // The zeroth index is the large object start page.
     page_index_t alloc_start_page_[4];
@@ -758,7 +758,7 @@ zero_dirty_pages(page_index_t start, page_index_t end) {
  * write-protecting. */
 
 /* We use either two or three regions for the current newspace generation. */
-#ifdef LISP_FEATURE_SEGREGATED_CODE
+#if SEGREGATED_CODE
 struct alloc_region gc_alloc_regions[3];
 #define boxed_region   gc_alloc_regions[BOXED_PAGE_FLAG-1]
 #define unboxed_region gc_alloc_regions[UNBOXED_PAGE_FLAG-1]
@@ -778,7 +778,7 @@ generation_alloc_start_page(generation_index_t generation, int page_type_flag, i
         lose("bad page_type_flag: %d", page_type_flag);
     if (large)
         return generations[generation].alloc_large_start_page;
-#ifdef LISP_FEATURE_SEGREGATED_CODE
+#if SEGREGATED_CODE
     return generations[generation].alloc_start_page_[page_type_flag];
 #else
     if (UNBOXED_PAGE_FLAG == page_type_flag)
@@ -796,7 +796,7 @@ set_generation_alloc_start_page(generation_index_t generation, int page_type_fla
         lose("bad page_type_flag: %d", page_type_flag);
     if (large)
         generations[generation].alloc_large_start_page = page;
-#ifdef LISP_FEATURE_SEGREGATED_CODE
+#if SEGREGATED_CODE
     else
         generations[generation].alloc_start_page_[page_type_flag] = page;
 #else
@@ -1045,7 +1045,7 @@ gc_alloc_update_page_tables(int page_type_flag, struct alloc_region *alloc_regio
             gc_assert(page_starts_contiguous_block_p(first_page));
         page_table[first_page].allocated &= ~(OPEN_REGION_PAGE_FLAG);
 
-#ifdef LISP_FEATURE_SEGREGATED_CODE
+#if SEGREGATED_CODE
         gc_assert(page_table[first_page].allocated == page_type_flag);
 #else
         gc_assert(page_table[first_page].allocated & page_type_flag);
@@ -1069,7 +1069,7 @@ gc_alloc_update_page_tables(int page_type_flag, struct alloc_region *alloc_regio
         /* All the rest of the pages should be accounted for. */
         while (more) {
             page_table[next_page].allocated &= ~(OPEN_REGION_PAGE_FLAG);
-#ifdef LISP_FEATURE_SEGREGATED_CODE
+#if SEGREGATED_CODE
             gc_assert(page_table[next_page].allocated == page_type_flag);
 #else
             gc_assert(page_table[next_page].allocated & page_type_flag);
@@ -1329,6 +1329,11 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t bytes,
 
     if (nbytes_goal < gencgc_alloc_granularity)
         nbytes_goal = gencgc_alloc_granularity;
+#if !defined(LISP_FEATURE_64_BIT) && SEGREGATED_CODE
+    // Increase the region size to avoid excessive fragmentation
+    if (page_type_flag == CODE_PAGE_FLAG && nbytes_goal < 65536)
+        nbytes_goal = 65536;
+#endif
 
     /* Toggled by gc_and_save for heap compaction, normally -1. */
     if (gencgc_alloc_start_page != -1) {
@@ -1683,7 +1688,7 @@ conservative_root_p(void *addr, page_index_t addr_page_index)
     /* quick check 1: Address is quite likely to have been invalid. */
     struct page* page = &page_table[addr_page_index];
     if (((uword_t)addr & (GENCGC_CARD_BYTES - 1)) > page_bytes_used(addr_page_index) ||
-#ifdef LISP_FEATURE_SEGREGATED_CODE
+#if SEGREGATED_CODE
         (!is_lisp_pointer((lispobj)addr) && page->allocated != CODE_PAGE_FLAG) ||
 #endif
         (compacting_p() && (page->gen != from_space ||
@@ -1691,7 +1696,7 @@ conservative_root_p(void *addr, page_index_t addr_page_index)
         return 0;
     gc_assert(!(page->allocated & OPEN_REGION_PAGE_FLAG));
 
-#ifdef LISP_FEATURE_SEGREGATED_CODE
+#if SEGREGATED_CODE
     /* quick check 2: Unless the page can hold code, the pointer's lowtag must
      * correspond to the widetag of the object. The object header can safely
      * be read even if it turns out that the pointer is not valid,
@@ -2149,7 +2154,7 @@ preserve_pointer(void *addr)
 
 
 #define IN_REGION_P(a,kind) (kind##_region.start_addr<=a && a<=kind##_region.free_pointer)
-#ifdef LISP_FEATURE_SEGREGATED_CODE
+#if SEGREGATED_CODE
 #define IN_BOXED_REGION_P(a) IN_REGION_P(a,boxed)||IN_REGION_P(a,code)
 #else
 #define IN_BOXED_REGION_P(a) IN_REGION_P(a,boxed)
@@ -3289,7 +3294,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
 
     /* Change to a new space for allocation, resetting the alloc_start_page */
         gc_alloc_generation = new_space;
-#ifdef LISP_FEATURE_SEGREGATED_CODE
+#if SEGREGATED_CODE
         bzero(generations[new_space].alloc_start_page_,
               sizeof generations[new_space].alloc_start_page_);
 #else
@@ -3600,7 +3605,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
 
     gc_assert(boxed_region.last_page < 0);
     gc_assert(unboxed_region.last_page < 0);
-#ifdef LISP_FEATURE_SEGREGATED_CODE
+#if SEGREGATED_CODE
     gc_assert(gc_alloc_regions[2].last_page < 0);
 #endif
 #ifdef PIN_GRANULARITY_LISPOBJ
@@ -3624,7 +3629,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
     }
 
     /* Reset the alloc_start_page for generation. */
-#ifdef LISP_FEATURE_SEGREGATED_CODE
+#if SEGREGATED_CODE
     bzero(generations[generation].alloc_start_page_,
           sizeof generations[generation].alloc_start_page_);
 #else
@@ -4005,7 +4010,7 @@ void gc_allocate_ptes()
     gc_alloc_generation = 0;
     gc_set_region_empty(&boxed_region);
     gc_set_region_empty(&unboxed_region);
-#ifdef LISP_FEATURE_SEGREGATED_CODE
+#if SEGREGATED_CODE
     gc_set_region_empty(&code_region);
 #endif
 
@@ -4049,7 +4054,7 @@ gencgc_pickup_dynamic(void)
         }
 
         if (!gencgc_partial_pickup) {
-#ifdef LISP_FEATURE_SEGREGATED_CODE
+#if SEGREGATED_CODE
             // Make the most general assumption: any page *might* contain code.
             page_table[page].allocated = CODE_PAGE_FLAG;
 #else
@@ -4195,7 +4200,7 @@ general_alloc(sword_t nbytes, int page_type_flag)
     /* Select correct region, and call general_alloc_internal with it.
      * For other then boxed allocation we must lock first, since the
      * region is shared. */
-#ifdef LISP_FEATURE_SEGREGATED_CODE
+#if SEGREGATED_CODE
     if (page_type_flag == BOXED_PAGE_FLAG) {
 #else
     if (BOXED_PAGE_FLAG & page_type_flag) {
@@ -4206,7 +4211,7 @@ general_alloc(sword_t nbytes, int page_type_flag)
         struct alloc_region *region = &boxed_region;
 #endif
         return general_alloc_internal(nbytes, page_type_flag, region, thread);
-#ifdef LISP_FEATURE_SEGREGATED_CODE
+#if SEGREGATED_CODE
     } else if (page_type_flag == UNBOXED_PAGE_FLAG ||
                page_type_flag == CODE_PAGE_FLAG) {
         struct alloc_region *region =
@@ -4387,7 +4392,7 @@ void gc_alloc_update_all_page_tables(int for_all_threads)
             update_thread_page_tables(th);
         }
     }
-#ifdef LISP_FEATURE_SEGREGATED_CODE
+#if SEGREGATED_CODE
     gc_alloc_update_page_tables(CODE_PAGE_FLAG, &code_region);
 #endif
     gc_alloc_update_page_tables(UNBOXED_PAGE_FLAG, &unboxed_region);

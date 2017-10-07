@@ -1017,9 +1017,11 @@ We could try a few things to mitigate this:
 
 #+nil ; for debugging
 (defun dump-dynamic-space-code (&optional (stream *standard-output*)
-                                &aux (n-pages 0) (n-code-bytes 0))
+                                &aux (n-code-bytes 0)
+                                     (total-pages last-free-page)
+                                     (pages
+                                      (make-array total-pages :element-type 'bit)))
   (flet ((dump-page (page-num)
-           (incf n-pages)
            (format stream "~&Page ~D~%" page-num)
            (let ((where (+ dynamic-space-start (* page-num gencgc-card-bytes)))
                  (seen-filler nil))
@@ -1035,23 +1037,25 @@ We could try a few things to mitigate this:
                            (progn (setq seen-filler nil) t))
                    (let ((*print-pretty* nil))
                      (format stream "~&  ~X ~4X ~S " where size obj)))
-                 (incf where size))
+                 (incf where size)
+                 (loop for index from page-num to (find-page-index (1- where))
+                       do (setf (sbit pages index) 1)))
                (let ((next-page (find-page-index where)))
                  (cond ((= (logand where (1- gencgc-card-bytes)) 0)
                         (format stream "~&-- END OF PAGE --~%")
                         (return next-page))
                        ((eq next-page page-num))
                        (t
-                        (incf n-pages)
                         (setq page-num next-page seen-filler nil))))))))
     (let ((i 0))
-      (loop while (< i last-free-page)
-            do (let ((allocation (ldb (byte 2 0)
-                                      (slot (deref page-table i) 'flags))))
-                 (if (= allocation 3)
+      (loop while (< i total-pages)
+            do (let ((type (ldb (byte 2 0) (slot (deref page-table i) 'flags))))
+                 (if (= type 3)
                      (setq i (dump-page i))
                      (incf i)))))
-    (let* ((tot (* n-pages gencgc-card-bytes))
+    (let* ((n-pages (count 1 pages))
+           (tot (* n-pages gencgc-card-bytes))
            (waste (- tot n-code-bytes)))
-      (format t "~&Used=~D Waste=~D (~F%)~%" n-code-bytes waste
+      (format t "~&Used-bytes=~D Pages=~D Waste=~D (~F%)~%"
+              n-code-bytes n-pages waste
               (* 100 (/ waste tot))))))

@@ -1,6 +1,7 @@
 #ifndef _GENCGC_ALLOC_REGION_H_
 #define _GENCGC_ALLOC_REGION_H_
 
+#define SEGREGATED_CODE 1
 #include "gc.h"
 
 #ifndef LISP_FEATURE_GENCGC
@@ -21,7 +22,7 @@ struct alloc_region {
     void  *start_addr;
 };
 
-#ifdef LISP_FEATURE_SEGREGATED_CODE
+#if SEGREGATED_CODE
 // One region for each of {BOXED,UNBOXED,CODE}_PAGE_FLAG
 extern struct alloc_region  gc_alloc_regions[3];
 #else
