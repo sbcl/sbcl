@@ -1441,12 +1441,21 @@ gc_alloc_with_region(sword_t nbytes,int page_type_flag, struct alloc_region *my_
     return gc_alloc_with_region(nbytes, page_type_flag, my_region,0);
 }
 
-/* Copy a large object. If the object is in a large object region then
- * it is simply promoted, else it is copied. If it's large enough then
- * it's copied to a large object region.
+/* Copy a large object. If the object is on a large object page then
+ * it is simply promoted, else it is copied.
  *
  * Bignums and vectors may have shrunk. If the object is not copied
- * the space needs to be reclaimed, and the page_tables corrected. */
+ * the space needs to be reclaimed, and the page_tables corrected.
+ *
+ * Code objects can't shrink, but it's not worth adding an extra test
+ * for large code just to avoid the loop that performs adjustment, so
+ * go through the adjustment motions even though nothing happens.
+ *
+ * An object that is on non-large object pages will never move
+ * to large object pages, thus ensuring that the assignment of
+ * '.large_object = 0' in prepare_for_final_gc() is meaningful.
+ * The saved core should have no large object pages.
+ */
 static lispobj
 general_copy_large_object(lispobj object, sword_t nwords, boolean boxedp)
 {
@@ -1574,10 +1583,11 @@ general_copy_large_object(lispobj object, sword_t nwords, boolean boxedp)
         return(object);
 
     } else {
+        int page_type_flag = // Keep code strictly on code pages.
+            boxedp ? page_table[first_page].allocated & 3 : UNBOXED_PAGE_FLAG;
+
         /* Allocate space. */
-        new = gc_general_alloc(nwords*N_WORD_BYTES,
-                               (boxedp ? BOXED_PAGE_FLAG : UNBOXED_PAGE_FLAG),
-                               ALLOC_QUICK);
+        new = gc_general_alloc(nwords*N_WORD_BYTES, page_type_flag, ALLOC_QUICK);
 
         /* Copy the object. */
         memcpy(new,native_pointer(object),nwords*N_WORD_BYTES);

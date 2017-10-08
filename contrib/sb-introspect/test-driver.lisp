@@ -392,11 +392,38 @@
   (defvar *large-array* (make-array (* sb-vm:gencgc-card-bytes 4)
                                     :element-type '(unsigned-byte 8)))
   (sb-ext:gc :gen 1) ; Array won't move to a large unboxed page until GC'd
-  (deftest* (allocation-information.5)
+  (deftest (allocation-information.5)
           (tai *large-array* :heap
                `(:space :dynamic :generation 1 :boxed nil :pinned nil :large t)
                :ignore (list :page :write-protected))
       t))
+
+(sb-ext:defglobal *large-code*
+    (sb-c:allocate-code-object 0 (* 4 sb-vm:gencgc-card-bytes)))
+(defun large-code-properties ()
+  (let* ((props (nth-value 1 (allocation-information *large-code*)))
+         (page (getf props :page))
+         (gen (getf props :generation)))
+    (values page gen)))
+(defun check-page-and-gen (page gen)
+  (let ((props (nth-value 1 (allocation-information *large-code*))))
+    ;; This FORMAT call has the effect of consuming enough stack space
+    ;; to clobber a lingering pointer to *LARGE-CODE* from the stack.
+    ;; Without it, the next test iteration (after next GC) will fail.
+    (format (make-broadcast-stream) "~S" props)
+    ;; Check that uncopyableness isn't due to pin,
+    ;; or else the test proves nothing.
+    (and (eq (getf props :pinned t) nil)
+         (eq (getf props :large) t)
+         (= (getf props :page) page)
+         (= (getf props :generation) gen))))
+#+gencgc
+(deftest (allocation-information.6)
+    (multiple-value-bind (page gen) (large-code-properties)
+      (loop for i from 1 to 5
+            do (sb-ext:gc :gen i)
+            always (check-page-and-gen page i)))
+  t)
 
 #.(if (and (eq sb-ext:*evaluator-mode* :compile) (member :sb-thread *features*))
 '(deftest allocation-information.thread.1

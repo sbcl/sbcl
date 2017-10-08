@@ -314,9 +314,6 @@ trans_code(struct code *code)
 {
     /* if object has already been transported, just return pointer */
     if (forwarding_pointer_p((lispobj *)code)) {
-#ifdef DEBUG_CODE_GC
-        printf("Was already transported\n");
-#endif
         return (struct code *)native_pointer(forwarding_pointer_value((lispobj*)code));
     }
 
@@ -326,19 +323,11 @@ trans_code(struct code *code)
     lispobj l_code = (lispobj) LOW_WORD(code) | OTHER_POINTER_LOWTAG;
     sword_t nheader_words = code_header_words(code->header);
     sword_t ncode_words = code_instruction_words(code->code_size);
-    sword_t nwords = nheader_words + ncode_words;
-    lispobj l_new_code = gc_general_copy_object(l_code, nwords, CODE_PAGE_FLAG);
-    struct code *new_code = (struct code *) native_pointer(l_new_code);
-
-#if defined(DEBUG_CODE_GC)
-    printf("Old code object at 0x%08x, new code object at 0x%08x.\n",
-           (uword_t) code, (uword_t) new_code);
-    printf("Code object is %d words long.\n", nwords);
-#endif
+    lispobj l_new_code = copy_large_object(l_code, nheader_words + ncode_words);
 
 #ifdef LISP_FEATURE_GENCGC
-    if (new_code == code)
-        return new_code;
+    if (l_new_code == l_code)
+        return code;
 #endif
 
     set_forwarding_pointer((lispobj *)code, l_new_code);
@@ -348,6 +337,7 @@ trans_code(struct code *code)
     /* Do this by scanning the new code, since the old header is unusable */
 
     uword_t displacement = l_new_code - l_code;
+    struct code *new_code = (struct code *) native_pointer(l_new_code);
 
     for_each_simple_fun(i, nfheaderp, new_code, 1, {
         /* Calculate the old raw function pointer */
@@ -356,10 +346,6 @@ trans_code(struct code *code)
         /* Calculate the new lispobj */
         lispobj nfheaderl = make_lispobj(nfheaderp, FUN_POINTER_LOWTAG);
 
-#ifdef DEBUG_CODE_GC
-        printf("fheaderp->header (at %x) <- %x\n",
-               &(fheaderp->header) , nfheaderl);
-#endif
         set_forwarding_pointer((lispobj *)fheaderp, nfheaderl);
 
         /* fix self pointer. */

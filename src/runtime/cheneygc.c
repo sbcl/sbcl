@@ -38,7 +38,6 @@
 #define DEBUG_SPACE_PREDICATES
 #define DEBUG_SCAVENGE_VERBOSE
 #define DEBUG_COPY_VERBOSE
-#define DEBUG_CODE_GC
 #endif
 
 lispobj *from_space;
