@@ -107,12 +107,11 @@
   ;; vertices: vertices with lower spill cost come first.
   (vertices nil :type list)
   ;; unsorted set of precolored vertices.
-  (precolored-vertices nil :type list)
-  (tn-vertex (bug "missing arg") :type hash-table)
+  (precolored-vertices nil :type list :read-only t)
   ;; A function that maps TNs to vertices, and then to the vertex's
   ;; assigned offset, if any.  The offset (or NIL) is returned first,
   ;; then the vertex as a second value.
-  (tn-vertex-mapping (bug "missing arg") :type function))
+  (tn-vertex-mapping (bug "missing arg") :type function :read-only t))
 
 ;;; Interference graph construction
 ;;;
@@ -322,7 +321,6 @@
       (%make-interference-graph
        :vertices (stable-sort (uncolored) #'< :key #'vertex-spill-cost)
        :precolored-vertices (colored)
-       :tn-vertex tn-vertex
        :tn-vertex-mapping (lambda (tn)
                             (awhen (gethash tn tn-vertex)
                               (values (vertex-color it) it)))))))
