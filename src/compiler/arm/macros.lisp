@@ -274,7 +274,7 @@
                 (emit-label ALLOC)
                 (allocation-tramp ,result-tn ,size BACK-FROM-ALLOC)
                 (emit-label FIXUP)
-                (inst word (make-fixup "boxed_region" :foreign))))))))
+                (inst word (make-fixup "gc_alloc_region" :foreign))))))))
 
 (defmacro with-fixed-allocation ((result-tn flag-tn type-code size
                                             &key (lowtag other-pointer-lowtag)

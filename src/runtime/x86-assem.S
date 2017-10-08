@@ -666,7 +666,7 @@ DEFINE_ALLOC_TO_REG(alloc_16_to_edi,%edi,$16)
 #ifdef LISP_FEATURE_SB_THREAD
 #define START_REGION %fs:THREAD_ALLOC_REGION_OFFSET
 #else
-#define START_REGION GNAME(boxed_region)
+#define START_REGION GNAME(gc_alloc_region)
 #endif
 
 #if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_WIN32)

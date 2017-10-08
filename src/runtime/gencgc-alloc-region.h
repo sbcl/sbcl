@@ -24,7 +24,7 @@ struct alloc_region {
 
 #if SEGREGATED_CODE
 // One region for each of {BOXED,UNBOXED,CODE}_PAGE_FLAG
-extern struct alloc_region  gc_alloc_regions[3];
+extern struct alloc_region  gc_alloc_region[3];
 #else
 extern struct alloc_region  boxed_region;
 extern struct alloc_region  unboxed_region;

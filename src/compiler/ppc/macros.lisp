@@ -209,7 +209,7 @@
               (move ,temp-tn ,size)))
 
        #!-sb-thread
-       (inst lr ,flag-tn (make-fixup "boxed_region" :foreign))
+       (inst lr ,flag-tn (make-fixup "gc_alloc_region" :foreign))
        #!-sb-thread
        (inst lwz ,result-tn ,flag-tn 0)
        #!+sb-thread
@@ -218,7 +218,7 @@
 
        ;; we can optimize this to only use one fixup here, once we get
        ;; it working
-       ;; (inst lr ,flag-tn (make-fixup "boxed_region" :foreign 4))
+       ;; (inst lr ,flag-tn (make-fixup "gc_alloc_region" :foreign 4))
        ;; (inst lwz ,flag-tn ,flag-tn 0)
        #!-sb-thread
        (inst lwz ,flag-tn ,flag-tn 4)
@@ -247,7 +247,7 @@
          ;; #!-sb-thread three #!+sb-thread one machine instruction.
          ;; The lr of a fixup counts as two instructions.
          #!-sb-thread
-         (inst lr ,flag-tn (make-fixup "boxed_region" :foreign))
+         (inst lr ,flag-tn (make-fixup "gc_alloc_region" :foreign))
          #!-sb-thread
          (inst stw ,result-tn ,flag-tn 0)
          #!+sb-thread

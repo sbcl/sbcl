@@ -205,7 +205,7 @@
      ;; it.
      #!+gencgc
      (t
-      (inst li ,temp-tn (make-fixup "boxed_region" :foreign))
+      (inst li ,temp-tn (make-fixup "gc_alloc_region" :foreign))
       (loadw ,result-tn ,temp-tn 0)     ;boxed_region.free_pointer
       (loadw ,temp-tn ,temp-tn 1)       ;boxed_region.end_addr
 
@@ -233,7 +233,7 @@
           ;; Kludge: We ought to have two distinct FLAG-TN and TEMP-TN
           ;; here, to avoid the SUB and the TEMP-TN reload which is
           ;; causing it.  PPC gets it right.
-          (inst li ,temp-tn (make-fixup "boxed_region" :foreign))
+          (inst li ,temp-tn (make-fixup "gc_alloc_region" :foreign))
           (storew ,result-tn ,temp-tn 0)
 
           (inst b done)

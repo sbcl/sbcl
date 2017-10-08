@@ -81,7 +81,7 @@
   ;; dynamic-space-free-pointer increments only when a page is full.
   ;; Using boxed_region directly is finer-grained.
   #!+(and (not sb-thread) gencgc)
-  (ash (extern-alien "boxed_region" unsigned-long)
+  (ash (extern-alien "gc_alloc_region" unsigned-long)
        (- (1+ sb!vm:word-shift)))
   ;; threads imply gencgc. use the per-thread alloc region pointer
   #!+sb-thread

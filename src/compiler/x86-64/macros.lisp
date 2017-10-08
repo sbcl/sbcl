@@ -227,14 +227,14 @@
          (make-ea :qword :base thread-base-tn
                   :disp (* n-word-bytes thread-alloc-region-slot))
          #!-sb-thread
-         (make-ea :qword :disp (make-fixup "boxed_region" :foreign)))
+         (make-ea :qword :disp (make-fixup "gc_alloc_region" :foreign)))
         ;; thread->alloc_region.end_addr
         (end-addr
          #!+sb-thread
          (make-ea :qword :base thread-base-tn
                   :disp (* n-word-bytes (1+ thread-alloc-region-slot)))
          #!-sb-thread
-         (make-ea :qword :disp (make-fixup "boxed_region" :foreign 8))))
+         (make-ea :qword :disp (make-fixup "gc_alloc_region" :foreign 8))))
     (cond ((or in-elsewhere
                ;; large objects will never be made in a per-thread region
                (and (integerp size)

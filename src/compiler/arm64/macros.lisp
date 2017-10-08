@@ -223,7 +223,7 @@
                   size)
               #!-sb-thread
               (progn
-                (load-inline-constant ,flag-tn '(:fixup "boxed_region" :foreign) ,lip)
+                (load-inline-constant ,flag-tn '(:fixup "gc_alloc_region" :foreign) ,lip)
                 (inst ldp ,result-tn ,flag-tn (@ ,flag-tn)))
               #!+sb-thread
               (inst ldp ,result-tn ,flag-tn (@ thread-tn
@@ -234,7 +234,7 @@
               (inst b :hi ALLOC)
               #!-sb-thread
               (progn
-                (load-inline-constant ,flag-tn '(:fixup "boxed_region" :foreign) ,lip)
+                (load-inline-constant ,flag-tn '(:fixup "gc_alloc_region" :foreign) ,lip)
                 (storew ,result-tn ,flag-tn))
               #!+sb-thread
               (storew ,result-tn thread-tn thread-alloc-region-slot)

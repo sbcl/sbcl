@@ -759,10 +759,10 @@ zero_dirty_pages(page_index_t start, page_index_t end) {
 
 /* We use either two or three regions for the current newspace generation. */
 #if SEGREGATED_CODE
-struct alloc_region gc_alloc_regions[3];
-#define boxed_region   gc_alloc_regions[BOXED_PAGE_FLAG-1]
-#define unboxed_region gc_alloc_regions[UNBOXED_PAGE_FLAG-1]
-#define code_region    gc_alloc_regions[CODE_PAGE_FLAG-1]
+struct alloc_region gc_alloc_region[3];
+#define boxed_region   gc_alloc_region[BOXED_PAGE_FLAG-1]
+#define unboxed_region gc_alloc_region[UNBOXED_PAGE_FLAG-1]
+#define code_region    gc_alloc_region[CODE_PAGE_FLAG-1]
 #else
 struct alloc_region boxed_region;
 struct alloc_region unboxed_region;
@@ -3606,7 +3606,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
     gc_assert(boxed_region.last_page < 0);
     gc_assert(unboxed_region.last_page < 0);
 #if SEGREGATED_CODE
-    gc_assert(gc_alloc_regions[2].last_page < 0);
+    gc_assert(gc_alloc_region[2].last_page < 0);
 #endif
 #ifdef PIN_GRANULARITY_LISPOBJ
     hopscotch_log_stats(&pinned_objects, "pins");
