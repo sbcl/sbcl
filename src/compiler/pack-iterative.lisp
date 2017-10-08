@@ -73,7 +73,7 @@
 (def!struct (vertex
              (:include sset-element)
              (:copier nil)
-             (:constructor make-vertex (tn pack-type)))
+             (:constructor %make-vertex (tn element-size pack-type)))
   ;; incidence set, as an ordered list (for reproducibility)
   (incidence (make-ordered-set) :type ordered-set :read-only t)
   ;; list of potential locations in the TN's preferred SB for the
@@ -82,17 +82,22 @@
   (initial-domain nil :type list)
   (initial-domain-size 0 :type index)
   ;; TN this is a vertex for.
-  (tn nil :type tn)
+  (tn           nil :type tn                                  :read-only t)
+  (element-size nil :type fixnum                              :read-only t)
   ;; type of packing necessary. We should only have to determine
   ;; colors for :normal TNs/vertices
-  (pack-type nil :type (member :normal :wired :restricted))
+  (pack-type    nil :type (member :normal :wired :restricted) :read-only t)
+  ;; (tn-spill-cost (vertex-tn vertex))
+  (spill-cost   0   :type fixnum)
   ;; color offset
   (color nil :type (or fixnum null))
   ;; current status, removed from the interference graph or not (on
   ;; stack or not)
-  (invisible nil :type t)
-  ;; (tn-spill-cost (vertex-tn vertex))
-  (spill-cost 0 :type fixnum))
+  (invisible nil :type t))
+
+(declaim (inline make-vertex))
+(defun make-vertex (tn pack-type)
+  (%make-vertex tn (sc-element-size (tn-sc tn)) pack-type))
 
 (declaim (inline vertex-sc))
 (defun vertex-sc (vertex)
@@ -347,11 +352,11 @@
   (declare (type fixnum color)
            (type vertex vertex)
            (optimize speed (safety 0)))
-  (let ((color+size (+ color (sc-element-size (vertex-sc vertex)))))
+  (let ((color+size (+ color (vertex-element-size vertex))))
     (flet ((intervals-intersect-p (color2 vertex2)
              (declare (fixnum color2))
              (if (< color2 color)
-                 (< color (+ color2 (sc-element-size (vertex-sc vertex2))))
+                 (< color (+ color2 (vertex-element-size vertex2)))
                  (< color2 color+size))))
       (do-oset-elements (neighbor (vertex-incidence vertex) t)
         (cond ((vertex-invisible neighbor))
