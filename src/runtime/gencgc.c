@@ -1456,11 +1456,12 @@ gc_alloc_with_region(sword_t nbytes,int page_type_flag, struct alloc_region *my_
  * '.large_object = 0' in prepare_for_final_gc() is meaningful.
  * The saved core should have no large object pages.
  */
-static lispobj
-general_copy_large_object(lispobj object, sword_t nwords, boolean boxedp)
+lispobj
+copy_large_object(lispobj object, sword_t nwords, int page_type_flag)
 {
     lispobj *new;
     page_index_t first_page;
+    boolean boxedp = page_type_flag != UNBOXED_PAGE_FLAG;
 
     CHECK_COPY_PRECONDITIONS(object, nwords);
 
@@ -1473,6 +1474,7 @@ general_copy_large_object(lispobj object, sword_t nwords, boolean boxedp)
     first_page = find_page_index((void *)object);
     gc_assert(first_page >= 0);
 
+    // FIXME: an object that shrank so much to become non-large should be copied.
     if (page_table[first_page].large_object) {
         /* Promote the object. Note: Unboxed objects may have been
          * allocated to a BOXED region so it may be necessary to
@@ -1583,9 +1585,6 @@ general_copy_large_object(lispobj object, sword_t nwords, boolean boxedp)
         return(object);
 
     } else {
-        int page_type_flag = // Keep code strictly on code pages.
-            boxedp ? page_table[first_page].allocated & 3 : UNBOXED_PAGE_FLAG;
-
         /* Allocate space. */
         new = gc_general_alloc(nwords*N_WORD_BYTES, page_type_flag, ALLOC_QUICK);
 
@@ -1595,18 +1594,6 @@ general_copy_large_object(lispobj object, sword_t nwords, boolean boxedp)
         /* Return Lisp pointer of new object. */
         return make_lispobj(new, lowtag_of(object));
     }
-}
-
-lispobj
-copy_large_object(lispobj object, sword_t nwords)
-{
-    return general_copy_large_object(object, nwords, 1);
-}
-
-lispobj
-copy_large_unboxed_object(lispobj object, sword_t nwords)
-{
-    return general_copy_large_object(object, nwords, 0);
 }
 
 /* to copy unboxed objects */

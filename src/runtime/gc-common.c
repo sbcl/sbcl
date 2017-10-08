@@ -323,7 +323,8 @@ trans_code(struct code *code)
     lispobj l_code = (lispobj) LOW_WORD(code) | OTHER_POINTER_LOWTAG;
     sword_t nheader_words = code_header_words(code->header);
     sword_t ncode_words = code_instruction_words(code->code_size);
-    lispobj l_new_code = copy_large_object(l_code, nheader_words + ncode_words);
+    lispobj l_new_code = copy_large_object(l_code, nheader_words + ncode_words,
+                                           CODE_PAGE_FLAG);
 
 #ifdef LISP_FEATURE_GENCGC
     if (l_new_code == l_code)
@@ -851,7 +852,7 @@ trans_vector(lispobj object)
     gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG);
 
     sword_t length = fixnum_value(VECTOR(object)->length);
-    return copy_large_object(object, ALIGN_UP(length + 2, 2));
+    return copy_large_object(object, ALIGN_UP(length + 2, 2), BOXED_PAGE_FLAG);
 }
 
 static sword_t
@@ -888,7 +889,7 @@ NWORDS(uword_t x, uword_t n_bits)
   static lispobj __attribute__((unused)) trans_##name(lispobj object) { \
     gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG); \
     sword_t length = fixnum_value(VECTOR(object)->length); \
-    return copy_large_unboxed_object(object, ALIGN_UP(nwords + 2, 2)); \
+    return copy_large_object(object, ALIGN_UP(nwords + 2, 2), UNBOXED_PAGE_FLAG); \
   } \
   static sword_t __attribute__((unused)) size_##name(lispobj *where) { \
     sword_t length = fixnum_value(((struct vector*)where)->length); \

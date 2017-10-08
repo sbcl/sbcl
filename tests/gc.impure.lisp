@@ -167,3 +167,40 @@
     (gc :full t)
     (assert (= (sb-kernel:get-lisp-obj-address *pin-test-object*)
                *pin-test-object-address*))))
+
+(defun ensure-code/data-separation ()
+  (let* ((n-bits (+ sb-vm::last-free-page 10))
+         (code-bits (make-array n-bits :element-type 'bit))
+         (data-bits (make-array n-bits :element-type 'bit))
+         (total-code-size 0))
+    (sb-vm::map-allocated-objects
+     (lambda (obj type size)
+       ;; M-A-O disables GC, therefore GET-LISP-OBJ-ADDRESS is safe
+       (let ((obj-addr (sb-kernel:get-lisp-obj-address obj))
+             (array (cond ((= type sb-vm:code-header-widetag)
+                           (incf total-code-size size)
+                           code-bits)
+                          (t
+                           data-bits))))
+         ;; This is not the most efficient way to update the bit arrays,
+         ;; but the simplest and clearest for sure. (The loop could avoided
+         ;; if the current page is the same as the previously seen page)
+         (loop for index from (sb-vm::find-page-index obj-addr)
+               to (sb-vm::find-page-index (+ (logandc2 obj-addr sb-vm:lowtag-mask)
+                                             (1- size)))
+               do (setf (sbit array index) 1))))
+     :dynamic)
+    (assert (not (find 1 (bit-and code-bits data-bits))))
+    (let* ((code-bytes-consumed
+            (* (count 1 code-bits) sb-vm:gencgc-card-bytes))
+           (waste
+            (- total-code-size code-bytes-consumed)))
+      ;; This should be true for all platforms.
+      ;; Some have as little as .5% space wasted.
+      (assert (< waste (* 3/100 code-bytes-consumed))))))
+
+(compile 'ensure-code/data-separation)
+
+(with-test (:name :code/data-separation
+                  :skipped-on '(:not :gencgc))
+  (ensure-code/data-separation))

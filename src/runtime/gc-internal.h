@@ -209,10 +209,9 @@ extern void scav_hash_table_entries (struct hash_table *hash_table,
 extern int (*weak_ht_alivep_funs[5])(lispobj,lispobj);
 extern void gc_scav_pair(lispobj where[2]);
 
-lispobj  copy_large_unboxed_object(lispobj object, sword_t nwords);
 lispobj  copy_unboxed_object(lispobj object, sword_t nwords);
-lispobj  copy_large_object(lispobj object, sword_t nwords);
 lispobj  copy_object(lispobj object, sword_t nwords);
+lispobj  copy_large_object(lispobj object, sword_t nwords, int page_type_flag);
 struct simple_fun *code_fun_addr(struct code*, int);
 
 lispobj *search_read_only_space(void *pointer);

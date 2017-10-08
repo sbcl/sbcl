@@ -34,7 +34,7 @@
 #define GNAME(var) _##var
 #endif
 
-#if POSITION_INDEPENDENT_ASM
+#ifdef POSITION_INDEPENDENT_ASM
 #define PIC_CALL(x) x@PLT
 #define PIC_VAR(x) x(%rip)
 #else
