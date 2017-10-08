@@ -366,7 +366,8 @@
 
 ;; Assumes that VERTEX pack-type is :WIRED.
 (defun vertex-color-possible-p (vertex color)
-  (declare (type fixnum color) (type vertex vertex))
+  (declare (type fixnum color)
+           (type vertex vertex))
   (and (or (and (neq (vertex-pack-type vertex) :wired)
                 (not (tn-offset (vertex-tn vertex))))
            (= color (the fixnum (vertex-color vertex))))
@@ -399,13 +400,33 @@
           (pushnew target vertices))))
     (nreverse vertices)))
 
-;; Choose the "best" color for these vertices: a color is good if as
-;; many of these vertices simultaneously take that color, and those
-;; that can't have a low spill cost.
-(defun vertices-best-color (vertices colors)
-  (let ((best-color      nil)
-        (best-compatible '())
-        (best-cost       nil))
+;;; Choose the "best" color for these vertices: a color is good if as
+;;; many of these vertices simultaneously take that color, and those
+;;; that can't have a low spill cost.
+(defun vertices-best-color/single-color (vertices color)
+  (let ((compatible '()))
+    (dolist (vertex vertices)
+      (when (and (notany (lambda (existing)
+                           (oset-member (vertex-incidence existing)
+                                        vertex))
+                         compatible)
+                 (vertex-color-possible-p vertex color))
+        (push vertex compatible)))
+    (values color compatible)))
+
+(defun vertices-best-color/single-vertex (vertex colors)
+  (dolist (color colors)
+    (when (vertex-color-possible-p vertex color)
+      (return-from vertices-best-color/single-vertex
+        (values color (list vertex)))))
+  (values (first colors) '()))
+
+(declaim (ftype (function (cons cons) (values fixnum list &optional))
+                vertices-best-color/general))
+(defun vertices-best-color/general (vertices colors)
+  (let* ((best-color      nil)
+         (best-compatible '())
+         (best-cost       nil))
     ;; TODO: sort vertices by spill cost, so that high-spill cost ones
     ;; are more likely to be compatible?  We're trying to find a
     ;; maximal 1-colorable subgraph here, ie. a maximum independent
@@ -428,6 +449,18 @@
                 best-compatible compatible
                 best-cost       cost))))
     (values best-color best-compatible)))
+
+(declaim (inline vertices-best-color))
+(defun vertices-best-color (vertices colors)
+  (cond
+    ((null vertices)
+     (values (first colors) '()))
+    ((null (rest vertices))
+     (vertices-best-color/single-vertex (first vertices) colors))
+    ((null (rest colors))
+     (vertices-best-color/single-color vertices (first colors)))
+    (t
+     (vertices-best-color/general vertices colors))))
 
 ;;; Coloring inner loop
 
@@ -439,9 +472,7 @@
            (sc (vertex-sc vertex))
            (sb (sc-sb sc)))
       (multiple-value-bind (color recolor-vertices)
-          (if targets
-              (vertices-best-color targets it)
-              (values (first it) nil))
+          (vertices-best-color targets it)
         (aver color)
         (dolist (target recolor-vertices)
           (aver (vertex-color target))
