@@ -9,17 +9,8 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package :cl-user)
-
-(asdf:defsystem :sb-queue
-  :depends-on (:sb-concurrency)
-  :components ((:file "package")))
-
-(defmethod asdf:perform :after ((o asdf:load-op)
-                                (c (eql (asdf:find-system :sb-queue))))
-  (provide 'sb-queue))
-
-
-(defmethod asdf:perform ((o asdf:test-op)
-                         (c (eql (asdf:find-system :sb-queue))))
-  :pass)
+(defsystem "sb-queue"
+  :depends-on ("sb-concurrency")
+  :components ((:file "package"))
+  :perform (load-op :after (o c) (provide 'sb-queue))
+  :perform (test-op (o c) :pass))

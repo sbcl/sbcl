@@ -1,8 +1,8 @@
 ;;; -*-  Lisp -*-
 
-(defsystem :sb-bsd-sockets
+(defsystem "sb-bsd-sockets"
   :version "0.59"
-  :defsystem-depends-on (sb-grovel)
+  :defsystem-depends-on ("sb-grovel")
   #+sb-building-contrib :pathname
   #+sb-building-contrib #p"SYS:CONTRIB;SB-BSD-SOCKETS;"
   :components
@@ -40,10 +40,12 @@
    ;; (:static-file "TODO")
    )
   :perform (load-op :after (o c) (provide 'sb-bsd-sockets))
-  :perform (test-op (o c) (test-system 'sb-bsd-sockets/tests)))
+  :in-order-to ((test-op (test-op "sb-bsd-sockets/tests"))))
 
-(defsystem :sb-bsd-sockets/tests
-  :depends-on (sb-rt sb-bsd-sockets #-win32 sb-posix)
+(defsystem "sb-bsd-sockets/tests"
+  :depends-on ("sb-rt"
+               "sb-bsd-sockets"
+               (:feature (:not :win32) "sb-posix"))
   :components ((:file "tests"))
   :perform (test-op (o c)
              (multiple-value-bind (soft strict pending)

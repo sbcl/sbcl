@@ -9,17 +9,17 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package :cl-user)
-
-(asdf:defsystem :sb-concurrency
+(defsystem "sb-concurrency"
   :components ((:file "package")
                (:file "frlock"   :depends-on ("package"))
                (:file "queue"    :depends-on ("package"))
                (:file "mailbox"  :depends-on ("package" "queue"))
-               (:file "gate"     :depends-on ("package"))))
+               (:file "gate"     :depends-on ("package")))
+  :perform (load-op :after (o c) (provide 'sb-concurrency))
+  :in-order-to ((test-op (test-op "sb-concurrency/tests"))))
 
-(asdf:defsystem :sb-concurrency-tests
-  :depends-on (:sb-concurrency :sb-rt)
+(defsystem "sb-concurrency/tests"
+  :depends-on ("sb-concurrency" "sb-rt")
   :components
   ((:module tests
     :components
@@ -30,17 +30,8 @@
      (:file "test-mailbox" :depends-on ("package" "test-utils"))
      (:file "test-gate"    :depends-on ("package" "test-utils"))))))
 
-(defmethod asdf:perform :after ((o asdf:load-op)
-                                (c (eql (asdf:find-system :sb-concurrency))))
-  (provide 'sb-concurrency))
-
-(defmethod asdf:perform ((o asdf:test-op)
-                         (c (eql (asdf:find-system :sb-concurrency))))
-  (asdf:oos 'asdf:load-op :sb-concurrency-tests)
-  (asdf:oos 'asdf:test-op :sb-concurrency-tests))
-
-(defmethod asdf:perform ((o asdf:test-op)
-                         (c (eql (asdf:find-system :sb-concurrency-tests))))
+(defmethod perform ((o test-op)
+                    (c (eql (find-system "sb-concurrency/tests"))))
   (multiple-value-bind (soft strict pending)
       (funcall (intern "DO-TESTS" (find-package "SB-RT")))
     (declare (ignorable pending))

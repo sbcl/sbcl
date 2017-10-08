@@ -9,15 +9,12 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(defpackage #:sb-introspect-system (:use :cl :asdf :uiop))
-(in-package #:sb-introspect-system)
-
-(defsystem :sb-introspect
+(defsystem "sb-introspect"
   :components ((:file "introspect"))
   #+sb-building-contrib :pathname
   #+sb-building-contrib #p"SYS:CONTRIB;SB-INTROSPECT;"
   :perform (load-op :after (o c) (provide 'sb-introspect))
-  :perform (test-op (o c) (test-system :sb-introspect/tests)))
+  :in-order-to ((test-op (test-op "sb-introspect/tests"))))
 
 (defclass plist-file (cl-source-file)
   ((source-plist
@@ -43,8 +40,8 @@
 (defmethod component-depends-on ((op load-op) (com source-only-file))
   `((load-source-op ,com) ,@(call-next-method)))
 
-(defsystem :sb-introspect/tests
-  :depends-on (:sb-introspect :sb-rt)
+(defsystem "sb-introspect/tests"
+  :depends-on ("sb-introspect" "sb-rt")
   #+sb-building-contrib :pathname
   #+sb-building-contrib #p"SYS:CONTRIB;SB-INTROSPECT;"
   :components ((:file "xref-test-data")

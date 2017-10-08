@@ -1,7 +1,7 @@
 ;;; -*- lisp -*-
 
-(defsystem sb-simple-streams
-  :depends-on (sb-bsd-sockets sb-posix)
+(defsystem "sb-simple-streams"
+  :depends-on ("sb-bsd-sockets" "sb-posix")
   #+sb-building-contrib :pathname
   #+sb-building-contrib #p"SYS:CONTRIB;SB-SIMPLE-STREAMS;"
   :components ((:file "package")
@@ -22,10 +22,10 @@
                ;;(:file "gray-compat" :depends-on ("package"))
                )
   :perform (load-op :after (o c) (provide 'sb-simple-streams))
-  :perform (test-op (o c) (test-system 'sb-simple-streams/tests)))
+  :in-order-to ((test-op (test-op "sb-simple-streams/tests"))))
 
-(defsystem sb-simple-streams/tests
-  :depends-on (sb-rt sb-simple-streams)
+(defsystem "sb-simple-streams/tests"
+  :depends-on ("sb-rt" "sb-simple-streams")
   #+sb-building-contrib :pathname
   #+sb-building-contrib #p"SYS:CONTRIB;SB-SIMPLE-STREAMS;"
   :components ((:file "simple-stream-tests")))
