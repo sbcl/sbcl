@@ -1,31 +1,57 @@
 #!/bin/sh -e
 
+REPOSITORY=https://gitlab.common-lisp.net/asdf/asdf.git
+BRANCH=${1:-release}
+
+UPSTREAM_NAME=asdf-upstream
+UPSTREAM_DIR="../../obj/${UPSTREAM_NAME}"
+
 # Get the current ASDF release from the upstream repo.
 
-if test -d asdf-upstream
+echo "Pulling ASDF branch '${BRANCH}' from '${REPOSITORY}'"
+
+if test -d "${UPSTREAM_NAME}"
 then
-    if test -d ../../obj/asdf-upstream
+    if test -d "${UPSTREAM_DIR}"
     then
-        rm -rf asdf-upstream
+        rm -rf "${UPSTREAM_NAME}"
     else
-        mv asdf-upstream ../../obj/asdf-upstream
+        mv "${UPSTREAM_NAME}" "${UPSTREAM_DIR}"
     fi
 fi
 
-if test -d ../../obj/asdf-upstream
+if test -d "${UPSTREAM_DIR}"
 then
-    (cd ../../obj/asdf-upstream/
-    git checkout release
-    git reset --hard release
-    git pull -a origin release)
+    (cd "${UPSTREAM_DIR}"
+    git checkout "${BRANCH}"
+    git reset --hard "${BRANCH}"
+    git pull -a origin "${BRANCH}")
 else
     (cd ../../obj/
-    git clone --branch release https://gitlab.common-lisp.net/asdf/asdf.git asdf-upstream)
+    git clone --branch "${BRANCH}" "${REPOSITORY}" "${UPSTREAM_NAME}")
 fi
 
-( echo -n ";;; This is UIOP " ; eval echo $(cat ../../obj/asdf-upstream/version.lisp-expr) ;
-  cd ../../obj/asdf-upstream && cat $(make --quiet driver-files) ;
-  echo '(provide "UIOP")' ; echo '(provide "uiop")' ) > uiop.lisp
-( echo -n ";;; This is ASDF " ; eval echo $(cat ../../obj/asdf-upstream/version.lisp-expr) ;
-  echo '(eval-when (:compile-toplevel :load-toplevel :execute) (require :uiop))' ;
-  cd ../../obj/asdf-upstream && cat $(make --quiet defsystem-files) ) > asdf.lisp
+# Determine new version
+VERSION=$( eval echo $(cat "${UPSTREAM_DIR}/version.lisp-expr") )
+echo "New ASDF version is ${VERSION}"
+
+# Update UIOP files
+(
+    cd "${UPSTREAM_DIR}" \
+        && echo ";;; This is UIOP ${VERSION}" \
+        && cat $(make --quiet driver-files) \
+        && echo '(provide "UIOP")' \
+        && echo '(provide "uiop")'
+) > uiop.lisp
+
+# Update ASDF files
+(
+    cd "${UPSTREAM_DIR}" \
+        && echo ";;; This is ASDF ${VERSION}" \
+        && echo '(eval-when (:compile-toplevel :load-toplevel :execute) (require :uiop))' \
+        && cat $(make --quiet defsystem-files)
+) > asdf.lisp
+
+# Updated documentation
+cp "${UPSTREAM_DIR}/README.md" .
+cp "${UPSTREAM_DIR}/doc/asdf.texinfo" .
