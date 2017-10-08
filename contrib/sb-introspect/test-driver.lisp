@@ -399,7 +399,7 @@
       t))
 
 (sb-ext:defglobal *large-code*
-    (sb-c:allocate-code-object 0 (* 4 sb-vm:gencgc-card-bytes)))
+    (sb-c:allocate-code-object nil 0 (* 4 sb-vm:gencgc-card-bytes)))
 (defun large-code-properties ()
   (let* ((props (nth-value 1 (allocation-information *large-code*)))
          (page (getf props :page))

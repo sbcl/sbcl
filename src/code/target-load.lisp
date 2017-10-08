@@ -240,8 +240,7 @@
   (declare (simple-vector stack) (type index ptr))
   (let* ((debug-info-index (+ ptr box-num))
          (toplevel-p (svref stack (1+ debug-info-index)))
-         (code (sb!c:allocate-code-object #!+immobile-code (not toplevel-p)
-                                          box-num code-length)))
+         (code (sb!c:allocate-code-object (not toplevel-p) box-num code-length)))
     (declare (ignorable toplevel-p))
     (setf (%code-debug-info code) (svref stack debug-info-index))
     (loop for i of-type index from sb!vm:code-constants-offset

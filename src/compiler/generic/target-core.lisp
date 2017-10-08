@@ -16,9 +16,9 @@
 
 (in-package "SB!C")
 
-(declaim (ftype (sfunction (#!+immobile-code boolean fixnum fixnum)
-                           code-component) allocate-code-object))
-(defun allocate-code-object (#!+immobile-code immobile-p boxed unboxed)
+(declaim (ftype (sfunction (boolean fixnum fixnum) code-component) allocate-code-object))
+(defun allocate-code-object (immobile-p boxed unboxed)
+  (declare (ignorable immobile-p))
   #!+gencgc
   (let ((code
           (without-gcing
@@ -114,7 +114,7 @@
              (constants (ir2-component-constants 2comp))
              (box-num (- (length constants) sb!vm:code-constants-offset))
              (code-obj (allocate-code-object
-                        #!+immobile-code (eq *compile-to-memory-space* :immobile)
+                        (or #!+immobile-code (eq *compile-to-memory-space* :immobile))
                         box-num length)))
         (declare (type index box-num length))
 
