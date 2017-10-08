@@ -1,5 +1,5 @@
 SBCLTEXI:=sbcl.texinfo
-ASDFTEXI:=asdf.texinfo version.texinfo
+ASDFTEXI:=asdf.texinfo
 DOCFILES:=*.texinfo $(ASDFTEXI)
 TMPTYPES:=aux cp cps fn fns ky log pg toc tp tps vr vrs
 TMPFILES:=$(foreach target,asdf sbcl,$(foreach type,$(TMPTYPES),$(target).$(type)))
