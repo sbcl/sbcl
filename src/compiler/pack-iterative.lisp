@@ -325,18 +325,16 @@
                             (awhen (gethash tn tn-vertex)
                               (values (vertex-color it) it)))))))
 
-;; &key reset: whether coloring/invisibility information should be
-;; removed from all the remaining vertices
-(defun remove-vertex-from-interference-graph (vertex graph &key reset)
+;;; Coloring/invisibility information is removed from all remaining
+;;; vertices.
+(defun reset-interference-graph-without-vertex (graph vertex)
   (declare (type vertex vertex) (type interference-graph graph))
-  (let ((vertices (if reset
-                      (loop for v in (ig-vertices graph)
-                            unless (eql v vertex)
-                              do (aver (not (tn-offset (vertex-tn v))))
-                                 (setf (vertex-invisible v) nil
-                                       (vertex-color v) nil)
-                              and collect v)
-                      (remove vertex (ig-vertices graph)))))
+  (let ((vertices (loop for v in (ig-vertices graph)
+                        unless (eql v vertex)
+                          do (aver (not (tn-offset (vertex-tn v))))
+                             (setf (vertex-invisible v) nil
+                                   (vertex-color v) nil)
+                          and collect v)))
     (setf (ig-vertices graph) vertices)
     (do-oset-elements (neighbor (vertex-incidence vertex) graph)
       (oset-delete (vertex-incidence neighbor) vertex))))
@@ -478,14 +476,18 @@
                (push vertex prespilling-stack))))
       (values precoloring-stack prespilling-stack))))
 
+(defun color-vertex (vertex color)
+  (declare (type vertex vertex))
+  (setf (vertex-color vertex) color
+        (vertex-invisible vertex) nil))
+
 ;; Try and color the interference graph once.
 (defun color-interference-graph (interference-graph)
   (let ((tn-vertex (ig-tn-vertex-mapping interference-graph)))
     (flet ((color-vertices (vertices)
              (dolist (vertex vertices)
                (awhen (find-vertex-color vertex tn-vertex)
-                 (setf (vertex-color vertex) it
-                       (vertex-invisible vertex) nil)))))
+                 (color-vertex vertex it)))))
       (multiple-value-bind (probably-colored probably-spilled)
           (partition-and-order-vertices interference-graph)
         (color-vertices probably-colored)
@@ -532,27 +534,28 @@
                                 :key (lambda (vertex)
                                        (tn-loop-depth
                                         (vertex-tn vertex)))))
-         (nvertices (length vertices))
-         (graph (make-interference-graph vertices component))
-         to-spill)
+         (graph (make-interference-graph vertices component)))
     (labels ((spill-candidates-p (vertex)
                (unless (vertex-color vertex)
                  (aver (eql :normal (vertex-pack-type vertex)))
                  t))
-             (iter (to-spill)
-               (when to-spill
-                 (setf (vertex-invisible to-spill) t
-                       (vertex-color to-spill) nil)
-                 (push to-spill spill-list)
-                 (setf graph (remove-vertex-from-interference-graph
-                              to-spill graph :reset t)))
+             (try-color ()
                (color-interference-graph graph)
-               (find-if #'spill-candidates-p (ig-vertices graph))))
+               (find-if #'spill-candidates-p (ig-vertices graph)))
+             (spill (vertex)
+               (setf (vertex-invisible vertex) t
+                     (vertex-color vertex) nil)
+               (push vertex spill-list)
+               (setf graph (reset-interference-graph-without-vertex
+                            graph vertex))))
       (loop repeat iterations
-            while (setf to-spill (iter to-spill))))
+            for uncolored = (try-color)
+            while uncolored
+            do (spill uncolored)))
     (let ((colored (ig-vertices graph)))
-      (aver (= nvertices (+ (length spill-list) (length colored)
-                            (length (ig-precolored-vertices graph)))))
+      (aver (= (length vertices)
+               (+ (length spill-list) (length colored)
+                  (length (ig-precolored-vertices graph)))))
       colored)))
 
 ;;; Nice interface
