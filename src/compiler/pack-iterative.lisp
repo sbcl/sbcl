@@ -75,7 +75,7 @@
              (:copier nil)
              (:constructor make-vertex (tn pack-type)))
   ;; incidence set, as an ordered list (for reproducibility)
-  (incidence (make-ordered-set) :type ordered-set)
+  (incidence (make-ordered-set) :type ordered-set :read-only t)
   ;; list of potential locations in the TN's preferred SB for the
   ;; vertex, taking into account reserve locations and preallocated
   ;; TNs.
@@ -276,7 +276,6 @@
                               (restricted-tn-locations tn))))
                (aver (not (unbounded-tn-p tn)))
                (setf (vertex-number vertex) i
-                     (vertex-incidence vertex) (make-ordered-set)
                      (vertex-initial-domain vertex) locs
                      (vertex-initial-domain-size vertex) (length locs)
                      (vertex-color vertex) offset
