@@ -5874,8 +5874,8 @@ system or its dependencies if it has already been loaded."
   ;; Happily, all those implementations all have the same module-provider hook interface.
   #+(or abcl clasp cmucl clozure ecl mkcl sbcl)
   (:import-from #+abcl :sys #+(or clasp cmucl ecl) :ext #+clozure :ccl #+mkcl :mk-ext #+sbcl sb-ext
-		#:*module-provider-functions*
-		#+ecl #:*load-hooks*)
+                #:*module-provider-functions*
+                #+ecl #:*load-hooks*)
   #+(or clasp mkcl) (:import-from :si #:*load-hooks*))
 
 (in-package :asdf/footer)
@@ -5909,15 +5909,15 @@ system or its dependencies if it has already been loaded."
     (setf (gethash 'module-provide-asdf *wrapped-module-provider*) 'module-provide-asdf)
     (defun wrap-module-provider (provider name)
       (let ((results (multiple-value-list (funcall provider name))))
-	(when (first results) (register-preloaded-system (coerce-name name)))
-	(values-list results)))
+        (when (first results) (register-preloaded-system (coerce-name name)))
+        (values-list results)))
     (defun wrap-module-provider-function (provider)
       (ensure-gethash provider *wrapped-module-provider*
-		      (constantly
-		       #'(lambda (module-name)
-			   (wrap-module-provider provider module-name)))))
+                      (constantly
+                       #'(lambda (module-name)
+                           (wrap-module-provider provider module-name)))))
     (setf *module-provider-functions*
-	  (mapcar #'wrap-module-provider-function *module-provider-functions*))))
+          (mapcar #'wrap-module-provider-function *module-provider-functions*))))
 
 #+cmucl ;; Hook into the CMUCL herald.
 (with-upgradability ()
