@@ -2340,8 +2340,6 @@ scavenge_generations(generation_index_t from, generation_index_t to)
             && (generation != new_space)
             && (generation >= from)
             && (generation <= to)) {
-            page_index_t last_page,j;
-            int write_protected=1;
 
             /* This should be the start of a region */
             gc_assert(page_starts_contiguous_block_p(i));
@@ -2358,22 +2356,17 @@ scavenge_generations(generation_index_t from, generation_index_t to)
                              GENCGC_CARD_BYTES / N_WORD_BYTES - 2);
                     update_page_write_prot(i);
                 }
-                for (last_page = i + 1; ; last_page++) {
-                    lispobj* start = (lispobj*)page_address(last_page);
-                    write_protected = page_table[last_page].write_protected;
-                    if (page_ends_contiguous_block_p(last_page, generation)) {
-                        if (!write_protected) {
-                            scavenge(start, page_bytes_used(last_page) / N_WORD_BYTES);
-                            update_page_write_prot(last_page);
-                        }
-                        break;
-                    }
-                    if (!write_protected) {
-                        scavenge(start, GENCGC_CARD_BYTES / N_WORD_BYTES);
-                        update_page_write_prot(last_page);
+                while (!page_ends_contiguous_block_p(i, generation)) {
+                    ++i;
+                    if (!page_table[i].write_protected) {
+                        scavenge((lispobj*)page_address(i),
+                                 page_bytes_used(i) / N_WORD_BYTES);
+                        update_page_write_prot(i);
                     }
                 }
             } else {
+                page_index_t last_page, j;
+                boolean write_protected = 1;
                 /* Now work forward until the end of the region */
                 for (last_page = i; ; last_page++) {
                     write_protected =
@@ -2399,8 +2392,8 @@ scavenge_generations(generation_index_t from, generation_index_t to)
                                num_wp, generation));
                     }
                 }
+                i = last_page;
             }
-            i = last_page;
         }
     }
 
