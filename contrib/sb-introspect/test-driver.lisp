@@ -388,7 +388,7 @@
 (setq sb-ext:*evaluator-mode* :compile)
 (sb-ext:defglobal *large-obj* nil)
 
-#+(and gencgc (or x86-64 ppc) (not win32))
+#+(and gencgc (or x86 x86-64 ppc) (not win32))
 (progn
   (setq *print-array* nil)
   (setq *large-obj* (make-array (* sb-vm:gencgc-card-bytes 4)
@@ -430,7 +430,19 @@
     (multiple-value-bind (page gen)
         (page-and-gen
          (setq *large-obj*
-               (sb-c:allocate-code-object nil 0 (* 4 sb-vm:gencgc-card-bytes))))
+               ;; To get a large-object page, a code object has to exceed
+               ;; LARGE_OBJECT_SIZE and not fit within an open region.
+               ;; (This is a minor bug, because one should be able to
+               ;; create regions as large as desired without affecting
+               ;; determination of whether an object is large.
+               ;; Practically it means is that a small object region
+               ;; is limited to at most 3 pages)
+               ;; 32-bit machines use 64K for code allocation regions,
+               ;; but the large object size can be as small as 16K.
+               ;; 16K might fit in the free space of an open region,
+               ;; and by accident would not go on a large object page.
+               (sb-c:allocate-code-object nil 0
+                (max (* 4 sb-vm:gencgc-card-bytes) #-64-bit 65536))))
       (loop for i from 1 to 5
             always (assert-large-page/gen/boxedp '*large-obj* page i t)))
   t)
@@ -446,8 +458,8 @@
       (setq *small-bignum* (+ (+ *b* (ash 1 100)) *negb*))
       (and (let ((props (nth-value 1 (allocation-information *small-bignum*))))
              ;; *SMALL-BIGNUM* was created as a large boxed object
-             (eq (getf props :large) t)
-             (eq (getf props :boxed) t))
+             (and (eq (getf props :large) t)
+                  (eq (getf props :boxed) t)))
            (multiple-value-bind (page gen) (page-and-gen *b*)
              (loop for i from 1 to 5
                    always
