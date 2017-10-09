@@ -17,7 +17,7 @@
 
 use_test_subdirectory
 
-run_sbcl --eval "(sb-ext:exit :code (or #+(and sb-thread sb-traceroot) 0 7))"
+run_sbcl --eval "(sb-ext:exit :code (or #+sb-traceroot 0 7))"
 test $? = 7 && exit $EXIT_TEST_WIN # Pass if feature is absent or not fully working
 
 tmpfilename="$TEST_FILESTEM.out"
@@ -74,10 +74,12 @@ EOF
 
 # Should be able to identify a specific Lisp thread
 # May or may not work for other than x86-64
-thread=`run_sbcl --eval '(or #+(and sb-thread x86-64) (princ "\"main thread\":"))' --quit`
+thread=`run_sbcl --eval \
+ '(princ #+sb-thread "\"main thread\":TLS:"
+         #-sb-thread "COMMON-LISP-USER::")' --quit`
 
 win1=`awk '/C stack.+TEST1.+cons.+FOO.+cons.+vector.+cons/{print "win\n"}' $tmpfilename`
-win2=`awk '/'"${thread}"'TLS:\*FRED/{print "win\n"}' $tmpfilename`
+win2=`awk '/'"${thread}"'\*FRED/{print "win\n"}' $tmpfilename`
 win3=`awk '/bindings:\*FRED/{print "win\n"}' $tmpfilename`
 
 test z$win1 = zwin -a z$win2 = zwin -a z$win3 = zwin && exit $EXIT_TEST_WIN

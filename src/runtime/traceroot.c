@@ -183,7 +183,8 @@ char *ref_kind_name[4] = {"heap","C stack","bindings","TLS"};
 
 /// This unfortunately entails a heap scan,
 /// but it's quite fast if the symbol is found in immobile space.
-static lispobj* find_sym_by_tls_index(unsigned int tls_index)
+#ifdef LISP_FEATURE_SB_THREAD
+static lispobj* find_sym_by_tls_index(lispobj tls_index)
 {
     lispobj* where = 0;
     lispobj* end = 0;
@@ -207,6 +208,7 @@ static lispobj* find_sym_by_tls_index(unsigned int tls_index)
     }
     return 0;
 }
+#endif
 
 static inline int interestingp(lispobj ptr, struct hopscotch_table* targets)
 {
@@ -290,7 +292,7 @@ static lispobj examine_stacks(struct hopscotch_table* targets,
                               enum ref_kind *root_kind,
                               struct thread** root_thread,
                               char** thread_pc,
-                              unsigned int *tls_index)
+                              lispobj *tls_index)
 {
     boolean world_stopped = context_scanner != 0;
     struct thread *th;
@@ -451,7 +453,7 @@ static void trace1(lispobj object,
     enum ref_kind root_kind;
     struct thread* root_thread;
     char* thread_pc = 0;
-    unsigned int tls_index;
+    lispobj tls_index;
     lispobj target;
     int i;
 
@@ -563,11 +565,15 @@ static void trace1(lispobj object,
             fprintf(file, "thread=%p", root_thread);
         fprintf(file, ":%s:", ref_kind_name[root_kind]);
         if (root_kind==BINDING_STACK || root_kind==TLS) {
+#ifdef LISP_FEATURE_SB_THREAD
             lispobj* symbol = find_sym_by_tls_index(tls_index);
+#else
+            lispobj* symbol = native_pointer(tls_index);
+#endif
             if (symbol)
                 show_lstring(symbol_name(symbol), 0, file);
             else
-                fprintf(file, "%x", tls_index);
+                fprintf(file, "%"OBJ_FMTX, tls_index);
         } else {
             struct simple_fun* fun = simple_fun_from_pc(thread_pc);
             if (fun) {
