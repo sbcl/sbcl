@@ -619,6 +619,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
    #s(sb-cold:package-data
       :name "SB!IMPL"
       :doc "private: a grab bag of implementation details"
+      :import-from (("SB!KERNEL" "*PACKAGE-NAMES*"))
       :use ("CL" "SB!ALIEN" "SB!BIGNUM" "SB!DEBUG" "SB!EXT"
                  "SB!FASL" "SB!GRAY" "SB!INT" "SB!KERNEL" "SB!SYS"))
 

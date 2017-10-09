@@ -8,10 +8,12 @@
 #include "genesis/cons.h"
 #include "genesis/constants.h"
 #include "genesis/gc-tables.h"
+#include "genesis/instance.h"
 #include "genesis/layout.h"
 #include "genesis/package.h"
 #include "genesis/vector.h"
 #include "pseudo-atomic.h" // for get_alloc_pointer()
+#include "search.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -892,57 +894,6 @@ void prove_liveness(lispobj objects, int criterion)
     gc_prove_liveness(0, objects, gc_n_stack_pins, pinned_objects.keys, criterion);
 }
 
-#include "genesis/package.h"
-#include "genesis/instance.h"
-
-static boolean __attribute__((unused)) sym_stringeq(lispobj sym, const char *string, int len)
-{
-    struct vector* name = VECTOR(SYMBOL(sym)->name);
-    return widetag_of(name->header) == SIMPLE_BASE_STRING_WIDETAG
-        && name->length == make_fixnum(len)
-        && !strcmp((char*)name->data, string);
-}
-
-/* Find the C string 'name' in 'table', a package-hashtable.
- * This does not need to be particularly efficient. No hashing is involved. */
-static struct symbol* find_symbol_or_lose(char name[], lispobj table, int* hint)
-{
-    int namelen = strlen(name);
-    struct vector* cells = (struct vector*)
-        native_pointer(((struct instance*)native_pointer(table))
-                       ->slots[INSTANCE_DATA_START]);
-    int cells_length = fixnum_value(cells->length);
-    int index = *hint;
-    if (index >= cells_length)
-        index = 0; // safeguard against vector shrinkage
-    int initial_index = index;
-    do {
-        lispobj thing = cells->data[index];
-        if (lowtag_of(thing) == OTHER_POINTER_LOWTAG
-            && widetag_of(SYMBOL(thing)->header) == SYMBOL_WIDETAG
-            && sym_stringeq(thing, name, namelen)) {
-            *hint = index;
-            return SYMBOL(thing);
-        }
-        index = (index + 1) % cells_length;
-    } while (index != initial_index);
-    lose("Can't find %s", name);
-}
-
-static lispobj sb_thread_all_threads()
-{
-#ifdef ENTER_FOREIGN_CALLBACK_FDEFN
-    // Starting with a known static fdefn in SB-THREAD::, get the SB-THREAD package
-    // and find *ALL-THREADS* (which isn't static). Fewer static symbols is better.
-    struct symbol*   sym = SYMBOL(FDEFN(ENTER_FOREIGN_CALLBACK_FDEFN)->name);
-    struct package*  pkg = (struct package*)native_pointer(sym->package);
-    static int hint = 0;
-    sym = find_symbol_or_lose("*ALL-THREADS*", pkg->internal_symbols, &hint);
-    return sym->value;
-#endif
-    return NIL;
-}
-
 // These are slot offsets in (DEFSTRUCT THREAD),
 // not the C structure defined in genesis/thread.h
 #define LISP_THREAD_NAME_SLOT INSTANCE_DATA_START+0
@@ -950,7 +901,9 @@ static lispobj sb_thread_all_threads()
 
 struct vector* lisp_thread_name(os_thread_t os_thread)
 {
-    lispobj list = sb_thread_all_threads();
+    static unsigned int hint;
+    lispobj* sym = find_symbol("*ALL-THREADS*", "SB-THREAD", &hint);
+    lispobj list = sym ? ((struct symbol*)sym)->value : NIL;
     while (list != NIL) {
         struct instance* lisp_thread = (struct instance*)native_pointer(CONS(list)->car);
         list = CONS(list)->cdr;

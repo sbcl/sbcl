@@ -12,6 +12,8 @@
 #ifndef _SEARCH_H_
 #define _SEARCH_H_
 
+extern lispobj* find_symbol(char*, char*, unsigned int*); // Find via package
+// Find via heap scan
 extern boolean search_for_type(int type, lispobj **start, int *count);
 extern lispobj* search_for_symbol(char *name, lispobj start, lispobj end);
 
