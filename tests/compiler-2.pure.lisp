@@ -390,3 +390,17 @@
                                           (min a)))))))
                              :allow-warnings t)
                     1 2))))
+
+(with-test (:name :block-delete-twice)
+  (assert (= (funcall
+              (funcall
+               (checked-compile
+                `(lambda ()
+                   (declare (notinline >=))
+                   (block nil
+                     (lambda (x &key (key (if (>= 0 1)
+                                              (return (catch 'ct5 0)))))
+                       (declare (ignore key))
+                       x)))))
+              123)
+             123)))

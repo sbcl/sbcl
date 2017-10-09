@@ -1506,7 +1506,9 @@
 ;;; COMPONENT-DELETE-BLOCKS.
 (defun delete-block (block &optional silent)
   (declare (type cblock block))
-  (aver (block-component block))      ; else block is already deleted!
+  (unless (block-component block)
+    ;; Already deleted
+    (return-from delete-block))
   #!+high-security (aver (not (memq block (component-delete-blocks (block-component block)))))
   (unless silent
     (note-block-deletion block))
