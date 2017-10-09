@@ -1423,7 +1423,9 @@
                         (xep-verify-arg-count node block fun arg-count-tn))))
         #!-x86-64
         (declare (ignore verified))
-       (cond ((and (optional-dispatch-p ef) (optional-dispatch-more-entry ef))
+       (cond ((and (optional-dispatch-p ef)
+                   (optional-dispatch-more-entry ef)
+                   (neq (functional-kind (optional-dispatch-more-entry ef)) :deleted))
               ;; COPY-MORE-ARG should handle SP adjustemnt, but it
               ;; isn't done on all targets.
               #!-precise-arg-count-error

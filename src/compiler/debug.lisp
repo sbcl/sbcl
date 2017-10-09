@@ -906,7 +906,8 @@ One of :WARN, :ERROR or :NONE.")
     (global-var
      (format stream "~S {~A}" (leaf-debug-name leaf) (global-var-kind leaf)))
     (functional
-     (format stream "~S ~S" (type-of leaf) (functional-debug-name leaf)))))
+     (format stream "~S ~S ~S" (type-of leaf) (functional-debug-name leaf)
+             (mapcar #'leaf-debug-name (lambda-vars leaf))))))
 
 ;;; Attempt to find a block given some thing that has to do with it.
 (declaim (ftype (sfunction (t) cblock) block-or-lose))

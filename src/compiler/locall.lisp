@@ -175,49 +175,103 @@
                `(%verify-arg-count ,n-supplied ,nargs))
           (%funcall ,fun ,@temps))))
     (optional-dispatch
+     ;; Force convertion of all entries
+     (optional-dispatch-entry-point-fun fun 0)
      (let* ((min (optional-dispatch-min-args fun))
             (max (optional-dispatch-max-args fun))
             (more (optional-dispatch-more-entry fun))
             (n-supplied (gensym))
-            (temps (make-gensym-list max)))
-       (collect ((entries))
-         ;; Force convertion of all entries
-         (optional-dispatch-entry-point-fun fun 0)
-         (loop for ep in (optional-dispatch-entry-points fun)
-               and n from min
-               do (entries `((eql ,n-supplied ,n)
-                             (%funcall ,(force ep) ,@(subseq temps 0 n)))))
-         #!+precise-arg-count-error
-         `(lambda (,n-supplied ,@temps)
-            (declare (type index ,n-supplied))
-            (cond
-              ,@(butlast (entries))
-              (t
-               ;; Arg-checking is performed before this step,
-               ;; arranged by INIT-XEP-ENVIRONMENT,
-               ;; perform the last action unconditionally,
-               ;; and without this the function derived type will be bad.
-               ,(if more
-                    (with-unique-names (n-context n-count)
-                      `(multiple-value-bind (,n-context ,n-count)
-                           (%more-arg-context ,n-supplied ,max)
-                         (%funcall ,more ,@temps ,n-context ,n-count)))
-                    (cadar (last (entries)))))))
-         #!-precise-arg-count-error
-         `(lambda (,n-supplied ,@temps)
-            (declare (type index ,n-supplied))
-            (cond
-             ,@(if more (butlast (entries)) (entries))
-             ,@(when more
-                 ;; KLUDGE: (NOT (< ...)) instead of >= avoids one round of
-                 ;; deftransforms and lambda-conversion.
-                 `((,(if (zerop min) t `(not (< ,n-supplied ,max)))
-                    ,(with-unique-names (n-context n-count)
-                       `(multiple-value-bind (,n-context ,n-count)
-                            (%more-arg-context ,n-supplied ,max)
-                          (%funcall ,more ,@temps ,n-context ,n-count))))))
-             (t
-              (%local-arg-count-error ,n-supplied ',(leaf-debug-name fun))))))))))
+            (temps (make-gensym-list max))
+            (main (optional-dispatch-main-entry fun))
+            (optional-vars (nthcdr min (lambda-vars main)))
+            (keyp (optional-dispatch-keyp fun))
+            (used-eps (nreverse
+                       ;; Ignore only the entries at the tail, can't
+                       ;; deal with the values being used by
+                       ;; subsequent default forms at the moment
+                       (loop with previous-unused = t
+                             for last = t then nil
+                             for promise in (reverse (optional-dispatch-entry-points fun))
+                             for ep = (force promise)
+                             for n downfrom max
+                             for optional-n downfrom (- max min)
+                             unless (and previous-unused
+                                         (can-ignore-optional-ep optional-n optional-vars
+                                                                 keyp))
+                             collect (cons ep n)
+                             and do (setf previous-unused last)
+                             else if (and last more)
+                             collect (cons main (1+ n)))))
+            (entries
+              (loop for previous-n = (1- min) then n
+                    for ((ep . n) . next) on used-eps
+                    collect
+                    (cond (next
+                           `(,(if (= (1+ previous-n) n)
+                                  `(eql ,n-supplied ,n)
+                                  `(<= ,n-supplied ,n))
+                             (%funcall ,ep ,@(subseq temps 0 n))))
+                          (more
+                           (with-unique-names (n-context n-count)
+                             `(#!-precise-arg-count-error
+                               ,(or (zerop min)
+                                    `(<= ,n-supplied ,n))
+                               t
+                               ,(if (= max n)
+                                    `(multiple-value-bind (,n-context ,n-count)
+                                         (%more-arg-context ,n-supplied ,max)
+                                       (%funcall ,more ,@temps ,n-context ,n-count))
+                                    ;; The &rest var is unused, call the main entry point directly
+                                    `(%funcall ,ep
+                                               ,@(loop for supplied-p = nil
+                                                       then (and info
+                                                                 (arg-info-supplied-p info))
+                                                       with vars = temps
+                                                       for x in (lambda-vars ep)
+                                                       for info = (lambda-var-arg-info x)
+                                                       collect
+                                                       (cond (supplied-p
+                                                              t)
+                                                             ((and info
+                                                                   (eq (arg-info-kind info)
+                                                                       :more-count))
+                                                              0)
+                                                             (t
+                                                              (pop vars)))))))))
+                          (t
+                           `(#!-precise-arg-count-error
+                             (<= ,n-supplied ,n)
+                             t
+                             ;; Arg-checking is performed before this step,
+                             ;; arranged by INIT-XEP-ENVIRONMENT,
+                             ;; perform the last action unconditionally,
+                             ;; and without this the function derived type will be bad.
+                             (%funcall ,ep ,@(subseq temps 0 n))))))))
+       `(lambda (,n-supplied ,@temps)
+          (declare (type index ,n-supplied)
+                   (ignorable ,n-supplied))
+          (cond
+            ,@entries
+            #!-precise-arg-count-error
+            (t
+             (%local-arg-count-error ,n-supplied ',(leaf-debug-name fun)))))))))
+
+(defun can-ignore-optional-ep (n vars keyp)
+  (let ((var (loop with i = n
+                   for var in vars
+                   when (and (lambda-var-arg-info var)
+                             (minusp (decf i)))
+                   return var)))
+    (when (and var
+               (not (lambda-var-refs var))
+               (eql (lambda-var-type var) *universal-type*))
+      (let* ((info (lambda-var-arg-info var))
+             (kind (arg-info-kind info)))
+        (or (and (eq kind :optional)
+                 (not (arg-info-supplied-p info))
+                 (constantp (arg-info-default info)))
+            (and (eq kind :rest)
+                 (not keyp)))))))
 
 ;;; Make an external entry point (XEP) for FUN and return it. We
 ;;; convert the result of MAKE-XEP-LAMBDA in the correct environment,
