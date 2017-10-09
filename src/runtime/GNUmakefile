@@ -115,7 +115,7 @@ sbcl.h: $(wildcard genesis/*.h)
 # ...but it's still nice to have it done by default.
 HEADERS=$(wildcard *.h genesis/*.h)
 TAGS tags: $(SRCS) $(HEADERS)
-	etags $(SRCS) $(HEADERS) || true
+	@etags $(SRCS) $(HEADERS) || true
 
 clean:
 	-rm -f *.[do] $(TARGET) sbcl.nm sbcl.h core *.tmp $(OS_CLEAN_FILES)
