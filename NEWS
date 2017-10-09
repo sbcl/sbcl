@@ -6,6 +6,9 @@ changes relative to sbcl-1.4.0:
     optimizing for speed is now faster for functions with large bodies.
   * bug fix: SB-INTROSPECT:ALLOCATION-INFORMATION works on big-endian CPUs
     (fixes lp#490490 for real rather than by disabling a test)
+  * bug fix: code objects and bignums of large enough size to be placed
+    on GC pages without any other object no longer cause accidental copying
+    during garbage collection. (gencgc only)
 
 changes in sbcl-1.4.0 relative to sbcl-1.3.21:
   * minor incompatible change: DESTRUCTURING-BIND treats non-toplevel () as

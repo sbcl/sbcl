@@ -385,26 +385,29 @@
          :ignore '(:space))
   t)
 
+(setq sb-ext:*evaluator-mode* :compile)
+(sb-ext:defglobal *large-obj* nil)
 
 #+(and gencgc (or x86-64 ppc) (not win32))
 (progn
   (setq *print-array* nil)
-  (defvar *large-array* (make-array (* sb-vm:gencgc-card-bytes 4)
-                                    :element-type '(unsigned-byte 8)))
+  (setq *large-obj* (make-array (* sb-vm:gencgc-card-bytes 4)
+                                :element-type '(unsigned-byte 8)))
   (sb-ext:gc :gen 1) ; Array won't move to a large unboxed page until GC'd
-  (deftest (allocation-information.5)
-          (tai *large-array* :heap
+  (deftest allocation-information.5
+          (tai *large-obj* :heap
                `(:space :dynamic :generation 1 :boxed nil :pinned nil :large t)
                :ignore (list :page :write-protected))
       t))
 
-(sb-ext:defglobal *large-code* nil)
 (defun page-and-gen (thing)
   (let ((props (nth-value 1 (allocation-information thing))))
     (values (getf props :page)
             (getf props :generation))))
-(defun check-page/gen/boxedp (thing page gen boxedp)
-  (let ((props (nth-value 1 (allocation-information thing))))
+
+(defun assert-large-page/gen/boxedp (thing-name page gen boxedp)
+  (sb-ext:gc :gen gen)
+  (let ((props (nth-value 1 (allocation-information (symbol-value thing-name)))))
     ;; This FORMAT call has the effect of consuming enough stack space
     ;; to clobber a lingering pointer to THING from the stack.
     ;; Without it, the next test iteration (after next GC) will fail.
@@ -417,37 +420,45 @@
          (= (getf props :generation) gen)
          (eq (getf props :boxed :missing) boxedp))))
 #+gencgc
-(deftest (allocation-information.6)
+(deftest allocation-information.6
+    ;; Remember, all tests run after all toplevel forms have executed,
+    ;; so if this were (DEFGLOBAL *LARGE-CODE* ... ) or something,
+    ;; the garbage collection explicitly requested for ALLOCATION-INFORMATION.5
+    ;; would have already happened, and thus affected this test as well.
+    ;; So we need to make the objects within each test,
+    ;; while avoiding use of lexical vars that would cause conservative pinning.
     (multiple-value-bind (page gen)
         (page-and-gen
-         (setq *large-code*
+         (setq *large-obj*
                (sb-c:allocate-code-object nil 0 (* 4 sb-vm:gencgc-card-bytes))))
       (loop for i from 1 to 5
-            do (sb-ext:gc :gen i)
-            always (check-page/gen/boxedp *large-code* page i t)))
+            always (assert-large-page/gen/boxedp '*large-obj* page i t)))
   t)
-;;; Create a bignum using 4 GC cards
 (sb-ext:defglobal *b* nil)
 (sb-ext:defglobal *negb* nil)
+(sb-ext:defglobal *small-bignum* nil)
 #+gencgc
-(deftest (allocation-information.7)
-    (let (c)
+(deftest allocation-information.7
+    (progn
+      ;; Create a bignum using 4 GC cards
       (setq *b* (ash 1 (* sb-vm:gencgc-card-bytes sb-vm:n-byte-bits 4)))
       (setq *negb* (- *b*))
-      (setq c (+ (+ *b* (ash 1 100)) *negb*))
-      (and (let ((props (nth-value 1 (allocation-information c))))
-             ;; C was created as a large boxed object
+      (setq *small-bignum* (+ (+ *b* (ash 1 100)) *negb*))
+      (and (let ((props (nth-value 1 (allocation-information *small-bignum*))))
+             ;; *SMALL-BIGNUM* was created as a large boxed object
              (eq (getf props :large) t)
              (eq (getf props :boxed) t))
-         (multiple-value-bind (page gen) (page-and-gen *b*)
-           (loop for i from 1 to 5
-                 do (sb-ext:gc :gen i)
-                 always
-                 (and (check-page/gen/boxedp *b* page i nil)
-                      (let ((props (nth-value 1 (allocation-information c))))
-                        ;; C is on a small unboxed page
-                        (and (not (getf props :large :missing))
-                             (not (getf props :boxed :missing)))))))))
+           (multiple-value-bind (page gen) (page-and-gen *b*)
+             (loop for i from 1 to 5
+                   always
+                   (and (assert-large-page/gen/boxedp '*b* page i nil)
+                        (let ((props (nth-value 1 (allocation-information *small-bignum*))))
+                          ;; Scrub away the ref to *small-bignum* by making a random call
+                          (format (make-broadcast-stream) "~S" props)
+                          ;; Assert that *SMALL-BIGNUM* got moved to a small unboxed page
+                          (and (not (getf props :pinned :fail))
+                               (not (getf props :large :fail))
+                               (not (getf props :boxed :fail)))))))))
   t)
 
 #.(if (and (eq sb-ext:*evaluator-mode* :compile) (member :sb-thread *features*))
