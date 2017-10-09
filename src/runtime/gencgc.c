@@ -1877,7 +1877,7 @@ scavenge_pinned_ranges()
     }
 }
 
-/* Deposit filler objects (numeric arrays) on small object pinned pages
+/* Deposit filler objects on small object pinned pages
  * from the page start to the first pinned object and in between pairs
  * of pinned objects. Zero-fill bytes following the last pinned object.
  * Also ensure that no scan_start_offset points to a page in
@@ -1953,13 +1953,28 @@ wipe_nonpinned_words()
     for (i = 0; i < n_pins; ++i) {
         lispobj* obj = (lispobj*)pinned_objects.keys[i];
         page_index_t begin_page_index = find_page_index(obj);
-        // Create an unboxed array occupying space from 'fill_from' up to but
+        // Create a filler object occupying space from 'fill_from' up to but
         // excluding 'obj'. If obj directly abuts its predecessor then don't.
         if ((uword_t)obj > fill_from) {
             lispobj* filler = (lispobj*)fill_from;
             int nwords = obj - filler;
-            filler[0] = SIMPLE_ARRAY_WORD_WIDETAG;
-            filler[1] = make_fixnum(nwords - 2);
+            if (page_table[begin_page_index].allocated != CODE_PAGE_FLAG) {
+                // On pages holding non-code, the filler is an array
+                filler[0] = SIMPLE_ARRAY_WORD_WIDETAG;
+                filler[1] = make_fixnum(nwords - 2);
+            } else if (nwords > 2) {
+                // Otherwise try to keep a strict code/non-code distinction
+                filler[0] = 2<<N_WIDETAG_BITS | CODE_HEADER_WIDETAG;
+                filler[1] = make_fixnum((nwords - 2) * N_WORD_BYTES);
+                filler[2] = 0;
+                filler[3] = 0;
+            } else {
+                // But as an exception, use a NIL array for tiny code filler
+                // (If the ENSURE-CODE/DATA-SEPARATION test fails again,
+                // it may need to ignore these objects. Hasn't happened yet)
+                filler[0] = SIMPLE_ARRAY_NIL_WIDETAG;
+                filler[1] = make_fixnum(0xDEAD);
+            }
         }
         if (fill_from == page_base((uword_t)obj)) {
             adjust_gen_usage(begin_page_index);
