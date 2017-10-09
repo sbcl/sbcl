@@ -199,7 +199,7 @@
                                          (can-ignore-optional-ep optional-n optional-vars
                                                                  keyp))
                              collect (cons ep n)
-                             and do (setf previous-unused last)
+                             and do (setf previous-unused (eq ep main))
                              else if (and last more)
                              collect (cons main (1+ n)))))
             (entries

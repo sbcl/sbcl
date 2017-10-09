@@ -349,3 +349,10 @@
                                   (ldb (byte 22 10) (* b 9))))
               -3391381516052980893)
              2826685)))
+
+(with-test (:name :unused-&optional-and-&key)
+  (assert (= (funcall (checked-compile `(lambda (&optional x &key)
+                                          (declare (ignore x))
+                                          10)
+                                       :allow-style-warnings t))
+             10)))
