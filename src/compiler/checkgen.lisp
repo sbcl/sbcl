@@ -517,7 +517,10 @@
                    (casts node)))))
         (setf (block-type-check block) nil)))
     (dolist (cast (casts))
-      (unless (bound-cast-p cast)
+      (unless (or (bound-cast-p cast)
+                  ;; The block could become deleted by IR1-OPTIMIZE-CAST
+                  ;; called by CAST-TYPE-CHECK
+                  (node-to-be-deleted-p cast))
         (multiple-value-bind (check types) (cast-check-types cast)
           (ecase check
             (:simple

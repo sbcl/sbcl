@@ -366,3 +366,27 @@
                        (the integer (values a 2305843009213693946 a -207))))
                    123))
                  '(123 2305843009213693946 123 -207))))
+
+(with-test (:name :deleted-block-during-generate-type-checks)
+  (assert (zerop
+           (funcall
+            (checked-compile `(lambda (a b)
+                                (declare (notinline min ash conjugate oddp >=)
+                                         (optimize debug))
+                                (if (and (or t (>= a)) (oddp 0))
+                                    (prog2 0
+                                        0
+                                      (labels ((f (a b c &key)
+                                                 (declare (ignore a b c))
+                                                 6965670824543402))
+                                        (f a 0 b)))
+                                    (conjugate
+                                     (dotimes (i 0 0)
+                                       (catch 'c
+                                         (ash
+                                          (the integer
+                                               (ignore-errors
+                                                (ignore-errors (throw 'c 1))))
+                                          (min a)))))))
+                             :allow-warnings t)
+                    1 2))))
