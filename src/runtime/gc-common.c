@@ -769,8 +769,15 @@ DEF_SCAV_BOXED(tiny_boxed, TINY_BOXED_NWORDS)
  * excluding the 8 widetag bits to convey the size.
  * To size it, shift out the high bit, the shift right by an extra bit,
  * round to odd, and add 1 for the header. */
-static sword_t size_bignum(lispobj *where) {
+static inline sword_t size_bignum(lispobj *where) {
     return 1 + ((*where << 1 >> (1+N_WIDETAG_BITS)) | 1);
+}
+
+static lispobj trans_bignum(lispobj object)
+{
+    gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG);
+    return copy_large_object(object, size_bignum(native_pointer(object)),
+                             UNBOXED_PAGE_FLAG);
 }
 
 /* Note: on the sparc we don't have to do anything special for fdefns, */

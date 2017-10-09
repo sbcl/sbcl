@@ -398,31 +398,56 @@
                :ignore (list :page :write-protected))
       t))
 
-(sb-ext:defglobal *large-code*
-    (sb-c:allocate-code-object nil 0 (* 4 sb-vm:gencgc-card-bytes)))
-(defun large-code-properties ()
-  (let* ((props (nth-value 1 (allocation-information *large-code*)))
-         (page (getf props :page))
-         (gen (getf props :generation)))
-    (values page gen)))
-(defun check-page-and-gen (page gen)
-  (let ((props (nth-value 1 (allocation-information *large-code*))))
+(sb-ext:defglobal *large-code* nil)
+(defun page-and-gen (thing)
+  (let ((props (nth-value 1 (allocation-information thing))))
+    (values (getf props :page)
+            (getf props :generation))))
+(defun check-page/gen/boxedp (thing page gen boxedp)
+  (let ((props (nth-value 1 (allocation-information thing))))
     ;; This FORMAT call has the effect of consuming enough stack space
-    ;; to clobber a lingering pointer to *LARGE-CODE* from the stack.
+    ;; to clobber a lingering pointer to THING from the stack.
     ;; Without it, the next test iteration (after next GC) will fail.
     (format (make-broadcast-stream) "~S" props)
     ;; Check that uncopyableness isn't due to pin,
     ;; or else the test proves nothing.
-    (and (eq (getf props :pinned t) nil)
+    (and (eq (getf props :pinned :missing) nil)
          (eq (getf props :large) t)
          (= (getf props :page) page)
-         (= (getf props :generation) gen))))
+         (= (getf props :generation) gen)
+         (eq (getf props :boxed :missing) boxedp))))
 #+gencgc
 (deftest (allocation-information.6)
-    (multiple-value-bind (page gen) (large-code-properties)
+    (multiple-value-bind (page gen)
+        (page-and-gen
+         (setq *large-code*
+               (sb-c:allocate-code-object nil 0 (* 4 sb-vm:gencgc-card-bytes))))
       (loop for i from 1 to 5
             do (sb-ext:gc :gen i)
-            always (check-page-and-gen page i)))
+            always (check-page/gen/boxedp *large-code* page i t)))
+  t)
+;;; Create a bignum using 4 GC cards
+(sb-ext:defglobal *b* nil)
+(sb-ext:defglobal *negb* nil)
+#+gencgc
+(deftest (allocation-information.7)
+    (let (c)
+      (setq *b* (ash 1 (* sb-vm:gencgc-card-bytes sb-vm:n-byte-bits 4)))
+      (setq *negb* (- *b*))
+      (setq c (+ (+ *b* (ash 1 100)) *negb*))
+      (and (let ((props (nth-value 1 (allocation-information c))))
+             ;; C was created as a large boxed object
+             (eq (getf props :large) t)
+             (eq (getf props :boxed) t))
+         (multiple-value-bind (page gen) (page-and-gen *b*)
+           (loop for i from 1 to 5
+                 do (sb-ext:gc :gen i)
+                 always
+                 (and (check-page/gen/boxedp *b* page i nil)
+                      (let ((props (nth-value 1 (allocation-information c))))
+                        ;; C is on a small unboxed page
+                        (and (not (getf props :large :missing))
+                             (not (getf props :boxed :missing)))))))))
   t)
 
 #.(if (and (eq sb-ext:*evaluator-mode* :compile) (member :sb-thread *features*))

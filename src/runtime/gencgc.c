@@ -1474,8 +1474,10 @@ copy_large_object(lispobj object, sword_t nwords, int page_type_flag)
     first_page = find_page_index((void *)object);
     gc_assert(first_page >= 0);
 
-    // FIXME: an object that shrank so much to become non-large should be copied.
-    if (page_table[first_page].large_object) {
+    // An objects that shrank but was allocated on a large-object page
+    // is a candidate for copying if its current size is non-large.
+    if (page_table[first_page].large_object
+        && nwords >= LARGE_OBJECT_SIZE / N_WORD_BYTES) {
         /* Promote the object. Note: Unboxed objects may have been
          * allocated to a BOXED region so it may be necessary to
          * change the region to UNBOXED. */
