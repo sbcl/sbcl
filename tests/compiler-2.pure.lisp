@@ -356,3 +356,13 @@
                                           10)
                                        :allow-style-warnings t))
              10)))
+
+(with-test (:name :unknown-values-coercion)
+  (assert (equal (multiple-value-list
+                  (funcall
+                   (checked-compile
+                    `(lambda (a)
+                       (declare (notinline values typep))
+                       (the integer (values a 2305843009213693946 a -207))))
+                   123))
+                 '(123 2305843009213693946 123 -207))))

@@ -1195,20 +1195,16 @@
   (multiple-value-bind (fp args arg-locs nargs)
       (ir2-convert-full-call-args node block)
     (let* ((lvar (node-lvar node))
-           #!+x86-64
-           to-move
-           (locs #!-x86-64
-                 (standard-result-tns lvar)
-                 #!+x86-64
-                 (and lvar
+           (locs (and lvar
                       (loop for loc in (ir2-lvar-locs (lvar-info lvar))
                             for i from 0
-                            collect (if (or (eql (tn-kind loc) :unused)
-                                            (>= i sb!vm::register-arg-count))
-                                        loc
-                                        (let ((std (standard-arg-location i)))
-                                          (push (cons loc std) to-move)
-                                          std)))))
+                            collect (cond ((eql (tn-kind loc) :unused)
+                                           loc)
+                                          #!+x86-64 ;; needs default-unknown-values support
+                                          ((>= i sb!vm::register-arg-count)
+                                           (make-normal-tn *backend-t-primitive-type*))
+                                          (t
+                                           (standard-arg-location i))))))
            (loc-refs (reference-tn-list locs t))
            (nvals (length locs)))
       (multiple-value-bind (fun-tn named)
@@ -1229,12 +1225,7 @@
                      (loc-refs)                        ; results
                      arg-locs nargs #!+immobile-code named nvals ; info
                      (emit-step-p node))))
-        #!-x86-64
-        (move-lvar-result node block locs lvar)
-        #!+x86-64
-        (loop for (to . from) in to-move
-              unless (eq from to)
-              do (emit-move node block from to)))))
+        (move-lvar-result node block locs lvar))))
   (values))
 
 ;;; Do full call when unknown values are desired.
