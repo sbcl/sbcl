@@ -1749,14 +1749,14 @@ conservative_root_p(void *addr, page_index_t addr_page_index)
 #endif
 
 /* Adjust large bignum and vector objects. This will adjust the
- * allocated region if the size has shrunk, and move unboxed objects
+ * allocated region if the size has shrunk, and change boxed pages
  * into unboxed pages. The pages are not promoted here, and the
- * promoted region is not added to the new_regions; this is really
+ * object is not added to the new_regions; this is really
  * only designed to be called from preserve_pointer(). Shouldn't fail
  * if this is missed, just may delay the moving of objects to unboxed
  * pages, and the freeing of pages. */
 static void
-maybe_adjust_large_object(page_index_t first_page)
+maybe_adjust_large_object(page_index_t first_page, sword_t nwords)
 {
     lispobj* where = (lispobj*)page_address(first_page);
     page_index_t next_page;
@@ -1775,9 +1775,6 @@ maybe_adjust_large_object(page_index_t first_page)
         page_type_flag = UNBOXED_PAGE_FLAG;
     else
         return;
-
-    /* Find its current size. */
-    sword_t nwords = sizetab[widetag](where);
 
     /* Note: Any page write-protection must be removed, else a later
      * scavenge_newspace may incorrectly not scavenge these pages.
@@ -2146,7 +2143,7 @@ preserve_pointer(void *addr)
     }
 
     if (page_table[first_page].large_object)
-        maybe_adjust_large_object(first_page);
+        maybe_adjust_large_object(first_page, nwords);
     else
         pin_object(object_start);
 }
