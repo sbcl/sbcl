@@ -182,11 +182,7 @@
                     (x (tn-ref-tn args))
                     (y (tn-ref-tn (vop-results vop)))
                     constant)
-               (cond ((and (eq (vop-name vop) 'move)
-                           (location= x y))
-                      ;; Helps subsequent optimization of adjacent VOPs
-                      (delete-vop vop))
-                     ((or (eq (sc-name (tn-sc x)) 'null)
+               (cond ((or (eq (sc-name (tn-sc x)) 'null)
                           (not (eq (tn-kind x) :constant)))
                       (remove-written-tns))
                      ((setf constant (find-constant-tn x (tn-sc y)))

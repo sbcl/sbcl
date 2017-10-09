@@ -627,6 +627,8 @@ necessary, since type inference may take arbitrarily long to converge.")
             (maybe-mumble "check-pack ")
             (check-pack-consistency component))
 
+          (delete-no-op-vops component)
+          (ir2-optimize-jumps component)
           (optimize-constant-loads component)
           (when *compiler-trace-output*
             (describe-component component *compiler-trace-output*)
