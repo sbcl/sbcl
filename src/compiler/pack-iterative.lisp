@@ -358,11 +358,11 @@
              (if (< color2 color)
                  (< color (+ color2 (vertex-element-size vertex2)))
                  (< color2 color+size))))
-      (dotimes (i incidence-count)
+      (dotimes (i incidence-count t)
         #-sb-xc-host (declare (optimize (sb!c::insert-array-bounds-checks 0)))
         (let ((neighbor (aref incidence i)))
-         (when (intervals-intersect-p (vertex-color neighbor) neighbor)
-           (return nil)))))))
+          (when (intervals-intersect-p (vertex-color neighbor) neighbor)
+            (return nil)))))))
 
 ;; Assumes that VERTEX pack-type is :WIRED.
 (defun vertex-color-possible-p (vertex color)
@@ -407,7 +407,7 @@
   (let ((compatible '()))
     (dolist (vertex vertices)
       (when (and (notany (lambda (existing)
-                           (oset-member (vertex-incidence existing)
+                           (oset-member (vertex-full-incidence existing)
                                         vertex))
                          compatible)
                  (vertex-color-possible-p vertex color))
