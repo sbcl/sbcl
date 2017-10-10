@@ -560,7 +560,6 @@
     (if lvar
         (do-uses (other-node lvar)
           (when (and (neq node other-node)
-                     (not (node-deleted other-node))
                      (eq block (node-block other-node)))
             ;; This must be a preceding node and the current node will
             ;; overwrite the value, unlink the lvar and the node will
