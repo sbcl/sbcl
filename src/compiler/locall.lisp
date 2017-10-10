@@ -162,17 +162,9 @@
      (let* ((n-supplied (gensym))
             (nargs (length (lambda-vars fun)))
             (temps (make-gensym-list nargs)))
-       #!+precise-arg-count-error
        `(lambda (,n-supplied ,@temps)
           (declare (type index ,n-supplied)
                    (ignore ,n-supplied))
-          (%funcall ,fun ,@temps))
-       #!-precise-arg-count-error
-       `(lambda (,n-supplied ,@temps)
-          (declare (type index ,n-supplied))
-          ,(if (policy *lexenv* (zerop verify-arg-count))
-               `(declare (ignore ,n-supplied))
-               `(%verify-arg-count ,n-supplied ,nargs))
           (%funcall ,fun ,@temps))))
     (optional-dispatch
      ;; Force convertion of all entries
@@ -201,9 +193,12 @@
                              collect (cons ep n)
                              and do (setf previous-unused (eq ep main))
                              else if (and last more)
-                             collect (cons main (1+ n)))))
-            (entries
-              (loop for previous-n = (1- min) then n
+                             collect (cons main (1+ n))))))
+       `(lambda (,n-supplied ,@temps)
+          (declare (type index ,n-supplied)
+                   (ignorable ,n-supplied))
+          (cond
+            ,@(loop for previous-n = (1- min) then n
                     for ((ep . n) . next) on used-eps
                     collect
                     (cond (next
@@ -213,10 +208,7 @@
                              (%funcall ,ep ,@(subseq temps 0 n))))
                           (more
                            (with-unique-names (n-context n-count)
-                             `(#!-precise-arg-count-error
-                               ,(or (zerop min)
-                                    `(<= ,n-supplied ,n))
-                               t
+                             `(t
                                ,(if (= max n)
                                     `(multiple-value-bind (,n-context ,n-count)
                                          (%more-arg-context ,n-supplied ,max)
@@ -239,22 +231,12 @@
                                                              (t
                                                               (pop vars)))))))))
                           (t
-                           `(#!-precise-arg-count-error
-                             (<= ,n-supplied ,n)
-                             t
+                           `(t
                              ;; Arg-checking is performed before this step,
                              ;; arranged by INIT-XEP-ENVIRONMENT,
                              ;; perform the last action unconditionally,
                              ;; and without this the function derived type will be bad.
-                             (%funcall ,ep ,@(subseq temps 0 n))))))))
-       `(lambda (,n-supplied ,@temps)
-          (declare (type index ,n-supplied)
-                   (ignorable ,n-supplied))
-          (cond
-            ,@entries
-            #!-precise-arg-count-error
-            (t
-             (%local-arg-count-error ,n-supplied ',(leaf-debug-name fun)))))))))
+                             (%funcall ,ep ,@(subseq temps 0 n))))))))))))
 
 (defun can-ignore-optional-ep (n vars keyp)
   (let ((var (loop with i = n

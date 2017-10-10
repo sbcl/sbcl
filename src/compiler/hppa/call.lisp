@@ -1165,25 +1165,6 @@ default-value-8
     (inst addi (fixnumize (- fixed)) supplied count)
     (inst sub csp-tn count context)))
 
-;;; Signal wrong argument count error if Nargs isn't = to Count.
-#!-precise-arg-count-error
-(define-vop (verify-arg-count)
-  (:policy :fast-safe)
-  (:translate sb!c::%verify-arg-count)
-  (:args (nargs :scs (any-reg)))
-  (:arg-types positive-fixnum (:constant t))
-  (:info count)
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:generator 3
-    (let ((err-lab
-           (generate-error-code vop 'invalid-arg-count-error nargs)))
-      (cond ((zerop count)
-             (inst bc :<> nil nargs zero-tn err-lab))
-            (t
-             (inst bci :<> nil (fixnumize count) nargs err-lab))))))
-
-#!+precise-arg-count-error
 (define-vop (verify-arg-count)
   (:policy :fast-safe)
   (:args (nargs :scs (any-reg)))

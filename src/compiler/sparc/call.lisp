@@ -1142,28 +1142,6 @@ default-value-8
     (inst sub count supplied (fixnumize fixed))
     (inst sub context csp-tn count)))
 
-
-;;; Signal wrong argument count error if Nargs isn't = to Count.
-#!-precise-arg-count-error
-(define-vop (verify-arg-count)
-  (:policy :fast-safe)
-  (:translate sb!c::%verify-arg-count)
-  (:args (nargs :scs (any-reg)))
-  (:arg-types positive-fixnum (:constant t))
-  (:info count)
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:generator 3
-    (let ((err-lab
-           (generate-error-code vop 'invalid-arg-count-error nargs)))
-      (inst cmp nargs (fixnumize count))
-      (if (member :sparc-v9 *backend-subfeatures*)
-          ;; Assume we don't take the branch
-          (inst b :ne err-lab :pn)
-          (inst b :ne err-lab))
-      (inst nop))))
-
-#!+precise-arg-count-error
 (define-vop (verify-arg-count)
   (:policy :fast-safe)
   (:args (nargs :scs (any-reg)))
@@ -1187,12 +1165,12 @@ default-value-8
              (max
               (when (plusp min)
                 (inst cmp nargs (fixnumize min))
-                (b :leu))
+                (b :ltu))
               (inst cmp nargs (fixnumize max))
-              (b :geu))
+              (b :gtu))
              ((plusp min)
               (inst cmp nargs (fixnumize min))
-              (b :leu)))))))
+              (b :ltu)))))))
 
 ;;; Single-stepping
 (define-vop (step-instrument-before-vop)

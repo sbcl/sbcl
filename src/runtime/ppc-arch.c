@@ -572,9 +572,7 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
     }
     /* twi :ne ... or twi ... nargs */
     if (((code >> 26) == 3) && (((code >> 21) & 31) == 24
-#ifdef LISP_FEATURE_PRECISE_ARG_COUNT_ERROR
                                 || ((code >> 16) & 31) == reg_NARGS
-#endif
         )) {
         interrupt_internal_error(context, 0);
         return;

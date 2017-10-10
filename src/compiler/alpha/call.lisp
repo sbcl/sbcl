@@ -1154,33 +1154,12 @@ default-value-8
     (inst subq supplied (fixnumize fixed) count)
     (inst subq csp-tn count context)))
 
-;;; Signal wrong argument count error if NARGS isn't equal to COUNT.
-#!-precise-arg-count-error
-(define-vop (verify-arg-count)
-  (:policy :fast-safe)
-  (:translate sb!c::%verify-arg-count)
-  (:args (nargs :scs (any-reg)))
-  (:arg-types positive-fixnum (:constant t))
-  (:temporary (:scs (any-reg) :type fixnum) temp)
-  (:info count)
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:generator 3
-    (let ((err-lab
-           (generate-error-code vop 'invalid-arg-count-error nargs)))
-      (cond ((zerop count)
-             (inst bne nargs err-lab))
-            (t
-             (inst subq nargs (fixnumize count) temp)
-             (inst bne temp err-lab))))))
-
-#!+precise-arg-count-error
 (define-vop (verify-arg-count)
   (:policy :fast-safe)
   (:args (nargs :scs (any-reg)))
   (:arg-types positive-fixnum (:constant t) (:constant t))
   (:info min max)
-  (:temporary (:scs (any-reg) :type fixnum) temp)
+  (:temporary (:scs (unsigned-reg) :type fixnum) temp)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 3
@@ -1190,7 +1169,7 @@ default-value-8
              (cond ((zerop max)
                     (inst bne nargs err-lab))
                    (t
-                    (inst subq nargs (fixnumize count) temp)
+                    (inst subq nargs (fixnumize max) temp)
                     (inst bne temp err-lab))))
             (max
              (when (plusp min)

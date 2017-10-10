@@ -104,19 +104,6 @@
            (let ((error-number (sap-ref-8 pc 4)))
              (values error-number
                      (sb!kernel::decode-internal-error-args (sap+ pc 5) error-number))))
-          #!-precise-arg-count-error
-          ((and (= (ldb (byte 6 10) op) 3)
-                (= (ldb (byte 5 5) op) 24))
-           (let ((prev (sap-ref-32 (int-sap (- (sap-int pc) 4)) 0)))
-             (if (and (= (ldb (byte 6 26) prev) 3)
-                      (= (ldb (byte 5 21) prev) 0))
-                 (values (ldb (byte 16 0) prev)
-                         (list (make-sc-offset any-reg-sc-number
-                                               (ldb (byte 5 16) prev))))
-                 (values #.(error-number-or-lose
-                            'invalid-arg-count-error)
-                         (list (make-sc-offset any-reg-sc-number regnum))))))
-          #!+precise-arg-count-error
           ((and (= (ldb (byte 6 10) op) 3) ;; twi
                 (or (= regnum #.(sc-offset-offset arg-count-sc))
                     (= (ldb (byte 5 5) op) 24))) ;; :ne

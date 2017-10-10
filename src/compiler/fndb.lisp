@@ -1707,7 +1707,6 @@
 (defknown %more-kw-arg (t fixnum) (values t t))
 (defknown %more-arg-values (t index index) * (flushable))
 
-#!-precise-arg-count-error
 (defknown %verify-arg-count (index index) (values))
 
 (defknown %arg-count-error (t) nil)

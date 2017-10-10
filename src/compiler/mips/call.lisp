@@ -1191,64 +1191,39 @@ default-value-8
     (inst addu count supplied (fixnumize (- fixed)))
     (inst subu context csp-tn count)))
 
-
-;;; Signal wrong argument count error if Nargs isn't = to Count.
-;;;
-#!-precise-arg-count-error
-(define-vop (verify-arg-count)
-  (:policy :fast-safe)
-  (:translate sb!c::%verify-arg-count)
-  (:args (nargs :scs (any-reg)))
-  (:arg-types positive-fixnum (:constant t))
-  (:temporary (:scs (any-reg) :type fixnum) temp)
-  (:info count)
-  (:vop-var vop)
-  (:save-p :compute-only)
-  (:generator 3
-    (let ((err-lab
-           (generate-error-code vop 'invalid-arg-count-error nargs)))
-      (cond ((zerop count)
-             (inst bne nargs err-lab)
-             (inst nop))
-            (t
-             (inst li temp (fixnumize count))
-             (inst bne nargs temp err-lab)
-             (inst nop))))))
-
-#!+precise-arg-count-error
 (define-vop (verify-arg-count)
   (:policy :fast-safe)
   (:args (nargs :scs (any-reg)))
-  (:temporary (:scs (any-reg) :type fixnum) temp)
+  (:temporary (:scs (unsigned-reg)) temp)
   (:arg-types positive-fixnum (:constant t) (:constant t))
   (:info min max)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 3
-              (let ((err-lab
-                      (generate-error-code vop 'invalid-arg-count-error nargs)))
-                (cond ((not min)
-                       (cond ((zerop max)
-                              (inst bne nargs err-lab))
-                             (t
-                              (inst li temp (fixnumize max))
-                              (inst bne nargs temp err-lab)))
-                       (inst nop))
-                      (max
-                       (when (plusp min)
-                         (inst li temp (fixnumize min))
-                         (inst sltu temp nargs temp)
-                         (inst bne temp err-lab)
-                         (inst nop))
-                       (inst li temp (fixnumize max))
-                       (inst sltu temp temp nargs)
-                       (inst bne temp err-lab)
-                       (inst nop))
-                      ((plusp min)
-                       (inst li temp (fixnumize min))
-                       (inst sltu temp nargs temp)
-                       (inst bne temp err-lab)
-                       (inst nop))))))
+    (let ((err-lab
+            (generate-error-code vop 'invalid-arg-count-error nargs)))
+      (cond ((not min)
+             (cond ((zerop max)
+                    (inst bne nargs err-lab))
+                   (t
+                    (inst li temp (fixnumize max))
+                    (inst bne nargs temp err-lab)))
+             (inst nop))
+            (max
+             (when (plusp min)
+               (inst li temp (fixnumize min))
+               (inst sltu temp nargs temp)
+               (inst bne temp err-lab)
+               (inst nop))
+             (inst li temp (fixnumize max))
+             (inst sltu temp temp nargs)
+             (inst bne temp err-lab)
+             (inst nop))
+            ((plusp min)
+             (inst li temp (fixnumize min))
+             (inst sltu temp nargs temp)
+             (inst bne temp err-lab)
+             (inst nop))))))
 
 ;;; Single-stepping
 
