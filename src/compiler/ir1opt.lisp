@@ -557,46 +557,54 @@
   (declare (type cblock block))
   (setf (block-flush-p block) nil)
   (do-nodes-backwards (node lvar block :restart-p t)
-    (unless lvar
-      (typecase node
-        (ref
-         (setf victim node)
-         (delete-ref node)
-         (unlink-node node))
-        (combination
-         (when (flushable-combination-p node)
+    (if lvar
+        (do-uses (other-node lvar)
+          (when (and (neq node other-node)
+                     (not (node-deleted other-node))
+                     (eq block (node-block other-node)))
+            ;; This must be a preceding node and the current node will
+            ;; overwrite the value, unlink the lvar and the node will
+            ;; get a chance to be deleted on one of the next iterations
+            (delete-lvar-use other-node)))
+        (typecase node
+          (ref
            (setf victim node)
-           (flush-combination node)))
-        (mv-combination
-         (when (eq (basic-combination-kind node) :local)
-           (let ((fun (combination-lambda node)))
-             (when (dolist (var (lambda-vars fun) t)
-                     (when (or (leaf-refs var)
-                               (lambda-var-sets var))
-                       (return nil)))
+           (delete-ref node)
+           (unlink-node node))
+          (combination
+           (when (flushable-combination-p node)
+             (setf victim node)
+             (flush-combination node)))
+          (mv-combination
+           (when (eq (basic-combination-kind node) :local)
+             (let ((fun (combination-lambda node)))
+               (when (dolist (var (lambda-vars fun) t)
+                       (when (or (leaf-refs var)
+                                 (lambda-var-sets var))
+                         (return nil)))
+                 (setf victim node)
+                 (mapc #'flush-dest (basic-combination-args node))
+                 (delete-let fun)))))
+          (exit
+           (let ((value (exit-value node)))
+             (when value
                (setf victim node)
-               (mapc #'flush-dest (basic-combination-args node))
-               (delete-let fun)))))
-        (exit
-         (let ((value (exit-value node)))
-           (when value
+               (flush-dest value)
+               (setf (exit-value node) nil))))
+          (cset
+           (let ((var (set-var node)))
+             (when (and (lambda-var-p var)
+                        (null (leaf-refs var)))
+               (setf victim node)
+               (flush-dest (set-value node))
+               (setf (basic-var-sets var)
+                     (delq node (basic-var-sets var)))
+               (unlink-node node))))
+          (cast
+           (unless (cast-type-check node)
              (setf victim node)
-             (flush-dest value)
-             (setf (exit-value node) nil))))
-        (cset
-         (let ((var (set-var node)))
-           (when (and (lambda-var-p var)
-                      (null (leaf-refs var)))
-             (setf victim node)
-             (flush-dest (set-value node))
-             (setf (basic-var-sets var)
-                   (delq node (basic-var-sets var)))
-             (unlink-node node))))
-        (cast
-         (unless (cast-type-check node)
-           (setf victim node)
-           (flush-dest (cast-value node))
-           (unlink-node node))))))
+             (flush-dest (cast-value node))
+             (unlink-node node))))))
 
   victim)
 

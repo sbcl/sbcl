@@ -404,3 +404,17 @@
                        x)))))
               123)
              123)))
+
+(with-test (:name :dead-lvars-and-stack-analysis)
+  (assert (=
+           (funcall
+            (checked-compile
+             `(lambda (b)
+                (catch 'ct2
+                  (block b5
+                    (return-from b5
+                      (multiple-value-prog1 19
+                        (if (or b t)
+                            (return-from b5 333))))))))
+            11)
+           333)))
