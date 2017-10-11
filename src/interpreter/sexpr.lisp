@@ -706,7 +706,7 @@
                     (frame fun (interpreter-trampoline fun ,@args))
                   (dispatch (lambda-frame-sexpr frame)
                             (new-env make-var-env
-                                     ,(if (zerop n) nil `(vector ,@args))))))
+                                     ,(if (zerop n) #() `(vector ,@args))))))
               (named-lambda (.apply. ,n) ,args
                 (declare #.+handler-optimize+ (optimize sb-c:verify-arg-count))
                 (with-lambda-frame
@@ -715,7 +715,7 @@
                     (catch exit
                       (dispatch (lambda-frame-sexpr frame)
                                 (new-env make-lambda-env
-                                         ,(if (zerop n) nil `(vector ,@args))
+                                         ,(if (zerop n) #() `(vector ,@args))
                                          exit)))))))))
     (case (lambda-frame-min-args (interpreted-function-frame fun))
       (5 (invoke 5))

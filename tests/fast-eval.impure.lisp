@@ -285,3 +285,7 @@
                     (search "exited tagbody"
                             (simple-condition-format-control c)))))
      (:no-error (&rest whatever) (error "Expected an error"))))
+
+(test-util:with-test (:name :argless-lambda)
+  (assert (eq ((lambda () (declare (special *some-var*)) (setq *some-var* t)))
+              t)))
