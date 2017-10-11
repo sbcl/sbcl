@@ -29,6 +29,7 @@
 #include "interr.h"
 #include "gc.h"
 #include "gc-internal.h"
+#include "gc-private.h"
 #include "thread.h"
 #include "genesis/gc-tables.h"
 #include "genesis/primitive-objects.h"

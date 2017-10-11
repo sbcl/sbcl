@@ -726,6 +726,7 @@ process_directory(int count, struct ndir_entry *entry,
         }
     }
 
+#ifdef LISP_FEATURE_RELOCATABLE_HEAP
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     if (IMMOBILE_SPACE_START != spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].base) {
         adj->range[0].start = spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].base;
@@ -741,6 +742,7 @@ process_directory(int count, struct ndir_entry *entry,
     }
     if (adj->range[0].delta | adj->range[1].delta)
         relocate_heap(adj);
+#endif
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     /* Now determine page characteristics (such as object spacing)
