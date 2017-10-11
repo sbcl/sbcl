@@ -1,5 +1,5 @@
-#ifndef SBCL_INCLUDED_CPPUTIL_H
-#define SBCL_INCLUDED_CPPUTIL_H
+#ifndef SBCL_INCLUDED_ALIGN_H
+#define SBCL_INCLUDED_ALIGN_H
 
 #include <stdint.h>
 
@@ -16,4 +16,4 @@
 #define PTR_IS_ALIGNED(pointer,granularity)     \
     IS_ALIGNED((uintptr_t)pointer,granularity)
 
-#endif /* SBCL_INCLUDED_CPPUTIL_H */
+#endif /* SBCL_INCLUDED_ALIGN_H */

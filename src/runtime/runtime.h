@@ -343,7 +343,7 @@ make_fixnum(sword_t n)
 static inline sword_t
 fixnum_value(lispobj n)
 {
-    return n >> N_FIXNUM_TAG_BITS;
+    return (sword_t)n >> N_FIXNUM_TAG_BITS;
 }
 
 static inline uword_t
@@ -352,13 +352,12 @@ code_header_words(lispobj header) // given header = code->header
   return HeaderValue(header) & SHORT_HEADER_MAX_WORDS;
 }
 
+#include "align.h"
 static inline sword_t
 code_instruction_words(lispobj n) // given n = code->code_size
 {
     /* Convert bytes into words, double-word aligned. */
-    sword_t x = ((n >> N_FIXNUM_TAG_BITS) + LOWTAG_MASK) & ~LOWTAG_MASK;
-
-    return x >> WORD_SHIFT;
+    return ALIGN_UP(fixnum_value(n), 2*N_WORD_BYTES) >> WORD_SHIFT;
 }
 #undef HEADER_VALUE_MASKED
 

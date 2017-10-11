@@ -682,7 +682,7 @@ instance_scan(void (*proc)(lispobj*, sword_t, uword_t),
       if (layout_bitmap == make_fixnum(-1))
           proc(instance_slots, nslots, arg);
       else {
-          sword_t bitmap = (sword_t)layout_bitmap >> N_FIXNUM_TAG_BITS; // signed integer!
+          sword_t bitmap = fixnum_value(layout_bitmap); // signed integer!
           for (index = 0; index < nslots ; index++, bitmap >>= 1)
               if (bitmap & 1)
                   proc(instance_slots + index, 1, arg);
@@ -725,7 +725,7 @@ scav_instance(lispobj *where, lispobj header)
         instance_scan((void(*)(lispobj*,sword_t,uword_t))scavenge,
                       where+1, nslots, lbitmap, 0);
     } else {
-        sword_t bitmap = (sword_t)lbitmap >> N_FIXNUM_TAG_BITS; // signed integer!
+        sword_t bitmap = fixnum_value(lbitmap); // signed integer!
         sword_t n = nslots;
         lispobj obj;
         for ( ; n-- ; bitmap >>= 1) {

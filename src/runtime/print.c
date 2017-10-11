@@ -298,9 +298,9 @@ static void brief_fixnum(lispobj obj)
     if (!fixnump(obj)) return print_unknown(obj);
 
 #ifndef LISP_FEATURE_ALPHA
-    printf("%ld", ((long)obj)>>N_FIXNUM_TAG_BITS);
+    printf("%ld", fixnum_value(obj));
 #else
-    printf("%d", ((s32)obj)>>N_FIXNUM_TAG_BITS);
+    printf("%d", fixnum_value(obj));
 #endif
 }
 
@@ -312,9 +312,9 @@ static void print_fixnum(lispobj obj)
     if (!fixnump(obj)) return print_unknown(obj);
 
 #ifndef LISP_FEATURE_ALPHA
-    printf(": %ld", ((long)obj)>>N_FIXNUM_TAG_BITS);
+    printf(": %ld", fixnum_value(obj));
 #else
-    printf(": %d", ((s32)obj)>>N_FIXNUM_TAG_BITS);
+    printf(": %d", fixnum_value(obj));
 #endif
 }
 
@@ -448,7 +448,7 @@ static void brief_struct(lispobj obj)
 static boolean tagged_slot_p(struct layout *layout, int slot_index)
 {
   lispobj bitmap = layout->bitmap;
-  sword_t fixnum = (sword_t)bitmap >> N_FIXNUM_TAG_BITS; // optimistically
+  sword_t fixnum = fixnum_value(bitmap); // optimistically
   return fixnump(bitmap)
          ? bitmap == make_fixnum(-1) ||
             (slot_index < N_WORD_BITS && ((fixnum >> slot_index) & 1) != 0)

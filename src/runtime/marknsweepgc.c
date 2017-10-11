@@ -817,7 +817,7 @@ fixedobj_points_to_younger_p(lispobj* obj, int n_words,
     lbitmap = LAYOUT(layout[0])->bitmap;
     if (lbitmap != make_fixnum(-1)) {
         gc_assert(fixnump(lbitmap));  // No bignums (yet)
-        sword_t bitmap = (sword_t)lbitmap >> N_FIXNUM_TAG_BITS;
+        sword_t bitmap = fixnum_value(lbitmap);
         lispobj* where = obj + 1;
         for ( ; --n_words ; ++where, bitmap >>= 1 )
             if ((bitmap & 1) != 0 &&
