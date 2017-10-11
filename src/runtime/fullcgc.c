@@ -274,7 +274,7 @@ static void trace_object(lispobj* where)
                 __mark_obj(where[i]);
         return; // do not scan slots
     case SIMPLE_VECTOR_WIDETAG:
-        if ((HeaderValue(header) & 0xFF) != subtype_VectorNormal) {
+        if (is_vector_subtype(header, VectorValidHashing)) {
             lispobj lhash_table = where[2];
             gc_dcheck(is_lisp_pointer(lhash_table));
             __mark_obj(lhash_table);

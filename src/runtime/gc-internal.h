@@ -83,6 +83,8 @@ code_n_funs(struct code* code) { return fixnum_value((code)->n_entries) & 0x3FFF
 #define FIRST_SIMPLE_FUN_OFFSET(code) ((code)->n_entries >> 16)
 #endif
 
+#define is_vector_subtype(header, val) ((HeaderValue(header) & 3) == subtype_##val)
+
 // Iterate over the native pointers to each function in 'code_var'
 // offsets are stored as the number of bytes into the instructions
 // portion of the code object at which the simple-fun object resides.

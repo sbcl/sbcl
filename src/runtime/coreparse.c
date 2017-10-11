@@ -459,10 +459,10 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
             break;
         // Vectors require extra care because of EQ-based hashing.
         case SIMPLE_VECTOR_WIDETAG:
-          if ((HeaderValue(*where) & 0xFF) == subtype_VectorValidHashing) {
+          if (is_vector_subtype(*where, VectorValidHashing)) {
               struct vector* v = (struct vector*)where;
               gc_assert(v->length > 0 &&
-                        !(fixnum_value(v->length) & 1) &&  // length must be even
+                        !(v->length & make_fixnum(1)) && // length must be even
                         lowtag_of(v->data[0]) == INSTANCE_POINTER_LOWTAG);
               lispobj* data = (lispobj*)v->data;
               adjust_pointers(&data[0], 1, adj); // adjust the hash-table structure

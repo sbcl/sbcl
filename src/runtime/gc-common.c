@@ -1124,7 +1124,7 @@ void scav_hash_table_entries (struct hash_table *hash_table,
 }
 
 sword_t
-scav_vector (lispobj *where, lispobj object)
+scav_vector (lispobj *where, lispobj header)
 {
     sword_t kv_length = fixnum_value(where[1]);
     struct hash_table *hash_table;
@@ -1132,7 +1132,7 @@ scav_vector (lispobj *where, lispobj object)
     /* SB-VM:VECTOR-VALID-HASHING-SUBTYPE is set for EQ-based and weak
      * hash tables in the Lisp HASH-TABLE code to indicate need for
      * special GC support. */
-    if ((HeaderValue(object) & 0xFF) == subtype_VectorNormal) {
+    if (is_vector_subtype(header, VectorNormal)) {
  normal:
       scavenge(where + 2, kv_length);
       return ALIGN_UP(kv_length + 2, 2);

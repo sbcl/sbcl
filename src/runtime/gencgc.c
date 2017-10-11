@@ -2265,9 +2265,9 @@ update_page_write_prot(page_index_t page)
 static inline boolean large_simple_vector_p(page_index_t page) {
     if (!page_table[page].large_object)
         return 0;
-    lispobj object = *(lispobj *)page_address(page);
-    return widetag_of(object) == SIMPLE_VECTOR_WIDETAG &&
-        (HeaderValue(object) & 0xFF) == subtype_VectorNormal;
+    lispobj header = *(lispobj *)page_address(page);
+    return widetag_of(header) == SIMPLE_VECTOR_WIDETAG &&
+        is_vector_subtype(header, VectorNormal);
 
 }
 
