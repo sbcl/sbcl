@@ -339,26 +339,6 @@ scav_weak_pointer(lispobj *where, lispobj object)
 }
 
 lispobj *
-search_read_only_space(void *pointer)
-{
-    lispobj* start = (lispobj*)READ_ONLY_SPACE_START;
-    lispobj* end = read_only_space_free_pointer;
-    if ((pointer < (void *)start) || (pointer >= (void *)end))
-        return NULL;
-    return gc_search_space(start, pointer);
-}
-
-lispobj *
-search_static_space(void *pointer)
-{
-    lispobj* start = (lispobj*)STATIC_SPACE_START;
-    lispobj* end = static_space_free_pointer;
-    if ((pointer < (void *)start) || (pointer >= (void *)end))
-        return NULL;
-    return gc_search_space(start, pointer);
-}
-
-lispobj *
 search_dynamic_space(void *pointer)
 {
     lispobj *start = (lispobj *) current_dynamic_space;
