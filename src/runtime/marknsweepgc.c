@@ -47,6 +47,7 @@
 
 #include "gc.h"
 #include "gc-internal.h"
+#include "gc-private.h"
 #include "genesis/gc-tables.h"
 #include "genesis/vector.h"
 #include "forwarding-ptr.h"

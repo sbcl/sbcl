@@ -171,8 +171,6 @@ void update_dynamic_space_free_pointer(void);
 void gc_alloc_update_page_tables(int page_type_flag, struct alloc_region *alloc_region);
 void gc_alloc_update_all_page_tables(int);
 void gc_set_region_empty(struct alloc_region *region);
-void gc_mark_range(lispobj*start, long count);
-void gc_mark_obj(lispobj);
 
 /*
  * predicates

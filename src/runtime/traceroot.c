@@ -4,6 +4,7 @@
 #include "runtime.h"
 #include "lispregs.h"
 #include "gc-internal.h"
+#include "gc-private.h"
 #include "genesis/closure.h"
 #include "genesis/cons.h"
 #include "genesis/constants.h"

@@ -45,6 +45,7 @@
 #include "genesis/hash-table.h"
 #define WANT_SCAV_TRANS_SIZE_TABLES
 #include "gc-internal.h"
+#include "gc-private.h"
 #include "forwarding-ptr.h"
 #include "var-io.h"
 
