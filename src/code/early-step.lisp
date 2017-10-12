@@ -20,7 +20,7 @@
 ;; structure is used instead. (See EMIT-SINGLE-STEP-TEST in
 ;; src/compiler/x86/call.lisp).
 #!-sb-thread
-(defvar *stepping* nil)
+(defvar *stepping* 0)
 
 ;; Used for implementing the STEP-OUT restart. The step-wrapper will
 ;; bind this to :MAYBE, before calling the wrapped code. When
