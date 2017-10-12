@@ -1374,7 +1374,7 @@
                      :disp (* thread-stepping-slot n-word-bytes))
         0)
   #!-sb-thread
-  (inst cmp (make-ea :qword
+  (inst cmp (make-ea :byte
                      :disp (+ nil-value (static-symbol-offset
                                          'sb!impl::*stepping*)
                               (* symbol-value-slot n-word-bytes)
