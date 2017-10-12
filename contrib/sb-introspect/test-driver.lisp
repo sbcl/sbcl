@@ -420,7 +420,7 @@
          (= (getf props :generation) gen)
          (eq (getf props :boxed :missing) boxedp))))
 #+gencgc
-(deftest allocation-information.6
+(deftest* (allocation-information.6 :fails-on (or :sparc))
     ;; Remember, all tests run after all toplevel forms have executed,
     ;; so if this were (DEFGLOBAL *LARGE-CODE* ... ) or something,
     ;; the garbage collection explicitly requested for ALLOCATION-INFORMATION.5
