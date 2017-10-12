@@ -5,20 +5,59 @@
 
 (in-package "SB!VM")
 
-;;; KLUDGE: this has to be the very first code component in immobile space
-;;; due to hardcoding of the address in arch_os_link_runtime().
-#!+immobile-space
-(define-assembly-routine
-    (alloc-tramp (:return-style :none))
-    ()
-  ;; This is a shell of a routine. We leave filler enough to write two JMP
-  ;; instructions in the manner of linkage table entries. This is so that CALL
-  ;; can be used with a rel32 operand from immobile code without assuming a fixed
-  ;; difference between the immobile space and linkage table base addresses.
-  ;; (Assembly routines are themselves in immobile space)
-  ;; The entries are "alloc_tramp" and "alloc_to_r11", in that order.
-  (dotimes (i (* 2 sb!vm:linkage-table-entry-size))
-    (inst byte 0)))
+(macrolet
+    ((def ((name &key do-not-preserve (stack-delta 0))
+           &body move-result)
+       `(define-assembly-routine
+            (,name (:return-style :none))
+            ()
+          (macrolet ((map-registers (op)
+                       (let ((registers (set-difference
+                                         '(rax-tn rcx-tn rdx-tn rsi-tn rdi-tn
+                                           r8-tn r9-tn r10-tn r11-tn)
+                                         ',do-not-preserve)))
+                         ;; Preserve alignment
+                         (when (oddp (length registers))
+                           (push (car registers) registers))
+                         `(progn
+                            ,@(loop for reg in (if (eq op 'pop)
+                                                   (reverse registers)
+                                                   registers)
+                                    collect
+                                    `(inst ,op ,reg)))))
+                     (map-floats (op)
+                       `(progn
+                          ,@(loop for i by 16
+                                  for float in
+                                  '(float0-tn float1-tn float2-tn float3-tn
+                                    float4-tn float5-tn float6-tn float7-tn
+                                    float8-tn float9-tn float10-tn float11-tn
+                                    float12-tn float13-tn float14-tn float15-tn)
+                                  collect
+                                  (if (eql op 'pop)
+                                      `(inst movaps ,float (make-ea :qword :base rsp-tn :disp ,i))
+                                      `(inst movaps (make-ea :qword :base rsp-tn :disp ,i) ,float))))))
+            (inst cld)
+            (inst push rbp-tn)
+            (inst mov rbp-tn rsp-tn)
+            (inst and rsp-tn (- (* n-word-bytes 2)))
+            (inst sub rsp-tn (* 16 16))
+            (map-floats push)
+            (map-registers push)
+            (inst mov rdi-tn (make-ea :qword :base rbp-tn :disp 16))
+            (inst mov rax-tn (make-fixup "alloc" :foreign))
+            (inst call rax-tn)
+            ,@move-result
+            (map-registers pop)
+            (map-floats pop)
+            (inst mov rsp-tn rbp-tn)
+            (inst pop rbp-tn)
+            (inst ret ,stack-delta)))))
+  (def (alloc-tramp)
+    (inst mov (make-ea :qword :base rbp-tn :disp 16) rax-tn))
+  (def (alloc-tramp-r11 :do-not-preserve (r11-tn)
+                        :stack-delta 8) ;; remove the size parameter
+    (inst mov r11-tn rax-tn)))
 
 (define-assembly-routine
     (undefined-tramp (:return-style :none))

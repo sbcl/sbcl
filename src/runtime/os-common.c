@@ -203,11 +203,6 @@ void os_link_runtime()
              n, m);
 #endif /* LISP_FEATURE_SB_DYNAMIC_CORE */
 
-#ifdef LISP_FEATURE_X86_64
-    extern void arch_os_link_runtime();
-    arch_os_link_runtime();
-#endif
-
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     /* Delayed until after dynamic space has been mapped, fixups made,
      * and/or immobile-space linkage entries written,

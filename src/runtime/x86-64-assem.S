@@ -287,83 +287,7 @@ GNAME(funcall_alien_callback):
 	ret
 	SIZE(GNAME(funcall_alien_callback))
 #endif
- 
 
-/* Our call-site does not take care of caller-saved xmm registers, so it
- * falls to us spill them beforing hopping into C.
- *
- * We simply save all of them.
- *
- * (But for the sake of completeness, here is my understanding of the specs:)
- *                     System V       Microsoft
- * argument passing    xmm0-7         xmm0-3
- * caller-saved        xmm8-15        xmm4-5
- * callee-saved        -              xmm6-15
- *
- *  --DFL */
-
-#define stkxmmsave(n) movaps %xmm##n, n*16(%rsp)
-#define stkxmmload(n) movaps n*16(%rsp), %xmm##n
-#define map_all_xmm(op) \
-	op(0);op(1);op(2);op(3);op(4);op(5);op(6);op(7); \
-    op(8);op(9);op(10);op(11);op(12);op(13);op(14);op(15);
-
-#define push_regs_a_c_d_si_di_8_9_10 \
- push %rax; push %rcx; push %rdx; push %rsi; push %rdi; push %r8; push %r9; push %r10
-#define pop_regs_10_9_8_di_si_d_c_a \
- pop %r10; pop %r9; pop %r8; pop %rdi; pop %rsi; pop %rdx; pop %rcx; pop %rax
-        
-	.text
-	.align	align_16byte,0x90
-	.globl  GNAME(alloc_tramp)
-	TYPE(GNAME(alloc_tramp))
-GNAME(alloc_tramp):
-	cld
-	push	%rbp		# Save old frame pointer.
-	mov	%rsp,%rbp	# Establish new frame.
-	and	$-32,%rsp
-	sub	$16*16,%rsp
-	map_all_xmm(stkxmmsave)
-	# Doing rax twice is to maintain 16-byte stack alignment.
-	push    %rax
-	push_regs_a_c_d_si_di_8_9_10
-	push	%r11
-	# r12 through r15 are callee-saved
-	mov	16(%rbp),%rdi
-	call	GNAME(alloc)
-	mov	%rax,16(%rbp)
-	pop	%r11
-	pop_regs_10_9_8_di_si_d_c_a
-	pop	%rax # corresponds to "extra" push
-	map_all_xmm(stkxmmload)
-	mov	%rbp,%rsp
-	pop	%rbp
-	ret
-	SIZE(GNAME(alloc_tramp))
-
-
-	.align	align_16byte,0x90
-	.globl  GNAME(alloc_to_r11)
-	TYPE(GNAME(alloc_to_r11))
-GNAME(alloc_to_r11):
-	cld
-	push	%rbp		# Save old frame pointer.
-	mov	%rsp,%rbp	# Establish new frame.
-	and	$-32,%rsp
-	sub	$16*16,%rsp
-	map_all_xmm(stkxmmsave)
-	push_regs_a_c_d_si_di_8_9_10
-	# r12 through r15 are callee-saved
-	mov	16(%rbp),%rdi
-	call	GNAME(alloc)
-	mov	%rax,%r11       # move to result register
-	pop_regs_10_9_8_di_si_d_c_a
-	map_all_xmm(stkxmmload)
-	mov	%rbp,%rsp
-	pop	%rbp
-	retq    $8              # remove 8 bytes from the stack
-	SIZE(GNAME(alloc_to_r11))
-
 /*
  * fun-end breakpoint magic
  */
