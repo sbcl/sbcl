@@ -407,7 +407,9 @@
          ,@(when translate `((:translate ,translate)))
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg) :to :eval)
-              (index :scs (any-reg) :to :result)
+              (index :scs (,@(when (member translate '(%instance-cas %raw-instance-cas/word))
+                               '(immediate))
+                           any-reg) :to :eval)
               (old-value :scs ,scs :target rax)
               (new-value :scs ,scs))
        (:arg-types ,type tagged-num ,el-type ,el-type)
@@ -417,9 +419,12 @@
        (:result-types ,el-type)
        (:generator 5
          (move rax old-value)
-         (inst cmpxchg (make-ea :qword :base object :index index
-                                :scale (ash 1 (- word-shift n-fixnum-tag-bits))
-                                :disp (- (* ,offset n-word-bytes) ,lowtag))
+         (inst cmpxchg
+               (make-ea :qword :base object
+                        :index  (unless (sc-is index immediate) index)
+                        :scale (ash 1 (- word-shift n-fixnum-tag-bits))
+                        :disp (- (* (+ (if (sc-is index immediate) (tn-value index) 0)
+                                       ,offset) n-word-bytes) ,lowtag))
                new-value :lock)
          (move value rax)))))
 
