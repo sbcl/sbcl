@@ -435,6 +435,9 @@ else
     case $sbcl_arch in
         x86|x86-64|arm64)
             case $sbcl_os in
+    # Be aware that if you use multiple threads on Darwin,
+    # it works well enough when threads don't interact much, but
+    # you might encounter https://bugs.launchpad.net/sbcl/+bug/901441
                 linux|darwin)
                     WITH_FEATURES="$WITH_FEATURES :sb-thread"
             esac
