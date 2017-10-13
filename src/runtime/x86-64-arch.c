@@ -30,13 +30,17 @@
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
 
-#define BREAKPOINT_INST 0xcc    /* INT3 */
-#define UD2_INST 0x0b0f         /* UD2 */
 
-#ifndef LISP_FEATURE_UD2_BREAKPOINTS
-#define BREAKPOINT_WIDTH 1
-#else
+#ifdef LISP_FEATURE_UD2_BREAKPOINTS
+#define UD2_INST 0x0b0f         /* UD2 */
 #define BREAKPOINT_WIDTH 2
+#else
+#ifdef LISP_FEATURE_INT4_BREAKPOINTS
+# define BREAKPOINT_INST 0xce    /* INTO */
+#else
+# define BREAKPOINT_INST 0xcc    /* INT3 */
+#endif
+#define BREAKPOINT_WIDTH 1
 #endif
 
 unsigned int cpuid_fn1_ecx;
@@ -375,6 +379,11 @@ sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context) {
 #if defined(LISP_FEATURE_UD2_BREAKPOINTS) && !defined(LISP_FEATURE_MACH_EXCEPTION_HANDLER)
     if (*((unsigned short *)*os_context_pc_addr(context)) == UD2_INST) {
         *os_context_pc_addr(context) += 2;
+        return sigtrap_handler(signal, siginfo, context);
+    }
+#elif defined(LISP_FEATURE_INT4_BREAKPOINTS) && !defined(LISP_FEATURE_MACH_EXCEPTION_HANDLER)
+    if (*((unsigned char *)*os_context_pc_addr(context)) == BREAKPOINT_INST) {
+        *os_context_pc_addr(context) += BREAKPOINT_WIDTH;
         return sigtrap_handler(signal, siginfo, context);
     }
 #endif

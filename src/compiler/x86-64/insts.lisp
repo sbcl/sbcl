@@ -2502,12 +2502,12 @@
 
 (define-instruction break (segment code)
   (:declare (type (unsigned-byte 8) code))
-  #!-ud2-breakpoints (:printer byte-imm ((op #b11001100))
+  #!-ud2-breakpoints (:printer byte-imm ((op (or #!+int4-breakpoints #xCE #xCC)))
                                '(:name :tab code) :control #'break-control)
   #!+ud2-breakpoints (:printer word-imm ((op #b0000101100001111))
                                '(:name :tab code) :control #'break-control)
   (:emitter
-   #!-ud2-breakpoints (emit-byte segment #b11001100)
+   #!-ud2-breakpoints (emit-byte segment (or #!+int4-breakpoints #xCE #xCC))
    ;; On darwin, trap handling via SIGTRAP is unreliable, therefore we
    ;; throw a sigill with 0x0b0f instead and check for this in the
    ;; SIGILL handler and pass it on to the sigtrap handler if
@@ -2520,8 +2520,8 @@
   (:printer byte-imm ((op #b11001101)))
   (:emitter
    (etypecase number
-     ((member 3)
-      (emit-byte segment #b11001100))
+     ((member 3 4)
+      (emit-byte segment (if (eql number 4) #xCE #xCC)))
      ((unsigned-byte 8)
       (emit-byte segment #b11001101)
       (emit-byte segment number)))))

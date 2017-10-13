@@ -282,7 +282,7 @@
 (defun emit-error-break (vop kind code values)
   (assemble ()
     #!-ud2-breakpoints
-    (inst int 3)                  ; i386 breakpoint instruction
+    (inst int #!+int4-breakpoints 4 #!-int4-breakpoints 3)
     ;; On Darwin, we need to use #x0b0f instead of int3 in order
     ;; to generate a SIGILL instead of a SIGTRAP as darwin/x86
     ;; doesn't seem to be reliably firing SIGTRAP

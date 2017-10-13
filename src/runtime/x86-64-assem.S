@@ -82,6 +82,8 @@
  * call sigtrap_handler. */
 #if defined(LISP_FEATURE_UD2_BREAKPOINTS)
 #define TRAP ud2
+#elif defined(LISP_FEATURE_INT4_BREAKPOINTS)
+#define TRAP .byte 0xCE /* due to illegality, assembler won't emit "into" */
 #else
 #define TRAP int3
 #endif
