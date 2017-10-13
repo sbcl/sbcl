@@ -177,7 +177,7 @@
 (defun allocation-tramp (alloc-tn size back-label return-in-tmp lip)
   (unless (eq size tmp-tn)
     (inst mov tmp-tn size))
-  (load-inline-constant alloc-tn '(:fixup "alloc_tramp" :foreign) lip)
+  (load-inline-constant alloc-tn '(:fixup alloc-tramp :assembly-routine) lip)
   (inst blr alloc-tn)
   (unless return-in-tmp
     (move alloc-tn tmp-tn))

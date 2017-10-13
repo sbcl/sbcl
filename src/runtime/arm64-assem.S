@@ -361,114 +361,14 @@ fun_end_breakpoint_trap:
         b      fun_end_breakpoint_trap
         .global fun_end_breakpoint_end
 fun_end_breakpoint_end:
-
 #ifdef LISP_FEATURE_GENCGC
-	.align
-	.global	alloc_tramp
-	.type	alloc_tramp, %function
-alloc_tramp:
-        stp     reg_NL0,reg_NL1, [sp,#-80]!
-        stp     reg_NL2,reg_NL3, [sp,#16]
-        stp     reg_NL4,reg_NL5, [sp,#32]
-        stp     reg_NL6,reg_NL7, [sp,#48]
-        stp     reg_NL8,reg_NL9, [sp,#64]
-
-        mov     x0, reg_TMP // size
-
-#ifdef LISP_FEATURE_SB_THREAD
-        stp     reg_CFP,reg_CSP, [reg_THREAD, THREAD_CONTROL_FRAME_POINTER_OFFSET]
-        str     reg_CSP, [reg_THREAD, THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET]
-#else
-        ldr	reg_NFP, =current_control_frame_pointer
-	str	reg_CFP, [reg_NFP]
-	ldr	reg_OCFP, =current_control_stack_pointer
-	str	reg_CSP, [reg_OCFP]
-
-        ldr     reg_TMP, =foreign_function_call_active
-        str     reg_TMP, [reg_TMP]
-#endif
-        // Create a new frame
-        add     reg_CSP,reg_CSP, #32+80
-        stp     reg_CFP,reg_NULL,[reg_CSP, #-112]
-        stp     reg_CODE,reg_LR,[reg_CSP, #-96]
-
-        stp     reg_R0,reg_R1, [reg_CSP,#-80]
-        stp     reg_R2,reg_R3, [reg_CSP,#-64]
-        stp     reg_R4,reg_R5, [reg_CSP,#-48]
-        stp     reg_R6,reg_R7, [reg_CSP,#-32]
-        stp     reg_R8,reg_R9, [reg_CSP,#-16]
-
-        stp     q0, q1, [sp,#-512]!
-        stp     q2,q3, [sp,#32]
-        stp     q4,q5, [sp,#64]
-        stp     q6,q7, [sp,#96]
-        stp     q8,q9, [sp,#128]
-        stp     q10,q11, [sp,#160]
-        stp     q12,q13, [sp,#192]
-        stp     q14,q15, [sp,#224]
-        stp     q16,q17, [sp,#256]
-        stp     q18,q19, [sp,#288]
-        stp     q20,q21, [sp,#320]
-        stp     q22,q23, [sp,#352]
-        stp     q24,q25, [sp,#384]
-        stp     q26,q27, [sp,#416]
-        stp     q28,q29, [sp,#448]
-        stp     q30,q31, [sp,#480]
-
-        bl      alloc
-
-        ldp     q30,q31, [sp,#480]
-        ldp     q28,q29, [sp,#448]
-        ldp     q26,q27, [sp,#416]
-        ldp     q24,q25, [sp,#384]
-        ldp     q22,q23, [sp,#352]
-        ldp     q20,q21, [sp,#320]
-        ldp     q18,q19, [sp,#288]
-        ldp     q16,q17, [sp,#256]
-        ldp     q14,q15, [sp,#224]
-        ldp     q12,q13, [sp,#192]
-        ldp     q10,q11, [sp,#160]
-        ldp     q8,q9, [sp,#128]
-        ldp     q6,q7, [sp,#96]
-        ldp     q4,q5, [sp,#64]
-        ldp     q2,q3, [sp,#32]
-        ldp     q0, q1, [sp],#512
-
-        ldp     reg_R8,reg_R9, [reg_CSP,#-16]
-        ldp     reg_R6,reg_R7, [reg_CSP,#-32]
-        ldp     reg_R4,reg_R5, [reg_CSP,#-48]
-        ldp     reg_R2,reg_R3, [reg_CSP,#-64]
-        ldp     reg_R0,reg_R1, [reg_CSP,#-80]
-
-        ldr     reg_LR,[reg_CSP,#-88]
-
-        sub     reg_CSP, reg_CSP, #32+80 // deallocate the frame
-
-        // foreign_function_call_active
-#ifdef LISP_FEATURE_SB_THREAD
-        str     xzr, [reg_THREAD, THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET]
-#else
-	str     xzr, [reg_TMP]
-#endif
-
-        mov     reg_TMP, x0
-
-        ldp     reg_NL8,reg_NL9, [sp,#64]
-        ldp     reg_NL6,reg_NL7, [sp,#48]
-        ldp     reg_NL4,reg_NL5, [sp,#32]
-        ldp     reg_NL2,reg_NL3, [sp,#16]
-        ldp     reg_NL0,reg_NL1, [sp],#80
-
-	ret
-
         .align
 	.global	do_pending_interrupt
 	.type	do_pending_interrupt, %function
 do_pending_interrupt:
         brk trap_PendingInterrupt
 	ret
-        #endif
-
+#endif
 #ifdef __ELF__
 // Mark the object as not requiring an executable stack.
 .section .note.GNU-stack,"",%progbits
