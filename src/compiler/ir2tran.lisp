@@ -1200,7 +1200,7 @@
                             for i from 0
                             collect (cond ((eql (tn-kind loc) :unused)
                                            loc)
-                                          #!+x86-64 ;; needs default-unknown-values support
+                                          #!+(or x86-64 arm64) ;; needs default-unknown-values support
                                           ((>= i sb!vm::register-arg-count)
                                            (make-normal-tn *backend-t-primitive-type*))
                                           (t

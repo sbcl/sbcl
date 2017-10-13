@@ -502,8 +502,9 @@ invoked. In that case it will store into PLACE and start over."
   ;; optional dispatch mechanism for the M-V-B gets increasingly
   ;; hairy.
   (let ((val (and (sb!xc:constantp n env) (constant-form-value n env))))
-    (if (and (integerp val) (<= 0 val #!-x86-64 10 ; Arbitrary limit.
-                                      #!+x86-64 1000))  ;; it has better DEFAULT-UNKNOWN-VALUES
+    (if (and (integerp val) (<= 0 val (or #+(or x86-64 arm64) ;; better DEFAULT-UNKNOWN-VALUES
+                                          1000
+                                          10))) ; Arbitrary limit.
         (let ((dummy-list (make-gensym-list val))
               (keeper (sb!xc:gensym "KEEPER")))
           `(multiple-value-bind (,@dummy-list ,keeper) ,form

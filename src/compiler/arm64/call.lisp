@@ -192,11 +192,10 @@
 ;;;  -- Reset SP.  This must be done whenever other than 1 value is returned,
 ;;;     regardless of the number of values desired.
 
-(defun default-unknown-values (vop values nvals move-temp temp lip lra-label)
+(defun default-unknown-values (vop values nvals move-temp lip lra-label)
   (declare (type (or tn-ref null) values)
-           (type unsigned-byte nvals) (type tn move-temp temp))
-  (let ((expecting-values-on-stack (> nvals register-arg-count))
-        (values-on-stack temp))
+           (type unsigned-byte nvals) (type tn move-temp))
+  (let ((expecting-values-on-stack (> nvals register-arg-count)))
     (note-this-location vop (if (<= nvals 1)
                                 :single-value-return
                                 :unknown-return))
@@ -211,7 +210,8 @@
         (do ((i 1 (1+ i))
              (val (tn-ref-across values) (tn-ref-across val)))
             ((= i (min nvals register-arg-count)))
-          (inst csel (tn-ref-tn val) null-tn (tn-ref-tn val) :ne)))
+          (unless (eq (tn-kind (tn-ref-tn val)) :unused)
+           (inst csel (tn-ref-tn val) null-tn (tn-ref-tn val) :ne))))
 
       ;; If we're not expecting values on the stack, all that
       ;; remains is to clear the stack frame (for the multiple-
@@ -231,26 +231,31 @@
         (inst mov tmp-tn (fixnumize 1))
         (inst csel nargs-tn tmp-tn nargs-tn :ne)
 
-        ;; Compute the number of stack values (may be negative if
-        ;; not all of the register values are populated).
-        (inst sub values-on-stack nargs-tn (fixnumize register-arg-count))
-
         ;; For each expected stack value...
         (do ((i register-arg-count (1+ i))
+             (decrement (fixnumize (1+ register-arg-count)))
              (val (do ((i 0 (1+ i))
                        (val values (tn-ref-across val)))
                       ((= i register-arg-count) val))
                   (tn-ref-across val)))
             ((null val))
-          (assemble ()
-            ;; ... Load it if there is a stack value available, or
-            ;; default it if there isn't.
-            (inst subs values-on-stack values-on-stack (fixnumize 1))
-            (inst b :lt NONE)
-            (loadw move-temp ocfp-tn i 0)
-            NONE
-            (inst csel move-temp null-tn move-temp :lt)
-            (store-stack-tn (tn-ref-tn val) move-temp)))
+          (let ((tn (tn-ref-tn val)))
+            (if (eq (tn-kind tn) :unused)
+                (incf decrement (fixnumize 1))
+                (assemble ()
+                  ;; ... Load it if there is a stack value available, or
+                  ;; default it if there isn't.
+                  (inst subs nargs-tn nargs-tn decrement)
+                  (setf decrement (fixnumize 1))
+                  (inst b :lt NONE)
+                  (loadw move-temp ocfp-tn i 0)
+                  NONE
+                  (sc-case tn
+                    (control-stack
+                     (inst csel move-temp null-tn move-temp :lt)
+                     (store-stack-tn tn move-temp))
+                    (t
+                     (inst csel tn null-tn move-temp :lt)))))))
         ;; Deallocate the callee stack frame.
         (move csp-tn ocfp-tn))))
   (values))
@@ -587,7 +592,6 @@
   (:info arg-locs callee target nvals)
   (:vop-var vop)
   (:temporary (:scs (descriptor-reg) :from (:eval 0)) move-temp)
-  (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
   (:temporary (:sc any-reg :offset ocfp-offset :from (:eval 0)) ocfp)
   (:temporary (:scs (interior-reg)) lip)
@@ -606,9 +610,7 @@
       (note-this-location vop :call-site)
       (inst b target)
       (emit-return-pc label)
-      (default-unknown-values vop values nvals move-temp temp lip label)
-      ;; alpha uses (maybe-load-stack-nfp-tn cur-nfp nfp-save temp)
-      ;; instead of the clause below
+      (default-unknown-values vop values nvals move-temp lip label)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))
 
@@ -811,7 +813,10 @@
            (:temporary (:scs (descriptor-reg) :to :eval)
                        function)))
 
-     (:temporary (:sc any-reg :offset nargs-offset :to :eval)
+     (:temporary (:sc any-reg :offset nargs-offset :to
+                      ,(if (eq return :fixed)
+                           :save
+                           :eval))
                  nargs-pass)
 
      ,@(when variable
@@ -822,8 +827,7 @@
                          ,name))
                  *register-arg-names* *register-arg-offsets*))
      ,@(when (eq return :fixed)
-         '((:temporary (:scs (non-descriptor-reg)) temp)
-           (:temporary (:scs (descriptor-reg) :from :eval) move-temp)
+         '((:temporary (:scs (descriptor-reg) :from :eval) move-temp)
            (:temporary (:sc any-reg :from :eval :offset ocfp-offset) ocfp-temp)))
 
      ,@(unless (eq return :tail)
@@ -963,8 +967,7 @@
          ,@(ecase return
              (:fixed
               '((emit-return-pc lra-label)
-                (default-unknown-values vop values nvals move-temp
-                                        temp lip lra-label)
+                (default-unknown-values vop values nvals move-temp lip lra-label)
                 (when cur-nfp
                   (load-stack-tn cur-nfp nfp-save))))
              (:unknown

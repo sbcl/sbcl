@@ -318,7 +318,7 @@
          (mapcar (lambda (var)
                    (cond
                      ;; Needs support from the CALL VOPs, default-unknown-values specifically
-                     #!+x86-64
+                     #!+(or x86-64 arm64)
                      ((not (lambda-var-refs var))
                       nil)
                      (t

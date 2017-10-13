@@ -249,9 +249,6 @@
                                (tn-offset source2))
                         (rotatef dest1 dest2)
                         (rotatef source1 source2))
-                      (when fp-load-tn
-                        (load-stack-tn fp-load-tn fp)
-                        (setf fp fp-load-tn))
                       (inst ldp dest1 dest2
                             (@ fp (* (tn-offset source1) n-word-bytes)))
                       t))))
@@ -269,13 +266,13 @@
                (fp2 (tn-ref-tn (tn-ref-across (sb!c::vop-args vop2))))
                (dest1 (dest vop1))
                (dest2 (dest vop2)))
-           (do-moves (source vop1) (source vop2) (dest vop1) (dest vop2)
-             (if (and (stack-p dest1)
-                      (stack-p dest2)
-                      (eq fp1 fp2))
-                 fp1
-                 cfp-tn)
-             (tn-ref-load-tn (tn-ref-across (sb!c::vop-args vop1))))))))))
+           (when (eq fp1 fp2)
+             (do-moves (source vop1) (source vop2) (dest vop1) (dest vop2)
+               (if (and (stack-p dest1)
+                        (stack-p dest2))
+                   fp1
+                   cfp-tn)
+               (tn-ref-load-tn (tn-ref-across (sb!c::vop-args vop1)))))))))))
 
 
 ;;;; ILLEGAL-MOVE
