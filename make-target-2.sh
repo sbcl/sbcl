@@ -43,12 +43,12 @@ if [ "$1" != --load ]; then
     echo //doing warm init - compilation phase
     ./src/runtime/sbcl --core output/cold-sbcl.core \
      --lose-on-corruption --no-sysinit --no-userinit \
-     --load src/cold/warm.lisp --quit
+     --eval '(sb-fasl::!warm-load "src/cold/warm.lisp")' --quit
 fi
 echo //doing warm init - load and dump phase
 ./src/runtime/sbcl --core output/cold-sbcl.core \
  --lose-on-corruption --no-sysinit --no-userinit \
- --load make-target-2-load.lisp \
+ --eval '(sb-fasl::!warm-load "make-target-2-load.lisp")' \
  --eval '(progn #+gencgc(setf (extern-alien "gc_coalesce_string_literals" char) 2))' \
  --eval '(sb-ext:save-lisp-and-die "output/sbcl.core")'
 

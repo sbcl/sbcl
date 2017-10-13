@@ -272,3 +272,9 @@
     (destructuring-bind (name code offset) routine
       (setf (gethash name *assembler-routines*)
             (sap-int (sap+ (code-instructions code) offset))))))
+
+(defun !warm-load (file)
+  (restart-case (load file)
+    (abort ()
+      :report "Abort building SBCL."
+      (sb!ext:exit :code 1))))
