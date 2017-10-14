@@ -573,10 +573,11 @@ One of :WARN, :ERROR or :NONE.")
         (barf "The WRITE-P in ~S isn't ~S." vop write-p))
       (unless (find-in #'tn-ref-next-ref ref vop-refs)
         (barf "~S not found in REFS for ~S" ref vop))
-      (unless (find-in #'tn-ref-next ref
-                       (if (tn-ref-write-p ref)
-                           (tn-writes (tn-ref-tn ref))
-                           (tn-reads (tn-ref-tn ref))))
+      (unless (or (eq (tn-kind (tn-ref-tn ref)) :unused)
+                  (find-in #'tn-ref-next ref
+                           (if (tn-ref-write-p ref)
+                               (tn-writes (tn-ref-tn ref))
+                               (tn-reads (tn-ref-tn ref)))))
         (barf "~S not found in reads/writes for its TN" ref))
 
       (let ((target (tn-ref-target ref)))
