@@ -170,6 +170,7 @@
 
 (deftype optimization-quality-range-designator ()
   '(or (eql nil)                                ; skip quality
+       (integer 0 3)                            ; one value
        (cons (or (eql nil) (integer 0 3)) list) ; list of values, nil means skip
        (eql t)))                                ; all values
 
@@ -203,13 +204,16 @@
 ;;;       NIL
 ;;;         Omit the quality.
 ;;;
-;;;       T
-;;;         Generate all values (0, 1, 2, 3) for the quality.
+;;;       (INTEGER 0 3)
+;;;
+;;;         Use the specified value for the quality.
 ;;;
 ;;;       (NIL | (INTEGER 0 3))*
 ;;;         Generate the specified values. A "value" of NIL omits the
 ;;;         quality from the combination.
 ;;;
+;;;       T
+;;;         Generate all values (0, 1, 2, 3) for the quality.
 (declaim (ftype (function #.`(function
                               &key
                               ,@(mapcar #'list +optimization-quality-keywords+
@@ -225,7 +229,9 @@
                ((eql t)
                 (dotimes (i 4) (funcall thunk i)))
                (cons
-                (map nil thunk values))))
+                (map nil thunk values))
+               ((integer 0 3)
+                (funcall thunk values))))
            (one-quality (qualities specs values)
              (let ((quality (first qualities))
                    (spec    (first specs)))
@@ -258,6 +264,30 @@
                                 for value = (getf args keyword)
                                 when value collect (list name value))))
          args))
+
+(defun expand-optimize-specifier (specifier)
+  (etypecase specifier
+    (cons
+     specifier)
+    ((eql nil)
+     '(:speed nil :safety nil :debug nil :compilation-speed nil :space nil))
+    ((eql :default)
+     '(:speed 1 :safety 1 :debug 1 :compilation-speed 1 :space 1))
+    ((eql :safe)
+     (list :filter (lambda (&key speed safety &allow-other-keys)
+                     (> safety speed))))
+    ((eql :quick)
+     '(:compilation-speed 1 :space 1))
+    ((eql :all)
+     '())))
+
+(defun map-optimization-quality-combinations* (function specifier)
+  (apply #'map-optimization-quality-combinations
+         function (expand-optimize-specifier specifier)))
+
+(defun map-optimize-declarations* (function specifier)
+  (apply #'map-optimize-declarations
+         function (expand-optimize-specifier specifier)))
 
 ;;;; CHECKED-COMPILE
 
