@@ -291,6 +291,74 @@
 
 ;;;; CHECKED-COMPILE
 
+(defun prepare-form (thing &key optimize)
+  (cond
+    ((functionp thing)
+     (error "~@<~S is a function, not a form.~@:>" thing))
+    ((and optimize (not (typep thing '(cons (eql lambda)))))
+     (error "~@<Cannot splice ~A declaration into forms other than ~
+             ~S: ~S.~@:>"
+            'optimize 'lambda thing))
+    (optimize
+     `(,(first thing) ,(second thing)
+        (declare (optimize ,@optimize))
+        ,@(nthcdr 2 thing)))
+
+    (t
+     thing)))
+
+(defun compile-capturing-output-and-conditions
+    (form &key name condition-transform)
+  (let ((warnings '())
+        (style-warnings '())
+        (notes '())
+        (compiler-errors '())
+        (error-output (make-string-output-stream)))
+    (flet ((maybe-transform (condition)
+             (if condition-transform
+                 (funcall condition-transform condition)
+                 condition)))
+      (handler-bind ((sb-ext:compiler-note
+                       (lambda (condition)
+                         (push (maybe-transform condition) notes)
+                         (muffle-warning condition)))
+                     (style-warning
+                       (lambda (condition)
+                         (push (maybe-transform condition) style-warnings)
+                         (muffle-warning condition)))
+                     (warning
+                       (lambda (condition)
+                         (push (maybe-transform condition) warnings)
+                         (muffle-warning condition)))
+                     (sb-c:compiler-error
+                       (lambda (condition)
+                         (push (maybe-transform condition) compiler-errors))))
+        (multiple-value-bind (function warnings-p failure-p)
+            (let ((*error-output* error-output))
+              (compile name form))
+          (values function warnings-p failure-p
+                  warnings style-warnings notes compiler-errors
+                  error-output))))))
+
+(defun print-form-and-optimize (stream form-and-optimize &optional colonp atp)
+  (declare (ignore colonp atp))
+  (destructuring-bind (form . optimize) form-and-optimize
+    (format stream "~@:_~@:_~2@T~S~@:_~@:_~
+                    with ~:[~
+                      default optimization policy~
+                    ~;~
+                      ~:*~@:_~@:_~2@T~S~@:_~@:_~
+                      optimization policy~
+                    ~]"
+            form (when optimize (list optimize)))))
+
+(defun print-signaled-conditions (stream conditions &optional colonp atp)
+  (declare (ignore colonp atp))
+  (format stream "~{~@:_~@:_~{~/sb-ext:print-symbol-with-prefix/: ~A~}~}"
+          (mapcar (lambda (condition)
+                    (list (type-of condition) condition))
+                  conditions)))
+
 ;;; Compile FORM capturing and muffling all [style-]warnings and notes
 ;;; and return six values: 1) the compiled function 2) a Boolean
 ;;; indicating whether compilation failed 3) a list of warnings 4) a
@@ -320,74 +388,49 @@
                         allow-style-warnings
                         (allow-notes t)
                         (allow-compiler-errors allow-failure)
-                        condition-transform)
-  (when (functionp form)
-    (error "~@<~S is a function, not a form.~@:>" form))
+                        condition-transform
+                        optimize)
+  (sb-int:binding* ((form (prepare-form form :optimize optimize))
+                    ((function nil failure-p
+                      warnings style-warnings notes compiler-errors
+                      error-output)
+                     (compile-capturing-output-and-conditions
+                      form :name name :condition-transform condition-transform)))
+    (labels ((fail (kind conditions &optional allowed-type)
+               (error "~@<Compilation of~/test-util::print-form-and-optimize/ ~
+                       signaled ~A~P:~/test-util::print-signaled-conditions/~
+                       ~@[~@:_~@:_Allowed type is ~
+                      ~/sb-ext:print-type-specifier/.~]~@:>"
+                      (cons form optimize) kind (length conditions) conditions
+                      allowed-type))
+             (check-conditions (kind conditions allow)
+               (cond
+                 (allow
+                  (let ((offenders (remove-if (lambda (condition)
+                                                (typep condition allow))
+                                              conditions)))
+                    (when offenders
+                      (fail kind offenders allow))))
+                 (conditions
+                  (fail kind conditions)))))
 
-  (let ((warnings '())
-        (style-warnings '())
-        (notes '())
-        (compiler-errors '())
-        (error-output (make-string-output-stream)))
-    (flet ((maybe-transform (condition)
-             (if condition-transform
-                 (funcall condition-transform condition)
-                 condition)))
-      (handler-bind ((sb-ext:compiler-note
-                      (lambda (condition)
-                        (push (maybe-transform condition) notes)
-                        (muffle-warning condition)))
-                     (style-warning
-                      (lambda (condition)
-                        (push (maybe-transform condition) style-warnings)
-                        (muffle-warning condition)))
-                     (warning
-                      (lambda (condition)
-                        (push (maybe-transform condition) warnings)
-                        (muffle-warning condition)))
-                     (sb-c:compiler-error
-                      (lambda (condition)
-                        (push (maybe-transform condition) compiler-errors))))
-        (multiple-value-bind (function warnings-p failure-p)
-            (let ((*error-output* error-output))
-              (compile name form))
-          (declare (ignore warnings-p))
-          (labels ((fail (kind conditions &optional allowed-type)
-                     (error "~@<Compilation of ~S signaled ~A~P:~
-                             ~{~@:_~@:_~{~/sb-ext:print-symbol-with-prefix/: ~A~}~}~
-                             ~@[~@:_~@:_Allowed type is ~S.~]~@:>"
-                            form kind (length conditions)
-                            (mapcar (lambda (condition)
-                                      (list (type-of condition) condition))
-                                    conditions)
-                            allowed-type))
-                   (check-conditions (kind conditions allow)
-                     (cond
-                       (allow
-                        (let ((offenders (remove-if (lambda (condition)
-                                                      (typep condition allow))
-                                                    conditions)))
-                          (when offenders
-                            (fail kind offenders allow))))
-                       (conditions
-                        (fail kind conditions)))))
+      (when (and (not allow-failure) failure-p)
+        (let ((output (get-output-stream-string error-output)))
+          (error "~@<Compilation of~/test-util::print-form-and-optimize/ ~
+                  failed~@[ with output~
+                  ~@:_~@:_~2@T~@<~@;~A~:>~@:_~@:_~].~@:>"
+                 (cons form optimize) (when (plusp (length output)) output))))
 
-            (when (and (not allow-failure) failure-p)
-              (let ((output (get-output-stream-string error-output)))
-                (error "~@<Compilation of ~S failed~@[ with ~
-                        output~@:_~@:_~A~@:_~@:_~].~@:>"
-                       form (when (plusp (length output)) output))))
+      (check-conditions "warning"        warnings        allow-warnings)
+      (check-conditions "style-warning"  style-warnings  allow-style-warnings)
+      (check-conditions "note"           notes           allow-notes)
+      (check-conditions "compiler-error" compiler-errors allow-compiler-errors)
 
-            (check-conditions "warning"        warnings        allow-warnings)
-            (check-conditions "style-warning"  style-warnings  allow-style-warnings)
-            (check-conditions "note"           notes           allow-notes)
-            (check-conditions "compiler-error" compiler-errors allow-compiler-errors)
-
-            ;; Since we may have prevented warnings from being taken
-            ;; into account for FAILURE-P by muffling them, adjust the
-            ;; second return value accordingly.
-            (values function (when (or failure-p warnings) t)
-                    warnings style-warnings notes compiler-errors)))))))
+      ;; Since we may have prevented warnings from being taken
+      ;; into account for FAILURE-P by muffling them, adjust the
+      ;; second return value accordingly.
+      (values function (when (or failure-p warnings) t)
+              warnings style-warnings notes compiler-errors))))
 
 ;;; Like CHECKED-COMPILE, but for each captured condition, capture and
 ;;; later return a cons
