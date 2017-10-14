@@ -625,26 +625,26 @@
 
 (with-test (:name (:bug-1044465 :reduced))
   ;; Test case from Stas Boukarev
-  (compile nil '(lambda (x)
-                 (let ((a (if x
-                              (list (list x))
-                              (list (list x)))))
-                   (declare (dynamic-extent a))
-                   (prin1 a)
-                   1))))
+  (checked-compile '(lambda (x)
+                      (let ((a (if x
+                                   (list (list x))
+                                   (list (list x)))))
+                        (declare (dynamic-extent a))
+                        (prin1 a)
+                        1))))
 
 (with-test (:name (:bug-1044465 :nasty))
   ;; Test case from Alastair Bridgewater
-  (compile nil '(lambda (x y)
-                 (dotimes (i 2)
-                   (block bar
-                     (let ((a (if x
-                                 (list (list x))
-                                 (list (list x))))
-                           (b (if y x (return-from bar x))))
-                      (declare (dynamic-extent a))
-                      (prin1 a)
-                      b))))))
+  (checked-compile '(lambda (x y)
+                      (dotimes (i 2)
+                        (block bar
+                          (let ((a (if x
+                                       (list (list x))
+                                       (list (list x))))
+                                (b (if y x (return-from bar x))))
+                            (declare (dynamic-extent a))
+                            (prin1 a)
+                            b))))))
 
 ;;; multiple uses for dx lvar
 
@@ -805,20 +805,13 @@
 ;;; Bugs found by Paul F. Dietz
 
 (with-test (:name (:dx-bug-misc :pfdietz))
-  (assert
-   (eq
-    (funcall
-     (compile
-      nil
+  (checked-compile-and-assert (:optimize :all)
       '(lambda (a b)
-        (declare (optimize (speed 2) (space 0) (safety 0)
-                  (debug 1) (compilation-speed 3)))
-        (let* ((v5 (cons b b)))
-          (declare (dynamic-extent v5))
-          v5
-          a)))
-     'x 'y)
-    'x)))
+         (let* ((v5 (cons b b)))
+           (declare (dynamic-extent v5))
+           v5
+           a))
+    (('x 'y) 'x)))
 
 ;;; bug reported by Svein Ove Aas
 (defun svein-2005-ii-07 (x y)
@@ -945,28 +938,28 @@
                  (test-update-uvl-live-sets #() 4 5))))
 
 (with-test (:name :regression-1.0.23.38)
-  (compile nil '(lambda ()
-                 (declare (muffle-conditions compiler-note))
-                 (flet ((make (x y)
-                          (let ((res (cons x x)))
-                            (setf (cdr res) y)
-                            res)))
-                   (declare (inline make))
-                   (let ((z (make 1 2)))
-                     (declare (dynamic-extent z))
-                     (print z)
-                     t))))
-  (compile nil '(lambda ()
-                 (declare (muffle-conditions compiler-note))
-                 (flet ((make (x y)
-                          (let ((res (cons x x)))
-                            (setf (cdr res) y)
-                            (if x res y))))
-                   (declare (inline make))
-                   (let ((z (make 1 2)))
-                     (declare (dynamic-extent z))
-                     (print z)
-                     t)))))
+  (checked-compile '(lambda ()
+                      (declare (muffle-conditions compiler-note))
+                      (flet ((make (x y)
+                               (let ((res (cons x x)))
+                                 (setf (cdr res) y)
+                                 res)))
+                        (declare (inline make))
+                        (let ((z (make 1 2)))
+                          (declare (dynamic-extent z))
+                          (print z)
+                          t))))
+  (checked-compile '(lambda ()
+                      (declare (muffle-conditions compiler-note))
+                      (flet ((make (x y)
+                               (let ((res (cons x x)))
+                                 (setf (cdr res) y)
+                                 (if x res y))))
+                        (declare (inline make))
+                        (let ((z (make 1 2)))
+                          (declare (dynamic-extent z))
+                          (print z)
+                          t)))))
 
 ;;; On x86 and x86-64 upto 1.0.28.16 LENGTH and WORDS argument
 ;;; tns to ALLOCATE-VECTOR-ON-STACK could be packed in the same
@@ -983,29 +976,27 @@
 (with-test (:name :handler-case-bogus-compiler-note
             :skipped-on '(not (and :stack-allocatable-fixed-objects
                                    :stack-allocatable-closures)))
-  (handler-bind
-      ((compiler-note (lambda (note)
-                        (error "compiler issued note ~S during test" note))))
-    ;; Taken from SWANK, used to signal a bogus stack allocation
-    ;; failure note.
-    (compile nil
-             `(lambda (files fasl-dir load)
-                (declare (muffle-conditions style-warning))
-                (let ((needs-recompile nil))
-                  (dolist (src files)
-                    (let ((dest (binary-pathname src fasl-dir)))
-                      (handler-case
-                          (progn
-                            (when (or needs-recompile
-                                      (not (probe-file dest))
-                                      (file-newer-p src dest))
-                              (setq needs-recompile t)
-                              (ensure-directories-exist dest)
-                              (compile-file src :output-file dest :print nil :verbose t))
-                            (when load
-                              (load dest :verbose t)))
-                        (serious-condition (c)
-                          (handle-loadtime-error c dest))))))))))
+  ;; Taken from SWANK, used to signal a bogus stack allocation
+  ;; failure note.
+  (checked-compile
+   `(lambda (files fasl-dir load)
+      (declare (muffle-conditions style-warning))
+      (let ((needs-recompile nil))
+        (dolist (src files)
+          (let ((dest (binary-pathname src fasl-dir)))
+            (handler-case
+                (progn
+                  (when (or needs-recompile
+                            (not (probe-file dest))
+                            (file-newer-p src dest))
+                    (setq needs-recompile t)
+                    (ensure-directories-exist dest)
+                    (compile-file src :output-file dest :print nil :verbose t))
+                  (when load
+                    (load dest :verbose t)))
+              (serious-condition (c)
+                (handle-loadtime-error c dest)))))))
+   :allow-notes nil))
 
 (declaim (inline foovector barvector))
 (defun foovector (x y z)
@@ -1020,15 +1011,10 @@
             :skipped-on '(not (and :stack-allocatable-vectors
                                    :stack-allocatable-closures)))
   (flet ((assert-notes (j lambda)
-           (let ((n 0))
-             (handler-bind ((compiler-note (lambda (c)
-                                             (declare (ignore c))
-                                             (incf n))))
-               (let ((*error-output* (make-broadcast-stream)))
-                 (compile nil lambda))
-               (unless (= j n)
-                 (error "Wanted ~S notes, got ~S for~%   ~S"
-                        j n lambda))))))
+           (let ((notes (nth 4 (multiple-value-list (checked-compile lambda))))) ; TODO
+             (unless (= (length notes) j)
+               (error "Wanted ~S notes, got ~S for~%   ~S"
+                      j (length notes) lambda)))))
     ;; These ones should complain.
     (assert-notes 1 `(lambda (x)
                        (let ((v (make-array x)))
@@ -1108,26 +1094,21 @@
       (assert-no-consing (funcall bad-boy #'foo)))))
 
 (with-test (:name :bug-497321)
-  (flet ((test (lambda type)
-           (let ((n 0))
-             (handler-bind ((condition (lambda (c)
-                                         (incf n)
-                                         (unless (typep c type)
-                                           (error "wanted ~S for~%  ~S~%got ~S"
-                                                  type lambda (type-of c))))))
-               (let ((*error-output* (make-broadcast-stream)))
-                 (compile nil lambda)))
-             (assert (= n 1)))))
+  (flet ((test (lambda &rest args)
+           (multiple-value-bind (fun failure-p warnings style-warnings notes)
+               (apply #'checked-compile lambda args)
+             (declare (ignore fun failure-p))
+             (assert (= (length (append warnings style-warnings notes)) 1)))))
     (test `(lambda () (declare (dynamic-extent #'bar)))
-          'style-warning)
+          :allow-style-warnings 'style-warning)
     (test `(lambda () (declare (dynamic-extent bar)))
-          'style-warning)
+          :allow-style-warnings 'style-warning)
     (test `(lambda (bar) (cons bar (lambda () (declare (dynamic-extent bar)))))
-          'sb-ext:compiler-note)
+          :allow-notes 'sb-ext:compiler-note)
     (test `(lambda ()
              (flet ((bar () t))
                (cons #'bar (lambda () (declare (dynamic-extent #'bar))))))
-          'sb-ext:compiler-note)))
+          :allow-notes 'sb-ext:compiler-note)))
 
 (with-test (:name :bug-586105
             :skipped-on '(not (and :stack-allocatable-vectors
@@ -1193,28 +1174,28 @@
 ;;;; These tests aren't strictly speaking DX, but rather &REST -> &MORE
 ;;;; conversion.
 (with-test (:name :rest-to-more-conversion)
-  (let ((f1 (compile nil `(lambda (f &rest args)
-                            (apply f args)))))
+  (let ((f1 (checked-compile `(lambda (f &rest args)
+                                (apply f args)))))
     (assert-no-consing (assert (eql f1 (funcall f1 #'identity f1)))))
-  (let ((f2 (compile nil `(lambda (f1 f2 &rest args)
-                            (values (apply f1 args) (apply f2 args))))))
+  (let ((f2 (checked-compile `(lambda (f1 f2 &rest args)
+                                (values (apply f1 args) (apply f2 args))))))
     (assert-no-consing (multiple-value-bind (a b)
                            (funcall f2 (lambda (x y z) (+ x y z)) (lambda (x y z) (- x y z))
                                     1 2 3)
                          (assert (and (eql 6 a) (eql -4 b))))))
-  (let ((f3 (compile nil `(lambda (f &optional x &rest args)
-                            (when x
-                              (apply f x args))))))
+  (let ((f3 (checked-compile `(lambda (f &optional x &rest args)
+                                (when x
+                                  (apply f x args))))))
     (assert-no-consing (assert (eql 42 (funcall f3
                                                 (lambda (a b c) (+ a b c))
                                                 11
                                                 10
                                                 21)))))
   (let ((f4
-          (let ((*error-output* (make-broadcast-stream)))
-            (compile nil `(lambda (f &optional x &rest args
-                                     &key y &allow-other-keys)
-                            (apply f y x args))))))
+         (checked-compile `(lambda (f &optional x &rest args
+                                    &key y &allow-other-keys)
+                             (apply f y x args))
+                          :allow-style-warnings t)))
     (assert-no-consing (funcall f4 (lambda (y x yk y2 b c)
                                      (assert (eq y 'y))
                                      (assert (= x 2))
@@ -1223,62 +1204,73 @@
                                      (assert (eq b 'b))
                                      (assert (eq c 'c)))
                                 2 :y 'y 'b 'c)))
-  (let ((f5 (compile nil `(lambda (a b c &rest args)
-                            (apply #'list* a b c args)))))
-    (assert (equal '(1 2 3 4 5 6 7) (funcall f5 1 2 3 4 5 6 '(7)))))
-  (let ((f6 (compile nil `(lambda (x y)
-                            (declare (optimize speed))
-                            (concatenate 'string x y)))))
-    (assert (equal "foobar" (funcall f6 "foo" "bar"))))
-  (let ((f7 (compile nil `(lambda (&rest args)
-                            (lambda (f)
-                              (apply f args))))))
-    (assert (equal '(a b c d e f) (funcall (funcall f7 'a 'b 'c 'd 'e 'f) 'list))))
-  (let ((f8 (compile nil `(lambda (&rest args)
-                            (flet ((foo (f)
-                                     (apply f args)))
-                              #'foo)))))
-    (assert (equal '(a b c d e f) (funcall (funcall f8 'a 'b 'c 'd 'e 'f) 'list))))
-  (let ((f9 (compile nil `(lambda (f &rest args)
-                            (flet ((foo (g)
-                                     (apply g args)))
-                              (declare (dynamic-extent #'foo))
-                              (funcall f #'foo))))))
-    (assert (equal '(a b c d e f)
-                   (funcall f9 (lambda (f) (funcall f 'list)) 'a 'b 'c 'd 'e 'f))))
-  (let ((f10 (compile nil `(lambda (f &rest args)
-                            (flet ((foo (g)
-                                     (apply g args)))
-                              (funcall f #'foo))))))
-    (assert (equal '(a b c d e f)
-                   (funcall f10 (lambda (f) (funcall f 'list)) 'a 'b 'c 'd 'e 'f))))
-  (let ((f11 (compile nil `(lambda (x y z)
-                             (block out
-                               (labels ((foo (x &rest rest)
-                                          (apply (lambda (&rest rest2)
-                                                   (return-from out (values-list rest2)))
-                                                 x rest)))
-                                (if x
-                                    (foo x y z)
-                                    (foo y z x))))))))
-    (multiple-value-bind (a b c) (funcall f11 1 2 3)
-      (assert (eql a 1))
-      (assert (eql b 2))
-      (assert (eql c 3)))))
+  (checked-compile-and-assert ()
+      `(lambda (a b c &rest args)
+         (apply #'list* a b c args))
+    ((1 2 3 4 5 6 '(7)) '(1 2 3 4 5 6 7)))
+  (checked-compile-and-assert ()
+      `(lambda (x y)
+         (concatenate 'string x y))
+    (("foo" "bar") "foobar"))
+  (checked-compile-and-assert ()
+      `(lambda (&rest args)
+         (lambda (f)
+           (apply f args)))
+    (('a 'b 'c 'd 'e 'f) '(a b c d e f)
+     :test (lambda (values expected)
+             (equal (multiple-value-list
+                     (funcall (first values) 'list))
+                    expected))))
+  (checked-compile-and-assert ()
+      `(lambda (&rest args)
+         (flet ((foo (f)
+                  (apply f args)))
+           #'foo))
+    (('a 'b 'c 'd 'e 'f) '(a b c d e f)
+     :test (lambda (values expected)
+             (equal (multiple-value-list
+                     (funcall (first values) 'list))
+                    expected))))
+  (checked-compile-and-assert ()
+      `(lambda (f &rest args)
+         (flet ((foo (g)
+                  (apply g args)))
+           (declare (dynamic-extent #'foo))
+           (funcall f #'foo)))
+    (((lambda (f) (funcall f 'list)) 'a 'b 'c 'd 'e 'f)
+     '(a b c d e f)))
+  (checked-compile-and-assert ()
+      `(lambda (f &rest args)
+         (flet ((foo (g)
+                  (apply g args)))
+           (funcall f #'foo)))
+    (((lambda (f) (funcall f 'list)) 'a 'b 'c 'd 'e 'f)
+     '(a b c d e f)))
+  (checked-compile-and-assert ()
+      `(lambda (x y z)
+         (block out
+           (labels ((foo (x &rest rest)
+                      (apply (lambda (&rest rest2)
+                               (return-from out (values-list rest2)))
+                             x rest)))
+             (if x
+                 (foo x y z)
+                 (foo y z x)))))
+    ((1 2 3) (values 1 2 3))))
 
 (defun opaque-funcall (function &rest arguments)
   (apply function arguments))
 
 (with-test (:name :implicit-value-cells)
   (flet ((test-it (type input output)
-           (let ((f (compile nil `(lambda (x)
-                                    (declare (type ,type x))
-                                    (flet ((inc ()
-                                             (incf x)))
-                                      (declare (dynamic-extent #'inc))
-                                      (list (opaque-funcall #'inc) x))))))
-             (assert (equal (funcall f input)
-                            (list output output))))))
+           (checked-compile-and-assert ()
+               `(lambda (x)
+                  (declare (type ,type x))
+                  (flet ((inc ()
+                           (incf x)))
+                    (declare (dynamic-extent #'inc))
+                    (list (opaque-funcall #'inc) x)))
+             ((input) (list output output)))))
     (let ((width sb-vm:n-word-bits))
       (test-it t (1- most-positive-fixnum) most-positive-fixnum)
       (test-it `(unsigned-byte ,(1- width)) (ash 1 (- width 2)) (1+ (ash 1 (- width 2))))
@@ -1290,24 +1282,22 @@
       (test-it '(complex double-float) #c(3d0 4d0) #c(4d0 4d0)))))
 
 (with-test (:name :sap-implicit-value-cells)
-  (let ((f (compile nil `(lambda (x)
-                           (declare (type system-area-pointer x))
-                           (flet ((inc ()
-                                    (setf x (sb-sys:sap+ x 16))))
-                             (declare (dynamic-extent #'inc))
-                             (list (opaque-funcall #'inc) x)))))
+  (let ((f (checked-compile `(lambda (x)
+                               (declare (type system-area-pointer x))
+                               (flet ((inc ()
+                                        (setf x (sb-sys:sap+ x 16))))
+                                 (declare (dynamic-extent #'inc))
+                                 (list (opaque-funcall #'inc) x)))))
         (width sb-vm:n-machine-word-bits))
     (assert (every (lambda (x)
                      (sb-sys:sap= x (sb-sys:int-sap (+ 16 (ash 1 (1- width))))))
                    (funcall f (sb-sys:int-sap (ash 1 (1- width))))))))
 
-(with-test (:name :&more-bounds)
-  ;; lp#1154946
-  (assert (not (funcall (compile nil '(lambda (&rest args) (car args))))))
-  (assert (not (funcall (compile nil '(lambda (&rest args) (nth 6 args))))))
-  (assert (not (funcall (compile nil '(lambda (&rest args) (elt args 10))))))
-  (assert (not (funcall (compile nil '(lambda (&rest args) (cadr args))))))
-  (assert (not (funcall (compile nil '(lambda (&rest args) (third args)))))))
+(with-test (:name (:&more-bounds :lp-1154946))
+  (checked-compile-and-assert () '(lambda (&rest args) (car args)) (() nil))
+  (checked-compile-and-assert () '(lambda (&rest args) (nth 6 args)) (() nil))
+  (checked-compile-and-assert () '(lambda (&rest args) (cadr args)) (() nil))
+  (checked-compile-and-assert () '(lambda (&rest args) (third args)) (() nil)))
 
 (with-test (:name :local-notinline-functions)
   (multiple-value-bind (start result end)
@@ -1346,15 +1336,15 @@
     (eval `(defun ,name (a b &optional c d)
              (declare (ignore c d))
              (cons a b)))
-    (assert (equal (funcall
-                    (funcall
-                     (checked-compile
-                      `(lambda ()
-                         (let ((x (cons
-                                   (,name 1 2)
-                                   (,name 2 3))))
-                           (declare (dynamic-extent x))
-                           (true x))
-                         #',name)))
-                    2 3)
-                   '(2 . 3)))))
+    (checked-compile-and-assert ()
+        `(lambda ()
+           (let ((x (cons
+                     (,name 1 2)
+                     (,name 2 3))))
+             (declare (dynamic-extent x))
+             (true x))
+           #',name)
+      (() '(2 . 3) :test (lambda (values expected)
+                           (equal (multiple-value-list
+                                   (funcall (first values) 2 3))
+                                  expected))))))
