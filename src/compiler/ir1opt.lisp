@@ -1925,41 +1925,74 @@
 ;;; Note that we are responsible for clearing the LVAR-REOPTIMIZE
 ;;; flags.
 (defun propagate-let-args (call fun)
-  (declare (type combination call) (type clambda fun))
-  (loop for arg in (combination-args call)
-        and var in (lambda-vars fun) do
-    (when (and arg (lvar-reoptimize arg))
-      (setf (lvar-reoptimize arg) nil)
-      (cond
-        ((lambda-var-sets var)
-         (propagate-from-sets var (lvar-type arg)))
-        ((let ((use (lvar-uses arg)))
-           (when (ref-p use)
-             (let ((leaf (ref-leaf use)))
-               (when (and (constant-reference-p use)
-                          (csubtypep (leaf-type leaf)
-                                     ;; (NODE-DERIVED-TYPE USE) would
-                                     ;; be better -- APD, 2003-05-15
-                                     (leaf-type var)))
-                 (propagate-to-refs var (lvar-type arg))
-                 (unless (preserve-single-use-debug-var-p call var)
-                   (let ((use-component (node-component use)))
-                     (substitute-leaf-if
-                      (lambda (ref)
-                        (cond ((eq (node-component ref) use-component)
-                               t)
-                              (t
-                               (aver (lambda-toplevelish-p (lambda-home fun)))
-                               nil)))
-                      leaf var)))
-                 t)))))
-        ((and (null (rest (leaf-refs var)))
-              (not (preserve-single-use-debug-var-p call var))
-              (substitute-single-use-lvar arg var)))
-        (t
-         (propagate-to-refs var (lvar-type arg))))))
+  (declare (type basic-combination call) (type clambda fun))
+  (let* ((args (basic-combination-args call))
+         (vars (lambda-vars fun))
+         (args-and-types (cond ((combination-p call)
+                                (loop for arg in args
+                                      collect (and arg
+                                                   (lvar-reoptimize arg)
+                                                   (progn
+                                                     (setf (lvar-reoptimize arg) nil)
+                                                     (cons arg (lvar-type arg))))))
+                               ((and (singleton-p args)
+                                     (not (singleton-p vars)))
+                                (when (lvar-reoptimize (car args))
+                                  (setf (lvar-reoptimize (car args)) nil)
+                                  (loop for type in (values-type-in (lvar-derived-type (first args))
+                                                                    (length vars))
+                                        collect (cons nil type))))
+                               (t
+                                ;; If an ARG produces multiple values just grab its type
+                                (loop for arg in args
+                                      for types = (values-types (lvar-derived-type arg))
+                                      while types
+                                      if (cdr types)
+                                      nconc (loop for type in types
+                                                  collect (and (lvar-reoptimize arg)
+                                                               (cons nil type)))
+                                      else
+                                      collect (and (lvar-reoptimize arg)
+                                                   (cons arg (car types)))
+                                      do
+                                      (setf (lvar-reoptimize arg) nil))))))
+    (loop for var in vars
+          for (arg . type) in args-and-types
+          do
+          (cond
+            ((lambda-var-deleted var))
+            ((lambda-var-sets var)
+             (and type
+                  (propagate-from-sets var type)))
+            ((and arg
+                  (let ((use (lvar-uses arg)))
+                    (when (ref-p use)
+                      (let ((leaf (ref-leaf use)))
+                        (when (and (constant-reference-p use)
+                                   (csubtypep (leaf-type leaf)
+                                              ;; (NODE-DERIVED-TYPE USE) would
+                                              ;; be better -- APD, 2003-05-15
+                                              (leaf-type var)))
+                          (propagate-to-refs var type)
+                          (unless (preserve-single-use-debug-var-p call var)
+                            (let ((use-component (node-component use)))
+                              (substitute-leaf-if
+                               (lambda (ref)
+                                 (cond ((eq (node-component ref) use-component)
+                                        t)
+                                       (t
+                                        (aver (lambda-toplevelish-p (lambda-home fun)))
+                                        nil)))
+                               leaf var)))
+                          t))))))
+            ((and arg
+                  (null (rest (leaf-refs var)))
+                  (not (preserve-single-use-debug-var-p call var))
+                  (substitute-single-use-lvar arg var)))
+            (type
+             (propagate-to-refs var type)))))
 
-  (when (every #'not (combination-args call))
+  (when (every #'not (basic-combination-args call))
     (delete-let fun))
 
   (values))
@@ -2045,15 +2078,17 @@
          (when (lvar-reoptimize fun)
            (setf (lvar-reoptimize fun) nil)
            (maybe-let-convert (combination-lambda node)))
-         (loop for arg in (basic-combination-args node)
-               do
-               (setf (lvar-reoptimize arg) nil))
-         (when (eq (functional-kind (combination-lambda node)) :mv-let)
-           (unless (convert-mv-bind-to-let node)
-             (ir1-optimize-mv-bind node))))
+         (cond ((neq (functional-kind (combination-lambda node)) :mv-let)
+                (loop for arg in (basic-combination-args node)
+                      do
+                      (setf (lvar-reoptimize arg) nil)))
+               ((convert-mv-bind-to-let node))
+               ((ir1-optimize-mv-bind node))))
         (:full
-         (let* ((fun-changed (lvar-reoptimize fun))
-                (args (basic-combination-args node)))
+         (let* ((fun-changed (lvar-reoptimize fun)))
+           (loop for arg in (basic-combination-args node)
+                 do
+                 (setf (lvar-reoptimize arg) nil))
            (when fun-changed
              (setf (lvar-reoptimize fun) nil)
              (let ((type (lvar-type fun)))
@@ -2067,31 +2102,21 @@
                    (maybe-let-convert (ref-leaf use))))))
            (unless (or (eq (basic-combination-kind node) :local)
                        (eq (lvar-fun-name fun) '%throw))
-             (ir1-optimize-mv-call node))
-           (dolist (arg args)
-             (setf (lvar-reoptimize arg) nil))))
+             (ir1-optimize-mv-call node))))
         (:error))))
+
   (values))
 
 ;;; Propagate derived type info from the values lvar to the vars.
 (defun ir1-optimize-mv-bind (node)
   (declare (type mv-combination node))
-  (let* ((args (basic-combination-args node))
-         (vars (lambda-vars (combination-lambda node)))
-         (types (if (singleton-p args)
-                    (values-type-in (lvar-derived-type (first args))
-                                    (length vars))
-                    (loop for arg in args
-                          append (values-types (lvar-derived-type arg))))))
-    (loop for var in vars
-          and type in types
-          do (if (basic-var-sets var)
-                 (propagate-from-sets var type)
-                 (propagate-to-refs var type)))
-    (loop for arg in args
-          do
-          (setf (lvar-reoptimize arg) nil)))
-  (values))
+  (propagate-let-args node (combination-lambda node))
+  ;; While PROPAGATE-LET-ARGS does end up calling DELETE-LET for
+  ;; non-mv combinations (when DELETE-LAMBDA-VAR clears all args)
+  ;; it's a bit trickier to do for mv combinations, especially since a
+  ;; lot of old code does not expect mv-combination-args to ever
+  ;; contain NIL, just let FLUSH-DEAD-CODE deal with it
+  (setf (block-flush-p (node-block node)) t))
 
 (defun ir1-optimize-mv-call (node)
   (let ((fun (basic-combination-fun node))
@@ -2163,6 +2188,7 @@
                (combination-p use)
                (eq (lvar-fun-name (combination-fun use))
                    'values))
+      (setf (lvar-reoptimize (car args)) nil)
       (let* ((fun (combination-lambda call))
              (vars (lambda-vars fun))
              (vals (combination-args use))
