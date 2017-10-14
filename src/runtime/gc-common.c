@@ -1069,7 +1069,6 @@ void scav_hash_table_entries (struct hash_table *hash_table,
     uword_t next_vector_length;
     lispobj *hash_vector;
     uword_t hash_vector_length;
-    lispobj empty_symbol;
     uword_t i;
 
     kv_vector = get_array_data(hash_table->table,
@@ -1099,8 +1098,8 @@ void scav_hash_table_entries (struct hash_table *hash_table,
       * help reduce collisions. */
      gc_assert(next_vector_length*2 == kv_length);
 
-     if ((empty_symbol = kv_vector[1]) != UNBOUND_MARKER_WIDETAG)
-        lose("unexpected empty-hash-table-slot marker: %p\n", empty_symbol);
+     if (kv_vector[1] != UNBOUND_MARKER_WIDETAG)
+        lose("unexpected empty-hash-table-slot marker: %p\n", kv_vector[1]);
 
     /* Work through the KV vector. */
     int (*alivep_test)(lispobj,lispobj) = alivep[fixnum_value(hash_table->_weakness)];
@@ -1112,11 +1111,10 @@ void scav_hash_table_entries (struct hash_table *hash_table,
             /* Scavenge the key and value. */                                  \
             scav_entry(&kv_vector[2*i]);                                       \
             /* If an EQ-based key has moved, mark the hash-table for rehash */ \
-            if (!hash_vector || hash_vector[i] == MAGIC_HASH_VECTOR_VALUE) {   \
-                lispobj new_key = kv_vector[2*i];                              \
-                if (old_key != new_key && new_key != empty_symbol)             \
-                    hash_table->needs_rehash_p = T;                            \
-    }}}
+            if (kv_vector[2*i] != old_key &&                                   \
+                (!hash_vector || hash_vector[i] == MAGIC_HASH_VECTOR_VALUE))   \
+              hash_table->needs_rehash_p = T;                                  \
+    }}
     if (alivep_test)
         SCAV_ENTRIES(alivep_test(old_key, value))
     else
@@ -1208,8 +1206,9 @@ static inline void
 scan_weak_hash_table_chain (struct hash_table *hash_table, lispobj *prev,
                             lispobj *kv_vector, lispobj *index_vector,
                             lispobj *next_vector, lispobj *hash_vector,
-                            lispobj empty_symbol, int (*alivep_test)(lispobj,lispobj))
+                            int (*alivep_test)(lispobj,lispobj))
 {
+    const lispobj empty_symbol = UNBOUND_MARKER_WIDETAG;
     unsigned index = *prev;
     while (index) {
         unsigned next = next_vector[index];
@@ -1244,7 +1243,6 @@ scan_weak_hash_table (struct hash_table *hash_table,
     lispobj *next_vector;
     uword_t next_vector_length = 0; /* prevent warning */
     lispobj *hash_vector;
-    lispobj empty_symbol;
     int (*alivep_test)(lispobj,lispobj) = alivep[fixnum_value(hash_table->_weakness)];
     uword_t i;
 
@@ -1257,12 +1255,11 @@ scan_weak_hash_table (struct hash_table *hash_table,
                                  &next_vector_length);
     hash_vector = get_array_data(hash_table->hash_vector,
                                  SIMPLE_ARRAY_WORD_WIDETAG, NULL);
-    empty_symbol = kv_vector[1];
 
     for (i = 0; i < length; i++) {
         scan_weak_hash_table_chain(hash_table, &index_vector[i],
                                    kv_vector, index_vector, next_vector,
-                                   hash_vector, empty_symbol, alivep_test);
+                                   hash_vector, alivep_test);
     }
 }
 
