@@ -3,6 +3,8 @@
   (:export #:with-test #:report-test-status #:*failures*
            #:really-invoke-debugger
            #:*break-on-failure* #:*break-on-expected-failure*
+
+           ;; thread tools
            #:make-kill-thread #:make-join-thread
 
            ;; MAP-OPTIMIZATION-*
@@ -10,8 +12,11 @@
            #:map-optimize-declarations
 
            ;; CHECKED-COMPILE and friends
-           #:checked-compile #:checked-compile-capturing-source-paths
+           #:checked-compile #:checked-compile-and-assert
+           #:checked-compile-capturing-source-paths
            #:checked-compile-condition-source-paths
+
+           ;; RUNTIME
            #:runtime #:split-string #:shuffle))
 
 (in-package :test-util)
@@ -431,6 +436,160 @@
       ;; second return value accordingly.
       (values function (when (or failure-p warnings) t)
               warnings style-warnings notes compiler-errors))))
+
+(defun print-arguments (stream arguments &optional colonp atp)
+  (declare (ignore colonp atp))
+  (format stream "~:[~
+                    without arguments ~
+                  ~;~:*~
+                    with arguments~@:_~@:_~
+                    ~2@T~@<~{~S~^~@:_~}~:>~@:_~@:_~
+                  ~]"
+          arguments))
+
+(defun call-capturing-values-and-conditions (function &rest args)
+  (let ((values     nil)
+        (conditions '()))
+    (block nil
+      (handler-bind ((condition (lambda (condition)
+                                  (push condition conditions)
+                                  (typecase condition
+                                    (warning
+                                     (muffle-warning condition))
+                                    (serious-condition
+                                     (return))))))
+        (setf values (multiple-value-list (apply function args)))))
+    (values values (nreverse conditions))))
+
+(defun %checked-compile-and-assert-one-case
+    (form optimize function args-thunk expected test)
+  (let ((args (multiple-value-list (funcall args-thunk))))
+    (flet ((failed-to-signal (expected-type)
+             (error "~@<Calling the result of compiling~
+                      ~/test-util::print-form-and-optimize/ ~
+                      ~/test-util::print-arguments/~
+                      returned normally instead of signaling a ~
+                      condition of type ~
+                      ~/sb-ext:print-type-specifier/.~@:>"
+                    (cons form optimize) args expected-type))
+           (signaled-unexpected (conditions)
+             (error "~@<Calling the result of compiling~
+                      ~/test-util::print-form-and-optimize/ ~
+                      ~/test-util::print-arguments/~
+                      signaled unexpected condition~P~
+                      ~/test-util::print-signaled-conditions/~
+                      .~@:>"
+                    (cons form optimize) args (length conditions) conditions))
+           (returned-unexpected (values expected test)
+             (error "~@<Calling the result of compiling~
+                     ~/test-util::print-form-and-optimize/ ~
+                     ~/test-util::print-arguments/~
+                     returned values~@:_~@:_~
+                     ~2@T~<~{~S~^~@:_~}~:>~@:_~@:_~
+                     with is not ~S to~@:_~@:_~
+                     ~2@T~<~{~S~^~@:_~}~:>~@:_~@:_~
+                     .~@:>"
+                    (cons form optimize) args
+                    (list values) test (list expected))))
+      (multiple-value-bind (values conditions)
+          (apply #'call-capturing-values-and-conditions function args)
+        (typecase expected
+          ((cons (eql condition) (cons t null))
+           (let* ((expected-condition-type (second expected))
+                  (unexpected (remove-if (lambda (condition)
+                                           (typep condition
+                                                  expected-condition-type))
+                                         conditions))
+                  (expected (set-difference conditions unexpected)))
+             (cond
+               (unexpected
+                (signaled-unexpected unexpected))
+               ((null expected)
+                (failed-to-signal expected-condition-type)))))
+          (t
+           (let ((expected (funcall expected)))
+             (cond
+               (conditions
+                (signaled-unexpected conditions))
+               ((not (funcall test values expected))
+                (returned-unexpected values expected test))))))))))
+
+(defun %checked-compile-and-assert-one-compilation
+    (form optimize other-checked-compile-args cases)
+  (let ((function (apply #'checked-compile form
+                         (if optimize
+                             (list* :optimize optimize
+                                    other-checked-compile-args)
+                             other-checked-compile-args))))
+    (loop for (args-thunk values test) in cases
+       do (%checked-compile-and-assert-one-case
+           form optimize function args-thunk values test))))
+
+(defun %checked-compile-and-assert (form checked-compile-args cases)
+  (let ((optimize (getf checked-compile-args :optimize))
+        (other-args (loop for (key value) on checked-compile-args by #'cddr
+                          unless (eq key :optimize)
+                          collect key and collect value)))
+    (map-optimize-declarations*
+     (lambda (&optional optimize)
+       (%checked-compile-and-assert-one-compilation
+        form optimize other-args cases))
+     optimize)))
+
+;;; Compile FORM using CHECKED-COMPILE, then call the resulting
+;;; function with arguments and assert expected return values
+;;; according to CASES.
+;;;
+;;; Elements of CASES are of the form
+;;;
+;;;   ((&rest ARGUMENT-FORMS) VALUES-FORM &optional TEST)
+;;;
+;;; where ARGUMENT-FORMS are evaluated to produce the arguments for
+;;; one call of the function and VALUES-FORM is evaluated to produce
+;;; the expected return values for that function call. TEST is used to
+;;; compare a list of the values returned by the function call to the
+;;; list of values obtained by calling VALUES-FORM.
+;;;
+;;; If VALUES-FORM is of the form
+;;;
+;;;   (CONDITION CONDITION-TYPE)
+;;;
+;;; the function call is expected to signal the designated condition
+;;; instead of returning values.
+;;;
+;;; The OPTIMIZE keyword parameter controls the optimization policies
+;;; (or policy) used when compiling FORM. The argument is interpreted
+;;; as described for MAP-OPTIMIZE-DECLARATIONS*.
+;;;
+;;; The other keyword parameters, NAME and
+;;; ALLOW-{WARNINGS,STYLE-WARNINGS,NOTES}, behave as with
+;;; CHECKED-COMPILE.
+(defmacro checked-compile-and-assert ((&key name
+                                            allow-warnings
+                                            allow-style-warnings
+                                            (allow-notes t)
+                                            (optimize :quick))
+                                         form &body cases)
+  (flet ((make-case-form (case)
+           (destructuring-bind (args values &key (test ''equal testp))
+               case
+             (let ((conditionp (typep values '(cons (eql condition) (cons t null)))))
+               (when (and testp conditionp)
+                 (sb-ext:with-current-source-form (case)
+                   (error "~@<Cannot use ~S with ~S ~S.~@:>"
+                          values :test test)))
+               `(list (lambda () (values ,@args))
+                      ,(if conditionp
+                           `',values
+                           `(lambda () (multiple-value-list ,values)))
+                      ,test)))))
+    `(%checked-compile-and-assert
+      ,form (list :name ,name
+                  :allow-warnings ,allow-warnings
+                  :allow-style-warnings ,allow-style-warnings
+                  :allow-notes ,allow-notes
+                  :optimize ,optimize)
+      (list ,@(mapcar #'make-case-form cases)))))
 
 ;;; Like CHECKED-COMPILE, but for each captured condition, capture and
 ;;; later return a cons
