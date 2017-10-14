@@ -25,17 +25,19 @@
 
 (load "compiler-test-util.lisp")
 
-(with-test (:name :ldb-recognize-local-macros)
+(defun compiles-with-warning (lambda)
+  (assert (nth-value 2 (checked-compile lambda :allow-warnings t))))
+
+(with-test (:name (ldb :recognize-local-macros))
   ;; Should not call %LDB
   (assert (not (ctu:find-named-callees
-                (compile nil
-                         '(lambda (x)
-                           (declare (optimize speed))
-                           (macrolet ((b () '(byte 2 2)))
-                             (ldb (b) (the fixnum x)))))))))
+                (checked-compile
+                 '(lambda (x)
+                   (declare (optimize speed))
+                   (macrolet ((b () '(byte 2 2)))
+                     (ldb (b) (the fixnum x)))))))))
 
-;; lp#1458190
-(with-test (:name :dbp-eval-order)
+(with-test (:name (dpb :eval-order :lp-1458190))
   (sb-int:collect ((calls))
     (flet ((f (new old)
              (dpb (progn (calls 'eval-new) new)
@@ -51,7 +53,7 @@
 ;; the nuance of TRULY-THE. Strictly speaking, byte-specifier is not a
 ;; type specifier that users are supposed to know about, so portable code
 ;; should not care, but this might affect internal code.
-(with-test (:name :dpb-inner-macro)
+(with-test (:name (dpb :inner-macro))
   (flet ((source-xform (sexpr)
            (funcall (sb-int:info :function :source-transform (car sexpr))
                     sexpr (sb-kernel:make-null-lexenv))))
@@ -69,25 +71,23 @@
   ;; that asserts that inlining F works in (THE (SATISFIES F) obj).
   (assert (equal (sb-ext:typexpand 'sb-impl::function-name)
                  '(satisfies sb-int:legal-fun-name-p)))
-  (let ((f (compile nil '(lambda (x) (the sb-impl::function-name x)))))
+  (let ((f (checked-compile '(lambda (x) (the sb-impl::function-name x)))))
     (assert (equal (list (symbol-function 'sb-int:valid-function-name-p))
                    (ctu:find-named-callees f))))
-  (let ((f (compile nil '(lambda (x)
-                           (declare (notinline sb-int:legal-fun-name-p))
-                           (the sb-impl::function-name x)))))
+  (let ((f (checked-compile '(lambda (x)
+                               (declare (notinline sb-int:legal-fun-name-p))
+                               (the sb-impl::function-name x)))))
     (assert (equal (list (symbol-function 'sb-int:legal-fun-name-p))
                    (ctu:find-named-callees f)))))
 
-(with-test (:name :make-array-untestable-type-no-warning)
-  (assert-no-signal
-   (compile nil `(lambda () (make-array '(2 2)
-                                        :element-type `(satisfies foofa))))))
+(with-test (:name (make-array :untestable-type :no-warning))
+  (checked-compile `(lambda () (make-array '(2 2)
+                                           :element-type `(satisfies foofa)))))
 
-(with-test (:name :make-array-nil-no-warning)
-  (assert-no-signal
-   (compile nil '(lambda () (make-array '(2 2) :element-type nil)))))
+(with-test (:name (make-array nil :no-warning))
+  (checked-compile '(lambda () (make-array '(2 2) :element-type nil))))
 
-(with-test (:name :nth-value-huge-n-works)
+(with-test (:name (nth-value :huge-n :works))
   (flet ((return-a-ton-of-values ()
            (values-list (loop for i below 5000 collect i))))
     (assert (= (nth-value 1 (return-a-ton-of-values)) 1))
@@ -100,51 +100,45 @@
   (b nil :type integer))
 
 (with-test (:name :improperly-initialized-slot-warns)
-  (with-open-stream (*error-output* (make-broadcast-stream))
-    (multiple-value-bind (f warn err)
-        (compile nil '(lambda () (make-a-foo-1 :a 'what)))
-      ;; should warn because B's default is NIL, not an integer.
-      (assert (and f warn err)))
-    (multiple-value-bind (f warn err)
-        (compile nil '(lambda () (make-a-foo-2 3)))
-      ;; should warn because A's default is 0
-      (assert (and f warn err)))))
+  ;; should warn because B's default is NIL, not an integer.
+  (compiles-with-warning '(lambda () (make-a-foo-1 :a 'what)))
+  ;; should warn because A's default is 0
+  (compiles-with-warning '(lambda () (make-a-foo-2 3))))
 
-(with-test (:name :inline-structure-ctor-no-declaim)
-  (let ((f (compile nil
-                    '(lambda ()
-                       (make-a-foo-1 :a 'wat :b 3)))))
+(with-test (:name (inline structure :ctor :no declaim))
+  (let ((f (checked-compile '(lambda ()
+                               (make-a-foo-1 :a 'wat :b 3)))))
     (assert (ctu:find-named-callees f)))
-  (let ((f (compile nil
-                    '(lambda ()
-                       (declare (inline make-a-foo-1))
-                       (make-a-foo-1 :a 'wat :b 3)))))
+  (let ((f (checked-compile '(lambda ()
+                               (declare (inline make-a-foo-1))
+                               (make-a-foo-1 :a 'wat :b 3)))))
     (assert (not (ctu:find-named-callees f)))))
 
 (with-test (:name :internal-name-p :skipped-on :sb-xref-for-internals)
   (assert (sb-c::internal-name-p 'sb-int:neq)))
 
-(with-test (:name :coerce-callable-to-fun-note)
-  (macrolet ((try (form what)
-               `(assert
-                 (search ,(format nil "~A is not known to be" what)
-                         (with-output-to-string (*error-output*)
-                           (compile nil '(lambda (x)
-                                           (declare (optimize speed))
-                                           (funcall ,form))))))))
+(with-test (:name (:coerce-callable-to-fun :note))
+  (flet ((try (form what)
+           (multiple-value-bind (fun failure-p warnings style-warnings notes)
+               (checked-compile `(lambda (x)
+                                  (declare (optimize speed))
+                                  (funcall ,form)))
+             (declare (ignore fun failure-p warnings style-warnings))
+             (assert (search (format nil "~A is not known to be" what)
+                             (princ-to-string (first notes)))))))
 
-    (try (eval `(work-with ,x)) "callable expression")
-    (try x "X")
+    (try '(eval `(work-with ,x)) "callable expression")
+    (try 'x "X")
     ;; For this I'd accept either Z or X in the message.
-    (try (progn (let ((z x)) (identity z))) "X")))
+    (try '(progn (let ((z x)) (identity z))) "X")))
 
-(with-test (:name :princ-to-string-unflushable)
+(with-test (:name (princ-to-string :unflushable))
   ;; Ordinary we'll flush it
-  (let ((f (compile nil '(lambda (x) (princ-to-string x) x))))
+  (let ((f (checked-compile '(lambda (x) (princ-to-string x) x))))
     (assert (not (ctu:find-named-callees f :name 'princ-to-string))))
   ;; But in high safety it should be called for effect
-  (let ((f (compile nil '(lambda (x)
-                           (declare (optimize safety)) (princ-to-string x) x))))
+  (let ((f (checked-compile '(lambda (x)
+                               (declare (optimize safety)) (princ-to-string x) x))))
     (assert (ctu:find-named-callees f :name 'princ-to-string))))
 
 (with-test (:name :space-bounds-no-consing
@@ -153,7 +147,7 @@
   (ctu:assert-no-consing (sb-vm::%space-bounds :static))
   (ctu:assert-no-consing (sb-vm::space-bytes :static)))
 
-(with-test (:name :map-allocated-objects-no-consing
+(with-test (:name (sb-vm::map-allocated-objects :no-consing)
                   :skipped-on :interpreter
                   :fails-on :ppc)
   (let ((n 0))
@@ -198,16 +192,16 @@
                    (setq prev-loc loc)))))
             (assert (equal (unpacked) test-list))))))))
 
-(with-test (:name :symbol-value-quoted-constant)
-  (let ((f (compile nil '(lambda () (symbol-value 'char-code-limit)))))
+(with-test (:name (symbol-value symbol-global-value :quoted-constant))
+  (let ((f (checked-compile '(lambda () (symbol-value 'char-code-limit)))))
     (assert (not (ctu:find-code-constants f :type 'symbol))))
-  (let ((f (compile nil '(lambda () (symbol-global-value 'char-code-limit)))))
+  (let ((f (checked-compile '(lambda () (symbol-global-value 'char-code-limit)))))
     (assert (not (ctu:find-code-constants f :type 'symbol)))))
 
-(with-test (:name :set-symbol-value-of-defglobal)
+(with-test (:name (:set symbol-value :of defglobal))
   (let ((s 'sb-c::*recognized-declarations*))
     (assert (eq (sb-int:info :variable :kind s) :global)) ; verify precondition
-    (let ((f (compile nil `(lambda () (setf (symbol-value ',s) nil)))))
+    (let ((f (checked-compile `(lambda () (setf (symbol-value ',s) nil)))))
       ;; Should not have a call to SET-SYMBOL-GLOBAL-VALUE>
       (assert (not (ctu:find-code-constants f :type 'sb-kernel:fdefn))))))
 
@@ -248,12 +242,11 @@
     (assert (= (length (remove-duplicates strings :test 'string=))
                (length strings)))))
 
-(with-test (:name :no-style-warning-for-inline-cl-fun)
-  (assert (not (nth-value
-                1 (compile nil '(lambda (x)
-                                 (declare (optimize (speed 3)) (inline length)
-                                          (muffle-conditions compiler-note))
-                                 (length x)))))))
+(with-test (:name (:no style-warning :for inline :cl-fun))
+  (checked-compile '(lambda (x)
+                      (declare (optimize (speed 3)) (inline length)
+                      (muffle-conditions compiler-note))
+                      (length x))))
 
 (with-test (:name :deleted-return-use)
   (assert (= (funcall (checked-compile `(lambda ()
@@ -299,8 +292,6 @@
                                   (the integer (x)))
                                 132)))
            132)))
-(defun compiles-with-warning (lambda)
-  (assert (nth-value 2 (checked-compile lambda :allow-warnings t))))
 
 (with-test (:name (:type-conflict funcall :external-lambda))
   (compiles-with-warning `(lambda ()
@@ -312,7 +303,7 @@
                             (let ((x (lambda (x) (declare (fixnum x)) x)))
                               (find-if x "abca")))))
 
-(with-test (:name (:type-conflict :map :result-type))
+(with-test (:name (:type-conflict map :result-type))
   (compiles-with-warning `(lambda (str)
                             (map 'string (lambda (x) (declare (ignore x)) nil)
                                  str))))
@@ -331,10 +322,9 @@
     (search "Derived type of EVENP is"
             (princ-to-string (first warnings)))))
 
-(with-test (:name (:type-conflict :string-union-type))
-  (compiles-with-warning
-   `(lambda (x)
-      (find-if #'evenp (the string x)))))
+(with-test (:name (:type-conflict string :union-type))
+  (compiles-with-warning `(lambda (x)
+                            (find-if #'evenp (the string x)))))
 
 (with-test (:name :type-across-hairy-lambda-transforms)
   (assert (subtypep (sb-kernel:%simple-fun-type (lambda (x) (find 1 (the vector x))))
@@ -350,14 +340,14 @@
               -3391381516052980893)
              2826685)))
 
-(with-test (:name :unused-&optional-and-&key)
+(with-test (:name (:unused &optional :and &key))
   (assert (= (funcall (checked-compile `(lambda (&optional x &key)
                                           (declare (ignore x))
                                           10)
                                        :allow-style-warnings t))
              10)))
 
-(with-test (:name :unknown-values-coercion)
+(with-test (:name (:unknown values :coercion))
   (assert (equal (multiple-value-list
                   (funcall
                    (checked-compile
