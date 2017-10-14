@@ -249,50 +249,47 @@
                       (length x))))
 
 (with-test (:name :deleted-return-use)
-  (assert (= (funcall (checked-compile `(lambda ()
-                                          (block nil
-                                            (return 345)
-                                            (let ((a (catch 'x)))
-                                              (flet ((%f (a &optional b)
-                                                       a))
-                                                (%f 0 (%f 123))))))))
-             345)))
+  (checked-compile-and-assert ()
+      `(lambda ()
+         (block nil
+           (return 345)
+           (let ((a (catch 'x)))
+             (flet ((%f (a &optional b)
+                      a))
+               (%f 0 (%f 123))))))
+    (() 345)))
 
 (with-test (:name :shift-right-transform-nil-type)
-  (assert (=
-           (funcall
-            (checked-compile
-             `(lambda (b c)
-                (declare (type (integer -10 -6) c)
-                         (optimize (debug 2)))
-                (catch 'c
-                  (flet ((f1 (a &optional (b (shiftf b 0)) c d)
-                           (declare (ignore a b c d))
-                           (throw 'c 780)))
-                    (flet ((f2 (a b)
-                             (f1 a b 0)))
-                      (ash
-                       (f1 (if t
-                               c
-                               (f1 (f2 1 0) 0))
-                           b)
-                       (+ c)))))))
-            3 -7)
-           780)))
+  (checked-compile-and-assert (:optimize nil)
+      `(lambda (b c)
+         (declare (type (integer -10 -6) c)
+                  (optimize (debug 2)))
+         (catch 'c
+           (flet ((f1 (a &optional (b (shiftf b 0)) c d)
+                    (declare (ignore a b c d))
+                    (throw 'c 780)))
+             (flet ((f2 (a b)
+                      (f1 a b 0)))
+               (ash
+                (f1 (if t
+                        c
+                        (f1 (f2 1 0) 0))
+                    b)
+                (+ c))))))
+      ((-3 -7) 780)))
 
 (with-test (:name :move-lvar-result-through-unused-cast)
-  (assert (=
-           (funcall
-            (checked-compile `(lambda ()
-                                (declare (optimize (debug 0)))
-                                (labels ((f (a b)
-                                           a b)
-                                         (x ()
-                                           (apply #'f (list 2 3))))
-                                  (declare (notinline f))
-                                  (the integer (x)))
-                                132)))
-           132)))
+  (checked-compile-and-assert (:optimize nil)
+      `(lambda ()
+         (declare (optimize (debug 0)))
+         (labels ((f (a b)
+                    a b)
+                  (x ()
+                    (apply #'f (list 2 3))))
+           (declare (notinline f))
+           (the integer (x)))
+         132)
+    (() 132)))
 
 (with-test (:name (:type-conflict funcall :external-lambda))
   (compiles-with-warning `(lambda ()
@@ -332,80 +329,69 @@
                     '(function * (values (or (integer 1 1) null) &optional)))))
 
 (with-test (:name :lea-type-derivation)
-  (assert (= (funcall
-              (checked-compile `(lambda (b)
-                                  (declare ((integer -3755795408964870057
-                                                     -3391381516052960895)
-                                            b))
-                                  (ldb (byte 22 10) (* b 9))))
-              -3391381516052980893)
-             2826685)))
+  (checked-compile-and-assert ()
+      `(lambda (b)
+         (declare ((integer -3755795408964870057 -3391381516052960895)
+                   b))
+         (ldb (byte 22 10) (* b 9)))
+    ((-3391381516052980893) 2826685)))
 
 (with-test (:name (:unused &optional :and &key))
-  (assert (= (funcall (checked-compile `(lambda (&optional x &key)
-                                          (declare (ignore x))
-                                          10)
-                                       :allow-style-warnings t))
-             10)))
+  (checked-compile-and-assert (:allow-style-warnings t)
+      `(lambda (&optional x &key)
+         (declare (ignore x))
+         10)
+    (() 10)))
 
 (with-test (:name (:unknown values :coercion))
-  (assert (equal (multiple-value-list
-                  (funcall
-                   (checked-compile
-                    `(lambda (a)
-                       (declare (notinline values typep))
-                       (the integer (values a 2305843009213693946 a -207))))
-                   123))
-                 '(123 2305843009213693946 123 -207))))
+  (checked-compile-and-assert ()
+      `(lambda (a)
+         (declare (notinline values typep))
+         (the integer (values a 2305843009213693946 a -207)))
+    ((123) (values 123 2305843009213693946 123 -207))))
 
 (with-test (:name :deleted-block-during-generate-type-checks)
-  (assert (zerop
-           (funcall
-            (checked-compile `(lambda (a b)
-                                (declare (notinline min ash conjugate oddp >=)
-                                         (optimize debug))
-                                (if (and (or t (>= a)) (oddp 0))
-                                    (prog2 0
-                                        0
-                                      (labels ((f (a b c &key)
-                                                 (declare (ignore a b c))
-                                                 6965670824543402))
-                                        (f a 0 b)))
-                                    (conjugate
-                                     (dotimes (i 0 0)
-                                       (catch 'c
-                                         (ash
-                                          (the integer
-                                               (ignore-errors
-                                                (ignore-errors (throw 'c 1))))
-                                          (min a)))))))
-                             :allow-warnings t)
-                    1 2))))
+  (checked-compile-and-assert (:allow-warnings t)
+      `(lambda (a b)
+         (declare (notinline min ash conjugate oddp >=))
+         (if (and (or t (>= a)) (oddp 0))
+             (prog2 0
+                 0
+               (labels ((f (a b c &key)
+                          (declare (ignore a b c))
+                          6965670824543402))
+                 (f a 0 b)))
+             (conjugate
+              (dotimes (i 0 0)
+                (catch 'c
+                  (ash
+                   (the integer
+                        (ignore-errors
+                          (ignore-errors (throw 'c 1))))
+                   (min a)))))))
+    ((1 2) 0)))
 
 (with-test (:name :block-delete-twice)
-  (assert (= (funcall
-              (funcall
-               (checked-compile
-                `(lambda ()
-                   (declare (notinline >=))
-                   (block nil
-                     (lambda (x &key (key (if (>= 0 1)
-                                              (return (catch 'ct5 0)))))
-                       (declare (ignore key))
-                       x)))))
-              123)
-             123)))
+  (checked-compile-and-assert ()
+      `(lambda ()
+         (declare (notinline >=))
+         (block nil
+           (lambda (x &key (key (if (>= 0 1)
+                                    (return (catch 'ct5 0)))))
+             (declare (ignore key))
+             x)))
+    (() 123 :test (lambda (values expected)
+                    (equal (multiple-value-list
+                            (funcall (first values) (first expected)))
+                           expected)))))
 
 (with-test (:name :dead-lvars-and-stack-analysis)
-  (assert (=
-           (funcall
-            (checked-compile
-             `(lambda (b)
-                (catch 'ct2
-                  (block b5
-                    (return-from b5
-                      (multiple-value-prog1 19
-                        (if (or b t)
-                            (return-from b5 333))))))))
-            11)
-           333)))
+  (checked-compile-and-assert ()
+    `(lambda (b)
+       (catch 'ct2
+         (block b5
+           (return-from b5
+             (multiple-value-prog1 19
+               (if (or b t)
+                   (return-from b5 333)))))))
+    ((11) 333)))
