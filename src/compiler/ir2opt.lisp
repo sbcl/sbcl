@@ -121,7 +121,6 @@
 ;; 3. Execute the chosen conditional move VOP
 ;; 4. Convert the result from the common representation
 ;; 5. Jump to the successor
-#!-sb-fluid (declaim (inline convert-one-cmov))
 (defun convert-one-cmov (cmove-vop
                          value-if arg-if
                          value-else arg-else
@@ -129,24 +128,39 @@
                          flags info
                          label
                          vop node 2block)
-  (delete-vop vop)
-  (flet ((load-and-coerce (dst src)
-           (when (and dst (neq dst src))
-             (emit-and-insert-vop node 2block
-                                  (template-or-lose 'move)
-                                  (reference-tn src nil)
-                                  (reference-tn dst t)
-                                  (ir2-block-last-vop 2block)))))
-    (load-and-coerce arg-if   value-if)
-    (load-and-coerce arg-else value-else))
-  (emit-template node 2block (template-or-lose cmove-vop)
-                 (reference-tn-list (remove nil (list arg-if arg-else))
-                                    nil)
-                 (reference-tn res t)
-                 (list* flags info))
-  (emit-move node 2block res target)
-  (vop branch node 2block label)
-  (update-block-succ 2block (list label)))
+  (let ((prev (vop-prev vop)))
+    (delete-vop vop)
+    (flet ((reuse-if-eq-arg (value-if vop)
+             ;; Most of the time this means:
+             ;; if X is already NIL, don't load it again.
+             (when (and (eq (vop-name vop) 'if-eq)
+                        (immediate-tn-p value-if))
+               (let* ((args (vop-args vop))
+                      (test (tn-ref-tn (tn-ref-across args))))
+                 (when (and (immediate-tn-p test)
+                            (equal (tn-value value-if)
+                                   (tn-value test)))
+                   (tn-ref-tn args)))))
+           (load-and-coerce (dst src)
+             (when (and dst (neq dst src))
+               (emit-and-insert-vop node 2block
+                                    (template-or-lose 'move)
+                                    (reference-tn src nil)
+                                    (reference-tn dst t)
+                                    (ir2-block-last-vop 2block)))))
+      (let ((reuse (reuse-if-eq-arg value-if prev)))
+        (if reuse
+            (setf arg-if reuse)
+            (load-and-coerce arg-if   value-if)))
+      (load-and-coerce arg-else value-else))
+    (emit-template node 2block (template-or-lose cmove-vop)
+                   (reference-tn-list (remove nil (list arg-if arg-else))
+                                      nil)
+                   (reference-tn res t)
+                   (list* flags info))
+    (emit-move node 2block res target)
+    (vop branch node 2block label)
+    (update-block-succ 2block (list label))))
 
 ;; Since conditional branches are always at the end of blocks,
 ;; it suffices to look at the last VOP in each block.
