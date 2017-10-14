@@ -333,7 +333,8 @@
         (remf info key)))
     (equal info info2)))
 
-(deftest allocation-infromation.1
+
+(deftest allocation-information.1
     (tai nil :heap '(:space :static))
   t)
 
@@ -411,7 +412,7 @@
     ;; This FORMAT call has the effect of consuming enough stack space
     ;; to clobber a lingering pointer to THING from the stack.
     ;; Without it, the next test iteration (after next GC) will fail.
-    (format (make-broadcast-stream) "~S" props)
+    (format (make-string-output-stream) "~S~%" props)
     ;; Check that uncopyableness isn't due to pin,
     ;; or else the test proves nothing.
     (and (eq (getf props :pinned :missing) nil)
@@ -443,24 +444,30 @@
                ;; and by accident would not go on a large object page.
                (sb-c:allocate-code-object nil 0
                 (max (* 4 sb-vm:gencgc-card-bytes) #-64-bit 65536))))
+      (declare (notinline format))
+      (format (make-string-output-stream) "~%")
       (loop for i from 1 to 5
             always (assert-large-page/gen/boxedp '*large-obj* page i t)))
   t)
 (sb-ext:defglobal *b* nil)
 (sb-ext:defglobal *negb* nil)
 (sb-ext:defglobal *small-bignum* nil)
+(defun get-small-bignum-allocation-information ()
+  (setq *small-bignum* (+ (+ *b* (ash 1 100)) *negb*))
+  (nth-value 1 (allocation-information *small-bignum*)))
 #+gencgc
 (deftest allocation-information.7
-    (progn
+    (locally
+      (declare (notinline format))
       ;; Create a bignum using 4 GC cards
       (setq *b* (ash 1 (* sb-vm:gencgc-card-bytes sb-vm:n-byte-bits 4)))
       (setq *negb* (- *b*))
-      (setq *small-bignum* (+ (+ *b* (ash 1 100)) *negb*))
-      (and (let ((props (nth-value 1 (allocation-information *small-bignum*))))
+      (and (let ((props (get-small-bignum-allocation-information)))
              ;; *SMALL-BIGNUM* was created as a large boxed object
              (and (eq (getf props :large) t)
                   (eq (getf props :boxed) t)))
            (multiple-value-bind (page gen) (page-and-gen *b*)
+             (format (make-string-output-stream) "~%")
              (loop for i from 1 to 5
                    always
                    (and (assert-large-page/gen/boxedp '*b* page i nil)
