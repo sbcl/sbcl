@@ -537,4 +537,16 @@ void execute_full_sweep_phase()
     fclose(sweeplog);
     sweeplog = 0;
 #endif
+
+    page_index_t first_page, last_page;
+    for (first_page = 0; first_page < last_free_page; ++first_page)
+        if (page_table[first_page].write_protected) {
+            last_page = first_page;
+            while (page_table[last_page+1].write_protected)
+                ++last_page;
+            os_protect(page_address(first_page),
+                       (last_page - first_page + 1) * GENCGC_CARD_BYTES,
+                       OS_VM_PROT_READ | OS_VM_PROT_EXECUTE);
+            first_page = last_page;
+        }
 }

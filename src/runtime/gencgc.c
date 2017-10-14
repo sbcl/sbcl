@@ -103,9 +103,9 @@ boolean gencgc_verbose = 0;
  * and see what they say. */
 
 /* We hunt for pointers to old-space, when GCing generations >= verify_gen.
- * Set verify_gens to HIGHEST_NORMAL_GENERATION + 1 to disable this kind of
+ * Set verify_gens to HIGHEST_NORMAL_GENERATION + 2 to disable this kind of
  * check. */
-generation_index_t verify_gens = HIGHEST_NORMAL_GENERATION + 1;
+generation_index_t verify_gens = HIGHEST_NORMAL_GENERATION + 2;
 
 /* Should we do a pre-scan verify of generation 0 before it's GCed? */
 boolean pre_verify_gen_0 = 0;
@@ -3311,21 +3311,19 @@ garbage_collect_generation(generation_index_t generation, int raise)
 
     } else { // "full" [sic] GC
 
-        extern void prepare_for_full_mark_phase();
         /* This is a full mark-and-sweep of all generations without compacting
          * and without returning free space to the allocator. The intent is to
          * break chains of objects causing accidental reachability.
          * Subsequent GC cycles will compact and reclaims space as usual. */
-        if (ENABLE_PAGE_PROTECTION) {
-            // Unprotect everything
-            for (i = 0; i < last_free_page; i++)
-                if (page_bytes_used(i))
-                    page_table[i].write_protected = 0;
+        from_space = new_space = -1;
+
+        // Unprotect the dynamic space but leave page_table bits alone
+        if (ENABLE_PAGE_PROTECTION)
             os_protect(page_address(0), npage_bytes(last_free_page),
                        OS_VM_PROT_ALL);
-        }
-        from_space = new_space = -1;
+
         // Allocate pages from dynamic space for the work queue.
+        extern void prepare_for_full_mark_phase();
         prepare_for_full_mark_phase();
 
     }
