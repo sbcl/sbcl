@@ -186,7 +186,7 @@ static inline void set_function_layout(lispobj* fun_ptr, lispobj layout) {
 #include "genesis/bignum.h"
 extern boolean positive_bignum_logbitp(int,struct bignum*);
 
-#ifndef LISP_FEATURE_IMMOBILE_SPACE
+#ifdef LISP_FEATURE_IMMOBILE_CODE
 
 /* The callee_lispobj of an fdefn is the value in the 'raw_addr' slot to which
  * control transfer occurs, but cast as a simple-fun or code component.
@@ -198,19 +198,26 @@ extern boolean positive_bignum_logbitp(int,struct bignum*);
  * a pointer lowtag because it only affects print_otherptr() and verify_space()
  * neither of which materially impact garbage collection. */
 
-static inline boolean points_to_readonly_space(uword_t ptr) {
-    return READ_ONLY_SPACE_START <= ptr && ptr < READ_ONLY_SPACE_END;
-}
+extern lispobj fdefn_callee_lispobj(struct fdefn *fdefn);
+
+#elif defined(LISP_FEATURE_IMMOBILE_SPACE)
+
 static inline lispobj fdefn_callee_lispobj(struct fdefn *fdefn) {
-    return (lispobj)
-        (fdefn->raw_addr -
-         (points_to_readonly_space((uword_t)fdefn->raw_addr) ? 0 : FUN_RAW_ADDR_OFFSET));
+    extern unsigned int asm_routines_end;
+    return (lispobj)fdefn->raw_addr -
+      ((uword_t)fdefn->raw_addr < (uword_t)asm_routines_end ? 0 : FUN_RAW_ADDR_OFFSET);
 }
 
 #else
 
-extern lispobj fdefn_callee_lispobj(struct fdefn *fdefn);
+static inline boolean points_to_readonly_space(uword_t ptr) {
+    return READ_ONLY_SPACE_START <= ptr && ptr < READ_ONLY_SPACE_END;
+}
+static inline lispobj fdefn_callee_lispobj(struct fdefn *fdefn) {
+    return (lispobj)fdefn->raw_addr -
+      (points_to_readonly_space((uword_t)fdefn->raw_addr) ? 0 : FUN_RAW_ADDR_OFFSET);
+}
 
-#endif /* immobile space */
+#endif
 
 #endif /* _GC_INTERNAL_H_ */

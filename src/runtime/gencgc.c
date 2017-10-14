@@ -3001,7 +3001,7 @@ void verify_gc(uword_t flags)
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 #  ifdef __linux__
-    // Try this verification if marknsweep was compiled with extra debugging.
+    // Try this verification if immobile-space was compiled with extra debugging.
     // But weak symbols don't work on macOS.
     extern void __attribute__((weak)) check_varyobj_pages();
     if (&check_varyobj_pages) check_varyobj_pages();

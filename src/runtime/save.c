@@ -45,7 +45,7 @@
 #endif
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-# include "marknsweepgc.h"
+# include "immobile-space.h"
 #endif
 
 #ifdef LISP_FEATURE_SB_CORE_COMPRESSION

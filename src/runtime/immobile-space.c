@@ -53,7 +53,7 @@
 #include "forwarding-ptr.h"
 #include "pseudo-atomic.h"
 #include "var-io.h"
-#include "marknsweepgc.h"
+#include "immobile-space.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -1289,12 +1289,9 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
             varyobj_page_touched_bits[(page-FIRST_VARYOBJ_PAGE)/32] &= ~(1<<(page & 31));
     }
     compute_immobile_space_bound();
-    struct code* code = (struct code*)address;
-    while (!code_n_funs(code)) {
-        gc_assert(widetag_of(code->header) == CODE_HEADER_WIDETAG);
-        code = (struct code*)
-          (lispobj*)code + sizetab[CODE_HEADER_WIDETAG]((lispobj*)code);
-    }
+    lispobj* code = (lispobj*)address;
+    while (widetag_of(*code) == CODE_HEADER_WIDETAG && !code_n_funs((struct code*)code))
+        code += sizetab[CODE_HEADER_WIDETAG](code);
     asm_routines_end = (unsigned)(uword_t)code;
     page_attributes_valid = 1;
 }
@@ -1377,6 +1374,7 @@ void prepare_immobile_space_for_save(lispobj init_function, boolean verbose)
             assign_generation(obj, PSEUDO_STATIC_GENERATION);
     }
 
+#ifdef LISP_FEATURE_IMMOBILE_CODE
     // It's better to wait to defrag until after the binding stack is undone,
     // because we explicitly don't fixup code refs from stacks.
     // i.e. if there *were* something on the binding stack that cared that code
@@ -1391,6 +1389,7 @@ void prepare_immobile_space_for_save(lispobj init_function, boolean verbose)
         defrag_immobile_space(code_component_order, verbose);
         if (verbose) printf("done]\n");
     }
+#endif
 }
 
 //// Interface
@@ -2283,6 +2282,7 @@ void fixup_immobile_refs(lispobj (*fixup_lispobj)(lispobj),
                         + (ptr - (lispobj)header_addr);
                 }
             } else if (ptr > asm_routines_end) {
+#ifdef LISP_FEATURE_IMMOBILE_CODE
               /* Carefully avoid looking at assembler routines, which precede
                * all other code in immobile code space. As currently implemented,
                * defragmentation deposits a FP into the code header for those
@@ -2304,6 +2304,9 @@ void fixup_immobile_refs(lispobj (*fixup_lispobj)(lispobj),
                               == SIMPLE_FUN_WIDETAG);
                     *fixup_where = fpval + FUN_RAW_ADDR_OFFSET;
                 }
+#else
+                lose("unexpected immobile-space pointer");
+#endif
             }
         }
     }
