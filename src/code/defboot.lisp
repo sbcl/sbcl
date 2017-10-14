@@ -110,15 +110,27 @@ evaluated as a PROGN."
   `(if ,test nil ,(prognify forms env))))
 
 (sb!xc:defmacro and (&rest forms)
-  (named-let expand-forms ((nested nil) (forms forms))
+  (named-let expand-forms ((nested nil) (forms forms) (ignore-last nil))
     (cond ((endp forms) t)
           ((endp (rest forms))
-           ;; Preserve non-toplevelness of the form!
-           (let ((car (car forms))) (if nested car `(the t ,car))))
+           (let ((car (car forms)))
+             (cond (nested
+                    car)
+                   (t
+                    ;; Preserve non-toplevelness of the form!
+                    `(the t ,car)))))
+          ((and ignore-last
+                (endp (cddr forms)))
+           (car forms))
+          ;; Better code that way, since the result will only have two
+          ;; values, NIL or the last form, and the precedeing tests
+          ;; will only be used for jumps
+          ((and (not nested) (cddr forms))
+           `(if ,(expand-forms t forms t)
+                ,@(last forms)))
           (t
            `(if ,(first forms)
-                ,(expand-forms t (rest forms))
-                nil)))))
+                ,(expand-forms t (rest forms) ignore-last))))))
 
 (sb!xc:defmacro or (&rest forms)
   (named-let expand-forms ((nested nil) (forms forms))
