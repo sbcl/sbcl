@@ -277,7 +277,8 @@
                                (f1 (f2 1 0) 0))
                            b)
                        (+ c)))))))
-            3 -7))))
+            3 -7)
+           780)))
 
 (with-test (:name :move-lvar-result-through-unused-cast)
   (assert (=
