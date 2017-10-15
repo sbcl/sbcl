@@ -25,7 +25,9 @@
                     ;; Check that it prints without an error.
                     (let ((string (princ-to-string e)))
                       :ok)))))))
-;;;
+
+;;; This enforces the rules given in CLHS 11.1.2.1.1 Constraints on
+;;; the COMMON-LISP Package for Conforming Implementations.
 
 (defun classify-symbol (symbol)
   (let ((result 0)
