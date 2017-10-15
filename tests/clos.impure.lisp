@@ -656,12 +656,12 @@
 ;;; CALL-NEXT-METHOD should call NO-NEXT-METHOD if there is no next
 ;;; method.
 (defmethod no-next-method-test ((x integer)) (call-next-method))
-(assert (null (ignore-errors (no-next-method-test 1))))
+(assert-error (no-next-method-test 1) sb-pcl::no-next-method-error)
 (defmethod no-next-method ((g (eql #'no-next-method-test)) m &rest args)
   (declare (ignore args))
   'success)
 (assert (eq (no-next-method-test 1) 'success))
-(assert (null (ignore-errors (no-next-method-test 'foo))))
+(assert-error (no-next-method-test 'foo) sb-pcl::no-applicable-method-error)
 
 ;;; regression test for bug 176, following a fix that seems
 ;;; simultaneously to fix 140 while not exposing 176 (by Gerd
@@ -1735,7 +1735,7 @@
   (:method :ignore ((x number)) (declare (notinline /)) (/ 0)))
 (handler-bind ((style-warning #'muffle-warning))
 (assert (equal '(result) (test-mc27prime 3))))
-(assert-error (test-mc27 t))           ; still no-applicable-method
+(assert-error (test-mc27 t) sb-pcl::no-applicable-method-error) ; still no-applicable-method
 
 ;;; more invalid wrappers.  This time for a long-standing bug in the
 ;;; compiler's expansion for TYPEP on various class-like things, with
@@ -2154,7 +2154,7 @@
   "string")
 (with-test (:name :no-applicable-method/retry)
   (assert (equal "cons"
-                 (handler-bind ((error
+                 (handler-bind ((sb-pcl::no-applicable-method-error
                                  (lambda (c)
                                    (declare (ignore c))
                                    (let ((r (find-restart 'sb-pcl::retry)))
@@ -2168,7 +2168,7 @@
 (defmethod no-primary-method/retry :before (x) (assert x))
 (with-test (:name :no-primary-method/retry)
   (assert (equal "ok!"
-                 (handler-bind ((error
+                 (handler-bind ((sb-pcl::no-primary-method-error
                                  (lambda (c)
                                    (declare (ignore c))
                                    (let ((r (find-restart 'sb-pcl::retry)))
@@ -2564,7 +2564,8 @@
     (eval `(defclass ,class () ()))
     (assert-error
      (funcall (checked-compile `(lambda ()
-                                  (allocate-instance ',class)))))))
+                                  (allocate-instance ',class))))
+     sb-pcl::no-applicable-method-error)))
 
 (defclass unbound-slot-after-allocation=class ()
   ((abc :allocation :class)

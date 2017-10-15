@@ -702,36 +702,66 @@
 
 (setq **boot-state** 'braid)
 
-(defmethod no-applicable-method (generic-function &rest args)
-  (error "~@<There is no applicable method for the generic function ~2I~_~S~
-          ~I~_when called with arguments ~2I~_~S.~:>"
-         generic-function
-         args))
+(define-condition effective-method-condition (reference-condition)
+  ((generic-function :initarg :generic-function
+                     :reader effective-method-condition-generic-function)
+   (method :initarg :method :initform nil
+           :reader effective-method-condition-method)
+   (args :initarg :args
+         :reader effective-method-condition-args))
+  (:default-initargs
+   :generic-function (missing-arg)
+   :args (missing-arg)))
 
+(define-condition effective-method-error (error
+                                          effective-method-condition)
+  ((problem :initarg :problem :reader effective-method-error-problem))
+  (:default-initargs :problem (missing-arg))
+  (:report
+   (lambda (condition stream)
+     (format stream "~@<~A for the generic function ~2I~_~S ~I~_when ~
+                     called ~@[from method ~2I~_~S~I~_~]with arguments ~
+                     ~2I~_~S.~:>"
+             (effective-method-error-problem condition)
+             (effective-method-condition-generic-function condition)
+             (effective-method-condition-method condition)
+             (effective-method-condition-args condition)))))
+
+(define-condition no-applicable-method-error (effective-method-error)
+  ()
+  (:default-initargs
+   :problem "There is no applicable method"
+   :references '((:ansi-cl :section (7 6 6)))))
+(defmethod no-applicable-method (generic-function &rest args)
+  (error 'no-applicable-method-error
+         :generic-function generic-function
+         :args args))
+
+(define-condition no-next-method-error (effective-method-error)
+  ()
+  (:default-initargs
+   :problem "There is no next method"
+   :references '((:ansi-cl :section (7 6 6 2)))))
 (defmethod no-next-method ((generic-function standard-generic-function)
                            (method standard-method) &rest args)
-  (error "~@<There is no next method for the generic function ~2I~_~S~
-          ~I~_when called from method ~2I~_~S~I~_with arguments ~2I~_~S.~:>"
-         generic-function
-         method
-         args))
+  (error 'no-next-method-error
+         :generic-function generic-function
+         :method method
+         :args args))
 
 ;;; An extension to the ANSI standard: in the presence of e.g. a
 ;;; :BEFORE method, it would seem that going through
 ;;; NO-APPLICABLE-METHOD is prohibited, as in fact there is an
 ;;; applicable method.  -- CSR, 2002-11-15
-(define-condition no-primary-method (reference-condition error)
-  ((generic-function :initarg :generic-function :reader no-primary-method-generic-function)
-   (args :initarg :args :reader no-primary-method-args))
-  (:report
-   (lambda (c s)
-     (format s "~@<There is no primary method for the generic function ~2I~_~S~
-                ~I~_when called with arguments ~2I~_~S.~:>"
-             (no-primary-method-generic-function c)
-             (no-primary-method-args c))))
-  (:default-initargs :references '((:ansi-cl :section (7 6 6 2)))))
+(define-condition no-primary-method-error (effective-method-error)
+  ()
+  (:default-initargs
+   :problem "There is no primary method"
+   :references '((:ansi-cl :section (7 6 6 2)))))
 (defmethod no-primary-method (generic-function &rest args)
-  (error 'no-primary-method :generic-function generic-function :args args))
+  (error 'no-primary-method-error
+         :generic-function generic-function
+         :args args))
 
 ;; FIXME shouldn't this specialize on STANDARD-METHOD-COMBINATION?
 (defmethod invalid-qualifiers ((gf generic-function)
