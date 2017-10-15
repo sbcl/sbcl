@@ -1133,7 +1133,7 @@
         finally (eval `(defclass ,class-name ()
                          (,@slot-descs)
                          (:default-initargs ,@default-initargs))))
-  (let ((f (compile nil `(lambda () (make-instance ',class-name)))))
+  (let ((f (checked-compile `(lambda () (make-instance ',class-name)))))
     (assert (typep (funcall f) class-name))))
 
 ;;; bug 262: DEFMETHOD failed on a generic function without a lambda
@@ -1145,20 +1145,19 @@
 
 ;;; salex on #lisp 2003-10-13 reported that type declarations inside
 ;;; WITH-SLOTS are too hairy to be checked
-(defun ensure-no-notes (form)
-  (handler-case (compile nil `(lambda () ,form))
-    (sb-ext:compiler-note (c)
-      ;; FIXME: it would be better to check specifically for the "type
-      ;; is too hairy" note
-      (error c))))
 (defvar *x*)
-(ensure-no-notes '(with-slots (a) *x*
-                   (declare (integer a))
-                   a))
-(ensure-no-notes '(with-slots (a) *x*
-                   (declare (integer a))
-                   (declare (notinline slot-value))
-                   a))
+(with-test (:name (with-slots declare :note :hairy))
+  (flet ((ensure-no-notes (form)
+           ;; FIXME: it would be better to check specifically for the "type
+           ;; is too hairy" note
+           (checked-compile `(lambda () ,form) :allow-notes nil)))
+    (ensure-no-notes '(with-slots (a) *x*
+                       (declare (integer a))
+                       a))
+    (ensure-no-notes '(with-slots (a) *x*
+                       (declare (integer a))
+                       (declare (notinline slot-value))
+                       a))))
 
 ;;; from CLHS 7.6.5.1
 (defclass character-class () ((char :initarg :char)))
@@ -1347,20 +1346,17 @@
 
 ;;; Bug reported by Zach Beane; incorrect return of (function
 ;;; ',fun-name) in defgeneric
-(assert
- (typep (funcall (compile nil
-                          '(lambda () (flet ((nonsense () nil))
-                                        (declare (ignorable #'nonsense))
-                                        (defgeneric nonsense ())))))
-        'generic-function))
-
-(assert
- (typep (funcall (compile nil
-                          '(lambda () (flet ((nonsense-2 () nil))
-                                        (declare (ignorable #'nonsense-2))
-                                        (defgeneric nonsense-2 ()
-                                          (:method () t))))))
-        'generic-function))
+(with-test (:name (defgeneric :return type))
+  (flet ((test (form)
+           (let ((fun (checked-compile form)))
+             (assert (typep (funcall fun) 'generic-function)))))
+    (test '(lambda () (flet ((nonsense () nil))
+                        (declare (ignorable #'nonsense))
+                        (defgeneric nonsense ()))))
+    (test '(lambda () (flet ((nonsense-2 () nil))
+                        (declare (ignorable #'nonsense-2))
+                        (defgeneric nonsense-2 ()
+                          (:method () t)))))))
 
 ;;; bug reported by Bruno Haible: (setf find-class) using a
 ;;; forward-referenced class
@@ -1655,9 +1651,9 @@
 (eval `(defmethod class-as-specializer-test1 ((x ,(find-class 'class-as-specializer-test)))
          'foo))
 (assert (eq 'foo (class-as-specializer-test1 (make-instance 'class-as-specializer-test))))
-(funcall (compile nil `(lambda ()
-                         (defmethod class-as-specializer-test2 ((x ,(find-class 'class-as-specializer-test)))
-                           'bar))))
+(funcall (checked-compile `(lambda ()
+                             (defmethod class-as-specializer-test2 ((x ,(find-class 'class-as-specializer-test)))
+                               'bar))))
 (assert (eq 'bar (class-as-specializer-test2 (make-instance 'class-as-specializer-test))))
 
 ;;; CHANGE-CLASS and tricky allocation.
@@ -2388,7 +2384,9 @@
   ;; Now compile a lambda containing MAKE-INSTANCE to exercise the
   ;; fallback constructor generator. Call the resulting compiled
   ;; function to trigger the bug.
-  (funcall (compile nil '(lambda () (make-instance 'bug-1179858 :foo t)))))
+  (checked-compile-and-assert ()
+      '(lambda () (make-instance 'bug-1179858 :foo t))
+    (() nil :test (constantly t))))
 
 ;;; Other brokenness, found while investigating: fallback-generator
 ;;; handling of non-keyword initialization arguments
@@ -2401,9 +2399,9 @@
 (with-test (:name (make-instance :fallback-generator-non-keyword-initarg :bug-1179858))
   (flet ((foo= (n i) (= (bug-1179858b-foo i) n)))
     (assert
-     (foo= 14 (funcall (compile nil '(lambda () (make-instance 'bug-1179858b))))))
+     (foo= 14 (funcall (checked-compile '(lambda () (make-instance 'bug-1179858b))))))
     (assert
-     (foo= 15 (funcall (compile nil '(lambda () (make-instance 'bug-1179858b 'foo 15))))))))
+     (foo= 15 (funcall (checked-compile '(lambda () (make-instance 'bug-1179858b 'foo 15))))))))
 
 (with-test (:name (:cpl-violation-setup :bug-309076))
   (assert-error
@@ -2424,17 +2422,13 @@
 (defmacro macro ()
   (let ((a 20))
     (declare (special a))
-    (assert
-     (=
-      (funcall
-       (compile nil
-                (sb-mop:make-method-lambda
-                 #'b
-                 (find-method #'b () ())
-                 '(lambda () (declare (special a)) a)
-                 nil))
-       '(1) ())
-      20))))
+    (checked-compile-and-assert ()
+        (sb-mop:make-method-lambda
+         #'b
+         (find-method #'b () ())
+         '(lambda () (declare (special a)) a)
+         nil)
+      (('(1) ()) 20))))
 
 (with-test (:name :make-method-lambda-leakage)
   ;; lambda list of X leaks into the invocation of make-method-lambda
@@ -2562,10 +2556,9 @@
 (with-test (:name (allocate-instance :on symbol))
   (let ((class (gensym "CLASS-")))
     (eval `(defclass ,class () ()))
-    (assert-error
-     (funcall (checked-compile `(lambda ()
-                                  (allocate-instance ',class))))
-     sb-pcl::no-applicable-method-error)))
+    (checked-compile-and-assert ()
+        `(lambda () (allocate-instance ',class))
+      (() (condition sb-pcl::no-applicable-method-error)))))
 
 (defclass unbound-slot-after-allocation=class ()
   ((abc :allocation :class)
@@ -2584,7 +2577,7 @@
                             (declare (ignore condition))
                             (error "Timeout"))))
     (sb-ext:with-timeout 0.1
-      (assert-error (funcall (checked-compile `(lambda ()
-                                                 (defmethod foo ((bar keyword))))
-                                              :allow-warnings t))
-                    sb-pcl:class-not-found-error))))
+      (checked-compile-and-assert (:allow-warnings t)
+          `(lambda ()
+             (defmethod foo ((bar keyword))))
+        (() (condition sb-pcl:class-not-found-error))))))

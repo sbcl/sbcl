@@ -32,7 +32,7 @@
 (defmethod c-of ((x foo))
   (slot-value x 'c))
 
-(let ((fun (compile nil '(lambda (x) (slot-value x 'a)))))
+(let ((fun (checked-compile '(lambda (x) (slot-value x 'a)))))
   (dotimes (i 4)                        ; KLUDGE: get caches warm
     (assert (= 1 (slot-value *foo* 'a)))
     (assert (= 1 (a-of *foo*)))
@@ -43,7 +43,7 @@
 (defclass foo ()
   ((b :initarg :b :initform 3) (a :initarg :a)))
 
-(let ((fun (compile nil '(lambda (x) (slot-value x 'a)))))
+(let ((fun (checked-compile '(lambda (x) (slot-value x 'a)))))
   (dotimes (i 4)                        ; KLUDGE: get caches warm
     (assert (= 1 (slot-value *foo* 'a)))
     (assert (= 1 (a-of *foo*)))
@@ -56,7 +56,7 @@
    (b :initarg :b :initform 3)
    (a :initarg :a)))
 
-(let ((fun (compile nil '(lambda (x) (slot-value x 'a)))))
+(let ((fun (checked-compile '(lambda (x) (slot-value x 'a)))))
   (dotimes (i 4) ; KLUDGE: get caches warm
     (assert (= 1 (slot-value *foo* 'a)))
     (assert (= 1 (a-of *foo*)))
@@ -69,7 +69,7 @@
    (b :initarg :b :initform 3)
    (c :initarg :c :initform t)))
 
-(let ((fun (compile nil '(lambda (x) (slot-value x 'a)))))
+(let ((fun (checked-compile '(lambda (x) (slot-value x 'a)))))
   (dotimes (i 4) ; KLUDGE: get caches warm
     (assert (= 1 (slot-value *foo* 'a)))
     (assert (= 1 (a-of *foo*)))
@@ -80,7 +80,7 @@
 (defclass foo ()
   ((b :initarg :b :initform 3)))
 
-(let ((fun (compile nil '(lambda (x) (slot-value x 'a)))))
+(let ((fun (checked-compile '(lambda (x) (slot-value x 'a)))))
   (dotimes (i 4)                        ; KLUDGE: get caches warm
     (assert-error (slot-value *foo* 'a))
     (assert-error (a-of *foo*))
@@ -125,26 +125,21 @@
 ;;; Tests the compiler's incremental rejiggering of GF types.
 (fmakunbound 'foo)
 (with-test (:name :keywords-supplied-in-methods-ok-1)
-  (assert
-   (null
-    (nth-value
-     1
-     (progn
-       (defgeneric foo (x &key))
-       (defmethod foo ((x integer) &key bar) (list x bar))
-       (compile nil '(lambda () (foo (read) :bar 10))))))))
+  (defgeneric foo (x &key))
+  (defmethod foo ((x integer) &key bar) (list x bar))
+  (checked-compile '(lambda () (foo (read) :bar 10))))
 
 (fmakunbound 'foo)
 (with-test (:name :keywords-supplied-in-methods-ok-2)
-  (assert
-   (nth-value
-    1
-    (progn
-      (defgeneric foo (x &key))
-      (defmethod foo ((x integer) &key bar) (list x bar))
-      ;; On second thought...
-      (remove-method #'foo (find-method #'foo () '(integer)))
-      (compile nil '(lambda () (foo (read) :bar 10)))))))
+  (defgeneric foo (x &key))
+  (defmethod foo ((x integer) &key bar) (list x bar))
+  ;; On second thought...
+  (remove-method #'foo (find-method #'foo () '(integer)))
+  (multiple-value-bind  (fun failure-p warnings style-warnings)
+      (checked-compile '(lambda () (foo (read) :bar 10))
+                       :allow-style-warnings t)
+    (declare (ignore fun failure-p warnings))
+    (assert (= (length style-warnings) 1))))
 
 ;; If the GF has &REST with no &KEY, not all methods are required to
 ;; parse the tail of the arglist as keywords, so we don't treat the
@@ -154,8 +149,7 @@
   (defgeneric foo (x &rest y))
   (defmethod foo ((i integer) &key w) (list i w))
   ;; 1.0.20.30 failed here.
-  (assert
-   (null (nth-value 1 (compile nil '(lambda () (foo 5 :w 10 :foo 15))))))
+  (checked-compile '(lambda () (foo 5 :w 10 :foo 15)))
   (assert
    (not (sb-kernel::args-type-keyp (sb-int:proclaimed-ftype 'foo)))))
 
@@ -173,10 +167,8 @@
                          (sb-kernel:fun-type-keywords
                           (sb-int:proclaimed-ftype 'foo)))
                  '(:y :z)))
-  (assert
-   (null (nth-value 1 (compile nil '(lambda () (foo 5 :z 10 :y 15))))))
-  (assert
-   (null (nth-value 1 (compile nil '(lambda () (foo 5 :z 10 :foo 15))))))
+  (checked-compile '(lambda () (foo 5 :z 10 :y 15)))
+  (checked-compile '(lambda () (foo 5 :z 10 :foo 15)))
   (assert
    (sb-kernel::args-type-keyp (sb-int:proclaimed-ftype 'foo)))
   (assert
@@ -188,7 +180,7 @@
 (with-test (:name :method-allow-other-keys)
   (defgeneric foo (x &key))
   (defmethod foo ((x integer) &rest y &key &allow-other-keys) (list x y))
-  (assert (null (nth-value 1 (compile nil '(lambda () (foo 10 :foo 20))))))
+  (checked-compile '(lambda () (foo 10 :foo 20)))
   (assert (sb-kernel::args-type-keyp (sb-int:proclaimed-ftype 'foo)))
   (assert (sb-kernel::args-type-allowp (sb-int:proclaimed-ftype 'foo))))
 
