@@ -2576,7 +2576,7 @@
   (handler-bind ((timeout (lambda (condition)
                             (declare (ignore condition))
                             (error "Timeout"))))
-    (sb-ext:with-timeout 0.1
+    (sb-ext:with-timeout 1
       (checked-compile-and-assert (:allow-warnings t)
           `(lambda ()
              (defmethod foo ((bar keyword))))
