@@ -395,3 +395,12 @@
                (if (or b t)
                    (return-from b5 333)))))))
     ((11) 333)))
+
+(with-test (:name :mv-call-more-values)
+  (checked-compile-and-assert ()
+    `(lambda (z)
+       (multiple-value-call (lambda (&optional x y &rest args)
+                              (declare (ignore args))
+                              (+ y x))
+         2 (truncate z 30)))
+    ((2345) 80)))

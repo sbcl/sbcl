@@ -2509,6 +2509,7 @@ is :ANY, the function name is not checked."
                         (when (eq length :unknown)
                           (return))
                         (loop for type in types
+                              while vars
                               do
                               (funcall function
                                        (and (= length 1)

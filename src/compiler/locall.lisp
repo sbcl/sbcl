@@ -563,7 +563,8 @@
                       (and vars
                        (loop repeat (nth-value 1 (values-types
                                                   (lvar-derived-type arg)))
-                             collect (leaf-type (pop vars)))))
+                             for var in vars
+                             collect (leaf-type var))))
                      (lexenv-policy (node-lexenv call)))))))))
   (values))
 

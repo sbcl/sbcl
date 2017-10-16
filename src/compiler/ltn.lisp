@@ -336,7 +336,7 @@
                                         (lvar-derived-type arg)))
                    collect (if types
                                (pop types)
-                               *wild-type*)))))))
+                               *backend-t-primitive-type*)))))))
   (values))
 
 ;;; We force all the argument lvars to use the unknown values

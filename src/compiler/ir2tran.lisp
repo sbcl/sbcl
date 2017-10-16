@@ -1632,7 +1632,9 @@
                       while vars
                       nconc
                       (lvar-tns node block lvar (loop repeat values
-                                                      collect (primitive-type (leaf-type (pop vars))))))))
+                                                      collect (if vars
+                                                                  (primitive-type (leaf-type (pop vars)))
+                                                                  *backend-t-primitive-type*))))))
           vars))
   (values))
 
