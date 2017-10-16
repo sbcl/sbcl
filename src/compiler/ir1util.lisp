@@ -2469,3 +2469,49 @@ is :ANY, the function name is not checked."
                                         :unknown-keys unknown
                                         rest)))
                args)))))
+
+;;; Call (lambda (arg lambda-var type)), for a mv-combination ARG can
+;;; be NIL when it produces multiple values.
+;;; If REOPTIMIZE is T only the arguments for which LVAR-REOPTIMIZE is
+;;; true will be examined, resetting LVAR-REOPTIMIZE to NIL before
+;;; calling FUNCTION.
+(defun map-combination-arg-var (function combination &key reoptimize)
+  (let ((args (basic-combination-args combination))
+        (vars (lambda-vars (combination-lambda combination))))
+    (flet ((reoptimize-p (arg)
+             (cond ((not arg) nil)
+                   ((not reoptimize))
+                   ((lvar-reoptimize arg)
+                    (setf (lvar-reoptimize arg) nil)
+                    t))))
+      (cond ((combination-p combination)
+             (loop for arg in args
+                   for var in vars
+                   when (reoptimize-p arg)
+                   do
+                   (funcall function arg var (lvar-type arg))))
+            ((singleton-p args)
+             (when (reoptimize-p (first args))
+               (loop with arg = (first args)
+                     for var in vars
+                     for type in (values-type-in (lvar-derived-type arg)
+                                                 (length vars))
+                     do
+                     (funcall function
+                              (and (singleton-p vars)
+                                   arg)
+                              var
+                              type))))
+            (t
+             (loop for arg in args
+                   when (reoptimize-p arg)
+                   do (multiple-value-bind (types length) (values-types (lvar-derived-type arg))
+                        (when (eq length :unknown)
+                          (return))
+                        (loop for type in types
+                              do
+                              (funcall function
+                                       (and (= length 1)
+                                            arg)
+                                       (pop vars)
+                                       type)))))))))

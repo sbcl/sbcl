@@ -1926,71 +1926,41 @@
 ;;; flags.
 (defun propagate-let-args (call fun)
   (declare (type basic-combination call) (type clambda fun))
-  (let* ((args (basic-combination-args call))
-         (vars (lambda-vars fun))
-         (args-and-types (cond ((combination-p call)
-                                (loop for arg in args
-                                      collect (and arg
-                                                   (lvar-reoptimize arg)
-                                                   (progn
-                                                     (setf (lvar-reoptimize arg) nil)
-                                                     (cons arg (lvar-type arg))))))
-                               ((and (singleton-p args)
-                                     (not (singleton-p vars)))
-                                (when (lvar-reoptimize (car args))
-                                  (setf (lvar-reoptimize (car args)) nil)
-                                  (loop for type in (values-type-in (lvar-derived-type (first args))
-                                                                    (length vars))
-                                        collect (cons nil type))))
-                               (t
-                                ;; If an ARG produces multiple values just grab its type
-                                (loop for arg in args
-                                      for types = (values-types (lvar-derived-type arg))
-                                      while types
-                                      if (cdr types)
-                                      nconc (loop for type in types
-                                                  collect (and (lvar-reoptimize arg)
-                                                               (cons nil type)))
-                                      else
-                                      collect (and (lvar-reoptimize arg)
-                                                   (cons arg (car types)))
-                                      do
-                                      (setf (lvar-reoptimize arg) nil))))))
-    (loop for var in vars
-          for (arg . type) in args-and-types
-          do
-          (cond
-            ((lambda-var-deleted var))
-            ((lambda-var-sets var)
-             (and type
-                  (propagate-from-sets var type)))
-            ((and arg
-                  (let ((use (lvar-uses arg)))
-                    (when (ref-p use)
-                      (let ((leaf (ref-leaf use)))
-                        (when (and (constant-reference-p use)
-                                   (csubtypep (leaf-type leaf)
-                                              ;; (NODE-DERIVED-TYPE USE) would
-                                              ;; be better -- APD, 2003-05-15
-                                              (leaf-type var)))
-                          (propagate-to-refs var type)
-                          (unless (preserve-single-use-debug-var-p call var)
-                            (let ((use-component (node-component use)))
-                              (substitute-leaf-if
-                               (lambda (ref)
-                                 (cond ((eq (node-component ref) use-component)
-                                        t)
-                                       (t
-                                        (aver (lambda-toplevelish-p (lambda-home fun)))
-                                        nil)))
-                               leaf var)))
-                          t))))))
-            ((and arg
-                  (null (rest (leaf-refs var)))
-                  (not (preserve-single-use-debug-var-p call var))
-                  (substitute-single-use-lvar arg var)))
-            (type
-             (propagate-to-refs var type)))))
+  (map-combination-arg-var
+   (lambda (arg var type)
+     (cond
+       ((lambda-var-deleted var))
+       ((lambda-var-sets var)
+        (propagate-from-sets var type))
+       ((and arg
+             (let ((use (lvar-uses arg)))
+               (when (ref-p use)
+                 (let ((leaf (ref-leaf use)))
+                   (when (and (constant-reference-p use)
+                              (csubtypep (leaf-type leaf)
+                                         ;; (NODE-DERIVED-TYPE USE) would
+                                         ;; be better -- APD, 2003-05-15
+                                         (leaf-type var)))
+                     (propagate-to-refs var type)
+                     (unless (preserve-single-use-debug-var-p call var)
+                       (let ((use-component (node-component use)))
+                         (substitute-leaf-if
+                          (lambda (ref)
+                            (cond ((eq (node-component ref) use-component)
+                                   t)
+                                  (t
+                                   (aver (lambda-toplevelish-p (lambda-home fun)))
+                                   nil)))
+                          leaf var)))
+                     t))))))
+       ((and arg
+             (null (rest (leaf-refs var)))
+             (not (preserve-single-use-debug-var-p call var))
+             (substitute-single-use-lvar arg var)))
+       (t
+        (propagate-to-refs var type))))
+   call
+   :reoptimize t)
 
   (when (every #'not (basic-combination-args call))
     (delete-let fun))
