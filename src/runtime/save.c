@@ -162,7 +162,7 @@ write_and_compress_bytes(FILE *file, char *addr, long bytes, os_vm_offset_t file
 {
     long here, data;
 
-    bytes = (bytes+os_vm_page_size-1)&~(os_vm_page_size-1);
+    bytes = ALIGN_UP(bytes, os_vm_page_size);
 
 #ifdef LISP_FEATURE_WIN32
     long count;
@@ -175,7 +175,7 @@ write_and_compress_bytes(FILE *file, char *addr, long bytes, os_vm_offset_t file
     fflush(file);
     here = ftell(file);
     fseek(file, 0, SEEK_END);
-    data = (ftell(file)+os_vm_page_size-1)&~(os_vm_page_size-1);
+    data = ALIGN_UP(ftell(file), os_vm_page_size);
     fseek(file, data, SEEK_SET);
     write_bytes_to_file(file, addr, bytes, compression);
     fseek(file, here, SEEK_SET);

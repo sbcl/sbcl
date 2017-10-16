@@ -174,18 +174,13 @@ sigset_t *os_context_sigmask_addr(os_context_t *context);
 extern os_vm_address_t os_allocate(os_vm_size_t len);
 extern void os_deallocate(os_vm_address_t addr, os_vm_size_t len);
 
-/* FIXME: The os_trunc_foo(..) and os_round_foo(..) macros here could
- * be functions. */
-
-#define os_trunc_to_page(addr) \
-    (os_vm_address_t)(((uword_t)(addr))&~(os_vm_page_size-1))
-#define os_round_up_to_page(addr) \
-    os_trunc_to_page((addr)+(os_vm_page_size-1))
+#define os_trunc_to_page(addr) PTR_ALIGN_DOWN(addr, os_vm_page_size)
+#define os_round_up_to_page(addr) PTR_ALIGN_UP(addr, os_vm_page_size)
 
 #define os_trunc_size_to_page(size) \
-    (os_vm_size_t)(((uword_t)(size))&~(os_vm_page_size-1))
+    (os_vm_size_t)ALIGN_DOWN((uword_t)size, os_vm_page_size)
 #define os_round_up_size_to_page(size) \
-    os_trunc_size_to_page((size)+(os_vm_page_size-1))
+    (os_vm_size_t)ALIGN_UP((uword_t)size, os_vm_page_size)
 
 /* KLUDGE: The errno error reporting system is an ugly nonreentrant
  * botch which nonetheless wasn't too painful in the old days.
