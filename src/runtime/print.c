@@ -290,18 +290,21 @@ static void print_unknown(lispobj obj)
   printf("unknown object: %p", (void *)obj);
 }
 
+#if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_64_BIT)
+# define OBJ_FMTd "lld"
+#elif defined(LISP_FEATURE_64_BIT)
+# define OBJ_FMTd "ld"
+#else
+# define OBJ_FMTd "d"
+#endif
+
 static void brief_fixnum(lispobj obj)
 {
     /* KLUDGE: Rather than update the tables in print_obj(), we
        declare all fixnum-or-unknown tags to be fixnums and sort it
        out here with a guard clause. */
     if (!fixnump(obj)) return print_unknown(obj);
-
-#ifndef LISP_FEATURE_ALPHA
-    printf("%ld", fixnum_value(obj));
-#else
-    printf("%d", fixnum_value(obj));
-#endif
+    printf("%"OBJ_FMTd, fixnum_value(obj));
 }
 
 static void print_fixnum(lispobj obj)
@@ -310,12 +313,7 @@ static void print_fixnum(lispobj obj)
        declare all fixnum-or-unknown tags to be fixnums and sort it
        out here with a guard clause. */
     if (!fixnump(obj)) return print_unknown(obj);
-
-#ifndef LISP_FEATURE_ALPHA
-    printf(": %ld", fixnum_value(obj));
-#else
-    printf(": %d", fixnum_value(obj));
-#endif
+    printf(": %"OBJ_FMTd, fixnum_value(obj));
 }
 
 static void brief_otherimm(lispobj obj)
