@@ -14,6 +14,10 @@
 
 (in-package "SB!IMPL")
 
+;; This variable properly belongs in 'target-hash-table',
+;; but it's compiled after this file is.
+(!defglobal *user-hash-table-tests* nil)
+
 (sb!int::/show0 "fdefinition.lisp 22")
 
 ;;;; fdefinition (fdefn) objects
@@ -365,10 +369,8 @@
 
     ;; Check for hash-table stuff. Woe onto him that mixes encapsulation
     ;; with this.
-    (when (and (symbolp name) (fboundp name)
-               (boundp '*user-hash-table-tests*))
+    (when (and (symbolp name) (fboundp name))
       (let ((old (symbol-function name)))
-        (declare (special *user-hash-table-tests*))
         (dolist (spec *user-hash-table-tests*)
           (cond ((eq old (second spec))
                  ;; test-function

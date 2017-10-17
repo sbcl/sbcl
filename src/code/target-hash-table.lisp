@@ -135,8 +135,6 @@
 
 ;;;; user-defined hash table tests
 
-(defglobal *user-hash-table-tests* nil)
-
 (defun register-hash-table-test (name hash-fun)
   (declare (symbol name) (function hash-fun))
   (unless (fboundp name)
@@ -990,6 +988,7 @@ table itself."
         ;; Mark all slots as empty by setting all keys and values to magic
         ;; tag.
         (aver (eq (aref kv-vector 0) hash-table))
+        (setf (kv-vector-needs-rehash kv-vector) 0)
         (fill kv-vector +empty-ht-slot+ :start 2)
         ;; Set up the free list, all free.
         (do ((i 1 (1+ i)))

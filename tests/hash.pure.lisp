@@ -138,3 +138,14 @@
     (format (make-broadcast-stream) "Printing: ~A~%" key)
     (assert (remhash key map))
     (assert (= 0 (hash-table-count map)))))
+
+(with-test (:name :clrhash-clears-rehash-p)
+  (let ((tbl (make-hash-table)))
+    (dotimes (i 10)
+      (setf (gethash (cons 'foo (gensym)) tbl) 1))
+    (gc)
+    ;; The need-to-rehash bit is set
+    (assert (eql 1 (svref (sb-impl::hash-table-table tbl) 1)))
+    (clrhash tbl)
+    ;; The need-to-rehash bit is not set
+    (assert (eql 0 (svref (sb-impl::hash-table-table tbl) 1)))))
