@@ -23,20 +23,6 @@
   (declare (ignore name))
   `#'(lambda ,args ,@body))
 
-;;; Interrupt control isn't an issue in the cross-compiler: we don't
-;;; use address-dependent (and thus GC-dependent) hashes, and we only
-;;; have a single thread of control.
-(defmacro without-interrupts (&rest forms)
-  `(macrolet ((allow-with-interrupts (&body body)
-                `(progn ,@body))
-              (with-local-interrupts (&body body)
-                `(progn ,@body)))
-     ,@forms))
-
-(defmacro with-locked-hash-table ((table) &body body)
-  (declare (ignore table))
-  `(progn ,@body))
-
 (defmacro with-locked-system-table ((table) &body body)
   (declare (ignore table))
   `(progn ,@body))
