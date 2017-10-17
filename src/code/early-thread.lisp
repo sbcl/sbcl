@@ -9,9 +9,6 @@
 
 (in-package "SB!THREAD")
 
-(!define-thread-local *current-thread* nil
-      "Bound in each thread to the thread itself.")
-
 (def!type thread-name () 'simple-string)
 
 (defstruct (thread (:constructor %make-thread)
@@ -41,3 +38,18 @@ in future versions."
   (%owner nil :type (or null thread))
   #!+(and sb-thread sb-futex)
   (state    0 :type fixnum))
+
+;; The host has a stub for this macro. The cross-compiler doesn't use
+;; it until it's seen. So no SB!XC:DEFMACRO needed
+#-sb-xc-host
+(defmacro with-system-mutex ((mutex &key without-gcing allow-with-interrupts)
+                                    &body body)
+  `(dx-flet ((with-system-mutex-thunk () ,@body))
+     (,(cond (without-gcing
+               'call-with-system-mutex/without-gcing)
+             (allow-with-interrupts
+              'call-with-system-mutex/allow-with-interrupts)
+             (t
+              'call-with-system-mutex))
+       #'with-system-mutex-thunk
+       ,mutex)))

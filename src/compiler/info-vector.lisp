@@ -226,7 +226,7 @@
         (if (eq (info-env-storage env) storage)
             ;; Grab and release the mutex for no other reason than to
             ;; observe that a rehasher doesn't (for the moment) have it.
-            (sb!thread:with-mutex ((info-env-mutex env))) ; do nothing, retry
+            (sb!thread::with-system-mutex ((info-env-mutex env))) ; do nothing, retry
             (return (info-env-storage env)))))
 
 ;; Look in info-environment ENV for the name KEY. Arguments are like GETHASH.
@@ -310,7 +310,7 @@
         (let ((old-count (info-env-adjust-count env 1)))
           (declare (type info-cell-index old-count))
           (when (>= old-count (info-storage-threshold storage))
-            (sb!thread:with-mutex ((info-env-mutex env))
+            (sb!thread::with-system-mutex ((info-env-mutex env))
               ;; any thread could have beaten us to rehashing
               (when (eq (info-env-storage env) storage)
                 (info-env-rehash env)))

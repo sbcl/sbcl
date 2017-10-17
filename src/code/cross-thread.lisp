@@ -15,6 +15,10 @@
   (declare (ignore mutex))
   `(locally ,@body))
 
+(defmacro with-system-mutex ((mutex) &body body)
+  (declare (ignore mutex))
+  `(locally ,@body))
+
 (defmacro with-recursive-lock ((mutex) &body body)
   (declare (ignore mutex))
   `(locally ,@body))
