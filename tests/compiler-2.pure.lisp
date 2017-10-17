@@ -415,3 +415,14 @@
                          (svref #(46 32) 0)))
                 (unwind-protect (%f (%f 0)))))))
     (() 123)))
+
+(with-test (:name :cmov-constants-different-primitive-type)
+  (checked-compile-and-assert ()
+    `(lambda (b)
+       (case b
+         ((2030) 4611686018427387908)
+         ((572) b)
+         (t 0)))
+    ((572) 572)
+    ((123) 0)
+    ((2030) 4611686018427387908)))
