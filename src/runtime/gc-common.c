@@ -1103,6 +1103,7 @@ void scav_hash_table_entries (struct hash_table *hash_table,
 
     /* Work through the KV vector. */
     int (*alivep_test)(lispobj,lispobj) = alivep[fixnum_value(hash_table->_weakness)];
+    boolean rehash = 0;
 #define SCAV_ENTRIES(aliveness_predicate) \
     for (i = 1; i < next_vector_length; i++) {                                 \
         lispobj old_key = kv_vector[2*i];                                      \
@@ -1113,12 +1114,16 @@ void scav_hash_table_entries (struct hash_table *hash_table,
             /* If an EQ-based key has moved, mark the hash-table for rehash */ \
             if (kv_vector[2*i] != old_key &&                                   \
                 (!hash_vector || hash_vector[i] == MAGIC_HASH_VECTOR_VALUE))   \
-              kv_vector[1] = make_fixnum(1);                                   \
+                rehash = 1;                                                    \
     }}
     if (alivep_test)
         SCAV_ENTRIES(alivep_test(old_key, value))
     else
         SCAV_ENTRIES(1)
+    // Though at least partly writable, the vector might have
+    // element 1 on a write-protected page.
+    if (rehash)
+        NON_FAULTING_STORE(kv_vector[1] = make_fixnum(1), &kv_vector[1]);
 }
 
 sword_t
@@ -1179,7 +1184,9 @@ scav_vector (lispobj *where, lispobj header)
          * weak_hash_tables (if it's not there already) for the weak
          * object phase. */
         if (hash_table->next_weak_hash_table == NIL) {
-            hash_table->next_weak_hash_table = (lispobj)weak_hash_tables;
+            NON_FAULTING_STORE(hash_table->next_weak_hash_table
+                                 = (lispobj)weak_hash_tables,
+                               &hash_table->next_weak_hash_table);
             weak_hash_tables = hash_table;
         }
     }
@@ -1271,7 +1278,8 @@ scan_weak_hash_tables (int (*alivep[5])(lispobj,lispobj))
 
     for (table = weak_hash_tables; table != NULL; table = next) {
         next = (struct hash_table *)table->next_weak_hash_table;
-        table->next_weak_hash_table = NIL;
+        NON_FAULTING_STORE(table->next_weak_hash_table = NIL,
+                           &table->next_weak_hash_table);
         scan_weak_hash_table(table, alivep);
     }
 

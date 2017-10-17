@@ -210,4 +210,75 @@ static inline boolean layout_bitmap_logbitp(int index, lispobj bitmap)
     return positive_bignum_logbitp(index, (struct bignum*)native_pointer(bitmap));
 }
 
+#if defined(LISP_FEATURE_GENCGC)
+
+/* Define a macro to avoid a detour through the write fault handler.
+ *
+ * It's usually more efficient to do these extra tests than to receive
+ * a signal. And it leaves the page protected, which is a bonus.
+ * The downside is that multiple operations on the same page ought to
+ * be batched, so that there is at most one unprotect/reprotect per page
+ * rather than per write operation per page.
+ *
+ * This also should fix -fsanitize=thread which makes handling of SIGSEGV
+ * during GC difficult. Not impossible, but definitely broken.
+ * It has to do with the way the sanitizer intercepts calls
+ * to sigaction() - it mucks with your sa_mask :-(.
+ *
+ * This macro take an aribtrary expression as the 'operation' rather than
+ * an address and value to assign, for two reasons:
+ * 1. there may be more than one store operation that has to be
+ *    within the scope of the lifted write barrier,
+ *    so a single lvalue and rvalue is maybe inadequate.
+ * 2. it might need to use a sync_fetch_and_<frob>() gcc intrinsic,
+ *    so it's not necessarily just going to be an '=' operator
+ *
+ * KLUDGE: assume that faults do not occur in immobile space.
+ * for the most part. (This is pretty obviously not true,
+ * but seems only to be a problem in fullcgc)
+ */
+
+#define NON_FAULTING_STORE(operation, addr) { \
+  page_index_t page_index = find_page_index(addr); \
+  if (page_index < 0 || !page_table[page_index].write_protected) { operation; } \
+  else { unprotect_page_index(page_index); \
+         operation; \
+         protect_page(page_address(page_index), page_index); }}
+
+#else
+
+#define NON_FAULTING_STORE(operation, addr) operation
+
+#endif
+
+/* This is used bu the fault handler, and potentially during GC */
+static inline void unprotect_page_index(page_index_t page_index)
+{
+    os_protect(page_address(page_index), GENCGC_CARD_BYTES, OS_VM_PROT_ALL);
+    page_table[page_index].write_protected_cleared = 1;
+    page_table[page_index].write_protected = 0;
+}
+
+static inline void protect_page(void* page_addr, page_index_t page_index)
+{
+    os_protect((void *)page_addr,
+               GENCGC_CARD_BYTES,
+               OS_VM_PROT_READ|OS_VM_PROT_EXECUTE);
+
+    /* Note: we never touch the write_protected_cleared bit when protecting
+     * a page. Consider two random threads that reach their SIGSEGV handlers
+     * concurrently, each checking why it got a write fault. One thread wins
+     * the race to remove the memory protection, and marks our shadow bit.
+     * wp_cleared is set so that the other thread can conclude that the fault
+     * was reasonable.
+     * If GC unprotects and reprotects a page, it's probably OK to reset the
+     * cleared bit 0 if it was 0 before. (Because the fault handler blocks
+     * SIG_STOP_FOR_GC which is usually SIGUSR2, handling the wp fault is
+     * atomic with respect to invocation of GC)
+     * But nothing is really gained by resetting the cleared flag.
+     * It is explicitly zeroed on pages marked as free though.
+     */
+    page_table[page_index].write_protected = 1;
+}
+
 #endif /* _GC_INTERNAL_H_ */

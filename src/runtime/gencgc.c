@@ -2245,17 +2245,8 @@ update_page_write_prot(page_index_t page)
 #endif
     }
 
-    if (wp_it == 1) {
-        /* Write-protect the page. */
-        /*FSHOW((stderr, "/write-protecting page %d gen %d\n", page, gen));*/
-
-        os_protect((void *)page_addr,
-                   GENCGC_CARD_BYTES,
-                   OS_VM_PROT_READ|OS_VM_PROT_EXECUTE);
-
-        /* Note the page as protected in the page tables. */
-        page_table[page].write_protected = 1;
-    }
+    if (wp_it == 1)
+        protect_page(page_addr, page);
 
     return (wp_it);
 }
@@ -4294,10 +4285,7 @@ gencgc_handle_wp_violation(void* fault_addr)
         ret = thread_mutex_lock(&free_pages_lock);
         gc_assert(ret == 0);
         if (page_table[page_index].write_protected) {
-            /* Unprotect the page. */
-            os_protect(page_address(page_index), GENCGC_CARD_BYTES, OS_VM_PROT_ALL);
-            page_table[page_index].write_protected_cleared = 1;
-            page_table[page_index].write_protected = 0;
+            unprotect_page_index(page_index);
         } else if (!ignore_memoryfaults_on_unprotected_pages) {
             /* The only acceptable reason for this signal on a heap
              * access is that GENCGC write-protected the page.
