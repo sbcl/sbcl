@@ -1098,8 +1098,8 @@ void scav_hash_table_entries (struct hash_table *hash_table,
       * help reduce collisions. */
      gc_assert(next_vector_length*2 == kv_length);
 
-     if (kv_vector[1] != UNBOUND_MARKER_WIDETAG)
-        lose("unexpected empty-hash-table-slot marker: %p\n", kv_vector[1]);
+     if (kv_vector[1] && kv_vector[1] != make_fixnum(1))
+        lose("unexpected need-to-rehash: %"OBJ_FMTX, kv_vector[1]);
 
     /* Work through the KV vector. */
     int (*alivep_test)(lispobj,lispobj) = alivep[fixnum_value(hash_table->_weakness)];
@@ -1113,7 +1113,7 @@ void scav_hash_table_entries (struct hash_table *hash_table,
             /* If an EQ-based key has moved, mark the hash-table for rehash */ \
             if (kv_vector[2*i] != old_key &&                                   \
                 (!hash_vector || hash_vector[i] == MAGIC_HASH_VECTOR_VALUE))   \
-              hash_table->needs_rehash_p = T;                                  \
+              kv_vector[1] = make_fixnum(1);                                   \
     }}
     if (alivep_test)
         SCAV_ENTRIES(alivep_test(old_key, value))
@@ -1160,8 +1160,8 @@ scav_vector (lispobj *where, lispobj header)
 
     /* Verify that vector element 1 is as expected.
        Don't bother scavenging it, since we lose() if it's not an immediate. */
-    if (where[3] != UNBOUND_MARKER_WIDETAG)
-        lose("unexpected empty-hash-table-slot marker: %p\n", where[3]);
+    if (where[3] && where[3] != make_fixnum(1))
+        lose("unexpected need-to-rehash: %"OBJ_FMTX, where[3]);
 
     /* Scavenge hash table, which will fix the positions of the other
      * needed objects. */
@@ -1169,7 +1169,7 @@ scav_vector (lispobj *where, lispobj header)
 
     /* Cross-check the kv_vector. */
     if (where != native_pointer(hash_table->table)) {
-        lose("hash_table table!=this table %x\n", hash_table->table);
+        lose("hash_table table!=this table %"OBJ_FMTX, hash_table->table);
     }
 
     if (!hash_table->_weakness) {

@@ -1798,10 +1798,8 @@ static void fixup_space(lispobj* where, size_t n_words)
                     needs_rehash = 1;
                   }
               }
-              if (needs_rehash) {
-                  struct hash_table *ht = (struct hash_table*)native_pointer(v->data[0]);
-                  ht->needs_rehash_p = T;
-              }
+              if (needs_rehash)
+                  data[1] = make_fixnum(1);
               break;
           } else {
             // FALLTHROUGH_INTENDED

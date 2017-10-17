@@ -87,11 +87,6 @@
   ;; Used for locking GETHASH/(SETF GETHASH)/REMHASH
   (lock (sb!thread:make-mutex :name "hash-table lock")
         :type sb!thread:mutex :read-only t)
-  ;; The GC will set this to T if it moves an EQ-based key. This used
-  ;; to be signaled by a bit in the header of the kv vector, but that
-  ;; implementation caused some concurrency issues when we stopped
-  ;; inhibiting GC during hash-table lookup.
-  (needs-rehash-p nil :type (member nil t))
   ;; Has user requested synchronization?
   (synchronized-p nil :type (member nil t) :read-only t)
   ;; For detecting concurrent accesses.
