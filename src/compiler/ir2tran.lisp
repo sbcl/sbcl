@@ -678,13 +678,14 @@
              (value (cast-value node))
              (2value (lvar-info value)))
     (check-functional-cast node)
-    (ecase (ir2-lvar-kind 2lvar)
-      (:unused)
-      ((:unknown :fixed)
-       (aver (not (cast-type-check node)))
-       (move-results-coerced node block
-                             (ir2-lvar-locs 2value)
-                             (ir2-lvar-locs 2lvar))))))
+    (when 2lvar ;; the cast can be unused but not deleted to due vestigial exits
+      (ecase (ir2-lvar-kind 2lvar)
+        (:unused)
+        ((:unknown :fixed)
+         (aver (not (cast-type-check node)))
+         (move-results-coerced node block
+                               (ir2-lvar-locs 2value)
+                               (ir2-lvar-locs 2lvar)))))))
 
 (defoptimizer (%check-bound ir2-hook) ((array bound index) node block)
   (declare (ignore block))

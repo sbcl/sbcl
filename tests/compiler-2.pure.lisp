@@ -404,3 +404,14 @@
                               (+ y x))
          2 (truncate z 30)))
     ((2345) 80)))
+
+(with-test (:name :unused-casts-at-ir2-convert)
+  (checked-compile-and-assert ()
+    `(lambda ()
+       (unwind-protect 123
+         (the integer
+              (labels ((%f (x &key)
+                         (declare (ignore x))
+                         (svref #(46 32) 0)))
+                (unwind-protect (%f (%f 0)))))))
+    (() 123)))
