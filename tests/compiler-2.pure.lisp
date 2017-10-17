@@ -426,3 +426,14 @@
     ((572) 572)
     ((123) 0)
     ((2030) 4611686018427387908)))
+
+(with-test (:name :mv-bind-skipping-vars-on-reoptimize)
+  (checked-compile-and-assert ()
+    `(lambda ()
+       (let (lv1)
+         (apply (lambda (&rest args)
+                  (declare (ignore args)))
+                0
+                (list 3 lv1))
+         (setf lv1 10)))
+    (() 10)))

@@ -2504,15 +2504,15 @@ is :ANY, the function name is not checked."
                               type))))
             (t
              (loop for arg in args
-                   when (reoptimize-p arg)
                    do (multiple-value-bind (types length) (values-types (lvar-derived-type arg))
                         (when (eq length :unknown)
                           (return))
-                        (loop for type in types
-                              while vars
-                              do
-                              (funcall function
-                                       (and (= length 1)
-                                            arg)
-                                       (pop vars)
-                                       type)))))))))
+                        (if (reoptimize-p arg)
+                            (loop with singleton-arg = (and (= length 1)
+                                                            arg)
+                                  for type in types
+                                  while vars
+                                  do
+                                  (funcall function singleton-arg
+                                           (pop vars) type))
+                            (setf vars (nthcdr length vars))))))))))
