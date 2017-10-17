@@ -534,11 +534,12 @@ pscav(lispobj *addr, long nwords, boolean constant)
                 break;
 
               case SIMPLE_VECTOR_WIDETAG:
-                  if (is_vector_subtype(thing, VectorValidHashing)) {
-                    struct hash_table *hash_table =
-                        (struct hash_table *)native_pointer(addr[2]);
-                    hash_table->needs_rehash_p = T;
-                  }
+                // addr[0] : header
+                //     [1] : vector length
+                //     [2] : element[0] = hashtable
+                //     [3] : element[1] = rehash bit
+                if (is_vector_subtype(thing, VectorValidHashing))
+                    addr[3] = make_fixnum(1);
                 count = 2;
                 break;
 

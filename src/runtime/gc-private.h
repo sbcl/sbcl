@@ -245,12 +245,6 @@ static inline boolean layout_bitmap_logbitp(int index, lispobj bitmap)
          operation; \
          protect_page(page_address(page_index), page_index); }}
 
-#else
-
-#define NON_FAULTING_STORE(operation, addr) operation
-
-#endif
-
 /* This is used bu the fault handler, and potentially during GC */
 static inline void unprotect_page_index(page_index_t page_index)
 {
@@ -280,5 +274,11 @@ static inline void protect_page(void* page_addr, page_index_t page_index)
      */
     page_table[page_index].write_protected = 1;
 }
+
+#else
+
+#define NON_FAULTING_STORE(operation, addr) operation
+
+#endif
 
 #endif /* _GC_INTERNAL_H_ */
