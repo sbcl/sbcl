@@ -230,6 +230,10 @@
     ;; and patching them on runtime startup
     sb!fasl::*assembler-routines*
 
+    ;; List of Lisp specials bindings made by create_thread_struct()
+    ;; other than the per-thread-c-interface-symbols.
+    sb!thread::*thread-initial-bindings*
+
     ;;; The following symbols aren't strictly required to be static
     ;;; - they are not accessed from C - but we make them static in order
     ;;; to (perhaps) micro-optimize access in Lisp.

@@ -157,11 +157,6 @@ exited. The offending thread can be accessed using THREAD-ERROR-THREAD."))
 ;;; gencgc and numbers on the stack (returned by GET-LISP-OBJ-ADDRESS)
 ;;; are treated as references.
 
-;;; set the doc here because in early-thread FDOCUMENTATION is not
-;;; available, yet
-(setf (fdocumentation '*current-thread* 'variable)
-      "Bound in each thread to the thread itself.")
-
 (setf
  (fdocumentation 'thread-name 'function)
  "Name of the thread. Can be assigned to using SETF. Thread names can be
@@ -1423,36 +1418,10 @@ session."
 #!+sb-thread
 (defun initial-thread-function-trampoline
     (thread setup-sem real-function thread-list arguments arg1 arg2 arg3)
-  ;; In time we'll move some of the binding presently done in C here
-  ;; too.
-  ;;
-  ;; KLUDGE: Here we have a magic list of variables that are not
-  ;; thread-safe for one reason or another.  As people report problems
-  ;; with the thread safety of certain variables, (e.g. "*print-case* in
-  ;; multiple threads broken", sbcl-devel 2006-07-14), we add a few more
-  ;; bindings here.  The Right Thing is probably some variant of
-  ;; Allegro's *cl-default-special-bindings*, as that is at least
-  ;; accessible to users to secure their own libraries.
-  ;;   --njf, 2006-07-15
-  ;;
-  ;; FIXME: because #<"main thread"> does not come through here, the global
-  ;; values of these symbols matter. That's bad! It would be nicer for codegen
-  ;; if these symbols (and some others) never required testing for
-  ;; NO-TLS-VALUE-MARKER and potential fallback to loading symbol-global-value.
-  ;;
   ;; As it is, this lambda must not cons until we are ready to run
   ;; GC. Be very careful.
-  (let* ((*current-thread* thread)
-         (*restart-clusters* nil)
-         (*handler-clusters* sb!kernel::**initial-handler-clusters**)
-         (*exit-in-process* nil)
-         (sb!impl::*deadline* nil)
-         (sb!impl::*deadline-seconds* nil)
-         (sb!impl::*step-out* nil)
-         ;; internal reader variables
-         (sb!impl::*token-buf-pool* nil)
-         (sb!impl::*ignored-package-locks* :invalid)
-         (sb!impl::*descriptor-handlers* nil)) ; serve-event
+  (let ()
+    (setq *current-thread* thread) ; is thread-local already
     ;; *ALLOC-SIGNAL* is made thread-local by create_thread_struct()
     ;; so this assigns into TLS, not the global value.
     (setf sb!vm:*alloc-signal* *default-alloc-signal*)

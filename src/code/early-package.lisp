@@ -15,8 +15,8 @@
 ;;; Unbound outside package lock context, inside either list of
 ;;; packages for which locks are ignored, T when locks for
 ;;; all packages are ignored, and :invalid outside package-lock
-;;; context. FIXME: This needs to be rebound for each thread.
-(!defvar *ignored-package-locks* :invalid)
+;;; context.
+(!define-thread-local *ignored-package-locks* :invalid)
 
 ;; This proclamation avoids a ton of style warnings due to so many calls
 ;; that get cross-compiled prior to compiling "target-package.lisp"

@@ -550,11 +550,8 @@ standard Lisp readtable when NIL."
 (defvar *read-buffer*)
 
 ;; A list of available TOKEN-BUFs
-;; Should need no toplevel binding if multi-threaded,
-;; but doesn't really matter, as INITIAL-THREAD-FUNCTION-TRAMPOLINE
-;; rebinds to NIL.
 (declaim (type (or null token-buf) *token-buf-pool*))
-(defvar *token-buf-pool* nil)
+(!define-thread-local *token-buf-pool* nil)
 
 (defun reset-read-buffer (buffer)
   ;; Turn BUFFER into an empty read buffer.

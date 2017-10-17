@@ -14,11 +14,11 @@
 
 ;;; Current deadline as internal time units or NIL.
 (declaim (type (or unsigned-byte null) *deadline*))
-(!defvar *deadline* nil)
+(!define-thread-local *deadline* nil)
 
 ;;; The relative number of seconds the current deadline corresponds
 ;;; to. Used for continuing from TIMEOUT conditions.
-(!defvar *deadline-seconds* nil)
+(!define-thread-local *deadline-seconds* nil)
 
 (declaim (inline seconds-to-internal-time))
 (defun seconds-to-internal-time (seconds)

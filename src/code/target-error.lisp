@@ -18,12 +18,6 @@
 
 ;; Host lisp does not need a value for this, so start it out as NIL.
 (defglobal **initial-handler-clusters** nil)
-(setq **initial-handler-clusters**
-  `(((,(find-classoid-cell 'warning :create t)
-      .
-      ,(named-lambda "MAYBE-MUFFLE" (warning)
-         (when (muffle-warning-p warning)
-           (muffle-warning warning)))))))
 
 ;;; Each cluster is an alist of the form
 ;;;
@@ -39,18 +33,23 @@
 ;;;
 ;;; Lists to which *HANDLER-CLUSTERS* is bound generally have dynamic
 ;;; extent.
-(defvar *handler-clusters* **initial-handler-clusters**)
+#!+sb-thread (!define-thread-local *handler-clusters* **initial-handler-clusters**)
+#!-sb-thread (defvar *handler-clusters* **initial-handler-clusters**)
 
 ;;; a list of lists of currently active RESTART instances. maintained
 ;;; by RESTART-BIND.
-;;; This variable is proclaimed to be "eventually" always-bound,
-;;; meaning in the loaded code. If DEFVAR were used, the compiler knows that
-;;; BOUNDP will be T, and therefore a code deletion note should be issused
-;;; for the initialization expression (UNLESS (BOUNDP x) <initform>).
-;;; Technically it's not even right to use DEFVAR because it works only
-;;; if the initializer is really NIL, since that is what %DEFVAR will assign
-;;; on account of the fact that an initializer was supplied at all.
-(defparameter *restart-clusters* '())
+(!define-thread-local *restart-clusters* nil)
+
+(defun !target-error-cold-init ()
+  (setq **initial-handler-clusters**
+        `(((,(find-classoid-cell 'warning :create t)
+            .
+            ,(named-lambda "MAYBE-MUFFLE" (warning)
+               (when (muffle-warning-p warning)
+                 (muffle-warning warning)))))))
+  ;;; If multithreaded, *HANDLER-CLUSTERS* is #<unbound> at this point.
+  ;;; This SETQ assigns to TLS since the value is not no-tls-value-marker.
+  (setq *handler-clusters* **initial-handler-clusters**))
 
 (defmethod print-object ((restart restart) stream)
   (if *print-escape*

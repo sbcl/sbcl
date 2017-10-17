@@ -97,6 +97,11 @@
   ;; And be extra paranoid - ensure that it really gets called.
   (locally (declare (notinline fboundp)) (fboundp '(setf !zzzzzz)))
 
+  ;; Ensure that *CURRENT-THREAD* and *HANDLER-CLUSTERS* have sane values.
+  ;; create_thread_struct() assigned NIL/unbound-marker respectively.
+  (sb!thread::init-initial-thread)
+  (show-and-call sb!kernel::!target-error-cold-init)
+
   ;; Putting data in a synchronized hashtable (*PACKAGE-NAMES*)
   ;; requires that the main thread be properly initialized.
   (show-and-call thread-init-or-reinit)
@@ -356,7 +361,6 @@ process to continue normally."
 ;;;; initialization functions
 
 (defun thread-init-or-reinit ()
-  (sb!thread::init-initial-thread)
   (sb!thread::init-job-control)
   (sb!thread::get-foreground))
 
@@ -367,6 +371,10 @@ process to continue normally."
   (setf sb!alien::*default-c-string-external-format* nil)
   ;; WITHOUT-GCING implies WITHOUT-INTERRUPTS.
   (without-gcing
+    ;; Create *CURRENT-THREAD* first, since initializing a stream calls
+    ;; ALLOC-BUFFER which calls FINALIZE which acquires **FINALIZER-STORE-LOCK**
+    ;; which needs a valid thread in order to grab a mutex.
+    (sb!thread::init-initial-thread)
     ;; Initialize streams first, so that any errors can be printed later
     (stream-reinit t)
     (os-cold-init-or-reinit)

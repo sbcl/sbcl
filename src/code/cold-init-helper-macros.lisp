@@ -102,6 +102,28 @@
                (declare (ignorable obj env))
                ,target-expr))))))
 
+;;; Define a variable that is initialized in create_thread_struct() before any
+;;; Lisp code can execute. In particular, *RESTART-CLUSTERS* and *HANDLER-CLUSTERS*
+;;; should have a value before anything else happens.
+;;; While thread-local vars are generally useful, this is not the implementation
+;;; that would exist in the target system, if exposed more generally.
+;;; (Among the issues is the very restricted initialization form)
+(defmacro !define-thread-local (name initform &optional docstring)
+  (check-type initform symbol)
+  #!-sb-thread `(!defvar ,name ,initform ,docstring)
+  #!+sb-thread `(progn
+                  #-sb-xc-host (!%define-thread-local ',name ',initform)
+                  (defvar ,name ,initform ,docstring)))
+
+(defvar *!thread-initial-bindings* nil)
+#+sb-xc-host
+(setf (get '!%define-thread-local :sb-cold-funcall-handler/for-effect)
+      (lambda (name initsym)
+        (push `(,name . ,initsym) *!thread-initial-bindings*)))
+#-sb-xc-host
+(defun !%define-thread-local (dummy1 dummy2) ; to avoid warning
+  (declare (ignore dummy1 dummy2)))
+
 ;;; FIXME: Consider renaming this file asap.lisp,
 ;;; and the renaming the various things
 ;;;   *ASAP-FORMS* or *REVERSED-ASAP-FORMS*

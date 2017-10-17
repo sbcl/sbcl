@@ -9,8 +9,8 @@
 
 (in-package "SB!THREAD")
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defvar *current-thread* nil))
+(!define-thread-local *current-thread* nil
+      "Bound in each thread to the thread itself.")
 
 (def!type thread-name () 'simple-string)
 

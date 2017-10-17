@@ -58,7 +58,7 @@ been specified on the command-line.")
          (%exit)))))
 
 (define-load-time-global *exit-lock* nil)
-(defvar *exit-in-process* nil)
+(!define-thread-local *exit-in-process* nil)
 (declaim (type (or null real) *exit-timeout*))
 (defvar *exit-timeout* 60
   "Default amount of seconds, if any, EXIT should wait for other

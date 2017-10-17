@@ -1650,8 +1650,21 @@ core and return a descriptor to it."
                      (sort-cold-layouts))))
 
   #!+sb-thread
-  (cold-set 'sb!vm::*free-tls-index*
-            (make-descriptor (ash *genesis-tls-counter* sb!vm:word-shift)))
+  (let ((bindings sb!kernel::*!thread-initial-bindings*))
+    ;; Assign the initialization vector for create_thread_struct()
+    (cold-set 'sb!thread::*thread-initial-bindings*
+              (vector-in-core
+               (mapcar (lambda (pair)
+                         (let* ((name (cold-intern (car pair)))
+                                (value (cdr pair))
+                                (initform (cold-intern value)))
+                           (aver (symbolp value))
+                           (if (null value) name (cold-cons initform name))))
+                       bindings)))
+    (dolist (binding bindings)
+      (ensure-symbol-tls-index (car (ensure-list binding))))
+    (cold-set 'sb!vm::*free-tls-index*
+              (make-descriptor (ash *genesis-tls-counter* sb!vm:word-shift))))
 
   (dolist (symbol sb!impl::*cache-vector-symbols*)
     (cold-set symbol *nil-descriptor*))

@@ -176,13 +176,14 @@ SetSymbolValue(u64 tagged_symbol_pointer,lispobj val, void *thread)
 #ifdef LISP_FEATURE_SB_THREAD
 /* write_TLS assigns directly into TLS causing the symbol to
  * be thread-local without saving a prior value on the binding stack. */
-# define write_TLS(sym, val, thread) \
-   *(lispobj*)(sym##_tlsindex + \
-               (char*)((union per_thread_data*)thread)->dynamic_values) = val
+# define write_TLS(sym, val, thread) write_TLS_index(sym##_tlsindex, val, thread, _ignored_)
+# define write_TLS_index(index, val, thread, sym) \
+   *(lispobj*)(index + (char*)((union per_thread_data*)thread)->dynamic_values) = val
 # define read_TLS(sym, thread) \
    *(lispobj*)(sym##_tlsindex + (char*)((union per_thread_data*)thread)->dynamic_values)
 #else
 # define write_TLS(sym, val, thread) SYMBOL(sym)->value = val
+# define write_TLS_index(index, val, thread, sym) sym->value = val
 # define read_TLS(sym, thread) SYMBOL(sym)->value
 #endif
 

@@ -54,7 +54,7 @@
             (handler-descriptor handler)
             (handler-function handler))))
 
-(defvar *descriptor-handlers* nil
+(!define-thread-local *descriptor-handlers* nil
   "List of all the currently active handlers for file descriptors")
 
 (sb!xc:defmacro with-descriptor-handlers (&body forms)
