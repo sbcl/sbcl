@@ -46,8 +46,7 @@
   (startup-info (* t))
   (process-information (* t)))
 
-(define-alien-routine ("GetProcessId" get-process-id) dword
-  (process handle))
+
 
 (defun search-path (partial-name)
   "Searh executable using the system path"
@@ -64,11 +63,18 @@
              nil partial-name nil
              max_path (cast pathname-buffer (* char)) nil)))
 
+(define-alien-routine ("GetProcessId" get-process-id) dword
+  (process handle))
+
 (define-alien-routine ("GetExitCodeProcess" get-exit-code-process) int
   (handle handle) (exit-code dword :out))
 
 (define-alien-routine ("GetExitCodeThread" get-exit-code-thread) int
   (handle handle) (exit-code dword :out))
+
+(define-alien-routine ("TerminateProcess" terminate-process) boolean
+  (process handle)
+  (exit-code uint))
 
 (defun mswin-spawn (program argv stdin stdout stderr searchp envp directory)
   (let ((std-handles (multiple-value-list (get-std-handles)))

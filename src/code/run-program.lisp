@@ -298,6 +298,14 @@ PROCESS."
              t)
             (t
              t)))))
+#+win32
+(defun process-kill (process signal &optional (whom :pid))
+  (declare (ignore signal whom))
+  (get-processes-status-changes)
+  (let ((handle (process-handle process)))
+    (when handle
+      (prog1 (sb-win32::terminate-process handle 1)
+        (get-processes-status-changes)))))
 
 (defun process-alive-p (process)
   "Return T if PROCESS is still alive, NIL otherwise."
