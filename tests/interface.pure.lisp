@@ -158,7 +158,7 @@
 ;;; comprehensive test.
 (with-test (:name (sb-ext:gc :minimal :stress))
   (loop repeat 2
-     do (compile nil '(lambda (x) x))
+     do (checked-compile '(lambda (x) x))
      do (sb-ext:gc :full t)))
 
 ;;; On x86-64, the instruction definitions for CMP*[PS][SD] were broken
@@ -271,11 +271,9 @@
   (assert-error (fboundp '(cas "foo"))))
 
 (with-test (:name (sleep :return-value))
-  (assert (equal (multiple-value-list
-                  (funcall
-                   (checked-compile `(lambda ()
-                                       (sleep 0.1)))))
-                 '(nil))))
+  (checked-compile-and-assert ()
+      `(lambda () (sleep 0.001))
+    (() nil)))
 
 (with-test (:name (time :no *print-length* :abbreviation))
   (let ((s (make-string-output-stream)))
