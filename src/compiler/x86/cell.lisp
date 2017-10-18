@@ -247,17 +247,14 @@
   (:args (function :scs (descriptor-reg) :target result)
          (fdefn :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg) raw)
-  (:temporary (:sc byte-reg) type)
   (:results (result :scs (descriptor-reg)))
   (:generator 38
-    (load-type type function (- fun-pointer-lowtag))
-    (inst lea raw
-          (make-ea-for-object-slot function simple-fun-code-offset
-                                   fun-pointer-lowtag))
-    (inst cmp type simple-fun-widetag)
-    (inst jmp :e normal-fn)
     (inst lea raw (make-fixup 'closure-tramp :assembly-routine))
-    NORMAL-FN
+    (inst cmp (make-ea :byte :base function :disp (- fun-pointer-lowtag))
+          simple-fun-widetag)
+    (inst cmov :e raw
+          (make-ea :dword :base function
+                   :disp (- (* simple-fun-self-slot n-word-bytes) fun-pointer-lowtag)))
     (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
     (storew raw fdefn fdefn-raw-addr-slot other-pointer-lowtag)
     (move result function)))
