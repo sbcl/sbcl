@@ -2188,6 +2188,8 @@ core and return a descriptor to it."
 ;;; looks up the encoding for this name (created by a previous DEFINE-FOP)
 ;;; instead of creating a new encoding.
 (defmacro define-cold-fop ((name &optional arglist) &rest forms)
+  #+c-headers-only (declare (ignore name arglist forms))
+  #-c-headers-only
   (let* ((code (get name 'opcode))
          (argc (aref (car **fop-signatures**) code))
          (fname (symbolicate "COLD-" name)))
@@ -2311,11 +2313,13 @@ core and return a descriptor to it."
 
 ;; I don't feel like hacking up DEFINE-COLD-FOP any more than necessary,
 ;; so this code is handcrafted to accept two operands.
+#-c-headers-only
 (flet ((fop-cold-symbol-in-package-save (fasl-input length+flag pkg-index)
          (cold-load-symbol length+flag (ref-fop-table fasl-input pkg-index)
                            fasl-input)))
   (let ((i (get 'fop-symbol-in-package-save 'opcode)))
-    (fill **fop-funs** #'fop-cold-symbol-in-package-save :start i :end (+ i 4))))
+    (fill **fop-funs** #'fop-cold-symbol-in-package-save :start i :end (+ i 4))
+    (values)))
 
 (define-cold-fop (fop-lisp-symbol-save (length+flag))
   (cold-load-symbol length+flag *cl-package* (fasl-input)))
@@ -2679,8 +2683,10 @@ core and return a descriptor to it."
                      (bvref-32 (descriptor-mem des) i)))))
        des)))
 
+#-c-headers-only
 (let ((i (get 'fop-code 'opcode)))
-  (fill **fop-funs** #'cold-load-code :start i :end (+ i 4)))
+  (fill **fop-funs** #'cold-load-code :start i :end (+ i 4))
+  (values))
 
 (defun resolve-deferred-known-funs ()
   (dolist (item *deferred-known-fun-refs*)
@@ -2731,8 +2737,10 @@ core and return a descriptor to it."
     (write-wordindexed fn sb!vm::simple-fun-info-slot info)
     fn))
 
+#-c-headers-only
 (let ((i (get 'fop-fun-entry 'opcode)))
-  (fill **fop-funs** #'cold-fop-fun-entry :start i :end (+ i 4)))
+  (fill **fop-funs** #'cold-fop-fun-entry :start i :end (+ i 4))
+  (values))
 
 #!+sb-thread
 (define-cold-fop (fop-symbol-tls-fixup)
@@ -3745,7 +3753,8 @@ III. initially undefined function references (alphabetically):
                     (descriptor-gspace (car *cold-assembler-objects*)))
           (cold-set (cold-intern '*assembler-objects*)
                     (vector-in-core (nreverse *cold-assembler-objects*)))))
-      (finish-symbols)
+      (when core-file-name
+        (finish-symbols))
       (/show "back from FINISH-SYMBOLS")
       (finalize-load-time-value-noise)
 

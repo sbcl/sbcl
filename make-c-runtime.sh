@@ -8,7 +8,7 @@ time $SBCL_XC_HOST <<EOF
 (load "src/cold/set-up-cold-packages.lisp")
 (in-package "SB-COLD")
 (in-host-compilation-mode
- (lambda ()
+ (lambda (&aux (*features* (cons :c-headers-only *features*)))
   (do-stems-and-flags (stem flags)
     (when (member :c-headers flags)
        (handler-bind ((style-warning (function muffle-warning)))

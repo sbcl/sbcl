@@ -110,10 +110,12 @@
             (constants `(def!constant ,offset-sym ,offset))
             (when special
               (specials `(defvar ,special))))
+          #-c-headers-only
           (when ref-trans
             (when ref-known-p
               (forms `(defknown ,ref-trans (,type) ,slot-type ,ref-known)))
             (forms `(def-reffer ,ref-trans ,offset ,lowtag)))
+          #-c-headers-only
           (when set-trans
             (when set-known-p
               (forms `(defknown ,set-trans
@@ -123,6 +125,7 @@
                                 ,slot-type
                         ,set-known)))
             (forms `(def-setter ,set-trans ,offset ,lowtag)))
+          #-c-headers-only
           (when cas-trans
             (when rest-p
               (error ":REST-P and :CAS-TRANS incompatible."))
@@ -139,6 +142,7 @@
           (incf offset length)))
       (unless variable-length-p
         (constants `(def!constant ,(symbolicate name "-SIZE") ,offset)))
+      #-c-headers-only
       (when alloc-trans
         (forms `(def-alloc ,alloc-trans ,offset
                   ,(if variable-length-p :var-alloc :fixed-alloc)

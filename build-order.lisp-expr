@@ -391,10 +391,10 @@
  ("src/code/deftypes-for-target" :c-headers)
 
  ;; defines IR1-ATTRIBUTES macro, needed by proclaim.lisp
- ("src/compiler/knownfun" :c-headers)
+ ("src/compiler/knownfun")
 
  ;; needs FUN-INFO structure slot setters, defined in knownfun.lisp
- ("src/compiler/fun-info-funs" :c-headers)
+ ("src/compiler/fun-info-funs")
 
  ;; stuff needed by "code/defstruct"
  ("src/code/cross-type" :c-headers :not-target)
@@ -436,8 +436,8 @@
  ("src/code/readtable")
  ("src/code/pathname")
 
- ("src/compiler/fndb" :c-headers)
- ("src/compiler/generic/vm-fndb" :c-headers)
+ ("src/compiler/fndb")
+ ("src/compiler/generic/vm-fndb")
 
  ("src/compiler/generic/late-objdef" :c-headers)
 
@@ -453,7 +453,7 @@
  #!+(and os-provides-dlopen win32) ("src/code/win32-foreign-load" :not-host)
  ("src/code/foreign")
 
- ("src/code/fop" :c-headers) ; needs macros from code/load.lisp
+ ("src/code/fop") ; needs macros from code/load.lisp
 
  ("src/compiler/ctype")
  ("src/compiler/disassem")
