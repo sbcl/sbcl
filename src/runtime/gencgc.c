@@ -3244,8 +3244,9 @@ garbage_collect_generation(generation_index_t generation, int raise)
     /* The oldest generation can't be raised. */
     gc_assert(!raise || generation < HIGHEST_NORMAL_GENERATION);
 
-    /* Check if weak hash tables were processed in the previous GC. */
+    /* Check that weak hash tables were processed in the previous GC. */
     gc_assert(weak_hash_tables == NULL);
+    gc_assert(weak_AND_hash_tables == NULL);
 
     /* Initialize the weak pointer list. */
     weak_pointers = NULL;

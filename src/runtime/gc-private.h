@@ -80,6 +80,7 @@ gc_general_copy_object(lispobj object, long nwords, int page_type_flag)
 extern sword_t (*scavtab[256])(lispobj *where, lispobj object);
 extern struct weak_pointer *weak_pointers; /* in gc-common.c */
 extern struct hash_table *weak_hash_tables; /* in gc-common.c */
+extern struct hash_table *weak_AND_hash_tables; /* in gc-common.c */
 
 // These next two are prototyped for both GCs
 // but only gencgc will ever call them.

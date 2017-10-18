@@ -1006,6 +1006,7 @@ void scan_weak_pointers(void)
  * default. On the other hand, all applications will need an
  * occasional full GC anyway, so it's not that bad either.  */
 struct hash_table *weak_hash_tables = NULL;
+struct hash_table *weak_AND_hash_tables = NULL;
 
 /* Return true if OBJ has already survived the current GC. */
 static inline int pointer_survived_gc_yet(lispobj obj)
@@ -1036,6 +1037,8 @@ static inline int pointer_survived_gc_yet(lispobj obj)
 
 #define HT_ENTRY_LIVENESS_FUN_ARRAY_NAME weak_ht_alivep_funs
 #include "weak-hash-pred.inc"
+/* magic number. cf WEAK-HASH-TABLE-KINDS in 'hash-table.lisp' */
+#define WEAKNESS_KEY_AND_VALUE 3
 
 /* Return the beginning of data in ARRAY (skipping the header and the
  * length) or NULL if it isn't an array of the specified widetag after
@@ -1183,11 +1186,21 @@ scav_vector (lispobj *where, lispobj header)
 
     if (!hash_table->_weakness) {
         scav_hash_table_entries(hash_table, weak_ht_alivep_funs, gc_scav_pair);
-    } else {
+    } else if (hash_table->next_weak_hash_table == NIL) {
         /* Delay scavenging of this table by pushing it onto
          * weak_hash_tables (if it's not there already) for the weak
          * object phase. */
-        if (hash_table->next_weak_hash_table == NIL) {
+        if (hash_table->_weakness == make_fixnum(WEAKNESS_KEY_AND_VALUE)) {
+            /* Store it in the list of "AND" relation tables.
+             * These tables don't get scavenged because the key can't enliven
+             * the value nor vice-versa. Both halves must be a-priori live
+             * to survive the culling pass. */
+            NON_FAULTING_STORE(hash_table->next_weak_hash_table
+                                 = (lispobj)weak_AND_hash_tables,
+                               &hash_table->next_weak_hash_table);
+            weak_AND_hash_tables = hash_table;
+        } else {
+            // It goes on the list of all others
             NON_FAULTING_STORE(hash_table->next_weak_hash_table
                                  = (lispobj)weak_hash_tables,
                                &hash_table->next_weak_hash_table);
@@ -1274,6 +1287,18 @@ scan_weak_hash_table (struct hash_table *hash_table,
     }
 }
 
+/* Fix one <k,v> pair in a weak key-AND-value hashtable.
+ * Do not call scavenge(), just follow forwarding pointers */
+static void pair_follow_fps(lispobj* ht_entry)
+{
+    lispobj obj = ht_entry[0];
+    if (is_lisp_pointer(obj) && forwarding_pointer_p(native_pointer(obj)))
+        ht_entry[0] = forwarding_pointer_value(native_pointer(obj));
+    obj = ht_entry[1];
+    if (is_lisp_pointer(obj) && forwarding_pointer_p(native_pointer(obj)))
+        ht_entry[1] = forwarding_pointer_value(native_pointer(obj));
+}
+
 /* Remove dead entries from weak hash tables. */
 void
 scan_weak_hash_tables (int (*alivep[5])(lispobj,lispobj))
@@ -1286,8 +1311,18 @@ scan_weak_hash_tables (int (*alivep[5])(lispobj,lispobj))
                            &table->next_weak_hash_table);
         scan_weak_hash_table(table, alivep);
     }
-
     weak_hash_tables = NULL;
+
+    for (table = weak_AND_hash_tables; table != NULL; table = next) {
+        next = (struct hash_table *)table->next_weak_hash_table;
+        NON_FAULTING_STORE(table->next_weak_hash_table = NIL,
+                           &table->next_weak_hash_table);
+        // Scavenge once to chase forwarded objects.
+        scav_hash_table_entries(table, alivep, pair_follow_fps);
+        // Then remove non-surviving entries as usual.
+        scan_weak_hash_table(table, alivep);
+    }
+    weak_AND_hash_tables = NULL;
 }
 
 
