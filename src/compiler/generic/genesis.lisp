@@ -3329,26 +3329,36 @@ core and return a descriptor to it."
 (defun write-map (*standard-output*)
   (let ((*print-pretty* nil)
         (*print-case* :upcase))
-    (format t "assembler routines defined in core image:~2%")
+    (format t "Table of contents~%")
+    (format t "=================~%")
+    (let ((sections '("assembler routines"
+                      "defined functions"
+                      "undefined functions"
+                      "layouts"
+                      "type specifiers"
+                      "symbols")))
+      (dotimes (i (length sections))
+        (format t "~4<~@R.~> ~A~%" (1+ i) (nth i sections))))
+    (format t "=================~2%")
+    (format t "I. assembler routines defined in core image:~2%")
     (dolist (routine (sort (copy-list *cold-assembler-routines*) #'< :key #'cadr))
       (format t "~8,'0X: ~S~%" (cadr routine) (car routine)))
-    (let ((fdefns nil)
-          (funs nil)
+    (let ((funs nil)
           (undefs nil))
       (maphash (lambda (name fdefn &aux (fun (cold-fdefn-fun fdefn)))
-                 (push (list (- (descriptor-bits fdefn) (descriptor-lowtag fdefn))
-                             name) fdefns)
-                 (if (cold-null fun)
-                     (push name undefs)
-                     (push (list (- (descriptor-bits fun) (descriptor-lowtag fun))
-                                 name) funs)))
+                 (let ((fdefn-bits (descriptor-bits fdefn)))
+                   (if (cold-null fun)
+                       (push `(,fdefn-bits ,name) undefs)
+                       (push `(,fdefn-bits ,(descriptor-bits fun) ,name) funs))))
                *cold-fdefn-objects*)
-      (format t "~%~|~%fdefns (native pointer):
-~:{~%~8,'0X: ~S~}~%" (sort fdefns #'< :key #'car))
-      (format t "~%~|~%initially defined functions (native pointer):
-~:{~%~8,'0X: ~S~}~%" (sort funs #'< :key #'car))
-      (format t
-"~%~|
+      (format t "~%~|~%II. defined functions (alphabetically):
+
+     FDEFN   FUNCTION  NAME
+========== ==========  ====~:{~%~10,'0X ~10,'0X  ~S~}~%"
+              (sort funs #'string<
+                    :key (lambda (x) (fun-name-block-name (caddr x)))))
+
+      (format t "~%~|
 (a note about initially undefined function references: These functions
 are referred to by code which is installed by GENESIS, but they are not
 installed by GENESIS. This is not necessarily a problem; functions can
@@ -3358,26 +3368,31 @@ they are called, everything should be OK. Things are also OK if the
 cross-compiler knew their inline definition and used that everywhere
 that they were called before the out-of-line definition is installed,
 as is fairly common for structure accessors.)
-initially undefined function references:~2%")
 
-      (setf undefs (sort undefs #'string< :key #'fun-name-block-name))
-      (dolist (name undefs)
-        (format t "~8,'0X: ~S~%"
-                (descriptor-bits (gethash name *cold-fdefn-objects*))
-                name)))
+III. initially undefined function references (alphabetically):
 
-    (format t "~%~|~%layout names:~2%")
+     FDEFN  NAME
+==========  ====~:{~%~10,'0X  ~S~}~%"
+              (sort undefs #'string<
+                    :key (lambda (x) (fun-name-block-name (cadr x))))))
+
+    (format t "~%~|~%IV. layout names:~2%")
     (dolist (x (sort-cold-layouts))
       (let* ((des (cdr x))
              (inherits (read-slot des *host-layout-of-layout* :inherits)))
         (format t "~8,'0X: ~S[~D]~%~10T~:S~%" (descriptor-bits des) (car x)
                   (cold-layout-length des) (listify-cold-inherits inherits))))
 
-    (format t "~%~|~%parsed type specifiers:~2%")
+    (format t "~%~|~%V. parsed type specifiers:~2%")
     (mapc (lambda (cell)
             (format t "~X: ~S~%" (descriptor-bits (cdr cell)) (car cell)))
           (sort (%hash-table-alist *ctype-cache*) #'<
                 :key (lambda (x) (descriptor-bits (cdr x))))))
+
+    (format t "~%~|~%VI. symbols (numerically):~2%")
+    (mapc (lambda (cell) (format t "~X: ~S~%" (car cell) (cdr cell)))
+          (sort (%hash-table-alist *cold-symbols*) #'< :key #'car))
+
   (values))
 
 ;;;; writing core file
