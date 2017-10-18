@@ -191,8 +191,8 @@
   status-hook                           ; closure to call when PROC changes status
   plist                                 ; a place for clients to stash things
   (cookie nil :type cons :read-only t)  ; list of the number of pipes from the subproc
-  #+win32
-  copiers)                              ; list of sb-win32::io-copier
+  #+win32 copiers ; list of sb-win32::io-copier
+  #+win32 (handle nil :type (or null (signed-byte 32))))
 
 (defmethod print-object ((process process) stream)
   (print-unreadable-object (process stream :type t)
@@ -323,9 +323,9 @@ status slot."
   (with-active-processes-lock ()
    (setf *active-processes* (delete process *active-processes*)))
   #+win32
-  (let ((handle (shiftf (process-pid process) nil)))
-    (when (and handle (plusp handle))
-      (or (sb-win32:close-handle handle)
+  (let ((handle (shiftf (process-handle process) nil)))
+    (when handle
+      (or (plusp (sb-win32:close-handle handle))
           (sb-win32::win32-error 'process-close))))
   process)
 
@@ -352,14 +352,16 @@ status slot."
                                t))))
                        #+win32
                        (lambda (proc)
-                         (let ((pid (process-pid proc)))
-                           (when pid
+                         (let ((handle (process-handle proc)))
+                           (when handle
                              (multiple-value-bind (ok code)
-                                 (sb-win32::get-exit-code-process pid)
+                                 (sb-win32::get-exit-code-process handle)
                                (when (and (plusp ok)
                                           (/= code sb-win32::still-active))
                                  (setf (process-%status proc) :exited
                                        (process-%exit-code proc) code)
+                                 (sb-win32::close-handle handle)
+                                 (setf (process-handle proc) nil)
                                  (when (process-status-hook proc)
                                    (push proc exited))
                                  t)))))
@@ -827,17 +829,17 @@ Users Manual for details about the PROCESS structure.
                    ;; Make sure we are not notified about the child
                    ;; death before we have installed the PROCESS
                    ;; structure in *ACTIVE-PROCESSES*.
-                   (let (child)
+                   (let (child #+win32 handle)
                      (with-active-processes-lock ()
                        (with-environment (environment-vec environment
                                           :null (not (or environment environment-p)))
-                         (setq child
+                         (setf (values child #+win32 handle)
                                #+win32
                                (sb-win32::mswin-spawn
                                 progname
                                 args
                                 stdin stdout stderr
-                                search environment-vec wait directory)
+                                search environment-vec directory)
                                #-win32
                                (with-args (args-vec args)
                                  (without-gcing
@@ -857,7 +859,8 @@ Users Manual for details about the PROCESS structure.
                                   #-win32 :pty #-win32 pty-stream
                                   :%status :running
                                   :pid child
-                                  #+win32 :copiers #+win32 *handlers-installed*))
+                                  #+win32 :copiers #+win32 *handlers-installed*
+                                  #+win32 :handle #+win32 handle))
                            (push proc *active-processes*))))
                      ;; Report the error outside the lock.
                      (case child

@@ -46,6 +46,9 @@
   (startup-info (* t))
   (process-information (* t)))
 
+(define-alien-routine ("GetProcessId" get-process-id) dword
+  (process handle))
+
 (defun search-path (partial-name)
   "Searh executable using the system path"
   (with-alien ((pathname-buffer pathname-buffer))
@@ -67,8 +70,7 @@
 (define-alien-routine ("GetExitCodeThread" get-exit-code-thread) int
   (handle handle) (exit-code dword :out))
 
-(defun mswin-spawn (program argv stdin stdout stderr searchp envp waitp
-                    directory)
+(defun mswin-spawn (program argv stdin stdout stderr searchp envp directory)
   (let ((std-handles (multiple-value-list (get-std-handles)))
         (inheritp nil))
     (flet ((maybe-std-handle (arg)
@@ -98,7 +100,7 @@
                               (alien-sap process-information))
               (let ((child (slot process-information 'process-handle)))
                 (close-handle (slot process-information 'thread-handle))
-                child)
+                (values (get-process-id child) child))
               -2))))))
 
 (define-alien-routine ("SetConsoleCtrlHandler" set-console-ctrl-handler) int
@@ -270,12 +272,12 @@ true to stop searching)." *console-control-spec*)
     (free-alien (io-copier-buffer copier))))
 
 (defun win32-process-wait (process)
-  (let ((pid (process-pid process))
+  (let ((handle (sb-impl::process-handle process))
         (copiers (sb-impl::process-copiers process)))
     (cond (copiers
            (unwind-protect
                 (with-alien ((events
-                              ;; Should be enough for stdout, stderr, pid,
+                              ;; Should be enough for stdout, stderr, handle,
                               ;; and the signal event
                               (array handle 4)))
                   (let ((copiers (setup-copiers copiers))
@@ -284,7 +286,7 @@ true to stop searching)." *console-control-spec*)
                     (loop for i below count
                           do (setf (deref events i)
                                    (io-copier-event (svref copiers i))))
-                    (setf (deref events count) pid)
+                    (setf (deref events count) handle)
                     (labels ((pending-or-error (operation
                                                 &optional (error (get-last-error)))
                                (when (/= error error-io-pending)
@@ -350,7 +352,7 @@ true to stop searching)." *console-control-spec*)
                                    (let ((copier (svref copiers event)))
                                      (copy copier)
                                      (try-read copier)))
-                                  ((= event count) ;; PID event
+                                  ((= event count) ;; HANDLE event
                                    (return))
                                   ((= event wait-failed)
                                    (win32-error "WaitForMultipleObjects")))))))
@@ -358,8 +360,8 @@ true to stop searching)." *console-control-spec*)
           (t
            (do ()
                ((= 0
-                   (wait-object-or-signal pid))))))
-    (multiple-value-bind (ok code) (get-exit-code-process pid)
+                   (wait-object-or-signal handle))))))
+    (multiple-value-bind (ok code) (get-exit-code-process handle)
       (when (and (plusp ok) (/= code still-active))
         (setf (sb-impl::process-%status process) :exited
               (sb-impl::process-%exit-code process) code))))

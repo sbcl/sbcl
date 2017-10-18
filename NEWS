@@ -10,6 +10,8 @@ changes relative to sbcl-1.4.0:
     on GC pages without any other object no longer cause accidental copying
     during garbage collection. (gencgc only)
   * bug fix: sb-fasteval failure with 0-argument lambdas (lp#1722715)
+  * bug fix: RUN-PROGRAM doesn't leak handles on win32 and PROCESS-CLOSE
+    doesn't crash. (lp#1724472)
 
 changes in sbcl-1.4.0 relative to sbcl-1.3.21:
   * minor incompatible change: DESTRUCTURING-BIND treats non-toplevel () as
