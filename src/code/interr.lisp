@@ -59,18 +59,12 @@
                              (fdefn-fun fdefn))))
                      (function value)
                      (t
-                      (try (make-condition 'retry-undefined-function
-                                           :name name
-                                           :format-control "Bad value when restarting ~s: ~s"
-                                           :format-arguments (list name value))
-                           t)))
-                   (try (make-condition 'retry-undefined-function
-                                        :name name
-                                        :format-control (if (fdefn-p value)
-                                                            "~S is still undefined"
-                                                            "Can't replace ~s with ~s because it is undefined")
-                                        :format-arguments (list name value))
-                        t)))
+                      (still-bad "Bad value when restarting ~s: ~s"
+                                 name value)))
+                   (still-bad (if (fdefn-p value)
+                                  "~S is still undefined"
+                                  "Can't replace ~s with ~s because it is undefined")
+                              name value)))
              (set-value (function retrying)
                (if retrying
                    (retry-value function)
@@ -78,6 +72,12 @@
                     nil tn-offset
                     (retry-value function)
                     *current-internal-error-context*)))
+             (still-bad (format-control &rest format-arguments)
+               (try (make-condition 'retry-undefined-function
+                                    :name name
+                                    :format-control format-control
+                                    :format-arguments format-arguments)
+                    t))
              (try (condition &optional retrying)
                (cond (context
                       ;; The #'abc case from SAFE-FDEFN-FUN, CONTEXT
@@ -206,12 +206,9 @@
                    (info :variable :type symbol)
                  (if (and defined
                           (not (ctypep value type)))
-                     (try (make-condition 'retry-unbound-variable
-                                          :name symbol
-                                          :format-control
-                                          "Type mismatch when restarting unbound symbol error:~@
-                                           ~s is not of type ~s"
-                                          :format-arguments (list value (type-specifier type))))
+                     (still-bad "Type mismatch when restarting unbound symbol error:~@
+                                 ~s is not of type ~/sb!impl:print-type/"
+                                value type)
                      value)))
              (set-value (value &optional set-symbol)
                (sb!di::sub-set-debug-var-slot
@@ -225,27 +222,28 @@
              (retry-evaluation ()
                (if (boundp symbol)
                    (set-value (symbol-value symbol))
-                   (try (make-condition 'retry-unbound-variable
-                                        :name symbol
-                                        :format-control "~s is still unbound"
-                                        :format-arguments (list symbol)))))
+                   (still-bad "~s is still unbound" symbol)))
+             (still-bad (format-control &rest format-arguments)
+               (try (make-condition 'retry-unbound-variable
+                                    :name symbol
+                                    :format-control format-control
+                                    :format-arguments format-arguments)))
              (try (condition)
-               (cond (t
-                      (restart-case (error condition)
-                        (continue ()
-                          :report (lambda (stream)
-                                    (format stream "Retry using ~s." symbol))
-                          (retry-evaluation))
-                        (use-value (value)
-                          :report (lambda (stream)
-                                    (format stream "Use specified value."))
-                          :interactive read-evaluated-form
-                          (set-value value))
-                        (store-value (value)
-                          :report (lambda (stream)
-                                    (format stream "Set specified value and use it."))
-                          :interactive read-evaluated-form
-                          (set-value value t)))))))
+               (restart-case (error condition)
+                 (continue ()
+                   :report (lambda (stream)
+                             (format stream "Retry using ~s." symbol))
+                   (retry-evaluation))
+                 (use-value (value)
+                   :report (lambda (stream)
+                             (format stream "Use specified value."))
+                   :interactive read-evaluated-form
+                   (set-value value))
+                 (store-value (value)
+                   :report (lambda (stream)
+                             (format stream "Set specified value and use it."))
+                   :interactive read-evaluated-form
+                   (set-value value t)))))
       (try (make-condition 'unbound-variable :name symbol)))))
 
 (deferr unbound-symbol-error (symbol)
