@@ -1816,7 +1816,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
          ;; FIXME: setting INFO is inefficient when not actually
          ;; changing anything
          (unless (info :variable :wired-tls name)
-           (setf (info :variable :wired-tls name) :always-has-tls))
+           (setf (info :variable :wired-tls name) t))
          ;; We force the symbol into the code constants in case BIND
          ;; does not actually reference it, as with x86.
          (emit-constant name)

@@ -428,10 +428,9 @@
 (define-info-type (:variable :documentation) :type-spec (or string null))
 
 ;; :WIRED-TLS describes how SYMBOL-VALUE (implicit or not) should be compiled.
-;;  - :ALWAYS-HAS-TLS means that calls to SYMBOL-VALUE should access the TLS
-;;     with a fixed offset. The index is assigned no later than load-time of
-;;     the file containing code thus compiled. Presence of an index in the
-;;     image that performed compilation is irrelevant (for now).
+;;  - T means that SYMBOL-VALUE should access the TLS with a fixed offset,
+;;     resolved at load-time. Presence of an index in the image that performed
+;;     compilation is irrelevant (for now).
 ;;  - :ALWAYS-THREAD-LOCAL implies a fixed offset, *and* that the check for
 ;;     no-tls-value may be elided. There is currently no way to set this.
 ;;     Note that this does not affect elision of the check for unbound-marker
@@ -447,24 +446,9 @@
 ;; ever referenced by SYMBOL-VALUE or SET. Depletion should occur lazily.
 ;;
 (define-info-type (:variable :wired-tls)
-    :type-spec (or (member nil :always-has-tls :always-thread-local)
-                   fixnum) ; the actual index, for thread slots (to be done)
-    :default
-    (lambda (symbol)
-      (declare (symbol symbol))
-      (and (eq (info :variable :kind symbol) :special)
-           #-sb-xc-host
-           (eq (symbol-package symbol) *cl-package*)
-           #+sb-xc-host
-           (flet ((external-in-package-p (pkg)
-                    (and (string= (package-name (symbol-package symbol)) pkg)
-                         (eq (nth-value 1 (find-symbol (string symbol) pkg))
-                             :external))))
-             ;; I'm not worried about random extra externals in some bizarro
-             ;; host lisp. TLS assignment has no bearing on semantics at all.
-             (or (external-in-package-p "COMMON-LISP")
-                 (external-in-package-p "SB-XC")))
-           :always-has-tls)))
+    :type-spec (or (member nil t :always-thread-local)
+                   fixnum) ; the actual index, for thread slots
+    :default nil)
 
 ;;;; ":TYPE" subsection - Data pertaining to globally known types.
 

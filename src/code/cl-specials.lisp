@@ -12,7 +12,7 @@
 
 (in-package "COMMON-LISP")
 
-(declaim         (special cl:*
+#.(let ((list           '(cl:*
                           cl:**
                           cl:***
                           cl:*break-on-signals*
@@ -65,7 +65,13 @@
                           cl:-
                           cl:/
                           cl://
-                          cl:///))
+                          cl:///)))
+    `(progn
+       (declaim (special ,@list))
+       (eval-when (:compile-toplevel :load-toplevel)
+         (dolist (symbol ',list)
+           (declare (notinline (setf sb!int:info))) ; skirt failure-to-inline warning
+           (setf (sb!int:info :variable :wired-tls symbol) t)))))
 
 (declaim (type t cl:+ cl:++ cl:+++ cl:- cl:* cl:** cl:***))
 
