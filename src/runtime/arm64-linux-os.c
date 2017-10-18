@@ -97,8 +97,11 @@ os_restore_fp_control(os_context_t *context)
 os_context_register_t   *
 os_context_float_register_addr(os_context_t *context, int offset)
 {
+    /* KLUDGE: neither glibc nor the kernel can settle down on a name,
+       the kernel used __reserved, now glibc uses __glibc_reserved1.
+       Hardcode it until they make up their mind */
     return (os_context_register_t*)
-        &((struct fpsimd_context *)context->uc_mcontext.__reserved)->vregs[offset];
+        &((struct fpsimd_context *)((uintptr_t)&context->uc_mcontext + 288))->vregs[offset];
 }
 
 void
