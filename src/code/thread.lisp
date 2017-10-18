@@ -14,10 +14,10 @@
 (!define-thread-local *current-thread* nil
       "Bound in each thread to the thread itself.")
 
+;; FIXME: this isn't working. Why not?
+(sb!xc:proclaim '(always-bound *current-thread*)) ; no compile-time effect
 (eval-when (:compile-toplevel)
-  (setq *current-thread* nil)) ; kludge
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (sb!xc:proclaim '(sb!ext:always-bound *current-thread*)))
+  (setf (info :variable :always-bound '*current-thread*) :eventually))
 
 (defstruct (foreign-thread
              (:copier nil)
