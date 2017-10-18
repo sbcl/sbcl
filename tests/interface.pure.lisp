@@ -301,7 +301,8 @@
     (assert (= (eval '(cons 1)) 123))))
 
 (with-test (:name :restart-bogus-arg-to-values-list-error)
-  (handler-bind ((error #'continue))
-    (assert (= (funcall (checked-compile `(lambda (x) (values-list x)))
-                        '(1 2 3 4 5 6 7 8 . 10))
-               '(1 2 3 4 5 6 7 8)))))
+  (let ((fun (checked-compile `(lambda (x) (values-list x)))))
+    (assert (equal (handler-bind ((error #'continue))
+                     (multiple-value-list
+                      (funcall fun '(1 2 3 4 5 6 7 8 . 10))))
+                   '(1 2 3 4 5 6 7 8)))))
