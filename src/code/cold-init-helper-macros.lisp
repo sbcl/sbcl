@@ -110,9 +110,15 @@
 ;;; (Among the issues is the very restricted initialization form)
 (defmacro !define-thread-local (name initform &optional docstring)
   (check-type initform symbol)
-  #!-sb-thread `(!defvar ,name ,initform ,docstring)
+  #!-sb-thread `(progn
+                  (eval-when (:compile-toplevel :load-toplevel :execute)
+                    (setf (info :variable :always-bound ',name) :always-bound))
+                  (!defvar ,name ,initform ,docstring))
   #!+sb-thread `(progn
                   #-sb-xc-host (!%define-thread-local ',name ',initform)
+                  (eval-when (:compile-toplevel :load-toplevel :execute)
+                    (setf (info :variable :wired-tls ',name) :always-thread-local)
+                    (setf (info :variable :always-bound ',name) :always-bound))
                   (defvar ,name ,initform ,docstring)))
 
 (defvar *!thread-initial-bindings* nil)

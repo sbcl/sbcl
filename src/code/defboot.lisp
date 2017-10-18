@@ -444,25 +444,6 @@ evaluated as a PROGN."
 
 ;;;; conditions, handlers, restarts
 
-;;; KLUDGE: we PROCLAIM these special here so that we can use restart
-;;; macros in the compiler before the DEFVARs are compiled.
-;;;
-;;; For an explanation of these data structures, see DEFVARs in
-;;; target-error.lisp.
-(sb!xc:proclaim '(special *handler-clusters* *restart-clusters*))
-
-;;; Generated code need not check for unbound-marker in *HANDLER-CLUSTERS*
-;;; (resp *RESTART-). To elicit this we must poke at the info db.
-;;; SB!XC:PROCLAIM SPECIAL doesn't advise the host Lisp that *HANDLER-CLUSTERS*
-;;; is special and so it rightfully complains about a SETQ of the variable.
-;;; But I must SETQ if proclaming ALWAYS-BOUND because the xc asks the host
-;;; whether it's currently bound.
-;;; But the DEFVARs are in target-error. So it's one hack or another.
-(setf (info :variable :always-bound '*handler-clusters*)
-      #+sb-xc :always-bound #-sb-xc :eventually)
-(setf (info :variable :always-bound '*restart-clusters*)
-      #+sb-xc :always-bound #-sb-xc :eventually)
-
 (sb!xc:defmacro with-condition-restarts
     (condition-form restarts-form &body body)
   "Evaluates the BODY in a dynamic environment where the restarts in the list
