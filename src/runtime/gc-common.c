@@ -1104,20 +1104,24 @@ void scav_hash_table_entries (struct hash_table *hash_table,
     /* Work through the KV vector. */
     int (*alivep_test)(lispobj,lispobj) = alivep[fixnum_value(hash_table->_weakness)];
     boolean rehash = 0;
+    // We can disregard any pair, albeit alive, if neither the key nor value
+    // is a pointer. This effectively ignores empty pairs,
+    // as well as makes fixnum -> fixnum pairs more efficient.
+    // If the bitwise OR of two lispobjs satisfies is_lisp_pointer(),
+    // then at least one is a pointer.
 #define SCAV_ENTRIES(aliveness_predicate) \
     for (i = 1; i < next_vector_length; i++) {                                 \
-        lispobj old_key = kv_vector[2*i];                                      \
-        lispobj __attribute__((unused)) value = kv_vector[2*i+1];              \
-        if (aliveness_predicate) {                                             \
+        lispobj key = kv_vector[2*i], value = kv_vector[2*i+1];                \
+        if (is_lisp_pointer(key|value) && aliveness_predicate) {               \
             /* Scavenge the key and value. */                                  \
             scav_entry(&kv_vector[2*i]);                                       \
             /* If an EQ-based key has moved, mark the hash-table for rehash */ \
-            if (kv_vector[2*i] != old_key &&                                   \
+            if (kv_vector[2*i] != key &&                                       \
                 (!hash_vector || hash_vector[i] == MAGIC_HASH_VECTOR_VALUE))   \
                 rehash = 1;                                                    \
     }}
     if (alivep_test)
-        SCAV_ENTRIES(alivep_test(old_key, value))
+        SCAV_ENTRIES(alivep_test(key, value))
     else
         SCAV_ENTRIES(1)
     // Though at least partly writable, the vector might have
