@@ -1662,13 +1662,13 @@ search_dynamic_space(void *pointer)
 // Return 0 if there is no such object - that is, if addr is past the
 // end of the used bytes, or its pages are not in 'from_space' etc.
 static lispobj*
-conservative_root_p(void *addr, page_index_t addr_page_index)
+conservative_root_p(lispobj addr, page_index_t addr_page_index)
 {
     /* quick check 1: Address is quite likely to have been invalid. */
     struct page* page = &page_table[addr_page_index];
-    if (((uword_t)addr & (GENCGC_CARD_BYTES - 1)) > page_bytes_used(addr_page_index) ||
+    if ((addr & (GENCGC_CARD_BYTES - 1)) > page_bytes_used(addr_page_index) ||
 #if SEGREGATED_CODE
-        (!is_lisp_pointer((lispobj)addr) && page->allocated != CODE_PAGE_FLAG) ||
+        (!is_lisp_pointer(addr) && page->allocated != CODE_PAGE_FLAG) ||
 #endif
         (compacting_p() && (page->gen != from_space ||
                             (page->large_object && page->dont_move))))
@@ -1686,19 +1686,19 @@ conservative_root_p(void *addr, page_index_t addr_page_index)
      * definitive test which involves searching for the containing object. */
 
     if (page->allocated != CODE_PAGE_FLAG) {
-        lispobj* obj = native_pointer((lispobj)addr);
-        if (lowtag_of((lispobj)addr) == LIST_POINTER_LOWTAG) {
+        lispobj* obj = native_pointer(addr);
+        if (lowtag_of(addr) == LIST_POINTER_LOWTAG) {
             if (!is_cons_half(obj[0]) || !is_cons_half(obj[1]))
                 return 0;
         } else {
             unsigned char widetag = widetag_of(*obj);
             if (!other_immediate_lowtag_p(widetag) ||
-                lowtag_of((lispobj)addr) != lowtag_for_widetag[widetag>>2])
+                lowtag_of(addr) != lowtag_for_widetag[widetag>>2])
                 return 0;
         }
         /* Don't gc_search_space() more than once for any object.
          * Doesn't apply to code since the base address is unknown */
-        if (pinned_p((lispobj)addr, addr_page_index)) return 0;
+        if (pinned_p(addr, addr_page_index)) return 0;
     }
 #endif
 
@@ -1708,13 +1708,13 @@ conservative_root_p(void *addr, page_index_t addr_page_index)
      * expensive but important, since it vastly reduces the
      * probability that random garbage will be bogusly interpreted as
      * a pointer which prevents a page from moving. */
-    lispobj* object_start = search_dynamic_space(addr);
+    lispobj* object_start = search_dynamic_space((void*)addr);
     if (!object_start) return 0;
 
     /* If the containing object is a code object and 'addr' points
      * anywhere beyond the boxed words,
      * presume it to be a valid unboxed return address. */
-    if (instruction_ptr_p(addr, object_start))
+    if (instruction_ptr_p((void*)addr, object_start))
         return object_start;
 
     /* Large object pages only contain ONE object, and it will never
@@ -1722,9 +1722,9 @@ conservative_root_p(void *addr, page_index_t addr_page_index)
      * than necessary and then shrunk to fit, leaving what look like
      * (0 . 0) CONSes at the end.  These appear valid to
      * properly_tagged_descriptor_p(), so pick them off here. */
-    if (((lowtag_of((lispobj)addr) == LIST_POINTER_LOWTAG) &&
+    if (((lowtag_of(addr) == LIST_POINTER_LOWTAG) &&
          page_table[addr_page_index].large_object)
-        || !properly_tagged_descriptor_p(addr, object_start))
+        || !properly_tagged_descriptor_p((void*)addr, object_start))
         return 0;
 
     return object_start;
@@ -2115,7 +2115,7 @@ preserve_pointer(void *addr)
          object_start = fun_code_header(object_start);
      }
 #else
-    if (page < 0 || (object_start = conservative_root_p(addr, page)) == NULL)
+    if (page < 0 || (object_start = conservative_root_p((lispobj)addr, page)) == NULL)
         return;
 #endif
 
