@@ -1696,6 +1696,9 @@ conservative_root_p(void *addr, page_index_t addr_page_index)
                 lowtag_of((lispobj)addr) != lowtag_for_widetag[widetag>>2])
                 return 0;
         }
+        /* Don't gc_search_space() more than once for any object.
+         * Doesn't apply to code since the base address is unknown */
+        if (pinned_p((lispobj)addr, addr_page_index)) return 0;
     }
 #endif
 
