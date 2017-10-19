@@ -280,9 +280,11 @@
      '(:speed 1 :safety 1 :debug 1 :compilation-speed 1 :space 1))
     ((eql :safe)
      (list :filter (lambda (&key speed safety &allow-other-keys)
-                     (> safety speed))))
+                     (and (> safety 0) (>= safety speed)))))
     ((eql :quick)
      '(:compilation-speed 1 :space 1))
+    ((eql :quick/incomplete)
+     '(:compilation-speed nil :space nil))
     ((eql :all)
      '())))
 
@@ -355,7 +357,7 @@
                       ~:*~@:_~@:_~2@T~S~@:_~@:_~
                       optimization policy~
                     ~]"
-            form (when optimize (list optimize)))))
+            form optimize)))
 
 (defun print-signaled-conditions (stream conditions &optional colonp atp)
   (declare (ignore colonp atp))
@@ -395,12 +397,12 @@
                         (allow-compiler-errors allow-failure)
                         condition-transform
                         optimize)
-  (sb-int:binding* ((form (prepare-form form :optimize optimize))
+  (sb-int:binding* ((prepared-form (prepare-form form :optimize optimize))
                     ((function nil failure-p
                       warnings style-warnings notes compiler-errors
                       error-output)
                      (compile-capturing-output-and-conditions
-                      form :name name :condition-transform condition-transform)))
+                      prepared-form :name name :condition-transform condition-transform)))
     (labels ((fail (kind conditions &optional allowed-type)
                (error "~@<Compilation of~/test-util::print-form-and-optimize/ ~
                        signaled ~A~P:~/test-util::print-signaled-conditions/~
