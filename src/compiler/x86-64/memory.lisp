@@ -12,8 +12,8 @@
 
 (in-package "SB!VM")
 
-(defun symbol-slot-addr (symbol slot)
-  (make-ea :qword :disp
+(defun symbol-slot-ea (symbol slot &optional (size :qword))
+  (make-ea size :disp
            (let ((offset (- (* slot n-word-bytes) other-pointer-lowtag)))
              (if (static-symbol-p symbol)
                  (+ nil-value (static-symbol-offset symbol) offset)
@@ -30,9 +30,12 @@
   (:policy :fast-safe)
   (:generator 4
     (cond ((sc-is object immediate)
+           ;; This is a hack so that FAST-SYMBOL-GLOBAL-VALUE
+           ;; and %SET-SYMBOL-GLOBAL-VALUE can inherit CELL-REF.
+           ;; (Not sure it's the prettiest way)
            ;; this sanity-check is meta-compile-time statically assertable
            (aver (eq offset symbol-value-slot))
-           (inst mov value (symbol-slot-addr (tn-value object) offset)))
+           (inst mov value (symbol-slot-ea (tn-value object) offset)))
           (t
            (loadw value object offset lowtag)))))
 (define-vop (cell-set)
@@ -52,7 +55,7 @@
       (cond ((sc-is object immediate)
              ;; this sanity-check is meta-compile-time statically assertable
              (aver (eq offset symbol-value-slot))
-             (inst mov (symbol-slot-addr (tn-value object) offset) value))
+             (inst mov (symbol-slot-ea (tn-value object) offset) value))
             (t
              (storew value object offset lowtag))))))
 

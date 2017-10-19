@@ -1818,7 +1818,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
          (unless (info :variable :wired-tls name)
            (setf (info :variable :wired-tls name) t))
          ;; We force the symbol into the code constants in case BIND
-         ;; does not actually reference it, as with x86.
+         ;; does not actually reference it, as with immobile symbols.
          (emit-constant name)
          (vop bind node block (lvar-tn node block value) name))
        (vop dynbind node block (lvar-tn node block value)

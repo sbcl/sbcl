@@ -104,8 +104,8 @@
        (or (in-cl-package-p symbol)
            ;; KLUDGE: rather than extensible list of predicates that match
            ;; in behavior between the host and target lisp, hardcode a few.
-           (memq symbol '(sb!vm:static-symbol-p
-                          sb!vm::wired-tls-symbol-p)))))
+           (memq symbol '(sb!vm::symbol-always-has-tls-index-p
+                          sb!vm:static-symbol-p)))))
 
 ;;; This is like TYPEP, except that it asks whether HOST-OBJECT would
 ;;; be of TARGET-TYPE when instantiated on the target SBCL. Since this

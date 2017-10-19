@@ -353,3 +353,19 @@
           (unless (member null-type remainder :test #'csubtypep)
             (push null-type remainder))))
       (values widetags remainder))))
+
+;; Return T if SYMBOL will have a nonzero TLS index at load time or sooner.
+;; True of all specials exported from CL:, all which expose slots of the thread
+;; structure, and any symbol that the compiler decides will eventually have a
+;; nonzero TLS index due to compiling a dynamic binding of it.
+(defun sb!vm::symbol-always-has-tls-index-p (symbol)
+  (not (null (info :variable :wired-tls symbol))))
+
+;; Return T if SYMBOL will always have a thread-local value.
+;; True of variables defined by !DEFINE-THREAD-LOCAL and thread slots.
+;; As an optimization, set and ref are permitted (but not required)
+;; to avoid checking for no-tls-value.
+(defun sb!vm::symbol-always-has-tls-value-p (symbol)
+  (let ((where (info :variable :wired-tls symbol)))
+    (or (fixnump where) ; thread slots
+        (eq where :always-thread-local)))) ; everything else
