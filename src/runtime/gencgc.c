@@ -2163,7 +2163,35 @@ preserve_pointer(void *addr)
  * younger, so it just checks if there is a pointer to the current
  * region.
  *
- * We return 1 if the page was write-protected, else 0. */
+ * We return 1 if the page was write-protected, else 0.
+ *
+ * Note that because of the existence of some words which have fixnum lowtag
+ * but are actually pointers, you might think it would be possible for this
+ * function to go wrong, protecting a page that contains old->young pointers.
+ * Well, it seems fine mostly. Why: two of the guilty parties are CLOSURE-FUN
+ * and FDEFN-RAW-ADDR.  Closure-fun is a fixnum (on x86) which when treated
+ * as a pointer indicates the entry point to call. Its function can never
+ * be an object younger than itself. (An invariant of any immutable object)
+ * fdefn-raw-address is more subtle. In set-fdefn-fun we first store 'fun'
+ * and then 'raw-addr', where a stop-for-GC could occur in between.
+ * So if the fdefn was, before the first store:
+ *     fun -> younger object
+ *     raw-addr -> younger object
+ * and then after the first store:
+ *     fun -> older object | <- interrupt occurred after this store
+ *     raw-addr -> younger object
+ * then we have a page that may look like it has no traceable pointers
+ * to younger objects (the raw-addr is untraceable by the algorithm below).
+ * But because the fdefn is in a register, it is pinned, therefore it is live,
+ * therefore all its slots will be traced on this GC.
+ * In fact update_page_write_prot() won't even be called on the fdefn's page.
+ * The final problem is compact-instance-header layouts. Conditions and
+ * structures can't point to younger layouts, so that much is easy.
+ * Standard-objects can. I think those layouts are kept live by the
+ * voluminous amount of metadata that CLOS insists on maintaining,
+ * though I'm not 100% sure, and would not be surprised if there is a bug
+ * related to GC of those layouts.
+ */
 static int
 update_page_write_prot(page_index_t page)
 {
