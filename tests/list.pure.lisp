@@ -91,9 +91,10 @@
       do (assert (equal (apply 'nconc (copy-tree args)) result))
       do (let* ((exp `(nconc ,@ (mapcar (lambda (arg)
                                           `(copy-tree ',arg))
-                                        args)))
-                (fun (checked-compile `(lambda () ,exp))))
-           (assert (equal (funcall fun) result))))))
+                                        args))))
+           (checked-compile-and-assert ()
+               `(lambda () ,exp)
+             (() result))))))
 
 (with-test (:name (nconc :improper-list type-error))
   (let ((tests '(((3 (1 . 2)) 3)
@@ -276,7 +277,9 @@
   (macrolet ((test (value form)
                `(let ((* ,value))
                   (assert (eval ,form))
-                  (assert (funcall (checked-compile '(lambda () ,form)))))))
+                  (checked-compile-and-assert (:optimize :safe)
+                      '(lambda () ,form)
+                    (() t)))))
     (test 'evenp
           (equal '(2 3 4) (member-if * (list 1 2 3 4))))
     (test 'evenp
@@ -301,7 +304,9 @@
   (macrolet ((test (value form)
                `(let ((* ,value))
                   (assert (eval ,form))
-                  (assert (funcall (checked-compile '(lambda () ,form)))))))
+                  (checked-compile-and-assert ()
+                      '(lambda () ,form)
+                    (() t)))))
     (test 'oddp
           (equal '(2 3 4) (member-if-not * (list 1 2 3 4))))
     (test 'oddp
@@ -323,12 +328,12 @@
 ;;; for ASSOC & MEMBER
 (with-test (:name (assoc member *print-case*))
   (let ((*print-case* :downcase))
-    (assert (eql 2
-                 (cdr (funcall (checked-compile `(lambda (i l) (assoc i l)))
-                               :b '((:a . 1) (:b . 2))))))
-    (assert (equal '(3 4 5)
-                   (funcall (checked-compile `(lambda (i l) (member i l)))
-                            3 '(1 2 3 4 5))))))
+    (checked-compile-and-assert ()
+        `(lambda (i l) (assoc i l))
+      ((:b '((:a . 1) (:b . 2))) '(:b . 2)))
+    (checked-compile-and-assert ()
+        `(lambda (i l) (member i l))
+      ((3 '(1 2 3 4 5)) '(3 4 5)))))
 
 ;;; bad bounding index pair to SUBSEQ on a list
 (with-test (:name (subseq sb-kernel:bounding-indices-bad-error))
@@ -343,9 +348,10 @@
 
 ;;; ADJOIN must apply key to item as well
 (with-test (:name (adjoin :key))
-  (let ((fun (checked-compile `(lambda (x y)
-                                 (adjoin x y :key #'car :test #'string=)))))
-    (assert (equal '((:b)) (funcall fun (list 'b) (list '(:b))))))
+  (checked-compile-and-assert ()
+      `(lambda (x y)
+         (adjoin x y :key #'car :test #'string=))
+    (((list 'b) (list '(:b))) '((:b))))
 
   #+(or sb-eval sb-fasteval)
   (assert (equal '((:b))

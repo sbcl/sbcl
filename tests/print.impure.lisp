@@ -563,8 +563,9 @@
 (with-test (:name (write :return-value))
   ;; COMPILE is called explicitly because there was a bug in the
   ;; compiler-macro for WRITE, which isn't expanded by the evaluator.
-  (assert (= 123 (funcall (checked-compile '(lambda (s) (write 123 :stream s)))
-                          (make-broadcast-stream)))))
+  (checked-compile-and-assert ()
+      '(lambda (s) (write 123 :stream s))
+    (((make-broadcast-stream)) 123)))
 
 (with-test (:name (write write-to-string compiler-macro :lp598374 :lp581564))
   (let ((test (checked-compile
@@ -577,11 +578,11 @@
     (assert (equal "12"
                    (with-output-to-string (*standard-output*)
                      (assert (eql 12 (funcall test 12)))))))
-  (let ((test (checked-compile
-               `(lambda ()
-                  (let ((*print-length* 42))
-                    (write-to-string *print-length* :length nil))))))
-    (assert (equal "42" (funcall test)))))
+  (checked-compile-and-assert  ()
+      `(lambda ()
+         (let ((*print-length* 42))
+           (write-to-string *print-length* :length nil)))
+    (() "42")))
 
 (with-test (:name (format :compile-literal-dest-string))
   (multiple-value-bind (fun failure-p warnings)
@@ -792,10 +793,9 @@
       (assert (equal (format nil "~$" '(123)) "(123)")))))
 
 (with-test (:name (format :concatenate))
-  (assert (equal
-           (funcall (checked-compile `(lambda (x) (format nil "~s" (the string x))))
-                    "\\")
-           (prin1-to-string "\\"))))
+  (checked-compile-and-assert ()
+      `(lambda (x) (format nil "~s" (the string x)))
+    (("\\") (prin1-to-string "\\"))))
 
 (with-test (:name (write :stream nil))
   (assert
