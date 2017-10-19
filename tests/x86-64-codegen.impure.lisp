@@ -9,7 +9,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#-(and x86-64 immobile-space) (sb-ext:exit :code 104) ; can't run these tests
+#-(and x86-64 immobile-space sb-thread) (sb-ext:exit :code 104) ; can't run these tests
 
 (defun disasm (safety expr &optional (remove-epilogue t))
   ;; This lambda has a name because if it doesn't, then the name
