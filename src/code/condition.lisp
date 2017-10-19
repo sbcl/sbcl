@@ -585,6 +585,14 @@
 (define-condition cell-error (error)
   ((name :reader cell-error-name :initarg :name)))
 
+(define-condition values-list-argument-error (type-error)
+  ()
+  (:report
+   (lambda (condition stream)
+     (format stream "~@<Attempt to use ~S on a dotted list: ~
+                     ~2I~_~S~:>"
+             'values-list (type-error-datum condition)))))
+
 (define-condition unbound-variable (cell-error) ()
   (:report
    (lambda (condition stream)

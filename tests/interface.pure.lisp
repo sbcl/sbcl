@@ -300,7 +300,8 @@
 
 (with-test (:name :restart-bogus-arg-to-values-list-error)
   (let ((fun (checked-compile `(lambda (x) (values-list x)))))
-    (assert (equal (handler-bind ((error #'continue))
+    (assert (equal (handler-bind ((sb-kernel::values-list-argument-error
+                                   #'continue))
                      (multiple-value-list
                       (funcall fun '(1 2 3 4 5 6 7 8 . 10))))
                    '(1 2 3 4 5 6 7 8)))))
