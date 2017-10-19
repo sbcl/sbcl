@@ -270,40 +270,48 @@
                                 addr disp))))
                     dstate)))))
     #!+sb-thread
-    (when (and (eql base-reg #.(ash (tn-offset sb!vm::thread-base-tn) -1))
-               (not index-reg) ; no index
-               (typep disp '(integer 0 *)) ; positive displacement
-               (seg-code (dstate-segment dstate)))
+    (flet ((guess-symbol (predicate)
+             (binding* ((code-header (seg-code (dstate-segment dstate)) :exit-if-null)
+                        (header-n-words (code-header-words code-header)))
+               (loop for word-num from code-constants-offset below header-n-words
+                     for obj = (code-header-ref code-header word-num)
+                     when (and (symbolp obj) (funcall predicate obj))
+                     do (return obj)))))
       ;; Try to reverse-engineer which thread-local binding this is
-      (let* ((code (seg-code (dstate-segment dstate)))
-             (header-n-words (code-header-words code))
-             (tls-index (ash disp (- n-fixnum-tag-bits)))
-             (symbol
-              (or (loop for word-num from code-constants-offset below header-n-words
-                        for obj = (code-header-ref code word-num)
-                        when (and (symbolp obj) (= (symbol-tls-index obj) tls-index))
-                        do (return obj))
-                  ;; static symbols with known TLS index don't go in the code header,
-                  ;; but it'd be nice to guess at the symbol.
-                  (static-symbol-from-tls-index tls-index))))
-        (when symbol
-          (return-from print-mem-ref
-            (note (lambda (stream) (format stream "tls: ~S" symbol))
-                  dstate))))
-      ;; Or maybe we're looking at the 'struct thread' itself
-      (when (< disp max-interrupts)
-        (let* ((thread-slots
-                (load-time-value
-                 (primitive-object-slots
-                  (find 'sb!vm::thread *primitive-objects*
-                        :key #'primitive-object-name)) t))
-               (slot (find (ash disp (- word-shift)) thread-slots
-                           :key #'slot-offset)))
-          (when slot
-            (return-from print-mem-ref
-              (note (lambda (stream)
-                      (format stream "thread.~(~A~)" (slot-name slot)))
-                    dstate))))))))
+      (cond ((and disp ; Test whether disp looks aligned to an object header
+                  (not (logtest (- disp 4) sb!vm:lowtag-mask))
+                  (not base-reg) (not index-reg))
+             (let* ((addr (+ disp (- 4) sb!vm:other-pointer-lowtag))
+                    (symbol
+                     (guess-symbol (lambda (s) (= (get-lisp-obj-address s) addr)))))
+               (when symbol
+                 (note (lambda (stream) (format stream "tls_index: ~S" symbol))
+                       dstate))))
+            ((and (eql base-reg #.(ash (tn-offset sb!vm::thread-base-tn) -1))
+                  (not index-reg) ; no index
+                  (typep disp '(integer 0 *))) ; positive displacement
+             (let* ((tls-index (ash disp (- n-fixnum-tag-bits)))
+                    (symbol (or (guess-symbol
+                                 (lambda (s) (= (symbol-tls-index s) tls-index)))
+                                ;; static symbols aren't in the code header
+                                (static-symbol-from-tls-index tls-index))))
+               (when symbol
+                 (return-from print-mem-ref
+                   (note (lambda (stream) (format stream "tls: ~S" symbol))
+                         dstate))))
+             ;; Or maybe we're looking at the 'struct thread' itself
+             (when (< disp max-interrupts)
+               (let* ((thread-slots
+                       (load-time-value
+                        (primitive-object-slots
+                         (find 'sb!vm::thread *primitive-objects*
+                               :key #'primitive-object-name)) t))
+                      (slot (find (ash disp (- word-shift)) thread-slots
+                                  :key #'slot-offset)))
+                 (when slot
+                   (note (lambda (stream)
+                           (format stream "thread.~(~A~)" (slot-name slot)))
+                         dstate)))))))))
 
 (defun lea-compute-label (value dstate)
   ;; If VALUE should be regarded as a label, return the address.
