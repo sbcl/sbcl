@@ -1353,6 +1353,15 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t bytes,
         } else if (small_object &&
                    page_extensible_p(first_page, gc_alloc_generation, page_type_flag)) {
             bytes_found = GENCGC_CARD_BYTES - page_bytes_used(first_page);
+            // XXX: Prefer to start non-code on new pages.
+            //      This is temporary until scavenging of small-object pages
+            //      is made a little more intelligent (work in progress).
+            if (bytes_found < nbytes && page_type_flag != CODE_PAGE_FLAG) {
+                if (bytes_found > most_bytes_found)
+                    most_bytes_found = bytes_found;
+                first_page++;
+                continue;
+            }
         } else {
             first_page++;
             continue;
