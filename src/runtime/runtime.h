@@ -335,7 +335,7 @@ make_lispobj(void *o, int low_tag)
 
 #define MAKE_FIXNUM(n) (n << N_FIXNUM_TAG_BITS)
 static inline lispobj
-make_fixnum(sword_t n)
+make_fixnum(uword_t n) // '<<' on negatives is _technically_ undefined behavior
 {
     return MAKE_FIXNUM(n);
 }

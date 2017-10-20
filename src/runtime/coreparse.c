@@ -330,6 +330,7 @@ static void adjust_pointers(lispobj *where, sword_t n_words, struct heap_adjust*
 }
 
 #include "var-io.h"
+#include "unaligned.h"
 static void __attribute__((unused))
 adjust_code_refs(struct heap_adjust* adj, lispobj fixups, struct code* code)
 {
@@ -343,8 +344,8 @@ adjust_code_refs(struct heap_adjust* adj, lispobj fixups, struct code* code)
         loc += prev_loc;
         prev_loc = loc;
         int* fixup_where = (int*)(instructions + loc);
-        lispobj ptr = (lispobj)(*fixup_where);
-        *fixup_where = (int)(ptr + calc_adjustment(adj, ptr));
+        lispobj ptr = UNALIGNED_LOAD32(fixup_where);
+        UNALIGNED_STORE32(fixup_where, ptr + calc_adjustment(adj, ptr));
     }
 }
 
@@ -794,7 +795,7 @@ load_core_file(char *file, os_vm_offset_t file_offset)
     SHOW("found CORE_MAGIC");
 
 #define WORD_FMTX OS_VM_SIZE_FMTX
-    for ( ; val != END_CORE_ENTRY_TYPE_CODE ; ptr += remaining_len) {
+    for ( ; ; ptr += remaining_len) {
         val = *ptr++;
         len = *ptr++;
         remaining_len = len - 2; /* (-2 to cancel the two ++ operations) */
@@ -804,8 +805,9 @@ load_core_file(char *file, os_vm_offset_t file_offset)
         switch (val) {
 
         case END_CORE_ENTRY_TYPE_CODE:
-            SHOW("END_CORE_ENTRY_TYPE_CODE case");
-            break;
+            free(header);
+            close(fd);
+            return initial_function;
 
         case BUILD_ID_CORE_ENTRY_TYPE_CODE:
             SHOW("BUILD_ID_CORE_ENTRY_TYPE_CODE case");
@@ -877,11 +879,6 @@ load_core_file(char *file, os_vm_offset_t file_offset)
             lose("unknown core file entry: 0x%"WORD_FMTX"\n", val);
         }
     }
-    SHOW("about to free(header)");
-    free(header);
-    close(fd);
-    SHOW("returning from load_core_file(..)");
-    return initial_function;
 }
 
 #include "genesis/hash-table.h"

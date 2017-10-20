@@ -54,6 +54,7 @@
 #include "pseudo-atomic.h"
 #include "var-io.h"
 #include "immobile-space.h"
+#include "unaligned.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -605,7 +606,7 @@ static int next_varyobj_root_page(unsigned int page_index,
             if (varyobj_page_gens_augmented(page_index) & genmask)
                 return page_index;
             else {
-                word ^= (1<<bit_index);
+                word ^= (1U<<bit_index);
                 continue;
             }
         }
@@ -1062,7 +1063,7 @@ sweep_varyobj_pages(int raise)
             if (ENABLE_PAGE_PROTECTION && varyobj_page_touched(page)
                 && varyobj_page_gens_augmented(page) > 1
                 && can_wp_varyobj_page(page, keep_gen, new_gen))
-                varyobj_page_touched_bits[(page - FIRST_VARYOBJ_PAGE)/32] &= ~(1<<(page & 31));
+                varyobj_page_touched_bits[(page - FIRST_VARYOBJ_PAGE)/32] &= ~(1U<<(page & 31));
             continue;
         }
         lispobj* page_base = (lispobj*)low_page_address(page);
@@ -1130,7 +1131,7 @@ sweep_varyobj_pages(int raise)
         COMPUTE_NEW_MASK(mask, VARYOBJ_PAGE_GENS(page));
         VARYOBJ_PAGE_GENS(page) = mask;
         if ( mask && wp_it )
-            varyobj_page_touched_bits[(page - FIRST_VARYOBJ_PAGE)/32] &= ~(1 << (page & 31));
+            varyobj_page_touched_bits[(page - FIRST_VARYOBJ_PAGE)/32] &= ~(1U << (page & 31));
     }
 #ifdef DEBUG
     verify_immobile_page_protection(keep_gen, new_gen);
@@ -1284,9 +1285,9 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
     // Write-protect the pages occupied by the core file.
     // (There can be no inter-generation pointers.)
     if (ENABLE_PAGE_PROTECTION) {
-        int page;
+        low_page_index_t page;
         for (page = FIRST_VARYOBJ_PAGE ; page <= last_page ; ++page)
-            varyobj_page_touched_bits[(page-FIRST_VARYOBJ_PAGE)/32] &= ~(1<<(page & 31));
+            varyobj_page_touched_bits[(page-FIRST_VARYOBJ_PAGE)/32] &= ~(1U<<(page & 31));
     }
     compute_immobile_space_bound();
     lispobj* code = (lispobj*)address;
@@ -1407,7 +1408,7 @@ int immobile_space_handle_wp_violation(void* fault_addr)
         // threadsafe, so allow it anywhere. More strictness could be imparted
         // by tracking the max value attained by the free pointer.
         __sync_or_and_fetch(&varyobj_page_touched_bits[(page_index-FIRST_VARYOBJ_PAGE)/32],
-                            1 << (page_index & 31));
+                            1U << (page_index & 31));
     } else {
         // FIXME: a single bitmap of touched bits would make more sense,
         // and the _CLEARED flag doesn't achieve much if anything.
@@ -1659,7 +1660,9 @@ static void adjust_fdefn_entrypoint(lispobj* where, int displacement,
         callee_adjust = callee_new - callee_old;
     }
 #ifdef LISP_FEATURE_X86_64
-    *(int*)((char*)&fdefn->raw_addr + 1) += callee_adjust - displacement;
+    UNALIGNED_STORE32((char*)&fdefn->raw_addr + 1,
+                      UNALIGNED_LOAD32((char*)&fdefn->raw_addr + 1)
+                      + callee_adjust - displacement);
 #else
 #error "Can't adjust fdefn_raw_addr for this architecture"
 #endif
@@ -2120,7 +2123,8 @@ void defrag_immobile_space(int* components, boolean verbose)
         for ( ; reloc_index < end_reloc_index ; ++reloc_index ) {
             unsigned char* inst_addr = (unsigned char*)(long)immobile_space_relocs[reloc_index];
             gc_assert(*inst_addr == 0xE8 || *inst_addr == 0xE9);
-            unsigned int target_addr = (int)(long)inst_addr + 5 + *(int*)(inst_addr+1);
+            unsigned int target_addr =
+                (int)(long)inst_addr + 5 + (int)UNALIGNED_LOAD32(inst_addr+1);
             int target_adjust = 0;
             // Both this code and the jumped-to code can move.
             // For this component, adjust by the displacement by (old - new).
@@ -2143,7 +2147,9 @@ void defrag_immobile_space(int* components, boolean verbose)
             char* fixup_loc = (immobile_space_p((lispobj)inst_addr) ?
                                (char*)tempspace_addr(inst_addr - code + load_addr) :
                                (char*)inst_addr) + 1;
-            *(int*)fixup_loc += target_adjust + (code - load_addr);
+            UNALIGNED_STORE32(fixup_loc,
+                              UNALIGNED_LOAD32(fixup_loc)
+                                + target_adjust + (code - load_addr));
         }
     }
 #endif
@@ -2262,11 +2268,11 @@ void fixup_immobile_refs(lispobj (*fixup_lispobj)(lispobj),
         loc += prev_loc;
         prev_loc = loc;
         int* fixup_where = (int*)(instructions + loc);
-        lispobj ptr = (lispobj)(*fixup_where);
+        lispobj ptr = (lispobj)UNALIGNED_LOAD32(fixup_where);
         if (is_lisp_pointer(ptr)) {
             lispobj fixed = fixup_lispobj(ptr);
             if (fixed != ptr)
-                *fixup_where = fixed;
+                UNALIGNED_STORE32(fixup_where, fixed);
         } else {
             lispobj* header_addr;
             if (ptr < IMMOBILE_VARYOBJ_SUBSPACE_START) {
@@ -2276,8 +2282,9 @@ void fixup_immobile_refs(lispobj (*fixup_lispobj)(lispobj),
                 gc_assert(header_addr);
                 if (forwarding_pointer_p(header_addr)) {
                     lispobj fpval = forwarding_pointer_value(header_addr);
-                    *fixup_where = (int)(long)native_pointer(fpval)
-                        + (ptr - (lispobj)header_addr);
+                    UNALIGNED_STORE32(fixup_where,
+                                      (int)(long)native_pointer(fpval)
+                                      + (ptr - (lispobj)header_addr));
                 }
             } else if (ptr > asm_routines_end) {
 #ifdef LISP_FEATURE_IMMOBILE_CODE
@@ -2300,7 +2307,7 @@ void fixup_immobile_refs(lispobj (*fixup_lispobj)(lispobj),
                     // It must be the entrypoint to a static [sic] function.
                     gc_assert(widetag_of(*tempspace_addr(native_pointer(fpval)))
                               == SIMPLE_FUN_WIDETAG);
-                    *fixup_where = fpval + FUN_RAW_ADDR_OFFSET;
+                    UNALIGNED_STORE32(fixup_where, fpval + FUN_RAW_ADDR_OFFSET);
                 }
 #else
                 lose("unexpected immobile-space pointer");

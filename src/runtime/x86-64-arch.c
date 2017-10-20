@@ -26,6 +26,7 @@
 #include "breakpoint.h"
 #include "thread.h"
 #include "pseudo-atomic.h"
+#include "unaligned.h"
 
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
@@ -482,8 +483,8 @@ arch_write_linkage_table_jmp(char *reloc_addr, void *target_addr)
 {
     reloc_addr[0] = 0xFF; /* Opcode for near jump to absolute reg/mem64. */
     reloc_addr[1] = 0x25; /* ModRM #b00 100 101, i.e. RIP-relative. */
-    *(uint32_t*)(reloc_addr+2) = 0; /* 32-bit displacement field = 0 */
-    *(uword_t *)(reloc_addr+6) = (uword_t)target_addr;
+    UNALIGNED_STORE32((reloc_addr+2), 0); /* 32-bit displacement field = 0 */
+    UNALIGNED_STORE64((reloc_addr+6), (uword_t)target_addr);
     /* write a nop for good measure. */
     reloc_addr[14] = 0x90;
 }
@@ -561,8 +562,9 @@ arch_set_fp_modes(unsigned int mxcsr)
 lispobj fdefn_callee_lispobj(struct fdefn* fdefn) {
     extern unsigned asm_routines_end;
     if (((lispobj)fdefn->raw_addr & 0xFE) == 0xE8) {  // looks good
-        unsigned int raw_fun = (int)(long)&fdefn->raw_addr + 5 // length of "JMP rel32"
-          + *(int*)((char*)&fdefn->raw_addr + 1);
+        int32_t offs = UNALIGNED_LOAD32((char*)&fdefn->raw_addr + 1);
+        unsigned int raw_fun =
+            (int)(long)&fdefn->raw_addr + 5 + offs; // 5 = length of "JMP rel32"
         switch (((unsigned char*)&fdefn->raw_addr)[5]) {
         case 0x00: // no closure/fin trampoline
           // If the target is an assembly routine, there is no simple-fun

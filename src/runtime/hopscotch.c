@@ -60,7 +60,7 @@ uint32_t hopscotch_hmix(uword_t key)
 /// Set a single bit in the hop mask for logical cell at 'index'
 static inline void set_hop_bit(tableptr ht, unsigned index, int bit)
 {
-    unsigned mask = 1<<bit;
+    unsigned mask = 1U<<bit;
     ht->hops[index] |= mask;
 }
 /// Set all the bits in the hop mask for logical cell at 'index'
@@ -564,7 +564,7 @@ int hopscotch_insert(tableptr ht, uword_t key, sword_t val)
             put_pair(physical_elt, 0, 0);
             // This logical bin no longer owns the index where the victim was,
             // but does own the index where it got moved to.
-            set_hop_mask(ht, logical_bin, bits ^ (1<<displacement | 1<<victim));
+            set_hop_mask(ht, logical_bin, bits ^ (1U<<displacement | 1U<<victim));
             // Now free_index gets smaller, and we try again from the top.
             free_index = physical_elt;
             goto retry;
