@@ -2991,9 +2991,13 @@ bootstrapping.
            (and (symbolp instance)
                 `((declare (%variable-rebinding ,in ,instance)))))
        ,in
-       (symbol-macrolet ,(mapcar (lambda (slot-entry)
-                                   (let ((var-name (car slot-entry))
-                                         (accessor-name (cadr slot-entry)))
-                                     `(,var-name (,accessor-name ,in))))
-                                 slots)
-          ,@body))))
+       (symbol-macrolet
+           ,(mapcar (lambda (slot-entry)
+                      (unless (proper-list-of-length-p slot-entry 2)
+                        (error "Malformed slot entry: ~s, should be (variable-name accessor-name)"
+                               slot-entry))
+                      (let ((var-name (car slot-entry))
+                            (accessor-name (cadr slot-entry)))
+                        `(,var-name (,accessor-name ,in))))
+             slots)
+         ,@body))))
