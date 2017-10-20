@@ -1972,7 +1972,7 @@ undoably_install_low_level_interrupt_handler (int signal,
         sa.sa_sigaction = low_level_handle_now_handler;
 #endif
 
-    sigcopyset(&sa.sa_mask, &blockable_sigset);
+    sa.sa_mask = blockable_sigset;
     sa.sa_flags = SA_SIGINFO | SA_RESTART
         | (sigaction_nodefer_works ? SA_NODEFER : 0);
 #if defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
@@ -2025,7 +2025,7 @@ install_handler(int signal, void handler(int, siginfo_t*, os_context_t*),
         else
             sa.sa_sigaction = interrupt_handle_now_handler;
 
-        sigcopyset(&sa.sa_mask, &blockable_sigset);
+        sa.sa_mask = blockable_sigset;
         sa.sa_flags = SA_SIGINFO | SA_RESTART |
             (sigaction_nodefer_works ? SA_NODEFER : 0);
         sigaction(signal, &sa, NULL);
