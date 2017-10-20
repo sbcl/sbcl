@@ -20,13 +20,15 @@
 ;;; In sbcl-0.6.10, Douglas Brebner reported that (SETF EXTERN-ALIEN)
 ;;; was messed up so badly that trying to execute expressions like
 ;;; this signalled an error.
-(setf (sb-alien:extern-alien "thread_control_stack_size" sb-alien:unsigned)
-      (sb-alien:extern-alien "thread_control_stack_size" sb-alien:unsigned))
+(with-test (:name (setf extern-alien))
+  (setf (sb-alien:extern-alien "thread_control_stack_size" sb-alien:unsigned)
+        (sb-alien:extern-alien "thread_control_stack_size" sb-alien:unsigned)))
 
 ;;; bug 133, fixed in 0.7.0.5: Somewhere in 0.pre7.*, C void returns
 ;;; were broken ("unable to use values types here") when
 ;;; auto-PROCLAIM-of-return-value was added to DEFINE-ALIEN-ROUTINE.
-(sb-alien:define-alien-routine ("free" free) void (ptr (* t) :in))
+(with-test (:name (define-alien-routine :bug-133))
+  (sb-alien:define-alien-routine ("free" free) void (ptr (* t) :in)))
 
 ;;; Types of alien functions were being incorrectly DECLAIMED when
 ;;; docstrings were included in the definition until sbcl-0.7.6.15.
@@ -34,64 +36,68 @@
   "docstring"
   (name c-string))
 
-(multiple-value-bind (function warningsp failurep)
-    (compile nil '(lambda () (ftype-correctness)))
-  (declare (ignore function failurep))
-  (assert warningsp))
+(with-test (:name (define-alien-routine ftype :correctness))
+  (multiple-value-bind (function failure-p warnings)
+      (checked-compile '(lambda () (ftype-correctness))
+                       :allow-warnings t)
+    (declare (ignore function failure-p))
+    (assert (= (length warnings) 1)))
 
-(multiple-value-bind (function warningsp failurep)
-    (compile nil '(lambda () (ftype-correctness "FOO")))
-  (declare (ignore function failurep))
-  (assert (not warningsp)))
+  (checked-compile '(lambda () (ftype-correctness "FOO")))
 
-(multiple-value-bind (function warningsp failurep)
-    (compile nil '(lambda () (ftype-correctness "FOO" "BAR")))
-  (declare (ignore function failurep))
-  (assert warningsp))
+  (multiple-value-bind (function failure-p warnings)
+      (checked-compile '(lambda () (ftype-correctness "FOO" "BAR"))
+                       :allow-warnings t)
+    (declare (ignore function failure-p))
+    (assert (= (length warnings) 1))))
 
 ;;; This used to break due to too eager auxiliary type twiddling in
 ;;; parse-alien-record-type.
 (defparameter *maybe* nil)
-(defun with-alien-test-for-struct-plus-funcall ()
-  (with-alien ((x (struct bar (x unsigned) (y unsigned)))
-               ;; bogus definition, but we just need the symbol
-               (f (function int (* (struct bar))) :extern "printf"))
-    (when *maybe*
-      (alien-funcall f (addr x)))))
+(with-test (:name (with-alien struct :and alien-funcall))
+  (checked-compile
+   '(lambda ()
+      (with-alien ((x (struct bar (x unsigned) (y unsigned)))
+                   ;; bogus definition, but we just need the symbol
+                   (f (function int (* (struct bar))) :extern "printf"))
+        (when *maybe*
+          (alien-funcall f (addr x)))))))
 
 ;;; Mutually referent structures
 (define-alien-type struct.1 (struct struct.1 (x (* (struct struct.2))) (y int)))
 (define-alien-type struct.2 (struct struct.2 (x (* (struct struct.1))) (y int)))
-(let ((s1 (make-alien struct.1))
-      (s2 (make-alien struct.2)))
-  (setf (slot s1 'x) s2
-        (slot s2 'x) s1
-        (slot (slot s1 'x) 'y) 1
-        (slot (slot s2 'x) 'y) 2)
-  (assert (= 1 (slot (slot s1 'x) 'y)))
-  (assert (= 2 (slot (slot s2 'x) 'y))))
+(with-test (:name (define-alien-type :mutually-reference-structures))
+  (let ((s1 (make-alien struct.1))
+        (s2 (make-alien struct.2)))
+    (setf (slot s1 'x) s2
+          (slot s2 'x) s1
+          (slot (slot s1 'x) 'y) 1
+          (slot (slot s2 'x) 'y) 2)
+    (assert (= 1 (slot (slot s1 'x) 'y)))
+    (assert (= 2 (slot (slot s2 'x) 'y)))))
 
 ;;; "Alien bug" on sbcl-devel 2004-10-11 by Thomas F. Burdick caused
 ;;; by recursive struct definition.
-(let ((fname "alien-bug-2004-10-11.tmp.lisp"))
-  (unwind-protect
-       (progn
-         (with-open-file (f fname :direction :output :if-exists :supersede)
-           (mapc (lambda (form) (print form f))
-                 '((defpackage :alien-bug
-                     (:use :cl :sb-alien))
-                   (in-package :alien-bug)
-                   (define-alien-type objc-class
-                       (struct objc-class
-                        (protocols
-                         (* (struct protocol-list
-                                    (list (array (* (struct objc-class))))))))))))
+(with-test (:name (compile-file :nested define-alien-type struct))
+  (let ((fname "alien-bug-2004-10-11.tmp.lisp"))
+    (unwind-protect
+         (progn
+           (with-open-file (f fname :direction :output :if-exists :supersede)
+             (mapc (lambda (form) (print form f))
+                   '((defpackage :alien-bug
+                       (:use :cl :sb-alien))
+                     (in-package :alien-bug)
+                     (define-alien-type objc-class
+                      (struct objc-class
+                       (protocols
+                        (* (struct protocol-list
+                                   (list (array (* (struct objc-class))))))))))))
            (load fname)
            (load fname)
            (load (compile-file fname))
            (load (compile-file fname)))
-    (delete-file (compile-file-pathname fname))
-    (delete-file fname)))
+      (delete-file (compile-file-pathname fname))
+      (delete-file fname))))
 
 ;;; enumerations with only one enum resulted in division-by-zero
 ;;; reported on sbcl-help 2004-11-16 by John Morrison
@@ -100,48 +106,53 @@
 (define-alien-type enum.2 (enum nil (zero 0) (one 1) (two 2) (three 3)
                                     (four 4) (five 5) (six 6) (seven 7)
                                     (eight 8) (nine 9)))
-(with-alien ((integer-array (array int 3)))
-  (let ((enum-array (cast integer-array (array enum.2 3))))
-    (setf (deref enum-array 0) 'three
-          (deref enum-array 1) 'four)
-    (setf (deref integer-array 2) (+ (deref integer-array 0)
-                                     (deref integer-array 1)))
-    (assert (eql (deref enum-array 2) 'seven))))
-;; The code that is used for mapping from integers to symbols depends on the
-;; `density' of the set of used integers, so test with a sparse set as well.
+(with-test (:name (define-alien-type enum array cast))
+  (with-alien ((integer-array (array int 3)))
+    (let ((enum-array (cast integer-array (array enum.2 3))))
+      (setf (deref enum-array 0) 'three
+            (deref enum-array 1) 'four)
+      (setf (deref integer-array 2) (+ (deref integer-array 0)
+                                       (deref integer-array 1)))
+      (assert (eql (deref enum-array 2) 'seven)))))
+
+;; The code that is used for mapping from integers to symbols depends
+;; on the `density' of the set of used integers, so test with a sparse
+;; set as well.
 (define-alien-type enum.3 (enum nil (zero 0) (one 1) (k-one 1001) (k-two 1002)))
-(with-alien ((integer-array (array int 3)))
-  (let ((enum-array (cast integer-array (array enum.3 3))))
-    (setf (deref enum-array 0) 'one
-          (deref enum-array 1) 'k-one)
-    (setf (deref integer-array 2) (+ (deref integer-array 0)
-                                     (deref integer-array 1)))
-    (assert (eql (deref enum-array 2) 'k-two))))
+(with-test (:name (define-alien-type enum :sparse-integers))
+  (with-alien ((integer-array (array int 3)))
+    (let ((enum-array (cast integer-array (array enum.3 3))))
+      (setf (deref enum-array 0) 'one
+            (deref enum-array 1) 'k-one)
+      (setf (deref integer-array 2) (+ (deref integer-array 0)
+                                       (deref integer-array 1)))
+      (assert (eql (deref enum-array 2) 'k-two)))))
 
 ;; enums used to allow values to be used only once
 ;; C enums allow for multiple tags to point to the same value
 (define-alien-type enum.4
     (enum nil (:key1 1) (:key2 2) (:keytwo 2)))
-(with-alien ((enum-array (array enum.4 3)))
-  (setf (deref enum-array 0) :key1)
-  (setf (deref enum-array 1) :key2)
-  (setf (deref enum-array 2) :keytwo)
-  (assert (and (eql (deref enum-array 1) (deref enum-array 2))
-               (eql (deref enum-array 1) :key2))))
+(with-test (:name (define-alien-type enum :repeated-integers))
+  (with-alien ((enum-array (array enum.4 3)))
+    (setf (deref enum-array 0) :key1)
+    (setf (deref enum-array 1) :key2)
+    (setf (deref enum-array 2) :keytwo)
+    (assert (and (eql (deref enum-array 1) (deref enum-array 2))
+                 (eql (deref enum-array 1) :key2)))))
 
 ;;; As reported by Baughn on #lisp, ALIEN-FUNCALL loops forever when
 ;;; compiled with (DEBUG 3).
-(sb-kernel::values-specifier-type-cache-clear)
-(proclaim '(optimize (debug 3)))
-(let ((f (compile nil '(lambda (v)
-                        (sb-alien:alien-funcall (sb-alien:extern-alien "getenv"
-                                                 (function (c-string) c-string))
-                         v)))))
-  (assert (typep (funcall f "HOME") '(or string null))))
-
+(with-test (:name (alien-funcall debug 3))
+  (sb-kernel::values-specifier-type-cache-clear)
+  (checked-compile-and-assert ()
+      '(lambda (v)
+        (sb-alien:alien-funcall (sb-alien:extern-alien "getenv"
+                                 (function (c-string) c-string))
+         v))
+    (("HOME") '(or string null) :test (lambda (values expected)
+                                        (every #'typep values expected)))))
 
 ;;; CLH: Test for non-standard alignment in alien structs
-;;;
 (sb-alien:define-alien-type align-test-struct
     (sb-alien:union align-test-union
                     (s (sb-alien:struct nil
@@ -151,24 +162,25 @@
                                         (c3 sb-alien:unsigned-char :alignment 32)
                                         (c4 sb-alien:unsigned-char :alignment 8)))
                     (u (sb-alien:array sb-alien:unsigned-char 16))))
+(with-test (:name (define-alien-type struct :alignment))
+  (let ((a1 (sb-alien:make-alien align-test-struct)))
+    (declare (type (sb-alien:alien (* align-test-struct)) a1))
+    (setf (sb-alien:slot (sb-alien:slot a1 's) 's1) 1)
+    (setf (sb-alien:slot (sb-alien:slot a1 's) 'c1) 21)
+    (setf (sb-alien:slot (sb-alien:slot a1 's) 'c2) 41)
+    (setf (sb-alien:slot (sb-alien:slot a1 's) 'c3) 61)
+    (setf (sb-alien:slot (sb-alien:slot a1 's) 'c4) 81)
+    (assert (equal '(1 21 41 61 81)
+                   (list (sb-alien:deref (sb-alien:slot a1 'u) 0)
+                         (sb-alien:deref (sb-alien:slot a1 'u) 2)
+                         (sb-alien:deref (sb-alien:slot a1 'u) 4)
+                         (sb-alien:deref (sb-alien:slot a1 'u) 8)
+                         (sb-alien:deref (sb-alien:slot a1 'u) 9))))))
 
-(let ((a1 (sb-alien:make-alien align-test-struct)))
-  (declare (type (sb-alien:alien (* align-test-struct)) a1))
-  (setf (sb-alien:slot (sb-alien:slot a1 's) 's1) 1)
-  (setf (sb-alien:slot (sb-alien:slot a1 's) 'c1) 21)
-  (setf (sb-alien:slot (sb-alien:slot a1 's) 'c2) 41)
-  (setf (sb-alien:slot (sb-alien:slot a1 's) 'c3) 61)
-  (setf (sb-alien:slot (sb-alien:slot a1 's) 'c4) 81)
-  (assert (equal '(1 21 41 61 81)
-                 (list (sb-alien:deref (sb-alien:slot a1 'u) 0)
-                       (sb-alien:deref (sb-alien:slot a1 'u) 2)
-                       (sb-alien:deref (sb-alien:slot a1 'u) 4)
-                       (sb-alien:deref (sb-alien:slot a1 'u) 8)
-                       (sb-alien:deref (sb-alien:slot a1 'u) 9)))))
-
-(handler-bind ((compiler-note (lambda (c)
-                                (error "bad note! ~A" c))))
-  (funcall (compile nil '(lambda () (sb-alien:make-alien sb-alien:int)))))
+(with-test (:name (make-alien :no-note))
+  (checked-compile-and-assert (:allow-notes nil)
+      '(lambda () (sb-alien:make-alien sb-alien:int))
+    (() 'sb-alien:alien :test #'typep)))
 
 ;;; Test case for unwinding an alien (Win32) exception frame
 ;;;
@@ -207,11 +219,12 @@
            :ok)))))
 
 ;;; Unused local alien caused a compiler error
-(with-test (:name :unused-local-alien)
-  (let ((fun `(lambda ()
-                (sb-alien:with-alien ((alien1923 (array (sb-alien:unsigned 8) 72)))
-                  (values)))))
-    (assert (not (funcall (compile nil fun))))))
+(with-test (:name (sb-alien:with-alien :unused :no error))
+  (checked-compile-and-assert ()
+      `(lambda ()
+         (sb-alien:with-alien ((alien1923 (array (sb-alien:unsigned 8) 72)))
+           (values)))
+    (() (values))))
 
 ;;; Non-local exit from WITH-ALIEN caused alien stack to be leaked.
 (defvar *sap-int*)
@@ -223,15 +236,15 @@
           (setf *sap-int* sap-int)))
     (when x
       (return-from try-to-leak-alien-stack 'going))
-    (never)))
+    (locally (declare (muffle-conditions style-warning))
+      (never))))
 (with-test (:name :nlx-causes-alien-stack-leak
                   :fails-on :interpreter) ; should it work?
   (let ((*sap-int* nil))
     (loop repeat 1024
           do (try-to-leak-alien-stack t))))
 
-;;; bug 431
-(with-test (:name :alien-struct-redefinition
+(with-test (:name (define-alien-type struct :redefinition :bug-431)
                   :fails-on :interpreter)
   (eval '(progn
           (define-alien-type nil (struct mystruct (myshort short) (mychar char)))
@@ -258,7 +271,8 @@
 ;; non-linkage-table systems resolve such things immediately and
 ;; signal errors.
 #-(or win32 (not linkage-table))
-(sb-alien:define-alien-routine bug-316075 void (result char :out))
+(locally (declare (muffle-conditions style-warning))
+  (sb-alien:define-alien-routine bug-316075 void (result char :out)))
 (with-test (:name :bug-316075 :fails-on :win32
                   :broken-on '(not :linkage-table))
   #+win32 (error "fail")
@@ -268,9 +282,7 @@
   ;; by default, then the warning already happened above at DEFINE-ALIEN-ROUTINE
   ;; because when that got compiled, it warned, which inhibited further
   ;; warnings for the same foreign symbol.
-  (handler-bind (((and warning (not style-warning)) #'error))
-    (compile nil '(lambda () (multiple-value-list (bug-316075))))))
-
+  (checked-compile '(lambda () (multiple-value-list (bug-316075)))))
 
 ;;; Bug #316325: "return values of alien calls assumed truncated to
 ;;; correct width on x86"
@@ -316,15 +328,13 @@
 (with-test (:name :bug-654485)
   ;; DEBUG 2 used to prevent let-conversion of the open-coded ALIEN-FUNCALL body,
   ;; which in turn led the dreaded %SAP-ALIEN note.
-  (handler-case
-      (compile nil
-               `(lambda (program argv)
-                  (declare (optimize (debug 2)))
-                  (with-alien ((sys-execv1 (function int c-string (* c-string)) :extern
-                                           "execv"))
-                    (values (alien-funcall sys-execv1 program argv)))))
-    (compiler-note (n)
-      (error "bad note: ~A" n))))
+  (checked-compile
+   `(lambda (program argv)
+      (declare (optimize (debug 2)))
+      (with-alien ((sys-execv1 (function int c-string (* c-string)) :extern
+                               "execv"))
+        (values (alien-funcall sys-execv1 program argv))))
+   :allow-notes nil))
 
 (with-test (:name :bug-721087 :fails-on :win32)
   (assert (typep nil '(alien c-string)))
@@ -496,18 +506,15 @@
 (with-test (:name :note-local-alien-type)
   (let ((type (sb-alien::make-local-alien-info :type
                                                (sb-alien-internals:parse-alien-type 'c-string nil))))
-    (assert (eql (funcall
-                  (checked-compile
-                   `(lambda (x)
-                      (declare (optimize (debug 2)))
-                      (let ((alien (sb-alien-internals:make-local-alien ',type)))
-                        (sb-alien-internals:note-local-alien-type ',type alien)
-                        (flet ((x ()
-                                 (setf alien x)))
-                          (x))
-                        alien)))
-                  31)
-                 31))))
+    (checked-compile-and-assert ()
+        `(lambda (x)
+           (let ((alien (sb-alien-internals:make-local-alien ',type)))
+             (sb-alien-internals:note-local-alien-type ',type alien)
+             (flet ((x ()
+                      (setf alien x)))
+               (x))
+             alien))
+        ((31) 31))))
 
 (with-test (:name :memoize-coerce-to-interpreted-fun)
   (let* ((form1 '(lambda (x) x))
