@@ -2954,9 +2954,11 @@ bootstrapping.
 ;;; walker stuff was only used for implementing stuff like that; maybe
 ;;; it's not needed any more? Hunt down what it was used for and see.
 
-(defun extract-the (form)
+(defun extract-the (form &optional context)
   (cond ((and (consp form) (eq (car form) 'the))
-         (aver (proper-list-of-length-p form 3))
+         (unless (proper-list-of-length-p form 3)
+           (error "Invalid instance form ~S~@[ in ~S~@]"
+                  form context))
          (third form))
         (t
          form)))
@@ -2965,31 +2967,34 @@ bootstrapping.
   (let ((in (gensym)))
     `(let ((,in ,instance))
        (declare (ignorable ,in))
-       ,@(let ((instance (extract-the instance)))
-           (and (symbolp instance)
-                `((declare (%variable-rebinding ,in ,instance)))))
+       ,@(let ((instance (extract-the instance 'with-slots)))
+           (when (symbolp instance)
+             `((declare (%variable-rebinding ,in ,instance)))))
        ,in
-       (symbol-macrolet ,(mapcar (lambda (slot-entry)
-                                   (let ((var-name
-                                          (if (symbolp slot-entry)
-                                              slot-entry
-                                              (car slot-entry)))
-                                         (slot-name
-                                          (if (symbolp slot-entry)
-                                              slot-entry
-                                              (cadr slot-entry))))
-                                     `(,var-name
-                                       (slot-value ,in ',slot-name))))
-                                 slots)
-                        ,@body))))
+       (symbol-macrolet
+           ,(mapcar (lambda (slot-entry)
+                      (unless (typep slot-entry
+                                     '(or symbol
+                                          (cons symbol (cons symbol null))))
+                        (error "Malformed slot entry: ~s, should be ~
+                                either a symbol or (variable-name ~
+                                slot-name)"
+                               slot-entry))
+                      (destructuring-bind
+                            (var-name &optional (slot-name var-name))
+                          (ensure-list slot-entry)
+                        `(,var-name
+                          (slot-value ,in ',slot-name))))
+                    slots)
+         ,@body))))
 
 (defmacro with-accessors (slots instance &body body)
   (let ((in (gensym)))
     `(let ((,in ,instance))
        (declare (ignorable ,in))
-       ,@(let ((instance (extract-the instance)))
-           (and (symbolp instance)
-                `((declare (%variable-rebinding ,in ,instance)))))
+       ,@(let ((instance (extract-the instance 'with-accessors)))
+           (when (symbolp instance)
+             `((declare (%variable-rebinding ,in ,instance)))))
        ,in
        (symbol-macrolet
            ,(mapcar (lambda (slot-entry)
