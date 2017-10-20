@@ -2205,7 +2205,7 @@ update_page_write_prot(page_index_t page)
     sword_t num_words = page_bytes_used(page) / N_WORD_BYTES;
 
     /* Shouldn't be a free page. */
-    gc_assert(!page_free_p(page));
+    gc_dcheck(!page_free_p(page)); // Implied by the next assertion
     gc_assert(page_bytes_used(page) != 0);
 
     if (!ENABLE_PAGE_PROTECTION) return 0;
@@ -2383,11 +2383,9 @@ scavenge_generations(generation_index_t from, generation_index_t to)
 
                     /* Now scan the pages and write protect those that
                      * don't have pointers to younger generations. */
-                    if (ENABLE_PAGE_PROTECTION) {
-                        for (j = i; j <= last_page; j++) {
-                            num_wp += update_page_write_prot(j);
-                        }
-                    }
+                    for (j = i; j <= last_page; j++)
+                        num_wp += update_page_write_prot(j);
+
                     if ((gencgc_verbose > 1) && (num_wp != 0)) {
                         FSHOW((stderr,
                                "/write protected %d pages within generation %d\n",
