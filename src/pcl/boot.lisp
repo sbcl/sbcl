@@ -2963,46 +2963,51 @@ bootstrapping.
         (t
          form)))
 
-(defmacro with-slots (slots instance &body body)
-  (let ((in (gensym)))
-    `(let ((,in ,instance))
-       (declare (ignorable ,in))
-       ,@(let ((instance (extract-the instance 'with-slots)))
-           (when (symbolp instance)
-             `((declare (%variable-rebinding ,in ,instance)))))
-       ,in
-       (symbol-macrolet
-           ,(mapcar (lambda (slot-entry)
-                      (unless (typep slot-entry
-                                     '(or symbol
-                                          (cons symbol (cons symbol null))))
-                        (error "Malformed slot entry: ~s, should be ~
-                                either a symbol or (variable-name ~
-                                slot-name)"
-                               slot-entry))
-                      (destructuring-bind
-                            (var-name &optional (slot-name var-name))
-                          (ensure-list slot-entry)
-                        `(,var-name
-                          (slot-value ,in ',slot-name))))
-                    slots)
-         ,@body))))
+(flet ((maybe-rebinding (instance-var instance-form context)
+         (with-current-source-form (instance-form)
+           (let ((instance (extract-the instance-form context)))
+             (when (symbolp instance)
+               `((declare (%variable-rebinding ,instance-var ,instance))))))))
 
-(defmacro with-accessors (slots instance &body body)
-  (let ((in (gensym)))
-    `(let ((,in ,instance))
-       (declare (ignorable ,in))
-       ,@(let ((instance (extract-the instance 'with-accessors)))
-           (when (symbolp instance)
-             `((declare (%variable-rebinding ,in ,instance)))))
-       ,in
-       (symbol-macrolet
-           ,(mapcar (lambda (slot-entry)
-                      (unless (proper-list-of-length-p slot-entry 2)
-                        (error "Malformed slot entry: ~s, should be (variable-name accessor-name)"
-                               slot-entry))
-                      (let ((var-name (car slot-entry))
-                            (accessor-name (cadr slot-entry)))
-                        `(,var-name (,accessor-name ,in))))
-             slots)
-         ,@body))))
+  (defmacro with-slots (slots instance &body body)
+    (let ((in (gensym)))
+      `(let ((,in ,instance))
+         (declare (ignorable ,in))
+         ,@(maybe-rebinding in instance 'with-slots)
+         ,in
+         (symbol-macrolet
+             ,(mapcar (lambda (slot-entry)
+                        (with-current-source-form (slot-entry slots)
+                          (unless (typep slot-entry
+                                         '(or symbol
+                                           (cons symbol (cons symbol null))))
+                            (error "Malformed slot entry: ~s, should be ~
+                                  either a symbol or (variable-name ~
+                                  slot-name)"
+                                   slot-entry))
+                          (destructuring-bind
+                                (var-name &optional (slot-name var-name))
+                              (ensure-list slot-entry)
+                            `(,var-name
+                              (slot-value ,in ',slot-name)))))
+                      slots)
+           ,@body))))
+
+  (defmacro with-accessors (slots instance &body body)
+    (let ((in (gensym)))
+      `(let ((,in ,instance))
+         (declare (ignorable ,in))
+         ,@(maybe-rebinding in instance 'with-accessors)
+         ,in
+         (symbol-macrolet
+             ,(mapcar (lambda (slot-entry)
+                        (with-current-source-form (slot-entry slots)
+                          (unless (proper-list-of-length-p slot-entry 2)
+                            (error "Malformed slot entry: ~s, should ~
+                                  be (variable-name accessor-name)"
+                                   slot-entry))
+                          (destructuring-bind (var-name accessor-name)
+                              slot-entry
+                            `(,var-name (,accessor-name ,in)))))
+                      slots)
+           ,@body)))))
