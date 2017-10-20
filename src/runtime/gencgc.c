@@ -1666,7 +1666,7 @@ conservative_root_p(lispobj addr, page_index_t addr_page_index)
 {
     /* quick check 1: Address is quite likely to have been invalid. */
     struct page* page = &page_table[addr_page_index];
-    if ((addr & (GENCGC_CARD_BYTES - 1)) > page_bytes_used(addr_page_index) ||
+    if ((addr & (GENCGC_CARD_BYTES - 1)) >= page_bytes_used(addr_page_index) ||
 #if SEGREGATED_CODE
         (!is_lisp_pointer(addr) && page->allocated != CODE_PAGE_FLAG) ||
 #endif
