@@ -918,8 +918,9 @@
   ;;    Unused result
   (kind (missing-arg)
         :type (member :normal :environment :debug-environment
-                      :save :save-once :specified-save :load :constant
-                      :component :alias :unused))
+                      :save :save-once  :load :constant
+                      :component :alias :unused
+                      #!-fp-and-pc-standard-save :specified-save))
   ;; the primitive-type for this TN's value. Null in restricted or
   ;; wired TNs.
   (primitive-type nil :type (or primitive-type null))

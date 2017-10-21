@@ -187,6 +187,7 @@
   tn)
 
 ;;; Specify that SAVE be used as the save location for TN. TN is returned.
+#!-fp-and-pc-standard-save
 (defun specify-save-tn (tn save)
   (declare (type tn tn save))
   (aver (eq (tn-kind save) :normal))
