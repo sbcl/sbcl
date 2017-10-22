@@ -24,8 +24,7 @@
 
 ;;;; conflict determination
 
-;;; Return true if the element at the specified offset, or in any of
-;;; the [size-1] subsequent offsets, in SB has a conflict with TN:
+;;; Return true if TN has a conflict in SC at the specified offset.
 ;;; -- If a component-live TN (:COMPONENT kind), then iterate over
 ;;;    all the blocks. If the element at OFFSET is used anywhere in
 ;;;    any of the component's blocks (always-live /= 0), then there
@@ -41,12 +40,14 @@
 ;;;    it is local to.
 ;;;
 ;;; If there is a conflict, returns the first such conflicting offset.
-(defun offset-conflicts-in-sb (tn sb offset &key (size 1))
-  (declare (type tn tn) (type finite-sb sb) (type index offset size))
-  (let ((confs (tn-global-conflicts tn))
-        (kind (tn-kind tn))
-        (sb-conflicts (finite-sb-conflicts sb))
-        (sb-always-live (finite-sb-always-live sb)))
+(declaim (ftype (sfunction (tn sc index) (or null index)) conflicts-in-sc))
+(defun conflicts-in-sc (tn sc offset)
+  (let* ((confs (tn-global-conflicts tn))
+         (kind (tn-kind tn))
+         (sb (sc-sb sc))
+         (sb-conflicts (finite-sb-conflicts sb))
+         (sb-always-live (finite-sb-always-live sb))
+         (size (sc-element-size sc)))
     (macrolet ((do-offsets ((var) &body body)
                  `(loop for ,var upfrom offset
                         repeat size
@@ -69,13 +70,13 @@
                  (do-offsets (offset-iter)
                      (let ((loc-live (svref sb-always-live offset-iter)))
                        (when (/= (sbit loc-live num) 0)
-                         (return-from offset-conflicts-in-sb offset-iter))))
+                         (return-from conflicts-in-sc offset-iter))))
                  (do-offsets (offset-iter)
                      (let ((loc-confs (svref sb-conflicts offset-iter)))
                        (when (/= (sbit (svref loc-confs num)
                                        (global-conflicts-number conf))
                                  0)
-                         (return-from offset-conflicts-in-sb offset-iter))))))))
+                         (return-from conflicts-in-sc offset-iter))))))))
         (t
          (do-offsets (offset-iter)
              (and (/= (sbit (svref (svref sb-conflicts offset-iter)
@@ -83,13 +84,6 @@
                             (tn-local-number tn))
                       0)
                   offset-iter)))))))
-
-;;; Return true if TN has a conflict in SC at the specified offset.
-(declaim (ftype (sfunction (tn sc index) (or null index)) conflicts-in-sc))
-(defun conflicts-in-sc (tn sc offset)
-  (declare (type tn tn) (type sc sc) (type index offset))
-  (offset-conflicts-in-sb tn (sc-sb sc) offset
-                          :size (sc-element-size sc)))
 
 ;;; Add TN's conflicts into the conflicts for the location at OFFSET
 ;;; in SC. We iterate over each location in TN, adding to the
