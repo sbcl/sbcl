@@ -941,7 +941,7 @@ care."
   (let ((check-bound-tran (make-ctran))
         (index-ctran (make-ctran))
         (index-lvar (make-lvar)))
-    ;; CHECK-BOUND transform ensure that INDEX won't be evaluated twice
+    ;; CHECK-BOUND transform ensures that INDEX won't be evaluated twice
     (ir1-convert start check-bound-tran nil `(%check-bound ,array ,bound ,index))
     (ir1-convert check-bound-tran index-ctran index-lvar index)
     (let* ((check-bound-combination (ctran-use check-bound-tran))
