@@ -1,6 +1,9 @@
-(in-package :cl-user)
+(cl:defpackage #:sb-sprof-test
+  (:use #:cl #:sb-sprof)
+  (:export #:run-tests))
 
-(require :sb-sprof)
+(cl:in-package #:sb-sprof-test)
+
 ;#+sb-fasteval (setq sb-ext:*evaluator-mode* :compile)
 
 ;;; silly examples
@@ -13,7 +16,7 @@
       (test-0 n (1+ depth)))))
 
 (defun test ()
-  (sb-sprof:with-profiling (:reset t :max-samples 1000 :report :graph)
+  (with-profiling (:reset t :max-samples 1000 :report :graph)
     (test-0 7)))
 
 (defun consalot ()
@@ -25,27 +28,28 @@
 (defun consing-test ()
   ;; 0.0001 chosen so that it breaks rather reliably when sprof does not
   ;; respect pseudo atomic.
-  (sb-sprof:with-profiling (:reset t
-                            ;; setitimer with small intervals
-                            ;; is broken on FreeBSD 10.0
-                            ;; And ARM targets are not fast in
-                            ;; general, causing the profiling signal
-                            ;; to be constantly delivered without
-                            ;; making any progress.
-                            #-(or freebsd arm) :sample-interval
-                            #-(or freebsd arm) 0.0001
-                            #+arm :sample-interval #+arm 0.1
-                            :report :graph :loop nil)
+  (with-profiling (:reset t
+                          ;; setitimer with small intervals
+                          ;; is broken on FreeBSD 10.0
+                          ;; And ARM targets are not fast in
+                          ;; general, causing the profiling signal
+                          ;; to be constantly delivered without
+                          ;; making any progress.
+                          #-(or freebsd arm) :sample-interval
+                          #-(or freebsd arm) 0.0001
+                          #+arm :sample-interval #+arm 0.1
+                          :report :graph :loop nil)
     (let ((target (+ (get-universal-time) 15)))
       (princ #\.)
       (force-output)
       (loop while (< (get-universal-time) target)
-            do (consalot)))))
+         do (consalot)))))
 
-#-(or win32 darwin)                    ;not yet
-(test)
-#-(or win32 darwin)                    ;not yet
-(consing-test)
+(defun run-tests ()
+  #-(or win32 darwin)                   ;not yet
+  (test)
+  #-(or win32 darwin)                   ;not yet
+  (consing-test))
 
 ;; For debugging purposes, print output for visual inspection to see if
 ;; the allocation sequence gets hit in the right places (i.e. not at all

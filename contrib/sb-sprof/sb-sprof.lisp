@@ -1423,5 +1423,3 @@ functions during statistical profiling."
                     (sb-c:%more-arg-values more-context
                                            0
                                            more-count)))))))))
-
-(provide 'sb-sprof)
