@@ -34,7 +34,7 @@ deprecated features or internal symbols.
 
 During the end-of-month freeze, core developers should avoid
 committing anything that breaks a previously working contrib module.
-Contrib maintainers should checkout the frozen SBCL version and 
+Contrib maintainers should checkout the frozen SBCL version and
 submit patches where their contribs are broken.
 
 Contrib modules that still don't work at release time will not be
@@ -51,12 +51,12 @@ all:     # do whatever compilation is necessary
 test:    # run the package tests
 install: # copy all necessary files into $(BUILD_ROOT)$(INSTALL_DIR)
 
-If the contrib package involves more than one file, you are encouraged
-to use ASDF to build it and load it.  A version of asdf is bundled as
-an SBCL contrib, which knows to look in $SBCL_HOME/systems/ for asd
-files - your install target should create an appropriate symlink there
-to the installed location of the system file.  Look in
-sb-bsd-sockets/Makefile for an example of an asdf-using contrib.
+You are encouraged to use ASDF to build it and load it.  A version of
+ASDF is bundled as an SBCL contrib, which knows to look in
+$SBCL_HOME/systems/ for asd files - your install target should create
+an appropriate symlink there to the installed location of the system
+file.  Look in sb-bsd-sockets/Makefile for an example of an ASDF-using
+contrib.
 
 $(BUILD_ROOT)$(INSTALL_DIR) will have been created by the system
 before your install target is called.  You do not need to make it
