@@ -180,7 +180,7 @@
   (:args (array)
          (bound)
          (index :scs (any-reg)))
-  (:arg-types * * fixnum)
+  (:arg-types * * (:or positive-fixnum fixnum))
   (:variant-cost 4))
 
 ;;;; accessors/setters
