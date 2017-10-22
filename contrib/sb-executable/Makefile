@@ -1,5 +1,2 @@
-MODULE=sb-executable
-include ../vanilla-module.mk
-
-test::
-	true
+SYSTEM=sb-executable
+include ../asdf-module.mk
