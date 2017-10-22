@@ -1070,7 +1070,7 @@
                                  (ignore-errors (return-from b6
                                                   (if (= c 8) b 82674))))))
                       (%f2))))
-                 :allow-style-warnings 'sb-int:type-style-warning)
+                 :allow-warnings 'sb-int:type-warning)
                 22992834060 -5833)
                82674)))
 (with-test (:name (compile :node/lvar :derive-type :misc.5))
