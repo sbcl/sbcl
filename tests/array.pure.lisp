@@ -529,3 +529,9 @@
     (assert-error (funcall fun 'abc))
     (assert (not (array-has-fill-pointer-p (funcall fun nil))))
     (assert (= (length (funcall fun nil)) 3))))
+
+(with-test (:name :check-bound-fixnum-check)
+  (assert-error
+   (funcall (checked-compile `(lambda (x) (aref #100(a) x)))
+            #\Nul)
+   type-error))

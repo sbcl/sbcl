@@ -174,14 +174,6 @@
   (:policy :fast)
   (:variant nil)
   (:variant-cost 4))
-
-(define-vop (check-bound/fixnum check-bound)
-  (:variant nil)
-  (:args (array)
-         (bound)
-         (index :scs (any-reg)))
-  (:arg-types * * (:or positive-fixnum fixnum))
-  (:variant-cost 4))
 
 ;;;; accessors/setters
 

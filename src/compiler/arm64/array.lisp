@@ -108,15 +108,6 @@
   (:policy :fast)
   (:variant nil)
   (:variant-cost 4))
-
-(define-vop (check-bound/fixnum check-bound)
-  (:variant nil)
-  (:args (array)
-         (bound)
-         (index :scs (any-reg)))
-  (:arg-types * * (:or fixnum positive-fixnum))
-  (:variant-cost 4))
-
 ;;;; Accessors/Setters
 
 ;;; Variants built on top of word-index-ref, etc.  I.e. those vectors whos
