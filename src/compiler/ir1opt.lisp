@@ -1304,7 +1304,8 @@
                                             `(,name)
                                             `(funcall #',name))
                                         ,@dummies))
-                                  (leaf-source-name leaf)))))))))
+                                  (leaf-source-name leaf)
+                                  nil))))))))
   (values))
 
 ;;;; known function optimization
@@ -1475,7 +1476,7 @@
 ;;; possible to do this starting from debug names as well as source
 ;;; names, but as of sbcl-0.7.1.5, there was no need for this
 ;;; generality, since source names are always known to our callers.)
-(defun transform-call (call res source-name)
+(defun transform-call (call res source-name &optional (reoptimize-combination t))
   (declare (type combination call) (list res))
   (aver (and (legal-fun-name-p source-name)
              (not (eql source-name '.anonymous.))))
@@ -1510,7 +1511,12 @@
                             (lambda-return (main-entry new-fun))))
               (derive-node-type node type))))
 
-        (locall-analyze-component *current-component*))))
+        (locall-analyze-component *current-component*)
+        (when reoptimize-combination
+          ;; This is mainly to call PROPAGATE-LET-ARGS so that the
+          ;; newly converted code gets to better types sooner.
+          (setf (node-reoptimize call) nil)
+          (ir1-optimize-combination call)))))
   (values))
 
 (defun constant-fold-arg-p (name)
