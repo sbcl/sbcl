@@ -10,5 +10,6 @@
   :depends-on ("sb-sprof")
   :components ((:file "test"))
   :perform (test-op (o c)
+             #-(or win32 darwin) ;not yet
              (or (funcall (find-symbol "RUN-TESTS" "SB-SPROF-TEST"))
                  (error "test-op failed"))))
