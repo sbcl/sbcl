@@ -2,7 +2,8 @@
 changes relative to sbcl-1.4.0:
   * optimization: faster foreign callbacks.
   * enhancement: complex arrays can be stack allocated.
-  * enhancement: PROCESS-KILL now exists on win32.
+  * enhancement: PROCESS-KILL now exists on win32 and PROCESS-PID actually
+    returns the PID.
   * optimization: the register allocation method used by the compiler when
     optimizing for speed is now faster for functions with large bodies.
   * bug fix: SB-INTROSPECT:ALLOCATION-INFORMATION works on big-endian CPUs
