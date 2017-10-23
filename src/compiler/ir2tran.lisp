@@ -1898,7 +1898,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
 
 ;;; %CLEANUP-POINT doesn't do anything except prevent the body from
 ;;; being entirely deleted.
-(defoptimizer (%cleanup-point ir2-convert) (() node block) node block)
+(defoptimizer (%cleanup-point ir2-convert) ((&rest args) node block) args node block)
 
 ;;; This function invalidates a lexical exit on exiting from the
 ;;; dynamic extent. This is done by storing 0 into the indirect value

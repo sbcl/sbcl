@@ -1147,6 +1147,28 @@ the thrown values will be returned."
          :catch (%catch (%escape-fun ,exit-block) ,tag)
          ,@body)))))
 
+;;; Since NSP is restored on unwind we only need to protect against
+;;; local transfers of control, basically the same as special
+;;; bindings.
+;;; Needs to be wrapped in a LET (let ((nsp (current-nsp))) (restoring-nsp nsp body))
+;;; The LET is needed because the cleanup can be emitted multiple
+;;; times, but there's no reference to NSP before EMIT-CLEANUPS.
+;;; Passing NSP to the dummy %CLEANUP-FUN keeps it alive.
+#!-c-stack-is-control-stack
+(def-ir1-translator restoring-nsp
+    ((nsp &body body) start next result)
+  (let ((cleanup (make-cleanup :kind :restore-nsp))
+        (nsp-ctran (make-ctran))
+        (cleanup-ctran (make-ctran)))
+    (ir1-convert start nsp-ctran nil nsp)
+    (setf (cleanup-mess-up cleanup) (ctran-use nsp-ctran))
+    (let ((*lexenv* (make-lexenv :cleanup cleanup)))
+      ;; KLUDGE: reference NSP twice so that the LET doesn't get
+      ;; deleted before EMIT-CLEANUPS
+      (ir1-convert nsp-ctran cleanup-ctran nil `(%cleanup-point ,nsp ,nsp))
+      (ir1-convert-progn-body cleanup-ctran next result
+                              body))))
+
 (def-ir1-translator unwind-protect
     ((protected &body cleanup) start next result)
   "UNWIND-PROTECT protected cleanup*

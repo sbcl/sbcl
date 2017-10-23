@@ -48,6 +48,15 @@
   (:generator 1
     (move bsp-tn res)))
 
+(define-vop (current-nsp)
+  (:results (res :scs (any-reg descriptor-reg)))
+  (:generator 1
+    (move res nsp-tn)))
+
+(define-vop (set-nsp)
+  (:args (nsp :scs (any-reg descriptor-reg)))
+  (:generator 1
+    (move nsp-tn nsp)))
 
 ;;;; Unwind block hackery:
 

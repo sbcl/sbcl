@@ -1695,7 +1695,7 @@
   (movable flushable always-translatable)
   :derive-type #'result-type-first-arg)
 
-(defknown %cleanup-point () t)
+(defknown %cleanup-point (&rest t) t)
 (defknown %special-bind (t t) t)
 (defknown %special-unbind (&rest symbol) t)
 (defknown %listify-rest-args (t index) list (flushable))

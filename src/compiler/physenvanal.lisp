@@ -515,7 +515,9 @@
                (code `(%lexical-exit-breakup ',nlx))))
             (:dynamic-extent
              (when (cleanup-info cleanup)
-               (code `(%cleanup-point))))))))
+               (code `(%cleanup-point))))
+            (:restore-nsp
+             (code `(%primitive set-nsp ,(ref-leaf node))))))))
     (flet ((coalesce-unbinds (code)
              code
               #!+(and sb-thread unbind-n-vop)

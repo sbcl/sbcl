@@ -116,19 +116,14 @@ This is SETFable."
   ;;        The alien is allocated on the heap, and has infinite extent. The alien
   ;;        is allocated at load time, so the same piece of memory is used each time
   ;;        this form executes.
-  (/noshow "entering WITH-ALIEN" bindings)
-  (let (#!+c-stack-is-control-stack
-        bind-alien-stack-pointer)
+  (let (bind-alien-stack-pointer)
     (with-auxiliary-alien-types env
       (dolist (binding (reverse bindings))
-        (/noshow binding)
         (destructuring-bind
             (symbol type &optional opt1 (opt2 nil opt2p))
             binding
-          (/noshow symbol type opt1 opt2)
           (let* ((alien-type (parse-alien-type type env))
                  (datap (not (alien-fun-type-p alien-type))))
-            (/noshow alien-type)
             (multiple-value-bind (allocation initial-value)
                 (if opt2p
                     (values opt1 opt2)
@@ -139,7 +134,6 @@ This is SETFable."
                        (values opt1 nil))
                       (t
                        (values :local opt1))))
-              (/noshow allocation initial-value)
               (setf body
                     (ecase allocation
                       #+nil
@@ -155,14 +149,12 @@ This is SETFable."
                                    `((setq ,symbol ,initial-value)))
                                ,@body)))))
                       (:extern
-                       (/noshow0 ":EXTERN case")
                        `((symbol-macrolet
                              ((,symbol
                                 (%alien-value
                                  (foreign-symbol-sap ,initial-value ,datap) 0 ,alien-type)))
                            ,@body)))
                       (:local
-                       (/noshow0 ":LOCAL case")
                        (let* ((var (sb!xc:gensym "VAR"))
                               (initval (if initial-value (sb!xc:gensym "INITVAL")))
                               (info (make-local-alien-info :type alien-type))
@@ -177,35 +169,23 @@ This is SETFable."
                                     `((let ((,initval ,initial-value))
                                         ,@inner-body))
                                     inner-body)))
-                         (/noshow var initval info)
-                         #!+c-stack-is-control-stack
-                         (progn (setf bind-alien-stack-pointer t)
-                                `((let ((,var (make-local-alien ',info)))
-                                    ,@body-forms)))
-                         ;; FIXME: This version is less efficient then it needs to be, since
-                         ;; it could just save and restore the number-stack pointer once,
-                         ;; instead of doing multiple decrements if there are multiple bindings.
-                         #!-c-stack-is-control-stack
+                         (setf bind-alien-stack-pointer t)
                          `((let ((,var (make-local-alien ',info)))
-                             (multiple-value-prog1
-                                 (progn ,@body-forms)
-                               ;; No need for unwind protect here, since
-                               ;; allocation involves modifying NSP, and
-                               ;; NSP is saved and restored during NLX.
-                               ;; And in non-transformed case it
-                               ;; performs finalization.
-                               (dispose-local-alien ',info ,var))))))))))))
-      (/noshow "revised" body)
+                             ,@body-forms))))))))))
       (verify-local-auxiliaries-okay)
-      (/noshow0 "back from VERIFY-LOCAL-AUXILIARIES-OK, returning")
       `(symbol-macrolet ((&auxiliary-type-definitions&
                            ,(append *new-auxiliary-types*
                                     (auxiliary-type-definitions env))))
          ,@(cond
-             #!+c-stack-is-control-stack
              (bind-alien-stack-pointer
+              #!+c-stack-is-control-stack
               `((let ((sb!vm::*alien-stack-pointer* sb!vm::*alien-stack-pointer*))
-                  ,@body)))
+                  ,@body))
+              #!-c-stack-is-control-stack
+              (let ((nsp (gensym "NSP")))
+                `((let ((,nsp (%primitive sb!c:current-nsp)))
+                   (sb!c::restoring-nsp ,nsp
+                                        ,@body)))))
              (t
               body))))))
 

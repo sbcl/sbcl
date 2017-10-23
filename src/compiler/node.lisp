@@ -538,7 +538,8 @@
   ;; the kind of thing that has to be cleaned up
   (kind (missing-arg)
         :type (member :special-bind :catch :unwind-protect
-                      :block :tagbody :dynamic-extent))
+                      :block :tagbody :dynamic-extent
+                      #!-c-stack-is-control-stack :restore-nsp))
   ;; the node that messes things up. This is the last node in the
   ;; non-messed-up environment. Null only temporarily. This could be
   ;; deleted due to unreachability.

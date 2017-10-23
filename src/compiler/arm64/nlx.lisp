@@ -59,6 +59,16 @@
   (:results (res :scs (any-reg descriptor-reg)))
   (:generator 1
     (load-binding-stack-pointer res)))
+
+(define-vop (current-nsp)
+  (:results (res :scs (any-reg descriptor-reg)))
+  (:generator 1
+    (inst mov-sp res nsp-tn)))
+
+(define-vop (set-nsp)
+  (:args (nsp :scs (any-reg descriptor-reg)))
+  (:generator 1
+     (inst mov-sp nsp-tn nsp)))
 
 ;;;; Unwind block hackery:
 
