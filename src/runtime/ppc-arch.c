@@ -419,7 +419,7 @@ handle_allocation_trap(os_context_t * context)
     fprintf(stderr, "Alloc %d to %s\n", size, lisp_register_names[target]);
 #endif
 
-#if INLINE_ALLOC_DEBUG
+#ifdef INLINE_ALLOC_DEBUG
     if ((((unsigned long)boxed_region.end_addr + size) / PAGE_SIZE) ==
         (((unsigned long)boxed_region.end_addr) / PAGE_SIZE)) {
       fprintf(stderr,"*** possibly bogus trap allocation of %d bytes at %p\n",
