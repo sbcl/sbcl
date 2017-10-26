@@ -53,6 +53,13 @@ run_sbcl <<EOF >$tmpfilename
   (test1 wp (weak-pointer-value wp) :tls)
   (test1 wp (weak-pointer-value wp) :bindings)
   nil)
+
+(defun f0 ()
+  (let* ((c (cons 1 2))
+         (wp (make-weak-pointer c)))
+    (sb-ext::gc-and-search-roots wp :static)
+    c))
+(f0)
 EOF
 
 # In a typical test run the outputs would resemble as follows.
@@ -78,8 +85,9 @@ thread=`run_sbcl --eval \
  '(princ #+sb-thread "\"main thread\":TLS:"
          #-sb-thread "COMMON-LISP-USER::")' --quit`
 
-win1=`awk '/C stack.+TEST1.+cons.+FOO.+cons.+vector.+cons/{print "win\n"}' $tmpfilename`
-win2=`awk '/'"${thread}"'\*FRED/{print "win\n"}' $tmpfilename`
-win3=`awk '/bindings:\*FRED/{print "win\n"}' $tmpfilename`
+t1=`awk 'NR==1 && /C stack.+TEST1.+cons.+FOO.+cons.+vector.+cons/{print "PASS\n"}' $tmpfilename`
+t2=`awk 'NR==2 && /'"${thread}"'\*FRED/{print "PASS\n"}' $tmpfilename`
+t3=`awk 'NR==3 && /bindings:\*FRED/{print "PASS\n"}' $tmpfilename`
+t4=`awk 'NR==4 && /C stack.+->0x[^0]/{print "PASS\n"}' $tmpfilename`
 
-test z$win1 = zwin -a z$win2 = zwin -a z$win3 = zwin && exit $EXIT_TEST_WIN
+test z$t1 = zPASS -a z$t2 = zPASS -a z$t3 = zPASS -a z$t4 = zPASS && exit $EXIT_TEST_WIN

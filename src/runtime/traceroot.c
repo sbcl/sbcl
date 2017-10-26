@@ -287,6 +287,8 @@ static struct thread* deduce_thread(void (*context_scanner)(),
     return 0;
 }
 
+/* KNOWN BUG: stack reference to pinned large object or immobile object
+ * won't be found in pins hashtable */
 static lispobj examine_stacks(struct hopscotch_table* targets,
                               void (*context_scanner)(),
                               int n_pins, lispobj* pins,
@@ -593,7 +595,7 @@ static void trace1(lispobj object,
                 native_pointer(anchor->object), anchor->wordindex);
     }
 
-    target = 0;
+    target = thread_ref;
     while (top_layer) {
         struct node next = *anchor;
         lispobj ptr = next.object;
