@@ -292,7 +292,8 @@
     (null
      (sc-number-or-lose 'null))
     ((or (integer #.sb!xc:most-negative-fixnum #.sb!xc:most-positive-fixnum)
-         system-area-pointer character)
+         #-sb-xc-host system-area-pointer ; no object can be a SAP in the host
+         character)
      (sc-number-or-lose 'immediate))
     (symbol
      (if (static-symbol-p value)
