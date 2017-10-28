@@ -502,7 +502,7 @@
                        (basic-combination-args node))))
           (ecase (cleanup-kind cleanup)
             (:special-bind
-             (code `(%special-unbind 1)))
+             (code `(%special-unbind ',(leaf-source-name (lvar-value (car args))))))
             (:catch
              (code `(%catch-breakup)))
             (:unwind-protect
@@ -518,16 +518,17 @@
                (code `(%cleanup-point))))))))
     (flet ((coalesce-unbinds (code)
              code
-             #!+(and sb-thread unbind-n-vop)
-             (loop with cleanup
-                   while code
-                   do (setf cleanup (pop code))
-                   collect (if (eq (car cleanup) '%special-unbind)
-                               `(%special-unbind
-                                 ,(1+ (loop while (eq (caar code) '%special-unbind)
-                                            do (pop code)
-                                            count t)))
-                               cleanup))))
+              #!+(and sb-thread unbind-n-vop)
+              (loop with cleanup
+                    while code
+                    do (setf cleanup (pop code))
+                    collect (if (eq (car cleanup) '%special-unbind)
+                                `(%special-unbind
+                                  ,(cadr cleanup)
+                                  ,@(loop while (eq (caar code) '%special-unbind)
+                                          collect (cadar code)
+                                          do (pop code)))
+                                cleanup))))
      (when (code)
        (aver (not (node-tail-p (block-last block1))))
        (insert-cleanup-code

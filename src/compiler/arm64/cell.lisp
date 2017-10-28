@@ -318,12 +318,12 @@
       (inst str value (@ thread-tn tls-index))))
 
   (define-vop (unbind)
-    (:info n)
+    (:info symbols)
     (:temporary (:sc descriptor-reg) value)
     (:temporary (:sc any-reg) tls-index bsp)
     (:generator 0
       (load-binding-stack-pointer bsp)
-      (loop repeat n
+      (loop for symbol in symbols
             do
             (inst ldp value tls-index (@ bsp (* (- binding-value-slot binding-size)
                                                 n-word-bytes)))
