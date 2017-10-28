@@ -2051,15 +2051,17 @@
                  (node-to-be-deleted-p (lvar-uses fun)))
       (ecase (basic-combination-kind node)
         (:local
-         (when (lvar-reoptimize fun)
-           (setf (lvar-reoptimize fun) nil)
-           (maybe-let-convert (combination-lambda node)))
-         (cond ((neq (functional-kind (combination-lambda node)) :mv-let)
-                (loop for arg in (basic-combination-args node)
-                      do
-                      (setf (lvar-reoptimize arg) nil)))
-               ((convert-mv-bind-to-let node))
-               ((ir1-optimize-mv-bind node))))
+         (let ((lambda (combination-lambda node)))
+           (when (lvar-reoptimize fun)
+             (setf (lvar-reoptimize fun) nil)
+             (maybe-let-convert lambda))
+           (cond ((neq (functional-kind lambda) :mv-let)
+                  (loop for arg in (basic-combination-args node)
+                        do
+                        (setf (lvar-reoptimize arg) nil)))
+                 ((convert-mv-bind-to-let node))
+                 (t
+                  (propagate-let-args node lambda)))))
         (:full
          (let* ((fun-changed (lvar-reoptimize fun)))
            (loop for arg in (basic-combination-args node)
@@ -2082,17 +2084,6 @@
         (:error))))
 
   (values))
-
-;;; Propagate derived type info from the values lvar to the vars.
-(defun ir1-optimize-mv-bind (node)
-  (declare (type mv-combination node))
-  (propagate-let-args node (combination-lambda node))
-  ;; While PROPAGATE-LET-ARGS does end up calling DELETE-LET for
-  ;; non-mv combinations (when DELETE-LAMBDA-VAR clears all args)
-  ;; it's a bit trickier to do for mv combinations, especially since a
-  ;; lot of old code does not expect mv-combination-args to ever
-  ;; contain NIL, just let FLUSH-DEAD-CODE deal with it
-  (setf (block-flush-p (node-block node)) t))
 
 (defun ir1-optimize-mv-call (node)
   (let ((fun (basic-combination-fun node))
