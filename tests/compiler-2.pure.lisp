@@ -437,3 +437,15 @@
                 (list 3 lv1))
          (setf lv1 10)))
     (() 10)))
+
+(with-test (:name :transform-on-a-nil-arg)
+  (checked-compile-and-assert ()
+   `(lambda ()
+      (block nil
+        (logtest
+         (multiple-value-prog1
+             (unwind-protect (return 32))
+           (catch 'tag (return 33)))
+         1)
+        34))
+   (() 32)))

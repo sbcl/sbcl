@@ -1102,7 +1102,7 @@
            (setf (lambda-return call-fun) return)
            (setf (return-lambda return) call-fun)
            (setf (lambda-return fun) nil))))
-  (%delete-lvar-use call) ; LET call does not have value semantics
+  (delete-lvar-use call) ; LET call does not have value semantics
   (values))
 
 ;;; Actually do LET conversion. We call subfunctions to do most of the
