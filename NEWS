@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.4.0:
+changes in sbcl-1.4.1 relative to sbcl-1.4.0:
   * optimization: faster foreign callbacks.
   * enhancement: complex arrays can be stack allocated.
   * enhancement: PROCESS-KILL now exists on win32 and PROCESS-PID actually
