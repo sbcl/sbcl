@@ -420,8 +420,8 @@ profiling, and :TIME for wallclock profiling.")
            (let ((name (sap-foreign-symbol pc)))
              (if name
                  (values (format nil "foreign function ~a" name)
-                         (sap-int pc))
-                 (values nil (sap-int pc)))))
+                         (sap-int pc) :foreign)
+                 (values nil (sap-int pc) :foreign))))
           (t
            (let* ((code-header-len (* (sb-kernel:code-header-words code)
                                       sb-vm:n-word-bytes))
@@ -442,14 +442,14 @@ profiling, and :TIME for wallclock profiling.")
                   (df (sb-di::debug-fun-from-pc code pc-offset)))
              #+immobile-code (declare (ignorable di))
              (cond ((typep df 'sb-di::bogus-debug-fun)
-                    (values code (sap-int pc)))
+                    (values code (sap-int pc) nil))
                    (df
                     ;; The code component might be moved by the GC. Store
                     ;; a PC offset, and reconstruct the data in
                     ;; SAMPLE-PC-FROM-PC-OR-OFFSET.
-                    (values df pc-offset))
+                    (values df pc-offset nil))
                    (t
-                    (values nil 0))))))))
+                    (values nil 0 nil))))))))
 
 (defun ensure-samples-vector (samples)
   (let ((vector (samples-vector samples))
@@ -468,7 +468,7 @@ profiling, and :TIME for wallclock profiling.")
 (defun record (samples pc)
   (declare (type system-area-pointer pc)
            (muffle-conditions compiler-note))
-  (multiple-value-bind (info pc-or-offset)
+  (multiple-value-bind (info pc-or-offset foreign)
       (debug-info pc)
     (let ((vector (ensure-samples-vector samples))
           (index (samples-index samples)))
@@ -485,8 +485,9 @@ profiling, and :TIME for wallclock profiling.")
       ;; For each sample, store the debug-info and the PC/offset into
       ;; adjacent cells.
       (setf (aref vector index) info
-            (aref vector (1+ index)) pc-or-offset)))
-  (incf (samples-index samples) 2))
+            (aref vector (1+ index)) pc-or-offset))
+    (incf (samples-index samples) 2)
+    foreign))
 
 (defun record-trace-start (samples)
   ;; Mark the start of the trace.
@@ -632,13 +633,12 @@ profiling, and :TIME for wallclock profiling.")
             (locally (declare (optimize (inhibit-warnings 2)))
               (incf (samples-trace-count samples))
               (record-trace-start samples)
-              (let* ((pc-ptr (sb-vm:context-pc scp))
-                     (fp (sb-vm::context-register scp #.sb-vm::cfp-offset))
-                     (ra (sap-ref-word
-                          (int-sap fp)
-                          (* sb-vm::lra-save-offset sb-vm::n-word-bytes))))
-                (record samples pc-ptr)
-                (record samples (int-sap ra))))))))))
+              (let ((pc-ptr (sb-vm:context-pc scp))
+                    (fp (sb-vm::context-register scp #.sb-vm::cfp-offset)))
+                (unless (eq (record samples pc-ptr) :foreign)
+                  (record samples (sap-ref-sap
+                                   (int-sap fp)
+                                   (* sb-vm::lra-save-offset sb-vm::n-word-bytes))))))))))))
 
 ;;; Return the start address of CODE.
 (defun code-start (code)
