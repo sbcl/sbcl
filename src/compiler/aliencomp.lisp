@@ -51,8 +51,6 @@
   ())
 (defknown %local-alien-addr (local-alien-info t) (alien (* t))
   (flushable movable))
-(defknown dispose-local-alien (local-alien-info t) t
-  ())
 
 (defknown %cast (alien-value alien-type) alien
   (flushable movable))
@@ -426,19 +424,6 @@
     (if (local-alien-info-force-to-memory-p info)
         `(%sap-alien var ',(make-alien-pointer-type :to alien-type))
         (error "This shouldn't happen."))))
-
-;; DISPOSE-LOCAL-ALIEN can't happens on x86[-64].
-;; A transform of it is just misdirection.
-#!-(or x86 x86-64)
-(deftransform dispose-local-alien ((info var) * * :important t)
-  (alien-info-constant-or-abort info)
-  (let* ((info (lvar-value info))
-         (alien-type (local-alien-info-type info)))
-    (if (local-alien-info-force-to-memory-p info)
-        `(%primitive dealloc-number-stack-space
-                          ,(ceiling (alien-type-bits alien-type)
-                                    sb!vm:n-byte-bits))
-      nil)))
 
 ;;;; %CAST
 
