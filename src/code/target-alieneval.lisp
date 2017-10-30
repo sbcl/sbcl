@@ -178,14 +178,13 @@ This is SETFable."
                                     (auxiliary-type-definitions env))))
          ,@(cond
              (bind-alien-stack-pointer
-              #!+c-stack-is-control-stack
-              `((let ((sb!vm::*alien-stack-pointer* sb!vm::*alien-stack-pointer*))
-                  ,@body))
-              #!-c-stack-is-control-stack
-              (let ((nsp (gensym "NSP")))
-                `((let ((,nsp (%primitive sb!c:current-nsp)))
-                   (sb!c::restoring-nsp ,nsp
-                                        ,@body)))))
+              ;; The LET IR1-translator will actually turn this into
+              ;; RESTORING-NSP on #-c-stack-is-control-stack to avoid
+              ;; expanding into non-standard special forms.
+              ;; And the LET has to look exactly like this, not LET*
+              ;; and no other bindings.
+              `((let ((sb!c:*alien-stack-pointer* sb!c:*alien-stack-pointer*))
+                  ,@body)))
              (t
               body))))))
 

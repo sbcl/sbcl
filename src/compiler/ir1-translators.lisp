@@ -675,6 +675,14 @@ VALUE forms. The variables are bound in parallel after all of the VALUES forms
 have been evaluated."
   (cond ((null bindings)
          (ir1-translate-locally body start next result))
+        ;; This is just to avoid leaking non-standard special forms
+        ;; into macroexpanded code
+        #!-c-stack-is-control-stack
+        ((and (equal bindings '((*alien-stack-pointer* *alien-stack-pointer*))))
+         (ir1-convert start next result
+                      (let ((nsp (gensym "NSP")))
+                        `(let ((,nsp (%primitive current-nsp)))
+                           (restoring-nsp ,nsp ,@body)))))
         ((listp bindings)
          (multiple-value-bind (forms decls) (parse-body body nil)
            (multiple-value-bind (vars values) (extract-let-vars bindings 'let)
