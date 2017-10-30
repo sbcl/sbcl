@@ -250,14 +250,22 @@ unblock_signals(sigset_t *what, sigset_t *where, sigset_t *old)
     }
 }
 
+// Stringify sigset into the supplied result buffer.
 static void
-print_sigset(sigset_t *sigset)
+sigset_tostring(sigset_t *sigset, char* result, int result_length)
 {
-  int i;
-  for(i = 1; i < NSIG; i++) {
-    if (sigismember(sigset, i))
-      fprintf(stderr, "Signal %d masked\n", i);
-  }
+    int i;
+    int len = 0;
+    for(i = 1; i < NSIG; i++)
+        if (sigismember(sigset, i)) {
+            // ensure room for (generously) 3 digits + comma + null, or give up
+            if (len > result_length - 5) {
+                strcpy(result, "too many to list");
+                return;
+            }
+            len += sprintf(result+len, "%s%d", len?",":"", i);
+        }
+    result[len] = 0;
 }
 
 /* Return 1 is all signals is sigset2 are masked in sigset, return 0
@@ -283,8 +291,9 @@ all_signals_blocked_p(sigset_t *sigset, sigset_t *sigset2,
         }
     }
     if (has_blocked && has_unblocked) {
-        print_sigset(sigset);
-        lose("some %s signals blocked, some unblocked\n", name);
+        char buf[3*64]; // assuming worst case 64 signals present in sigset
+        sigset_tostring(sigset, buf, sizeof buf);
+        lose("%s signals partially blocked: {%s}\n", name);
     }
     if (has_blocked)
         return 1;
