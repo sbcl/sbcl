@@ -20,7 +20,6 @@ tar -cf $b-binary.tar \
     $b/doc/sbcl.1 \
     $b/pubring.pgp \
     $b/contrib/asdf-module.mk \
-    $b/contrib/vanilla-module.mk \
     `for contrib in $(cd $b/contrib && echo *); do
          src_dir=$b/contrib/$contrib
          cache_dir=$b/obj/asdf-cache/$contrib
