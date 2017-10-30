@@ -16,11 +16,9 @@
 /*
  * For a review of garbage collection techniques (e.g. generational
  * GC) and terminology (e.g. "scavenging") see Paul R. Wilson,
- * "Uniprocessor Garbage Collection Techniques". As of 20000618, this
- * had been accepted for _ACM Computing Surveys_ and was available
- * as a PostScript preprint through
- *   <http://www.cs.utexas.edu/users/oops/papers.html>
- * as
+ * "Uniprocessor Garbage Collection Techniques" available at
+ *   <https://www.cs.rice.edu/~javaplt/311/Readings/wilson92uniprocessor.pdf>
+ * or
  *   <ftp://ftp.cs.utexas.edu/pub/garbage/bigsurv.ps>.
  */
 
