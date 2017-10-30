@@ -1825,6 +1825,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
             (emit-constant name))))))
 
 (defoptimizer (%special-unbind ir2-convert) ((&rest symbols) node block)
+  (declare (ignorable symbols))
   (vop unbind node block #!+(and sb-thread unbind-n-vop)
                          (mapcar #'lvar-value symbols)))
 
