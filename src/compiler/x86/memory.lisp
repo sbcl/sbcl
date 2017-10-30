@@ -42,24 +42,6 @@
     (inst xadd (make-ea-for-object-slot object offset lowtag)
           value)))
 
-;;; SLOT-REF and SLOT-SET are used to define VOPs like CLOSURE-REF,
-;;; where the offset is constant at compile time, but varies for
-;;; different uses.
-(define-vop (slot-ref)
-  (:args (object :scs (descriptor-reg)))
-  (:results (value :scs (descriptor-reg any-reg)))
-  (:variant-vars base lowtag)
-  (:info offset)
-  (:generator 4
-    (loadw value object (+ base offset) lowtag)))
-(define-vop (slot-set)
-  (:args (object :scs (descriptor-reg))
-         (value :scs (descriptor-reg any-reg immediate)))
-  (:variant-vars base lowtag)
-  (:info offset)
-  (:generator 4
-     (storew (encode-value-if-immediate value) object (+ base offset) lowtag)))
-
 (define-vop (slot-set-conditional)
   (:args (object :scs (descriptor-reg) :to :eval)
          (old-value :scs (descriptor-reg any-reg) :target eax)

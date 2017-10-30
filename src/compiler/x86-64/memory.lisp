@@ -157,32 +157,6 @@
   (def-atomic %atomic-dec-car cell-xsub cons-car-slot)
   (def-atomic %atomic-dec-cdr cell-xsub cons-cdr-slot))
 
-;;; SLOT-REF and SLOT-SET are used to define VOPs like CLOSURE-REF,
-;;; where the offset is constant at compile time, but varies for
-;;; different uses.
-(define-vop (slot-ref)
-  (:args (object :scs (descriptor-reg)))
-  (:results (value :scs (descriptor-reg any-reg)))
-  (:variant-vars base lowtag)
-  (:info offset)
-  (:generator 4
-    (loadw value object (+ base offset) lowtag)))
-(define-vop (slot-set)
-  (:args (object :scs (descriptor-reg))
-         (value :scs (descriptor-reg any-reg immediate)))
-  (:temporary (:sc unsigned-reg) temp)
-  (:variant-vars base lowtag)
-  (:info offset)
-  (:generator 4
-     (if (sc-is value immediate)
-         (move-immediate (make-ea :qword :base object
-                                         :disp (- (* (+ base offset) n-word-bytes)
-                                                  lowtag))
-                         (encode-value-if-immediate value)
-                         temp)
-         ;; Else, value not immediate.
-         (storew value object (+ base offset) lowtag))))
-
 (define-vop (slot-set-conditional)
   (:args (object :scs (descriptor-reg) :to :eval)
          (old-value :scs (descriptor-reg any-reg) :target eax)
