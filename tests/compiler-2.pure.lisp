@@ -449,3 +449,14 @@
          1)
         34))
    (() 32)))
+
+(with-test (:name :nesteted-dx-deleted-uses)
+  (checked-compile-and-assert ()
+    `(lambda (a)
+       (block b2
+         (let* ((v1 (make-array nil :initial-element
+                                (let ((a a))
+                                  (return-from b2 a)))))
+           (declare (dynamic-extent v1))
+           (aref v1))))
+    ((342) 342)))

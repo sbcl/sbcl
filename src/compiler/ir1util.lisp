@@ -472,6 +472,88 @@
                        (ir1-attributep attr unsafely-flushable)))
           t)))))
 
+;;;; BLOCK UTILS
+
+(declaim (inline block-to-be-deleted-p))
+(defun block-to-be-deleted-p (block)
+  (or (block-delete-p block)
+      (eq (functional-kind (block-home-lambda block)) :deleted)))
+
+;;; Checks whether NODE is in a block to be deleted
+(declaim (inline node-to-be-deleted-p))
+(defun node-to-be-deleted-p (node)
+  (block-to-be-deleted-p (node-block node)))
+
+(declaim (ftype (sfunction (clambda) cblock) lambda-block))
+(defun lambda-block (clambda)
+  (node-block (lambda-bind clambda)))
+(declaim (ftype (sfunction (clambda) component) lambda-component))
+(defun lambda-component (clambda)
+  (block-component (lambda-block clambda)))
+
+(declaim (ftype (sfunction (cblock) node) block-start-node))
+(defun block-start-node (block)
+  (ctran-next (block-start block)))
+
+;;; Return the enclosing cleanup for environment of the first or last
+;;; node in BLOCK.
+(defun block-start-cleanup (block)
+  (node-enclosing-cleanup (block-start-node block)))
+(defun block-end-cleanup (block)
+  (node-enclosing-cleanup (block-last block)))
+
+;;; Return the lexenv of the last node in BLOCK.
+(defun block-end-lexenv (block)
+  (node-lexenv (block-last block)))
+
+;;; Return the non-LET LAMBDA that holds BLOCK's code, or NIL
+;;; if there is none.
+;;;
+;;; There can legitimately be no home lambda in dead code early in the
+;;; IR1 conversion process, e.g. when IR1-converting the SETQ form in
+;;;   (BLOCK B (RETURN-FROM B) (SETQ X 3))
+;;; where the block is just a placeholder during parsing and doesn't
+;;; actually correspond to code which will be written anywhere.
+(declaim (ftype (sfunction (cblock) (or clambda null)) block-home-lambda-or-null))
+(defun block-home-lambda-or-null (block)
+  (if (node-p (block-last block))
+      ;; This is the old CMU CL way of doing it.
+      (node-home-lambda (block-last block))
+      ;; Now that SBCL uses this operation more aggressively than CMU
+      ;; CL did, the old CMU CL way of doing it can fail in two ways.
+      ;;   1. It can fail in a few cases even when a meaningful home
+      ;;      lambda exists, e.g. in IR1-CONVERT of one of the legs of
+      ;;      an IF.
+      ;;   2. It can fail when converting a form which is born orphaned
+      ;;      so that it never had a meaningful home lambda, e.g. a form
+      ;;      which follows a RETURN-FROM or GO form.
+      (let ((pred-list (block-pred block)))
+        ;; To deal with case 1, we reason that
+        ;; previous-in-target-execution-order blocks should be in the
+        ;; same lambda, and that they seem in practice to be
+        ;; previous-in-compilation-order blocks too, so we look back
+        ;; to find one which is sufficiently initialized to tell us
+        ;; what the home lambda is.
+        (if pred-list
+            ;; We could get fancy about this, flooding through the
+            ;; graph of all the previous blocks, but in practice it
+            ;; seems to work just to grab the first previous block and
+            ;; use it.
+            (node-home-lambda (block-last (first pred-list)))
+            ;; In case 2, we end up with an empty PRED-LIST and
+            ;; have to punt: There's no home lambda.
+            nil))))
+
+;;; Return the non-LET LAMBDA that holds BLOCK's code.
+(declaim (ftype (sfunction (cblock) clambda) block-home-lambda))
+(defun block-home-lambda (block)
+  (block-home-lambda-or-null block))
+
+;;; Return the IR1 physical environment for BLOCK.
+(declaim (ftype (sfunction (cblock) physenv) block-physenv))
+(defun block-physenv (block)
+  (lambda-physenv (block-home-lambda block)))
+
 ;;;; DYNAMIC-EXTENT related
 
 (defun lambda-var-original-name (leaf)
@@ -643,6 +725,8 @@
     ;; Uses of mupltiple-use LVARs already end their blocks, so we just need
     ;; to process uses of single-use LVARs.
     (when (node-p uses)
+      (when (node-to-be-deleted-p uses)
+        (return-from handle-nested-dynamic-extent-lvars))
       (node-ends-block uses))
     ;; If this LVAR's USE is good for DX, it is either a CAST, or it
     ;; must be a regular combination whose arguments are potentially DX as well.
@@ -670,88 +754,6 @@
                       nconc (recurse use))
                 (when (use-good-for-dx-p uses dx recheck-component)
                   (recurse uses)))))))
-
-;;;;; BLOCK UTILS
-
-(declaim (inline block-to-be-deleted-p))
-(defun block-to-be-deleted-p (block)
-  (or (block-delete-p block)
-      (eq (functional-kind (block-home-lambda block)) :deleted)))
-
-;;; Checks whether NODE is in a block to be deleted
-(declaim (inline node-to-be-deleted-p))
-(defun node-to-be-deleted-p (node)
-  (block-to-be-deleted-p (node-block node)))
-
-(declaim (ftype (sfunction (clambda) cblock) lambda-block))
-(defun lambda-block (clambda)
-  (node-block (lambda-bind clambda)))
-(declaim (ftype (sfunction (clambda) component) lambda-component))
-(defun lambda-component (clambda)
-  (block-component (lambda-block clambda)))
-
-(declaim (ftype (sfunction (cblock) node) block-start-node))
-(defun block-start-node (block)
-  (ctran-next (block-start block)))
-
-;;; Return the enclosing cleanup for environment of the first or last
-;;; node in BLOCK.
-(defun block-start-cleanup (block)
-  (node-enclosing-cleanup (block-start-node block)))
-(defun block-end-cleanup (block)
-  (node-enclosing-cleanup (block-last block)))
-
-;;; Return the lexenv of the last node in BLOCK.
-(defun block-end-lexenv (block)
-  (node-lexenv (block-last block)))
-
-;;; Return the non-LET LAMBDA that holds BLOCK's code, or NIL
-;;; if there is none.
-;;;
-;;; There can legitimately be no home lambda in dead code early in the
-;;; IR1 conversion process, e.g. when IR1-converting the SETQ form in
-;;;   (BLOCK B (RETURN-FROM B) (SETQ X 3))
-;;; where the block is just a placeholder during parsing and doesn't
-;;; actually correspond to code which will be written anywhere.
-(declaim (ftype (sfunction (cblock) (or clambda null)) block-home-lambda-or-null))
-(defun block-home-lambda-or-null (block)
-  (if (node-p (block-last block))
-      ;; This is the old CMU CL way of doing it.
-      (node-home-lambda (block-last block))
-      ;; Now that SBCL uses this operation more aggressively than CMU
-      ;; CL did, the old CMU CL way of doing it can fail in two ways.
-      ;;   1. It can fail in a few cases even when a meaningful home
-      ;;      lambda exists, e.g. in IR1-CONVERT of one of the legs of
-      ;;      an IF.
-      ;;   2. It can fail when converting a form which is born orphaned
-      ;;      so that it never had a meaningful home lambda, e.g. a form
-      ;;      which follows a RETURN-FROM or GO form.
-      (let ((pred-list (block-pred block)))
-        ;; To deal with case 1, we reason that
-        ;; previous-in-target-execution-order blocks should be in the
-        ;; same lambda, and that they seem in practice to be
-        ;; previous-in-compilation-order blocks too, so we look back
-        ;; to find one which is sufficiently initialized to tell us
-        ;; what the home lambda is.
-        (if pred-list
-            ;; We could get fancy about this, flooding through the
-            ;; graph of all the previous blocks, but in practice it
-            ;; seems to work just to grab the first previous block and
-            ;; use it.
-            (node-home-lambda (block-last (first pred-list)))
-            ;; In case 2, we end up with an empty PRED-LIST and
-            ;; have to punt: There's no home lambda.
-            nil))))
-
-;;; Return the non-LET LAMBDA that holds BLOCK's code.
-(declaim (ftype (sfunction (cblock) clambda) block-home-lambda))
-(defun block-home-lambda (block)
-  (block-home-lambda-or-null block))
-
-;;; Return the IR1 physical environment for BLOCK.
-(declaim (ftype (sfunction (cblock) physenv) block-physenv))
-(defun block-physenv (block)
-  (lambda-physenv (block-home-lambda block)))
 
 ;;; Return the Top Level Form number of PATH, i.e. the ordinal number
 ;;; of its original source's top level form in its compilation unit.
