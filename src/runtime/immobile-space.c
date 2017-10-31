@@ -409,7 +409,7 @@ enliven_immobile_obj(lispobj *ptr, int rescan) // a native pointer
         if (pointerish) {
             if (page_index >= FIRST_VARYOBJ_PAGE)
                 varyobj_page_touched_bits[(page_index-FIRST_VARYOBJ_PAGE)/32]
-                    |= 1 << (page_index & 31);
+                    |= 1U << (page_index & 31);
             else
                 SET_WP_FLAG(page_index, WRITE_PROTECT_CLEARED);
         }

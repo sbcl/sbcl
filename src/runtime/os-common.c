@@ -12,6 +12,9 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
+#ifdef MEMORY_SANITIZER
+#include <sanitizer/msan_interface.h>
+#endif
 
 #include "sbcl.h"
 #include "globals.h"
@@ -158,6 +161,21 @@ os_dlsym_default(char *name)
 }
 #endif
 
+#ifdef MEMORY_SANITIZER
+/* Unless the Lisp compiler annotates every (SETF SAP-REF-n) to update
+ * shadow memory indicating non-poison state byte-for-byte,
+ * we need to unpoison all malloc() results,
+ * otherwise the memory can't be read by sanitized code.
+ */
+static void* malloc_unpoisoned(size_t size)
+{
+    void* result = malloc(size);
+    if (result)
+        __msan_unpoison(result, size);
+    return result;
+}
+#endif
+
 void os_link_runtime()
 {
     extern void write_protect_immobile_space();
@@ -179,7 +197,12 @@ void os_link_runtime()
         datap = lowtag_of(item) == LIST_POINTER_LOWTAG;
         symbol_name = datap ? CONS(item)->car : item;
         namechars = (void*)(intptr_t)(VECTOR(symbol_name)->data);
-        result = os_dlsym_default(namechars);
+#ifdef MEMORY_SANITIZER
+        if (!strcmp(namechars,"malloc"))
+            result = malloc_unpoisoned;
+        else
+#endif
+            result = os_dlsym_default(namechars);
         odxprint(runtime_link, "linking %s => %p", namechars, result);
 
         if (link_target == validated_end) {

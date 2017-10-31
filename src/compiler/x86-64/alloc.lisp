@@ -150,6 +150,26 @@
         ;; It would also be good to skip zero-fill of specialized vectors
         ;; perhaps in a policy-dependent way. At worst you'd see random
         ;; bits, and CLHS says consequences are undefined.
+        (when sb!c::*msan-compatible-stack-unpoison*
+          ;; Unpoison all DX vectors regardless of widetag.
+          ;; Mark the header and length as valid, not just the payload.
+          #!+linux ; shadow space differs by OS
+          (progn
+            ;; from 'llvm/projects/compiler-rt/lib/msan/msan.h':
+            ;;  "#define MEM_TO_SHADOW(mem) (((uptr)(mem)) ^ 0x500000000000ULL)"
+            (inst mov rax #x500000000000)
+            (inst lea rdi (make-ea :qword :base result
+                                   :disp (- other-pointer-lowtag)))
+            (inst xor rdi rax) ; compute shadow address
+            (zeroize rax)
+            (cond ((sc-is words immediate)
+                   (inst mov rcx (tn-value words)))
+                  (t
+                   (move rcx words)
+                   (inst shr rcx n-fixnum-tag-bits)))
+            (inst add rcx sb!vm:vector-data-offset)
+            (inst rep)
+            (inst stos rax)))
         (let ((data-addr
                 (make-ea :qword :base result
                                 :disp (- (* vector-data-offset n-word-bytes)

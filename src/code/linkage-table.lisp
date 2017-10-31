@@ -69,10 +69,10 @@
 (defun update-linkage-table ()
   (dohash ((key table-address) *linkage-info* :locked t)
     (let* ((datap (listp key))
-           (name (if datap (car key) key))
-           (real-address
-            (ensure-dynamic-foreign-symbol-address name datap)))
-      (aver (and table-address real-address))
-      (write-linkage-table-entry table-address
-                                 real-address
-                                 datap))))
+           (name (if datap (car key) key)))
+      ;; Absent a fix for the issue noted above at "Should figure out ...",
+      ;; never ever re-touch malloc or free if already linked.
+      (unless (or #!+sb-dynamic-core (member name '("malloc" "free") :test 'string=))
+        (let ((real-address (ensure-dynamic-foreign-symbol-address name datap)))
+          (aver (and table-address real-address))
+          (write-linkage-table-entry table-address real-address datap))))))

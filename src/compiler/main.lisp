@@ -1701,6 +1701,14 @@ necessary, since type inference may take arbitrarily long to converge.")
         (*macro-policy* *macro-policy*)
         (*compiler-coverage-metadata* (cons (make-hash-table :test 'equal)
                                             (make-hash-table :test 'equal)))
+        ;; Whether to emit msan unpoisoning code depends on the runtime
+        ;; value of the feature, not "#+msan", because we can use the target
+        ;; compiler to compile code for itself which isn't sanitized,
+        ;; *or* code for another image which is sanitized.
+        ;; And we can also cross-compile assuming msan.
+        (*msan-compatible-stack-unpoison*
+         (member :msan #+sb-xc-host sb-cold::*shebang-features*
+                       #-sb-xc-host *features*))
         (*handled-conditions* *handled-conditions*)
         (*disabled-package-locks* *disabled-package-locks*)
         (*lexenv* (make-null-lexenv))
