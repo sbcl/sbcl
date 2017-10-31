@@ -697,7 +697,7 @@
 ;;; union of the types.
 ;;;
 ;;; For now this only handles blocks consisting of
-;;; BASIC-COMBINATION, REF and CAST
+;;; BASIC-COMBINATION, REF, CAST, CSET
 (defun cblocks-equivalent-p (block1 block2)
   (declare (type cblock block1 block2))
   (and (equal (block-succ block1) (block-succ block2))
@@ -731,10 +731,11 @@
                           (cast
                            (when (cast-type-check node)
                              (push node result)))
-                          (basic-combination
+                          ((or basic-combination
+                               cset)
                            (push node result))
                           (t
-                           ;; Could also handle more stuff
+                           ;; Could handle more
                            (return-from cblocks-equivalent-p)))
                         (setf last nil))
                       result))
@@ -754,6 +755,11 @@
                              (cast-type-check cast2 ))
                          (eq-lvar-p (cast-value cast1)
                                     (cast-value cast2))))
+                  (eq-set-p (set1 set2)
+                    (eq (eq (set-var set1)
+                            (set-var set2))
+                        (eq-lvar-p (set-value set1)
+                                   (set-value set2))))
                   (eq-combination-p (call1 call2)
                     (and (eq-lvar-p (basic-combination-fun call1)
                                     (basic-combination-fun call2))
@@ -774,7 +780,10 @@
                                 (eq-combination-p node1 node2))
                                ((and (cast-p node1)
                                      (cast-p node2))
-                                (eq-cast-p node1 node2)))
+                                (eq-cast-p node1 node2))
+                               ((and (set-p node1)
+                                     (set-p node2))
+                                (eq-set-p node1 node2)))
                          (note-disjointed-types node1 node2)))
                   (eq-lvar-p (lvar1 lvar2)
                     (if (and lvar1 lvar2)
