@@ -255,8 +255,6 @@
                    (prev (node-prev dest) :exit-if-null)
                    (block (ctran-block prev))
                    (component (block-component block)))
-          (when (typep dest 'cif)
-            (setf (block-test-modified block) t))
           (setf (block-reoptimize block) t)
           (reoptimize-component component :maybe))))
     (do-uses (node lvar)
@@ -314,8 +312,8 @@
 ;;; This is similar to DERIVE-NODE-TYPE, but asserts that it is an
 ;;; error for LVAR's value not to be TYPEP to TYPE. We implement it
 ;;; splitting off DEST a new CAST node; old LVAR will deliver values
-;;; to CAST. If we improve the assertion, we set TYPE-CHECK and
-;;; TYPE-ASSERTED to guarantee that the new assertion will be checked.
+;;; to CAST. If we improve the assertion, we set TYPE-CHECK to
+;;; guarantee that the new assertion will be checked.
 (defun assert-lvar-type (lvar type policy &optional context)
   (declare (type lvar lvar) (type ctype type))
   (unless (values-subtypep (lvar-derived-type lvar) type)
@@ -346,9 +344,7 @@
       (reoptimize-lvar lvar)
       (when (return-p next)
         (node-ends-block cast))
-      (setf (block-attributep (block-flags (node-block cast))
-                              type-check type-asserted)
-            t)
+      (setf (block-type-check (node-block cast)) t)
       cast)))
 
 (defun assert-function-designator-lvar-type (lvar type arg-count caller)
@@ -540,8 +536,7 @@
 
   (setf (block-flags block1)
         (attributes-union (block-flags block1)
-                          (block-flags block2)
-                          (block-attributes type-asserted test-modified)))
+                          (block-flags block2)))
 
   (let ((next (block-next block2))
         (prev (block-prev block2)))

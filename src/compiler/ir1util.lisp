@@ -424,9 +424,7 @@
       (reoptimize-lvar lvar)
       (when (return-p next)
         (node-ends-block cast))
-      (setf (block-attributep (block-flags (node-block cast))
-                              type-check type-asserted)
-            t)
+      (setf (block-type-check (node-block cast)) t)
       cast)))
 
 ;;;; miscellaneous shorthand functions
@@ -981,10 +979,7 @@
     (aver (not (memq block2 succ1)))
     (cons block2 succ1)))
 
-;;; This is like LINK-BLOCKS, but we separate BLOCK1 and BLOCK2. If
-;;; this leaves a successor with a single predecessor that ends in an
-;;; IF, then set BLOCK-TEST-MODIFIED so that any test constraint will
-;;; now be able to be propagated to the successor.
+;;; This is like LINK-BLOCKS, but we separate BLOCK1 and BLOCK2.
 (defun unlink-blocks (block1 block2)
   (declare (type cblock block1 block2))
   (let ((succ1 (block-succ block1)))
@@ -996,19 +991,13 @@
              (setf (cdr prev) (cdr succ)))
           (aver succ))))
 
-  (let ((new-pred (delq block1 (block-pred block2))))
-    (setf (block-pred block2) new-pred)
-    (when (singleton-p new-pred)
-      (let ((pred-block (first new-pred)))
-        (when (if-p (block-last pred-block))
-          (setf (block-test-modified pred-block) t)))))
+  (setf (block-pred block2)
+        (delq block1 (block-pred block2)))
   (values))
 
 ;;; Swing the succ/pred link between BLOCK and OLD to be between BLOCK
 ;;; and NEW. If BLOCK ends in an IF, then we have to fix up the
-;;; consequent/alternative blocks to point to NEW. We also set
-;;; BLOCK-TEST-MODIFIED so that any test constraint will be applied to
-;;; the new successor.
+;;; consequent/alternative blocks to point to NEW.
 (defun change-block-successor (block old new)
   (declare (type cblock new old block))
   (unlink-blocks block old)
@@ -1017,7 +1006,6 @@
     (setf (component-reanalyze comp) t)
     (typecase last
       (cif
-       (setf (block-test-modified block) t)
        (let* ((succ-left (block-succ block))
               (new (if (and (eq new (component-tail comp))
                             succ-left)
@@ -1146,10 +1134,7 @@
 
         (do ((ctran start (node-next (ctran-next ctran))))
             ((not ctran))
-          (setf (ctran-block ctran) new-block))
-
-        (setf (block-type-asserted block) t)
-        (setf (block-test-modified block) t))))
+          (setf (ctran-block ctran) new-block)))))
   (values))
 
 ;;;; deleting stuff
@@ -1455,7 +1440,7 @@
          (block (ctran-block prev)))
     (reoptimize-component (block-component block) t)
     (setf (block-attributep (block-flags block)
-                            flush-p type-asserted type-check)
+                            flush-p type-check)
           t))
   (setf (node-lvar node) nil))
 
@@ -1718,10 +1703,6 @@
          (block (ctran-block prev))
          (prev-kind (ctran-kind prev))
          (last (block-last block)))
-
-    (setf (block-type-asserted block) t)
-    (setf (block-test-modified block) t)
-
     (cond ((or (eq prev-kind :inside-block)
                (and (eq prev-kind :block-start)
                     (not (eq node last))))

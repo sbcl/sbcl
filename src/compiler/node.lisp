@@ -214,14 +214,8 @@
 ;;;    set, since they may:
 ;;;     - be in the process of being deleted, or
 ;;;     - have no successors.
-;;; -- TYPE-ASSERTED, TEST-MODIFIED
-;;;    These flags are used to indicate that something in this block
-;;;    might be of interest to constraint propagation. TYPE-ASSERTED
-;;;    is set when an lvar type assertion is strengthened.
-;;;    TEST-MODIFIED is set whenever the test for the ending IF has
-;;;    changed (may be true when there is no IF.)
 (!def-boolean-attribute block
-  reoptimize flush-p type-check delete-p type-asserted test-modified)
+  reoptimize flush-p type-check delete-p)
 
 (macrolet ((defattr (block-slot)
              `(defmacro ,block-slot (block)
@@ -231,9 +225,7 @@
   (defattr block-reoptimize)
   (defattr block-flush-p)
   (defattr block-type-check)
-  (defattr block-delete-p)
-  (defattr block-type-asserted)
-  (defattr block-test-modified))
+  (defattr block-delete-p))
 
 (def!struct (cloop (:conc-name loop-)
                    (:predicate loop-p)
@@ -311,8 +303,7 @@
   (next nil :type (or null cblock))
   (prev nil :type (or null cblock))
   ;; This block's attributes: see above.
-  (flags (block-attributes reoptimize flush-p type-check type-asserted
-                           test-modified)
+  (flags (block-attributes reoptimize flush-p type-check)
          :type attributes)
   ;; in constraint propagation: list of LAMBDA-VARs killed in this block
   ;; in copy propagation: list of killed TNs
