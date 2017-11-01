@@ -106,10 +106,7 @@
 ;; and fix it if so.
 
 (defun call-with-load-bindings (function stream)
-           (let* (;; Bindings required by ANSI.
-                  (*readtable* *readtable*)
-                  (*package* (sane-package))
-                  ;; FIXME: we should probably document the circumstances
+           (let* (;; FIXME: we should probably document the circumstances
                   ;; where *LOAD-PATHNAME* and *LOAD-TRUENAME* aren't
                   ;; pathnames during LOAD.  ANSI makes no exceptions here.
                   (*load-pathname* (handler-case (pathname stream)
@@ -122,8 +119,7 @@
                                      (handler-case (truename stream)
                                        (file-error () nil))))
                   ;; Bindings used internally.
-                  (*load-depth* (1+ *load-depth*))
-                  )
+                  (*load-depth* (1+ *load-depth*)))
              (funcall function)))
 
 (defun load (pathspec &key (verbose *load-verbose*) (print *load-print*)
@@ -139,15 +135,17 @@
                     "Can't LOAD a directory: ~s."
                     :format-arguments (list (pathname stream))))
            (dx-flet ((thunk ()
-                       (let (
-                  ;; KLUDGE: I can't find in the ANSI spec where it says
-                  ;; that DECLAIM/PROCLAIM of optimization policy should
-                  ;; have file scope. CMU CL did this, and it seems
-                  ;; reasonable, but it might not be right; after all,
-                  ;; things like (PROCLAIM '(TYPE ..)) don't have file
-                  ;; scope, and I can't find anything under PROCLAIM or
-                  ;; COMPILE-FILE or LOAD or OPTIMIZE which justifies this
-                  ;; behavior. Hmm. -- WHN 2001-04-06
+                       (let ( ;; Bindings required by ANSI.
+                             (*readtable* *readtable*)
+                             (*package* (sane-package))
+                             ;; KLUDGE: I can't find in the ANSI spec where it says
+                             ;; that DECLAIM/PROCLAIM of optimization policy should
+                             ;; have file scope. CMU CL did this, and it seems
+                             ;; reasonable, but it might not be right; after all,
+                             ;; things like (PROCLAIM '(TYPE ..)) don't have file
+                             ;; scope, and I can't find anything under PROCLAIM or
+                             ;; COMPILE-FILE or LOAD or OPTIMIZE which justifies this
+                             ;; behavior. Hmm. -- WHN 2001-04-06
                              (sb!c::*policy* sb!c::*policy*))
                          (if faslp
                              (load-as-fasl stream verbose print)
