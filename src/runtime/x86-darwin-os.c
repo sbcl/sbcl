@@ -475,6 +475,15 @@ catch_exception_raise(mach_port_t exception_port,
         /* Trap call */
         handler = sigtrap_handler;
         break;
+    case EXC_BREAKPOINT:
+        if (single_stepping) {
+            signal = SIGTRAP;
+            /* Clear TF or the signal emulation wrapper won't proceed
+               with single stepping enabled. */
+            thread_state.eflags &= ~0x100;
+            handler = sigtrap_handler;
+            break;
+        }
     default:
         ret = KERN_INVALID_RIGHT;
     }

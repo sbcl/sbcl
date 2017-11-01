@@ -74,4 +74,8 @@ swap_lispobjs(volatile lispobj *dest, lispobj value)
 
 extern unsigned int avx_supported;
 
+/* When single stepping, single_stepping holds the original instruction
+ * PC location. */
+extern unsigned int *single_stepping;
+
 #endif /* _X86_64_ARCH_H */

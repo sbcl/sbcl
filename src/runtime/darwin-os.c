@@ -154,7 +154,7 @@ mach_lisp_thread_init(struct thread * thread)
 
     current_mach_thread = mach_thread_self();
     ret = thread_set_exception_ports(current_mach_thread,
-                                     EXC_MASK_BAD_ACCESS | EXC_MASK_BAD_INSTRUCTION,
+                                     EXC_MASK_BAD_ACCESS | EXC_MASK_BAD_INSTRUCTION | EXC_MASK_BREAKPOINT,
                                      thread_exception_port,
                                      EXCEPTION_DEFAULT,
                                      THREAD_STATE_NONE);

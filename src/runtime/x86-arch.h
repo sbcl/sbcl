@@ -94,4 +94,8 @@ swap_lispobjs(volatile lispobj *dest, lispobj value)
 extern void fast_bzero_detect(void *, size_t);
 extern void (*fast_bzero_pointer)(void *, size_t);
 
+/* When single stepping, single_stepping holds the original instruction
+ * PC location. */
+extern unsigned int *single_stepping;
+
 #endif /* _X86_ARCH_H */
