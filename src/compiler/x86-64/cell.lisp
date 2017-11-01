@@ -262,8 +262,7 @@
               (inst jmp :e (generate-error-code+
                             (if (sc-is symbol immediate)
                                 (lambda ()
-                                  (inst mov symbol-reg
-                                        (make-fixup known-symbol :immobile-object))))
+                                  (load-immediate vop symbol symbol-reg)))
                             vop 'unbound-symbol-error
                             symbol-reg)))
             RETRY))))
