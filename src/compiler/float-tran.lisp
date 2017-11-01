@@ -467,8 +467,11 @@
 ;;; semantics says we are supposed to compare as rationals, but we can
 ;;; do it for any rational that has a precise representation as a
 ;;; float (such as 0).
-(macrolet ((frob (op)
-             `(deftransform ,op ((x y) (float rational) *)
+(macrolet ((frob (op &optional complex)
+             `(deftransform ,op ((x y) (,(if complex
+                                             '(complex float)
+                                             'float)
+                                        rational) *)
                 "open-code FLOAT to RATIONAL comparison"
                 (unless (constant-lvar-p y)
                   (give-up-ir1-transform
@@ -478,10 +481,15 @@
                     (give-up-ir1-transform
                      "~S doesn't have a precise float representation."
                      val)))
-                `(,',op x (float y x)))))
+                `(,',op x (float y ,',(if complex
+                                          '(realpart x)
+                                          'x))))))
   (frob <)
   (frob >)
-  (frob =))
+  (frob =)
+  (frob < t)
+  (frob > t)
+  (frob = t))
 
 ;;;; irrational derive-type methods
 
