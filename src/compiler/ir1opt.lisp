@@ -685,115 +685,20 @@
 
 ;;;; IF optimization
 
-;;; Test if BLOCK1 can be replaced with BLOCK2 (or vice versa).
-;;; The second value are the pairs of nodes (from-block1 . from-block2)
-;;; which have different derived types (due to constraint
-;;; propagation), the remaining node needs to be rederived to the
-;;; union of the types.
-;;;
-;;; For now this only handles blocks consisting of
-;;; BASIC-COMBINATION, REF, CAST, CSET
-(defun cblocks-equivalent-p (block1 block2)
-  (declare (type cblock block1 block2))
-  (and (equal (block-succ block1) (block-succ block2))
-       (let* ((last1 (block-last block1))
-              (last2 (block-last block2))
-              (last-lvar1 (and (valued-node-p last1)
-                               (node-lvar last1)))
-              (last-lvar2 (and (valued-node-p last2)
-                               (node-lvar last2)))
-              types-to-fixup)
-         (labels ((block-nodes (block)
-                    ;; Return a list of nodes with side effects to be
-                    ;; checked for order and equivalence
-                    (let (result
-                          (last t))
-                      (do-nodes-backwards (node lvar block)
-                        (when (and lvar
-                                   (not last)
-                                   (neq (node-block (lvar-dest lvar))
-                                        block))
-                          ;; Some other blocks receives this LVAR,
-                          ;; yet it's not the last node in the block.
-                          (return-from cblocks-equivalent-p))
-                        (typecase node
-                          (ref
-                           ;; Only the last REF is interesting, all
-                           ;; other REFs are checked when they are
-                           ;; used by other nodes.
-                           (when last
-                             (push node result)))
-                          (cast
-                           (when (cast-type-check node)
-                             (push node result)))
-                          ((or basic-combination
-                               cset)
-                           (push node result))
-                          (t
-                           ;; Could handle more
-                           (return-from cblocks-equivalent-p)))
-                        (setf last nil))
-                      result))
-                  (note-disjointed-types (node1 node2)
-                    ;; Different types due to constraint propagation
-                    (unless (type= (node-derived-type node1)
-                                   (node-derived-type node2))
-                      (push (cons node1 node2) types-to-fixup))
-                    t)
-                  (eq-ref-p (ref1 ref2)
-                    (eq (ref-leaf ref1)
-                        (ref-leaf ref2)))
-                  (eq-cast-p (cast1 cast2)
-                    (and (type= (cast-asserted-type cast1)
-                                (cast-asserted-type cast2))
-                         (eq (cast-type-check cast1)
-                             (cast-type-check cast2 ))
-                         (eq-lvar-p (cast-value cast1)
-                                    (cast-value cast2))))
-                  (eq-set-p (set1 set2)
-                    (eq (eq (set-var set1)
-                            (set-var set2))
-                        (eq-lvar-p (set-value set1)
-                                   (set-value set2))))
-                  (eq-combination-p (call1 call2)
-                    (and (eq-lvar-p (basic-combination-fun call1)
-                                    (basic-combination-fun call2))
-                         (let ((args1 (basic-combination-args call1))
-                               (args2 (basic-combination-args call2)))
-                           (and (= (length args1) (length args2))
-                                (every #'eq-lvar-p args1 args2)))))
-                  (eq-node-p (node1 node2)
-                    (and (node-p node1)
-                         (node-p node2)
-                         (eq (node-block node1) block1)
-                         (eq (node-block node2) block2)
-                         (cond ((and (ref-p node1)
-                                     (ref-p node2))
-                                (eq-ref-p node1 node2))
-                               ((and (basic-combination-p node1)
-                                     (basic-combination-p node2))
-                                (eq-combination-p node1 node2))
-                               ((and (cast-p node1)
-                                     (cast-p node2))
-                                (eq-cast-p node1 node2))
-                               ((and (set-p node1)
-                                     (set-p node2))
-                                (eq-set-p node1 node2)))
-                         (note-disjointed-types node1 node2)))
-                  (eq-lvar-p (lvar1 lvar2)
-                    (if (and lvar1 lvar2)
-                        (let ((uses1 (lvar-uses lvar1))
-                              (uses2 (lvar-uses lvar2)))
-                          (eq-node-p uses1 uses2))
-                        ;; Ok if both are deleted
-                        (eq lvar1 lvar2))))
-           (and (eq last-lvar1 last-lvar2)
-                ;; But check all combinations and casts and their order
-                (let ((nodes1 (block-nodes block1))
-                      (nodes2 (block-nodes block2)))
-                  (and (= (length nodes1) (length nodes2))
-                       (every #'eq-node-p nodes1 nodes2)))
-                (values t types-to-fixup))))))
+;;; Utility: return T if both argument cblocks are equivalent.  For now,
+;;; detect only blocks that read the same leaf into the same lvar, and
+;;; continue to the same block.
+(defun cblocks-equivalent-p (x y)
+  (declare (type cblock x y))
+  (and (ref-p (block-start-node x))
+       (eq (block-last x) (block-start-node x))
+
+       (ref-p (block-start-node y))
+       (eq (block-last y) (block-start-node y))
+
+       (equal (block-succ x) (block-succ y))
+       (eql (ref-lvar (block-start-node x)) (ref-lvar (block-start-node y)))
+       (eql (ref-leaf (block-start-node x)) (ref-leaf (block-start-node y)))))
 
 ;;; Check whether the predicate is known to be true or false,
 ;;; deleting the IF node in favor of the appropriate branch when this
@@ -816,22 +721,18 @@
                     alternative)
                    ((type= type (specifier-type 'null))
                     consequent)
-                   ((multiple-value-bind (eq types-to-fixup)
-                        (cblocks-equivalent-p consequent alternative)
-                      (when eq
-                        ;; Even if the references are the same they can
-                        ;; have different derived types based on the TEST
-                        ;; constraint propagation.
-                        ;; Don't lose the second type when killing it.
-                        (loop for (consequent-node . alternative-node)
-                              in types-to-fixup
-                              do
-                              (derive-node-type consequent-node
-                                                (values-type-union
-                                                 (node-derived-type consequent-node)
-                                                 (node-derived-type alternative-node))
-                                                :from-scratch t))
-                        alternative))))))
+                   ((or (eq consequent alternative) ; Can this happen?
+                        (cblocks-equivalent-p alternative consequent))
+                    ;; Even if the references are the same they can have
+                    ;; different derived types based on the TEST
+                    ;; Don't lose the second type when killing it.
+                    (let ((consequent-ref (block-start-node consequent)))
+                      (derive-node-type consequent-ref
+                                        (values-type-union
+                                         (node-derived-type consequent-ref)
+                                         (node-derived-type (block-start-node alternative)))
+                                        :from-scratch t))
+                    alternative))))
       (when victim
         (kill-if-branch-1 node test block victim)
         (return-from ir1-optimize-if (values))))
