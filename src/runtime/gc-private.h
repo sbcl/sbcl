@@ -149,19 +149,6 @@ static inline boolean immobile_space_p(lispobj obj)
 }
 
 typedef int low_page_index_t;
-static inline low_page_index_t find_immobile_page_index(void *addr)
-{
-  if (addr >= (void*)IMMOBILE_SPACE_START) {
-      // Must use full register size here to avoid truncation of quotient
-      // and bogus result!
-      page_index_t index =
-          ((uintptr_t)addr -
-           (uintptr_t)IMMOBILE_SPACE_START) / IMMOBILE_CARD_BYTES;
-      if (index < (int)(IMMOBILE_SPACE_SIZE/IMMOBILE_CARD_BYTES))
-          return index;
-  }
-  return -1;
-}
 
 #ifdef LISP_FEATURE_LITTLE_ENDIAN
 static inline int immobile_obj_gen_bits(lispobj* pointer) // native pointer

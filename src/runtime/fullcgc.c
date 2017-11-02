@@ -431,16 +431,15 @@ static void sweep_fixedobj_pages(long *zeroed)
 {
     low_page_index_t page;
 
-    for (page = find_immobile_page_index((void*)(immobile_fixedobj_free_pointer-1));
-         page >= 0;
-         --page) {
+    for (page = 0 ; ; ++page) {
+        lispobj *obj = (lispobj*)((char*)IMMOBILE_SPACE_START + page * IMMOBILE_CARD_BYTES);
+        if (obj >= immobile_fixedobj_free_pointer)
+            break;
         int obj_spacing = fixedobj_page_obj_align(page);
         if (!obj_spacing)
             continue;
-        char *page_base = (char*)IMMOBILE_SPACE_START + page * IMMOBILE_CARD_BYTES;
         int nwords = fixedobj_page_obj_size(page);
-        lispobj *obj = (lispobj*)page_base;
-        lispobj *limit = (lispobj*)(page_base + IMMOBILE_CARD_BYTES - obj_spacing);
+        lispobj *limit = (lispobj*)((char*)obj + IMMOBILE_CARD_BYTES - obj_spacing);
         for ( ; obj <= limit ; obj = (lispobj*)((char*)obj + obj_spacing) ) {
             lispobj header = *obj;
             if (fixnump(header)) { // is a hole

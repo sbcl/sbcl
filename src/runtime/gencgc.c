@@ -3554,6 +3554,9 @@ garbage_collect_generation(generation_index_t generation, int raise)
      * scavenged. The new_space generation needs special handling as
      * objects may be moved in - it is handled separately below. */
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
+    // SCRATCH_GENERATION is scavenged in immobile space
+    // because pinned objects will already have had their generation
+    // number reassigned to that generation if applicable.
     scavenge_immobile_roots(generation+1, SCRATCH_GENERATION);
 #endif
     scavenge_generations(generation+1, PSEUDO_STATIC_GENERATION);

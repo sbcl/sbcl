@@ -79,9 +79,6 @@ void defrag_immobile_space(int* components, boolean verbose);
 
 unsigned asm_routines_end;
 
-// Inclusive bounds on highest in-use pages per subspace.
-low_page_index_t max_used_fixedobj_page, max_used_varyobj_page;
-
 // This table is for objects fixed in size, as opposed to variable-sized.
 // (Immobile objects are naturally fixed in placement)
 struct fixedobj_page *fixedobj_pages;
@@ -134,6 +131,20 @@ lispobj varyobj_holes;
 #define VARYOBJ_PAGE_GENS(x) varyobj_page_header_gens[x-FIRST_VARYOBJ_PAGE]
 #define varyobj_page_touched(x) \
   ((varyobj_page_touched_bits[(x-FIRST_VARYOBJ_PAGE)/32] >> (x&31)) & 1)
+
+static inline low_page_index_t find_immobile_page_index(void *addr)
+{
+  if (addr >= (void*)IMMOBILE_SPACE_START) {
+      // Must use full register size here to avoid truncation of quotient
+      // and bogus result!
+      page_index_t index =
+          ((uintptr_t)addr -
+           (uintptr_t)IMMOBILE_SPACE_START) / IMMOBILE_CARD_BYTES;
+      if (index < (int)(IMMOBILE_SPACE_SIZE/IMMOBILE_CARD_BYTES))
+          return index;
+  }
+  return -1;
+}
 
 #ifdef VERIFY_PAGE_GENS
 void check_fixedobj_page(low_page_index_t);
@@ -343,16 +354,18 @@ Threads A, and B, and C each want to claim index 6.
 
 //// The collector
 
+// Find the high water marks for this GC scavenge phase
+// (avoid passing exactly IMMOBILE_SPACE_END, which has no page index)
+#define calc_max_used_fixedobj_page() \
+  find_immobile_page_index(immobile_fixedobj_free_pointer-1)
+#define calc_max_used_varyobj_page() \
+  find_immobile_page_index(immobile_space_free_pointer-1)
+
 void update_immobile_nursery_bits()
 {
+  low_page_index_t max_used_fixedobj_page = calc_max_used_fixedobj_page();
+  low_page_index_t max_used_varyobj_page = calc_max_used_varyobj_page();
   low_page_index_t page;
-  lispobj fixedobj_free_ptr = (lispobj)immobile_fixedobj_free_pointer;
-  lispobj varyobj_free_ptr = (lispobj)immobile_space_free_pointer;
-
-  // Find the high water marks for this GC scavenge phase
-  // [avoid passing exactly IMMOBILE_SPACE_END, which has no page index]
-  max_used_fixedobj_page = find_immobile_page_index((void*)(fixedobj_free_ptr-1));
-  max_used_varyobj_page = find_immobile_page_index((void*)(varyobj_free_ptr-1));
 
   immobile_scav_queue = (unsigned int*)low_page_address(max_used_varyobj_page+1);
   gc_assert((IMMOBILE_SPACE_END - (uword_t)immobile_scav_queue) / sizeof(int)
@@ -361,7 +374,7 @@ void update_immobile_nursery_bits()
   if (ENABLE_PAGE_PROTECTION) {
       // Unprotect the in-use ranges. Any page could be written during scavenge
       os_protect((os_vm_address_t)IMMOBILE_SPACE_START,
-                 fixedobj_free_ptr - IMMOBILE_SPACE_START,
+                 (lispobj)immobile_fixedobj_free_pointer - IMMOBILE_SPACE_START,
                  OS_VM_PROT_ALL);
 
       // varyobj_free_ptr is typically not page-aligned - only by random chance
@@ -491,6 +504,7 @@ static void full_scavenge_immobile_newspace()
 
     // Fixed-size object pages.
 
+    low_page_index_t max_used_fixedobj_page = calc_max_used_fixedobj_page();
     for (page = 0; page <= max_used_fixedobj_page; ++page) {
         if (!(fixedobj_pages[page].gens & bit)) continue;
         // Skip amount within the loop is in bytes.
@@ -514,6 +528,7 @@ static void full_scavenge_immobile_newspace()
 
     // Variable-size object pages
 
+    low_page_index_t max_used_varyobj_page = calc_max_used_varyobj_page();
     page = FIRST_VARYOBJ_PAGE - 1; // Subtract 1 because of pre-increment
     while (1) {
         // Find the next page with anything in newspace.
@@ -621,6 +636,7 @@ scavenge_immobile_roots(generation_index_t min_gen, generation_index_t max_gen)
     // example: scavenging gens 2..6, the mask of root gens is #b1111100
     int genmask = ((1 << (max_gen - min_gen + 1)) - 1) << min_gen;
 
+    low_page_index_t max_used_fixedobj_page = calc_max_used_fixedobj_page();
     low_page_index_t page;
     for (page = 0; page <= max_used_fixedobj_page ; ++page) {
         if (fixedobj_page_wp(page) || !(fixedobj_pages[page].gens & genmask))
@@ -643,6 +659,7 @@ scavenge_immobile_roots(generation_index_t min_gen, generation_index_t max_gen)
     }
 
     // Variable-length object pages
+    low_page_index_t max_used_varyobj_page = calc_max_used_varyobj_page();
     unsigned n_varyobj_pages = 1+max_used_varyobj_page-FIRST_VARYOBJ_PAGE;
     unsigned end_bitmap_index = (n_varyobj_pages+31)/32;
     page = next_varyobj_root_page(FIRST_VARYOBJ_PAGE, end_bitmap_index, genmask);
@@ -725,6 +742,7 @@ void write_protect_immobile_space()
     // Now find contiguous ranges of pages that are protectable,
     // minimizing the number of system calls as much as possible.
     int i, start = -1, end = -1; // inclusive bounds on page indices
+    low_page_index_t max_used_fixedobj_page = calc_max_used_fixedobj_page();
     for (i = max_used_fixedobj_page ; i >= 0 ; --i) {
         if (fixedobj_page_wp(i)) {
             if (end < 0) end = i;
@@ -738,6 +756,7 @@ void write_protect_immobile_space()
         }
     }
 #define varyobj_page_wp(x) !varyobj_page_touched(x)
+    low_page_index_t max_used_varyobj_page = calc_max_used_varyobj_page();
     for (i = max_used_varyobj_page ; i >= FIRST_VARYOBJ_PAGE ; --i) {
         if (varyobj_page_wp(i)) {
             if (end < 0) end = i;
@@ -968,6 +987,7 @@ sweep_fixedobj_pages(int raise)
 
     SETUP_GENS();
 
+    low_page_index_t max_used_fixedobj_page = calc_max_used_fixedobj_page();
     low_page_index_t page;
     for (page = 0; page <= max_used_fixedobj_page; ++page) {
         // On pages that won't need manipulation of the freelist,
@@ -1054,6 +1074,7 @@ sweep_varyobj_pages(int raise)
 {
     SETUP_GENS();
 
+    low_page_index_t max_used_varyobj_page = calc_max_used_varyobj_page();
     lispobj* free_pointer = immobile_space_free_pointer;
     low_page_index_t page;
     for (page = FIRST_VARYOBJ_PAGE; page <= max_used_varyobj_page; ++page) {
@@ -1138,24 +1159,6 @@ sweep_varyobj_pages(int raise)
 #endif
 }
 
-static void compute_immobile_space_bound()
-{
-    int max;
-    // find the highest page in use
-    for (max = FIRST_VARYOBJ_PAGE-1 ; max >= 0 ; --max)
-        if (fixedobj_pages[max].attr.parts.obj_size)
-            break;
-    max_used_fixedobj_page = max; // this is a page index, not the number of pages.
-    immobile_fixedobj_free_pointer =
-      (lispobj*)(IMMOBILE_SPACE_START + IMMOBILE_CARD_BYTES*(1+max));
-
-    for (max = (IMMOBILE_SPACE_SIZE/IMMOBILE_CARD_BYTES)-1 ;
-         max >= FIRST_VARYOBJ_PAGE ; --max)
-        if (varyobj_page_gens_augmented(max))
-            break;
-     max_used_varyobj_page = max; // this is a page index, not the number of pages.
-}
-
 // TODO: (Maybe this won't work. Not sure yet.) rather than use the
 // same 'raise' concept as in gencgc, each immobile object can store bits
 // indicating whether it has survived any GC at its current generation.
@@ -1167,7 +1170,6 @@ sweep_immobile_space(int raise)
   gc_assert(immobile_scav_queue_count == 0);
   sweep_fixedobj_pages(raise);
   sweep_varyobj_pages(raise);
-  compute_immobile_space_bound();
 }
 
 static void gc_init_immobile()
@@ -1289,7 +1291,6 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
         for (page = FIRST_VARYOBJ_PAGE ; page <= last_page ; ++page)
             varyobj_page_touched_bits[(page-FIRST_VARYOBJ_PAGE)/32] &= ~(1U<<(page & 31));
     }
-    compute_immobile_space_bound();
     lispobj* code = (lispobj*)address;
     while (widetag_of(*code) == CODE_HEADER_WIDETAG && !code_n_funs((struct code*)code))
         code += sizetab[CODE_HEADER_WIDETAG](code);
@@ -1497,7 +1498,7 @@ lispobj alloc_layout(lispobj slots)
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
                          (LAYOUT_OF_LAYOUT << 32) |
 #endif
-                         (LAYOUT_SIZE-1)<<8 | INSTANCE_WIDETAG,
+                         (LAYOUT_SIZE-1)<<N_WIDETAG_BITS | INSTANCE_WIDETAG,
                          &layout_page_hint);
 #ifndef LISP_FEATURE_COMPACT_INSTANCE_HEADER
     l->slots[0] = LAYOUT_OF_LAYOUT;
@@ -1522,7 +1523,7 @@ lispobj alloc_sym(lispobj name)
       alloc_immobile_obj(MAKE_ATTR(ALIGN_UP(SYMBOL_SIZE,2), // spacing
                                    ALIGN_UP(SYMBOL_SIZE,2), // size
                                    0),
-                         (SYMBOL_SIZE-1)<<8 | SYMBOL_WIDETAG,
+                         (SYMBOL_SIZE-1)<<N_WIDETAG_BITS | SYMBOL_WIDETAG,
                          &symbol_page_hint);
     s->value = UNBOUND_MARKER_WIDETAG;
     s->hash = 0;
@@ -1539,7 +1540,7 @@ lispobj alloc_fdefn(lispobj name)
       alloc_immobile_obj(MAKE_ATTR(ALIGN_UP(FDEFN_SIZE,2), // spacing
                                    ALIGN_UP(FDEFN_SIZE,2), // size
                                    0),
-                         (FDEFN_SIZE-1)<<8 | FDEFN_WIDETAG,
+                         (FDEFN_SIZE-1)<<N_WIDETAG_BITS | FDEFN_WIDETAG,
                          &fdefn_page_hint);
     f->name = name;
     f->fun = NIL;
@@ -1559,7 +1560,7 @@ lispobj alloc_generic_function(lispobj slots)
                                    ALIGN_UP(GF_SIZE,2), // size
                                    0),
                          // 5 payload words following the header
-                         ((GF_SIZE-1)<<8) | FUNCALLABLE_INSTANCE_WIDETAG,
+                         ((GF_SIZE-1)<<N_WIDETAG_BITS) | FUNCALLABLE_INSTANCE_WIDETAG,
                          // KLUDGE: same page attributes as symbols,
                          // so use the same hint.
                          &symbol_page_hint);
@@ -1922,6 +1923,7 @@ void defrag_immobile_space(int* components, boolean verbose)
     bzero(sym_kind_histo, sizeof sym_kind_histo);
 
 #if DEFRAGMENT_FIXEDOBJ_SUBSPACE
+    low_page_index_t max_used_fixedobj_page = calc_max_used_fixedobj_page();
     for ( ; page_index <= max_used_fixedobj_page ; ++page_index) {
         int obj_spacing = fixedobj_page_obj_align(page_index);
         if (obj_spacing) {
@@ -1945,8 +1947,7 @@ void defrag_immobile_space(int* components, boolean verbose)
     int n_layout_pages = calc_n_pages(obj_type_histo[INSTANCE_WIDETAG/4],
                                       LAYOUT_ALIGN / N_WORD_BYTES);
     int n_fdefn_pages = calc_n_pages(obj_type_histo[FDEFN_WIDETAG/4], FDEFN_SIZE);
-    int n_fin_pages = calc_n_pages(obj_type_histo[FUNCALLABLE_INSTANCE_WIDETAG/4],
-                                   6); // KLUDGE
+    int n_fin_pages = calc_n_pages(obj_type_histo[FUNCALLABLE_INSTANCE_WIDETAG/4], GF_SIZE);
 #if !(defined(LISP_FEATURE_IMMOBILE_CODE) && defined(LISP_FEATURE_COMPACT_INSTANCE_HEADER))
     gc_assert(n_fin_pages == 0);
 #endif
@@ -1989,9 +1990,10 @@ void defrag_immobile_space(int* components, boolean verbose)
     varyobj_tempspace.start = calloc(varyobj_tempspace.n_bytes, 1);
 
     if (verbose)
-        printf("%d+%d+%d+%d objects... ",
+        printf("%d+%d+%d+%d+%d objects... ",
                obj_type_histo[INSTANCE_WIDETAG/4],
                obj_type_histo[FDEFN_WIDETAG/4],
+               obj_type_histo[FUNCALLABLE_INSTANCE_WIDETAG/4],
                (sym_kind_histo[0]+sym_kind_histo[1]+
                 sym_kind_histo[2]+sym_kind_histo[3]),
                n_code_components);
@@ -2020,6 +2022,12 @@ void defrag_immobile_space(int* components, boolean verbose)
     }
 
 #if DEFRAGMENT_FIXEDOBJ_SUBSPACE
+    char** alloc_ptrs[64];
+    bzero(alloc_ptrs, sizeof alloc_ptrs);
+    alloc_ptrs[INSTANCE_WIDETAG/4] = &layout_alloc_ptr;
+    alloc_ptrs[FDEFN_WIDETAG/4] = &fdefn_alloc_ptr;
+    alloc_ptrs[FUNCALLABLE_INSTANCE_WIDETAG/4] = &fin_alloc_ptr;
+
     // Permute fixed-sized object pages and deposit forwarding pointers.
     for ( page_index = find_immobile_page_index(defrag_base) ;
           page_index <= max_used_fixedobj_page ; ++page_index) {
@@ -2032,26 +2040,11 @@ void defrag_immobile_space(int* components, boolean verbose)
             if (fixnump(word) || filler_obj_p(obj))
                 continue;
             char** alloc_ptr;
-            int lowtag = OTHER_POINTER_LOWTAG;
             int widetag = widetag_of(word);
-            switch (widetag) {
-            case INSTANCE_WIDETAG:
-              alloc_ptr = &layout_alloc_ptr;
-              lowtag = INSTANCE_POINTER_LOWTAG;
-              break;
-            case FUNCALLABLE_INSTANCE_WIDETAG:
-              alloc_ptr = &fin_alloc_ptr;
-              lowtag = FUN_POINTER_LOWTAG;
-              break;
-            case FDEFN_WIDETAG:
-              alloc_ptr = &fdefn_alloc_ptr;
-              break;
-            case SYMBOL_WIDETAG:
-              alloc_ptr = &symbol_alloc_ptr[classify_symbol(obj)];
-              break;
-            default:
-              lose("Unexpected widetag");
-            }
+            if (widetag == SYMBOL_WIDETAG)
+                alloc_ptr = &symbol_alloc_ptr[classify_symbol(obj)];
+            else if (!(alloc_ptr = alloc_ptrs[widetag>>2]))
+                lose("Unexpected widetag %x", widetag);
             lispobj* new = (lispobj*)*alloc_ptr;
             lispobj end = (lispobj)new + obj_spacing;
 #define ALIGN_MASK (IMMOBILE_CARD_BYTES - 1)
@@ -2060,7 +2053,8 @@ void defrag_immobile_space(int* components, boolean verbose)
                 new = (lispobj*)(end & ~ALIGN_MASK); // snap to page
 #undef ALIGN_MASK
             memcpy(tempspace_addr(new), obj, sizetab[widetag](obj) << WORD_SHIFT);
-            set_forwarding_pointer(obj, make_lispobj(new, lowtag));
+            set_forwarding_pointer(obj,
+                                   make_lispobj(new, lowtag_for_widetag[widetag>>2]));
             *alloc_ptr = (char*)new + obj_spacing;
         }
     }
