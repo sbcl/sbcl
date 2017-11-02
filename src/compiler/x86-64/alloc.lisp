@@ -432,6 +432,7 @@
        ((descriptor-reg)))
   (def alloc-immobile-fdefn  "alloc_fdefn"  ; MAKE-FDEFN
        ((descriptor-reg)))
+  #!+immobile-code (def alloc-fun-tramp "alloc_fun_tramp" ((descriptor-reg)))
   #!+(and immobile-code compact-instance-header)
   (def alloc-generic-function  "alloc_generic_function"
        ((descriptor-reg)))

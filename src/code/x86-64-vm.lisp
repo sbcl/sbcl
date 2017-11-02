@@ -175,8 +175,7 @@
 #!+immobile-code
 (progn
 (defun fun-immobilize (fun)
-  (let ((code (allocate-code-object t 0 16)))
-    (setf (%code-debug-info code) fun)
+  (let ((code (%primitive sb!vm::alloc-fun-tramp fun)))
     (let ((sap (code-instructions code))
           (ea (+ (logandc2 (get-lisp-obj-address code) lowtag-mask)
                  (ash code-debug-info-slot word-shift))))

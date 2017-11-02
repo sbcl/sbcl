@@ -1548,6 +1548,25 @@ lispobj alloc_fdefn(lispobj name)
     return make_lispobj(f, OTHER_POINTER_LOWTAG);
 }
 
+// Function trampolines are 6 words long:
+//  4 boxed words: code header, size, debug-info (a callable object), padding
+//  2 raw words: instruction bytes
+#define FUN_TRAMP_SIZE 6
+lispobj alloc_fun_tramp(lispobj callable)
+{
+    lispobj* obj = (lispobj*)
+      alloc_immobile_obj(MAKE_ATTR(FUN_TRAMP_SIZE, FUN_TRAMP_SIZE, 0),
+                         // header indicates 4 boxed words
+                         (4 << N_WIDETAG_BITS) | CODE_HEADER_WIDETAG,
+                         // KLUDGE: same page attributes as symbols,
+                         // so use the same hint.
+                         &symbol_page_hint);
+    obj[1] = make_fixnum(16);
+    obj[2] = callable;
+    obj[3] = 0;
+    return make_lispobj(obj, OTHER_POINTER_LOWTAG);
+}
+
 #if defined(LISP_FEATURE_IMMOBILE_CODE) && defined(LISP_FEATURE_COMPACT_INSTANCE_HEADER)
 #include "genesis/funcallable-instance.h"
 #define GF_SIZE (sizeof(struct funcallable_instance)/sizeof(lispobj)+2) /* = 6 */
@@ -1943,17 +1962,19 @@ void defrag_immobile_space(int* components, boolean verbose)
     gc_assert(obj_type_histo[INSTANCE_WIDETAG/4]);
 
     // Calculate space needed for fixedobj pages after defrag.
-    // page order is: layouts, fdefns, GFs, symbols
+    // page order is: layouts, fdefns, trampolines, GFs, symbols
     int n_layout_pages = calc_n_pages(obj_type_histo[INSTANCE_WIDETAG/4],
                                       LAYOUT_ALIGN / N_WORD_BYTES);
     int n_fdefn_pages = calc_n_pages(obj_type_histo[FDEFN_WIDETAG/4], FDEFN_SIZE);
+    int n_code_pages = calc_n_pages(obj_type_histo[CODE_HEADER_WIDETAG/4], FUN_TRAMP_SIZE);
     int n_fin_pages = calc_n_pages(obj_type_histo[FUNCALLABLE_INSTANCE_WIDETAG/4], GF_SIZE);
 #if !(defined(LISP_FEATURE_IMMOBILE_CODE) && defined(LISP_FEATURE_COMPACT_INSTANCE_HEADER))
     gc_assert(n_fin_pages == 0);
 #endif
     char* layout_alloc_ptr = defrag_base;
     char* fdefn_alloc_ptr  = layout_alloc_ptr + n_layout_pages * IMMOBILE_CARD_BYTES;
-    char* fin_alloc_ptr    = fdefn_alloc_ptr + n_fdefn_pages * IMMOBILE_CARD_BYTES;
+    char* code_alloc_ptr   = fdefn_alloc_ptr + n_fdefn_pages * IMMOBILE_CARD_BYTES;
+    char* fin_alloc_ptr    = code_alloc_ptr + n_code_pages * IMMOBILE_CARD_BYTES;
     char* symbol_alloc_ptr[N_SYMBOL_KINDS+1];
     symbol_alloc_ptr[0]    = fin_alloc_ptr + n_fin_pages * IMMOBILE_CARD_BYTES;
     for (i=0; i<N_SYMBOL_KINDS ; ++i)
@@ -1990,9 +2011,10 @@ void defrag_immobile_space(int* components, boolean verbose)
     varyobj_tempspace.start = calloc(varyobj_tempspace.n_bytes, 1);
 
     if (verbose)
-        printf("%d+%d+%d+%d+%d objects... ",
+        printf("%d+%d+%d+%d+%d+%d objects... ",
                obj_type_histo[INSTANCE_WIDETAG/4],
                obj_type_histo[FDEFN_WIDETAG/4],
+               obj_type_histo[CODE_HEADER_WIDETAG/4],
                obj_type_histo[FUNCALLABLE_INSTANCE_WIDETAG/4],
                (sym_kind_histo[0]+sym_kind_histo[1]+
                 sym_kind_histo[2]+sym_kind_histo[3]),
@@ -2026,6 +2048,7 @@ void defrag_immobile_space(int* components, boolean verbose)
     bzero(alloc_ptrs, sizeof alloc_ptrs);
     alloc_ptrs[INSTANCE_WIDETAG/4] = &layout_alloc_ptr;
     alloc_ptrs[FDEFN_WIDETAG/4] = &fdefn_alloc_ptr;
+    alloc_ptrs[CODE_HEADER_WIDETAG/4] = &code_alloc_ptr;
     alloc_ptrs[FUNCALLABLE_INSTANCE_WIDETAG/4] = &fin_alloc_ptr;
 
     // Permute fixed-sized object pages and deposit forwarding pointers.

@@ -56,15 +56,15 @@
          (when (= type sb-vm:code-header-widetag)
            (loop for i from sb-vm:code-constants-offset
                  below (code-header-words obj)
-                 do (let ((ref (code-header-ref obj i)))
+                 do (let ((ref (code-header-ref obj i))
+                          (fun))
                       (when (and (fdefn-p ref)
-                                 (simple-fun-p (fdefn-fun ref)))
-                        (let ((code (fun-code-header (fdefn-fun ref))))
-                          (when (immobile-space-obj-p code)
-                            (let ((ht (pick-table
-                                       (%simple-fun-name
-                                        (%code-entry-point code 0)))))
-                            (incf (gethash code ht 0))))))))))
+                                 (simple-fun-p (setq fun (fdefn-fun ref)))
+                                 (immobile-space-obj-p fun))
+                        (let* ((code (fun-code-header fun))
+                               (ht (pick-table (%simple-fun-name
+                                                (%code-entry-point code 0)))))
+                          (incf (gethash code ht 0))))))))
        :immobile)
       (append (hashtable-keys-sorted other-stuff)
               (hashtable-keys-sorted compiler-stuff)))))
@@ -121,6 +121,7 @@
      (lambda (obj type size)
        (declare (ignore size))
        (when (and (= type sb-vm:code-header-widetag)
+                  (not (typep (%code-debug-info obj) 'function))
                   (not (gethash obj hashset)))
          (setf (gethash obj hashset) t)
          (vector-push-extend obj ordering)))

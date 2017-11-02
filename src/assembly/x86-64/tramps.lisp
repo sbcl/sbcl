@@ -89,6 +89,12 @@
 ;;; but the simple-fun which underlies the closure expects %RAX to be the
 ;;; closure itself. So we grab the closure out of the fdefn pointed to,
 ;;; then jump to the simple-fun that the closure points to.
+;;;
+;;; Immobile code uses a different strategy to call a closure that has been
+;;; installed as a globally named function. The fdefn contains a jump opcode
+;;; to a tiny code component specific to the particular closure.
+;;; The trampoline is responsible for loading RAX, since named calls don't.
+#!-immobile-code
 (define-assembly-routine
     (closure-tramp (:return-style :none))
     ()

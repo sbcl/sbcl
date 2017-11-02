@@ -1604,6 +1604,8 @@ variable: an unreadable object representing the error is printed instead.")
     (let ((dinfo (%code-debug-info component)))
       (cond ((eq dinfo :bogus-lra)
              (write-string "bogus code object" stream))
+            ((functionp dinfo)
+             (format stream "trampoline ~S" dinfo))
             (t
              (format stream "code object [~D]" (code-n-entries component))
              (let ((fun-name (awhen (%code-entry-point component 0)
