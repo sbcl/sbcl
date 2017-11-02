@@ -1632,10 +1632,7 @@ static lispobj* defrag_search_varyobj_subspace(lispobj addr)
             lispobj *temp_obj = tempspace_addr(forwarded_obj);
             count = sizetab[widetag_of(*temp_obj)](temp_obj);
             if ((lispobj*)(uword_t)addr < where+count) {
-                int __attribute__((unused)) widetag = widetag_of(*temp_obj);
-                gc_assert(widetag == CODE_HEADER_WIDETAG ||
-                          widetag == FDEFN_WIDETAG ||
-                          widetag == FUNCALLABLE_INSTANCE_WIDETAG);
+                gc_assert(widetag_of(*temp_obj) == CODE_HEADER_WIDETAG);
                 return where;
             }
         }
