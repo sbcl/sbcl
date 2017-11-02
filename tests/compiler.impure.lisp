@@ -2800,3 +2800,28 @@
                                           :allow-warnings t
                                           :allow-failure t))
                 type-error))
+
+
+(declaim (inline bug-1728074-to-boolean bug-1728074-foo))
+(defun bug-1728074-to-boolean (x) (/= x 0))
+(defun bug-1728074-foo (storage key converter)
+  (labels ((value (entry)
+             (funcall converter (ash entry -17)))
+           (insert (start key new)
+             (when *
+               (return-from insert (value (aref storage start))))
+             (let ((entry (aref storage start)))
+               (let* ((okey (logand entry #xf00))
+                      (ostart (logand okey #xf)))
+                 (unless (= ostart start)
+                   (insert ostart okey entry)))))
+           (probe (index)
+             (let ((entry (aref storage index)))
+               (when (= key (logand #xf00 entry))
+                 (value entry)))))
+    (declare (inline value))
+    (probe (logand key #xf))))
+
+(with-test (:name :defined-fun-in-a-deleted-home-lambda)
+  (checked-compile `(lambda (cache key) (bug-1728074-foo cache key #'bug-1728074-to-boolean))))
+

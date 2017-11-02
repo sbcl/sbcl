@@ -1386,12 +1386,11 @@
         (dolist (functional functionals)
           (when (and (neq (functional-kind functional) :deleted)
                      (policy= policy (lexenv-%policy (functional-lexenv functional)))
-                     (eq (lambda-component
-                          (lambda-home
-                           (if (lambda-p functional)
-                               functional
-                               (optional-dispatch-main-entry functional))))
-                         *current-component*))
+                     ;; Is it in the same component
+                     (let ((home-lambda (lambda-home (main-entry functional))))
+                       (and (neq (functional-kind home-lambda) :deleted)
+                            (eq (lambda-component home-lambda)
+                                *current-component*))))
             (return functional)))))))
 
 ;;; Do stuff to delete the semantic attachments of a REF node. When
