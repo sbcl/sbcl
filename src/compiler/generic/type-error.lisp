@@ -118,8 +118,11 @@
 
 (defun encode-internal-error-args (values)
   (with-adjustable-vector (vector)
-    (dolist (tn values)
+    (dolist (where values)
       (write-var-integer
-       (make-sc-offset (sc-number (tn-sc tn)) (or (tn-offset tn) 0))
+       ;; WHERE can be either a TN or a packed SC number + offset
+       (if (tn-p where)
+           (make-sc-offset (sc-number (tn-sc where)) (or (tn-offset where) 0))
+           where)
        vector))
     (loop for octet across vector do (inst byte octet))))

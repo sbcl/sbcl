@@ -251,20 +251,26 @@
         (when check-boundp
           (assemble ()
             (inst cmp (reg-in-size value :dword) unbound-marker-widetag)
-            (let ((*location-context* (make-restart-location RETRY value)))
-              ;; For IMMEDIATE sc we need to load the symbol. It would be better
-              ;; to encode it into the break info, but:
-              ;;  * there are some comments scattered around indicating
-              ;;    that it doesn't work to encode immediate values.
-              ;;  * I don't feel like figuring out whether that's true
-              ;; Anyway, this keeps the extra MOV instruction out of
-              ;; the normal execution path.
+            (let* ((immediatep (sc-is symbol immediate))
+                   (staticp (and immediatep (static-symbol-p known-symbol)))
+                   (*location-context* (make-restart-location RETRY value)))
+              ;; IMMEDIATE sc symbols are not in a register (they are accessed
+              ;; via absolute address), nor are they present in the code header.
+              ;; So emit a MOV just before the INT opcode for such symbols,
+              ;; out of the normal execution path. Most static symbols are
+              ;; DEFCONSTANTs or DEFGLOBALs, so this case is infrequent.
               (inst jmp :e (generate-error-code+
-                            (if (sc-is symbol immediate)
+                            (if staticp
                                 (lambda ()
                                   (load-immediate vop symbol symbol-reg)))
                             vop 'unbound-symbol-error
-                            symbol-reg)))
+                            (if (and immediatep (not staticp))
+                                ;; TN has an offset in the code header the same
+                                ;; as if it had CONSTANT sc, the latter working
+                                ;; correctly as an error break argument.
+                                (make-sc-offset (sc-number-or-lose 'constant)
+                                                (tn-offset symbol))
+                                symbol-reg))))
             RETRY))))
 
   ;; With Symbol-Value, we check that the value isn't the trap object. So

@@ -79,7 +79,7 @@
 
 (with-test (:name :symeval-unknown-tls-index)
   ;; When symbol SC is immediate:
-  ;;    8B142514A24C20     MOV EDX, [#x204CA214]
+  ;;    8B142514A24C20     MOV EDX, [#x204CA214]    ; tls_index: *BLUB*
   ;;    498B1414           MOV RDX, [R12+RDX]
   ;;    83FA61             CMP EDX, 97
   ;;    480F44142518A24C20 CMOVEQ RDX, [#x204CA218] ; *BLUB*
