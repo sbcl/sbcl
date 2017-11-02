@@ -829,6 +829,9 @@ fixedobj_points_to_younger_p(lispobj* obj, int n_words,
     funobj[0] = fdefn_callee_lispobj((struct fdefn*)obj);
     return range_points_to_younger_p(funobj, funobj+1, gen, keep_gen, new_gen)
         || range_points_to_younger_p(obj+1, obj+3, gen, keep_gen, new_gen);
+  case CODE_HEADER_WIDETAG:
+    funobj[0] = ((struct code*)obj)->debug_info;
+    return range_points_to_younger_p(funobj, funobj+1, gen, keep_gen, new_gen);
   case INSTANCE_WIDETAG:
   case FUNCALLABLE_INSTANCE_WIDETAG:
     layout[0] = instance_layout(obj); // same as above
