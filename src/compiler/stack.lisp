@@ -401,7 +401,7 @@
         (discard end-stack pruned-start-stack)
         (dummy-allocations pruned-start-stack start-stack)
         (when (cleanup-code)
-          (let* ((block (insert-cleanup-code block1 block2
+          (let* ((block (insert-cleanup-code (list block1) block2
                                              (block-start-node block2)
                                              `(progn ,@(cleanup-code))))
                  (2block (make-ir2-block block)))

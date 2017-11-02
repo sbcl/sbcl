@@ -43,10 +43,9 @@
 ;;; beginning. We indicate that we have trashed the DFO by setting
 ;;; COMPONENT-REANALYZE. If CLEANUP is supplied, then convert with
 ;;; that cleanup.
-(defun insert-cleanup-code (block1 block2 node form &optional cleanup)
-  (declare (type cblock block1 block2) (type node node)
-           (type (or cleanup null) cleanup))
-  (setf (component-reanalyze (block-component block1)) t)
+(defun insert-cleanup-code (pred-blocks succ-block node form &optional cleanup)
+  (declare  (type node node) (type (or cleanup null) cleanup))
+  (setf (component-reanalyze (block-component (car pred-blocks))) t)
   (with-ir1-environment-from-node node
     (with-component-last-block (*current-component*
                                 (block-next (component-head *current-component*)))
@@ -56,8 +55,10 @@
              (*lexenv* (if cleanup
                            (make-lexenv :cleanup cleanup)
                            *lexenv*)))
-        (change-block-successor block1 block2 block)
-        (link-blocks block block2)
+        (loop for pred-block in pred-blocks
+              do
+              (change-block-successor pred-block succ-block block))
+        (link-blocks block succ-block)
         (ir1-convert start next nil form)
         (setf (block-last block) (ctran-use next))
         (setf (node-next (block-last block)) nil)

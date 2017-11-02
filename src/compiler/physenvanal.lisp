@@ -334,7 +334,7 @@
          (entry (exit-entry exit))
          (cleanup (entry-cleanup entry))
          (info (make-nlx-info cleanup exit))
-         (new-block (insert-cleanup-code exit-block next-block
+         (new-block (insert-cleanup-code (list exit-block) next-block
                                          entry
                                          `(%nlx-entry ',info)
                                          cleanup))
@@ -489,13 +489,12 @@
 ;;; We don't need to adjust the ending cleanup of the cleanup block,
 ;;; since the cleanup blocks are inserted at the start of the DFO, and
 ;;; are thus never scanned.
-(defun emit-cleanups (block1 block2)
-  (declare (type cblock block1 block2))
+(defun emit-cleanups (pred-blocks succ-block)
   (collect ((code)
             (reanalyze-funs))
-    (let ((cleanup2 (block-start-cleanup block2)))
-      (do-nested-cleanups (cleanup (block-end-lexenv block1))
-        (when (eq cleanup cleanup2)
+    (let ((succ-cleanup (block-start-cleanup succ-block)))
+      (do-nested-cleanups (cleanup (block-end-lexenv (car pred-blocks)))
+        (when (eq cleanup succ-cleanup)
           (return))
         (let* ((node (cleanup-mess-up cleanup))
                (args (when (basic-combination-p node)
@@ -532,12 +531,12 @@
                                           do (pop code)))
                                 cleanup))))
      (when (code)
-       (aver (not (node-tail-p (block-last block1))))
+       (aver (not (node-tail-p (block-last (car pred-blocks)))))
        (insert-cleanup-code
-        block1 block2 (block-last block1) `(progn ,@(coalesce-unbinds (code))))
+        pred-blocks succ-block (block-last (car pred-blocks))
+        `(progn ,@(coalesce-unbinds (code))))
        (dolist (fun (reanalyze-funs))
          (locall-analyze-fun-1 fun)))))
-
   (values))
 
 ;;; Loop over the blocks in COMPONENT, calling EMIT-CLEANUPS when we
@@ -560,7 +559,19 @@
                              (eq (node-enclosing-cleanup
                                   (cleanup-mess-up cleanup2))
                                  cleanup1)))
-              (emit-cleanups block1 block2)))))))
+              ;; If multiple blocks with the same cleanups end up at the same block
+              ;; issue only one cleanup, e.g. (let (*) (if x 1 2))
+              ;;
+              ;; Possible improvement: (let (*) (if x (let (**) 1) 2))
+              ;; unbinding * only once.
+              (emit-cleanups (loop for pred in (block-pred block2)
+                                   when (or (eq pred block1)
+                                            (and
+                                             (block-start pred)
+                                             (eq (block-end-cleanup pred) cleanup1)
+                                             (eq (block-physenv pred) env2)))
+                                   collect pred)
+                             block2)))))))
   (values))
 
 ;;; Mark optimizable tail-recursive uses of function result
