@@ -154,10 +154,8 @@ static boolean conservative_stack = 1;
  * page_table_pages is set from the size of the dynamic space. */
 page_index_t page_table_pages;
 struct page *page_table;
-#ifdef LISP_FEATURE_SB_TRACEROOT
 lispobj gc_object_watcher;
 int gc_traceroot_criterion;
-#endif
 #ifdef PIN_GRANULARITY_LISPOBJ
 int gc_n_stack_pins;
 struct hopscotch_table pinned_objects;
@@ -3560,9 +3558,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
 #endif
     scavenge_generations(generation+1, PSEUDO_STATIC_GENERATION);
 
-#ifdef LISP_FEATURE_SB_TRACEROOT
     if (gc_object_watcher) scavenge(&gc_object_watcher, 1);
-#endif
     scavenge_pinned_ranges();
     /* The Lisp start function is stored in the core header, not a static
      * symbol. It is passed to gc_and_save() in this C variable */
@@ -3927,15 +3923,17 @@ collect_garbage(generation_index_t last_gen)
 #endif
     gc_active_p = 0;
 
-#ifdef LISP_FEATURE_SB_TRACEROOT
     if (gc_object_watcher) {
         extern void gc_prove_liveness(void(*)(), lispobj, int, uword_t*, int);
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
         gc_prove_liveness(preserve_context_registers,
                           gc_object_watcher,
                           gc_n_stack_pins, pinned_objects.keys,
                           gc_traceroot_criterion);
-    }
+#else
+        gc_prove_liveness(0, gc_object_watcher, 0, 0, gc_traceroot_criterion);
 #endif
+    }
 
     log_generation_stats(gc_logfile, "=== GC End ===");
     SHOW("returning from collect_garbage");

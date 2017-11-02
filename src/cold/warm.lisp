@@ -151,7 +151,7 @@
                 "SRC;CODE;WARM-LIB"
                 #+win32 "SRC;CODE;WARM-MSWIN"
                 "SRC;CODE;RUN-PROGRAM"
-                #+sb-traceroot "SRC;CODE;TRACEROOT"
+                #+gencgc "SRC;CODE;TRACEROOT"
 
                 #+immobile-code "SRC;CODE;IMMOBILE-SPACE"
                 "SRC;CODE;REPACK-XREF"

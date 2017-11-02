@@ -24,7 +24,7 @@ ifdef LISP_FEATURE_SB_CORE_COMPRESSION
 endif
 
 ifdef LISP_FEATURE_GENCGC
-  GC_SRC = fullcgc.c gencgc.c
+  GC_SRC = fullcgc.c gencgc.c traceroot.c
 else
   GC_SRC = cheneygc.c
 endif

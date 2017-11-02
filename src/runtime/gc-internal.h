@@ -66,8 +66,8 @@ do {                                                                   \
 
 #include "align.h"
 
-/* FIXME: Shouldn't this be defined in sbcl.h? */
-
+// Offset from an fdefn raw address to the underlying simple-fun,
+// if and only if it points to a simple-fun.
 #if defined(LISP_FEATURE_SPARC) || defined(LISP_FEATURE_ARM)
 #define FUN_RAW_ADDR_OFFSET 0
 #else

@@ -17,7 +17,7 @@
 
 use_test_subdirectory
 
-run_sbcl --eval "(sb-ext:exit :code (or #+sb-traceroot 0 7))"
+run_sbcl --eval "(sb-ext:exit :code (or #+gencgc 0 7))"
 test $? = 7 && exit $EXIT_TEST_WIN # Pass if feature is absent or not fully working
 
 tmpfilename="$TEST_FILESTEM.out"
@@ -79,13 +79,14 @@ EOF
 #      ->(g5,FOO)0x1002c825d3[1]->(g5,cons)0x1002c83427[0]
 #      ->(g5,simple vector)0x1002c83b9f[3]->(g5,cons)0x1002c84377[0]->0x1002c848c7.
 
-# Should be able to identify a specific Lisp thread
-# May or may not work for other than x86-64
-thread=`run_sbcl --eval \
- '(princ #+sb-thread "\"main thread\":TLS:"
-         #-sb-thread "COMMON-LISP-USER::")' --quit`
+# Can find the function name only for x86
+func=`run_sbcl --eval '(princ (or #+(or x86 x86-64) "TEST1" ""))' --quit`
 
-t1=`awk 'NR==1 && /C stack.+TEST1.+cons.+FOO.+cons.+vector.+cons/{print "PASS\n"}' $tmpfilename`
+# Should be able to identify a specific Lisp thread
+thread=`run_sbcl --eval '(princ (or #+sb-thread "\"main thread\":TLS:"
+                                    "COMMON-LISP-USER::"))' --quit`
+
+t1=`awk 'NR==1 && /C stack.+'"${func}"'.+cons.+FOO.+cons.+vector.+cons/{print "PASS\n"}' $tmpfilename`
 t2=`awk 'NR==2 && /'"${thread}"'\*FRED/{print "PASS\n"}' $tmpfilename`
 t3=`awk 'NR==3 && /bindings:\*FRED/{print "PASS\n"}' $tmpfilename`
 t4=`awk 'NR==4 && /C stack.+->0x[^0]/{print "PASS\n"}' $tmpfilename`

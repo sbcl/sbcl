@@ -159,9 +159,11 @@ static int find_ref(lispobj* source, lispobj target)
         for(i=1; i<scan_limit; ++i)
             if (layout_bitmap_logbitp(i-1, bitmap)) check_ptr(i, source[i]);
         return -1;
+#if FUN_SELF_FIXNUM_TAGGED
     case CLOSURE_WIDETAG:
         check_ptr(1, ((struct closure*)source)->fun - FUN_RAW_ADDR_OFFSET);
         break;
+#endif
     case CODE_HEADER_WIDETAG:
         for_each_simple_fun(i, function_ptr, (struct code*)source, 0, {
             int wordindex = &function_ptr->name - source;
@@ -216,6 +218,7 @@ static inline int interestingp(lispobj ptr, struct hopscotch_table* targets)
     return is_lisp_pointer(ptr) && hopscotch_containsp(targets, ptr);
 }
 
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
 /* Try to find the call frame that contains 'addr', which is the address
  * in which a conservative root was seen.
  * Return the program counter associated with that frame. */
@@ -286,6 +289,7 @@ static struct thread* deduce_thread(void (*context_scanner)(),
     }
     return 0;
 }
+#endif
 
 /* KNOWN BUG: stack reference to pinned large object or immobile object
  * won't be found in pins hashtable */
@@ -297,7 +301,6 @@ static lispobj examine_stacks(struct hopscotch_table* targets,
                               char** thread_pc,
                               lispobj *tls_index)
 {
-    boolean world_stopped = context_scanner != 0;
     struct thread *th;
 
     for_each_thread(th) {
@@ -324,7 +327,31 @@ static lispobj examine_stacks(struct hopscotch_table* targets,
                 *tls_index = where[1];
                 return *where;
             }
+#ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+        *root_kind = CONTROL_STACK;
+        // Examine the control stack
+        where = th->control_stack_start;
+        end = access_control_stack_pointer(th);
+        for ( ; where < end ; ++where)
+            if (interestingp(*where, targets)) {
+                *root_thread = th;
+                *thread_pc = 0;
+                return *where;
+            }
+        // Examine the explicit pin list
+        lispobj pin_list = read_TLS(PINNED_OBJECTS,th);
+        while (pin_list != NIL) {
+            uword_t pin = CONS(pin_list)->car;
+            if (interestingp(pin, targets)) {
+                *root_thread = th;
+                *thread_pc = 0;
+                return *where;
+            }
+            pin_list = CONS(pin_list)->cdr;
+        }
+#endif
     }
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
     // Look in the control stacks
     *root_kind = CONTROL_STACK;
     uword_t pin;
@@ -332,6 +359,7 @@ static lispobj examine_stacks(struct hopscotch_table* targets,
     for (i=n_pins-1; i>=0; --i)
         // Bypass interestingp() to avoid one test - pins are known pointers.
         if (hopscotch_containsp(targets, pin = pins[i])) {
+            boolean world_stopped = context_scanner != 0;
             if (world_stopped) {
                 *root_thread = deduce_thread(context_scanner, pin, thread_pc);
             } else {
@@ -343,14 +371,15 @@ static lispobj examine_stacks(struct hopscotch_table* targets,
                 void **esp = __builtin_frame_address(0);
                 void **where;
                 for (where = ((void **)th->control_stack_end)-1; where >= esp;  --where)
-                  if (*where == (void*)pin) {
-                      *root_thread = th;
-                      *thread_pc = deduce_thread_pc(th, where);
-                      break;
-                  }
+                    if (*where == (void*)pin) {
+                        *root_thread = th;
+                        *thread_pc = deduce_thread_pc(th, where);
+                        break;
+                    }
             }
             return pin;
         }
+#endif
     *root_kind = HEAP;
     return 0;
 }
@@ -428,7 +457,7 @@ static void maybe_show_object_name(lispobj obj, FILE* stream)
             fputs("::", stream);
             safely_show_lstring(native_pointer(SYMBOL(obj)->name), 0, stream);
             break;
-      }
+        }
 }
 
 static boolean root_p(lispobj ptr, int criterion)
@@ -614,11 +643,13 @@ static void trace1(lispobj object,
                 lowtag_of(ptr) == FUN_POINTER_LOWTAG)
                 target = instance_layout(native_pointer(ptr));
             break;
+#if FUN_SELF_FIXNUM_TAGGED
         case 1:
             if (lowtag_of(ptr) == FUN_POINTER_LOWTAG &&
                 widetag_of(*native_pointer(ptr)) == CLOSURE_WIDETAG)
                 target -= FUN_RAW_ADDR_OFFSET;
             break;
+#endif
         case 3:
             if (lowtag_of(ptr) == OTHER_POINTER_LOWTAG &&
                 widetag_of(FDEFN(ptr)->header) == FDEFN_WIDETAG)
@@ -668,7 +699,7 @@ static void record_ptr(lispobj* source, lispobj target,
 #define check_ptr(ptr) { \
     ++n_scanned_words; \
     if (!is_lisp_pointer(ptr)) ++n_immediates; \
-    else if (relevant_ptr_p((void*)ptr)) { \
+    else if (relevant_ptr_p((void*)(ptr))) { \
       ++n_pointers; \
       if (record_ptrs) record_ptr(where,ptr,ss); \
     }}
@@ -676,7 +707,7 @@ static void record_ptr(lispobj* source, lispobj target,
 static uword_t build_refs(lispobj* where, lispobj* end,
                           struct scan_state* ss)
 {
-    lispobj layout, bitmap, fun;
+    lispobj layout, bitmap;
     sword_t nwords, scan_limit, i, j;
     uword_t n_objects = 0, n_scanned_words = 0,
             n_immediates = 0, n_pointers = 0;
@@ -708,10 +739,11 @@ static uword_t build_refs(lispobj* where, lispobj* end,
             for(i=1; i<scan_limit; ++i)
                 if (layout_bitmap_logbitp(i-1, bitmap)) check_ptr(where[i]);
             continue;
+#if FUN_SELF_FIXNUM_TAGGED
         case CLOSURE_WIDETAG:
-            fun = ((struct closure*)where)->fun - FUN_RAW_ADDR_OFFSET;
-            check_ptr(fun);
+            check_ptr(((struct closure*)where)->fun - FUN_RAW_ADDR_OFFSET);
             break;
+#endif
         case CODE_HEADER_WIDETAG:
             for_each_simple_fun(i, function_ptr, (struct code*)where, 0, {
                 int wordindex = &function_ptr->name - where;

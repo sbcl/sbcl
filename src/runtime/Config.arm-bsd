@@ -15,7 +15,7 @@ ARCH_SRC = arm-arch.c
 OS_SRC = bsd-os.c arm-bsd-os.c
 
 ifdef LISP_FEATURE_GENCGC
-  GC_SRC = fullcgc.c gencgc.c
+  GC_SRC = fullcgc.c gencgc.c traceroot.c
 else
   GC_SRC = cheneygc.c
 endif
