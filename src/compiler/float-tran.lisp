@@ -487,8 +487,6 @@
   (frob <)
   (frob >)
   (frob =)
-  (frob < t)
-  (frob > t)
   (frob = t))
 
 ;;;; irrational derive-type methods
