@@ -2904,7 +2904,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
             } else if (to_immobile_space) {
                 // the object pointed to must not have been discarded as garbage
                 FAIL_IF(!other_immediate_lowtag_p(*native_pointer(thing)) ||
-                        immobile_filler_p(native_pointer(thing)),
+                        filler_obj_p(native_pointer(thing)),
                         "trashed object");
             }
             /* Any pointer that points to non-static space is examined further.

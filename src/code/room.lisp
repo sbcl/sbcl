@@ -415,7 +415,7 @@ We could try a few things to mitigate this:
       (:immobile
        ;; Filter out filler objects. These either look like cons cells
        ;; in fixedobj subspace, or code without enough header words
-       ;; in varyobj subspace. (cf 'immobile_filler_p' in gc-internal.h)
+       ;; in varyobj subspace. (cf 'filler_obj_p' in gc-internal.h)
        (dx-flet ((filter (obj type size)
                    (unless (consp obj)
                      (funcall fun obj type size))))

@@ -175,13 +175,13 @@ static inline int __immobile_obj_gen_bits(lispobj* pointer) // native pointer
 #error "Need to define immobile_obj_gen_bits() for big-endian"
 #endif /* little-endian */
 
-static inline boolean immobile_filler_p(lispobj* obj) {
+static inline boolean filler_obj_p(lispobj* obj) {
   return *(int*)obj == (2<<N_WIDETAG_BITS | CODE_HEADER_WIDETAG);
 }
 
 #else
 
-static inline boolean immobile_filler_p(lispobj* obj) { return 0; }
+static inline boolean filler_obj_p(lispobj* obj) { return 0; }
 
 #endif /* immobile space */
 
