@@ -126,7 +126,12 @@ extern void scavenge_control_stack(struct thread *th);
 extern void scrub_control_stack(void);
 extern void scrub_thread_control_stack(struct thread *);
 
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
+#ifndef LISP_FEATURE_IMMOBILE_SPACE
+
+static inline boolean immobile_space_p(lispobj obj) { return 0; }
+static inline boolean filler_obj_p(lispobj* obj) { return 0; }
+
+#else
 
 extern void enliven_immobile_obj(lispobj*,int);
 extern void fixup_immobile_refs(lispobj (*)(lispobj), lispobj, struct code*);
@@ -178,10 +183,6 @@ static inline int __immobile_obj_gen_bits(lispobj* pointer) // native pointer
 static inline boolean filler_obj_p(lispobj* obj) {
   return *(int*)obj == (2<<N_WIDETAG_BITS | CODE_HEADER_WIDETAG);
 }
-
-#else
-
-static inline boolean filler_obj_p(lispobj* obj) { return 0; }
 
 #endif /* immobile space */
 

@@ -2249,7 +2249,7 @@ update_page_write_prot(page_index_t page)
             }
         }
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-        else if ((index = find_immobile_page_index(ptr)) >= 0 &&
+        else if (immobile_space_p((lispobj)ptr) &&
                  other_immediate_lowtag_p(header = *native_pointer((lispobj)ptr))) {
             // This is *possibly* a pointer to an object in immobile space,
             // given that above two conditions were satisfied.

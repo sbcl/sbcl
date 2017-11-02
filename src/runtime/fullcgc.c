@@ -36,12 +36,8 @@
 #define BIGNUM_MARK_BIT MARK_BIT
 #endif
 
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
 #define interesting_pointer_p(x) \
-  (find_page_index((void*)x) >= 0 || find_immobile_page_index((void*)x) >= 0)
-#else
-#define interesting_pointer_p(x) (find_page_index((void*)x) >= 0)
-#endif
+  (find_page_index((void*)x) >= 0 || immobile_space_p(x))
 
 #ifdef DEBUG
 #  define dprintf(arg) printf arg

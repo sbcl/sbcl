@@ -690,11 +690,7 @@ static void record_ptr(lispobj* source, lispobj target,
                   (sword_t)((char*)new_cell - ss->scratchpad.base));
 }
 
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-#define relevant_ptr_p(x) find_page_index(x)>=0||find_immobile_page_index(x)>=0
-#else
-#define relevant_ptr_p(x) find_page_index(x)>=0
-#endif
+#define relevant_ptr_p(x) find_page_index(x)>=0||immobile_space_p((lispobj)x)
 
 #define check_ptr(ptr) { \
     ++n_scanned_words; \
