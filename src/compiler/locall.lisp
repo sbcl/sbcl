@@ -333,7 +333,9 @@
                       (eq (lvar-uses lvar) ref))
 
                  (convert-call-if-possible ref dest)
-
+                 ;; It might have been deleted by CONVERT-CALL-IF-POSSIBLE
+                 (when (eq (functional-kind fun) :deleted)
+                   (return-from locall-analyze-fun-1))
                  (unless (eq (basic-combination-kind dest) :local)
                    (reference-entry-point ref)
                    (setq local-p nil)))

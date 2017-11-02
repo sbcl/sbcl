@@ -460,3 +460,11 @@
            (declare (dynamic-extent v1))
            (aref v1))))
     ((342) 342)))
+
+(with-test (:name :deleted-during-locall-analyze-fun-1)
+  (checked-compile-and-assert (:allow-warnings t)
+    `(lambda ()
+       (flet ((a ()))
+         (a 1)
+         (a 2)))
+    (() (condition program-error))))
