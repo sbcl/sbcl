@@ -2851,12 +2851,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
     boolean is_in_readonly_space =
         (READ_ONLY_SPACE_START <= (uword_t)where &&
          where < read_only_space_free_pointer);
-    boolean is_in_immobile_space = 0;
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-    is_in_immobile_space =
-        (IMMOBILE_SPACE_START <= (uword_t)where &&
-         where < immobile_space_free_pointer);
-#endif
+    boolean is_in_immobile_space = immobile_space_p((lispobj)where);
 
     lispobj *end = where + nwords;
     size_t count;
@@ -2872,14 +2867,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
 
         if (is_lisp_pointer(thing)) {
             page_index_t page_index = find_page_index((void*)thing);
-            boolean to_immobile_space = 0;
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-            to_immobile_space =
-                (IMMOBILE_SPACE_START <= thing &&
-                 thing < (lispobj)immobile_fixedobj_free_pointer) ||
-                (IMMOBILE_VARYOBJ_SUBSPACE_START <= thing &&
-                 thing < (lispobj)immobile_space_free_pointer);
-#endif
+            boolean to_immobile_space = immobile_space_p(thing);
 
     /* unlike lose(), fprintf detects format mismatch, hence the casts */
 #define FAIL_IF(what, why) if (what) { \
