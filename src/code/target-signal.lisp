@@ -284,7 +284,7 @@
   (if (/= (extern-alien "install_sig_memory_fault_handler" int) 0)
       (enable-interrupt sigbus #'sigbus-handler :synchronous t)
       (write-string ";;;; SIGBUS handler not installed
-"))
+" sb!sys:*stderr*))
   #!-(or linux android)
   (enable-interrupt sigsys #'sigsys-handler :synchronous t)
   #!-sb-wtimer
