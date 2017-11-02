@@ -283,13 +283,18 @@
 (defun install-condition-slot-reader (name condition slot-name)
   (declare (ignore condition))
   (setf (fdefinition name)
-        (lambda (condition)
-          (condition-slot-value condition slot-name))))
+        (set-closure-name
+         (lambda (condition) (condition-slot-value condition slot-name))
+         t
+         `(condition-slot-reader ,name))))
 (defun install-condition-slot-writer (name condition slot-name)
   (declare (ignore condition))
   (setf (fdefinition name)
-        (lambda (new-value condition)
-          (set-condition-slot-value condition new-value slot-name))))
+        (set-closure-name
+         (lambda (new-value condition)
+           (set-condition-slot-value condition new-value slot-name))
+         t
+         `(condition-slot-writer ,name))))
 
 (!defvar *define-condition-hooks* nil)
 

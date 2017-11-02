@@ -1447,7 +1447,7 @@ NOTE: This interface is experimental and subject to change."
   #+sb-xc-host (declare (ignore software version name replacement-spec))
   #-sb-xc-host
   (setf (fdefinition name)
-        (sb!impl::set-closure-name
+        (set-closure-name
          (lambda (&rest args)
            (declare (ignore args))
            (deprecation-error software version 'function name replacement-spec))

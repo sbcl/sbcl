@@ -126,7 +126,7 @@
   (typecase fun
     (%method-function fun)
     ;; a closure potentially becomes a different closure
-    (closure (setq fun (sb!impl::set-closure-name fun t new-name)))
+    (closure (setq fun (set-closure-name fun t new-name)))
     (t (setf (%fun-name fun) new-name)))
   ;; Fixup name-to-function mappings in cases where the function
   ;; hasn't been defined by DEFUN.  (FIXME: is this right?  This logic

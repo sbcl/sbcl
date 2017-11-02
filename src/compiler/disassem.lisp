@@ -612,7 +612,8 @@
          (sub-table (assq :printer cache)))
     (or (cdr (assoc guts (cdr sub-table) :test #'equal))
         (let ((template
-     '(lambda (chunk inst stream dstate
+     `(named-lambda (inst-printer ,@*current-instruction-flavor*)
+        (chunk inst stream dstate
                &aux (chunk (truly-the dchunk chunk))
                     (inst (truly-the instruction inst))
                     (stream (truly-the stream stream))

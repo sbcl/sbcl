@@ -1180,6 +1180,7 @@ possibly temporarily, because it might be used internally."
                "PRINT-NOT-READABLE-ERROR"
                "REPLACE/EQL-HASH-TABLE"
                "RECONS"
+               "SET-CLOSURE-NAME"
 
                ;; ..and macros..
                "COLLECT"

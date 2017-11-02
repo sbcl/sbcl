@@ -208,7 +208,7 @@ only."
   ;; but we can trivially replicate its low-level effect.
   (let ((fdefn (find-or-create-fdefn symbol))
         (closure
-         (sb!impl::set-closure-name
+         (set-closure-name
           (lambda (&rest args)
            (declare (ignore args))
            ;; ANSI specification of FUNCALL says that this should be
