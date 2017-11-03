@@ -468,3 +468,16 @@
          (a 1)
          (a 2)))
     (() (condition program-error))))
+
+
+(with-test (:name :delete-return-without-flush-dest)
+  (assert (eql
+           (catch 'c
+             (funcall (checked-compile
+                       '(lambda ()
+                         (labels ((%f () 40))
+                           (multiple-value-prog1 *
+                             (throw 'c (%f))
+                             (%f)
+                             30))))))
+           40)))

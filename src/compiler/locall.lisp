@@ -1089,6 +1089,7 @@
          (call-return (lambda-return call-fun)))
     (when (and call-return
                (block-delete-p (node-block call-return)))
+      (flush-dest (return-result call-return))
       (delete-return call-return)
       (unlink-node call-return)
       (setq call-return nil))
