@@ -110,6 +110,14 @@ unsigned int immobile_scav_queue_count;
 #define page_full_p(i) (fixedobj_pages[i].free_index >= (int)IMMOBILE_CARD_BYTES)
 #define fixedobj_page_wp(i) (fixedobj_pages[i].attr.parts.flags & WRITE_PROTECT)
 
+/* Compute the last (potential) object on a fixed-size object page
+ * starting at 'base' and stepping by 'spacing_bytes' bytes */
+static inline lispobj* compute_fixedobj_limit(void* base, int spacing_bytes) {
+    return (lispobj*)((char*)base + IMMOBILE_CARD_BYTES - spacing_bytes);
+}
+#define NEXT_FIXEDOBJ(where, spacing_bytes) \
+    (where = (lispobj*)((char*)where + spacing_bytes))
+
 /// Variable-length pages:
 
 // Array of inverted write-protect flags, 1 bit per page.
@@ -486,7 +494,7 @@ void immobile_space_preserve_pointer(void* addr)
     if (valid && (!compacting_p() ||
                   __immobile_obj_gen_bits(object_start) == from_space)) {
         dprintf((logfile,"immobile obj @ %p (<- %p) is conservatively live\n",
-                 header_addr, addr));
+                 object_start, addr));
         if (compacting_p())
             enliven_immobile_obj(object_start, 0);
         else
@@ -510,20 +518,14 @@ static void full_scavenge_immobile_newspace()
         // Skip amount within the loop is in bytes.
         int obj_spacing = fixedobj_page_obj_align(page);
         lispobj* obj    = low_page_address(page);
-        // Use an inclusive, not exclusive, limit. On pages with dense packing
-        // (i.e. non-LAYOUT), if the object size does not evenly divide the page
-        // size, it is wrong to examine memory at an address which could be
-        // an object start, but for the fact that it runs off the page boundary.
-        // On the other hand, unused words hold 0, so it's kind of ok to read them.
-        lispobj* limit  = (lispobj*)((char*)obj +
-                                     IMMOBILE_CARD_BYTES - obj_spacing);
-        for ( ; obj <= limit ; obj = (lispobj*)((char*)obj + obj_spacing) ) {
+        lispobj* limit  = compute_fixedobj_limit(obj, obj_spacing);
+        do {
             if (!fixnump(*obj) && __immobile_obj_gen_bits(obj) == new_space) {
                 set_visited(obj);
                 lispobj header = *obj;
                 scavtab[widetag_of(header)](obj, header);
             }
-        }
+        } while (NEXT_FIXEDOBJ(obj, obj_spacing) <= limit);
     }
 
     // Variable-size object pages
@@ -643,8 +645,7 @@ scavenge_immobile_roots(generation_index_t min_gen, generation_index_t max_gen)
             continue;
         int obj_spacing = fixedobj_page_obj_align(page);
         lispobj* obj = low_page_address(page);
-        lispobj* limit = (lispobj*)((char*)obj +
-                                    IMMOBILE_CARD_BYTES - obj_spacing);
+        lispobj* limit = compute_fixedobj_limit(obj, obj_spacing);
         int gen;
         // Immobile space can only contain objects with a header word,
         // no conses, so any fixnum where a header could be is not a live
@@ -655,7 +656,7 @@ scavenge_immobile_roots(generation_index_t min_gen, generation_index_t max_gen)
                 lispobj header = *obj;
                 scavtab[widetag_of(header)](obj, header);
             }
-        } while ((obj = (lispobj*)((char*)obj + obj_spacing)) <= limit);
+        } while (NEXT_FIXEDOBJ(obj, obj_spacing) <= limit);
     }
 
     // Variable-length object pages
@@ -905,13 +906,14 @@ static inline boolean can_wp_fixedobj_page(page_index_t page, int keep_gen, int 
     int obj_spacing = fixedobj_page_obj_align(page);
     int obj_size_words = fixedobj_page_obj_size(page);
     lispobj* obj = low_page_address(page);
-    lispobj* limit = (lispobj*)((char*)obj + IMMOBILE_CARD_BYTES - obj_spacing);
-    for ( ; obj <= limit ; obj = (lispobj*)((char*)obj + obj_spacing) )
+    lispobj* limit = compute_fixedobj_limit(obj, obj_spacing);
+    do {
         if (!fixnump(*obj) && // an object header
             fixedobj_points_to_younger_p(obj, obj_size_words,
                                          __immobile_obj_generation(obj),
                                          keep_gen, new_gen))
             return 0;
+    } while (NEXT_FIXEDOBJ(obj, obj_spacing) <= limit);
     return 1;
 }
 
@@ -999,14 +1001,17 @@ sweep_fixedobj_pages(int raise)
             // Scan for old->young pointers, and WP if there are none.
             if (ENABLE_PAGE_PROTECTION && !fixedobj_page_wp(page)
                 && fixedobj_pages[page].gens > 1
-                && can_wp_fixedobj_page(page, keep_gen, new_gen))
+                && can_wp_fixedobj_page(page, keep_gen, new_gen)) {
                 SET_WP_FLAG(page, WRITE_PROTECT);
+                dprintf((logfile, "set WP(1) on page %d (mask=%#x)\n",
+                         page, fixedobj_pages[page].gens));
+            }
             continue;
         }
         int obj_spacing = fixedobj_page_obj_align(page);
         int obj_size_words = fixedobj_page_obj_size(page);
         page_base = low_page_address(page);
-        limit = (lispobj*)(page_base + IMMOBILE_CARD_BYTES - obj_spacing);
+        limit = compute_fixedobj_limit(page_base, obj_spacing);
         obj = (lispobj*)page_base;
         hole = NULL;
         int any_kept = 0; // was anything moved to the kept generation
@@ -1016,7 +1021,7 @@ sweep_fixedobj_pages(int raise)
         // If already write-protected, skip the tests.
         int wp_it = ENABLE_PAGE_PROTECTION && !fixedobj_page_wp(page);
         int gen;
-        for ( ; obj <= limit ; obj = (lispobj*)((char*)obj + obj_spacing) ) {
+        do {
             if (fixnump(*obj)) { // was already a hole
             trash_it:
                 // re-link it into the new freelist
@@ -1043,7 +1048,7 @@ sweep_fixedobj_pages(int raise)
             } else if (wp_it && fixedobj_points_to_younger_p(obj, obj_size_words,
                                                              gen, keep_gen, new_gen))
               wp_it = 0;
-        }
+        } while (NEXT_FIXEDOBJ(obj, obj_spacing) <= limit);
         if ( hole ) // terminate the chain of holes
             *hole = (lispobj)((char*)obj - ((char*)hole + obj_spacing));
         fixedobj_pages[page].prior_gc_free_word_index =
@@ -1054,7 +1059,7 @@ sweep_fixedobj_pages(int raise)
             fixedobj_pages[page].gens = mask;
             if (wp_it) {
                 SET_WP_FLAG(page, WRITE_PROTECT);
-                dprintf((logfile, "Lowspace: set WP on page %d\n", page));
+                dprintf((logfile, "set WP(2) on page %d\n", page));
             }
         } else {
             dprintf((logfile,"page %d is all garbage\n", page));
@@ -1319,12 +1324,12 @@ void prepare_immobile_space_for_final_gc()
         if (mask & 1<<PSEUDO_STATIC_GENERATION) {
             int obj_spacing = fixedobj_page_obj_align(page);
             lispobj* obj = (lispobj*)page_base;
-            lispobj* limit = (lispobj*)(page_base + IMMOBILE_CARD_BYTES - obj_spacing);
-            for ( ; obj <= limit ; obj = (lispobj*)((char*)obj + obj_spacing) ) {
+            lispobj* limit = compute_fixedobj_limit(page_base, obj_spacing);
+            do {
                 if (!fixnump(*obj)
                     && __immobile_obj_gen_bits(obj) == PSEUDO_STATIC_GENERATION)
                     assign_generation(obj, HIGHEST_NORMAL_GENERATION);
-            }
+            } while (NEXT_FIXEDOBJ(obj, obj_spacing) <= limit);
             fixedobj_pages[page].gens = (mask & ~(1<<PSEUDO_STATIC_GENERATION))
                                         | 1<<HIGHEST_NORMAL_GENERATION;
         }
@@ -1947,8 +1952,8 @@ void defrag_immobile_space(int* components, boolean verbose)
         int obj_spacing = fixedobj_page_obj_align(page_index);
         if (obj_spacing) {
             lispobj* obj = low_page_address(page_index);
-            lispobj* limit = (lispobj*)((char*)obj + IMMOBILE_CARD_BYTES);
-            for ( ; obj < limit ; obj = (lispobj*)((char*)obj + obj_spacing) ) {
+            lispobj* limit = compute_fixedobj_limit(obj, obj_spacing);
+            do {
                 lispobj word = *obj;
                 if (!fixnump(word)) {
                     if (widetag_of(word) == SYMBOL_WIDETAG)
@@ -1956,7 +1961,7 @@ void defrag_immobile_space(int* components, boolean verbose)
                     else
                         ++obj_type_histo[widetag_of(word)/4];
                 }
-            }
+            } while (NEXT_FIXEDOBJ(obj, obj_spacing) <= limit);
         }
     }
     gc_assert(obj_type_histo[INSTANCE_WIDETAG/4]);
@@ -2057,8 +2062,8 @@ void defrag_immobile_space(int* components, boolean verbose)
         int obj_spacing = fixedobj_page_obj_align(page_index);
         if (!obj_spacing) continue;
         lispobj* obj = low_page_address(page_index);
-        lispobj* limit = (lispobj*)((char*)obj + IMMOBILE_CARD_BYTES);
-        for ( ; obj < limit ; obj = (lispobj*)((char*)obj + obj_spacing) ) {
+        lispobj* limit = compute_fixedobj_limit(obj, obj_spacing);
+        do {
             lispobj word = *obj;
             if (fixnump(word) || filler_obj_p(obj))
                 continue;
@@ -2079,7 +2084,7 @@ void defrag_immobile_space(int* components, boolean verbose)
             set_forwarding_pointer(obj,
                                    make_lispobj(new, lowtag_for_widetag[widetag>>2]));
             *alloc_ptr = (char*)new + obj_spacing;
-        }
+        } while (NEXT_FIXEDOBJ(obj, obj_spacing) <= limit);
     }
 #ifdef LISP_FEATURE_X86_64
     // Fixup JMP offset in fdefns, and self pointers in funcallable instances.
@@ -2094,8 +2099,8 @@ void defrag_immobile_space(int* components, boolean verbose)
         int obj_spacing = fixedobj_page_obj_align(page_index);
         if (!obj_spacing) continue;
         lispobj* obj = low_page_address(page_index);
-        lispobj* limit = (lispobj*)((char*)obj + IMMOBILE_CARD_BYTES);
-        for ( ; obj < limit ; obj = (lispobj*)((char*)obj + obj_spacing) ) {
+        lispobj* limit = compute_fixedobj_limit(obj, obj_spacing);
+        do {
             if (fixnump(*obj) || filler_obj_p(obj))
                 continue;
             gc_assert(forwarding_pointer_p(obj));
@@ -2111,7 +2116,7 @@ void defrag_immobile_space(int* components, boolean verbose)
                 tempspace_addr(new)[1] = (lispobj)(new + 4);
                 break;
             }
-        }
+        } while (NEXT_FIXEDOBJ(obj, obj_spacing) <= limit);
     }
 #endif  /* LISP_FEATURE_X86_64 */
 #endif  /* DEFRAGMENT_FIXEDOBJ_SUBSPACE */
@@ -2342,21 +2347,21 @@ void check_fixedobj_page(int page)
   // the aggregate over all objects on that page. Verify that invariant,
   // checking all pages, not just the ones below the free pointer.
   int genmask, obj_size, obj_spacing, i, all_ok = 1;
-  lispobj *obj, *limit, header;
+  lispobj *obj, header;
   int sees_younger = 0;
 
   obj_size = fixedobj_page_obj_size(page);
   obj_spacing = fixedobj_page_obj_align(page);
   obj = low_page_address(page);
-  limit = (lispobj*)((char*)(obj + WORDS_PER_PAGE) - obj_spacing);
+  lispobj *limit = compute_fixedobj_limit(obj, obj_spacing);
   genmask = 0;
   if (obj_size == 0) {
+      gc_assert(!fixedobj_pages[page].gens);
       for (i=0; i<WORDS_PER_PAGE; ++i)
         gc_assert(obj[i]==0);
-      gc_assert(fixedobj_pages[page].gens ==0);
       return;
   }
-  for ( ; obj <= limit ; obj += obj_spacing ) {
+  do {
       header = *obj;
       if (!fixnump(header)) {
           int gen = __immobile_obj_gen_bits(obj);
@@ -2365,7 +2370,7 @@ void check_fixedobj_page(int page)
           if (fixedobj_points_to_younger_p(obj, obj_size, gen, 0xff, 0xff))
             sees_younger = 1;
       }
-  }
+  } while (NEXT_FIXEDOBJ(obj, obj_spacing) <= limit);
   // It's not wrong if the gen0 bit is set spuriously, but it should only
   // happen at most once, on the first GC after image startup.
   // At all other times, the invariant should hold that if the freelist
@@ -2377,13 +2382,13 @@ void check_fixedobj_page(int page)
   // was never really live, so won't contain any pointers.
   if (fixedobj_pages[page].gens != genmask
       && fixedobj_pages[page].gens != (genmask|1)) {
-    fprintf(stderr, "Page #x%x @ %p: stored mask=%x actual=%x\n",
+    fprintf(stderr, "Page %d @ %p: stored mask=%x actual=%x\n",
             page, low_page_address(page),
             fixedobj_pages[page].gens, genmask);
     all_ok = 0;
   }
   if (fixedobj_page_wp(page) && sees_younger) {
-    fprintf(stderr, "Page #x%x @ %p: WP is wrong\n",
+    fprintf(stderr, "Page %d @ %p: WP is wrong\n",
             page, low_page_address(page));
     all_ok = 0;
   }
@@ -2520,7 +2525,19 @@ void check_varyobj_pages()
               mask |= 1 << gen;
           }
       }
-      gc_assert(mask == VARYOBJ_PAGE_GENS(page));
+      /* This assertion fails after a fullcgc which doesn't update
+       * the genmasks, so that they remain as overestimates */
+      // gc_assert(mask == VARYOBJ_PAGE_GENS(page));
+
+      int actual = VARYOBJ_PAGE_GENS(page);
+      /* Fail if any bit in (LOGANDC1 ACTUAL EXPECTED) is true:
+       *    actual=0, expected=0 -> // ok
+       *    actual=1, expected=1 -> // ok
+       *    actual=1, expected=0 -> // ok
+       *    actual=0, expected=1 -> // NOT ok
+       */
+      if (~actual & mask)
+          lose("genmask wrong: actual=%x expect=%x\n", actual, mask);
   }
 }
 #endif
