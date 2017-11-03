@@ -170,6 +170,34 @@ maybe_resignal_to_lisp_thread(int signal, os_context_t *context)
         return 0;
 }
 
+#if INSTALL_SIG_MEMORY_FAULT_HANDLER && defined(THREAD_SANITIZER)
+/* Under TSAN, every signal blocks every other signal regardless of the
+ * 'sa_mask' given to sigaction(). This is courtesy of an interceptor -
+ * https://github.com/llvm-mirror/compiler-rt/blob/bcc227ee4af1ef3e63033b35dcb1d5627a3b2941/lib/tsan/rtl/tsan_interceptors.cc#L1972
+ *
+ * So among other things, SIGSEGV is blocked on receipt of any random signal
+ * of interest (SIGPROF, SIGALRM, SIGPIPE, ...) that might call Lisp code.
+ * Therefore, if any handler re-enters Lisp, there is a high likelihood
+ * of SIGSEGV being delivered while blocked. Unfortunately, the OS treats
+ * blocked SIGSEGV exactly as if the specified disposition were SIG_DFL,
+ * which results in process termination and a core dump.
+ *
+ * It doesn't work to route all our signals through 'unblock_me_trampoline',
+ * because that only unblocks the specific signal that was just delivered,
+ * to work around the problem of SA_NODEFER not working. (Which says that
+ * a signal should not be blocked within in its own handler; it says nothing
+ * about all other signals.)
+ * Our trick is to unblock SIGSEGV early in every handler,
+ * so not to face sudden death if it happens to invoke Lisp.
+ */
+#  define UNBLOCK_SIGSEGV() \
+  { sigset_t mask; sigemptyset(&mask); \
+    sigaddset(&mask, SIG_MEMORY_FAULT); /* usually SIGSEGV */ \
+    thread_sigmask(SIG_UNBLOCK, &mask, 0); }
+#else
+#  define UNBLOCK_SIGSEGV() {}
+#endif
+
 /* These are to be used in signal handlers. Currently all handlers are
  * called from one of:
  *
@@ -191,6 +219,7 @@ maybe_resignal_to_lisp_thread(int signal, os_context_t *context)
 #define SAVE_ERRNO(signal,context,void_context)                 \
     {                                                           \
         int _saved_errno = errno;                               \
+        UNBLOCK_SIGSEGV();                                      \
         RESTORE_FP_CONTROL_WORD(context,void_context);          \
         if (!maybe_resignal_to_lisp_thread(signal, context))    \
         {
