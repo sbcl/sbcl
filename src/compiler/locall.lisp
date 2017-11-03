@@ -1091,8 +1091,13 @@
                (block-delete-p (node-block call-return)))
       (flush-dest (return-result call-return))
       (delete-return call-return)
-      (unlink-node call-return)
-      (setq call-return nil))
+      ;; A new return will be put into that lambda, don't want
+      ;; DELETE-RETURN called by DELETE-BLOCK to delete the new return
+      ;; from the lambda.
+      ;; (Previously, UNLINK-NODE was called on the return, but it
+      ;; doesn't work well on deleted blocks)
+      (setf (return-lambda call-return) nil
+            call-return nil))
     (cond ((not return))
           ((or next-block call-return)
            (unless (block-delete-p (node-block return))
@@ -1361,7 +1366,8 @@
       (when (and (dolist (ref (leaf-refs clambda) t)
                    (let ((dest (node-dest ref)))
                      (when (or (not dest)
-                               (block-delete-p (node-block dest)))
+                               (node-to-be-deleted-p ref)
+                               (node-to-be-deleted-p dest))
                        (return nil))
                      (let ((home (node-home-lambda ref)))
                        (unless (eq home clambda)

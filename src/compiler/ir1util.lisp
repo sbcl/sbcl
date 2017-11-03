@@ -1577,13 +1577,14 @@
 ;;; Do stuff to indicate that the return node NODE is being deleted.
 (defun delete-return (node)
   (declare (type creturn node))
-  (let* ((fun (return-lambda node))
-         (tail-set (lambda-tail-set fun)))
-    (aver (lambda-return fun))
-    (setf (lambda-return fun) nil)
-    (when (and tail-set (not (find-if #'lambda-return
-                                      (tail-set-funs tail-set))))
-      (setf (tail-set-type tail-set) *empty-type*)))
+  (let ((fun (return-lambda node)))
+    (when fun ;; could become replaced by MOVE-RETURN-STUFF
+      (let ((tail-set (lambda-tail-set fun)))
+        (aver (lambda-return fun))
+        (setf (lambda-return fun) nil)
+        (when (and tail-set (not (find-if #'lambda-return
+                                          (tail-set-funs tail-set))))
+          (setf (tail-set-type tail-set) *empty-type*)))))
   (values))
 
 ;;; If any of the VARS in FUN was never referenced and was not

@@ -469,7 +469,6 @@
          (a 2)))
     (() (condition program-error))))
 
-
 (with-test (:name :delete-return-without-flush-dest)
   (assert (eql
            (catch 'c
@@ -481,3 +480,30 @@
                              (%f)
                              30))))))
            40)))
+
+(with-test (:name :let-conversion-inside-deleted-lambda.1)
+  (checked-compile-and-assert ()
+    `(lambda ()
+       (block nil
+         (catch 'c)
+         (flet ((f (x &key)
+                  (when x
+                    (progv '(*) '(0)
+                      (return)))))
+           (f (return 123))
+           (f 0))))
+    (() 123)))
+
+(with-test (:name :let-conversion-inside-deleted-lambda.2)
+  (checked-compile-and-assert ()
+    `(lambda ()
+       (block nil
+         (block nil
+           (lambda () (return)))
+         (labels ((l () (l))
+                  (%f (a &key)
+                    (l)
+                    (return a)))
+           (%f (return 321))
+           (%f 1))))
+    (() 321)))

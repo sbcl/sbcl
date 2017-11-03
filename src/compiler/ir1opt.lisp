@@ -661,25 +661,26 @@
 ;;; results of the calls.
 (defun ir1-optimize-return (node)
   (declare (type creturn node))
-  (tagbody
-   :restart
-     (let* ((tails (lambda-tail-set (return-lambda node)))
-            (funs (tail-set-funs tails)))
-       (collect ((res *empty-type* values-type-union))
-                (dolist (fun funs)
-                  (let ((return (lambda-return fun)))
-                    (when return
-                      (when (node-reoptimize return)
-                        (setf (node-reoptimize return) nil)
-                        (when (find-result-type return)
-                          (go :restart)))
-                      (res (return-result-type return)))))
+  (let ((lambda (return-lambda node)))
+    (tagbody
+     :restart
+       (let* ((tails (lambda-tail-set lambda))
+              (funs (tail-set-funs tails)))
+         (collect ((res *empty-type* values-type-union))
+           (dolist (fun funs)
+             (let ((return (lambda-return fun)))
+               (when return
+                 (when (node-reoptimize return)
+                   (setf (node-reoptimize return) nil)
+                   (when (find-result-type return)
+                     (go :restart)))
+                 (res (return-result-type return)))))
 
-                (when (type/= (res) (tail-set-type tails))
-                  (setf (tail-set-type tails) (res))
-                  (dolist (fun (tail-set-funs tails))
-                    (dolist (ref (leaf-refs fun))
-                      (reoptimize-lvar (node-lvar ref))))))))
+           (when (type/= (res) (tail-set-type tails))
+             (setf (tail-set-type tails) (res))
+             (dolist (fun (tail-set-funs tails))
+               (dolist (ref (leaf-refs fun))
+                 (reoptimize-lvar (node-lvar ref)))))))))
 
   (values))
 
