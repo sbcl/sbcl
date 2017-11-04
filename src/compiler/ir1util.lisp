@@ -1385,11 +1385,11 @@
       ;; have one.
       (let ((policy (lexenv-%policy *lexenv*)))
         (dolist (functional functionals)
-          (when (and (neq (functional-kind functional) :deleted)
+          (when (and (not (memq (functional-kind functional) '(:deleted :zombie)))
                      (policy= policy (lexenv-%policy (functional-lexenv functional)))
                      ;; Is it in the same component
                      (let ((home-lambda (lambda-home (main-entry functional))))
-                       (and (neq (functional-kind home-lambda) :deleted)
+                       (and (not (memq (functional-kind home-lambda) '(:deleted :zombie)))
                             (eq (lambda-component home-lambda)
                                 *current-component*))))
             (return functional)))))))
