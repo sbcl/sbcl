@@ -302,17 +302,20 @@
   (cond
     ((functionp thing)
      (error "~@<~S is a function, not a form.~@:>" thing))
-    ((and optimize (not (typep thing '(cons (eql lambda)))))
-     (error "~@<Cannot splice ~A declaration into forms other than ~
-             ~S: ~S.~@:>"
-            'optimize 'lambda thing))
-    (optimize
+    ((not optimize)
+     thing)
+    ((typep thing '(cons (eql sb-int:named-lambda)))
+     `(,@(subseq thing 0 3)
+         (declare (optimize ,@optimize))
+         ,@(nthcdr 3 thing)))
+    ((typep thing '(cons (eql lambda)))
      `(,(first thing) ,(second thing)
         (declare (optimize ,@optimize))
         ,@(nthcdr 2 thing)))
-
     (t
-     thing)))
+     (error "~@<Cannot splice ~A declaration into forms other than ~
+             ~{~S~#[~; and ~:;, ~]~}: ~S.~@:>"
+            'optimize '(lambda sb-int:named-lambda) thing))))
 
 (defun compile-capturing-output-and-conditions
     (form &key name condition-transform)
