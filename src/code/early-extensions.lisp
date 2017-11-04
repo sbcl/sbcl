@@ -1718,6 +1718,19 @@ to :INTERPRET, an interpreter will be used.")
              (sorted (stable-sort wrapped comparator :key #'cdr)))
         (map-into sorted #'car sorted))))
 
+(declaim (inline schwartzian-stable-sort-vector))
+(defun schwartzian-stable-sort-vector (vector comparator &key key)
+  (if (null key)
+      (stable-sort (copy-seq vector) comparator)
+      (let* ((key (if (functionp key)
+                      key
+                      (symbol-function key)))
+             (wrapped (map 'vector (lambda (x)
+                                     (cons x (funcall key x)))
+                           vector))
+             (sorted (stable-sort wrapped comparator :key #'cdr)))
+        (map-into sorted #'car sorted))))
+
 ;;; Just like WITH-OUTPUT-TO-STRING but doesn't close the stream,
 ;;; producing more compact code.
 (defmacro with-simple-output-to-string

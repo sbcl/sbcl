@@ -257,8 +257,8 @@
   (let* ((sc (tn-sc tn))
          (reserve (sc-reserve-locations sc)))
     (loop
-      for loc in (sc-locations sc)
-      unless (or (and reserve (memq loc reserve)) ; common case: no reserve
+      for loc across (sc-locations sc)
+      unless (or (and reserve (find loc reserve)) ; common case: no reserve
                  (conflicts-in-sc tn sc loc))
         collect loc)))
 

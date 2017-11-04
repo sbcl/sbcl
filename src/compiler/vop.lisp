@@ -28,6 +28,14 @@
 (deftype sc-vector () `(simple-vector ,sc-number-limit))
 (deftype sc-bit-vector () `(simple-bit-vector ,sc-number-limit))
 
+(deftype sc-locations ()
+  '(simple-array sc-offset 1))
+(declaim (inline make-sc-locations))
+(defun make-sc-locations (locations)
+  (make-array (length locations)
+              :element-type 'sc-offset
+              :initial-contents locations))
+
 ;;; the different policies we can use to determine the coding strategy
 (deftype ltn-policy ()
   '(member :safe :small :fast :fast-safe))
@@ -792,8 +800,8 @@
   (sb nil :type (or sb null))
   ;; the size of elements in this SC, in units of locations in the SB
   (element-size 0 :type index)
-  ;; if our SB is finite, a list of the locations in this SC
-  (locations nil :type list)
+  ;; if our SB is finite, a vector of the locations in this SC
+  (locations (missing-arg) :type sc-locations :read-only t)
   ;; a list of the alternate (save) SCs for this SC
   (alternate-scs nil :type list)
   ;; a list of the constant SCs that can me moved into this SC
@@ -846,11 +854,11 @@
   ;; alignment restriction. The offset must be an even multiple of this.
   ;; this must be a power of two.
   (alignment 1 :type (and index (integer 1)))
-  ;; a list of locations that we avoid packing in during normal
+  ;; a vector of locations that we avoid packing in during normal
   ;; register allocation to ensure that these locations will be free
   ;; for operand loading. This prevents load-TN packing from thrashing
   ;; by spilling a lot.
-  (reserve-locations nil :type list))
+  (reserve-locations (missing-arg) :type sc-locations :read-only t))
 (defprinter (sc)
   name)
 

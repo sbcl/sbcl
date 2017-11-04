@@ -377,8 +377,7 @@
       (let* ((sb (sc-sb sc))
              (confs (finite-sb-live-tns sb)))
         (aver (eq (sb-kind sb) :finite))
-        (dolist (el (sc-locations sc))
-          (declare (type index el))
+        (dovector (el (sc-locations sc))
           (let ((conf (load-tn-conflicts-in-sc op sc el t)))
             (if conf
                 (used (describe-tn-use el conf op))
@@ -1040,7 +1039,7 @@
       (let* ((tn (tn-ref-tn target))
              (loc (tn-offset tn)))
         (if (and (eq (tn-sc tn) sc)
-                 (member (the index loc) (sc-locations sc))
+                 (find (the index loc) (sc-locations sc))
                  (not (load-tn-conflicts-in-sc op sc loc nil)))
             loc
             nil)))))
@@ -1057,11 +1056,11 @@
       (let* ((tn (tn-ref-tn target))
              (loc (tn-offset tn)))
         (when (and (eq (sc-sb sc) (sc-sb (tn-sc tn)))
-                   (member (the index loc) (sc-locations sc))
+                   (find (the index loc) (sc-locations sc))
                    (not (load-tn-conflicts-in-sc op sc loc nil)))
               (return-from select-load-tn-location loc)))))
 
-  (dolist (loc (sc-locations sc) nil)
+  (dovector (loc (sc-locations sc) nil)
     (unless (load-tn-conflicts-in-sc op sc loc nil)
       (return loc))))
 
@@ -1115,7 +1114,7 @@
                (event unpack-tn node)
                (unpack-tn victim))
              (throw 'unpacked-tn nil)))
-      (dolist (loc (sc-locations sc))
+      (dovector (loc (sc-locations sc))
         (declare (type index loc))
         (block SKIP
           (collect ((victims nil adjoin))
@@ -1275,7 +1274,7 @@
     ;; -- TN doesn't conflict with target's location.
     (if (and (eq target-sb (sc-sb sc))
              (or (eq (sb-kind target-sb) :unbounded)
-                 (member loc (sc-locations sc)))
+                 (find loc (sc-locations sc)))
              (= (sc-element-size target-sc) (sc-element-size sc))
              (not (conflicts-in-sc tn sc loc))
              (zerop (mod loc (sc-alignment sc))))
@@ -1351,7 +1350,7 @@
 ;;; on register-starved architectures (x86) this seems to be a bad
 ;;; strategy. -- JES 2004-09-11
 (defun select-location (tn sc &key use-reserved-locs optimize)
-  (declare (type tn tn) (type sc sc) (inline member))
+  (declare (type tn tn) (type sc sc))
   (let* ((sb (sc-sb sc))
          (element-size (sc-element-size sc))
          (alignment (sc-alignment sc))
@@ -1370,7 +1369,7 @@
           (let ((locations (sc-locations sc)))
             (when optimize
               (setf locations
-                    (schwartzian-stable-sort-list
+                    (schwartzian-stable-sort-vector
                      locations '>
                      :key (lambda (location-offset)
                             (loop for offset from location-offset
@@ -1378,10 +1377,9 @@
                                   maximize (svref
                                             (finite-sb-always-live-count sb)
                                             offset))))))
-            (dolist (offset locations)
+            (dovector (offset locations)
               (when (or use-reserved-locs
-                        (not (member offset
-                                     (sc-reserve-locations sc))))
+                        (not (find offset (sc-reserve-locations sc))))
                 (attempt-location offset))))))))
 
 ;;; If a save TN, return the saved TN, otherwise return TN. This is

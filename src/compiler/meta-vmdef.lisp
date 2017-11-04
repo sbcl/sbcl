@@ -166,8 +166,8 @@
                              :sb (sb-or-lose ',sb-name)
                              :element-size ,element-size
                              :alignment ,alignment
-                             :locations ',locations
-                             :reserve-locations ',reserve-locations
+                             :locations (make-sc-locations ',locations)
+                             :reserve-locations (make-sc-locations ',reserve-locations)
                              :save-p ',save-p
                              :number-stack-p ,nstack-p
                              :alternate-scs (mapcar #'sc-or-lose
