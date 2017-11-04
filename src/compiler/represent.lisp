@@ -224,9 +224,9 @@
 ;;; look at the other operand. If its representation has already been
 ;;; chosen (e.g. if it is wired), then we use the appropriate move
 ;;; costs, otherwise we just ignore the references.
-(defun add-representation-costs (refs scs costs
-                                      ops-slot costs-slot more-costs-slot
-                                      write-p)
+(defun add-representation-costs (tn refs scs costs
+                                 ops-slot costs-slot more-costs-slot
+                                 write-p)
   (declare (type function ops-slot costs-slot more-costs-slot))
   (do ((ref refs (tn-ref-next ref)))
       ((null ref))
@@ -238,7 +238,8 @@
                  (incf (svref costs scn) res)))))
       (let* ((vop (tn-ref-vop ref))
              (info (vop-info vop)))
-        (unless (find (vop-info-name info) *ignore-cost-vops*)
+        (unless (and (neq (tn-kind tn) :constant)
+                     (find (vop-info-name info) *ignore-cost-vops*))
           (case (vop-info-name info)
             (move
              (let ((rep (tn-sc
@@ -281,14 +282,15 @@
   (dolist (scn scs)
     (setf (svref costs scn) 0))
 
-  (add-representation-costs (tn-reads tn) scs costs
+  (add-representation-costs tn (tn-reads tn) scs costs
                             #'vop-args #'vop-info-arg-costs
                             #'vop-info-more-arg-costs
                             nil)
-  (add-representation-costs (tn-writes tn) scs costs
+  (add-representation-costs tn (tn-writes tn) scs costs
                             #'vop-results #'vop-info-result-costs
                             #'vop-info-more-result-costs
                             t)
+
 
   (let ((min most-positive-fixnum)
         (min-scn nil)
@@ -485,7 +487,6 @@
 ;;; specified VOP. Dest-TN is the destination TN if we are doing a
 ;;; move or move-arg, and is NIL otherwise. This is only used for
 ;;; efficiency notes.
-#!-sb-fluid (declaim (inline coerce-some-operands))
 (defun coerce-some-operands (ops dest-tn load-scs before)
   (declare (type (or tn-ref null) ops) (list load-scs)
            (type (or tn null) dest-tn) (type (or vop null) before))
@@ -636,34 +637,41 @@
 (defun select-representations (component)
   (let ((costs (make-array sc-number-limit))
         (2comp (component-info component)))
+    (labels ((assign-constant-offset (tn)
+               (when (sc-is tn constant)
+                 (setf (tn-offset tn)
+                       (or (position (tn-leaf tn)
+                                     (ir2-component-constants 2comp))
+                           (vector-push-extend (tn-leaf tn)
+                                               (ir2-component-constants 2comp))))))
+             (possible-scs (tn)
+               (if (eq (tn-kind tn) :constant)
+                   (list (sc-number-or-lose 'constant)
+                         (immediate-constant-sc (constant-value (tn-leaf tn))))
+                   (primitive-type-scs (tn-primitive-type tn))))
+             (pass (tn &key unique)
+               (do ((tn tn (tn-next tn)))
+                   ((null tn))
+                 (aver (tn-primitive-type tn))
+                 (unless (tn-sc tn)
+                   (let* ((scs (possible-scs tn)))
+                     (cond ((rest scs)
+                            (multiple-value-bind (sc uniquep)
+                                (select-tn-representation tn scs costs)
+                              (when (or (not unique)
+                                        uniquep)
+                                (setf (tn-sc tn) sc)
+                                (assign-constant-offset tn))))
+                           (t
+                            (setf (tn-sc tn)
+                                  (svref *backend-sc-numbers* (first scs)))
+                            (assign-constant-offset tn))))))))
 
-    ;; First pass; only allocate SCs where there is a distinct choice.
-    (do ((tn (ir2-component-normal-tns 2comp)
-             (tn-next tn)))
-        ((null tn))
-      (aver (tn-primitive-type tn))
-      (unless (tn-sc tn)
-        (let* ((scs (primitive-type-scs (tn-primitive-type tn))))
-          (cond ((rest scs)
-                 (multiple-value-bind (sc unique)
-                     (select-tn-representation tn scs costs)
-                   (when unique
-                      (setf (tn-sc tn) sc))))
-                (t
-                 (setf (tn-sc tn)
-                       (svref *backend-sc-numbers* (first scs))))))))
-
-    (do ((tn (ir2-component-normal-tns 2comp)
-             (tn-next tn)))
-        ((null tn))
-      (aver (tn-primitive-type tn))
-      (unless (tn-sc tn)
-        (let* ((scs (primitive-type-scs (tn-primitive-type tn)))
-               (sc (if (rest scs)
-                       (select-tn-representation tn scs costs)
-                       (svref *backend-sc-numbers* (first scs)))))
-          (aver sc)
-          (setf (tn-sc tn) sc))))
+      ;; First pass; only allocate SCs where there is a distinct choice.
+      (pass (ir2-component-constant-tns 2comp) :unique t)
+      (pass (ir2-component-normal-tns 2comp) :unique t)
+      (pass (ir2-component-constant-tns 2comp))
+      (pass (ir2-component-normal-tns 2comp)))
 
     (do ((alias (ir2-component-alias-tns 2comp)
                 (tn-next alias)))
@@ -680,5 +688,4 @@
       (frob ir2-component-normal-tns nil)
       (frob ir2-component-wired-tns t)
       (frob ir2-component-restricted-tns t)))
-
   (values))

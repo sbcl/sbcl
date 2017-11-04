@@ -68,90 +68,23 @@
          (entry-info-closure-tn (lambda-info thing))))
       (bug "~@<~2I~_~S ~_not found in ~_~S~:>" thing physenv)))
 
-;;; If LEAF already has a constant TN, return that, otherwise make a
-;;; TN for it.
-(defun constant-tn (leaf boxedp)
-  (declare (type constant leaf))
-  ;; When convenient we can have both a boxed and unboxed TN for
-  ;; constant.
-  (if boxedp
-      (or (constant-boxed-tn leaf)
-          (setf (constant-boxed-tn leaf) (make-constant-tn leaf t)))
-      (or (leaf-info leaf)
-          (setf (leaf-info leaf) (make-constant-tn leaf nil)))))
-
 ;;; Return a TN that represents the value of LEAF, or NIL if LEAF
 ;;; isn't directly represented by a TN. ENV is the environment that
 ;;; the reference is done in.
-(defun leaf-tn (leaf env boxedp)
+(defun leaf-tn (leaf env)
   (declare (type leaf leaf) (type physenv env))
   (typecase leaf
     (lambda-var
      (unless (lambda-var-indirect leaf)
        (find-in-physenv leaf env)))
-    (constant (constant-tn leaf boxedp))
+    (constant (make-constant-tn leaf))
     (t nil)))
 
 ;;; This is used to conveniently get a handle on a constant TN during
 ;;; IR2 conversion. It returns a constant TN representing the Lisp
 ;;; object VALUE.
 (defun emit-constant (value)
-  (constant-tn (find-constant value) t))
-
-(defun boxed-combination-ref-p (combination lvar)
-  (let ((args (combination-args combination)))
-    (flet ((struct-slot-tagged-p (dd index)
-             (let ((slot (and dd
-                              (find index (dd-slots dd) :key #'dsd-index))))
-               (and slot
-                    (eq (dsd-raw-type slot) t))))
-           (constant (lvar)
-             (and (constant-lvar-p lvar)
-                  (lvar-value lvar))))
-      (case (combination-fun-source-name combination nil)
-        (data-vector-set-with-offset
-         (and (eq lvar (car (last args)))
-              (csubtypep (lvar-type (car args))
-                         (specifier-type '(array t)))))
-        (initialize-vector
-         (csubtypep (lvar-type (car args))
-                    (specifier-type '(array t))))
-        (%make-structure-instance
-         (let* ((dd (constant (car args)))
-                (slot-specs (constant (cadr args)))
-                (pos (position lvar (cddr args)))
-                (slot (and pos
-                           (nth pos slot-specs))))
-           (struct-slot-tagged-p dd (cddr slot))))
-        (%instance-set
-         (let* ((instance (lvar-type (car args)))
-                (layout (and (structure-classoid-p instance)
-                             (classoid-layout instance))))
-           (and (eq lvar (car (last args)))
-                (struct-slot-tagged-p (and layout
-                                           (layout-info layout))
-                                      (constant (cadr args))))))
-        ((%special-bind %set-sap-ref-lispobj
-          %rplaca %rplacd cons list list*
-          values)
-         t)
-        (t
-         (call-full-like-p combination))))))
-
-(defun boxed-ref-p (ref)
-  (let* ((lvar (ref-lvar ref))
-         (dest (lvar-dest lvar)))
-    (cond ((basic-combination-p dest)
-           (if (combination-p dest)
-               (boxed-combination-ref-p dest lvar)
-               (call-full-like-p dest)))
-          ((set-p dest)
-           (global-var-p (set-var dest)))
-          ((return-p dest)
-           (let* ((fun (return-lambda dest))
-                  (returns (tail-set-info (lambda-tail-set fun))))
-             (or (xep-p fun)
-                 (eq (return-info-kind returns) :unknown)))))))
+  (make-constant-tn (find-constant value)))
 
 ;;; Convert a REF node. The reference must not be delayed.
 (defun ir2-convert-ref (node block)
@@ -179,7 +112,7 @@
                  (vop ancestor-frame-ref node block tn (leaf-info leaf) res))))
           (t (emit-move node block tn res)))))
       (constant
-       (emit-move node block (constant-tn leaf (boxed-ref-p node)) res))
+       (emit-move node block (make-constant-tn leaf) res))
       (functional
        (ir2-convert-closure node block leaf res))
       (global-var
@@ -456,7 +389,7 @@
           (ecase (ir2-lvar-kind 2lvar)
             (:delayed
              (let ((ref (lvar-uses lvar)))
-               (leaf-tn (ref-leaf ref) (node-physenv ref) (boxed-ref-p ref))))
+               (leaf-tn (ref-leaf ref) (node-physenv ref))))
             (:fixed
              (aver (= (length (ir2-lvar-locs 2lvar)) 1))
              (first (ir2-lvar-locs 2lvar)))))

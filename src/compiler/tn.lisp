@@ -200,45 +200,39 @@
          (component-info *component-being-compiled*)))
   tn)
 
-;;; Create a constant TN. The implementation dependent
+;;; Create a constant TN. The backend dependent
 ;;; IMMEDIATE-CONSTANT-SC function is used to determine whether the
 ;;; constant has an immediate representation.
-(defun make-constant-tn (constant boxedp)
+(defun make-constant-tn (constant)
   (declare (type constant constant))
-  (let* ((immed (immediate-constant-sc (constant-value constant)))
-         (use-immed-p (and immed
-                           (or (not boxedp)
-                               (boxed-immediate-sc-p immed)))))
-    (cond
-      ;; CONSTANT-TN uses two caches, one for boxed and one for unboxed uses.
-      ;;
-      ;; However, in the case of USE-IMMED-P we can have the same TN for both
-      ;; uses. The first two legs here take care of that by cross-pollinating the
-      ;; cached values.
-      ;;
-      ;; Similarly, when there is no immediate SC.
-      ((and (or use-immed-p (not immed)) boxedp (leaf-info constant)))
-      ((and (or use-immed-p (not immed)) (not boxedp) (constant-boxed-tn constant)))
-      (t
-       (let* ((component (component-info *component-being-compiled*))
-              (sc (svref *backend-sc-numbers*
-                         (if use-immed-p
-                             immed
-                             (sc-number-or-lose 'constant))))
-              (res (make-tn 0 :constant (primitive-type (leaf-type constant)) sc)))
-         ;; Objects of type SYMBOL can be immediate but they still go in the constants
-         ;; because liveness depends on pointer tracing without looking at code-fixups.
-         (when (or (not use-immed-p)
-                   #!+immobile-space
-                   (let ((val (constant-value constant)))
-                     (or (and (symbolp val) (not (sb!vm:static-symbol-p val)))
-                         (typep val 'layout))))
-           (let ((constants (ir2-component-constants component)))
-             (setf (tn-offset res) (fill-pointer constants))
-             (vector-push-extend constant constants)))
-         (push-in tn-next res (ir2-component-constant-tns component))
-         (setf (tn-leaf res) constant)
-         res)))))
+  (or (leaf-info constant)
+      (let* ((immed (immediate-constant-sc (constant-value constant)))
+             (boxed (or (not immed)
+                        (boxed-immediate-sc-p immed))))
+        (let* ((component (component-info *component-being-compiled*))
+               ;; If a constant have either an immediate or boxed
+               ;; representation (e.g. double-float) postpone the SC
+               ;; choice until SELECT-REPRESENTATIONS.
+               (sc (and boxed
+                        (if immed
+                            (svref *backend-sc-numbers* immed)
+                            (sc-or-lose 'constant))))
+               (res (make-tn 0 :constant (primitive-type (leaf-type constant)) sc)))
+          ;; Objects of type SYMBOL can be immediate but they still go in the constants
+          ;; because liveness depends on pointer tracing without looking at code-fixups.
+          (when (and sc
+                     (or (not immed)
+                         #!+immobile-space
+                         (let ((val (constant-value constant)))
+                           (or (and (symbolp val) (not (sb!vm:static-symbol-p val)))
+                               (typep val 'layout)))))
+            (let ((constants (ir2-component-constants component)))
+              (setf (tn-offset res)
+                    (vector-push-extend constant constants))
+              (setf (leaf-info constant) res)))
+          (push-in tn-next res (ir2-component-constant-tns component))
+          (setf (tn-leaf res) constant)
+          res))))
 
 (defun make-load-time-value-tn (handle type)
   (let* ((component (component-info *component-being-compiled*))

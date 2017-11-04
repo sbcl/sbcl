@@ -29,9 +29,7 @@
                       (:copier nil)
                       (:include leaf))
   ;; the value of the constant
-  (value (missing-arg) :type t)
-  ;; Boxed TN for this constant, if any.
-  (boxed-tn nil :type (or null tn)))
+  (value (missing-arg) :type t))
 (defprinter (constant :identity t)
   value)
 

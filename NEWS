@@ -6,6 +6,7 @@ changes relative to sbcl-1.4.1:
     his terminal illness. Thank you and rest in peace. (lp#1681201)
   * enhancement: alien routines compiled with '-fsanitize=thread' and/or
     '-fsanitize=memory' cause fewer false positives in error reporting.
+  * optimization: fewer instances of consing float constants at runtime.
 
 changes in sbcl-1.4.1 relative to sbcl-1.4.0:
   * optimization: faster foreign callbacks.
