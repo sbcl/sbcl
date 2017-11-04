@@ -5819,7 +5819,8 @@
                          (setf x 0)
                          (go loop)))
                     z)))
-              2))))
+              2)
+             2)))
 
 (with-test (:name :vop-on-eql-type)
   (assert (= (funcall
@@ -6356,8 +6357,7 @@
                 (find 1 list :key (the (member car) key))))))
     (assert (equal (funcall fun '((a b) (1 a)) 'car)
                    '(1 a)))
-    (assert-error (equal (funcall fun '((a b) (1 a)) 'cdr)
-                         '(1 a)))))
+    (assert-error (funcall fun '((a b) (1 a)) 'cdr))))
 
 (with-test (:name :two-arg-rewriting-find-if)
   (assert (= (funcall (checked-compile
