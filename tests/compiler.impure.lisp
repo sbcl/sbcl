@@ -47,16 +47,14 @@
 (defmacro ayup-duplicate-keys-are-ok-i-see-the-lite (&key k)
   k)
 (with-test (:name (:macro :lambda-list :duplicate &key :arguments))
-  (assert (equal (funcall (checked-compile
-                           '(lambda ()
-                              (ayup-duplicate-keys-are-ok-i-see-the-lite
-                               :k 112))))
-                 112))
-  (assert (equal (funcall (checked-compile
-                           '(lambda ()
-                             (ayup-duplicate-keys-are-ok-i-see-the-lite
-                              :k 'x :k 'y))))
-                 'x)))
+  (checked-compile-and-assert ()
+      '(lambda ()
+         (ayup-duplicate-keys-are-ok-i-see-the-lite :k 112))
+    (() 112))
+  (checked-compile-and-assert ()
+      '(lambda ()
+         (ayup-duplicate-keys-are-ok-i-see-the-lite :k 'x :k 'y))
+    (() 'x)))
 
 ;;; Lexically binding a name that is 1) bound to a global symbol macro
 ;;; 2) at home in a locked package
@@ -577,15 +575,16 @@
   (bug211b))
 
 (with-test (:name (compile :lambda-list :bug-211c))
-  (let ((fun (checked-compile
-              '(lambda ()
-                (flet ((test (&key (x :x x-p))
-                         (list x x-p)))
-                  (assert (equal (test) '(:x nil)))
-                  (assert (equal (test :x 1) '(1 t)))
-                  (assert (equal (test :y 2 :allow-other-keys 11 :allow-other-keys nil)
-                                 '(:x nil))))))))
-    (funcall fun)))
+  (checked-compile-and-assert ()
+      '(lambda ()
+         (flet ((test (&key (x :x x-p))
+                  (list x x-p)))
+           (assert (equal (test) '(:x nil)))
+           (assert (equal (test :x 1) '(1 t)))
+           (assert (equal (test :y 2 :allow-other-keys 11 :allow-other-keys nil)
+                          '(:x nil)))
+           nil))
+      (() nil)))
 
 (with-test (:name (compile :lambda-list :allow-other-keys
                            :bug-211 :do-not-allow))
@@ -821,7 +820,8 @@
 (with-test (:name (function-lambda-expression compile :bug-228))
   (let ((x (function-lambda-expression #'bug228)))
     (when x
-      (assert (= (funcall (checked-compile x) 1) 2)))))
+      (checked-compile-and-assert (:optimize nil) x
+        ((1) 2)))))
 
 ;;;
 (defun bug192b (i)
@@ -1117,10 +1117,10 @@
                                 :initial-element #c(-1.0 -2.0)))))))
 
 (with-test (:name :make-array-symbol-as-initial-element)
-  (assert (every (lambda (x) (eq x 'a))
-                 (funcall (checked-compile
-                           `(lambda ()
-                              (make-array 12 :initial-element 'a)))))))
+  (checked-compile-and-assert ()
+      `(lambda ()
+         (make-array 12 :initial-element 'a))
+    (() #(a a a a a a a a a a a a) :test 'equalp)))
 
 ;;; This non-minimal test-case catches a nasty error when loading
 ;;; inline constants.
@@ -1377,16 +1377,19 @@
       form))
 
 (with-test (:name (:cmacro-with-simple-key :no-key))
-  (let ((fun (checked-compile `(lambda () (cmacro-with-simple-key)))))
-    (assert (string= "cmacro=NIL" (funcall fun)))))
+  (checked-compile-and-assert ()
+      `(lambda () (cmacro-with-simple-key))
+    (() "cmacro=NIL")))
 
 (with-test (:name (:cmacro-with-simple-key :constant-key))
-  (let ((fun (checked-compile `(lambda () (cmacro-with-simple-key :a 42)))))
-    (assert (string= "cmacro=42" (funcall fun)))))
+  (checked-compile-and-assert ()
+      `(lambda () (cmacro-with-simple-key :a 42))
+    (() "cmacro=42")))
 
 (with-test (:name (:cmacro-with-simple-key :variable-key))
-  (let ((fun (checked-compile `(lambda (x) (cmacro-with-simple-key x 42)))))
-    (assert (string= "fun=42" (funcall fun :a)))))
+  (checked-compile-and-assert ()
+      `(lambda (x) (cmacro-with-simple-key x 42))
+    ((:a) "fun=42")))
 
 (defun cmacro-with-nasty-key (&key ((nasty-key var)))
   (format nil "fun=~A" var))
@@ -1396,20 +1399,21 @@
       form))
 
 (with-test (:name (:cmacro-with-nasty-key :no-key))
-  (let ((fun (checked-compile `(lambda () (cmacro-with-nasty-key)))))
-    (assert (string= "cmacro=NIL" (funcall fun)))))
+  (checked-compile-and-assert ()
+      `(lambda () (cmacro-with-nasty-key))
+    (() "cmacro=NIL")))
 
 (with-test (:name (:cmacro-with-nasty-key :constant-key))
   ;; This bogosity is thanks to cmacro lambda lists being /macro/ lambda
   ;; lists.
-  (let ((fun (checked-compile
-              `(lambda () (cmacro-with-nasty-key 'nasty-key 42)))))
-    (assert (string= "fun=42" (funcall fun)))))
+  (checked-compile-and-assert ()
+      `(lambda () (cmacro-with-nasty-key 'nasty-key 42))
+    (() "fun=42")))
 
 (with-test (:name (:cmacro-with-nasty-key :variable-key))
-  (let ((fun (checked-compile
-              `(lambda (nasty-key) (cmacro-with-nasty-key nasty-key 42)))))
-    (assert (string= "fun=42" (funcall fun 'nasty-key)))))
+  (checked-compile-and-assert ()
+      `(lambda (nasty-key) (cmacro-with-nasty-key nasty-key 42))
+    (('nasty-key) "fun=42")))
 
 (defconstant tricky-key 'tricky-key)
 (defun cmacro-with-tricky-key (&key ((tricky-key var)))
@@ -2300,12 +2304,10 @@
   42)
 (declaim (notinline bug-655581))
 (test-util:with-test (:name :bug-655581)
-  (multiple-value-bind (type derived)
-      (funcall (test-util:checked-compile
-                `(lambda ()
-                   (ctu:compiler-derived-type (bug-655581)))))
-    (assert derived)
-    (assert (equal '(integer 42 42) type))))
+  (test-util:checked-compile-and-assert ()
+      `(lambda ()
+         (ctu:compiler-derived-type (bug-655581)))
+    (() (values '(integer 42 42) t))))
 
 (test-util:with-test (:name :clear-derived-types-on-set-fdefn)
   (let ((*evaluator-mode* :compile)
@@ -2720,7 +2722,7 @@
     (assert (equal (eval `(defun ,name ()))
                    name))))
 
-(with-test (:name :make-sequence-unknown)
+(with-test (:name (make-sequence :unknown type))
   (let ((fun (checked-compile
               `(lambda (x)
                  (let ((vector (make-sequence '(simple-array make-sequence-unknown (*)) 10)))
@@ -2796,10 +2798,9 @@
 
 (with-test (:name :ftype-return-type-conflict)
   (declaim (ftype (function () fixnum) ftype-return-type-conflict))
-  (assert-error (funcall (checked-compile `(sb-int:named-lambda ftype-return-type-conflict () nil)
-                                          :allow-warnings t
-                                          :allow-failure t))
-                type-error))
+  (checked-compile-and-assert (:optimize :safe :allow-warnings t)
+      `(sb-int:named-lambda ftype-return-type-conflict () nil)
+    (() (condition type-error))))
 
 
 (declaim (inline bug-1728074-to-boolean bug-1728074-foo))
@@ -2824,4 +2825,3 @@
 
 (with-test (:name :defined-fun-in-a-deleted-home-lambda)
   (checked-compile `(lambda (cache key) (bug-1728074-foo cache key #'bug-1728074-to-boolean))))
-
