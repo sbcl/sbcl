@@ -562,8 +562,8 @@
   (checked-compile-and-assert (:optimize :safe)
       '(lambda (v)
         (list (the fixnum (the (real 0) (eval v)))))
-    ((0.1) (condition type-error))
-    ((-1)  (condition type-error))))
+    ((0.1) (condition 'type-error))
+    ((-1)  (condition 'type-error))))
 
 ;;; the implicit block does not enclose lambda list
 (with-test (:name (compile :implicit block :does-not-enclose :lambda-list))
@@ -596,7 +596,7 @@
              `(with-test (:name (compile ,function :argument-type-check))
                 (checked-compile-and-assert (:optimize :safe)
                     ,form
-                  ((#\a #\b nil) (condition type-error))))))
+                  ((#\a #\b nil) (condition 'type-error))))))
   (define-char=-test char= `(lambda (x y z) (char= x y z)))
   (define-char=-test char/= `(lambda (x y z)
                                (char/= x y z))))
@@ -4137,7 +4137,7 @@
       '(lambda ()
          (eql (make-array 6)
               (list unbound-variable-1 unbound-variable-2)))
-    (() (condition error))))
+    (() (condition 'error))))
 
 (with-test (:name (compile :bug-771673))
   (assert (equal `(the foo bar) (macroexpand `(truly-the foo bar))))
@@ -4224,7 +4224,7 @@
       `(lambda (a)
          (parse-integer "12321321" (the (member :start) a) 1))
     ((:start) (values 2321321 8))
-    ((:end)   (condition type-error))))
+    ((:end)   (condition 'type-error))))
 
 (with-test (:name (compile simple-type-error :in-bound-propagation-a))
   (checked-compile `(lambda (i)
@@ -6196,7 +6196,7 @@
          (declare (type atom key))
          (find 1 list :key (the (member car) key)))
     (('((a b) (1 a)) 'car) '(1 a))
-    (('((a b) (1 a)) 'cdr) (condition type-error))))
+    (('((a b) (1 a)) 'cdr) (condition 'type-error))))
 
 (with-test (:name (:two-arg-rewriting find-if))
   (checked-compile-and-assert ()
@@ -6452,4 +6452,4 @@
 (with-test (:name :base-char-weakinging)
   (checked-compile-and-assert (:optimize :safe)
       `(lambda (x) (the base-char x))
-    (((code-char 252)) (condition type-error))))
+    (((code-char 252)) (condition 'type-error))))

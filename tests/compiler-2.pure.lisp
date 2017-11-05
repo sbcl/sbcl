@@ -467,7 +467,7 @@
        (flet ((a ()))
          (a 1)
          (a 2)))
-    (() (condition program-error))))
+    (() (condition 'program-error))))
 
 (with-test (:name :delete-return-without-flush-dest)
   (assert (eql

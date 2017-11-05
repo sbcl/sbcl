@@ -560,7 +560,7 @@
 ;;;   (CONDITION CONDITION-TYPE)
 ;;;
 ;;; the function call is expected to signal the designated condition
-;;; instead of returning values.
+;;; instead of returning values. CONDITION-TYPE is evaluated.
 ;;;
 ;;; The OPTIMIZE keyword parameter controls the optimization policies
 ;;; (or policy) used when compiling FORM. The argument is interpreted
@@ -585,7 +585,7 @@
                           values :test test)))
                `(list (lambda () (values ,@args))
                       ,(if conditionp
-                           `',values
+                           `(list 'condition ,(second values))
                            `(lambda () (multiple-value-list ,values)))
                       ,test)))))
     `(%checked-compile-and-assert

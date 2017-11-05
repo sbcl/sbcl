@@ -2800,7 +2800,7 @@
   (declaim (ftype (function () fixnum) ftype-return-type-conflict))
   (checked-compile-and-assert (:optimize :safe :allow-warnings t)
       `(sb-int:named-lambda ftype-return-type-conflict () nil)
-    (() (condition type-error))))
+    (() (condition 'type-error))))
 
 
 (declaim (inline bug-1728074-to-boolean bug-1728074-foo))

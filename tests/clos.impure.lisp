@@ -2558,7 +2558,7 @@
     (eval `(defclass ,class () ()))
     (checked-compile-and-assert ()
         `(lambda () (allocate-instance ',class))
-      (() (condition sb-pcl::no-applicable-method-error)))))
+      (() (condition 'sb-pcl::no-applicable-method-error)))))
 
 (defclass unbound-slot-after-allocation=class ()
   ((abc :allocation :class)
@@ -2580,4 +2580,4 @@
       (checked-compile-and-assert (:allow-warnings t)
           `(lambda ()
              (defmethod foo ((bar keyword))))
-        (() (condition sb-pcl:class-not-found-error))))))
+        (() (condition 'sb-pcl:class-not-found-error))))))
