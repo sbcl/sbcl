@@ -28,6 +28,15 @@ extern uword_t IMMOBILE_SPACE_START, IMMOBILE_VARYOBJ_SUBSPACE_START;
 #define IMMOBILE_SPACE_END (IMMOBILE_SPACE_START+IMMOBILE_SPACE_SIZE)
 #endif
 
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+static inline boolean immobile_space_p(lispobj obj)
+{
+  return IMMOBILE_SPACE_START <= obj && obj < IMMOBILE_SPACE_END;
+}
+#else
+static inline boolean immobile_space_p(lispobj obj) { return 0; }
+#endif
+
 #if defined(LISP_FEATURE_GENCGC) && !defined(ENABLE_PAGE_PROTECTION)
 /* Should we use page protection to help avoid the scavenging of pages
  * that don't have pointers to younger generations?

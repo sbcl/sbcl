@@ -143,11 +143,6 @@ extern void fixup_immobile_refs(lispobj (*)(lispobj), lispobj, struct code*);
 // because a simple-fun header does not contain a generation.
 #define __immobile_obj_generation(x) (__immobile_obj_gen_bits(x) & IMMOBILE_OBJ_GENERATION_MASK)
 
-static inline boolean immobile_space_p(lispobj obj)
-{
-  return IMMOBILE_SPACE_START <= obj && obj < IMMOBILE_SPACE_END;
-}
-
 typedef int low_page_index_t;
 
 #ifdef LISP_FEATURE_LITTLE_ENDIAN
