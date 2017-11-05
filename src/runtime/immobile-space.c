@@ -484,7 +484,7 @@ void immobile_space_preserve_pointer(void* addr)
         int obj_index = ((uword_t)addr & (IMMOBILE_CARD_BYTES-1)) / obj_spacing;
         dprintf((logfile,"Pointer %p is to immobile page %d, object %d\n",
                  addr, page_index, obj_index));
-        char* page_start_addr = (char*)((uword_t)addr & ~(IMMOBILE_CARD_BYTES-1));
+        char* page_start_addr = PTR_ALIGN_DOWN(addr, IMMOBILE_CARD_BYTES);
         object_start = (lispobj*)(page_start_addr + obj_index * obj_spacing);
         valid = !fixnump(*object_start)
             && (lispobj*)addr < object_start + fixedobj_page_obj_size(page_index)
@@ -1191,7 +1191,7 @@ static void gc_init_immobile()
     fixedobj_pages = calloc(n_fixedobj_pages, sizeof(struct fixedobj_page));
     gc_assert(fixedobj_pages);
 
-    n_bitmap_elts = (n_varyobj_pages + 31) / 32;
+    n_bitmap_elts = ALIGN_UP(n_varyobj_pages, 32) / 32;
     int request = n_bitmap_elts * sizeof (int)
                 + n_varyobj_pages * (sizeof (short)+sizeof (char));
     char* varyobj_page_tables = calloc(1, request);
@@ -1409,7 +1409,7 @@ int immobile_space_handle_wp_violation(void* fault_addr)
     low_page_index_t page_index = find_immobile_page_index(fault_addr);
     if (page_index < 0) return 0;
 
-    os_protect((os_vm_address_t)((lispobj)fault_addr & ~(IMMOBILE_CARD_BYTES-1)),
+    os_protect(PTR_ALIGN_DOWN(fault_addr, IMMOBILE_CARD_BYTES),
                IMMOBILE_CARD_BYTES, OS_VM_PROT_ALL);
     if (page_index >= FIRST_VARYOBJ_PAGE) {
         // The free pointer can move up or down. Attempting to insist that a WP
@@ -1448,7 +1448,7 @@ search_immobile_space(void *pointer)
             lispobj* found = gc_search_space(start, pointer);
             return (found && filler_obj_p(found)) ? 0 : found;
         } else if (pointer < (void*)immobile_fixedobj_free_pointer) {
-            char *page_base = (char*)((lispobj)pointer & ~(IMMOBILE_CARD_BYTES-1));
+            char *page_base = PTR_ALIGN_DOWN(pointer, IMMOBILE_CARD_BYTES);
             if (page_attributes_valid) {
                 int spacing = fixedobj_page_obj_align(page_index);
                 int index = ((char*)pointer - page_base) / spacing;

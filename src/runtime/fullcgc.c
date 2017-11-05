@@ -136,7 +136,7 @@ static lispobj gc_dequeue()
 struct hopscotch_table mark_bits;
 
 static inline uword_t compute_page_key(lispobj cons) {
-    return cons & ~(GENCGC_CARD_BYTES - 1);
+    return ALIGN_DOWN(cons, GENCGC_CARD_BYTES);
 }
 static inline int compute_dword_number(lispobj cons) {
     return (cons & (GENCGC_CARD_BYTES - 1)) >> (1+WORD_SHIFT);
