@@ -237,35 +237,36 @@
 (with-test (:name :bug-452008)
   ;; FIND & POSITION on lists should check bounds and (in safe code) detect
   ;; circular and dotted lists.
-  (map-optimize-declarations
-   (lambda (policy)
-     (flet ((test (type expr)
-              (let* ((lambda `(lambda () (declare (optimize ,@policy)) ,expr))
-                     (fun (checked-compile lambda)))
-                #+nil(let ((*print-circle* t)) (format t "~&test: ~S~%" lambda))
-                (let ((got (handler-case (funcall fun)
-                             (error (e) (if (typep e type) :error :lose))
-                             (:no-error (res) (list :no-error res)))))
-                  (unless (eq :error got)
-                    (error "wanted an error, got ~S~%" got))))))
-       (test 'sb-kernel:bounding-indices-bad-error
-             '(find :foo '(1 2 3 :foo) :start 1 :end 5 :from-end t))
-       (test 'sb-kernel:bounding-indices-bad-error
-             '(position :foo '(1 2 3 :foo) :start 1 :end 5 :from-end t))
-       (test 'sb-kernel:bounding-indices-bad-error
-             '(find :foo '(1 2 3 :foo) :start 3 :end 0 :from-end t))
-       (test 'sb-kernel:bounding-indices-bad-error
-             '(position :foo '(1 2 3 :foo) :start 3 :end 0 :from-end t))
-       (unless (equal policy '((speed 3) (safety 1)))
-         (test 'type-error
-               '(let ((list (list 1 2 3 :foo)))
-                 (find :bar (nconc list list))))
-         (test 'type-error
-               '(let ((list (list 1 2 3 :foo)))
-                 (position :bar (nconc list list)))))))
-   :speed '(0 3) :safety '(0 1 2) :debug nil :compilation-speed nil :space nil
-   :filter (lambda (&key speed safety)
-             (when (zerop safety) (zerop speed)))))
+  (labels ((safe (&key speed safety &allow-other-keys)
+             (case safety
+               (0 (= speed 0))
+               (t t)))
+           (extra-safe (&key speed safety &allow-other-keys)
+             (case safety
+               (0 (= speed 0))
+               (1 (< speed 2))
+               (t t)))
+           (test (type expr &key (filter #'safe))
+             (checked-compile-and-assert
+                 (:optimize `(:compilation-speed nil :space nil :filter ,filter))
+                 `(lambda () ,expr)
+               (() (condition type)))))
+    (test 'sb-kernel:bounding-indices-bad-error
+          '(find :foo '(1 2 3 :foo) :start 1 :end 5 :from-end t))
+    (test 'sb-kernel:bounding-indices-bad-error
+          '(position :foo '(1 2 3 :foo) :start 1 :end 5 :from-end t))
+    (test 'sb-kernel:bounding-indices-bad-error
+          '(find :foo '(1 2 3 :foo) :start 3 :end 0 :from-end t))
+    (test 'sb-kernel:bounding-indices-bad-error
+          '(position :foo '(1 2 3 :foo) :start 3 :end 0 :from-end t))
+    (test 'type-error
+          '(let ((list (list 1 2 3 :foo)))
+             (find :bar (nconc list list)))
+          :filter #'extra-safe)
+    (test 'type-error
+          '(let ((list (list 1 2 3 :foo)))
+             (position :bar (nconc list list)))
+          :filter #'extra-safe)))
 
 (with-test (:name :bug-554385)
   ;; FIND-IF shouldn't look through the entire list.
@@ -276,45 +277,36 @@
   (assert (= 3 (position :foo '(1 2 3 :foo) :start 1 :end 5))))
 
 (with-test (:name (search :empty-seq))
-  (assert (eql 0
-               (funcall (checked-compile
-                                 `(lambda (x)
-                                    (declare (optimize (speed 3)) (simple-vector x))
-                                    (search x #())))
-                        #())))
-  (assert (eql 0
-               (funcall (checked-compile
-                                 `(lambda (x)
-                                    (declare (optimize (speed 3)) (simple-vector x))
-                                    (search x #(t t t))))
-                        #())))
-  (assert (eql 0
-               (funcall (checked-compile
-                                 `(lambda (x)
-                                    (declare (optimize (speed 3)) (simple-vector x))
-                                    (search x #(t t t) :end1 0)))
-                        #(t t t))))
-  (assert (eql 0
-               (funcall (checked-compile
-                                 `(lambda (x)
-                                    (declare (optimize (speed 3)) (simple-vector x))
-                                    (search x #(t t t) :key nil)))
-                        #())))
-  (assert (eql 0
-               (funcall (checked-compile
-                                 `(lambda (x k)
-                                    (declare (optimize (speed 3)) (simple-vector x))
-                                    (search x #(t t t) :key k)))
-                        #() nil)))
-  (assert (eq :ok
-              (handler-case
-                  (funcall (checked-compile
-                                    `(lambda (x)
-                                       (declare (optimize (speed 3)) (simple-vector x))
-                                       (search x #(t t t) :start2 1 :end2 0 :end1 0)))
-                           #(t t t))
-                (sb-kernel:bounding-indices-bad-error ()
-                  :ok))))
+  (checked-compile-and-assert ()
+      `(lambda (x)
+         (declare (simple-vector x))
+         (search x #()))
+    ((#()) 0))
+  (checked-compile-and-assert ()
+      `(lambda (x)
+         (declare (simple-vector x))
+         (search x #(t t t)))
+    ((#()) 0))
+  (checked-compile-and-assert ()
+      `(lambda (x)
+         (declare (simple-vector x))
+         (search x #(t t t) :end1 0))
+    ((#(t t t)) 0))
+  (checked-compile-and-assert ()
+      `(lambda (x)
+         (declare (simple-vector x))
+         (search x #(t t t) :key nil))
+    ((#()) 0))
+  (checked-compile-and-assert ()
+      `(lambda (x k)
+         (declare (simple-vector x))
+         (search x #(t t t) :key k))
+    ((#() nil) 0))
+  (checked-compile-and-assert (:optimize :safe)
+      `(lambda (x)
+         (declare (simple-vector x))
+         (search x #(t t t) :start2 1 :end2 0 :end1 0))
+    ((#(t t t)) (condition 'sb-kernel:bounding-indices-bad-error)))
   (assert (eql 1
                (funcall (lambda ()
                           (declare (optimize speed))
@@ -396,11 +388,12 @@
                          #'< :key #'car))))))))
 
 (with-test (:name :&more-elt-index-too-large)
-  (assert-error (funcall
-                 (checked-compile `(lambda (&rest args)
-                                     (declare (optimize safety))
-                                     (elt args 0))))
-                sb-kernel:index-too-large-error))
+  (checked-compile-and-assert
+      (:optimize `(:filter ,(lambda (&key safety &allow-other-keys)
+                              (= safety 3))))
+      `(lambda (&rest args)
+         (elt args 0))
+    (() (condition 'sb-kernel:index-too-large-error))))
 
 (with-test (:name (sequence:dosequence :on-literals))
   (assert (= (sequence:dosequence (e #(1 2 3)) (return e))
