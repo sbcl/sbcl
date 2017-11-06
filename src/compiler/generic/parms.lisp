@@ -20,7 +20,9 @@
 (defun !read-dynamic-space-size ()
   (unless (member :sb-xc-host *features*)
     (return-from !read-dynamic-space-size (symbol-value 'default-dynamic-space-size)))
-  (with-open-file (f "output/dynamic-space-size.txt")
+  (with-open-file (f "output/dynamic-space-size.txt" :if-does-not-exist nil)
+    (unless f
+      (return-from !read-dynamic-space-size nil))
     (let ((line (read-line f)))
       (multiple-value-bind (number end)
           (parse-integer line :junk-allowed t)
@@ -64,7 +66,7 @@
 (defmacro !gencgc-space-setup
     (small-spaces-start
           &key ((:dynamic-space-start dynamic-space-start*))
-               ((:default-dynamic-space-size default-dynamic-space-size*))
+               ((:dynamic-space-size dynamic-space-size*))
                #!+immobile-space
                ((:immobile-space-size immobile-space-size*) (* 128 1024 1024))
                #!+immobile-space (immobile-code-space-size (* 104 1024 1024))
@@ -134,8 +136,10 @@
        ,(defconstantish (or #!+relocatable-heap t) 'dynamic-space-start
           (or dynamic-space-start* ptr))
        (defconstant default-dynamic-space-size
-         (or ,(!read-dynamic-space-size)
-             ,default-dynamic-space-size*
+         ;; Build-time make-config.sh option "--dynamic-space-size" overrides
+         ;; keyword argument :dynamic-space-size which overrides general default.
+         ;; All are overridden by runtime --dynamic-space-size command-line arg.
+         (or ,(or (!read-dynamic-space-size) dynamic-space-size*)
              (ecase n-word-bits
                (32 (expt 2 29))
                (64 (expt 2 30)))))))))
