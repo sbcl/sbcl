@@ -389,7 +389,7 @@
   (%deftransform x '(function (rational float) *) #'float-contagion-arg1)
   (%deftransform x '(function (float rational) *) #'float-contagion-arg2))
 
-(dolist (x '(= < > + * / -))
+(dolist (x '(= < > <= >= + * / -))
   (%deftransform x '(function (single-float double-float) *)
                  #'float-contagion-arg1)
   (%deftransform x '(function (double-float single-float) *)
@@ -486,6 +486,8 @@
                                           'x))))))
   (frob <)
   (frob >)
+  (frob <=)
+  (frob >=)
   (frob =)
   (frob = t))
 

@@ -3922,8 +3922,12 @@
                                        (lvar-type lvar))))
 
 (flet ((maybe-invert (node op inverted x y)
-         ;; Don't invert if either argument can be a float (NaNs)
          (cond
+           #!+x86-64 ;; it has >=/<= VOPs
+           ((and (csubtypep (lvar-type x) (specifier-type 'float))
+                 (csubtypep (lvar-type y) (specifier-type 'float)))
+            (give-up-ir1-transform))
+           ;; Don't invert if either argument can be a float (NaNs)
            ((or (maybe-float-lvar-p x) (maybe-float-lvar-p y))
             (delay-ir1-transform node :constraint)
             `(or (,op x y) (= x y)))

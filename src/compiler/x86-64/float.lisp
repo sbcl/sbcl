@@ -1122,7 +1122,9 @@
                         (t))
                       (inst comiss x y))))))
   (define-</> < <single-float <double-float not :p :nc)
-  (define-</> > >single-float >double-float not :p :na))
+  (define-</> > >single-float >double-float not :p :na)
+  (define-</> <= <=single-float <=double-float not :p :a)
+  (define-</> >= >=single-float >=double-float not :p :b))
 
 
 ;;;; conversion
