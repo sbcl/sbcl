@@ -2,13 +2,13 @@
 
 ;;; Common functions
 
-(defparameter *output-directory*
+(defvar *output-directory*
   (merge-pathnames
    (make-pathname :directory '(:relative :up "output"))
    (make-pathname :directory (pathname-directory *load-truename*))))
 
 (defparameter *unicode-character-database*
-  (make-pathname :directory (pathname-directory *load-truename*)))
+  (make-pathname :directory (pathname-directory *load-pathname*)))
 
 (defmacro with-input-txt-file ((s name) &body body)
   `(with-open-file (,s (make-pathname :name ,name :type "txt"
@@ -612,7 +612,8 @@ Length should be adjusted when the standard changes.")
 
 (defun slurp-ucd ()
   (with-input-txt-file (*standard-input* "UnicodeData")
-    (format t "~%//slurp-ucd~%")
+    (when *load-verbose*
+      (format t "~%//slurp-ucd~%"))
     (loop for line = (read-line nil nil)
           while line
           do (slurp-ucd-line line)))
@@ -842,13 +843,16 @@ Used to look up block data.")
                        (write-2-byte (ucd-decomp entry) low-pages)
                      finally (write-2-byte low-pages-index high-pages)
                        (incf low-pages-index)))))
-         finally (assert (< low-pages-index (ash 1 15))) (print low-pages-index)))))
+         finally (assert (< low-pages-index (ash 1 15)))
+                 (when *load-print*
+                   (print low-pages-index))))))
 
 (defun output-decomposition-data ()
   (with-output-dat-file (stream "decomp")
     (loop for cp across *decompositions* do
          (write-codepoint cp stream)))
-  (print (length *decompositions*)))
+  (when *load-print*
+    (print (length *decompositions*))))
 
 (defun output-composition-data ()
   (with-output-dat-file (stream "comp")
