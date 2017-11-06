@@ -128,7 +128,6 @@ extern void scrub_thread_control_stack(struct thread *);
 
 #ifndef LISP_FEATURE_IMMOBILE_SPACE
 
-static inline boolean immobile_space_p(lispobj obj) { return 0; }
 static inline boolean filler_obj_p(lispobj* obj) { return 0; }
 
 #else
