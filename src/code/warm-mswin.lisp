@@ -280,96 +280,100 @@ true to stop searching)." *console-control-spec*)
 (defun win32-process-wait (process)
   (let ((handle (sb-impl::process-handle process))
         (copiers (sb-impl::process-copiers process)))
-    (cond (copiers
-           (unwind-protect
-                (with-alien ((events
-                              ;; Should be enough for stdout, stderr, handle,
-                              ;; and the signal event
-                              (array handle 4)))
-                  (let ((copiers (setup-copiers copiers))
-                        (count (length copiers))
-                        (lisp-buffer (make-array +copier-buffer+ :element-type '(unsigned-byte 8))))
-                    (loop for i below count
-                          do (setf (deref events i)
-                                   (io-copier-event (svref copiers i))))
-                    (setf (deref events count) handle)
-                    (labels ((pending-or-error (operation
-                                                &optional (error (get-last-error)))
-                               (when (/= error error-io-pending)
-                                 (win32-error operation error)))
-                             (try-read (copier)
-                               (cond ((plusp
-                                       (read-file (io-copier-pipe copier)
-                                                  (io-copier-buffer copier)
-                                                  +copier-buffer+
-                                                  nil
-                                                  (io-copier-overlapped copier)))
-                                      (copy copier)
-                                      (try-read copier))
-                                     (t
-                                      (let ((last-error (get-last-error)))
-                                        (unless (= last-error error-broken-pipe)
-                                          (pending-or-error "ReadFile" last-error))))))
-                             (copy (copier)
-                               (let* ((stream (io-copier-stream copier))
-                                      (element-type (stream-element-type stream)))
-                                (multiple-value-bind (finished count)
-                                    (get-overlapped-result (io-copier-pipe copier)
-                                                           (io-copier-overlapped copier) nil)
-                                  (cond (finished
-                                         (loop for i below count
+    (when handle
+      (cond (copiers
+	     (unwind-protect
+		  (with-alien ((events
+				;; Should be enough for stdout, stderr, handle,
+				;; and the signal event
+				(array handle 4)))
+		    (let ((copiers (setup-copiers copiers))
+			  (count (length copiers))
+			  (lisp-buffer (make-array +copier-buffer+ :element-type '(unsigned-byte 8))))
+		      (loop for i below count
+			 do (setf (deref events i)
+				  (io-copier-event (svref copiers i))))
+		      (setf (deref events count) handle)
+		      (labels ((pending-or-error (operation
+						  &optional (error (get-last-error)))
+				 (when (/= error error-io-pending)
+				   (win32-error operation error)))
+			       (try-read (copier)
+				 (cond ((plusp
+					 (read-file (io-copier-pipe copier)
+						    (io-copier-buffer copier)
+						    +copier-buffer+
+						    nil
+						    (io-copier-overlapped copier)))
+					(copy copier)
+					(try-read copier))
+				       (t
+					(let ((last-error (get-last-error)))
+					  (unless (= last-error error-broken-pipe)
+					    (pending-or-error "ReadFile" last-error))))))
+			       (copy (copier)
+				 (let* ((stream (io-copier-stream copier))
+					(element-type (stream-element-type stream)))
+				   (multiple-value-bind (finished count)
+				       (get-overlapped-result (io-copier-pipe copier)
+							      (io-copier-overlapped copier) nil)
+				     (cond (finished
+					    (loop for i below count
                                                do (setf (aref lisp-buffer i)
                                                         (deref (io-copier-buffer copier) i)))
-                                         (cond
-                                           ((member element-type '(base-char character))
-                                            (write-string
-                                             (octets-to-string lisp-buffer
-                                                               :end count
-                                                               :external-format
-                                                               (io-copier-external-format copier))
-                                             stream))
-                                           (t
-                                            (handler-bind
-                                                ((type-error
-                                                   (lambda (c)
-                                                     (error 'simple-type-error
-                                                            :format-control
-                                                            "Error using ~s for program output:~@
+					    (cond
+					      ((member element-type '(base-char character))
+					       (write-string
+						(octets-to-string lisp-buffer
+								  :end count
+								  :external-format
+								  (io-copier-external-format copier))
+						stream))
+					      (t
+					       (handler-bind
+						   ((type-error
+						     (lambda (c)
+						       (error 'simple-type-error
+							      :format-control
+							      "Error using ~s for program output:~@
                                                              ~a"
-                                                            :format-arguments
-                                                            (list stream c)
-                                                            :expected-type
-                                                            (type-error-expected-type c)
-                                                            :datum
-                                                            (type-error-datum c)))))
-                                              (write-sequence lisp-buffer stream :end count)))))
-                                        (t
-                                         (let ((last-error (get-last-error)))
-                                           (unless (= last-error error-broken-pipe)
-                                             (pending-or-error "ReadFile" last-error)))))))))
-                      (loop for copier across copiers
-                            do (try-read copier))
-                      (loop for event = (wait-for-multiple-objects-or-signal (cast events
-                                                                                   (* handle))
-                                                                             (1+ count))
-                            do
-                            (cond ((= event wait-timeout))
-                                  ((< event count)
-                                   (let ((copier (svref copiers event)))
-                                     (copy copier)
-                                     (try-read copier)))
-                                  ((= event count) ;; HANDLE event
-                                   (return))
-                                  ((= event wait-failed)
-                                   (win32-error "WaitForMultipleObjects")))))))
-             (mapc #'free-copier copiers)))
-          (t
-           (do ()
-               ((= 0
-                   (wait-object-or-signal handle))))))
-    (multiple-value-bind (ok code) (get-exit-code-process handle)
-      (when (and (plusp ok) (/= code still-active))
-        (setf (sb-impl::process-%status process) :exited
-              (sb-impl::process-%exit-code process) code))))
+							      :format-arguments
+							      (list stream c)
+							      :expected-type
+							      (type-error-expected-type c)
+							      :datum
+							      (type-error-datum c)))))
+						 (write-sequence lisp-buffer stream :end count)))))
+					   (t
+					    (let ((last-error (get-last-error)))
+					      (unless (= last-error error-broken-pipe)
+						(pending-or-error "ReadFile" last-error)))))))))
+			(loop for copier across copiers
+			   do (try-read copier))
+			(loop for event = (wait-for-multiple-objects-or-signal (cast events
+										     (* handle))
+									       (1+ count))
+			   do
+			     (cond ((= event wait-timeout))
+				   ((< event count)
+				    (let ((copier (svref copiers event)))
+				      (copy copier)
+				      (try-read copier)))
+				   ((= event count) ;; HANDLE event
+				    (return))
+				   ((= event wait-failed)
+				    (win32-error "WaitForMultipleObjects")))))))
+	       (mapc #'free-copier copiers)))
+	    (t
+	     (do ()
+		 ((= 0
+		     (wait-object-or-signal handle))))))
+      (multiple-value-bind (ok code) (get-exit-code-process handle)
+	(when (and (plusp ok) (/= code still-active))
+	  (setf (sb-impl::process-handle process) nil)
+	  (close-handle handle)
+	  
+	  (setf (sb-impl::process-%status process) :exited
+		(sb-impl::process-%exit-code process) code)))))
   process)
 
