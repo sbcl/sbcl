@@ -45,7 +45,6 @@
        (sb!c:insert-step-conditions 0)
        ;; save FP and PC for alien calls -- or not
        (sb!c:alien-funcall-saves-fp-and-pc #!+x86 3 #!-x86 0)))))
-(compile 'proclaim-target-optimization)
 
 (defun in-target-cross-compilation-mode (fun)
   "Call FUN with everything set up appropriately for cross-compiling
@@ -63,8 +62,6 @@
         (*readtable* (copy-readtable)))
     ;; ..in order to make backquotes expand into target code
     ;; instead of host code.
-    ;; FIXME: Isn't this now taken care of automatically by
-    ;; toplevel forms in the xcompiler backq.lisp file?
     (set-macro-character #\` #'sb!impl::backquote-charmacro)
     (set-macro-character #\, #'sb!impl::comma-charmacro)
 
@@ -75,7 +72,6 @@
     ;; Specify where target machinery lives.
     (with-additional-nickname ("SB-XC" "SB!XC")
       (funcall fun))))
-(compile 'in-target-cross-compilation-mode)
 
 
 ;; Supress function/macro redefinition warnings under clisp.
