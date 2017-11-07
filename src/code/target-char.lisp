@@ -32,11 +32,9 @@
              (flet ((coerce-it (array)
                       (!coerce-to-specialized array '(unsigned-byte 8)))
                     (file (name type)
-                      ;; FIXME: this fails on a certain build system,
-                      ;; as does the more obvious :directory '(:relative "output").
-                      ;; Why???
-                      (make-pathname :directory (pathname-directory (merge-pathnames "output/"))
-                                     :name name :type type))
+                      (let ((dir (sb-cold:prepend-genfile-path "output/")))
+                        (make-pathname :directory (pathname-directory (merge-pathnames dir))
+                                       :name name :type type)))
                     (read-ub8-vector (pathname)
                       (with-open-file (stream pathname
                                               :element-type '(unsigned-byte 8))

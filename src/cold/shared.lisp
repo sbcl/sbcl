@@ -132,8 +132,31 @@
     (rename-file x path)))
 (compile 'rename-file-a-la-unix)
 
+(export '(prepend-genfile-path read-from-file *generated-sources-root*))
+(defvar *generated-sources-root* "")
+
+;;; See remark in COMPILE-STEM about strings vs. The Common Lisp Way
+(defun prepend-genfile-path (namestring)
+  (concatenate 'string
+               ;; if exact match to "output/", or mismatch at the next character
+               (if (member (mismatch "output/" namestring) '(nil 7))
+                   *generated-sources-root*
+                   "")
+               namestring))
+(compile 'prepend-genfile-path) ; seems in vogue to compile everything in this file
+
+;;; Return an expression read from the file named NAMESTRING.
+(defun read-from-file (namestring)
+  (with-open-file (s (prepend-genfile-path namestring))
+    (let* ((result (read s))
+           (eof-result (cons nil nil))
+           (after-result (read s nil eof-result)))
+      (unless (eq after-result eof-result)
+        (error "more than one expression in file ~S" namestring))
+      result)))
+(compile 'read-from-file)
+
 ;;; other miscellaneous tools
-(load "src/cold/read-from-file.lisp")
 (load "src/cold/rename-package-carefully.lisp")
 (load "src/cold/with-stuff.lisp")
 
@@ -318,9 +341,15 @@
       stem)))
 (compile 'stem-remap-target)
 
-;;; Determine the source path for a stem.
+;;; Determine the source path for a stem by remapping from the abstract name
+;;; if it contains "/target/" and appending a ".lisp" suffix.
+;;; Assume that STEM is source-tree-relative unless it starts with "output/"
+;;; in which case it could be elsewhere, if you prefer to keep the sources
+;;; devoid of compilation artifacts. (The production of out-of-tree artifacts
+;;; is not actually implemented in the generic build, however if your build
+;;; system does that by itself, then hooray for you)
 (defun stem-source-path (stem)
-  (concatenate 'string "" (stem-remap-target stem) ".lisp"))
+  (concatenate 'string (prepend-genfile-path (stem-remap-target stem)) ".lisp"))
 (compile 'stem-source-path)
 
 ;;; Determine the object path for a stem/flags/mode combination.
