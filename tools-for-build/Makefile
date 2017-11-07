@@ -16,8 +16,6 @@ LDLIBS:=$(OS_LIBS)
 
 all: grovel-headers determine-endianness where-is-mcontext
 
-grovel-headers: CPPFLAGS+=-Wno-format
-
 clean:
 	rm -f *.o grovel-headers determine-endianness where-is-mcontext
 	rm -f *.exe

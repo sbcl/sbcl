@@ -73,17 +73,18 @@
 #include "gc.h"
 
 #define DEFTYPE(lispname,cname) { cname foo; \
-    printf("(define-alien-type " lispname " (%s %d))\n", (((foo=-1)<0) ? "signed" : "unsigned"), (8 * (sizeof foo))); }
+    printf("(define-alien-type " lispname " (%s %lu))\n", \
+           (((foo=-1)<0) ? "signed" : "unsigned"), (8LU * (sizeof foo))); }
 
 #define DEFSTRUCT(lispname,cname,body) { cname bar; \
     printf("(define-alien-type nil\n  (struct %s", #lispname); \
     body; \
     printf("))\n"); }
 #define DEFSLOT(lispname,cname) \
-    printf("\n          (%s (%s %d))", \
+    printf("\n          (%s (%s %lu))", \
            #lispname, \
            (((bar.cname=-1)<0) ? "signed" : "unsigned"), \
-           (8 * (sizeof bar.cname)))
+           (8LU * (sizeof bar.cname)))
 
 void
 defconstant(char* lisp_name, unsigned long unix_number)
