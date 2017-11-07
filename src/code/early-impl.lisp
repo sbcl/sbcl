@@ -46,3 +46,7 @@
 ;;; (And in any case it is not really a special var)
 #!+(and (or x86 x86-64) (not sb-thread))
 (!defvar *pseudo-atomic-bits* 0)
+
+#!+c-stack-is-control-stack
+(setf (info :variable :always-bound 'sb!c:*alien-stack-pointer*) :always-bound)
+

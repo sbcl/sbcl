@@ -169,9 +169,6 @@
                   trap-number)))))
 
 
-;;; the current alien stack pointer; saved/restored for non-local exits
-(defvar *alien-stack-pointer*)
-
 #!+immobile-code
 (progn
 (defun fun-immobilize (fun)
