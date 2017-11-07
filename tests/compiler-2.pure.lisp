@@ -524,3 +524,13 @@
              (f 0)
              x))))
     (() 0)))
+
+(with-test (:name :deleting-exits-with-multiple-users)
+  (checked-compile-and-assert ()
+    `(lambda (a b)
+       (block nil
+         (multiple-value-prog1 b
+           (tagbody (return (multiple-value-prog1 3
+                              (if a (go z)))) z))))
+    ((nil :good) 3)
+    ((t :good) :good)))

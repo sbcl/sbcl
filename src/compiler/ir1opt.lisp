@@ -887,8 +887,7 @@
                      :asserted-type *wild-type*
                      :type-to-check *wild-type*
                      :value value
-                     :vestigial-exit-lexenv (node-lexenv node)
-                     :vestigial-exit-entry-lexenv (node-lexenv entry)
+                     :vestigial-exit t
                      :%type-check nil)))
               ;; We only expect a single successor to EXIT-BLOCK,
               ;; because it contains an EXIT node (which must end its
@@ -2267,31 +2266,14 @@
     (values)))
 
 (defun may-delete-vestigial-exit (cast)
-  (let ((exit-lexenv (cast-vestigial-exit-lexenv cast)))
-    (when exit-lexenv
-      ;; Vestigial exits are only introduced when eliminating a local
-      ;; RETURN-FROM.  We may delete them only when we can show that
-      ;; there are no other code paths that use the entry LVAR that
-      ;; are live from within the block that contained the deleted
-      ;; EXIT and that all uses of the entry LVAR have the same
-      ;; dynamic-extent environment.  The conservative version of this
-      ;; is that there are no EXITs for any ENTRY introduced between
-      ;; the LEXENV of the deleted EXIT and the LEXENV of the target
-      ;; ENTRY and that there is no :DYNAMIC-EXTENT cleanup between
-      ;; the deleted EXIT and the target ENTRY (which the CAST shares
-      ;; a lexenv with).  See ONLY-HARMLESS-CLEANUPS in locall.lisp
-      ;; for a similar analysis.
-      (let ((entry-cleanup (block-start-cleanup (node-block cast))))
-        (do-nested-cleanups (cleanup exit-lexenv)
-          (when (eq cleanup entry-cleanup)
-            (return))
-          (case (cleanup-kind cleanup)
-            ((:block :tagbody)
-             (when (entry-exits (cleanup-mess-up cleanup))
-               (return-from may-delete-vestigial-exit nil)))
-            ((:dynamic-extent)
-             (return-from may-delete-vestigial-exit nil)))))))
-  (values t))
+  (or (not (cast-vestigial-exit cast))
+      ;; If it previously was an EXIT we can't simply delete it
+      ;; since that will move the LVAR use into incorrect place.
+      ;; If there's no other uses it's safe to delete.
+      ;; A better test would be to see if none of the uses are alive
+      ;; before cast-value is used.
+      (not (cast-lvar cast))
+      (atom (lvar-uses (cast-lvar cast)))))
 
 (defun compile-time-type-error-context (context)
   #+sb-xc-host context

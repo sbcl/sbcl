@@ -1450,13 +1450,9 @@
   ;; T
   ;;    A type check is needed.
   (%type-check t :type (member t :external nil))
-  ;; the LEXENV for the deleted EXIT node for which this is the
-  ;; remaining value semantics. If NULL, we do not have exit value
-  ;; semantics and may be deleted based on type information.
-  (vestigial-exit-lexenv nil :type (or lexenv null))
-  ;; the LEXENV for the ENTRY node for the deleted EXIT node mentioned
-  ;; above. NULL if we do not have exit value semantics.
-  (vestigial-exit-entry-lexenv nil :type (or lexenv null))
+  ;; Was this an EXIT deleted by MAYBE-DELETE-EXIT before?
+  ;; Needs to treated carefully to preserve exit value semantics.
+  (vestigial-exit nil :type boolean)
   ;; the lvar which is checked
   (value (missing-arg) :type lvar)
   (context nil)
@@ -1468,8 +1464,7 @@
   value
   asserted-type
   type-to-check
-  vestigial-exit-lexenv
-  vestigial-exit-entry-lexenv)
+  (vestigial-exit :test vestigial-exit))
 
 ;;; A cast that always follows %check-bound and they are deleted together.
 ;;; Created via BOUND-CAST ir1-translator by chaining it together with %check-bound.
