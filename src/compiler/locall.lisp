@@ -1045,8 +1045,9 @@
                      (lvar (node-lvar call)))
                  (unlink-blocks block (first (block-succ block)))
                  (link-blocks block next-block)
-                 (aver (not (node-lvar this-call)))
-                 (add-lvar-use this-call lvar)))
+                 (if (eq (node-derived-type this-call) *empty-type*)
+                     (maybe-terminate-block this-call nil)
+                     (add-lvar-use this-call lvar))))
               (:deleted)
               ;; The called function might be an assignment in the
               ;; case where we are currently converting that function.

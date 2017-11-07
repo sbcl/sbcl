@@ -507,3 +507,20 @@
            (%f (return 321))
            (%f 1))))
     (() 321)))
+
+(with-test (:name :unconvert-tail-calls)
+  (checked-compile-and-assert ()
+    `(lambda ()
+       (block nil
+         (labels ((f (&optional (a (return))
+                                (b (if t (return)))
+                                c
+                      &rest args)
+                    (declare (ignore a b c args))
+                    (return 0)))
+           (let (x)
+             (equal 10 (f 0 3))
+             (f 123 0 0)
+             (f 0)
+             x))))
+    (() 0)))
