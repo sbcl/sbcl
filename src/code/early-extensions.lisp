@@ -76,7 +76,7 @@
 ;;; The smallest power of two that is equal to or greater than X.
 (declaim (inline power-of-two-ceiling))
 (defun power-of-two-ceiling (x)
-  (declare (index x))
+  (declare (type index x))
   (ash 1 (integer-length (1- x))))
 
 (def!type load/store-index (scale lowtag min-offset
