@@ -6071,6 +6071,27 @@
                (sb-kernel:get-lisp-obj-address
                 42)))))
 
+(with-test (:name (compile :exit-deletion :2017-03-29 :tagbody)
+                  :fails-on :sbcl)
+  (checked-compile '(lambda ()
+                     (block foo
+                       (multiple-value-prog1 42
+                         (tagbody
+                            (return-from foo
+                              (catch 'ct (go tag6)))
+                          tag6))))))
+
+(with-test (:name (compile :exit-deletion :bug-1723993 :ignoring-block-value)
+                  :fails-on :sbcl)
+  (checked-compile '(lambda (x)
+                     (block b1
+                       (multiple-value-prog1 0
+                         (block b2
+                           (return-from b1
+                             (catch 'c
+                               (return-from b2
+                                 x)))))))))
+
 (with-test (:name :mv-call-no-let-conversion)
   (assert (equal
            (funcall
