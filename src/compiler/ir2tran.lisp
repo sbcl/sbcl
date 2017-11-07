@@ -1227,9 +1227,7 @@
       (unless (and (stringp compname) (string/= compname "DEFMACRO"))
         ;; Catch FOO and (SETF FOO) both.
         (let ((stem (if (atom fname) fname (second fname))))
-          (when (member stem
-                        sb-cold::*full-calls-to-warn-about*
-                        :test #'string=)
+          (when (member stem *full-calls-to-warn-about* :test #'string=)
             (warn "Full call to ~S" fname)))))
 
     (let* ((inlineable-p (not (let ((*lexenv* (node-lexenv node)))

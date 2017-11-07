@@ -200,3 +200,19 @@
 (defmacro without-gcing (&body body) `(progn ,@body))
 
 (defun logically-readonlyize (x) x)
+
+;;;; Variables which have meaning only to the cross-compiler, defined here
+;;;; in lieu of #+sb-xc-host elsewere which messes up toplevel form numbers.
+(in-package "SB!C")
+
+;;; Set of function names whose definition will never be seen in make-host-2,
+;;; as they are deferred until warm load.
+;;; The table is populated by compile-cold-sbcl, and not present in the target.
+(defparameter *undefined-fun-whitelist* (make-hash-table :test 'equal))
+
+;;; The opposite of the whitelist - if certain full calls are seen, it is probably
+;;; the result of a missed transform and/or misconfiguration.
+(defparameter *full-calls-to-warn-about*
+  '(;mask-signed-field ;; Too many to fix
+    ))
+

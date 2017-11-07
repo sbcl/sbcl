@@ -11,83 +11,10 @@
 (load "src/cold/defun-load-or-cload-xcompiler.lisp")
 (load-or-cload-xcompiler #'host-load-stem)
 
-(let ((*features* (cons :sb-xc *features*)))
-  (load "src/cold/muffler.lisp"))
-
-;; Avoid forward-reference to an as-yet unknown type.
-;; NB: This is not how you would write this function, if you required
-;; such a thing. It should be (TYPEP X 'CODE-DELETION-NOTE).
-;; Do as I say, not as I do.
-(defun code-deletion-note-p (x)
-  (eq (type-of x) 'sb!ext:code-deletion-note))
-(setq sb!c::*handled-conditions*
-      `((,(sb!kernel:specifier-type
-           '(or (satisfies unable-to-optimize-note-p)
-                (satisfies code-deletion-note-p)))
-         . muffle-warning)))
-
-(defun proclaim-target-optimization ()
-  (let ((debug (if (position :sb-show *shebang-features*) 2 1)))
-    (sb-xc:proclaim
-     `(optimize
-       (compilation-speed 1) (debug ,debug)
-       ;; CLISP's pretty-printer is fragile and tends to cause stack
-       ;; corruption or fail internal assertions, as of 2003-04-20; we
-       ;; therefore turn off as many notes as possible.
-       (sb!ext:inhibit-warnings #-clisp 2 #+clisp 3)
-       ;; SAFETY = SPEED (and < 3) should provide reasonable safety,
-       ;; but might skip some unreasonably expensive stuff
-       ;; (e.g. %DETECT-STACK-EXHAUSTION in sbcl-0.7.2).
-       (safety 2) (space 1) (speed 2)
-       ;; sbcl-internal optimization declarations:
-       ;;
-       ;; never insert stepper conditions
-       (sb!c:insert-step-conditions 0)
-       ;; save FP and PC for alien calls -- or not
-       (sb!c:alien-funcall-saves-fp-and-pc #!+x86 3 #!-x86 0)))))
-
-(defun in-target-cross-compilation-mode (fun)
-  "Call FUN with everything set up appropriately for cross-compiling
-   a target file."
-  (let (;; In order to increase microefficiency of the target Lisp,
-        ;; enable old CMU CL defined-function-types-never-change
-        ;; optimizations. (ANSI says users aren't supposed to
-        ;; redefine our functions anyway; and developers can
-        ;; fend for themselves.)
-        #!-sb-fluid
-        (sb!ext:*derive-function-types* t)
-        ;; Let the target know that we're the cross-compiler.
-        (*features* (cons :sb-xc *features*))
-        ;; We need to tweak the readtable..
-        (*readtable* (copy-readtable)))
-    ;; ..in order to make backquotes expand into target code
-    ;; instead of host code.
-    (set-macro-character #\` #'sb!impl::backquote-charmacro)
-    (set-macro-character #\, #'sb!impl::comma-charmacro)
-
-    (set-dispatch-macro-character #\# #\+ #'she-reader)
-    (set-dispatch-macro-character #\# #\- #'she-reader)
-    ;; Control optimization policy.
-    (proclaim-target-optimization)
-    ;; Specify where target machinery lives.
-    (with-additional-nickname ("SB-XC" "SB!XC")
-      (funcall fun))))
-
-
 ;; Supress function/macro redefinition warnings under clisp.
 #+clisp (setf custom:*suppress-check-redefinition* t)
 
-(setf *target-compile-file* #'sb-xc:compile-file)
-(setf *target-assemble-file* #'sb!c:assemble-file)
-(setf *in-target-compilation-mode-fn* #'in-target-cross-compilation-mode)
-
 ;;; Run the cross-compiler to produce cold fasl files.
-;; ... and since the cross-compiler hasn't seen a DEFMACRO for QUASIQUOTE,
-;; make it think it has, otherwise it fails more-or-less immediately.
-(setf (sb-xc:macro-function 'sb!int:quasiquote)
-      (lambda (form env)
-        (the sb!kernel:lexenv-designator env)
-        (sb!impl::expand-quasiquote (second form) t)))
 (setq sb!c::*track-full-called-fnames* :minimal) ; Change this as desired
 (let (fail
       variables
