@@ -994,7 +994,7 @@
 
 ;;; various MISC.*, related to NODEs/LVARs with derived type NIL
 (with-test (:name (compile :node/lvar :derive-type :misc.1))
-  (checked-compile-and-assert ()
+  (checked-compile-and-assert (:allow-warnings t)
       '(lambda (c)
          (declare (type (integer -3924 1001809828) c))
          (min 47 (if (ldb-test (byte 2 14) c)
@@ -1002,7 +1002,7 @@
                      (ignore-errors -732893970))))
     ((705347625) -570344431)))
 (with-test (:name (compile :node/lvar :derive-type :misc.2))
-  (checked-compile-and-assert ()
+  (checked-compile-and-assert (:allow-style-warnings t)
       '(lambda (b)
          (declare (type (integer -1598566306 2941) b))
          (max -148949 (ignore-errors b)))

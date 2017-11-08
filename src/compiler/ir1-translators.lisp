@@ -1253,10 +1253,22 @@ values from the first VALUES-FORM making up the first argument, etc."
 
 Evaluate VALUES-FORM and then the FORMS, but return all the values of
 VALUES-FORM."
-  (let ((dummy (make-ctran)))
-    (ctran-starts-block dummy)
-    (ir1-convert start dummy result values-form)
-    (ir1-convert-progn-body dummy next nil forms)))
+  (let* ((value-ctran (make-ctran))
+         (forms-ctran (make-ctran))
+         (value-lvar (make-lvar))
+         ;; This is to avoid writing in the RESULT LVAR before the
+         ;; body is executed, because the body may overwrite it.
+         ;; See MAY-DELETE-VESTIGIAL-EXIT.
+         (cast (make-vestigial-exit-cast
+                :value value-lvar)))
+    (ctran-starts-block value-ctran)
+    (ir1-convert start value-ctran value-lvar values-form)
+    (ir1-convert-progn-body value-ctran forms-ctran nil forms)
+    (link-node-to-previous-ctran cast forms-ctran)
+    (setf (lvar-dest value-lvar) cast)
+    (use-continuation cast next result)
+    cast))
+
 
 ;;;; interface to defining macros
 

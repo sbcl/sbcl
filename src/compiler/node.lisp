@@ -1450,9 +1450,6 @@
   ;; T
   ;;    A type check is needed.
   (%type-check t :type (member t :external nil))
-  ;; Was this an EXIT deleted by MAYBE-DELETE-EXIT before?
-  ;; Needs to treated carefully to preserve exit value semantics.
-  (vestigial-exit nil :type boolean)
   ;; the lvar which is checked
   (value (missing-arg) :type lvar)
   (context nil)
@@ -1463,8 +1460,14 @@
   %type-check
   value
   asserted-type
-  type-to-check
-  (vestigial-exit :test vestigial-exit))
+  type-to-check)
+
+;;; A filter to help order the value semantics of MULTIPLE-VALUE-PROG1
+(def!struct (vestigial-exit-cast (:include cast
+                                           (%type-check nil)
+                                           (asserted-type *wild-type*)
+                                           (type-to-check *wild-type*))
+                                 (:copier nil)))
 
 ;;; A cast that always follows %check-bound and they are deleted together.
 ;;; Created via BOUND-CAST ir1-translator by chaining it together with %check-bound.

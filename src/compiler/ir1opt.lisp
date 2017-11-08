@@ -867,66 +867,7 @@
                (eq (node-home-lambda node) (node-home-lambda entry)))
       (setf (entry-exits entry) (delq node (entry-exits entry)))
       (if value
-          (with-ir1-environment-from-node entry
-            ;; We can't simply use DELETE-FILTER to unlink the node
-            ;; and substitute some LVAR magic, as this can confuse the
-            ;; stack analysis if there's another EXIT to the same
-            ;; continuation.  Instead, we fabricate a new block (in
-            ;; the same lexenv as the ENTRY, so it can't be merged
-            ;; backwards), insert a gimmicked CAST node to link up the
-            ;; LVAR holding the value being returned to the LVAR which
-            ;; is expecting to accept the value, thus placing the
-            ;; return value where it needs to be while still providing
-            ;; the hook required for stack analysis.
-            ;;                                     -- AJB, 2014-Mar-03
-            (let* ((exit-block (node-block node))
-                   (new-ctran (make-ctran))
-                   (new-block (ctran-starts-block new-ctran))
-                   (cast-node
-                    (%make-cast
-                     :asserted-type *wild-type*
-                     :type-to-check *wild-type*
-                     :value value
-                     :vestigial-exit t
-                     :%type-check nil)))
-              ;; We only expect a single successor to EXIT-BLOCK,
-              ;; because it contains an EXIT node (which must end its
-              ;; block) and the only blocks that have more than once
-              ;; successor are those with IF nodes (which also must
-              ;; end their blocks).  Still, just to be sure, we use a
-              ;; construct that guarantees an error if this
-              ;; expectation is violated.
-              (destructuring-bind
-                    (entry-block)
-                  (block-succ exit-block)
-
-                ;; Finish creating the new block.
-                (link-node-to-previous-ctran cast-node new-ctran)
-                (setf (block-last new-block) cast-node)
-
-                ;; Link the new block into the control sequence.
-                (unlink-blocks exit-block entry-block)
-                (link-blocks exit-block new-block)
-                (link-blocks new-block entry-block)
-
-                ;; Finish re-pointing the value-holding LVAR to the
-                ;; CAST node.
-                (setf (lvar-dest value) cast-node)
-                (setf (exit-value node) nil)
-                (reoptimize-lvar value)
-
-                ;; Register the CAST node as providing a value to the
-                ;; LVAR for the continuation.
-                (add-lvar-use cast-node (node-lvar node))
-                (reoptimize-lvar (node-lvar node))
-
-                ;; Remove the EXIT node.
-                (unlink-node node)
-
-                ;; And, because we created a new block, we need to
-                ;; force component reanalysis (to assign a DFO number
-                ;; to the block if nothing else).
-                (setf (component-reanalyze *current-component*) t))))
+          (delete-filter node (node-lvar node) value)
           (unlink-node node)))))
 
 
@@ -2266,14 +2207,9 @@
     (values)))
 
 (defun may-delete-vestigial-exit (cast)
-  (or (not (cast-vestigial-exit cast))
-      ;; If it previously was an EXIT we can't simply delete it
-      ;; since that will move the LVAR use into incorrect place.
-      ;; If there's no other uses it's safe to delete.
-      ;; A better test would be to see if none of the uses are alive
-      ;; before cast-value is used.
-      (not (cast-lvar cast))
-      (atom (lvar-uses (cast-lvar cast)))))
+  ;; VESTIGIAL-EXIT-CASTs come from MULTIPLE-VALUES-PROG1 to avoid
+  ;; overwriting their lvars
+  (not (vestigial-exit-cast-p cast)))
 
 (defun compile-time-type-error-context (context)
   #+sb-xc-host context
