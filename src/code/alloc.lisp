@@ -53,7 +53,7 @@
 (define-alien-variable "varyobj_holes" long)
 (define-alien-variable "varyobj_page_touched_bits" (* (unsigned 32)))
 (define-alien-variable "varyobj_page_scan_start_offset" (* (unsigned 16)))
-(define-alien-variable "varyobj_page_header_gens" (* (unsigned 8)))
+(define-alien-variable "varyobj_page_gens" (* (unsigned 8)))
 (define-alien-routine "find_preceding_object" long (where long))
 
 ;;; Lazily created freelist, used only when unallocate is called:
@@ -308,8 +308,8 @@
             (index (varyobj-page-index addr))
             (obj-end (+ addr n-bytes)))
        ;; Mark the page as being used by a nursery object.
-       (setf (deref varyobj-page-header-gens index)
-             (logior (deref varyobj-page-header-gens index) 1))
+       (setf (deref varyobj-page-gens index)
+             (logior (deref varyobj-page-gens index) 1))
        ;; On the object's first page, set the scan start only if addr
        ;; is lower than the current page-scan-start object.
        ;; Note that offsets are expressed in doublewords backwards from

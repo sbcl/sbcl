@@ -131,12 +131,14 @@ static int n_bitmap_elts; // length of array measured in 'int's
 // from a freed object.
 unsigned short* varyobj_page_scan_start_offset;
 
-// Array of page generation masks
-unsigned char* varyobj_page_header_gens;
+// Array of page generation masks for objects which start on this page.
+// An object which ends on but does not start on page 'n' does not affect
+// the generation mask for page 'n'
+unsigned char* varyobj_page_gens;
 // Holes to be stuffed back into the managed free list.
 lispobj varyobj_holes;
 
-#define VARYOBJ_PAGE_GENS(x) varyobj_page_header_gens[x-FIRST_VARYOBJ_PAGE]
+#define VARYOBJ_PAGE_GENS(x) varyobj_page_gens[x-FIRST_VARYOBJ_PAGE]
 #define varyobj_page_touched(x) \
   ((varyobj_page_touched_bits[(x-FIRST_VARYOBJ_PAGE)/32] >> (x&31)) & 1)
 
@@ -1200,7 +1202,7 @@ static void gc_init_immobile()
     // The conservative value for 'touched' is 1.
     memset(varyobj_page_touched_bits, 0xff, n_bitmap_elts * sizeof (int));
     varyobj_page_scan_start_offset = (unsigned short*)(varyobj_page_touched_bits + n_bitmap_elts);
-    varyobj_page_header_gens = (unsigned char*)(varyobj_page_scan_start_offset + n_varyobj_pages);
+    varyobj_page_gens = (unsigned char*)(varyobj_page_scan_start_offset + n_varyobj_pages);
 }
 
 /* Because the immobile page table is not dumped into a core image,
@@ -1605,7 +1607,7 @@ static struct {
   int n_bytes;
 } fixedobj_tempspace, varyobj_tempspace;
 
-// Given an adddress in the target core, return the equivalent
+// Given an address in the target core, return the equivalent
 // physical address to read or write during defragmentation
 static lispobj* tempspace_addr(void* address)
 {

@@ -802,19 +802,18 @@ Experimental: interface subject to change."
              (sb-sys:with-pinned-objects (object)
                (let* ((addr (sb-kernel:get-lisp-obj-address object))
                       (space
-                       (cond ((< sb-vm:read-only-space-start addr
+                       (cond ((< (sb-kernel:current-dynamic-space-start) addr
+                                 (sb-sys:sap-int (sb-kernel:dynamic-space-free-pointer)))
+                              :dynamic)
+                             #+immobile-space
+                             ((sb-kernel:immobile-space-addr-p addr)
+                              :immobile)
+                             ((< sb-vm:read-only-space-start addr
                                  (sb-sys:sap-int sb-vm:*read-only-space-free-pointer*))
                               :read-only)
                              ((< sb-vm:static-space-start addr
                                  (sb-sys:sap-int sb-vm:*static-space-free-pointer*))
-                              :static)
-                             #+immobile-space
-                             ((< sb-vm:immobile-space-start addr
-                                 (sb-sys:sap-int sb-vm:*immobile-space-free-pointer*))
-                              :immobile)
-                             ((< (sb-kernel:current-dynamic-space-start) addr
-                                 (sb-sys:sap-int (sb-kernel:dynamic-space-free-pointer)))
-                              :dynamic))))
+                              :static))))
                  (when space
                    #+gencgc
                    (if (eq :dynamic space)

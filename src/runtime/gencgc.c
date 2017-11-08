@@ -2092,7 +2092,7 @@ preserve_pointer(void *addr)
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
   /* Immobile space MUST be lower than dynamic space,
      or else this test needs to be revised */
-    if (addr < (void*)IMMOBILE_SPACE_END) {
+    if (addr < (void*)DYNAMIC_SPACE_START) {
         extern void immobile_space_preserve_pointer(void*);
         immobile_space_preserve_pointer(addr);
         return;
@@ -2256,7 +2256,7 @@ update_page_write_prot(page_index_t page)
             // But unlike in the dynamic space case, we need to read a byte
             // from the object to determine its generation, which requires care.
             // Consider an unboxed word that looks like a pointer to a word that
-            // looks like fun-header-widetag. We can't naively back up to the
+            // looks like simple-fun-widetag. We can't naively back up to the
             // underlying code object since the alleged header might not be one.
             int obj_gen = gen; // Make comparison fail if we fall through
             if (lowtag_of((lispobj)ptr) == FUN_POINTER_LOWTAG &&
@@ -2265,7 +2265,7 @@ update_page_write_prot(page_index_t page)
                 // This is a heuristic, since we're not actually looking for
                 // an object boundary. Precise scanning of 'page' would obviate
                 // the guard conditions here.
-                if ((lispobj)code >= IMMOBILE_VARYOBJ_SUBSPACE_START
+                if (immobile_space_p((lispobj)code)
                     && widetag_of(*code) == CODE_HEADER_WIDETAG)
                     obj_gen = __immobile_obj_generation(code);
             } else {
