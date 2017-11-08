@@ -186,25 +186,6 @@
                                                 (type-of maybe-package))
                                             really-package)))))))
 
-;;; Access *DEFAULT-PATHNAME-DEFAULTS*, issuing a warning if its value
-;;; is silly. (Unlike the vaguely-analogous SANE-PACKAGE, we don't
-;;; actually need to reset the variable when it's silly, since even
-;;; crazy values of *DEFAULT-PATHNAME-DEFAULTS* don't leave the system
-;;; in a state where it's hard to recover interactively.)
-(defun sane-default-pathname-defaults ()
-  (let* ((dfd *default-pathname-defaults*)
-         (dfd-dir (pathname-directory dfd)))
-    ;; It's generally not good to use a relative pathname for
-    ;; *DEFAULT-PATHNAME-DEFAULTS*, since relative pathnames
-    ;; are defined by merging into a default pathname (which is,
-    ;; by default, *DEFAULT-PATHNAME-DEFAULTS*).
-    (when (and (consp dfd-dir)
-               (eql (first dfd-dir) :relative))
-      (warn
-       "~@<~S is a relative pathname. (But we'll try using it anyway.)~@:>"
-       '*default-pathname-defaults*))
-    dfd))
-
 ;;; Give names to elements of a numeric sequence.
 (defmacro defenum ((&key (start 0) (step 1))
                    &rest identifiers)
