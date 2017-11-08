@@ -165,11 +165,21 @@
             (cond ((sc-is words immediate)
                    (inst mov rcx (tn-value words)))
                   (t
+                   ;; 'words' might be (should be) in 'rcx' at this point.
+                   ;; We need 'rcx' as the counter for REP STOS but we also
+                   ;; need it again in the fill loop for the actual vector.
+                   ;; 'result' is live from :load and conflicts with everything
+                   ;; so we can safely use it as a temp.
+                   (inst mov result words) ; preserve 'words'
                    (move rcx words)
                    (inst shr rcx n-fixnum-tag-bits)))
             (inst add rcx sb!vm:vector-data-offset)
             (inst rep)
-            (inst stos rax)))
+            (inst stos rax)
+            (unless (sc-is words immediate)
+              (inst mov words result) ; restore 'words'
+              (inst lea result ; recompute the tagged pointer
+                    (make-ea :byte :base rsp-tn :disp other-pointer-lowtag)))))
         (let ((data-addr
                 (make-ea :qword :base result
                                 :disp (- (* vector-data-offset n-word-bytes)

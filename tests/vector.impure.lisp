@@ -77,3 +77,16 @@
   (frob *array-displaced-to-simple-vector* nil nil)
   (frob *array-displaced-to-adjustable-vector-t* nil nil)
   (frob *simple-array* nil nil))
+
+;;; While it's true that we might actually want NOT to zero-fill
+;;; all dx-vectors, the zero-fill code for x86-64 was broken with ':msan'
+;;; in features because it reused 'rcx' as the count after rcx was
+;;; already decremented to 0 by the shadow unpoisoning loop.
+(with-test (:name :dx-char-vector-zeroized)
+  (funcall
+   (compile nil
+            (lambda (n)
+              (sb-int:dx-let ((v (make-array (the (mod 200) n)
+                                             :element-type 'base-char)))
+                (assert (not (find #\null v :test #'char/=))))))
+   (opaque-identity 40)))
