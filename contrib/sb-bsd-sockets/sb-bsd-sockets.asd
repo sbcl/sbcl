@@ -7,28 +7,31 @@
   #+sb-building-contrib #p"SYS:CONTRIB;SB-BSD-SOCKETS;"
   :components
   ((:file "defpackage")
-   (:file "win32-lib" :if-feature :win32)
-   (:sb-grovel-constants-file "constants"
-    :package :sockint
-    :depends-on ("defpackage")
-    :if-feature (:not :win32))
-   (:sb-grovel-constants-file "win32-constants"
-    :package :sockint
-    :depends-on ("defpackage" "win32-lib")
-    :if-feature :win32)
-   (:file "util" :depends-on ("defpackage" "constants"))
-   (:file "protocol" :depends-on ("defpackage"))
+
+   (:sb-grovel-constants-file "constants" :depends-on ("defpackage")
+                          :if-feature (:not :win32)
+                          :package :sockint)
+   (:file "win32-lib"     :if-feature :win32)
+   (:sb-grovel-constants-file "win32-constants" :depends-on ("defpackage" "win32-lib")
+                          :if-feature :win32
+                          :package :sockint)
+
+   (:file "util"          :depends-on ("defpackage" "constants"))
+   (:file "protocol"      :depends-on ("defpackage"))
+
    (:file "win32-sockets" :depends-on ("protocol" "win32-constants")
-    :if-feature :win32)
-   (:file "sockets" :depends-on ("util" "constants" "protocol" "win32-sockets"))
-   (:file "sockopt" :depends-on ("util" "sockets"))
-   (:file "inet" :depends-on ("protocol" "sockets"))
-   (:file "inet4" :depends-on ("protocol" "sockets"))
-   (:file "inet6" :depends-on ("protocol" "sockets")
-    :if-feature (:not :win32))
-   (:file "local" :depends-on ("protocol" "sockets"))
-   (:file "name-service" :depends-on ("protocol" "sockets"))
-   (:file "misc" :depends-on ("sockets"))
+                          :if-feature :win32)
+   (:file "sockets"       :depends-on ("util" "constants" "protocol" "win32-sockets"))
+   (:file "sockopt"       :depends-on ("util" "sockets"))
+
+   (:file "inet"          :depends-on ("protocol" "sockets"))
+   (:file "inet4"         :depends-on ("protocol" "sockets"))
+   (:file "inet6"         :depends-on ("protocol" "sockets")
+                          :if-feature (:not :win32))
+   (:file "local"         :depends-on ("protocol" "sockets"))
+
+   (:file "name-service"  :depends-on ("protocol" "sockets"))
+   (:file "misc"          :depends-on ("sockets"))
 
    ;; FIXME at least NEWS and TODO actually exist in the
    ;; filesystem. However, their all-uppercase names are translated to
