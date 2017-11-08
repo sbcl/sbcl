@@ -68,16 +68,9 @@
 (push 'call-wsa-startup sb-ext:*init-hooks*)
 
 ;; not implemented on win32
-(defconstant af-local 0)
 (defconstant msg-dontwait 0)
 (defconstant msg-trunc 0)
 (defconstant msg-eor 0)
 (defconstant msg-nosignal 0)
 (defconstant msg-waitall 0)
 (defconstant msg-eor 0)
-(defconstant size-of-sockaddr-un 0)
-(defun (setf sockaddr-un-family) (addr family) ())
-(defun (setf sockaddr-un-path) (addr family) ())
-(defun sockaddr-un-path (addr) ())
-(defun free-sockaddr-un (addr) ())
-(defun allocate-sockaddr-un () ())

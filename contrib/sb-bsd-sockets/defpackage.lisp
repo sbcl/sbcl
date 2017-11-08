@@ -6,7 +6,7 @@
 
 (defpackage "SB-BSD-SOCKETS"
   (:export #:socket
-           #:local-socket #:local-abstract-socket
+           #-win32 #:local-socket #-win32 #:local-abstract-socket
            #:inet-socket #:inet6-socket
            #:make-inet-socket ; deprecated
 
