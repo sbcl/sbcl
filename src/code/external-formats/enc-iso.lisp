@@ -1,4 +1,4 @@
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 (define-unibyte-mapping-external-format :iso-8859-2
     (:|iso-8859-2| :latin-2 :|latin-2|)

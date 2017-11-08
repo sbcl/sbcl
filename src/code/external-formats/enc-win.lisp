@@ -1,4 +1,4 @@
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 (define-unibyte-mapping-external-format :cp1250
     (:|cp1250| :windows-1250 :|windows-1250|)

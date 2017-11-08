@@ -1,4 +1,4 @@
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 (define-multibyte-mapper +ucs-to-eucjp-table+
      ((#xa1 #x8fa2c2)
       (#xa2 #xa1f1)

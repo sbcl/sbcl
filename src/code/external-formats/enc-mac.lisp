@@ -1,4 +1,4 @@
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 (define-unibyte-mapping-external-format :mac-roman
     (:|mac-roman| :|MacRoman| :mac :|mac| :macintosh :|macintosh|)

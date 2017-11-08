@@ -81,6 +81,21 @@
                 "SRC;INTERPRETER;SPECIAL-FORMS"
                 "SRC;INTERPRETER;EVAL"
                 "SRC;INTERPRETER;DEBUG"))
+      (external-format-srcs
+       (append '("SRC;CODE;EXTERNAL-FORMATS;ENC-EBCDIC")
+               #+sb-unicode
+               '("SRC;CODE;EXTERNAL-FORMATS;ENC-CYR"
+                 "SRC;CODE;EXTERNAL-FORMATS;ENC-DOS"
+                 "SRC;CODE;EXTERNAL-FORMATS;ENC-ISO"
+                 "SRC;CODE;EXTERNAL-FORMATS;ENC-WIN"
+                 "SRC;CODE;EXTERNAL-FORMATS;ENC-MAC"
+                 "SRC;CODE;EXTERNAL-FORMATS;MB-UTIL"
+                 "SRC;CODE;EXTERNAL-FORMATS;ENC-CN-TBL"
+                 "SRC;CODE;EXTERNAL-FORMATS;ENC-CN"
+                 "SRC;CODE;EXTERNAL-FORMATS;ENC-JPN-TBL"
+                 "SRC;CODE;EXTERNAL-FORMATS;ENC-JPN"
+                 "SRC;CODE;EXTERNAL-FORMATS;ENC-UCS"
+                 "SRC;CODE;EXTERNAL-FORMATS;ENC-UTF")))
        (pcl-srcs
               '(;; CLOS, derived from the PCL reference implementation
                 ;;
@@ -212,5 +227,6 @@
         (*compile-print* nil))
     (do-srcs early-srcs)
     (with-compilation-unit () (do-srcs interpreter-srcs))
+    (do-srcs external-format-srcs)
     (with-compilation-unit () (do-srcs pcl-srcs))
     (do-srcs other-srcs))))

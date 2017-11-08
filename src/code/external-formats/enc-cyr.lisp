@@ -1,4 +1,4 @@
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 (define-unibyte-mapping-external-format :koi8-r (:|koi8-r|)
   (#x80 #x2500) ; BOX DRAWINGS LIGHT HORIZONTAL

@@ -14,7 +14,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 
 (declaim (inline utf-noncharacter-code-p))
@@ -423,7 +423,7 @@
                             (dpb (cref 3) (byte 8 24)
                                  (dpb (cref 2) (byte 8 16)
                                       (dpb (cref 1) (byte 8 8) (cref 0))))))))
-          (if (and (< code sb!xc:char-code-limit)
+          (if (and (< code char-code-limit)
                    (not (utf-noncharacter-code-p code)))
               (code-char code)
               (decoding-error array pos (+ pos bytes) :utf-32le
@@ -443,14 +443,13 @@
                             (dpb (cref 0) (byte 8 24)
                                  (dpb (cref 1) (byte 8 16)
                                       (dpb (cref 2) (byte 8 8) (cref 3))))))))
-          (if (and (< code sb!xc:char-code-limit)
+          (if (and (< code char-code-limit)
                    (not (utf-noncharacter-code-p code)))
               (code-char code)
               (decoding-error array pos (+ pos bytes) :utf-32be
                               'octet-decoding-error pos)))))))
 
-(eval-when (:compile-toplevel)
-  (sb!xc:proclaim '(muffle-conditions compiler-note)))
+(declaim (muffle-conditions compiler-note))
 (instantiate-octets-definition define-simple-get-utf32-character)
 
 (defmacro define-utf-32->string (accessor type)
@@ -504,7 +503,7 @@
       (setf (sap-ref-32le sap tail) bits))
   4
   (let ((code (sap-ref-32le sap head)))
-    (if (and (< code sb!xc:char-code-limit)
+    (if (and (< code char-code-limit)
              (not (utf-noncharacter-code-p code)))
         (code-char code)
         (return-from decode-break-reason 4)))
@@ -519,7 +518,7 @@
       (setf (sap-ref-32be sap tail) bits))
   4
   (let ((code (sap-ref-32be sap head)))
-    (if (and (< code sb!xc:char-code-limit)
+    (if (and (< code char-code-limit)
              (not (utf-noncharacter-code-p code)))
         (code-char code)
         (return-from decode-break-reason 4)))

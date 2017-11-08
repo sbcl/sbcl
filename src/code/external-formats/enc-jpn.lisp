@@ -1,4 +1,4 @@
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 ;;; EUC-JP
 (declaim (inline ucs-to-eucjp eucjp-to-ucs
@@ -28,8 +28,7 @@
            (type (unsigned-byte 8) code))
   (<= #xA1 code #xFE))
 
-(eval-when (:compile-toplevel)
-  (sb!xc:proclaim '(muffle-conditions compiler-note)))
+(declaim (muffle-conditions compiler-note))
 (define-multibyte-encoding :euc-jp (:euc-jp :eucjp :|eucJP|)
   ucs-to-eucjp eucjp-to-ucs mb-len-as-eucjp eucjp-continuation-byte-p)
 

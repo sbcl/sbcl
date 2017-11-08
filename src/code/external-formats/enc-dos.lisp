@@ -1,4 +1,4 @@
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 (define-unibyte-mapping-external-format :cp437 (:|cp437|)
   (#x80 #x00C7) ; LATIN CAPITAL LETTER C WITH CEDILLA

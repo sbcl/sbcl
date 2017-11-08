@@ -180,6 +180,8 @@
   (/show0 "doing cold toplevel forms and fixups")
   (progn (write `("Length(TLFs)= " ,(length *!cold-toplevels*)))
          (terpri))
+  ;; only the basic external formats are present at this point.
+  (setq sb!impl::*default-external-format* :latin-1)
 
   (!with-init-wrappers
     (loop for index-in-cold-toplevels from 0

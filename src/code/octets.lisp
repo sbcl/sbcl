@@ -371,10 +371,6 @@ one-past-the-end"
                                                   "LATIN-1")
                                               "KEYWORD")
                              #!+win32 (sb!win32::ansi-codepage)))
-        (/show0 "cold-printing defaulted external-format:")
-        #!+sb-show
-        (cold-print external-format)
-        (/show0 "matching to known aliases")
         (let ((entry (get-external-format external-format)))
           (cond
             (entry

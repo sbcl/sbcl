@@ -2,7 +2,7 @@
 ;;; Chun Tian (binghe) <binghe.lisp@gmail.com>
 ;;; Sat Dec 23 02:45:12 CST 2006
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 ;;; GBK
 (declaim (inline ucs-to-gbk gbk-to-ucs
@@ -31,7 +31,6 @@
            (ignore code))
   t)
 
-(eval-when (:compile-toplevel)
-  (sb!xc:proclaim '(muffle-conditions compiler-note)))
+(declaim (muffle-conditions compiler-note))
 (define-multibyte-encoding :gbk (:gbk :cp936)
   ucs-to-gbk gbk-to-ucs mb-len-as-gbk gbk-continuation-byte-p)

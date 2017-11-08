@@ -1,4 +1,4 @@
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 (defmacro define-unibyte-permutation-mapper (byte-code-name code-byte-name table)
   (let ((byte-to-code-table

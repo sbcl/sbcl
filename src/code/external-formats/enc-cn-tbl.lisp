@@ -9,7 +9,7 @@
 ;;; $ cat CP936-only.TXT | awk -F "\t" '{printf("      (%s %s)\n",$2,$1);}' | sort | sed -e 's/0x/#x/g' > UCS2GBK.txt
 ;;; and insert GBK2UCS.txt and UCS2GBK.txt to this file.
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 (define-multibyte-mapper +gbk-to-ucs-table+
     ( ;; begin, insert GBK2UCS.TXT here (emacs: C-x i GBK2UCS.TXT)
