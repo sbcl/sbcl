@@ -80,7 +80,6 @@
 (setf *target-assemble-file* #'sb!c:assemble-file)
 (setf *in-target-compilation-mode-fn* #'in-target-cross-compilation-mode)
 
-;;; Run the cross-compiler to produce cold fasl files.
 ;; ... and since the cross-compiler hasn't seen a DEFMACRO for QUASIQUOTE,
 ;; make it think it has, otherwise it fails more-or-less immediately.
 (setf (sb-xc:macro-function 'sb!int:quasiquote)

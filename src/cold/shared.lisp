@@ -161,7 +161,19 @@
 (load "src/cold/with-stuff.lisp")
 
 ;;; Try to minimize/conceal any non-standardness of the host Common Lisp.
-(load "src/cold/ansify.lisp")
+#-sbcl (load "src/cold/ansify.lisp")
+
+;;;; Do not put SBCL-specific things in 'ansify'. Put them here.
+;;;; And there had better not be a reason that SBCL needs ansification.
+#+sbcl
+(progn
+  (setq *compile-print* nil)
+  (load "src/cold/muffler.lisp")
+  ;; Let's just say we never care to see these.
+  (declaim (sb-ext:muffle-conditions
+            (satisfies unable-to-optimize-note-p)
+            (satisfies optional+key-style-warning-p)
+            sb-ext:code-deletion-note)))
 
 ;;;; special read-macros for building the cold system (and even for
 ;;;; building some of our tools for building the cold system)
@@ -439,7 +451,7 @@
          (ignore-failure-p (find :ignore-failure-p flags)))
     (declare (type function compile-file))
 
-    (ensure-directories-exist obj :verbose t)
+    (ensure-directories-exist obj :verbose *compile-print*) ; host's value
 
     ;; We're about to set about building a new object file. First, we
     ;; delete any preexisting object file in order to avoid confusing
