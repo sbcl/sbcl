@@ -212,6 +212,10 @@
          (and (boundp symbol) (not (keywordp symbol))))))
   (unintern 'sb-impl::shake-packages 'sb-impl))
 
+;;; Use historical (stupid) behavior for storing pathname namestrings
+;;; in fasls.
+(setq sb-c::*name-context-file-path-selector* 'truename)
+
 ;;; Lock internal packages
 #+sb-package-locks
 (dolist (p (list-all-packages))

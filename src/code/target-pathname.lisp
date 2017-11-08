@@ -1671,7 +1671,7 @@ unspecified elements into a completed to-pathname based on the to-wildname."
         (unless type-supplied
           (error "cannot specify the version without a type: ~S" pathname))
         (etypecase version
-          ((member :newest) (strings ".NEWEST"))
+          ((member :newest) (strings ".NEWEST")) ; really? not in LPNIFY-NAMESTRING
           ((member :wild) (strings ".*"))
           (fixnum (strings ".") (strings (format nil "~D" version))))))
     (apply #'concatenate 'simple-string (strings))))

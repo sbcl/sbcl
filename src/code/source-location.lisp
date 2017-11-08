@@ -96,28 +96,22 @@
     (%make-definition-source-location namestring tlf-number form-number)))
 
 #+sb-xc-host
-(defun lpnify-namestring (untruename dir type)
-  (let ((src (position "src" dir :test #'string= :from-end t)))
-    (cond
-     ((and src (not (string= (car (last dir)) "output")))
-      (format nil "SYS:~{~:@(~A~);~}~:@(~A~).~:@(~A~)"
-              (subseq dir src) (pathname-name untruename) type))
-     ((and (string-equal (car (last dir)) "output")
-           (string-equal (pathname-name untruename) "stuff-groveled-from-headers"))
-      (format nil "SYS:OUTPUT;STUFF-GROVELED-FROM-HEADERS.~:@(~A~)" type))
-     (t
-      #+sb-xc-host-interactive
-      (namestring untruename)
-      #-sb-xc-host-interactive
-      (error "Don't know how to handle ~a untruename" untruename)))))
+(defun lpnify-namestring (untruename &aux (dir (pathname-directory untruename)))
+  (aver (eq (car dir) :relative))
+  (format nil "SYS:~:@(~{~A;~}~A.~A~)"
+          (cdr dir)
+          (pathname-name untruename)
+          (pathname-type untruename)))
 
 (defun make-file-info-namestring (name file-info)
-  #+sb-xc-host (declare (ignore name))
+  (declare (ignorable name))
+  ;; These differ because we want logical pathnames when storing the paths
+  ;; to our own sources, but without the logic in target-pathname.lisp
+  ;; or reliance on the translations of the build host.
+  #+sb-xc-host (lpnify-namestring (file-info-untruename file-info))
+  #-sb-xc-host
   (let* ((untruename (file-info-untruename file-info))
          (dir (and untruename (pathname-directory untruename))))
-    #+sb-xc-host
-    (lpnify-namestring untruename dir (pathname-type untruename))
-    #-sb-xc-host
     (if (and dir (eq (first dir) :absolute))
         (namestring untruename)
         (if name

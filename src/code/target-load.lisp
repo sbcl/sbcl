@@ -272,6 +272,7 @@
             (sap-int (sap+ (code-instructions code) offset))))))
 
 (defun !warm-load (file)
+  #!+unix (setq *default-pathname-defaults* (make-pathname))
   (restart-case (load file)
     (abort ()
       :report "Abort building SBCL."

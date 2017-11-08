@@ -824,8 +824,9 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;; Given a pathname, return a SOURCE-INFO structure.
 (defun make-file-source-info (file external-format &optional form-tracking-p)
   (make-source-info
-   :file-info (make-file-info :name (truename file)
-                              :untruename (merge-pathnames file)
+   :file-info (make-file-info :name (truename file) ; becomes *C-F-TRUENAME*
+                              :untruename #+sb-xc-host file ; becomes *C-F-PATHNAME*
+                                          #-sb-xc-host (merge-pathnames file)
                               :external-format external-format
                               :subforms
                               (if form-tracking-p

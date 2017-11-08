@@ -273,8 +273,11 @@
 
      :namestring (or *source-namestring*
                      (make-file-info-namestring
-                      (if (pathnamep (file-info-name file-info))
-                          (file-info-name file-info))
+                      (let ((pathname
+                             (case *name-context-file-path-selector*
+                               (pathname (file-info-untruename file-info))
+                               (truename (file-info-name file-info)))))
+                        (if (pathnamep pathname) pathname))
                       file-info))
      :created (file-info-write-date file-info)
      :form (when function

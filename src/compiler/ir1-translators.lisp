@@ -463,6 +463,47 @@ body, references to a NAME will effectively be replaced with the EXPANSION."
 Return VALUE without evaluating it."
   (reference-constant start next result thing))
 
+;;; We now have a switch to decide whether relative pathnames
+;;; can be stored in fasl files as their source name.
+;;; Regardless of what ANSI says must be bound to *fooNAME* specials,
+;;; the only sane choice for this switch is to use untruenames,
+;;; because compilers should record source filenames _as_given_ for
+;;; later consumption by linkers and debuggers. Attempting to convert
+;;; to a truename fails miserably on symlink forests and
+;;; content-addressable filesystems. Compare to a typical C compiler:
+;;;  $ mkdir -p /tmp/a/b/c/d/e/f/g
+;;;  $ cd /tmp/a/b/c/d
+;;;  $ touch e/f/g/h.i
+;;;  $ cc -g3 -S -o - e/f/g/h.i | grep file
+;;;    .file        "h.i"
+;;;    .file 1 "e/f/g/h.i"
+;;; It has emitted a debug info with just a tail, and a debug info with
+;;; the unaltered pathname, and not a truename in sight.
+;;;
+;;; But in Lisp we merge pathnames with the defaults, because CLHS says that
+;;; "*compile-file-pathname* ... is bound to (pathname (merge-pathnames input-file))."
+;;; and similarly for *load-pathname*.
+;;; It's an implementation detail that we use the same information
+;;; to bind *compile-file-pathname* and to store in the fasl though.
+;;; But CLHS does *NOT* say that that the pathname of a source files as
+;;; represented in its corresponding compiled object is a fully merged name
+;;; - how would it? obtaining the source path isn't a specified thing -
+;;; and that's our loophole to allow the choice.
+;;; Another loophole is that *DEFAULT-PATHNAME-DEFAULTS* can always be #"".
+
+;;; We could invent internal variables, like *COMPILE-FILE-PATHNAME-UNMERGED*
+;;; to hold the right (useful) thing, when the *COMPILE-FILE-PATHNAME*
+;;; holds the un-useful thing.
+;;; Anyway, long story short, merging is all the more wrong when we went
+;;; to heroic efforts to reverse-engineer the original pathname by
+;;; scanning for "src/" as used to be done in LPNIFY-NAMESTRING.
+;;; So name-contexts, at least in self-build, should use untruenameized
+;;; un-merged pathnames. I'm not daring enough to change it for everyone.
+;;; It defaults to what it should, and is changed before saving the image.
+;;;
+(declaim (type (member pathname truename) *name-context-file-path-selector*))
+(defglobal *name-context-file-path-selector* 'pathname)
+
 (defun name-context ()
   ;; Name of the outermost non-NIL BLOCK, or the source namestring
   ;; of the source file.
@@ -479,10 +520,10 @@ Return VALUE without evaluating it."
                                      (neq :catch (cleanup-kind (entry-cleanup (pop b)))))))
                             (lexenv-blocks *lexenv*) :from-end t))
               *source-namestring*
-              (let* ((p (or sb!xc:*compile-file-truename* *load-truename*)))
-                (when p
-                  #+sb-xc-host (lpnify-namestring (namestring p) (pathname-directory p) (pathname-type p))
-                  #-sb-xc-host (namestring p))))))
+              (awhen (case *name-context-file-path-selector*
+                       (pathname (or sb!xc:*compile-file-pathname* *load-pathname*))
+                       (truename (or sb!xc:*compile-file-truename* *load-truename*)))
+                (#+sb-xc-host lpnify-namestring #-sb-xc-host namestring it)))))
     (when context
       (list :in context))))
 

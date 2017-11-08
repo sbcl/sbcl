@@ -417,8 +417,8 @@
   (external-format nil  :read-only t)
   ;; the defaulted, but not necessarily absolute file name (i.e. prior
   ;; to TRUENAME call.) Null if not a file. This is used to set
-  ;; *COMPILE-FILE-PATHNAME*, and if absolute, is dumped in the
-  ;; debug-info.
+  ;; *COMPILE-FILE-PATHNAME*, and if absolute (a harmful constraint to be sure),
+  ;; is dumped in the debug-info.
   (untruename nil :type (or pathname null) :read-only t)
   ;; the file's write date (if relevant)
   (write-date nil :type (or unsigned-byte null)  :read-only t)
