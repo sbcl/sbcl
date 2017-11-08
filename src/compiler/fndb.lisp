@@ -1500,7 +1500,8 @@
                                            :rename-and-delete :overwrite
                                            :append :supersede nil))
                        (:if-does-not-exist (member :error :create nil))
-                       (:external-format external-format-designator))
+                       (:external-format external-format-designator)
+                       #+win32 (:overlapped t))
   (or stream null))
 
 (defknown rename-file (pathname-designator filename)
