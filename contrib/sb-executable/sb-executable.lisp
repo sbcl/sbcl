@@ -53,10 +53,10 @@ exec sbcl --noinform ~{~A ~}--eval \"(with-open-file (i \\\"$0\\\" :element-type
                                            (make-pathname :type "fasl"))
                           :element-type '(unsigned-byte 8))
         (copy-stream in out))))
+  #-win32
   (let* (;; FIXME: use OUT as the pathname designator
          (out-name (namestring (translate-logical-pathname output-file)))
          (prot (elt (multiple-value-list (sb-unix:unix-stat out-name)) 3)))
-    #-win32
     (if prot
         (sb-unix::void-syscall ("chmod" c-string int)
                                out-name
