@@ -5035,7 +5035,7 @@
       ;; Test all permutations of different types
       (loop for x in values
          do (loop for y in values
-               do (checked-compile-and-assert ()
+               do (checked-compile-and-assert (:optimize nil)
                       `(lambda (x y)
                          (,predicate (the ,(type-of x) x)
                                      (the ,(type-of y) y)))
