@@ -1266,8 +1266,7 @@ VALUES-FORM."
     (ir1-convert-progn-body value-ctran forms-ctran nil forms)
     (link-node-to-previous-ctran cast forms-ctran)
     (setf (lvar-dest value-lvar) cast)
-    (use-continuation cast next result)
-    cast))
+    (use-continuation cast next result)))
 
 
 ;;;; interface to defining macros
