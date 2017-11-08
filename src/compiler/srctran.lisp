@@ -3923,7 +3923,7 @@
 
 (flet ((maybe-invert (node op inverted x y)
          (cond
-           #!+x86-64 ;; it has >=/<= VOPs
+           #!+(or x86-64 arm64) ;; have >=/<= VOPs
            ((and (csubtypep (lvar-type x) (specifier-type 'float))
                  (csubtypep (lvar-type y) (specifier-type 'float)))
             (give-up-ir1-transform))
