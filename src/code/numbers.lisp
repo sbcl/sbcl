@@ -1285,7 +1285,6 @@ and the number of 0 bits if INTEGER is negative."
 ;;; of 0 before the dispatch so that the bignum code doesn't have to worry
 ;;; about "small bignum" zeros.
 (defun two-arg-gcd (u v)
-  #-sb-xc-host (declare (muffle-conditions compiler-note))
   (cond ((eql u 0) (abs v))
         ((eql v 0) (abs u))
         (t
