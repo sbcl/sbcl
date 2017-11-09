@@ -2218,9 +2218,10 @@ core and return a descriptor to it."
 ;;; COLD-LOAD loads stuff into the core image being built by calling
 ;;; LOAD-AS-FASL with the fop function table rebound to a table of cold
 ;;; loading functions.
-(defun cold-load (filename)
+(defun cold-load (filename verbose)
   "Load the file named by FILENAME into the cold load image being built."
-  (write-line (namestring filename))
+  (when verbose
+    (write-line (namestring filename)))
   (with-open-file (s filename :element-type '(unsigned-byte 8))
     (load-as-fasl s nil nil)))
 
@@ -3660,7 +3661,7 @@ III. initially undefined function references (alphabetically):
       ;; *COLD-ASSEMBLER-ROUTINES* above and calling
       ;; INITIALIZE-STATIC-SPACE below.
       (when preload-file
-        (cold-load preload-file))
+        (cold-load preload-file verbose))
 
       ;; Prepare for cold load.
       (initialize-layouts)
@@ -3688,12 +3689,12 @@ III. initially undefined function references (alphabetically):
       #!+immobile-space
       (flet ((assembler-file-p (name) (tailwise-equal (namestring name) ".assem-obj")))
         (dolist (file-name (remove-if-not #'assembler-file-p object-file-names))
-          (cold-load file-name))
+          (cold-load file-name verbose))
         (setf object-file-names (remove-if #'assembler-file-p object-file-names)))
 
       ;; Cold load.
       (dolist (file-name object-file-names)
-        (cold-load file-name))
+        (cold-load file-name verbose))
 
       (when *known-structure-classoids*
         (let ((dd-layout (find-layout 'defstruct-description)))
@@ -3762,6 +3763,10 @@ III. initially undefined function references (alphabetically):
       (when map-file-name
         (with-open-file (stream map-file-name :direction :output :if-exists :supersede)
           (write-map stream)))
+      (when core-file-name
+        (write-initial-core-file core-file-name))
+      (unless c-header-dir-name
+        (return-from sb-cold:genesis))
       (let ((filename (format nil "~A/Makefile.features" c-header-dir-name)))
         (ensure-directories-exist filename)
         (with-open-file (stream filename :direction :output :if-exists :supersede)
@@ -3799,10 +3804,7 @@ III. initially undefined function references (alphabetically):
           (write-boilerplate stream) ; no inclusion guard, it's not a ".h" file
           (write-thread-init stream))
         (out-to "static-symbols" (write-static-symbols stream))
-        (out-to "sc-offset" (write-sc-offset-coding stream)))
-
-      (when core-file-name
-        (write-initial-core-file core-file-name)))))
+        (out-to "sc-offset" (write-sc-offset-coding stream))))))
 
 ;;; Invert the action of HOST-CONSTANT-TO-CORE. If STRICTP is given as NIL,
 ;;; then we can produce a host object even if it is not a faithful rendition.
