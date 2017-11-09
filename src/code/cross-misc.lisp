@@ -216,3 +216,13 @@
   '(;mask-signed-field ;; Too many to fix
     ))
 
+;;; Used by OPEN-FASL-OUTPUT
+(defun string-to-octets (string &key external-format)
+  (assert (eq external-format :utf-8))
+  (let* ((n (length string))
+         (a (make-array n :element-type '(unsigned-byte 8))))
+    (dotimes (i n a)
+      (let ((code (sb!xc:char-code (char string i))))
+        (unless (<= 0 code 127)
+          (setf code (sb!xc:char-code #\?)))
+        (setf (aref a i) code)))))

@@ -276,16 +276,8 @@
 (defun open-fasl-output (name where)
   (declare (type pathname name))
   (flet ((fasl-write-string (string stream)
-           ;; SB-EXT:STRING-TO-OCTETS is not available while cross-compiling
-           #+sb-xc-host
-           (loop for char across string
-                 do (let ((code (char-code char)))
-                      (unless (<= 0 code 127)
-                        (setf char #\?))
-                      (write-byte code stream)))
            ;; UTF-8 is safe to use, because +FASL-HEADER-STRING-STOP-CHAR-CODE+
            ;; may not appear in UTF-8 encoded bytes
-           #-sb-xc-host
            (write-sequence (string-to-octets string :external-format :utf-8)
                            stream)))
     (let* ((stream (open name
