@@ -480,7 +480,7 @@ catch_exception_raise(mach_port_t exception_port,
             signal = SIGTRAP;
             /* Clear TF or the signal emulation wrapper won't proceed
                with single stepping enabled. */
-            thread_state.eflags &= ~0x100;
+            thread_state.EFLAGS &= ~0x100;
             handler = sigtrap_handler;
             break;
         }

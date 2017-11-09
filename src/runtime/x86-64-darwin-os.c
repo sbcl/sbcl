@@ -47,6 +47,7 @@ typedef struct __darwin_mcontext64 darwin_mcontext;
 #define ss __ss
 #define es __es
 #define fs __fs
+#define rflags __rflags
 
 #define fpu_fcw __fpu_fcw
 #define fpu_mxcsr __fpu_mxcsr
@@ -399,7 +400,7 @@ catch_exception_raise(mach_port_t exception_port,
             signal = SIGTRAP;
             /* Clear TF or the signal emulation wrapper won't proceed
                with single stepping enabled. */
-            thread_state.__rflags &= ~0x100;
+            thread_state.rflags &= ~0x100;
             handler = sigtrap_handler;
             break;
         }
