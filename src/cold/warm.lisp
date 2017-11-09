@@ -56,45 +56,37 @@
 ;;;     ((:or :macro (:match "$EARLY-") (:match "$BOOT-"))
 ;;;     (declare (optimize (speed 0))))))
 ;;;
-;;; FIXME: This has mutated into a hack which crudely duplicates
-;;; functionality from the existing mechanism to load files from
-;;; build-order.lisp-expr, without being quite parallel. (E.g. object
-;;; files end up alongside the source files instead of ending up in
-;;; parallel directory trees.) Maybe we could merge the filenames here
-;;; into build-order.lisp-expr with some new flag (perhaps :WARM) to
-;;; indicate that the files should be handled not in cold load but
-;;; afterwards.
 (let ((early-srcs
-              '("SRC;CODE;WARM-ERROR"
-                "SRC;CODE;ROOM" ; for MAP-ALLOCATED-OBJECTS
+              '("src/code/warm-error"
+                "src/code/room" ; for MAP-ALLOCATED-OBJECTS
                 ;; We re-nickname SB-SEQUENCE as SEQUENCE now.
                 ;; It could be done in genesis, but not earlier,
                 ;; since the host has a package of that name.
-                "SRC;CODE;DEFPACKAGE"))
+                "src/code/defpackage"))
 
       (interpreter-srcs
               #+sb-fasteval
-              '("SRC;INTERPRETER;MACROS"
-                "SRC;INTERPRETER;CHECKFUNS"
-                "SRC;INTERPRETER;ENV"
-                "SRC;INTERPRETER;SEXPR"
-                "SRC;INTERPRETER;SPECIAL-FORMS"
-                "SRC;INTERPRETER;EVAL"
-                "SRC;INTERPRETER;DEBUG"))
+              '("src/interpreter/macros"
+                "src/interpreter/checkfuns"
+                "src/interpreter/env"
+                "src/interpreter/sexpr"
+                "src/interpreter/special-forms"
+                "src/interpreter/eval"
+                "src/interpreter/debug"))
       (external-format-srcs
-       (append '("SRC;CODE;EXTERNAL-FORMATS;ENC-EBCDIC")
+       (append '("src/code/external-formats/enc-ebcdic")
                #+sb-unicode
-               '("SRC;CODE;EXTERNAL-FORMATS;ENC-CYR"
-                 "SRC;CODE;EXTERNAL-FORMATS;ENC-DOS"
-                 "SRC;CODE;EXTERNAL-FORMATS;ENC-ISO"
-                 "SRC;CODE;EXTERNAL-FORMATS;ENC-WIN"
-                 "SRC;CODE;EXTERNAL-FORMATS;ENC-MAC"
-                 "SRC;CODE;EXTERNAL-FORMATS;MB-UTIL"
-                 "SRC;CODE;EXTERNAL-FORMATS;ENC-CN-TBL"
-                 "SRC;CODE;EXTERNAL-FORMATS;ENC-CN"
-                 "SRC;CODE;EXTERNAL-FORMATS;ENC-JPN-TBL"
-                 "SRC;CODE;EXTERNAL-FORMATS;ENC-JPN"
-                 "SRC;CODE;EXTERNAL-FORMATS;ENC-UTF")))
+               '("src/code/external-formats/enc-cyr"
+                 "src/code/external-formats/enc-dos"
+                 "src/code/external-formats/enc-iso"
+                 "src/code/external-formats/enc-win"
+                 "src/code/external-formats/enc-mac"
+                 "src/code/external-formats/mb-util"
+                 "src/code/external-formats/enc-cn-tbl"
+                 "src/code/external-formats/enc-cn"
+                 "src/code/external-formats/enc-jpn-tbl"
+                 "src/code/external-formats/enc-jpn"
+                 "src/code/external-formats/enc-utf")))
        (pcl-srcs
               '(;; CLOS, derived from the PCL reference implementation
                 ;;
@@ -102,101 +94,104 @@
                 ;; (arbitrary) linearization of the declared build
                 ;; order dependencies from the old PCL defsys.lisp
                 ;; dependency database.
-                #+nil "src/pcl/walk" ; #+NIL = moved to build-order.lisp-expr
-                #+nil "SRC;PCL;EARLY-LOW"
-                "SRC;PCL;MACROS"
-                "SRC;PCL;COMPILER-SUPPORT"
-                #+nil "SRC;PCL;LOW"
-                #+nil "SRC;PCL;SLOT-NAME" ; moved to build-order.lisp-expr
-                "SRC;PCL;DEFCLASS"
-                "SRC;PCL;DEFS"
-                "SRC;PCL;FNGEN"
-                "SRC;PCL;WRAPPER"
-                "SRC;PCL;CACHE"
-                "SRC;PCL;DLISP"
-                "SRC;PCL;BOOT"
-                "SRC;PCL;VECTOR"
-                "SRC;PCL;SLOTS-BOOT"
-                "SRC;PCL;COMBIN"
-                "SRC;PCL;DFUN"
-                "SRC;PCL;CTOR"
-                "SRC;PCL;BRAID"
-                "SRC;PCL;DLISP3"
-                "SRC;PCL;GENERIC-FUNCTIONS"
-                "SRC;PCL;SLOTS"
-                "SRC;PCL;INIT"
-                "SRC;PCL;STD-CLASS"
-                "SRC;PCL;CPL"
-                "SRC;PCL;FSC"
-                "SRC;PCL;METHODS"
-                "SRC;PCL;FIXUP"
-                "SRC;PCL;DEFCOMBIN"
-                "SRC;PCL;CTYPES"
-                "SRC;PCL;ENV"
-                "SRC;PCL;DOCUMENTATION"
-                "SRC;PCL;PRINT-OBJECT"
-                "SRC;PCL;PRECOM1"
-                "SRC;PCL;PRECOM2"))
+                "src/pcl/macros"
+                "src/pcl/compiler-support"
+                "src/pcl/defclass"
+                "src/pcl/defs"
+                "src/pcl/fngen"
+                "src/pcl/wrapper"
+                "src/pcl/cache"
+                "src/pcl/dlisp"
+                "src/pcl/boot"
+                "src/pcl/vector"
+                "src/pcl/slots-boot"
+                "src/pcl/combin"
+                "src/pcl/dfun"
+                "src/pcl/ctor"
+                "src/pcl/braid"
+                "src/pcl/dlisp3"
+                "src/pcl/generic-functions"
+                "src/pcl/slots"
+                "src/pcl/init"
+                "src/pcl/std-class"
+                "src/pcl/cpl"
+                "src/pcl/fsc"
+                "src/pcl/methods"
+                "src/pcl/fixup"
+                "src/pcl/defcombin"
+                "src/pcl/ctypes"
+                "src/pcl/env"
+                "src/pcl/documentation"
+                "src/pcl/print-object"
+                "src/pcl/precom1"
+                "src/pcl/precom2"))
       (other-srcs
-              '("SRC;CODE;SETF-FUNS"
-                "SRC;CODE;STUBS"
+              '("src/code/setf-funs"
+                "src/code/stubs"
                 ;; miscellaneous functionality which depends on CLOS
-                "SRC;CODE;LATE-CONDITION"
+                "src/code/late-condition"
 
                 ;; CLOS-level support for the Gray OO streams
                 ;; extension (which is also supported by various
                 ;; lower-level hooks elsewhere in the code)
-                "SRC;PCL;GRAY-STREAMS-CLASS"
-                "SRC;PCL;GRAY-STREAMS"
+                "src/pcl/gray-streams-class"
+                "src/pcl/gray-streams"
 
                 ;; CLOS-level support for User-extensible sequences.
-                "SRC;PCL;SEQUENCE"
+                "src/pcl/sequence"
 
                 ;; other functionality not needed for cold init, moved
                 ;; to warm init to reduce peak memory requirement in
                 ;; cold init
-                "SRC;CODE;DESCRIBE"
+                "src/code/describe"
 
-                "SRC;CODE;DESCRIBE-POLICY"
-                "SRC;CODE;INSPECT"
-                "SRC;CODE;PROFILE"
-                "SRC;CODE;NTRACE"
-                "SRC;CODE;STEP"
-                "SRC;CODE;WARM-LIB"
-                #+win32 "SRC;CODE;WARM-MSWIN"
-                "SRC;CODE;RUN-PROGRAM"
-                #+gencgc "SRC;CODE;TRACEROOT"
+                "src/code/describe-policy"
+                "src/code/inspect"
+                "src/code/profile"
+                "src/code/ntrace"
+                "src/code/step"
+                "src/code/warm-lib"
+                #+win32 "src/code/warm-mswin"
+                "src/code/run-program"
+                #+gencgc "src/code/traceroot"
 
-                #+immobile-code "SRC;CODE;IMMOBILE-SPACE"
-                "SRC;CODE;REPACK-XREF"
-                "SRC;CODE;SAVE"))
+                #+immobile-code "src/code/immobile-space"
+                "src/code/repack-xref"
+                "src/code/save"))
       (sb-c::*handled-conditions* sb-c::*handled-conditions*))
  (declare (special *compile-files-p*))
  (proclaim '(sb-ext:muffle-conditions
              (or (satisfies unable-to-optimize-note-p)
                  (satisfies optional+key-style-warning-p))))
- (flet
-    ((do-srcs (list)
-       (dolist (stem list)
-         (let ((fullname (concatenate 'string "SYS:" stem ".LISP")))
-           (sb-int:/show "about to compile" fullname)
+ (flet ((do-srcs (list)
+         (dolist (stem list)
+          ;; Do like SB-COLD::LPNIFY-STEM for consistency, though parse/xlate/unparse
+          ;; would probably also work. I don't think that's better.
+          (let ((fullname (format nil "SYS:~:@(~A~).LISP" (substitute #\; #\/ stem)))
+                (output
+                  (compile-file-pathname stem
+                   :output-file
+                   ;; Specifying the directory name for :OUTPUT-FILE is enough.
+                   ;; It does the right thing. (Does it work on Windows? I hope so)
+                   (truename
+                    (concatenate
+                     'string sb-fasl::*!target-obj-prefix*
+                     ;; OR: (namestring (make-pathname :directory (pathname-directory stem)))
+                     (subseq stem 0 (1+ (position #\/ stem :from-end t))))))))
            (flet ((report-recompile-restart (stream)
-                    (format stream "Recompile file ~S" fullname))
+                    (format stream "Recompile file ~S" stem))
                   (report-continue-restart (stream)
-                    (format stream
-                            "Continue, using possibly bogus file ~S"
-                            (compile-file-pathname fullname))))
+                    (format stream "Continue, using possibly bogus file ~S" output)))
              (tagbody
               retry-compile-file
                 (multiple-value-bind (output-truename warnings-p failure-p)
                     (ecase (if (boundp '*compile-files-p*) *compile-files-p* t)
                      ((t)   (let ((sb-c::*source-namestring* fullname))
-                             (compile-file fullname)))
-                     ((nil) (compile-file-pathname fullname)))
+                              (compile-file stem :output-file output)))
+                     ((nil) output))
                   (declare (ignore warnings-p))
-                  (sb-int:/show "done compiling" fullname)
                   (cond ((not output-truename)
-                         (error "COMPILE-FILE of ~S failed." fullname))
+                         (error "COMPILE-FILE of ~S failed." stem))
                         (failure-p
                          (unwind-protect
                               (restart-case
