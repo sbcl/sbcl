@@ -3504,8 +3504,12 @@ III. initially undefined function references (alphabetically):
       ;; Write the magic number.
       (write-word core-magic)
 
-      ;; Write the build ID.
-      (binding* ((build-id (with-open-file (s "output/build-id.inc") (read s)))
+      ;; Write the build ID, which contains a generated string
+      ;; plus a suffix identifying a certain configuration of the C compiler.
+      (binding* ((build-id (concatenate
+                            'string
+                            (with-open-file (s "output/build-id.inc") (read s))
+                            (if (member :msan sb-cold::*shebang-features*) "-msan" "")))
                  ((nwords padding) (ceiling (length build-id) sb!vm:n-word-bytes)))
         (declare (type simple-string build-id))
         ;; Write BUILD-ID-CORE-ENTRY-TYPE-CODE, the length of the header,

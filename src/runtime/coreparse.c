@@ -56,7 +56,18 @@
 #endif
 
 unsigned char build_id[] =
+// The suffix added to build-id indicates which flavor of C compiler was used.
+// This enforces that when you put :MSAN in your Lisp features, you don't
+// omit "-fsanitize=memory -DMEMORY_SANITIZE" from CFLAGS and LINKFLAGS.
+// (Some Lisp features affect C flags, but not this one.)
+// It is important for out-of-tree builds: once they work, you can produce
+// two trees of artifacts from identical sources *including* the build-id.inc
+// (but not including "local-target-features.lisp-expr"), and end up with two
+// Lisp cores and two C runtimes. The extra suffix avoids accidental mismatch.
 #include "../../output/build-id.inc"
+#ifdef MEMORY_SANITIZER
+"-msan"
+#endif
 ;
 
 int

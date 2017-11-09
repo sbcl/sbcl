@@ -35,7 +35,8 @@
 
 (macrolet ((define-fasl-format-features ()
              (let (;; master value for *F-P-A-F-F*
-                   (fpaff (append '(:sb-thread :sb-package-locks :sb-unicode :gencgc)
+                   (fpaff (append '(:sb-thread :sb-package-locks :sb-unicode
+                                    :gencgc :msan)
                                   #!+(or x86 x86-64) '(:int4-breakpoints
                                                        :ud2-breakpoints))))
                `(progn
@@ -60,7 +61,8 @@
                   ;; need to do anything sophisticated with its
                   ;; logical structure, just test it for equality.)
                   (defglobal *features-affecting-fasl-format*
-                    ,(let ((*print-pretty* nil))
+                    ,(let ((*print-pretty* nil)
+                           (*print-length* nil))
                        (prin1-to-string
                         (sort
                          (copy-seq
@@ -68,6 +70,11 @@
                          #'string<
                          :key #'symbol-name))))))))
   (define-fasl-format-features))
+
+(eval-when (:compile-toplevel)
+  (assert (and (not (find #\newline *features-affecting-fasl-format*))
+               (not (find #\# *features-affecting-fasl-format*))
+               (not (search ".." *features-affecting-fasl-format*)))))
 
 ;;; the code for a character which terminates a fasl file header
 (defconstant +fasl-header-string-stop-char-code+ 255)
