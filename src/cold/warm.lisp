@@ -190,7 +190,8 @@
               retry-compile-file
                 (multiple-value-bind (output-truename warnings-p failure-p)
                     (ecase (if (boundp '*compile-files-p*) *compile-files-p* t)
-                     ((t)   (compile-file fullname))
+                     ((t)   (let ((sb-c::*source-namestring* fullname))
+                             (compile-file fullname)))
                      ((nil) (compile-file-pathname fullname)))
                   (declare (ignore warnings-p))
                   (sb-int:/show "done compiling" fullname)
@@ -216,7 +217,8 @@
                   (unless (handler-bind
                               ((sb-kernel:redefinition-with-defgeneric
                                 #'muffle-warning))
-                            (load output-truename))
+                            (let ((sb-c::*source-namestring* fullname))
+                              (load output-truename)))
                     (error "LOAD of ~S failed." output-truename))
                   (sb-int:/show "done loading" output-truename))))))))
 

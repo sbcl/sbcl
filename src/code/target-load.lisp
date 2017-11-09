@@ -272,8 +272,9 @@
             (sap-int (sap+ (code-instructions code) offset))))))
 
 (defun !warm-load (file)
-  #!+unix (setq *default-pathname-defaults* (make-pathname))
-  (restart-case (load file)
+  (restart-case (let ((sb!c::*source-namestring*
+                       (format nil "SYS:~A" (substitute #\; #\/ file))))
+                  (load file))
     (abort ()
       :report "Abort building SBCL."
       (sb!ext:exit :code 1))))

@@ -95,21 +95,7 @@
             (setf tlf-number (1- (fill-pointer (file-info-forms it))))))
     (%make-definition-source-location namestring tlf-number form-number)))
 
-#+sb-xc-host
-(defun lpnify-namestring (untruename &aux (dir (pathname-directory untruename)))
-  (aver (eq (car dir) :relative))
-  (format nil "SYS:~:@(~{~A;~}~A.~A~)"
-          (cdr dir)
-          (pathname-name untruename)
-          (pathname-type untruename)))
-
 (defun make-file-info-namestring (name file-info)
-  (declare (ignorable name))
-  ;; These differ because we want logical pathnames when storing the paths
-  ;; to our own sources, but without the logic in target-pathname.lisp
-  ;; or reliance on the translations of the build host.
-  #+sb-xc-host (lpnify-namestring (file-info-untruename file-info))
-  #-sb-xc-host
   (let* ((untruename (file-info-untruename file-info))
          (dir (and untruename (pathname-directory untruename))))
     (if (and dir (eq (first dir) :absolute))

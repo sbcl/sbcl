@@ -523,7 +523,7 @@ Return VALUE without evaluating it."
               (awhen (case *name-context-file-path-selector*
                        (pathname (or sb!xc:*compile-file-pathname* *load-pathname*))
                        (truename (or sb!xc:*compile-file-truename* *load-truename*)))
-                (#+sb-xc-host lpnify-namestring #-sb-xc-host namestring it)))))
+                (namestring it)))))
     (when context
       (list :in context))))
 
