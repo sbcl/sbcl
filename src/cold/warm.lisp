@@ -94,7 +94,6 @@
                  "SRC;CODE;EXTERNAL-FORMATS;ENC-CN"
                  "SRC;CODE;EXTERNAL-FORMATS;ENC-JPN-TBL"
                  "SRC;CODE;EXTERNAL-FORMATS;ENC-JPN"
-                 "SRC;CODE;EXTERNAL-FORMATS;ENC-UCS"
                  "SRC;CODE;EXTERNAL-FORMATS;ENC-UTF")))
        (pcl-srcs
               '(;; CLOS, derived from the PCL reference implementation

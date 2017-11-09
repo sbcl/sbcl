@@ -14,7 +14,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB-IMPL")
+(in-package "SB!IMPL")
 
 ;;; TODO Macro for generating different variants:
 ;;; :ucs-2le (little endian)    sap-ref-16le
@@ -29,16 +29,16 @@
 
 ;;; Define feature LITTLE-ENDIAN-AND-MISALIGNED-READ?
 (defun sap-ref-16le (sap offset)
-  #+(or x86 x86-64)
+  #!+(or x86 x86-64)
   (sap-ref-16 sap offset)
-  #-(or x86 x86-64)
+  #!-(or x86 x86-64)
   (dpb (sap-ref-8 sap (1+ offset)) (byte 8 8)
        (sap-ref-8 sap offset)))
 
 (defun (setf sap-ref-16le) (value sap offset)
-  #+(or x86 x86-64)
+  #!+(or x86 x86-64)
   (setf (sap-ref-16 sap offset) value)
-  #-(or x86 x86-64)
+  #!-(or x86 x86-64)
   (setf (sap-ref-8 sap offset) (logand value #xff)
         (sap-ref-8 sap (1+ offset)) (ldb (byte 8 8) value)))
 
@@ -51,17 +51,17 @@
         (sap-ref-8 sap offset) (ldb (byte 8 8) value)))
 
 (defun sap-ref-32le (sap offset)
-  #+(or x86 x86-64)
+  #!+(or x86 x86-64)
   (sap-ref-32 sap offset)
-  #-(or x86 x86-64)
+  #!-(or x86 x86-64)
   (dpb (sap-ref-8 sap (+ offset 3)) (byte 8 24)
        (dpb (sap-ref-8 sap (+ offset 2)) (byte 8 16)
             (sap-ref-16le sap offset))))
 
 (defun (setf sap-ref-32le) (value sap offset)
-  #+(or x86 x86-64)
+  #!+(or x86 x86-64)
   (setf (sap-ref-32 sap offset) value)
-  #-(or x86 x86-64)
+  #!-(or x86 x86-64)
   (setf (sap-ref-8 sap offset) (logand value #xff)
         (sap-ref-8 sap (1+ offset)) (ldb (byte 8 8) value)
         (sap-ref-8 sap (+ offset 2)) (ldb (byte 8 16) value)
@@ -235,7 +235,7 @@
 
 (instantiate-octets-definition define-ucs-2->string)
 
-(define-external-format/variable-width (:ucs-2le :ucs2le #+win32 :ucs2 #+win32 :ucs-2) t
+(define-external-format/variable-width (:ucs-2le :ucs2le #!+win32 :ucs2 #!+win32 :ucs-2) t
   (code-char #xfffd)
   2
   (if (< bits #x10000)
@@ -347,7 +347,7 @@
                             (dpb (cref 3) (byte 8 24)
                                  (dpb (cref 2) (byte 8 16)
                                       (dpb (cref 1) (byte 8 8) (cref 0))))))))
-          (if (< code char-code-limit)
+          (if (< code sb!xc:char-code-limit)
               (code-char code)
               (decoding-error array pos (+ pos bytes) :ucs-4le
                               'octet-decoding-error pos))))
@@ -366,12 +366,13 @@
                             (dpb (cref 0) (byte 8 24)
                                  (dpb (cref 1) (byte 8 16)
                                       (dpb (cref 2) (byte 8 8) (cref 3))))))))
-          (if (< code char-code-limit)
+          (if (< code sb!xc:char-code-limit)
               (code-char code)
               (decoding-error array pos (+ pos bytes) :ucs-4be
                               'octet-decoding-error pos)))))))
 
-(declaim (muffle-conditions compiler-note))
+(eval-when (:compile-toplevel)
+  (sb!xc:proclaim '(muffle-conditions compiler-note)))
 (instantiate-octets-definition define-simple-get-ucs4-character)
 
 (defmacro define-ucs-4->string (accessor type)
@@ -423,7 +424,7 @@
   (setf (sap-ref-32le sap tail) bits)
   4
   (let ((code (sap-ref-32le sap head)))
-    (if (< code char-code-limit)
+    (if (< code sb!xc:char-code-limit)
         (code-char code)
         (return-from decode-break-reason 4)))
   ucs-4le->string-aref
@@ -435,7 +436,7 @@
   (setf (sap-ref-32be sap tail) bits)
   4
   (let ((code (sap-ref-32be sap head)))
-    (if (< code char-code-limit)
+    (if (< code sb!xc:char-code-limit)
         (code-char code)
         (return-from decode-break-reason 4)))
   ucs-4be->string-aref
