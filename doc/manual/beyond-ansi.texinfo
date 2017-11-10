@@ -1075,7 +1075,7 @@ precondition for using copy-on-write to share code between multiple Lisp
 processes.  This is less important with modern generational garbage
 collectors, but not all SBCL platforms use such a garbage collector.
 
-@include fun-sb-ext-purify.texinfo
+@comment @include fun-sb-ext-purify.texinfo
 
 The @code{sb-ext:truly-the} special form declares the type of the
 result of the operations, producing its argument; the declaration is
