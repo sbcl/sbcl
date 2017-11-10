@@ -157,6 +157,7 @@
 
                 #+immobile-code "src/code/immobile-space"
                 "src/code/repack-xref"
+                #+cheneygc "src/code/purify"
                 "src/code/save"))
       (sb-c::*handled-conditions* sb-c::*handled-conditions*))
  (declare (special *compile-files-p*))
