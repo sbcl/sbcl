@@ -534,3 +534,18 @@
                               (if a (go z)))) z))))
     ((nil :good) 3)
     ((t :good) :good)))
+
+(with-test (:name :merge-tail-sets-deleted-functional)
+  (checked-compile-and-assert ()
+    `(lambda (a)
+       (block nil
+         (tagbody
+            (go g549)
+          g549
+            (return-from nil
+              (block b3
+                (let ((x (progn (lambda (&optional (x a)) x)
+                                (unwind-protect 10)
+                                (return-from b3 a))))
+                  (unwind-protect x)))))))
+    ((321) 321)))
