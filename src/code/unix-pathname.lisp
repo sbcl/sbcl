@@ -229,15 +229,17 @@
         (ecase (pop directory)
           (:absolute
            (let ((next (pop directory)))
-             (cond ((eq :home next)
-                    (write-string (user-homedir-namestring) s))
-                   ((and (consp next) (eq :home (car next)))
-                    (let ((where (user-homedir-namestring (second next))))
-                      (if where
-                          (write-string where s)
-                          (error "User homedir unknown for: ~S." (second next)))))
-                   (next
-                    (push next directory)))
+             (cond
+               ((typep next '(or (eql :home) (cons (eql :home))))
+                (let* ((username (when (consp next) (second next)))
+                       (namestring (handler-case
+                                       (user-homedir-namestring username)
+                                     (error (condition)
+                                       (error "User homedir unknown~@[ for ~S~]: ~A."
+                                              username condition)))))
+                  (write-string namestring s)))
+               (next
+                (push next directory)))
              (write-char #\/ s)))
           (:relative)))
       (loop for (piece . subdirs) on directory
