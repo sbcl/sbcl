@@ -593,22 +593,29 @@ exist or if is a file or a symbolic link."
                              *default-pathname-defaults*
                              :as-directory t)))
 
-(defun user-homedir-namestring (&optional username)
-  (flet ((not-empty (x)
-           (and (not (equal x "")) x)))
+(flet ((not-empty (x)
+         (and (not (equal x "")) x))
+       (lose (&optional username)
+         (error "Couldn't find home directory~@[ for ~S~]." username)))
+
+  #!-win32
+  (defun user-homedir-namestring (&optional username)
     (if username
         (sb!unix:user-homedir username)
         (or (not-empty (posix-getenv "HOME"))
-            #!+win32
-            (not-empty (posix-getenv "USERPROFILE"))
-            #!+win32
+            (not-empty (sb!unix:uid-homedir (sb!unix:unix-getuid)))
+            (lose))))
+
+  #!+win32
+  (defun user-homedir-namestring (&optional username)
+    (if username
+        (lose username)
+        (or (not-empty (posix-getenv "USERPROFILE"))
             (let ((drive (not-empty (posix-getenv "HOMEDRIVE")))
                   (path (not-empty (posix-getenv "HOMEPATH"))))
               (and drive path
                    (concatenate 'string drive path)))
-            #!-win32
-            (not-empty (sb!unix:uid-homedir (sb!unix:unix-getuid)))
-            (error "Couldn't find home directory.")))))
+            (lose)))))
 
 ;;; (This is an ANSI Common Lisp function.)
 (defun user-homedir-pathname (&optional host)
