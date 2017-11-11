@@ -298,7 +298,7 @@
                (frob pathname-type)))))
 
 ;;; host-namestring testing
-(with-test (:name :host-namestring)
+(with-test (:name host-namestring)
   (assert (string=
            (namestring (parse-namestring "/foo" (host-namestring #p"/bar")))
            "/foo"))
@@ -384,7 +384,7 @@
 
 ;;; bug reported by Artem V. Andreev: :WILD not handled in unparsing
 ;;; directory lists.
-(with-test (:name :unparse-wild)
+(with-test (:name (namestring :unparse-wild))
   (assert (equal (namestring #p"/tmp/*/") "/tmp/*/")))
 
 ;;; Printing of pathnames; see CLHS 22.1.3.1. This section was started
@@ -414,7 +414,7 @@
 
 ;;; we failed to unparse logical pathnames with :NAME :WILD :TYPE NIL.
 ;;; (Reported by Pascal Bourguignon.
-(with-test (:name :unparse-logical-wild)
+(with-test (:name (namestring :unparse-logical-wild))
   (let ((pathname (make-pathname :host "SYS" :directory '(:absolute :wild-inferiors)
                                  :name :wild :type nil)))
     (assert (string= (namestring pathname) "SYS:**;*"))
