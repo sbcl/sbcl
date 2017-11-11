@@ -136,10 +136,16 @@
                                      &aux (dir-hash (pathname-dir-hash directory))
                                           (stem-hash (mix (sxhash name) (sxhash type)))))))
 
-;;; This is used both for Unix and Windows: while we accept both
-;;; \ and / as directory separators on Windows, we print our
-;;; own always with /, which is much less confusing what with
-;;; being \ needing to be escaped.
+;;; Utility functions
+
+(declaim (inline pathname-component-present-p))
+(defun pathname-component-present-p (component)
+  (not (typep component '(or null (eql :unspecific)))))
+
+;;; The following functions are used both for Unix and Windows: while
+;;; we accept both \ and / as directory separators on Windows, we
+;;; print our own always with /, which is much less confusing what
+;;; with being \ needing to be escaped.
 #-sb-xc-host ; %PATHNAME-DIRECTORY is target-only
 (defun unparse-physical-directory (pathname escape-char)
   (declare (pathname pathname))
@@ -180,3 +186,53 @@
          (t
           (error "invalid directory component: ~S" dir)))))
     (apply #'concatenate 'simple-string (pieces))))
+
+#-sb-xc-host
+(defun unparse-physical-file (pathname escape-char)
+  (declare (type pathname pathname))
+  (let ((name (%pathname-name pathname))
+        (type (%pathname-type pathname)))
+    (collect ((fragments))
+      ;; Note: by ANSI 19.3.1.1.5, we ignore the version slot when
+      ;; translating logical pathnames to a filesystem without
+      ;; versions (like Unix and Win32).
+      (when name
+        (when (and (null type)
+                   (typep name 'string)
+                   (> (length name) 0)
+                   (position #\. name :start 1))
+          (error "too many dots in the name: ~S" pathname))
+        (when (and (typep name 'string)
+                   (string= name ""))
+          (error "name is of length 0: ~S" pathname))
+        (fragments (unparse-physical-piece name escape-char)))
+      (when (pathname-component-present-p type)
+        (unless name
+          (error "cannot specify the type without a file: ~S" pathname))
+        (when (typep type 'simple-string)
+          (when (position #\. type)
+            (error "type component can't have a #\. inside: ~S" pathname)))
+        (fragments ".")
+        (fragments (unparse-physical-piece type escape-char)))
+      (apply #'concatenate 'simple-string (fragments)))))
+
+#-sb-xc-host
+(defun unparse-native-physical-file (pathname)
+  (let ((name (pathname-name pathname))
+        (type (pathname-type pathname)))
+    (collect ((fragments))
+      (cond
+        ((pathname-component-present-p name)
+         (unless (stringp name)         ; some kind of wild field
+           (error "Bad name component in NATIVE-NAMESTRING: ~S." name))
+         (fragments name)
+         (when (pathname-component-present-p type)
+           (unless (stringp type)       ; some kind of wild field
+             (error "Bad type component in NATIVE-NAMESTRING: ~S." type))
+           (fragments ".")
+           (fragments type)))
+        ((pathname-component-present-p type) ; type without a name
+         (error
+          "Type component without a name component in NATIVE-NAMESTRING: ~S."
+          type)))
+      (apply #'concatenate 'simple-string (fragments)))))

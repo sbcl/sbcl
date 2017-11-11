@@ -178,52 +178,20 @@
 
 (defun unparse-unix-file (pathname)
   (declare (type pathname pathname))
-  (collect ((strings))
-    (let* ((name (%pathname-name pathname))
-           (type (%pathname-type pathname))
-           (type-supplied (not (or (null type) (eq type :unspecific)))))
-      ;; Note: by ANSI 19.3.1.1.5, we ignore the version slot when
-      ;; translating logical pathnames to a filesystem without
-      ;; versions (like Unix).
-      (when name
-        (when (and (null type)
-                   (typep name 'string)
-                   (> (length name) 0)
-                   (position #\. name :start 1))
-          (error "too many dots in the name: ~S" pathname))
-        (when (and (typep name 'string)
-                   (string= name ""))
-          (error "name is of length 0: ~S" pathname))
-        (strings (unparse-physical-piece name #\\)))
-      (when type-supplied
-        (unless name
-          (error "cannot specify the type without a file: ~S" pathname))
-        (when (typep type 'simple-string)
-          (when (position #\. type)
-            (error "type component can't have a #\. inside: ~S" pathname)))
-        (strings ".")
-        (strings (unparse-physical-piece type #\\))))
-    (apply #'concatenate 'simple-string (strings))))
-
-(/show0 "filesys.lisp 406")
+  (unparse-physical-file pathname #\\))
 
 (defun unparse-unix-namestring (pathname)
   (declare (type pathname pathname))
   (concatenate 'simple-string
-               (unparse-unix-directory pathname)
-               (unparse-unix-file pathname)))
+               (unparse-physical-directory pathname #\\)
+               (unparse-physical-file pathname #\\)))
 
 (defun unparse-native-unix-namestring (pathname as-file)
   (declare (type pathname pathname))
-  (let* ((directory (pathname-directory pathname))
-         (name (pathname-name pathname))
-         (name-present-p (typep name '(not (member nil :unspecific))))
-         (name-string (if name-present-p name ""))
-         (type (pathname-type pathname))
-         (type-present-p (typep type '(not (member nil :unspecific))))
-         (type-string (if type-present-p type "")))
-    (when name-present-p
-      (setf as-file nil))
+  (let ((directory (pathname-directory pathname))
+        (seperator-after-directory-p
+         (or (pathname-component-present-p (pathname-name pathname))
+             (not as-file))))
     (with-simple-output-to-string (s)
       (when directory
         (ecase (pop directory)
@@ -251,25 +219,9 @@
                  (t
                   (error "Bad directory segment in NATIVE-NAMESTRING: ~S."
                          piece)))
-            if (or subdirs (stringp name))
-            do (write-char #\/ s)
-            else
-            do (unless as-file
-                 (write-char #\/ s)))
-      (if name-present-p
-          (progn
-            (unless (stringp name-string) ;some kind of wild field
-              (error "Bad name component in NATIVE-NAMESTRING: ~S." name))
-            (write-string name-string s)
-            (when type-present-p
-              (unless (stringp type-string) ;some kind of wild field
-                (error "Bad type component in NATIVE-NAMESTRING: ~S." type))
-              (write-char #\. s)
-              (write-string type-string s)))
-          (when type-present-p          ; type without a name
-            (error
-             "Type component without a name component in NATIVE-NAMESTRING: ~S."
-             type))))))
+            when (or subdirs seperator-after-directory-p)
+            do (write-char #\/ s))
+      (write-string (unparse-native-physical-file pathname) s))))
 
 (defun unparse-unix-enough (pathname defaults)
   (declare (type pathname pathname defaults))
