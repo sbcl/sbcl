@@ -419,6 +419,15 @@
                                  :name :wild :type nil)))
     (assert (string= (namestring pathname) "SYS:**;*"))
     (assert (string= (write-to-string pathname :readably t) "#P\"SYS:**;*\""))))
+
+(with-test (:name (namestring :signals file-error))
+  (flet ((test (&rest initargs)
+           (let ((pathname (apply #'make-pathname initargs)))
+             (assert-error (namestring pathname) file-error))))
+    (test :name "foo.")
+    (test :name "")
+    (test :type "foo")
+    (test :name "foo" :type ".bar")))
 
 ;;; reported by James Y Knight on sbcl-devel 2006-05-17
 (with-test (:name :merge-back)
@@ -426,6 +435,16 @@
         (p2 (make-pathname :directory '(:relative :back "foo"))))
     (assert (equal (merge-pathnames p1 p2)
                    (make-pathname :directory '(:relative :back "foo" "bar"))))))
+
+(with-test (:name (native-namestring :signals file-error :unix))
+  (flet ((test (&rest initargs)
+           (let ((pathname (apply #'make-pathname initargs)))
+             (assert-error (native-namestring pathname) file-error))))
+    (test :directory '(:absolute (:home "no-such-user")))
+    (test :directory '(:absolute :wild))
+    (test :name :wild)
+    (test :name "foo" :type :wild)
+    (test :type "bar")))
 
 ;;; construct native namestrings even if the directory is empty (means
 ;;; that same as if (:relative))

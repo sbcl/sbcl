@@ -203,8 +203,10 @@
                        (namestring (handler-case
                                        (user-homedir-namestring username)
                                      (error (condition)
-                                       (error "User homedir unknown~@[ for ~S~]: ~A."
-                                              username condition)))))
+                                       (no-native-namestring-error
+                                        pathname
+                                        "user homedir not known~@[ for ~S~]: ~A"
+                                        username condition)))))
                   (write-string namestring s)))
                (next
                 (push next directory)))
@@ -217,8 +219,8 @@
                  (string
                   (write-string piece s))
                  (t
-                  (error "Bad directory segment in NATIVE-NAMESTRING: ~S."
-                         piece)))
+                  (no-native-namestring-error
+                   pathname "of the directory segment ~S." piece)))
             when (or subdirs seperator-after-directory-p)
             do (write-char #\/ s))
       (write-string (unparse-native-physical-file pathname) s))))

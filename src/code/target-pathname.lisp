@@ -1022,9 +1022,8 @@ directory."
       (or (%pathname-namestring pathname)
           (let ((host (%pathname-host pathname)))
             (if (not host)
-                (error
-                 "can't determine the namestring for pathnames with no host:~%  ~S"
-                 pathname)
+                (no-namestring-error
+                 pathname "there is no ~S component." :host)
                 (setf (%pathname-namestring pathname)
                       (logically-readonlyize
                        (possibly-base-stringize

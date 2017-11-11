@@ -201,17 +201,23 @@
                    (typep name 'string)
                    (> (length name) 0)
                    (position #\. name :start 1))
-          (error "too many dots in the name: ~S" pathname))
+          (no-namestring-error
+           pathname
+           "there are too many dots in the ~S component ~S." :name name))
         (when (and (typep name 'string)
                    (string= name ""))
-          (error "name is of length 0: ~S" pathname))
+          (no-namestring-error
+           pathname "the ~S component ~S is of length 0" :name name))
         (fragments (unparse-physical-piece name escape-char)))
       (when (pathname-component-present-p type)
         (unless name
-          (error "cannot specify the type without a file: ~S" pathname))
+          (no-namestring-error
+           pathname
+           "there is a ~S component but no ~S component" :type :name))
         (when (typep type 'simple-string)
           (when (position #\. type)
-            (error "type component can't have a #\. inside: ~S" pathname)))
+            (no-namestring-error
+             pathname "the ~S component contains a ~S" :type #\.)))
         (fragments ".")
         (fragments (unparse-physical-piece type escape-char)))
       (apply #'concatenate 'simple-string (fragments)))))
@@ -224,15 +230,17 @@
       (cond
         ((pathname-component-present-p name)
          (unless (stringp name)         ; some kind of wild field
-           (error "Bad name component in NATIVE-NAMESTRING: ~S." name))
+           (no-native-namestring-error
+            pathname "of the ~S component ~S." :name name))
          (fragments name)
          (when (pathname-component-present-p type)
            (unless (stringp type)       ; some kind of wild field
-             (error "Bad type component in NATIVE-NAMESTRING: ~S." type))
+             (no-native-namestring-error
+              pathname "of the :~S component ~S" :type type))
            (fragments ".")
            (fragments type)))
         ((pathname-component-present-p type) ; type without a name
-         (error
-          "Type component without a name component in NATIVE-NAMESTRING: ~S."
-          type)))
+         (no-native-namestring-error
+          pathname
+          "there is a ~S component but no ~S component" :type :name)))
       (apply #'concatenate 'simple-string (fragments)))))

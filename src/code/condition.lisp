@@ -1111,6 +1111,40 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
              (namestring-parse-error-namestring condition)
              (namestring-parse-error-offset condition)))))
 
+(define-condition pathname-unparse-error (file-error
+                                          simple-condition)
+  ((problem :reader pathname-unparse-error-problem :initarg :problem))
+  (:report (lambda (condition stream)
+             (format stream "~@<The pathname ~S ~A~:[.~; because ~:*~?~]~@:>"
+                     (file-error-pathname condition)
+                     (pathname-unparse-error-problem condition)
+                     (simple-condition-format-control condition)
+                     (simple-condition-format-arguments condition))))
+  (:default-initargs
+   :problem (missing-arg)))
+
+(define-condition no-namestring-error (pathname-unparse-error
+                                       reference-condition)
+  ()
+  (:default-initargs
+   :problem "does not have a namestring"
+   :references '((:ansi-cl :section (19 1 2)))))
+(defun no-namestring-error
+    (pathname &optional format-control &rest format-arguments)
+  (error 'no-namestring-error
+         :pathname pathname
+         :format-control format-control :format-arguments format-arguments))
+
+(define-condition no-native-namestring-error (pathname-unparse-error)
+  ()
+  (:default-initargs
+   :problem "does not have a native namestring"))
+(defun no-native-namestring-error
+    (pathname &optional format-control &rest format-arguments)
+  (error 'no-native-namestring-error
+         :pathname pathname
+         :format-control format-control :format-arguments format-arguments))
+
 (define-condition simple-package-error (simple-condition package-error) ())
 
 (define-condition simple-reader-package-error (simple-reader-error package-error) ())

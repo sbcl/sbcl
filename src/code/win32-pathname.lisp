@@ -216,7 +216,9 @@
           ((and (= 1 (length device)) (alpha-char-p (char device 0)))
            (concatenate 'simple-string device ":"))
           ((and (consp directory) (eq :relative (car directory)))
-           (error "No printed representation for a relative UNC pathname."))
+           (no-native-namestring-error
+            pathname
+            "there is no printed representation for a relative UNC pathname"))
           (t
            (if native
                (concatenate 'simple-string "\\\\" device)

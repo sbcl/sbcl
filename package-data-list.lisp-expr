@@ -2155,6 +2155,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "CASE-FAILURE" "ECASE-FAILURE" "ETYPECASE-FAILURE"
                "NAMESTRING-PARSE-ERROR"
                "NAMESTRING-PARSE-ERROR-OFFSET"
+               "NO-NAMESTRING-ERROR" "NO-NATIVE-NAMESTRING-ERROR"
                "MAKE-RESTART" "RESTART-ASSOCIATED-CONDITIONS"
                "COERCE-TO-CONDITION"
 
