@@ -347,6 +347,27 @@
 
 ;;;; conditional compilation: the #+ and #- readmacros
 
+;;; If X is a symbol, see whether it is present in *FEATURES*. Also
+;;; handle arbitrary combinations of atoms using NOT, AND, OR.
+(defun featurep (x)
+  (typecase x
+    (cons
+     (case (car x)
+       ((:not not)
+        (cond
+          ((cddr x)
+           (error "too many subexpressions in feature expression: ~S" x))
+          ((null (cdr x))
+           (error "too few subexpressions in feature expression: ~S" x))
+          (t (not (featurep (cadr x))))))
+       ((:and and) (every #'featurep (cdr x)))
+       ((:or or) (some #'featurep (cdr x)))
+       (t
+        (error "unknown operator in feature expression: ~S." x))))
+    (symbol (not (null (memq x *features*))))
+    (t
+      (error "invalid feature expression: ~S" x))))
+
 (defun sharp-plus-minus (stream sub-char numarg)
     (ignore-numarg sub-char numarg)
     (if (char= (if (featurep (let ((*package* *keyword-package*)
