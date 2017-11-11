@@ -334,29 +334,24 @@
               pathname))))))
 
 ;;; Convert PATHNAME-DESIGNATOR (a pathname, or string, or
-;;; stream), into a pathname in pathname.
-;;;
-;;; FIXME: was rewritten, should be tested (or rewritten again, this
-;;; time using ONCE-ONLY, *then* tested)
+;;; stream), into a pathname in PATHNAME.
 (eval-when (:compile-toplevel :execute)
 (sb!xc:defmacro with-pathname ((pathname pathname-designator) &body body)
-  (let ((pd0 (gensym)))
-    `(let* ((,pd0 ,pathname-designator)
-            (,pathname (etypecase ,pd0
-                         (pathname ,pd0)
-                         (string (parse-namestring ,pd0))
-                         (file-stream (file-name ,pd0)))))
+  (once-only ((pathname-designator pathname-designator))
+    `(let ((,pathname (etypecase ,pathname-designator
+                        (pathname ,pathname-designator)
+                        (string (parse-namestring ,pathname-designator))
+                        (file-stream (file-name ,pathname-designator)))))
        ,@body)))
 
 (sb!xc:defmacro with-native-pathname ((pathname pathname-designator) &body body)
-  (let ((pd0 (gensym)))
-    `(let* ((,pd0 ,pathname-designator)
-            (,pathname (etypecase ,pd0
-                         (pathname ,pd0)
-                         (string (parse-native-namestring ,pd0))
-                         ;; FIXME
-                         #+nil
-                         (file-stream (file-name ,pd0)))))
+  (once-only ((pathname-designator pathname-designator))
+    `(let ((,pathname (etypecase ,pathname-designator
+                        (pathname ,pathname-designator)
+                        (string (parse-native-namestring ,pathname-designator))
+                        ;; FIXME
+                        #+nil
+                        (file-stream (file-name ,pathname-designator)))))
        ,@body)))
 
 (sb!xc:defmacro with-host ((host host-designator) &body body)
@@ -384,37 +379,36 @@
   ;;
   ;; A logical host is an object of implementation-dependent nature. In
   ;; SBCL, it's a member of the HOST class (a subclass of STRUCTURE-OBJECT).
-  (let ((hd0 (gensym)))
-    `(let* ((,hd0 ,host-designator)
-            (,host (etypecase ,hd0
-                     ((string 0)
-                      ;; This is a special host. It's not valid as a
-                      ;; logical host, so it is a sensible thing to
-                      ;; designate the physical host object. So we do
-                      ;; that.
-                      *physical-host*)
-                     (string
-                      ;; In general ANSI-compliant Common Lisps, a
-                      ;; string might also be a physical pathname
-                      ;; host, but ANSI leaves this up to the
-                      ;; implementor, and in SBCL we don't do it, so
-                      ;; it must be a logical host.
-                      (find-logical-host ,hd0))
-                     ((or null (member :unspecific))
-                      ;; CLHS says that HOST=:UNSPECIFIC has
-                      ;; implementation-defined behavior. We
-                      ;; just turn it into NIL.
-                      nil)
-                     (list
-                      ;; ANSI also allows LISTs to designate hosts,
-                      ;; but leaves its interpretation
-                      ;; implementation-defined. Our interpretation
-                      ;; is that it's unsupported.:-|
-                      (error "A LIST representing a pathname host is not ~
+  (once-only ((host-designator host-designator))
+    `(let ((,host (etypecase ,host-designator
+                    ((string 0)
+                     ;; This is a special host. It's not valid as a
+                     ;; logical host, so it is a sensible thing to
+                     ;; designate the physical host object. So we do
+                     ;; that.
+                     *physical-host*)
+                    (string
+                     ;; In general ANSI-compliant Common Lisps, a
+                     ;; string might also be a physical pathname
+                     ;; host, but ANSI leaves this up to the
+                     ;; implementor, and in SBCL we don't do it, so
+                     ;; it must be a logical host.
+                     (find-logical-host ,host-designator))
+                    ((or null (member :unspecific))
+                     ;; CLHS says that HOST=:UNSPECIFIC has
+                     ;; implementation-defined behavior. We
+                     ;; just turn it into NIL.
+                     nil)
+                    (list
+                     ;; ANSI also allows LISTs to designate hosts,
+                     ;; but leaves its interpretation
+                     ;; implementation-defined. Our interpretation
+                     ;; is that it's unsupported.:-|
+                     (error "A LIST representing a pathname host is not ~
                               supported in this implementation:~%  ~S"
-                             ,hd0))
-                     (host ,hd0))))
-      ,@body)))
+                            ,host-designator))
+                    (host ,host-designator))))
+       ,@body)))
 ) ; EVAL-WHEN
 
 (defun find-host (host-designator &optional (errorp t))
