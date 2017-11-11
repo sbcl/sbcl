@@ -4359,9 +4359,9 @@
   (let ((fun (checked-compile
               `(lambda (x)
                  (declare (double-float x))
-                 (unknown-fun 1.0d0 (+ 1.0d0 x)))
+                 (unknown-fun 4.0d0 (+ 4.0d0 x)))
               :allow-style-warnings t)))
-    (assert (equal '(1.0d0) (ctu:find-code-constants fun :type 'double-float)))))
+    (assert (equal '(4.0d0) (ctu:find-code-constants fun :type 'double-float)))))
 
 (with-test (:name (compile :only-one-boxed-constant-for-multiple-uses))
   (let* ((big (1+ most-positive-fixnum))
