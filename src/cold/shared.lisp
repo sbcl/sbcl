@@ -146,12 +146,19 @@
 (compile 'prepend-genfile-path) ; seems in vogue to compile everything in this file
 
 ;;; Return an expression read from the file named NAMESTRING.
+;;; For user-supplied inputs, protect against more than one expression
+;;; appearing in the file. With trusted inputs we needn't bother.
 (defun read-from-file (namestring)
   (with-open-file (s (prepend-genfile-path namestring))
     (let* ((result (read s))
-           (eof-result (cons nil nil))
-           (after-result (read s nil eof-result)))
-      (unless (eq after-result eof-result)
+           (eof-result (cons nil nil)))
+      (when (string= (pathname-name namestring) "build-order")
+        ;; build-order uses both host and target conditionals.
+        ;; Our sanity checks during make-host-1 would complain
+        ;; about #+feature when reading the second expression in the file
+        ;; whenever such feature is also a possible target feature.
+        (return-from read-from-file result))
+      (unless (eq (read s nil eof-result) eof-result)
         (error "more than one expression in file ~S" namestring))
       result)))
 (compile 'read-from-file)

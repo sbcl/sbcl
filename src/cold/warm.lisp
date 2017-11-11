@@ -56,109 +56,9 @@
 ;;;     ((:or :macro (:match "$EARLY-") (:match "$BOOT-"))
 ;;;     (declare (optimize (speed 0))))))
 ;;;
-(let ((early-srcs
-              '("src/code/warm-error"
-                "src/code/room" ; for MAP-ALLOCATED-OBJECTS
-                ;; We re-nickname SB-SEQUENCE as SEQUENCE now.
-                ;; It could be done in genesis, but not earlier,
-                ;; since the host has a package of that name.
-                "src/code/defpackage"))
-
-      (interpreter-srcs
-              #+sb-fasteval
-              '("src/interpreter/macros"
-                "src/interpreter/checkfuns"
-                "src/interpreter/env"
-                "src/interpreter/sexpr"
-                "src/interpreter/special-forms"
-                "src/interpreter/eval"
-                "src/interpreter/debug"))
-      (external-format-srcs
-       (append '("src/code/external-formats/enc-ebcdic")
-               #+sb-unicode
-               '("src/code/external-formats/enc-cyr"
-                 "src/code/external-formats/enc-dos"
-                 "src/code/external-formats/enc-iso"
-                 "src/code/external-formats/enc-win"
-                 "src/code/external-formats/enc-mac"
-                 "src/code/external-formats/mb-util"
-                 "src/code/external-formats/enc-cn-tbl"
-                 "src/code/external-formats/enc-cn"
-                 "src/code/external-formats/enc-jpn-tbl"
-                 "src/code/external-formats/enc-jpn"
-                 "src/code/external-formats/enc-utf")))
-       (pcl-srcs
-              '(;; CLOS, derived from the PCL reference implementation
-                ;;
-                ;; This PCL build order is based on a particular
-                ;; (arbitrary) linearization of the declared build
-                ;; order dependencies from the old PCL defsys.lisp
-                ;; dependency database.
-                "src/pcl/macros"
-                "src/pcl/compiler-support"
-                "src/pcl/defclass"
-                "src/pcl/defs"
-                "src/pcl/fngen"
-                "src/pcl/wrapper"
-                "src/pcl/cache"
-                "src/pcl/dlisp"
-                "src/pcl/boot"
-                "src/pcl/vector"
-                "src/pcl/slots-boot"
-                "src/pcl/combin"
-                "src/pcl/dfun"
-                "src/pcl/ctor"
-                "src/pcl/braid"
-                "src/pcl/dlisp3"
-                "src/pcl/generic-functions"
-                "src/pcl/slots"
-                "src/pcl/init"
-                "src/pcl/std-class"
-                "src/pcl/cpl"
-                "src/pcl/fsc"
-                "src/pcl/methods"
-                "src/pcl/fixup"
-                "src/pcl/defcombin"
-                "src/pcl/ctypes"
-                "src/pcl/env"
-                "src/pcl/documentation"
-                "src/pcl/print-object"
-                "src/pcl/precom1"
-                "src/pcl/precom2"))
-      (other-srcs
-              '("src/code/setf-funs"
-                "src/code/stubs"
-                ;; miscellaneous functionality which depends on CLOS
-                "src/code/late-condition"
-
-                ;; CLOS-level support for the Gray OO streams
-                ;; extension (which is also supported by various
-                ;; lower-level hooks elsewhere in the code)
-                "src/pcl/gray-streams-class"
-                "src/pcl/gray-streams"
-
-                ;; CLOS-level support for User-extensible sequences.
-                "src/pcl/sequence"
-
-                ;; other functionality not needed for cold init, moved
-                ;; to warm init to reduce peak memory requirement in
-                ;; cold init
-                "src/code/describe"
-
-                "src/code/describe-policy"
-                "src/code/inspect"
-                "src/code/profile"
-                "src/code/ntrace"
-                "src/code/step"
-                "src/code/warm-lib"
-                #+win32 "src/code/warm-mswin"
-                "src/code/run-program"
-                #+gencgc "src/code/traceroot"
-
-                #+immobile-code "src/code/immobile-space"
-                "src/code/repack-xref"
-                #+cheneygc "src/code/purify"
-                "src/code/save"))
+(let ((sources (with-open-file (f "build-order.lisp-expr")
+                 (let ((*features* (cons :warm-build-phase *features*)))
+                   (read f))))
       (sb-c::*handled-conditions* sb-c::*handled-conditions*))
  (declare (special *compile-files-p*))
  (proclaim '(sb-ext:muffle-conditions
@@ -222,8 +122,5 @@
         (*print-level* 5)
         (*print-circle* t)
         (*compile-print* nil))
-    (do-srcs early-srcs)
-    (with-compilation-unit () (do-srcs interpreter-srcs))
-    (do-srcs external-format-srcs)
-    (with-compilation-unit () (do-srcs pcl-srcs))
-    (do-srcs other-srcs))))
+    (dolist (group sources)
+      (with-compilation-unit () (do-srcs group))))))
