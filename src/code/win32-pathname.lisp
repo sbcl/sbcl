@@ -264,6 +264,7 @@
 (defun unparse-native-win32-namestring (pathname as-file)
   (declare (type pathname pathname))
   (let* ((device (pathname-device pathname))
+         (devicep (not (member device '(:unc nil))))
          (directory (pathname-directory pathname))
          (name (pathname-name pathname))
          (name-present-p (typep name '(not (member nil :unspecific))))
@@ -284,36 +285,41 @@
                              :directory (substitute :back :up directory))))))
     (coerce
      (with-simple-output-to-string (s)
-       (when absolutep
-         (write-string (case device
-                         (:unc +unc-file-name-prefix+)
-                         (otherwise +long-file-name-prefix+)) s))
-       (when (or (not absolutep) (not (member device '(:unc nil))))
-         (write-string (unparse-win32-device pathname t) s))
+       (cond
+         (absolutep
+          (write-string (case device
+                          (:unc +unc-file-name-prefix+)
+                          (otherwise +long-file-name-prefix+))
+                        s))
+         (devicep
+          (write-string (unparse-win32-device pathname t) s)))
        (when directory
          (ecase (pop directory)
            (:absolute
             (let ((next (pop directory)))
-              ;; Don't use USER-HOMEDIR-NAMESTRING, since
-              ;; it can be specified as C:/User/user
-              ;; and (native-namestring (user-homedir-pathname))
-              ;; will be not equal to it, because it's parsed first.
-              (cond ((eq :home next)
-                     (write-string (native-namestring (user-homedir-pathname))
-                                   s))
-                    ((and (consp next) (eq :home (car next)))
-                     (let ((where (user-homedir-pathname (second next))))
-                       (if where
-                           (write-string (native-namestring where) s)
-                           (error "User homedir unknown for: ~S."
-                                  (second next)))))
-                    ;; namestring of user-homedir-pathname already has
-                    ;; // at the end
-                    (next
-                     (write-char #\\ s)
-                     (push next directory))
-                    (t
-                     (write-char #\\ s)))))
+              (cond
+                ((typep next '(or (eql :home) (cons (eql :home))))
+                 (let* ((username (when (consp next) (second next)))
+                        (home (handler-case
+                                  (if username
+                                      (parse-native-namestring
+                                       (user-homedir-namestring username))
+                                      (user-homedir-pathname))
+                                (error (condition)
+                                  (error "User homedir unknown~@[ for ~S~]: ~A."
+                                         username condition)))))
+                   (when (and (or absolutep devicep)
+                              (not (string-equal device (pathname-device home))))
+                     (error "Device in homedir ~S conflicts which device ~S"
+                            home device))
+                   (write-string (native-namestring home) s)))
+                ;; namestring of user-homedir-pathname already has
+                ;; // at the end
+                (next
+                 (write-char #\\ s)
+                 (push next directory))
+                (t
+                 (write-char #\\ s)))))
            (:relative)))
        (loop for (piece . subdirs) on directory
              do (typecase piece
