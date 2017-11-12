@@ -163,6 +163,12 @@ across a network.
 
 @include class-sb-bsd-sockets-local-socket.texinfo
 
+A local abstract socket address is also a string the scope of which is
+the local machine. However, in contrast to a local socket address, there
+is no corresponding filesystem node.
+
+@include class-sb-bsd-sockets-local-abstract-socket.texinfo
+
 @node Name Service
 @section Name Service
 
