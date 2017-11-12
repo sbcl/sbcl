@@ -192,9 +192,6 @@ See gethostbyaddr(3) for details."
 GET-NAME-SERVICE-ERRNO")
 
 (defun name-service-error (where &optional errno)
-  ;; There was a dummy docstring here for the texinfo extractor, but I
-  ;; see no reason for this to be documented in the manual, and removed
-  ;; it. -- JES
   (let ((*name-service-errno* (get-name-service-errno errno)))
     ;; Comment next to NETDB_INTERNAL in netdb.h says "See errno.".
     ;; This special case treatment hasn't actually been tested yet.
