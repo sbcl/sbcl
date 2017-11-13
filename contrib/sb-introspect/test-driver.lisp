@@ -350,7 +350,7 @@
 (deftest allocation-information.2c
   ;; This is a a test of SBCL genesis that leverages sb-introspect.
     (tai (sb-kernel::find-fdefn (elt sb-vm:+static-fdefns+ 0))
-         :heap '(:space #-immobile-space :static #+immobile-space :immobile))
+         :heap '(:space #+immobile-code :immobile #-immobile-code :static))
   t)
 
 (deftest allocation-information.3
