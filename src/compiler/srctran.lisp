@@ -945,6 +945,9 @@
                  ((zerop (type-bound-number y))
                   ;; Divide by zero means result is infinity
                   nil)
+                 ((and (numberp x) (zerop x))
+                  ;; Zero divided by anything is zero, but don't lose the sign
+                  (/ x (signum (type-bound-number y))))
                  (t
                   (bound-binop / x y)))))
     (let ((top-range (interval-range-info top))

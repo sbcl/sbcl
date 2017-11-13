@@ -549,3 +549,10 @@
                                 (return-from b3 a))))
                   (unwind-protect x)))))))
     ((321) 321)))
+
+(with-test (:name :interval-div-zero)
+  (checked-compile-and-assert (:optimize :safe)
+    `(lambda (x y)
+       (truncate (the (integer 0 0) x)
+                 (the (rational (1) (2)) y)))
+   ((0 3/2) (values 0 0))))
