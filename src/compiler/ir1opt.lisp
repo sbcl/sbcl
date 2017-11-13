@@ -892,112 +892,95 @@
     (propagate-fun-change node)
     (maybe-terminate-block node nil))
   (let ((args (basic-combination-args node))
-        (kind (basic-combination-kind node))
         (info (basic-combination-fun-info node)))
-    (ecase kind
-      (:local
-       (let ((fun (combination-lambda node)))
-         (if (eq (functional-kind fun) :let)
-             (propagate-let-args node fun)
-             (propagate-local-call-args node fun))))
-      (:error
-       (dolist (arg args)
-         (when arg
-           (setf (lvar-reoptimize arg) nil))))
-      (:full
-       (dolist (arg args)
-         (when arg
-           (setf (lvar-reoptimize arg) nil)))
-       (cond (info
-              (check-important-result node info)
-              (let ((fun (fun-info-destroyed-constant-args info)))
-                (when (and fun (funcall fun args))
-                  (let ((*compiler-error-context* node))
-                    (warn 'constant-modified
-                          :fun-name (lvar-fun-name
-                                     (basic-combination-fun node) t))
-                    (setf (basic-combination-kind node) :error)
-                    (return-from ir1-optimize-combination))))
-              (let ((fun (fun-info-derive-type info)))
-                (when fun
-                  (let ((res (funcall fun node)))
-                    (when res
-                      (derive-node-type node (coerce-to-values res))
-                      (maybe-terminate-block node nil))))))
-             (t
-              ;; Check against the DEFINED-TYPE unless TYPE is already good.
-              (let* ((fun (basic-combination-fun node))
-                     (uses (lvar-uses fun))
-                     (leaf (when (ref-p uses) (ref-leaf uses))))
-                (multiple-value-bind (type defined-type)
-                    (if (global-var-p leaf)
-                        (values (leaf-type leaf) (leaf-defined-type leaf))
-                        (values nil nil))
-                  (when (and (not (fun-type-p type)) (fun-type-p defined-type))
-                    (validate-call-type node type leaf)))))))
-      (:known
-       (aver info)
-       (dolist (arg args)
-         (when arg
-           (setf (lvar-reoptimize arg) nil)))
-       (check-important-result node info)
-       (let ((fun (fun-info-destroyed-constant-args info)))
-         (when (and fun
-                    ;; If somebody is really sure that they want to modify
-                    ;; constants, let them.
-                    (policy node (> check-constant-modification 0)))
-           (let ((destroyed-constant-args (funcall fun args)))
-             (when destroyed-constant-args
-               (let ((*compiler-error-context* node))
-                 (warn 'constant-modified
-                       :fun-name (lvar-fun-name
-                                  (basic-combination-fun node)))
-                 (setf (basic-combination-kind node) :error)
-                 (return-from ir1-optimize-combination))))))
+    (flet ((clear-reoptimize-args ()
+             (dolist (arg args)
+               (when arg
+                 (setf (lvar-reoptimize arg) nil))))
+           (process-info ()
+             (check-important-result node info)
+             (let ((fun (fun-info-destroyed-constant-args info)))
+               (when (and fun
+                          ;; If somebody is really sure that they want to modify
+                          ;; constants, let them.
+                          (policy node (> check-constant-modification 0))
+                          (funcall fun args))
+                 (let ((*compiler-error-context* node))
+                   (warn 'constant-modified
+                         :fun-name (lvar-fun-name
+                                    (basic-combination-fun node) t))
+                   (setf (basic-combination-kind node) :error)
+                   (return-from ir1-optimize-combination))))
+             (let ((fun (fun-info-derive-type info)))
+               (when fun
+                 (let ((res (funcall fun node)))
+                   (when res
+                     (derive-node-type node (coerce-to-values res))
+                     (maybe-terminate-block node nil)))))))
+      (ecase (basic-combination-kind node)
+        (:local
+         (let ((fun (combination-lambda node)))
+           (if (eq (functional-kind fun) :let)
+               (propagate-let-args node fun)
+               (propagate-local-call-args node fun))))
+        (:error
+         (clear-reoptimize-args))
+        (:full
+         (clear-reoptimize-args)
+         (cond (info
+                ;; This is a known function marked NOTINLINE
+                (process-info))
+               (t
+                ;; Check against the DEFINED-TYPE unless TYPE is already good.
+                (let* ((fun (basic-combination-fun node))
+                       (uses (lvar-uses fun))
+                       (leaf (when (ref-p uses) (ref-leaf uses))))
+                  (multiple-value-bind (type defined-type)
+                      (if (global-var-p leaf)
+                          (values (leaf-type leaf) (leaf-defined-type leaf))
+                          (values nil nil))
+                    (when (and (not (fun-type-p type)) (fun-type-p defined-type))
+                      (validate-call-type node type leaf)))))))
+        (:known
+         (aver info)
+         (clear-reoptimize-args)
+         (process-info)
+         (let ((attr (fun-info-attributes info)))
+           (when (constant-fold-call-p node)
+             (constant-fold-call node)
+             (return-from ir1-optimize-combination))
+           (when (and (ir1-attributep attr commutative)
+                      (= (length args) 2)
+                      (constant-lvar-p (first args))
+                      (not (constant-lvar-p (second args))))
+             (setf (basic-combination-args node) (nreverse args))))
 
-       (let ((attr (fun-info-attributes info)))
-         (when (constant-fold-call-p node)
-           (constant-fold-call node)
-           (return-from ir1-optimize-combination))
-         (when (and (ir1-attributep attr commutative)
-                    (= (length args) 2)
-                    (constant-lvar-p (first args))
-                    (not (constant-lvar-p (second args))))
-           (setf (basic-combination-args node) (nreverse args))))
-       (let ((fun (fun-info-derive-type info)))
-         (when fun
-           (let ((res (funcall fun node)))
-             (when res
-               (derive-node-type node (coerce-to-values res))
-               (maybe-terminate-block node nil)))))
-
-       (let ((fun (fun-info-optimizer info)))
-         (unless (and fun (funcall fun node))
-           ;; First give the VM a peek at the call
-           (multiple-value-bind (style transform)
-               (combination-implementation-style node)
-             (ecase style
-               (:direct
-                ;; The VM knows how to handle this.
-                )
-               (:transform
-                ;; The VM mostly knows how to handle this.  We need
-                ;; to massage the call slightly, though.
-                (transform-call node transform (combination-fun-source-name node)))
-               ((:default :maybe)
-                ;; Let transforms have a crack at it.
-                (dolist (x (fun-info-transforms info))
-                  #!+sb-show
-                  (when *show-transforms-p*
-                    (let* ((lvar (basic-combination-fun node))
-                           (fname (lvar-fun-name lvar t)))
-                      (/show "trying transform" x (transform-function x) "for" fname)))
-                  (unless (ir1-transform node x)
+         (let ((fun (fun-info-optimizer info)))
+           (unless (and fun (funcall fun node))
+             ;; First give the VM a peek at the call
+             (multiple-value-bind (style transform)
+                 (combination-implementation-style node)
+               (ecase style
+                 (:direct
+                  ;; The VM knows how to handle this.
+                  )
+                 (:transform
+                  ;; The VM mostly knows how to handle this.  We need
+                  ;; to massage the call slightly, though.
+                  (transform-call node transform (combination-fun-source-name node)))
+                 ((:default :maybe)
+                  ;; Let transforms have a crack at it.
+                  (dolist (x (fun-info-transforms info))
                     #!+sb-show
                     (when *show-transforms-p*
-                      (/show "quitting because IR1-TRANSFORM result was NIL"))
-                    (return)))))))))))
-
+                      (let* ((lvar (basic-combination-fun node))
+                             (fname (lvar-fun-name lvar t)))
+                        (/show "trying transform" x (transform-function x) "for" fname)))
+                    (unless (ir1-transform node x)
+                      #!+sb-show
+                      (when *show-transforms-p*
+                        (/show "quitting because IR1-TRANSFORM result was NIL"))
+                      (return))))))))))))
   (values))
 
 (defun xep-tail-combination-p (node)
