@@ -327,7 +327,7 @@
         (dump-counted-string (symbol-name +backend-fasl-file-implementation+))
         (dump-word +fasl-file-version+ res)
         (dump-counted-string (sb!xc:lisp-implementation-version))
-        (dump-counted-string *features-affecting-fasl-format*))
+        (dump-counted-string (compute-features-affecting-fasl-format)))
       res)))
 
 ;;; Close the specified FASL-OUTPUT, aborting the write if ABORT-P.

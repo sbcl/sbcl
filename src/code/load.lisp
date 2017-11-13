@@ -375,11 +375,12 @@
                        :expected expected-version)
               (continue () :report "Load the fasl file anyway"))))
         ;; Read and validate *FEATURES* which affect binary compatibility.
-        (let ((faff-in-this-file (string-from-stream)))
-          (unless (string= faff-in-this-file *features-affecting-fasl-format*)
+        (let ((faff-in-this-file (string-from-stream))
+              (expected (compute-features-affecting-fasl-format)))
+          (unless (string= faff-in-this-file expected)
             (error 'invalid-fasl-features
                    :stream stream
-                   :expected *features-affecting-fasl-format*
+                   :expected expected
                    :features faff-in-this-file)))
         ;; success
         t))))

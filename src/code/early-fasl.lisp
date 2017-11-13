@@ -13,6 +13,10 @@
 
 ;;;; various constants and essentially-constants
 
+(defun fasl-target-features ()
+  #+sb-xc-host sb-cold:*shebang-features*
+  #-sb-xc-host *features*)
+
 ;;; a string which appears at the start of a fasl file header
 ;;;
 ;;; This value is used to identify fasl files. Even though this is not
@@ -33,48 +37,42 @@
 ;;;   against.
 (defglobal *fasl-header-string-start-string* "# FASL")
 
-(macrolet ((define-fasl-format-features ()
-             (let (;; master value for *F-P-A-F-F*
-                   (fpaff (append '(:sb-thread :sb-package-locks :sb-unicode
-                                    :gencgc :msan)
-                                  #!+(or x86 x86-64) '(:int4-breakpoints
-                                                       :ud2-breakpoints))))
-               `(progn
-                  ;; a list of *(SHEBANG-)FEATURES* flags which affect
-                  ;; binary compatibility, i.e. which must be the same
-                  ;; between the SBCL which compiles the code and the
-                  ;; SBCL which executes the code
-                  ;;
-                  ;; This is a property of SBCL executables in the
-                  ;; abstract, not of this particular SBCL executable,
-                  ;; so any flag in this list may or may not be present
-                  ;; in the *FEATURES* list of this particular build.
-                  (defglobal *features-potentially-affecting-fasl-format*
-                    ',fpaff)
-                  ;; a string representing flags of *F-P-A-F-F* which
-                  ;; are in this particular build
-                  ;;
-                  ;; (A list is the natural logical representation for
-                  ;; this, but we represent it as a string because
-                  ;; that's physically convenient for writing to and
-                  ;; reading from fasl files, and because we don't
-                  ;; need to do anything sophisticated with its
-                  ;; logical structure, just test it for equality.)
-                  (defglobal *features-affecting-fasl-format*
-                    ,(let ((*print-pretty* nil)
-                           (*print-length* nil))
-                       (prin1-to-string
-                        (sort
-                         (copy-seq
-                          (intersection sb-cold:*shebang-features* fpaff))
-                         #'string<
-                         :key #'symbol-name))))))))
-  (define-fasl-format-features))
+;;; a list of *(SHEBANG-)FEATURES* flags which affect binary compatibility,
+;;; i.e. which must be the same between the SBCL which compiled the code
+;;; and the SBCL which executes the code. This is a property of SBCL executables
+;;; in the abstract, not of this particular SBCL executable,
+;;; so any flag in this list may or may not be present
+;;; in the *FEATURES* list of this particular build.
+(defglobal *features-potentially-affecting-fasl-format*
+    (append '(:sb-thread :sb-package-locks :sb-unicode :cheneygc :gencgc :msan)
+            #!+(or x86 x86-64) '(:int4-breakpoints :ud2-breakpoints)))
 
+;;; Return a string representing symbols in *FEATURES-POTENTIALLY-AFFECTING-FASL-FORMAT*
+;;; which are present in a particular compilation.
+(defun compute-features-affecting-fasl-format ()
+  (let ((list (sort (copy-list (intersection *features-potentially-affecting-fasl-format*
+                                             (fasl-target-features)))
+                    #'string< :key #'symbol-name)))
+    ;; Stringify the subset of *FEATURES* that affect fasl format.
+    ;; A list would be the natural representation choice for this, but a string
+    ;; is convenient for and a requirement for writing to and reading from fasls
+    ;; at this stage of the loading. WITH-STANDARD-IO-SYNTAX and WRITE-TO-STRING
+    ;; would work, but this is simple enough to do by hand.
+    (with-simple-output-to-string (stream)
+      (let ((delimiter #\())
+        (dolist (symbol list)
+          (write-char delimiter stream)
+          (write-string (string symbol) stream)
+          (setq delimiter #\Space)))
+      (write-char #\) stream))))
+
+#-sb-xc-host
 (eval-when (:compile-toplevel)
-  (assert (and (not (find #\newline *features-affecting-fasl-format*))
-               (not (find #\# *features-affecting-fasl-format*))
-               (not (search ".." *features-affecting-fasl-format*)))))
+  (let ((string (compute-features-affecting-fasl-format)))
+    (assert (and (> (length string) 2)
+                 (not (find #\newline string))
+                 (not (find #\# string))
+                 (not (search ".." string))))))
 
 ;;; the code for a character which terminates a fasl file header
 (defconstant +fasl-header-string-stop-char-code+ 255)

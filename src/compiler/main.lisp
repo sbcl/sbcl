@@ -1706,8 +1706,7 @@ necessary, since type inference may take arbitrarily long to converge.")
         ;; *or* code for another image which is sanitized.
         ;; And we can also cross-compile assuming msan.
         (*msan-compatible-stack-unpoison*
-         (member :msan #+sb-xc-host sb-cold::*shebang-features*
-                       #-sb-xc-host *features*))
+         (member :msan (sb!fasl::fasl-target-features)))
         (*handled-conditions* *handled-conditions*)
         (*disabled-package-locks* *disabled-package-locks*)
         (*lexenv* (make-null-lexenv))

@@ -20,6 +20,8 @@
 ;;; the feature list for the target system
 (export '*shebang-features*)
 (declaim (type list *shebang-features*))
+;; FIXME: is there a reason this isn't SB!XC:*FEATURES* ?
+;; We haven't set up the SB!XC package yet, but we certainly could.
 (defvar *shebang-features*)
 
 (defun target-platform-name ()
