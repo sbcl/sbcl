@@ -544,20 +544,23 @@
     (t (bug "Unexpected arguments to bounds coercion: ~S ~S" val type))))
 
 (defun coerce-for-bound (val type)
-  (if (consp val)
-      (let ((xbound (coerce-for-bound (car val) type)))
-        (if (coercion-loses-precision-p (car val) type)
-            xbound
-            (list xbound)))
-      (cond
-        ((subtypep type 'double-float)
-         (if (<= most-negative-double-float val most-positive-double-float)
-             (coerce val type)))
-        ((or (subtypep type 'single-float) (subtypep type 'float))
-         ;; coerce to float returns a single-float
-         (if (<= most-negative-single-float val most-positive-single-float)
-             (coerce val type)))
-        (t (coerce val type)))))
+  (cond
+    ((or (null val)
+         (null type))
+     val)
+    ((consp val)
+     (let ((xbound (coerce-for-bound (car val) type)))
+       (if (coercion-loses-precision-p (car val) type)
+           xbound
+           (list xbound))))
+    ((subtypep type 'double-float)
+     (if (<= most-negative-double-float val most-positive-double-float)
+         (coerce val type)))
+    ((or (subtypep type 'single-float) (subtypep type 'float))
+     ;; coerce to float returns a single-float
+     (if (<= most-negative-single-float val most-positive-single-float)
+         (coerce val type)))
+    (t (coerce val type))))
 
 (defun coerce-and-truncate-floats (val type)
   (when val
@@ -1750,11 +1753,12 @@
   ;; result is a float of some type. We need to determine what that
   ;; type is. Basically it's the more contagious of the two types.
   (let ((q-type (truncate-derive-type-quot number-type divisor-type))
-        (res-type (numeric-contagion number-type divisor-type)))
+        (format (numeric-type-format
+                 (numeric-contagion number-type divisor-type))))
     (make-numeric-type :class 'float
-                       :format (numeric-type-format res-type)
-                       :low (numeric-type-low q-type)
-                       :high (numeric-type-high q-type))))
+                       :format format
+                       :low (coerce-for-bound (numeric-type-low q-type) format)
+                       :high (coerce-for-bound (numeric-type-high q-type) format))))
 
 (defun ftruncate-derive-type-quot-aux (n d same-arg)
   (declare (ignore same-arg))
@@ -1896,18 +1900,19 @@
                   ;; Compute type of quotient (first) result.
                   (defun ,q-aux (number-type divisor-type)
                     (let* ((number-interval
-                            (numeric-type->interval number-type))
+                             (numeric-type->interval number-type))
                            (divisor-interval
-                            (numeric-type->interval divisor-type))
+                             (numeric-type->interval divisor-type))
                            (quot (,q-name (interval-div number-interval
                                                         divisor-interval)))
                            (res-type (numeric-contagion number-type
-                                                        divisor-type)))
+                                                        divisor-type))
+                           (format (numeric-type-format res-type)))
                       (make-numeric-type
                        :class (numeric-type-class res-type)
-                       :format (numeric-type-format res-type)
-                       :low  (interval-low quot)
-                       :high (interval-high quot))))
+                       :format format
+                       :low  (coerce-for-bound (interval-low quot) format)
+                       :high (coerce-for-bound (interval-high quot) format))))
 
                   (defoptimizer (,name derive-type) ((number divisor))
                     (flet ((derive-q (n d same-arg)
