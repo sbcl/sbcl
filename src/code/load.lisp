@@ -250,19 +250,13 @@
              (invalid-fasl-expected condition)))))
 
 (define-condition invalid-fasl-features (invalid-fasl)
-  ((potential-features :reader invalid-fasl-potential-features
-                       :initarg :potential-features)
-   (features :reader invalid-fasl-features :initarg :features))
+  ((features :reader invalid-fasl-features :initarg :features))
   (:report
    (lambda (condition stream)
-     (format stream "~@<incompatible ~S in fasl file ~S: ~2I~_~
-                     Of features affecting binary compatibility, ~4I~_~S~2I~_~
-                     the fasl has ~4I~_~A,~2I~_~
-                     while the runtime expects ~4I~_~A.~:>"
-             '*features*
-             (invalid-fasl-stream condition)
-             (invalid-fasl-potential-features condition)
+     (format stream "~@<incompatible features ~A ~_in fasl file ~S: ~2I~_~
+                     Runtime expects ~A~:>"
              (invalid-fasl-features condition)
+             (invalid-fasl-stream condition)
              (invalid-fasl-expected condition)))))
 
 ;;; Skips past the shebang line on stream, if any.
@@ -385,7 +379,6 @@
           (unless (string= faff-in-this-file *features-affecting-fasl-format*)
             (error 'invalid-fasl-features
                    :stream stream
-                   :potential-features *features-potentially-affecting-fasl-format*
                    :expected *features-affecting-fasl-format*
                    :features faff-in-this-file)))
         ;; success
