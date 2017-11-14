@@ -61,10 +61,11 @@
 ;;; REX-R            A REX prefix with the "register" bit set was found
 ;;; REX-X            A REX prefix with the "index" bit set was found
 ;;; REX-B            A REX prefix with the "base" bit set was found
-(defconstant +allow-qword-imm+ #b10000000)
-(defconstant +operand-size-8+  #b01000000)
-(defconstant +operand-size-16+ #b00100000)
-(defconstant +rex+             #b00010000)
+(defconstant +allow-qword-imm+ #b100000000)
+(defconstant +operand-size-8+  #b010000000)
+(defconstant +operand-size-16+ #b001000000)
+(defconstant +fs-segment+      #b000100000)
+(defconstant +rex+             #b000010000)
 ;;; The next 4 exactly correspond to the bits in the REX prefix itself,
 ;;; to avoid unpacking and stuffing into inst-properties one at a time.
 (defconstant +rex-w+           #b1000)
@@ -1434,7 +1435,10 @@
      (emit-byte segment #xf0))))
 
 (define-instruction fs (segment)
-  (:printer byte ((op #x64)) nil))
+  (:printer byte ((op #x64 :prefilter (lambda (dstate value)
+                                        (declare (ignore value))
+                                        (dstate-setprop dstate +fs-segment+))))
+            nil :print-name nil))
 
 (define-instruction lock (segment)
   (:printer byte ((op #b11110000)) nil))

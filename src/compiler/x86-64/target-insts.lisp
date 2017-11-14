@@ -252,6 +252,8 @@
     (when (and width (eq mode :sized-ref))
       (princ width stream)
       (princ '| PTR | stream))
+    (when (dstate-getprop dstate +fs-segment+)
+      (princ "FS:" stream))
     (write-char #\[ stream)
     (when base-reg
       (if (eql :rip base-reg)

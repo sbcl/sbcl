@@ -131,7 +131,7 @@
       (sb-disassem::disassemble-memory (sb-sys:sap-int (sb-sys:vector-sap bytes))
                                        (length bytes)
                                        :stream s))
-    (assert (search "FS LOCK OR [#x20100400], R8B"
+    (assert (search "LOCK OR FS:[#x20100400], R8B"
                     (get-output-stream-string s)))))
 
 (with-test (:name :disassemble-static-fdefn :skipped-on '(not :x86-64))
