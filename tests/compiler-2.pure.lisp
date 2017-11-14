@@ -568,3 +568,10 @@
                                   `(lambda (x)
                                      (nth-value 1 (,fun (the double-float x) 1/2)))))))
                         '(double-float real)))))
+
+(with-test (:name :complex-float-contagion)
+  (checked-compile-and-assert ()
+    `(lambda (p1)
+       (declare (type (or double-float integer) p1))
+       (complex p1 2.0))
+    ((1d0) #c(1d0 2d0))))
