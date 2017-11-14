@@ -15,6 +15,28 @@
 
 (in-package "SB!X86-ASM")
 
+;;; Return the operand size based on the prefixes and width bit from
+;;; the dstate.
+(defun inst-operand-size (dstate)
+  (declare (type disassem-state dstate))
+  (cond ((dstate-getprop dstate 'operand-size-8) :byte)
+        ((dstate-getprop dstate 'operand-size-16) :word)
+        (t +default-operand-size+)))
+
+;;; Return the operand size for a "word-sized" operand based on the
+;;; prefixes from the dstate.
+(defun inst-word-operand-size (dstate)
+  (declare (type disassem-state dstate))
+  (if (dstate-getprop dstate 'operand-size-16) :word :dword))
+
+;;; This is a sort of bogus prefilter that just stores the info globally for
+;;; other people to use; it probably never gets printed.
+(defun prefilter-width (dstate value)
+  (declare (type bit value) (type disassem-state dstate))
+  (when (zerop value)
+    (dstate-setprop dstate 'operand-size-8))
+  value)
+
 (defun print-reg-with-width (value width stream dstate)
   (declare (ignore dstate))
   (princ (aref (ecase width
@@ -97,9 +119,9 @@
   (princ16 value stream))
 
 (defun maybe-print-segment-override (stream dstate)
-  (cond ((dstate-get-inst-prop dstate 'fs-segment-prefix)
+  (cond ((dstate-getprop dstate 'fs-segment-prefix)
          (princ "FS:" stream))
-        ((dstate-get-inst-prop dstate 'gs-segment-prefix)
+        ((dstate-getprop dstate 'gs-segment-prefix)
          (princ "GS:" stream))))
 
 (defun print-mem-access (value stream print-size-p dstate)

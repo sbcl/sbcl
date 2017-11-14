@@ -46,20 +46,6 @@
 ;;; instruction, must be set by prefilters, and contain a single bit of
 ;;; data each (presence/absence).
 
-;;; Return the operand size based on the prefixes and width bit from
-;;; the dstate.
-(defun inst-operand-size (dstate)
-  (declare (type disassem-state dstate))
-  (cond ((dstate-get-inst-prop dstate 'operand-size-8) :byte)
-        ((dstate-get-inst-prop dstate 'operand-size-16) :word)
-        (t +default-operand-size+)))
-
-;;; Return the operand size for a "word-sized" operand based on the
-;;; prefixes from the dstate.
-(defun inst-word-operand-size (dstate)
-  (declare (type disassem-state dstate))
-  (if (dstate-get-inst-prop dstate 'operand-size-16) :word :dword))
-
 ;;; Returns either an integer, meaning a register, or a list of
 ;;; (BASE-REG OFFSET INDEX-REG INDEX-SCALE), where any component
 ;;; may be missing or nil to indicate that it's not used or has the
@@ -102,16 +88,6 @@
            (list r/m (read-signed-suffix 8 dstate)))
         (t                            ; (= mod #b10)
            (list r/m (read-signed-suffix 32 dstate)))))
-
-
-;;; This is a sort of bogus prefilter that just stores the info globally for
-;;; other people to use; it probably never gets printed.
-(defun prefilter-width (dstate value)
-  (declare (type bit value)
-           (type disassem-state dstate))
-  (when (zerop value)
-    (dstate-put-inst-prop dstate 'operand-size-8))
-  value)
 
 (defun width-bits (width)
   (ecase width
@@ -223,14 +199,14 @@
 (define-arg-type x66
   :prefilter (lambda (dstate junk)
                (declare (ignore junk))
-               (dstate-put-inst-prop dstate 'operand-size-16)))
+               (dstate-setprop dstate 'operand-size-16)))
 
 ;;; Used to capture the effect of the #x64 and #x65 segment override
 ;;; prefixes.
 (define-arg-type seg
   :prefilter (lambda (dstate value)
                (declare (type bit value))
-               (dstate-put-inst-prop
+               (dstate-setprop
                 dstate (elt '(fs-segment-prefix gs-segment-prefix) value))))
 
 (defconstant-eqx +conditions+

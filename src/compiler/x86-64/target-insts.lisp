@@ -15,6 +15,40 @@
 
 (in-package "SB!X86-64-ASM")
 
+;;; Return the operand size depending on the prefixes and width bit as
+;;; stored in DSTATE.
+(defun inst-operand-size (dstate)
+  (declare (type disassem-state dstate))
+  (cond ((dstate-getprop dstate +operand-size-8+) :byte)
+        ((dstate-getprop dstate +rex-w+) :qword)
+        ((dstate-getprop dstate +operand-size-16+) :word)
+        (t +default-operand-size+)))
+
+;;; The same as INST-OPERAND-SIZE, but for those instructions (e.g.
+;;; PUSH, JMP) that have a default operand size of :qword. It can only
+;;; be overwritten to :word.
+(defun inst-operand-size-default-qword (dstate)
+  (declare (type disassem-state dstate))
+  (if (dstate-getprop dstate +operand-size-16+) :word :qword))
+
+;;; This prefilter is used solely for its side effect, namely to put
+;;; the property OPERAND-SIZE-8 into the DSTATE if VALUE is 0.
+(defun prefilter-width (dstate value)
+  (declare (type bit value) (type disassem-state dstate))
+  (when (zerop value)
+    (dstate-setprop dstate +operand-size-8+))
+  value)
+
+;;; A register field that can be extended by REX.R.
+(defun prefilter-reg-r (dstate value)
+  (declare (type reg value) (type disassem-state dstate))
+  (if (dstate-getprop dstate +rex-r+) (+ value 8) value))
+
+;;; A register field that can be extended by REX.B.
+(defun prefilter-reg-b (dstate value)
+  (declare (type reg value) (type disassem-state dstate))
+  (if (dstate-getprop dstate +rex-b+) (+ value 8) value))
+
 (defstruct (machine-ea (:include sb!disassem::filtered-arg)
                        (:copier nil)
                        (:predicate nil)
@@ -31,7 +65,7 @@
            (type disassem-state dstate))
   (princ (if (and (eq width :byte)
                   (<= 4 value 7)
-                  (not (dstate-get-inst-prop dstate +rex+)))
+                  (not (dstate-getprop dstate +rex+)))
              (aref #("AH" "CH" "DH" "BH") (- value 4))
              (aref (ecase width
                      (:byte sb!vm::+byte-register-names+)
@@ -59,7 +93,7 @@
 ;; Avoid use of INST-OPERAND-SIZE because it's wrong for this type of operand.
 (defun print-d/q-word-reg (value stream dstate)
   (print-reg-with-width value
-                        (if (dstate-get-inst-prop dstate +rex-w+) :qword :dword)
+                        (if (dstate-getprop dstate +rex-w+) :qword :dword)
                         stream
                         dstate))
 
@@ -148,8 +182,7 @@
              (#b01 (read-signed-suffix 8 dstate))
              (#b10 (read-signed-suffix 32 dstate))))
          (extend (bit-name reg)
-           (logior (if (dstate-get-inst-prop dstate bit-name) 8 0)
-                   reg)))
+           (logior (if (dstate-getprop dstate bit-name) 8 0) reg)))
     (declare (inline extend))
     (let ((full-reg (extend +rex-b+ r/m)))
       (cond ((= mod #b11) full-reg) ; register direct mode

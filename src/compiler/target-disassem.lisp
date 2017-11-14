@@ -1001,6 +1001,22 @@
                   :alignment alignment
                   :byte-order sb!c:*backend-byte-order*)))
 
+;;; Put PROPERTY into the set of instruction properties in DSTATE.
+;;; PROPERTY can be a fixnum or symbol, but any given backend
+;;; must exclusively use one or the other property representation.
+(defun dstate-setprop (dstate property)
+  (if (fixnump property)
+      (setf (dstate-inst-properties dstate)
+            (logior (or (dstate-inst-properties dstate) 0) property))
+      (push property (dstate-inst-properties dstate))))
+
+;;; Return non-NIL if PROPERTY is in the set of instruction properties in
+;;; DSTATE. As with -PUT-INST-PROP, we can have a bitmask or a plist.
+(defun dstate-getprop (dstate property)
+  (if (fixnump property)
+      (logtest (or (dstate-inst-properties dstate) 0) property)
+      (memq property (dstate-inst-properties dstate))))
+
 (defun add-fun-header-hooks (segment)
   (declare (type segment segment))
   (dotimes (i (or (awhen (seg-code segment) (code-n-entries it)) 0))

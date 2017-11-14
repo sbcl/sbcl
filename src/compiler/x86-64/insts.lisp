@@ -72,40 +72,6 @@
 (defconstant +rex-x+           #b0010)
 (defconstant +rex-b+           #b0001)
 
-;;; Return the operand size depending on the prefixes and width bit as
-;;; stored in DSTATE.
-(defun inst-operand-size (dstate)
-  (declare (type disassem-state dstate))
-  (cond ((dstate-get-inst-prop dstate +operand-size-8+) :byte)
-        ((dstate-get-inst-prop dstate +rex-w+) :qword)
-        ((dstate-get-inst-prop dstate +operand-size-16+) :word)
-        (t +default-operand-size+)))
-
-;;; The same as INST-OPERAND-SIZE, but for those instructions (e.g.
-;;; PUSH, JMP) that have a default operand size of :qword. It can only
-;;; be overwritten to :word.
-(defun inst-operand-size-default-qword (dstate)
-  (declare (type disassem-state dstate))
-  (if (dstate-get-inst-prop dstate +operand-size-16+) :word :qword))
-
-;;; This prefilter is used solely for its side effect, namely to put
-;;; the property OPERAND-SIZE-8 into the DSTATE if VALUE is 0.
-(defun prefilter-width (dstate value)
-  (declare (type bit value) (type disassem-state dstate))
-  (when (zerop value)
-    (dstate-put-inst-prop dstate +operand-size-8+))
-  value)
-
-;;; A register field that can be extended by REX.R.
-(defun prefilter-reg-r (dstate value)
-  (declare (type reg value) (type disassem-state dstate))
-  (if (dstate-get-inst-prop dstate +rex-r+) (+ value 8) value))
-
-;;; A register field that can be extended by REX.B.
-(defun prefilter-reg-b (dstate value)
-  (declare (type reg value) (type disassem-state dstate))
-  (if (dstate-get-inst-prop dstate +rex-b+) (+ value 8) value))
-
 (defun width-bits (width)
   (ecase width
     (:byte 8)
@@ -119,17 +85,16 @@
 ;;; Used to capture the lower four bits of the REX prefix all at once ...
 (define-arg-type wrxb
   :prefilter (lambda (dstate value)
-               (dstate-put-inst-prop dstate (logior +rex+ (logand value #b1111)))
+               (dstate-setprop dstate (logior +rex+ (logand value #b1111)))
                value))
 ;;; ... or individually (not needed for REX.R and REX.X).
 ;;; They are always used together, so only the first one sets the REX property.
 (define-arg-type rex-w
   :prefilter  (lambda (dstate value)
-                (dstate-put-inst-prop dstate
-                                      (logior +rex+ (if (plusp value) +rex-w+ 0)))))
+                (dstate-setprop dstate (logior +rex+ (if (plusp value) +rex-w+ 0)))))
 (define-arg-type rex-b
   :prefilter (lambda (dstate value)
-               (dstate-put-inst-prop dstate (if (plusp value) +rex-b+ 0))))
+               (dstate-setprop dstate (if (plusp value) +rex-b+ 0))))
 
 (define-arg-type width
   :prefilter #'prefilter-width
@@ -142,7 +107,7 @@
 (define-arg-type x66
   :prefilter (lambda (dstate junk)
                (declare (ignore junk))
-               (dstate-put-inst-prop dstate +operand-size-16+)))
+               (dstate-setprop dstate +operand-size-16+)))
 
 ;;; Find the Lisp object, if any, called by a "CALL rel32offs"
 ;;; instruction format and add it as an end-of-line comment,
@@ -190,7 +155,7 @@
 ;;; The exception is that opcode group 0xB8 .. 0xBF allows a :qword immediate.
 (define-arg-type signed-imm-data
   :prefilter (lambda (dstate &aux (width (inst-operand-size dstate)))
-               (when (and (not (dstate-get-inst-prop dstate +allow-qword-imm+))
+               (when (and (not (dstate-getprop dstate +allow-qword-imm+))
                           (eq width :qword))
                  (setf width :dword))
                (read-signed-suffix (width-bits width) dstate))
@@ -1493,7 +1458,7 @@
 (define-instruction mov (segment dst src)
   ;; immediate to register
   (:printer reg ((op #b1011 :prefilter (lambda (dstate value)
-                                         (dstate-put-inst-prop dstate +allow-qword-imm+)
+                                         (dstate-setprop dstate +allow-qword-imm+)
                                          value))
                  (imm nil :type 'signed-imm-data/asm-routine))
             '(:name :tab reg ", " imm))

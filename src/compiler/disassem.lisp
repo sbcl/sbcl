@@ -1096,30 +1096,6 @@
   (the address (+ (seg-virtual-location (dstate-segment dstate))
                   (dstate-next-offs dstate))))
 
-;;; Get the value of the property called NAME in DSTATE. Also SETF'able.
-;;;
-;;; KLUDGE: The associated run-time machinery for this is in
-;;; target-disassem.lisp (much later). This is here just to make sure
-;;; it's defined before it's used. -- WHN ca. 19990701
-(defmacro dstate-get-prop (dstate name)
-  `(getf (dstate-properties ,dstate) ,name))
-
-;;; Put PROPERTY into the set of instruction properties in DSTATE.
-;;; PROPERTY can be a fixnum or symbol, but any given backend
-;;; must exclusively use one or the other property representation.
-(defun dstate-put-inst-prop (dstate property)
-  (if (fixnump property)
-      (setf (dstate-inst-properties dstate)
-            (logior (or (dstate-inst-properties dstate) 0) property))
-      (push property (dstate-inst-properties dstate))))
-
-;;; Return non-NIL if PROPERTY is in the set of instruction properties in
-;;; DSTATE. As with -PUT-INST-PROP, we can have a bitmask or a plist.
-(defun dstate-get-inst-prop (dstate property)
-  (if (fixnump property)
-      (logtest (or (dstate-inst-properties dstate) 0) property)
-      (memq property (dstate-inst-properties dstate))))
-
 (declaim (ftype function read-suffix))
 (defun read-signed-suffix (length dstate)
   (declare (type (member 8 16 32 64) length)
