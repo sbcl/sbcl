@@ -20,7 +20,7 @@
       variables
       functions
       types)
-  (sb-xc:with-compilation-unit ()
+  (sb!xc:with-compilation-unit ()
     (load "src/cold/compile-cold-sbcl.lisp")
     ;; Enforce absence of unexpected forward-references to warm loaded code.
     ;; Looking into a hidden detail of this compiler seems fair game.

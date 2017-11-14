@@ -1418,7 +1418,7 @@ core and return a descriptor to it."
      (string= package-name "SB!" :end1 3 :end2 3)
      ;; This one is OK too, since it ends up being COMMON-LISP on the
      ;; target.
-     (string= package-name "SB-XC")
+     (string= package-name "SB!XC")
      ;; Anything else looks bad. (maybe COMMON-LISP-USER? maybe an extension
      ;; package in the xc host? something we can't think of
      ;; a valid reason to cold intern, anyway...)
@@ -1509,10 +1509,10 @@ core and return a descriptor to it."
                     &aux (package (symbol-package-for-target-symbol symbol)))
 
   ;; Anything on the cross-compilation host which refers to the target
-  ;; machinery through the host SB-XC package should be translated to
+  ;; machinery through the host SB!XC package should be translated to
   ;; something on the target which refers to the same machinery
   ;; through the target COMMON-LISP package.
-  (let ((p (find-package "SB-XC")))
+  (let ((p (find-package "SB!XC")))
     (when (eq package p)
       (setf package *cl-package*))
     (when (eq (symbol-package symbol) p)
@@ -1695,10 +1695,10 @@ core and return a descriptor to it."
      (lambda (pkgcons)
       (destructuring-bind (pkg-name . pkg-info) pkgcons
         (let ((shadow
-               ;; Record shadowing symbols (except from SB-XC) in SB! packages.
+               ;; Record shadowing symbols (except from SB!XC) in SB! packages.
                (when (eql (mismatch pkg-name "SB!") 3)
                  ;; Be insensitive to the host's ordering.
-                 (sort (remove (find-package "SB-XC")
+                 (sort (remove (find-package "SB!XC")
                                (package-shadowing-symbols (find-package pkg-name))
                                :key #'symbol-package) #'string<))))
           (write-slots (cdr pkg-info) ; package
@@ -1707,7 +1707,7 @@ core and return a descriptor to it."
                                             (mapcar 'cold-intern shadow))))
         (unless (member pkg-name '("COMMON-LISP" "KEYWORD") :test 'string=)
           (let ((host-pkg (find-package pkg-name))
-                (sb-xc-pkg (find-package "SB-XC"))
+                (sb-xc-pkg (find-package "SB!XC"))
                 syms)
             ;; Now for each symbol directly present in this host-pkg,
             ;; i.e. accessible but not :INHERITED, figure out if the symbol
@@ -1784,8 +1784,8 @@ core and return a descriptor to it."
   (let ((result
          (if (symbolp des)
              ;; This parallels the logic at the start of COLD-INTERN
-             ;; which re-homes symbols in SB-XC to COMMON-LISP.
-             (if (eq (symbol-package des) (find-package "SB-XC"))
+             ;; which re-homes symbols in SB!XC to COMMON-LISP.
+             (if (eq (symbol-package des) (find-package "SB!XC"))
                  (intern (symbol-name des) *cl-package*)
                  des)
              (ecase (descriptor-lowtag des)

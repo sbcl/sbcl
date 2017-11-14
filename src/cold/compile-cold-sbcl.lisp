@@ -31,7 +31,7 @@
 
 (defun proclaim-target-optimization ()
   (let ((debug (if (position :sb-show *shebang-features*) 2 1)))
-    (sb-xc:proclaim
+    (sb!xc:proclaim
      `(optimize
        (compilation-speed 1) (debug ,debug)
        ;; CLISP's pretty-printer is fragile and tends to cause stack
@@ -72,17 +72,16 @@
     (set-dispatch-macro-character #\# #\- #'she-reader)
     ;; Control optimization policy.
     (proclaim-target-optimization)
-    ;; Specify where target machinery lives.
-    (with-additional-nickname ("SB-XC" "SB!XC")
+    (progn
       (funcall fun))))
 
-(setf *target-compile-file* #'sb-xc:compile-file)
+(setf *target-compile-file* #'sb!xc:compile-file)
 (setf *target-assemble-file* #'sb!c:assemble-file)
 (setf *in-target-compilation-mode-fn* #'in-target-cross-compilation-mode)
 
 ;; ... and since the cross-compiler hasn't seen a DEFMACRO for QUASIQUOTE,
 ;; make it think it has, otherwise it fails more-or-less immediately.
-(setf (sb-xc:macro-function 'sb!int:quasiquote)
+(setf (sb!xc:macro-function 'sb!int:quasiquote)
       (lambda (form env)
         (the sb!kernel:lexenv-designator env)
         (sb!impl::expand-quasiquote (second form) t)))

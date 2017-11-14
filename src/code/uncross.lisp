@@ -67,7 +67,7 @@
     (labels ((uncross-symbol (symbol)
                (let ((old-symbol-package (symbol-package symbol)))
                  (if (and old-symbol-package
-                          (string= (package-name old-symbol-package) "SB-XC"))
+                          (string= (package-name old-symbol-package) "SB!XC"))
                      (values (intern (symbol-name symbol) "COMMON-LISP"))
                      symbol)))
              (rcr (form) ; recursive part

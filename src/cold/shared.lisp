@@ -163,10 +163,6 @@
       result)))
 (compile 'read-from-file)
 
-;;; other miscellaneous tools
-(load "src/cold/rename-package-carefully.lisp")
-(load "src/cold/with-stuff.lisp")
-
 ;;; Try to minimize/conceal any non-standardness of the host Common Lisp.
 #-sbcl (load "src/cold/ansify.lisp")
 
@@ -553,8 +549,7 @@
 (defun in-host-compilation-mode (fn)
   (declare (type function fn))
   (let ((*features* (cons :sb-xc-host *features*)))
-    (with-additional-nickname ("SB-XC" "SB!XC")
-      (funcall fn))))
+    (funcall fn)))
 (compile 'in-host-compilation-mode)
 
 ;;; Process a file as source code for the cross-compiler, compiling it

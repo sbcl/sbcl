@@ -53,7 +53,11 @@
 ;; The common theme of the functions, macros, constants, and so
 ;; forth in this package is that they run in the host and affect the
 ;; compilation of the target.
-(let ((package-name "SB-XC"))
+;;
+;; FIXME: this package should have only one name, not two,
+;; and its one name should be SBCL, but changing it to that
+;; would entail touching about 900 lines.
+(let ((package-name "SB!XC"))
   (make-package package-name :use nil :nicknames nil)
   (dolist (name '(;; the constants (except for T and NIL which have
                   ;; a specially hacked correspondence between
@@ -157,7 +161,7 @@
 
 ;; Symbols that we want never to accidentally see the host's definition of.
 (defparameter *shadowing-imports*
-  (mapcar (lambda (name) (find-symbol name "SB-XC"))
+  (mapcar (lambda (name) (find-symbol name "SB!XC"))
           '("BYTE" "BYTE-POSITION" "BYTE-SIZE"
             "DPB" "LDB" "LDB-TEST"
             "DEPOSIT-FIELD" "MASK-FIELD")))
