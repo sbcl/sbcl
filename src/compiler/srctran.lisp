@@ -1735,10 +1735,15 @@
 
 (defun truncate-derive-type-rem-aux (num div same-arg)
   (declare (ignore same-arg))
-  (if (and (numeric-type-real-p num)
-           (numeric-type-real-p div))
-      (truncate-derive-type-rem num div)
-      *empty-type*))
+  (cond ((not (and (numeric-type-real-p num)
+                   (numeric-type-real-p div)))
+         *empty-type*)
+        ;; Floats introduce rounding errors
+        ((and (memq (numeric-type-class num) '(integer rational))
+              (memq (numeric-type-class div) '(integer rational)))
+         (truncate-derive-type-rem num div))
+        (t
+         (numeric-contagion num div))))
 
 (defoptimizer (truncate derive-type) ((number divisor))
   (let ((quot (two-arg-derive-type number divisor
@@ -1876,12 +1881,17 @@
                                (numeric-type-real-p d))
                           (,q-aux n d)
                           *empty-type*))
-                    (derive-r (n d same-arg)
+                    (derive-r (num div same-arg)
                       (declare (ignore same-arg))
-                      (if (and (numeric-type-real-p n)
-                               (numeric-type-real-p d))
-                          (,r-aux n d)
-                          *empty-type*)))
+                      (cond ((not (and (numeric-type-real-p num)
+                                       (numeric-type-real-p div)))
+                             *empty-type*)
+                            ;; Floats introduce rounding errors
+                            ((and (memq (numeric-type-class num) '(integer rational))
+                                  (memq (numeric-type-class div) '(integer rational)))
+                             (,r-aux num div))
+                            (t
+                             (numeric-contagion num div)))))
                (let ((quot (two-arg-derive-type
                             number divisor #'derive-q #',name))
                      (rem (two-arg-derive-type
@@ -1921,12 +1931,17 @@
                                       (numeric-type-real-p d))
                                  (,q-aux n d)
                                  *empty-type*))
-                           (derive-r (n d same-arg)
+                           (derive-r (num div same-arg)
                              (declare (ignore same-arg))
-                             (if (and (numeric-type-real-p n)
-                                      (numeric-type-real-p d))
-                                 (,r-aux n d)
-                                 *empty-type*)))
+                             (cond ((not (and (numeric-type-real-p num)
+                                              (numeric-type-real-p div)))
+                                    *empty-type*)
+                                   ;; Floats introduce rounding errors
+                                   ((and (memq (numeric-type-class num) '(integer rational))
+                                         (memq (numeric-type-class div) '(integer rational)))
+                                    (,r-aux num div))
+                                   (t
+                                    (numeric-contagion num div)))))
                       (let ((quot (two-arg-derive-type
                                    number divisor #'derive-q #',name))
                             (rem (two-arg-derive-type

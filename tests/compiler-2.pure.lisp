@@ -556,3 +556,15 @@
        (truncate (the (integer 0 0) x)
                  (the (rational (1) (2)) y)))
    ((0 3/2) (values 0 0))))
+
+(with-test (:name :float-remainders-rounding-errors)
+  (loop for fun in '(ceiling truncate floor
+                     fceiling ftruncate ffloor
+                     round fround)
+        do
+        (assert (member (second
+                         (third (sb-kernel:%simple-fun-type
+                                 (checked-compile
+                                  `(lambda (x)
+                                     (nth-value 1 (,fun (the double-float x) 1/2)))))))
+                        '(double-float real)))))
