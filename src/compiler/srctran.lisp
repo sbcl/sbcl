@@ -3749,6 +3749,15 @@
                                             (integerp y-dim)
                                             (not (= x-dim y-dim)))))))))))
 
+;;; Only a simple array will always remain non-empty
+(defun array-type-non-empty-p (type)
+  (and (csubtypep type (specifier-type 'simple-array))
+       (let ((dimensions (ctype-array-dimensions type)))
+         (and (consp dimensions)
+              (every (lambda (dim)
+                       (typep dim '(integer 1)))
+                     dimensions)))))
+
 ;;; similarly to the EQL transform above, we attempt to constant-fold
 ;;; or convert to a simpler predicate: mostly we have to be careful
 ;;; with strings and bit-vectors.
@@ -3865,6 +3874,10 @@
         ((both-csubtypep 'hash-table)
          '(hash-table-equalp x y))
         ((and (both-csubtypep 'array)
+              ;; At least one array has to be longer than 0
+              ;; and not adjustable, because #() and "" are equal.
+              (or (array-type-non-empty-p x-type)
+                  (array-type-non-empty-p y-type))
               (flet ((upgraded-et (type)
                        (multiple-value-bind (specialized supetype)
                            (array-type-upgraded-element-type type)

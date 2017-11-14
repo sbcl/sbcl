@@ -593,3 +593,12 @@
                 (type double-float p2))
        (equalp p1 p2))
     ((1 1d0) t)))
+
+(with-test (:name :equalp-transform-zero-array)
+  (checked-compile-and-assert ()
+    `(lambda (a b)
+       (declare (simple-string a)
+                (simple-bit-vector b))
+       (equalp a b))
+    (("" #*) t)))
+
