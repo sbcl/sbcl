@@ -1,4 +1,4 @@
-;;; This is ASDF 3.3.0.1
+;;; This is ASDF 3.3.1
 (eval-when (:compile-toplevel :load-toplevel :execute) (require :uiop))
 ;;;; -------------------------------------------------------------------------
 ;;;; Handle upgrade as forward- and backward-compatibly as possible
@@ -96,7 +96,7 @@ previously-loaded version of ASDF."
          ;; "3.4.5.67" would be a development version in the official branch, on top of 3.4.5.
          ;; "3.4.5.0.8" would be your eighth local modification of official release 3.4.5
          ;; "3.4.5.67.8" would be your eighth local modification of development version 3.4.5.67
-         (asdf-version "3.3.0.1")
+         (asdf-version "3.3.1")
          (existing-version (asdf-version)))
     (setf *asdf-version* asdf-version)
     (when (and existing-version (not (equal asdf-version existing-version)))
@@ -2394,7 +2394,7 @@ unless identically to toplevel"
   (defmethod record-dependency ((plan sequential-plan) (o operation) (c component))
     (values)))
 
-(when-upgrading (:version "3.2.1")
+(when-upgrading (:version "3.3.0")
   (defmethod initialize-instance :after ((plan plan-traversal) &key &allow-other-keys)))
 
 
@@ -2482,7 +2482,7 @@ or NIL if no the status is considered outside of a specific plan."))
     "Return the earliest status later than both status1 and status2"
     (make-action-status
      :bits (logand (status-bits status1) (status-bits status2))
-     :stamp (latest-stamp (status-stamp status1) (status-stamp status2))
+     :stamp (latest-timestamp (status-stamp status1) (status-stamp status2))
      :level (min (status-level status1) (status-level status2))
      :index (or (status-index status1) (status-index status2))))
 
@@ -2635,22 +2635,22 @@ initialized with SEED."
             (in-files (input-files o c))
             (in-stamps (mapcar #'get-file-stamp in-files))
             (missing-in (loop :for f :in in-files :for s :in in-stamps :unless s :collect f))
-            (latest-in (stamps-latest (cons dep-stamp in-stamps))))
+            (latest-in (timestamps-latest (cons dep-stamp in-stamps))))
        (when (and missing-in (not just-done)) (return (values nil nil))))
      (let* (;; collect timestamps from outputs, and exit early if any is missing
             (out-files (remove-if 'null (output-files o c)))
             (out-stamps (mapcar (if just-done 'register-file-stamp 'get-file-stamp) out-files))
             (missing-out (loop :for f :in out-files :for s :in out-stamps :unless s :collect f))
-            (earliest-out (stamps-earliest out-stamps)))
+            (earliest-out (timestamps-earliest out-stamps)))
        (when (and missing-out (not just-done)) (return (values nil nil))))
      (let (;; Time stamps from the files at hand, and whether any is missing
            (all-present (not (or missing-in missing-out)))
            ;; Has any input changed since we last generated the files?
-           ;; Note that we use stamp<= instead of stamp< to play nice with generated files.
+           ;; Note that we use timestamp<= instead of timestamp< to play nice with generated files.
            ;; Any race condition is intrinsic to the limited timestamp resolution.
-           (up-to-date-p (stamp<= latest-in earliest-out))
+           (up-to-date-p (timestamp<= latest-in earliest-out))
            ;; If everything is up to date, the latest of inputs and outputs is our stamp
-           (done-stamp (stamps-latest (cons latest-in out-stamps))))
+           (done-stamp (timestamps-latest (cons latest-in out-stamps))))
        ;; Warn if some files are missing:
        ;; either our model is wrong or some other process is messing with our files.
        (when (and just-done (not all-present))
@@ -3432,7 +3432,7 @@ PREVIOUS-TIME when not null is the time at which the PREVIOUS system was loaded.
           (let ((o (make-operation 'define-op)))
             (multiple-value-bind (stamp done-p)
                 (compute-action-stamp plan o system)
-              (return (and (stamp<= stamp (component-operation-time o system))
+              (return (and (timestamp<= stamp (component-operation-time o system))
                            done-p)))))
       (system-out-of-date () nil)))
 
@@ -3459,7 +3459,7 @@ PREVIOUS-TIME when not null is the time at which the PREVIOUS system was loaded.
                               (pathname-equal
                                (physicalize-pathname pathname)
                                (physicalize-pathname previous-pathname))))
-                     (stamp<= stamp previous-time)
+                     (timestamp<= stamp previous-time)
                      ;; TODO: check that all dependencies are up-to-date.
                      ;; This necessitates traversing them without triggering
                      ;; the adding of nodes to the plan.

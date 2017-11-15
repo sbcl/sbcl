@@ -1,7 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-1.4.1:
-  * enhancement: ASDF updated to 3.3.0.1. This ASDF release is dedicated to
+  * enhancement: ASDF updated to 3.3.1. The ASDF release is dedicated to
     the late Elias Pipping who put enormous amounts of work into it despite
     his terminal illness. Thank you and rest in peace. (lp#1681201)
   * enhancement: alien routines compiled with '-fsanitize=thread' and/or

@@ -1,4 +1,4 @@
-;;; This is UIOP 3.3.0.1
+;;; This is UIOP 3.3.1
 ;;;; ---------------------------------------------------------------------------
 ;;;; Handle ASDF package upgrade, including implementation-dependent magic.
 ;;
@@ -984,9 +984,9 @@ Return a string made of the parts not omitted or emitted by FROB."
    #:string-prefix-p #:string-enclosed-p #:string-suffix-p
    #:standard-case-symbol-name #:find-standard-case-symbol ;; symbols
    #:coerce-class ;; CLOS
-   #:stamp< #:stamps< #:stamp*< #:stamp<= ;; stamps
-   #:earlier-stamp #:stamps-earliest #:earliest-stamp
-   #:later-stamp #:stamps-latest #:latest-stamp #:latest-stamp-f
+   #:timestamp< #:timestamps< #:timestamp*< #:timestamp<= ;; timestamps
+   #:earlier-timestamp #:timestamps-earliest #:earliest-timestamp
+   #:later-timestamp #:timestamps-latest #:latest-timestamp #:latest-timestamp-f
    #:list-to-hash-set #:ensure-gethash ;; hash-table
    #:ensure-function #:access-at #:access-at-count ;; functions
    #:call-function #:call-functions #:register-hook-function
@@ -1334,11 +1334,11 @@ If optional ERROR argument is NIL, return NIL instead of an error when the symbo
                     (string (standard-case-symbol-name package-designator)))
                   error)))
 
-;;; stamps: a REAL or a boolean where T=-infinity, NIL=+infinity
+;;; timestamps: a REAL or a boolean where T=-infinity, NIL=+infinity
 (eval-when (#-lispworks :compile-toplevel :load-toplevel :execute)
-  (deftype stamp () '(or real boolean)))
+  (deftype timestamp () '(or real boolean)))
 (with-upgradability ()
-  (defun stamp< (x y)
+  (defun timestamp< (x y)
     (etypecase x
       ((eql t) (not (eql y t)))
       (real (etypecase y
@@ -1346,16 +1346,16 @@ If optional ERROR argument is NIL, return NIL instead of an error when the symbo
               (real (< x y))
               (null t)))
       (null nil)))
-  (defun stamps< (list) (loop :for y :in list :for x = nil :then y :always (stamp< x y)))
-  (defun stamp*< (&rest list) (stamps< list))
-  (defun stamp<= (x y) (not (stamp< y x)))
-  (defun earlier-stamp (x y) (if (stamp< x y) x y))
-  (defun stamps-earliest (list) (reduce 'earlier-stamp list :initial-value nil))
-  (defun earliest-stamp (&rest list) (stamps-earliest list))
-  (defun later-stamp (x y) (if (stamp< x y) y x))
-  (defun stamps-latest (list) (reduce 'later-stamp list :initial-value t))
-  (defun latest-stamp (&rest list) (stamps-latest list))
-  (define-modify-macro latest-stamp-f (&rest stamps) latest-stamp))
+  (defun timestamps< (list) (loop :for y :in list :for x = nil :then y :always (timestamp< x y)))
+  (defun timestamp*< (&rest list) (timestamps< list))
+  (defun timestamp<= (x y) (not (timestamp< y x)))
+  (defun earlier-timestamp (x y) (if (timestamp< x y) x y))
+  (defun timestamps-earliest (list) (reduce 'earlier-timestamp list :initial-value nil))
+  (defun earliest-timestamp (&rest list) (timestamps-earliest list))
+  (defun later-timestamp (x y) (if (timestamp< x y) y x))
+  (defun timestamps-latest (list) (reduce 'later-timestamp list :initial-value t))
+  (defun latest-timestamp (&rest list) (timestamps-latest list))
+  (define-modify-macro latest-timestamp-f (&rest timestamps) latest-timestamp))
 
 
 ;;; Function designators
@@ -1623,7 +1623,7 @@ message, that takes the functionality as its first argument (that can be skipped
 (in-package :uiop/version)
 
 (with-upgradability ()
-  (defparameter *uiop-version* "3.3.0.1")
+  (defparameter *uiop-version* "3.3.1")
 
   (defun unparse-version (version-list)
     "From a parsed version (a list of natural numbers), compute the version string"
@@ -6707,6 +6707,9 @@ or whether it's already taken care of by the implementation's underlying run-pro
     "A portable abstraction of a low-level call to libc's system()."
     (declare (ignorable keys directory input if-input-does-not-exist output
                         if-output-exists error-output if-error-output-exists))
+    (when (member :stream (list input output error-output))
+      (parameter-error "~S: ~S is not allowed as synchronous I/O redirection argument"
+                       'run-program :stream))
     #+(or abcl allegro clozure cmucl ecl (and lispworks os-unix) mkcl sbcl scl)
     (let (#+(or abcl ecl mkcl)
             (version (parse-version
