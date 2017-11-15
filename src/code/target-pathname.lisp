@@ -14,7 +14,7 @@
 #!-sb-fluid (declaim (freeze-type logical-pathname logical-host))
 
 ;;; To be initialized in unix/win32-pathname.lisp
-(defvar *physical-host*)
+(defglobal *physical-host* nil)
 
 ;;; Return a value suitable, e.g., for preinitializing
 ;;; *DEFAULT-PATHNAME-DEFAULTS* before *DEFAULT-PATHNAME-DEFAULTS* is

@@ -25,7 +25,7 @@
                        (simplify-namestring #'simplify-win32-namestring)
                        (customary-case :lower))))
 
-(defvar *physical-host* (make-win32-host))
+(setq *physical-host* (make-win32-host))
 
 ;;;
 (define-symbol-macro +long-file-name-prefix+ (quote "\\\\?\\"))

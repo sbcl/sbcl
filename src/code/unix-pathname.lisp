@@ -26,7 +26,7 @@
                        (simplify-namestring #'simplify-unix-namestring)
                        (customary-case :lower))))
 
-(defvar *physical-host* (make-unix-host))
+(setq *physical-host* (make-unix-host))
 
 ;;; Take a string and return a list of cons cells that mark the char
 ;;; separated subseq. The first value is true if absolute directories
