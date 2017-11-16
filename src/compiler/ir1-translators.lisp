@@ -1014,35 +1014,11 @@ care."
       (setf (lvar-dest index-lvar) cast)
       (use-continuation cast next result))))
 
-;;; Checks at compile time that the function designator can accept
-;;; ARG-COUNT arguments. Can't exactly use THE since
-;;; (function (t t)) doesn't match functions with &optional or &rest
-;;; doesn't include symbols
-(def-ir1-translator callable-cast ((arg-count caller value) start next result)
-  (let ((value-ctran (make-ctran))
-        (value-lvar (make-lvar))
-        (policy (lexenv-policy *lexenv*)))
-    (ir1-convert start value-ctran value-lvar value)
-    (let* ((type (specifier-type 'callable))
-           (cast (make-function-designator-cast :asserted-type type
-                                                :value value-lvar
-                                                :type-to-check (maybe-weaken-check type policy)
-                                                :derived-type (coerce-to-values type)
-                                                :caller caller
-                                                :arg-count arg-count)))
-      (link-node-to-previous-ctran cast value-ctran)
-      (setf (lvar-dest value-lvar) cast)
-      (use-continuation cast next result))))
-
 #-sb-xc-host
 (setf (info :function :macro-function 'truly-the)
       (lambda (whole env)
         (declare (ignore env))
         `(the ,@(cdr whole)))
-      (info :function :macro-function 'callable-cast)
-      (lambda (whole env)
-        (declare (ignore env))
-        `(the callable ,@(cdddr whole)))
       (info :function :macro-function 'the*)
       (lambda (whole env)
         (declare (ignore env))

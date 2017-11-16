@@ -459,7 +459,6 @@
 
 ;;; SBCL-only special forms
 (define-walker-template truly-the (nil quote eval))
-(define-walker-template callable-cast (nil quote quote eval))
 (define-walker-template sb!kernel:the* (nil quote eval))
 ;;; FIXME: maybe we don't need this one any more, given that
 ;;; NAMED-LAMBDA now expands into (FUNCTION (NAMED-LAMBDA ...))?

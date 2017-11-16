@@ -658,17 +658,15 @@ evaluated as a PROGN."
                       `(cons ,(case (car test)
                                 ((named-lambda function) test)
                                 (t `(load-time-value ,test t)))
-                             ,(if (typep handler '(cons (eql function)))
-                                  `(callable-cast 1 handler-bind ,handler)
+                             ,(locally
                                   ;; Regardless of lexical policy, never allow
                                   ;; a non-callable into handler-clusters.
-                                  `(let ((x ,handler))
-                                     (declare (optimize (safety 3)))
-                                     (callable-cast 1 handler-bind x)))))
+                                  (declare (optimize (safety 3)))
+                                `(the (function-designator (condition)) ,handler))))
                      ((info :function :info name) ; known
                       ;; This takes care of CONTINUE,ABORT,MUFFLE-WARNING.
                       ;; #' will be evaluated in the null environment.
-                      `(load-time-value (cons ,test (callable-cast 1 handler-bind #',name)) t))
+                      `(load-time-value (cons ,test (the (function-designator (condition)) #',name)) t))
                      (t
                       ;; For each handler specified as #'F we must verify
                       ;; that F is fboundp upon entering the binding scope.
@@ -683,7 +681,7 @@ evaluated as a PROGN."
                                         (find-or-create-fdefn ',name) t))))
                       ;; Resolve to an fdefn at load-time.
                       `(load-time-value
-                        (cons ,test (find-or-create-fdefn (callable-cast 1 handler-bind ',name)))
+                        (cons ,test (find-or-create-fdefn (the (function-designator (condition)) ',name)))
                         t)))))
 
            (const-list (items)
