@@ -745,6 +745,13 @@
   ;; when multiple values were specified for the return.
   (returns (missing-arg) :type ctype :read-only t))
 
+(defstruct (fun-designator-type
+            (:include fun-type)
+            (:copier nil)
+            (:conc-name fun-type-)
+            (:constructor make-fun-designator-type
+                (required optional rest
+                 keyp keywords allowp wild-args returns))))
 (declaim (ftype (sfunction (ctype ctype) (values t t)) csubtypep))
 ;;; Look for nice relationships for types that have nice relationships
 ;;; only when one is a hierarchical subtype of the other.

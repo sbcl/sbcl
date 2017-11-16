@@ -227,14 +227,18 @@
 (!define-type-method (function :negate) (type) (make-negation-type type))
 
 (!define-type-method (function :unparse) (type)
-  (if *unparse-fun-type-simplify*
-      'function
-      (list 'function
-            (if (fun-type-wild-args type)
-                '*
-                (unparse-args-types type))
-            (type-specifier
-             (fun-type-returns type)))))
+  (let ((name (if (fun-designator-type-p type)
+                  'function-designator
+                  'function)))
+    (cond (*unparse-fun-type-simplify*
+           name)
+          (t
+           (list name
+                 (if (fun-type-wild-args type)
+                     '*
+                     (unparse-args-types type))
+                 (type-specifier
+                  (fun-type-returns type)))))))
 
 ;;; The meaning of this is a little confused. On the one hand, all
 ;;; function objects are represented the same way regardless of the
@@ -242,65 +246,74 @@
 ;;; (TYPEP #'FOO (FUNCTION (FIXNUM) *)) in any meaningful way. On the
 ;;; other hand, Python wants to reason about function types. So...
 (!define-type-method (function :simple-subtypep) (type1 type2)
- (flet ((fun-type-simple-p (type)
-          (not (or (fun-type-rest type)
-                   (fun-type-keyp type))))
-        (every-csubtypep (types1 types2)
-          (loop
-             for a1 in types1
-             for a2 in types2
-             do (multiple-value-bind (res sure-p)
-                    (csubtypep a1 a2)
-                  (unless res (return (values res sure-p))))
-             finally (return (values t t)))))
-   (and/type (values-subtypep (fun-type-returns type1)
-                              (fun-type-returns type2))
-             (cond ((fun-type-wild-args type2) (values t t))
-                   ((fun-type-wild-args type1)
-                    (cond ((fun-type-keyp type2) (values nil nil))
-                          ((not (fun-type-rest type2)) (values nil t))
-                          ((not (null (fun-type-required type2)))
-                           (values nil t))
-                          (t (and/type (type= *universal-type*
-                                              (fun-type-rest type2))
-                                       (every/type #'type=
-                                                   *universal-type*
-                                                   (fun-type-optional
-                                                    type2))))))
-                   ((not (and (fun-type-simple-p type1)
-                              (fun-type-simple-p type2)))
-                    (values nil nil))
-                   (t (multiple-value-bind (min1 max1) (fun-type-nargs type1)
-                        (multiple-value-bind (min2 max2) (fun-type-nargs type2)
-                          (cond ((or (> max1 max2) (< min1 min2))
-                                 (values nil t))
-                                ((and (= min1 min2) (= max1 max2))
-                                 (and/type (every-csubtypep
-                                            (fun-type-required type1)
-                                            (fun-type-required type2))
-                                           (every-csubtypep
-                                            (fun-type-optional type1)
-                                            (fun-type-optional type2))))
-                                (t (every-csubtypep
-                                    (concatenate 'list
+  (if (and (fun-designator-type-p type1 )
+           (not (fun-designator-type-p type2)))
+      (values nil t)
+      (flet ((fun-type-simple-p (type)
+               (not (or (fun-type-rest type)
+                        (fun-type-keyp type))))
+             (every-csubtypep (types1 types2)
+               (loop
+                 for a1 in types1
+                 for a2 in types2
+                 do (multiple-value-bind (res sure-p)
+                        (csubtypep a1 a2)
+                      (unless res (return (values res sure-p))))
+                 finally (return (values t t)))))
+        (and/type (values-subtypep (fun-type-returns type1)
+                                   (fun-type-returns type2))
+                  (cond ((fun-type-wild-args type2) (values t t))
+                        ((fun-type-wild-args type1)
+                         (cond ((fun-type-keyp type2) (values nil nil))
+                               ((not (fun-type-rest type2)) (values nil t))
+                               ((not (null (fun-type-required type2)))
+                                (values nil t))
+                               (t (and/type (type= *universal-type*
+                                                   (fun-type-rest type2))
+                                            (every/type #'type=
+                                                        *universal-type*
+                                                        (fun-type-optional
+                                                         type2))))))
+                        ((not (and (fun-type-simple-p type1)
+                                   (fun-type-simple-p type2)))
+                         (values nil nil))
+                        (t (multiple-value-bind (min1 max1) (fun-type-nargs type1)
+                             (multiple-value-bind (min2 max2) (fun-type-nargs type2)
+                               (cond ((or (> max1 max2) (< min1 min2))
+                                      (values nil t))
+                                     ((and (= min1 min2) (= max1 max2))
+                                      (and/type (every-csubtypep
                                                  (fun-type-required type1)
-                                                 (fun-type-optional type1))
-                                    (concatenate 'list
-                                                 (fun-type-required type2)
-                                                 (fun-type-optional type2))))))))))))
+                                                 (fun-type-required type2))
+                                                (every-csubtypep
+                                                 (fun-type-optional type1)
+                                                 (fun-type-optional type2))))
+                                     (t (every-csubtypep
+                                         (concatenate 'list
+                                                      (fun-type-required type1)
+                                                      (fun-type-optional type1))
+                                         (concatenate 'list
+                                                      (fun-type-required type2)
+                                                      (fun-type-optional type2)))))))))))))
 
 (!define-superclasses function ((function)) !cold-init-forms)
 
 ;;; The union or intersection of two FUNCTION types is FUNCTION.
 (!define-type-method (function :simple-union2) (type1 type2)
-  (declare (ignore type1 type2))
-  (specifier-type 'function))
+  (if (or (fun-designator-type-p type1)
+          (fun-designator-type-p type2))
+      (specifier-type '(or function symbol))
+      (specifier-type 'function)))
+
 (!define-type-method (function :simple-intersection2) (type1 type2)
   (let ((ftype (specifier-type 'function)))
     (cond ((eq type1 ftype) type2)
           ((eq type2 ftype) type1)
           (t (let ((rtype (values-type-intersection (fun-type-returns type1)
-                                                    (fun-type-returns type2))))
+                                                    (fun-type-returns type2)))
+                   (designator
+                     (and (fun-designator-type-p type1)
+                          (fun-designator-type-p type2))))
                (flet ((change-returns (ftype rtype)
                         (declare (type fun-type ftype) (type ctype rtype))
                         (make-fun-type :required (fun-type-required ftype)
@@ -308,29 +321,35 @@
                                        :keyp (fun-type-keyp ftype)
                                        :keywords (fun-type-keywords ftype)
                                        :allowp (fun-type-allowp ftype)
-                                       :returns rtype)))
-               (cond
-                 ((fun-type-wild-args type1)
-                  (if (fun-type-wild-args type2)
-                      (make-fun-type :wild-args t
-                                     :returns rtype)
-                      (change-returns type2 rtype)))
-                 ((fun-type-wild-args type2)
-                  (change-returns type1 rtype))
-                 (t (multiple-value-bind (req opt rest)
-                        (args-type-op type1 type2 #'type-intersection #'max)
-                      (make-fun-type :required req
-                                     :optional opt
-                                     :rest rest
-                                     ;; FIXME: :keys
-                                     :allowp (and (fun-type-allowp type1)
-                                                  (fun-type-allowp type2))
-                                     :returns rtype))))))))))
+                                       :returns rtype
+                                       :designator designator)))
+                 (cond
+                   ((fun-type-wild-args type1)
+                    (if (fun-type-wild-args type2)
+                        (make-fun-type :wild-args t
+                                       :returns rtype
+                                       :designator designator)
+                        (change-returns type2 rtype)))
+                   ((fun-type-wild-args type2)
+                    (change-returns type1 rtype))
+                   (t (multiple-value-bind (req opt rest)
+                          (args-type-op type1 type2 #'type-intersection #'max)
+                        (make-fun-type :required req
+                                       :optional opt
+                                       :rest rest
+                                       ;; FIXME: :keys
+                                       :allowp (and (fun-type-allowp type1)
+                                                    (fun-type-allowp type2))
+                                       :returns rtype
+                                       :designator designator))))))))))
 
 ;;; The union or intersection of a subclass of FUNCTION with a
 ;;; FUNCTION type is somewhat complicated.
 (!define-type-method (function :complex-intersection2) (type1 type2)
   (cond
+    ((and (fun-designator-type-p type2)
+          (csubtypep type1 (specifier-type 'symbol)))
+     type1)
     ((type= type1 (specifier-type 'function)) type2)
     ((csubtypep type1 (specifier-type 'function)) nil)
     (t :call-other-method)))
@@ -344,15 +363,20 @@
     (t nil)))
 
 (!define-type-method (function :simple-=) (type1 type2)
-  (macrolet ((compare (comparator field)
-               (let ((reader (symbolicate '#:fun-type- field)))
-                 `(,comparator (,reader type1) (,reader type2)))))
-    (and/type (compare type= returns)
-              (cond ((neq (fun-type-wild-args type1) (fun-type-wild-args type2))
-                     (values nil t))
-                    ((eq (fun-type-wild-args type1) t)
-                     (values t t))
-                    (t (type=-args type1 type2))))))
+  (if (or (and (fun-designator-type-p type1)
+               (not (fun-designator-type-p type2)))
+          (and (not (fun-designator-type-p type1))
+               (fun-designator-type-p type2)))
+      (values nil t)
+      (macrolet ((compare (comparator field)
+                   (let ((reader (symbolicate '#:fun-type- field)))
+                     `(,comparator (,reader type1) (,reader type2)))))
+        (and/type (compare type= returns)
+                  (cond ((neq (fun-type-wild-args type1) (fun-type-wild-args type2))
+                         (values nil t))
+                        ((eq (fun-type-wild-args type1) t)
+                         (values t t))
+                        (t (type=-args type1 type2)))))))
 
 (!define-type-class constant :inherits values)
 
@@ -397,29 +421,44 @@
 
     (result)))
 
+(defun translate-fun-type (context args result
+                           &key designator)
+  (let ((result (coerce-to-values (values-specifier-type-r context result))))
+    (cond ((neq args '*)
+           (multiple-value-bind (llks required optional rest keywords)
+               (parse-args-types context args :function-type)
+             (if (and (null required)
+                      (null optional)
+                      (eq rest *universal-type*)
+                      (not (ll-kwds-keyp llks)))
+                 (if (eq result *wild-type*)
+                     (specifier-type 'function)
+                     (make-fun-type :wild-args t :returns result
+                                    :designator designator))
+                 (make-fun-type :required required
+                                :optional optional
+                                :rest rest
+                                :keyp (ll-kwds-keyp llks)
+                                :keywords keywords
+                                :allowp (ll-kwds-allowp llks)
+                                :returns result
+                                :designator designator))))
+          ((eq result *wild-type*)
+           (specifier-type
+            (if designator
+                'callable
+                'function)))
+          (t
+           (make-fun-type :wild-args t :returns result
+                          :designator designator)))))
+
 (!def-type-translator function ((:context context)
                                 &optional (args '*) (result '*))
-  (let ((result (coerce-to-values (values-specifier-type-r context result))))
-    (if (eq args '*)
-        (if (eq result *wild-type*)
-            (specifier-type 'function)
-            (make-fun-type :wild-args t :returns result))
-        (multiple-value-bind (llks required optional rest keywords)
-            (parse-args-types context args :function-type)
-          (if (and (null required)
-                   (null optional)
-                   (eq rest *universal-type*)
-                   (not (ll-kwds-keyp llks)))
-              (if (eq result *wild-type*)
-                  (specifier-type 'function)
-                  (make-fun-type :wild-args t :returns result))
-              (make-fun-type :required required
-                             :optional optional
-                             :rest rest
-                             :keyp (ll-kwds-keyp llks)
-                             :keywords keywords
-                             :allowp (ll-kwds-allowp llks)
-                             :returns result))))))
+  (translate-fun-type context args result))
+
+(!def-type-translator function-designator ((:context context)
+                                &optional (args '*) (result '*))
+  (translate-fun-type context args result :designator t))
 
 (!def-type-translator values :list ((:context context) &rest values)
   (if (eq values '*)

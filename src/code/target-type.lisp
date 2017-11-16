@@ -54,6 +54,8 @@
               #'ctypep
               obj
               (compound-type-types type)))
+    (fun-designator-type
+     (typep obj '(or function symbol)))
     (fun-type
      (values (functionp obj) t))
     (unknown-type

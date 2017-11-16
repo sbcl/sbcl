@@ -267,17 +267,23 @@
 
 (defun make-fun-type (&key required optional rest
                            keyp keywords allowp
-                           wild-args returns)
+                           wild-args returns
+                           designator)
   (let ((rest (if (eq rest *empty-type*) nil rest))
         (n (length required)))
-    (if (and (<= n 3)
-             (not optional) (not rest) (not keyp)
-             (not keywords) (not allowp) (not wild-args)
-             (eq returns *wild-type*)
-             (not (find *universal-type* required :test #'neq)))
-        (svref (literal-ctype-vector *interned-fun-types*) n)
-        (%make-fun-type required optional rest keyp keywords
-                        allowp wild-args returns))))
+    (cond (designator
+           (make-fun-designator-type required optional rest keyp keywords
+                                     allowp wild-args returns))
+          ((and
+            (<= n 3)
+            (not optional) (not rest) (not keyp)
+            (not keywords) (not allowp) (not wild-args)
+            (eq returns *wild-type*)
+            (not (find *universal-type* required :test #'neq)))
+           (svref (literal-ctype-vector *interned-fun-types*) n))
+          (t
+           (%make-fun-type required optional rest keyp keywords
+                           allowp wild-args returns)))))
 
 ;; This seems to be used only by cltl2, and within 'cross-type',
 ;; where it is never used, which makes sense, since pretty much we
