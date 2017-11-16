@@ -43,11 +43,6 @@
   (declare (type list insts))
   (sort insts #'> :key #'specializer-rank))
 
-(defun specialization-error (insts)
-  (bug
-   "~@<Instructions either aren't related or conflict in some way: ~4I~_~S~:>"
-   insts))
-
 ;;; Given a list of instructions INSTS, Sees if one of these instructions is a
 ;;; more general form of all the others, in which case they are put into its
 ;;; specializers list, and it is returned. Otherwise an error is signaled.
@@ -62,7 +57,8 @@
           (return)                      ; exit the inner loop
           )))
     (cond ((null masters)
-           (specialization-error insts))
+           (bug "~@<Instructions either aren't related or conflict in some way: ~4I~_~S~:>"
+                insts))
           ((cdr masters)
            (error "multiple specializing masters: ~S" masters))
           (t
@@ -225,10 +221,10 @@
 ;;; Function header layout (dual word aligned):
 ;;;     header-word
 ;;;     self pointer
-;;;     next pointer (next function header)
 ;;;     name
 ;;;     arglist
 ;;;     type
+;;;     info
 ;;;
 ;;; LRA layout (dual word aligned):
 ;;;     header-word
@@ -1007,7 +1003,6 @@
 
 ;;; Return non-NIL if any bit in MASK
 ;;; is in the set of instruction properties in DSTATE.
-(declaim (inline dstate-getprop))
 (defun dstate-getprop (dstate mask)
   (logtest mask (dstate-inst-properties dstate)))
 
