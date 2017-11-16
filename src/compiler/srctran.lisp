@@ -1961,9 +1961,13 @@
         (hi (interval-high quot)))
     ;; Take the floor of the lower bound. The result is always a
     ;; closed lower bound.
-    (setf lo (if lo
-                 (floor (type-bound-number lo))
-                 nil))
+    (when lo
+      (setf lo (- (floor (type-bound-number lo))
+                  ;; FLOOR on floats depends on the divisor,
+                  ;; make it conservative
+                  (if (floatp (type-bound-number lo))
+                      1
+                      0))))
     ;; For the upper bound, we need to be careful.
     (setf hi
           (cond ((consp hi)
@@ -2053,9 +2057,13 @@
         (hi (interval-high quot)))
     ;; Take the ceiling of the upper bound. The result is always a
     ;; closed upper bound.
-    (setf hi (if hi
-                 (ceiling (type-bound-number hi))
-                 nil))
+    (when hi
+      (setf hi (+ (floor (type-bound-number hi))
+                  ;; CEILING on floats depends on the divisor,
+                  ;; make it conservative
+                  (if (ceiling (type-bound-number hi))
+                      1
+                      0))))
     ;; For the lower bound, we need to be careful.
     (setf lo
           (cond ((consp lo)

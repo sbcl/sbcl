@@ -569,6 +569,16 @@
                                      (nth-value 1 (,fun (the double-float x) 1/2)))))))
                         '(double-float real)))))
 
+(with-test (:name :float-quotient-rounding-errors)
+  (checked-compile-and-assert (:optimize :safe)
+   `(lambda ()
+      (floor -114658225103614 84619.58))
+    (() (values -1354984705 8473228.0)))
+  (checked-compile-and-assert (:optimize :safe)
+   `(lambda ()
+      (ceiling 114658225103614 84619.58))
+    (() (values 1354984705 -8473228.0))))
+
 (with-test (:name :complex-float-contagion)
   (checked-compile-and-assert ()
     `(lambda (p1)
