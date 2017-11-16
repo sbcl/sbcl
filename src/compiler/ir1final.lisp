@@ -200,12 +200,14 @@
                  (eq (combination-kind node) :known))
         (let ((comination-name (lvar-fun-name (combination-fun node) t)))
           (map-callable-arguments
-           (lambda (lvar &key arg-count no-function-conversion &allow-other-keys)
+           (lambda (lvar args results &key no-function-conversion &allow-other-keys)
+             (declare (ignore results))
              ;; TODO: handle CASTS.
              ;; principal-lvar-use will return the REF but the
              ;; CAST itself needs to be replaced.
              (unless no-function-conversion
-               (let ((ref (lvar-uses lvar)))
+               (let ((ref (lvar-uses lvar))
+                     (arg-count (length args)))
                  (when (ref-p ref)
                    (flet ((translate-two-args (name)
                             (and (eql arg-count 2)

@@ -216,11 +216,19 @@
 
 ;;;; lvar substitution
 
+(defun update-dependent-casts (new old)
+  (loop for cast in (lvar-dependent-casts old)
+        do (nsubst new old (dependent-cast-deps cast))
+        when (lvar-p new)
+        do
+        (push cast (lvar-dependent-casts new))))
+
 ;;; In OLD's DEST, replace OLD with NEW. NEW's DEST must initially be
 ;;; NIL. We do not flush OLD's DEST.
 (defun substitute-lvar (new old)
   (declare (type lvar old new))
   (aver (not (lvar-dest new)))
+  (update-dependent-casts new old)
   (let ((dest (lvar-dest old)))
     (etypecase dest
       ((or ref bind))
@@ -248,6 +256,7 @@
            (type boolean propagate-dx))
 
   (cond (new
+         (update-dependent-casts new old)
          (do-uses (node old)
            (%delete-lvar-use node)
            (add-lvar-use node new))
@@ -1568,6 +1577,12 @@
        (let ((var (set-var node)))
          (setf (basic-var-sets var)
                (delete node (basic-var-sets var)))))
+      (dependent-cast
+       (loop for dep in (dependent-cast-deps node)
+             when (lvar-p dep)
+             do (setf (lvar-dependent-casts dep)
+                      (delq node (lvar-dependent-casts dep))))
+       (flush-dest (cast-value node)))
       (cast
        (flush-dest (cast-value node)))))
 
@@ -2106,7 +2121,7 @@ is :ANY, the function name is not checked."
 ;;; is true, then we don't care if the leaf is NOTINLINE.
 (defun lvar-fun-name (lvar &optional notinline-ok)
   (declare (type lvar lvar))
-  (let ((use (lvar-uses lvar)))
+  (let ((use (principal-lvar-use lvar)))
     (if (ref-p use)
         (let ((leaf (ref-leaf use)))
           (if (and (global-var-p leaf)
@@ -2383,7 +2398,7 @@ is :ANY, the function name is not checked."
 ;;; declared NOTINLINE.
 (defun lvar-fun-is (lvar names)
   (declare (type lvar lvar) (list names))
-  (let ((use (lvar-uses lvar)))
+  (let ((use (principal-lvar-use lvar)))
     (and (ref-p use)
          (let* ((*lexenv* (node-lexenv use))
                 (leaf (ref-leaf use))
@@ -2448,25 +2463,6 @@ is :ANY, the function name is not checked."
   (and (policy call (eql preserve-single-use-debug-variables 3))
        (or (not (lambda-var-p var))
            (not (lambda-system-lambda-p (lambda-var-home var))))))
-
-;;; The function should accept
-;;; (lvar &key (arg-count (or null unsigned-byte)) (no-function-conversion boolean)
-;;;            (args argument-description*) (arg-lvars list-of-lvars))
-;;; where argument-description is either a position into arg-lvars or
-;;; (sequence position-into-arg-lvars)
-(defun map-callable-arguments (function combination)
-  (let* ((comination-name (lvar-fun-name (combination-fun combination) t))
-         (type (info :function :type comination-name))
-         (info (info :function :info comination-name)))
-    (when (fun-info-callable-map info)
-      (multiple-value-bind (args unknown) (resolve-key-args (combination-args combination) type)
-        (apply (fun-info-callable-map info)
-               (lambda (lvar &rest rest)
-                 (when lvar
-                   (apply function lvar :arg-lvars args
-                                        :unknown-keys unknown
-                                        rest)))
-               args)))))
 
 ;;; Call (lambda (arg lambda-var type)), for a mv-combination ARG can
 ;;; be NIL when it produces multiple values.

@@ -403,17 +403,15 @@
                     '(&optional &rest &key &allow-other-keys))
            :silent t)
         (let (vars
-              call-vars
-              arg-count-specified)
+              call-vars)
           (labels ((callable-p (x)
-                     (member x '(callable function)))
+                     (member x '(function function-designator)))
                    (process-var (x &optional (name (gensym)))
                      (if (callable-p (if (consp x)
                                          (car x)
                                          x))
                          (push (list* name
                                       (cond ((consp x)
-                                             (setf arg-count-specified t)
                                              (cdr x))))
                                call-vars)
                          (push name vars))
@@ -422,46 +420,68 @@
                      (if (and (consp type)
                               (callable-p (car type)))
                          (car type)
-                         type))
-                   (callable-rest-p (x)
-                     (and (consp x)
-                          (callable-p (car x))
-                          (eql (cadr x) '&rest))))
-            (let* (rest-var
+                         type)))
+            (let* (key-arg
+                   rest-var
                    (lambda-list
-                     (cond ((find-if #'callable-rest-p required)
-                            (setf rest-var (gensym))
-                            `(,@(loop for var in required
-                                      collect (process-var var)
-                                      until (callable-rest-p var))
-                              &rest ,rest-var))
-                           (t
-                            `(,@(mapcar #'process-var required)
-                              ,@(and optional
-                                     `(&optional ,@(mapcar #'process-var optional)))
-                              ,@(and rest
-                                     `(&rest ,@(mapcar #'process-var rest)))
-                              ,@(and (ll-kwds-keyp llks)
-                                     `(&key ,@(loop for (key type) in keys
-                                                    for var = (gensym)
-                                                    do (process-var type var)
-                                                    collect `((,key ,var))))))))))
+                     `(,@(mapcar #'process-var required)
+                       ,@(and optional
+                              `(&optional ,@(mapcar #'process-var optional)))
+                       ,@(and rest
+                              `(&rest ,(setf rest-var (process-var (car rest)))))
+                       ,@(and (ll-kwds-keyp llks)
+                              `(&key
+                                ,@(loop for (key type) in keys
+                                        for var = (gensym)
+                                        do (process-var type var)
+                                        collect (if (eq key :key)
+                                                    (let ((var-supplied-p (gensym)))
+                                                      (setf key-arg
+                                                            (cons var var-supplied-p))
+                                                      `((,key ,var) nil ,var-supplied-p))
+                                                    `((,key ,var)))))))))
 
-              (assert call-vars)
               (values
                `(lambda (function ,@lambda-list)
-                  (declare (ignore ,@vars))
-                  ,@(loop for (x arg-count . options) in call-vars
-                          collect `(funcall function
-                                            ,x
-                                            ,@(and arg-count
-                                                   `(:arg-count
-                                                     ,(if (eq arg-count '&rest)
-                                                          `(length ,rest-var)
-                                                          arg-count)))
-                                            ,@(loop for (keyword value) on options by #'cddr
-                                                    collect keyword
-                                                    collect `',value))))
+                  (declare (ignorable ,@vars))
+                  ;; Turn all the (nth-arg n . options) into (arg-lvar . options)
+                  ,@(loop for (lvar args results . options) in call-vars
+                          for rest-p = (typep (car (last args)) '(cons (eql rest-args)))
+                          collect
+                          (labels ((handle-keys (options)
+                                   `(list ,@(loop for (key value) on options by #'cddr
+                                                  collect key
+                                                  collect (if (eq key :key)
+                                                              (destructuring-bind (var . var-p)
+                                                                  key-arg
+                                                                `(and ,var-p
+                                                                      ,var))
+                                                              value))))
+                                   (process-arg (arg)
+                                     (if (consp arg)
+                                         (ecase (car arg)
+                                           (nth-arg
+                                            `(list* ,(nth (cadr arg) lambda-list)
+                                                    ,(handle-keys (cddr arg))))
+                                           (or
+                                            `(list* (list 'or ,@(mapcar #'process-arg (cdr arg))))))
+                                         `(load-time-value (values-specifier-type ',arg)))))
+                            `(and ,lvar
+                                  (funcall function
+                                           ,lvar
+                                           (list*
+                                            ,@(loop for arg in (if rest-p
+                                                                   (butlast args)
+                                                                   args)
+                                                    collect (process-arg arg))
+                                            ,(and rest-p
+                                                  `(loop with rest-options = ',(cdar (last args))
+                                                         for x in ,rest-var
+                                                         collect (list* x rest-options))))
+                                           ,(if results
+                                                (process-arg results)
+                                                '*wild-type*)
+                                           ,@options)))))
                `(,@(mapcar #'process-type required)
                  ,@(and optional
                         `(&optional ,@(mapcar #'process-type optional)))

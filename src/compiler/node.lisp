@@ -90,7 +90,8 @@
   ;; if the LVAR value is DYNAMIC-EXTENT, CLEANUP protecting it.
   (dynamic-extent nil :type (or null cleanup))
   ;; something or other that the back end annotates this lvar with
-  (info nil))
+  (info nil)
+  (dependent-casts nil))
 (!set-load-form-method lvar (:xc :target) :ignore-it)
 
 (defmethod print-object ((x lvar) stream)
@@ -1485,14 +1486,23 @@
   (array (missing-arg) :type lvar)
   (bound (missing-arg) :type lvar))
 
-;;; Used for marking CALLABLE arguments with unrecognizable LVARS in
-;;; VALID-CALLABLE-ARGUMENT so that it can be rerun in
-;;; IR1-OPTIMIZE-CAST with better information.
-;;; Also used by CALLABLE-CAST
-(def!struct (function-designator-cast (:include cast) (:copier nil))
-  (arg-count (missing-arg) :type index)
-  (caller nil :type symbol))
+(def!struct (dependent-cast (:include cast) (:copier nil))
+  ;; Either LVARs or LEAFs
+  (deps nil :type list))
 
+(def!struct (function-designator-cast (:include dependent-cast)
+                                      (:copier nil))
+  (caller nil :type symbol)
+  (arg-specs nil :type list)
+  (result-specs nil :type list))
+(defprinter (function-designator-cast :identity t)
+  %type-check
+  value
+  asserted-type
+  (deps :test deps)
+  (caller :test caller)
+  (arg-specs :test arg-specs)
+  (result-specs :test result-specs))
 
 ;;;; non-local exit support
 ;;;;

@@ -1070,7 +1070,10 @@
 ;;; Just dump it as a specifier. (We'll convert it back upon loading.)
 (defmethod make-load-form ((type ctype) &optional env)
   (declare (ignore env))
-  `(specifier-type ',(type-specifier type)))
+  `(,(if (values-type-p type)
+         'values-specifier-type
+         'specifier-type)
+    ',(type-specifier type)))
 
 (defun-cached (type-negation :hash-function #'type-hash-value
                              :hash-bits 8

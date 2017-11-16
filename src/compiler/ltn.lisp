@@ -140,7 +140,8 @@
   (let* ((tn-ptype (primitive-type (lvar-type lvar)))
          (info (make-ir2-lvar tn-ptype)))
     (setf (lvar-info lvar) info)
-    (let ((name (lvar-fun-name lvar t)))
+    (let ((name (and (ref-p (lvar-uses lvar)) ;; lvar-fun-name sees through casts
+                     (lvar-fun-name lvar t))))
       (if (and delay name)
           (setf (ir2-lvar-kind info) :delayed)
           (setf (ir2-lvar-locs info)

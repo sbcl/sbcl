@@ -551,57 +551,6 @@
                    nvals)))))))
   (values))
 
-;;; Doing this during IR2 conversion and not in ir1-optimize-cast
-;;; because of possible function redefinition and the need to signal a
-;;; style-warning and not a full warning.
-;;; If the cast is not deleted after a warning is signalled then it
-;;; might get signalled multiple times, and IR2 conversion happens
-;;; only once.
-(defun check-functional-cast (cast)
-  (let ((value (cast-value cast))
-        (atype (cast-asserted-type cast)))
-    (cond ((function-designator-cast-p cast)
-           (multiple-value-bind (type name leaf) (lvar-fun-type value)
-             (when (and (fun-type-p type)
-                        leaf)
-               (let ((*valid-fun-use-name* (function-designator-cast-caller cast))
-                     (*lossage-fun* (callable-argument-lossage-kind name
-                                                                    leaf
-                                                                    #'compiler-style-warn
-                                                                    #'compiler-warn))
-                     (*compiler-error-context* cast)
-                     (dest (lvar-dest (cast-lvar cast))))
-                 (if (and (combination-p dest)
-                          (eq (lvar-fun-name (combination-fun dest) t)
-                              *valid-fun-use-name*))
-                     (map-callable-arguments (lambda (lvar &rest args)
-                                               (when (eq lvar (cast-lvar cast))
-                                                 (apply #'valid-callable-argument value args)))
-                                             dest)
-                     ;; Coming from CALLABLE-CAST
-                     (valid-callable-argument value
-                                              :arg-count
-                                              (function-designator-cast-arg-count cast)))))))
-          ((fun-type-p atype)
-           (multiple-value-bind (type name leaf) (lvar-fun-type value)
-             (when (and (fun-type-p type)
-                        leaf)
-               (let ((int (type-intersection type atype)))
-                 (when (or (memq *empty-type* (fun-type-required int))
-                           (and (eq (fun-type-returns int) *empty-type*)
-                                (neq (fun-type-returns type) *empty-type*)
-                                (not (and (eq (fun-type-returns atype) *empty-type*)
-                                          (eq (fun-type-returns type) *wild-type*)))))
-                   (%compile-time-type-error-warn cast
-                                                  (type-specifier atype)
-                                                  (type-specifier type)
-                                                  (list name)
-                                                  :condition
-                                                  (callable-argument-lossage-kind name
-                                                                                  leaf
-                                                                                  'type-style-warning
-                                                                                  'type-warning))))))))))
-
 ;;; CAST
 (defun ir2-convert-cast (node block)
   (declare (type cast node)

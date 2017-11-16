@@ -473,6 +473,7 @@
  ("src/compiler/ir1-translators")
  ;; FIXME: #+ should be (and sb-xc-host) but it isn't set yet.
  ("src/compiler/ir1util" #+cmucl :ignore-failure-p)
+ ("src/compiler/callable-args")
  ("src/compiler/ir1opt")
  ("src/compiler/loop")
 

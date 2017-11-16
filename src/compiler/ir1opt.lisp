@@ -256,7 +256,9 @@
                    (block (ctran-block prev))
                    (component (block-component block)))
           (setf (block-reoptimize block) t)
-          (reoptimize-component component :maybe))))
+          (reoptimize-component component :maybe))
+        (loop for cast in (lvar-dependent-casts lvar)
+              do (setf (node-reoptimize cast) t))))
     (do-uses (node lvar)
       (setf (block-type-check (node-block node)) t)))
   (values))
@@ -324,37 +326,6 @@
                                       context)))
         (use-lvar cast internal-lvar)
         t))))
-
-(defun insert-function-designator-cast-before (next lvar type arg-count caller policy)
-  (declare (type node next) (type lvar lvar) (type ctype type))
-  (with-ir1-environment-from-node next
-    (let* ((ctran (node-prev next))
-           (cast (make-function-designator-cast :asserted-type type
-                                                :type-to-check (maybe-weaken-check type policy)
-                                                :value lvar
-                                                :derived-type (coerce-to-values type)
-                                                :arg-count arg-count
-                                                :caller caller))
-           (internal-ctran (make-ctran)))
-      (setf (ctran-next ctran) cast
-            (node-prev cast) ctran)
-      (use-ctran cast internal-ctran)
-      (link-node-to-previous-ctran next internal-ctran)
-      (setf (lvar-dest lvar) cast)
-      (reoptimize-lvar lvar)
-      (when (return-p next)
-        (node-ends-block cast))
-      (setf (block-type-check (node-block cast)) t)
-      cast)))
-
-(defun assert-function-designator-lvar-type (lvar type arg-count caller)
-  (declare (type lvar lvar) (type ctype type))
-  (let ((internal-lvar (make-lvar))
-        (dest (lvar-dest lvar)))
-    (substitute-lvar internal-lvar lvar)
-    (let ((cast (insert-function-designator-cast-before dest lvar type arg-count
-                                                        caller *policy*)))
-      (use-lvar cast internal-lvar))))
 
 
 ;;;; IR1-OPTIMIZE
@@ -1163,12 +1134,11 @@
                    (assert-call-type call defined-type nil)
                    (maybe-terminate-block call ir1-converting-not-optimizing-p)))))
            (recognize-known-call call ir1-converting-not-optimizing-p))
-          ((let ((*valid-callable-argument-assert-unknown-lvars* t))
-             (valid-fun-use call type
-                            :argument-test #'always-subtypep
-                            :result-test nil
-                            :lossage-fun #'compiler-warn
-                            :unwinnage-fun #'compiler-notify))
+          ((valid-fun-use call type
+                          :argument-test #'always-subtypep
+                          :result-test nil
+                          :lossage-fun #'compiler-warn
+                          :unwinnage-fun #'compiler-notify)
            (assert-call-type call type)
            (maybe-terminate-block call ir1-converting-not-optimizing-p)
            (recognize-known-call call ir1-converting-not-optimizing-p))
@@ -1464,7 +1434,8 @@
                              (constant-lvar-p lvar)))
                        args)
                 (map-callable-arguments
-                 (lambda (lvar &key &allow-other-keys)
+                 (lambda (lvar &rest args)
+                   (declare (ignore args))
                    (constant-fold-arg-p (or (lvar-fun-name lvar t)
                                             (lvar-value lvar))))
                  combination)))
@@ -1868,6 +1839,7 @@
                                          (leaf-type var)))
                      (propagate-to-refs var type)
                      (unless (preserve-single-use-debug-var-p call var)
+                       (update-dependent-casts leaf arg)
                        (let ((use-component (node-component use)))
                          (substitute-leaf-if
                           (lambda (ref)

@@ -324,6 +324,15 @@
   (compiles-with-warning `(lambda (x)
                             (find-if #'evenp (the string x)))))
 
+(with-test (:name (:type-conflict map-into :let))
+  (compiles-with-warning `(lambda (z)
+                            (let ((x "abc"))
+                              (map-into z #'evenp x)))))
+
+(with-test (:name (:type-conflict map-into :result))
+  (compiles-with-warning `(lambda (z)
+                            (map-into (make-string 10) #'evenp z))))
+
 (with-test (:name :type-across-hairy-lambda-transforms)
   (assert (subtypep (sb-kernel:%simple-fun-type (lambda (x) (find 1 (the vector x))))
                     '(function * (values (or (integer 1 1) null) &optional)))))
