@@ -373,7 +373,7 @@
   (declare (type disassem-state dstate)
            (type segment segment))
   (setf (dstate-segment dstate) segment)
-  (setf (dstate-inst-properties dstate) nil)
+  (setf (dstate-inst-properties dstate) 0)
   (setf (dstate-cur-offs-hooks dstate)
         (stable-sort (nreverse (copy-list (seg-hooks segment)))
                      (lambda (oh1 oh2)
@@ -659,7 +659,7 @@
                                  (dstate-filtered-arg-pool-free dstate))
                   (setq arg saved-next))))
         (setf (dstate-filtered-arg-pool-in-use dstate) nil)
-        (setf (dstate-inst-properties dstate) nil)))))
+        (setf (dstate-inst-properties dstate) 0)))))
 
 
 (defun collect-labelish-operands (args cache)
@@ -1001,21 +1001,15 @@
                   :alignment alignment
                   :byte-order sb!c:*backend-byte-order*)))
 
-;;; Put PROPERTY into the set of instruction properties in DSTATE.
-;;; PROPERTY can be a fixnum or symbol, but any given backend
-;;; must exclusively use one or the other property representation.
-(defun dstate-setprop (dstate property)
-  (if (fixnump property)
-      (setf (dstate-inst-properties dstate)
-            (logior (or (dstate-inst-properties dstate) 0) property))
-      (push property (dstate-inst-properties dstate))))
+;;; Logically or MASK into the set of instruction properties in DSTATE.
+(defun dstate-setprop (dstate mask)
+  (setf (dstate-inst-properties dstate) (logior mask (dstate-inst-properties dstate))))
 
-;;; Return non-NIL if PROPERTY is in the set of instruction properties in
-;;; DSTATE. As with -PUT-INST-PROP, we can have a bitmask or a plist.
-(defun dstate-getprop (dstate property)
-  (if (fixnump property)
-      (logtest (or (dstate-inst-properties dstate) 0) property)
-      (memq property (dstate-inst-properties dstate))))
+;;; Return non-NIL if any bit in MASK
+;;; is in the set of instruction properties in DSTATE.
+(declaim (inline dstate-getprop))
+(defun dstate-getprop (dstate mask)
+  (logtest mask (dstate-inst-properties dstate)))
 
 (defun add-fun-header-hooks (segment)
   (declare (type segment segment))

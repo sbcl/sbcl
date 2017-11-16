@@ -195,19 +195,22 @@
              (princ (schar (symbol-name (inst-operand-size dstate)) 0)
                     stream)))
 
+(defconstant +fs-segment-prefix+ #b0001)
+(defconstant +gs-segment-prefix+ #b0010)
+(defconstant +operand-size-8+    #b0100)
+(defconstant +operand-size-16+   #b1000)
+
 ;;; Used to capture the effect of the #x66 operand size override prefix.
 (define-arg-type x66
   :prefilter (lambda (dstate junk)
                (declare (ignore junk))
-               (dstate-setprop dstate 'operand-size-16)))
+               (dstate-setprop dstate +operand-size-16+)))
 
 ;;; Used to capture the effect of the #x64 and #x65 segment override
 ;;; prefixes.
 (define-arg-type seg
   :prefilter (lambda (dstate value)
-               (declare (type bit value))
-               (dstate-setprop
-                dstate (elt '(fs-segment-prefix gs-segment-prefix) value))))
+               (dstate-setprop dstate (ash 1 (the bit value)))))
 
 (defconstant-eqx +conditions+
   '((:o . 0)
