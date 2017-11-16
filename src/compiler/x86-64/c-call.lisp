@@ -283,8 +283,6 @@
   (:ignore results
            #!+(and sb-safepoint win32) rdi
            #!+(and sb-safepoint win32) rsi
-           #!+win32 args
-           #!+win32 rax
            #!+sb-safepoint r15
            #!+sb-safepoint r13)
   (:vop-var vop)
