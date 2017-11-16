@@ -455,9 +455,9 @@ undo_init_new_thread(struct thread *th, init_thread_data *scribble)
  * lisp function after doing arch_os_thread_init and whatever other
  * bookkeeping needs to be done
  */
-int
-new_thread_trampoline(struct thread *th)
+void* new_thread_trampoline(void* arg)
 {
+    struct thread *th = (struct thread *)arg;
     int result;
     init_thread_data scribble;
 
@@ -476,7 +476,7 @@ new_thread_trampoline(struct thread *th)
     schedule_thread_post_mortem(th);
 
     FSHOW((stderr,"/exiting thread %lu\n", thread_self()));
-    return result;
+    return (void*)(uintptr_t)result;
 }
 
 static struct thread *create_thread_struct(lispobj);
@@ -802,7 +802,7 @@ create_thread_struct(lispobj initial_function) {
 }
 
 void create_initial_thread(lispobj initial_function) {
-    struct thread *th=create_thread_struct(initial_function);
+    struct thread *th = create_thread_struct(initial_function);
 #ifdef LISP_FEATURE_SB_THREAD
     pthread_key_create(&lisp_thread, 0);
 #endif
@@ -852,8 +852,7 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
                               ALIEN_STACK_SIZE)) ||
 # endif
 #endif
-       (retcode = pthread_create
-        (kid_tid,th->os_attr,(void *(*)(void *))new_thread_trampoline,th))) {
+       (retcode = pthread_create(kid_tid, th->os_attr, new_thread_trampoline, th))) {
         FSHOW_SIGNAL((stderr, "init = %d\n", initcode));
         FSHOW_SIGNAL((stderr, "pthread_create returned %d, errno %d\n",
                       retcode, errno));
