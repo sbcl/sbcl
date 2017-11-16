@@ -756,13 +756,14 @@
                                   (insert-array-bounds-checks 0)))
                ,(cond #!+x86-64
                       ((type= element-ctype *universal-type*)
-                       '(values (%primitive sb!vm::fill-vector/t
-                                 data item start end)))
+                       '(%primitive sb!vm::fill-vector/t
+                         data item start end))
                       (t
                        `(do ((i start (1+ i)))
-                            ((= i end) seq)
+                            ((= i end))
                           (declare (type index i))
-                          (setf (aref data i) item)))))
+                          (setf (aref data i) item))))
+               seq)
             ;; ... though we still need to check that the new element can fit
             ;; into the vector in safe code. -- CSR, 2002-07-05
             `((declare (type ,element-type item)))))

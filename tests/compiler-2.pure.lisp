@@ -612,3 +612,10 @@
        (equalp a b))
     (("" #*) t)))
 
+(with-test (:name :fill-transform-returning-array-data)
+  (let ((vector (make-array 10 :fill-pointer 2)))
+    (checked-compile-and-assert ()
+      `(lambda (v)
+           (declare (type (vector t) v))
+           (fill v nil))
+      ((vector) vector))))
