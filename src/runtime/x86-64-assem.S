@@ -26,6 +26,9 @@
 #include "genesis/fdefn.h"
 #include "genesis/static-symbols.h"
 #include "genesis/thread.h"
+#ifdef MEMORY_SANITIZER
+#include "genesis/symbol.h"
+#endif
 	
 /* Minimize conditionalization for different OS naming schemes. */
 #if defined __linux__  || defined LISP_FEATURE_FREEBSD || defined __OpenBSD__ || defined __NetBSD__ || defined __sun || defined _WIN64 || defined __DragonFly__
@@ -115,6 +118,10 @@
 GNAME(call_into_lisp_first_time):
 	push	%rbp		# Save old frame pointer.
 	mov	%rsp,%rbp	# Establish new frame.
+#ifdef MEMORY_SANITIZER
+        movq	__msan_param_tls@GOTTPOFF(%rip), %rax
+        movq	%rax, (SYMBOL_VALUE_OFFSET+MSAN_PARAM_TLS)
+#endif
 #if defined(LISP_FEATURE_DARWIN)
 	movq    GSYM(GNAME(all_threads)),%rax
 #else

@@ -297,6 +297,15 @@
       (let ((label (gen-label)))
         (inst lea r14 (make-fixup nil :code-object label))
         (emit-label label)))
+    (when sb!c::*msan-compatible-stack-unpoison*
+      (inst mov rax (static-symbol-value-ea 'msan-param-tls))
+      ;; Unpoison parameters
+      (do ((n 0 (+ n n-word-bytes))
+           (arg args (tn-ref-across arg)))
+          ((null arg))
+        ;; KLUDGE: assume all parameters are 8 bytes or less
+        (inst fs)
+        (inst mov (make-ea :qword :base rax :disp n) 0)))
     #!-win32
     ;; ABI: AL contains amount of arguments passed in XMM registers
     ;; for vararg calls.
