@@ -110,23 +110,6 @@
     (when (plusp count)
       (format t "~&Removed ~D doc string~:P" count)))
 
-  ;; Share identical FUN-INFOs
-  sb-int::
-  (let ((ht (make-hash-table :test 'equalp))
-        (old-count 0))
-    (sb-int:call-with-each-globaldb-name
-     (lambda (name)
-       (binding* ((info (info :function :info name) :exit-if-null)
-                  (shared-info (gethash info ht info)))
-         (incf old-count)
-         (if (eq info shared-info)
-             (setf (gethash info ht) info)
-           (setf (info :function :info name) shared-info)))))
-    (format t "~&FUN-INFO: Collapsed ~D -> ~D~%"
-            old-count (hash-table-count ht)))
-
-  (sb-disassem::!compile-inst-printers)
-
   ;; Unintern no-longer-needed stuff before the possible PURIFY in
   ;; SAVE-LISP-AND-DIE.
   #-sb-fluid (!unintern-init-only-stuff)

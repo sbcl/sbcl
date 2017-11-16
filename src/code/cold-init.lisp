@@ -245,6 +245,7 @@
   (show-and-call float-cold-init-or-reinit)
 
   (show-and-call !class-finalize)
+  (show-and-call sb!disassem::!compile-inst-printers)
 
   ;; Install closures as guards on some early PRINT-OBJECT methods so that
   ;; THREAD and RESTART print nicely prior to the real methods being installed.

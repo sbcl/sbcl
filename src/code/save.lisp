@@ -187,6 +187,16 @@ sufficiently motivated to do lengthy fixes."
         (return-from save-lisp-and-die))))
   (when (eql t compression)
     (setf compression -1))
+
+  ;; Share EQUALP FUN-INFOs
+  (let ((ht (make-hash-table :test 'equalp)))
+    (sb-int:call-with-each-globaldb-name
+     (lambda (name)
+       (binding* ((info (info :function :info name) :exit-if-null)
+                  (shared-info (gethash info ht)))
+         (if shared-info
+             (setf (info :function :info name) shared-info)
+             (setf (gethash info ht) info))))))
   ;; Share similar simple-fun arglists and types
   ;; EQUALISH considers any two identically-spelled gensyms as EQ
   (let ((arglist-hash (make-hash-table :hash-function 'equal-hash
