@@ -456,3 +456,8 @@
     (assert (not (ctu:find-code-constants f :type 'sb-kernel:layout)))
     ;; And the function is safe.
     (assert-error (funcall f nil nil) type-error)))
+
+(with-test (:name (search :singleton-transform))
+  (checked-compile-and-assert ()
+    `(lambda (e) (search '(a) '(b) :end1 e))
+    ((0) 0)))

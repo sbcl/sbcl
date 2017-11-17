@@ -1276,7 +1276,7 @@
                                    (give-up-ir1-transform))))
              (pattern-end (cond ((constant-lvar-p end1)
                                  (lvar-value end1))
-                                ((not start1)
+                                ((not end1)
                                  (length pattern))
                                 (t
                                  (give-up-ir1-transform))))
