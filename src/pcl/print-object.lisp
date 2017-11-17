@@ -33,13 +33,16 @@
 ;;; by the printer doing bootstrapping, and immediately replace it
 ;;; with some new printing logic, so that the Lisp printer stays
 ;;; crippled only for the shortest necessary time.
-(write-string "; Removing placeholder PRINT-OBJECT ...") (force-output)
+(unless (sb-impl::!c-runtime-noinform-p)
+  (write-string "; Removing placeholder PRINT-OBJECT ...")
+  (force-output))
 (let ((*print-pretty* t)) ; use pretty printer dispatch table, not PRINT-OBJECT
   (fmakunbound 'print-object)
   (defgeneric print-object (object stream))
   (!incorporate-cross-compiled-methods 'print-object))
-(write-string " done
-")
+(unless (sb-impl::!c-runtime-noinform-p)
+  (write-string " done
+"))
 
 ;;;; PRINT-OBJECT methods for objects from PCL classes
 ;;;;

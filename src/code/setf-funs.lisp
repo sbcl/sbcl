@@ -22,9 +22,10 @@
         (setf (info :function :type s)
               (specifier-type (type-specifier ftype)))
         (push s l))))
-  (let ((*print-pretty* nil)
-        (*print-length* nil))
-    (format t "~&; Fixed ftypes: ~S~%" (sort l #'string<))))
+  (unless (sb-impl::!c-runtime-noinform-p)
+    (let ((*print-pretty* nil)
+          (*print-length* nil))
+      (format t "~&; Fixed ftypes: ~S~%" (sort l #'string<)))))
 
 (eval-when (:compile-toplevel :execute)
 

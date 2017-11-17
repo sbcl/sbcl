@@ -1950,7 +1950,6 @@ core and return a descriptor to it."
 ;; the C runtime.
 #!-sb-dynamic-core
 (defun load-cold-foreign-symbol-table (filename)
-  (/show "load-cold-foreign-symbol-table" filename)
   (with-open-file (file filename)
     (loop for line = (read-line file nil nil)
           while line do
@@ -2000,7 +1999,6 @@ core and return a descriptor to it."
                                (not (= old-value value)))
                       (warn "redefining ~S from #X~X to #X~X"
                             name old-value value)))
-                  (/show "adding to *cold-foreign-symbol-table*:" name value)
                   (setf (gethash name *cold-foreign-symbol-table*) value)
                   #!+win32
                   (let ((at-position (position #\@ name)))
@@ -3437,7 +3435,7 @@ III. initially undefined function references (alphabetically):
                    *core-file*))))
   num)
 
-(defun output-gspace (gspace)
+(defun output-gspace (gspace verbose)
   (force-output *core-file*)
   (let* ((posn (file-position *core-file*))
          (bytes (* (gspace-free-word-index gspace) sb!vm:n-word-bytes))
@@ -3446,12 +3444,9 @@ III. initially undefined function references (alphabetically):
 
     (file-position *core-file*
                    (* sb!c:+backend-page-bytes+ (1+ *data-page*)))
-    (format t
-            "writing ~S byte~:P [~S page~:P] from ~S~%"
-            total-bytes
-            pages
-            gspace)
-    (force-output)
+    (when verbose
+      (format t "writing ~S byte~:P [~S page~:P] from ~S~%"
+              total-bytes pages gspace))
 
     ;; Note: It is assumed that the GSPACE allocation routines always
     ;; allocate whole pages (of size +backend-page-bytes+) and that any
@@ -3487,14 +3482,13 @@ III. initially undefined function references (alphabetically):
 ;;; the "initial core file" because core files could be created later
 ;;; by executing SAVE-LISP in a running system, perhaps after we've
 ;;; added some functionality to the system.)
-(declaim (ftype (function (string)) write-initial-core-file))
-(defun write-initial-core-file (filename)
+(defun write-initial-core-file (filename verbose)
 
   (let ((filenamestring (namestring filename))
         (*data-page* 0))
 
-    (format t "[building initial core file in ~S: ~%" filenamestring)
-    (force-output)
+    (when verbose
+      (format t "[building initial core file in ~S: ~%" filenamestring))
 
     (with-open-file (*core-file* filenamestring
                                  :direction :output
@@ -3528,7 +3522,8 @@ III. initially undefined function references (alphabetically):
                            (list *dynamic*))))
         ;; length = (5 words/space) * N spaces + 2 for header.
         (write-word (+ (* (length spaces) 5) 2))
-        (mapc #'output-gspace spaces))
+        (dolist (space spaces)
+          (output-gspace space verbose)))
 
       ;; Write the initial function.
       (write-word initial-fun-core-entry-type-code)
@@ -3536,18 +3531,17 @@ III. initially undefined function references (alphabetically):
       (let* ((cold-name (cold-intern '!cold-init))
              (initial-fun
               (cold-fdefn-fun (cold-fdefinition-object cold-name))))
-        (format t
-                "~&/(DESCRIPTOR-BITS INITIAL-FUN)=#X~X~%"
-                (descriptor-bits initial-fun))
+        (when verbose
+          (format t "~&/INITIAL-FUN=#X~X~%" (descriptor-bits initial-fun)))
         (write-word (descriptor-bits initial-fun)))
 
       ;; Write the End entry.
       (write-word end-core-entry-type-code)
       (write-word 2)))
 
-  (format t "done]~%")
-  (force-output)
-  (/show "leaving WRITE-INITIAL-CORE-FILE")
+  (when verbose
+    (format t "done]~%")
+    (force-output))
   (values))
 
 ;;;; the actual GENESIS function
@@ -3708,12 +3702,13 @@ III. initially undefined function references (alphabetically):
                    (layout (gethash name *cold-layouts*)))
               (aver layout)
               (write-slots layout *host-layout-of-layout* :info dd))))
-        (format t "~&; SB!Loader: (~D~@{+~D~}) structs/consts/funs/methods/other~%"
-                (length *known-structure-classoids*)
-                (length *!cold-defconstants*)
-                (length *!cold-defuns*)
-                (reduce #'+ *cold-methods* :key (lambda (x) (length (cdr x))))
-                (length *!cold-toplevels*)))
+        (when verbose
+          (format t "~&; SB!Loader: (~D~@{+~D~}) structs/consts/funs/methods/other~%"
+                  (length *known-structure-classoids*)
+                  (length *!cold-defconstants*)
+                  (length *!cold-defuns*)
+                  (reduce #'+ *cold-methods* :key (lambda (x) (length (cdr x))))
+                  (length *!cold-toplevels*))))
 
       (dolist (symbol '(*!cold-defconstants* *!cold-defuns* *!cold-toplevels*))
         (cold-set symbol (list-to-core (nreverse (symbol-value symbol))))
@@ -3760,7 +3755,6 @@ III. initially undefined function references (alphabetically):
                     (vector-in-core (nreverse *cold-assembler-objects*)))))
       (when core-file-name
         (finish-symbols))
-      (/show "back from FINISH-SYMBOLS")
       (finalize-load-time-value-noise)
 
       ;; Write results to files.
@@ -3768,7 +3762,7 @@ III. initially undefined function references (alphabetically):
         (with-open-file (stream map-file-name :direction :output :if-exists :supersede)
           (write-map stream)))
       (when core-file-name
-        (write-initial-core-file core-file-name))
+        (write-initial-core-file core-file-name verbose))
       (unless c-header-dir-name
         (return-from sb-cold:genesis))
       (let ((filename (format nil "~A/Makefile.features" c-header-dir-name)))

@@ -210,13 +210,6 @@
                          #'identity)))
     (funcall customizer default-subfeatures)))
 
-(progn (write-string "target *FEATURES* = ")
-       (write *shebang-features* :pretty nil :length nil)
-       (terpri)
-       (write-string "*shebang-backend-subfeatures* = ")
-       (write *shebang-backend-subfeatures* :pretty nil :length nil)
-       (terpri))
-
 ;;; Call for effect of signaling an error if no target picked.
 (target-platform-name)
 

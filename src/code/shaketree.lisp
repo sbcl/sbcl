@@ -40,5 +40,5 @@
         (loop for (internals externals . package) in list
               do (reintern internals (package-internal-symbols package) package)
                  (reintern externals (package-external-symbols package) package))
-        (format t "~&Dropped ~D symbols~%" n-dropped)
+        #+nil (format t "~&Dropped ~D symbols~%" n-dropped)
         (force-output)))))

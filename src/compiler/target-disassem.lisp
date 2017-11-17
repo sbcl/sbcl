@@ -798,9 +798,10 @@
               (collect-inst-variants
                (logically-readonlyize (string-upcase symbol))
                package it cache))))
-    (apply 'format t
-           "~&Disassembler: ~D printers, ~D prefilters, ~D labelers~%"
-           (mapcar (lambda (x) (length (cdr x))) cache))))
+    (unless (sb!impl::!c-runtime-noinform-p)
+      (apply 'format t
+             "~&Disassembler: ~D printers, ~D prefilters, ~D labelers~%"
+             (mapcar (lambda (x) (length (cdr x))) cache)))))
 
 ;;; Get the instruction-space, creating it if necessary.
 (defun get-inst-space (&key (package sb!assem::*backend-instruction-set-package*)

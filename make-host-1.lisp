@@ -5,8 +5,17 @@
 ;;; things.)
 (setf *print-level* 5 *print-length* 5)
 
-(progn (load "src/cold/shared.lisp")
-       (load "tools-for-build/ldso-stubs.lisp"))
+(progn
+  (load "src/cold/shared.lisp")
+  (load "tools-for-build/ldso-stubs.lisp")
+  (let ((*print-pretty* nil)
+        (*print-length* nil))
+    (dolist (thing '("*SHEBANG-FEATURES*" "*SHEBANG-BACKEND-SUBFEATURES*"))
+      (let ((val (symbol-value (intern thing "SB-COLD"))))
+        (when val
+          (format t "~&target *~A* = ~S~%"
+                  (subseq thing (length "*SHEBANG-") (1- (length thing)))
+                  val))))))
 (in-package "SB-COLD")
 (progn
   (setf *host-obj-prefix* "obj/from-host/")

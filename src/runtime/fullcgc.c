@@ -376,10 +376,11 @@ void execute_full_mark_phase()
 #define timediff(b,a,field) \
     (double)((a.field.tv_sec-b.field.tv_sec)*1000000 + \
              (a.field.tv_usec-b.field.tv_usec)) / 1000000.0
-    fprintf(stderr,
-            "[Mark phase: %d pages used, HT-count=%d, ET=%f+%f sys+usr]\n",
-            (int)(page_table_pages - free_page), mark_bits.count,
-            timediff(before, after, ru_stime), timediff(before, after, ru_utime));
+    if (gencgc_verbose)
+        fprintf(stderr,
+                "[Mark phase: %d pages used, HT-count=%d, ET=%f+%f sys+usr]\n",
+                (int)(page_table_pages - free_page), mark_bits.count,
+                timediff(before, after, ru_stime), timediff(before, after, ru_utime));
 #endif
 }
 
@@ -522,11 +523,13 @@ void execute_full_sweep_phase()
 #endif
     if (sweeplog) fprintf(sweeplog, "-- dynamic space --\n");
     walk_generation(sweep, -1, (uword_t)words_zeroed);
-    fprintf(stderr, "[Sweep phase: ");
-    int i;
-    for(i=6;i>=0;--i)
-        fprintf(stderr, "%ld%s", words_zeroed[i], i?"+":"");
-    fprintf(stderr, " words zeroed]\n");
+    if (gencgc_verbose) {
+        fprintf(stderr, "[Sweep phase: ");
+        int i;
+        for(i=6;i>=0;--i)
+            fprintf(stderr, "%ld%s", words_zeroed[i], i?"+":"");
+        fprintf(stderr, " words zeroed]\n");
+    }
     hopscotch_destroy(&mark_bits);
 #ifdef LOG_SWEEP_ACTIONS
     fclose(sweeplog);

@@ -78,6 +78,8 @@
      ,@forms
      (dolist (f wrapped-functions) (unencapsulate f '!cold-init))))
 
+(defun !c-runtime-noinform-p () (/= (extern-alien "lisp_startup_options" char) 0))
+
 ;;; called when a cold system starts up
 (defun !cold-init (&aux real-choose-symbol-out-fun)
   "Give the world a shove and hope it spins."
@@ -90,7 +92,8 @@
   (setq *error-output* (!make-cold-stderr-stream)
                       *standard-output* *error-output*
                       *trace-output* *error-output*)
-  (write-string "COLD-INIT... ")
+  (unless (!c-runtime-noinform-p)
+    (write-string "COLD-INIT... "))
 
   ;; Assert that FBOUNDP doesn't choke when its answer is NIL.
   ;; It was fine if T because in that case the legality of the arg is certain.
@@ -178,8 +181,9 @@
   ;; fixups be done separately? Wouldn't that be clearer and better?
   ;; -- WHN 19991204
   (/show0 "doing cold toplevel forms and fixups")
-  (progn (write `("Length(TLFs)= " ,(length *!cold-toplevels*)))
-         (terpri))
+  (unless (!c-runtime-noinform-p)
+    (write `("Length(TLFs)= " ,(length *!cold-toplevels*)))
+    (terpri))
   ;; only the basic external formats are present at this point.
   (setq sb!impl::*default-external-format* :latin-1)
 
@@ -297,7 +301,6 @@
   (/show0 "back from first GC")
 
   ;; The show is on.
-  (terpri)
   (/show0 "going into toplevel loop")
   (handling-end-of-the-world
     (toplevel-init)
