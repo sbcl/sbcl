@@ -98,6 +98,7 @@
 
 ;;;; SB definitions
 
+(!define-storage-bases
 ;;; Despite the fact that there are only 8 different registers, we consider
 ;;; them 16 in order to describe the overlap of byte registers. The only
 ;;; thing we need to represent is what registers overlap. Therefore, we
@@ -118,6 +119,7 @@
 (define-storage-base constant :non-packed)
 (define-storage-base immediate-constant :non-packed)
 (define-storage-base noise :unbounded :size 2)
+)
 
 ;;;; SC definitions
 

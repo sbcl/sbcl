@@ -27,42 +27,38 @@
 ;;;
 ;;; We enter the basic structure at meta-compile time, and then fill
 ;;; in the missing slots at load time.
-(defmacro define-storage-base (name kind &key size (size-increment size)
-                                           (size-alignment 1))
+(defmacro !define-storage-bases (&rest definitions &aux (index -1) forms)
+  (dolist (def definitions)
+    (destructuring-bind (name kind &key size (size-increment size)
+                                             (size-alignment 1))
+        (cdr def)
 
-  (declare (type symbol name))
-  (declare (type (member :finite :unbounded :non-packed) kind))
+      (declare (type symbol name))
+      (declare (type (member :finite :unbounded :non-packed) kind))
 
-  ;; SIZE is either mandatory or forbidden.
-  (ecase kind
-    (:non-packed
-     (when size
-       (error "A size specification is meaningless in a ~S SB." kind)))
-    ((:finite :unbounded)
-     (unless size (error "Size is not specified in a ~S SB." kind))
-     (aver (typep size 'unsigned-byte))
-     (aver (= 1 (logcount size-alignment)))
-     (aver (not (logtest size (1- size-alignment))))
-     (aver (not (logtest size-increment (1- size-alignment))))))
+      ;; SIZE is either mandatory or forbidden.
+      (ecase kind
+        (:non-packed
+         (when size
+           (error "A size specification is meaningless in a ~S SB." kind)))
+        ((:finite :unbounded)
+         (unless size (error "Size is not specified in a ~S SB." kind))
+         (aver (typep size 'unsigned-byte))
+         (aver (= 1 (logcount size-alignment)))
+         (aver (not (logtest size (1- size-alignment))))
+         (aver (not (logtest size-increment (1- size-alignment))))))
 
-  `(progn
-       ;; DEFINE-STORAGE-CLASS needs the storage bases while building
-       ;; the cross-compiler, but to eval this during cross-compilation
-       ;; would kill the cross-compiler.
-     (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-       (unless (find ',name *backend-sbs* :key 'sb-name)
-         (let* ((index (length *backend-sbs*))
-                (sbs (make-array (1+ index))))
-           (replace sbs *backend-sbs*)
-           (setf (aref sbs index)
-                 ,(if (eq kind :non-packed)
-                      `(make-sb :%index index :name ',name :kind ,kind)
-                      `(make-finite-sb :%index index :name ',name
-                                       :kind ,kind :size ,size
-                                       :size-increment ,size-increment
-                                       :size-alignment ,size-alignment)))
-           (setf *backend-sbs* sbs))))
-     ',name))
+      (incf index)
+      (push (if (eq kind :non-packed)
+                `(make-sb :%index ,index :name ',name :kind ,kind)
+                `(make-finite-sb :%index ,index :name ',name
+                                 :kind ,kind :size ,size
+                                 :size-increment ,size-increment
+                                 :size-alignment ,size-alignment))
+            forms)))
+  ;; Do not clobber the global var while running the cross-compiler.
+  `(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
+     (setf *backend-sbs* (vector ,@(nreverse forms)))))
 
 (defun finite-sbs-ctor-form ()
   `(vector

@@ -84,12 +84,14 @@
     a0 a1 a2 a3 a4 a5)
   (defparameter register-arg-names '(a0 a1 a2 a3 a4 a5)))
 
+(!define-storage-bases
 (define-storage-base registers :finite :size 32)
 (define-storage-base float-registers :finite :size 64)
 (define-storage-base control-stack :unbounded :size 8)
 (define-storage-base non-descriptor-stack :unbounded :size 0)
 (define-storage-base constant :non-packed)
 (define-storage-base immediate-constant :non-packed)
+)
 
 (!define-storage-classes
 

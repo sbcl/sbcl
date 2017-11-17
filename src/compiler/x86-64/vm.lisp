@@ -185,6 +185,7 @@
 ;;; to take one unit, and [dq]?words to take two. We don't need to
 ;;; tell the difference between [dq]?words, because you can't put two
 ;;; words in a dword register.
+(!define-storage-bases
 (define-storage-base registers :finite :size 32)
 
 (define-storage-base float-registers :finite :size 16)
@@ -194,6 +195,7 @@
 (define-storage-base constant :non-packed)
 (define-storage-base immediate-constant :non-packed)
 (define-storage-base noise :unbounded :size 2)
+)
 
 ;;;; SC definitions
 

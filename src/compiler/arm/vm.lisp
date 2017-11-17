@@ -66,6 +66,7 @@
 
 ;;;; SB and SC definition:
 
+(!define-storage-bases
 (define-storage-base registers :finite :size 16)
 (define-storage-base control-stack :unbounded :size 2 :size-increment 1)
 (define-storage-base non-descriptor-stack :unbounded :size 0)
@@ -78,6 +79,7 @@
 ;; {,COMPLEX-}{SINGLE,DOUBLE}-REG SCs below.
 #!-arm-vfp
 (error "Don't know how many float registers for non-VFP systems")
+)
 
 (!define-storage-classes
 
