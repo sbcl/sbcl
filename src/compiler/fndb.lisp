@@ -541,7 +541,8 @@
     vector
   (flushable))
 
-(defknown map (type-specifier (function-designator ((rest-args :sequence t)))
+(defknown map (type-specifier (function-designator ((nth-arg 2 :sequence t)
+                                                    (rest-args :sequence t)))
                               sequence &rest sequence)
   consed-sequence (call)
 ; :DERIVE-TYPE 'TYPE-SPEC-ARG1 ? Nope... (MAP NIL ...) returns NULL, not NIL.
