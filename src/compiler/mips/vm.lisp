@@ -279,33 +279,33 @@
 (defun immediate-constant-sc (value)
   (typecase value
     ((integer 0 0)
-     (sc-number-or-lose 'zero))
+     zero-sc-number)
     (null
-     (sc-number-or-lose 'null))
+     null-sc-number)
     (symbol
      (if (static-symbol-p value)
-         (sc-number-or-lose 'immediate)
+         immediate-sc-number
          nil))
     ((or (integer #.sb!xc:most-negative-fixnum #.sb!xc:most-positive-fixnum)
          character)
-     (sc-number-or-lose 'immediate))
+     immediate-sc-number)
     #-sb-xc-host ; There is no such object type in the host
     (system-area-pointer
-     (sc-number-or-lose 'immediate))
+     immediate-sc-number)
     (character
-     (sc-number-or-lose 'immediate))))
+     immediate-sc-number)))
 
 (defun boxed-immediate-sc-p (sc)
-  (or (eql sc (sc-number-or-lose 'zero))
-      (eql sc (sc-number-or-lose 'null))
-      (eql sc (sc-number-or-lose 'immediate))))
+  (or (eql sc zero-sc-number)
+      (eql sc null-sc-number)
+      (eql sc immediate-sc-number)))
 
 ;;;; Function Call Parameters
 
 ;;; The SC numbers for register and stack arguments/return values.
 ;;;
-(defconstant immediate-arg-scn (sc-number-or-lose 'any-reg))
-(defconstant control-stack-arg-scn (sc-number-or-lose 'control-stack))
+(defconstant immediate-arg-scn any-reg-sc-number)
+(defconstant control-stack-arg-scn control-stack-sc-number)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 

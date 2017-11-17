@@ -346,18 +346,18 @@
   (typecase value
     ((or (integer #.sb!xc:most-negative-fixnum #.sb!xc:most-positive-fixnum)
          character)
-     (sc-number-or-lose 'immediate))
+     immediate-sc-number)
     (symbol
      (when (static-symbol-p value)
-       (sc-number-or-lose 'immediate)))
+       immediate-sc-number))
     (single-float
        (case value
-         ((0f0 1f0) (sc-number-or-lose 'fp-constant))
-         (t (sc-number-or-lose 'fp-single-immediate))))
+         ((0f0 1f0) fp-constant-sc-number)
+         (t fp-single-immediate-sc-number)))
     (double-float
        (case value
-         ((0d0 1d0) (sc-number-or-lose 'fp-constant))
-         (t (sc-number-or-lose 'fp-double-immediate))))
+         ((0d0 1d0) fp-constant-sc-number)
+         (t fp-double-immediate-sc-number)))
     #!+long-float
     (long-float
        (when (or (eql value 0l0) (eql value 1l0)
@@ -366,10 +366,10 @@
                  (eql value (log 2.718281828459045235360287471352662L0 2l0))
                  (eql value (log 2l0 10l0))
                  (eql value (log 2l0 2.718281828459045235360287471352662L0)))
-         (sc-number-or-lose 'fp-constant)))))
+         fp-constant-sc-number))))
 
 (defun boxed-immediate-sc-p (sc)
-  (eql sc (sc-number-or-lose 'immediate)))
+  (eql sc immediate-sc-number))
 
 ;; For an immediate TN, return its value encoded for use as a literal.
 ;; For any other TN, return the TN.  Only works for FIXNUMs,

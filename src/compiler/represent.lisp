@@ -646,7 +646,7 @@
                                                (ir2-component-constants 2comp))))))
              (possible-scs (tn)
                (if (eq (tn-kind tn) :constant)
-                   (list (sc-number-or-lose 'constant)
+                   (list sb!vm:constant-sc-number
                          (immediate-constant-sc (constant-value (tn-leaf tn))))
                    (primitive-type-scs (tn-primitive-type tn))))
              (pass (tn &key unique)

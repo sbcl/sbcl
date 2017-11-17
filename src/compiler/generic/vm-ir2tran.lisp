@@ -134,8 +134,7 @@
                         (or unbound-marker-tn
                             (setf unbound-marker-tn
                                   (let ((tn (make-restricted-tn
-                                             nil
-                                             (sc-number-or-lose 'sb!vm::any-reg))))
+                                             nil sb!vm:any-reg-sc-number)))
                                     (vop make-unbound-marker node block tn)
                                     tn))))
                        (:null
@@ -144,8 +143,7 @@
                         (or funcallable-instance-tramp-tn
                             (setf funcallable-instance-tramp-tn
                                   (let ((tn (make-restricted-tn
-                                             nil
-                                             (sc-number-or-lose 'sb!vm::any-reg))))
+                                             nil sb!vm:any-reg-sc-number)))
                                     (vop make-funcallable-instance-tramp node block tn)
                                     tn)))))
                      name dx-p slot lowtag))))))))

@@ -134,9 +134,8 @@
 (defun decode-restart-location (x)
   (declare (fixnum x))
   (let ((registers-size #.(integer-length (sb-size (sb-or-lose 'sb!vm::registers)))))
-    (values (make-sc-offset
-             (sc-number-or-lose 'sb!vm::descriptor-reg)
-             (ldb (byte registers-size 0) x))
+    (values (make-sc-offset sb!vm:descriptor-reg-sc-number
+                            (ldb (byte registers-size 0) x))
             (ash x (- registers-size)))))
 
 ;;; Dump a compiled debug-location into *BYTE-BUFFER* that describes

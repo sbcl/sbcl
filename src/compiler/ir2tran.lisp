@@ -1358,9 +1358,9 @@
         (let ((closure (make-normal-tn *backend-t-primitive-type*)))
           (when (policy fun (> store-closure-debug-pointer 1))
             ;; Save the closure pointer on the stack.
-            (let ((closure-save (make-representation-tn
-                                 *backend-t-primitive-type*
-                                 (sc-number-or-lose 'sb!vm::control-stack))))
+            (let ((closure-save
+                   (make-representation-tn *backend-t-primitive-type*
+                                           sb!vm:control-stack-sc-number)))
               (vop setup-closure-environment node block start-label
                    closure-save)
               (setf (ir2-physenv-closure-save-tn env) closure-save)
@@ -1412,9 +1412,8 @@
   ;; It could be saved from the XEP, but some functions have both
   ;; external and internal entry points, so it will be saved twice.
   (let ((temp (make-normal-tn *backend-t-primitive-type*))
-        (bsp-save-tn (make-representation-tn
-                      *backend-t-primitive-type*
-                      (sc-number-or-lose 'sb!vm::control-stack))))
+        (bsp-save-tn (make-representation-tn *backend-t-primitive-type*
+                                             sb!vm:control-stack-sc-number)))
     (vop current-binding-pointer node block temp)
     (emit-move node block temp bsp-save-tn)
     (setf (ir2-physenv-bsp-save-tn env) bsp-save-tn)

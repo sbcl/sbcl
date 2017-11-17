@@ -18,7 +18,7 @@
 
 (flet ((yes (x)
          (assert
-          (eql (sc-number-or-lose 'immediate)
+          (eql immediate-sc-number
                (immediate-constant-sc x))))
        (no (x)
          (assert

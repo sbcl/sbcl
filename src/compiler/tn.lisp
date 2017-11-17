@@ -239,7 +239,7 @@
 (defun make-load-time-value-tn (handle type)
   (let* ((component (component-info *component-being-compiled*))
          (sc (svref *backend-sc-numbers*
-                    (sc-number-or-lose 'constant)))
+                    sb!vm:constant-sc-number))
          (res (make-tn 0 :constant (primitive-type type) sc))
          (constants (ir2-component-constants component)))
     (setf (tn-offset res) (fill-pointer constants))
@@ -267,8 +267,7 @@
          (res (make-tn 0
                        :constant
                        *backend-t-primitive-type*
-                       (svref *backend-sc-numbers*
-                              (sc-number-or-lose 'constant))))
+                       (svref *backend-sc-numbers* sb!vm:constant-sc-number)))
          (constants (ir2-component-constants component)))
 
     (do ((i 0 (1+ i)))
@@ -476,7 +475,7 @@
     (and leaf
          (eq (tn-kind tn) :constant)
          (eq (immediate-constant-sc (constant-value leaf))
-             (sc-number-or-lose 'sb!vm::immediate)))))
+             'sb!vm:immediate-sc-number))))
 
 ;;; Force TN to be allocated in a SC that doesn't need to be saved: an
 ;;; unbounded non-save-p SC. We don't actually make it a real "restricted" TN,

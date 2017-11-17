@@ -181,7 +181,7 @@
                       (constant-name (symbolicate sc-name "-SC-NUMBER")))
                  `((define-storage-class ,sc-name ,sc-number
                      ,sb-name ,@args)
-                   (def!constant ,constant-name ,sc-number))))))
+                   (defconstant ,constant-name ,sc-number))))))
       `(progn ,@(mapcan #'process-class classes)))))
 
 ;;;; stuff for defining reffers and setters

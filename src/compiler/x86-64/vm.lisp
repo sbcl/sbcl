@@ -463,7 +463,7 @@
   (typecase value
     ((or (integer #.sb!xc:most-negative-fixnum #.sb!xc:most-positive-fixnum)
          character)
-     (sc-number-or-lose 'immediate))
+     immediate-sc-number)
     (symbol ; Symbols in static and immobile space are immediate
      (when (or ;; With #!+immobile-symbols, all symbols are in immobile-space.
                ;; And the cross-compiler always uses immobile-space if enabled.
@@ -483,35 +483,31 @@
                         (immobile-space-obj-p value)))
 
                (static-symbol-p value))
-       (sc-number-or-lose 'immediate)))
+       immediate-sc-number))
     #!+immobile-space
     (layout
-       (sc-number-or-lose 'immediate))
+       immediate-sc-number)
     (single-float
-       (sc-number-or-lose
-        (if (eql value 0f0) 'fp-single-zero 'fp-single-immediate)))
+       (if (eql value 0f0) fp-single-zero-sc-number fp-single-immediate-sc-number))
     (double-float
-       (sc-number-or-lose
-        (if (eql value 0d0) 'fp-double-zero 'fp-double-immediate)))
+       (if (eql value 0d0) fp-double-zero-sc-number fp-double-immediate-sc-number))
     ((complex single-float)
-       (sc-number-or-lose
-        (if (eql value #c(0f0 0f0))
-            'fp-complex-single-zero
-            'fp-complex-single-immediate)))
+       (if (eql value #c(0f0 0f0))
+            fp-complex-single-zero-sc-number
+            fp-complex-single-immediate-sc-number))
     ((complex double-float)
-       (sc-number-or-lose
-        (if (eql value #c(0d0 0d0))
-            'fp-complex-double-zero
-            'fp-complex-double-immediate)))
+       (if (eql value #c(0d0 0d0))
+            fp-complex-double-zero-sc-number
+            fp-complex-double-immediate-sc-number))
     #!+(and sb-simd-pack (not (host-feature sb-xc-host)))
-    ((simd-pack double-float) (sc-number-or-lose 'double-sse-immediate))
+    ((simd-pack double-float) double-sse-immediate-sc-number)
     #!+(and sb-simd-pack (not (host-feature sb-xc-host)))
-    ((simd-pack single-float) (sc-number-or-lose 'single-sse-immediate))
+    ((simd-pack single-float) single-sse-immediate-sc-number)
     #!+(and sb-simd-pack (not (host-feature sb-xc-host)))
-    (simd-pack (sc-number-or-lose 'int-sse-immediate))))
+    (simd-pack int-sse-immediate-sc-number)))
 
 (defun boxed-immediate-sc-p (sc)
-  (eql sc (sc-number-or-lose 'immediate)))
+  (eql sc immediate-sc-number))
 
 (defun encode-value-if-immediate (tn &optional (tag t))
   (if (sc-is tn immediate)

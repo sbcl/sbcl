@@ -303,8 +303,7 @@
         (mapcar (lambda (tn)
                   (cond ((and (tn-p tn) (sc-is tn immediate))
                          (aver (typep (tn-value tn) '(or symbol layout)))
-                         (make-sc-offset (sc-number-or-lose 'constant)
-                                         (tn-offset tn)))
+                         (make-sc-offset constant-sc-number (tn-offset tn)))
                         (t
                          tn)))
                 values))))))

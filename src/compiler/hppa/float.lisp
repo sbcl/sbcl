@@ -378,7 +378,7 @@
           (inst ldw offset nfp y)
           (inst ldw (+ offset n-word-bytes) nfp
                 (make-wired-tn (primitive-type-or-lose 'unsigned-byte-32)
-                               (sc-number-or-lose 'unsigned-reg)
+                               unsigned-reg-sc-number
                                (+ 1 (tn-offset y))))
           (inst stw old1 offset nfp)
           (inst stw old2 (+ offset n-word-bytes) nfp)))
@@ -388,7 +388,7 @@
         (inst ldw (- (* (1+ double-float-value-slot) n-word-bytes)
                      other-pointer-lowtag) x
                   (make-wired-tn (primitive-type-or-lose 'unsigned-byte-32)
-                                 (sc-number-or-lose 'unsigned-reg)
+                                 unsigned-reg-sc-number
                                  (+ 1 (tn-offset y))))))))
 (define-move-vop move-to-double-int-reg
   :move (double-reg descriptor-reg) (double-int-carg-reg))
