@@ -93,6 +93,11 @@
                      :disp (- (* slot n-word-bytes) lowtag))
             word)))
 
+;; from 'llvm/projects/compiler-rt/lib/msan/msan.h':
+;;  "#define MEM_TO_SHADOW(mem) (((uptr)(mem)) ^ 0x500000000000ULL)"
+#!+linux ; shadow space differs by OS
+(defconstant msan-mem-to-shadow-xor-const #x500000000000)
+
 ;;; ALLOCATE-VECTOR
 (macrolet ((calc-size-in-bytes (n-words result-tn)
              `(cond ((sc-is ,n-words immediate)
@@ -118,6 +123,8 @@
     (:args (type :scs (unsigned-reg immediate))
            (length :scs (any-reg immediate))
            (words :scs (any-reg immediate)))
+    ;; Result is live from the beginning, like a temp, because we use it as such
+    ;; in 'calc-size-in-bytes'
     (:results (result :scs (descriptor-reg) :from :load))
     (:arg-types positive-fixnum positive-fixnum positive-fixnum)
     (:policy :fast-safe)
@@ -130,20 +137,21 @@
          (put-header result type length t)))))
 
   (define-vop (allocate-vector-on-stack)
-    (:args (type :scs (unsigned-reg immediate) :to :save)
-           (length :scs (any-reg immediate) :to :eval :target rax)
-           (words :scs (any-reg immediate) :target rcx))
-    (:temporary (:sc any-reg :offset ecx-offset :from (:argument 2)) rcx)
-    (:temporary (:sc any-reg :offset eax-offset :from :eval) rax)
-    (:temporary (:sc any-reg :offset edi-offset) rdi)
-    (:temporary (:sc complex-double-reg) zero)
+    (:args (type :scs (unsigned-reg immediate))
+           (length :scs (any-reg immediate))
+           (words :scs (any-reg immediate)))
     (:results (result :scs (descriptor-reg) :from :load))
+    (:temporary (:sc any-reg :offset ecx-offset :from :eval) rcx)
+    (:temporary (:sc any-reg :offset eax-offset :from :eval) rax)
+    (:temporary (:sc any-reg :offset edi-offset :from :eval) rdi)
+    (:temporary (:sc complex-double-reg) zero)
     (:arg-types positive-fixnum positive-fixnum positive-fixnum)
     (:translate allocate-vector)
     (:policy :fast-safe)
     (:node-var node)
     (:generator 100
-      (let ((size (calc-size-in-bytes words result)))
+      (let ((size (calc-size-in-bytes words result))
+            (rax-zeroed))
         (allocation result size node t other-pointer-lowtag)
         (put-header result type length nil)
         ;; FIXME: It would be good to check for stack overflow here.
@@ -153,30 +161,29 @@
         (when sb!c::*msan-compatible-stack-unpoison*
           ;; Unpoison all DX vectors regardless of widetag.
           ;; Mark the header and length as valid, not just the payload.
-          #!+linux ; shadow space differs by OS
-          (progn
-            ;; from 'llvm/projects/compiler-rt/lib/msan/msan.h':
-            ;;  "#define MEM_TO_SHADOW(mem) (((uptr)(mem)) ^ 0x500000000000ULL)"
-            (inst mov rax #x500000000000)
-            (inst lea rdi (make-ea :qword :base result
-                                   :disp (- other-pointer-lowtag)))
-            (inst xor rdi rax) ; compute shadow address
-            (zeroize rax)
+          #!+linux ; unimplemented for others
+          (let ((words-savep
+                 ;; 'words' might be co-located with any of the temps
+                 (or (location= words rdi) (location= words rcx) (location= words rax)))
+                (rax rax))
+            (setq rax-zeroed (not (location= words rax)))
+            (when words-savep ; use 'result' to save 'words'
+              (inst mov result words))
             (cond ((sc-is words immediate)
-                   (inst mov rcx (tn-value words)))
+                   (inst mov rcx (+ (tn-value words) vector-data-offset)))
                   (t
-                   ;; 'words' might be (should be) in 'rcx' at this point.
-                   ;; We need 'rcx' as the counter for REP STOS but we also
-                   ;; need it again in the fill loop for the actual vector.
-                   ;; 'result' is live from :load and conflicts with everything
-                   ;; so we can safely use it as a temp.
-                   (inst mov result words) ; preserve 'words'
-                   (move rcx words)
-                   (inst shr rcx n-fixnum-tag-bits)))
-            (inst add rcx sb!vm:vector-data-offset)
+                   (inst lea rcx
+                         (make-ea :qword :base words
+                                  :disp (ash vector-data-offset n-fixnum-tag-bits)))
+                   (if (= n-fixnum-tag-bits 1)
+                       (setq rax (reg-in-size rax :dword)) ; don't bother shifting rcx
+                       (inst shr rcx n-fixnum-tag-bits))))
+            (inst mov rdi msan-mem-to-shadow-xor-const)
+            (inst xor rdi rsp-tn) ; compute shadow address
+            (zeroize rax)
             (inst rep)
             (inst stos rax)
-            (unless (sc-is words immediate)
+            (when words-savep
               (inst mov words result) ; restore 'words'
               (inst lea result ; recompute the tagged pointer
                     (make-ea :byte :base rsp-tn :disp other-pointer-lowtag)))))
@@ -190,8 +197,7 @@
                      (cond ((> n 8)
                             (inst mov rcx (tn-value words)))
                            ((= n 1)
-                            (zeroize rax)
-                            (inst mov data-addr rax)
+                            (inst mov data-addr 0)
                             (return-from zero-fill))
                            (t
                             (multiple-value-bind (double single) (truncate n 2)
@@ -207,7 +213,7 @@
                    (move rcx words)
                    (inst shr rcx n-fixnum-tag-bits)))
             (inst lea rdi data-addr)
-            (zeroize rax)
+            (unless rax-zeroed (zeroize rax))
             (inst rep)
             (inst stos rax)))))))
 
