@@ -17,11 +17,6 @@
 ;; used for things going down the stack but C wants to have args
 ;; indexed in the positive direction.
 
-(defun my-make-wired-tn (prim-type-name sc-name offset)
-  (make-wired-tn (primitive-type-or-lose prim-type-name)
-                 (sc-number-or-lose sc-name)
-                 offset))
-
 (defstruct (arg-state (:copier nil))
   (stack-frame-size 0))
 
@@ -30,16 +25,16 @@
     (setf (arg-state-stack-frame-size state) (1+ stack-frame-size))
     (multiple-value-bind (ptype stack-sc)
         (if (alien-integer-type-signed type)
-            (values 'signed-byte-32 'signed-stack)
-            (values 'unsigned-byte-32 'unsigned-stack))
-      (my-make-wired-tn ptype stack-sc stack-frame-size))))
+            (values 'signed-byte-32 signed-stack-sc-number)
+            (values 'unsigned-byte-32 unsigned-stack-sc-number))
+      (make-wired-tn* ptype stack-sc stack-frame-size))))
 
 (define-alien-type-method (system-area-pointer :arg-tn) (type state)
   (declare (ignore type))
   (let ((stack-frame-size (arg-state-stack-frame-size state)))
     (setf (arg-state-stack-frame-size state) (1+ stack-frame-size))
-    (my-make-wired-tn 'system-area-pointer
-                      'sap-stack
+    (make-wired-tn* 'system-area-pointer
+                      sap-stack-sc-number
                       stack-frame-size)))
 
 #!+long-float
@@ -47,19 +42,19 @@
   (declare (ignore type))
   (let ((stack-frame-size (arg-state-stack-frame-size state)))
     (setf (arg-state-stack-frame-size state) (+ stack-frame-size 3))
-    (my-make-wired-tn 'long-float 'long-stack stack-frame-size)))
+    (make-wired-tn* 'long-float long-stack-sc-number stack-frame-size)))
 
 (define-alien-type-method (double-float :arg-tn) (type state)
   (declare (ignore type))
   (let ((stack-frame-size (arg-state-stack-frame-size state)))
     (setf (arg-state-stack-frame-size state) (+ stack-frame-size 2))
-    (my-make-wired-tn 'double-float 'double-stack stack-frame-size)))
+    (make-wired-tn* 'double-float double-stack-sc-number stack-frame-size)))
 
 (define-alien-type-method (single-float :arg-tn) (type state)
   (declare (ignore type))
   (let ((stack-frame-size (arg-state-stack-frame-size state)))
     (setf (arg-state-stack-frame-size state) (1+ stack-frame-size))
-    (my-make-wired-tn 'single-float 'single-stack stack-frame-size)))
+    (make-wired-tn* 'single-float single-stack-sc-number stack-frame-size)))
 
 (defstruct (result-state (:copier nil))
   (num-results 0))
@@ -74,9 +69,9 @@
     (setf (result-state-num-results state) (1+ num-results))
     (multiple-value-bind (ptype reg-sc)
         (if (alien-integer-type-signed type)
-            (values 'signed-byte-32 'signed-reg)
-            (values 'unsigned-byte-32 'unsigned-reg))
-      (my-make-wired-tn ptype reg-sc (result-reg-offset num-results)))))
+            (values 'signed-byte-32 signed-reg-sc-number)
+            (values 'unsigned-byte-32 unsigned-reg-sc-number))
+      (make-wired-tn* ptype reg-sc (result-reg-offset num-results)))))
 
 (define-alien-type-method (integer :naturalize-gen) (type alien)
   (if (<= (alien-type-bits type) 16)
@@ -89,7 +84,7 @@
   (declare (ignore type))
   (let ((num-results (result-state-num-results state)))
     (setf (result-state-num-results state) (1+ num-results))
-    (my-make-wired-tn 'system-area-pointer 'sap-reg
+    (make-wired-tn* 'system-area-pointer sap-reg-sc-number
                       (result-reg-offset num-results))))
 
 #!+long-float
@@ -97,19 +92,19 @@
   (declare (ignore type))
   (let ((num-results (result-state-num-results state)))
     (setf (result-state-num-results state) (1+ num-results))
-    (my-make-wired-tn 'long-float 'long-reg (* num-results 2))))
+    (make-wired-tn* 'long-float long-reg-sc-number (* num-results 2))))
 
 (define-alien-type-method (double-float :result-tn) (type state)
   (declare (ignore type))
   (let ((num-results (result-state-num-results state)))
     (setf (result-state-num-results state) (1+ num-results))
-    (my-make-wired-tn 'double-float 'double-reg (* num-results 2))))
+    (make-wired-tn* 'double-float double-reg-sc-number (* num-results 2))))
 
 (define-alien-type-method (single-float :result-tn) (type state)
   (declare (ignore type))
   (let ((num-results (result-state-num-results state)))
     (setf (result-state-num-results state) (1+ num-results))
-    (my-make-wired-tn 'single-float 'single-reg (* num-results 2))))
+    (make-wired-tn* 'single-float single-reg-sc-number (* num-results 2))))
 
 (define-alien-type-method (values :result-tn) (type state)
   (let ((values (alien-values-type-values type)))
@@ -124,7 +119,7 @@
     (collect ((arg-tns))
       (dolist (arg-type (alien-fun-type-arg-types type))
         (arg-tns (invoke-alien-type-method :arg-tn arg-type arg-state)))
-      (values (my-make-wired-tn 'positive-fixnum 'any-reg esp-offset)
+      (values (make-wired-tn* 'positive-fixnum any-reg-sc-number esp-offset)
               (* (arg-state-stack-frame-size arg-state) n-word-bytes)
               (arg-tns)
               (invoke-alien-type-method :result-tn

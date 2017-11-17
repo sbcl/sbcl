@@ -141,6 +141,8 @@
     (setf (tn-offset res) offset)
     (push-in tn-next res (ir2-component-wired-tns component))
     res))
+(defun sb!vm::make-wired-tn* (prim-type-name scn offset)
+  (make-wired-tn (primitive-type-or-lose prim-type-name) scn offset))
 
 ;;; Create a packed TN restricted to the SC with number SCN. Ptype is as
 ;;; for MAKE-WIRED-TN.

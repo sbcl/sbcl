@@ -15,11 +15,6 @@
 
 (defconstant +max-register-args+ 4)
 
-(defun my-make-wired-tn (prim-type-name sc-name offset)
-  (make-wired-tn (primitive-type-or-lose prim-type-name)
-                 (sc-number-or-lose sc-name)
-                 offset))
-
 (defstruct arg-state
   (num-register-args 0)
   #!-arm-softfp
@@ -42,25 +37,25 @@
   (let ((reg-args (arg-state-num-register-args state)))
     (cond ((< reg-args +max-register-args+)
            (setf (arg-state-num-register-args state) (1+ reg-args))
-           (my-make-wired-tn prim-type reg-sc (register-args-offset reg-args)))
+           (make-wired-tn* prim-type reg-sc (register-args-offset reg-args)))
           (t
            (let ((frame-size (arg-state-stack-frame-size state)))
              (setf (arg-state-stack-frame-size state) (1+ frame-size))
-             (my-make-wired-tn prim-type stack-sc frame-size))))))
+             (make-wired-tn* prim-type stack-sc frame-size))))))
 
 (define-alien-type-method (integer :arg-tn) (type state)
   (if (alien-integer-type-signed type)
-      (int-arg state 'signed-byte-32 'signed-reg 'signed-stack)
-      (int-arg state 'unsigned-byte-32 'unsigned-reg 'unsigned-stack)))
+      (int-arg state 'signed-byte-32 signed-reg-sc-number signed-stack-sc-number)
+      (int-arg state 'unsigned-byte-32 unsigned-reg-sc-number unsigned-stack-sc-number)))
 
 (define-alien-type-method (system-area-pointer :arg-tn) (type state)
   (declare (ignore type))
-  (int-arg state 'system-area-pointer 'sap-reg 'sap-stack))
+  (int-arg state 'system-area-pointer sap-reg-sc-number sap-stack-sc-number))
 
 #!+arm-softfp
 (define-alien-type-method (single-float :arg-tn) (type state)
   (declare (ignore type))
-  (int-arg state 'single-float 'unsigned-reg 'single-stack))
+  (int-arg state 'single-float unsigned-reg-sc-number single-stack-sc-number))
 
 #!-arm-softfp
 (define-alien-type-method (single-float :arg-tn) (type state)
@@ -69,10 +64,10 @@
     (cond ((> register 15)
            (let ((frame-size (arg-state-stack-frame-size state)))
              (setf (arg-state-stack-frame-size state) (1+ frame-size))
-             (my-make-wired-tn 'single-float 'single-stack frame-size)))
+             (make-wired-tn* 'single-float single-stack-sc-number frame-size)))
           (t
            (incf (arg-state-fp-registers state))
-           (my-make-wired-tn 'single-float 'single-reg register)))))
+           (make-wired-tn* 'single-float single-reg-sc-number register)))))
 
 #!+arm-softfp
 (define-alien-type-method (double-float :arg-tn) (type state)
@@ -85,13 +80,13 @@
            (setf (arg-state-num-register-args state) +max-register-args+)
            (let ((frame-size (arg-state-stack-frame-size state)))
              (setf (arg-state-stack-frame-size state) (+ frame-size 2))
-             (my-make-wired-tn 'double-float 'double-stack frame-size)))
+             (make-wired-tn* 'double-float double-stack-sc-number frame-size)))
           (t
            (setf (arg-state-num-register-args state) (+ register 2))
            (list
-            (my-make-wired-tn 'unsigned-byte-32 'unsigned-reg
+            (make-wired-tn* 'unsigned-byte-32 unsigned-reg-sc-number
                               (register-args-offset register))
-            (my-make-wired-tn 'unsigned-byte-32 'unsigned-reg
+            (make-wired-tn* 'unsigned-byte-32 unsigned-reg-sc-number
                               (register-args-offset (1+ register)))
             'move-double-to-int-args)))))
 
@@ -106,46 +101,46 @@
                    (setf (arg-state-stack-frame-size state)
                          (logandc2 (+ (arg-state-stack-frame-size state) 1) 1))))
              (setf (arg-state-stack-frame-size state) (+ frame-size 2))
-             (my-make-wired-tn 'double-float 'double-stack frame-size)))
+             (make-wired-tn* 'double-float double-stack-sc-number frame-size)))
           (t
            (incf (arg-state-fp-registers state) 2)
-           (my-make-wired-tn 'double-float 'double-reg register)))))
+           (make-wired-tn* 'double-float double-reg-sc-number register)))))
 
 (define-alien-type-method (integer :result-tn) (type state)
   (let ((num-results (result-state-num-results state)))
     (setf (result-state-num-results state) (1+ num-results))
     (multiple-value-bind (ptype reg-sc)
         (if (alien-integer-type-signed type)
-            (values 'signed-byte-32 'signed-reg)
-            (values 'unsigned-byte-32 'unsigned-reg))
-      (my-make-wired-tn ptype reg-sc
+            (values 'signed-byte-32 signed-reg-sc-number)
+            (values 'unsigned-byte-32 unsigned-reg-sc-number))
+      (make-wired-tn* ptype reg-sc
                         (result-reg-offset num-results)))))
 
 (define-alien-type-method (system-area-pointer :result-tn) (type state)
   (declare (ignore type state))
-  (my-make-wired-tn 'system-area-pointer 'sap-reg nargs-offset))
+  (make-wired-tn* 'system-area-pointer sap-reg-sc-number nargs-offset))
 
 #!+arm-softfp
 (define-alien-type-method (single-float :result-tn) (type state)
   (declare (ignore type state))
-  (my-make-wired-tn 'single-float 'unsigned-reg nargs-offset))
+  (make-wired-tn* 'single-float unsigned-reg-sc-number nargs-offset))
 
 #!-arm-softfp
 (define-alien-type-method (single-float :result-tn) (type state)
   (declare (ignore type state))
-  (my-make-wired-tn 'single-float 'single-reg 0))
+  (make-wired-tn* 'single-float single-reg-sc-number 0))
 
 #!+arm-softfp
 (define-alien-type-method (double-float :result-tn) (type state)
   (declare (ignore type state))
-  (list (my-make-wired-tn 'unsigned-byte-32 'unsigned-reg nargs-offset)
-        (my-make-wired-tn 'unsigned-byte-32 'unsigned-reg nl3-offset)
+  (list (make-wired-tn* 'unsigned-byte-32 unsigned-reg-sc-number nargs-offset)
+        (make-wired-tn* 'unsigned-byte-32 unsigned-reg-sc-number nl3-offset)
         'move-int-args-to-double))
 
 #!-arm-softfp
 (define-alien-type-method (double-float :result-tn) (type state)
   (declare (ignore type state))
-  (my-make-wired-tn 'double-float 'double-reg 0))
+  (make-wired-tn* 'double-float double-reg-sc-number 0))
 
 (define-alien-type-method (values :result-tn) (type state)
   (let ((values (alien-values-type-values type)))
