@@ -85,10 +85,8 @@
     ;; instruction pipe with undecodable junk (the sc-numbers).
     (error-call vop errcode object)))
 
+#!+immobile-space
 (defun type-err-type-tn-loadp (thing)
-  (declare (ignorable thing))
-  #!-immobile-space nil
-  #!+immobile-space
   (cond ((sc-is thing immediate)
          (let ((obj (tn-value thing)))
            (typecase obj
@@ -109,6 +107,7 @@
                 (:args ,@(mapcar (lambda (arg)
                                    `(,arg :scs (descriptor-reg any-reg character-reg
                                                 unsigned-reg signed-reg constant)
+                                          #!+immobile-space
                                           ,@(if (eq name 'type-check-error)
                                                 `(:load-if (type-err-type-tn-loadp ,arg)))))
                                  args))
