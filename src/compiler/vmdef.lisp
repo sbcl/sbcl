@@ -25,7 +25,7 @@
        (or (gethash x *backend-sc-names*)
            (error "~S is not a defined storage class." x))))
 (defun sb-or-lose (x)
-  (the sb
+  (the storage-base
        (dovector (sb *backend-sbs*
                      (error "~S is not a defined storage base." x))
          (when (eq (sb-name sb) x)

@@ -48,10 +48,10 @@
          (aver (not (logtest size (1- size-alignment))))
          (aver (not (logtest size-increment (1- size-alignment))))))
 
-      (incf index)
       (push (if (eq kind :non-packed)
-                `(make-sb :%index ,index :name ',name :kind ,kind)
-                `(make-finite-sb :%index ,index :name ',name
+                `(make-storage-base :name ',name :kind ,kind)
+                `(make-finite-sb-template
+                                 :index ,(incf index) :name ',name
                                  :kind ,kind :size ,size
                                  :size-increment ,size-increment
                                  :size-alignment ,size-alignment))
@@ -59,28 +59,6 @@
   ;; Do not clobber the global var while running the cross-compiler.
   `(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
      (setf *backend-sbs* (vector ,@(nreverse forms)))))
-
-(defun finite-sbs-ctor-form ()
-  `(vector
-    ,@(loop for sb across *backend-sbs*
-            for index from 0
-            collect
-            (if (eq (sb-kind sb) :non-packed)
-                0
-                ;; These "proxy" objects don't really need to be instances of
-                ;; FINITE-SB.  Not all slots of them are accessed.
-                (let ((size (sb-size sb)))
-                  `(make-finite-sb
-                    :%index ,(sb-%index sb)
-                    :name ',(sb-name sb)
-                    :kind ,(sb-kind sb)
-                    :size ,(sb-size sb)
-                    :size-increment ,(finite-sb-size-increment sb)
-                    :size-alignment ,(finite-sb-size-alignment sb)
-                    :always-live (make-array ,size :initial-element #*)
-                    :conflicts (make-array ,size :initial-element #())
-                    :live-tns (make-array ,size :initial-element nil)
-                    :always-live-count (make-array ,size :initial-element 0)))))))
 
 ;;; Define a storage class NAME that uses the named Storage-Base.
 ;;; NUMBER is a small, non-negative integer that is used as an alias.

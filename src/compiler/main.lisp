@@ -359,7 +359,17 @@ Examples:
   ;; since it's primarily a debugging tool, it's nicer to have
   ;; a wider unique scope by ID.
   `(let ((*compiler-ir-obj-map* (make-compiler-ir-obj-map))
-         (*finite-sbs* ,(finite-sbs-ctor-form)))
+         (*finite-sbs*
+          (vector
+           ,@(loop for sb across *backend-sbs*
+                   unless (eq (sb-kind sb) :non-packed)
+                   collect
+                   (let ((size (sb-size sb)))
+                     `(make-finite-sb
+                       :conflicts (make-array ,size :initial-element #())
+                       :always-live (make-array ,size :initial-element #*)
+                       :always-live-count (make-array ,size :initial-element 0)
+                       :live-tns (make-array ,size :initial-element nil)))))))
      (unwind-protect
          (let ((*warnings-p* nil)
                (*failure-p* nil))

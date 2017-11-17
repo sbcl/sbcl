@@ -144,7 +144,7 @@
 ;; offset has been marked as ALWAYS-LIVE.
 (defun find-location-usage (sb offset)
   (declare (optimize speed))
-  (declare (type sb sb) (type index offset))
+  (declare (type storage-base sb) (type index offset))
   (let* ((always-live (svref (finite-sb-always-live sb) offset)))
     (declare (simple-bit-vector always-live))
     (count 1 always-live)))
@@ -964,7 +964,7 @@
 ;;;
 ;;; We return a conflicting TN if there is a conflict.
 (defun load-tn-offset-conflicts-in-sb (op sb offset)
-  (declare (type tn-ref op) (type finite-sb sb) (type index offset))
+  (declare (type tn-ref op) (type sb!c::finite-sb-template sb) (type index offset))
   (aver (eq (sb-kind sb) :finite))
   (let ((vop (tn-ref-vop op)))
     (labels ((tn-overlaps (tn)
