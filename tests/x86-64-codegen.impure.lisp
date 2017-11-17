@@ -93,3 +93,18 @@
   ;;    83FA61             CMP EDX, 97
   ;;    480F4450F9         CMOVEQ RDX, [RAX-7]
   (assert (= (length (disasm 0 'blub)) 5)))
+
+(with-test (:name :object-not-type-error-encoding)
+  ;; There should not be a "MOV Rnn, #xSYMBOL" instruction
+  ;; before the OBJECT-NOT-TYPE-ERROR.
+  (let* ((lines
+          (split-string
+           (with-output-to-string (s)
+            (let ((sb-disassem:*disassem-location-column-width* 0))
+              (disassemble '(lambda (x) (the sb-assem:label x))
+                           :stream s)))
+           #\newline))
+         (index
+          (position "; error trap" lines :test 'search)))
+    (assert (search "OBJECT-NOT-TYPE-ERROR" (nth (1+ index) lines)))
+    (assert (search "; 'SB-ASSEM:LABEL" (nth (+ index 3) lines)))))

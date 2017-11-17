@@ -265,11 +265,7 @@
                                   (load-immediate vop symbol symbol-reg)))
                             vop 'unbound-symbol-error
                             (if (and immediatep (not staticp))
-                                ;; TN has an offset in the code header the same
-                                ;; as if it had CONSTANT sc, the latter working
-                                ;; correctly as an error break argument.
-                                (make-sc-offset (sc-number-or-lose 'constant)
-                                                (tn-offset symbol))
+                                symbol
                                 symbol-reg))))
             RETRY))))
 

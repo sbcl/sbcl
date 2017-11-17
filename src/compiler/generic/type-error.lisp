@@ -85,6 +85,22 @@
     ;; instruction pipe with undecodable junk (the sc-numbers).
     (error-call vop errcode object)))
 
+(defun type-err-type-tn-loadp (thing)
+  (declare (ignorable thing))
+  #!-immobile-space nil
+  #!+immobile-space
+  (cond ((sc-is thing immediate)
+         (let ((obj (tn-value thing)))
+           (typecase obj
+             (layout nil)
+             ;; non-static symbols can be referenced as error-break args
+             ;; because they appear in the code constants.
+             ;; static symbols can't be referenced as error-break args
+             ;; because there is no way to refer to an immediate value.
+             (symbol (static-symbol-p obj))
+             (t t))))
+        (t t)))
+
 (macrolet ((def (name error translate context &rest args)
              `(define-vop (,name)
                 ,@(when translate
@@ -92,7 +108,9 @@
                       (:translate ,translate)))
                 (:args ,@(mapcar (lambda (arg)
                                    `(,arg :scs (descriptor-reg any-reg character-reg
-                                                unsigned-reg signed-reg constant)))
+                                                unsigned-reg signed-reg constant)
+                                          ,@(if (eq name 'type-check-error)
+                                                `(:load-if (type-err-type-tn-loadp ,arg)))))
                                  args))
                 ,@(and context
                        `((:info *location-context*)

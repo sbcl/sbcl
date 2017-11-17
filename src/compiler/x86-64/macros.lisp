@@ -299,7 +299,15 @@
       (#.invalid-arg-count-trap) ; there is no "payload" in this trap kind
       (t
        (inst byte code)
-       (encode-internal-error-args values)))))
+       (encode-internal-error-args
+        (mapcar (lambda (tn)
+                  (cond ((and (tn-p tn) (sc-is tn immediate))
+                         (aver (typep (tn-value tn) '(or symbol layout)))
+                         (make-sc-offset (sc-number-or-lose 'constant)
+                                         (tn-offset tn)))
+                        (t
+                         tn)))
+                values))))))
 
 (defun generate-error-code (vop error-code &rest values)
   (apply #'generate-error-code+ nil vop error-code values))
