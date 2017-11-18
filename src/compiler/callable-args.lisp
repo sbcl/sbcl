@@ -156,7 +156,13 @@
          (lvar-type (lvar-type lvar))
          (leaf (if (ref-p use)
                    (ref-leaf use)
-                   (return-from lvar-fun-type lvar-type)))
+                   (return-from lvar-fun-type
+                     (values lvar-type
+                             (typecase use
+                               (node
+                                (node-source-form use))
+                               (t
+                                '.anonymous.))))))
          (defined-type (and (global-var-p leaf)
                             (case (global-var-where-from leaf)
                               (:declared
@@ -200,13 +206,14 @@
     (values type fun-name leaf)))
 
 (defun callable-argument-lossage-kind (fun-name leaf soft hard)
-  (if (and (neq (leaf-where-from leaf) :defined-here)
-           (not (and (functional-p leaf)
-                     (or (lambda-p leaf)
-                         (member (functional-kind leaf)
-                                 '(:toplevel-xep)))))
-           (or (not fun-name)
-               (not (info :function :info fun-name))))
+  (if (or (not leaf)
+          (and (neq (leaf-where-from leaf) :defined-here)
+               (not (and (functional-p leaf)
+                         (or (lambda-p leaf)
+                             (member (functional-kind leaf)
+                                     '(:toplevel-xep)))))
+               (or (not fun-name)
+                   (not (info :function :info fun-name)))))
       soft
       hard))
 
@@ -373,8 +380,7 @@
 ;;; simple type intersection.
 (defun check-function-designator-cast (cast)
   (multiple-value-bind (type name leaf) (lvar-fun-type (cast-value cast))
-    (when (and (fun-type-p type)
-               leaf)
+    (when (fun-type-p type)
       (multiple-value-bind (args results)
           (function-designator-cast-types cast)
         (let* ((*compiler-error-context* cast)
@@ -451,8 +457,7 @@
            (check-function-designator-cast cast))
           ((fun-type-p atype)
            (multiple-value-bind (type name leaf) (lvar-fun-type value)
-             (when (and (fun-type-p type)
-                        leaf)
+             (when (fun-type-p type)
                (let ((int (type-intersection type atype)))
                  (when (or (memq *empty-type* (fun-type-required int))
                            (and (eq (fun-type-returns int) *empty-type*)

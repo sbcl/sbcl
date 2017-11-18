@@ -333,6 +333,13 @@
   (compiles-with-warning `(lambda (z)
                             (map-into (make-string 10) #'evenp z))))
 
+(with-test (:name (:type-conflict complement))
+  (assert (nth-value 3
+                     (checked-compile
+                      `(lambda (z)
+                         (find z "l" :test (complement #'=)))
+                      :allow-style-warnings t))))
+
 (with-test (:name :type-across-hairy-lambda-transforms)
   (assert (subtypep (sb-kernel:%simple-fun-type (lambda (x) (find 1 (the vector x))))
                     '(function * (values (or (integer 1 1) null) &optional)))))
