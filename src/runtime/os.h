@@ -24,14 +24,14 @@
 extern uword_t DYNAMIC_SPACE_START;
 #endif
 #if defined(LISP_FEATURE_RELOCATABLE_HEAP) && defined(LISP_FEATURE_IMMOBILE_SPACE)
-extern uword_t IMMOBILE_SPACE_START, IMMOBILE_VARYOBJ_SUBSPACE_START;
-#define IMMOBILE_SPACE_END (IMMOBILE_SPACE_START+IMMOBILE_SPACE_SIZE)
+extern uword_t FIXEDOBJ_SPACE_START, VARYOBJ_SPACE_START;
 #endif
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
+#define IMMOBILE_SPACE_TOTAL_SIZE (FIXEDOBJ_SPACE_SIZE+VARYOBJ_SPACE_SIZE)
 static inline boolean immobile_space_p(lispobj obj)
 {
-  return IMMOBILE_SPACE_START <= obj && obj < IMMOBILE_SPACE_END;
+  return FIXEDOBJ_SPACE_START <= obj && obj < (VARYOBJ_SPACE_START+VARYOBJ_SPACE_SIZE);
 }
 #else
 static inline boolean immobile_space_p(lispobj obj) { return 0; }

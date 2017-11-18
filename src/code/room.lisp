@@ -149,8 +149,8 @@
              (%make-lisp-obj (sap-int *read-only-space-free-pointer*))))
     #+immobile-space
     (:immobile
-     (values (%make-lisp-obj immobile-space-start)
-             (%make-lisp-obj (sap-int *immobile-space-free-pointer*))))
+     (values (%make-lisp-obj fixedobj-space-start)
+             (%make-lisp-obj (sap-int *varyobj-space-free-pointer*))))
     (:dynamic
      (values (%make-lisp-obj (current-dynamic-space-start))
              (%make-lisp-obj (sap-int (dynamic-space-free-pointer)))))))
@@ -325,11 +325,10 @@
 ;;; Return fixnums in the same fashion as %SPACE-BOUNDS.
 (defun immobile-subspace-bounds (subspace)
   (case subspace
-    (:fixed (values (%make-lisp-obj immobile-space-start)
-                    (%make-lisp-obj (sap-int *immobile-fixedobj-free-pointer*))))
-    (:variable (values (%make-lisp-obj (+ immobile-space-start
-                                          immobile-fixedobj-subspace-size))
-                       (%make-lisp-obj (sap-int *immobile-space-free-pointer*))))))
+    (:fixed (values (%make-lisp-obj fixedobj-space-start)
+                    (%make-lisp-obj (sap-int *fixedobj-space-free-pointer*))))
+    (:variable (values (%make-lisp-obj varyobj-space-start)
+                       (%make-lisp-obj (sap-int *varyobj-space-free-pointer*))))))
 
 (declaim (ftype (sfunction (function &rest immobile-subspaces) null)
                 map-immobile-objects))

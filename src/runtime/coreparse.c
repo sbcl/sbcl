@@ -550,8 +550,8 @@ void relocate_heap(struct heap_adjust* adj)
         fprintf(stderr, "Relocating immobile space from [%p:%p] to [%p:%p]\n",
                 (char*)adj->range[0].start,
                 (char*)adj->range[0].end,
-                (char*)IMMOBILE_SPACE_START,
-                (char*)IMMOBILE_SPACE_START+(adj->range[0].end-adj->range[0].start));
+                (char*)FIXEDOBJ_SPACE_START,
+                (char*)FIXEDOBJ_SPACE_START+(adj->range[0].end-adj->range[0].start));
 #endif
         fprintf(stderr, "Relocating dynamic space from [%p:%p] to [%p:%p]\n",
                 (char*)adj->range[1].start,
@@ -561,8 +561,8 @@ void relocate_heap(struct heap_adjust* adj)
     }
     relocate_space(STATIC_SPACE_START, static_space_free_pointer, adj);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    relocate_space(IMMOBILE_SPACE_START, immobile_fixedobj_free_pointer, adj);
-    relocate_space(IMMOBILE_VARYOBJ_SUBSPACE_START, immobile_space_free_pointer, adj);
+    relocate_space(FIXEDOBJ_SPACE_START, fixedobj_free_pointer, adj);
+    relocate_space(VARYOBJ_SPACE_START, varyobj_free_pointer, adj);
     SYMBOL(FUNCTION_LAYOUT)->value = \
         adjust_word(adj, SYMBOL(FUNCTION_LAYOUT)->value >> 32) << 32;
 #endif
@@ -606,8 +606,8 @@ process_directory(int count, struct ndir_entry *entry,
         {0, STATIC_SPACE_START, &static_space_free_pointer},
         {0, READ_ONLY_SPACE_START, &read_only_space_free_pointer},
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-        {0, IMMOBILE_SPACE_START, &immobile_fixedobj_free_pointer},
-        {0, IMMOBILE_VARYOBJ_SUBSPACE_START, &immobile_space_free_pointer}
+        {0, FIXEDOBJ_SPACE_START, &fixedobj_free_pointer},
+        {0, VARYOBJ_SPACE_START, &varyobj_free_pointer}
 #endif
     };
 
@@ -674,7 +674,7 @@ process_directory(int count, struct ndir_entry *entry,
 # ifndef LISP_FEATURE_IMMOBILE_SPACE
             }
 # else
-                if (DYNAMIC_SPACE_START < IMMOBILE_SPACE_START)
+                if (DYNAMIC_SPACE_START < FIXEDOBJ_SPACE_START)
                     lose("Won't map dynamic space below immobile space");
             /* Assume presence of linkage-table space for this platform.
              * An unusable gap may exist between the linkage table and immobile space
@@ -682,18 +682,18 @@ process_directory(int count, struct ndir_entry *entry,
              * unmapping the alleged gap */
              } else if (id == IMMOBILE_FIXEDOBJ_CORE_SPACE_ID) {
                 addr = (uword_t)os_validate(MOVABLE_LOW, (os_vm_address_t)addr,
-                                            IMMOBILE_SPACE_SIZE);
-                IMMOBILE_SPACE_START = addr;
-                if (IMMOBILE_SPACE_START + IMMOBILE_SPACE_SIZE > 0x80000000)
+                                            IMMOBILE_SPACE_TOTAL_SIZE);
+                FIXEDOBJ_SPACE_START = addr;
+                if (FIXEDOBJ_SPACE_START + IMMOBILE_SPACE_TOTAL_SIZE > 0x80000000)
                     lose("Won't map immobile space above 2GB");
                 // varyobj subspace must be enforced to reside at a known offset
                 // from fixedobj subspace.
                 spaces[IMMOBILE_VARYOBJ_CORE_SPACE_ID].base =
-                  spaces[id].base + IMMOBILE_FIXEDOBJ_SUBSPACE_SIZE;
-                IMMOBILE_VARYOBJ_SUBSPACE_START = addr + IMMOBILE_FIXEDOBJ_SUBSPACE_SIZE;
+                  spaces[id].base + FIXEDOBJ_SPACE_SIZE;
+                VARYOBJ_SPACE_START = addr + FIXEDOBJ_SPACE_SIZE;
             } else if (id == IMMOBILE_VARYOBJ_CORE_SPACE_ID) {
                 /* Ignore what the core file said */
-                addr = IMMOBILE_VARYOBJ_SUBSPACE_START;
+                addr = VARYOBJ_SPACE_START;
             }
 # endif
 
@@ -738,11 +738,11 @@ process_directory(int count, struct ndir_entry *entry,
 
 #ifdef LISP_FEATURE_RELOCATABLE_HEAP
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    if (IMMOBILE_SPACE_START != spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].base) {
+    if (FIXEDOBJ_SPACE_START != spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].base) {
         adj->range[0].start = spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].base;
-        adj->range[0].end   = adj->range[0].start + IMMOBILE_FIXEDOBJ_SUBSPACE_SIZE
+        adj->range[0].end   = adj->range[0].start + FIXEDOBJ_SPACE_SIZE
             + spaces[IMMOBILE_VARYOBJ_CORE_SPACE_ID].len;
-        adj->range[0].delta = IMMOBILE_SPACE_START - adj->range[0].start;
+        adj->range[0].delta = FIXEDOBJ_SPACE_START - adj->range[0].start;
     }
 #endif
     if (DYNAMIC_SPACE_START != spaces[DYNAMIC_CORE_SPACE_ID].base) {

@@ -68,17 +68,14 @@
 ;;; Return the zero-based index within the varyobj subspace of immobile space.
 (defun varyobj-page-index (address)
   (declare (type (and fixnum unsigned-byte) address))
-  (values (floor (- address (+ immobile-space-start immobile-fixedobj-subspace-size))
-                 immobile-card-bytes)))
+  (values (floor (- address varyobj-space-start) immobile-card-bytes)))
 
 (defun varyobj-page-address (index)
-  (+ immobile-space-start immobile-fixedobj-subspace-size
-     (* index immobile-card-bytes)))
+  (+ varyobj-space-start (* index immobile-card-bytes)))
 
 ;;; Convert a zero-based varyobj page index into a scan start address.
 (defun varyobj-page-scan-start (index)
-  (- (+ immobile-space-start immobile-fixedobj-subspace-size
-        (* (1+ index) immobile-card-bytes))
+  (- (+ varyobj-space-start (* (1+ index) immobile-card-bytes))
      (* 2 n-word-bytes (deref varyobj-page-scan-start-offset index))))
 
 (declaim (inline hole-p))
@@ -167,9 +164,9 @@
       (remove-from-freelist found))
     found))
 
-(defun set-immobile-space-free-pointer (free-ptr)
+(defun set-varyobj-space-free-pointer (free-ptr)
   (declare (type (and fixnum unsigned-byte) free-ptr))
-  (setq *immobile-space-free-pointer* (int-sap free-ptr))
+  (setq *varyobj-space-free-pointer* (int-sap free-ptr))
   ;; When the free pointer is not page-aligned - it usually won't be -
   ;; then we create an unboxed array from the pointer to the page end
   ;; so that it appears as one contiguous object when scavenging.
@@ -187,7 +184,7 @@
   #!+immobile-space-debug
   (awhen *in-use-bits* (mark-range it hole (hole-size hole) nil))
   (let* ((hole-end (hole-end-address hole))
-         (end-is-free-ptr (eql hole-end (sap-int *immobile-space-free-pointer*))))
+         (end-is-free-ptr (eql hole-end (sap-int *varyobj-space-free-pointer*))))
     ;; First, ensure that no page's scan-start points to this hole.
     ;; For smaller-than-page objects, this will do nothing if the hole
     ;; was not the scan-start. For larger-than-page, we have to update
@@ -243,7 +240,7 @@
         ;; the free pointer diminishes the opportunity to use the frontier
         ;; to later allocate a larger object that would not have fit
         ;; into any existing hole.
-        (set-immobile-space-free-pointer hole)
+        (set-varyobj-space-free-pointer hole)
         (return-from unallocate))
       (let* ((successor hole-end)
              (succ-is-free (freed-hole-p successor)))
@@ -291,15 +288,15 @@
                              (add-to-freelist found)
                              (+ found remaining)))))) ; Consume the upper piece
               ;; 3. Extend the frontier.
-              (let* ((addr (sap-int *immobile-space-free-pointer*))
+              (let* ((addr (sap-int *varyobj-space-free-pointer*))
                      (free-ptr (+ addr n-bytes))
-                      (limit (+ immobile-space-start
-                                (- immobile-space-size immobile-card-bytes))))
+                     (limit (+ varyobj-space-start
+                               (- varyobj-space-size immobile-card-bytes))))
                 ;; The last page can't be used, because GC uses it as scratch space.
                 (when (> free-ptr limit)
                   (format t "~&Immobile space exhausted~%")
                   (sb!impl::%halt))
-                (set-immobile-space-free-pointer free-ptr)
+                (set-varyobj-space-free-pointer free-ptr)
                 addr))))
      (aver (not (logtest addr lowtag-mask))) ; Assert proper alignment
      ;; Compute the start and end of the first page consumed.

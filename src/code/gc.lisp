@@ -41,11 +41,14 @@
 #!+immobile-space
 (progn
   #!+relocatable-heap
-  (define-alien-variable ("IMMOBILE_SPACE_START" sb!vm:immobile-space-start) unsigned-long)
+  (progn
+    (define-alien-variable ("FIXEDOBJ_SPACE_START" sb!vm:fixedobj-space-start) unsigned-long)
+    (define-alien-variable ("VARYOBJ_SPACE_START" sb!vm:varyobj-space-start) unsigned-long))
   (defun immobile-space-addr-p (addr)
     (declare (type word addr))
-    (let ((start sb!vm:immobile-space-start))
-      (<= start addr (truly-the word (+ start sb!vm:immobile-space-size)))))
+    (let ((start sb!vm:fixedobj-space-start))
+      (<= start addr (truly-the word (+ start (1- (+ sb!vm:fixedobj-space-size
+                                                     sb!vm:varyobj-space-size)))))))
   (defun immobile-space-obj-p (obj)
     (immobile-space-addr-p (get-lisp-obj-address obj))))
 

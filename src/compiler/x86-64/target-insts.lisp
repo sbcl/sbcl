@@ -535,9 +535,8 @@
               ,@body))))
       ;; Slowness here is bothersome, especially for SB!VM::REMOVE-STATIC-LINKS,
       ;; so skip right over all fixedobj pages.
-      (ash (+ immobile-space-start immobile-fixedobj-subspace-size)
-           (- n-fixnum-tag-bits))
-      (%make-lisp-obj (sap-int *immobile-space-free-pointer*)))))
+      (ash varyobj-space-start (- n-fixnum-tag-bits))
+      (%make-lisp-obj (sap-int *varyobj-space-free-pointer*)))))
 
 (defun sb!vm::statically-link-core (&key callers exclude-callers
                                          callees exclude-callees

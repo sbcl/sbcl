@@ -18,12 +18,11 @@
 (define-alien-variable ("static_space_free_pointer" sb!vm:*static-space-free-pointer*)
   system-area-pointer)
 #!+immobile-space
-(progn (define-alien-variable ("immobile_space_free_pointer"
-                               sb!vm:*immobile-space-free-pointer*)
-         system-area-pointer)
-       (define-alien-variable ("immobile_fixedobj_free_pointer"
-                               sb!vm:*immobile-fixedobj-free-pointer*)
-         system-area-pointer))
+(progn
+  (define-alien-variable ("varyobj_free_pointer" sb!vm:*varyobj-space-free-pointer*)
+    system-area-pointer)
+  (define-alien-variable ("fixedobj_free_pointer" sb!vm:*fixedobj-space-free-pointer*)
+    system-area-pointer))
 
 (declaim (inline memmove))
 (define-alien-routine ("memmove" memmove) void

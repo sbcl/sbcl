@@ -192,8 +192,8 @@ static lispobj* find_sym_by_tls_index(lispobj tls_index)
     lispobj* where = 0;
     lispobj* end = 0;
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    where = (lispobj*)IMMOBILE_SPACE_START;
-    end = immobile_fixedobj_free_pointer;
+    where = (lispobj*)FIXEDOBJ_SPACE_START;
+    end = fixedobj_free_pointer;
 #endif
     while (1) {
         while (where < end) {
@@ -778,9 +778,8 @@ static void scan_spaces(struct scan_state* ss)
 {
     build_refs((lispobj*)STATIC_SPACE_START, static_space_free_pointer, ss);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    build_refs((lispobj*)IMMOBILE_SPACE_START, immobile_fixedobj_free_pointer, ss);
-    build_refs((lispobj*)IMMOBILE_VARYOBJ_SUBSPACE_START,
-               immobile_space_free_pointer, ss);
+    build_refs((lispobj*)FIXEDOBJ_SPACE_START, fixedobj_free_pointer, ss);
+    build_refs((lispobj*)VARYOBJ_SPACE_START, varyobj_free_pointer, ss);
 #endif
     walk_generation((uword_t(*)(lispobj*,lispobj*,uword_t))build_refs,
                     -1, (uword_t)ss);

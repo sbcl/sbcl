@@ -2187,12 +2187,8 @@ void coalesce_similar_objects()
                    (uword_t)&ht);
 #endif
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    coalesce_range((lispobj*)IMMOBILE_SPACE_START,
-                   immobile_fixedobj_free_pointer,
-                   (uword_t)&ht);
-    coalesce_range((lispobj*)IMMOBILE_VARYOBJ_SUBSPACE_START,
-                   immobile_space_free_pointer,
-                   (uword_t)&ht);
+    coalesce_range((lispobj*)FIXEDOBJ_SPACE_START, fixedobj_free_pointer, (uword_t)&ht);
+    coalesce_range((lispobj*)VARYOBJ_SPACE_START, varyobj_free_pointer, (uword_t)&ht);
 #endif
 #ifdef LISP_FEATURE_GENCGC
     walk_generation(coalesce_range, -1, (uword_t)&ht);

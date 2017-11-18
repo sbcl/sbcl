@@ -2906,7 +2906,7 @@ core and return a descriptor to it."
       #!+immobile-space
       ;; Must be a multiple of 32 because it makes the math a nicer
       ;; when computing word and bit index into the 'touched' bitmap.
-      (assert (zerop (rem sb!vm:immobile-fixedobj-subspace-size
+      (assert (zerop (rem sb!vm:fixedobj-space-size
                           (* 32 sb!vm:immobile-card-bytes))))
       #!-gencgc
       (progn
@@ -3620,12 +3620,11 @@ III. initially undefined function references (alphabetically):
            #!+immobile-space
            (*immobile-fixedobj* (make-gspace :immobile-fixedobj
                                              immobile-fixedobj-core-space-id
-                                             sb!vm:immobile-space-start))
+                                             sb!vm:fixedobj-space-start))
            #!+immobile-space
            (*immobile-varyobj* (make-gspace :immobile-varyobj
                                             immobile-varyobj-core-space-id
-                                            (+ sb!vm:immobile-space-start
-                                               sb!vm:immobile-fixedobj-subspace-size)))
+                                            sb!vm:varyobj-space-start))
            (*dynamic*   (make-gspace :dynamic
                                      dynamic-core-space-id
                                      #!+gencgc sb!vm:dynamic-space-start

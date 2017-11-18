@@ -3021,8 +3021,8 @@ void verify_gc(uword_t flags)
 #  endif
     if (verbose)
         printf("Verifying immobile space\n");
-    verify_space(IMMOBILE_SPACE_START, immobile_fixedobj_free_pointer, flags);
-    verify_space(IMMOBILE_VARYOBJ_SUBSPACE_START, immobile_space_free_pointer, flags);
+    verify_space(FIXEDOBJ_SPACE_START, fixedobj_free_pointer, flags);
+    verify_space(VARYOBJ_SPACE_START, varyobj_free_pointer, flags);
 #endif
     struct thread *th;
     if (verbose)

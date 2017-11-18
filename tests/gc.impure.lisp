@@ -204,3 +204,11 @@
 (with-test (:name :code/data-separation
                   :skipped-on '(:not :gencgc))
   (ensure-code/data-separation))
+
+#+immobile-space
+(with-test (:name :immobile-space-addr-p)
+  ;; Upper bound should be exclusive
+  (assert (not (sb-kernel:immobile-space-addr-p
+                (+ sb-vm:fixedobj-space-start
+                   sb-vm:fixedobj-space-size
+                   sb-vm:varyobj-space-size)))))

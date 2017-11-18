@@ -433,8 +433,8 @@ static void sweep_fixedobj_pages(long *zeroed)
     low_page_index_t page;
 
     for (page = 0 ; ; ++page) {
-        lispobj *obj = (lispobj*)((char*)IMMOBILE_SPACE_START + page * IMMOBILE_CARD_BYTES);
-        if (obj >= immobile_fixedobj_free_pointer)
+        lispobj *obj = (lispobj*)(FIXEDOBJ_SPACE_START + page * IMMOBILE_CARD_BYTES);
+        if (obj >= fixedobj_free_pointer)
             break;
         int obj_spacing = fixedobj_page_obj_align(page);
         if (!obj_spacing)
@@ -518,7 +518,7 @@ void execute_full_sweep_phase()
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     sweep_fixedobj_pages(words_zeroed);
     if (sweeplog) fprintf(sweeplog, "-- varyobj pages --\n");
-    sweep((lispobj*)IMMOBILE_VARYOBJ_SUBSPACE_START, immobile_space_free_pointer,
+    sweep((lispobj*)VARYOBJ_SPACE_START, varyobj_free_pointer,
           (uword_t)words_zeroed);
 #endif
     if (sweeplog) fprintf(sweeplog, "-- dynamic space --\n");

@@ -45,8 +45,8 @@ lispobj *dynamic_space_free_pointer;
 lispobj *read_only_space_free_pointer;
 lispobj *static_space_free_pointer;
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-lispobj *immobile_space_free_pointer;
-lispobj *immobile_fixedobj_free_pointer;
+lispobj *varyobj_free_pointer;
+lispobj *fixedobj_free_pointer;
 #endif
 os_vm_address_t anon_dynamic_space_start;
 

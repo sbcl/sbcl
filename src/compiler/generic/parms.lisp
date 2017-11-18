@@ -62,14 +62,21 @@
 ;;     for almost all platforms, but is too small to make VirtualProtect
 ;;     happy -- hence the need for an extra `alignment' configuration
 ;;     option below, which parms.lisp can set to #x10000 on Windows.
+;;     To clarify: there is a gap at the end of read-only space to
+;;     the safepoint page, but no gap at the end of the latter
+;;     to the start of static space. (What do these gaps achieve?)
 ;;
 (defmacro !gencgc-space-setup
     (small-spaces-start
           &key ((:dynamic-space-start dynamic-space-start*))
                ((:dynamic-space-size dynamic-space-size*))
-               #!+immobile-space
-               ((:immobile-space-size immobile-space-size*) (* 128 1024 1024))
-               #!+immobile-space (immobile-code-space-size (* 104 1024 1024))
+               ;; The immobile-space START parameters should not be used
+               ;; except in forcing discontiguous addresses for testing.
+               ;; And of course, don't use them if unsupported.
+               ((:fixedobj-space-start fixedobj-space-start*))
+               ((:fixedobj-space-size  fixedobj-space-size*) (* 24 1024 1024))
+               ((:varyobj-space-start  varyobj-space-start*))
+               ((:varyobj-space-size   varyobj-space-size*) (* 104 1024 1024))
                ;; Smallest os_validate()able alignment; used as safepoint
                ;; page size.  Default suitable for POSIX platforms.
                (alignment            #x1000)
@@ -88,53 +95,61 @@
                ;; but can't be due to dependency order problem.
                )))
     (let*
-        ((spaces '(read-only static
-                   #!+linkage-table linkage-table
-                   #!+immobile-space immobile))
+        ((spaces (append `((read-only . ,small-space-spread)
+                           (static . ,small-space-spread))
+                         #!+linkage-table
+                         `((linkage-table . ,small-space-spread))
+                         #!+immobile-space
+                         `((fixedobj . ,fixedobj-space-size*)
+                           (varyobj . ,varyobj-space-size*))))
          (ptr small-spaces-start)
          safepoint-address
          (small-space-forms
-          (loop for (space next-space) on spaces appending
+          (loop for (space . size) in spaces appending
                 (let* ((relocatable
-                        ;; TODO: immobile and linkage-table should be relocatable
-                        #!+relocatable-heap (member space '(immobile)))
-                       (next-start
-                        (+ ptr (cond #!+immobile-space
-                                     ((eq space 'immobile)
-                                      ;; We subtract margin-size when
-                                      ;; computing FOO-SPACE-END,
-                                      ;; so add it in here to compensate.
-                                      (+ immobile-space-size* margin-size))
-                                     (t
-                                      small-space-spread))))
-                       (end next-start))
-                  (when (eq next-space 'static)
+                        ;; TODO: linkage-table could move with code, if the CPU
+                        ;; prefers PC-relative jumps, and we emit better code
+                        ;; (which we don't- for x86 we jmp via RBX always)
+                        #!+relocatable-heap (member space '(fixedobj varyobj)))
+                       (start ptr)
+                       (end (+ ptr size)))
+                  (setf ptr end)
+                  (when (eq space 'read-only)
                     ;; margin becomes safepoint page; substract margin again.
                     (decf end alignment)
                     (setf safepoint-address end))
-                  (let* ((start-sym (symbolicate space "-SPACE-START"))
-                         (start-val ptr)
-                         (end-val (- end margin-size)))
-                    (setf ptr next-start)
-                    `(,(defconstantish relocatable start-sym start-val)
+                  (let ((start-sym (symbolicate space "-SPACE-START")))
+                    ;; Allow expressly given addresses / sizes for immobile space.
+                    ;; The addresses are for testing only - you should not need them.
+                    (case space
+                      (varyobj  (setq start (or varyobj-space-start* start)
+                                      end (+ start varyobj-space-size*)))
+                      (fixedobj (setq start (or fixedobj-space-start* start)
+                                      end (+ start fixedobj-space-size*)))
+                      (t        (setq end (- end margin-size))))
+                    `(,(defconstantish relocatable start-sym start)
                       ,(if relocatable
-                           `(defconstant ,(symbolicate space "-SPACE-SIZE")
-                              ,(- end-val start-val))
-                           `(defconstant ,(symbolicate space "-SPACE-END")
-                              ,end-val)))))))
+                           `(defconstant ,(symbolicate space "-SPACE-SIZE") ,(- end start))
+                           `(defconstant ,(symbolicate space "-SPACE-END") ,end)))))))
          (safepoint-page-forms
           (list #!+sb-safepoint
                 `(defconstant gc-safepoint-page-addr ,safepoint-address)))
          )
-    #+ccl safepoint-address ; workaround for incorrect "Unused" warning
+    ;; CCL warns about a variable that is assigned but never read.
+    ;; That's actually reasonable. We consider it used, as do others.
+    safepoint-address ; "use" it here just to be sure it's used
     `(progn
        ,@safepoint-page-forms
        ,@small-space-forms
-       #!+immobile-space
-       (defconstant immobile-fixedobj-subspace-size
-         ,(- immobile-space-size* immobile-code-space-size))
        ,(defconstantish (or #!+relocatable-heap t) 'dynamic-space-start
           (or dynamic-space-start* ptr))
+       #!+(and immobile-space (host-feature sb-xc-host))
+       (unless (and (< fixedobj-space-start varyobj-space-start)
+                    (= (+ fixedobj-space-start fixedobj-space-size)
+                       varyobj-space-start))
+         (error "Incorrect immobile space setup: ~X:~X ~X:~X"
+                fixedobj-space-start (+ fixedobj-space-start fixedobj-space-size)
+                varyobj-space-start (+ varyobj-space-start varyobj-space-size)))
        (defconstant default-dynamic-space-size
          ;; Build-time make-config.sh option "--dynamic-space-size" overrides
          ;; keyword argument :dynamic-space-size which overrides general default.
