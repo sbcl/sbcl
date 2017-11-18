@@ -435,7 +435,7 @@
         (call-inst (find-inst #b11101000 (get-inst-space)))
         (seg (sb!disassem::%make-segment
               :sap-maker (lambda () (error "Bad sap maker")) :virtual-location 0))
-        (dstate (make-dstate)))
+        (dstate (make-dstate nil)))
     (flet ((scan-function (fun-entry-addr fun-end-addr predicate)
              (setf (seg-virtual-location seg) fun-entry-addr
                    (seg-length seg) (- fun-end-addr fun-entry-addr)
@@ -507,7 +507,7 @@
   ;; Loop over all code objects
   `(let* ((call (find-inst #xE8 (get-inst-space)))
           (jmp  (find-inst #xE9 (get-inst-space)))
-          (dstate (make-dstate))
+          (dstate (make-dstate nil))
           (sap (int-sap 0))
           (seg (sb!disassem::%make-segment :sap-maker (lambda () sap))))
      (sb!vm::map-objects-in-range
@@ -588,35 +588,34 @@
 (defglobal *static-linker-lock* (sb!thread:make-mutex :name "static linker"))
 (defun sb!vm::remove-static-links (fdefn)
   ; (warn "undoing static linkage of ~S" (fdefn-name fdefn))
-  (let ((*default-dstate-hooks* '()))
-    (sb!thread::with-system-mutex (*static-linker-lock* :without-gcing t)
-      ;; If the jump is to FUN-ENTRY, change it back to FDEFN-ENTRY
-      (let ((fun-entry (sb!vm::fdefn-call-target fdefn))
-            (fdefn-entry (+ (get-lisp-obj-address fdefn)
-                            (ash fdefn-raw-addr-slot word-shift)
-                            (- other-pointer-lowtag))))
-        ;; Examine only those code components which potentially use FDEFN.
-        (do-immobile-functions
-            (code fun addr :if (loop for i downfrom (1- (sb!kernel:code-header-words code))
+  (sb!thread::with-system-mutex (*static-linker-lock* :without-gcing t)
+    ;; If the jump is to FUN-ENTRY, change it back to FDEFN-ENTRY
+    (let ((fun-entry (sb!vm::fdefn-call-target fdefn))
+          (fdefn-entry (+ (get-lisp-obj-address fdefn)
+                          (ash fdefn-raw-addr-slot word-shift)
+                          (- other-pointer-lowtag))))
+      ;; Examine only those code components which potentially use FDEFN.
+      (do-immobile-functions
+         (code fun addr :if (loop for i downfrom (1- (sb!kernel:code-header-words code))
                                   to sb!vm:code-constants-offset
                                   thereis (eq (sb!kernel:code-header-ref code i)
                                               fdefn)))
-          (map-segment-instructions
-           (lambda (chunk inst)
-             (when (or (eq inst jmp) (eq inst call))
-               ;; TRULY-THE because near-jump-displacement isn't a known fun.
-               (let ((disp (truly-the (signed-byte 32)
-                                      (near-jump-displacement chunk dstate))))
-                 (when (= fun-entry (+ disp (dstate-next-addr dstate)))
-                   (let ((new-disp
-                          (the (signed-byte 32)
-                               (- fdefn-entry (dstate-next-addr dstate)))))
-                     ;; CMPXCHG is atomic even when misaligned, and x86-64 promises
-                     ;; that self-modifying code works correctly, so the fetcher
-                     ;; should never see a torn write.
-                     (%primitive sb!vm::signed-sap-cas-32
-                                 (int-sap (dstate-cur-addr dstate))
-                                 1 disp new-disp))))))
-           seg dstate)))
-      (setf (sb!vm::fdefn-has-static-callers fdefn) 0)))) ; Clear static link flag
+        (map-segment-instructions
+         (lambda (chunk inst)
+           (when (or (eq inst jmp) (eq inst call))
+             ;; TRULY-THE because near-jump-displacement isn't a known fun.
+             (let ((disp (truly-the (signed-byte 32)
+                                    (near-jump-displacement chunk dstate))))
+               (when (= fun-entry (+ disp (dstate-next-addr dstate)))
+                 (let ((new-disp
+                        (the (signed-byte 32)
+                             (- fdefn-entry (dstate-next-addr dstate)))))
+                   ;; CMPXCHG is atomic even when misaligned, and x86-64 promises
+                   ;; that self-modifying code works correctly, so the fetcher
+                   ;; should never see a torn write.
+                   (%primitive sb!vm::signed-sap-cas-32
+                               (int-sap (dstate-cur-addr dstate))
+                               1 disp new-disp))))))
+         seg dstate)))
+    (setf (sb!vm::fdefn-has-static-callers fdefn) 0))) ; Clear static link flag
 ) ; end PROGN
