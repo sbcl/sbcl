@@ -81,8 +81,8 @@ allocate_spaces(void)
     ensure_space( (lispobj *)LINKAGE_TABLE_SPACE_START,
                   LINKAGE_TABLE_SPACE_SIZE);
 #endif
-#if defined(IMMOBILE_SPACE_START) && !defined(LISP_FEATURE_RELOCATABLE_HEAP)
-    ensure_space((lispobj *)IMMOBILE_SPACE_START, IMMOBILE_SPACE_SIZE);
+#if defined(LISP_FEATURE_IMMOBILE_SPACE) && !defined(LISP_FEATURE_RELOCATABLE_HEAP)
+# error "unsupported configuration: immobile-space && !relocatable-heap"
 #endif
 
 #ifdef LISP_FEATURE_OS_PROVIDES_DLOPEN

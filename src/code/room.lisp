@@ -139,7 +139,6 @@
 ;;; use an address width that is narrower than 64 bits.
 ;;; This function is private because of the wacky representation.
 (defun %space-bounds (space)
-  (declare (type spaces space))
   (ecase space
     (:static
      (values (%make-lisp-obj static-space-start)
@@ -148,8 +147,12 @@
      (values (%make-lisp-obj read-only-space-start)
              (%make-lisp-obj (sap-int *read-only-space-free-pointer*))))
     #+immobile-space
-    (:immobile
+    (:fixed
      (values (%make-lisp-obj fixedobj-space-start)
+             (%make-lisp-obj (sap-int *fixedobj-space-free-pointer*))))
+    #+immobile-space
+    (:variable
+     (values (%make-lisp-obj varyobj-space-start)
              (%make-lisp-obj (sap-int *varyobj-space-free-pointer*))))
     (:dynamic
      (values (%make-lisp-obj (current-dynamic-space-start))
@@ -157,8 +160,11 @@
 
 ;;; Return the total number of bytes used in SPACE.
 (defun space-bytes (space)
-  (multiple-value-bind (start end) (%space-bounds space)
-    (ash (- end start) n-fixnum-tag-bits)))
+  (if (eq space :immobile)
+      (+ (space-bytes :immobile-fixed)
+         (space-bytes :immobile-variable))
+      (multiple-value-bind (start end) (%space-bounds space)
+        (ash (- end start) n-fixnum-tag-bits))))
 
 ;;; Round SIZE (in bytes) up to the next dualword boundary. A dualword
 ;;; is eight bytes on platforms with 32-bit word size and 16 bytes on
@@ -321,20 +327,12 @@
 
 #+immobile-space
 (progn
-(declaim (inline immobile-subspace-bounds))
-;;; Return fixnums in the same fashion as %SPACE-BOUNDS.
-(defun immobile-subspace-bounds (subspace)
-  (case subspace
-    (:fixed (values (%make-lisp-obj fixedobj-space-start)
-                    (%make-lisp-obj (sap-int *fixedobj-space-free-pointer*))))
-    (:variable (values (%make-lisp-obj varyobj-space-start)
-                       (%make-lisp-obj (sap-int *varyobj-space-free-pointer*))))))
-
+(deftype immobile-subspaces () '(member :fixed :variable))
 (declaim (ftype (sfunction (function &rest immobile-subspaces) null)
                 map-immobile-objects))
 (defun map-immobile-objects (function &rest subspaces) ; Perform no filtering
   (do-rest-arg ((subspace) subspaces)
-    (multiple-value-bind (start end) (immobile-subspace-bounds subspace)
+    (multiple-value-bind (start end) (%space-bounds subspace)
       (map-objects-in-range function start end)))))
 
 #|
@@ -487,13 +485,10 @@ We could try a few things to mitigate this:
 
 #+immobile-space
 (progn
-(deftype immobile-subspaces ()
-  '(member :fixed :variable))
-
 (declaim (ftype (function (immobile-subspaces) (values t t t &optional))
                 immobile-fragmentation-information))
 (defun immobile-fragmentation-information (subspace)
-  (binding* (((start free-pointer) (immobile-subspace-bounds subspace))
+  (binding* (((start free-pointer) (%space-bounds subspace))
              (used-bytes (ash (- free-pointer start) n-fixnum-tag-bits))
              (holes '())
              (hole-bytes 0))
