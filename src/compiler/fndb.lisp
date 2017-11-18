@@ -581,7 +581,7 @@
                                         (nth-arg 1 :sequence t :key :key)))
                   sequence &rest t &key (:from-end t) (:start index)
                   (:end sequence-end) (:initial-value t)
-                  (:key (function-designator ((nth-arg 1)))))
+                  (:key (function-designator ((nth-arg 1 :sequence t)))))
   t
   (foldable flushable call))
 
@@ -616,7 +616,7 @@
      (:test-not (function-designator ((nth-arg 1) (nth-arg 2 :sequence t :key :key))))
      (:start index) (:end sequence-end)
      (:count sequence-count)
-     (:key (function-designator ((nth-arg 2)))))
+     (:key (function-designator ((nth-arg 2 :sequence t)))))
   consed-sequence
   (flushable call)
   :derive-type (sequence-result-nth-arg 3))
@@ -657,7 +657,7 @@
      (:test-not (function-designator ((nth-arg 1) (nth-arg 2 :sequence t :key :key))))
      (:start index) (:end sequence-end)
      (:count sequence-count)
-     (:key (function-designator ((nth-arg 2)))))
+     (:key (function-designator ((nth-arg 2 :sequence t)))))
   sequence
   (flushable call)
   :derive-type (sequence-result-nth-arg 3)
