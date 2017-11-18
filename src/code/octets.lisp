@@ -38,6 +38,8 @@ one-past-the-end"
                                       (octets-encoding-error-position c)))
                      (octets-encoding-error-external-format c)))))
 
+(declaim (ftype (sfunction (t t t) (simple-array (unsigned-byte 8) 1))
+                encoding-error))
 (defun encoding-error (external-format string pos)
   (restart-case
       (error 'octets-encoding-error
