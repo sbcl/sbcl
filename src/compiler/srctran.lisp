@@ -24,6 +24,13 @@
   (specifier-type
    `(function (&rest t) (values ,(type-specifier (lvar-type value)) &optional))))
 
+(defoptimizer (complement derive-type) ((fun))
+  (let ((type (lvar-fun-type fun)))
+    (when (fun-type-p type)
+      (specifier-type
+       (append (butlast (type-specifier type))
+               '(boolean))))))
+
 ;;; If the function has a known number of arguments, then return a
 ;;; lambda with the appropriate fixed number of args. If the
 ;;; destination is a FUNCALL, then do the &REST APPLY thing, and let
