@@ -272,4 +272,4 @@ static inline void protect_page(void* page_addr, page_index_t page_index)
 #define FUN_SELF_FIXNUM_TAGGED 0
 #endif
 
-#endif /* _GC_INTERNAL_H_ */
+#endif /* _GC_PRIVATE_H_ */

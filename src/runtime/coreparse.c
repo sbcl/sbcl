@@ -702,7 +702,7 @@ process_directory(int count, struct ndir_entry *entry,
             sword_t offset = os_vm_page_size * (1 + entry->data_page);
             if (compressed)
                 inflate_core_bytes(fd, offset + file_offset, (os_vm_address_t)addr, len);
-             else
+            else
                 load_core_bytes(fd, offset + file_offset, (os_vm_address_t)addr, len);
         }
 
