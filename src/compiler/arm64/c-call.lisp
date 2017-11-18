@@ -55,8 +55,8 @@
 
 (define-alien-type-method (integer :arg-tn) (type state)
   (if (alien-integer-type-signed type)
-      (int-arg state 'signed-byte-64 signed-reg-sc-number 'signed-stack)
-      (int-arg state 'unsigned-byte-64 unsigned-reg-sc-number 'unsigned-stack)))
+      (int-arg state 'signed-byte-64 signed-reg-sc-number signed-stack-sc-number)
+      (int-arg state 'unsigned-byte-64 unsigned-reg-sc-number unsigned-stack-sc-number)))
 
 (define-alien-type-method (system-area-pointer :arg-tn) (type state)
   (declare (ignore type))
