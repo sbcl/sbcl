@@ -17,11 +17,6 @@
 
 (in-package "SB!IMPL")
 
-;;; FIXME: don't we have this somewhere else?
-(deftype array-range ()
-  "A number that can represent an index into a vector, including
-one-past-the-end"
-  '(integer 0 #.sb!xc:array-dimension-limit))
 
 ;;;; conditions
 

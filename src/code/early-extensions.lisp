@@ -28,6 +28,11 @@
 (def!type hash ()
   `(integer 0 ,max-hash))
 
+;;; A number that can represent an index into a vector, including
+;;; one-past-the-end
+(deftype array-range ()
+  '(integer 0 #.sb!xc:array-dimension-limit))
+
 ;;; a type used for indexing into sequences, and for related
 ;;; quantities like lengths of lists and other sequences.
 ;;;
