@@ -31,6 +31,7 @@ uword_t DYNAMIC_SPACE_START;
 uword_t FIXEDOBJ_SPACE_START, VARYOBJ_SPACE_START;
 uword_t immobile_space_lower_bound, immobile_space_max_offset;
 unsigned int immobile_range_1_max_offset, immobile_range_2_min_offset;
+unsigned int varyobj_space_size = VARYOBJ_SPACE_SIZE;
 #endif
 
 static void

@@ -27,10 +27,10 @@ extern uword_t DYNAMIC_SPACE_START;
 extern uword_t FIXEDOBJ_SPACE_START, VARYOBJ_SPACE_START;
 extern uword_t immobile_space_lower_bound, immobile_space_max_offset;
 extern unsigned int immobile_range_1_max_offset, immobile_range_2_min_offset;
+extern unsigned int varyobj_space_size;
 #endif
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-#define IMMOBILE_SPACE_TOTAL_SIZE (FIXEDOBJ_SPACE_SIZE+VARYOBJ_SPACE_SIZE)
 static inline boolean immobile_space_p(lispobj obj)
 {
 /* To test the two immobile ranges, we first check that a pointer is within

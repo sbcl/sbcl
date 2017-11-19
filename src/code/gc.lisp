@@ -40,10 +40,15 @@
 
 #!+immobile-space
 (progn
+  (define-alien-variable sb!vm:varyobj-space-size (unsigned 32))
   #!+relocatable-heap
   (progn
     (define-alien-variable ("FIXEDOBJ_SPACE_START" sb!vm:fixedobj-space-start) unsigned-long)
     (define-alien-variable ("VARYOBJ_SPACE_START" sb!vm:varyobj-space-start) unsigned-long))
+  (define-alien-variable ("varyobj_free_pointer" sb!vm:*varyobj-space-free-pointer*)
+    system-area-pointer)
+  (define-alien-variable ("fixedobj_free_pointer" sb!vm:*fixedobj-space-free-pointer*)
+    system-area-pointer)
   (defun immobile-space-addr-p (addr)
     (declare (type word addr))
     (or (let ((start sb!vm:fixedobj-space-start))

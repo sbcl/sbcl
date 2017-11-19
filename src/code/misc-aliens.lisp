@@ -17,12 +17,6 @@
     system-area-pointer)
 (define-alien-variable ("static_space_free_pointer" sb!vm:*static-space-free-pointer*)
   system-area-pointer)
-#!+immobile-space
-(progn
-  (define-alien-variable ("varyobj_free_pointer" sb!vm:*varyobj-space-free-pointer*)
-    system-area-pointer)
-  (define-alien-variable ("fixedobj_free_pointer" sb!vm:*fixedobj-space-free-pointer*)
-    system-area-pointer))
 
 (declaim (inline memmove))
 (define-alien-routine ("memmove" memmove) void

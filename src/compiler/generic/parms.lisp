@@ -128,9 +128,12 @@
                                       end (+ start fixedobj-space-size*)))
                       (t        (setq end (- end margin-size))))
                     `(,(defconstantish relocatable start-sym start)
-                      ,(if relocatable
-                           `(defconstant ,(symbolicate space "-SPACE-SIZE") ,(- end start))
-                           `(defconstant ,(symbolicate space "-SPACE-END") ,end)))))))
+                      ,(cond ((not relocatable)
+                              `(defconstant ,(symbolicate space "-SPACE-END") ,end))
+                             #-sb-xc-host ((eq space 'varyobj)) ; don't emit anything
+                             (t
+                              `(defconstant ,(symbolicate space "-SPACE-SIZE")
+                                 ,(- end start)))))))))
          (safepoint-page-forms
           (list #!+sb-safepoint
                 `(defconstant gc-safepoint-page-addr ,safepoint-address)))

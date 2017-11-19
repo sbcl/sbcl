@@ -157,10 +157,10 @@ static inline low_page_index_t find_varyobj_page_index(void *addr)
   if (addr >= (void*)VARYOBJ_SPACE_START) {
       // Must use full register size here to avoid truncation of quotient
       // and bogus result!
-      page_index_t index =
-          ((uintptr_t)addr - (uintptr_t)VARYOBJ_SPACE_START) / IMMOBILE_CARD_BYTES;
-      if (index < (int)(VARYOBJ_SPACE_SIZE/IMMOBILE_CARD_BYTES))
-          return index;
+      size_t offset = (uintptr_t)addr - (uintptr_t)VARYOBJ_SPACE_START;
+      if (offset >= varyobj_space_size)
+          return -1;
+      return offset / IMMOBILE_CARD_BYTES;
   }
   return -1;
 }

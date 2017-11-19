@@ -608,7 +608,7 @@ process_directory(int count, struct ndir_entry *entry,
         {0, 0, STATIC_SPACE_START, &static_space_free_pointer},
         {0, 0, READ_ONLY_SPACE_START, &read_only_space_free_pointer},
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-        {IMMOBILE_SPACE_TOTAL_SIZE | 1, 0,
+        {(FIXEDOBJ_SPACE_SIZE+VARYOBJ_SPACE_SIZE) | 1, 0,
             FIXEDOBJ_SPACE_START, &fixedobj_free_pointer},
         {1, 0, VARYOBJ_SPACE_START, &varyobj_free_pointer}
 #endif
