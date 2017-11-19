@@ -18,14 +18,14 @@
 (defun report ()
   (handler-case
       (sb-cover:report *output-directory*)
-    (warning ()
-      (error "Unexpected warning"))))
+    (warning (condition)
+      (error "Unexpected warning: ~A" condition))))
 
 (defun report-expect-failure ()
   (handler-case
       (progn
         (sb-cover:report *output-directory*)
-        (error "Should've raised a warning"))
+        (error "Should've signaled a warning"))
     (warning ())))
 
 
