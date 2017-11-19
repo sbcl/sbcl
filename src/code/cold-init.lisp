@@ -306,12 +306,10 @@
     (toplevel-init)
     (critically-unreachable "after TOPLEVEL-INIT")))
 
-(define-deprecated-function :early "1.0.56.55" quit (exit sb!thread:abort-thread)
-    (&key recklessly-p (unix-status 0))
-  (if (or recklessly-p (sb!thread:main-thread-p))
-      (exit :code unix-status :abort recklessly-p)
-      (sb!thread:abort-thread))
-  (critically-unreachable "after trying to die in QUIT"))
+(defun quit (&key recklessly-p (unix-status 0))
+  "Calls (SB-EXT:EXIT :CODE UNIX-STATUS :ABORT RECKLESSLY-P),
+see documentation for SB-EXT:EXIT."
+  (exit :code unix-status :abort recklessly-p))
 
 (declaim (ftype (sfunction (&key (:code (or null exit-code))
                                  (:timeout (or null real))

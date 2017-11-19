@@ -304,57 +304,6 @@ Deprecated in favor of the corresponding prefix-less functions
 1.2.10 in March 2015. Expected to move into late deprecation in August
 2015.
 
-@item @strong{SB-EXT:QUIT}
-
-Deprecated in favor of @code{sb-ext:exit} as of 1.0.56.55 in May 2012.
-Expected to move into late deprecation in May 2013.
-
-The design of @code{sb-ext:quit} proved too broken to fix in a
-backwards-compatible manner, so it had to be deprecated and replaced.
-
-Problems with it were manifold: when called in the main thread it
-cause the entire process to exit. When called in another thread with
-@code{:recklessly-p} it also caused the entire process to exit.
-However, when called in another thread without @code{:recklessly-p} it
-instead caused that thread to terminate abnormally without terminating
-the process. Its behaviour versus other threads than the one it was
-called in was also underspecified, and dependent on things such as the
-current session. Any conceivable change that would have made it sane
-would also have silently broken code that depended on the old
-behaviour.
-
-@strong{Remedy}
-
-For code needing to work with legacy SBCLs, if you were calling
-@code{quit} with @code{:recklessly-p t}, use
-
-@sp 1
-@lisp
-(defun system-exit (&optional (code 0))
-  (alien-funcall (extern-alien "exit" (function void int)) code))
-@end lisp
-@sp 1
-
-instead. In modern SBCLs simply call either @code{sb-posix:exit} or
-@code{sb-ext:exit}.
-
-If you were calling it without @code{:recklessly-p}, be advised
-that your code may not function as expected when called from threads
-other than the main one (see above) -- in any case, you can support
-legacy SBCLs using the following conditionalization:
-
-@sp 1
-@lisp
-(defun lisp-exit (&key (code 0) abort)
-  #+#.(cl:if (cl:find-symbol "EXIT" :sb-ext) '(and) '(or))
-  ;; Assuming process exit is what is desired -- if thread termination
-  ;; is intended, use SB-THREAD:ABORT-THREAD instead.
-  (sb-ext:exit :code code :abort abort)
-  #-#.(cl:if (cl:find-symbol "EXIT" :sb-ext) '(and) '(or))
-  (sb-ext:quit :unix-status code :recklessly-p abort))
-@end lisp
-@sp 1
-
 @sp 1
 @item @strong{SB-UNIX:UNIX-EXIT}
 

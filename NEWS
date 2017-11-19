@@ -1,6 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-1.4.1:
+  * minor incompatible change: SB-EXT:QUIT is no longer marked as deprecated
+    and behaves like SB-EXT:EXIT.
   * enhancement: ASDF updated to 3.3.1. The ASDF release is dedicated to
     the late Elias Pipping who put enormous amounts of work into it despite
     his terminal illness. Thank you and rest in peace. (lp#1681201)
