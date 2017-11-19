@@ -1031,7 +1031,7 @@
 ;;; A SAP-MAKER is a no-argument function that returns a SAP.
 
 ;; FIXME: Are the objects we are taking saps for always pinned?
-#!-sb-fluid (declaim (inline sap-maker))
+(declaim (inline sap-maker))
 (defun sap-maker (function input offset)
   (declare (optimize (speed 3))
            (muffle-conditions compiler-note)
