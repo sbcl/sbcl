@@ -592,22 +592,25 @@ process_directory(int count, struct ndir_entry *entry,
     extern void immobile_space_coreparse(uword_t,uword_t);
 
     struct {
+        size_t desired_size; // size wanted, ORed with 1 if addr must be <2GB
+        // Values from the core file:
         uword_t len; // length in bytes, as an integral multiple of os_vm_page_size
         uword_t base;
         lispobj** pfree_pointer; // pointer to x_free_pointer
     } spaces[MAX_CORE_SPACE_ID+1] = {
-        {0, 0, 0}, // blank for space ID 0
+        {0, 0, 0, 0}, // blank for space ID 0
 #ifdef LISP_FEATURE_GENCGC
-        {0, DYNAMIC_SPACE_START, 0},
+        {dynamic_space_size, 0, DYNAMIC_SPACE_START, 0},
 #else
-        {0, 0, 0},
+        {0, 0, 0, 0},
 #endif
         // This order is determined by constants in compiler/generic/genesis
-        {0, STATIC_SPACE_START, &static_space_free_pointer},
-        {0, READ_ONLY_SPACE_START, &read_only_space_free_pointer},
+        {0, 0, STATIC_SPACE_START, &static_space_free_pointer},
+        {0, 0, READ_ONLY_SPACE_START, &read_only_space_free_pointer},
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-        {0, FIXEDOBJ_SPACE_START, &fixedobj_free_pointer},
-        {0, VARYOBJ_SPACE_START, &varyobj_free_pointer}
+        {IMMOBILE_SPACE_TOTAL_SIZE | 1, 0,
+            FIXEDOBJ_SPACE_START, &fixedobj_free_pointer},
+        {1, 0, VARYOBJ_SPACE_START, &varyobj_free_pointer}
 #endif
     };
 
@@ -624,7 +627,8 @@ process_directory(int count, struct ndir_entry *entry,
 #elif defined(LISP_FEATURE_IMMOBILE_SPACE)
         // Enforce address of readonly, static, immobile varyobj
         int enforce_address = id != DYNAMIC_CORE_SPACE_ID
-          && id != IMMOBILE_FIXEDOBJ_CORE_SPACE_ID;
+          && id != IMMOBILE_FIXEDOBJ_CORE_SPACE_ID
+          && id != IMMOBILE_VARYOBJ_CORE_SPACE_ID;
 #else
         // Enforce address of readonly and static spaces.
         int enforce_address = id != DYNAMIC_CORE_SPACE_ID;
@@ -662,41 +666,45 @@ process_directory(int count, struct ndir_entry *entry,
             uword_t __attribute__((unused)) aligned_start;
 #ifdef LISP_FEATURE_RELOCATABLE_HEAP
             // Try to map at address requested by the core file.
-            if (id == DYNAMIC_CORE_SPACE_ID) {
-                addr = (uword_t)os_validate(MOVABLE, (os_vm_address_t)addr,
-                                            dynamic_space_size);
+            size_t request = spaces[id].desired_size;
+            int sub_2gb_flag = (request & 1);
+            request &= ~(size_t)1;
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+            if (id == IMMOBILE_VARYOBJ_CORE_SPACE_ID)
+                // Pretend an os_validate() happened based on the address that
+                // would be obtained by a constant offset from fixedobj space
+                addr = FIXEDOBJ_SPACE_START + FIXEDOBJ_SPACE_SIZE;
+            else
+#endif
+            if (request)
+                addr = (uword_t)os_validate(sub_2gb_flag ? MOVABLE_LOW : MOVABLE,
+                                            (os_vm_address_t)addr, request);
+            switch (id) {
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+            case IMMOBILE_FIXEDOBJ_CORE_SPACE_ID:
+            case IMMOBILE_VARYOBJ_CORE_SPACE_ID:
+                if (addr + request > 0x80000000)
+                    lose("Won't map immobile space above 2GB");
+                if (id == IMMOBILE_FIXEDOBJ_CORE_SPACE_ID)
+                    FIXEDOBJ_SPACE_START = addr;
+                else
+                    VARYOBJ_SPACE_START = addr;
+                break;
+#endif
+            case DYNAMIC_CORE_SPACE_ID:
                 aligned_start = ALIGN_UP(addr, GENCGC_CARD_BYTES);
                 /* Misalignment can happen only if card size exceeds OS page.
                  * Drop one card to avoid overrunning the allocated space */
                 if (aligned_start > addr) // not card-aligned
                     dynamic_space_size -= GENCGC_CARD_BYTES;
-                DYNAMIC_SPACE_START = addr = aligned_start;
-# ifndef LISP_FEATURE_IMMOBILE_SPACE
-            }
-# else
-                if (DYNAMIC_SPACE_START < FIXEDOBJ_SPACE_START)
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+                // FIXME: is this invariant still needed?
+                if (addr < FIXEDOBJ_SPACE_START || addr < VARYOBJ_SPACE_START)
                     lose("Won't map dynamic space below immobile space");
-            /* Assume presence of linkage-table space for this platform.
-             * An unusable gap may exist between the linkage table and immobile space
-             * but it's not important whether it does or doesn't. So we don't bother
-             * unmapping the alleged gap */
-             } else if (id == IMMOBILE_FIXEDOBJ_CORE_SPACE_ID) {
-                addr = (uword_t)os_validate(MOVABLE_LOW, (os_vm_address_t)addr,
-                                            IMMOBILE_SPACE_TOTAL_SIZE);
-                FIXEDOBJ_SPACE_START = addr;
-                if (FIXEDOBJ_SPACE_START + IMMOBILE_SPACE_TOTAL_SIZE > 0x80000000)
-                    lose("Won't map immobile space above 2GB");
-                // varyobj subspace must be enforced to reside at a known offset
-                // from fixedobj subspace.
-                spaces[IMMOBILE_VARYOBJ_CORE_SPACE_ID].base =
-                  spaces[id].base + FIXEDOBJ_SPACE_SIZE;
-                VARYOBJ_SPACE_START = addr + FIXEDOBJ_SPACE_SIZE;
-            } else if (id == IMMOBILE_VARYOBJ_CORE_SPACE_ID) {
-                /* Ignore what the core file said */
-                addr = VARYOBJ_SPACE_START;
+#endif
+                DYNAMIC_SPACE_START = addr = aligned_start;
+                break;
             }
-# endif
-
 #endif /* LISP_FEATURE_RELOCATABLE_HEAP */
 
             sword_t offset = os_vm_page_size * (1 + entry->data_page);
@@ -761,6 +769,29 @@ process_directory(int count, struct ndir_entry *entry,
      * on what it's address should be, not what it was in the file */
     immobile_space_coreparse(spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].len,
                              spaces[IMMOBILE_VARYOBJ_CORE_SPACE_ID].len);
+    /* Suppose we have:
+     *   A               B                             C                D
+     *   | varyobj space | .... other random stuff ... | fixedobj space | ...
+     * then the lower bound is A, the upper bound is D,
+     * the max_offset is the distance from A to D,
+     * and the excluded middle is the range spanned by B to C.
+     */
+    struct range {
+        uword_t start, end;
+    };
+    struct range range1 =
+        {FIXEDOBJ_SPACE_START, FIXEDOBJ_SPACE_START + FIXEDOBJ_SPACE_SIZE};
+    struct range range2 =
+        {VARYOBJ_SPACE_START, VARYOBJ_SPACE_START + VARYOBJ_SPACE_SIZE};
+    if (range2.start < range1.start) { // swap
+        struct range temp = range1;
+        range1 = range2;
+        range2 = temp;
+    }
+    immobile_space_lower_bound  = range1.start;
+    immobile_space_max_offset   = range2.end - range1.start;
+    immobile_range_1_max_offset = range1.end - range1.start;
+    immobile_range_2_min_offset = range2.start - range1.start;
 #endif
 #ifdef LISP_FEATURE_X86_64
     tune_asm_routines_for_microarch(); // before WPing immobile space

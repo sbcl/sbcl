@@ -268,7 +268,6 @@ struct fixedobj_page { // 12 bytes per page
 extern struct fixedobj_page *fixedobj_pages;
 #define fixedobj_page_obj_align(i) (fixedobj_pages[i].attr.parts.obj_align<<WORD_SHIFT)
 #define fixedobj_page_obj_size(i) fixedobj_pages[i].attr.parts.obj_size
-#define FIRST_VARYOBJ_PAGE (FIXEDOBJ_SPACE_SIZE/(int)IMMOBILE_CARD_BYTES)
 #endif
 
 extern page_index_t last_free_page;

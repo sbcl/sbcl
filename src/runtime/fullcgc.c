@@ -433,7 +433,7 @@ static void sweep_fixedobj_pages(long *zeroed)
     low_page_index_t page;
 
     for (page = 0 ; ; ++page) {
-        lispobj *obj = (lispobj*)(FIXEDOBJ_SPACE_START + page * IMMOBILE_CARD_BYTES);
+        lispobj *obj = fixedobj_page_address(page);
         if (obj >= fixedobj_free_pointer)
             break;
         int obj_spacing = fixedobj_page_obj_align(page);

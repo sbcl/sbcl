@@ -29,6 +29,8 @@ uword_t DYNAMIC_SPACE_START;
 #endif
 #if defined(LISP_FEATURE_RELOCATABLE_HEAP) && defined(LISP_FEATURE_IMMOBILE_SPACE)
 uword_t FIXEDOBJ_SPACE_START, VARYOBJ_SPACE_START;
+uword_t immobile_space_lower_bound, immobile_space_max_offset;
+unsigned int immobile_range_1_max_offset, immobile_range_2_min_offset;
 #endif
 
 static void

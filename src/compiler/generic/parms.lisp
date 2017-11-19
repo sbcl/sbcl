@@ -143,13 +143,6 @@
        ,@small-space-forms
        ,(defconstantish (or #!+relocatable-heap t) 'dynamic-space-start
           (or dynamic-space-start* ptr))
-       #!+(and immobile-space (host-feature sb-xc-host))
-       (unless (and (< fixedobj-space-start varyobj-space-start)
-                    (= (+ fixedobj-space-start fixedobj-space-size)
-                       varyobj-space-start))
-         (error "Incorrect immobile space setup: ~X:~X ~X:~X"
-                fixedobj-space-start (+ fixedobj-space-start fixedobj-space-size)
-                varyobj-space-start (+ varyobj-space-start varyobj-space-size)))
        (defconstant default-dynamic-space-size
          ;; Build-time make-config.sh option "--dynamic-space-size" overrides
          ;; keyword argument :dynamic-space-size which overrides general default.

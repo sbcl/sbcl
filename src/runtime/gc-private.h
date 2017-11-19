@@ -272,4 +272,17 @@ static inline void protect_page(void* page_addr, page_index_t page_index)
 #define FUN_SELF_FIXNUM_TAGGED 0
 #endif
 
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+static inline void *
+fixedobj_page_address(low_page_index_t page_num)
+{
+    return (void*)(FIXEDOBJ_SPACE_START + (page_num * IMMOBILE_CARD_BYTES));
+}
+static inline void *
+varyobj_page_address(low_page_index_t page_num)
+{
+    return (void*)(VARYOBJ_SPACE_START + (page_num * IMMOBILE_CARD_BYTES));
+}
+#endif
+
 #endif /* _GC_PRIVATE_H_ */
