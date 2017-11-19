@@ -230,8 +230,9 @@
                                (typep val 'layout)))))
             (let ((constants (ir2-component-constants component)))
               (setf (tn-offset res)
-                    (vector-push-extend constant constants))
-              (setf (leaf-info constant) res)))
+                    (vector-push-extend constant constants))))
+          (when sc
+            (setf (leaf-info constant) res))
           (push-in tn-next res (ir2-component-constant-tns component))
           (setf (tn-leaf res) constant)
           res))))
