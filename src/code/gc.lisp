@@ -46,9 +46,10 @@
     (define-alien-variable ("VARYOBJ_SPACE_START" sb!vm:varyobj-space-start) unsigned-long))
   (defun immobile-space-addr-p (addr)
     (declare (type word addr))
-    (let ((start sb!vm:fixedobj-space-start))
-      (<= start addr (truly-the word (+ start (1- (+ sb!vm:fixedobj-space-size
-                                                     sb!vm:varyobj-space-size)))))))
+    (or (let ((start sb!vm:fixedobj-space-start))
+          (<= start addr (truly-the word (+ start (1- sb!vm:fixedobj-space-size)))))
+        (let ((start sb!vm:varyobj-space-start))
+          (<= start addr (truly-the word (+ start (1- sb!vm:varyobj-space-size)))))))
   (defun immobile-space-obj-p (obj)
     (immobile-space-addr-p (get-lisp-obj-address obj))))
 

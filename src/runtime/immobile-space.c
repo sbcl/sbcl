@@ -372,7 +372,6 @@ Threads A, and B, and C each want to claim index 6.
 void update_immobile_nursery_bits()
 {
   low_page_index_t max_used_fixedobj_page = calc_max_used_fixedobj_page();
-  low_page_index_t max_used_varyobj_page = calc_max_used_varyobj_page();
   low_page_index_t page;
 
   if (ENABLE_PAGE_PROTECTION) {
@@ -1743,7 +1742,7 @@ static void fixup_space(lispobj* where, size_t n_words)
     lispobj header_word;
     int widetag;
     long size;
-    int static_space_p = ((lispobj)where == STATIC_SPACE_START);
+    int __attribute__((unused)) static_space_p = ((lispobj)where == STATIC_SPACE_START);
     struct code* code;
 
     while (where < end) {
@@ -1858,13 +1857,6 @@ static void fixup_space(lispobj* where, size_t n_words)
 int* immobile_space_reloc_index;
 int* immobile_space_relocs;
 
-static int calc_n_pages(int n_objects, int words_per_object)
-{
-  words_per_object = ALIGN_UP(words_per_object, 2);
-  int objects_per_page = WORDS_PER_PAGE / words_per_object;
-  return (n_objects + objects_per_page - 1) / objects_per_page;
-}
-
 // Take and return an untagged pointer, or 0 if the object did not survive GC.
 static lispobj* get_load_address(lispobj* old)
 {
@@ -1874,6 +1866,7 @@ static lispobj* get_load_address(lispobj* old)
     return 0;
 }
 
+#if DEFRAGMENT_FIXEDOBJ_SUBSPACE
 // This does not accept (SIMPLE-ARRAY NIL (*))
 // (You'd have a pretty bad time trying making a symbol like that)
 static int schar(struct vector* string, int index)
@@ -1926,15 +1919,16 @@ static char* compute_defrag_start_address()
     return (char*)obj;
 }
 
+static int calc_n_pages(int n_objects, int words_per_object)
+{
+  words_per_object = ALIGN_UP(words_per_object, 2);
+  int objects_per_page = WORDS_PER_PAGE / words_per_object;
+  return (n_objects + objects_per_page - 1) / objects_per_page;
+}
+#endif
+
 void defrag_immobile_space(int* components, boolean verbose)
 {
-    // Find the starting address of fixed-size objects that will undergo defrag.
-    // Never move the first few pages of LAYOUTs or PACKAGEs created by genesis.
-    // If codegen becomes smarter, things like layout of FUNCTION and some
-    // some others can be used as immediate constants in compiled code.
-    // With initial packages, it's mainly a debugging convenience that they not move.
-    char* defrag_base = compute_defrag_start_address();
-    low_page_index_t page_index = find_immobile_page_index(defrag_base);
     lispobj* addr;
     int i;
 
@@ -1944,6 +1938,13 @@ void defrag_immobile_space(int* components, boolean verbose)
     bzero(sym_kind_histo, sizeof sym_kind_histo);
 
 #if DEFRAGMENT_FIXEDOBJ_SUBSPACE
+    // Find the starting address of fixed-size objects that will undergo defrag.
+    // Never move the first few pages of LAYOUTs or PACKAGEs created by genesis.
+    // If codegen becomes smarter, things like layout of FUNCTION and some
+    // some others can be used as immediate constants in compiled code.
+    // With initial packages, it's mainly a debugging convenience that they not move.
+    char* defrag_base = compute_defrag_start_address();
+    low_page_index_t page_index = find_immobile_page_index(defrag_base);
     low_page_index_t max_used_fixedobj_page = calc_max_used_fixedobj_page();
     for ( ; page_index <= max_used_fixedobj_page ; ++page_index) {
         int obj_spacing = fixedobj_page_obj_align(page_index);
