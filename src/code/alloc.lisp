@@ -290,9 +290,7 @@
               ;; 3. Extend the frontier.
               (let* ((addr (sap-int *varyobj-space-free-pointer*))
                      (free-ptr (+ addr n-bytes))
-                     (limit (+ varyobj-space-start
-                               (- varyobj-space-size immobile-card-bytes))))
-                ;; The last page can't be used, because GC uses it as scratch space.
+                     (limit (+ varyobj-space-start varyobj-space-size)))
                 (when (> free-ptr limit)
                   (format t "~&Immobile space exhausted~%")
                   (sb!impl::%halt))

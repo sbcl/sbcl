@@ -375,22 +375,16 @@ void update_immobile_nursery_bits()
   low_page_index_t max_used_varyobj_page = calc_max_used_varyobj_page();
   low_page_index_t page;
 
-  immobile_scav_queue = (unsigned int*)low_page_address(max_used_varyobj_page+1);
-  gc_assert((FIXEDOBJ_SPACE_START + IMMOBILE_SPACE_TOTAL_SIZE
-             - (uword_t)immobile_scav_queue) / sizeof(int)
-            >= QCAPACITY);
-
   if (ENABLE_PAGE_PROTECTION) {
       // Unprotect the in-use ranges. Any page could be written during scavenge
       os_protect((os_vm_address_t)FIXEDOBJ_SPACE_START,
                  (lispobj)fixedobj_free_pointer - FIXEDOBJ_SPACE_START,
                  OS_VM_PROT_ALL);
 
-      // varyobj_free_ptr is typically not page-aligned - only by random chance
-      // might it be. Additionally we need a page beyond that for the re-scan queue.
-      os_vm_address_t limit = (char*)immobile_scav_queue + IMMOBILE_CARD_BYTES;
+      // varyobj_free_ptr is typically not page-aligned
       os_protect((os_vm_address_t)VARYOBJ_SPACE_START,
-                 limit - (os_vm_address_t)VARYOBJ_SPACE_START,
+                 ALIGN_UP((uword_t)varyobj_free_pointer,
+                          IMMOBILE_CARD_BYTES) - VARYOBJ_SPACE_START,
                  OS_VM_PROT_ALL);
   }
 
@@ -733,7 +727,6 @@ void set_immobile_space_hints()
 
 void write_protect_immobile_space()
 {
-    immobile_scav_queue = NULL;
     immobile_scav_queue_head = 0;
 
     set_immobile_space_hints();
@@ -1201,6 +1194,8 @@ static void gc_init_immobile()
     memset(varyobj_page_touched_bits, 0xff, n_bitmap_elts * sizeof (int));
     varyobj_page_scan_start_offset = (unsigned short*)(varyobj_page_touched_bits + n_bitmap_elts);
     varyobj_page_gens = (unsigned char*)(varyobj_page_scan_start_offset + n_varyobj_pages);
+    // Scav queue is arbitrarily located.
+    immobile_scav_queue = malloc(IMMOBILE_CARD_BYTES);
 }
 
 /* Because the immobile page table is not dumped into a core image,
