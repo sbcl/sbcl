@@ -53,7 +53,9 @@
                          (realpart object)
                          object)))
             (ecase (numeric-type-class type)
-              (integer (integerp num))
+              (integer (and (integerp num)
+                            (or (not (complexp object))
+                                (integerp (imagpart object)))))
               (rational (rationalp num))
               (float
                (ecase (numeric-type-format type)

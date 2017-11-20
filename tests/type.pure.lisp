@@ -649,3 +649,8 @@
                  '(string 10)))
   (assert (equal (type-specifier (specifier-type '(simple-string 10)))
                  '(simple-string 10))))
+
+(in-package "CL-USER")
+
+(with-test (:name (typep :complex-integer))
+  (assert (not (eval '(typep #c(0 1/2) '(complex integer))))))
