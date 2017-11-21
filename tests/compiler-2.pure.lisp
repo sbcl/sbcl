@@ -635,3 +635,16 @@
            (declare (type (vector t) v))
            (fill v nil))
       ((vector) vector))))
+
+(with-test (:name :missing-error-context)
+  (flet ((run ()
+          (let ((string
+                 (with-output-to-string (*error-output*)
+                   (compile nil '(sb-int:named-lambda bob () (otherfun) 3)))))
+            (assert (search "in: SB-INT:NAMED-LAMBDA BOB" string)))))
+    (run)
+    ;; Unrepeatability is confusing:
+    ;; The first compiler invocation used to leave *last-format-string*
+    ;; with a toplevel value, so the second would not print enough context
+    ;; because the format control and args were the same.
+    (run)))

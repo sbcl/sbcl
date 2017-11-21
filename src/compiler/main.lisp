@@ -258,7 +258,9 @@ Examples:
                                    (let ((x (undefined-warning-name x)))
                                      (if (symbolp x)
                                          (symbol-name x)
-                                         (prin1-to-string x)))))))
+                                         (prin1-to-string x))))))
+              (*last-message-count* (list* 0 nil nil))
+              (*last-error-context* nil))
           (dolist (kind '(:variable :function :type))
             (let ((names (mapcar #'undefined-warning-name
                                    (remove kind undefs :test #'neq
@@ -1729,9 +1731,6 @@ necessary, since type inference may take arbitrarily long to converge.")
            (declare (ignore error))
            (return-from sub-compile-file (values t t t))))
         (*current-path* nil)
-        (*last-format-string* nil)
-        (*last-format-args* nil)
-        (*last-message-count* 0)
         (*compiler-sset-counter* 0)
         (sb!xc:*gensym-counter* 0))
     (handler-case
@@ -1898,6 +1897,8 @@ SPEED and COMPILATION-SPEED optimization values, and the
          (source-info
           (make-file-source-info input-pathname external-format
                                  #-sb-xc-host t)) ; can't track, no SBCL streams
+         (*last-message-count* (list* 0 nil nil))
+         (*last-error-context* nil)
          (*compiler-trace-output* nil)) ; might be modified below
 
     (unwind-protect

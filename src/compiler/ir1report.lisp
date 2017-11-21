@@ -244,31 +244,31 @@
 ;;; so that we don't print it out redundantly.
 
 ;;; The last COMPILER-ERROR-CONTEXT that we printed.
-(defvar *last-error-context* nil)
+(defvar *last-error-context*)
 (declaim (type (or compiler-error-context null) *last-error-context*))
 
 ;;; The format string and args for the last error we printed.
-(defvar *last-format-string* nil)
-(defvar *last-format-args* nil)
-(declaim (type (or string null) *last-format-string*))
-(declaim (type list *last-format-args*))
+(define-symbol-macro *last-format-string*
+  (the (or string null) (cadr *last-message-count*)))
+(define-symbol-macro *last-format-args* (cddr *last-message-count*))
 
 ;;; The number of times that the last error message has been emitted,
 ;;; so that we can compress duplicate error messages.
-(defvar *last-message-count* 0)
-(declaim (type index *last-message-count*))
+(defvar *last-message-count*)
+(declaim (type (cons index (cons (or string null) t)) *last-message-count*))
 
 ;;; If the last message was given more than once, then print out an
 ;;; indication of how many times it was repeated. We reset the message
 ;;; count when we are done.
-(defun note-message-repeats (stream &optional (terpri t))
-  (cond ((= *last-message-count* 1)
+(defun note-message-repeats (stream &optional (terpri t)
+                                    &aux (count (car *last-message-count*)))
+  (cond ((= count 1)
          (when terpri
            (terpri stream)))
-        ((> *last-message-count* 1)
+        ((> count 1)
          (format stream "~&; [Last message occurs ~W times.]~2%"
-                 *last-message-count*)))
-  (setq *last-message-count* 0))
+                 count)))
+  (setf (car *last-message-count*) 0))
 
 ;;; Print out the message, with appropriate context if we can find it.
 ;;; If the context is different from the context of the last message
@@ -356,7 +356,7 @@
       (format stream "~&~?" format-string format-args))
     (fresh-line stream))
 
-  (incf *last-message-count*)
+  (incf (car *last-message-count*))
   (values))
 
 (defun print-compiler-condition (condition)

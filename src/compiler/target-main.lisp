@@ -46,9 +46,7 @@
                    (and (member :msan *features*)
                         (find-dynamic-foreign-symbol-address "__msan_unpoison")))
                   (*current-path* nil)
-                  (*last-format-string* nil)
-                  (*last-format-args* nil)
-                  (*last-message-count* 0)
+                  (*last-message-count* (list* 0 nil nil))
                   (*last-error-context* nil)
                   (*gensym-counter* 0)
                   ;; KLUDGE: This rebinding of policy is necessary so that
