@@ -105,7 +105,10 @@
           (labels ((make-tn ()
                      (make-representation-tn ptype scn))
                    (frob-tn (tn)
-                     (if (constant-tn-p tn)
+                     ;; Careful not to load constants which require boxing
+                     ;; and may overwrite the flags.
+                     ;; Representation selection should avoid that.
+                     (if (eq (tn-kind tn) :constant)
                          tn
                          (make-tn))))
             (values vop
