@@ -464,6 +464,7 @@ catch_exception_raise(mach_port_t exception_port,
 
     return ret;
 }
+#endif
 
 void
 os_restore_fp_control(os_context_t *context)
@@ -480,7 +481,7 @@ os_restore_fp_control(os_context_t *context)
     asm ("fldcw %0" : : "m" (fpu_control_word));
 }
 
-#endif
+
 
 os_context_register_t *
 os_context_float_register_addr(os_context_t *context, int offset)
