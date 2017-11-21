@@ -59,8 +59,12 @@
                              (fdefn-fun fdefn))))
                      (function value)
                      (t
-                      (still-bad "Bad value when restarting ~s: ~s"
-                                 name value)))
+                      (if (valid-function-name-p value)
+                          (let ((fdefn (find-fdefn value)))
+                            (and fdefn
+                                 (fdefn-fun fdefn)))
+                          (still-bad "Bad value when restarting ~s: ~s"
+                                     name value))))
                    (still-bad (if (fdefn-p value)
                                   "~S is still undefined"
                                   "Can't replace ~s with ~s because it is undefined")
