@@ -1002,7 +1002,8 @@
                      (ignore-errors -732893970))))
     ((705347625) -570344431)))
 (with-test (:name (compile :node/lvar :derive-type :misc.2))
-  (checked-compile-and-assert (:allow-style-warnings t)
+  (checked-compile-and-assert (:allow-style-warnings t
+                               :allow-warnings t)
       '(lambda (b)
          (declare (type (integer -1598566306 2941) b))
          (max -148949 (ignore-errors b)))
