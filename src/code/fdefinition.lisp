@@ -106,6 +106,24 @@
           (sb!pcl::ensure-accessor name))
         fdefn)))
 
+;;; Return T if FUNCTION is the error-signaling trampoline for a macro or a
+;;; special operator. Test for this by seeing whether FUNCTION is the same
+;;; closure as for a known macro.
+(declaim (inline macro/special-guard-fun-p))
+(defun macro/special-guard-fun-p (function)
+  ;; When inlined, this is a few instructions shorter than CLOSUREP
+  ;; if we already know that FUNCTION is a function.
+  ;; It will signal a type error if not, which is the right thing to do anyway.
+  ;; (this isn't quite a true predicate)
+  (and (= (fun-subtype function) sb!vm:closure-widetag)
+       ;; This test needs to reference the name of any macro, but in order for
+       ;; cold-init to work, the macro has to be defined first.
+       ;; So pick DX-LET, as it's in primordial-extensions.
+       ;; Prior to cold-init fixing up the load-time-value, this compares
+       ;; %closure-fun to 0, which is ok - it returns NIL.
+       (eq (load-time-value (%closure-fun (symbol-function 'dx-let)) t)
+           (%closure-fun function))))
+
 ;;; Remove NAME's FTYPE information unless it was explicitly PROCLAIMED.
 ;;; The NEW-FUNCTION argument is presently unused, but could be used
 ;;; for checking compatibility of the NEW-FUNCTION against a proclamation.
@@ -122,61 +140,50 @@
 ;;; but as we've defined FDEFINITION, that strips encapsulations.
 (defmacro %coerce-name-to-fun (name &optional (lookup-fn 'find-fdefn)
                                     strictly-functionp)
-  `(block nil
-     (let ((name ,name))
-       (tagbody retry
-          (let ((fdefn (,lookup-fn name)))
-            (when fdefn
-              (let ((f (fdefn-fun (truly-the fdefn fdefn))))
+  (declare (boolean strictly-functionp))
+  `(let* ((name ,name) (fdefn (,lookup-fn name)) f)
+     (if (and fdefn
+              (setq f (fdefn-fun (truly-the fdefn fdefn)))
                 ;; If STRICTLY-FUNCTIONP is true, we make sure not to return an error
                 ;; trampoline. This extra check ensures that full calls such as
                 ;; (MAPCAR 'OR '()) signal an error that OR isn't a function.
                 ;; This accords with the non-requirement that macros store strictly
                 ;; a function in the symbol that names them. In many implementations,
                 ;; (FUNCTIONP (SYMBOL-FUNCTION 'OR)) => NIL. We want to pretend that.
-                (when f
-                  (,@(if strictly-functionp
-                         '(unless (macro/special-guard-fun-p f))
-                         '(progn))
-                   (return f)))))
-            (setf name
-                  (let ((name name))
-                    ;; Avoid making the initial NAME a value cell,
-                    ;; it will cons even if no restarts are reached
-                    (restart-case (error 'undefined-function :name name)
-                      (continue ()
-                        :report (lambda (stream)
-                                  (format stream "Retry using ~s." name))
-                        name)
-                      (use-value (value)
-                        :report (lambda (stream)
-                                  (format stream "Use specified function"))
-                        :interactive read-evaluated-form
-                        (when (functionp value)
-                          (return value))
-                        (the ,(if (eq lookup-fn 'symbol-fdefn)
-                                  'symbol
-                                  t)
-                             value)))))
-            (go retry))))))
+              ,@(if strictly-functionp '((not (macro/special-guard-fun-p f)))))
+         f
+         (retry-%coerce-name-to-fun name ,strictly-functionp))))
 
-;; Return T if FUNCTION is the error-signaling trampoline
-;; for a macro or a special operator. Test for this by seeing
-;; whether FUNCTION is the same closure as for a known macro.
-;; For cold-init to work, this must pick any macro defined before
-;; this function is. A safe choice is a macro from this same file.
-(declaim (inline macro/special-guard-fun-p))
-(defun macro/special-guard-fun-p (function)
-  ;; When inlined, this is a few instructions shorter than CLOSUREP
-  ;; if we already know that FUNCTION is a function.
-  ;; It will signal a type error if not, which is the right thing to do anyway.
-  ;; (this isn't quite a true predicate)
-  (and (= (fun-subtype function) sb!vm:closure-widetag)
-       ;; Prior to cold-init fixing up the load-time-value, this compares
-       ;; %closure-fun to 0, which is ok - it returns NIL.
-       (eq (load-time-value (%closure-fun (symbol-function '%coerce-name-to-fun))
-                            t)
-           (%closure-fun function))))
+;;; If %COERCE-NAME-TO-FUN fails, continue here.
+;;; LOOKUP-FN, being more about speed than semantics, is irrelevant.
+;;; Once we're forced down the slow path, it doesn't matter whether the fdefn
+;;; lookup considers generalized function names (which require a hash-table)
+;;; versus optimizing for just symbols (by using SYMBOL-INFO).
+;;;
+;;; Furthermore we explicitly allow any function name when retrying,
+;;; even if the erring caller was SYMBOL-FUNCTION. It is consistent
+;;; that both #'(SETF MYNEWFUN) and '(SETF MYNEWFUN) are permitted
+;;; as the object to use in the USE-VALUE restart.
+(defun retry-%coerce-name-to-fun (name strictly-functionp)
+  (setq name (restart-case (error 'undefined-function :name name)
+               (continue ()
+                 :report (lambda (stream)
+                           (format stream "Retry using ~s." name))
+                 name)
+               (use-value (value)
+                 :report (lambda (stream)
+                           (format stream "Use specified function"))
+                 :interactive read-evaluated-form
+                 (if (functionp value)
+                     (return-from retry-%coerce-name-to-fun value)
+                     value))))
+  (let ((fdefn (find-fdefn name)))
+    (when fdefn
+      (let ((f (fdefn-fun (truly-the fdefn fdefn))))
+        (when (and f (or (not strictly-functionp)
+                         (not (macro/special-guard-fun-p f))))
+          (return-from retry-%coerce-name-to-fun f)))))
+  (retry-%coerce-name-to-fun name strictly-functionp))
 
 ;; Coerce CALLABLE (a function-designator) to a FUNCTION.
 ;; The compiler emits this when someone tries to FUNCALL something.

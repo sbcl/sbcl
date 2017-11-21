@@ -537,6 +537,23 @@
       (assert (eq (test-use-value call) 11))
       (assert (eq (test-use-value return) value-lambda)))))
 
+(defun (setf thing) (a b) (declare (ignore b)) a)
+
+;;; Assert that the USE-VALUE restart for SYMBOL-FUNCTION
+;;; lets you specify any function.
+(with-test (:name :undefined-restart-symbol-function
+            :skipped-on '(not :x86-64))
+  (flet ((test-use-value (value-to-use)
+           (let ((f (handler-bind
+                        ((undefined-function
+                          (lambda (c)
+                            (declare (ignore c))
+                            (use-value value-to-use))))
+                      (symbol-function 'nonexistent-fun))))
+             (assert (eq :win (funcall f :win 'whatever))))))
+    (test-use-value #'(setf thing))
+    (test-use-value '(setf thing))))
+
 (with-test (:name :unknown-key-restart)
   (handler-bind ((sb-ext:unknown-keyword-argument
                    (lambda (c)
