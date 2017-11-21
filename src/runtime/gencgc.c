@@ -3943,6 +3943,16 @@ gc_init(void)
 #if defined(LISP_FEATURE_SB_SAFEPOINT)
     alloc_gc_page();
 #endif
+    // Verify that foo_BIT constants agree with the C compiler's bit packing
+    // and that we can compute the correct adddress of the bitfields.
+    // These tests can be optimized out of the emitted code by a good compiler.
+    struct page test;
+    unsigned char *pflagbits = (unsigned char*)&test.gen - 1;
+    memset(&test, 0, sizeof test);
+    *pflagbits = WRITE_PROTECTED_BIT;
+    gc_assert(test.write_protected);
+    *pflagbits = WP_CLEARED_BIT;
+    gc_assert(test.write_protected_cleared);
 }
 
 void gc_allocate_ptes()
@@ -4307,10 +4317,9 @@ gencgc_handle_wp_violation(void* fault_addr)
         return 0;
 
     } else {
-        int ret;
-        ret = thread_mutex_lock(&free_pages_lock);
-        gc_assert(ret == 0);
-        if (page_table[page_index].write_protected) {
+        unsigned char *pflagbits = (unsigned char*)&page_table[page_index].gen - 1;
+        unsigned char flagbits = __sync_fetch_and_add(pflagbits, 0);
+        if (flagbits & WRITE_PROTECTED_BIT) {
             unprotect_page_index(page_index);
         } else if (!ignore_memoryfaults_on_unprotected_pages) {
             /* The only acceptable reason for this signal on a heap
@@ -4319,7 +4328,7 @@ gencgc_handle_wp_violation(void* fault_addr)
              * we had better not have the second one lose here if it
              * does this test after the first one has already set wp=0
              */
-            if(page_table[page_index].write_protected_cleared != 1) {
+            if (!(flagbits & WP_CLEARED_BIT)) {
                 void lisp_backtrace(int frames);
                 lisp_backtrace(10);
                 fprintf(stderr,
@@ -4346,8 +4355,6 @@ gencgc_handle_wp_violation(void* fault_addr)
                     lose("Feh.\n");
             }
         }
-        ret = thread_mutex_unlock(&free_pages_lock);
-        gc_assert(ret == 0);
         /* Don't worry, we can handle it. */
         return 1;
     }

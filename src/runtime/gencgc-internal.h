@@ -139,6 +139,13 @@ struct page {
     generation_index_t gen;
 };
 extern struct page *page_table;
+#ifdef LISP_FEATURE_BIG_ENDIAN
+#define WRITE_PROTECTED_BIT (1<<4)
+#define WP_CLEARED_BIT (1<<3)
+#else
+#define WRITE_PROTECTED_BIT (1<<3)
+#define WP_CLEARED_BIT (1<<4)
+#endif
 
 struct __attribute__((packed)) corefile_pte {
   uword_t sso; // scan start offset
