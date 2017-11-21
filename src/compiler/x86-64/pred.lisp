@@ -105,7 +105,7 @@
           (labels ((make-tn ()
                      (make-representation-tn ptype scn))
                    (frob-tn (tn)
-                     (if (immediate-tn-p tn)
+                     (if (constant-tn-p tn)
                          tn
                          (make-tn))))
             (values vop
