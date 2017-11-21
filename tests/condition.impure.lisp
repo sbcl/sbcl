@@ -508,7 +508,7 @@
   (assert (integerp (this-should-fail)))) ; but not now it shouldn't
 
 (with-test (:name :undefined-restart
-            :skipped-on '(not :x86-64)) ;; jut not implemented yet
+            :skipped-on '(not :undefined-fun-restarts))
   (let* ((name (gensym))
          (tail-call (checked-compile `(lambda () (,name)) :allow-style-warnings t))
          (call (checked-compile `(lambda () (1+ (,name))) :allow-style-warnings t))
@@ -541,8 +541,7 @@
 
 ;;; Assert that the USE-VALUE restart for SYMBOL-FUNCTION
 ;;; lets you specify any function.
-(with-test (:name :undefined-restart-symbol-function
-            :skipped-on '(not :x86-64))
+(with-test (:name :undefined-restart-symbol-function)
   (flet ((test-use-value (value-to-use)
            (let ((f (handler-bind
                         ((undefined-function
