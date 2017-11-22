@@ -467,11 +467,9 @@
       *wild-type*))
 
 (deftransform %sap-alien ((sap type) * *)
+  "optimize away %SAP-ALIEN"
   (give-up-ir1-transform
-   ;; FIXME: The hardcoded newline here causes more-than-usually
-   ;; screwed-up formatting of the optimization note output.
-   "could not optimize away %SAP-ALIEN: forced to do runtime ~@
-    allocation of alien-value structure"))
+   "forced to do runtime allocation of alien-value structure"))
 
 ;;;; NATURALIZE/DEPORT/EXTRACT/DEPOSIT magic
 
