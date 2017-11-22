@@ -268,8 +268,8 @@
 ;;;   :IMPORTANT
 ;;;           - If the transform fails and :IMPORTANT is
 ;;;               NIL,       then never print an efficiency note.
-;;;               :SLIGHTLY, then print a note if SPEED>=INHIBIT-WARNINGS.
-;;;               T,         then print a note if SPEED>INHIBIT-WARNINGS.
+;;;               :SLIGHTLY, then print a note if SPEED>INHIBIT-WARNINGS.
+;;;               T,         then print a note if SPEED>=INHIBIT-WARNINGS.
 ;;;             :SLIGHTLY is the default.
 (defmacro deftransform (name (lambda-list &optional (arg-types '*)
                                           (result-type '*)
