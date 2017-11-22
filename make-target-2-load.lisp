@@ -110,6 +110,16 @@
     (when (plusp count)
       (format t "~&Removed ~D doc string~:P" count)))
 
+  ;; Remove source forms of compiled-to-memory lambda expressions.
+  ;; The disassembler is the major culprit for retention of these.
+  (sb-vm::map-allocated-objects
+   (lambda (obj type size)
+     (declare (ignore size))
+     (when (typep obj 'sb-c::debug-source)
+       (unless (sb-c::debug-source-namestring obj)
+         (setf (sb-c::debug-source-form obj) nil))))
+   :all)
+
   ;; Unintern no-longer-needed stuff before the possible PURIFY in
   ;; SAVE-LISP-AND-DIE.
   #-sb-fluid (!unintern-init-only-stuff)

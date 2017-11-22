@@ -350,7 +350,7 @@
 
   ;; For functions processed by EVAL (including EVAL-WHEN and LOAD on
   ;; a source file), the source form.
-  (form nil :type list :read-only t)
+  (form nil :type list :read-only nil)
   ;; This is the function whose source is the form.
   (function nil :read-only t)
 
