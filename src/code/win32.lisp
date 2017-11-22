@@ -835,11 +835,15 @@ absense."
   (whence dword))
 
 (defun lseeki64 (handle offset whence)
-  (multiple-value-bind (moved to-place)
-      (set-file-pointer-ex handle offset whence)
-    (if moved
-        (values to-place 0)
-        (values -1 (get-last-error)))))
+  (let ((type (get-file-type handle)))
+    (if (or (= type file-type-char)
+	    (= type file-type-disk))
+	(multiple-value-bind (moved to-place)
+	    (set-file-pointer-ex handle offset whence)
+	  (if moved
+	      (values to-place 0)
+	      (values -1 (get-last-error))))
+	(values -1 0))))
 
 ;; File mapping support routines
 (define-alien-routine (#!+sb-unicode "CreateFileMappingW"
