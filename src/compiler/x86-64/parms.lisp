@@ -104,10 +104,7 @@
 
 (!gencgc-space-setup #x20000000
                      :dynamic-space-start #x1000000000
-
-                     #!+openbsd :dynamic-space-size #!+openbsd #x1bcf0000
-
-                     #!+win32 :alignment #!+win32 #x10000)
+                     #!+openbsd :dynamic-space-size #!+openbsd #x1bcf0000)
 
 (defconstant linkage-table-entry-size 16)
 

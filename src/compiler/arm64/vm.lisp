@@ -364,3 +364,11 @@
   (make-random-tn :kind :normal
                   :sc (sc-or-lose '32-bit-reg)
                   :offset (tn-offset tn)))
+
+;;; null-tn will be used for setting it, just check the lowtag
+#!+sb-thread
+(defconstant pseudo-atomic-flag
+    (ash list-pointer-lowtag #!+little-endian 0 #!+big-endian 32))
+#!+sb-thread
+(defconstant pseudo-atomic-interrupted-flag
+    (ash list-pointer-lowtag #!+little-endian 32 #!+big-endian 0))

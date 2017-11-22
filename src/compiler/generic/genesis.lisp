@@ -225,7 +225,7 @@
   ;; a BIGNUM if the host's fixnum is limited in size.
   ;; So it's not clear whether this test belongs here, because if we do need it,
   ;; then it best belongs where we assign space addresses in the first place.
-  (let ((target-space-alignment (ash 1 16)))
+  (let ((target-space-alignment sb!c:+backend-page-bytes+))
     (unless (zerop (rem byte-address target-space-alignment))
       (error "The byte address #X~X is not aligned on a #X~X-byte boundary."
              byte-address target-space-alignment)))
@@ -2892,7 +2892,7 @@ core and return a descriptor to it."
     (flet ((check (start end space)
              (unless (< start end)
                (error "Bogus space: ~A" space))
-             (let ((type (specifier-type `(integer ,start ,end))))
+             (let ((type (specifier-type `(integer ,start (,end)))))
                (dolist (other types)
                  (unless (eq *empty-type* (type-intersection (cdr other) type))
                    (error "Space overlap: ~A with ~A" space (car other))))

@@ -44,8 +44,6 @@
 ;;     gencgc does not purify any more.  We can count on being able to
 ;;     allocate them with roughly the same size, and next to each other.
 ;;
-;;     There is one page of unmapped buffer between them for good measure.
-;;
 ;;     The linkage table (if enabled) can be treated the same way.
 ;;
 ;;     Dynamic space traditionally sits elsewhere, so has its own
@@ -53,19 +51,7 @@
 ;;     the other spaces (used on Windows/x86).
 ;;
 ;;     The safepoint page (if enabled) is to be allocated immediately
-;;     prior to static page.  For x86(-64) this would not matter, because
-;;     they can only reference it using an absolute fixup anyway, but
-;;     for RISC platforms we can (and must) do better.
-;;
-;;     The safepoint page needs to be small enough that the offset from
-;;     static space is immediate, e.g. >= -2^12 for SPARC.  #x1000 works
-;;     for almost all platforms, but is too small to make VirtualProtect
-;;     happy -- hence the need for an extra `alignment' configuration
-;;     option below, which parms.lisp can set to #x10000 on Windows.
-;;     To clarify: there is a gap at the end of read-only space to
-;;     the safepoint page, but no gap at the end of the latter
-;;     to the start of static space. (What do these gaps achieve?)
-;;
+;;     prior to static page.
 (defmacro !gencgc-space-setup
     (small-spaces-start
           &key ((:dynamic-space-start dynamic-space-start*))
@@ -77,13 +63,7 @@
                ((:fixedobj-space-size  fixedobj-space-size*) (* 24 1024 1024))
                ((:varyobj-space-start  varyobj-space-start*))
                ((:varyobj-space-size   varyobj-space-size*) (* 104 1024 1024))
-               ;; Smallest os_validate()able alignment; used as safepoint
-               ;; page size.  Default suitable for POSIX platforms.
-               (alignment            #x1000)
-               ;; traditional distance between spaces -- including the margin:
-               (small-space-spread #x100000)
-               ;; traditional margin between spaces
-               (margin-size          #x1000))
+               (small-space-size #x100000))
   (declare (ignorable dynamic-space-start*)) ; might be unused in make-host-2
   (flet ((defconstantish (relocatable symbol value)
            (if (not relocatable) ; easy case
@@ -95,65 +75,56 @@
                ;; but can't be due to dependency order problem.
                )))
     (let*
-        ((spaces (append `((read-only . ,small-space-spread)
-                           (static . ,small-space-spread))
+        ((spaces (append `((read-only ,small-space-size)
+                           ;#!+sb-safepoint
+                           (safepoint ,+backend-page-bytes+ gc-safepoint-page-addr)
+                           (static ,small-space-size))
                          #!+linkage-table
-                         `((linkage-table . ,small-space-spread))
+                         `((linkage-table ,small-space-size))
                          #!+immobile-space
-                         `((fixedobj . ,fixedobj-space-size*)
-                           (varyobj . ,varyobj-space-size*))))
+                         `((fixedobj ,fixedobj-space-size*)
+                           (varyobj ,varyobj-space-size*))))
          (ptr small-spaces-start)
-         safepoint-address
          (small-space-forms
-          (loop for (space . size) in spaces appending
-                (let* ((relocatable
-                        ;; TODO: linkage-table could move with code, if the CPU
-                        ;; prefers PC-relative jumps, and we emit better code
-                        ;; (which we don't- for x86 we jmp via RBX always)
-                        #!+relocatable-heap (member space '(fixedobj varyobj)))
-                       (start ptr)
-                       (end (+ ptr size)))
-                  (setf ptr end)
-                  (when (eq space 'read-only)
-                    ;; margin becomes safepoint page; substract margin again.
-                    (decf end alignment)
-                    (setf safepoint-address end))
-                  (let ((start-sym (symbolicate space "-SPACE-START")))
-                    ;; Allow expressly given addresses / sizes for immobile space.
-                    ;; The addresses are for testing only - you should not need them.
-                    (case space
-                      (varyobj  (setq start (or varyobj-space-start* start)
-                                      end (+ start varyobj-space-size*)))
-                      (fixedobj (setq start (or fixedobj-space-start* start)
-                                      end (+ start fixedobj-space-size*)))
-                      (t        (setq end (- end margin-size))))
-                    `(,(defconstantish relocatable start-sym start)
-                      ,(cond ((not relocatable)
-                              `(defconstant ,(symbolicate space "-SPACE-END") ,end))
-                             #-sb-xc-host ((eq space 'varyobj)) ; don't emit anything
-                             (t
-                              `(defconstant ,(symbolicate space "-SPACE-SIZE")
-                                 ,(- end start)))))))))
-         (safepoint-page-forms
-          (list #!+sb-safepoint
-                `(defconstant gc-safepoint-page-addr ,safepoint-address)))
-         )
-    ;; CCL warns about a variable that is assigned but never read.
-    ;; That's actually reasonable. We consider it used, as do others.
-    safepoint-address ; "use" it here just to be sure it's used
-    `(progn
-       ,@safepoint-page-forms
-       ,@small-space-forms
-       ,(defconstantish (or #!+relocatable-heap t) 'dynamic-space-start
-          (or dynamic-space-start* ptr))
-       (defconstant default-dynamic-space-size
-         ;; Build-time make-config.sh option "--dynamic-space-size" overrides
-         ;; keyword argument :dynamic-space-size which overrides general default.
-         ;; All are overridden by runtime --dynamic-space-size command-line arg.
-         (or ,(or (!read-dynamic-space-size) dynamic-space-size*)
-             (ecase n-word-bits
-               (32 (expt 2 29))
-               (64 (expt 2 30)))))))))
+           (loop for (space size var-name) in spaces
+                 appending
+                 (let* ((relocatable
+                          ;; TODO: linkage-table could move with code, if the CPU
+                          ;; prefers PC-relative jumps, and we emit better code
+                          ;; (which we don't- for x86 we jmp via RBX always)
+                          #!+relocatable-heap (member space '(fixedobj varyobj)))
+                        (start ptr)
+                        (end (+ ptr size)))
+                   (setf ptr end)
+                   (if var-name
+                       `((defconstant ,var-name ,start))
+                       (let ((start-sym (symbolicate space "-SPACE-START")))
+                         ;; Allow expressly given addresses / sizes for immobile space.
+                         ;; The addresses are for testing only - you should not need them.
+                         (case space
+                           (varyobj  (setq start (or varyobj-space-start* start)
+                                           end (+ start varyobj-space-size*)))
+                           (fixedobj (setq start (or fixedobj-space-start* start)
+                                           end (+ start fixedobj-space-size*))))
+                         `(,(defconstantish relocatable start-sym start)
+                           ,(cond ((not relocatable)
+                                   `(defconstant ,(symbolicate space "-SPACE-END") ,end))
+                                  #-sb-xc-host ((eq space 'varyobj)) ; don't emit anything
+                                  (t
+                                   `(defconstant ,(symbolicate space "-SPACE-SIZE")
+                                      ,(- end start)))))))))))
+      `(progn
+         ,@small-space-forms
+         ,(defconstantish (or #!+relocatable-heap t) 'dynamic-space-start
+            (or dynamic-space-start* ptr))
+         (defconstant default-dynamic-space-size
+           ;; Build-time make-config.sh option "--dynamic-space-size" overrides
+           ;; keyword argument :dynamic-space-size which overrides general default.
+           ;; All are overridden by runtime --dynamic-space-size command-line arg.
+           (or ,(or (!read-dynamic-space-size) dynamic-space-size*)
+               (ecase n-word-bits
+                 (32 (expt 2 29))
+                 (64 (expt 2 30)))))))))
 
 (defconstant-eqx +c-callable-fdefns+
   '(sub-gc

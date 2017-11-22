@@ -18,11 +18,6 @@
 ;;;; compiler constants
 
 (defconstant +backend-fasl-file-implementation+ :sparc)
-
-(setf *backend-register-save-penalty* 3)
-
-(setf *backend-byte-order* :big-endian)
-
 (defconstant +backend-page-bytes+ 8192)
 
 ;;; The size in bytes of GENCGC cards, i.e. the granularity at which

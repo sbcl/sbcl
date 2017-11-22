@@ -109,6 +109,7 @@
 
  ;; for various constants e.g. SB!XC:MOST-POSITIVE-FIXNUM and
  ;; SB!VM:N-LOWTAG-BITS, needed by "early-objdef" and others
+ ("src/compiler/target/backend-parms" :c-headers)
  ("src/compiler/generic/parms" :c-headers)
  ("src/compiler/target/parms" :c-headers)
  ("src/compiler/generic/early-vm" :c-headers)
@@ -308,9 +309,6 @@
 
  ;; for e.g. MAX-VOP-TN-REFS, needed by "meta-vmdef"
  ("src/compiler/vmdef" :c-headers)
-
- ;; needs "backend"
- ("src/compiler/target/backend-parms" :c-headers)
 
  ("src/code/force-delayed-defbangconstants")
  ("src/code/defmacro" :c-headers)

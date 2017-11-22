@@ -1,9 +1,6 @@
 (in-package "SB!VM")
 
 (defconstant +backend-fasl-file-implementation+ :arm)
-(setf *backend-byte-order*
-      #!+little-endian :little-endian
-      #!-little-endian :big-endian)
 
   ;; Minumum observed value, not authoritative.
 (defconstant +backend-page-bytes+ #!+linux 4096 #!+netbsd 8192)

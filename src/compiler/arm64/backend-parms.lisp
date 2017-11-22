@@ -2,10 +2,6 @@
 
 (defconstant +backend-fasl-file-implementation+ :arm64)
 
-(setf *backend-byte-order*
-      #!+little-endian :little-endian
-      #!+big-endian :big-endian)
-
   ;; Can be in the range 4K-64K
 (defconstant +backend-page-bytes+ 65536)
 
@@ -21,11 +17,3 @@
 ;;; The minimum size at which we release address ranges to the OS.
 ;;; This must be a multiple of the OS page size.
 (defconstant gencgc-release-granularity +backend-page-bytes+)
-
-;;; null-tn will be used for setting it, just check the lowtag
-#!+sb-thread
-(defconstant pseudo-atomic-flag
-    (ash list-pointer-lowtag #!+little-endian 0 #!+big-endian 32))
-#!+sb-thread
-(defconstant pseudo-atomic-interrupted-flag
-    (ash list-pointer-lowtag #!+little-endian 32 #!+big-endian 0))

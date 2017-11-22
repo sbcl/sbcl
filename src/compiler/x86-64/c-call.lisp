@@ -252,6 +252,10 @@
   (:generator 2
    (inst mov res (make-fixup foreign-symbol :foreign-dataref))))
 
+#!+sb-safepoint
+(defconstant thread-saved-csp-offset
+  (- (/ +backend-page-bytes+ n-word-bytes)))
+
 (define-vop (call-out)
   (:args (function :scs (sap-reg)
                    :target rbx)

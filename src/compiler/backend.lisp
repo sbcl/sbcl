@@ -25,12 +25,14 @@
 
 ;;; the number of references that a TN must have to offset the
 ;;; overhead of saving the TN across a call
-(defvar *backend-register-save-penalty* 0)
+(defvar *backend-register-save-penalty* 3)
 (declaim (type index *backend-register-save-penalty*))
 
 ;;; the byte order of the target machine. :BIG-ENDIAN has the MSB first (e.g.
 ;;; IBM RT), :LITTLE-ENDIAN has the MSB last (e.g. DEC VAX).
-(defvar *backend-byte-order*)
+(defvar *backend-byte-order*
+  #!+little-endian :little-endian
+  #!+big-endian :big-endian)
 (declaim (type (member nil :little-endian :big-endian) *backend-byte-order*))
 
 ;;; translation from SC numbers to SC info structures. SC numbers are always

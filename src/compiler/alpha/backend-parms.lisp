@@ -19,10 +19,6 @@
 
 (defconstant +backend-fasl-file-implementation+ :alpha)
 
-(setf *backend-register-save-penalty* 3)
-
-(setf *backend-byte-order* :little-endian)
-
 ;;; XXX the C runtime gets page size using getpagesize() - can't we
 ;;; look at that instead of hardcoding it here too?
 (defconstant +backend-page-bytes+ 8192)

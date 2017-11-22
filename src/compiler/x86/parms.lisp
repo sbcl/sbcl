@@ -183,7 +183,7 @@
 ;;; NetBSD configuration used to have this comment regarding the linkage
 ;;; table: "In CMUCL: 0xB0000000->0xB1000000"
 
-#!+win32     (!gencgc-space-setup #x22000000 :alignment #x10000)
+#!+win32     (!gencgc-space-setup #x22000000)
 #!+linux     (!gencgc-space-setup #x01000000 :dynamic-space-start #x09000000)
 #!+sunos     (!gencgc-space-setup #x20000000 :dynamic-space-start #x48000000)
 #!+freebsd   (!gencgc-space-setup #x01000000 :dynamic-space-start #x58000000)
