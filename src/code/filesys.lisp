@@ -610,7 +610,8 @@ exist or if is a file or a symbolic link."
   (defun user-homedir-namestring (&optional username)
     (if username
         (lose username)
-        (or (not-empty (posix-getenv "USERPROFILE"))
+        (or (not-empty (posix-getenv "HOME"))
+            (not-empty (posix-getenv "USERPROFILE"))
             (let ((drive (not-empty (posix-getenv "HOMEDRIVE")))
                   (path (not-empty (posix-getenv "HOMEPATH"))))
               (and drive path
