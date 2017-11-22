@@ -48,9 +48,8 @@ symbol in the linkage table, and never returns an address in the linkage-table."
 #-sb-xc-host
 (defun foreign-symbol-address (name &optional datap)
   "Returns the address of the foreign symbol NAME. DATAP must be true if the
-symbol designates a variable (used only on linkage-table platforms). Returns a
-secondary value that is true if DATAP was true and the symbol is a dynamic
-foreign symbol.
+symbol designates a variable (used only on linkage-table platforms).
+Returns a secondary value T if the symbol is a dynamic foreign symbol.
 
 On linkage-table ports the returned address is always static: either direct
 address of a static symbol, or the linkage-table address of a dynamic one.
