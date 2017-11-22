@@ -109,19 +109,31 @@
     (assert (not (funcall f2 #*101010)))))
 
 ;;; BIT-POSITION would access 1 word beyond a bit-vector's final word
-;;; which could crash if the next page of memory was not readable.
-;;; To produce such a sitution, create a bit-vector at the end of static space,
-;;; relying on the fact that there should be a gap to the following space.
-;;; (Indeed this test reliably crashed prior to the fix for overrun)
-(with-test (:name :bit-position-overrun)
+;;; which could crash if the next page of memory was not readable. To
+;;; produce such a sitution, mmap two pages the second one read
+;;; protected, allocated the vector at the end of the first one and
+;;; see if it touches the second pages.
+(with-test (:name :bit-position-overrun
+                  :skipped-on :win32)
   (let* ((n-bytes (* 4 sb-vm:n-word-bytes))
-         (addr (- sb-vm:static-space-end n-bytes))
+         (first (sb-posix:mmap nil (* sb-c:+backend-page-bytes+ 2)
+                               (logior sb-posix:prot-read
+                                       sb-posix:prot-write)
+                               (logior sb-posix:map-private sb-posix:map-anon) -1 0))
+         (second (sb-sys:sap+ first sb-c:+backend-page-bytes+))
+         (addr (sb-sys:sap+ second (- n-bytes)))
          (n-bits (* 2 sb-vm:n-word-bits)))
-    (setf (sb-sys:sap-ref-word (sb-sys:int-sap addr) 0) sb-vm:simple-bit-vector-widetag)
-    (setf (sb-sys:sap-ref-word (sb-sys:int-sap addr) sb-vm:n-word-bytes)
+    (assert (sb-sys:sap=
+             second
+             (sb-posix:mmap second sb-c:+backend-page-bytes+
+                            sb-posix:prot-none
+                            (logior sb-posix:map-private sb-posix:map-anon sb-posix:map-fixed)
+                            -1 0)))
+    (setf (sb-sys:sap-ref-word addr 0) sb-vm:simple-bit-vector-widetag)
+    (setf (sb-sys:sap-ref-word addr sb-vm:n-word-bytes)
           (ash n-bits sb-vm:n-fixnum-tag-bits))
     (multiple-value-bind (object widetag size)
-        (sb-vm::reconstitute-object (ash addr (- sb-vm:n-fixnum-tag-bits)))
+        (sb-vm::reconstitute-object (ash (sb-sys:sap-int addr) (- sb-vm:n-fixnum-tag-bits)))
       (declare (ignore widetag))
       (assert (simple-bit-vector-p object))
       (assert (= size n-bytes))
