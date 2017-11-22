@@ -144,19 +144,9 @@
       ((eq type *empty-type*) nil)
       ((not type) (error "Undefined type: ~S" spec))
       (t
-       (let ((ctype (specifier-type `(complex ,spec))))
-         (cond
-           ((eq ctype *empty-type*) '(eql 0))
-           ((csubtypep ctype (specifier-type '(complex single-float)))
-            'single-float)
-           ((csubtypep ctype (specifier-type '(complex double-float)))
-            'double-float)
-           #!+long-float
-           ((csubtypep ctype (specifier-type '(complex long-float)))
-            'long-float)
-           ((csubtypep ctype (specifier-type '(complex rational)))
-            'rational)
-           (t 'real)))))))
+       (let ((ctype (specifier-type `(complex ,spec)))) ; error checking
+         (declare (ignore ctype))
+         (type-specifier type))))))
 
 ;;; Return the most specific integer type that can be quickly checked that
 ;;; includes the given type.
