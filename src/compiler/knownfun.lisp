@@ -51,16 +51,16 @@
   (let* ((ctype (specifier-type type))
          (note (or note "optimize"))
          (info (fun-info-or-lose name))
-         (old (find-if (lambda (x)
-                         (and (type= (transform-type x) ctype)
-                              (string-equal (transform-note x) note)
-                              (eq (transform-important x) important)))
-                       (fun-info-transforms info))))
+         (old (find ctype (fun-info-transforms info)
+                    :test #'type=
+                    :key #'transform-type)))
     (cond (old
            (style-warn 'redefinition-with-deftransform
                        :transform old)
            (setf (transform-function old) fun
-                 (transform-note old) note))
+                 (transform-note old) note
+                 (transform-important old) important
+                 (transform-policy old) policy))
           (t
            (push (make-transform :type ctype :function fun :note note
                                  :important important
