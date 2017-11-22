@@ -15,7 +15,7 @@
 
 #!+linkage-table
 (deftransform foreign-symbol-address ((symbol &optional datap) (simple-string boolean)
-                                      * :important t :policy :fast-safe)
+                                      * :policy :fast-safe)
   (if (and (constant-lvar-p symbol)
            (constant-lvar-p datap)
            #!+sb-dynamic-core (not (lvar-value datap)))
