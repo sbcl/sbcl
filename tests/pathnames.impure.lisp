@@ -338,7 +338,7 @@
                    (make-pathname :name "foo" :type "txt" :version 1)
                    (make-pathname :name "foo" :type ".txt")
                    (make-pathname :name "foo." :type "txt")
-                   (make-pathname :name "\\" :type "txt")
+                   (make-pathname :name #-win32 "\\" #+win32 "^^" :type "txt")
                    (make-pathname :name "^" :type "txt")
                    (make-pathname :name "foo*" :type "txt")
                    (make-pathname :name "foo[" :type "txt")
@@ -605,10 +605,15 @@
 
 ;;; lp#673625
 (with-test (:name :pathname-escape-first-directory-component
-                  :fails-on :win32)
+            :fails-on :win32)
   ;; ~ / :HOME
-  (assert (equal (pathname-directory #p"\\~/foo/") '(:relative "~" "foo")))
-  (assert (equal (native-namestring #p"\\~/foo/") "~/foo/"))
+  (assert (equal (pathname-directory #-win32 #p"\\~/foo/"
+                                     #+win32 #p"^~/foo/") 
+                 '(:relative "~" "foo")))
+  (assert (equal (native-namestring #-win32 #p"\\~/foo/"
+                                    #+win32 #p"^~/foo/")
+                 #-win32 "~/foo/"
+                 #+win32 "~\\foo\\"))
   (assert (equal (namestring (make-pathname :directory '(:absolute "~zot")))
                  "\\~zot/"))
   ;; * / :WILD
