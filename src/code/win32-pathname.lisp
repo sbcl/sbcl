@@ -284,8 +284,10 @@
                                    username condition)))))
                    (when (and (or absolutep devicep)
                               (not (string-equal device (pathname-device home))))
-                     (error "Device in homedir ~S conflicts which device ~S"
-                            home device))
+                     (no-native-namestring-error
+                      pathname
+                      "Device in homedir ~S conflicts which device ~S"
+                      home device))
                    (write-string (native-namestring home) s)))
                 ;; namestring of user-homedir-pathname already has
                 ;; // at the end
@@ -299,8 +301,9 @@
              do (typecase piece
                   ((member :up :back) (write-string ".." s))
                   (string (write-string piece s))
-                  (t (error "Bad directory segment in NATIVE-NAMESTRING: ~S."
-                            piece)))
+                  (t (no-native-namestring-error pathname
+                                                 "Bad directory segment in NATIVE-NAMESTRING: ~S."
+                                                 piece)))
              when (or subdirs seperator-after-directory-p)
              do (write-char #\\ s))
        (write-string (unparse-native-physical-file pathname) s)
@@ -319,6 +322,7 @@
      'simple-string)))
 
 ;;; FIXME.
+;;; ... fix what?
 (defun unparse-win32-enough (pathname defaults)
   (declare (type pathname pathname defaults))
   (flet ((lose ()
