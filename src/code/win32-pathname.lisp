@@ -192,12 +192,13 @@
                      (list end nil)))))))
         (values nil
                 device
-                (cons (if absolute :absolute :relative) directory)
+                (cond (absolute
+                       (cons :absolute directory))
+                      (directory
+                       (cons :relative directory)))
                 (first name-and-type)
                 (second name-and-type)
                 nil)))))
-
-
 
 (defun unparse-win32-host (pathname)
   (declare (type pathname pathname)
