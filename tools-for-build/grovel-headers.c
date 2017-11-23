@@ -222,6 +222,8 @@ main(int argc, char *argv[])
     deferrno("ewouldblock", EWOULDBLOCK);
     printf("\n");
 
+    deferrno("sc-nprocessors-onln", _SC_NPROCESSORS_ONLN);
+
     printf(";;; for wait3(2) in run-program.lisp\n");
 #ifdef WCONTINUED
     defconstant("wcontinued", WCONTINUED);

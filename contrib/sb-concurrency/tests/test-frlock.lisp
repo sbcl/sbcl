@@ -22,7 +22,8 @@
   #+openbsd 0.01
   #-openbsd 0.0001)
 
-(defun test-frlocks (&key (reader-count 100) (read-count 1000000)
+(defun test-frlocks (&key (reader-count (max (* 12 *cpus*) 200))
+                          (read-count 1000000)
                           (outer-read-pause 0) (inner-read-pause 0)
                           (writer-count 10) (write-count (/ 1 *minimum-sleep*))
                           (outer-write-pause *minimum-sleep*) (inner-write-pause 0))

@@ -28,7 +28,7 @@
   ;; cross the gate if it is closed.
   (deftest gate.1
       (let* ((gate (make-gate))
-             (marks (make-array 100 :initial-element nil))
+             (marks (make-array (if (> *cpus* 1) 100 50) :initial-element nil))
              (threads (loop for i from 0 below (length marks)
                             collect (make-thread (lambda (n)
                                                    (wait-on-gate gate)
@@ -56,7 +56,7 @@
   (deftest gate.2
       (let* ((gate (make-gate))
              (cont (make-gate))
-             (marks (make-array 100 :initial-element nil))
+             (marks (make-array (if (> *cpus* 1) 100 50) :initial-element nil))
              (threads (loop for i from 0 below (length marks)
                             collect (make-thread (lambda (n)
                                                    (wait-on-gate gate)

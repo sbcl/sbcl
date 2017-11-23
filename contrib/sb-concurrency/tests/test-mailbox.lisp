@@ -185,7 +185,7 @@
 
 (deftest mailbox.single-producer-multiple-consumers
     (test-mailbox-producers-consumers :n-senders 1
-                                      :n-receivers 100
+                                      :n-receivers (if (> *cpus* 1) 100 50)
                                       :n-messages 1000)
   (:received . 1000)
   (:garbage  . 0)

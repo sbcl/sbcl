@@ -151,20 +151,20 @@
                (wait-on-semaphore w)
                (let ((last -1))
                  (loop
-                   (multiple-value-bind (x ok) (dequeue q)
-                     (cond (x
-                            (if (and (> x last) ok)
-                                (setf last x)
-                                (return (list last x ok))))
-                           (t
-                            (if (not ok)
-                                (return t)
-                                (return (list last x ok))))))))))
+                  (multiple-value-bind (x ok) (dequeue q)
+                    (cond (x
+                           (if (and (> x last) ok)
+                               (setf last x)
+                               (return (list last x ok))))
+                          (t
+                           (if (not ok)
+                               (return t)
+                               (return (list last x ok))))))))))
         (let ((deschedulers
-               (list (make-thread #'dq)
-                     (make-thread #'dq)
-                     (make-thread #'dq)
-                     (make-thread #'dq))))
+                (list (make-thread #'dq)
+                      (make-thread #'dq)
+                      (make-thread #'dq)
+                      (make-thread #'dq))))
           (loop repeat 4 do (wait-on-semaphore r))
           (signal-semaphore w 4)
           (mapcar #'join-thread deschedulers))))

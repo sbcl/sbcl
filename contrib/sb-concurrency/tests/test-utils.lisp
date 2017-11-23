@@ -14,6 +14,14 @@
 #+sb-thread
 (progn
 
+(defvar *cpus*
+  (min 1
+       #-win32 (sb-alien:alien-funcall
+                (sb-alien:extern-alien "sysconf"
+                                       (function sb-alien:long sb-alien:int))
+                sb-unix::sc-nprocessors-onln)
+       #+win32 (sb-alien:extern-alien "os_number_of_processors" sb-alien:int)))
+
 (defparameter +timeout+ 30.0)
 
 (defun make-threads (n name fn)
