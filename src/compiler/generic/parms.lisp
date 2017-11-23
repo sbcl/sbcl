@@ -76,7 +76,7 @@
                )))
     (let*
         ((spaces (append `((read-only ,small-space-size)
-                           ;#!+sb-safepoint
+                           #!+sb-safepoint
                            (safepoint ,+backend-page-bytes+ gc-safepoint-page-addr)
                            (static ,small-space-size))
                          #!+linkage-table
