@@ -63,7 +63,7 @@
 ;;; The issues don't seem to have anything to do with mailboxes
 ;;; per-se, but are rather related to our usage of signal-unsafe
 ;;; pthread functions inside signal handlers.
-;;; 
+;;;
 ;;; INTERRUPT-THREAD is not reliable on Windows
 #+(and sb-thread (not sunos) (not win32))
 (progn

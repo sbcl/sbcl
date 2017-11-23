@@ -608,7 +608,7 @@
             :fails-on :win32)
   ;; ~ / :HOME
   (assert (equal (pathname-directory #-win32 #p"\\~/foo/"
-                                     #+win32 #p"^~/foo/") 
+                                     #+win32 #p"^~/foo/")
                  '(:relative "~" "foo")))
   (assert (equal (native-namestring #-win32 #p"\\~/foo/"
                                     #+win32 #p"^~/foo/")
