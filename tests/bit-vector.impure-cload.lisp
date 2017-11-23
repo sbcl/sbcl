@@ -113,8 +113,8 @@
 ;;; produce such a sitution, mmap two pages the second one read
 ;;; protected, allocated the vector at the end of the first one and
 ;;; see if it touches the second pages.
-(with-test (:name :bit-position-overrun
-                  :skipped-on :win32)
+#-win32 ;; no sb-posix:mmap
+(with-test (:name :bit-position-overrun)
   (let* ((n-bytes (* 4 sb-vm:n-word-bytes))
          (first (sb-posix:mmap nil (* sb-c:+backend-page-bytes+ 2)
                                (logior sb-posix:prot-read
