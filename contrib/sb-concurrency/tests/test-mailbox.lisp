@@ -63,7 +63,9 @@
 ;;; The issues don't seem to have anything to do with mailboxes
 ;;; per-se, but are rather related to our usage of signal-unsafe
 ;;; pthread functions inside signal handlers.
-#+(and sb-thread (not sunos))
+;;; 
+;;; INTERRUPT-THREAD is not reliable on Windows
+#+(and sb-thread (not sunos) (not win32))
 (progn
 
 ;; Dummy struct for ATOMIC-INCF to work.
@@ -172,7 +174,6 @@
                      `(:errors   . ,errors)
                      `(:timeouts . ,timeouts))))))))
 
-#-win32
 (deftest mailbox.single-producer-single-consumer
     (test-mailbox-producers-consumers :n-senders 1
                                       :n-receivers 1
@@ -182,7 +183,6 @@
   (:errors   . 0)
   (:timeouts . 0))
 
-#-win32
 (deftest mailbox.single-producer-multiple-consumers
     (test-mailbox-producers-consumers :n-senders 1
                                       :n-receivers 100
@@ -192,7 +192,6 @@
   (:errors   . 0)
   (:timeouts . 0))
 
-#-win32
 (deftest mailbox.multiple-producers-single-consumer
     (test-mailbox-producers-consumers :n-senders 10
                                       :n-receivers 1
@@ -202,7 +201,6 @@
   (:errors   . 0)
   (:timeouts . 0))
 
-#-win32
 (deftest mailbox.multiple-producers-multiple-consumers
     (test-mailbox-producers-consumers :n-senders 50
                                       :n-receivers 50
