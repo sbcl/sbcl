@@ -95,7 +95,7 @@
 
 (with-test (:name (:deadline :futex-wait-eintr)
             :skipped-on '(not :sb-thread)
-            :broken-on)
+            :broken-on :win32)
   (let ((lock (sb-thread:make-mutex))
         (waitp t))
     (make-join-thread (lambda ()
