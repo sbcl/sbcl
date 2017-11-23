@@ -85,7 +85,8 @@
                             (with-mutex (m :timeout 0.1)
                               t)))))))
 
-(with-test (:name (:interrupt-thread :deferrables-unblocked-by-lock))
+(with-test (:name (:interrupt-thread :deferrables-unblocked-by-lock)
+            :broken-on :win32)
   (let ((lock (sb-thread::make-mutex))
         (thread (make-join-thread (lambda ()
                                     (loop (sleep 1))))))
@@ -514,7 +515,8 @@
 
 ;;; Here we test that interrupting TRY-SEMAPHORE does not leave a
 ;;; semaphore in a bad state.
-(with-test (:name (:try-semaphore :interrupt-safe))
+(with-test (:name (:try-semaphore :interrupt-safe)
+            :broken-on :win32)
   (flet ((make-threads (count fn)
            (loop repeat count collect (make-thread fn)))
          (kill-thread (thread)
@@ -582,21 +584,24 @@
 ;; (d) waiting on a lock, (e) some code which we hope is likely to be
 ;; in pseudo-atomic
 
-(with-test (:name (:interrupt-thread :more-basics))
+(with-test (:name (:interrupt-thread :more-basics)
+            :broken-on :win32)
   (let ((child (test-interrupt (lambda () (loop)))))
     (terminate-thread child)))
 
 (with-test (:name (:interrupt-thread :interrupt-foreign-loop)
                   ;; This feature is explicitly unsupported on Win32.
-                  :skipped-on :win32)
+            :broken-on :win32)
   (test-interrupt #'loop-forever :quit))
 
-(with-test (:name (:interrupt-thread :interrupt-sleep))
+(with-test (:name (:interrupt-thread :interrupt-sleep)
+                  :broken-on :win32)
   (let ((child (test-interrupt (lambda () (loop (sleep 2000))))))
     (terminate-thread child)
     (wait-for-threads (list child))))
 
-(with-test (:name (:interrupt-thread :interrupt-mutex-acquisition))
+(with-test (:name (:interrupt-thread :interrupt-mutex-acquisition)
+                  :broken-on :win32)
   (let ((lock (make-mutex :name "loctite"))
         child)
     (with-mutex (lock)
@@ -617,7 +622,8 @@
 
 (defun alloc-stuff () (copy-list '(1 2 3 4 5)))
 
-(with-test (:name (:interrupt-thread :interrupt-consing-child))
+(with-test (:name (:interrupt-thread :interrupt-consing-child)
+                  :broken-on :win32)
   (let ((thread (make-thread (lambda () (loop (alloc-stuff))))))
     (let ((killers
            (loop repeat 4 collect
@@ -636,7 +642,8 @@
 (format t "~&multi interrupt test done~%")
 
 #+(or x86 x86-64) ;; x86oid-only, see internal commentary.
-(with-test (:name (:interrupt-thread :interrupt-consing-child :again))
+(with-test (:name (:interrupt-thread :interrupt-consing-child :again)
+                  :broken-on :win32)
   (let ((c (make-thread (lambda () (loop (alloc-stuff))))))
     ;; NB this only works on x86: other ports don't have a symbol for
     ;; pseudo-atomic atomicity
@@ -663,7 +670,8 @@
   (unless (typep i 'fixnum)
     (error "!!!!!!!!!!!")))
 
-(with-test (:name (:interrupt-thread :interrupt-ATOMIC-INCF))
+(with-test (:name (:interrupt-thread :interrupt-ATOMIC-INCF)
+                  :broken-on :win32)
   (let ((c (make-thread
             (lambda ()
               (handler-bind ((error #'(lambda (cond)
@@ -688,7 +696,8 @@
 
 (defvar *runningp* nil)
 
-(with-test (:name (:interrupt-thread :no-nesting))
+(with-test (:name (:interrupt-thread :no-nesting)
+                  :broken-on :win32)
   (let ((thread (sb-thread:make-thread
                  (lambda ()
                    (catch 'xxx
@@ -705,7 +714,8 @@
                                   (throw 'xxx *runningp*)))
     (assert (not (sb-thread:join-thread thread)))))
 
-(with-test (:name (:interrupt-thread :nesting))
+(with-test (:name (:interrupt-thread :nesting)
+                  :broken-on :win32)
   (let ((thread (sb-thread:make-thread
                  (lambda ()
                    (catch 'xxx
@@ -738,12 +748,11 @@
       (when (and a-done b-done) (return))
       (sleep 1))))
 
-(terpri)
-
 (defun waste (&optional (n 100000))
   (loop repeat n do (make-string 16384)))
 
-(with-test (:name (:one-thread-runs-gc-while-other-conses))
+(with-test (:name (:one-thread-runs-gc-while-other-conses)
+                  :broken-on :win32)
   (loop for i below 100 do
         (princ "!")
         (force-output)
@@ -752,8 +761,6 @@
              (waste)))
         (waste)
         (sb-ext:gc)))
-
-(terpri)
 
 (defparameter *aaa* nil)
 (with-test (:name (:one-thread-runs-gc-while-other-conses :again))
@@ -767,8 +774,6 @@
         (let ((*aaa* (waste)))
           (waste))
         (sb-ext:gc)))
-
-(format t "~&gc test done~%")
 
 (defun exercise-syscall (fn reference-errno)
   (make-kill-thread
@@ -786,7 +791,8 @@
               (abort-thread)))))))
 
 ;; (nanosleep -1 0) does not fail on FreeBSD
-(with-test (:name (:exercising-concurrent-syscalls) :fails-on :win32)
+(with-test (:name (:exercising-concurrent-syscalls)
+            :broken-on :win32)
   (let* (#-freebsd
          (nanosleep-errno (progn
                             (sb-unix:nanosleep -1 0)
@@ -810,7 +816,8 @@
 
 (format t "~&errno test done~%")
 
-(with-test (:name :all-threads-have-abort-restart)
+(with-test (:name :all-threads-have-abort-restart
+                  :broken-on :win32)
   (loop repeat 100 do
         (let ((thread (make-kill-thread (lambda () (sleep 0.1)))))
           (sb-thread:interrupt-thread
@@ -888,7 +895,8 @@
      (decf sb-vm::*binding-stack-pointer* binding-pointer-delta))))
 
 #+(or x86 x86-64) ;the only platforms with a *binding-stack-pointer* variable
-(with-test (:name (:binding-stack-gc-safety))
+(with-test (:name (:binding-stack-gc-safety)
+            :broken-on :win32)
   (let (threads)
     (unwind-protect
          (progn
@@ -940,7 +948,7 @@
                   ;; sure if it would finish as expected, but since it
                   ;; hits swap on my system I'm not likely to find out
                   ;; soon. Disabling for now. -- nikodemus
-            :skipped-on :sbcl)
+            :broken-on :sbcl)
   ;; We expect a (probable) error here: parellel readers and writers
   ;; on a hash-table are not expected to work -- but we also don't
   ;; expect this to corrupt the image.
@@ -976,7 +984,8 @@
 
 (format t "~&unsynchronized hash table test done~%")
 
-(with-test (:name (:synchronized-hash-table))
+(with-test (:name (:synchronized-hash-table)
+            :broken-on :win32)
   (let* ((hash (make-hash-table :synchronized t))
          (*errors* nil)
          (threads (list (make-join-thread
@@ -1010,7 +1019,8 @@
 
 (format t "~&synchronized hash table test done~%")
 
-(with-test (:name (:hash-table-parallel-readers))
+(with-test (:name (:hash-table-parallel-readers)
+                  :broken-on :win32)
   (let ((hash (make-hash-table))
         (*errors* nil))
     (loop repeat 50
@@ -1051,7 +1061,8 @@
 
 (format t "~&multiple reader hash table test done~%")
 
-(with-test (:name (:hash-table-single-accessor-parallel-gc))
+(with-test (:name :hash-table-single-accessor-parallel-gc
+                  :broken-on :win32)
   (let ((hash (make-hash-table))
         (*errors* nil))
     (let ((threads (list (make-kill-thread
@@ -1090,7 +1101,8 @@
 |     (mp:make-process #'roomy)))
 |#
 
-(with-test (:name (:condition-variable :notify-multiple))
+(with-test (:name (:condition-variable :notify-multiple)
+                  :broken-on :win32)
   (flet ((tester (notify-fun)
            (let ((queue (make-waitqueue :name "queue"))
                  (lock (make-mutex :name "lock"))
@@ -1235,7 +1247,7 @@
              (1+ sb-vm:+highest-normal-generation+))
   (pushnew :verify-gens *features*))
 
-(with-test (:name :backtrace :skipped-on ':verify-gens)
+(with-test (:name :backtrace :broken-on ':verify-gens)
   ;; Printing backtraces from several threads at once used to hang the
   ;; whole SBCL process (discovered by accident due to a timer.impure
   ;; test misbehaving). The cause was that packages weren't even
@@ -1321,8 +1333,9 @@
 ;;; fruitful to concentrate their efforts around this test...
 
 (with-test (:name (:funcallable-instances)
-                  :skipped-on '(and :sb-safepoint
-                                    (not :c-stack-is-control-stack)))
+            :broken-on '(or :win32
+                         (and :sb-safepoint
+                          (not :c-stack-is-control-stack))))
   ;; the funcallable-instance implementation used not to be threadsafe
   ;; against setting the funcallable-instance function to a closure
   ;; (because the code and lexenv were set separately).
@@ -1431,9 +1444,8 @@
     (force-output)))
 (format t "parallel defclass test done~%")
 
-(with-test (:name (:deadlock-detection :interrupts) :fails-on :win32)
-  #+win32                               ;be more explicit than just :skipped-on
-  (error "not attempting, because of deadlock error in background thread")
+(with-test (:name (:deadlock-detection :interrupts)
+            :broken-on :win32)
   (let* ((m1 (sb-thread:make-mutex :name "M1"))
          (m2 (sb-thread:make-mutex :name "M2"))
          (t1-can-go (sb-thread:make-semaphore :name "T1 can go"))
@@ -1508,7 +1520,8 @@
         (funcall release lock)
         (assert (eq t (funcall with lock)))))))
 
-(with-test (:name :interrupt-io-unnamed-pipe)
+(with-test (:name :interrupt-io-unnamed-pipe
+                  :broken-on :win32)
   (let (result)
     (labels
         ((reader (fd)

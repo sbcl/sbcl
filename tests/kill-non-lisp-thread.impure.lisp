@@ -36,7 +36,8 @@
 
 (define-alien-routine kill-non-lisp-thread void)
 
-(with-test (:name :kill-non-lisp-thread)
+(with-test (:name :kill-non-lisp-thread
+            :broken-on :win32)
   (let ((receivedp nil))
     (push (lambda ()
             (setq receivedp t))

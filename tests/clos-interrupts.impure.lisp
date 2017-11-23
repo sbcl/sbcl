@@ -78,7 +78,8 @@
   'symbol)
 
 (test-util:with-test (:name :compute-test
-                            :fails-on (and :win32 (not :sb-thread)))
+                      :skipped-on (not :sb-thread)
+                      :broken-on :win32)
   (compute-test 1 2)
 
   ;; Check that we actually interrupted something.

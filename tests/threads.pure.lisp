@@ -39,20 +39,22 @@
 
 ;;; Terminating a thread that's waiting for the terminal.
 
-#+sb-thread
-(let ((thread (make-thread (lambda ()
-                             (sb-thread::get-foreground)))))
-  (sleep 1)
-  (assert (thread-alive-p thread))
-  (terminate-thread thread)
-  (sleep 1)
-  (assert (not (thread-alive-p thread))))
+(with-test (:name (:terminate-thread :get-foreground)
+                  :skipped-on (not :sb-thread)
+                  :broken-on :win32)
+ (let ((thread (make-thread (lambda ()
+                              (sb-thread::get-foreground)))))
+   (sleep 1)
+   (assert (thread-alive-p thread))
+   (terminate-thread thread)
+   (sleep 1)
+   (assert (not (thread-alive-p thread)))))
 
 ;;; Condition-wait should not be interruptible under WITHOUT-INTERRUPTS
 
 (with-test (:name :without-interrupts+condition-wait
             :skipped-on '(not :sb-thread)
-            :fails-on '(and :win32 :sb-futex))
+            :broken-on :win32)
   (let* ((lock (make-mutex))
          (queue (make-waitqueue))
          (thread (make-thread (lambda ()
@@ -70,7 +72,9 @@
 
 ;;; GRAB-MUTEX should not be interruptible under WITHOUT-INTERRUPTS
 
-(with-test (:name :without-interrupts+grab-mutex :skipped-on '(not :sb-thread))
+(with-test (:name :without-interrupts+grab-mutex
+            :skipped-on '(not :sb-thread)
+            :broken-on :win32)
   (let* ((lock (make-mutex))
          (bar (progn (grab-mutex lock) nil))
          (thread (make-thread (lambda ()
@@ -514,7 +518,8 @@
 
 (with-test (:name (wait-on-semaphore semaphore-notification :lp-1038034)
             :skipped-on '(not :sb-thread)
-            :fails-on :sb-thread)
+            :fails-on :sb-thread
+            :broken-on :win32)
   ;; Test robustness of semaphore acquisition and notification with
   ;; asynchronous thread termination...  Which we know is currently
   ;; fragile.
@@ -561,7 +566,8 @@
     (force-output)))
 
 (with-test (:name (wait-on-semaphore semaphore-notification)
-            :skipped-on '(not :sb-thread))
+            :skipped-on '(not :sb-thread)
+            :broken-on :win32)
   (let ((sem (make-semaphore))
         (ok nil)
         (n 0))
@@ -656,7 +662,8 @@
 ;; See (:TIMER :DISPATCH-THREAD :MAKE-THREAD :BUG-1180102) in
 ;; timer.impure.lisp.
 (with-test (:name (make-thread :interrupt-with make-thread :bug-1180102)
-            :skipped-on '(not :sb-thread))
+            :skipped-on '(not :sb-thread)
+            :broken-on :win32)
   (fresh-line)
   (write-string "; ")
   (force-output)

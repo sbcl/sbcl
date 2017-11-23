@@ -39,6 +39,7 @@
 #+sb-thread
 (defun make-kill-thread (&rest args)
   (let ((thread (apply #'sb-thread:make-thread args)))
+    #-win32 ;; poor thread interruption on safepoints
     (when (boundp '*threads-to-kill*)
       (push thread *threads-to-kill*))
     thread))
@@ -114,6 +115,7 @@
                                   (member thread ,threads)
                                   (sb-thread:thread-ephemeral-p thread))
                         (setf any-leftover thread)
+                        #-win32
                         (ignore-errors (sb-thread:terminate-thread thread))))
                     (when any-leftover
                       (fail-test :leftover-thread ',name any-leftover)

@@ -86,13 +86,16 @@
        (sb-thread:wait-on-semaphore sem)))))
 
 (with-test (:name (:deadline sb-thread:join-thread)
-                  :skipped-on '(not :sb-thread))
+            :skipped-on '(not :sb-thread)
+            :broken-on :win32)
   (assert-timeout
    (sb-sys:with-deadline (:seconds 1)
      (sb-thread:join-thread
       (make-kill-thread (lambda () (loop (sleep 1))))))))
 
-(with-test (:name (:deadline :futex-wait-eintr) :skipped-on '(not :sb-thread))
+(with-test (:name (:deadline :futex-wait-eintr)
+            :skipped-on '(not :sb-thread)
+            :broken-on)
   (let ((lock (sb-thread:make-mutex))
         (waitp t))
     (make-join-thread (lambda ()
