@@ -332,7 +332,7 @@
    `(lambda (program argv)
       (declare (optimize (debug 2)))
       (with-alien ((sys-execv1 (function int c-string (* c-string)) :extern
-                               "execv"))
+                               "exit"))
         (values (alien-funcall sys-execv1 program argv))))
    :allow-notes nil))
 
