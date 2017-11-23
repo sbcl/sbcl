@@ -133,7 +133,10 @@
     (setf (sb-sys:sap-ref-word addr sb-vm:n-word-bytes)
           (ash n-bits sb-vm:n-fixnum-tag-bits))
     (multiple-value-bind (object widetag size)
-        (sb-vm::reconstitute-object (ash (sb-sys:sap-int addr) (- sb-vm:n-fixnum-tag-bits)))
+        (sb-vm::reconstitute-object (sb-c::mask-signed-field
+                                     sb-vm:n-fixnum-bits
+                                     (ash (sb-sys:sap-int addr)
+                                          (- sb-vm:n-fixnum-tag-bits))))
       (declare (ignore widetag))
       (assert (simple-bit-vector-p object))
       (assert (= size n-bytes))
