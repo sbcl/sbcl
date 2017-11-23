@@ -277,8 +277,10 @@
                                        (user-homedir-namestring username))
                                       (user-homedir-pathname))
                                 (error (condition)
-                                  (error "User homedir unknown~@[ for ~S~]: ~A."
-                                         username condition)))))
+                                  (no-native-namestring-error
+                                   pathname
+                                   "user homedir not known~@[ for ~S~]: ~A"
+                                   username condition)))))
                    (when (and (or absolutep devicep)
                               (not (string-equal device (pathname-device home))))
                      (error "Device in homedir ~S conflicts which device ~S"
