@@ -15,7 +15,7 @@
 (progn
 
 (defvar *cpus*
-  (min 1
+  (max 1
        #-win32 (sb-alien:alien-funcall
                 (sb-alien:extern-alien "sysconf"
                                        (function sb-alien:long sb-alien:int))
