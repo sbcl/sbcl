@@ -40,7 +40,7 @@
 ;;; Terminating a thread that's waiting for the terminal.
 
 (with-test (:name (:terminate-thread :get-foreground)
-                  :skipped-on (not :sb-thread)
+                  :skipped-on '(not :sb-thread)
                   :broken-on :win32)
  (let ((thread (make-thread (lambda ()
                               (sb-thread::get-foreground)))))
