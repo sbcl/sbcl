@@ -358,7 +358,7 @@
                 :search t
                 :output :bad)))
 
-(with-test (:name (run-program :stop+continue) :skipped-on (not :linux))
+(with-test (:name (run-program :stop+continue) :skipped-on :win32)
   (let ((process (run-program "cat" '() :search t :input :stream :wait nil)))
     (flet ((kill-and-check-status (signal expected-status)
              (process-kill process signal)
