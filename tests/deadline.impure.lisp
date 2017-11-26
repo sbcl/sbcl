@@ -66,7 +66,7 @@
     (assert (not final))))
 
 (with-test (:name (:deadline sb-thread:grab-mutex)
-                  :skipped-on '(not :sb-thread))
+                  :skipped-on (not :sb-thread))
   (assert-timeout
    (let ((lock (sb-thread:make-mutex))
          (waitp t))
@@ -79,14 +79,14 @@
        (sb-thread:grab-mutex lock)))))
 
 (with-test (:name (:deadline sb-thread:wait-on-semaphore)
-                  :skipped-on '(not :sb-thread))
+                  :skipped-on (not :sb-thread))
   (assert-timeout
    (let ((sem (sb-thread:make-semaphore :count 0)))
      (sb-sys:with-deadline (:seconds 1)
        (sb-thread:wait-on-semaphore sem)))))
 
 (with-test (:name (:deadline sb-thread:join-thread)
-            :skipped-on '(not :sb-thread)
+            :skipped-on (not :sb-thread)
             :broken-on :win32)
   (assert-timeout
    (sb-sys:with-deadline (:seconds 1)
@@ -94,7 +94,7 @@
       (make-kill-thread (lambda () (loop (sleep 1))))))))
 
 (with-test (:name (:deadline :futex-wait-eintr)
-            :skipped-on '(not :sb-thread)
+            :skipped-on (not :sb-thread)
             :broken-on :win32)
   (let ((lock (sb-thread:make-mutex))
         (waitp t))

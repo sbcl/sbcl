@@ -90,7 +90,7 @@
     (sb-ext:timeout () t)))
 
 (with-test (:name (:timer :relative)
-            :fails-on '(and :sparc :linux)
+            :fails-on (and :sparc :linux)
             :skipped-on :win32)
   (let* ((has-run-p nil)
          (timer (make-timer (lambda () (setq has-run-p t))
@@ -103,7 +103,7 @@
     (assert (zerop (length (sb-impl::%pqueue-contents sb-impl::*schedule*))))))
 
 (with-test (:name (:timer :absolute)
-            :fails-on '(and :sparc :linux)
+            :fails-on (and :sparc :linux)
             :skipped-on :win32)
   (let* ((has-run-p nil)
          (timer (make-timer (lambda () (setq has-run-p t))
@@ -115,14 +115,14 @@
     (assert has-run-p)
     (assert (zerop (length (sb-impl::%pqueue-contents sb-impl::*schedule*))))))
 
-(with-test (:name (:timer :other-thread) :skipped-on '(not :sb-thread))
+(with-test (:name (:timer :other-thread) :skipped-on (not :sb-thread))
   (let* ((thread (make-kill-thread (lambda () (sleep 2))))
          (timer (make-timer (lambda ()
                               (assert (eq thread sb-thread:*current-thread*)))
                             :thread thread)))
     (schedule-timer timer 0.1)))
 
-(with-test (:name (:timer :new-thread) :skipped-on '(not :sb-thread))
+(with-test (:name (:timer :new-thread) :skipped-on (not :sb-thread))
   (let* ((original-thread sb-thread:*current-thread*)
          (timer (make-timer
                  (lambda ()
@@ -132,7 +132,7 @@
     (schedule-timer timer 0.1)))
 
 (with-test (:name (:timer :repeat-and-unschedule)
-            :fails-on '(and :sparc :linux)
+            :fails-on (and :sparc :linux)
             :skipped-on :win32)
   (let* ((run-count 0)
          timer)
@@ -199,7 +199,7 @@
   (loop while (some #'sb-thread:thread-alive-p threads) do (sleep 0.01)))
 
 (with-test (:name (:with-timeout :many-at-the-same-time)
-                  :skipped-on '(not :sb-thread))
+                  :skipped-on (not :sb-thread))
   (let ((ok t))
     (let ((threads (loop repeat 10 collect
                          (sb-thread:make-thread
@@ -216,7 +216,7 @@
                       (wait-for-threads threads)))))
       (assert ok))))
 
-(with-test (:name (:with-timeout :dead-thread) :skipped-on '(not :sb-thread))
+(with-test (:name (:with-timeout :dead-thread) :skipped-on (not :sb-thread))
   (make-join-thread
    (lambda ()
      (let ((timer (make-timer (lambda ()))))
@@ -249,8 +249,8 @@
 ;;; running out of stack (due to repeating timers being rescheduled
 ;;; before they ran) and dying threads were open interrupts.
 (with-test (:name (:timer :parallel-unschedule)
-            :skipped-on '(not :sb-thread)
-            :broken-on ':ppc)
+            :skipped-on (not :sb-thread)
+            :broken-on :ppc)
   (let ((timer (sb-ext:make-timer (lambda () 42) :name "parallel schedulers"))
         (other nil))
     (flet ((flop ()
@@ -301,7 +301,7 @@
   (loop repeat 10 do (test))))
 
 (with-test (:name (:timer :threaded-stress)
-                  :skipped-on '(not :sb-thread)
+                  :skipped-on (not :sb-thread)
                   :fails-on :win32)
   #+win32
   (error "fixme")
@@ -341,7 +341,7 @@
 ;; See (MAKE-THREAD :INTERRUPT-WITH MAKE-THREAD :BUG-1180102) in
 ;; threads.pure.lisp.
 (with-test (:name (:timer :dispatch-thread :make-thread :bug-1180102)
-            :skipped-on '(not :sb-thread))
+            :skipped-on (not :sb-thread))
   (flet ((test (thread)
            (let ((timer (make-timer (lambda ()) :thread thread)))
              (schedule-timer timer .01 :repeat-interval 0.1)

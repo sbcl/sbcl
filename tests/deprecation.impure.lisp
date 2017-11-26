@@ -332,7 +332,7 @@
               :final)))
 
 (with-test (:name (:late-deprecated-fun-doc :bug-1439151)
-                  :skipped-on '(not :sb-doc))
+                  :skipped-on (not :sb-doc))
   (assert (string= (documentation 'you-cant-use-this 'function)
                    (documentation #'you-cant-use-this 'function)))
   (assert (string= (documentation 'function.defun.late 'function)

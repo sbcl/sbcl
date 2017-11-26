@@ -5052,7 +5052,7 @@
 
 (with-test (:name (compile restart-case optimize speed compiler-note)
                   ;; Cannot-DX note crashes test driver unless we have this:
-            :skipped-on '(not :stack-allocatable-fixed-objects))
+            :skipped-on (not :stack-allocatable-fixed-objects))
   (checked-compile '(lambda ()
                      (declare (optimize speed))
                      (restart-case () (c ()))))
@@ -5064,7 +5064,7 @@
                        x))))
 
 (with-test (:name (compile :copy-more-arg)
-            :fails-on '(not (or :x86 :x86-64 :arm :arm64)))
+            :fails-on (not (or :x86 :x86-64 :arm :arm64)))
   ;; copy-more-arg might not copy in the right direction
   ;; when there are more fixed args than stack frame slots,
   ;; and thus end up splatting a single argument everywhere.
@@ -5105,7 +5105,7 @@
 
 ;; quantifiers shouldn't cons themselves.
 (with-test (:name :quantifiers-no-consing
-            :skipped-on '(or :interpreter
+            :skipped-on (or :interpreter
                              (not :stack-allocatable-closures)))
   (let ((constantly-t (lambda (x) x t))
         (constantly-nil (lambda (x) x nil))
@@ -5236,7 +5236,7 @@
                          (typep a '(simple-array * (*)))))))))))
 
 (with-test (:name :array-subtype-tests
-            :skipped-on '(:not (:or :x86 :x86-64)))
+            :skipped-on (:not (:or :x86 :x86-64)))
   (checked-compile-and-assert ()
       `(lambda ()
          (typep #() '(or simple-vector simple-string)))
@@ -5825,7 +5825,7 @@
                       (make-list (expt 2 28) :initial-element 0))))
 
 (with-test (:name (make-list :large 2)
-            :skipped-on '(not :64-bit))
+            :skipped-on (not :64-bit))
   (checked-compile `(lambda ()
                       (make-list (expt 2 30) :initial-element 0))))
 

@@ -68,7 +68,7 @@
     (assert gc-happend)))
 
 ;;; SB-EXT:GENERATION-* accessors returned bogus values for generation > 0
-(with-test (:name :bug-529014 :skipped-on '(not :gencgc))
+(with-test (:name :bug-529014 :skipped-on (not :gencgc))
   (loop for i from 0 to sb-vm:+pseudo-static-generation+
      do (assert (= (sb-ext:generation-bytes-consed-between-gcs i)
                    (truncate (sb-ext:bytes-consed-between-gcs)
@@ -117,7 +117,7 @@
                  (storage-condition ()
                    :oom)))))
 
-(with-test (:name :gc-logfile :skipped-on '(not :gencgc))
+(with-test (:name :gc-logfile :skipped-on (not :gencgc))
   (assert (not (gc-logfile)))
   (let ((p #p"gc.log"))
     (assert (not (probe-file p)))
@@ -145,7 +145,7 @@
 (defparameter *pin-test-object-address* nil)
 
 (with-test (:name (sb-sys:with-pinned-objects :actually-pins-objects)
-                  :skipped-on ':cheneygc)
+                  :skipped-on :cheneygc)
   ;; The interpreters (both sb-eval and sb-fasteval) special-case
   ;; WITH-PINNED-OBJECTS as a "special form", because the x86oid
   ;; version of WITH-PINNED-OBJECTS uses black magic that isn't
@@ -202,7 +202,7 @@
 (compile 'ensure-code/data-separation)
 
 (with-test (:name :code/data-separation
-                  :skipped-on '(:not :gencgc))
+                  :skipped-on (:not :gencgc))
   (ensure-code/data-separation))
 
 #+immobile-space

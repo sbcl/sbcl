@@ -335,7 +335,7 @@
   (sb-int:dx-let ((s (make-list-container :listy-slot (make-list n))))
     (funcall thunk s)))
 ;; :stack-allocatable-lists is necessary but not sufficient
-(with-test (:name (:dx-list :make-list) :skipped-on '(not :x86-64))
+(with-test (:name (:dx-list :make-list) :skipped-on (not :x86-64))
   (assert (null (ctu:find-named-callees #'make-var-length-dx-list)))
   (assert-no-consing (make-var-length-dx-list
                       50 (lambda (x) (declare (ignore x))))))
@@ -691,11 +691,11 @@
 
 (defvar *a-cons* (cons nil nil))
 
-(with-test (:name (:no-consing :dx-closures) :skipped-on '(not :stack-allocatable-closures))
+(with-test (:name (:no-consing :dx-closures) :skipped-on (not :stack-allocatable-closures))
   (assert-no-consing (dxclosure 42)))
 
 (with-test (:name (:no-consing :dx-lists)
-            :skipped-on '(not (and :stack-allocatable-lists
+            :skipped-on (not (and :stack-allocatable-lists
                                :stack-allocatable-fixed-objects)))
   (assert-no-consing (dxlength 1 2 3))
   (assert-no-consing (dxlength t t t t t t))
@@ -713,11 +713,11 @@
   (assert-no-consing (multiple-dx-uses)))
 
 (with-test (:name (:no-consing :dx-value-cell)
-                  :skipped-on '(not :stack-allocatable-closures))
+                  :skipped-on (not :stack-allocatable-closures))
   (assert-no-consing (dx-value-cell 13)))
 
 (with-test (:name (:no-consing :dx-fixed-objects)
-                  :skipped-on '(not (and :stack-allocatable-fixed-objects
+                  :skipped-on (not (and :stack-allocatable-fixed-objects
                                          :stack-allocatable-closures)))
   (assert-no-consing (cons-on-stack 42))
   (assert-no-consing (make-foo1-on-stack 123))
@@ -726,7 +726,7 @@
   (assert-no-consing (dx-handler-bind 2))
   (assert-no-consing (dx-handler-case 2)))
 
-(with-test (:name (:no-consing :dx-vectors) :skipped-on '(not :stack-allocatable-vectors))
+(with-test (:name (:no-consing :dx-vectors) :skipped-on (not :stack-allocatable-vectors))
   (assert-no-consing (force-make-array-on-stack 128))
   (assert-no-consing (make-array-on-stack-2 5 '(1 2.0 3 4.0 5)))
   (assert-no-consing (make-array-on-stack-3 9 8 7))
@@ -734,7 +734,7 @@
   (assert-no-consing (make-array-on-stack-5))
   (assert-no-consing (vector-on-stack :x :y)))
 
-(with-test (:name (:no-consing :dx-arrays) :skipped-on '(not :stack-allocatable-vectors))
+(with-test (:name (:no-consing :dx-arrays) :skipped-on (not :stack-allocatable-vectors))
   (assert-no-consing (make-3d-fixed-array-on-stack-1))
   (assert-no-consing (make-2d-variable-array-on-stack))
   (assert-no-consing (make-2d-array-function-initializer 1))
@@ -742,13 +742,13 @@
   (assert-no-consing (make-2d-array-function-initializer 3)))
 
 (with-test (:name (:no-consing :dx-specialized-arrays)
-            :skipped-on '(not (and :stack-allocatable-vectors
+            :skipped-on (not (and :stack-allocatable-vectors
                                    :c-stack-is-control-stack)))
   (assert-no-consing (make-3d-fixed-array-on-stack-2 0 0 1 1)))
 
 (with-test (:name (:no-consing :specialized-dx-vectors)
-            :skipped-on `(not (and :stack-allocatable-vectors
-                                   :c-stack-is-control-stack)))
+            :skipped-on (not (and :stack-allocatable-vectors
+                                  :c-stack-is-control-stack)))
   (assert-no-consing (make-array-on-stack-1))
   (assert-no-consing (make-array-on-stack-6))
   (assert-no-consing (make-array-on-stack-7))
@@ -757,7 +757,7 @@
   (assert-no-consing (make-array-on-stack-10))
   (assert-no-consing (make-array-on-stack-11)))
 
-(with-test (:name (:no-consing :dx-raw-instances) :skipped-on '(or (not :raw-instance-init-vops)
+(with-test (:name (:no-consing :dx-raw-instances) :skipped-on (or (not :raw-instance-init-vops)
                                                                    (not (and :gencgc :c-stack-is-control-stack))))
   (let (a b)
     (setf a 1.24 b 1.23d0)
@@ -798,7 +798,7 @@
   (sb-thread:with-mutex (*mutex*)
     (true *mutex*)))
 
-(with-test (:name (:no-consing :mutex) :skipped-on '(not :sb-thread))
+(with-test (:name (:no-consing :mutex) :skipped-on (not :sb-thread))
   (assert-no-consing (test-mutex)))
 
 
@@ -974,7 +974,7 @@
   (assert (= 1 (length-and-words-packed-in-same-tn -3))))
 
 (with-test (:name :handler-case-bogus-compiler-note
-            :skipped-on '(not (and :stack-allocatable-fixed-objects
+            :skipped-on (not (and :stack-allocatable-fixed-objects
                                    :stack-allocatable-closures)))
   ;; Taken from SWANK, used to signal a bogus stack allocation
   ;; failure note.
@@ -1008,7 +1008,7 @@
 (defun barvector (x y z)
   (make-array 3 :initial-contents (list x y z)))
 (with-test (:name :dx-compiler-notes
-            :skipped-on '(not (and :stack-allocatable-vectors
+            :skipped-on (not (and :stack-allocatable-vectors
                                    :stack-allocatable-closures)))
   (flet ((assert-notes (j lambda)
            (let ((notes (nth 4 (multiple-value-list (checked-compile lambda))))) ; TODO
@@ -1066,7 +1066,7 @@
           (assert (= sp (sb-c::%primitive sb-c:current-stack-pointer)))
           (setf sp (sb-c::%primitive sb-c:current-stack-pointer))))))
 (with-test (:name :handler-case-eating-stack
-            :skipped-on '(not (and :stack-allocatable-fixed-objects
+            :skipped-on (not (and :stack-allocatable-fixed-objects
                                    :stack-allocatable-closures)))
   (assert-no-consing (handler-case-eating-stack)))
 
@@ -1086,7 +1086,7 @@
       (declare (dynamic-extent vec))
       (funcall fun vec))))
 (with-test (:name :recheck-nested-dx-bug
-            :skipped-on '(not :stack-allocatable-vectors))
+            :skipped-on (not :stack-allocatable-vectors))
   (assert (funcall (bad-boy (vec 1.0 2.0 3.3))
                    (lambda (vec) (equalp vec (vec 1.0 2.0 3.3)))))
   (flet ((foo (x) (declare (ignore x))))
@@ -1111,7 +1111,7 @@
           :allow-notes 'sb-ext:compiler-note)))
 
 (with-test (:name :bug-586105
-            :skipped-on '(not (and :stack-allocatable-vectors
+            :skipped-on (not (and :stack-allocatable-vectors
                                :stack-allocatable-lists)))
   (flet ((test (x)
            (let ((vec1 (make-array 1 :initial-contents (list (list x))))

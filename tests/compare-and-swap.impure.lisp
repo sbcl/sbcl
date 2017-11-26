@@ -152,14 +152,14 @@
     (assert (= (- (ash 1 sb-vm:n-word-bits) 2) (box-word box)))))
 
 (with-test (:name :cas-raw-instance-ref-word
-            :skipped-on '(not (or :x86 :x86-64)))
+            :skipped-on (not (or :x86 :x86-64)))
   (let ((foo (make-box :word 42)))
     ;; basic smoke test - not checking for atomicity or anything
     (assert (eql (cas (box-word foo) 42 43) 42))
     (assert (eql (cas (box-word foo) 43 44) 43))))
 
 (with-test (:name :atomic-incf-full-call-lp1381867
-            :skipped-on '(not (or :x86 :x86-64 :ppc)))
+            :skipped-on (not (or :x86 :x86-64 :ppc)))
   ;; contortions to avoid reader errors
   (let* ((%riai/w (intern "%RAW-INSTANCE-ATOMIC-INCF/WORD" "SB-KERNEL"))
          (form
@@ -517,7 +517,7 @@
     (assert (not (cas bar nil t)))))
 
 (with-test (:name :atomic-push
-            :skipped-on '(not :sb-thread))
+            :skipped-on (not :sb-thread))
   (let ((store (cons nil nil))
         (n 100000))
     (symbol-macrolet ((x (car store))

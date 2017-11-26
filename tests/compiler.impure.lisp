@@ -959,7 +959,7 @@
 
 ;;;; MUFFLE-CONDITIONS test (corresponds to the test in the manual)
 ; FIXME: make a better test!
-(with-test (:name muffle-conditions :skipped-on '(or :alpha :x86-64))
+(with-test (:name muffle-conditions :skipped-on (or :alpha :x86-64))
   (multiple-value-bind (fun failure-p warnings style-warnings notes)
       (checked-compile
        '(lambda (x)

@@ -29,7 +29,7 @@
 (defun test-collation ()
   (declare (optimize (debug 2)))
   (with-test (:name (:collation)
-                    :skipped-on '(not :sb-unicode))
+                    :skipped-on (not :sb-unicode))
     (with-open-file (s "data/CollationTest_SHIFTED_SHORT.txt" :external-format :utf8)
       (loop with previous-string = ""
          for line = (read-line s nil nil)

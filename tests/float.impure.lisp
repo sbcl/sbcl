@@ -244,7 +244,7 @@
 ;; that can differ by arbitrarily large amounts for large inputs.
 ;; The test expects the x87 results.
 (with-test (:name (:range-reduction :x87)
-            :skipped-on '(not :x86))
+            :skipped-on (not :x86))
   (flet ((almost= (x y)
            (< (abs (- x y)) 1d-5)))
     (macrolet ((foo (op value)
@@ -303,7 +303,7 @@ fractional bits."
 ;; (:range-reduction :x87) above.
 (with-test (:name (:range-reduction :precise-pi)
             :skipped-on :x86
-            :fails-on '(and :openbsd :x86-64))
+            :fails-on (and :openbsd :x86-64))
   (let ((rational-pi-half (/ (pi-gauss-legendre 2200) 2)))
     (labels ((round-pi-half (x)
                "Return two values as if (ROUND X (/ PI 2)) was called

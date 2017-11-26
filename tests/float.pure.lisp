@@ -100,7 +100,7 @@
   (assert (= 0.0d0 (scale-float 1.0d0 (1- most-negative-fixnum)))))
 
 (with-test (:name (:scale-float-overflow :bug-372)
-            :fails-on '(or :arm64 (and :darwin :ppc)))
+            :fails-on (or :arm64 (and :darwin :ppc)))
   (flet ((test (form)
            (assert-error (funcall (checked-compile `(lambda () ,form)
                                                    :allow-style-warnings t))
@@ -135,7 +135,7 @@
     (mapc #'test '(sin cos tan))))
 
 (with-test (:name (:addition-overflow :bug-372)
-            :fails-on '(or :arm64
+            :fails-on (or :arm64
                         (and :ppc :openbsd)
                         (and :ppc :darwin)
                         (and :x86 :netbsd)))
@@ -156,7 +156,7 @@
 ;; the preceeding "pure" test files aren't as free of side effects as
 ;; we might like.
 (with-test (:name (:addition-overflow :bug-372 :take-2)
-            :fails-on '(or :arm64
+            :fails-on (or :arm64
                         (and :ppc :openbsd)
                         (and :ppc :darwin)
                         (and :x86 :netbsd)))
@@ -191,7 +191,7 @@
                              (+ x0 x1 x6 x7) (+ x2 x3 x4 x5)))))))
 
 (with-test (:name (:nan :comparison)
-            :fails-on '(or :sparc))
+            :fails-on (or :sparc))
   (sb-int:with-float-traps-masked (:invalid)
     (macrolet ((test (form)
                  (let ((nform (subst '(/ 0.0 0.0) 'nan form)))
@@ -327,7 +327,7 @@
                         (locally ,@body))
                     ,@(loop for var in dummy
                             collect `(sb-vm::touch-object ,var)))))))
-  (with-test (:name :clear-sqrtsd :skipped-on '(not (or :x86 :x86-64)))
+  (with-test (:name :clear-sqrtsd :skipped-on (not (or :x86 :x86-64)))
     (flet ((test-sqrtsd (float)
              (declare (optimize speed (safety 1))
                       (type (double-float (0d0)) float))
@@ -337,7 +337,7 @@
       (declare (notinline test-sqrtsd))
       (assert (zerop (imagpart (test-sqrtsd 4d0))))))
 
-  (with-test (:name :clear-sqrtsd-single :skipped-on '(not (or :x86 :x86-64)))
+  (with-test (:name :clear-sqrtsd-single :skipped-on (not (or :x86 :x86-64)))
     (flet ((test-sqrtsd-float (float)
              (declare (optimize speed (safety 1))
                       (type (single-float (0f0)) float))
@@ -347,7 +347,7 @@
       (declare (notinline test-sqrtsd-float))
       (assert (zerop (imagpart (test-sqrtsd-float 4f0))))))
 
-  (with-test (:name :clear-cvtss2sd :skipped-on '(not (or :x86 :x86-64)))
+  (with-test (:name :clear-cvtss2sd :skipped-on (not (or :x86 :x86-64)))
     (flet ((test-cvtss2sd (float)
              (declare (optimize speed (safety 1))
                       (type single-float float))
@@ -357,7 +357,7 @@
       (declare (notinline test-cvtss2sd))
       (assert (zerop (imagpart (test-cvtss2sd 1f0))))))
 
-  (with-test (:name :clear-cvtsd2ss :skipped-on '(not (or :x86 :x86-64)))
+  (with-test (:name :clear-cvtsd2ss :skipped-on (not (or :x86 :x86-64)))
     (flet ((test-cvtsd2ss (float)
              (declare (optimize speed (safety 1))
                       (type double-float float))
@@ -367,7 +367,7 @@
       (declare (notinline test-cvtsd2ss))
       (assert (zerop (imagpart (test-cvtsd2ss 4d0))))))
 
-  (with-test (:name :clear-cvtsi2sd :skipped-on '(not (or :x86 :x86-64)))
+  (with-test (:name :clear-cvtsi2sd :skipped-on (not (or :x86 :x86-64)))
     (flet ((test-cvtsi2sd (int)
              (declare (optimize speed (safety 0))
                       (type (unsigned-byte 10) int))
@@ -376,7 +376,7 @@
       (declare (notinline test-cvtsi2sd))
       (assert (zerop (imagpart (test-cvtsi2sd 4))))))
 
-  (with-test (:name :clear-cvtsi2ss :skipped-on '(not (or :x86 :x86-64)))
+  (with-test (:name :clear-cvtsi2ss :skipped-on (not (or :x86 :x86-64)))
     (flet ((test-cvtsi2ss (int)
              (declare (optimize speed (safety 0))
                       (type (unsigned-byte 10) int))

@@ -274,7 +274,7 @@
 (locally (declare (muffle-conditions style-warning))
   (sb-alien:define-alien-routine bug-316075 void (result char :out)))
 (with-test (:name :bug-316075 :fails-on :win32
-                  :broken-on '(not :linkage-table))
+                  :broken-on (not :linkage-table))
   #+win32 (error "fail")
   #-linkage-table (error "unable to set up test precondition")
   ;; The interpreter gives you a style-warning because the "undefined alien"
@@ -295,7 +295,7 @@
     ((foo (unsigned 32)))
   foo)
 
-(with-test (:name :bug-316325 :skipped-on '(not (or :x86-64 :x86))
+(with-test (:name :bug-316325 :skipped-on (not (or :x86-64 :x86))
                   :fails-on :interpreter)
   ;; This test works by defining a callback function that provides an
   ;; identity transform over a full-width machine word, then calling

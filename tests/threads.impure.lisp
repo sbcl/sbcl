@@ -1247,7 +1247,7 @@
              (1+ sb-vm:+highest-normal-generation+))
   (pushnew :verify-gens *features*))
 
-(with-test (:name :backtrace :broken-on ':verify-gens)
+(with-test (:name :backtrace :broken-on :verify-gens)
   ;; Printing backtraces from several threads at once used to hang the
   ;; whole SBCL process (discovered by accident due to a timer.impure
   ;; test misbehaving). The cause was that packages weren't even
@@ -1333,9 +1333,9 @@
 ;;; fruitful to concentrate their efforts around this test...
 
 (with-test (:name (:funcallable-instances)
-            :broken-on '(or :win32
-                         (and :sb-safepoint
-                          (not :c-stack-is-control-stack))))
+            :broken-on (or :win32
+                           (and :sb-safepoint
+                                (not :c-stack-is-control-stack))))
   ;; the funcallable-instance implementation used not to be threadsafe
   ;; against setting the funcallable-instance function to a closure
   ;; (because the code and lexenv were set separately).

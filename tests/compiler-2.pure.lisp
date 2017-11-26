@@ -206,7 +206,7 @@
       (assert (not (ctu:find-code-constants f :type 'sb-kernel:fdefn))))))
 
 (with-test (:name :layout-constants
-                  :skipped-on '(not (and :x86-64 :immobile-space)))
+                  :skipped-on (not (and :x86-64 :immobile-space)))
   (let ((addr-of-pathname-layout
          (write-to-string
           (sb-kernel:get-lisp-obj-address (sb-kernel:find-layout 'pathname))
@@ -222,7 +222,7 @@
         (incf count)))
     (assert (= count 2))))
 
-(with-test (:name :set-symbol-value-imm :skipped-on '(not :x86-64))
+(with-test (:name :set-symbol-value-imm :skipped-on (not :x86-64))
   (let (success)
     (dolist (line (split-string
                    (with-output-to-string (s)
@@ -235,7 +235,7 @@
         (setq success t)))
     (assert success)))
 
-(with-test (:name :linkage-table-bogosity :skipped-on '(not :sb-dynamic-core))
+(with-test (:name :linkage-table-bogosity :skipped-on (not :sb-dynamic-core))
   (let ((strings (map 'list (lambda (x) (if (consp x) (car x) x))
                       #+sb-dynamic-core sb-vm::+required-foreign-symbols+
                       #-sb-dynamic-core '())))

@@ -309,10 +309,10 @@
   (assert (not (setf (documentation 'docfoo 'function) nil)))
   (assert-documentation 'docfoo 'function nil))
 
-(with-test (:name (documentation :built-in-macro) :skipped-on '(not :sb-doc))
+(with-test (:name (documentation :built-in-macro) :skipped-on (not :sb-doc))
   (assert (documentation 'trace 'function)))
 
-(with-test (:name (documentation :built-in-function) :skipped-on '(not :sb-doc))
+(with-test (:name (documentation :built-in-function) :skipped-on (not :sb-doc))
   (assert (documentation 'cons 'function)))
 
 (defvar documentation.variable nil

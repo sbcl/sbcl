@@ -77,7 +77,7 @@
          (assert (char= #\# (char (read-line s) 0)))))
     ;; Part0: specific cases
     (with-test (:name (:unicode-normalization :part0)
-                      :skipped-on '(not :sb-unicode))
+                      :skipped-on (not :sb-unicode))
       (do ((line (read-line s) (read-line s)))
           ((char= #\# (char line 0))
            (assert (string= "@Part1" (read-line s) :end2 6))
@@ -89,7 +89,7 @@
     ;; Part1: single characters.  (Extra work to check for conformance
     ;; on unlisted entries)
     (with-test (:name (:unicode-normalization :part1)
-                      :skipped-on '(not :sb-unicode))
+                      :skipped-on (not :sb-unicode))
       (do ((line (read-line s) (read-line s))
            (code 0))
           ((char= #\# (char line 0))
@@ -107,7 +107,7 @@
             (test-no-normalization (string (code-char code)))))))
     ;; Part2: Canonical Order Test
     (with-test (:name (:unicode-normalization :part2)
-                      :skipped-on '(not :sb-unicode))
+                      :skipped-on (not :sb-unicode))
       (do ((line (read-line s) (read-line s)))
           ((char= #\# (char line 0))
            (assert (string= "@Part3" (read-line s) :end2 6))
@@ -117,7 +117,7 @@
           (test-line c1 c2 c3 c4 c5))))
     ;; Part3: PRI #29 Test
     (with-test (:name (:unicode-normalization :part3)
-                      :skipped-on '(not :sb-unicode))
+                      :skipped-on (not :sb-unicode))
       (do ((line (read-line s) (read-line s)))
           ((char= #\# (char line 0))
            (assert (char= #\# (char (read-line s) 0)))

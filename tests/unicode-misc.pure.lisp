@@ -11,7 +11,7 @@
 
 #+sb-unicode
 (with-test (:name (:unicode-casing)
-                  :skipped-on '(not :sb-unicode))
+                  :skipped-on (not :sb-unicode))
   (labels ((str (&rest chars)
              (coerce chars 'string))
            (test-fn (fn locale pairs)

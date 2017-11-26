@@ -52,7 +52,7 @@
 (defun test-graphemes ()
   (declare (optimize (debug 2)))
   (with-test (:name (:grapheme-breaking)
-                    :skipped-on '(not :sb-unicode))
+                    :skipped-on (not :sb-unicode))
     (with-open-file (s "data/GraphemeBreakTest.txt" :external-format :utf8)
       (loop for line = (read-line s nil nil)
             while line
@@ -63,7 +63,7 @@
 (defun test-words ()
   (declare (optimize (debug 2)))
   (with-test (:name (:word-breaking)
-                    :skipped-on '(not :sb-unicode))
+                    :skipped-on (not :sb-unicode))
     (with-open-file (s "data/WordBreakTest.txt" :external-format :utf8)
       (loop for line = (read-line s nil nil)
             while line
@@ -74,7 +74,7 @@
 (defun test-sentences ()
   (declare (optimize (debug 2)))
   (with-test (:name (:sentence-breaking)
-                    :skipped-on '(not :sb-unicode))
+                    :skipped-on (not :sb-unicode))
     (with-open-file (s "data/SentenceBreakTest.txt" :external-format :utf8)
       (loop for line = (read-line s nil nil)
             while line
@@ -103,7 +103,7 @@
 (defun test-line-breaking ()
   (declare (optimize (debug 2)))
   (with-test (:name (:line-breaking)
-                    :skipped-on '(not :sb-unicode))
+                    :skipped-on (not :sb-unicode))
     (with-open-file (s "data/LineBreakTest.txt" :external-format :utf8)
       (loop for line = (read-line s nil nil)
          while line

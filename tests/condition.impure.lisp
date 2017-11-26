@@ -510,7 +510,7 @@
 (defun (setf thing) (a b) (declare (ignore b)) a)
 
 (with-test (:name :undefined-restart
-            :skipped-on '(not :undefined-fun-restarts))
+            :skipped-on (not :undefined-fun-restarts))
   (let* ((name (gensym))
          (tail-call (checked-compile `(lambda () (,name)) :allow-style-warnings t))
          (call (checked-compile `(lambda () (1+ (,name))) :allow-style-warnings t))

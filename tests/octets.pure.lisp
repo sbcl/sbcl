@@ -260,7 +260,7 @@
 (assert (equalp #(251) (string-to-octets (string (code-char 369))
                                          :external-format :latin-2)))
 
-(with-test (:name (:euc-jp :decoding-errors) :skipped-on '(not :sb-unicode))
+(with-test (:name (:euc-jp :decoding-errors) :skipped-on (not :sb-unicode))
   (handler-bind ((sb-int:character-decoding-error
                   (lambda (c) (use-value #\? c))))
     (assert (string= "?{?"
@@ -268,20 +268,20 @@
                       (coerce #(182 123 253 238) '(vector (unsigned-byte 8)))
                       :external-format :euc-jp)))))
 
-(with-test (:name (:utf-8 :surrogates :encoding-errors) :skipped-on '(not :sb-unicode))
+(with-test (:name (:utf-8 :surrogates :encoding-errors) :skipped-on (not :sb-unicode))
   (handler-bind ((sb-int:character-encoding-error
                   (lambda (c) (use-value #\? c))))
     (assert (equalp (string-to-octets (string (code-char #xd800))
                                       :external-format :utf-8)
                     (vector (char-code #\?))))))
-(with-test (:name (:utf-8 :surrogates :decoding-errors) :skipped-on '(not :sb-unicode))
+(with-test (:name (:utf-8 :surrogates :decoding-errors) :skipped-on (not :sb-unicode))
   (handler-bind ((sb-int:character-decoding-error
                   (lambda (c) (use-value #\? c))))
     (assert (find #\? (octets-to-string
                        (coerce #(237 160 128) '(vector (unsigned-byte 8)))
                        :external-format :utf-8)))))
 
-(with-test (:name (:ucs-2 :out-of-range :encoding-errors) :skipped-on '(not :sb-unicode))
+(with-test (:name (:ucs-2 :out-of-range :encoding-errors) :skipped-on (not :sb-unicode))
   (handler-bind ((sb-int:character-encoding-error
                   (lambda (c) (use-value "???" c))))
     (assert (equalp (string-to-octets (string (code-char #x10001))
@@ -293,7 +293,7 @@
                                       :external-format :ucs-2be)
                     #(0 63 0 63 0 63)))))
 
-(with-test (:name (:ucs-4 :out-of-range :decoding-errors) :skipped-on '(not :sb-unicode))
+(with-test (:name (:ucs-4 :out-of-range :decoding-errors) :skipped-on (not :sb-unicode))
   (handler-bind ((sb-int:character-decoding-error
                   (lambda (c) (use-value "???" c))))
     (assert (equalp (octets-to-string (coerce '(1 2 3 4) '(vector (unsigned-byte 8)))
@@ -311,7 +311,7 @@
                                       :external-format :ucs-4be)
                     (string (code-char #x10ffff))))))
 
-(with-test (:name (:utf-16le :ensure-roundtrip) :skipped-on '(not :sb-unicode))
+(with-test (:name (:utf-16le :ensure-roundtrip) :skipped-on (not :sb-unicode))
   (flet ((enc (x)
            (string-to-octets x :external-format :utf-16le))
          (dec (x)
@@ -323,7 +323,7 @@
       (assert (equalp (enc string) octets))
       (assert (equalp (dec octets) string)))))
 
-(with-test (:name (:utf-16le :encoding-error) :skipped-on '(not :sb-unicode))
+(with-test (:name (:utf-16le :encoding-error) :skipped-on (not :sb-unicode))
   (flet ((enc (x)
            (string-to-octets x :external-format '(:utf-16le :replacement #\?)))
          (dec (x)
@@ -332,7 +332,7 @@
     (let ((string (map 'string 'code-char '(#xd800 #xdc00 #xfffe #x10ffff))))
       (assert (equalp (enc string) #(63 0 63 0 63 0 63 0))))))
 
-(with-test (:name (:utf-16be :ensure-roundtrip) :skipped-on '(not :sb-unicode))
+(with-test (:name (:utf-16be :ensure-roundtrip) :skipped-on (not :sb-unicode))
   (flet ((enc (x)
            (string-to-octets x :external-format :utf-16be))
          (dec (x)
@@ -344,7 +344,7 @@
       (assert (equalp (enc string) octets))
       (assert (equalp (dec octets) string)))))
 
-(with-test (:name (:utf-16be :encoding-error) :skipped-on '(not :sb-unicode))
+(with-test (:name (:utf-16be :encoding-error) :skipped-on (not :sb-unicode))
   (flet ((enc (x)
            (string-to-octets x :external-format '(:utf-16be :replacement #\?)))
          (dec (x)
@@ -354,7 +354,7 @@
       (assert (equalp (enc string) #(0 63 0 63 0 63 0 63))))))
 
 
-(with-test (:name (:utf-32le :ensure-roundtrip) :skipped-on '(not :sb-unicode))
+(with-test (:name (:utf-32le :ensure-roundtrip) :skipped-on (not :sb-unicode))
   (flet ((enc (x)
            (string-to-octets x :external-format :utf-32le))
          (dec (x)
@@ -366,7 +366,7 @@
       (assert (equalp (enc string) octets))
       (assert (equalp (dec octets) string)))))
 
-(with-test (:name (:utf-32le :encoding-error) :skipped-on '(not :sb-unicode))
+(with-test (:name (:utf-32le :encoding-error) :skipped-on (not :sb-unicode))
   (flet ((enc (x)
            (string-to-octets x :external-format '(:utf-32le :replacement #\?)))
          (dec (x)
@@ -376,7 +376,7 @@
       (assert (equalp (enc string) #(63 0 0 0 63 0 0 0 63 0 0 0 63 0 0 0))))))
 
 
-(with-test (:name (:utf-32be :ensure-roundtrip) :skipped-on '(not :sb-unicode))
+(with-test (:name (:utf-32be :ensure-roundtrip) :skipped-on (not :sb-unicode))
   (flet ((enc (x)
            (string-to-octets x :external-format :utf-32be))
          (dec (x)
@@ -388,7 +388,7 @@
       (assert (equalp (enc string) octets))
       (assert (equalp (dec octets) string)))))
 
-(with-test (:name (:utf-32be :encoding-error) :skipped-on '(not :sb-unicode))
+(with-test (:name (:utf-32be :encoding-error) :skipped-on (not :sb-unicode))
   (flet ((enc (x)
            (string-to-octets x :external-format '(:utf-32be :replacement #\?)))
          (dec (x)
@@ -398,7 +398,7 @@
       (assert (equalp (enc string) #(0 0 0 63 0 0 0 63 0 0 0 63 0 0 0 63))))))
 
 (with-test (:name :compile-file-position-with-encodings
-            :skipped-on '(not :sb-unicode))
+            :skipped-on (not :sb-unicode))
   (with-open-file (f1 "data/compile-file-pos.lisp" :external-format :utf-8)
     (with-open-file (f2 "data/compile-file-pos-utf16be.lisp"
                         :external-format :utf-16be)

@@ -32,7 +32,7 @@
       (process-close process))))
 
 (with-test (:name (run-program :cat 2)
-                  :skipped-on '(or (not :sb-thread) :win32))
+                  :skipped-on (or (not :sb-thread) :win32))
   ;; Tests that reading from a FIFO is interruptible.
   (let* ((process (run-program "/bin/cat" '()
                                :wait nil :output :stream :input :stream))

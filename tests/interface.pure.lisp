@@ -19,7 +19,7 @@
 
 ;;;; properties of symbols, e.g. presence of doc strings for public symbols
 
-(with-test (:name (documentation :cl) :skipped-on '(:not :sb-doc))
+(with-test (:name (documentation :cl) :skipped-on (:not :sb-doc))
   (let ((n 0))
     (do-symbols (s 'cl)
       (if (fboundp s)
@@ -229,7 +229,7 @@
 ;;; This tests that the x86-64 disasembler does not crash
 ;;; on LEA with a rip-relative operand and no label.
 (with-test (:name (disassemble :no-labels)
-                  :skipped-on '(not :x86-64))
+                  :skipped-on (not :x86-64))
   (let* ((lines
           (split-string
            (with-output-to-string (stream)

@@ -236,7 +236,7 @@ Wanted ~S, got ~S."
   (with-open-file (s "../tools-for-build/BidiMirroring.txt"
                      :external-format :ascii)
     (with-test (:name (:bidi-mirroring-glyph)
-                :skipped-on '(not :sb-unicode))
+                :skipped-on (not :sb-unicode))
       (loop for line = (read-line s nil nil)
          while line
          unless (or (string= "" line) (eql 0 (position #\# line)))

@@ -320,7 +320,7 @@ if a restart was invoked."
     (assert (null (iter)))))
 
 ;;; MAKE-PACKAGE error in another thread blocking FIND-PACKAGE & FIND-SYMBOL
-(with-test (:name :bug-511072 :skipped-on '(not :sb-thread))
+(with-test (:name :bug-511072 :skipped-on (not :sb-thread))
   (let* ((p (make-package :bug-511072))
          (sem1 (sb-thread:make-semaphore))
          (sem2 (sb-thread:make-semaphore))
@@ -784,7 +784,7 @@ if a restart was invoked."
 ;; Concurrent FIND-SYMBOL was adversely affected by package rehash.
 ;; It's slightly difficult to show that this is fixed, because this
 ;; test only sometimes failed prior to the fix. Now it never fails though.
-(with-test (:name :concurrent-find-symbol :skipped-on '(not :sb-thread))
+(with-test (:name :concurrent-find-symbol :skipped-on (not :sb-thread))
  (let ((pkg (make-package (gensym)))
        (threads)
        (names)
@@ -873,7 +873,7 @@ if a restart was invoked."
 
 ;; This test would consistently fail when GENTEMP first called FIND-SYMBOL
 ;; and then INTERN when FIND-SYMBOL said that it found no symbol.
-(with-test (:name (gentemp :threadsafety) :skipped-on '(not :sb-thread))
+(with-test (:name (gentemp :threadsafety) :skipped-on (not :sb-thread))
   (let ((n-threads 5)
         (n-iter 1000)
         (threads))
@@ -889,7 +889,7 @@ if a restart was invoked."
 ;;; Nonetheless it did sometimes fail, and now should never fail.
 (with-test (:name :concurrent-intern-bad-published-symbol-package
                   ;; No point in wasting time on concurrency bugs otherwise
-                  :skipped-on '(not :sb-thread))
+                  :skipped-on (not :sb-thread))
   ;; Confirm that the compiler does not know that KEYWORDICATE
   ;; returns a KEYWORD (so the answer isn't constant-folded)
   (assert (sb-kernel:type= (sb-int:info :function :type 'sb-int:keywordicate)

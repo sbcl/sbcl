@@ -98,7 +98,7 @@
 
 ;;; A few cases Windows does have enough marbles to pass right now
 (with-test (:name (sb-ext:native-namestring :win32)
-                  :skipped-on '(not :win32))
+                  :skipped-on (not :win32))
   (assert (equal "C:\\FOO" (native-namestring "C:\\FOO")))
   (assert (equal "C:\\FOO" (native-namestring "C:/FOO")))
   (assert (equal "C:\\FOO\\BAR" (native-namestring "C:\\FOO\\BAR")))
@@ -278,6 +278,6 @@
                    "OPEN :IF-EXISTS :NEW-VERSION is not supported ~
                             when a new version must be created."))))
 
-(with-test (:name :parse-native-namestring-canon :skipped-on '(not :unix))
+(with-test (:name :parse-native-namestring-canon :skipped-on (not :unix))
   (let ((pathname (parse-native-namestring "foo/bar//baz")))
     (assert (string= (car (last (pathname-directory pathname))) "bar"))))

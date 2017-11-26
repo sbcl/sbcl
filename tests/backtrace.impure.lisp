@@ -185,12 +185,12 @@
          (funcall fun)))
 
   (with-test (:name (:backtrace :undefined-function :bug-346)
-                    :skipped-on :interpreter
-                    ;; Failures on SPARC, and probably HPPA are due to
-                    ;; not having a full and valid stack frame for the
-                    ;; undefined function frame.  See PPC
-                    ;; undefined_tramp for details.
-                    :fails-on '(or :sparc))
+              :skipped-on :interpreter
+              ;; Failures on SPARC, and probably HPPA are due to
+              ;; not having a full and valid stack frame for the
+              ;; undefined function frame.  See PPC
+              ;; undefined_tramp for details.
+              :fails-on :sparc)
     (assert-backtrace
      (lambda () (test #'optimized))
      (list (append *undefined-function-frame* '(42))
@@ -207,7 +207,7 @@
            (list `(flet test :in ,*p*) #'not-optimized)))))
 
 (with-test (:name (:backtrace :interrupted-condition-wait)
-                  :skipped-on '(not :sb-thread))
+                  :skipped-on (not :sb-thread))
   (let ((m (sb-thread:make-mutex))
         (q (sb-thread:make-waitqueue)))
     (assert-backtrace
@@ -260,7 +260,7 @@
 (defun throw-test ()
   (throw 'no-such-tag t))
 (with-test (:name (:backtrace :throw :no-such-tag)
-                  :fails-on '(and :sparc :linux))
+                  :fails-on (and :sparc :linux))
   (assert-backtrace #'throw-test '((throw-test))))
 
 (funcall (checked-compile
@@ -560,7 +560,7 @@
 
 #+sb-fasteval
 (with-test (:name (:backtrace :interpreted-factorial)
-            :skipped-on '(not :interpreter))
+            :skipped-on (not :interpreter))
   (assert-backtrace
    (lambda () (fact 5))
    '((fact 0)

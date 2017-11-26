@@ -1390,7 +1390,7 @@ redefinition."
                              :initial-element *c*))
 
 (test-util:with-test (:name :dfloat-endianness
-                      :skipped-on '(not (or :mips :x86))) ; only tested on these
+                      :skipped-on (not (or :mips :x86))) ; only tested on these
   (compare-memory pi 2 *adf* 2 2) ; Array
   (compare-memory pi 2 (make-struct-df) 2 2) ; Structure
 

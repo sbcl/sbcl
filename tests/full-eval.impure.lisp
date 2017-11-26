@@ -109,7 +109,7 @@
 (locally
  (declare (muffle-conditions compiler-note))
  (defun some-inline-fun (x) (- x)))
-(with-test (:name :inline-fun-captures-decl :fails-on '(not :sb-fasteval))
+(with-test (:name :inline-fun-captures-decl :fails-on (not :sb-fasteval))
   (assert (equal (sb-int:fun-name-inline-expansion 'some-inline-fun)
                  '(sb-c:lambda-with-lexenv
                    (:declare ((muffle-conditions compiler-note))) (x)

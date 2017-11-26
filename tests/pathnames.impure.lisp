@@ -551,7 +551,7 @@
 ;;; Reported by Willem Broekema: Reading #p"\\\\" caused an error due
 ;;; to insufficient sanity in input testing in EXTRACT-DEVICE (in
 ;;; src;code;win32-pathname).
-(with-test (:name :bug-489698 :skipped-on '(not :win32))
+(with-test (:name :bug-489698 :skipped-on (not :win32))
   (assert (equal (make-pathname :directory '(:absolute))
                  (read-from-string "#p\"\\\\\\\\\""))))
 
@@ -623,7 +623,7 @@
   (let ((*default-pathname-defaults* #p"/tmp/foo"))
     (ensure-directories-exist "/")))
 
-(with-test (:name :long-file-name :skipped-on '(not :win32))
+(with-test (:name :long-file-name :skipped-on (not :win32))
   (let* ((x '("hint--if-you-are-having-trouble-deleting-this-test-directory"
               "use-the-7zip-file-manager"))
          (base (truename

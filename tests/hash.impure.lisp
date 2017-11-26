@@ -291,7 +291,7 @@
        (sb-thread::wait-on-semaphore ,sem)
        (values-list ,values))))
 
-(with-test (:name (:hash-table :weakness :eql :numbers) :skipped-on '(and :c-stack-is-control-stack (not :sb-thread)))
+(with-test (:name (:hash-table :weakness :eql :numbers) :skipped-on (and :c-stack-is-control-stack (not :sb-thread)))
   (flet ((random-number ()
            (random 1000)))
     (loop for weakness in '(nil :key :value :key-and-value :key-or-value) do
@@ -330,7 +330,7 @@
   (format stream "Hash: ~S~%" (sb-impl::hash-table-hash-vector ht))
   (force-output stream))
 
-(with-test (:name (:hash-table :weakness :removal) :skipped-on '(and :c-stack-is-control-stack (not :sb-thread)))
+(with-test (:name (:hash-table :weakness :removal) :skipped-on (and :c-stack-is-control-stack (not :sb-thread)))
   (loop for test in '(eq eql equal equalp) do
         ; (format t "test: ~A~%" test)
         (loop for weakness in '(:key :value :key-and-value :key-or-value)
@@ -357,7 +357,7 @@
                           (return)))
                       (gc :full t))))))
 
-(with-test (:name (:hash-table :weakness :string-interning) :skipped-on '(and :c-stack-is-control-stack (not :sb-thread)))
+(with-test (:name (:hash-table :weakness :string-interning) :skipped-on (and :c-stack-is-control-stack (not :sb-thread)))
   (let ((ht (make-hash-table :test 'equal :weakness :key))
         (s "a"))
     (setf (gethash s ht) s)
@@ -365,7 +365,7 @@
     (assert (eq (gethash (copy-seq s) ht) s))))
 
 ;;; see if hash_vector is not written when there is none ...
-(with-test (:name (:hash-table :weakness :eq) :skipped-on '(and :c-stack-is-control-stack (not :sb-thread)))
+(with-test (:name (:hash-table :weakness :eq) :skipped-on (and :c-stack-is-control-stack (not :sb-thread)))
   (loop repeat 10 do
         (let ((index (random 2000)))
           (let ((first (+ most-positive-fixnum (mod (* index 31) 9)))
@@ -376,7 +376,7 @@
               hash-table)))))
 
 ;; used to crash in gc
-(with-test (:name (:hash-table :weakness :keep) :skipped-on '(and :c-stack-is-control-stack (not :sb-thread)))
+(with-test (:name (:hash-table :weakness :keep) :skipped-on (and :c-stack-is-control-stack (not :sb-thread)))
   (loop repeat 2 do
         (let ((h1 (make-hash-table :weakness :key :test #'equal))
               (keep ()))

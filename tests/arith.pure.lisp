@@ -480,7 +480,7 @@
 ;;; MOD and REM. Test that the transform is indeed triggered and test
 ;;; several cases for correct results.
 (with-test (:name (:integer-division-using-multiplication :used)
-                  :skipped-on '(not (or :x86-64 :x86)))
+                  :skipped-on (not (or :x86-64 :x86)))
   (dolist (fun '(truncate floor ceiling mod rem))
     (let* ((foo (checked-compile
                  `(lambda (x)

@@ -77,9 +77,9 @@
     `(progn
        (start-test)
        (cond
-         ((broken-p ,broken-on)
+         ((broken-p ',broken-on)
           (fail-test :skipped-broken ',name "Test broken on this platform"))
-         ((skipped-p ,skipped-on)
+         ((skipped-p ',skipped-on)
           (fail-test :skipped-disabled ',name "Test disabled for this combination of platform and features"))
          (t
           (let (#+sb-thread (,threads (sb-thread:list-all-threads))
@@ -87,7 +87,7 @@
                 (*threads-to-kill* nil))
             (block ,block-name
               (handler-bind ((error (lambda (error)
-                                      (if (expected-failure-p ,fails-on)
+                                      (if (expected-failure-p ',fails-on)
                                           (fail-test :expected-failure ',name error)
                                           (fail-test :unexpected-failure ',name error))
                                       (return-from ,block-name))))
@@ -120,7 +120,7 @@
                     (when any-leftover
                       (fail-test :leftover-thread ',name any-leftover)
                       (return-from ,block-name)))
-                  (if (expected-failure-p ,fails-on)
+                  (if (expected-failure-p ',fails-on)
                       (fail-test :unexpected-success ',name nil)
                       ;; Non-pretty is for cases like (with-test (:name (let ...)) ...
                       (log-msg/non-pretty "Success ~S" ',name)))))))))))
