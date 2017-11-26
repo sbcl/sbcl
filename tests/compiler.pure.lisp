@@ -6152,9 +6152,35 @@
                    s)))
     (('(1 2) 3) 6)))
 
-(with-test (:name (multiple-value-call :type-derivation)
-                  :fails-on :sbcl)
-  (checked-compile-and-assert (:allow-warnings t)
+(with-test (:name (multiple-value-call :type-checking-rest))
+  (checked-compile-and-assert (:allow-warnings t
+                               :optimize :safe)
+      `(lambda (list)
+         (multiple-value-call
+             (lambda (&optional a &rest r)
+               (declare ((satisfies eval) r)
+                        (ignore r))
+               (list a))
+           (values-list list)))
+    (('(1 list 2)) '(1))
+    (('(1)) (condition 'type-error))))
+
+(with-test (:name (multiple-value-call :type-checking-rest.2))
+  (checked-compile-and-assert (:allow-warnings t
+                               :optimize :safe)
+      `(lambda (list)
+         (multiple-value-call
+             (lambda (&optional a &rest r)
+               (declare (null r)
+                        (ignore r))
+               (list a))
+           (values-list list)))
+    (('(1 list 2)) (condition 'type-error))
+    (('(1)) '(1))))
+
+(with-test (:name (multiple-value-call :type-checking-rest :type-derivation))
+  (checked-compile-and-assert (:allow-warnings t
+                               :optimize :safe)
       `(lambda (list)
          (multiple-value-call
              (lambda (&optional a &rest r)
@@ -6162,7 +6188,8 @@
                         (ignore r))
                (list a))
            (values-list list)))
-    (('(1 2)) '(1))))
+    (('(1 2)) '(1))
+    (('(1)) (condition 'type-error))))
 
 (with-test (:name :delete-optional-dispatch-xep)
   (let ((name (gensym)))

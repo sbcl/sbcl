@@ -2100,7 +2100,15 @@ is :ANY, the function name is not checked."
               (when (or (arg-info-supplied-p info) (arg-info-default info))
                 (return nil)))
              (:rest
-              (return (and (null (cdr arg)) (null (leaf-refs (car arg))))))
+              (return (and (null (cdr arg))
+                           (null (leaf-refs (car arg)))
+                           ;; Type checking will require reading the
+                           ;; variable, but it's done in one of the
+                           ;; dispatch functions making it invisible
+                           ;; to LEAF-REFS
+                           (or (neq (leaf-where-from (car arg)) :declared)
+                               (values (csubtypep (specifier-type 'list)
+                                                  (leaf-type (car arg))))))))
              (t
               (return nil)))))))
 
