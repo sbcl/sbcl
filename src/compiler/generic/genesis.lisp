@@ -2611,18 +2611,13 @@ core and return a descriptor to it."
             ;; Note that the number of constants is rounded up to ensure
             ;; that the code vector will be properly aligned.
             (header-n-words (round-up raw-header-n-words 2))
-            (toplevel-p (pop-stack))
+            (immobile-p (pop-stack))
             (debug-info (pop-stack))
             (des (allocate-cold-descriptor
-                  #!-immobile-code *dynamic*
-                  ;; toplevel-p is an indicator of whether the code will
-                  ;; will become garbage. If so, put it in dynamic space,
-                  ;; otherwise immobile space.
-                  #!+immobile-code
-                  (if toplevel-p *dynamic* *immobile-varyobj*)
+                  (or #!+immobile-code (and immobile-p *immobile-varyobj*) *dynamic*)
                   (+ (ash header-n-words sb!vm:word-shift) code-size)
                   sb!vm:other-pointer-lowtag)))
-       (declare (ignorable toplevel-p))
+       (declare (ignorable immobile-p))
        (write-header-word des header-n-words sb!vm:code-header-widetag)
        (write-wordindexed des sb!vm:code-code-size-slot
                           (make-fixnum-descriptor code-size))

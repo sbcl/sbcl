@@ -1130,7 +1130,7 @@
               (fasl-output-source-info fasl-output))
         (dump-object info fasl-output))
 
-      (dump-object (if (eq (sb!c::component-kind component) :toplevel) :toplevel nil)
+      (dump-object (or #!+immobile-code (sb!c::code-immobile-p component))
                    fasl-output)
       (dump-fop 'fop-code fasl-output code-length
                 (- header-length sb!vm:code-constants-offset)
