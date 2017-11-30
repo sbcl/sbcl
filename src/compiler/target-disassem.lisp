@@ -1797,13 +1797,15 @@
   (declare (type address address))
   (when (null addr->name)
     (setf addr->name (make-hash-table) *assembler-routines-by-addr* addr->name)
-    (flet ((invert (name->addr)
+    (flet ((invert (name->addr addr-xform)
              (maphash (lambda (name address)
-                        (setf (gethash address addr->name) name))
+                        (setf (gethash (funcall addr-xform address) addr->name) name))
                       name->addr)))
-       (invert sb!fasl:*assembler-routines*)
+      (let ((code sb!fasl::*assembler-routines*))
+        (invert (car (%code-debug-info code))
+                (lambda (x) (sap-int (sap+ (code-instructions code) (car x))))))
     #!-sb-dynamic-core
-       (invert *static-foreign-symbols*))
+       (invert *static-foreign-symbols* #'identity))
     (loop for name across sb!vm:+static-fdefns+
           for address =
           #!+immobile-code (sb!vm::function-raw-address name)

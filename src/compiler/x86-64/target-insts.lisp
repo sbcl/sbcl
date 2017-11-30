@@ -456,24 +456,16 @@
                (vector-push-extend start-relocs-index code-components))))
 
       ;; Assembler routines contain jumps to immobile code.
-      ;; Since these code components do not contain simple-funs,
-      ;; we have to group the routines by looking at addresses.
-      (let ((asm-routines
-             (loop for addr being each hash-value of sb!fasl:*assembler-routines*
-                   collect addr)))
-        (dovector (code sb!fasl::*assembler-objects*)
-          (let* ((text-origin (sap-int (code-instructions code)))
-                 (text-end (+ text-origin (%code-code-size code)))
-                 (relocs-index (fill-pointer relocs)))
-            (mapl (lambda (list)
-                    (scan-function (car list)
-                                   (if (cdr list) (cadr list) text-end)
-                                   ;; Look for transfers into immobile code
-                                   #'immobile-space-addr-p))
-                  (sort (remove-if-not (lambda (address)
-                                         (<= text-origin address text-end))
-                                       asm-routines) #'<))
-            (finish-component code relocs-index))))
+      (let* ((code sb!fasl:*assembler-routines*)
+             (origin (sap-int (code-instructions code)))
+             (relocs-index (fill-pointer relocs)))
+        (dolist (range (sort (loop for range being each hash-value
+                                   of (car (%code-debug-info code)) collect range)
+                             #'< :key #'car))
+          ;; byte range is inclusive bound on both ends
+          (scan-function (+ origin (car range))
+                         (+ origin (cdr range) 1) #'immobile-space-addr-p))
+        (finish-component code relocs-index))
 
       ;; Immobile space - code components can jump to immobile space,
       ;; read-only space, and C runtime routines.

@@ -132,9 +132,7 @@
 ;;;   Assembler routines are named by full Lisp symbols: they
 ;;;     have packages and that sort of native Lisp stuff associated
 ;;;     with them. We can compare them with EQ.
-(declaim (type hash-table *assembler-routines*))
-(defglobal *assembler-routines* (make-hash-table :test 'eq))
-(defglobal *assembler-objects* nil)
+(defglobal *assembler-routines* nil)
 
 
 ;;;; the FOP database

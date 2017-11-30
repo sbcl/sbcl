@@ -79,7 +79,7 @@
         (hashset (make-hash-table :test 'eq)))
 
     ;; Place assembler routines first.
-    (dovector (code sb-fasl::*assembler-objects*)
+    (let ((code sb-fasl:*assembler-routines*))
       (setf (gethash code hashset) t)
       (vector-push-extend code ordering))
 

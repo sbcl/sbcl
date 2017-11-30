@@ -567,18 +567,6 @@ void relocate_heap(struct heap_adjust* adj)
         adjust_word(adj, SYMBOL(FUNCTION_LAYOUT)->value >> 32) << 32;
 #endif
     relocate_space(DYNAMIC_SPACE_START, (lispobj*)get_alloc_pointer(), adj);
-    lispobj asmroutines = SYMBOL(ASSEMBLER_ROUTINES)->value;
-    if (lowtag_of(asmroutines) == INSTANCE_POINTER_LOWTAG) {
-        /* Adjust the values in SB-FASL::*ASSEMBLER-ROUTINES*.
-         * No need to frob the 'needs_rehash_p' slot on account of this */
-        struct hash_table *ht = (struct hash_table*)native_pointer(asmroutines);
-        struct vector *table = (struct vector*)native_pointer(ht->table);
-        int i;
-        for (i=fixnum_value(table->length)-1; i>=3; i -= 2) {
-            if (fixnump(table->data[i]))
-                table->data[i] = make_fixnum(adjust_word(adj, fixnum_value(table->data[i])));
-        }
-    }
 }
 #endif
 
@@ -925,21 +913,26 @@ load_core_file(char *file, os_vm_offset_t file_offset)
 
 #include "genesis/hash-table.h"
 #include "genesis/vector.h"
+#include "genesis/cons.h"
 os_vm_address_t get_asm_routine_by_name(const char* name)
 {
-    lispobj routines = SYMBOL(ASSEMBLER_ROUTINES)->value;
-    if (lowtag_of(routines) == INSTANCE_POINTER_LOWTAG) {
-        struct hash_table* ht = (struct hash_table*)native_pointer(routines);
+#ifdef LISP_FEATURE_IMMOBILE_CODE
+    struct code* code = (struct code*)VARYOBJ_SPACE_START;
+#else
+    struct code* code = (struct code*)READ_ONLY_SPACE_START;
+#endif
+    if (lowtag_of(code->debug_info) == LIST_POINTER_LOWTAG) {
+        struct hash_table* ht =
+            (struct hash_table*)native_pointer(CONS(code->debug_info)->car);
         struct vector* table = VECTOR(ht->table);
         lispobj sym;
         int i;
-        for (i=2 ; i < fixnum_value(table->length) ; i += 2) {
-          sym = table->data[i];
-          if (lowtag_of(sym) == OTHER_POINTER_LOWTAG
-              && widetag_of(SYMBOL(sym)->header) == SYMBOL_WIDETAG
-              && !strcmp(name, (char*)(VECTOR(SYMBOL(sym)->name)->data)))
-              return (os_vm_address_t)fixnum_value(table->data[i+1]);
-        }
+        for (i=2 ; i < fixnum_value(table->length) ; i += 2)
+            if (lowtag_of(sym = table->data[i]) == OTHER_POINTER_LOWTAG
+                && widetag_of(SYMBOL(sym)->header) == SYMBOL_WIDETAG
+                && !strcmp(name, (char*)(VECTOR(SYMBOL(sym)->name)->data)))
+                return ALIGN_UP(offsetof(struct code,constants), 2*N_WORD_BYTES)
+                    + fixnum_value(CONS(table->data[i+1])->car) + (os_vm_address_t)code;
         // Something is wrong if we have a hashtable but find nothing.
         fprintf(stderr, "WARNING: get_asm_routine_by_name(%s) failed\n",
                 name);

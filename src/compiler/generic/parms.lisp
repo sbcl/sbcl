@@ -214,10 +214,6 @@
     ;; dynamic runtime linking support
     #!+sb-dynamic-core +required-foreign-symbols+
 
-    ;; for looking up assembler routine by name
-    ;; and patching them on runtime startup
-    sb!fasl::*assembler-routines*
-
     ;; List of Lisp specials bindings made by create_thread_struct()
     ;; other than the per-thread-c-interface-symbols.
     sb!thread::*thread-initial-bindings*

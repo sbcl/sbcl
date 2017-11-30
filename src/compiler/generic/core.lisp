@@ -56,8 +56,7 @@
            (flavor (fixup-flavor fixup))
            (value (ecase flavor
                     (:assembly-routine
-                     (aver (symbolp name))
-                     (or (gethash name *assembler-routines*)
+                     (or (get-asm-routine name)
                          (error "undefined assembler routine: ~S" name)))
                     (:foreign
                      (aver (stringp name))

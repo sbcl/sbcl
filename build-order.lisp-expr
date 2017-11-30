@@ -573,9 +573,8 @@
  ("src/assembly/target/array")
  ("src/assembly/target/arith")
  ("src/assembly/target/alloc")
- ;; "tramps" should be listed first so that the physical order here
- ;; reflects the order in which assembler files get loaded.
- ("src/assembly/target/tramps"     :assem :not-host :not-genesis)
+ ;; assembly files are all loaded by genesis before any compiled files.
+ ("src/assembly/target/tramps"     :assem :not-host)
  ("src/assembly/target/assem-rtns" :assem :not-host)
  ("src/assembly/target/array"      :assem :not-host)
  ("src/assembly/target/arith"      :assem :not-host)

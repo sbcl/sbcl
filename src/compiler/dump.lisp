@@ -1159,7 +1159,9 @@
   (dump-fop 'fop-assembler-code file)
   (dump-word length file)
   (write-segment-contents code-segment (fasl-output-stream file))
-  (dolist (routine routines)
+  ;; reversing sorts the entry points in ascending address order
+  ;; except possibly when there are multiple entry points to one routine
+  (dolist (routine (reverse routines))
     (dump-object (car routine) file)
     (dump-fop 'fop-assembler-routine file)
     (dump-word (+ (label-position (cadr routine))

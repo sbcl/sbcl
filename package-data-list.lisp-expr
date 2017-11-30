@@ -576,6 +576,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
       :use ("CL" "SB!ALIEN" "SB!ASSEM" "SB!BIGNUM" "SB!C"
                  "SB!EXT" "SB!INT" "SB!KERNEL" "SB!SYS")
       :export ("*ASSEMBLER-ROUTINES*"
+               "GET-ASM-ROUTINE"
                "+BACKEND-FASL-FILE-IMPLEMENTATION+"
                "BUILD-ID-CORE-ENTRY-TYPE-CODE"
                "*FASL-FILE-TYPE*"

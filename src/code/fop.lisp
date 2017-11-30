@@ -670,9 +670,8 @@
     code-object))
 
 (!define-fop 148 :not-host (fop-assembler-fixup (code-object kind routine))
-  (multiple-value-bind (value found) (gethash routine *assembler-routines*)
-    (unless found
-      (error "undefined assembler routine: ~S" routine))
+  (let ((value (or (get-asm-routine routine)
+                   (error "undefined assembler routine: ~S" routine))))
     (sb!vm:fixup-code-object code-object (read-word-arg (fasl-input-stream))
                              value kind :assembly-routine))
   code-object)

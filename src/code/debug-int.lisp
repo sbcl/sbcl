@@ -1033,20 +1033,6 @@ register."
 
 ;;;; frame utilities
 
-(defun find-assembly-routine (component pc)
-  (let* ((start (sap-int (code-instructions component)))
-         (end (+ start pc))
-         (min-name)
-         (min-diff))
-    (loop for name being the hash-key of sb!fasl:*assembler-routines*
-          using (hash-value address)
-          when (and (<= start address end)
-                    (or (not min-diff)
-                        (< (- end address) min-diff)))
-          do (setf min-name name
-                   min-diff (- end address)))
-    min-name))
-
 (defun compiled-debug-fun-from-pc (debug-info pc &optional escaped)
   (let* ((fun-map (sb!c::compiled-debug-info-fun-map debug-info))
          (len (length fun-map)))
@@ -1088,8 +1074,11 @@ register."
 (defun debug-fun-from-pc (component pc &optional (escaped t))
   (let ((info (%code-debug-info component)))
     (cond
-      ((not info)
-       (let ((routine (find-assembly-routine component pc)))
+      ((consp info)
+       (let ((routine (let ((ofs (- pc (sap-int (code-instructions component)))))
+                        (dohash ((name pc-range) (car info))
+                          (when (<= (car pc-range) ofs (cdr pc-range))
+                            (return name))))))
          (make-bogus-debug-fun (cond ((not routine)
                                       "no debug information for frame")
                                      ((memq routine '(sb!vm::undefined-tramp

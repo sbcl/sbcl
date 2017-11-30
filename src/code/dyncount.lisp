@@ -226,7 +226,7 @@ comments from CMU CL:
   "Return a hash-table mapping string VOP names to the cost recorded in the
    generator for all VOPs which are also the names of assembly routines."
   (let ((res (make-hash-table :test 'equal)))
-     (dohash ((name v) *assembler-routines* :locked t)
+     (dohash ((name v) (car (%code-debug-info *assembler-routines*)))
        (declare (ignore v))
        (let ((vop (gethash name *backend-template-names*)))
          (when vop

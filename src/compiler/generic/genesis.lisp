@@ -2028,15 +2028,17 @@ core and return a descriptor to it."
                  *cold-foreign-symbol-table*)
         (error "The foreign symbol ~S is undefined." name))))
 
-(defvar *cold-assembler-objects*) ; list of the code components
+(defvar *cold-assembler-obj*) ; a single code component
 (defvar *cold-assembler-routines*)
-
-(defvar *cold-assembler-fixups*)
 (defvar *cold-static-call-fixups*)
 
 (defun lookup-assembler-reference (symbol &optional (errorp t))
-  (or (cadr (assoc symbol *cold-assembler-routines*))
-      (and errorp (error "Assembler routine ~S not defined." symbol))))
+  (let ((code-component (car *cold-assembler-obj*))
+        (offset (or (cdr (assoc symbol *cold-assembler-routines*))
+                    (and errorp (error "Assembler routine ~S not defined." symbol)))))
+    (when offset
+      (+ (logandc2 (descriptor-bits code-component) sb!vm:lowtag-mask)
+         (calc-offset code-component offset)))))
 
 ;;; Unlike in the target, FOP-KNOWN-FUN sometimes has to backpatch.
 (defvar *deferred-known-fun-refs*)
@@ -2116,15 +2118,7 @@ core and return a descriptor to it."
                                     *code-fixup-notes*)))))
   code-object)
 
-(defun resolve-assembler-fixups ()
-  (dolist (fixup *cold-assembler-fixups*)
-    (let* ((routine (car fixup))
-           (value (lookup-assembler-reference routine)))
-      (when value
-        (cold-fixup (second fixup) (third fixup) value (fourth fixup)
-                    :assembly-routine))))
-  ;; Static calls are very similar to assembler routine calls,
-  ;; so take care of those too.
+(defun resolve-static-call-fixups ()
   (dolist (fixup *cold-static-call-fixups*)
     (destructuring-bind (name kind code offset) fixup
       (cold-fixup code offset
@@ -2163,10 +2157,10 @@ core and return a descriptor to it."
                                                     (if (listp key) (car key) key)))))
                (if (listp key) (cold-list sym) sym))
              'sb!vm::+required-foreign-symbols+)
-    (to-core (sort (copy-list *cold-assembler-routines*) #'string< :key #'car)
+    (cold-set (cold-intern '*assembler-routines*) (car *cold-assembler-obj*))
+    (to-core (sort *cold-assembler-routines* #'< :key 'cdr)
              (lambda (rtn)
-               (cold-list (cold-intern (first rtn))
-                          (third rtn) (number-to-core (fourth rtn))))
+               (cold-cons (cold-intern (first rtn)) (make-fixnum-descriptor (cdr rtn))))
              '*!initial-assembler-routines*)))
 
 
@@ -2741,13 +2735,18 @@ core and return a descriptor to it."
   (fill **fop-funs** #'cold-fop-fun-entry :start i :end (+ i 4))
   (values))
 
+;;; For combining all assembler code components into one code component
+;;; we have to adjust offsets of fixups into the single new component
+(defvar *fixup-offset-addend*)
+(defun read-fixup-offset (stream) (+ (read-word-arg stream) *fixup-offset-addend*))
+
 #!+sb-thread
 (define-cold-fop (fop-symbol-tls-fixup)
   (let* ((symbol (pop-stack))
          (kind (pop-stack))
          (code-object (pop-stack)))
     (cold-fixup code-object
-                (read-word-arg (fasl-input-stream))
+                (read-fixup-offset (fasl-input-stream))
                 (ensure-symbol-tls-index symbol)
                 kind))) ; and re-push code-object
 
@@ -2757,7 +2756,7 @@ core and return a descriptor to it."
          (len (read-byte-arg (fasl-input-stream)))
          (sym (make-string len))
          (dummy (read-string-as-bytes (fasl-input-stream) sym))
-         (offset (read-word-arg (fasl-input-stream)))
+         (offset (read-fixup-offset (fasl-input-stream)))
          (value #!+sb-dynamic-core (dyncore-note-symbol sym nil)
                 #!-sb-dynamic-core (cold-foreign-symbol-address sym)))
     (declare (ignore dummy))
@@ -2784,44 +2783,46 @@ core and return a descriptor to it."
 
 (define-cold-fop (fop-assembler-code)
   (let* ((length (read-word-arg (fasl-input-stream)))
+         (aligned-length (round-up length (* 2 sb!vm:n-word-bytes)))
          (header-n-words
           ;; Note: we round the number of constants up to ensure that
           ;; the code vector will be properly aligned.
           (round-up sb!vm:code-constants-offset 2))
-         (des (allocate-cold-descriptor (or #!+immobile-space *immobile-varyobj*
-                                            *read-only*)
-                                        (+ (ash header-n-words
-                                                sb!vm:word-shift)
-                                           length)
-                                        sb!vm:other-pointer-lowtag)))
-    (push des *cold-assembler-objects*)
-    (write-header-word des header-n-words sb!vm:code-header-widetag)
-    (write-wordindexed des
-                       sb!vm:code-code-size-slot
-                       (make-fixnum-descriptor length))
-    (write-wordindexed des sb!vm:code-debug-info-slot *nil-descriptor*)
-
-    (let* ((start (+ (descriptor-byte-offset des)
-                     (ash header-n-words sb!vm:word-shift)))
-           (end (+ start length)))
+         (asm-code *cold-assembler-obj*)
+         (des (car asm-code))
+         (cur-length 0)
+         (space (or #!+immobile-space *immobile-varyobj* *read-only*)))
+    (cond (des
+           (setq cur-length
+                 (descriptor-fixnum (read-wordindexed des sb!vm:code-code-size-slot)))
+           (aver (= (gspace-free-word-index space)
+                    (+ (/ cur-length sb!vm:n-word-bytes) header-n-words)))
+           (incf (gspace-free-word-index space) (/ aligned-length sb!vm:n-word-bytes)))
+          (t
+           (setq des (allocate-cold-descriptor
+                      space
+                      (+ (ash header-n-words sb!vm:word-shift) length)
+                      sb!vm:other-pointer-lowtag))
+           (setf asm-code (list des) *cold-assembler-obj* asm-code)
+           (write-header-word des header-n-words sb!vm:code-header-widetag)))
+    (write-wordindexed  des sb!vm:code-code-size-slot
+                        (make-fixnum-descriptor (+ cur-length aligned-length)))
+    (push aligned-length (cdr asm-code))
+    (let ((start (+ (descriptor-byte-offset des)
+                    (ash header-n-words sb!vm:word-shift)
+                    cur-length)))
       (read-bigvec-as-sequence-or-die (descriptor-mem des)
                                       (fasl-input-stream)
                                       :start start
-                                      :end end))
+                                      :end (+ start length)))
     des))
 
 (define-cold-fop (fop-assembler-routine)
   (let* ((name (pop-stack))
          (code-component (pop-stack))
          (offset (read-word-arg (fasl-input-stream))))
-    (push (list name
-                ;; Compute the value to write at the fixup location
-                (+ (logandc2 (descriptor-bits code-component) sb!vm:lowtag-mask)
-                   (calc-offset code-component offset))
-                ;; Store the bits to correctly compute *ASSEMBLER-ROUTINES*
-                ;; even if the routines are loaded at a differet address
-                ;; from expected (which implies not readonly space)
-                code-component offset)
+    (aver (eq code-component (car *cold-assembler-obj*)))
+    (push (cons name (apply #'+ offset (cddr *cold-assembler-obj*)))
           *cold-assembler-routines*)
     code-component))
 
@@ -2829,14 +2830,13 @@ core and return a descriptor to it."
   (let* ((routine (pop-stack))
          (kind (pop-stack))
          (code-object (pop-stack))
-         (offset (read-word-arg (fasl-input-stream))))
-    (push (list routine code-object offset kind) *cold-assembler-fixups*)
-    code-object))
+         (offset (read-fixup-offset (fasl-input-stream))))
+    (cold-fixup code-object offset (lookup-assembler-reference routine) kind)))
 
 (define-cold-fop (fop-code-object-fixup)
   (let* ((kind (pop-stack))
          (code-object (pop-stack))
-         (offset (read-word-arg (fasl-input-stream)))
+         (offset (read-fixup-offset (fasl-input-stream)))
          (value (descriptor-bits code-object)))
     (cold-fixup code-object offset value kind))) ; and re-push code-object
 
@@ -2846,7 +2846,7 @@ core and return a descriptor to it."
     (let* ((obj (pop-stack))
            (kind (pop-stack))
            (code-object (pop-stack))
-           (offset (read-word-arg (fasl-input-stream)))
+           (offset (read-fixup-offset (fasl-input-stream)))
            (cold-layout (or (gethash obj *cold-layouts*)
                             (error "No cold-layout for ~S~%" obj))))
       (cold-fixup code-object offset
@@ -2856,7 +2856,7 @@ core and return a descriptor to it."
     (let ((obj (pop-stack))
           (kind (pop-stack))
           (code-object (pop-stack))
-          (offset (read-word-arg (fasl-input-stream))))
+          (offset (read-fixup-offset (fasl-input-stream))))
       (cold-fixup code-object offset
                   (descriptor-bits (if (symbolp obj) (cold-intern obj) obj))
                   kind :immobile-object))))
@@ -2867,7 +2867,7 @@ core and return a descriptor to it."
          (fdefn (cold-fdefinition-object name))
          (kind (pop-stack))
          (code-object (pop-stack))
-         (offset (read-word-arg (fasl-input-stream))))
+         (offset (read-fixup-offset (fasl-input-stream))))
     (cold-fixup code-object offset
                 (+ (descriptor-bits fdefn)
                    (ash sb!vm:fdefn-raw-addr-slot sb!vm:word-shift)
@@ -2879,7 +2879,7 @@ core and return a descriptor to it."
   (let ((name (pop-stack))
         (kind (pop-stack))
         (code-object (pop-stack))
-        (offset (read-word-arg (fasl-input-stream))))
+        (offset (read-fixup-offset (fasl-input-stream))))
     (push (list name kind code-object offset) *cold-static-call-fixups*)
     code-object))
 
@@ -3348,8 +3348,9 @@ core and return a descriptor to it."
         (format t "~4<~@R.~> ~A~%" (1+ i) (nth i sections))))
     (format t "=================~2%")
     (format t "I. assembler routines defined in core image:~2%")
-    (dolist (routine (sort (copy-list *cold-assembler-routines*) #'< :key #'cadr))
-      (format t "~8,'0X: ~S~%" (cadr routine) (car routine)))
+    (dolist (routine (reverse *cold-assembler-routines*))
+      (let ((name (car routine)))
+        (format t "~8,'0X: ~S~%" (lookup-assembler-reference name) name)))
     (let ((funs nil)
           (undefs nil))
       (maphash (lambda (name fdefn &aux (fun (cold-fdefn-fun fdefn)))
@@ -3562,7 +3563,7 @@ III. initially undefined function references (alphabetically):
 ;;;   CORE-FILE-NAME gets a Lisp core.
 ;;;   C-HEADER-DIR-NAME gets the path in which to place generated headers
 ;;;   MAP-FILE-NAME gets the name of the textual 'cold-sbcl.map' file
-(defun sb-cold:genesis (&key object-file-names preload-file
+(defun sb-cold:genesis (&key object-file-names
                              core-file-name c-header-dir-name map-file-name
                              symbol-table-file-name (verbose t))
   (declare (ignorable symbol-table-file-name))
@@ -3643,22 +3644,22 @@ III. initially undefined function references (alphabetically):
            (*cold-methods* nil)
            (*!cold-toplevels* nil)
            *cold-static-call-fixups*
-           *cold-assembler-fixups*
            *cold-assembler-routines*
-           *cold-assembler-objects*
+           *cold-assembler-obj*
+           (*fixup-offset-addend* 0)
            (*code-fixup-notes* (make-hash-table))
            (*deferred-known-fun-refs* nil))
 
       (setf *nil-descriptor* (make-nil-descriptor)
             *simple-vector-0-descriptor* (vector-in-core nil))
 
-      ;; If we're given a preload file, it contains tramps and whatnot
-      ;; that must be loaded before we create any FDEFNs.  It can in
-      ;; theory be loaded any time between binding
-      ;; *COLD-ASSEMBLER-ROUTINES* above and calling
-      ;; INITIALIZE-STATIC-SPACE below.
-      (when preload-file
-        (cold-load preload-file verbose))
+      ;; Load all assembler code
+      (flet ((assembler-file-p (name) (tailwise-equal (namestring name) ".assem-obj")))
+        (dolist (file-name (remove-if-not #'assembler-file-p object-file-names))
+          (cold-load file-name verbose)
+          (incf *fixup-offset-addend* (cadr *cold-assembler-obj*)))
+        (setf object-file-names (remove-if #'assembler-file-p object-file-names)))
+      (setf *fixup-offset-addend* 0)
 
       ;; Prepare for cold load.
       (initialize-layouts)
@@ -3681,13 +3682,6 @@ III. initially undefined function references (alphabetically):
       ;; Create SB!KERNEL::*TYPE-CLASSES* as an array of NIL
       (cold-set (cold-intern 'sb!kernel::*type-classes*)
                 (vector-in-core (make-list (length sb!kernel::*type-classes*))))
-
-      ;; Load the remaining assembler code into immobile space
-      #!+immobile-space
-      (flet ((assembler-file-p (name) (tailwise-equal (namestring name) ".assem-obj")))
-        (dolist (file-name (remove-if-not #'assembler-file-p object-file-names))
-          (cold-load file-name verbose))
-        (setf object-file-names (remove-if #'assembler-file-p object-file-names)))
 
       ;; Cold load.
       (dolist (file-name object-file-names)
@@ -3737,7 +3731,7 @@ III. initially undefined function references (alphabetically):
 
       ;; Tidy up loose ends left by cold loading. ("Postpare from cold load?")
       (resolve-deferred-known-funs)
-      (resolve-assembler-fixups)
+      (resolve-static-call-fixups)
       (foreign-symbols-to-core)
       #!+(or x86 immobile-space)
       (dolist (pair (sort (%hash-table-alist *code-fixup-notes*) #'< :key #'car))
@@ -3747,11 +3741,6 @@ III. initially undefined function references (alphabetically):
                            #!+x86-64 (number-to-core
                                       (sb!c::pack-code-fixup-locs
                                        (sort (cdr pair) #'<)))))
-      (when *cold-assembler-objects*
-        (unless (eq *read-only* ; "Stayin' Alive"
-                    (descriptor-gspace (car *cold-assembler-objects*)))
-          (cold-set (cold-intern '*assembler-objects*)
-                    (vector-in-core (nreverse *cold-assembler-objects*)))))
       (when core-file-name
         (finish-symbols))
       (finalize-load-time-value-noise)

@@ -265,11 +265,30 @@
 ;;; how we learn about assembler routines at startup
 (defvar *!initial-assembler-routines*)
 
+(defun get-asm-routine (name &aux (code *assembler-routines*))
+  (awhen (gethash (the symbol name) (car (%code-debug-info code)))
+    (sap-int (sap+ (code-instructions code) (car it)))))
+
 (defun !loader-cold-init ()
-  (dovector (routine *!initial-assembler-routines*)
-    (destructuring-bind (name code offset) routine
-      (setf (gethash name *assembler-routines*)
-            (sap-int (sap+ (code-instructions code) offset))))))
+  (let* ((code *assembler-routines*)
+         (size (%code-code-size code))
+         (vector (the simple-vector *!initial-assembler-routines*))
+         (count (length vector))
+         (ht (make-hash-table :test 'eq)))
+    ;; code-debug-info stores the name->addr hashtable, but readonly
+    ;; space can't point to dynamic space. indirect through a static cons
+    (setf (%code-debug-info code)
+          (rplaca (let ((ptr (sap-int sb!vm:*static-space-free-pointer*)))
+                    (setf sb!vm:*static-space-free-pointer*
+                          (int-sap (+ ptr (* sb!vm:n-word-bytes 2))))
+                    (%make-lisp-obj (logior ptr sb!vm:list-pointer-lowtag)))
+                  ht))
+    (dotimes (i count)
+      (destructuring-bind (name . offset) (svref vector i)
+        (let ((next-offset (if (< (1+ i) count) (cdr (svref vector (1+ i))) size)))
+          (aver (> next-offset offset))
+          ;; store inclusive bounds on PC offset range
+          (setf (gethash name ht) (cons offset (1- next-offset))))))))
 
 (defun !warm-load (file)
   (restart-case (let ((sb!c::*source-namestring*
