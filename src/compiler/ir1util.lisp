@@ -1677,24 +1677,34 @@
       (do-nodes (node nil block)
         (let* ((path (node-source-path node))
                (first (first path)))
-          (when (or (eq first 'original-source-start)
-                    (and (atom first)
-                         (or (not (symbolp first))
-                             (let ((pkg (symbol-package first)))
-                               (and pkg
-                                    (not (eq pkg (symbol-package :end))))))
-                         (not (member first '(t nil)))
-                         (not (typep first '(or fixnum character)))
-                         (every (lambda (x)
-                                  (present-in-form first x 0))
-                                (source-path-forms path))
-                         (present-in-form first (find-original-source path)
-                                          0)))
-            (unless (return-p node)
-              (let ((*compiler-error-context* node))
-                (compiler-notify 'code-deletion-note
-                                 :format-control "deleting unreachable code"
-                                 :format-arguments nil)))
+          (when (and (not (return-p node))
+                     ;; CASTs are just value filters and do not
+                     ;; represent code and they can be moved around
+                     ;; making CASTs from the original source code
+                     ;; appear in code inserted by the compiler, generating
+                     ;; false deletion notes.
+                     ;; And if a block with the original source gets
+                     ;; deleted the node that produces the value for
+                     ;; the CAST will get a note, no need to note
+                     ;; twice.
+                     (not (cast-p node))
+                     (or (eq first 'original-source-start)
+                         (and (atom first)
+                              (or (not (symbolp first))
+                                  (let ((pkg (symbol-package first)))
+                                    (and pkg
+                                         (not (eq pkg (symbol-package :end))))))
+                              (not (member first '(t nil)))
+                              (not (typep first '(or fixnum character)))
+                              (every (lambda (x)
+                                       (present-in-form first x 0))
+                                     (source-path-forms path))
+                              (present-in-form first (find-original-source path)
+                                               0))))
+            (let ((*compiler-error-context* node))
+              (compiler-notify 'code-deletion-note
+                               :format-control "deleting unreachable code"
+                               :format-arguments nil))
             (return))))))
   (values))
 

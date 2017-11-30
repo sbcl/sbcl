@@ -648,3 +648,27 @@
     ;; with a toplevel value, so the second would not print enough context
     ;; because the format control and args were the same.
     (run)))
+
+(with-test (:name :cast-deletion-notes)
+  (checked-compile-and-assert
+      (:allow-notes nil)
+      `(lambda (m)
+         (setf m (list 1 2 3))
+         (the simple-vector
+              (coerce m 'vector)))
+    ((nil) #(1 2 3) :test #'equalp)))
+
+(with-test (:name :cast-deletion-notes.2)
+  (multiple-value-bind (fun fail warn style notes)
+      (checked-compile
+       `(lambda (m)
+          (setf m (list 1 2 3))
+          (the simple-vector
+               (if (vectorp m)
+                   m
+                   #(1)))))
+    (declare (ignore fail warn style))
+    (assert (equalp (funcall fun nil)
+                    #(1)))
+    (assert (= (length notes) 1))
+    (assert (typep (car notes) 'code-deletion-note))))
