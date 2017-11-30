@@ -5,10 +5,23 @@ changes relative to sbcl-1.4.1:
     and behaves like SB-EXT:EXIT.
   * enhancement: ASDF updated to 3.3.1. The ASDF release is dedicated to
     the late Elias Pipping who put enormous amounts of work into it despite
-    his terminal illness. Thank you and rest in peace. (lp#1681201)
+    his terminal illness. Thank you and rest in peace.  (lp#1681201)
   * enhancement: alien routines compiled with '-fsanitize=thread' and/or
     '-fsanitize=memory' cause fewer false positives in error reporting.
   * optimization: fewer instances of consing float constants at runtime.
+  * bug fix: a number of compiler bugs detected by Paul F. Dietz' randomized
+    tester.  (lp#1731503, lp#1730699, lp#1723993, lp#1730434, lp#1661911,
+    lp#1729639, lp#1729471, lp#1728692)
+  * bug fix: better errors from NAMESTRING and friends on pathnames with no
+    namestrings.  (lp#792154)
+  * bug fix: EQUAL and EQUALP compiler transforms were too confident in
+    deriving a result.  (lp#1732277, lp#1732225)
+  * bug fix: FILL sometimes returned the underlying data vector rather than
+    the given array.  (lp#1732553)
+  * bug fix: SEARCH returned the wrong answer in some cases.  (lp#1732952)
+  * bug fix: the type (COMPLEX INTEGER) behaves more as specified by Function
+    TYPEP, which has stronger constraints than System Class COMPLEX.
+    (Reported by Eric Marsden, lp#1733400)
 
 changes in sbcl-1.4.1 relative to sbcl-1.4.0:
   * optimization: faster foreign callbacks.
