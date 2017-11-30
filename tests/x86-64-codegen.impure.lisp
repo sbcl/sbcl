@@ -108,3 +108,21 @@
           (position "; error trap" lines :test 'search)))
     (assert (search "OBJECT-NOT-TYPE-ERROR" (nth (1+ index) lines)))
     (assert (search "; 'SB-ASSEM:LABEL" (nth (+ index 3) lines)))))
+
+#+immobile-code
+(with-test (:name :reference-assembly-tramp)
+  (dolist (testcase '(("FUNCALLABLE-INSTANCE-TRAMP"
+                       sb-kernel:%make-funcallable-instance)
+                      ("UNDEFINED-TRAMP"
+                       sb-kernel:make-fdefn)))
+    (let ((lines
+           (split-string
+            (with-output-to-string (stream)
+              (let ((sb-disassem:*disassem-location-column-width* 0))
+                (disassemble (cadr testcase) :stream stream)))
+            #\newline)))
+      (assert (loop for line in lines
+                    thereis (and (search "LEA" line)
+                                 (search "RIP" line) ; require RIP-relative mode
+                                 ;; and verify disassembly
+                                 (search (car testcase) line)))))))

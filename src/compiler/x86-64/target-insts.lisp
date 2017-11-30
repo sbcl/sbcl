@@ -389,7 +389,8 @@
        (setq addr value)
        (when (stringp value) (setq fmt "= ~A"))))
     (when addr
-      (note (lambda (s) (format s fmt addr)) dstate))))
+      (unless (maybe-note-assembler-routine addr nil dstate)
+        (note (lambda (s) (format s fmt addr)) dstate)))))
 
 ;;;; interrupt instructions
 
@@ -430,7 +431,8 @@
         (relocs
          (make-array 100000 :element-type '(unsigned-byte 32)
                             :fill-pointer 0 :adjustable t))
-        ;; Look for these two instruction formats.
+        ;; Look for these three instruction formats.
+        (lea-inst (find-inst #x8D (get-inst-space)))
         (jmp-inst (find-inst #b11101001 (get-inst-space)))
         (call-inst (find-inst #b11101000 (get-inst-space)))
         (seg (sb!disassem::%make-segment
@@ -443,12 +445,23 @@
                    (let ((sap (int-sap fun-entry-addr))) (lambda () sap)))
              (map-segment-instructions
               (lambda (dchunk inst)
-                (when (and (or (eq inst jmp-inst)
-                               (eq inst call-inst))
-                           (funcall predicate
-                                    (+ (near-jump-displacement dchunk dstate)
-                                       (dstate-next-addr dstate))))
-                  (vector-push-extend (dstate-cur-addr dstate) relocs)))
+                (cond ((and (or (eq inst jmp-inst) (eq inst call-inst))
+                            (funcall predicate
+                                     (+ (near-jump-displacement dchunk dstate)
+                                        (dstate-next-addr dstate))))
+                       (vector-push-extend (dstate-cur-addr dstate) relocs))
+                      ((eq inst lea-inst)
+                       (let ((sap (funcall (seg-sap-maker seg))))
+                         (aver (eql (sap-ref-8 sap (dstate-cur-offs dstate)) #x8D))
+                         (let ((modrm (sap-ref-8 sap (1+ (dstate-cur-offs dstate)))))
+                           (when (and (= (logand modrm #b11000111) #b00000101) ; RIP-relative mode
+                                      (funcall predicate
+                                               (+ (signed-sap-ref-32
+                                                   sap (+ (dstate-cur-offs dstate) 2))
+                                                  (dstate-next-addr dstate))))
+                             (aver (eql (logand (sap-ref-8 sap (1- (dstate-cur-offs dstate))) #xF0)
+                                        #x40)) ; expect a REX prefix
+                             (vector-push-extend (dstate-cur-addr dstate) relocs)))))))
               seg dstate nil))
            (finish-component (code start-relocs-index)
              (when (> (fill-pointer relocs) start-relocs-index)

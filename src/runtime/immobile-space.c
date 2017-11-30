@@ -1292,7 +1292,7 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
         lispobj* __attribute__((unused)) padded_end = limit + size;
         gc_assert(!((uword_t)padded_end & (IMMOBILE_CARD_BYTES-1)));
     }
-    // Write-protect the pages occupied by the core file.
+    // Set the WP bits for pages occupied by the core file.
     // (There can be no inter-generation pointers.)
     if (ENABLE_PAGE_PROTECTION) {
         low_page_index_t page;
@@ -2131,7 +2131,7 @@ void defrag_immobile_space(int* components, boolean verbose)
 #endif  /* DEFRAGMENT_FIXEDOBJ_SUBSPACE */
 
 #ifdef LISP_FEATURE_X86_64
-    // Fix displacements in JMP and CALL instructions in code objects.
+    // Fix displacements in JMP, CALL, and LEA instructions in code objects.
     // There are 2 arrays in use:
     //  - the relocs[] array contains the address of any machine instruction
     //    that needs to be altered on account of space relocation.
@@ -2153,9 +2153,15 @@ void defrag_immobile_space(int* components, boolean verbose)
         int end_reloc_index = immobile_space_reloc_index[i*2+3];
         for ( ; reloc_index < end_reloc_index ; ++reloc_index ) {
             unsigned char* inst_addr = (unsigned char*)(long)immobile_space_relocs[reloc_index];
-            gc_assert(*inst_addr == 0xE8 || *inst_addr == 0xE9);
+            int inst_len = 5, // number of bytes in the instruction's encoding
+                inst_byte_num = 1; // where the displacement operand starts
+            switch (*inst_addr) { // opcode
+            case 0xE8: case 0xE9: break; // JMP or CALL
+            case 0x8D: inst_len = 6; inst_byte_num = 2; break; // LEA
+            default: lose("Can't fixup opcode %02x", *inst_addr);
+            }
             unsigned int target_addr =
-                (int)(long)inst_addr + 5 + (int)UNALIGNED_LOAD32(inst_addr+1);
+                (int)(long)inst_addr + inst_len + (int)UNALIGNED_LOAD32(inst_addr+inst_byte_num);
             int target_adjust = 0;
             // Both this code and the jumped-to code can move.
             // For this component, adjust by the displacement by (old - new).
@@ -2177,7 +2183,7 @@ void defrag_immobile_space(int* components, boolean verbose)
             // Otherwise perform the fixup where the instruction is now.
             char* fixup_loc = (immobile_space_p((lispobj)inst_addr) ?
                                (char*)tempspace_addr(inst_addr - code + load_addr) :
-                               (char*)inst_addr) + 1;
+                               (char*)inst_addr) + inst_byte_num;
             UNALIGNED_STORE32(fixup_loc,
                               UNALIGNED_LOAD32(fixup_loc)
                                 + target_adjust + (code - load_addr));

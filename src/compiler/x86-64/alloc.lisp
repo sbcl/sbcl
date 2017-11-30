@@ -364,8 +364,10 @@
   (:args)
   (:results (result :scs (any-reg)))
   (:generator 1
-    ;; TODO: if in immobile space, use LEA to make position-independent
-    (inst mov result (make-fixup 'funcallable-instance-tramp :assembly-routine))))
+    (let ((tramp (make-fixup 'funcallable-instance-tramp :assembly-routine)))
+      (if sb!c::*code-is-immobile*
+          (inst lea result tramp)
+          (inst mov result tramp)))))
 
 (define-vop (fixed-alloc)
   (:args)

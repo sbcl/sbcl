@@ -1744,7 +1744,13 @@
    (maybe-emit-rex-for-ea segment src dst
                           :operand-size (if (dword-reg-p dst) :dword :qword))
    (emit-byte segment #b10001101)
-   (emit-ea segment src (reg-tn-encoding dst))))
+   (cond ((and (fixup-p src)
+               (eq (fixup-flavor src) :assembly-routine)
+               sb!c::*code-is-immobile*)
+          (emit-mod-reg-r/m-byte segment #b00 (reg-tn-encoding dst) #b101)
+          (emit-relative-fixup segment src))
+         (t
+          (emit-ea segment src (reg-tn-encoding dst))))))
 
 (define-instruction cmpxchg (segment dst src &optional prefix)
   ;; Register/Memory with Register.

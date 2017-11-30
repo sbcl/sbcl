@@ -389,9 +389,10 @@
   #!+immobile-code (:temporary (:sc unsigned-reg) temp)
   (:generator 38
     #!+immobile-code
-    (progn
-     (inst mov (reg-in-size temp :dword)
-           (make-fixup 'undefined-tramp :assembly-routine))
+    (let ((tramp (make-fixup 'undefined-tramp :assembly-routine)))
+     (if sb!c::*code-is-immobile*
+         (inst lea temp tramp)
+         (inst mov temp tramp))
      ;; Compute displacement from the call site
      (inst sub (reg-in-size temp :dword) (reg-in-size fdefn :dword))
      (inst sub (reg-in-size temp :dword)
