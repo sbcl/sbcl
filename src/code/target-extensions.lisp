@@ -49,8 +49,9 @@ these hooks.")
 
 
 ;;; Binary search for simple vectors
-(defun binary-search (value seq &key (key #'identity))
+(defun binary-search* (value seq key)
   (declare (simple-vector seq))
+  (declare (function key))
   (labels ((recurse (start end)
              (when (< start end)
                (let* ((i (+ start (truncate (- end start) 2)))
@@ -61,8 +62,13 @@ these hooks.")
                        ((> value key-value)
                         (recurse (1+ i) end))
                        (t
-                        elt))))))
+                        i))))))
     (recurse 0 (length seq))))
+
+(defun binary-search (value seq &key (key #'identity))
+  (let ((index (binary-search* value seq key)))
+    (if index
+        (svref seq index))))
 
 (defun double-vector-binary-search (value vector)
   (declare (simple-vector vector)
