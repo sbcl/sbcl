@@ -201,6 +201,9 @@
 
 (defun logically-readonlyize (x) x)
 
+;;; Mainly for the fasl loader
+(defun %fun-name (f) (nth-value 2 (function-lambda-expression f)))
+
 ;;;; Variables which have meaning only to the cross-compiler, defined here
 ;;;; in lieu of #+sb-xc-host elsewere which messes up toplevel form numbers.
 (in-package "SB!C")
