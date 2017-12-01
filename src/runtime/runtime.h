@@ -67,7 +67,6 @@ typedef enum {
 
 void map_gc_page();
 void unmap_gc_page();
-int check_pending_interrupts();
 void gc_state_lock();
 void gc_state_wait(gc_phase_t);
 void gc_state_unlock();
