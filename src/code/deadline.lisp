@@ -13,7 +13,7 @@
 (in-package "SB!IMPL")
 
 ;;; Current deadline as internal time units or NIL.
-(declaim (type (or unsigned-byte null) *deadline*))
+(declaim (type (or internal-time null) *deadline*))
 (!define-thread-local *deadline* nil)
 
 ;;; The relative number of seconds the current deadline corresponds
@@ -22,7 +22,8 @@
 
 (declaim (inline seconds-to-internal-time))
 (defun seconds-to-internal-time (seconds)
-  (truncate (* seconds sb!xc:internal-time-units-per-second)))
+  (the internal-time
+       (values (truncate (* seconds sb!xc:internal-time-units-per-second)))))
 
 (defmacro with-deadline ((&key seconds override)
                          &body body)
