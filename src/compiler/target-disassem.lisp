@@ -268,39 +268,39 @@
 ;;; the offset of FUNCTION from the start of its code-component
 (defun fun-offset (function)
   (declare (type compiled-function function))
+  ;; FIXME: closure-length has fewer bits than the number of bits
+  ;; specifying the offset from a function back to its code.
+  ;; FUN_HEADER_NWORDS_MASK is 24 bits, closure-length is <= 15 bits
   (words-to-bytes (get-closure-length function)))
 
 ;;;; operations on code-components (which hold the instructions for
 ;;;; one or more functions)
 
+;;;   code     insts      segment       anywhere
+;;;      |         |            |              |
+;;;      A         B            C              X
+;;;
+;;; legend: A = 0th word of code object
+;;;         B = A + (ASH (CODE-HEADER-WORDS code) WORD-SHIFT)
+;;;         C = B + (SEG-INITIAL-OFFSET seg)
+;;;         X = arbitrary location >= C
+;;; (B and C could be the same location)
+
+;;; Compute X - A given X - C
 (defun segment-offs-to-code-offs (offset segment)
-  (without-gcing
-   (let* ((seg-base-addr (sap-int (funcall (seg-sap-maker segment))))
-          (code-addr
-           (logandc1 sb!vm:lowtag-mask
-                     (get-lisp-obj-address (seg-code segment))))
-          (addr (+ offset seg-base-addr)))
-     (declare (type address seg-base-addr code-addr addr))
-     (- addr code-addr))))
+  (+ offset
+     (ash (code-header-words (seg-code segment)) sb!vm:word-shift)
+     (seg-initial-offset segment)))
 
+;;; Compute X - C given X - A
 (defun code-offs-to-segment-offs (offset segment)
-  (without-gcing
-   (let* ((seg-base-addr (sap-int (funcall (seg-sap-maker segment))))
-          (code-addr
-           (logandc1 sb!vm:lowtag-mask
-                     (get-lisp-obj-address (seg-code segment))))
-          (addr (+ offset code-addr)))
-     (declare (type address seg-base-addr code-addr addr))
-     (- addr seg-base-addr))))
+  (- offset (ash (* (code-header-words (seg-code segment)) sb!vm:word-shift)
+                 (seg-initial-offset segment))))
 
+;;; Compute X - C given X - B
 (defun code-insts-offs-to-segment-offs (offset segment)
-  (without-gcing
-   (let* ((seg-base-addr (sap-int (funcall (seg-sap-maker segment))))
-          (code-insts-addr
-           (sap-int (code-instructions (seg-code segment))))
-          (addr (+ offset code-insts-addr)))
-     (declare (type address seg-base-addr code-insts-addr addr))
-     (- addr seg-base-addr))))
+  (- offset (seg-initial-offset segment)))
+
 
 #!-(or x86 x86-64)
 (defun lra-hook (chunk stream dstate)
@@ -469,22 +469,48 @@
            (type (or null stream) stream))
 
   (let ((ispace (get-inst-space))
-        (data-end-offset
-         ;; If the segment starts with unboxed data,
-         ;; dump some number of words using the .WORD pseudo-ops.
-         (if (and (seg-unboxed-data-range segment)
-                  (= (segment-offs-to-code-offs 0 segment)
-                     (car (seg-unboxed-data-range segment))))
-             (code-offs-to-segment-offs (cdr (seg-unboxed-data-range segment))
-                                        segment)
-             0)) ; sentinel value
         (prefix-p nil) ; just processed a prefix inst
         (prefix-len 0) ; sum of lengths of any prefix instruction(s)
         (prefix-print-names nil)) ; reverse list of prefixes seen
 
+   ;; To minimize the extent of disabled GC, the obligatory disabling for
+   ;; cheneygc occurs inside the per-instruction loop rather than around it.
+   ;; Otherwise, operating on huge memory regions could exhaust the heap.
+   ;; gencgc can do better though: pin SEG-OBJECT once only outside the loop.
+   (macrolet ((with-pinned-segment (&body body)
+                #!-gencgc `(without-gcing
+                            (setf (dstate-segment-sap dstate)
+                                  (funcall (seg-sap-maker segment)))
+                            ,@body)
+                #!+gencgc `(progn ,@body)))
+
     (rewind-current-segment dstate segment)
 
-    (loop
+    (#!-gencgc progn
+     #!+gencgc with-pinned-objects #!+gencgc ((seg-object (dstate-segment dstate))
+                                              (dstate-scratch-buf dstate))
+     #!+gencgc (setf (dstate-segment-sap dstate) (funcall (seg-sap-maker segment)))
+                 
+     ;; If segment starts with non-instruction data, print using .WORD pseudo-ops.
+     (let ((raw-data-end (seg-initial-raw-bytes segment)))
+       (when (plusp raw-data-end)
+         (when stream ; label calculation pass has NIL for stream
+           (with-pinned-segment
+            (loop
+             (when (>= (dstate-cur-offs dstate) raw-data-end) (return))
+             (print-current-address stream dstate)
+             (format stream "~A  #x~v,'0x~%"
+                     '.word (* 2 sb!vm:n-word-bytes)
+                     (sap-ref-word (dstate-segment-sap dstate)
+                                   (dstate-cur-offs dstate)))
+             (incf (dstate-cur-offs dstate) sb!vm:n-word-bytes)
+             (setf (dstate-output-state dstate) nil))))
+         ;; skip those bytes whether or not displaying anything
+         (setf (dstate-cur-offs dstate) raw-data-end
+               (dstate-next-offs dstate) raw-data-end)))
+
+     ;; Now commence disssembly of instructions
+     (loop
       (when (>= (dstate-cur-offs dstate) (seg-length (dstate-segment dstate)))
         ;; done!
         (when (and stream (> prefix-len 0))
@@ -501,26 +527,8 @@
         (print-current-address stream dstate))
       (call-offs-hooks nil stream dstate)
 
-      (when (< (dstate-cur-offs dstate) data-end-offset)
-        (when stream
-          (without-gcing
-           (format stream "~A  #x~v,'0x" '.word
-                   (* 2 sb!vm:n-word-bytes)
-                   (sap-ref-int (funcall (seg-sap-maker segment))
-                                (dstate-cur-offs dstate)
-                                sb!vm:n-word-bytes
-                                (dstate-byte-order dstate)))))
-        (setf (dstate-next-offs dstate)
-              (+ (dstate-cur-offs dstate) sb!vm:n-word-bytes)))
-
       (unless (> (dstate-next-offs dstate) (dstate-cur-offs dstate))
-        ;; FIXME: this can probably be WITH-PINNED-OBJECTS. For octet vectors and code
-        ;; there is something to pin, whereas if you are passing a memory address then
-        ;; you are either inside without-gcing anyway for this to be sensible at all,
-        ;; or are disassembling foreign code.
-        (without-gcing
-         (setf (dstate-segment-sap dstate) (funcall (seg-sap-maker segment)))
-
+        (with-pinned-segment
          (let* ((bytes-remaining (- (seg-length (dstate-segment dstate))
                                     (dstate-cur-offs dstate)))
                 (chunk
@@ -530,15 +538,11 @@
                      ;; number of instructions, and maybe you're so unlucky as to be
                      ;; on the exact last page of your heap.
                      (if (< bytes-remaining (/ dchunk-bits 8))
-                         (let* ((scratch-buf (dstate-scratch-buf dstate))
-                                (sap (vector-sap scratch-buf)))
-                           ;; We're inside a WITHOUT-GCING (up above).
-                           ;; Otherwise, put (dstate-scratch-buf dstate) in WPO
-                           (fill scratch-buf 0)
-                           (system-area-ub8-copy
-                            (dstate-segment-sap dstate)
-                            (dstate-cur-offs dstate)
-                            sap 0 bytes-remaining)
+                         (let ((sap (vector-sap (dstate-scratch-buf dstate))))
+                           (setf (sap-ref-word sap 0) 0)
+                           (system-area-ub8-copy (dstate-segment-sap dstate)
+                                                 (dstate-cur-offs dstate)
+                                                 sap 0 bytes-remaining)
                            (values sap 0))
                          (values (dstate-segment-sap dstate)
                                  (dstate-cur-offs dstate)))
@@ -594,7 +598,7 @@
                                            (sign-extend integer (byte-size byte-spec))
                                            integer))))
                               (let ((item-length (length item))
-                                    (fun (svref item 1)))
+                                    (fun (the function (svref item 1))))
                                 (setf (svref (dstate-filtered-values dstate) (svref item 0))
                                       (case item-length
                                         (2 (funcall fun dstate)) ; no subfields
@@ -655,7 +659,7 @@
                                  (dstate-filtered-arg-pool-free dstate))
                   (setq arg saved-next))))
         (setf (dstate-filtered-arg-pool-in-use dstate) nil)
-        (setf (dstate-inst-properties dstate) 0)))))
+        (setf (dstate-inst-properties dstate) 0)))))))
 
 
 (defun collect-labelish-operands (args cache)
@@ -993,10 +997,7 @@
     (when (> alignment 1)
       (push #'alignment-hook fun-hooks))
 
-    (%make-dstate :fun-hooks fun-hooks
-                  :argument-column arg-column
-                  :alignment alignment
-                  :byte-order sb!c:*backend-byte-order*)))
+    (%make-dstate alignment arg-column fun-hooks)))
 
 ;;; Logically or MASK into the set of instruction properties in DSTATE.
 (defun dstate-setprop (dstate mask)
@@ -1009,7 +1010,7 @@
 
 (defun add-fun-header-hooks (segment)
   (declare (type segment segment))
-  (dotimes (i (or (awhen (seg-code segment) (code-n-entries it)) 0))
+  (dotimes (i (code-n-entries (seg-code segment)))
     (let* ((fun (%code-entry-point (seg-code segment) i))
            (length (seg-length segment))
            (offset (code-offs-to-segment-offs (fun-offset fun) segment)))
@@ -1030,7 +1031,6 @@
 
 ;;; A SAP-MAKER is a no-argument function that returns a SAP.
 
-;; FIXME: Are the objects we are taking saps for always pinned?
 (declaim (inline sap-maker))
 (defun sap-maker (function input offset)
   (declare (optimize (speed 3))
@@ -1076,14 +1076,19 @@
 
 ;;; Return a memory segment located at the system-area-pointer returned by
 ;;; SAP-MAKER and LENGTH bytes long in the disassem-state object DSTATE.
-;;;
+;;; OBJECT is the object to pin (possibly NIL) when calling the SAP-MAKER.
+;;; INITIAL-RAW-BYTES is the number of leading bytes of the segment
+;;; that are not machine instructions.
+
 ;;; &KEY arguments include :VIRTUAL-LOCATION (by default the same as
 ;;; the address), :DEBUG-FUN, :SOURCE-FORM-CACHE (a
 ;;; SOURCE-FORM-CACHE object), and :HOOKS (a list of OFFS-HOOK
 ;;; objects).
-(defun make-segment (sap-maker length
+;;; INITIAL-OFFSET is the displacement into the instruction bytes
+;;; of CODE (if supplied) that the segment begins at.
+(defun make-segment (object initial-raw-bytes sap-maker length
                      &key
-                     code virtual-location
+                     code (initial-offset 0) virtual-location
                      debug-fun source-form-cache
                      hooks)
   (declare (type (function () system-area-pointer) sap-maker)
@@ -1091,21 +1096,17 @@
            (type (or null address) virtual-location)
            (type (or null sb!di:debug-fun) debug-fun)
            (type (or null source-form-cache) source-form-cache))
-  (let* ((segment
+  (let ((segment
           (%make-segment
+           :object object
+           :initial-raw-bytes initial-raw-bytes ; an offset into this segment
            :sap-maker sap-maker
            :length length
            :virtual-location (or virtual-location
                                  (sap-int (funcall sap-maker)))
            :hooks hooks
            :code code
-           :unboxed-data-range
-           (and code
-                (let ((n-words (code-n-unboxed-data-words code))
-                      (start (code-header-words code)))
-                  (and (plusp n-words)
-                       (cons (* sb!vm:n-word-bytes start)
-                             (* sb!vm:n-word-bytes (+ start n-words)))))))))
+           :initial-offset initial-offset))) ; an offset into CODE
     (add-debugging-hooks segment debug-fun source-form-cache)
     (add-fun-header-hooks segment)
     segment))
@@ -1114,18 +1115,23 @@
   (declare (type vector vector)
            (type offset offset)
            (inline make-segment))
-  (apply #'make-segment (vector-sap-maker vector offset) args))
+  (apply #'make-segment vector 0 (vector-sap-maker vector offset) args))
 
 (defun make-code-segment (code offset length &rest args)
   (declare (type code-component code)
            (type offset offset)
            (inline make-segment))
-  (apply #'make-segment (code-sap-maker code offset) length :code code args))
+  (apply #'make-segment code
+         (if (eql offset 0)
+             (ash (code-n-unboxed-data-words code) sb!vm:word-shift)
+             0)
+         (code-sap-maker code offset) length
+         :code code :initial-offset offset args))
 
-(defun make-memory-segment (address &rest args)
+(defun make-memory-segment (code address &rest args)
   (declare (type address address)
            (inline make-segment))
-  (apply #'make-segment (memory-sap-maker address) args))
+  (apply #'make-segment code 0 (memory-sap-maker address) args))
 
 ;;; just for fun
 (defun print-fun-headers (function)
@@ -1639,6 +1645,9 @@
 ;;; LENGTH long. Note that if CODE-COMPONENT is NIL and this memory
 ;;; could move during a GC, you'd better disable it around the call to
 ;;; this function.
+;;; FIXME: either remove CODE-COMPONENT from this interface or explain
+;;; how it could be used. It doesn't make sense to pass in an ADDRESS
+;;; unless CODE-COMPONENT was already pinned.
 (defun disassemble-memory (address
                            length
                            &key
@@ -1654,7 +1663,7 @@
           (if (system-area-pointer-p address)
               (sap-int address)
               address))
-         (dstate (make-dstate))
+         (dstate (make-dstate code-component))
          (segments
           (if code-component
               (let ((code-offs
@@ -1666,7 +1675,7 @@
                   (error "address ~X not in the code component ~S"
                          address code-component))
                 (get-code-segments code-component code-offs length))
-              (list (make-memory-segment address length)))))
+              (list (make-memory-segment code-component address length)))))
     (when use-labels
       (label-segments segments dstate))
     (disassemble-segments segments stream dstate)))
@@ -1767,19 +1776,17 @@
                 t)
         (values nil nil))))
 
-(defun get-code-constant-absolute (addr dstate &optional width)
+;;; Return the lisp object at ADDR in the code component being disassembled.
+;;; Since we've already decided what the ADDR is, there is nothing that
+;;; has to be done to pin objects or disable GC here - if the object can
+;;; move, then ADDR is already potentially wrong.
+(defun get-code-constant-absolute (addr dstate &optional width
+                                   &aux (code (seg-code (dstate-segment dstate))))
   (declare (type address addr))
   (declare (type disassem-state dstate))
   (declare (ignore width))
-  (let ((code (seg-code (dstate-segment dstate))))
-    (if (null code)
-      (return-from get-code-constant-absolute (values nil nil)))
-    ;; This WITHOUT-GCING, while not technically broken, is extremely deceptive
-    ;; because if it is really needed, then this function has a broken API.
-    ;; Since ADDR comes in as absolute, CODE must not move between the caller's
-    ;; computation and the comparison below. But we're already in WITHOUT-GCING
-    ;; in MAP-SEGMENT-INSTRUCTIONS, so, who cares, I guess?
-    (without-gcing
+  (if (null code)
+     (values nil nil)
      (let* ((n-header-bytes (* (code-header-words code) sb!vm:n-word-bytes))
             (header-addr (- (get-lisp-obj-address code)
                             sb!vm:other-pointer-lowtag))
@@ -1787,7 +1794,7 @@
          (cond ((< header-addr addr code-start)
                 (values (sap-ref-lispobj (int-sap addr) 0) t))
                (t
-                (values nil nil)))))))
+                (values nil nil))))))
 
 (defglobal *assembler-routines-by-addr* nil)
 

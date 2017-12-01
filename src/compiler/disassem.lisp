@@ -183,6 +183,7 @@
   ;; instructions that are the same as this instruction but with more
   ;; constraints
   (specializers nil :type list))
+(declaim (freeze-type instruction))
 (defmethod print-object ((inst instruction) stream)
   (print-unreadable-object (inst stream :type t :identity t)
     (format stream "~A(~A)" (inst-name inst) (inst-format-name inst))))
@@ -194,6 +195,7 @@
                        (:copier nil))
   (valid-mask dchunk-zero :type dchunk) ; applies to *children*
   (choices nil :type list))
+(declaim (freeze-type inst-space))
 (defmethod print-object ((ispace inst-space) stream)
   (print-unreadable-object (ispace stream :type t :identity t)))
 
@@ -1008,6 +1010,8 @@
 (defstruct (segment (:conc-name seg-)
                     (:constructor %make-segment)
                     (:copier nil))
+  ;; the object that should be pinned when calling the sap-maker
+  (object nil)
   (sap-maker (missing-arg)
              :type (function () #-sb-xc-host system-area-pointer))
   ;; Length in bytes of the range of memory covered by this segment.
@@ -1016,14 +1020,20 @@
   (storage-info nil :type (or null storage-info))
   ;; KLUDGE: CODE-COMPONENT is not a type the host understands
   #-sb-xc-host (code nil :type (or null code-component))
-  (unboxed-data-range nil :type (or null (cons fixnum fixnum)))
+  ;; the byte offset beyond CODE-INSTRUCTIONS of CODE which
+  ;; corresponds to offset 0 in this segment
+  (initial-offset 0 :type index)
+  ;; number of bytes to print as literal data without disassembling.
+  ;; will always be 0 for any segment whose initial-offset is nonzero
+  (initial-raw-bytes 0 :type index)
   (hooks nil :type list))
 
 ;;; All state during disassembly. We store some seemingly redundant
 ;;; information so that we can allow garbage collect during disassembly and
 ;;; not get tripped up by a code block being moved...
 (defstruct (disassem-state (:conc-name dstate-)
-                           (:constructor %make-dstate)
+                           (:constructor %make-dstate
+                               (alignment argument-column fun-hooks))
                            (:copier nil))
   ;; offset of current pos in segment
   (cur-offs 0 :type offset)
@@ -1038,7 +1048,7 @@
   (scratch-buf (make-array 8 :element-type '(unsigned-byte 8)))
   ;; what to align to in most cases
   (alignment sb!vm:n-word-bytes :type alignment)
-  (byte-order :little-endian
+  (byte-order sb!c:*backend-byte-order*
               :type (member :big-endian :little-endian))
   ;; for user code to track decoded bits, cleared each time after a
   ;; non-prefix instruction is processed

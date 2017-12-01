@@ -211,17 +211,14 @@
 ;;; Return contents of memory if either it refers to an unboxed code constant
 ;;; or is RIP-relative with a displacement of 0.
 (defun unboxed-constant-ref (dstate segment-offset addr disp)
-  (or  (and (eql disp 0)
+  ;; FIXME: why in one case do we read via SEGMENT-SAP and the other via ADDR?
+  (cond ((< segment-offset
+            (sb!disassem::seg-initial-raw-bytes (dstate-segment dstate)))
+         (sap-ref-word (dstate-segment-sap dstate) segment-offset))
+        ((eql disp 0)
             ;; Assume this is safe to read, since we're disassembling
             ;; from the memory just a few bytes preceding 'addr'.
-            (sap-ref-word (int-sap addr) 0))
-       (let* ((seg (dstate-segment dstate))
-              (code-offset
-               (sb!disassem::segment-offs-to-code-offs segment-offset seg))
-              (unboxed-range (sb!disassem::seg-unboxed-data-range seg)))
-         (or (and unboxed-range
-                  (<= (car unboxed-range) code-offset (cdr unboxed-range))
-                  (sap-ref-word (dstate-segment-sap dstate) segment-offset))))))
+         (sap-ref-word (int-sap addr) 0))))
 
 ;;; Prints a memory reference to STREAM. VALUE is a list of
 ;;; (BASE-REG OFFSET INDEX-REG INDEX-SCALE), where any component may be
