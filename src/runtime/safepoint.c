@@ -669,6 +669,7 @@ void thread_in_safety_transition(os_context_t *ctxptr)
     }
 }
 
+#ifdef LISP_FEATURE_WIN32
 void thread_interrupted(os_context_t *ctxptr)
 {
     struct thread *self = arch_os_get_current_thread();
@@ -691,6 +692,7 @@ void thread_interrupted(os_context_t *ctxptr)
     while(check_pending_thruptions(ctxptr));
 #endif
 }
+#endif
 
 void
 gc_stop_the_world()
