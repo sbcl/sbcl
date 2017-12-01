@@ -60,10 +60,10 @@
 ;;;
 ;;; except on machines where the arrays won't fit into the dynamic
 ;;; space.
-#.(cl:when (cl:> (sb-ext:dynamic-space-size)
-                 (cl:truncate (cl:1- cl:array-dimension-limit)
-                              sb-vm:n-word-bits))
-    (cl:push :sufficient-dynamic-space cl:*features*))
+(when (> (sb-ext:dynamic-space-size)
+         (truncate (1- array-dimension-limit)
+                   sb-vm:n-word-bits))
+  (push :sufficient-dynamic-space *features*))
 (with-test (:name (bit-vector bit-not bit-and :big)
                   :skipped-on (:not :sufficient-dynamic-space))
   (locally
