@@ -1075,10 +1075,9 @@ register."
   (let ((info (%code-debug-info component)))
     (cond
       ((consp info)
-       (let ((routine (let ((ofs (- pc (sap-int (code-instructions component)))))
-                        (dohash ((name pc-range) (car info))
-                          (when (<= (car pc-range) ofs (cdr pc-range))
-                            (return name))))))
+       (let ((routine (dohash ((name pc-range) (car info))
+                        (when (<= (car pc-range) pc (cdr pc-range))
+                          (return name)))))
          (make-bogus-debug-fun (cond ((not routine)
                                       "no debug information for frame")
                                      ((memq routine '(sb!vm::undefined-tramp

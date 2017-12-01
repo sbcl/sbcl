@@ -211,20 +211,8 @@
     (assert (string= string1 string2)))))
 
 (with-test (:name :disassemble-assembly-routine)
-  (let ((code
-         #+immobile-space
-         (elt sb-fasl::*assembler-objects* 0)
-         #-immobile-space
-         (block nil
-           (sb-vm::map-allocated-objects
-            (lambda (obj type size)
-              (declare (ignore size))
-              (when (= type sb-vm:code-header-widetag)
-                (return obj)))
-            :read-only))))
-    (assert code) ; found something to disassemble
-    (sb-disassem:disassemble-code-component code
-     :stream (make-broadcast-stream))))
+  (sb-disassem:disassemble-code-component sb-fasl:*assembler-routines*
+     :stream (make-broadcast-stream)))
 
 ;;; This tests that the x86-64 disasembler does not crash
 ;;; on LEA with a rip-relative operand and no label.
