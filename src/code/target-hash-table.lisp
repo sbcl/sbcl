@@ -464,38 +464,47 @@ multiple threads accessing the same hash-table without locking."
 
 ;;; Make new vectors for the table, extending the table based on the
 ;;; rehash-size.
-(defun rehash (table)
-  (declare (type hash-table table))
+(defun hash-table-new-vectors (table)
+  ;; Can at least some vectors be copied before entering WITHOUT-GCING
+  ;; for REHASH?
+  ;; So that they don't have to be alive at the same time and be collected.
+  (let* ((old-next-vector (hash-table-next-vector table))
+         (old-hash-vector (hash-table-hash-vector table))
+         (old-size (length old-next-vector))
+         (new-size
+           (power-of-two-ceiling
+            (let ((rehash-size (hash-table-rehash-size table)))
+              (etypecase rehash-size
+                (fixnum
+                 (+ rehash-size old-size))
+                (float
+                 (the index (truncate (* rehash-size old-size))))))))
+         (new-kv-vector (make-array (* 2 new-size)
+                                    :initial-element +empty-ht-slot+))
+         (new-next-vector
+           (make-array new-size :element-type 'word :initial-element 0))
+         (new-hash-vector
+           (when old-hash-vector
+             (make-array new-size
+                         :element-type 'word
+                         :initial-element +magic-hash-vector-value+)))
+         (new-index-vector (make-array new-size :element-type 'word :initial-element 0)))
+    (values new-size
+            new-kv-vector new-next-vector new-hash-vector new-index-vector)))
+
+(defun rehash (table new-size
+               new-kv-vector new-next-vector new-hash-vector
+               new-index-vector)
+  (declare (type hash-table table)
+           (type simple-vector new-kv-vector)
+           (type (simple-array word (*)) new-next-vector new-index-vector)
+           (type (or null (simple-array word (*))) new-hash-vector)
+           (type index new-size))
   (aver *gc-inhibit*)
   (let* ((old-kv-vector (hash-table-table table))
          (old-next-vector (hash-table-next-vector table))
          (old-hash-vector (hash-table-hash-vector table))
-         (old-size (length old-next-vector))
-         (new-size
-          (power-of-two-ceiling
-           (let ((rehash-size (hash-table-rehash-size table)))
-             (etypecase rehash-size
-               (fixnum
-                (+ rehash-size old-size))
-               (float
-                (the index (truncate (* rehash-size old-size))))))))
-         (new-kv-vector (make-array (* 2 new-size)
-                                    :initial-element +empty-ht-slot+))
-         (new-next-vector
-          (make-array new-size
-                      :element-type '(unsigned-byte #.sb!vm:n-word-bits)
-                      :initial-element 0))
-         (new-hash-vector
-          (when old-hash-vector
-            (make-array new-size
-                        :element-type '(unsigned-byte #.sb!vm:n-word-bits)
-                        :initial-element +magic-hash-vector-value+)))
-         (new-length new-size)
-         (new-index-vector
-          (make-array new-length
-                      :element-type '(unsigned-byte #.sb!vm:n-word-bits)
-                      :initial-element 0)))
-    (declare (type index new-size new-length old-size))
+         (old-size (length old-next-vector)))
 
     ;; Disable GC tricks on the OLD-KV-VECTOR.
     (set-header-data old-kv-vector sb!vm:vector-normal-subtype)
@@ -544,7 +553,7 @@ multiple threads accessing the same hash-table without locking."
                             +magic-hash-vector-value+)))
                ;; Can use the existing hash value (not EQ based)
                (let* ((hashing (aref new-hash-vector i))
-                      (index (index-for-hashing hashing new-length))
+                      (index (index-for-hashing hashing new-size))
                       (next (aref new-index-vector index)))
                  (declare (type index index)
                           (type hash hashing))
@@ -557,7 +566,7 @@ multiple threads accessing the same hash-table without locking."
                (set-header-data new-kv-vector
                                 sb!vm:vector-valid-hashing-subtype)
                (let* ((hashing (pointer-hash key))
-                      (index (index-for-hashing hashing new-length))
+                      (index (index-for-hashing hashing new-size))
                       (next (aref new-index-vector index)))
                  (declare (type index index)
                           (type hash hashing))
@@ -647,15 +656,24 @@ multiple threads accessing the same hash-table without locking."
     (declare (inline rehash-p rehash-without-growing-p))
     (cond ((rehash-p)
            ;; Use recursive locks since for weak tables the lock has
-           ;; already been acquired. GC must be inhibited to prevent
-           ;; the GC from seeing a rehash in progress.
+           ;; already been acquired.
            (sb!thread::with-recursive-system-lock
-               ((hash-table-lock hash-table) :without-gcing t)
+               ((hash-table-lock hash-table))
              ;; Repeat the condition inside the lock to ensure that if
              ;; two reader threads enter MAYBE-REHASH at the same time
              ;; only one rehash is performed.
              (when (rehash-p)
-               (rehash hash-table))))
+               ;; Cons new vectors outside of WITHOUT-GCING (except
+               ;; for weak hash-tables, GETHASH3 already uses
+               ;; WITHOUT-GCING in that case)
+               (multiple-value-bind (new-size new-kv-vector new-next-vector new-hash-vector new-index-vector)
+                   (hash-table-new-vectors hash-table)
+                 (without-gcing
+                   ;; Rehash inside WITHOUT-GCING to avoid movement
+                   ;; and the keep GC from seeing half-initilizaed
+                   ;; hash vectors.
+                   (rehash hash-table new-size new-kv-vector new-next-vector
+                           new-hash-vector new-index-vector))))))
           ((rehash-without-growing-p)
            (sb!thread::with-recursive-system-lock
                ((hash-table-lock hash-table) :without-gcing t)
