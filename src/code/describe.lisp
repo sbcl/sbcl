@@ -532,7 +532,7 @@
   (let ((*print-circle* nil)
         (*print-level* 24)
         (*print-length* 24))
-    (format stream "~@:_Lambda-list: ~:A" lambda-list)))
+    (format stream "~@:_Lambda-list: ~:S" lambda-list)))
 
 (defun describe-argument-precedence-order (argument-list stream)
   (let ((*print-circle* nil)
