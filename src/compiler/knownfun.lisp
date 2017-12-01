@@ -360,20 +360,24 @@
 ;;; This used to be done in DEFOPTIMIZER DERIVE-TYPE, but
 ;;; ASSERT-CALL-TYPE already asserts the ARRAY type, so it gets an extra
 ;;; assertion that may not get eliminated and requires extra work.
-(defun array-call-type-deriver (call trusted)
-  (let ((type (lvar-type (combination-fun call)))
-        (policy (lexenv-policy (node-lexenv call)))
-        (args (combination-args call)))
+(defun array-call-type-deriver (call trusted &optional set)
+  (let* ((type (lvar-type (combination-fun call)))
+         (policy (lexenv-policy (node-lexenv call)))
+         (args (combination-args call))
+         (required (fun-type-required type)))
     (flet ((assert-type (arg type)
              (when (assert-lvar-type arg type policy)
                (unless trusted (reoptimize-lvar arg)))))
-      (loop for (type . next) on (fun-type-required type)
-            while next
-            do (assert-type (pop args) type))
+      (when set
+        (assert-type (pop args)
+                     (pop required)))
       (assert-type (pop args)
-                   (specifier-type `(array * ,(make-list (length args)
-                                                         :initial-element '*))))
+                   (type-intersection
+                    (pop required)
+                    (specifier-type `(array * ,(length args)))))
+      (loop for type in required
+            do (assert-type (pop args) type))
+      (loop for type in (fun-type-optional type)
+            do (assert-type (pop args) type))
       (loop for subscript in args
             do (assert-type subscript (fun-type-rest type))))))
-
-(/show0 "knownfun.lisp end of file")

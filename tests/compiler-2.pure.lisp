@@ -672,3 +672,12 @@
                     #(1)))
     (assert (= (length notes) 1))
     (assert (typep (car notes) 'code-deletion-note))))
+
+(with-test (:name :array-call-type-deriver)
+  (checked-compile-and-assert
+      ()
+      `(lambda (vector)
+         (funcall (the (function (t t)) #'aref)
+                  vector
+                  0))
+    (((vector 333)) 333)))

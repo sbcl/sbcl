@@ -1905,7 +1905,8 @@
 
 (defknown (setf aref) (t array &rest index) t ()
   :destroyed-constant-args (nth-constant-args 2)
-  :call-type-deriver #'array-call-type-deriver)
+  :call-type-deriver (lambda (call trusted)
+                       (array-call-type-deriver call trusted t)))
 (defknown %set-row-major-aref (array index t) t ()
   :destroyed-constant-args (nth-constant-args 1))
 (defknown (%rplaca %rplacd) (cons t) t ()
