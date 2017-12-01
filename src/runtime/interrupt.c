@@ -1000,8 +1000,8 @@ interrupt_handle_pending(os_context_t *context)
         } else
 #endif
          /* Test for T and not for != NIL since the value :IN-PROGRESS
-          * is used in SUB-GC as part of the mechanism to supress
-          * recursive gcs.*/
+          * used to be used in SUB-GC as part of the mechanism to
+          * supress recursive gcs.*/
         if (read_TLS(GC_PENDING,thread) == T) {
 
             /* Two reasons for doing this. First, if there is a

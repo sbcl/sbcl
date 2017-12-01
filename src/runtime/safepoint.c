@@ -224,13 +224,8 @@ static inline gc_phase_t thread_gc_phase(struct thread* p)
     boolean inhibit = (read_TLS(GC_INHIBIT,p)==T)||
         (read_TLS(IN_WITHOUT_GCING,p)==IN_WITHOUT_GCING);
 
-    boolean inprogress =
-        (read_TLS(GC_PENDING,p)!=T&& read_TLS(GC_PENDING,p)!=NIL);
-
     return
-        inprogress ? (gc_state.collector && (gc_state.collector != p)
-                      ? GC_NONE : GC_QUIET)
-        : (inhibit ? GC_INVOKED : GC_NONE);
+        inhibit ? GC_INVOKED : GC_NONE;
 }
 
 static inline void thread_gc_promote(struct thread* p, gc_phase_t cur, gc_phase_t old) {
@@ -400,13 +395,10 @@ thread_may_gc()
 {
     /* Thread may gc if all of these are true:
      * 1) GC_INHIBIT == NIL  (outside of protected part of without-gcing)
-     * 2) GC_PENDING != :in-progress    (outside of recursion protection)
      * Note that we are in a safepoint here, which is always outside of PA. */
 
     struct thread *self = arch_os_get_current_thread();
-    return (read_TLS(GC_INHIBIT, self) == NIL
-            && (read_TLS(GC_PENDING, self) == T ||
-                read_TLS(GC_PENDING, self) == NIL));
+    return (read_TLS(GC_INHIBIT, self) == NIL);
 }
 
 #ifdef LISP_FEATURE_SB_THRUPTION
