@@ -172,110 +172,113 @@ sufficiently motivated to do lengthy fixes."
   (declare (ignore environment-name))
   #+gencgc
   (declare (ignore purify) (ignorable root-structures))
-  #+sb-core-compression
-  (check-type compression (or boolean (integer -1 9)))
-  #-sb-core-compression
-  (when compression
-    (error "Unable to save compressed core: this runtime was not built with zlib support"))
-  (when *dribble-stream*
-    (restart-case (error "Dribbling to ~s is enabled." (pathname *dribble-stream*))
-      (continue ()
-        :report "Stop dribbling and save the core."
-        (dribble))
-      (abort ()
-        :report "Abort saving the core."
-        (return-from save-lisp-and-die))))
-  (when (eql t compression)
-    (setf compression -1))
+  ;; If the toplevel function is not defined, this will signal an
+  ;; error before saving, not at startup time.
+  (let ((toplevel (%coerce-callable-to-fun toplevel)))
+    #+sb-core-compression
+    (check-type compression (or boolean (integer -1 9)))
+    #-sb-core-compression
+    (when compression
+      (error "Unable to save compressed core: this runtime was not built with zlib support"))
+    (when *dribble-stream*
+      (restart-case (error "Dribbling to ~s is enabled." (pathname *dribble-stream*))
+        (continue ()
+          :report "Stop dribbling and save the core."
+          (dribble))
+        (abort ()
+          :report "Abort saving the core."
+          (return-from save-lisp-and-die))))
+    (when (eql t compression)
+      (setf compression -1))
 
-  ;; Share EQUALP FUN-INFOs
-  (let ((ht (make-hash-table :test 'equalp)))
-    (sb-int:call-with-each-globaldb-name
-     (lambda (name)
-       (binding* ((info (info :function :info name) :exit-if-null)
-                  (shared-info (gethash info ht)))
-         (if shared-info
-             (setf (info :function :info name) shared-info)
-             (setf (gethash info ht) info))))))
-  ;; Share similar simple-fun arglists and types
-  ;; EQUALISH considers any two identically-spelled gensyms as EQ
-  (let ((arglist-hash (make-hash-table :hash-function 'equal-hash
-                                       :test 'fun-names-equalish))
-        (type-hash (make-hash-table :test 'equal)))
-    (sb-vm::map-allocated-objects
-     (lambda (object widetag size)
-       (declare (ignore size))
-       (when (= widetag sb-vm:code-header-widetag)
-         (dotimes (i (sb-kernel:code-n-entries object))
-           (let* ((fun (sb-kernel:%code-entry-point object i))
-                  (arglist (%simple-fun-arglist fun))
-                  (type (sb-vm::%%simple-fun-type fun)))
-             (setf (%simple-fun-arglist fun)
-                   (ensure-gethash arglist arglist-hash arglist))
-             (setf (sb-kernel:%simple-fun-type fun)
-                   (ensure-gethash type type-hash type))))))
-     :all))
-  ;;
-  (labels ((restart-lisp ()
-             (handling-end-of-the-world
-              (reinit)
-              #+hpux (%primitive sb-vm::setup-return-from-lisp-stub)
-              (funcall toplevel)))
-           (foreign-bool (value)
-             (if value 1 0)))
-    (let ((name (native-namestring (physicalize-pathname core-file-name)
-                                   :as-file t)))
-      (tune-image-for-dump)
-      (deinit)
-  ;; FIXME: Would it be possible to unmix the PURIFY logic from this
-  ;; function, and just do a GC :FULL T here? (Then if the user wanted
-  ;; a PURIFYed image, he'd just run PURIFY immediately before calling
-  ;; SAVE-LISP-AND-DIE.)
-    #+gencgc
-    (progn
-      #+immobile-code
-      (progn
-        ;; Perform static linkage. There seems to be no reason to have users
-        ;; decide whether they want this. Functions become un-statically-linked
-        ;; on demand, for TRACE, redefinition, etc.
-        (sb-vm::statically-link-core)
-        ;; Scan roots as close as possible to GC-AND-SAVE, in case anything
-        ;; prior causes compilation to occur into immobile space.
-        ;; Failing to see all immobile code would miss some relocs.
-        (sb-kernel::choose-code-component-order root-structures))
-      ;; Save the restart function. Logically a passed argument, but can't be,
-      ;; as it would require pinning around the whole save operation.
-      (with-pinned-objects (#'restart-lisp)
-        (setf lisp-init-function (get-lisp-obj-address #'restart-lisp)))
-      ;; Do a destructive non-conservative GC, and then save a core.
-      ;; A normal GC will leave huge amounts of storage unreclaimed
-      ;; (over 50% on x86). This needs to be done by a single function
-      ;; since the GC will invalidate the stack.
-      (gc-and-save name
-                   (foreign-bool executable)
-                   (foreign-bool save-runtime-options)
-                   (foreign-bool compression)
-                   (or compression 0)
-                   #+win32 (ecase application-type (:console 0) (:gui 1))
-                   #-win32 0)
-      (setf lisp-init-function 0)) ; only reach here on save error
-    #-gencgc
-    (progn
-      (if purify (purify :root-structures root-structures) (gc))
-      (without-gcing
-       (save name
-             (get-lisp-obj-address #'restart-lisp)
-             (foreign-bool executable)
-             (foreign-bool save-runtime-options)
-             (foreign-bool compression)
-             (or compression 0)
-             #+win32 (ecase application-type (:console 0) (:gui 1))
-             #-win32 0)))))
+    ;; Share EQUALP FUN-INFOs
+    (let ((ht (make-hash-table :test 'equalp)))
+      (sb-int:call-with-each-globaldb-name
+       (lambda (name)
+         (binding* ((info (info :function :info name) :exit-if-null)
+                    (shared-info (gethash info ht)))
+           (if shared-info
+               (setf (info :function :info name) shared-info)
+               (setf (gethash info ht) info))))))
+    ;; Share similar simple-fun arglists and types
+    ;; EQUALISH considers any two identically-spelled gensyms as EQ
+    (let ((arglist-hash (make-hash-table :hash-function 'equal-hash
+                                         :test 'fun-names-equalish))
+          (type-hash (make-hash-table :test 'equal)))
+      (sb-vm::map-allocated-objects
+       (lambda (object widetag size)
+         (declare (ignore size))
+         (when (= widetag sb-vm:code-header-widetag)
+           (dotimes (i (sb-kernel:code-n-entries object))
+             (let* ((fun (sb-kernel:%code-entry-point object i))
+                    (arglist (%simple-fun-arglist fun))
+                    (type (sb-vm::%%simple-fun-type fun)))
+               (setf (%simple-fun-arglist fun)
+                     (ensure-gethash arglist arglist-hash arglist))
+               (setf (sb-kernel:%simple-fun-type fun)
+                     (ensure-gethash type type-hash type))))))
+       :all))
+    ;;
+    (labels ((restart-lisp ()
+               (handling-end-of-the-world
+                 (reinit)
+                 #+hpux (%primitive sb-vm::setup-return-from-lisp-stub)
+                 (funcall toplevel)))
+             (foreign-bool (value)
+               (if value 1 0)))
+      (let ((name (native-namestring (physicalize-pathname core-file-name)
+                                     :as-file t)))
+        (tune-image-for-dump)
+        (deinit)
+        ;; FIXME: Would it be possible to unmix the PURIFY logic from this
+        ;; function, and just do a GC :FULL T here? (Then if the user wanted
+        ;; a PURIFYed image, he'd just run PURIFY immediately before calling
+        ;; SAVE-LISP-AND-DIE.)
+        #+gencgc
+        (progn
+          #+immobile-code
+          (progn
+            ;; Perform static linkage. There seems to be no reason to have users
+            ;; decide whether they want this. Functions become un-statically-linked
+            ;; on demand, for TRACE, redefinition, etc.
+            (sb-vm::statically-link-core)
+            ;; Scan roots as close as possible to GC-AND-SAVE, in case anything
+            ;; prior causes compilation to occur into immobile space.
+            ;; Failing to see all immobile code would miss some relocs.
+            (sb-kernel::choose-code-component-order root-structures))
+          ;; Save the restart function. Logically a passed argument, but can't be,
+          ;; as it would require pinning around the whole save operation.
+          (with-pinned-objects (#'restart-lisp)
+            (setf lisp-init-function (get-lisp-obj-address #'restart-lisp)))
+          ;; Do a destructive non-conservative GC, and then save a core.
+          ;; A normal GC will leave huge amounts of storage unreclaimed
+          ;; (over 50% on x86). This needs to be done by a single function
+          ;; since the GC will invalidate the stack.
+          (gc-and-save name
+                       (foreign-bool executable)
+                       (foreign-bool save-runtime-options)
+                       (foreign-bool compression)
+                       (or compression 0)
+                       #+win32 (ecase application-type (:console 0) (:gui 1))
+                       #-win32 0)
+          (setf lisp-init-function 0)) ; only reach here on save error
+        #-gencgc
+        (progn
+          (if purify (purify :root-structures root-structures) (gc))
+          (without-gcing
+            (save name
+                  (get-lisp-obj-address #'restart-lisp)
+                  (foreign-bool executable)
+                  (foreign-bool save-runtime-options)
+                  (foreign-bool compression)
+                  (or compression 0)
+                  #+win32 (ecase application-type (:console 0) (:gui 1))
+                  #-win32 0)))))
 
     ;; Something went very wrong -- reinitialize to have a prayer
     ;; of being able to report the error.
-  (reinit)
-  (error 'save-error))
+    (reinit)
+    (error 'save-error)))
 
 (defun tune-image-for-dump ()
   #+sb-fasteval (sb-interpreter::flush-everything)
