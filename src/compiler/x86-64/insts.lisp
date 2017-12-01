@@ -1746,6 +1746,7 @@
    (emit-byte segment #b10001101)
    (cond ((and (fixup-p src)
                (eq (fixup-flavor src) :assembly-routine)
+               #!+immobile-code
                sb!c::*code-is-immobile*)
           (emit-mod-reg-r/m-byte segment #b00 (reg-tn-encoding dst) #b101)
           (emit-relative-fixup segment src))

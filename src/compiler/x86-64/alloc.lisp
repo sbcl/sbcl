@@ -365,9 +365,11 @@
   (:results (result :scs (any-reg)))
   (:generator 1
     (let ((tramp (make-fixup 'funcallable-instance-tramp :assembly-routine)))
-      (if sb!c::*code-is-immobile*
-          (inst lea result tramp)
-          (inst mov result tramp)))))
+      (cond #!+immobile-code
+            (sb!c::*code-is-immobile*
+             (inst lea result tramp))
+            (t
+             (inst mov result tramp))))))
 
 (define-vop (fixed-alloc)
   (:args)

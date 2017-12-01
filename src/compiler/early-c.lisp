@@ -92,6 +92,7 @@
 (defvar *code-segment*)
 ;; FIXME: this is a kludge due to the absence of a 'vop' argument
 ;; to ALLOCATION-TRAMP in the x86-64 backend.
+#!+immobile-code
 (defvar *code-is-immobile*)
 #!+sb-dyncount (defvar *collect-dynamic-statistics*)
 (defvar *component-being-compiled*)
