@@ -14,24 +14,31 @@
 ;;; vector length were near ARRAY-DIMENSION-LIMIT. Testing this takes
 ;;; up a certain amount of time...
 
-(declaim (optimize (speed 3) (safety 1) (space 0) (compilation-speed 0)))
-
-(defun test-small-bit-vectors ()
+(with-test (:name (bit-vector bit-not bit-xor bit-and equal :small))
   ;; deal with the potential length 0 special case
-  (let ((a (make-array 0 :element-type 'bit))
-        (b (make-array 0 :element-type 'bit)))
-    (assert (equal (bit-not a) #*))
-    (assert (equal (bit-xor a b a) #*))
-    (assert (equal (bit-and a a b) #*)))
+  (locally
+      (declare (optimize (speed 3) (safety 1) (space 0) (compilation-speed 0)))
+    (let ((a (make-array 0 :element-type 'bit))
+          (b (make-array 0 :element-type 'bit)))
+      (assert (equal (bit-not a) #*))
+      (assert (equal (bit-xor a b a) #*))
+      (assert (equal (bit-and a a b) #*)))))
+
+(with-test (:name (bit-vector bit-not bit-xor bit-and equal :modification))
   ;; also test some return values for sanity
-  (let ((a (make-array 33 :element-type 'bit :initial-element 0))
-        (b (make-array 33 :element-type 'bit :initial-element 0)))
-    (assert (equal (bit-not a a) #*111111111111111111111111111111111))
-    (setf (aref a 0) 0) ; a = #*011..1
-    (setf (aref b 1) 1) ; b = #*010..0
-    (assert (equal (bit-xor a b) #*001111111111111111111111111111111))
-    (assert (equal (bit-and a b) #*010000000000000000000000000000000)))
-  ;; a special COUNT transform on bitvectors; triggers on (>= SPEED SPACE)
+  (locally
+      (declare (optimize (speed 3) (safety 1) (space 0) (compilation-speed 0)))
+    (let ((a (make-array 33 :element-type 'bit :initial-element 0))
+          (b (make-array 33 :element-type 'bit :initial-element 0)))
+      (assert (equal (bit-not a a) #*111111111111111111111111111111111))
+      (setf (aref a 0) 0)               ; a = #*011..1
+      (setf (aref b 1) 1)               ; b = #*010..0
+      (assert (equal (bit-xor a b) #*001111111111111111111111111111111))
+      (assert (equal (bit-and a b) #*010000000000000000000000000000000)))))
+
+(with-test (:name (bit-vector count))
+  ;; a special COUNT transform on bitvectors; triggers on (>= SPEED
+  ;; SPACE)
   (locally
       (declare (optimize (speed 3) (space 1)))
     (let ((bv1 (make-array 5 :element-type 'bit))
@@ -49,64 +56,50 @@
       (assert (= 1 (count 1 bv3)))
       (assert (= 67 (count 0 bv3))))))
 
-(defun inform (msg)
-  (print msg)
-  (force-output))
-
-(defun test-big-bit-vectors ()
-  ;; now test the biggy, mostly that it works...
-  (let ((a (progn
-             (inform :make-array-1)
-             (make-array (1- array-dimension-limit)
-                         :element-type 'bit :initial-element 0)))
-        (b (progn
-             (inform :make-array-2)
-             (make-array (1- array-dimension-limit)
-                         :element-type 'bit :initial-element 0))))
-    (inform :bit-not)
-    (bit-not a a)
-    (inform :aref-1)
-    (assert (= (aref a 0) 1))
-    (inform :aref-2)
-    (assert (= (aref a (- array-dimension-limit 2)) 1))
-    (inform :bit-and)
-    (bit-and a b a)
-    (inform :aref-3)
-    (assert (= (aref a 0) 0))
-    (inform :aref-4)
-    (assert (= (aref a (- array-dimension-limit 2)) 0))))
-
-(test-small-bit-vectors)
-
-;; except on machines where the arrays won't fit into the dynamic space.
-#+#.(cl:if (cl:> (sb-ext:dynamic-space-size)
+;;; now test the biggy, mostly that it works...
+;;;
+;;; except on machines where the arrays won't fit into the dynamic
+;;; space.
+#.(cl:when (cl:> (sb-ext:dynamic-space-size)
                  (cl:truncate (cl:1- cl:array-dimension-limit)
                               sb-vm:n-word-bits))
-           '(and)
-           '(or))
-(test-big-bit-vectors)
+    (cl:push :sufficient-dynamic-space cl:*features*))
+(with-test (:name (bit-vector bit-not bit-and :big)
+                  :skipped-on (:not :sufficient-dynamic-space))
+  (locally
+      (declare (optimize (speed 3) (safety 1) (space 0) (compilation-speed 0)))
+    (let ((a (make-array (1- array-dimension-limit)
+                         :element-type 'bit :initial-element 0))
+          (b (make-array (1- array-dimension-limit)
+                         :element-type 'bit :initial-element 0)))
+      (bit-not a a)
+      (assert (= (aref a 0) 1))
+      (assert (= (aref a (- array-dimension-limit 2)) 1))
+      (bit-and a b a)
+      (assert (= (aref a 0) 0))
+      (assert (= (aref a (- array-dimension-limit 2)) 0)))))
 
-(with-test (:name :find-non-bit-from-bit-vector)
+(with-test (:name (bit-vector find :non-bit-from-bit-vector))
   (assert (not (find #\a #*0101)))
   (assert (not (position #\a #*0101)))
-  (let ((f1 (compile nil
-                     `(lambda (b)
-                        (find b #*0101))))
-        (f2 (compile nil
-                     `(lambda (b)
-                        (position b #*0101)))))
-    (assert (not (funcall f1 t)))
-    (assert (not (funcall f2 t))))
-  (let ((f1 (compile nil
-                     `(lambda (b)
-                        (declare (bit-vector b))
-                        (find t b))))
-        (f2 (compile nil
-                     `(lambda (b)
-                        (declare (bit-vector b))
-                        (position t b)))))
-    (assert (not (funcall f1 #*010101)))
-    (assert (not (funcall f2 #*101010)))))
+  (checked-compile-and-assert ()
+      `(lambda (b)
+         (find b #*0101))
+    ((t) nil))
+  (checked-compile-and-assert ()
+      `(lambda (b)
+         (position b #*0101))
+    ((t) nil))
+  (checked-compile-and-assert ()
+      `(lambda (b)
+         (declare (bit-vector b))
+         (find t b))
+    ((#*010101) nil))
+  (checked-compile-and-assert ()
+      `(lambda (b)
+         (declare (bit-vector b))
+         (position t b))
+    ((#*101010) nil)))
 
 ;;; BIT-POSITION would access 1 word beyond a bit-vector's final word
 ;;; which could crash if the next page of memory was not readable. To
