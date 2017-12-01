@@ -114,7 +114,7 @@
   ;; The disassembler is the major culprit for retention of these.
   (sb-vm::map-allocated-objects
    (lambda (obj type size)
-     (declare (ignore size))
+     (declare (ignore type size))
      (when (typep obj 'sb-c::debug-source)
        (unless (sb-c::debug-source-namestring obj)
          (setf (sb-c::debug-source-form obj) nil))))
