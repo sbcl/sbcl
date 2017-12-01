@@ -2170,6 +2170,18 @@
   #+sb-xc-host context
   #-sb-xc-host (source-to-string context))
 
+(defun may-delete-function-designator-cast (cast)
+  ;; If the destination is a combination-fun that means the function
+  ;; is called here and not passed somewhere else, there's no longer a
+  ;; need to check the function type, the arguments to the call will
+  ;; do the same job.
+  (or (not (function-designator-cast-p cast))
+      (let* ((lvar (cast-lvar cast))
+             (dest (and lvar
+                        (lvar-dest lvar))))
+        (and (basic-combination-p dest)
+             (eq (basic-combination-fun dest) lvar)))))
+
 (defun ir1-optimize-cast (cast &optional do-not-optimize)
   (declare (type cast cast))
   (let ((value (cast-value cast))
@@ -2186,7 +2198,7 @@
       (let ((lvar (node-lvar cast)))
         (when (and (or (not (bound-cast-p cast))
                        (bound-cast-derived cast))
-                   (not (function-designator-cast-p cast))
+                   (may-delete-function-designator-cast cast)
                    (values-subtypep (lvar-derived-type value)
                                     (cast-asserted-type cast)))
           (delete-cast cast)

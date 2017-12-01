@@ -681,3 +681,17 @@
                   vector
                   0))
     (((vector 333)) 333)))
+
+(with-test (:name :function-designator-cast-removal)
+  (let ((fun (checked-compile
+              `(lambda (vectors x)
+                 (declare (list vectors x))
+                 (map 'list #'svref vectors x)))))
+    (assert (notany (lambda (c)
+                      (typecase c
+                        (sb-kernel:fdefn
+                         (eq (sb-c::fdefn-name c) 'svref))
+                        (function
+                         (eq c #'svref))))
+                    (ctu:find-code-constants fun)))
+    (assert (equal (funcall fun '(#(44)) '(0)) '(44)))))

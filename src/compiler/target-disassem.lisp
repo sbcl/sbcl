@@ -490,7 +490,7 @@
      #!+gencgc with-pinned-objects #!+gencgc ((seg-object (dstate-segment dstate))
                                               (dstate-scratch-buf dstate))
      #!+gencgc (setf (dstate-segment-sap dstate) (funcall (seg-sap-maker segment)))
-                 
+
      ;; If segment starts with non-instruction data, print using .WORD pseudo-ops.
      (let ((raw-data-end (seg-initial-raw-bytes segment)))
        (when (plusp raw-data-end)
