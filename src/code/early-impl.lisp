@@ -33,7 +33,6 @@
                   *interrupts-enabled*
                   *interrupt-pending*
                   #!+sb-thruption *thruption-pending*
-                  #!+sb-safepoint *gc-safe*
                   #!+sb-safepoint *in-safepoint*
                   *free-interrupt-context-index*
                   sb!vm::*allocation-pointer*
