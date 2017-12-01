@@ -142,7 +142,7 @@ static struct gc_state gc_state = {
 void
 gc_state_lock()
 {
-    odxprint(safepoints,"GC state [%p] to be locked",gc_state.lock);
+    odxprint(safepoints,"GC state to be locked");
     int result = pthread_mutex_lock(&gc_state.lock);
     gc_assert(!result);
     if (gc_state.master) {
@@ -158,7 +158,7 @@ gc_state_lock()
             pthread_cond_init(&gc_state.phase_cond[i],NULL);
         gc_state.initialized = 1;
     }
-    odxprint(safepoints,"GC state [%p] locked in phase %d",gc_state.lock, gc_state.phase);
+    odxprint(safepoints,"GC state locked in phase %d", gc_state.phase);
 }
 
 void
