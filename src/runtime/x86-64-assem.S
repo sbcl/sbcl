@@ -39,8 +39,10 @@
 
 #ifdef POSITION_INDEPENDENT_ASM
 #define PIC_CALL(x) x@PLT
+#define PIC_VAR(x) x(%rip)
 #else
 #define PIC_CALL(x) x
+#define PIC_VAR(x) x
 #endif
 
 /* Get the right type of alignment. Linux, FreeBSD and OpenBSD
@@ -67,6 +69,7 @@
 #if !defined(LISP_FEATURE_WIN32) && !defined(LISP_FEATURE_DARWIN)
 #define TYPE(name) .type name,@function
 #define SIZE(name) .size name,.-name
+#define DOLLAR(name) $(name)
 #else
 #define TYPE(name)
 #define SIZE(name)
@@ -86,6 +89,17 @@
 #define TRAP .byte 0xCE /* due to illegality, assembler won't emit "into" */
 #else
 #define TRAP int3
+#endif
+
+/*
+ * More Apple assembler hacks
+ */
+
+#if defined(LISP_FEATURE_DARWIN)
+/* global symbol x86-64 sym(%rip) hack:*/
+#define GSYM(name) name(%rip)
+#else
+#define GSYM(name) $name
 #endif
 
         
@@ -108,8 +122,11 @@ GNAME(call_into_lisp_first_time):
         movq	__msan_param_tls@GOTTPOFF(%rip), %rax
         movq	%rax, (SYMBOL_VALUE_OFFSET+MSAN_PARAM_TLS)
 #endif
-	mov	GNAME(all_threads)@GOTPCREL(%rip), %rax
-	mov	(%rax), %rax
+#if defined(LISP_FEATURE_DARWIN)
+	movq    GSYM(GNAME(all_threads)),%rax
+#else
+        movq    PIC_VAR(GNAME(all_threads)),%rax
+#endif
 	mov     THREAD_CONTROL_STACK_END_OFFSET(%rax) ,%rsp
 	jmp     Lstack
 
@@ -165,8 +182,11 @@ Lstack:
 	movq	%fs:0, %rax
 	movq	GNAME(current_thread)@TPOFF(%rax), %r12
 #else
-	mov	GNAME(specials)@GOTPCREL(%rip),%rdi
-	mov	(%rdi), %rdi
+#ifdef LISP_FEATURE_DARWIN
+	mov	GSYM(GNAME(specials)),%rdi
+#else
+	mov	PIC_VAR(specials),%rdi
+#endif
 	call    PIC_CALL(GNAME(pthread_getspecific))
 	mov	%rax,%r12
 #endif
@@ -371,8 +391,11 @@ GNAME(arch_scrub_control_stack):
 	 * guard page upper bound in R8, and our hard guard
 	 * page upper bound in R9. */
 	lea	-8(%rsp), %rax
-	mov	GNAME(os_vm_page_size)@GOTPCREL(%rip), %r9
-	mov	(%r9), %r9
+#ifdef LISP_FEATURE_DARWIN
+	mov	GSYM(GNAME(os_vm_page_size)),%r9
+#else
+	mov	PIC_VAR(os_vm_page_size),%r9
+#endif
 	lea	(%rsi,%r9), %r8
 	lea	(%rdx,%r9), %r9
 
