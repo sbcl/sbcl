@@ -46,6 +46,16 @@
 #include "interrupt.h"
 #include "lispregs.h"
 
+const char* gc_phase_names[GC_NPHASES] = {
+    "GC_NONE",
+    "GC_FLIGHT",
+    "GC_MESSAGE",
+    "GC_INVOKED",
+    "GC_QUIET",
+    "GC_SETTLED",
+    "GC_COLLECT"
+};
+
 #if !defined(LISP_FEATURE_WIN32)
 /* win32-os.c covers these, but there is no unixlike-os.c, so the normal
  * definition goes here.  Fixme: (Why) don't these work for Windows?
@@ -146,8 +156,9 @@ gc_state_lock()
     int result = pthread_mutex_lock(&gc_state.lock);
     gc_assert(!result);
     if (gc_state.master) {
-        fprintf(stderr,"GC state lock glitch [%p] in thread %p phase %d\n",
-                gc_state.master,arch_os_get_current_thread(),gc_state.phase);
+        fprintf(stderr,"GC state lock glitch [%p] in thread %p phase %d (%s)\n",
+                gc_state.master,arch_os_get_current_thread(),gc_state.phase,
+                gc_phase_names[gc_state.phase]);
         odxprint(safepoints,"GC state lock glitch [%p]",gc_state.master);
     }
     gc_assert(!gc_state.master);
@@ -158,13 +169,15 @@ gc_state_lock()
             pthread_cond_init(&gc_state.phase_cond[i],NULL);
         gc_state.initialized = 1;
     }
-    odxprint(safepoints,"GC state locked in phase %d", gc_state.phase);
+    odxprint(safepoints,"GC state locked in phase %d (%s)",
+             gc_state.phase, gc_phase_names[gc_state.phase]);
 }
 
 void
 gc_state_unlock()
 {
-    odxprint(safepoints,"GC state to be unlocked in phase %d",gc_state.phase);
+    odxprint(safepoints,"GC state to be unlocked in phase %d (%s)",
+             gc_state.phase, gc_phase_names[gc_state.phase]);
     gc_assert(arch_os_get_current_thread()==gc_state.master);
     gc_state.master = NULL;
     int result = pthread_mutex_unlock(&gc_state.lock);
@@ -176,8 +189,10 @@ void
 gc_state_wait(gc_phase_t phase)
 {
     struct thread* self = arch_os_get_current_thread();
-    odxprint(safepoints,"Waiting for %d -> %d [%d holders]",
-             gc_state.phase,phase,gc_state.phase_wait[gc_state.phase]);
+    odxprint(safepoints,"Waiting for %d (%s) -> %d (%s) [%d holders]",
+             gc_state.phase, gc_phase_names[gc_state.phase],
+             phase, gc_phase_names[phase],
+             gc_state.phase_wait[gc_state.phase]);
     gc_assert(gc_state.master == self);
     gc_state.master = NULL;
     while(gc_state.phase != phase && !(phase == GC_QUIET && (gc_state.phase > GC_QUIET)))
@@ -317,7 +332,8 @@ static inline void gc_done()
 
 static inline void gc_handle_phase()
 {
-    odxprint(safepoints,"Entering phase %d",gc_state.phase);
+    odxprint(safepoints,"Entering phase %d (%s)",
+             gc_state.phase, gc_phase_names[gc_state.phase]);
     switch (gc_state.phase) {
     case GC_FLIGHT:
         unmap_gc_page();
@@ -349,7 +365,9 @@ static inline void gc_handle_phase()
  * can be GC_NONE, it means this thread wouldn't block GC_NONE, but still wait
  * for it. */
 static inline void gc_advance(gc_phase_t cur, gc_phase_t old) {
-    odxprint(safepoints,"GC advance request %d -> %d in phase %d",old,cur,gc_state.phase);
+    odxprint(safepoints,"GC advance request %d (%s) -> %d (%s) in phase %d (%s)",
+             old, gc_phase_names[old], cur, gc_phase_names[cur],
+             gc_state.phase, gc_phase_names[gc_state.phase]);
     if (cur == old)
         return;
     if (cur == gc_state.phase)
@@ -358,17 +376,17 @@ static inline void gc_advance(gc_phase_t cur, gc_phase_t old) {
         old = GC_NONE;
     if (old != GC_NONE) {
         gc_state.phase_wait[old]--;
-        odxprint(safepoints,"%d holders of phase %d without me",gc_state.phase_wait[old],old);
+        odxprint(safepoints,"%d holders of phase %d (%s) without me",gc_state.phase_wait[old],old,gc_phase_names[old]);
     }
     if (cur != GC_NONE) {
         gc_state.phase_wait[cur]++;
-        odxprint(safepoints,"%d holders of phase %d with me",gc_state.phase_wait[cur],cur);
+        odxprint(safepoints,"%d holders of phase %d (%s) with me",gc_state.phase_wait[cur],cur,gc_phase_names[cur]);
     }
     /* roll forth as long as there's no waiters */
     while (gc_state.phase_wait[gc_state.phase]==0
            && gc_state.phase != cur) {
         gc_state.phase = gc_phase_next(gc_state.phase);
-        odxprint(safepoints,"no blockers, direct advance to %d",gc_state.phase);
+        odxprint(safepoints,"no blockers, direct advance to %d (%s)",gc_state.phase,gc_phase_names[gc_state.phase]);
         gc_handle_phase();
         pthread_cond_broadcast(&gc_state.phase_cond[gc_state.phase]);
     }
