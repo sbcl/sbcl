@@ -490,6 +490,14 @@ attach_os_thread(init_thread_data *scribble)
 
     struct thread *th = create_thread_struct(NIL);
     block_deferrable_signals(&scribble->oldset);
+
+#ifndef LISP_FEATURE_SB_SAFEPOINT
+    /* initial-thread-function-trampoline doesn't like when the GC signal is blocked */
+    /* FIXME: could be done using a single call to pthread_sigmask
+       together with locking the deferrable signals above. */
+    unblock_gc_signals(0, 0);
+#endif
+
     th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
     /* We don't actually want a pthread_attr here, but rather than add
      * `if's to the post-mostem, let's just keep that code happy by
