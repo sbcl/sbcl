@@ -174,15 +174,17 @@
 #!+(and sb-safepoint-strictly (not win32))
 (defun signal-handler-callback (run-handler signal args)
   ;; SAPs are dx allocated, close over the values, not the SAPs.
-  (let ((info (sap-ref-sap args 0))
+  (let ((thread (without-gcing
+                  ;; Hold off GCing until *current-thread* is set up
+                  (setf *current-thread*
+                        (sb!thread::make-signal-handling-thread :name "signal handler"
+                                                                :signal-number signal))))
+        (info (sap-ref-sap args 0))
         (context (sap-ref-sap args sb!vm:n-word-bytes)))
-    (sb!thread::initial-thread-function-trampoline
-     (sb!thread::make-signal-handling-thread :name "signal handler"
-                                             :signal-number signal)
-     nil (lambda ()
-           (funcall run-handler signal info context))
-     nil
-     nil nil nil nil)))
+    (dx-flet ((callback ()
+                (funcall run-handler signal info context)))
+      (sb!thread::initial-thread-function-trampoline thread nil
+                                                     #'callback nil))))
 
 
 ;;;; default LISP signal handlers

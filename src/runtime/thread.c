@@ -540,16 +540,6 @@ attach_os_thread(init_thread_data *scribble)
 
     init_new_thread(th, scribble, 0);
 
-    /* We will be calling into Lisp soon, and the functions being called
-     * recklessly ignore the comment in target-thread which says that we
-     * must be careful to not cause GC while initializing a new thread.
-     * Since we first need to create a fresh thread object, it's really
-     * tempting to just perform such unsafe allocation though.  So let's
-     * at least try to suppress GC before consing, and hope that it
-     * works: */
-    // Just stomp on the value already set by create_thread_struct()
-    write_TLS(GC_INHIBIT, T, th);
-
     uword_t stacksize
         = (uword_t) th->control_stack_end - (uword_t) th->control_stack_start;
     odxprint(misc, "attach_os_thread: attached %p as %p (0x%lx bytes stack)",

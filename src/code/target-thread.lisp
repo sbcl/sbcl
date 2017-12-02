@@ -1415,80 +1415,72 @@ session."
 ;;;; The beef
 
 #!+sb-thread
-(defun initial-thread-function-trampoline
-    (thread setup-sem real-function thread-list arguments arg1 arg2 arg3)
-  ;; As it is, this lambda must not cons until we are ready to run
-  ;; GC. Be very careful.
-  (let ()
-    (setq *current-thread* thread) ; is thread-local already
-    ;; *ALLOC-SIGNAL* is made thread-local by create_thread_struct()
-    ;; so this assigns into TLS, not the global value.
-    (setf sb!vm:*alloc-signal* *default-alloc-signal*)
-    (setf (thread-os-thread thread) (current-thread-os-thread))
-    (with-mutex ((thread-result-lock thread))
-      ;; Normally the list is allocated in the parent thread to
-      ;; avoid consing in a nascent thread.
+(defun initial-thread-function-trampoline (thread setup-sem real-function arguments)
+  ;; Can't initiate GC before *current-thread* is set, otherwise the
+  ;; locks grabbed by SUB-GC wouldn't function.
+  ;; Other threads can GC with impunity.
+  (setf *current-thread* thread ; is thread-local already
+        (thread-os-thread thread) (current-thread-os-thread))
+  ;; *ALLOC-SIGNAL* is made thread-local by create_thread_struct()
+  ;; so this assigns into TLS, not the global value.
+  (setf sb!vm:*alloc-signal* *default-alloc-signal*)
+  (with-mutex ((thread-result-lock thread))
+    (let* ((thread-list (list thread thread))
+           (session-cons (cdr thread-list)))
+      (with-all-threads-lock
+        (setf (cdr thread-list) *all-threads*
+              *all-threads* thread-list))
+      (let ((session *session*))
+        (with-session-lock (session)
+          (setf (cdr session-cons) (session-threads session)
+                (session-threads session) session-cons))))
+    (setf (thread-%alive-p thread) t)
 
-      (let* ((thread-list (or thread-list
-                              (list thread thread)))
-             (session-cons (cdr thread-list)))
-        (with-all-threads-lock
-          (setf (cdr thread-list) *all-threads*
-                *all-threads* thread-list))
-        (let ((session *session*))
-          (with-session-lock (session)
-            (setf (cdr session-cons) (session-threads session)
-                  (session-threads session) session-cons))))
-      (setf (thread-%alive-p thread) t)
+    (when setup-sem
+      (signal-semaphore setup-sem)
+      ;; setup-sem was dx-allocated, set it to NIL so that the
+      ;; backtrace doesn't get confused
+      (setf setup-sem nil))
 
-      (when setup-sem
-        (signal-semaphore setup-sem)
-        ;; setup-sem was dx-allocated, set it to NIL so that the
-        ;; backtrace doesn't get confused
-        (setf setup-sem nil))
-
-      ;; Using handling-end-of-the-world would be a bit tricky
-      ;; due to other catches and interrupts, so we essentially
-      ;; re-implement it here. Once and only once more.
-      (catch 'sb!impl::toplevel-catcher
-        (catch 'sb!impl::%end-of-the-world
-          (catch '%abort-thread
-            (restart-bind ((abort
-                             (lambda ()
-                               (throw '%abort-thread nil))
-                             :report-function
-                             (lambda (stream)
-                               (format stream "~@<abort thread (~a)~@:>"
-                                       *current-thread*))))
-              (without-interrupts
-                (unwind-protect
-                     (with-local-interrupts
-                       (setf *gc-inhibit* nil) ;for foreign callbacks
-                       (sb!unix::unblock-deferrable-signals)
-                       (setf (thread-result thread)
-                             (prog1
-                                 (multiple-value-list
-                                  (unwind-protect
-                                       (catch '%return-from-thread
-                                         (if (listp arguments)
-                                             (apply real-function arguments)
-                                             (funcall real-function arg1 arg2 arg3)))
-                                    (when *exit-in-process*
-                                      (sb!impl::call-exit-hooks))))
-                               #!+sb-safepoint
-                               (sb!kernel::gc-safepoint))))
-                  ;; we're going down, can't handle interrupts
-                  ;; sanely anymore. gc remains enabled.
-                  (block-deferrable-signals)
-                  ;; we don't want to run interrupts in a dead
-                  ;; thread when we leave without-interrupts.
-                  ;; this potentially causes important
-                  ;; interupts to be lost: sigint comes to
-                  ;; mind.
-                  (setq *interrupt-pending* nil)
-                  #!+sb-thruption
-                  (setq *thruption-pending* nil)
-                  (handle-thread-exit thread)))))))))
+    ;; Using handling-end-of-the-world would be a bit tricky
+    ;; due to other catches and interrupts, so we essentially
+    ;; re-implement it here. Once and only once more.
+    (catch 'sb!impl::toplevel-catcher
+      (catch 'sb!impl::%end-of-the-world
+        (catch '%abort-thread
+          (restart-bind ((abort
+                           (lambda ()
+                             (throw '%abort-thread nil))
+                           :report-function
+                           (lambda (stream)
+                             (format stream "~@<abort thread (~a)~@:>"
+                                     *current-thread*))))
+            (without-interrupts
+              (unwind-protect
+                   (with-local-interrupts
+                     (sb!unix::unblock-deferrable-signals)
+                     (setf (thread-result thread)
+                           (prog1
+                               (multiple-value-list
+                                (unwind-protect
+                                     (catch '%return-from-thread
+                                       (apply real-function arguments))
+                                  (when *exit-in-process*
+                                    (sb!impl::call-exit-hooks))))
+                             #!+sb-safepoint
+                             (sb!kernel::gc-safepoint))))
+                ;; we're going down, can't handle interrupts
+                ;; sanely anymore. gc remains enabled.
+                (block-deferrable-signals)
+                ;; we don't want to run interrupts in a dead
+                ;; thread when we leave without-interrupts.
+                ;; this potentially causes important
+                ;; interupts to be lost: sigint comes to
+                ;; mind.
+                (setq *interrupt-pending* nil)
+                #!+sb-thruption
+                (setq *thruption-pending* nil)
+                (handle-thread-exit thread))))))))
   (values))
 
 (defun make-thread (function &key name arguments ephemeral)
@@ -1518,26 +1510,23 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
            (arguments     (ensure-list arguments))
            #!+(or win32 darwin)
            (fp-modes (dpb 0 sb!vm::float-sticky-bits ;; clear accrued bits
-                          (sb!vm:floating-point-modes)))
-           ;; Allocate in the parent
-           (thread-list (list thread thread)))
+                          (sb!vm:floating-point-modes))))
       (declare (dynamic-extent setup-sem))
       (dx-flet ((initial-thread-function ()
                   ;; Inherit parent thread's FP modes
                   #!+(or win32 darwin)
                   (setf (sb!vm:floating-point-modes) fp-modes)
                   ;; As it is, this lambda must not cons until we are
-                  ;; ready to run GC. Be very careful.
-                  (initial-thread-function-trampoline
-                   thread setup-sem real-function thread-list
-                   arguments nil nil nil)))
-        ;; If the starting thread is stopped for gc before it signals
-        ;; the semaphore then we'd be stuck.
+                  ;; ready to run GC. Be careful.
+                  (initial-thread-function-trampoline thread setup-sem
+                                                      real-function arguments)))
+        ;; Holding mutexes or waiting on sempahores inside WITHOUT-GCING will lock up
         (assert (not *gc-inhibit*))
         ;; Keep INITIAL-FUNCTION in the dynamic extent until the child
         ;; thread is initialized properly. Wrap the whole thing in
-        ;; WITHOUT-INTERRUPTS because we pass INITIAL-FUNCTION to
-        ;; another thread.
+        ;; WITHOUT-INTERRUPTS (via WITH-SYSTEM-MUTEX) because we pass
+        ;; INITIAL-FUNCTION to another thread.
+        ;; (Does WITHOUT-INTERRUPTS really matter now that it's DXed?)
         (with-system-mutex (*make-thread-lock*)
           (if (zerop
                (%create-thread (get-lisp-obj-address #'initial-thread-function)))
@@ -1603,10 +1592,14 @@ subject to change."
           (function destroy-thread :replacement terminate-thread)))
 
 #!+sb-thread
-(defun enter-foreign-callback (arg1 arg2 arg3)
-  (initial-thread-function-trampoline
-   (make-foreign-thread :name "foreign callback")
-   nil #'sb!alien::enter-alien-callback nil t arg1 arg2 arg3))
+(defun enter-foreign-callback (index return arguments)
+  (let ((thread (without-gcing
+                  ;; Hold off GCing until *current-thread* is set up
+                  (setf *current-thread*
+                        (make-foreign-thread :name "foreign callback")))))
+    (dx-flet ((enter ()
+                (sb!alien::enter-alien-callback index return arguments)))
+      (initial-thread-function-trampoline thread nil #'enter nil))))
 
 (defmacro with-interruptions-lock ((thread) &body body)
   `(with-system-mutex ((thread-interruptions-lock ,thread))
