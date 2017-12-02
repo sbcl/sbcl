@@ -318,8 +318,8 @@ GNAME(fun_end_breakpoint_guts):
 	mov	%rsp,%rbx	# Setup ebx - the ofp.
 	sub	$8,%rsp		# Allocate one stack slot for the return value
 	mov	$(1 << N_FIXNUM_TAG_BITS),%rcx		# Setup ecx for one return value.
-	mov	GSYM(NIL),%rdi	# default second value
-	mov	GSYM(NIL),%rsi	# default third value
+	mov	$(NIL),%rdi	# default second value
+	mov	$(NIL),%rsi	# default third value
 multiple_value_return:
 	
 	.globl  GNAME(fun_end_breakpoint_trap)
