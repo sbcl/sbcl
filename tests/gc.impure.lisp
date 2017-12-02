@@ -175,6 +175,7 @@
          (total-code-size 0))
     (sb-vm::map-allocated-objects
      (lambda (obj type size)
+       (declare ((and fixnum (integer 1)) size))
        ;; M-A-O disables GC, therefore GET-LISP-OBJ-ADDRESS is safe
        (let ((obj-addr (sb-kernel:get-lisp-obj-address obj))
              (array (cond ((= type sb-vm:code-header-widetag)
@@ -186,8 +187,9 @@
          ;; but the simplest and clearest for sure. (The loop could avoided
          ;; if the current page is the same as the previously seen page)
          (loop for index from (sb-vm::find-page-index obj-addr)
-               to (sb-vm::find-page-index (+ (logandc2 obj-addr sb-vm:lowtag-mask)
-                                             (1- size)))
+               to (sb-vm::find-page-index (truly-the word
+                                                     (+ (logandc2 obj-addr sb-vm:lowtag-mask)
+                                                        (1- size))))
                do (setf (sbit array index) 1))))
      :dynamic)
     (assert (not (find 1 (bit-and code-bits data-bits))))

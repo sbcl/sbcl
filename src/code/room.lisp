@@ -321,7 +321,7 @@
     (define-alien-variable "fixedobj_pages" (* (struct immobile-page))))
   (declaim (inline find-page-index))
   (define-alien-routine ("ext_find_page_index" find-page-index)
-    long (index signed))
+    long (index unsigned))
   (define-alien-variable "last_free_page" sb-kernel::page-index-t)
   (define-alien-variable "page_table" (* (struct page))))
 
