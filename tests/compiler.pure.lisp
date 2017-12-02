@@ -4916,7 +4916,9 @@
 ;; correctly.
 ;;
 ;; When it fails, this test lands into ldb.
-(with-test (:name :no-overflow-during-allocation)
+(with-test (:name :no-overflow-during-allocation
+            ;; it's reported as FLOATING-POINT-INVALID-OPERATION
+            :fails-on :win32) 
   (handler-case (eval '(cosh 90))
     (floating-point-overflow ()
       t)))
