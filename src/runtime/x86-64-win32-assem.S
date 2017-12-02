@@ -39,8 +39,10 @@
 
 #ifdef POSITION_INDEPENDENT_ASM
 #define PIC_CALL(x) x@PLT
+#define PIC_VAR(x) x(%rip)
 #else
 #define PIC_CALL(x) x
+#define PIC_VAR(x) x
 #endif
 
 /* Get the right type of alignment. Linux, FreeBSD and OpenBSD
@@ -67,6 +69,7 @@
 #if !defined(LISP_FEATURE_WIN32) && !defined(LISP_FEATURE_DARWIN)
 #define TYPE(name) .type name,@function
 #define SIZE(name) .size name,.-name
+#define DOLLAR(name) $(name)
 #else
 #define TYPE(name)
 #define SIZE(name)
@@ -88,6 +91,20 @@
 #define TRAP int3
 #endif
 
+/*
+ * More Apple assembler hacks
+ */
+
+#if defined(LISP_FEATURE_DARWIN)
+/* global symbol x86-64 sym(%rip) hack:*/
+#define GSYM(name) name(%rip)
+#else
+#define GSYM(name) $name
+#endif
+
+        
+	.text
+        .globl  GNAME(all_threads)
         
 	.text	
 	.globl  GNAME(call_into_lisp_first_time)
@@ -105,8 +122,11 @@ GNAME(call_into_lisp_first_time):
         movq	__msan_param_tls@GOTTPOFF(%rip), %rax
         movq	%rax, (SYMBOL_VALUE_OFFSET+MSAN_PARAM_TLS)
 #endif
-	mov	GNAME(all_threads)@GOTPCREL(%rip), %rax
-	mov	(%rax), %rax
+#if defined(LISP_FEATURE_DARWIN)
+	movq    GSYM(GNAME(all_threads)),%rax
+#else
+        movq    PIC_VAR(GNAME(all_threads)),%rax
+#endif
 	mov     THREAD_CONTROL_STACK_END_OFFSET(%rax) ,%rsp
 	jmp     Lstack
 
@@ -143,7 +163,10 @@ Lstack:
 	push	%r13    # the lisp function returns
 	push	%r14    #
 	push	%r15    #
-	push	%rsp	# Save entry stack on (maybe) new stack.
+
+	mov	%rsp,%rbx	# remember current stack
+	push	%rbx		# Save entry stack on (maybe) new stack.
+
 	push	%rdi	# args from C
 	push	%rsi	#
 	push	%rdx	#
@@ -156,11 +179,14 @@ Lstack:
 	mov	%rax,(%rbp)
 # endif
 #ifdef LISP_FEATURE_GCC_TLS
-	movq	GNAME(current_thread)@GOTTPOFF(%rip), %r12
-	movq	%fs:(%r12), %r12
+	movq	%fs:0, %rax
+	movq	GNAME(current_thread)@TPOFF(%rax), %r12
 #else
-	mov	GNAME(specials)@GOTPCREL(%rip),%rdi
-	mov	(%rdi), %rdi
+#ifdef LISP_FEATURE_DARWIN
+	mov	GSYM(GNAME(specials)),%rdi
+#else
+	mov	PIC_VAR(specials),%rdi
+#endif
 	call    PIC_CALL(GNAME(pthread_getspecific))
 	mov	%rax,%r12
 #endif
@@ -169,20 +195,22 @@ Lstack:
 	pop	%rbx	# arg vector
 	pop	%rax	# function ptr/lexenv
 
-	# Why do we care what goes in unused argument-passing regs?
-	# These just seem like wasted instructions.
 	xor	%rdx,%rdx	# clear any descriptor registers 
 	xor	%rdi,%rdi	# that we can't be sure we'll 
 	xor	%rsi,%rsi	# initialise properly.  XX do r8-r15 too?
-	cmp	$2,%rcx
-	je	Ltwo
+	cmp	$0,%rcx
+        # It's tempting to think 'cmov' for these assignments, but don't:
+        # cmov does a memory cycle whether or not it moves, succumbing to
+        # a classic buffer overrun bug if argv[] is "badly" placed.
+	je	Ldone
+	mov	0(%rbx),%rdx	# arg0
 	cmp	$1,%rcx
-	je	Lone
-	jl	Lzero
+	je	Ldone
+	mov	8(%rbx),%rdi	# arg1
+	cmp	$2,%rcx
+	je	Ldone
 	mov	16(%rbx),%rsi	# arg2
-Ltwo:	mov	8(%rbx),%rdi	# arg1
-Lone:	mov	0(%rbx),%rdx	# arg0
-Lzero:
+Ldone:
 	shl	$(N_FIXNUM_TAG_BITS),%rcx	# (fixnumize num-args)
 	/* Registers rax, rcx, rdx, rdi, and rsi are now live. */
 	xor	%rbx,%rbx	# available
@@ -363,8 +391,11 @@ GNAME(arch_scrub_control_stack):
 	 * guard page upper bound in R8, and our hard guard
 	 * page upper bound in R9. */
 	lea	-8(%rsp), %rax
-	mov	GNAME(os_vm_page_size)@GOTPCREL(%rip), %r9
-	mov	(%r9), %r9
+#ifdef LISP_FEATURE_DARWIN
+	mov	GSYM(GNAME(os_vm_page_size)),%r9
+#else
+	mov	PIC_VAR(os_vm_page_size),%r9
+#endif
 	lea	(%rsi,%r9), %r8
 	lea	(%rdx,%r9), %r9
 
