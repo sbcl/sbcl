@@ -176,7 +176,8 @@ arbitrary printable objects, and need not be unique.")
                         (typecase thing
                           (cons
                            (list "waiting on:" (cdr thing)
-                                 "timeout: " (car thing)))
+                                 "timeout: " (sb!impl::timeout-to-seconds
+                                              (car thing))))
                           (null
                            (list info))
                           (t
@@ -407,9 +408,7 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
     `(let* ((,n-thread ,thread)
             (,n-lock ,lock)
             (,n-timeout ,(when timeoutp
-                           `(or ,timeout
-                                (when sb!impl::*deadline*
-                                  sb!impl::*deadline-seconds*))))
+                           `(or ,timeout sb!impl::*deadline*)))
             (,new (if ,n-timeout
                       ;; Using CONS tells the rest of the system there's a
                       ;; timeout in place, so it isn't considered a deadlock.

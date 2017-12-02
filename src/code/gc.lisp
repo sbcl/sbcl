@@ -223,7 +223,6 @@ statistics are appended to it."
              (sb!thread::without-thread-waiting-for
                  (:already-without-interrupts t)
                (let ((sb!impl::*deadline* nil)
-                     (sb!impl::*deadline-seconds* nil)
                      (epoch *gc-epoch*))
                  (loop
                   ;; GCing must be done without-gcing to avoid

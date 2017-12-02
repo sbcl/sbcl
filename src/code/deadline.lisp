@@ -16,14 +16,13 @@
 (declaim (type (or internal-time null) *deadline*))
 (!define-thread-local *deadline* nil)
 
-;;; The relative number of seconds the current deadline corresponds
-;;; to. Used for continuing from TIMEOUT conditions.
-(!define-thread-local *deadline-seconds* nil)
-
 (declaim (inline seconds-to-internal-time))
 (defun seconds-to-internal-time (seconds)
   (the internal-time
        (values (truncate (* seconds sb!xc:internal-time-units-per-second)))))
+
+(defun timeout-to-seconds (internal-time)
+  (* internal-time sb!xc:internal-time-units-per-second))
 
 (defmacro with-deadline ((&key seconds override)
                          &body body)
@@ -50,15 +49,14 @@ Experimental."
             (,deadline
               (when ,deadline-seconds
                 (+ (seconds-to-internal-time ,deadline-seconds)
-                   (get-internal-real-time)))))
-       (multiple-value-bind (*deadline* *deadline-seconds*)
-           (if ,override
-               (values ,deadline ,deadline-seconds)
-               (let ((old *deadline*))
-                 (if (and old (or (not ,deadline) (< old ,deadline)))
-                     (values old *deadline-seconds*)
-                     (values ,deadline ,deadline-seconds))))
-         ,@body))))
+                   (get-internal-real-time))))
+            (*deadline* (if ,override
+                            ,deadline
+                            (let ((old *deadline*))
+                              (if (and old (or (not ,deadline) (< old ,deadline)))
+                                  old
+                                  ,deadline)))))
+       ,@body)))
 
 (declaim (inline decode-internal-time))
 (defun decode-internal-time (time)
@@ -84,25 +82,27 @@ restart with it. Implementors of blocking functions are responsible
 for calling this when a deadline is reached."
   ;; Make sure we don't signal the same deadline twice. LET is not good
   ;; enough: we might catch the same deadline again while unwinding.
-  (when *deadline*
-    (setf *deadline* nil))
-  (with-interrupts
-    (restart-case
-        (error 'deadline-timeout :seconds *deadline-seconds*)
-      (defer-deadline (&optional (seconds *deadline-seconds*))
-        :report "Defer the deadline for SECONDS more."
-        :interactive (lambda ()
-                       (sb!int:read-evaluated-form
-                        "By how many seconds shall the deadline ~
-                         be deferred?: "))
-        (let* ((new-deadline-seconds (coerce seconds 'single-float))
-               (new-deadline (+ (seconds-to-internal-time new-deadline-seconds)
-                                (get-internal-real-time))))
-          (setf *deadline* new-deadline
-                *deadline-seconds* new-deadline-seconds)))
-      (cancel-deadline ()
-        :report "Cancel the deadline and continue."
-        (setf *deadline* nil *deadline-seconds* nil))))
+  (let ((deadline *deadline*))
+    (when deadline
+      (setf *deadline* nil))
+    (with-interrupts
+      (let ((seconds (when deadline
+                       (timeout-to-seconds deadline))))
+        (restart-case
+            (error 'deadline-timeout :seconds seconds)
+          (defer-deadline (&optional (seconds seconds))
+            :report "Defer the deadline for SECONDS more."
+            :interactive (lambda ()
+                           (sb!int:read-evaluated-form
+                            "By how many seconds shall the deadline ~
+                             be deferred?: "))
+            (let* ((new-deadline-seconds (coerce seconds 'single-float))
+                   (new-deadline (+ (seconds-to-internal-time new-deadline-seconds)
+                                    (get-internal-real-time))))
+              (setf *deadline* new-deadline)))
+          (cancel-deadline ()
+            :report "Cancel the deadline and continue."
+            (setf *deadline* nil))))))
   nil)
 
 (defun defer-deadline (seconds &optional condition)
