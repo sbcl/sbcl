@@ -15,6 +15,26 @@
   (sb-ext:run-program "sleep" (list (format nil "~D" seconds))
                       :search t :wait t))
 
+(with-test (:name (sb-sys:decode-timeout :large-values :lp-1727789))
+  (flet ((test (seconds)
+           (assert (not (sb-sys:decode-timeout seconds)))))
+    (test (1+ most-positive-fixnum))
+    (test (1+ sb-kernel:internal-seconds-limit))
+    (test (float (1+ sb-kernel:internal-seconds-limit) 1.0f0))
+    (test (float (1+ sb-kernel:internal-seconds-limit) 1.0d0))))
+
+(with-test (:name (sb-sys:with-deadline :large-values :lp-1727789))
+  (flet ((test (seconds)
+           (let ((sem (sb-thread:make-semaphore :count 0)))
+             (assert-timeout
+              (sb-sys:with-deadline (:seconds seconds)
+                (sb-sys:with-deadline (:seconds 0)
+                  (sb-thread:wait-on-semaphore sem)))))))
+    (test (1+ most-positive-fixnum))
+    (test (1+ sb-kernel:internal-seconds-limit))
+    (test (float (1+ sb-kernel:internal-seconds-limit) 1.0f0))
+    (test (float (1+ sb-kernel:internal-seconds-limit) 1.0d0))))
+
 (with-test (:name (:deadline sb-ext:run-program :trivial) :fails-on :win32)
   (assert-timeout (sb-sys:with-deadline (:seconds 1)
                     (run-sleep 3))))

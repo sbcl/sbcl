@@ -1,5 +1,10 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-1.4.2:
+  * bug fix: DECODE-TIMEOUT and operators accepting a timeout no longer signal
+    an error when called with an argument that is of type (real 0) but not
+    (unsigned-byte 62) (lp#1727789)
+
 changes in sbcl-1.4.2 relative to sbcl-1.4.1:
   * minor incompatible change: SB-EXT:QUIT is no longer marked as deprecated
     and behaves like SB-EXT:EXIT.
