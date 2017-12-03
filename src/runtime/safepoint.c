@@ -201,6 +201,12 @@ gc_state_wait(gc_phase_t phase)
     gc_state.master = self;
 }
 
+int
+gc_cycle_active(void)
+{
+    return gc_state.phase != GC_NONE;
+}
+
 static void
 set_csp_from_context(struct thread *self, os_context_t *ctx)
 {

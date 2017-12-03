@@ -69,6 +69,7 @@ void map_gc_page();
 void unmap_gc_page();
 void gc_state_lock();
 void gc_state_wait(gc_phase_t);
+int gc_cycle_active(void);
 void gc_state_unlock();
 
 #endif

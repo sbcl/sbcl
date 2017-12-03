@@ -622,6 +622,19 @@ check_interrupt_context_or_lose(os_context_t *context)
     int gc_pending = (read_TLS(GC_PENDING,thread) == T);
     int pseudo_atomic_interrupted = get_pseudo_atomic_interrupted(thread);
     int in_race_p = in_leaving_without_gcing_race_p(thread);
+    int safepoint_active = 0;
+#if defined(LISP_FEATURE_SB_SAFEPOINT)
+    /* Don't try to take the gc state lock if there's a chance that
+     * we're already holding it (thread_register_gc_trigger() is
+     * called from PA, gc_stop_the_world() and gc_start_the_world()
+     * are called from WITHOUT-GCING, all other takers of the lock
+     * have deferrables blocked). */
+    if (!(interrupt_pending || pseudo_atomic_interrupted || gc_inhibit)) {
+        gc_state_lock();
+        safepoint_active = gc_cycle_active();
+        gc_state_unlock();
+    }
+#endif
     /* In the time window between leaving the *INTERRUPTS-ENABLED* NIL
      * section and trapping, a SIG_STOP_FOR_GC would see the next
      * check fail, for this reason sig_stop_for_gc handler does not
@@ -631,14 +644,14 @@ check_interrupt_context_or_lose(os_context_t *context)
             lose("Stray deferred interrupt.\n");
     }
     if (gc_pending)
-        if (!(pseudo_atomic_interrupted || gc_inhibit || in_race_p))
+        if (!(pseudo_atomic_interrupted || gc_inhibit || in_race_p || safepoint_active))
             lose("GC_PENDING, but why?\n");
 #if defined(LISP_FEATURE_SB_THREAD)
     {
         int stop_for_gc_pending =
             (read_TLS(STOP_FOR_GC_PENDING,thread) != NIL);
         if (stop_for_gc_pending)
-            if (!(pseudo_atomic_interrupted || gc_inhibit || in_race_p))
+            if (!(pseudo_atomic_interrupted || gc_inhibit || in_race_p || safepoint_active))
                 lose("STOP_FOR_GC_PENDING, but why?\n");
         if (pseudo_atomic_interrupted)
             if (!(gc_pending || stop_for_gc_pending || interrupt_deferred_p))
