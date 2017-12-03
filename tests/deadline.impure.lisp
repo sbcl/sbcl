@@ -18,7 +18,7 @@
 (with-test (:name (sb-sys:decode-timeout :large-values :lp-1727789))
   (flet ((test (seconds)
            (assert (not (sb-sys:decode-timeout seconds)))))
-    (test (1+ most-positive-fixnum))
+    (test (expt 2 64))
     (test (1+ sb-kernel:internal-seconds-limit))
     (test (float (1+ sb-kernel:internal-seconds-limit) 1.0f0))
     (test (float (1+ sb-kernel:internal-seconds-limit) 1.0d0))))
