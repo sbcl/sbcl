@@ -727,7 +727,17 @@ gc_stop_the_world()
     case GC_FLIGHT:
     case GC_MESSAGE:
     case GC_INVOKED:
-        gc_state_wait(GC_QUIET);
+        if ((gc_state.phase == GC_MESSAGE)
+            || (gc_state.phase == GC_INVOKED)) {
+            /* If the phase was GC_MESSAGE or GC_INVOKED, we were
+             * accounted as "in alien", and are on the GC_INVOKED
+             * waitcount, or we were "in lisp" but in WITHOUT-GCING,
+             * which led to us putting OURSELVES on the GC_INVOKED
+             * waitcount. */
+            gc_advance(GC_QUIET, GC_INVOKED);
+        } else {
+            gc_state_wait(GC_QUIET);
+        }
     case GC_QUIET:
         gc_state.phase_wait[GC_QUIET]=1;
         gc_advance(GC_COLLECT,GC_QUIET);
