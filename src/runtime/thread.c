@@ -461,7 +461,7 @@ void* new_thread_trampoline(void* arg)
     int result;
     init_thread_data scribble;
 
-    FSHOW((stderr,"/creating thread %lu\n", thread_self()));
+    FSHOW((stderr,"/creating thread %p\n", thread_self()));
     check_deferrables_blocked_or_lose(0);
 #ifndef LISP_FEATURE_SB_SAFEPOINT
     check_gc_signals_unblocked_or_lose(0);
@@ -475,7 +475,7 @@ void* new_thread_trampoline(void* arg)
 
     schedule_thread_post_mortem(th);
 
-    FSHOW((stderr,"/exiting thread %lu\n", thread_self()));
+    FSHOW((stderr,"/exiting thread %p\n", thread_self()));
     return (void*)(uintptr_t)result;
 }
 
