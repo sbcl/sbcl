@@ -98,6 +98,7 @@
  * anyway */
 	
 	.align	align_16byte,0x90
+	.cfi_startproc
 GNAME(call_into_lisp_first_time):
 	push	%rbp		# Save old frame pointer.
 	mov	%rsp,%rbp	# Establish new frame.
@@ -137,6 +138,8 @@ Lstack:
 	push	%r15
 	mov	%rax,%r15
 #endif
+	.cfi_def_cfa rbp, 16
+	.cfi_offset  rbp, -16
 	/* FIXME x86 saves FPU state here */
 	push	%rbx  	# these regs are callee-saved according to C
 	push	%r12	# so must be preserved and restored when 
@@ -190,6 +193,14 @@ Lzero:
 	/* Alloc new frame. */
 	push	%rbp            # Dummy for return address
 	push	%rbp		# fp in save location S1
+	/* The call convention change from C to Lisp creates a minor backtrace
+	 * glitch if interrupted right before the following mov.  The address to
+	 * which this function returns (saved %rip) won't be addressable by %rbp
+	 * or %rsp. As an attempted fix, we could save the old rbp in rbx, and
+	 * change the CFA register to rbx. That doesn't work, because the next
+	 * frame (Lisp) doesn't specify how to restore rbx. Pushing the return
+	 * address on the new stack could work. But the better thing is to use
+	 * cfa_def_cfa_expression which is more complicated than I'm capable of */
 	mov	%rsp,%rbp	# The current sp marks start of new frame.
 
 Lcall:
@@ -222,6 +233,7 @@ LsingleValue:
 	leave
 #endif
 	ret
+	.cfi_endproc
 	SIZE(GNAME(call_into_lisp))
 
 #ifdef LISP_FEATURE_SB_THREAD
