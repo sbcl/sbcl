@@ -126,23 +126,11 @@ GNAME(call_into_lisp_first_time):
  * return values in rax rdx
  * callee saves rbp rbx r12-15 if it uses them
  */
-#ifdef LISP_FEATURE_WIN32
-# define SUPPORT_FOMIT_FRAME_POINTER
-#endif
 	.align	align_16byte,0x90
 GNAME(call_into_lisp):
-#ifdef SUPPORT_FOMIT_FRAME_POINTER
-	mov	%rbp,%rax
-#endif
 	push	%rbp		# Save old frame pointer.
 	mov	%rsp,%rbp	# Establish new frame.
 Lstack:
-#ifdef SUPPORT_FOMIT_FRAME_POINTER
-	/* If called through call_into_lisp_first_time, %r15 becomes invalid
-	 * here, but we will not return in that case. */
-	push	%r15
-	mov	%rax,%r15
-#endif
 	.cfi_def_cfa rbp, 16
 	.cfi_offset  rbp, -16
 	/* FIXME x86 saves FPU state here */
@@ -156,13 +144,6 @@ Lstack:
 	push	%rsi	#
 	push	%rdx	#
 #ifdef LISP_FEATURE_SB_THREAD
-# ifdef SUPPORT_FOMIT_FRAME_POINTER
-	mov	(%rbp),%rcx
-	sub	$32,%rsp
-	call	GNAME(carry_frame_pointer)
-	add	$32,%rsp
-	mov	%rax,(%rbp)
-# endif
 #ifdef LISP_FEATURE_GCC_TLS
 	movq	GNAME(current_thread)@GOTTPOFF(%rip), %r12
 	movq	%fs:(%r12), %r12
@@ -229,13 +210,8 @@ LsingleValue:
 /* FIXME Restore the NPX state. */
 
 	mov	%rdx,%rax	# c-val
-#ifdef SUPPORT_FOMIT_FRAME_POINTER
-	mov	%r15,%rbp	# orig rbp
-	pop	%r15		# orig r15
-	add	$8,%rsp		# no need for saved (overridden) rbp
-#else
 	leave
-#endif
+
 	ret
 	.cfi_endproc
 	SIZE(GNAME(call_into_lisp))
