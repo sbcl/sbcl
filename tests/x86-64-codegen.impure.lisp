@@ -34,6 +34,8 @@
         (setq lines (nbutlast lines)))
       ;; For human-readability, kill the whitespace
       (setq lines (mapcar (lambda (x) (string-left-trim " ;" x)) lines))
+      ;; Remove safepoint traps
+      (setq lines (remove-if (lambda (x) (search "; safepoint" x)) lines))
       ;; If the last 4 lines are of the expected form
       ;;   MOV RSP, RBP / CLC / POP RBP / RET
       ;; then strip them out
