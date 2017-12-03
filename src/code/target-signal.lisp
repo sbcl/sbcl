@@ -171,12 +171,12 @@
 ;;;; Rather, the signal spawns off a fresh native thread, which calls
 ;;;; into lisp with a fake context through this callback:
 
-#!+(and sb-safepoint-strictly (not win32))
+#!+sb-safepoint-strictly
 (defun signal-handler-callback (run-handler signal args)
   ;; SAPs are dx allocated, close over the values, not the SAPs.
   (let ((thread (without-gcing
                   ;; Hold off GCing until *current-thread* is set up
-                  (setf *current-thread*
+                  (setf sb!thread:*current-thread*
                         (sb!thread::make-signal-handling-thread :name "signal handler"
                                                                 :signal-number signal))))
         (info (sap-ref-sap args 0))
