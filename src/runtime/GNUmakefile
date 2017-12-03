@@ -88,6 +88,14 @@ sbcl.o: $(OBJS)
 libsbcl.a: $(OBJS)
 	rm -f $@ ; ar rcs $@ $^
 
+libsbcl.so: $(subst .o,.pic.o,$(filter-out ldso-stubs.o,$(OBJS)))
+	cc -shared -o $@ $^ -ldl -lpthread -lm
+%.pic.o: %.c
+	$(CC) -DLISP_FEATURE_GCC_TLS -fPIC -c $(CFLAGS) $< -o $@
+%.pic.o: %.S # (-fPIC doesn't affect hand-written assembly source)
+	$(CC) -DLISP_FEATURE_GCC_TLS -c $(CFLAGS) $< -o $@
+testmain: testmain.c libsbcl.so -ldl
+
 sbcl.mk:
 	( echo 'CC=$(CC)' ; \
 	  echo 'LD=$(LD)' ; \
