@@ -116,11 +116,14 @@
     (assert (zerop (length (sb-impl::%pqueue-contents sb-impl::*schedule*))))))
 
 (with-test (:name (:timer :other-thread) :skipped-on (not :sb-thread))
-  (let* ((thread (make-kill-thread (lambda () (sleep 2))))
+  (let* ((sem (sb-thread:make-semaphore))
+         (thread (sb-thread:make-thread (lambda () (sb-thread:wait-on-semaphore sem))))
          (timer (make-timer (lambda ()
                               (assert (eq thread sb-thread:*current-thread*)))
                             :thread thread)))
-    (schedule-timer timer 0.1)))
+    (schedule-timer timer 0.1)
+    (sb-thread:signal-semaphore sem)
+    (assert (sb-thread:join-thread thread))))
 
 (with-test (:name (:timer :new-thread) :skipped-on (not :sb-thread))
   (let* ((original-thread sb-thread:*current-thread*)

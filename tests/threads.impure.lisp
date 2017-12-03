@@ -177,14 +177,20 @@
 
 (with-test (:name (join-thread :timeout :default))
   (let* ((sym (gensym))
-         (thread (make-kill-thread (lambda () (sleep most-positive-fixnum)))))
+         (sem (make-semaphore))
+         (thread (make-thread (lambda () (wait-on-semaphore sem)))))
     (assert (equal (multiple-value-list
                     (join-thread thread :timeout .001 :default sym))
-                   (list sym :timeout)))))
+                   (list sym :timeout)))
+    (signal-semaphore sem)
+    (assert (join-thread thread))))
 
 (with-test (:name (join-thread :timeout :error))
-  (let ((thread (make-kill-thread (lambda () (sleep most-positive-fixnum)))))
-    (assert-error (join-thread thread :timeout .001) join-thread-error)))
+  (let* ((sem (make-semaphore))
+         (thread (make-thread (lambda () (wait-on-semaphore sem)))))
+    (assert-error (join-thread thread :timeout .001) join-thread-error)
+    (signal-semaphore sem)
+    (assert (join-thread thread))))
 
 (with-test (:name (join-thread :multiple-values))
   (assert (equal '(1 2 3)
