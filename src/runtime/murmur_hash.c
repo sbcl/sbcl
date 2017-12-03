@@ -1,37 +1,23 @@
 /*
  *
- * Copyright 2015, Google Inc.
- * All rights reserved.
+ * Copyright 2015 gRPC authors.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are
- * met:
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- *     * Redistributions of source code must retain the above copyright
- * notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above
- * copyright notice, this list of conditions and the following disclaimer
- * in the documentation and/or other materials provided with the
- * distribution.
- *     * Neither the name of Google Inc. nor the names of its
- * contributors may be used to endorse or promote products derived from
- * this software without specific prior written permission.
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 
 #include "murmur_hash.h"
+#include <string.h>
 
 #define ROTL32(x, r) ((x) << (r)) | ((x) >> (32 - (r)))
 
@@ -42,27 +28,21 @@
   (h) *= 0xc2b2ae35; \
   (h) ^= (h) >> 16;
 
-/* Block read - if your platform needs to do endian-swapping or can only
-   handle aligned reads, do the conversion here */
-#define GETBLOCK32(p, i) (p)[(i)]
-
-uint32_t gpr_murmur_hash3(const void *key, size_t len, uint32_t seed) {
-  const uint8_t *data = (const uint8_t *)key;
-  const size_t nblocks = len / 4;
-  int i;
-
+uint32_t gpr_murmur_hash3(const void* key, size_t len, uint32_t seed) {
   uint32_t h1 = seed;
   uint32_t k1;
 
   const uint32_t c1 = 0xcc9e2d51;
   const uint32_t c2 = 0x1b873593;
 
-  const uint32_t *blocks = ((const uint32_t *)key) + nblocks;
-  const uint8_t *tail = (const uint8_t *)(data + nblocks * 4);
+  const uint8_t* keyptr = (const uint8_t*)key;
+  const size_t bsize = sizeof(k1);
+  const size_t nblocks = len / bsize;
 
   /* body */
-  for (i = -(int)nblocks; i; i++) {
-    k1 = GETBLOCK32(blocks, i);
+  size_t i;
+  for (i = 0; i < nblocks; i++, keyptr += bsize) {
+    memcpy(&k1, keyptr, bsize);
 
     k1 *= c1;
     k1 = ROTL32(k1, 15);
@@ -78,11 +58,13 @@ uint32_t gpr_murmur_hash3(const void *key, size_t len, uint32_t seed) {
   /* tail */
   switch (len & 3) {
     case 3:
-      k1 ^= ((uint32_t)tail[2]) << 16;
+      k1 ^= ((uint32_t)keyptr[2]) << 16;
+    /* fallthrough */
     case 2:
-      k1 ^= ((uint32_t)tail[1]) << 8;
+      k1 ^= ((uint32_t)keyptr[1]) << 8;
+    /* fallthrough */
     case 1:
-      k1 ^= tail[0];
+      k1 ^= keyptr[0];
       k1 *= c1;
       k1 = ROTL32(k1, 15);
       k1 *= c2;
