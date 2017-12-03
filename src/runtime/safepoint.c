@@ -288,6 +288,8 @@ static inline void gc_notify_early()
     for_each_thread(p) {
         if (p==self)
             continue;
+        if (p==gc_state.collector)
+            continue;
         odxprint(safepoints,"notifying thread %p csp %p",p,*p->csp_around_foreign_call);
         if (!set_thread_csp_access(p,0)) {
             thread_gc_promote(p, gc_state.phase, GC_NONE);
