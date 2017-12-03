@@ -622,9 +622,9 @@ void thread_in_lisp_raised(os_context_t *ctxptr)
         if (gc_state.collector) {
             gc_advance(GC_NONE,GC_QUIET);
         } else {
-            *self->csp_around_foreign_call = 0;
             write_TLS(GC_PENDING,T,self);
         }
+        *self->csp_around_foreign_call = 0;
         gc_state_unlock();
         check_pending_gc(ctxptr);
 #ifdef LISP_FEATURE_SB_THRUPTION
