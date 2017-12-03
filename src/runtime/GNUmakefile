@@ -93,7 +93,7 @@ libsbcl.so: $(subst .o,.pic.o,$(filter-out ldso-stubs.o,$(OBJS)))
 %.pic.o: %.c
 	$(CC) -DLISP_FEATURE_GCC_TLS -fPIC -c $(CFLAGS) $< -o $@
 %.pic.o: %.S # (-fPIC doesn't affect hand-written assembly source)
-	$(CC) -DLISP_FEATURE_GCC_TLS -c $(CFLAGS) $< -o $@
+	$(CC) -DLISP_FEATURE_GCC_TLS -DPOSITION_INDEPENDENT_ASM -c $(CFLAGS) $< -o $@
 testmain: testmain.c libsbcl.so -ldl
 
 sbcl.mk:

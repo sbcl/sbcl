@@ -39,8 +39,14 @@
 
 #ifdef POSITION_INDEPENDENT_ASM
 #define PIC_CALL(x) x@PLT
+#define PIC_VAR(x,dest) mov GNAME(x)@GOTPCREL(%rip), dest ; mov (dest), dest
 #else
 #define PIC_CALL(x) x
+#ifdef LISP_FEATURE_DARWIN
+#define PIC_VAR(x,dest) mov GNAME(x)(%rip), dest
+#else
+#define PIC_VAR(x,dest) mov GNAME(x), dest
+#endif
 #endif
 
 /* Get the right type of alignment. Linux, FreeBSD and OpenBSD
@@ -106,8 +112,7 @@ GNAME(call_into_lisp_first_time):
         movq	__msan_param_tls@GOTTPOFF(%rip), %rax
         movq	%rax, (SYMBOL_VALUE_OFFSET+MSAN_PARAM_TLS)
 #endif
-	mov	GNAME(all_threads)@GOTPCREL(%rip), %rax
-	mov	(%rax), %rax
+	PIC_VAR	(all_threads, %rax)
 	mov     THREAD_CONTROL_STACK_END_OFFSET(%rax) ,%rsp
 	jmp     Lstack
 
@@ -162,8 +167,7 @@ Lstack:
 	movq	GNAME(current_thread)@GOTTPOFF(%rip), %r12
 	movq	%fs:(%r12), %r12
 #else
-	mov	GNAME(specials)@GOTPCREL(%rip),%rdi
-	mov	(%rdi), %rdi
+	PIC_VAR (specials, %rdi)
 	call    PIC_CALL(GNAME(pthread_getspecific))
 	mov	%rax,%r12
 #endif
@@ -375,8 +379,7 @@ GNAME(arch_scrub_control_stack):
 	 * guard page upper bound in R8, and our hard guard
 	 * page upper bound in R9. */
 	lea	-8(%rsp), %rax
-	mov	GNAME(os_vm_page_size)@GOTPCREL(%rip), %r9
-	mov	(%r9), %r9
+	PIC_VAR(os_vm_page_size, %r9)
 	lea	(%rsi,%r9), %r8
 	lea	(%rdx,%r9), %r9
 
