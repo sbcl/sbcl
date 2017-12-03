@@ -202,7 +202,8 @@
   (loop while (some #'sb-thread:thread-alive-p threads) do (sleep 0.01)))
 
 (with-test (:name (:with-timeout :many-at-the-same-time)
-                  :skipped-on (not :sb-thread))
+                  :skipped-on (not :sb-thread)
+                  :broken-on :win32)
   (let ((ok t))
     (let ((threads (loop repeat 10 collect
                          (sb-thread:make-thread
