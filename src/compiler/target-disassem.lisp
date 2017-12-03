@@ -294,8 +294,9 @@
 
 ;;; Compute X - C given X - A
 (defun code-offs-to-segment-offs (offset segment)
-  (- offset (ash (* (code-header-words (seg-code segment)) sb!vm:word-shift)
-                 (seg-initial-offset segment))))
+  (- offset
+     (ash (code-header-words (seg-code segment)) sb!vm:word-shift)
+     (seg-initial-offset segment)))
 
 ;;; Compute X - C given X - B
 (defun code-insts-offs-to-segment-offs (offset segment)
