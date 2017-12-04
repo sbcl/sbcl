@@ -25,13 +25,6 @@
 #define STATE_RUNNING MAKE_FIXNUM(1)
 #define STATE_STOPPED MAKE_FIXNUM(2)
 #define STATE_DEAD MAKE_FIXNUM(3)
-#if defined(LISP_FEATURE_SB_SAFEPOINT)
-# define STATE_SUSPENDED_BRIEFLY MAKE_FIXNUM(4)
-# define STATE_GC_BLOCKER MAKE_FIXNUM(5)
-# define STATE_PHASE1_BLOCKER MAKE_FIXNUM(5)
-# define STATE_PHASE2_BLOCKER MAKE_FIXNUM(6)
-# define STATE_INTERRUPT_BLOCKER MAKE_FIXNUM(7)
-#endif
 
 #ifdef LISP_FEATURE_SB_THREAD
 lispobj thread_state(struct thread *thread);
@@ -39,34 +32,6 @@ void set_thread_state(struct thread *thread, lispobj state);
 void wait_for_thread_state_change(struct thread *thread, lispobj state);
 
 #if defined(LISP_FEATURE_SB_SAFEPOINT)
-enum threads_suspend_reason {
-    SUSPEND_REASON_NONE,
-    SUSPEND_REASON_GC,
-    SUSPEND_REASON_INTERRUPT,
-    SUSPEND_REASON_GCING
-};
-
-struct threads_suspend_info {
-    int suspend;
-    pthread_mutex_t world_lock;
-    pthread_mutex_t lock;
-    enum threads_suspend_reason reason;
-    int phase;
-    struct thread * gc_thread;
-    struct thread * interrupted_thread;
-    int blockers;
-    int used_gc_page;
-};
-
-struct suspend_phase {
-    int suspend;
-    enum threads_suspend_reason reason;
-    int phase;
-    struct suspend_phase *next;
-};
-
-extern struct threads_suspend_info suspend_info;
-
 struct gcing_safety {
     lispobj csp_around_foreign_call;
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
@@ -340,7 +305,6 @@ typedef struct init_thread_data {
 void thread_in_safety_transition(os_context_t *ctx);
 void thread_in_lisp_raised(os_context_t *ctx);
 void thread_interrupted(os_context_t *ctx);
-void thread_pitstop(os_context_t *ctxptr);
 extern void thread_register_gc_trigger();
 
 # ifdef LISP_FEATURE_SB_THRUPTION
@@ -395,13 +359,6 @@ void pop_gcing_safety(struct gcing_safety *from)
 
 #define WITH_GC_AT_SAFEPOINTS_ONLY()                           \
     WITH_GC_AT_SAFEPOINTS_ONLY_hygenic(sbcl__gc_safety)
-
-#define WITH_STATE_SEM_hygenic(var, thread)                             \
-    os_sem_wait((thread)->state_sem, "thread_state");                   \
-    RUN_BODY_ONCE(var, os_sem_post((thread)->state_sem, "thread_state"))
-
-#define WITH_STATE_SEM(thread)                                     \
-    WITH_STATE_SEM_hygenic(sbcl__state_sem, thread)
 
 int check_pending_thruptions(os_context_t *ctx);
 
