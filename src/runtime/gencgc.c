@@ -4477,7 +4477,6 @@ gc_and_save(char *filename, boolean prepend_runtime,
     void *runtime_bytes = NULL;
     size_t runtime_size;
     extern void coalesce_similar_objects();
-    extern struct lisp_startup_options lisp_startup_options;
     boolean verbose = !lisp_startup_options.noinform;
 
     file = prepare_to_save(filename, prepend_runtime, &runtime_bytes,

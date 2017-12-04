@@ -189,8 +189,6 @@ write_bytes(FILE *file, char *addr, long bytes, os_vm_offset_t file_offset)
                                     COMPRESSION_LEVEL_NONE);
 }
 
-extern struct lisp_startup_options lisp_startup_options;
-
 static void
 output_space(FILE *file, int id, lispobj *addr, lispobj *end,
              os_vm_offset_t file_offset,
