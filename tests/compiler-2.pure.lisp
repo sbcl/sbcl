@@ -695,3 +695,15 @@
                          (eq c #'svref))))
                     (ctu:find-code-constants fun)))
     (assert (equal (funcall fun '(#(44)) '(0)) '(44)))))
+
+(with-test (:name :zombie-casts)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (flet ((f (a b)
+                  (declare (ignore a))
+                  b))
+           (multiple-value-call #'f
+             (values (the integer (unwind-protect (f 10 20)))
+                     322))))
+    (() 322)))

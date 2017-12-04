@@ -516,7 +516,7 @@ check_pending_thruptions(os_context_t *ctx)
     if (was_in_lisp) {
         fake_foreign_function_call(ctx);
     }
-    
+
     DX_ALLOC_SAP(context_sap, ctx);
     WITH_GC_AT_SAFEPOINTS_ONLY() {
         funcall1(StaticSymbolFunction(RUN_INTERRUPTION), context_sap);

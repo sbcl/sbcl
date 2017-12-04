@@ -2390,10 +2390,10 @@ is :ANY, the function name is not checked."
               :derived-type (coerce-to-values type)
               :context context))
 
-(defun cast-type-check (cast)
+(defun cast-type-check (cast &optional optimize)
   (declare (type cast cast))
   (when (cast-reoptimize cast)
-    (ir1-optimize-cast cast t))
+    (ir1-optimize-cast cast (not optimize)))
   (cast-%type-check cast))
 
 (defun note-single-valuified-lvar (lvar)
