@@ -516,9 +516,11 @@ check_pending_thruptions(os_context_t *ctx)
     if (was_in_lisp) {
         fake_foreign_function_call(ctx);
     }
-
+    
     DX_ALLOC_SAP(context_sap, ctx);
-    funcall1(StaticSymbolFunction(RUN_INTERRUPTION), context_sap);
+    WITH_GC_AT_SAFEPOINTS_ONLY() {
+        funcall1(StaticSymbolFunction(RUN_INTERRUPTION), context_sap);
+    }
 
     if (was_in_lisp)
         undo_fake_foreign_function_call(ctx);
@@ -822,9 +824,8 @@ wake_thread_posix(os_thread_t os_thread)
      * STW initiator. */
     if (self->os_thread == os_thread) {
         write_TLS(THRUPTION_PENDING,T,self);
-        WITH_GC_AT_SAFEPOINTS_ONLY()
-            while (check_pending_thruptions(0 /* ignore the sigmask */))
-                ;
+        while (check_pending_thruptions(0 /* ignore the sigmask */))
+            ;
         return 0;
     }
 
@@ -1003,8 +1004,10 @@ signal_handler_callback(lispobj run_handler, int signo, void *info, void *ctx)
     attach_os_thread(&scribble);
 
     odxprint(misc, "callback from signal handler thread for: %d\n", signo);
-    funcall3(StaticSymbolFunction(SIGNAL_HANDLER_CALLBACK),
-             run_handler, make_fixnum(signo), args_sap);
+    WITH_GC_AT_SAFEPOINTS_ONLY() {
+        funcall3(StaticSymbolFunction(SIGNAL_HANDLER_CALLBACK),
+                 run_handler, make_fixnum(signo), args_sap);
+    }
 
     detach_os_thread(&scribble);
     return;
