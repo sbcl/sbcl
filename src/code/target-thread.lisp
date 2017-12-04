@@ -1620,7 +1620,7 @@ subject to change."
       (funcall interruption))))
 
 #!+sb-thruption
-(defun run-interruption ()
+(defun run-interruption (*current-internal-error-context*)
   (in-interruption () ;the non-thruption code does this in the signal handler
     (let ((interruption (with-interruptions-lock (*current-thread*)
                           (pop (thread-interruptions *current-thread*)))))

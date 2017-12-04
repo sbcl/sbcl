@@ -520,8 +520,8 @@ check_pending_thruptions(os_context_t *ctx)
     sigset_t oldset;
     block_deferrable_signals(&oldset);
 #endif
-
-    funcall0(StaticSymbolFunction(RUN_INTERRUPTION));
+    DX_ALLOC_SAP(context_sap, ctx);
+    funcall1(StaticSymbolFunction(RUN_INTERRUPTION), context_sap);
 
 #ifdef LISP_FEATURE_WIN32
     if (ctx) undo_fake_foreign_function_call(ctx);
