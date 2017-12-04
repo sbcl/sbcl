@@ -63,7 +63,7 @@ const char* gc_phase_names[GC_NPHASES] = {
 void
 alloc_gc_page()
 {
-    os_validate(NOT_MOVABLE, GC_SAFEPOINT_PAGE_ADDR, 4);
+    os_validate(NOT_MOVABLE, GC_SAFEPOINT_PAGE_ADDR, BACKEND_PAGE_BYTES);
 }
 
 void
@@ -71,15 +71,15 @@ map_gc_page()
 {
     odxprint(misc, "map_gc_page");
     os_protect((void *) GC_SAFEPOINT_PAGE_ADDR,
-               4,
-               OS_VM_PROT_READ | OS_VM_PROT_WRITE);
+               BACKEND_PAGE_BYTES,
+               OS_VM_PROT_READ);
 }
 
 void
 unmap_gc_page()
 {
     odxprint(misc, "unmap_gc_page");
-    os_protect((void *) GC_SAFEPOINT_PAGE_ADDR, 4, OS_VM_PROT_NONE);
+    os_protect((void *) GC_SAFEPOINT_PAGE_ADDR, BACKEND_PAGE_BYTES, OS_VM_PROT_NONE);
 }
 #endif /* !LISP_FEATURE_WIN32 */
 
@@ -962,12 +962,12 @@ handle_safepoint_violation(os_context_t *ctx, os_vm_address_t fault_address)
 {
     FSHOW_SIGNAL((stderr, "fault_address = %p, sp = %p, &csp = %p\n",
                   fault_address,
-                  GC_SAFEPOINT_PAGE_ADDR,
+                  GC_SAFEPOINT_TRAP_ADDR,
                   arch_os_get_current_thread()->csp_around_foreign_call));
 
     struct thread *self = arch_os_get_current_thread();
 
-    if (fault_address == (os_vm_address_t) GC_SAFEPOINT_PAGE_ADDR) {
+    if (fault_address == (os_vm_address_t) GC_SAFEPOINT_TRAP_ADDR) {
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
         /* We're on the altstack and don't want to run Lisp code. */
         arrange_return_to_c_function(ctx, handle_global_safepoint_violation, 0);

@@ -2177,7 +2177,9 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
     arrange_return_to_lisp_function(context,
                                     StaticSymbolFunction(MEMORY_FAULT_ERROR));
 #else
+#  ifndef LISP_FEATURE_SB_SAFEPOINT
     unblock_gc_signals(0, 0);
+#  endif
     funcall0(StaticSymbolFunction(MEMORY_FAULT_ERROR));
     undo_fake_foreign_function_call(context);
 #endif

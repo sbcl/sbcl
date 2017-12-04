@@ -356,4 +356,4 @@
 
 #!+sb-safepoint
 (defun emit-safepoint ()
-  (inst lwz zero-tn null-tn (- (+ 4096 4 other-pointer-lowtag))))
+  (inst lwz zero-tn null-tn (- (+ gc-safepoint-trap-offset 4 other-pointer-lowtag))))

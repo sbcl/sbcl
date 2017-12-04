@@ -3218,6 +3218,7 @@ structure representations"
                                 "LINKAGE-TABLE-SPACE-END"
                                 "LINKAGE-TABLE-ENTRY-SIZE")
                #!+sb-safepoint "GC-SAFEPOINT-PAGE-ADDR"
+               #!+sb-safepoint "GC-SAFEPOINT-TRAP-OFFSET"
                "TLS-SIZE" "N-WIDETAG-BITS" "WIDETAG-MASK"
                "UNBOUND-MARKER-WIDETAG"
                "NO-TLS-VALUE-MARKER-WIDETAG"

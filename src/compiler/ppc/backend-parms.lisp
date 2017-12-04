@@ -20,3 +20,8 @@
 ;;; The minimum size at which we release address ranges to the OS.
 ;;; This must be a multiple of the OS page size.
 (defconstant gencgc-release-granularity +backend-page-bytes+)
+
+;;; The offset from the fault address reported to the runtime to the
+;;; END of the global safepoint page.
+#!+sb-safepoint
+(defconstant gc-safepoint-trap-offset 4096)
