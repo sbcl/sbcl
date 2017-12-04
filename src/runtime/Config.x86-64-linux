@@ -45,7 +45,7 @@ endif
 CFLAGS += -fno-omit-frame-pointer -momit-leaf-frame-pointer
 
 ifdef LISP_FEATURE_IMMOBILE_SPACE
-  GC_SRC = fullcgc.c gencgc.c traceroot.c immobile-space.c
+  GC_SRC = fullcgc.c gencgc.c traceroot.c immobile-space.c elf.c
 else
   GC_SRC = fullcgc.c gencgc.c traceroot.c
 endif

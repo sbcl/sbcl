@@ -119,6 +119,12 @@ maybe_initialize_runtime_options(int fd)
     }
 }
 
+#if defined(LISP_FEATURE_LINUX) && defined(LISP_FEATURE_IMMOBILE_CODE)
+#define ELFCORE 1
+#else
+#define ELFCORE 0
+#endif
+
 /* Search 'filename' for an embedded core.  An SBCL core has, at the
  * end of the file, a trailer containing optional saved runtime
  * options, the start of the core (an os_vm_offset_t), and a final
@@ -131,6 +137,7 @@ maybe_initialize_runtime_options(int fd)
 os_vm_offset_t
 search_for_embedded_core(char *filename)
 {
+    extern size_t search_for_elf_core(int, os_vm_offset_t*);
     lispobj header;
     os_vm_offset_t lispobj_size = sizeof(lispobj);
     os_vm_offset_t trailer_size = lispobj_size + sizeof(os_vm_offset_t);
@@ -176,6 +183,25 @@ search_for_embedded_core(char *filename)
     }
 
 lose:
+    ;
+#if ELFCORE
+    size_t core_size = search_for_elf_core(fd, &core_start);
+    if (core_size) {
+        int announce = !lisp_startup_options.noinform;
+        if (announce)
+            fprintf(stderr, "Lisp core in ELF section: %lx:%lx\n", core_start, core_start + core_size);
+        // FIXME: saving options at the end of the core is terrible.
+        // They should be in an optional core entry.
+        off_t options_offset = core_start + core_size
+            - (2+RUNTIME_OPTIONS_WORDS) * sizeof (lispobj);
+        struct runtime_options *new_runtime_options;
+        lseek(fd, options_offset, SEEK_SET);
+        if ((new_runtime_options = read_runtime_options(fd))) {
+          runtime_options = new_runtime_options;
+        }
+        return core_start;
+    }
+#endif
     if (fd != -1)
         close(fd);
 
@@ -309,6 +335,8 @@ struct heap_adjust {
 #include "genesis/hash-table.h"
 #include "genesis/layout.h"
 #include "genesis/vector.h"
+
+extern __attribute__((weak)) lispobj __lisp_code_start, __lisp_code_end;
 
 static inline sword_t calc_adjustment(struct heap_adjust* adj, lispobj x)
 {
@@ -598,11 +626,17 @@ void relocate_heap(struct heap_adjust* adj)
     relocate_space(STATIC_SPACE_START, static_space_free_pointer, adj);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     relocate_space(FIXEDOBJ_SPACE_START, fixedobj_free_pointer, adj);
-    relocate_space(VARYOBJ_SPACE_START, varyobj_free_pointer, adj);
     SYMBOL(FUNCTION_LAYOUT)->value = \
         adjust_word(adj, SYMBOL(FUNCTION_LAYOUT)->value >> 32) << 32;
 #endif
     relocate_space(DYNAMIC_SPACE_START, (lispobj*)get_alloc_pointer(), adj);
+
+    // Pointers within varyobj space to varyobj space do not need adjustment
+    // so remove any delta before performing the relocation pass on this space.
+    if (&__lisp_code_start) {
+        adj->range[2].delta = 0;
+    }
+    relocate_space(VARYOBJ_SPACE_START, varyobj_free_pointer, adj);
 }
 #endif
 
@@ -646,11 +680,28 @@ process_directory(int count, struct ndir_entry *entry,
         {0, 0, STATIC_SPACE_START, &static_space_free_pointer},
         {0, 0, READ_ONLY_SPACE_START, &read_only_space_free_pointer},
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-        {(FIXEDOBJ_SPACE_SIZE+VARYOBJ_SPACE_SIZE) | 1, 0,
+        {FIXEDOBJ_SPACE_SIZE | 1, 0,
             FIXEDOBJ_SPACE_START, &fixedobj_free_pointer},
         {1, 0, VARYOBJ_SPACE_START, &varyobj_free_pointer}
 #endif
     };
+
+    if (&__lisp_code_start) {
+        VARYOBJ_SPACE_START = (uword_t)&__lisp_code_start;
+        varyobj_free_pointer = &__lisp_code_end;
+        uword_t aligned_end = ALIGN_UP((uword_t)&__lisp_code_end, IMMOBILE_CARD_BYTES);
+        varyobj_space_size = aligned_end - VARYOBJ_SPACE_START;
+        spaces[IMMOBILE_VARYOBJ_CORE_SPACE_ID].len = varyobj_space_size;
+        gc_assert(varyobj_free_pointer >= (lispobj*)VARYOBJ_SPACE_START);
+#if !ENABLE_PAGE_PROTECTION
+        printf("Lisp code present in executable @ %lx:%lx (freeptr=%p)\n",
+               (uword_t)&__lisp_code_start, aligned_end, varyobj_free_pointer);
+#endif
+        // unprotect the pages
+        os_protect((void*)VARYOBJ_SPACE_START, varyobj_space_size, OS_VM_PROT_ALL);
+    } else {
+        spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].desired_size += VARYOBJ_SPACE_SIZE;
+    }
 
     for ( ; --count>= 0; ++entry) {
         sword_t id = entry->identifier;
@@ -762,7 +813,9 @@ process_directory(int count, struct ndir_entry *entry,
         lispobj *free_pointer = (lispobj *) addr + entry->nwords;
         switch (id) {
         default:
-            *spaces[id].pfree_pointer = free_pointer;
+            // varyobj free ptr is already nonzero if Lisp code in executable
+            if (!*spaces[id].pfree_pointer)
+                *spaces[id].pfree_pointer = free_pointer;
             break;
         case DYNAMIC_CORE_SPACE_ID:
 #ifdef LISP_FEATURE_CHENEYGC

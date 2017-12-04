@@ -1286,8 +1286,13 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
     if ((uword_t)limit & (IMMOBILE_CARD_BYTES-1)) {
         int remainder = IMMOBILE_CARD_BYTES -
           ((uword_t)limit & (IMMOBILE_CARD_BYTES-1));
-        limit[0] = SIMPLE_ARRAY_FIXNUM_WIDETAG;
-        limit[1] = make_fixnum((remainder >> WORD_SHIFT) - 2);
+        lispobj array_length = make_fixnum((remainder >> WORD_SHIFT) - 2);
+        if (limit[0] == SIMPLE_ARRAY_FIXNUM_WIDETAG) {
+            gc_assert(limit[1] == array_length);
+        } else {
+            limit[0] = SIMPLE_ARRAY_FIXNUM_WIDETAG;
+            limit[1] = array_length;
+        }
         int size = sizetab[SIMPLE_ARRAY_FIXNUM_WIDETAG](limit);
         lispobj* __attribute__((unused)) padded_end = limit + size;
         gc_assert(!((uword_t)padded_end & (IMMOBILE_CARD_BYTES-1)));
