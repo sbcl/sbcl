@@ -503,37 +503,31 @@ check_pending_thruptions(os_context_t *ctx)
         return 0;
     write_TLS(THRUPTION_PENDING, NIL, p);
 
-#ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-    int was_in_lisp = !foreign_function_call_active_p(p);
-    if (was_in_lisp) {
-        if (!ctx)
-            lose("self-kill bug");
-        fake_foreign_function_call(ctx);
-    }
-#endif
-
 #ifdef LISP_FEATURE_WIN32
     oldset = pself->blocked_signal_set;
     pself->blocked_signal_set = deferrable_sigset;
-    if (ctx) fake_foreign_function_call(ctx);
 #else
     sigset_t oldset;
     block_deferrable_signals(&oldset);
 #endif
+
+    int was_in_lisp = ctx && !foreign_function_call_active_p(p);
+
+    if (was_in_lisp) {
+        fake_foreign_function_call(ctx);
+    }
+
     DX_ALLOC_SAP(context_sap, ctx);
     funcall1(StaticSymbolFunction(RUN_INTERRUPTION), context_sap);
 
+    if (was_in_lisp)
+        undo_fake_foreign_function_call(ctx);
+
 #ifdef LISP_FEATURE_WIN32
-    if (ctx) undo_fake_foreign_function_call(ctx);
     pself->blocked_signal_set = oldset;
     if (ctx) ctx->sigmask = oldset;
 #else
     thread_sigmask(SIG_SETMASK, &oldset, 0);
-#endif
-
-#ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-    if (was_in_lisp)
-        undo_fake_foreign_function_call(ctx);
 #endif
 
     return 1;
