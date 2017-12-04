@@ -631,12 +631,14 @@ void relocate_heap(struct heap_adjust* adj)
 #endif
     relocate_space(DYNAMIC_SPACE_START, (lispobj*)get_alloc_pointer(), adj);
 
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
     // Pointers within varyobj space to varyobj space do not need adjustment
     // so remove any delta before performing the relocation pass on this space.
     if (&__lisp_code_start) {
         adj->range[2].delta = 0;
     }
     relocate_space(VARYOBJ_SPACE_START, varyobj_free_pointer, adj);
+#endif
 }
 #endif
 
@@ -686,6 +688,7 @@ process_directory(int count, struct ndir_entry *entry,
 #endif
     };
 
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
     if (&__lisp_code_start) {
         VARYOBJ_SPACE_START = (uword_t)&__lisp_code_start;
         varyobj_free_pointer = &__lisp_code_end;
@@ -702,6 +705,7 @@ process_directory(int count, struct ndir_entry *entry,
     } else {
         spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].desired_size += VARYOBJ_SPACE_SIZE;
     }
+#endif
 
     for ( ; --count>= 0; ++entry) {
         sword_t id = entry->identifier;

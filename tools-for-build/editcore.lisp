@@ -884,8 +884,8 @@
 
 ;;; Return a list of fixups (FIXUP-WHERE KIND ADDEND) to peform in a foreign core
 ;;; whose code space is subject to link-time relocation.
-;;;   #define R_X86_64_64		1	/* Direct 64 bit  */
-;;;   #define R_X86_64_PC32		2	/* PC relative 32 bit signed */
+;;;   #define R_X86_64_64         1  /* Direct 64 bit  */
+;;;   #define R_X86_64_PC32       2  /* PC relative 32 bit signed */
 ;;;
 (defun collect-relocations (spaces)
   (format t "mapped @ ~s~%~x~%" (car spaces) (cdr spaces))
