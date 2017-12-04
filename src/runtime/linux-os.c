@@ -250,7 +250,8 @@ os_init(char *argv[], char *envp[])
      * Since randomization is currently implemented only on x86 kernels,
      * don't do this trick on other platforms.
      */
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+#if (defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)) \
+     && (!defined(DISABLE_ASLR) || DISABLE_ASLR)
     if ((major_version == 2
          /* Some old kernels will apparently lose unsupported personality flags
           * on exec() */
