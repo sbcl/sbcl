@@ -1109,7 +1109,8 @@
            :code code
            :initial-offset initial-offset))) ; an offset into CODE
     (add-debugging-hooks segment debug-fun source-form-cache)
-    (add-fun-header-hooks segment)
+    (when code
+      (add-fun-header-hooks segment))
     segment))
 
 (defun make-vector-segment (vector offset &rest args)
