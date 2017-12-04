@@ -265,14 +265,6 @@ static inline void protect_page(void* page_addr, page_index_t page_index)
 
 #endif
 
-// For x86[-64], a simple-fun or closure's "self" slot is a fixum
-// On other backends, it is a lisp ointer.
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
-#define FUN_SELF_FIXNUM_TAGGED 1
-#else
-#define FUN_SELF_FIXNUM_TAGGED 0
-#endif
-
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 static inline void *
 fixedobj_page_address(low_page_index_t page_num)

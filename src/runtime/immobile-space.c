@@ -2304,7 +2304,7 @@ void fixup_immobile_refs(lispobj (*fixup_lispobj)(lispobj),
         // so that the magnitudes are smaller.
         loc += prev_loc;
         prev_loc = loc;
-        int* fixup_where = (int*)(instructions + loc);
+        void* fixup_where = instructions + loc;
         lispobj ptr = (lispobj)UNALIGNED_LOAD32(fixup_where);
         if (is_lisp_pointer(ptr)) {
             lispobj fixed = fixup_lispobj(ptr);
