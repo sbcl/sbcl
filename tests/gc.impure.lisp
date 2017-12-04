@@ -214,3 +214,22 @@
                 (+ sb-vm:fixedobj-space-start
                    sb-vm:fixedobj-space-size
                    sb-vm:varyobj-space-size)))))
+
+;;; After each iteration of FOO there are a few pinned conses.
+;;; On alternate GC cycles, those get promoted to generation 1.
+;;; When the logic for page-spanning-object zeroing incorrectly decreased
+;;; the upper bound on bytes used for partially pinned pages, it caused
+;;; an accumulation of pages in generation 1 each with 2 objects' worth
+;;; of bytes, and the remainder waste. Because the waste was not accounted
+;;; for, it did not trigger GC enough to avoid heap exhaustion.
+(with-test (:name :smallobj-auto-gc-trigger)
+  ;; Ensure that these are compiled functions because the interpreter
+  ;; would make lots of objects of various sizes which is insufficient
+  ;; to provoke the bug.
+  (setf (symbol-function 'foo)
+        (compile nil '(lambda () (list 1 2))))
+  ;; 500 million iterations of this loop seems to be reliable enough
+  ;; to show that GC happens.
+  (setf (symbol-function 'callfoo)
+        (compile nil '(lambda () (loop repeat 500000000 do (foo)))))
+  (funcall 'callfoo))

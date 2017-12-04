@@ -1936,7 +1936,6 @@ wipe_nonpinned_words()
     // Prime the loop
     uword_t fill_from = page_base(pinned_objects.keys[0]);
     os_vm_size_t bytes_moved = 0; // i.e. virtually moved
-    os_vm_size_t bytes_freed = 0; // bytes after last pinned object per page
 
     for (i = 0; i < n_pins; ++i) {
         lispobj* obj = (lispobj*)pinned_objects.keys[i];
@@ -2001,18 +2000,18 @@ wipe_nonpinned_words()
             long nbytes = page_end - (uword_t)obj_end;
             gc_assert(nbytes >= 0);
             if (nbytes) {
-                // Bytes beyond a page's highest used byte must be zero.
+                // Zero the page filler. (Important if it's a cons)
                 memset(obj_end, 0, nbytes);
-                bytes_freed += nbytes;
-                set_page_bytes_used(end_page_index,
-                                    (uword_t)obj_end - obj_end_pageaddr);
+                if (nbytes > 2*N_WORD_BYTES) {
+                    obj_end[0] = SIMPLE_ARRAY_WORD_WIDETAG;
+                    obj_end[1] = make_fixnum(nbytes/N_WORD_BYTES - 2);
+                }
             }
             fill_from = page_base(pinned_objects.keys[i+1]);
         }
     }
     generations[from_space].bytes_allocated -= bytes_moved;
-    generations[new_space].bytes_allocated += bytes_moved - bytes_freed;
-    bytes_allocated -= bytes_freed;
+    generations[new_space].bytes_allocated += bytes_moved;
 #undef adjust_gen_usage
 #undef page_base
 }
