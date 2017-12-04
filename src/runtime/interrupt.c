@@ -994,7 +994,7 @@ interrupt_handle_pending(os_context_t *context)
     if (read_TLS(GC_INHIBIT,thread)==NIL) {
         void *original_pending_handler = data->pending_handler;
 
-#ifdef LISP_FEATURE_SB_SAFEPOINT
+#if defined(LISP_FEATURE_SB_SAFEPOINT) && defined(LISP_FEATURE_SB_THREAD)
         /* handles the STOP_FOR_GC_PENDING case, plus THRUPTIONS */
         if (read_TLS(STOP_FOR_GC_PENDING,thread) != NIL
 # ifdef LISP_FEATURE_SB_THRUPTION

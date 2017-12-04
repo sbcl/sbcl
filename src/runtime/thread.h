@@ -31,6 +31,9 @@ lispobj thread_state(struct thread *thread);
 void set_thread_state(struct thread *thread, lispobj state);
 void wait_for_thread_state_change(struct thread *thread, lispobj state);
 
+extern pthread_key_t lisp_thread;
+#endif
+
 #if defined(LISP_FEATURE_SB_SAFEPOINT)
 struct gcing_safety {
     lispobj csp_around_foreign_call;
@@ -41,9 +44,6 @@ void** os_get_csp(struct thread* th);
 void alloc_gc_page();
 void assert_on_stack(struct thread *th, void *esp);
 #endif /* defined(LISP_FEATURE_SB_SAFEPOINT) */
-
-extern pthread_key_t lisp_thread;
-#endif
 
 extern int kill_safely(os_thread_t os_thread, int signal);
 

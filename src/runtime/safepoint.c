@@ -123,6 +123,7 @@ unmap_gc_page()
  *     Any thread waiting until GC end now continues.
  */
 struct gc_state {
+#ifdef LISP_FEATURE_SB_THREAD
     /* Flag: conditions are initialized */
     boolean initialized;
 
@@ -131,6 +132,7 @@ struct gc_state {
 
     /* Conditions: one per phase */
     pthread_cond_t phase_cond[GC_NPHASES];
+#endif
 
     /* For each [current or future] phase, a number of threads not yet ready to
      * leave it */
@@ -145,7 +147,9 @@ struct gc_state {
 };
 
 static struct gc_state gc_state = {
+#ifdef LISP_FEATURE_SB_THREAD
     .lock = PTHREAD_MUTEX_INITIALIZER,
+#endif
     .phase = GC_NONE,
 };
 
@@ -153,8 +157,10 @@ void
 gc_state_lock()
 {
     odxprint(safepoints,"GC state to be locked");
+#ifdef LISP_FEATURE_SB_THREAD
     int result = pthread_mutex_lock(&gc_state.lock);
     gc_assert(!result);
+#endif
     if (gc_state.master) {
         fprintf(stderr,"GC state lock glitch [%p] in thread %p phase %d (%s)\n",
                 gc_state.master,arch_os_get_current_thread(),gc_state.phase,
@@ -163,12 +169,14 @@ gc_state_lock()
     }
     gc_assert(!gc_state.master);
     gc_state.master = arch_os_get_current_thread();
+#ifdef LISP_FEATURE_SB_THREAD
     if (!gc_state.initialized) {
         int i;
         for (i=GC_NONE; i<GC_NPHASES; ++i)
             pthread_cond_init(&gc_state.phase_cond[i],NULL);
         gc_state.initialized = 1;
     }
+#endif
     odxprint(safepoints,"GC state locked in phase %d (%s)",
              gc_state.phase, gc_phase_names[gc_state.phase]);
 }
@@ -180,8 +188,10 @@ gc_state_unlock()
              gc_state.phase, gc_phase_names[gc_state.phase]);
     gc_assert(arch_os_get_current_thread()==gc_state.master);
     gc_state.master = NULL;
+#ifdef LISP_FEATURE_SB_THREAD
     int result = pthread_mutex_unlock(&gc_state.lock);
     gc_assert(!result);
+#endif
     odxprint(safepoints,"%s","GC state unlocked");
 }
 
@@ -195,8 +205,13 @@ gc_state_wait(gc_phase_t phase)
              gc_state.phase_wait[gc_state.phase]);
     gc_assert(gc_state.master == self);
     gc_state.master = NULL;
-    while(gc_state.phase != phase && !(phase == GC_QUIET && (gc_state.phase > GC_QUIET)))
+    while(gc_state.phase != phase && !(phase == GC_QUIET && (gc_state.phase > GC_QUIET))) {
+#ifdef LISP_FEATURE_SB_THREAD
         pthread_cond_wait(&gc_state.phase_cond[phase],&gc_state.lock);
+#else
+        lose("gc_state_wait() blocks, but we're #-SB-THREAD");
+#endif
+    }
     gc_assert(gc_state.master == NULL);
     gc_state.master = self;
 }
@@ -255,8 +270,10 @@ static inline void thread_gc_promote(struct thread* p, gc_phase_t cur, gc_phase_
     if (cur != GC_NONE) {
         gc_state.phase_wait[cur]++;
     }
+#ifdef LISP_FEATURE_SB_THREAD
     if (cur != GC_NONE)
         write_TLS(STOP_FOR_GC_PENDING,T,p);
+#endif
 }
 
 /* set_thread_csp_access -- alter page permissions for not-in-Lisp
@@ -290,7 +307,9 @@ static inline void gc_notify_early()
 {
     struct thread *self = arch_os_get_current_thread(), *p;
     odxprint(safepoints,"%s","global notification");
+#ifdef LISP_FEATURE_SB_THREAD
     pthread_mutex_lock(&all_threads_lock);
+#endif
     for_each_thread(p) {
         if (p==self)
             continue;
@@ -303,7 +322,9 @@ static inline void gc_notify_early()
             thread_gc_promote(p, thread_gc_phase(p), GC_NONE);
         }
     }
+#ifdef LISP_FEATURE_SB_THREAD
     pthread_mutex_unlock(&all_threads_lock);
+#endif
 }
 
 static inline void gc_notify_final()
@@ -311,7 +332,9 @@ static inline void gc_notify_final()
     struct thread *p;
     odxprint(safepoints,"%s","global notification");
     gc_state.phase_wait[gc_state.phase]=0;
+#ifdef LISP_FEATURE_SB_THREAD
     pthread_mutex_lock(&all_threads_lock);
+#endif
     for_each_thread(p) {
         if (p == gc_state.collector)
             continue;
@@ -320,22 +343,31 @@ static inline void gc_notify_final()
             thread_gc_promote(p, gc_state.phase, GC_NONE);
         }
     }
+#ifdef LISP_FEATURE_SB_THREAD
     pthread_mutex_unlock(&all_threads_lock);
+#endif
 }
 
 static inline void gc_done()
 {
-    struct thread *self = arch_os_get_current_thread(), *p;
+#ifdef LISP_FEATURE_SB_THREAD
+    struct thread *self = arch_os_get_current_thread();
+#endif
+    struct thread *p;
     boolean inhibit = (read_TLS(GC_INHIBIT,self)==T);
 
     odxprint(safepoints,"%s","global denotification");
+#ifdef LISP_FEATURE_SB_THREAD
     pthread_mutex_lock(&all_threads_lock);
+#endif
     for_each_thread(p) {
         if (inhibit && (read_TLS(GC_PENDING,p)==T))
             write_TLS(GC_PENDING,NIL,p);
         set_thread_csp_access(p,1);
     }
+#ifdef LISP_FEATURE_SB_THREAD
     pthread_mutex_unlock(&all_threads_lock);
+#endif
 }
 
 static inline void gc_handle_phase()
@@ -396,7 +428,9 @@ static inline void gc_advance(gc_phase_t cur, gc_phase_t old) {
         gc_state.phase = gc_phase_next(gc_state.phase);
         odxprint(safepoints,"no blockers, direct advance to %d (%s)",gc_state.phase,gc_phase_names[gc_state.phase]);
         gc_handle_phase();
+#ifdef LISP_FEATURE_SB_THREAD
         pthread_cond_broadcast(&gc_state.phase_cond[gc_state.phase]);
+#endif
     }
     odxprint(safepoints,"going to wait for %d threads",gc_state.phase_wait[gc_state.phase]);
     gc_state_wait(cur);
@@ -423,7 +457,9 @@ thread_may_gc()
      * 1) GC_INHIBIT == NIL  (outside of protected part of without-gcing)
      * Note that we are in a safepoint here, which is always outside of PA. */
 
+#ifdef LISP_FEATURE_SB_THREAD
     struct thread *self = arch_os_get_current_thread();
+#endif
     return (read_TLS(GC_INHIBIT, self) == NIL);
 }
 
@@ -456,8 +492,10 @@ thread_may_thrupt(os_context_t *ctx)
     if (read_TLS(GC_PENDING, self) != NIL)
         return 0;
 
+#ifdef LISP_FEATURE_SB_THREAD
     if (read_TLS(STOP_FOR_GC_PENDING, self) != NIL)
         return 0;
+#endif
 
 #ifdef LISP_FEATURE_WIN32
     if (deferrables_blocked_p(&self->os_thread->blocked_signal_set))
@@ -641,7 +679,9 @@ void thread_in_lisp_raised(os_context_t *ctxptr)
     }
     phase = thread_gc_phase(self);
     if (phase == GC_NONE) {
+#ifdef LISP_FEATURE_SB_THREAD
         write_TLS(STOP_FOR_GC_PENDING,NIL,self);
+#endif
         set_thread_csp_access(self,1);
         set_csp_from_context(self, ctxptr);
         if (gc_state.phase <= GC_SETTLED)
@@ -656,7 +696,9 @@ void thread_in_lisp_raised(os_context_t *ctxptr)
 #endif
     } else {
         gc_advance(phase,gc_state.phase);
+#ifdef LISP_FEATURE_SB_THREAD
         write_TLS(STOP_FOR_GC_PENDING,T,self);
+#endif
         gc_state_unlock();
     }
 }
@@ -676,7 +718,9 @@ void thread_in_safety_transition(os_context_t *ctxptr)
     } else {
         gc_phase_t phase = thread_gc_phase(self);
         if (phase == GC_NONE) {
+#ifdef LISP_FEATURE_SB_THREAD
             write_TLS(STOP_FOR_GC_PENDING,NIL,self);
+#endif
             set_csp_from_context(self, ctxptr);
             if (gc_state.phase <= GC_SETTLED)
                 gc_advance(phase,gc_state.phase);
@@ -685,7 +729,9 @@ void thread_in_safety_transition(os_context_t *ctxptr)
             *self->csp_around_foreign_call = 0;
         } else {
             gc_advance(phase,gc_state.phase);
+#ifdef LISP_FEATURE_SB_THREAD
             write_TLS(STOP_FOR_GC_PENDING,T,self);
+#endif
         }
         gc_state_unlock();
     }
@@ -754,7 +800,9 @@ gc_stop_the_world()
     }
     set_thread_csp_access(self,1);
     gc_state_unlock();
+#ifdef LISP_FEATURE_SB_THREAD
     write_TLS(STOP_FOR_GC_PENDING,NIL,self);
+#endif
 }
 
 
@@ -795,8 +843,11 @@ wake_thread_win32(struct thread *thread)
 
     write_TLS(THRUPTION_PENDING,T,thread);
 
-    if ((read_TLS(GC_PENDING,thread)==T)||
-        (read_TLS(STOP_FOR_GC_PENDING,thread)==T))
+    if ((read_TLS(GC_PENDING,thread)==T)
+#ifdef LISP_FEATURE_SB_THREAD
+        ||(read_TLS(STOP_FOR_GC_PENDING,thread)==T)
+#endif
+        )
         return;
 
     wake_thread_io(thread);
@@ -849,7 +900,10 @@ wake_thread_posix(os_thread_t os_thread)
                     odxprint(safepoints, "wake_thread_posix: found");
                     write_TLS(THRUPTION_PENDING,T,thread);
                     if (read_TLS(GC_PENDING,thread) == T
-                        || read_TLS(STOP_FOR_GC_PENDING,thread) == T)
+#ifdef LISP_FEATURE_SB_THREAD
+                        || read_TLS(STOP_FOR_GC_PENDING,thread) == T
+#endif
+                        )
                         break;
 
                     if (os_get_csp(thread)) {

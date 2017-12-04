@@ -118,11 +118,11 @@ run in any thread.")
 (define-alien-routine collect-garbage int
   (#!+gencgc last-gen #!-gencgc ignore int))
 
-#!+sb-thread
+#!+(or sb-thread sb-safepoint)
 (progn
   (define-alien-routine gc-stop-the-world void)
   (define-alien-routine gc-start-the-world void))
-#!-sb-thread
+#!-(or sb-thread sb-safepoint)
 (progn
   (defun gc-stop-the-world ())
   (defun gc-start-the-world ()))
@@ -197,7 +197,7 @@ statistics are appended to it."
                       ;; turn is a type-error.
                       (when (plusp run-time)
                         (incf *gc-run-time* run-time)))
-                    #!+sb-safepoint
+                    #!+(and sb-thread sb-safepoint)
                     (setf *stop-for-gc-pending* nil)
                     (setf *gc-pending* nil
                           new-usage (dynamic-usage))

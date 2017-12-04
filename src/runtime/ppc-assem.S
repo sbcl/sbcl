@@ -511,7 +511,12 @@ lra:
 
 #ifdef LISP_FEATURE_SB_SAFEPOINT
 	/* OK to run GC without stopping this thread from this point on. */
+#  ifdef LISP_FEATURE_SB_THREAD
 	stw reg_CSP,THREAD_SAVED_CSP_OFFSET(reg_THREAD)
+#  else
+	load(reg_CFUNC,CSYMBOL(all_threads))
+	stw reg_CSP,THREAD_SAVED_CSP_OFFSET(reg_CFUNC)
+#  endif
 #endif
 
 	mr reg_NL3,reg_NARGS
@@ -559,7 +564,12 @@ lra:
 
 # ifdef LISP_FEATURE_SB_SAFEPOINT
 	/* No longer OK to run GC except at safepoints. */
+#  ifdef LISP_FEATURE_SB_THREAD
 	stw reg_ZERO,THREAD_SAVED_CSP_OFFSET(reg_THREAD)
+#  else
+	load(reg_BSP,CSYMBOL(all_threads))
+	stw reg_ZERO,THREAD_SAVED_CSP_OFFSET(reg_BSP)
+#  endif
 # endif
 
 	/* Atomic ... */

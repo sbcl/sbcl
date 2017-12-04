@@ -138,6 +138,10 @@
 # define LoadCurrentThreadSlot(offset,reg);     \
 	movl	SBCL_THREAD_BASE_EA, reg ;      \
 	movl	offset(reg), reg ;
+#elif !defined(LISP_FEATURE_SB_THREAD)
+  /* so that we don't have to rewrite the safepoint logic */
+# define SBCL_THREAD_BASE_EA GNAME(all_threads)
+# define MAYBE_FS(addr) addr
 #elif defined(LISP_FEATURE_LINUX) || defined(LISP_FEATURE_SUNOS) || defined(LISP_FEATURE_FREEBSD) || \
         defined(LISP_FEATURE_DRAGONFLY)
     /* %fs:0 refers to the current thread.  Useful!  Less usefully,
