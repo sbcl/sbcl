@@ -707,3 +707,18 @@
              (values (the integer (unwind-protect (f 10 20)))
                      322))))
     (() 322)))
+
+
+(with-test (:name :find-dfo-on-deleted-lambda)
+  (assert (= (funcall
+              (funcall (checked-compile
+                        `(lambda ()
+                           (declare (notinline <))
+                           (block nil
+                             (lambda (&key (key
+                                            (unwind-protect
+                                                 (if (< 0)
+                                                     34
+                                                     (return (catch 'c))))))
+                               key))))))
+             34)))
