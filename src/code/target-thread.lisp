@@ -1521,7 +1521,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
                   (initial-thread-function-trampoline thread setup-sem
                                                       real-function arguments)))
         ;; Holding mutexes or waiting on sempahores inside WITHOUT-GCING will lock up
-        (assert (not *gc-inhibit*))
+        (aver (not *gc-inhibit*))
         ;; Keep INITIAL-FUNCTION in the dynamic extent until the child
         ;; thread is initialized properly. Wrap the whole thing in
         ;; WITHOUT-INTERRUPTS (via WITH-SYSTEM-MUTEX) because we pass

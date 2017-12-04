@@ -202,7 +202,7 @@ statistics are appended to it."
                     (setf *gc-pending* nil
                           new-usage (dynamic-usage))
                     #!+sb-thread
-                    (assert (not *stop-for-gc-pending*))
+                    (aver (not *stop-for-gc-pending*))
                     (gc-start-the-world)
                     ;; In a multithreaded environment the other threads
                     ;; will see *n-b-f-o-p* change a little late, but
