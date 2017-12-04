@@ -708,6 +708,20 @@
                      322))))
     (() 322)))
 
+(with-test (:name :zombie-casts.2)
+  (let ((sb-c::*max-optimize-iterations* 1))
+    (checked-compile-and-assert
+        ()
+        `(lambda (a b)
+           (declare (type fixnum a b))
+           (elt '(167992664 119771479)
+                (max 0
+                     (catch 'ct2
+                       (if (typep b '(integer -52))
+                           a
+                           0)))))
+      ((1 2) 119771479))))
+
 
 (with-test (:name :find-dfo-on-deleted-lambda)
   (assert (= (funcall

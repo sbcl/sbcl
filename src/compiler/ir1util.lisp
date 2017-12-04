@@ -2390,10 +2390,17 @@ is :ANY, the function name is not checked."
               :derived-type (coerce-to-values type)
               :context context))
 
-(defun cast-type-check (cast &optional optimize)
+(defun cast-type-check (cast &optional reoptimize)
   (declare (type cast cast))
   (when (cast-reoptimize cast)
-    (ir1-optimize-cast cast (not optimize)))
+    (ir1-optimize-cast cast t)
+    (when reoptimize
+      ;; Do one more pass after GENERATE-TYPE-CHECKS is done and
+      ;; uncovers unused CASTs. IR2 shouldn't see any unused casts
+      ;; because it would incorrectly think that CAST-VALUE is used.
+      (let ((block (node-block cast)))
+        (setf (block-reoptimize block) t)
+        (reoptimize-component (block-component block) :maybe))))
   (cast-%type-check cast))
 
 (defun note-single-valuified-lvar (lvar)
