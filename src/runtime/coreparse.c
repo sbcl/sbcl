@@ -134,7 +134,7 @@ search_for_embedded_core(char *filename)
     lispobj header;
     os_vm_offset_t lispobj_size = sizeof(lispobj);
     os_vm_offset_t trailer_size = lispobj_size + sizeof(os_vm_offset_t);
-    os_vm_offset_t core_start, pos;
+    os_vm_offset_t core_start;
     int fd = -1;
 
     if ((fd = open_binary(filename, O_RDONLY)) < 0)
@@ -162,7 +162,6 @@ search_for_embedded_core(char *filename)
 
         if (lseek(fd, core_start, SEEK_SET) < 0)
             goto lose;
-        pos = lseek(fd, 0, SEEK_CUR);
 
         if (read(fd, &header, (size_t)lispobj_size) < lispobj_size)
             goto lose;
@@ -173,7 +172,7 @@ search_for_embedded_core(char *filename)
         maybe_initialize_runtime_options(fd);
 
         close(fd);
-        return pos;
+        return core_start;
     }
 
 lose:
