@@ -278,7 +278,6 @@ extern struct fixedobj_page *fixedobj_pages;
 #endif
 
 extern page_index_t last_free_page;
-extern boolean gencgc_partial_pickup;
 
 extern uword_t
 walk_generation(uword_t (*proc)(lispobj*,lispobj*,uword_t),

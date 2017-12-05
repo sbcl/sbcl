@@ -116,12 +116,6 @@ boolean gencgc_zero_check = 0;
  * because we zero-fill lazily. This switch should probably be removed. */
 boolean gencgc_enable_verify_zero_fill = 0;
 
-/* When loading a core, don't do a full scan of the memory for the
- * memory region boundaries. (Set to true by coreparse.c if the core
- * contained a pagetable entry).
- */
-boolean gencgc_partial_pickup = 0;
-
 /* If defined, free pages are read-protected to ensure that nothing
  * accesses them.
  */
@@ -3933,9 +3927,7 @@ collect_garbage(generation_index_t last_gen)
  * 1. gc_init() - allocation of a fixed-address space via mmap(),
  *    failing which there's no reason to go on. (safepoint only)
  * 2. gc_allocate_ptes() - page table entries
- * 3. gencgc_pickup_dynamic() - calculation of scan start offsets
- * Steps (2) and (3) are combined in self-build because there is
- * no PAGE_TABLE_CORE_ENTRY_TYPE_CODE core entry. */
+ * 3. gencgc_pickup_dynamic() - calculation of total bytes used */
 void
 gc_init(void)
 {
@@ -4035,43 +4027,17 @@ gencgc_pickup_dynamic(void)
 {
     page_index_t page = 0;
     char *alloc_ptr = (char *)get_alloc_pointer();
-    lispobj *prev=(lispobj *)page_address(page);
     generation_index_t gen = PSEUDO_STATIC_GENERATION;
 
     bytes_allocated = 0;
 
     do {
-        lispobj *first,*ptr= (lispobj *)page_address(page);
-
-        if (!gencgc_partial_pickup || !page_free_p(page)) {
-          page_bytes_t bytes_used = GENCGC_CARD_BYTES;
+        if (!page_free_p(page)) {
           /* It is possible, though rare, for the saved page table
            * to contain free pages below alloc_ptr. */
-          page_table[page].gen = gen;
-          if (gencgc_partial_pickup)
-              bytes_used = page_bytes_used(page);
-          else
-              set_page_bytes_used(page, GENCGC_CARD_BYTES);
-          page_table[page].large_object = 0;
-          page_table[page].write_protected = 0;
-          page_table[page].write_protected_cleared = 0;
-          page_table[page].dont_move = 0;
-          set_page_need_to_zero(page, 1);
-
-          bytes_allocated += bytes_used;
-        }
-
-        if (!gencgc_partial_pickup) {
-#if SEGREGATED_CODE
-            // Make the most general assumption: any page *might* contain code.
-            page_table[page].allocated = CODE_PAGE_FLAG;
-#else
-            page_table[page].allocated = BOXED_PAGE_FLAG;
-#endif
-            first = gc_search_space3(ptr, prev, (ptr+2));
-            if(ptr == first)
-                prev=ptr;
-            set_page_scan_start_offset(page, page_address(page) - (char*)prev);
+            page_table[page].gen = gen;
+            set_page_need_to_zero(page, 1);
+            bytes_allocated += page_bytes_used(page);
         }
         page++;
     } while (page_address(page) < alloc_ptr);
@@ -4080,6 +4046,8 @@ gencgc_pickup_dynamic(void)
 
     generations[gen].bytes_allocated = bytes_allocated;
 
+    gc_assert((os_vm_size_t)(alloc_ptr - (char*)page_address(0)) >= bytes_allocated);
+    // Why do we need this?  I don't think allocation regions can be open yet.
     gc_alloc_update_all_page_tables(1);
     if (ENABLE_PAGE_PROTECTION)
         write_protect_generation_pages(gen);
@@ -4088,9 +4056,35 @@ gencgc_pickup_dynamic(void)
 void
 gc_initialize_pointers(void)
 {
-    /* !page_table_pages happens once only in self-build and not again */
-    if (!page_table_pages)
+    /* !page_table_pages happens once only in self-build and not again.
+     * A trivial table (all pages 100% full except possibly the last)
+     * is fine to start with. Ideally genesis would write this data.
+     * The performance impact from assuming that all pages have a scan_start
+     * of page_address(0) is negligible. (On average, we examine 4x more
+     * objects than would be examined if the bound were tighter) */
+    if (!page_table_pages) {
+        char *alloc_ptr = (char *)get_alloc_pointer();
         gc_allocate_ptes();
+        page_index_t page, max = find_page_index(alloc_ptr-1);
+        for (page = 0; page <= max; ++page) {
+            // Don't know how much is actually allocated, so say it's all used.
+            set_page_bytes_used(page, GENCGC_CARD_BYTES);
+            // Don't know the allocation type. Use the "anything" value.
+            // With segregated code, the conservative value is CODE,
+            // as it implies a mixture of boxed + unboxed data.
+#if SEGREGATED_CODE
+            page_table[page].allocated = CODE_PAGE_FLAG;
+#else
+            page_table[page].allocated = BOXED_PAGE_FLAG;
+#endif
+            set_page_scan_start_offset(page, page_address(page)-page_address(0));
+        }
+        // Now correct the usage for the last page
+        uword_t calculated = npage_bytes(max+1);
+        uword_t actual = alloc_ptr - page_address(0);
+        page_bytes_t excess = calculated - actual;
+        set_page_bytes_used(max, GENCGC_CARD_BYTES - excess);
+    }
     gencgc_pickup_dynamic();
 }
 
@@ -4546,7 +4540,7 @@ gc_and_save(char *filename, boolean prepend_runtime,
 
 /* Convert corefile ptes to corresponding 'struct page' */
 boolean gc_load_corefile_ptes(char data[], ssize_t bytes_read,
-                              page_index_t npages, page_index_t* ppage)
+                              page_index_t n_ptes, page_index_t* ppage)
 {
     page_index_t page = *ppage;
     int i = 0;
@@ -4560,7 +4554,7 @@ boolean gc_load_corefile_ptes(char data[], ssize_t bytes_read,
         // The other bits become the scan_start_offset
         set_page_scan_start_offset(page, pte.sso & ~0x03);
         page_table[page].allocated = pte.sso & 0x03;
-        if (++page == npages)
+        if (++page == n_ptes)
             return 0; // No more to go
         ++i;
     }

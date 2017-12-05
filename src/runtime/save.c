@@ -349,23 +349,21 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
 #ifdef LISP_FEATURE_GENCGC
     {
         extern void gc_store_corefile_ptes(struct corefile_pte*);
-        size_t true_size = sizeof last_free_page
-            + (last_free_page * sizeof(struct corefile_pte));
+        size_t true_size = last_free_page * sizeof(struct corefile_pte);
         size_t rounded_size = ALIGN_UP(true_size, os_vm_page_size);
-        char* data = successful_malloc(rounded_size);
-        *(page_index_t*)data = last_free_page;
-        struct corefile_pte *ptes = (struct corefile_pte*)(data + sizeof(page_index_t));
+        struct corefile_pte* ptes = (struct corefile_pte*)successful_malloc(rounded_size);
         gc_store_corefile_ptes(ptes);
         write_lispobj(PAGE_TABLE_CORE_ENTRY_TYPE_CODE, file);
-        write_lispobj(4, file);
+        write_lispobj(5, file); // 5 = # of words in this core header entry
+        write_lispobj(last_free_page, file);
         write_lispobj(rounded_size, file);
         /* Clear unwritten bytes in the malloc'd range. They're probably zero
          * because malloc of large blocks is usually just an mmap(),
          * but we can't be certain the memory was freshly allocated */
         char* clear_from = (char*)&ptes[last_free_page];
-        char* clear_to = data + rounded_size;
+        char* clear_to = (char*)ptes + rounded_size;
         memset(clear_from, 0, clear_to-clear_from);
-        sword_t offset = write_bytes(file, data, rounded_size, core_start_pos);
+        sword_t offset = write_bytes(file, (char*)ptes, rounded_size, core_start_pos);
         write_lispobj(offset, file);
     }
 #endif
