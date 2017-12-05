@@ -119,12 +119,6 @@ maybe_initialize_runtime_options(int fd)
     }
 }
 
-#if defined(LISP_FEATURE_LINUX) && defined(LISP_FEATURE_IMMOBILE_CODE)
-#define ELFCORE 1
-#else
-#define ELFCORE 0
-#endif
-
 /* Search 'filename' for an embedded core.  An SBCL core has, at the
  * end of the file, a trailer containing optional saved runtime
  * options, the start of the core (an os_vm_offset_t), and a final
@@ -336,7 +330,12 @@ struct heap_adjust {
 #include "genesis/layout.h"
 #include "genesis/vector.h"
 
+#if defined(LISP_FEATURE_LINUX) && defined(LISP_FEATURE_IMMOBILE_CODE)
+#define ELFCORE 1
 extern __attribute__((weak)) lispobj __lisp_code_start, __lisp_code_end;
+#else
+#define ELFCORE 0
+#endif
 
 static inline sword_t calc_adjustment(struct heap_adjust* adj, lispobj x)
 {
@@ -634,9 +633,10 @@ void relocate_heap(struct heap_adjust* adj)
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     // Pointers within varyobj space to varyobj space do not need adjustment
     // so remove any delta before performing the relocation pass on this space.
-    if (&__lisp_code_start) {
+#if ELFCORE
+    if (&__lisp_code_start)
         adj->range[2].delta = 0;
-    }
+#endif
     relocate_space(VARYOBJ_SPACE_START, varyobj_free_pointer, adj);
 #endif
 }
@@ -688,7 +688,7 @@ process_directory(int count, struct ndir_entry *entry,
 #endif
     };
 
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
+#if ELFCORE
     if (&__lisp_code_start) {
         VARYOBJ_SPACE_START = (uword_t)&__lisp_code_start;
         varyobj_free_pointer = &__lisp_code_end;
@@ -702,7 +702,10 @@ process_directory(int count, struct ndir_entry *entry,
 #endif
         // unprotect the pages
         os_protect((void*)VARYOBJ_SPACE_START, varyobj_space_size, OS_VM_PROT_ALL);
-    } else {
+    } else
+#endif
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    {
         spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].desired_size += VARYOBJ_SPACE_SIZE;
     }
 #endif
