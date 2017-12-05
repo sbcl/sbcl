@@ -279,6 +279,7 @@
                                (:sc unsigned-reg :offset rdi-offset) rdi)
   #!+(and sb-safepoint win32) (:temporary
                                (:sc unsigned-reg :offset rsi-offset) rsi)
+  #!+sb-safepoint (:temporary (:sc unsigned-stack) pc-save)
   (:ignore results
            #!+(and sb-safepoint win32) rdi
            #!+(and sb-safepoint win32) rsi
@@ -293,7 +294,8 @@
       ;; GC understands
       (let ((label (gen-label)))
         (inst lea r14 (make-fixup nil :code-object label))
-        (emit-label label)))
+        (emit-label label)
+        (move pc-save r14)))
     (when sb!c::*msan-compatible-stack-unpoison*
       (inst mov rax (static-symbol-value-ea 'msan-param-tls))
       ;; Unpoison parameters
@@ -313,18 +315,16 @@
                                     'float-registers)))
     #!+win32 (inst sub rsp-tn #x20) ;MS_ABI: shadow zone
     #!+sb-safepoint
-    (progn                 ;Store SP and PC in thread struct
-      (storew r14 thread-base-tn thread-pc-around-foreign-call-slot)
+    (progn                 ;Store SP in thread struct
       (storew rsp-tn thread-base-tn thread-saved-csp-offset))
     (move rbx function)
     (inst call rbx)
     #!+win32 (inst add rsp-tn #x20) ;MS_ABI: remove shadow space
     #!+sb-safepoint
     (progn
-      ;; Zero the saved PC and CSP
+      ;; Zero the saved CSP
       (inst xor r14 r14)
-      (storew r14 thread-base-tn thread-saved-csp-offset)
-      (storew r14 thread-base-tn thread-pc-around-foreign-call-slot))
+      (storew r14 thread-base-tn thread-saved-csp-offset))
     ;; To give the debugger a clue. XX not really internal-error?
     (note-this-location vop :internal-error)))
 
