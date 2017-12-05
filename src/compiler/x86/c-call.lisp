@@ -276,11 +276,11 @@
   #!+sb-safepoint (:temporary (:sc unsigned-reg :offset esi-offset) esi)
   #!+sb-safepoint (:temporary (:sc unsigned-reg :offset edi-offset) edi)
   #!-sb-safepoint (:node-var node)
+  #!+sb-safepoint (:temporary (:sc unsigned-stack) pc-save)
   (:vop-var vop)
   (:save-p t)
   (:ignore args ecx edx
-           #!+sb-safepoint esi
-           #!+sb-safepoint edi)
+           #!+sb-safepoint esi)
   (:generator 0
     ;; FIXME & OAOOM: This is brittle and error-prone to maintain two
     ;; instances of the same logic, on in arch-assem.S, and one in
@@ -291,6 +291,12 @@
             ;; An inline version of said changes is left to the
             ;; sufficiently motivated maintainer.
             #!-sb-safepoint (policy node (> space speed)))
+           ;; On safepoint builds, we need to stash the return address
+           ;; on the "protected" part of the control stack so that it
+           ;; doesn't move on us.  Pass the address of pc-save in EDI.
+           #!+sb-safepoint
+           (inst lea edi (make-ea :dword :base ebp-tn
+                                  :disp (frame-byte-offset (tn-offset pc-save))))
            (move eax function)
            (inst call (make-fixup "call_into_c" :foreign))
            (when (and results

@@ -228,21 +228,20 @@
  *   Both versions need to take special care with the return PC:
  *   - In the inline version of the code (if it existed), the two stores
  *     would be done directly in the CALL-OUT vop.  In that theoretical
- *     implementation, there is a time interval between return of the
- *     actual C call and a second SP store during which the return
- *     address might not be on the stack anymore.
+ *     implementation, even though the CALL instruction pushes the return
+ *     address to the stack, it is outside of the range preserved by the
+ *     GC as possible heap pointers.
  *   - In this out-of-line version, the stores are done during
  *     call_into_c's frame, but an equivalent problem arises: In order
  *     to present the stack of arguments as our foreign function expects
  *     them, call_into_c has to pop the Lisp return address into a
- *     register first; this register has to be preserved by GENCGC
- *     separately: our return address is not in the stack anymore.
- *   In both case, stack scanning alone is not sufficient to pin
- *   the return address, and we communicate it to GC explicitly
- *   in addition to the SP.
+ *     register.
+ *   In both cases, stack scanning would not normally find the return
+ *   address, so we arrange to store it in a slot within our calling
+ *   frame.  The address of this slot is passed to us in EDI.
  *
  * Note on look-alike accessor macros with vastly different behaviour:
- *   THREAD_PC_AROUND_FOREIGN_CALL_OFFSET is an "ordinary" field of the
+ *   THREAD_PC_AROUND_FOREIGN_CALL_OFFSET was an "ordinary" field of the
  *   struct thread, whereas THREAD_SAVED_CSP_OFFSET is a synchronization
  *   point on a potentially write-protected page.
 */
@@ -271,9 +270,10 @@ GNAME(call_into_c):
 	fstp	%st(0)
 
 #ifdef LISP_FEATURE_SB_SAFEPOINT
-        /* enter safe region: store SP and return PC */
+        /* Save our return PC in the allocated slot (address passed in EDI) */
+        movl    %ebx,(%edi)
+        /* enter safe region: store SP */
 	movl	SBCL_THREAD_BASE_EA,%edi
-        movl	%ebx,MAYBE_FS(THREAD_PC_AROUND_FOREIGN_CALL_OFFSET(%edi))
 	movl	%esp,MAYBE_FS(THREAD_SAVED_CSP_OFFSET(%edi))
 #endif
 
@@ -282,10 +282,9 @@ GNAME(call_into_c):
         /* return values now in eax/edx OR st(0) */
 
 #ifdef LISP_FEATURE_SB_SAFEPOINT
-        /* leave region: clear the SP!  (Also unpin the return PC.) */
+        /* leave region: clear the SP! */
 	xorl	%ecx,%ecx
 	movl	%ecx,MAYBE_FS(THREAD_SAVED_CSP_OFFSET(%edi))
-	movl	%ecx,MAYBE_FS(THREAD_PC_AROUND_FOREIGN_CALL_OFFSET(%edi))
 #endif
 
         movl	%eax,%ecx	  # remember integer return value
