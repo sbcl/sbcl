@@ -560,7 +560,6 @@ GNAME(do_pending_interrupt):
  * DEFINE_ALLOC_TO_FOO defines an alloction routine.
  */
 
-#ifdef LISP_FEATURE_DARWIN
 #define ALLOC(size)                                             \
         pushl   %ebp;              /* Save EBP               */ \
         movl    %esp,%ebp;         /* Save ESP to EBP        */ \
@@ -570,12 +569,6 @@ GNAME(do_pending_interrupt):
         call    GNAME(alloc);                                   \
         movl    %ebp,%esp;         /* Restore ESP from EBP   */ \
         popl    %ebp;              /* Restore EBP            */
-#else
-#define ALLOC(size)                                             \
-        pushl   size;              /* Argument to alloc      */ \
-        call    GNAME(alloc);                                   \
-        addl    $4,%esp;           /* Pop argument           */
-#endif
 
 #define DEFINE_ALLOC_TO_EAX(name,size)                          \
         .globl  GNAME(name);                                    \

@@ -46,10 +46,8 @@
        (inst mov ,n-dst ,n-src))))
 
 (defmacro align-stack-pointer (tn)
-  #!-darwin (declare (ignore tn))
-  #!+darwin
   ;; 16 byte alignment.
-  `(inst and ,tn #xfffffff0))
+  `(inst and ,tn -16))
 
 (defmacro make-ea-for-object-slot (ptr slot lowtag &optional (size :dword))
   `(make-ea ,size :base ,ptr :disp (- (* ,slot n-word-bytes) ,lowtag)))
