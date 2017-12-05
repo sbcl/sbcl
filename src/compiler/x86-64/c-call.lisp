@@ -314,17 +314,15 @@
     #!+win32 (inst sub rsp-tn #x20) ;MS_ABI: shadow zone
     #!+sb-safepoint
     (progn                 ;Store SP and PC in thread struct
-      (storew rsp-tn thread-base-tn thread-saved-csp-offset)
-      (storew r14 thread-base-tn thread-pc-around-foreign-call-slot))
+      (storew r14 thread-base-tn thread-pc-around-foreign-call-slot)
+      (storew rsp-tn thread-base-tn thread-saved-csp-offset))
     (move rbx function)
     (inst call rbx)
     #!+win32 (inst add rsp-tn #x20) ;MS_ABI: remove shadow space
     #!+sb-safepoint
     (progn
-      ;; Zeroing out
+      ;; Zero the saved PC and CSP
       (inst xor r14 r14)
-      ;; Zero PC storage place. NB. CSP-then-PC: same sequence on
-      ;; entry/exit, is actually corrent.
       (storew r14 thread-base-tn thread-saved-csp-offset)
       (storew r14 thread-base-tn thread-pc-around-foreign-call-slot))
     ;; To give the debugger a clue. XX not really internal-error?

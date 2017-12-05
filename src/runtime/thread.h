@@ -321,35 +321,27 @@ void push_gcing_safety(struct gcing_safety *into)
 {
     struct thread* th = arch_os_get_current_thread();
     asm volatile ("");
-    if ((into->csp_around_foreign_call =
-         *th->csp_around_foreign_call)) {
-        *th->csp_around_foreign_call = 0;
-        asm volatile ("");
+    into->csp_around_foreign_call = *th->csp_around_foreign_call;
+    *th->csp_around_foreign_call = 0;
+    asm volatile ("");
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-        into->pc_around_foreign_call = th->pc_around_foreign_call;
-        th->pc_around_foreign_call = 0;
-        asm volatile ("");
+    into->pc_around_foreign_call = th->pc_around_foreign_call;
+    th->pc_around_foreign_call = 0;
+    asm volatile ("");
 #endif
-    } else {
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-        into->pc_around_foreign_call = 0;
-#endif
-    }
 }
 
 static inline
 void pop_gcing_safety(struct gcing_safety *from)
 {
     struct thread* th = arch_os_get_current_thread();
-    if (from->csp_around_foreign_call) {
-        asm volatile ("");
-        *th->csp_around_foreign_call = from->csp_around_foreign_call;
-        asm volatile ("");
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-        th->pc_around_foreign_call = from->pc_around_foreign_call;
-        asm volatile ("");
+    asm volatile ("");
+    th->pc_around_foreign_call = from->pc_around_foreign_call;
 #endif
-    }
+    asm volatile ("");
+    *th->csp_around_foreign_call = from->csp_around_foreign_call;
+    asm volatile ("");
 }
 
 #define WITH_GC_AT_SAFEPOINTS_ONLY_hygenic(var)        \

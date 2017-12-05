@@ -273,8 +273,8 @@ GNAME(call_into_c):
 #ifdef LISP_FEATURE_SB_SAFEPOINT
         /* enter safe region: store SP and return PC */
 	movl	SBCL_THREAD_BASE_EA,%edi
+        movl	%ebx,MAYBE_FS(THREAD_PC_AROUND_FOREIGN_CALL_OFFSET(%edi))
 	movl	%esp,MAYBE_FS(THREAD_SAVED_CSP_OFFSET(%edi))
-	movl	%ebx,MAYBE_FS(THREAD_PC_AROUND_FOREIGN_CALL_OFFSET(%edi))
 #endif
 
 	/* foreign call, preserving ESI, EDI, and EBX */
