@@ -25,7 +25,7 @@ struct ndir_entry {
     core_entry_elt_t identifier;
     core_entry_elt_t nwords;
     core_entry_elt_t data_page;
-    core_entry_elt_t address; /* expressed in units of KiB */
+    core_entry_elt_t address;
     core_entry_elt_t page_count;
 };
 #define NDIR_ENTRY_LENGTH (sizeof (struct ndir_entry)/sizeof (core_entry_elt_t))

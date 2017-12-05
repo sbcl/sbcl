@@ -1043,8 +1043,7 @@
                   (symbol-macrolet ((id        (%vector-raw-bits buffer index))
                                     (nwords    (%vector-raw-bits buffer (+ index 1)))
                                     (data-page (%vector-raw-bits buffer (+ index 2)))
-                                    (addr      (* (%vector-raw-bits buffer (+ index 3))
-                                                  1024)) ; slightly silly convention
+                                    (addr      (%vector-raw-bits buffer (+ index 3)))
                                     (npages    (%vector-raw-bits buffer (+ index 4))))
                     (do ((,index-var ,start-index (+ ,index-var words-per-dirent)))
                         ((= ,index-var (+ ,start-index (* n-entries words-per-dirent))))
@@ -1146,8 +1145,9 @@
                       ;; adjust this entry's start page in the new core
                       (decf data-page page-adjust)))))
             (#.page-table-core-entry-type-code
-             (let ((bytes (%vector-raw-bits buffer ptr))
-                   (data-page (%vector-raw-bits buffer (1+ ptr))))
+             (aver (= len 3))
+             (let ((bytes (%vector-raw-bits buffer (1+ ptr)))
+                   (data-page (%vector-raw-bits buffer (+ ptr 2))))
                (aver (= data-page original-total-npages))
                (when verbose
                  (format t "PTE: page=~5x~40tbytes=~8x~%" data-page bytes))

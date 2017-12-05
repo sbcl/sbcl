@@ -709,7 +709,7 @@ process_directory(int count, struct ndir_entry *entry,
 
     for ( ; --count>= 0; ++entry) {
         sword_t id = entry->identifier;
-        uword_t addr = (1024 * entry->address); // multiplier as per core.h
+        uword_t addr = entry->address;
         int compressed = id & DEFLATED_CORE_SPACE_ID_FLAG;
         id -= compressed;
         if (id < 1 || id > MAX_CORE_SPACE_ID)
@@ -726,6 +726,10 @@ process_directory(int count, struct ndir_entry *entry,
         // Enforce address of readonly and static spaces.
         int enforce_address = id != DYNAMIC_CORE_SPACE_ID;
 #endif
+
+        // We'd like to enforce proper alignment of 'addr' but there's
+        // a problem: dynamic space has a stricter requirement (usually 32K)
+        // than code space (4K). So don't assert the alignment.
         if (enforce_address) {
             int fail;
 #ifdef LISP_FEATURE_CHENEYGC

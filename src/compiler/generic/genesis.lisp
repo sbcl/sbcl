@@ -3471,10 +3471,7 @@ III. initially undefined function references (alphabetically):
     (write-word (gspace-identifier gspace))
     (write-word (gspace-free-word-index gspace))
     (write-word *data-page*)
-    (multiple-value-bind (floor rem)
-        (floor (gspace-byte-address gspace) 1024) ; units as per core.h
-      (aver (zerop rem))
-      (write-word floor))
+    (write-word (gspace-byte-address gspace))
     (write-word pages)
 
     (incf *data-page* pages)))
