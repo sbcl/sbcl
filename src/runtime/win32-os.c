@@ -1381,6 +1381,13 @@ handle_exception(EXCEPTION_RECORD *exception_record,
     context.sigmask = self ? self->os_thread->blocked_signal_set : 0;
 #endif
 
+    os_context_register_t oldbp = NULL;
+    if (self) {
+        oldbp = self ? self->carried_base_pointer : 0;
+        self->carried_base_pointer
+            = (os_context_register_t) voidreg(win32_context, bp);
+    }
+
     /* For EXCEPTION_ACCESS_VIOLATION only. */
     void *fault_address = (void *)exception_record->ExceptionInformation[1];
 
@@ -1422,6 +1429,9 @@ handle_exception(EXCEPTION_RECORD *exception_record,
     if (rc)
         /* All else failed, drop through to the lisp-side exception handler. */
         signal_internal_error_or_lose(ctx, exception_record, fault_address);
+
+    if (self)
+        self->carried_base_pointer = oldbp;
 
     errno = lastErrno;
     SetLastError(lastError);

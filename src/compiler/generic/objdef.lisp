@@ -459,6 +459,11 @@
   (control-stack-pointer :c-type "lispobj *")
   #!+mach-exception-handler
   (mach-port-name :c-type "mach_port_name_t")
+  ;; Context base pointer for running on top of system libraries built using
+  ;; -fomit-frame-pointer.  Currently truly required and implemented only
+  ;; for (and win32 x86-64), but could be generalized to other platforms if
+  ;; needed:
+  #!+win32 (carried-base-pointer :c-type "os_context_register_t")
   #!+sb-safepoint (csp-around-foreign-call :c-type "lispobj *")
   #!+sb-safepoint (pc-around-foreign-call :c-type "lispobj *")
   #!+win32 (synchronous-io-handle-and-flag :c-type "HANDLE" :length 1)
