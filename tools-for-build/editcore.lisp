@@ -1146,8 +1146,8 @@
                       (decf data-page page-adjust)))))
             (#.page-table-core-entry-type-code
              (aver (= len 3))
-             (let ((bytes (%vector-raw-bits buffer (1+ ptr)))
-                   (data-page (%vector-raw-bits buffer (+ ptr 2))))
+             (symbol-macrolet ((bytes (%vector-raw-bits buffer (1+ ptr)))
+                               (data-page (%vector-raw-bits buffer (+ ptr 2))))
                (aver (= data-page original-total-npages))
                (when verbose
                  (format t "PTE: page=~5x~40tbytes=~8x~%" data-page bytes))
@@ -1155,7 +1155,7 @@
                    (floor bytes +backend-page-bytes+)
                  (aver (zerop remainder))
                  (push (cons data-page npages) copy-actions)
-                 (decf (%vector-raw-bits buffer (1+ ptr)) page-adjust))))))
+                 (decf data-page page-adjust))))))
         (write-sequence buffer temp-core)
         (dolist (action (nreverse copy-actions))
           ;; page index convention assumes absence of core header.
