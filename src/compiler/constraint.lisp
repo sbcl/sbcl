@@ -510,11 +510,14 @@
     (let ((eq-x (eq from-var (constraint-x con)))
           (eq-y (eq from-var (constraint-y con))))
       (dolist (var vars)
-        (conset-add-constraint target
-                               (constraint-kind con)
-                               (if eq-x var (constraint-x con))
-                               (if eq-y var (constraint-y con))
-                               (constraint-not-p con))))))
+        (let ((x (if eq-x var (constraint-x con)))
+              (y (if eq-y var (constraint-y con))))
+          (unless (eq x y)
+            (conset-add-constraint target
+                                   (constraint-kind con)
+                                   x
+                                   y
+                                   (constraint-not-p con))))))))
 
 ;; Add an (EQL LAMBDA-VAR LAMBDA-VAR) constraint on VAR1 and VAR2 and
 ;; inherit each other's constraints.
