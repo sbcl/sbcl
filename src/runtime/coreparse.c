@@ -119,6 +119,13 @@ maybe_initialize_runtime_options(int fd)
     }
 }
 
+#if defined(LISP_FEATURE_LINUX) && defined(LISP_FEATURE_IMMOBILE_CODE)
+#define ELFCORE 1
+extern __attribute__((weak)) lispobj __lisp_code_start, __lisp_code_end;
+#else
+#define ELFCORE 0
+#endif
+
 /* Search 'filename' for an embedded core.  An SBCL core has, at the
  * end of the file, a trailer containing optional saved runtime
  * options, the start of the core (an os_vm_offset_t), and a final
@@ -329,13 +336,6 @@ struct heap_adjust {
 #include "genesis/hash-table.h"
 #include "genesis/layout.h"
 #include "genesis/vector.h"
-
-#if defined(LISP_FEATURE_LINUX) && defined(LISP_FEATURE_IMMOBILE_CODE)
-#define ELFCORE 1
-extern __attribute__((weak)) lispobj __lisp_code_start, __lisp_code_end;
-#else
-#define ELFCORE 0
-#endif
 
 static inline sword_t calc_adjustment(struct heap_adjust* adj, lispobj x)
 {

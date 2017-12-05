@@ -611,7 +611,7 @@
           emit-sizes total-code-size)
 
   ;; Pad so that non-lisp code can't be colocated on a GC page.
-  ;; (Lack of Lisp object headers in C code is the issuee)
+  ;; (Lack of Lisp object headers in C code is the issue)
   (let ((aligned-end (logandc2 (+ end-loc 4095) 4095)))
     (when (> aligned-end end-loc)
       (multiple-value-bind (nwords remainder)
@@ -1141,33 +1141,32 @@
                          (setq fixedobj-space
                                (cons addr (+ addr (ash nwords word-shift))))))
                       (when (plusp npages) ; enqueue
-                        (push (cons data-page npages) copy-actions))
+                        (push (cons data-page (* npages +backend-page-bytes+))
+                              copy-actions))
                       ;; adjust this entry's start page in the new core
                       (decf data-page page-adjust)))))
             (#.page-table-core-entry-type-code
              (aver (= len 3))
-             (symbol-macrolet ((bytes (%vector-raw-bits buffer (1+ ptr)))
+             (symbol-macrolet ((nbytes (%vector-raw-bits buffer (1+ ptr)))
                                (data-page (%vector-raw-bits buffer (+ ptr 2))))
                (aver (= data-page original-total-npages))
                (when verbose
-                 (format t "PTE: page=~5x~40tbytes=~8x~%" data-page bytes))
-               (multiple-value-bind (npages remainder)
-                   (floor bytes +backend-page-bytes+)
-                 (aver (zerop remainder))
-                 (push (cons data-page npages) copy-actions)
-                 (decf data-page page-adjust))))))
+                 (format t "PTE: page=~5x~40tbytes=~8x~%" data-page nbytes))
+               (push (cons data-page nbytes) copy-actions)
+               (decf data-page page-adjust)))))
         (write-sequence buffer temp-core)
         (dolist (action (nreverse copy-actions))
           ;; page index convention assumes absence of core header.
           ;; i.e. data page 0 is the file page immediately following the core header
           (let ((offset (* (1+ (car action)) +backend-page-bytes+))
-                (npages (cdr action)))
+                (nbytes (cdr action)))
             (when verbose
-              (format t "File offset ~10x: ~4x page~:P~%" offset npages))
+              (format t "File offset ~10x: ~10x bytes~%" offset nbytes))
             (file-position input (+ core-offset offset))
-            (dotimes (page npages)
-              (read-sequence buffer input)
-              (write-sequence buffer temp-core))))
+            (loop (let ((chunksize (min (length buffer) nbytes)))
+                    (aver (eql (read-sequence buffer input :end chunksize) chunksize))
+                    (write-sequence buffer temp-core :end chunksize)
+                    (when (zerop (decf nbytes chunksize)) (return))))))
         ;; Trailer (runtime options and magic number)
         (let ((nbytes (read-sequence buffer input)))
           ;; expect trailing magic number

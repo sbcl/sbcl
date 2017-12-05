@@ -156,13 +156,10 @@ write_bytes_to_file(FILE * file, char *addr, long bytes, int compression)
 };
 
 
-static long
-write_and_compress_bytes(FILE *file, char *addr, long bytes, os_vm_offset_t file_offset,
-                         int compression)
+static long write_bytes(FILE *file, char *addr, long bytes,
+                        os_vm_offset_t file_offset, int compression)
 {
     long here, data;
-
-    bytes = ALIGN_UP(bytes, os_vm_page_size);
 
 #ifdef LISP_FEATURE_WIN32
     long count;
@@ -180,13 +177,6 @@ write_and_compress_bytes(FILE *file, char *addr, long bytes, os_vm_offset_t file
     write_bytes_to_file(file, addr, bytes, compression);
     fseek(file, here, SEEK_SET);
     return ((data - file_offset) / os_vm_page_size) - 1;
-}
-
-static long __attribute__((__unused__))
-write_bytes(FILE *file, char *addr, long bytes, os_vm_offset_t file_offset)
-{
-    return write_and_compress_bytes(file, addr, bytes, file_offset,
-                                    COMPRESSION_LEVEL_NONE);
 }
 
 static void
@@ -212,8 +202,8 @@ output_space(FILE *file, int id, lispobj *addr, lispobj *end,
         printf("writing %lu bytes from the %s space at %p\n",
                (long unsigned)bytes, names[id], addr);
 
-    data = write_and_compress_bytes(file, (char *)addr, bytes, file_offset,
-                                    core_compression_level);
+    data = write_bytes(file, (char *)addr, ALIGN_UP(bytes, os_vm_page_size),
+                       file_offset, core_compression_level);
 
     write_lispobj(data, file);
     write_lispobj((uword_t)addr, file);
@@ -350,20 +340,18 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     {
         extern void gc_store_corefile_ptes(struct corefile_pte*);
         size_t true_size = last_free_page * sizeof(struct corefile_pte);
-        size_t rounded_size = ALIGN_UP(true_size, os_vm_page_size);
-        struct corefile_pte* ptes = (struct corefile_pte*)successful_malloc(rounded_size);
-        gc_store_corefile_ptes(ptes);
+        size_t aligned_size = ALIGN_UP(true_size, N_WORD_BYTES);
+        char* data = successful_malloc(aligned_size);
+        // Zeroize the final few bytes of data that get written out
+        // but might be untouched by gc_store_corefile_ptes().
+        memset(data + aligned_size - N_WORD_BYTES, 0, N_WORD_BYTES);
+        gc_store_corefile_ptes((struct corefile_pte*)data);
         write_lispobj(PAGE_TABLE_CORE_ENTRY_TYPE_CODE, file);
         write_lispobj(5, file); // 5 = # of words in this core header entry
         write_lispobj(last_free_page, file);
-        write_lispobj(rounded_size, file);
-        /* Clear unwritten bytes in the malloc'd range. They're probably zero
-         * because malloc of large blocks is usually just an mmap(),
-         * but we can't be certain the memory was freshly allocated */
-        char* clear_from = (char*)&ptes[last_free_page];
-        char* clear_to = (char*)ptes + rounded_size;
-        memset(clear_from, 0, clear_to-clear_from);
-        sword_t offset = write_bytes(file, (char*)ptes, rounded_size, core_start_pos);
+        write_lispobj(aligned_size, file);
+        sword_t offset = write_bytes(file, data, aligned_size, core_start_pos,
+                                     COMPRESSION_LEVEL_NONE);
         write_lispobj(offset, file);
     }
 #endif

@@ -100,8 +100,8 @@ shrinkwrap-sbcl.s shrinkwrap-sbcl-core.o: sbcl ../../output/sbcl.core \
  ../../tools-for-build/editcore.lisp
 	../../run-sbcl.sh --script ../../tools-for-build/editcore.lisp split \
 		../../output/sbcl.core shrinkwrap-sbcl.s
-shrinkwrap-sbcl: shrinkwrap-sbcl.s shrinkwrap-sbcl-core.o $(OBJS) $(LIBS)
-	$(CC) -Wl,-export-dynamic $(CFLAGS) -o $@ $^
+shrinkwrap-sbcl: shrinkwrap-sbcl.s shrinkwrap-sbcl-core.o $(LIBSBCL)
+	$(CC) -Wl,-export-dynamic $(CFLAGS) -o $@ $^ $(LIBS)
 
 sbcl.mk:
 	( echo 'CC=$(CC)' ; \
