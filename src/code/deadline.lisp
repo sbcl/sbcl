@@ -204,41 +204,52 @@ deadline instead of the local timeout indicated by SECONDS.
 If SECONDS is null and there is no global timeout all returned values will be
 null. If a global deadline has already passed when DECODE-TIMEOUT is called,
 it will signal a timeout condition."
-  (let ((timeout (when seconds
-                   (seconds-to-maybe-internal-time seconds)))
-        (deadline *deadline*))
-    (when (not (or timeout deadline))
-      (return-from decode-timeout (values nil nil nil nil nil)))
-    (tagbody
-     :restart
-       (let* ((now (get-internal-real-time))
-              (deadline-internal-time (when deadline
-                                        (deadline-internal-time deadline)))
-              (deadline-timeout
-               (when deadline
-                 (let ((time-left (- deadline-internal-time now)))
-                   (if (plusp time-left)
-                       time-left
-                       (progn
-                         (signal-deadline)
-                         (setf deadline *deadline*)
-                         (go :restart)))))))
-         (return-from decode-timeout
-           (multiple-value-bind (final-timeout final-deadline signalp)
-               ;; Use either *DEADLINE* or TIMEOUT to produce both a
-               ;; timeout and deadline in internal-time units
-               (cond ((and deadline timeout)
-                      (if (< timeout deadline-timeout)
-                          (values timeout (+ timeout now) nil)
-                          (values deadline-timeout deadline-internal-time t)))
-                     (deadline
-                      (values deadline-timeout deadline-internal-time t))
-                     (t
-                      (values timeout (+ timeout now) nil)))
-             (if final-timeout
-                 (binding* (((to-sec to-usec)
-                             (decode-internal-time final-timeout))
-                            ((stop-sec stop-usec)
-                             (decode-internal-time final-deadline)))
-                   (values to-sec to-usec stop-sec stop-usec signalp))
-                 (values nil nil nil nil nil))))))))
+  (declare (optimize speed))
+  (flet ((return-timeout (timeout deadline signalp)
+           (binding* (((to-sec to-usec)
+                       (decode-internal-time timeout))
+                      ((stop-sec stop-usec)
+                       (decode-internal-time deadline)))
+             (values to-sec to-usec stop-sec stop-usec signalp)))
+         (return-no-timeout ()
+           (values nil nil nil nil nil)))
+    (let ((timeout (when seconds
+                     (seconds-to-maybe-internal-time seconds)))
+          (deadline *deadline*))
+      (when (not (or timeout deadline))
+        (return-no-timeout))
+      ;; Use either TIMEOUT or DEADLINE to produce both a timeout and
+      ;; deadline in internal-time units.
+      (tagbody
+       :restart
+         (let* ((now (get-internal-real-time))
+                (deadline-internal-time (when deadline
+                                          (deadline-internal-time deadline)))
+                (deadline-timeout
+                 (when deadline-internal-time
+                   (let ((time-left (- deadline-internal-time now)))
+                     (when (plusp time-left) time-left)))))
+           (return-from decode-timeout
+             (cond
+               ;; We have a timeout and a non-expired deadline. Use the
+               ;; one that expires earlier.
+               ((and timeout deadline-timeout)
+                (if (< timeout deadline-timeout)
+                    (return-timeout timeout (+ timeout now) nil)
+                    (return-timeout deadline-timeout deadline-internal-time t)))
+               ;; Non-expired deadline.
+               (deadline-timeout
+                (return-timeout deadline-timeout deadline-internal-time t))
+               ;; Expired deadline. Signal the DEADLINE-TIMEOUT
+               ;; condition. In case we return here (i.e. the deadline
+               ;; has been deferred or canceled), pick up the new value
+               ;; of *DEADLINE*.
+               ((and (not deadline-timeout) deadline-internal-time)
+                (signal-deadline)
+                (setf deadline *deadline*)
+                (go :restart))
+               ;; There is no deadline but a timeout.
+               (timeout
+                (return-timeout timeout (+ timeout now) nil))
+               (t
+                (return-no-timeout)))))))))
