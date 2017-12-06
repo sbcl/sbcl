@@ -284,7 +284,7 @@ static void set_seh_frame(void *frame)
 
 void alloc_gc_page()
 {
-    AVER(VirtualAlloc(GC_SAFEPOINT_PAGE_ADDR, sizeof(lispobj),
+    AVER(VirtualAlloc(GC_SAFEPOINT_PAGE_ADDR, BACKEND_PAGE_BYTES,
                       MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE));
 }
 
@@ -312,14 +312,14 @@ void alloc_gc_page()
 void map_gc_page()
 {
     DWORD oldProt;
-    AVER(VirtualProtect((void*) GC_SAFEPOINT_PAGE_ADDR, sizeof(lispobj),
+    AVER(VirtualProtect((void*) GC_SAFEPOINT_PAGE_ADDR, BACKEND_PAGE_BYTES,
                         PAGE_READWRITE, &oldProt));
 }
 
 void unmap_gc_page()
 {
     DWORD oldProt;
-    AVER(VirtualProtect((void*) GC_SAFEPOINT_PAGE_ADDR, sizeof(lispobj),
+    AVER(VirtualProtect((void*) GC_SAFEPOINT_PAGE_ADDR, BACKEND_PAGE_BYTES,
                         PAGE_NOACCESS, &oldProt));
 }
 
