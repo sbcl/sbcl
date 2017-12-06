@@ -2,12 +2,14 @@
 
 (use-package :test-util)
 
-(defmacro assert-timeout (form)
+(defmacro assert-timeout ((&optional expected-message) form)
   (let ((ok (gensym "OK")))
     `(let ((,ok ',ok))
        (unless (eq ,ok
                    (handler-case ,form
-                     (timeout ()
+                     (timeout (condition)
+                       (assert (string= ,expected-message
+                                        (princ-to-string condition)))
                        ,ok)))
          (error "No timeout from form:~%  ~S" ',form)))))
 
@@ -26,18 +28,19 @@
 (with-test (:name (sb-sys:with-deadline :large-values :lp-1727789))
   (flet ((test (seconds)
            (let ((sem (sb-thread:make-semaphore :count 0)))
-             (assert-timeout
-              (sb-sys:with-deadline (:seconds seconds)
-                (sb-sys:with-deadline (:seconds 0)
-                  (sb-thread:wait-on-semaphore sem)))))))
+             (assert-timeout ("A deadline was reached after 0 seconds.")
+               (sb-sys:with-deadline (:seconds seconds)
+                 (sb-sys:with-deadline (:seconds 0)
+                   (sb-thread:wait-on-semaphore sem)))))))
     (test (1+ most-positive-fixnum))
     (test (1+ sb-kernel:internal-seconds-limit))
     (test (float (1+ sb-kernel:internal-seconds-limit) 1.0f0))
     (test (float (1+ sb-kernel:internal-seconds-limit) 1.0d0))))
 
 (with-test (:name (:deadline sb-ext:run-program :trivial) :fails-on :win32)
-  (assert-timeout (sb-sys:with-deadline (:seconds 1)
-                    (run-sleep 3))))
+  (assert-timeout ("A deadline was reached after 1 seconds.")
+    (sb-sys:with-deadline (:seconds 1)
+      (run-sleep 3))))
 
 (with-test (:name (:deadline sb-sys:defer-deadline 1) :fails-on :win32)
   (let ((n 0)
@@ -87,31 +90,31 @@
 
 (with-test (:name (:deadline sb-thread:grab-mutex)
                   :skipped-on (not :sb-thread))
-  (assert-timeout
-   (let ((lock (sb-thread:make-mutex))
-         (waitp t))
-     (make-join-thread (lambda ()
-                         (sb-thread:grab-mutex lock)
-                         (setf waitp nil)
-                         (sleep 5)))
-     (loop while waitp do (sleep 0.01))
-     (sb-sys:with-deadline (:seconds 1)
-       (sb-thread:grab-mutex lock)))))
+  (assert-timeout ("A deadline was reached after 1 seconds.")
+    (let ((lock (sb-thread:make-mutex))
+          (waitp t))
+      (make-join-thread (lambda ()
+                          (sb-thread:grab-mutex lock)
+                          (setf waitp nil)
+                          (sleep 5)))
+      (loop while waitp do (sleep 0.01))
+      (sb-sys:with-deadline (:seconds 1)
+        (sb-thread:grab-mutex lock)))))
 
 (with-test (:name (:deadline sb-thread:wait-on-semaphore)
                   :skipped-on (not :sb-thread))
-  (assert-timeout
-   (let ((sem (sb-thread:make-semaphore :count 0)))
-     (sb-sys:with-deadline (:seconds 1)
-       (sb-thread:wait-on-semaphore sem)))))
+  (assert-timeout ("A deadline was reached after 1 seconds.")
+    (let ((sem (sb-thread:make-semaphore :count 0)))
+      (sb-sys:with-deadline (:seconds 1)
+        (sb-thread:wait-on-semaphore sem)))))
 
 (with-test (:name (:deadline sb-thread:join-thread)
             :skipped-on (not :sb-thread)
             :broken-on :win32)
-  (assert-timeout
-   (sb-sys:with-deadline (:seconds 1)
-     (sb-thread:join-thread
-      (make-kill-thread (lambda () (loop (sleep 1))))))))
+  (assert-timeout ("A deadline was reached after 1 seconds.")
+    (sb-sys:with-deadline (:seconds 1)
+      (sb-thread:join-thread
+       (make-kill-thread (lambda () (loop (sleep 1))))))))
 
 (with-test (:name (:deadline :futex-wait-eintr)
             :skipped-on (not :sb-thread)

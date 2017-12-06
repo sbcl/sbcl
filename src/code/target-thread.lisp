@@ -176,8 +176,7 @@ arbitrary printable objects, and need not be unique.")
                         (typecase thing
                           (cons
                            (list "waiting on:" (cdr thing)
-                                 "timeout: " (sb!impl::timeout-to-seconds
-                                              (car thing))))
+                                 "timeout: " (car thing)))
                           (null
                            (list info))
                           (t

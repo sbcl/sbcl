@@ -12,8 +12,21 @@
 
 (in-package "SB!IMPL")
 
-;;; Current deadline as internal time units or NIL.
-(declaim (type (or internal-time null) *deadline*))
+(declaim (inline make-deadline))
+(defstruct (deadline
+             (:constructor make-deadline (internal-time seconds))
+             (:copier nil))
+  ;; The absolute deadline in internal time.
+  (internal-time nil :type internal-time :read-only t)
+  ;; A relative representation of the deadline in seconds relative to
+  ;; the time this deadline was established. This is used in error
+  ;; message and when extended the deadline by the original amount of
+  ;; time.
+  (seconds       nil :type (real 0)      :read-only t))
+(declaim (freeze-type deadline))
+
+;;; Current DEADLINE or NIL.
+(declaim (type (or deadline null) *deadline*))
 (!define-thread-local *deadline* nil)
 
 (declaim (inline seconds-to-internal-time))
@@ -36,15 +49,12 @@
      (seconds-to-internal-time
       (coerce seconds 'single-float)))))
 
-(declaim (inline seconds-to-deadline))
-(defun seconds-to-deadline (seconds)
+(declaim (inline seconds-to-internal-time-deadline))
+(defun seconds-to-internal-time-deadline (seconds)
   (let ((internal-time (when seconds
                          (seconds-to-maybe-internal-time seconds))))
     (when internal-time
       (+ internal-time (get-internal-real-time)))))
-
-(defun timeout-to-seconds (internal-time)
-  (* internal-time sb!xc:internal-time-units-per-second))
 
 (defmacro with-deadline ((&key seconds override)
                          &body body)
@@ -61,17 +71,32 @@ not extended. Deadlines are per thread: children are unaffected by
 their parent's deadlines.
 
 Experimental."
-  (with-unique-names (deadline)
-    `(let* ((,deadline (when ,seconds
-                         (seconds-to-deadline ,seconds)))
-            (*deadline*
-             (if ,override
-                 ,deadline
-                 (let ((old *deadline*))
-                   (if (and old (or (not ,deadline) (< old ,deadline)))
-                       old
-                       ,deadline)))))
-       ,@body)))
+  (once-only ((seconds seconds))
+    (with-unique-names (deadline)
+      `(labels ((with-deadline-thunk ()
+                  ,@body)
+                (bind-deadline-and-call (deadline)
+                  (let ((*deadline* deadline))
+                    (with-deadline-thunk)))
+                (bind-new-deadline-and-call (deadline-internal-time seconds)
+                  (dx-let ((deadline (make-deadline
+                                      deadline-internal-time seconds)))
+                    (bind-deadline-and-call deadline))))
+         (let ((,deadline (when ,seconds
+                            (seconds-to-internal-time-deadline ,seconds))))
+           (cond
+             ((and ,override ,deadline)
+              (bind-new-deadline-and-call ,deadline ,seconds))
+             (,override
+              (bind-deadline-and-call nil))
+             (,deadline
+              (let ((old *deadline*))
+                (if (and old (< (deadline-internal-time old)
+                                ,deadline))
+                    (bind-deadline-and-call old)
+                    (bind-new-deadline-and-call ,deadline ,seconds))))
+             (t
+              (bind-deadline-and-call nil))))))))
 
 (declaim (inline decode-internal-time))
 (defun decode-internal-time (time)
@@ -102,7 +127,7 @@ for calling this when a deadline is reached."
       (setf *deadline* nil))
     (with-interrupts
       (let ((seconds (when deadline
-                       (timeout-to-seconds deadline))))
+                       (deadline-seconds deadline))))
         (restart-case
             (error 'deadline-timeout :seconds seconds)
           (defer-deadline (&optional (seconds seconds))
@@ -111,7 +136,12 @@ for calling this when a deadline is reached."
                            (sb!int:read-evaluated-form
                             "By how many seconds shall the deadline ~
                              be deferred?: "))
-            (setf *deadline* (seconds-to-deadline seconds)))
+            (setf *deadline*
+                  (let ((deadline (when seconds
+                                    (seconds-to-internal-time-deadline
+                                     seconds))))
+                    (when deadline
+                      (make-deadline deadline seconds)))))
           (cancel-deadline ()
             :report "Cancel the deadline and continue."
             (setf *deadline* nil))))))
@@ -130,7 +160,7 @@ CONDITION, or return NIL if the restart is not found."
 
 (declaim (inline relative-decoded-times))
 (defun relative-decoded-times (abs-sec abs-usec)
-"Returns relative decoded time as two values: difference between
+  "Returns relative decoded time as two values: difference between
 ABS-SEC and ABS-USEC and current real time.
 
 If ABS-SEC and ABS-USEC are in the past, 0 0 is returned."
@@ -179,34 +209,38 @@ it will signal a timeout condition."
   (let ((timeout (when seconds
                    (seconds-to-maybe-internal-time seconds)))
         (deadline *deadline*))
-    (if (not (or timeout deadline))
-      (values nil nil nil nil nil)
-      (tagbody
-       :restart
-         (let* ((now (get-internal-real-time))
-                (deadline-timeout (when deadline
-                                    (let ((time-left (- deadline now)))
-                                      (if (plusp time-left)
-                                          time-left
-                                          (progn
-                                            (signal-deadline)
-                                            (go :restart)))))))
-           (return-from decode-timeout
-             (multiple-value-bind (final-timeout final-deadline signalp)
-                 ;; Use either *DEADLINE* or TIMEOUT to produce both a timeout
-                 ;; and deadline in internal-time units
-                 (cond ((and deadline timeout)
-                        (if (< timeout deadline-timeout)
-                            (values timeout (+ timeout now) nil)
-                            (values deadline-timeout deadline t)))
-                       (deadline
-                        (values deadline-timeout deadline t))
-                       (timeout
-                        (values timeout (+ timeout now) nil)))
-               (if final-timeout
-                   (binding* (((to-sec to-usec)
-                               (decode-internal-time final-timeout))
-                              ((stop-sec stop-usec)
-                               (decode-internal-time final-deadline)))
-                     (values to-sec to-usec stop-sec stop-usec signalp))
-                   (values nil nil nil nil nil)))))))))
+    (when (not (or timeout deadline))
+      (return-from decode-timeout (values nil nil nil nil nil)))
+    (tagbody
+     :restart
+       (let* ((now (get-internal-real-time))
+              (deadline-internal-time (when deadline
+                                        (deadline-internal-time deadline)))
+              (deadline-timeout
+               (when deadline
+                 (let ((time-left (- deadline-internal-time now)))
+                   (if (plusp time-left)
+                       time-left
+                       (progn
+                         (signal-deadline)
+                         (setf deadline *deadline*)
+                         (go :restart)))))))
+         (return-from decode-timeout
+           (multiple-value-bind (final-timeout final-deadline signalp)
+               ;; Use either *DEADLINE* or TIMEOUT to produce both a
+               ;; timeout and deadline in internal-time units
+               (cond ((and deadline timeout)
+                      (if (< timeout deadline-timeout)
+                          (values timeout (+ timeout now) nil)
+                          (values deadline-timeout deadline-internal-time t)))
+                     (deadline
+                      (values deadline-timeout deadline-internal-time t))
+                     (t
+                      (values timeout (+ timeout now) nil)))
+             (if final-timeout
+                 (binding* (((to-sec to-usec)
+                             (decode-internal-time final-timeout))
+                            ((stop-sec stop-usec)
+                             (decode-internal-time final-deadline)))
+                   (values to-sec to-usec stop-sec stop-usec signalp))
+                 (values nil nil nil nil nil))))))))
