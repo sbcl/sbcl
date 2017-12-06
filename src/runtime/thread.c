@@ -684,7 +684,7 @@ create_thread_struct(lispobj initial_function) {
 # ifdef LISP_FEATURE_WIN32
     th->carried_base_pointer = 0;
 # endif
-    th->csp_around_foreign_call = csp_page;
+    th->csp_around_foreign_call = (lispobj *)th - 1;
 #endif
 
     struct nonpointer_thread_data *nonpointer_data

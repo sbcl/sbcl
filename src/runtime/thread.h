@@ -195,11 +195,6 @@ extern __thread struct thread *current_thread;
 
 #ifndef LISP_FEATURE_SB_SAFEPOINT
 # define THREAD_CSP_PAGE_SIZE 0
-#elif defined(LISP_FEATURE_PPC)
-  /* BACKEND_PAGE_BYTES is nice and large on this platform, but therefore
-   * does not fit into an immediate, making it awkward to access the page
-   * relative to the thread-tn... */
-# define THREAD_CSP_PAGE_SIZE 4096
 #else
 # define THREAD_CSP_PAGE_SIZE BACKEND_PAGE_BYTES
 #endif

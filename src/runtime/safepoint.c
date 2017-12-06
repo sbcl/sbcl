@@ -279,7 +279,7 @@ static inline void thread_gc_promote(struct thread* p, gc_phase_t cur, gc_phase_
 static inline boolean
 set_thread_csp_access(struct thread* p, boolean writable)
 {
-    os_protect((os_vm_address_t) p->csp_around_foreign_call,
+    os_protect((char *) p->csp_around_foreign_call + N_WORD_BYTES - THREAD_CSP_PAGE_SIZE,
                THREAD_CSP_PAGE_SIZE,
                writable? (OS_VM_PROT_READ|OS_VM_PROT_WRITE)
                : (OS_VM_PROT_READ));

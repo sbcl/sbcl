@@ -158,11 +158,9 @@
 # define MAYBE_FS(addr) %fs:addr
 #endif
 
-/* OAOOM because we don't have the C headers here */
-#define THREAD_CSP_PAGE_SIZE BACKEND_PAGE_BYTES
 
 /* the CSP page sits right before the thread */
-#define THREAD_SAVED_CSP_OFFSET (-THREAD_CSP_PAGE_SIZE)
+#define THREAD_SAVED_CSP_OFFSET (-N_WORD_BYTES)
 
 /*
  * x86/darwin (as of MacOS X 10.4.5) doesn't reliably file signal

@@ -253,8 +253,7 @@
    (inst mov res (make-fixup foreign-symbol :foreign-dataref))))
 
 #!+sb-safepoint
-(defconstant thread-saved-csp-offset
-  (- (/ +backend-page-bytes+ n-word-bytes)))
+(defconstant thread-saved-csp-offset -1)
 
 (define-vop (call-out)
   (:args (function :scs (sap-reg)
