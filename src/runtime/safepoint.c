@@ -57,11 +57,14 @@ const char* gc_phase_names[GC_NPHASES] = {
 };
 
 #ifdef LISP_FEATURE_SB_THREAD
+#define CURRENT_THREAD_VAR(name) \
+    struct thread *self = arch_os_get_current_thread()
 #define THREAD_STOP_PENDING(th) \
     read_TLS(STOP_FOR_GC_PENDING, th)
 #define SET_THREAD_STOP_PENDING(th,state) \
     write_TLS(STOP_FOR_GC_PENDING,state,th)
 #else
+#define CURRENT_THREAD_VAR(name)
 #define THREAD_STOP_PENDING(th) NIL
 #define SET_THREAD_STOP_PENDING(th,state)
 #endif
@@ -358,9 +361,7 @@ static inline void gc_notify_final()
 
 static inline void gc_done()
 {
-#ifdef LISP_FEATURE_SB_THREAD
-    struct thread *self = arch_os_get_current_thread();
-#endif
+    CURRENT_THREAD_VAR(self);
     struct thread *p;
     boolean inhibit = (read_TLS(GC_INHIBIT,self)==T);
 
@@ -465,9 +466,7 @@ thread_may_gc()
      * 1) GC_INHIBIT == NIL  (outside of protected part of without-gcing)
      * Note that we are in a safepoint here, which is always outside of PA. */
 
-#ifdef LISP_FEATURE_SB_THREAD
-    struct thread *self = arch_os_get_current_thread();
-#endif
+    CURRENT_THREAD_VAR(self);
     return (read_TLS(GC_INHIBIT, self) == NIL);
 }
 
