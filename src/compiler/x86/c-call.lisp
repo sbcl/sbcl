@@ -267,20 +267,14 @@
          (args :more t))
   (:results (results :more t))
   (:temporary (:sc unsigned-reg :offset eax-offset
-                   :from :eval :to :result) eax)
-  (:temporary (:sc unsigned-reg :offset ecx-offset
-                   :from :eval :to :result) ecx)
-  (:temporary (:sc unsigned-reg :offset edx-offset
-                   :from :eval :to :result) edx)
+               :from :eval :to :result) eax)
   (:temporary (:sc double-stack) fp-temp)
-  #!+sb-safepoint (:temporary (:sc unsigned-reg :offset esi-offset) esi)
   #!+sb-safepoint (:temporary (:sc unsigned-reg :offset edi-offset) edi)
   #!-sb-safepoint (:node-var node)
   #!+sb-safepoint (:temporary (:sc unsigned-stack) pc-save)
   (:vop-var vop)
   (:save-p t)
-  (:ignore args ecx edx
-           #!+sb-safepoint esi)
+  (:ignore args)
   (:generator 0
     ;; FIXME & OAOOM: This is brittle and error-prone to maintain two
     ;; instances of the same logic, on in arch-assem.S, and one in
