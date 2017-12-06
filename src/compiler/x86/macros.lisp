@@ -402,18 +402,20 @@
                              (- nil-value n-word-bytes other-pointer-lowtag
                                 gc-safepoint-trap-offset))))
 
-#!+sb-thread
 (defmacro pseudo-atomic (&rest forms)
   #!+sb-safepoint-strictly
   `(progn ,@forms (emit-safepoint))
   #!-sb-safepoint-strictly
-  (with-unique-names (label)
-    `(let ((,label (gen-label)))
-       (inst mov (make-ea :dword :disp (* 4 thread-pseudo-atomic-bits-slot))
-             ebp-tn :fs)
+  (with-unique-names (label pa-bits-ea)
+    `(let ((,label (gen-label))
+           (,pa-bits-ea
+            #!+sb-thread
+            (make-ea :dword :disp (* 4 thread-pseudo-atomic-bits-slot))
+            #!-sb-thread
+            (make-ea-for-symbol-value *pseudo-atomic-bits* :dword)))
+       (inst mov ,pa-bits-ea ebp-tn #!+sb-thread :fs)
        ,@forms
-       (inst xor (make-ea :dword :disp (* 4 thread-pseudo-atomic-bits-slot))
-             ebp-tn :fs)
+       (inst xor ,pa-bits-ea ebp-tn #!+sb-thread :fs)
        (inst jmp :z ,label)
        ;; if PAI was set, interrupts were disabled at the same time
        ;; using the process signal mask.
@@ -425,21 +427,6 @@
        ;; trap instead.  Let's take the opportunity to trigger that
        ;; safepoint right now.
        (emit-safepoint))))
-
-#!-sb-thread
-(defmacro pseudo-atomic (&rest forms)
-  (with-unique-names (label)
-    `(let ((,label (gen-label)))
-       (inst mov (make-ea-for-symbol-value *pseudo-atomic-bits* :dword)
-             ebp-tn)
-       ,@forms
-       (inst xor (make-ea-for-symbol-value *pseudo-atomic-bits* :dword)
-             ebp-tn)
-       (inst jmp :z ,label)
-       ;; if PAI was set, interrupts were disabled at the same time
-       ;; using the process signal mask.
-       (inst break pending-interrupt-trap)
-       (emit-label ,label))))
 
 ;;;; indexed references
 
