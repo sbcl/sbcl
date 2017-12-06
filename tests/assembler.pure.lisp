@@ -147,6 +147,6 @@
     ;; Check that find-called-object looked in static space for FDEFNs
     (dolist (line lines)
       (when (and (search "CALL" line)
-                 (search " SUB-GC>" line))
+                 (search " SUB-GC" line))
         (setq found t)))
     (assert found)))

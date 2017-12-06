@@ -45,11 +45,13 @@
            (- list-pointer-lowtag)))
       0))
 
+(defconstant-eqx +all-static-fdefns+
+    #.(concatenate 'vector +c-callable-fdefns+ +static-fdefns+) #'equalp)
+
 ;;; Return the (byte) offset from NIL to the start of the fdefn object
 ;;; for the static function NAME.
 (defun static-fdefn-offset (name)
-  (let ((static-fun-index
-          (position name #.(concatenate 'vector +c-callable-fdefns+ +static-fdefns+))))
+  (let ((static-fun-index (position name +all-static-fdefns+)))
     (and static-fun-index
          (+ (* (length +static-symbols+) (pad-data-block symbol-size))
             (pad-data-block (1- symbol-size))

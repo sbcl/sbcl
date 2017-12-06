@@ -1815,7 +1815,7 @@
                 (lambda (x) (sap-int (sap+ (code-instructions code) (car x))))))
     #!-sb-dynamic-core
        (invert *static-foreign-symbols* #'identity))
-    (loop for name across sb!vm:+static-fdefns+
+    (loop for name across sb!vm::+all-static-fdefns+
           for address =
           #!+immobile-code (sb!vm::function-raw-address name)
           #!-immobile-code (+ sb!vm::nil-value (sb!vm::static-fun-offset name))
