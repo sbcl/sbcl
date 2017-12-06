@@ -151,7 +151,6 @@ Lstack:
 	push	%r13    # the lisp function returns
 	push	%r14    #
 	push	%r15    #
-	push	%rsp	# Save entry stack on (maybe) new stack.
 	push	%rdi	# args from C
 	push	%rsi	#
 	push	%rdx	#
@@ -212,9 +211,6 @@ Lcall:
 	jnc	LsingleValue	
 	mov	%rbx, %rsp
 LsingleValue:	
-
-/* Restore the stack, in case there was a stack change. */
-	pop	%rsp		# c-sp
 
 /* Restore C regs */
 	pop	%r15

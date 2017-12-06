@@ -404,10 +404,6 @@ Lstack:
 	xorl	%edi,%edi	# second arg
 	xorl	%esi,%esi	# third arg
 
-/* no longer in function call */
-	movl	%esp,%ebx	# remember current stack
-	pushl	%ebx		# Save entry stack on (maybe) new stack.
-
 	/* Establish Lisp args. */
 	movl	 8(%ebp),%eax	# lexenv?
 	movl	12(%ebp),%ebx	# address of arg vec
@@ -464,9 +460,6 @@ LsingleValue:
 	popl	%fs:0
 	add	$8, %esp
 #endif
-
-/* Restore the stack, in case there was a stack change. */
-	popl	%esp		# c-sp
 
 /* Restore C regs: ebx esi edi. */
 	popl	%edi
