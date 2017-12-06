@@ -439,7 +439,14 @@
                          (:byte 'byte-reg)
                          (:word 'word-reg)
                          (:dword 'dword-reg)
-                         (:qword 'unsigned-reg)))
+                         (:qword 'unsigned-reg)
+                         ;; PC inside immobile code can fit into 32 bits
+                         (:immobile-code-pc
+                          (cond #!+immobile-code
+                                (sb!c::*code-is-immobile*
+                                 'dword-reg)
+                                (t
+                                 'unsigned-reg)))))
                   :offset (tn-offset tn)))
 
 ;; A register that's never used by the code generator, and can therefore
