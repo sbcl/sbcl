@@ -3370,13 +3370,6 @@ garbage_collect_generation(generation_index_t generation, int raise)
             esp = os_get_csp(th);
             assert_on_stack(th, esp);
 
-            /* In addition to pointers on the stack, also preserve the
-             * return PC, the only value from the context that we need
-             * in addition to the SP.  The return PC gets saved by the
-             * foreign call wrapper, and removed from the control stack
-             * into a register. */
-            preserve_pointer(th->pc_around_foreign_call);
-
             /* And on platforms with interrupts: scavenge ctx registers. */
 
             /* Disabled on Windows, because it does not have an explicit

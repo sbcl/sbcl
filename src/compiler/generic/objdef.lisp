@@ -465,7 +465,6 @@
   ;; needed:
   #!+win32 (carried-base-pointer :c-type "os_context_register_t")
   #!+sb-safepoint (csp-around-foreign-call :c-type "lispobj *")
-  #!+sb-safepoint (pc-around-foreign-call :c-type "lispobj *")
   #!+win32 (synchronous-io-handle-and-flag :c-type "HANDLE" :length 1)
   #!+(and sb-safepoint-strictly (not win32))
   (sprof-alloc-region :c-type "struct alloc_region" :length 5)

@@ -34,9 +34,6 @@ void wait_for_thread_state_change(struct thread *thread, lispobj state);
 #if defined(LISP_FEATURE_SB_SAFEPOINT)
 struct gcing_safety {
     lispobj csp_around_foreign_call;
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-    lispobj* pc_around_foreign_call;
-#endif
 };
 
 int handle_safepoint_violation(os_context_t *context, os_vm_address_t addr);
@@ -324,21 +321,12 @@ void push_gcing_safety(struct gcing_safety *into)
     into->csp_around_foreign_call = *th->csp_around_foreign_call;
     *th->csp_around_foreign_call = 0;
     asm volatile ("");
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-    into->pc_around_foreign_call = th->pc_around_foreign_call;
-    th->pc_around_foreign_call = 0;
-    asm volatile ("");
-#endif
 }
 
 static inline
 void pop_gcing_safety(struct gcing_safety *from)
 {
     struct thread* th = arch_os_get_current_thread();
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-    asm volatile ("");
-    th->pc_around_foreign_call = from->pc_around_foreign_call;
-#endif
     asm volatile ("");
     *th->csp_around_foreign_call = from->csp_around_foreign_call;
     asm volatile ("");
