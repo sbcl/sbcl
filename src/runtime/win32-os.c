@@ -1206,7 +1206,7 @@ handle_access_violation(os_context_t *ctx,
 
     /* Safepoint pages */
 #ifdef LISP_FEATURE_SB_THREAD
-    if (fault_address == (void *) GC_SAFEPOINT_PAGE_ADDR) {
+    if (fault_address == (void *) GC_SAFEPOINT_TRAP_ADDR) {
         thread_in_lisp_raised(ctx);
         return 0;
     }
