@@ -44,8 +44,3 @@
 (defconstant gencgc-release-granularity +backend-page-bytes+)
 ;;; The card size for immobile/low space
 #!+immobile-space (def!constant immobile-card-bytes 4096)
-
-;;; The offset from the fault address reported to the runtime to the
-;;; END of the global safepoint page.
-#!+sb-safepoint
-(defconstant gc-safepoint-trap-offset +backend-page-bytes+)

@@ -1822,7 +1822,9 @@
           do (setf (gethash address addr->name) name))
     ;; Not really a routine, but it uses the similar logic for annotations
     #!+sb-safepoint
-    (setf (gethash sb!vm::gc-safepoint-page-addr addr->name)
+    (setf (gethash (+ sb!vm:gc-safepoint-page-addr
+                      sb!c:+backend-page-bytes+
+                      (- sb!vm:gc-safepoint-trap-offset)) addr->name)
           "safepoint"))
   (gethash address addr->name))
 
