@@ -36,6 +36,11 @@
 
 #include <setjmp.h>
 
+#ifndef EH_UNWINDING
+#define EH_UNWINDING 0x02
+#define EH_EXIT_UNWIND 0x04
+#endif
+
 /* The "public" API */
 
 typedef void (*callback_ptr)(void);
