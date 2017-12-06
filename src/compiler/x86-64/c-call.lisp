@@ -295,10 +295,10 @@
                           while tn-ref
                           count (eq (sb-name (sc-sb (tn-sc (tn-ref-tn tn-ref))))
                                     'float-registers)))
-    #!+win32 (inst sub rsp-tn #x20) ;MS_ABI: shadow zone
     #!+sb-safepoint
     ;; Store SP in thread struct
     (storew rsp-tn thread-base-tn thread-saved-csp-offset)
+    #!+win32 (inst sub rsp-tn #x20) ;MS_ABI: shadow zone
     (inst call rbx)
     #!+win32 (inst add rsp-tn #x20) ;MS_ABI: remove shadow space
     #!+sb-safepoint
