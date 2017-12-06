@@ -303,10 +303,9 @@
     (inst call rbx)
     #!+win32 (inst add rsp-tn #x20) ;MS_ABI: remove shadow space
     #!+sb-safepoint
-    (progn
-      ;; Zero the saved CSP
-      (zeroize rcx-tn)
-      (storew rcx-tn thread-base-tn thread-saved-csp-offset))
+    ;; Zero the saved CSP
+    (inst xor (make-ea-for-object-slot thread-base-tn thread-saved-csp-offset 0)
+          rsp-tn)
     ;; To give the debugger a clue. XX not really internal-error?
     (note-this-location vop :internal-error)))
 
