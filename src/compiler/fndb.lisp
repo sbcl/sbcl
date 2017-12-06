@@ -1805,7 +1805,8 @@
 (defknown data-nil-vector-ref (simple-array index) nil
   (always-translatable))
 (defknown data-vector-set (array index t) t
-  (always-translatable))
+  (always-translatable)
+  :destroyed-constant-args (nth-constant-args 1))
 (defknown data-vector-set-with-offset (array fixnum fixnum t) t
   (always-translatable))
 (defknown hairy-data-vector-ref (array index) t (foldable))
