@@ -36,6 +36,7 @@
 
 (declaim (inline seconds-to-maybe-internal-time))
 (defun seconds-to-maybe-internal-time (seconds)
+  (declare (optimize (speed 3)))
   (typecase seconds
     ((integer 0 #.internal-seconds-limit)
      (locally ; FIXME compiler should learn to figure that out
@@ -43,11 +44,8 @@
        (seconds-to-internal-time seconds)))
     ((single-float 0.0f0 #.(float safe-internal-seconds-limit 1.0f0))
      (seconds-to-internal-time seconds))
-    ;; We're operating on a millisecond precision, so a single-float
-    ;; is enough, and is an immediate on 64bit platforms.
-    ((real 0 #.safe-internal-seconds-limit)
-     (seconds-to-internal-time
-      (coerce seconds 'single-float)))))
+    ((and (not single-float) (real 0 #.safe-internal-seconds-limit))
+     (seconds-to-internal-time seconds))))
 
 (declaim (inline seconds-to-internal-time-deadline))
 (defun seconds-to-internal-time-deadline (seconds)
