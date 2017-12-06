@@ -63,10 +63,14 @@ const char* gc_phase_names[GC_NPHASES] = {
     read_TLS(STOP_FOR_GC_PENDING, th)
 #define SET_THREAD_STOP_PENDING(th,state) \
     write_TLS(STOP_FOR_GC_PENDING,state,th)
+#define WITH_ALL_THREADS_LOCK \
+    pthread_mutex_lock(&all_threads_lock); \
+    RUN_BODY_ONCE(all_threads_lock, pthread_mutex_unlock(&all_threads_lock))
 #else
 #define CURRENT_THREAD_VAR(name)
 #define THREAD_STOP_PENDING(th) NIL
 #define SET_THREAD_STOP_PENDING(th,state)
+#define WITH_ALL_THREADS_LOCK
 #endif
 
 #if !defined(LISP_FEATURE_WIN32)
@@ -318,24 +322,20 @@ static inline void gc_notify_early()
 {
     struct thread *self = arch_os_get_current_thread(), *p;
     odxprint(safepoints,"%s","global notification");
-#ifdef LISP_FEATURE_SB_THREAD
-    pthread_mutex_lock(&all_threads_lock);
-#endif
-    for_each_thread(p) {
-        if (p==self)
-            continue;
-        if (p==gc_state.collector)
-            continue;
-        odxprint(safepoints,"notifying thread %p csp %p",p,*p->csp_around_foreign_call);
-        if (!set_thread_csp_access(p,0)) {
-            thread_gc_promote(p, gc_state.phase, GC_NONE);
-        } else {
-            thread_gc_promote(p, thread_gc_phase(p), GC_NONE);
+    WITH_ALL_THREADS_LOCK {
+        for_each_thread(p) {
+            if (p==self)
+                continue;
+            if (p==gc_state.collector)
+                continue;
+            odxprint(safepoints,"notifying thread %p csp %p",p,*p->csp_around_foreign_call);
+            if (!set_thread_csp_access(p,0)) {
+                thread_gc_promote(p, gc_state.phase, GC_NONE);
+            } else {
+                thread_gc_promote(p, thread_gc_phase(p), GC_NONE);
+            }
         }
     }
-#ifdef LISP_FEATURE_SB_THREAD
-    pthread_mutex_unlock(&all_threads_lock);
-#endif
 }
 
 static inline void gc_notify_final()
@@ -343,20 +343,16 @@ static inline void gc_notify_final()
     struct thread *p;
     odxprint(safepoints,"%s","global notification");
     gc_state.phase_wait[gc_state.phase]=0;
-#ifdef LISP_FEATURE_SB_THREAD
-    pthread_mutex_lock(&all_threads_lock);
-#endif
-    for_each_thread(p) {
-        if (p == gc_state.collector)
-            continue;
-        odxprint(safepoints,"notifying thread %p csp %p",p,*p->csp_around_foreign_call);
-        if (!set_thread_csp_access(p,0)) {
-            thread_gc_promote(p, gc_state.phase, GC_NONE);
+    WITH_ALL_THREADS_LOCK {
+        for_each_thread(p) {
+            if (p == gc_state.collector)
+                continue;
+            odxprint(safepoints,"notifying thread %p csp %p",p,*p->csp_around_foreign_call);
+            if (!set_thread_csp_access(p,0)) {
+                thread_gc_promote(p, gc_state.phase, GC_NONE);
+            }
         }
     }
-#ifdef LISP_FEATURE_SB_THREAD
-    pthread_mutex_unlock(&all_threads_lock);
-#endif
 }
 
 static inline void gc_done()
@@ -366,17 +362,13 @@ static inline void gc_done()
     boolean inhibit = (read_TLS(GC_INHIBIT,self)==T);
 
     odxprint(safepoints,"%s","global denotification");
-#ifdef LISP_FEATURE_SB_THREAD
-    pthread_mutex_lock(&all_threads_lock);
-#endif
-    for_each_thread(p) {
-        if (inhibit && (read_TLS(GC_PENDING,p)==T))
-            write_TLS(GC_PENDING,NIL,p);
-        set_thread_csp_access(p,1);
+    WITH_ALL_THREADS_LOCK {
+        for_each_thread(p) {
+            if (inhibit && (read_TLS(GC_PENDING,p)==T))
+                write_TLS(GC_PENDING,NIL,p);
+            set_thread_csp_access(p,1);
+        }
     }
-#ifdef LISP_FEATURE_SB_THREAD
-    pthread_mutex_unlock(&all_threads_lock);
-#endif
 }
 
 static inline void gc_handle_phase()
@@ -884,30 +876,30 @@ wake_thread_posix(os_thread_t os_thread)
         gc_advance(GC_INVOKED,GC_NONE);
         {
             /* only if in foreign code, notify using signal */
-            pthread_mutex_lock(&all_threads_lock);
-            for_each_thread (thread)
-                if (thread->os_thread == os_thread) {
-                    /* it's still alive... */
-                    found = 1;
+            WITH_ALL_THREADS_LOCK {
+                for_each_thread (thread)
+                    if (thread->os_thread == os_thread) {
+                        /* it's still alive... */
+                        found = 1;
 
-                    odxprint(safepoints, "wake_thread_posix: found");
-                    write_TLS(THRUPTION_PENDING,T,thread);
-                    if (read_TLS(GC_PENDING,thread) == T
-                        || THREAD_STOP_PENDING(thread) == T)
+                        odxprint(safepoints, "wake_thread_posix: found");
+                        write_TLS(THRUPTION_PENDING,T,thread);
+                        if (read_TLS(GC_PENDING,thread) == T
+                            || THREAD_STOP_PENDING(thread) == T)
+                            break;
+
+                        if (os_get_csp(thread)) {
+                            odxprint(safepoints, "wake_thread_posix: kill");
+                            /* ... and in foreign code.  Push it into a safety
+                             * transition. */
+                            int status = pthread_kill(os_thread, SIGPIPE);
+                            if (status)
+                                lose("wake_thread_posix: pthread_kill failed with %d\n",
+                                     status);
+                        }
                         break;
-
-                    if (os_get_csp(thread)) {
-                        odxprint(safepoints, "wake_thread_posix: kill");
-                        /* ... and in foreign code.  Push it into a safety
-                         * transition. */
-                        int status = pthread_kill(os_thread, SIGPIPE);
-                        if (status)
-                            lose("wake_thread_posix: pthread_kill failed with %d\n",
-                                 status);
                     }
-                    break;
-                }
-            pthread_mutex_unlock(&all_threads_lock);
+            }
         }
         gc_advance(GC_NONE,GC_INVOKED);
     } else {
@@ -916,14 +908,14 @@ wake_thread_posix(os_thread_t os_thread)
          * some other thread will take care of it.  Kludge: Unless it is
          * in foreign code.  Let's at least try to get our return value
          * right. */
-        pthread_mutex_lock(&all_threads_lock);
-        for_each_thread (thread)
-            if (thread->os_thread == os_thread) {
-                write_TLS(THRUPTION_PENDING,T,thread);
-                found = 1;
-                break;
-            }
-        pthread_mutex_unlock(&all_threads_lock);
+        WITH_ALL_THREADS_LOCK {
+            for_each_thread (thread)
+                if (thread->os_thread == os_thread) {
+                    write_TLS(THRUPTION_PENDING,T,thread);
+                    found = 1;
+                    break;
+                }
+        }
     }
     gc_state_unlock();
 
