@@ -38,7 +38,7 @@
     (test (float (1+ sb-kernel:internal-seconds-limit) 1.0d0))))
 
 (with-test (:name (:deadline sb-ext:run-program :trivial) :fails-on :win32)
-  (assert-timeout ("A deadline was reached after 1 seconds.")
+  (assert-timeout ("A deadline was reached after 1 second.")
     (sb-sys:with-deadline (:seconds 1)
       (run-sleep 3))))
 
@@ -90,7 +90,7 @@
 
 (with-test (:name (:deadline sb-thread:grab-mutex)
                   :skipped-on (not :sb-thread))
-  (assert-timeout ("A deadline was reached after 1 seconds.")
+  (assert-timeout ("A deadline was reached after 1 second.")
     (let ((lock (sb-thread:make-mutex))
           (waitp t))
       (make-join-thread (lambda ()
@@ -103,7 +103,7 @@
 
 (with-test (:name (:deadline sb-thread:wait-on-semaphore)
                   :skipped-on (not :sb-thread))
-  (assert-timeout ("A deadline was reached after 1 seconds.")
+  (assert-timeout ("A deadline was reached after 1 second.")
     (let ((sem (sb-thread:make-semaphore :count 0)))
       (sb-sys:with-deadline (:seconds 1)
         (sb-thread:wait-on-semaphore sem)))))
@@ -111,7 +111,7 @@
 (with-test (:name (:deadline sb-thread:join-thread)
             :skipped-on (not :sb-thread)
             :broken-on :win32)
-  (assert-timeout ("A deadline was reached after 1 seconds.")
+  (assert-timeout ("A deadline was reached after 1 second.")
     (sb-sys:with-deadline (:seconds 1)
       (sb-thread:join-thread
        (make-kill-thread (lambda () (loop (sleep 1))))))))

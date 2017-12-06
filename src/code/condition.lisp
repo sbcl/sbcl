@@ -1192,7 +1192,7 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
 (define-condition timeout (serious-condition)
   ((seconds :initarg :seconds :initform nil :reader timeout-seconds))
   (:report (lambda (condition stream)
-             (format stream "Timeout occurred~@[ after ~A seconds~]."
+             (format stream "Timeout occurred~@[ after ~A second~:P~]."
                      (timeout-seconds condition)))))
 
 (define-condition io-timeout (stream-error timeout)
@@ -1207,7 +1207,7 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
 
 (define-condition deadline-timeout (timeout) ()
   (:report (lambda (condition stream)
-             (format stream "A deadline was reached after ~A seconds."
+             (format stream "A deadline was reached after ~A second~:P."
                      (timeout-seconds condition)))))
 
 (define-condition declaration-type-conflict-error (reference-condition
