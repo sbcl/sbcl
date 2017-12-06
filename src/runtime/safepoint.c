@@ -56,6 +56,16 @@ const char* gc_phase_names[GC_NPHASES] = {
     "GC_COLLECT"
 };
 
+#ifdef LISP_FEATURE_SB_THREAD
+#define THREAD_STOP_PENDING(th) \
+    read_TLS(STOP_FOR_GC_PENDING, th)
+#define SET_THREAD_STOP_PENDING(th,state) \
+    write_TLS(STOP_FOR_GC_PENDING,state,th)
+#else
+#define THREAD_STOP_PENDING(th) NIL
+#define SET_THREAD_STOP_PENDING(th,state)
+#endif
+
 #if !defined(LISP_FEATURE_WIN32)
 /* win32-os.c covers these, but there is no unixlike-os.c, so the normal
  * definition goes here.  Fixme: (Why) don't these work for Windows?
@@ -270,10 +280,8 @@ static inline void thread_gc_promote(struct thread* p, gc_phase_t cur, gc_phase_
     if (cur != GC_NONE) {
         gc_state.phase_wait[cur]++;
     }
-#ifdef LISP_FEATURE_SB_THREAD
     if (cur != GC_NONE)
-        write_TLS(STOP_FOR_GC_PENDING,T,p);
-#endif
+        SET_THREAD_STOP_PENDING(p,T);
 }
 
 /* set_thread_csp_access -- alter page permissions for not-in-Lisp
@@ -492,10 +500,8 @@ thread_may_thrupt(os_context_t *ctx)
     if (read_TLS(GC_PENDING, self) != NIL)
         return 0;
 
-#ifdef LISP_FEATURE_SB_THREAD
-    if (read_TLS(STOP_FOR_GC_PENDING, self) != NIL)
+    if (THREAD_STOP_PENDING(self) != NIL)
         return 0;
-#endif
 
 #ifdef LISP_FEATURE_WIN32
     if (deferrables_blocked_p(&self->os_thread->blocked_signal_set))
@@ -679,9 +685,7 @@ void thread_in_lisp_raised(os_context_t *ctxptr)
     }
     phase = thread_gc_phase(self);
     if (phase == GC_NONE) {
-#ifdef LISP_FEATURE_SB_THREAD
-        write_TLS(STOP_FOR_GC_PENDING,NIL,self);
-#endif
+        SET_THREAD_STOP_PENDING(self,NIL);
         set_thread_csp_access(self,1);
         set_csp_from_context(self, ctxptr);
         if (gc_state.phase <= GC_SETTLED)
@@ -696,9 +700,7 @@ void thread_in_lisp_raised(os_context_t *ctxptr)
 #endif
     } else {
         gc_advance(phase,gc_state.phase);
-#ifdef LISP_FEATURE_SB_THREAD
-        write_TLS(STOP_FOR_GC_PENDING,T,self);
-#endif
+        SET_THREAD_STOP_PENDING(self,T);
         gc_state_unlock();
     }
 }
@@ -718,9 +720,7 @@ void thread_in_safety_transition(os_context_t *ctxptr)
     } else {
         gc_phase_t phase = thread_gc_phase(self);
         if (phase == GC_NONE) {
-#ifdef LISP_FEATURE_SB_THREAD
-            write_TLS(STOP_FOR_GC_PENDING,NIL,self);
-#endif
+            SET_THREAD_STOP_PENDING(self,NIL);
             set_csp_from_context(self, ctxptr);
             if (gc_state.phase <= GC_SETTLED)
                 gc_advance(phase,gc_state.phase);
@@ -729,9 +729,7 @@ void thread_in_safety_transition(os_context_t *ctxptr)
             *self->csp_around_foreign_call = 0;
         } else {
             gc_advance(phase,gc_state.phase);
-#ifdef LISP_FEATURE_SB_THREAD
-            write_TLS(STOP_FOR_GC_PENDING,T,self);
-#endif
+            SET_THREAD_STOP_PENDING(self,T);
         }
         gc_state_unlock();
     }
@@ -800,9 +798,7 @@ gc_stop_the_world()
     }
     set_thread_csp_access(self,1);
     gc_state_unlock();
-#ifdef LISP_FEATURE_SB_THREAD
-    write_TLS(STOP_FOR_GC_PENDING,NIL,self);
-#endif
+    SET_THREAD_STOP_PENDING(self,NIL);
 }
 
 
@@ -844,9 +840,7 @@ wake_thread_win32(struct thread *thread)
     write_TLS(THRUPTION_PENDING,T,thread);
 
     if ((read_TLS(GC_PENDING,thread)==T)
-#ifdef LISP_FEATURE_SB_THREAD
-        ||(read_TLS(STOP_FOR_GC_PENDING,thread)==T)
-#endif
+        ||(THREAD_STOP_PENDING(thread)==T)
         )
         return;
 
@@ -900,10 +894,7 @@ wake_thread_posix(os_thread_t os_thread)
                     odxprint(safepoints, "wake_thread_posix: found");
                     write_TLS(THRUPTION_PENDING,T,thread);
                     if (read_TLS(GC_PENDING,thread) == T
-#ifdef LISP_FEATURE_SB_THREAD
-                        || read_TLS(STOP_FOR_GC_PENDING,thread) == T
-#endif
-                        )
+                        || THREAD_STOP_PENDING(thread) == T)
                         break;
 
                     if (os_get_csp(thread)) {
