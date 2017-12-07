@@ -161,17 +161,6 @@ held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
       ,wait-p
       ,timeout)))
 
-(sb!xc:defmacro with-recursive-system-lock ((lock
-                                             &key without-gcing)
-                                            &body body)
-  `(dx-flet ((with-recursive-system-lock-thunk () ,@body))
-     (,(cond (without-gcing
-              'call-with-recursive-system-lock/without-gcing)
-             (t
-              'call-with-recursive-system-lock))
-      #'with-recursive-system-lock-thunk
-       ,lock)))
-
 (macrolet ((def (name &optional variant)
              `(defun ,(if variant (symbolicate name "/" variant) name)
                   (function mutex)

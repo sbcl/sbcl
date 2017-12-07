@@ -389,6 +389,3 @@
 (define-info-type (:function :type)
   :type-spec (or ctype defstruct-description (member :generic-function))
   :default #'ftype-from-fdefn)
-
-;;; A random place for this :-(
-#+sb-xc-host (setq *info-environment* (make-info-hashtable))

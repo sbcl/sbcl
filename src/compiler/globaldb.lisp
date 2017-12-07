@@ -216,7 +216,7 @@
   ;; from keyword-pair to object is deferred until cold-init.
   (dovector (x (the simple-vector *info-types*))
     (when x (!register-meta-info x)))
-  (setq *info-environment* (make-info-hashtable)))
+  #-sb-xc-host (setq *info-environment* (make-info-hashtable)))
 
 ;;;; GET-INFO-VALUE
 
@@ -227,6 +227,13 @@
 (declaim (type (or (cons (unsigned-byte #.(ash 1 info-number-bits)) function)
                    null) *globaldb-observer*))
 #-sb-xc-host (declaim (always-bound *globaldb-observer*))
+
+#+sb-xc-host
+(progn
+  (defun info-gethash (key table) (gethash key table))
+  (defun info-puthash (table key augmenter)
+    (let ((old (gethash key table)))
+      (setf (gethash key table) (funcall augmenter old)))))
 
 ;;; Return the value of NAME / INFO-NUMBER from the global environment,
 ;;; or return the default if there is no global info.
@@ -276,6 +283,7 @@
                         (eq package (symbol-package symbol)))
                 (dolist (name (info-vector-name-list symbol))
                   (funcall function name))))))
+    #-sb-xc-host
     (info-maphash (lambda (name data)
                     (declare (ignore data))
                     (funcall function name))

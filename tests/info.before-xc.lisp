@@ -128,8 +128,4 @@
               ((CAS ,s) (3 . "CAS-info#3"))
               ((FROB ,s) (15 . "FROB-info#15"))))))
 
-(let ((ht (make-info-hashtable)))
-  (setf (info-gethash '(hairy name) ht) :whatever)
-  (assert (eq (info-gethash (list 'hairy 'name) ht) :whatever)))
-
 (/show "done with tests/info.before-xc.lisp")

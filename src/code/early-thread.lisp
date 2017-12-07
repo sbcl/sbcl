@@ -53,3 +53,14 @@ in future versions."
               'call-with-system-mutex))
        #'with-system-mutex-thunk
        ,mutex)))
+
+;; Similar to above. The host doesn't need this one at all.
+#-sb-xc-host
+(defmacro with-recursive-system-lock ((lock &key without-gcing) &body body)
+  `(dx-flet ((with-recursive-system-lock-thunk () ,@body))
+     (,(cond (without-gcing
+              'call-with-recursive-system-lock/without-gcing)
+             (t
+              'call-with-recursive-system-lock))
+      #'with-recursive-system-lock-thunk
+       ,lock)))

@@ -173,6 +173,7 @@
  ;; 'info-vector' is needed at least as early as 'fdefinition' so that the
  ;; inlined INFO-VECTOR-FDEFINITION is available to %COERCE-CALLABLE-TO-FUN.
  ("src/code/signal" :not-host)
+ ("src/code/target-lfhash" :not-host)
  ("src/compiler/info-vector" :c-headers)
  ("src/compiler/globaldb" :c-headers)
  ("src/code/primordial-type" :c-headers)
