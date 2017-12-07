@@ -58,7 +58,7 @@ const char* gc_phase_names[GC_NPHASES] = {
 
 #ifdef LISP_FEATURE_SB_THREAD
 #define CURRENT_THREAD_VAR(name) \
-    struct thread *self = arch_os_get_current_thread()
+    struct thread *name = arch_os_get_current_thread()
 #define THREAD_STOP_PENDING(th) \
     read_TLS(STOP_FOR_GC_PENDING, th)
 #define SET_THREAD_STOP_PENDING(th,state) \
