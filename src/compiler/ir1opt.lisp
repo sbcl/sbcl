@@ -519,7 +519,7 @@
 ;;; Delete any nodes in BLOCK whose value is unused and which have no
 ;;; side effects. We can delete sets of lexical variables when the set
 ;;; variable has no references.
-(defun flush-dead-code (block &aux victim)
+(defun flush-dead-code (block)
   (declare (type cblock block))
   (setf (block-flush-p block) nil)
   (do-nodes-backwards (node lvar block :restart-p t)
@@ -533,12 +533,11 @@
             (delete-lvar-use other-node)))
         (typecase node
           (ref
-           (setf victim node)
            (delete-ref node)
            (unlink-node node))
           (combination
-           (when (flushable-combination-p node)
-             (setf victim node)
+           (when (and (not (node-tail-p node))
+                      (flushable-combination-p node))
              (flush-combination node)))
           (mv-combination
            (when (eq (basic-combination-kind node) :local)
@@ -547,31 +546,25 @@
                        (when (or (leaf-refs var)
                                  (lambda-var-sets var))
                          (return nil)))
-                 (setf victim node)
                  (mapc #'flush-dest (basic-combination-args node))
                  (delete-let fun)))))
           (exit
            (let ((value (exit-value node)))
              (when value
-               (setf victim node)
                (flush-dest value)
                (setf (exit-value node) nil))))
           (cset
            (let ((var (set-var node)))
              (when (and (lambda-var-p var)
                         (null (leaf-refs var)))
-               (setf victim node)
                (flush-dest (set-value node))
                (setf (basic-var-sets var)
                      (delq node (basic-var-sets var)))
                (unlink-node node))))
           (cast
            (unless (cast-type-check node)
-             (setf victim node)
              (flush-dest (cast-value node))
-             (unlink-node node))))))
-
-  victim)
+             (unlink-node node)))))))
 
 ;;;; local call return type propagation
 

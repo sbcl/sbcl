@@ -517,11 +517,7 @@
         ;; CAST-EXTERNALLY-CHECKABLE-P wants the backward pass
         (do-nodes-backwards (node nil block)
           (when (and (cast-p node)
-                     ;; Do not suppress reoptimization by
-                     ;; IR1-OPTIMIZE-CAST, this is the final step to
-                     ;; decide if the cast is unused, IR2 wouldn't
-                     ;; like a CAST without an LVAR.
-                     (cast-type-check node t))
+                     (cast-type-check node))
             (cast-check-uses node)
             (cond ((cast-externally-checkable-p node)
                    (setf (cast-%type-check node) :external))

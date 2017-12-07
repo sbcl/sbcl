@@ -104,3 +104,19 @@
   (assert (equal (sb-c:definition-source-location-plist
                      (sb-int:info :source-location :variable '*foofoo2*))
                  '(strange "Yes"))))
+
+(defstruct zombie-cast-struct
+  (value nil :type zombie-cast-struct-v))
+
+(defstruct zombie-cast-struct-v
+  (uses nil :type (or list zombie-cast-struct)))
+
+(with-test (:name :flush-zombie-casts)
+  (checked-compile `(lambda (x)
+                      (declare (optimize (debug 2) (speed 1)))
+                      (let ((value (zombie-cast-struct-value x)))
+                        (labels ((l (x)
+                                   (declare (ignore x))
+                                   (let ((uses (zombie-cast-struct-v-uses value)))
+                                     (when (zombie-cast-struct-p uses)
+                                       (list* uses (l uses)))))))))))

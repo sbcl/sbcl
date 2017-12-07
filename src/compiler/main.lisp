@@ -547,13 +547,6 @@ necessary, since type inference may take arbitrarily long to converge.")
         (return))
       (incf loop-count)))
 
-  (when *check-consistency*
-    (do-blocks-backwards (block component)
-      (awhen (flush-dead-code block)
-        (let ((*compiler-error-context* it))
-          (compiler-warn "dead code detected at the end of ~S"
-                         'ir1-phases)))))
-
   (ir1-finalize component)
   (values))
 
@@ -584,8 +577,14 @@ necessary, since type inference may take arbitrarily long to converge.")
     (maybe-mumble "LTN ")
     (ltn-analyze component)
     (dfo-as-needed component)
+
     (maybe-mumble "control ")
     (control-analyze component #'make-ir2-block)
+
+    ;; FIND-DFO does clean the component
+    ;; which may introduce newly unused nodes,
+    ;; perform FLUSH-DEAD-CODE
+    (thoroughly-clean-component component)
 
     (when (or (ir2-component-values-receivers (component-info component))
               (component-dx-lvars component))
