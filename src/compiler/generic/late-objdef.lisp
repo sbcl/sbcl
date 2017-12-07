@@ -65,6 +65,7 @@
     (no-tls-value-marker "immediate")
 
     #!+sb-simd-pack (simd-pack "unboxed")
+    (filler "unboxed")
 
     (simple-array "boxed")
     (simple-array-unsigned-byte-2 "vector_unsigned_byte_2")
