@@ -325,7 +325,8 @@ struct heap_adjust {
         sword_t delta;
     } range[3];
     int n_ranges;
-    int n_adjustments;
+    int n_relocs_abs; // absolute
+    int n_relocs_rel; // relative
 };
 
 #ifndef LISP_FEATURE_RELOCATABLE_HEAP
@@ -358,19 +359,20 @@ static inline lispobj adjust_word(struct heap_adjust* adj, lispobj word) {
 
 #define SHOW_SPACE_RELOCATION 0
 #if SHOW_SPACE_RELOCATION > 1
-# define FIXUP(expr, addr) fprintf(stderr, "%p: %lx", addr, *(addr)), \
-   expr, fprintf(stderr, "->%lx\n", *(addr)), ++adj->n_adjustments
-# define FIXUP32(expr, addr) fprintf(stderr, "%p: %x", addr, *(addr)), \
-   expr, fprintf(stderr, "->%x\n", *(addr)), ++adj->n_adjustments
-# define FIXUP_rel(expr, addr) FIXUP32(expr, addr)
+# define FIXUP(expr, addr) fprintf(stderr, "%p: (a) %lx", addr, *(long*)(addr)), \
+   expr, fprintf(stderr, " -> %lx\n", *(long*)(addr)), ++adj->n_relocs_abs
+# define FIXUP32(expr, addr) fprintf(stderr, "%p: (a) %x", addr, *(int*)(addr)), \
+   expr, fprintf(stderr, " -> %x\n", *(int*)(addr)), ++adj->n_relocs_abs
+# define FIXUP_rel(expr, addr) fprintf(stderr, "%p: (r) %x", addr, *(int*)(addr)), \
+   expr, fprintf(stderr, " -> %x\n", *(int*)(addr)), ++adj->n_relocs_rel
+#elif SHOW_SPACE_RELOCATION
+# define FIXUP(expr, addr) expr, ++adj->n_relocs_abs
+# define FIXUP32(expr, addr) expr, ++adj->n_relocs_abs
+# define FIXUP_rel(expr, addr) expr, ++adj->n_relocs_rel
 #else
-# if SHOW_SPACE_RELOCATION
-#  define FIXUP(expr, addr) expr, ++adj->n_adjustments
-# else
-#  define FIXUP(expr, addr) expr
-# endif
-# define FIXUP32(expr, addr) FIXUP(expr, addr)
-# define FIXUP_rel(expr, addr) FIXUP(expr, addr)
+# define FIXUP(expr, addr) expr
+# define FIXUP32(expr, addr) expr
+# define FIXUP_rel(expr, addr) expr
 #endif
 
 // Fix the word at 'where' without testing whether it looks pointer-like.
@@ -438,6 +440,7 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
     struct code* code;
     sword_t delta;
 
+    adj->n_relocs_abs = adj->n_relocs_rel = 0;
     for ( ; where < end ; where += nwords ) {
         header_word = *where;
         if (is_cons_half(header_word)) {
@@ -608,15 +611,19 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
         }
         adjust_pointers(where+1, nwords-1, adj);
     }
+#if SHOW_SPACE_RELOCATION
+    fprintf(stderr, "space @ %p: fixed %d absolute + %d relative pointers\n",
+            (lispobj*)start, adj->n_relocs_abs, adj->n_relocs_rel);
+#endif
 }
 
 void relocate_heap(struct heap_adjust* adj)
 {
-    if (SHOW_SPACE_RELOCATION) {
+    if (!lisp_startup_options.noinform || SHOW_SPACE_RELOCATION) {
         int i;
         for (i = 0; i < adj->n_ranges; ++i)
             if (adj->range[i].delta)
-                fprintf(stderr, "Relocating [%p:%p] into [%p:%p]\n",
+                fprintf(stderr, "NOTE: Relocating [%p:%p] into [%p:%p]\n",
                         (char*)adj->range[i].start,
                         (char*)adj->range[i].end,
                         (char*)adj->range[i].start + adj->range[i].delta,
@@ -853,12 +860,8 @@ process_directory(int count, struct ndir_entry *entry,
                    spaces[IMMOBILE_VARYOBJ_CORE_SPACE_ID].base, // expected
                    spaces[IMMOBILE_VARYOBJ_CORE_SPACE_ID].len);
 #endif
-    if (adj->range[0].delta | adj->range[1].delta | adj->range[2].delta) {
+    if (adj->range[0].delta | adj->range[1].delta | adj->range[2].delta)
         relocate_heap(adj);
-#if SHOW_SPACE_RELOCATION
-        fprintf(stderr, "%d pointers adjusted\n", adj->n_adjustments);
-#endif
-    }
 #endif
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
