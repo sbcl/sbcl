@@ -1817,15 +1817,6 @@
              (delete-block current)))
   block)
 
-;;; clean-component + flush-dead-code
-(defun thoroughly-clean-component (component)
-  (loop do
-        (do-blocks-backwards (block component)
-          ;; Don't trust BLOCK-FLUSH-P
-          (flush-dead-code block))
-        while (component-delete-blocks component)
-        do (clean-component component)))
-
 ;;; Convert code of the form
 ;;;   (FOO ... (FUN ...) ...)
 ;;; to

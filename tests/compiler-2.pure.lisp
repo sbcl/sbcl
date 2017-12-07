@@ -736,3 +736,11 @@
                                                      (return (catch 'c))))))
                                key))))))
              34)))
+
+(with-test (:name :ir1-ir2-dead-code-consistency)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (loop for x below 2
+               count (zerop (min x x x x x x x x x x))))
+    (() 1)))

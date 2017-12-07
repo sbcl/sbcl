@@ -581,11 +581,6 @@ necessary, since type inference may take arbitrarily long to converge.")
     (maybe-mumble "control ")
     (control-analyze component #'make-ir2-block)
 
-    ;; FIND-DFO does clean the component
-    ;; which may introduce newly unused nodes,
-    ;; perform FLUSH-DEAD-CODE
-    (thoroughly-clean-component component)
-
     (when (or (ir2-component-values-receivers (component-info component))
               (component-dx-lvars component))
       (maybe-mumble "stack ")
