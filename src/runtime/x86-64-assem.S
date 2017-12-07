@@ -193,16 +193,12 @@ Lzero:
 	/* Alloc new frame. */
 	push	%rbp            # Dummy for return address
 	push	%rbp		# fp in save location S1
-	/* The call convention change from C to Lisp creates a minor backtrace
-	 * glitch if interrupted right before the following mov.  The address to
-	 * which this function returns (saved %rip) won't be addressable by %rbp
-	 * or %rsp. As an attempted fix, we could save the old rbp in rbx, and
-	 * change the CFA register to rbx. That doesn't work, because the next
-	 * frame (Lisp) doesn't specify how to restore rbx. Pushing the return
-	 * address on the new stack could work. But the better thing is to use
-	 * cfa_def_cfa_expression which is more complicated than I'm capable of */
 	mov	%rsp,%rbp	# The current sp marks start of new frame.
-
+	# Inform unwinder that the new frame has not been entered yet.
+	# The CFA is what it was (old RBP+16) before the preceding mov.
+	# This sequence encodes DW_CFA_def_cfa_expression
+	# DW_OP_breg7 (rsp): 0 / DW_OP_deref / DW_OP_lit16 / DW_OP_plus
+	.cfi_escape 0x0f, 5, 0x77, 0, 6, 0x40, 0x22
 Lcall:
 	call	*CLOSURE_FUN_OFFSET(%rax)
 	
