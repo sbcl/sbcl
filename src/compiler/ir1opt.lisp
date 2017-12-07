@@ -2154,11 +2154,6 @@
         (note-single-valuified-lvar lvar)))
     (values)))
 
-(defun may-delete-vestigial-exit (cast)
-  ;; VESTIGIAL-EXIT-CASTs come from MULTIPLE-VALUES-PROG1 to avoid
-  ;; overwriting their lvars
-  (not (vestigial-exit-cast-p cast)))
-
 (defun compile-time-type-error-context (context)
   #+sb-xc-host context
   #-sb-xc-host (source-to-string context))
@@ -2168,74 +2163,82 @@
   ;; is called here and not passed somewhere else, there's no longer a
   ;; need to check the function type, the arguments to the call will
   ;; do the same job.
-  (or (not (function-designator-cast-p cast))
-      (let* ((lvar (cast-lvar cast))
-             (dest (and lvar
-                        (lvar-dest lvar))))
-        (and (basic-combination-p dest)
-             (eq (basic-combination-fun dest) lvar)))))
+  (let* ((lvar (cast-lvar cast))
+         (dest (and lvar
+                    (lvar-dest lvar))))
+    (and (basic-combination-p dest)
+         (eq (basic-combination-fun dest) lvar))))
 
-(defun ir1-optimize-cast (cast &optional do-not-optimize)
-  (declare (type cast cast))
-  (let ((value (cast-value cast))
-        (atype (cast-asserted-type cast)))
-    (unless (or do-not-optimize
-                (not (may-delete-vestigial-exit cast)))
-      (when (and (bound-cast-p cast)
-                 (bound-cast-check cast)
-                 (constant-lvar-p (bound-cast-bound cast)))
+(defun may-delete-cast (cast)
+  (typecase cast
+    (vestigial-exit-cast
+     nil)
+    (function-designator-cast
+     (may-delete-function-designator-cast cast))
+    (bound-cast
+     (bound-cast-derived cast))
+    (t t)))
+
+;;; Delete or move around casts when possible
+(defun maybe-delete-cast (cast)
+  (let ((atype (cast-asserted-type cast))
+        (lvar (cast-lvar cast))
+        (value (cast-value cast)))
+    (when (and (bound-cast-p cast)
+               (bound-cast-check cast))
+      (when (constant-lvar-p (bound-cast-bound cast))
         (setf atype
               (specifier-type `(integer 0 (,(lvar-value (bound-cast-bound cast)))))
               (cast-asserted-type cast) atype
               (bound-cast-derived cast) t))
-      (let ((lvar (node-lvar cast)))
-        (when (and (or (not (bound-cast-p cast))
-                       (bound-cast-derived cast))
-                   (may-delete-function-designator-cast cast)
-                   (values-subtypep (lvar-derived-type value)
-                                    (cast-asserted-type cast)))
-          (delete-cast cast)
-          (return-from ir1-optimize-cast t))
-
-        (when (and (listp (lvar-uses value))
-                   lvar)
-          ;; Pathwise removing of CAST
-          (let ((ctran (node-next cast))
-                (dest (lvar-dest lvar))
-                next-block)
-            (collect ((merges))
-              (do-uses (use value)
-                (when (and (values-subtypep (node-derived-type use) atype)
-                           (immediately-used-p value use))
-                  (unless next-block
-                    (when ctran (ensure-block-start ctran))
-                    (setq next-block (first (block-succ (node-block cast))))
-                    (ensure-block-start (node-prev cast))
-                    (reoptimize-lvar lvar)
-                    (setf (lvar-%derived-type value) nil))
-                  (%delete-lvar-use use)
-                  (add-lvar-use use lvar)
-                  (unlink-blocks (node-block use) (node-block cast))
-                  (link-blocks (node-block use) next-block)
-                  (when (and (return-p dest)
-                             (basic-combination-p use)
-                             (eq (basic-combination-kind use) :local))
-                    (merges use))))
-              (dolist (use (merges))
-                (merge-tail-sets use))))))
-
-      (when (and (bound-cast-p cast)
-                 (bound-cast-check cast)
-                 (policy cast (= insert-array-bounds-checks 0)))
+      (when (policy cast (= insert-array-bounds-checks 0))
         (flush-combination (bound-cast-check cast))
         (setf (bound-cast-check cast) nil)))
+    (cond ((not (may-delete-cast cast))
+           nil)
+          ((values-subtypep (lvar-derived-type value)
+                            (cast-asserted-type cast))
+           (delete-cast cast)
+           t)
+          ((and (listp (lvar-uses value))
+                lvar)
+           ;; Turn (the vector (if x y #()) into
+           ;; (if x (the vector y) #())
+           (let ((ctran (node-next cast))
+                 (dest (lvar-dest lvar))
+                 next-block)
+             (collect ((merges))
+               (do-uses (use value)
+                 (when (and (values-subtypep (node-derived-type use) atype)
+                            (immediately-used-p value use))
+                   (unless next-block
+                     (when ctran (ensure-block-start ctran))
+                     (setq next-block (first (block-succ (node-block cast))))
+                     (ensure-block-start (node-prev cast))
+                     (reoptimize-lvar lvar)
+                     (setf (lvar-%derived-type value) nil))
+                   (%delete-lvar-use use)
+                   (add-lvar-use use lvar)
+                   (unlink-blocks (node-block use) (node-block cast))
+                   (link-blocks (node-block use) next-block)
+                   (when (and (return-p dest)
+                              (basic-combination-p use)
+                              (eq (basic-combination-kind use) :local))
+                     (merges use))))
+               (dolist (use (merges))
+                 (merge-tail-sets use))))))))
 
-    (let* ((value-type (lvar-derived-type value))
+(defun ir1-optimize-cast (cast &optional do-not-optimize)
+  (declare (type cast cast))
+  (when (or do-not-optimize
+            (not (maybe-delete-cast cast)))
+    (let* ((value (cast-value cast))
+           (atype (cast-asserted-type cast))
+           (value-type (lvar-derived-type value))
            (int (values-type-intersection value-type atype)))
       (derive-node-type cast int)
-      (cond ((or
-              (neq int *empty-type*)
-              (eq value-type *empty-type*)))
+      (cond ((or (neq int *empty-type*)
+                 (eq value-type *empty-type*)))
             ;; No need to transform into an analog of
             ;; %COMPILE-TIME-TYPE-ERROR, %CHECK-BOUND will signal at
             ;; run-time and %CHECK-BOUND ir2-converter will signal at
@@ -2243,7 +2246,6 @@
             ;; optimization.
             ((bound-cast-p cast))
             (t
-             ;; FIXME: Do it in one step.
              (let ((context (node-source-form cast))
                    (detail (lvar-all-sources (cast-value cast))))
                (unless (cast-silent-conflict cast)
@@ -2257,10 +2259,10 @@
                 ;; FIXME: Derived type.
                 (if (cast-silent-conflict cast)
                     (let ((dummy-sym (gensym)))
-                     `(let ((,dummy-sym 'dummy))
-                        ,(internal-type-error-call dummy-sym atype
-                                                   (cast-context cast))
-                        ,dummy-sym))
+                      `(let ((,dummy-sym 'dummy))
+                         ,(internal-type-error-call dummy-sym atype
+                                                    (cast-context cast))
+                         ,dummy-sym))
                     `(%compile-time-type-error 'dummy
                                                ',(type-specifier atype)
                                                ',(type-specifier value-type)
@@ -2284,7 +2286,6 @@
       (when (and (cast-%type-check cast)
                  (values-subtypep value-type
                                   (cast-type-to-check cast)))
-        (setf (cast-%type-check cast) nil))))
-
-  (unless do-not-optimize
-    (setf (node-reoptimize cast) nil)))
+        (setf (cast-%type-check cast) nil))
+      (unless do-not-optimize
+        (setf (node-reoptimize cast) nil)))))
