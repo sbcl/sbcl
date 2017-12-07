@@ -311,6 +311,12 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     gc_alloc_update_all_page_tables(1);
     gc_assert(get_alloc_pointer() == (lispobj*)(page_address(find_last_free_page())));
 #endif
+    output_space(file,
+                 DYNAMIC_CORE_SPACE_ID,
+                 current_dynamic_space,
+                 (lispobj *)get_alloc_pointer(),
+                 core_start_pos,
+                 core_compression_level);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     output_space(file,
                  IMMOBILE_FIXEDOBJ_CORE_SPACE_ID,
@@ -318,6 +324,10 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                  fixedobj_free_pointer,
                  core_start_pos,
                  core_compression_level);
+    // Leave this space for last! Things are easier when splitting a core into
+    // code and non-code if we don't have to compensate for removal of pages.
+    // i.e. if code resided between dynamic and fixedobj space, then dynamic
+    // space would need to have it pages renumbered when code is pulled out.
     output_space(file,
                  IMMOBILE_VARYOBJ_CORE_SPACE_ID,
                  (lispobj *)VARYOBJ_SPACE_START,
@@ -325,12 +335,6 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                  core_start_pos,
                  core_compression_level);
 #endif
-    output_space(file,
-                 DYNAMIC_CORE_SPACE_ID,
-                 current_dynamic_space,
-                 (lispobj *)get_alloc_pointer(),
-                 core_start_pos,
-                 core_compression_level);
 
     write_lispobj(INITIAL_FUN_CORE_ENTRY_TYPE_CODE, file);
     write_lispobj(3, file);
