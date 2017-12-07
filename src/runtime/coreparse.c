@@ -797,11 +797,6 @@ process_directory(int count, struct ndir_entry *entry,
                  * Drop one card to avoid overrunning the allocated space */
                 if (aligned_start > addr) // not card-aligned
                     dynamic_space_size -= GENCGC_CARD_BYTES;
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-                // FIXME: is this invariant still needed?
-                if (addr < FIXEDOBJ_SPACE_START || addr < VARYOBJ_SPACE_START)
-                    lose("Won't map dynamic space below immobile space");
-#endif
                 DYNAMIC_SPACE_START = addr = aligned_start;
                 break;
             }

@@ -2078,19 +2078,18 @@ pin_object(lispobj* base_addr)
 #define NO_SANITIZE_MEMORY
 #endif
 
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+extern void immobile_space_preserve_pointer(void*);
+#else
+#define immobile_space_preserve_pointer(x) /* nothing */
+#endif
+
 static void NO_SANITIZE_MEMORY
 preserve_pointer(void *addr)
 {
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-  /* Immobile space MUST be lower than dynamic space,
-     or else this test needs to be revised */
-    if (addr < (void*)DYNAMIC_SPACE_START) {
-        extern void immobile_space_preserve_pointer(void*);
-        immobile_space_preserve_pointer(addr);
-        return;
-    }
-#endif
     page_index_t page = find_page_index(addr);
+    if (page < 0)
+        return immobile_space_preserve_pointer(addr); // if such space exists
     lispobj *object_start;
 
 #if GENCGC_IS_PRECISE
