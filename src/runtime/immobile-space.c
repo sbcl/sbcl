@@ -326,6 +326,17 @@ static int get_hint(int attributes, int *page)
     return free_slot;
 }
 
+static void unset_hint(int page)
+{
+    int attributes = fixedobj_pages[page].attr.packed;
+    unsigned int size = (attributes >> 16) & 0xff; // mask off the generation bits
+    int hint_index = size - 2;
+    if (hint_page(page_hints[hint_index]) == page)
+        page_hints[hint_index] = 0;
+    if (hint_page(page_hints[hint_index+1]) == page)
+        page_hints[hint_index+1] = 0;
+}
+
 // Unused, but possibly will be for some kind of collision-avoidance scheme
 // on claiming of new free pages.
 long immobile_alloc_collisions;
@@ -1070,6 +1081,7 @@ sweep_fixedobj_pages(int raise)
             }
         } else {
             dprintf((logfile,"page %d is all garbage\n", page));
+            unset_hint(page);
             fixedobj_pages[page].attr.packed = 0;
         }
 #ifdef DEBUG
