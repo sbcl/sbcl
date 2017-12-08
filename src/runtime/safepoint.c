@@ -315,6 +315,7 @@ static inline void gc_notify_early()
 {
     struct thread *self = arch_os_get_current_thread(), *p;
     odxprint(safepoints,"%s","global notification");
+    gc_assert(gc_state.phase == GC_MESSAGE);
     WITH_ALL_THREADS_LOCK {
         for_each_thread(p) {
             if (p==self)
@@ -324,7 +325,7 @@ static inline void gc_notify_early()
             odxprint(safepoints,"notifying thread %p csp %p",p,*p->csp_around_foreign_call);
             boolean was_in_lisp = !set_thread_csp_access(p,0);
             if (was_in_lisp) {
-                gc_state.phase_wait[gc_state.phase]++;
+                gc_state.phase_wait[GC_MESSAGE]++;
                 SET_THREAD_STOP_PENDING(p,T);
             } else if (thread_blocks_gc(p)) {
                 gc_state.phase_wait[GC_INVOKED]++;
@@ -338,7 +339,8 @@ static inline void gc_notify_final()
 {
     struct thread *p;
     odxprint(safepoints,"%s","global notification");
-    gc_state.phase_wait[gc_state.phase]=0;
+    gc_assert(gc_state.phase == GC_SETTLED);
+    gc_state.phase_wait[GC_SETTLED]=0;
     WITH_ALL_THREADS_LOCK {
         for_each_thread(p) {
             if (p == gc_state.collector)
@@ -346,7 +348,7 @@ static inline void gc_notify_final()
             odxprint(safepoints,"notifying thread %p csp %p",p,*p->csp_around_foreign_call);
             boolean was_in_lisp = !set_thread_csp_access(p,0);
             if (was_in_lisp) {
-                gc_state.phase_wait[gc_state.phase]++;
+                gc_state.phase_wait[GC_SETTLED]++;
                 SET_THREAD_STOP_PENDING(p,T);
             }
         }
