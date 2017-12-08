@@ -99,31 +99,34 @@
 (defun has-superclasses-complex-subtypep-arg1 (type1 type2 info)
   ;; If TYPE2 might be concealing something related to our class
   ;; hierarchy
-  (if (type-might-contain-other-types-p type2)
-      ;; too confusing, gotta punt
-      (values nil nil)
-      ;; ordinary case expected by old CMU CL code, where the taxonomy
-      ;; of TYPE2's representation accurately reflects the taxonomy of
-      ;; the underlying set
-      (values
-       ;; FIXME: This old CMU CL code probably deserves a comment
-       ;; explaining to us mere mortals how it works...
-       (and (sb!xc:typep type2 'classoid)
-            (dolist (x info nil)
-             (let ((guard (cdr x)))
-              (when (or (not guard)
-                        (csubtypep type1 (if (%instancep guard)
-                                             guard
-                                             (setf (cdr x)
-                                                   (specifier-type guard)))))
-                (return
-                 (or (eq type2 (car x))
-                     (let ((inherits (layout-inherits
-                                      (classoid-layout (car x)))))
-                       (dotimes (i (length inherits) nil)
-                         (when (eq type2 (layout-classoid (svref inherits i)))
-                           (return t))))))))))
-       t)))
+  (cond ((type-might-contain-other-types-p type2)
+         ;; too confusing, gotta punt
+         (values nil nil))
+        ((fun-designator-type-p type1)
+         (values nil t))
+        (t
+         ;; ordinary case expected by old CMU CL code, where the taxonomy
+         ;; of TYPE2's representation accurately reflects the taxonomy of
+         ;; the underlying set
+         (values
+          ;; FIXME: This old CMU CL code probably deserves a comment
+          ;; explaining to us mere mortals how it works...
+          (and (sb!xc:typep type2 'classoid)
+               (dolist (x info nil)
+                 (let ((guard (cdr x)))
+                   (when (or (not guard)
+                             (csubtypep type1 (if (%instancep guard)
+                                                  guard
+                                                  (setf (cdr x)
+                                                        (specifier-type guard)))))
+                     (return
+                       (or (eq type2 (car x))
+                           (let ((inherits (layout-inherits
+                                            (classoid-layout (car x)))))
+                             (dotimes (i (length inherits) nil)
+                               (when (eq type2 (layout-classoid (svref inherits i)))
+                                 (return t))))))))))
+          t))))
 
 ;;; This function takes a list of specs, each of the form
 ;;;    (SUPERCLASS-NAME &OPTIONAL GUARD).
