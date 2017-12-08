@@ -199,7 +199,7 @@
                       (ref
                        (go :next))
                       (cast
-                       (when (and (eq :external (cast-type-check node))
+                       (when (and (memq (cast-type-check node) '(:external nil))
                                   (eq dest (node-dest node)))
                          (go :next)))
                       (combination
