@@ -284,16 +284,6 @@ thread_blocks_gc(struct thread *thread)
     return inhibit;
 }
 
-static inline void thread_gc_promote(struct thread* p, gc_phase_t cur, gc_phase_t old) {
-    if (old != GC_NONE)
-        gc_state.phase_wait[old]--;
-    if (cur != GC_NONE) {
-        gc_state.phase_wait[cur]++;
-    }
-    if (cur != GC_NONE)
-        SET_THREAD_STOP_PENDING(p,T);
-}
-
 /* set_thread_csp_access -- alter page permissions for not-in-Lisp
    flag (Lisp Stack Top) of the thread `p'. The flag may be modified
    if `writable' is true.
@@ -334,11 +324,11 @@ static inline void gc_notify_early()
             odxprint(safepoints,"notifying thread %p csp %p",p,*p->csp_around_foreign_call);
             boolean was_in_lisp = !set_thread_csp_access(p,0);
             if (was_in_lisp) {
-                thread_gc_promote(p, gc_state.phase, GC_NONE);
+                gc_state.phase_wait[gc_state.phase]++;
+                SET_THREAD_STOP_PENDING(p,T);
             } else if (thread_blocks_gc(p)) {
-                thread_gc_promote(p, GC_INVOKED, GC_NONE);
-            } else {
-                thread_gc_promote(p, GC_NONE, GC_NONE);
+                gc_state.phase_wait[GC_INVOKED]++;
+                SET_THREAD_STOP_PENDING(p,T);
             }
         }
     }
@@ -356,7 +346,8 @@ static inline void gc_notify_final()
             odxprint(safepoints,"notifying thread %p csp %p",p,*p->csp_around_foreign_call);
             boolean was_in_lisp = !set_thread_csp_access(p,0);
             if (was_in_lisp) {
-                thread_gc_promote(p, gc_state.phase, GC_NONE);
+                gc_state.phase_wait[gc_state.phase]++;
+                SET_THREAD_STOP_PENDING(p,T);
             }
         }
     }
