@@ -682,9 +682,9 @@ void thread_in_lisp_raised(os_context_t *ctxptr)
         set_thread_csp_access(self,1);
         set_csp_from_context(self, ctxptr);
         if (gc_state.phase <= GC_SETTLED)
-            gc_advance(phase,gc_state.phase);
+            gc_advance(GC_NONE,gc_state.phase);
         else
-            gc_state_wait(phase);
+            gc_state_wait(GC_NONE);
         *self->csp_around_foreign_call = 0;
         gc_state_unlock();
         check_pending_gc(ctxptr);
@@ -692,7 +692,7 @@ void thread_in_lisp_raised(os_context_t *ctxptr)
         while(check_pending_thruptions(ctxptr));
 #endif
     } else {
-        gc_advance(phase,gc_state.phase);
+        gc_advance(GC_INVOKED,gc_state.phase);
         SET_THREAD_STOP_PENDING(self,T);
         gc_state_unlock();
     }
@@ -717,12 +717,12 @@ void thread_in_safety_transition(os_context_t *ctxptr)
             SET_THREAD_STOP_PENDING(self,NIL);
             set_csp_from_context(self, ctxptr);
             if (gc_state.phase <= GC_SETTLED)
-                gc_advance(phase,gc_state.phase);
+                gc_advance(GC_NONE,gc_state.phase);
             else
-                gc_state_wait(phase);
+                gc_state_wait(GC_NONE);
             *self->csp_around_foreign_call = 0;
         } else {
-            gc_advance(phase,gc_state.phase);
+            gc_advance(GC_INVOKED,gc_state.phase);
             SET_THREAD_STOP_PENDING(self,T);
         }
         gc_state_unlock();
