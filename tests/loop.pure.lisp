@@ -294,7 +294,7 @@
                        return (list a b))
                  '(1.0 2.0))))
 
-(with-test (:name :misplaced-diclarations)
+(with-test (:name :misplaced-declarations)
   (assert-no-signal
    (compile nil `(lambda ()
                    (loop with (a) = '(1.0)
@@ -424,3 +424,10 @@
   (assert (= (loop with (((a) b)) = '(((1) 3))
                    return (+ a b))
              4)))
+
+(with-test (:name :destructuring-m-v-list :skipped-on :interpreter)
+  (flet ((f (n-iter)
+           (loop for i from 0 below n-iter
+                 for (a b) = (multiple-value-list (floor i 5))
+                 sum (+ a b))))
+    (ctu:assert-no-consing (f 1000))))

@@ -317,26 +317,39 @@ code to be loaded.
                            ,(loop-make-psetq (cddr frobs))))))))
 
 (defun loop-make-desetq (var-val-pairs)
-  (if (null var-val-pairs)
-      nil
-      (cons 'loop-really-desetq var-val-pairs)))
+  (if var-val-pairs (cons 'loop-desetq var-val-pairs)))
 
 (sb!ext:defglobal *loop-desetq-temporary*
         (make-symbol "LOOP-DESETQ-TEMP"))
 
-(sb!xc:defmacro loop-really-desetq (&environment env
-                                               &rest var-val-pairs)
+(sb!xc:defmacro loop-desetq (&environment env &rest var-val-pairs)
   (labels ((find-non-null (var)
              ;; See whether there's any non-null thing here. Recurse
              ;; if the list element is itself a list.
              (do ((tail var)) ((not (consp tail)) tail)
                (when (find-non-null (pop tail)) (return t))))
            (loop-desetq-internal (var val &optional temp)
+             ;; Check for well-formed use of MULTIPLE-VALUE-LIST
+             (when (and (typep val '(cons (eql multiple-value-list) (cons t null)))
+                        (proper-list-p var))
+               (return-from loop-desetq-internal
+                 (let ((temps (make-gensym-list (length var))))
+                   `((multiple-value-bind ,temps ,(cadr val)
+                       ,@(mapcar (lambda (var val) `(loop-desetq ,var ,val))
+                                 var temps))))))
              ;; returns a list of actions to be performed
              (typecase var
                (null
                  (when (consp val)
                    ;; Don't lose possible side effects.
+                   ;; FIXME: this special case is just wrong. Either (DESETQ NIL THING)
+                   ;; evaluates THING, or it doesn't. If it does, then it mustn't touch
+                   ;; THING at all, because the user could have written
+                   ;;  (LOOP FOR NIL = (PROG1 AAA BBB)) where AAA and BBB are
+                   ;; symbol-macros the expansions of which are, let's say, (INCF C)
+                   ;; and (WHEN (PLUSP C) (RETURN)) respectively. The desired effect is
+                   ;; to perform the incf, ignore it, and then return.  But we turn that
+                   ;; whole form into NIL because of a PROG1. Wtf???
                    (if (eq (car val) 'prog1)
                        ;; These can come from PSETQ or DESETQ below.
                        ;; Throw away the value, keep the side effects.
