@@ -286,6 +286,46 @@ static int get_freeish_page(int hint_page, int attributes)
   lose("No more immobile pages available");
 }
 
+/// The size classes are: 2w, 4w, 6w, 8w, ..., up to 20w.
+/// Each size class can store at most 2 different alignments. So for example in
+/// the size class for 14 words there will be a page hint for 14-word-aligned
+/// objects and at most one other alignment.
+#define MAX_SIZE_CLASSES 10
+#define MAX_HINTS_PER_CLASS 2
+long page_hints[MAX_SIZE_CLASSES*MAX_HINTS_PER_CLASS];
+static inline int hint_attributes(long hint) { return hint & 0xFFFFFFFF; }
+static int hint_page(long hint) { return hint>>32; }
+static long make_hint(int page, int attributes) {
+    return ((long)page << 32) | attributes;
+}
+
+static int get_hint(int attributes, int *page)
+{
+    long hint;
+    unsigned int size = attributes >> 16;
+    int hint_index = size - 2, limit = hint_index + 1, free_slot = -1;
+    if (hint_index > (int)(sizeof page_hints / sizeof (long)))
+        lose("Unexpectedly large fixedobj allocation request");
+    for ( ; hint_index <= limit; ++hint_index ) {
+        __atomic_load(&page_hints[hint_index], &hint, __ATOMIC_SEQ_CST);
+        if (hint_attributes(hint) == attributes) {
+            *page = hint_page(hint);
+            return hint_index;
+        } else if (hint == 0 && free_slot < 0)
+            free_slot = hint_index;
+    }
+    if (free_slot<0)
+        lose("Should not happen\n"); // TODO: evict a hint
+    // Linearly search for a free page from the beginning
+    int free_page = get_freeish_page(0, attributes);
+    *page = free_page;
+    int existing = __sync_val_compare_and_swap(&page_hints[free_slot], 0,
+                                               make_hint(free_page, attributes));
+    if (existing) // collided. don't worry about it
+        return -1;
+    return free_slot;
+}
+
 // Unused, but possibly will be for some kind of collision-avoidance scheme
 // on claiming of new free pages.
 long immobile_alloc_collisions;
@@ -310,15 +350,15 @@ long immobile_alloc_collisions;
      masking. if the next address is above or equal to the page start,
      store it in the hint, otherwise mark the page full */
 
-lispobj alloc_immobile_obj(int page_attributes, lispobj header, int* hint)
+static lispobj* alloc_immobile_obj(int page_attributes, lispobj header)
 {
-  int page;
+  int hint_index, page;
   lispobj word;
   char * page_data, * obj_ptr, * next_obj_ptr, * limit, * next_free;
   int spacing_in_bytes = OBJ_SPACING(page_attributes) << WORD_SHIFT;
   const int npages = FIXEDOBJ_SPACE_SIZE / IMMOBILE_CARD_BYTES;
 
-  page = *hint;
+  hint_index = get_hint(page_attributes, &page);
   gc_dcheck(fixedobj_page_address(page) < (void*)fixedobj_free_pointer);
   do {
       page_data = fixedobj_page_address(page);
@@ -334,7 +374,7 @@ lispobj alloc_immobile_obj(int page_attributes, lispobj header, int* hint)
               // the next hole. Use it to update the freelist pointer.
               // Just slam it in.
               fixedobj_pages[page].free_index = next_obj_ptr + word - page_data;
-              return (lispobj)obj_ptr;
+              return (lispobj*)obj_ptr;
           }
           // If some other thread updated the free_index
           // to a larger value, use that. (See example below)
@@ -342,9 +382,14 @@ lispobj alloc_immobile_obj(int page_attributes, lispobj header, int* hint)
           obj_ptr = next_free > next_obj_ptr ? next_free : next_obj_ptr;
       }
       set_page_full(page);
+      int old_page = page;
       page = get_freeish_page(page+1 >= npages ? 0 : page+1,
                               page_attributes);
-      *hint = page;
+      if (hint_index >= 0) { // try to update the hint
+          __sync_val_compare_and_swap(page_hints + hint_index,
+                                      make_hint(old_page, page_attributes),
+                                      make_hint(page, page_attributes));
+      }
   } while (1);
 }
 
@@ -695,47 +740,9 @@ scavenge_immobile_roots(generation_index_t min_gen, generation_index_t max_gen)
 #define LAYOUT_OF_LAYOUT  ((FIXEDOBJ_SPACE_START+3*LAYOUT_ALIGN)|INSTANCE_POINTER_LOWTAG)
 #define LAYOUT_OF_PACKAGE ((FIXEDOBJ_SPACE_START+4*LAYOUT_ALIGN)|INSTANCE_POINTER_LOWTAG)
 
-// As long as Lisp doesn't have any native allocators (vops and whatnot)
-// it doesn't need to access these values.
-int layout_page_hint, symbol_page_hint, fdefn_page_hint;
-
-// For the three different page characteristics that we need,
-// claim a page that works for those characteristics.
-void set_immobile_space_hints()
-{
-  // The allocator doesn't check whether each 'hint' points to an
-  // expected kind of page, so we have to ensure up front that
-  // allocations start on different pages. i.e. You can point to
-  // a totally full page, but you can't point to a wrong page.
-  // It doesn't work to just assign these to consecutive integers
-  // without also updating the page attributes.
-
-  // Object sizes must be multiples of 2 because the n_words value we pass
-  // to scavenge() is gotten from the page attributes, and scavenge asserts
-  // that the ending address is aligned to a doubleword boundary as expected.
-
-  // For 32-bit immobile space, LAYOUTs must be 256-byte-aligned so that the
-  // low byte of a pointer contains no information, and a layout pointer can
-  // be stored in the high 3 bytes point of an instance header.
-  // instance-length can be recovered from the layout, and need not be stored
-  // in each instance. Representation change in rev 092af9c078c made
-  // things more difficult, but not impossible.
-  layout_page_hint = get_freeish_page(0, MAKE_ATTR(LAYOUT_ALIGN / N_WORD_BYTES, // spacing
-                                                   ALIGN_UP(LAYOUT_SIZE,2),
-                                                   0));
-  symbol_page_hint = get_freeish_page(0, MAKE_ATTR(ALIGN_UP(SYMBOL_SIZE,2),
-                                                   ALIGN_UP(SYMBOL_SIZE,2),
-                                                   0));
-  fdefn_page_hint = get_freeish_page(0, MAKE_ATTR(ALIGN_UP(FDEFN_SIZE,2),
-                                                  ALIGN_UP(FDEFN_SIZE,2),
-                                                  0));
-}
-
 void write_protect_immobile_space()
 {
     immobile_scav_queue_head = 0;
-
-    set_immobile_space_hints();
 
     if (!ENABLE_PAGE_PROTECTION)
         return;
@@ -1518,8 +1525,7 @@ lispobj alloc_layout(lispobj slots)
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
                          (LAYOUT_OF_LAYOUT << 32) |
 #endif
-                         (LAYOUT_SIZE-1)<<N_WIDETAG_BITS | INSTANCE_WIDETAG,
-                         &layout_page_hint);
+                         (LAYOUT_SIZE-1)<<N_WIDETAG_BITS | INSTANCE_WIDETAG);
 #ifndef LISP_FEATURE_COMPACT_INSTANCE_HEADER
     l->slots[0] = LAYOUT_OF_LAYOUT;
 #endif
@@ -1543,8 +1549,7 @@ lispobj alloc_sym(lispobj name)
       alloc_immobile_obj(MAKE_ATTR(ALIGN_UP(SYMBOL_SIZE,2), // spacing
                                    ALIGN_UP(SYMBOL_SIZE,2), // size
                                    0),
-                         (SYMBOL_SIZE-1)<<N_WIDETAG_BITS | SYMBOL_WIDETAG,
-                         &symbol_page_hint);
+                         (SYMBOL_SIZE-1)<<N_WIDETAG_BITS | SYMBOL_WIDETAG);
     s->value = UNBOUND_MARKER_WIDETAG;
     s->hash = 0;
     s->info = NIL;
@@ -1560,8 +1565,7 @@ lispobj alloc_fdefn(lispobj name)
       alloc_immobile_obj(MAKE_ATTR(ALIGN_UP(FDEFN_SIZE,2), // spacing
                                    ALIGN_UP(FDEFN_SIZE,2), // size
                                    0),
-                         (FDEFN_SIZE-1)<<N_WIDETAG_BITS | FDEFN_WIDETAG,
-                         &fdefn_page_hint);
+                         (FDEFN_SIZE-1)<<N_WIDETAG_BITS | FDEFN_WIDETAG);
     f->name = name;
     f->fun = NIL;
     f->raw_addr = 0;
@@ -1577,10 +1581,7 @@ lispobj alloc_fun_tramp(lispobj callable)
     lispobj* obj = (lispobj*)
       alloc_immobile_obj(MAKE_ATTR(FUN_TRAMP_SIZE, FUN_TRAMP_SIZE, 0),
                          // header indicates 4 boxed words
-                         (4 << N_WIDETAG_BITS) | CODE_HEADER_WIDETAG,
-                         // KLUDGE: same page attributes as symbols,
-                         // so use the same hint.
-                         &symbol_page_hint);
+                         (4 << N_WIDETAG_BITS) | CODE_HEADER_WIDETAG);
     obj[1] = make_fixnum(16);
     obj[2] = callable;
     obj[3] = 0;
@@ -1599,10 +1600,7 @@ lispobj alloc_generic_function(lispobj slots)
                                    ALIGN_UP(GF_SIZE,2), // size
                                    0),
                          // 5 payload words following the header
-                         ((GF_SIZE-1)<<N_WIDETAG_BITS) | FUNCALLABLE_INSTANCE_WIDETAG,
-                         // KLUDGE: same page attributes as symbols,
-                         // so use the same hint.
-                         &symbol_page_hint);
+                         ((GF_SIZE-1)<<N_WIDETAG_BITS) | FUNCALLABLE_INSTANCE_WIDETAG);
     ((struct funcallable_instance*)obj)->info[0] = slots;
     ((struct funcallable_instance*)obj)->trampoline = (lispobj)(obj + 4);
     return make_lispobj(obj, FUN_POINTER_LOWTAG);
