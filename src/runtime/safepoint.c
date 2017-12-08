@@ -647,105 +647,107 @@ check_pending_gc(os_context_t *ctx)
 void thread_in_lisp_raised(os_context_t *ctxptr)
 {
     struct thread *self = arch_os_get_current_thread();
+    boolean check_gc_and_thruptions = 0;
     odxprint(safepoints,"%s","thread_in_lisp_raised");
-    gc_state_lock();
 
-    if (gc_state.phase == GC_FLIGHT &&
-        read_TLS(GC_PENDING,self)==T &&
-        !thread_blocks_gc(self) &&
-        thread_may_gc() && read_TLS(IN_SAFEPOINT,self)!=T) {
-        set_csp_from_context(self, ctxptr);
-        gc_advance(GC_QUIET,GC_FLIGHT);
-        set_thread_csp_access(self,1);
-        if (gc_state.collector) {
-            gc_advance(GC_NONE,GC_QUIET);
+    WITH_GC_STATE_LOCK {
+        if (gc_state.phase == GC_FLIGHT &&
+            read_TLS(GC_PENDING,self)==T &&
+            !thread_blocks_gc(self) &&
+            thread_may_gc() && read_TLS(IN_SAFEPOINT,self)!=T) {
+            set_csp_from_context(self, ctxptr);
+            gc_advance(GC_QUIET,GC_FLIGHT);
+            set_thread_csp_access(self,1);
+            if (gc_state.collector) {
+                gc_advance(GC_NONE,GC_QUIET);
+            } else {
+                write_TLS(GC_PENDING,T,self);
+            }
+            *self->csp_around_foreign_call = 0;
+            check_gc_and_thruptions = 1;
         } else {
-            write_TLS(GC_PENDING,T,self);
+            if (gc_state.phase == GC_FLIGHT) {
+                gc_state_wait(GC_MESSAGE);
+            }
+            if (!thread_blocks_gc(self)) {
+                SET_THREAD_STOP_PENDING(self,NIL);
+                set_thread_csp_access(self,1);
+                set_csp_from_context(self, ctxptr);
+                if (gc_state.phase <= GC_SETTLED)
+                    gc_advance(GC_NONE,gc_state.phase);
+                else
+                    gc_state_wait(GC_NONE);
+                *self->csp_around_foreign_call = 0;
+                check_gc_and_thruptions = 1;
+            } else {
+                gc_advance(GC_INVOKED,gc_state.phase);
+                SET_THREAD_STOP_PENDING(self,T);
+            }
         }
-        *self->csp_around_foreign_call = 0;
-        gc_state_unlock();
+    }
+    if (check_gc_and_thruptions) {
         check_pending_gc(ctxptr);
 #ifdef LISP_FEATURE_SB_THRUPTION
         while(check_pending_thruptions(ctxptr));
 #endif
-        return;
-    }
-    if (gc_state.phase == GC_FLIGHT) {
-        gc_state_wait(GC_MESSAGE);
-    }
-    if (!thread_blocks_gc(self)) {
-        SET_THREAD_STOP_PENDING(self,NIL);
-        set_thread_csp_access(self,1);
-        set_csp_from_context(self, ctxptr);
-        if (gc_state.phase <= GC_SETTLED)
-            gc_advance(GC_NONE,gc_state.phase);
-        else
-            gc_state_wait(GC_NONE);
-        *self->csp_around_foreign_call = 0;
-        gc_state_unlock();
-        check_pending_gc(ctxptr);
-#ifdef LISP_FEATURE_SB_THRUPTION
-        while(check_pending_thruptions(ctxptr));
-#endif
-    } else {
-        gc_advance(GC_INVOKED,gc_state.phase);
-        SET_THREAD_STOP_PENDING(self,T);
-        gc_state_unlock();
     }
 }
 
 void thread_in_safety_transition(os_context_t *ctxptr)
 {
     struct thread *self = arch_os_get_current_thread();
+    boolean was_in_alien;
 
     odxprint(safepoints,"%s","GC safety transition");
-    gc_state_lock();
-    boolean was_in_alien = set_thread_csp_access(self,1);
-    if (was_in_alien) {
-        if (thread_blocks_gc(self)) {
-            gc_state_wait(GC_INVOKED);
-        } else {
-            gc_state_wait(GC_NONE);
-        }
-        gc_state_unlock();
-#ifdef LISP_FEATURE_SB_THRUPTION
-        while(check_pending_thruptions(ctxptr));
-#endif
-    } else {
-        if (!thread_blocks_gc(self)) {
-            SET_THREAD_STOP_PENDING(self,NIL);
-            set_csp_from_context(self, ctxptr);
-            if (gc_state.phase <= GC_SETTLED)
-                gc_advance(GC_NONE,gc_state.phase);
-            else
+    WITH_GC_STATE_LOCK {
+        was_in_alien = set_thread_csp_access(self,1);
+        if (was_in_alien) {
+            if (thread_blocks_gc(self)) {
+                gc_state_wait(GC_INVOKED);
+            } else {
                 gc_state_wait(GC_NONE);
-            *self->csp_around_foreign_call = 0;
+            }
         } else {
-            gc_advance(GC_INVOKED,gc_state.phase);
-            SET_THREAD_STOP_PENDING(self,T);
+            if (!thread_blocks_gc(self)) {
+                SET_THREAD_STOP_PENDING(self,NIL);
+                set_csp_from_context(self, ctxptr);
+                if (gc_state.phase <= GC_SETTLED)
+                    gc_advance(GC_NONE,gc_state.phase);
+                else
+                    gc_state_wait(GC_NONE);
+                *self->csp_around_foreign_call = 0;
+            } else {
+                gc_advance(GC_INVOKED,gc_state.phase);
+                SET_THREAD_STOP_PENDING(self,T);
+            }
         }
-        gc_state_unlock();
     }
+#ifdef LISP_FEATURE_SB_THRUPTION
+    if (was_in_alien) {
+        while(check_pending_thruptions(ctxptr));
+    }
+#endif
 }
 
 #ifdef LISP_FEATURE_WIN32
 void thread_interrupted(os_context_t *ctxptr)
 {
     struct thread *self = arch_os_get_current_thread();
+    boolean gc_active, was_in_alien;
 
     odxprint(safepoints,"%s","pending interrupt trap");
-    gc_state_lock();
-    if (gc_state.phase != GC_NONE) {
-        boolean was_in_alien = set_thread_csp_access(self,1);
+    WITH_GC_STATE_LOCK {
+        gc_active = gc_cycle_active();
+        if (gc_active) {
+            was_in_alien = set_thread_csp_access(self,1);
+        }
+    }
+    if (gc_active) {
         if (was_in_alien) {
-            gc_state_unlock();
             thread_in_safety_transition(ctxptr);
         } else {
-            gc_state_unlock();
             thread_in_lisp_raised(ctxptr);
         }
-    } else {
-        gc_state_unlock();
     }
     check_pending_gc(ctxptr);
 #ifdef LISP_FEATURE_SB_THRUPTION
