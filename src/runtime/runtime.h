@@ -72,6 +72,10 @@ void gc_state_wait(gc_phase_t);
 int gc_cycle_active(void);
 void gc_state_unlock();
 
+#define WITH_GC_STATE_LOCK \
+    gc_state_lock(); \
+    RUN_BODY_ONCE(gc_state_lock, gc_state_unlock())
+
 #endif
 
 /*

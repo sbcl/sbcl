@@ -371,9 +371,9 @@ init_new_thread(struct thread *th, init_thread_data *scribble, int guardp)
      * non-safepoint versions of this code.  Can we unify this more?
      */
 #ifdef LISP_FEATURE_SB_SAFEPOINT
-    gc_state_lock();
-    gc_state_wait(GC_NONE);
-    gc_state_unlock();
+    WITH_GC_STATE_LOCK {
+        gc_state_wait(GC_NONE);
+    }
     push_gcing_safety(&scribble->safety);
 #endif
 }

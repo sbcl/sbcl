@@ -442,13 +442,13 @@ thread_register_gc_trigger()
 {
     odxprint(misc, "/thread_register_gc_trigger");
     struct thread *self = arch_os_get_current_thread();
-    gc_state_lock();
-    if (gc_state.phase == GC_NONE &&
-        read_TLS(IN_SAFEPOINT,self)!=T &&
-        !thread_blocks_gc(self)) {
-        gc_advance(GC_FLIGHT,GC_NONE);
+    WITH_GC_STATE_LOCK {
+        if (gc_state.phase == GC_NONE &&
+            read_TLS(IN_SAFEPOINT,self)!=T &&
+            !thread_blocks_gc(self)) {
+            gc_advance(GC_FLIGHT,GC_NONE);
+        }
     }
-    gc_state_unlock();
 }
 
 static inline int
@@ -759,39 +759,39 @@ gc_stop_the_world()
 {
     struct thread* self = arch_os_get_current_thread();
     odxprint(safepoints, "stop the world");
-    gc_state_lock();
-    gc_state.collector = self;
-    gc_state.phase_wait[GC_QUIET]++;
+    WITH_GC_STATE_LOCK {
+        gc_state.collector = self;
+        gc_state.phase_wait[GC_QUIET]++;
 
-    switch(gc_state.phase) {
-    case GC_NONE:
-        gc_advance(GC_QUIET,gc_state.phase);
-    case GC_FLIGHT:
-    case GC_MESSAGE:
-    case GC_INVOKED:
-        if ((gc_state.phase == GC_MESSAGE)
-            || (gc_state.phase == GC_INVOKED)) {
-            /* If the phase was GC_MESSAGE or GC_INVOKED, we were
-             * accounted as "in alien", and are on the GC_INVOKED
-             * waitcount, or we were "in lisp" but in WITHOUT-GCING,
-             * which led to us putting OURSELVES on the GC_INVOKED
-             * waitcount. */
-            gc_advance(GC_QUIET, GC_INVOKED);
-        } else {
-            gc_state_wait(GC_QUIET);
+        switch(gc_state.phase) {
+        case GC_NONE:
+            gc_advance(GC_QUIET,gc_state.phase);
+        case GC_FLIGHT:
+        case GC_MESSAGE:
+        case GC_INVOKED:
+            if ((gc_state.phase == GC_MESSAGE)
+                || (gc_state.phase == GC_INVOKED)) {
+                /* If the phase was GC_MESSAGE or GC_INVOKED, we were
+                 * accounted as "in alien", and are on the GC_INVOKED
+                 * waitcount, or we were "in lisp" but in WITHOUT-GCING,
+                 * which led to us putting OURSELVES on the GC_INVOKED
+                 * waitcount. */
+                gc_advance(GC_QUIET, GC_INVOKED);
+            } else {
+                gc_state_wait(GC_QUIET);
+            }
+        case GC_QUIET:
+            gc_state.phase_wait[GC_QUIET]=1;
+            gc_advance(GC_COLLECT,GC_QUIET);
+            break;
+        case GC_COLLECT:
+            break;
+        default:
+            lose("Stopping the world in unexpected state %d",gc_state.phase);
+            break;
         }
-    case GC_QUIET:
-        gc_state.phase_wait[GC_QUIET]=1;
-        gc_advance(GC_COLLECT,GC_QUIET);
-        break;
-    case GC_COLLECT:
-        break;
-    default:
-        lose("Stopping the world in unexpected state %d",gc_state.phase);
-        break;
+        set_thread_csp_access(self,1);
     }
-    set_thread_csp_access(self,1);
-    gc_state_unlock();
     SET_THREAD_STOP_PENDING(self,NIL);
 }
 
@@ -799,12 +799,12 @@ gc_stop_the_world()
 void gc_start_the_world()
 {
     odxprint(safepoints,"%s","start the world");
-    gc_state_lock();
-    gc_state.collector = NULL;
-    write_TLS(IN_WITHOUT_GCING,IN_WITHOUT_GCING,
-                     arch_os_get_current_thread());
-    gc_advance(GC_NONE,GC_COLLECT);
-    gc_state_unlock();
+    WITH_GC_STATE_LOCK {
+        gc_state.collector = NULL;
+        write_TLS(IN_WITHOUT_GCING,IN_WITHOUT_GCING,
+                  arch_os_get_current_thread());
+        gc_advance(GC_NONE,GC_COLLECT);
+    }
 }
 
 
@@ -841,12 +841,12 @@ wake_thread_win32(struct thread *thread)
     wake_thread_io(thread);
     pthread_mutex_unlock(&all_threads_lock);
 
-    gc_state_lock();
-    if (gc_state.phase == GC_NONE) {
-        gc_advance(GC_INVOKED,GC_NONE);
-        gc_advance(GC_NONE,GC_INVOKED);
+    WITH_GC_STATE_LOCK {
+        if (gc_state.phase == GC_NONE) {
+            gc_advance(GC_INVOKED,GC_NONE);
+            gc_advance(GC_NONE,GC_INVOKED);
+        }
     }
-    gc_state_unlock();
 
     pthread_mutex_lock(&all_threads_lock);
     return;
@@ -873,54 +873,54 @@ wake_thread_posix(os_thread_t os_thread)
     sigset_t oldset;
     block_deferrable_signals(&oldset);
 
-    gc_state_lock();
-    if (gc_state.phase == GC_NONE) {
-        odxprint(safepoints, "wake_thread_posix: invoking");
-        gc_advance(GC_INVOKED,GC_NONE);
-        {
-            /* only if in foreign code, notify using signal */
+    WITH_GC_STATE_LOCK {
+        if (gc_state.phase == GC_NONE) {
+            odxprint(safepoints, "wake_thread_posix: invoking");
+            gc_advance(GC_INVOKED,GC_NONE);
+            {
+                /* only if in foreign code, notify using signal */
+                WITH_ALL_THREADS_LOCK {
+                    for_each_thread (thread)
+                        if (thread->os_thread == os_thread) {
+                            /* it's still alive... */
+                            found = 1;
+
+                            odxprint(safepoints, "wake_thread_posix: found");
+                            write_TLS(THRUPTION_PENDING,T,thread);
+                            if (read_TLS(GC_PENDING,thread) == T
+                                || THREAD_STOP_PENDING(thread) == T)
+                                break;
+
+                            if (os_get_csp(thread)) {
+                                odxprint(safepoints, "wake_thread_posix: kill");
+                                /* ... and in foreign code.  Push it into a safety
+                                 * transition. */
+                                int status = pthread_kill(os_thread, SIGPIPE);
+                                if (status)
+                                    lose("wake_thread_posix: pthread_kill failed with %d\n",
+                                         status);
+                            }
+                            break;
+                        }
+                }
+            }
+            gc_advance(GC_NONE,GC_INVOKED);
+        } else {
+            odxprint(safepoints, "wake_thread_posix: passive");
+            /* We are not able to wake the thread up actively, but maybe
+             * some other thread will take care of it.  Kludge: Unless it is
+             * in foreign code.  Let's at least try to get our return value
+             * right. */
             WITH_ALL_THREADS_LOCK {
                 for_each_thread (thread)
                     if (thread->os_thread == os_thread) {
-                        /* it's still alive... */
-                        found = 1;
-
-                        odxprint(safepoints, "wake_thread_posix: found");
                         write_TLS(THRUPTION_PENDING,T,thread);
-                        if (read_TLS(GC_PENDING,thread) == T
-                            || THREAD_STOP_PENDING(thread) == T)
-                            break;
-
-                        if (os_get_csp(thread)) {
-                            odxprint(safepoints, "wake_thread_posix: kill");
-                            /* ... and in foreign code.  Push it into a safety
-                             * transition. */
-                            int status = pthread_kill(os_thread, SIGPIPE);
-                            if (status)
-                                lose("wake_thread_posix: pthread_kill failed with %d\n",
-                                     status);
-                        }
+                        found = 1;
                         break;
                     }
             }
         }
-        gc_advance(GC_NONE,GC_INVOKED);
-    } else {
-        odxprint(safepoints, "wake_thread_posix: passive");
-        /* We are not able to wake the thread up actively, but maybe
-         * some other thread will take care of it.  Kludge: Unless it is
-         * in foreign code.  Let's at least try to get our return value
-         * right. */
-        WITH_ALL_THREADS_LOCK {
-            for_each_thread (thread)
-                if (thread->os_thread == os_thread) {
-                    write_TLS(THRUPTION_PENDING,T,thread);
-                    found = 1;
-                    break;
-                }
-        }
     }
-    gc_state_unlock();
 
     odxprint(safepoints, "wake_thread_posix leaving, found=%d", found);
     thread_sigmask(SIG_SETMASK, &oldset, 0);

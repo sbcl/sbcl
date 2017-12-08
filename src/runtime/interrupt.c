@@ -630,9 +630,9 @@ check_interrupt_context_or_lose(os_context_t *context)
      * are called from WITHOUT-GCING, all other takers of the lock
      * have deferrables blocked). */
     if (!(interrupt_pending || pseudo_atomic_interrupted || gc_inhibit)) {
-        gc_state_lock();
-        safepoint_active = gc_cycle_active();
-        gc_state_unlock();
+        WITH_GC_STATE_LOCK {
+            safepoint_active = gc_cycle_active();
+        }
     }
 #endif
     /* In the time window between leaving the *INTERRUPTS-ENABLED* NIL
