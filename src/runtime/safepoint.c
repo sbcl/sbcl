@@ -281,6 +281,14 @@ static inline gc_phase_t thread_gc_phase(struct thread* p)
         inhibit ? GC_INVOKED : GC_NONE;
 }
 
+static inline boolean
+thread_blocks_gc(struct thread *thread)
+{
+    /* Note that, unlike thread_may_gc(), this may be called on
+     * another thread, and that other thread may be in any state */
+    return thread_gc_phase(thread) != GC_NONE;
+}
+
 static inline void thread_gc_promote(struct thread* p, gc_phase_t cur, gc_phase_t old) {
     if (old != GC_NONE)
         gc_state.phase_wait[old]--;
@@ -447,7 +455,7 @@ thread_register_gc_trigger()
     gc_state_lock();
     if (gc_state.phase == GC_NONE &&
         read_TLS(IN_SAFEPOINT,self)!=T &&
-        thread_gc_phase(self)==GC_NONE) {
+        !thread_blocks_gc(self)) {
         gc_advance(GC_FLIGHT,GC_NONE);
     }
     gc_state_unlock();
@@ -649,13 +657,12 @@ check_pending_gc(os_context_t *ctx)
 void thread_in_lisp_raised(os_context_t *ctxptr)
 {
     struct thread *self = arch_os_get_current_thread();
-    gc_phase_t phase;
     odxprint(safepoints,"%s","thread_in_lisp_raised");
     gc_state_lock();
 
     if (gc_state.phase == GC_FLIGHT &&
         read_TLS(GC_PENDING,self)==T &&
-        thread_gc_phase(self)==GC_NONE &&
+        !thread_blocks_gc(self) &&
         thread_may_gc() && read_TLS(IN_SAFEPOINT,self)!=T) {
         set_csp_from_context(self, ctxptr);
         gc_advance(GC_QUIET,GC_FLIGHT);
@@ -676,8 +683,7 @@ void thread_in_lisp_raised(os_context_t *ctxptr)
     if (gc_state.phase == GC_FLIGHT) {
         gc_state_wait(GC_MESSAGE);
     }
-    phase = thread_gc_phase(self);
-    if (phase == GC_NONE) {
+    if (!thread_blocks_gc(self)) {
         SET_THREAD_STOP_PENDING(self,NIL);
         set_thread_csp_access(self,1);
         set_csp_from_context(self, ctxptr);
@@ -712,8 +718,7 @@ void thread_in_safety_transition(os_context_t *ctxptr)
         while(check_pending_thruptions(ctxptr));
 #endif
     } else {
-        gc_phase_t phase = thread_gc_phase(self);
-        if (phase == GC_NONE) {
+        if (!thread_blocks_gc(self)) {
             SET_THREAD_STOP_PENDING(self,NIL);
             set_csp_from_context(self, ctxptr);
             if (gc_state.phase <= GC_SETTLED)
