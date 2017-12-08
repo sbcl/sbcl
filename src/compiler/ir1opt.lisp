@@ -224,7 +224,8 @@
                   (setf (lvar-%externally-checkable-type arg)
                         *wild-type*)))
               (map-combination-args-and-types
-               (lambda (arg type)
+               (lambda (arg type &rest args)
+                 (declare (ignore args))
                  (setf (lvar-%externally-checkable-type arg)
                        (acond ((lvar-%externally-checkable-type arg)
                                (values-type-intersection
@@ -1426,12 +1427,17 @@
                          (or (lvar-fun-name lvar t)
                              (constant-lvar-p lvar)))
                        args)
-                (map-callable-arguments
-                 (lambda (lvar &rest args)
-                   (declare (ignore args))
-                   (constant-fold-arg-p (or (lvar-fun-name lvar t)
-                                            (lvar-value lvar))))
-                 combination)))
+                (block nil
+                  (map-callable-arguments
+                   (lambda (lvar args result &key unknown-keys &allow-other-keys)
+                     (declare (ignore args result))
+                     (when unknown-keys
+                       (return nil))
+                     (unless (constant-fold-arg-p (or (lvar-fun-name lvar t)
+                                                      (lvar-value lvar)))
+                       (return nil)))
+                   combination)
+                  t)))
           (t
            (every #'constant-lvar-p args)))))
 

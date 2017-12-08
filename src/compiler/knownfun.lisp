@@ -41,7 +41,8 @@
   ;; notes about failed transformation due to types even though it
   ;; wouldn't have been applied with the right types anyway,
   ;; or if another transform could be applied with the right policy.
-  (policy nil :type (or null function)))
+  (policy nil :type (or null function))
+  (extra-type nil))
 
 (defprinter (transform) type note important)
 
@@ -73,8 +74,8 @@
 (defun %defknown (names type attributes location
                   &key derive-type optimizer destroyed-constant-args result-arg
                        overwrite-fndb-silently
-                       callable-map
-                       call-type-deriver)
+                       call-type-deriver
+                       annotation)
   (let ((ctype (specifier-type type)))
     (dolist (name names)
       (unless overwrite-fndb-silently
@@ -101,8 +102,8 @@
                            :optimizer optimizer
                            :destroyed-constant-args destroyed-constant-args
                            :result-arg result-arg
-                           :callable-map callable-map
-                           :call-type-deriver call-type-deriver))
+                           :call-type-deriver call-type-deriver
+                           :annotation annotation))
       (if location
           (setf (getf (info :source-location :declaration name) 'defknown)
                 location)
@@ -142,20 +143,27 @@
     (setq attributes (union '(unwind) attributes)))
   (when (member 'flushable attributes)
     (pushnew 'unsafely-flushable attributes))
-  (multiple-value-bind (callable-map arg-types)
-      (make-callable-map arg-types attributes)
+  (multiple-value-bind (type annotation)
+      (split-type-info arg-types result-type)
     `(%defknown ',(if (and (consp name)
                            (not (legal-fun-name-p name)))
                       name
                       (list name))
-                '(sfunction ,arg-types ,result-type)
+                ',type
                 (ir1-attributes ,@attributes)
                 (source-location)
-                :callable-map ,callable-map
+                :annotation ,annotation
                 ,@keys)))
 
-(defun make-callable-map (arg-types attributes)
-  (if (member 'call attributes)
+(defstruct (fun-type-annotation
+            (:copier nil))
+  positional ;; required and &optional
+  key
+  returns)
+
+(defun split-type-info (arg-types result-type)
+  (if (eq arg-types '*)
+      `(sfunction ,arg-types ,result-type)
       (multiple-value-bind (llks required optional rest keys)
           (parse-lambda-list
            arg-types
@@ -163,99 +171,48 @@
            :accept (lambda-list-keyword-mask
                     '(&optional &rest &key &allow-other-keys))
            :silent t)
-        (let (vars
-              call-vars)
-          (labels ((callable-p (x)
-                     (member x '(function function-designator)))
-                   (process-var (x &optional (name (gensym)))
-                     (if (callable-p (if (consp x)
-                                         (car x)
-                                         x))
-                         (push (list* name
-                                      (cond ((consp x)
-                                             (cdr x))))
-                               call-vars)
-                         (push name vars))
-                     name)
-                   (process-type (type)
-                     (if (and (consp type)
-                              (callable-p (car type)))
-                         (car type)
-                         type)))
-            (let* (key-arg
-                   rest-var
-                   (lambda-list
-                     `(,@(mapcar #'process-var required)
-                       ,@(and optional
-                              `(&optional ,@(mapcar #'process-var optional)))
-                       ,@(and rest
-                              `(&rest ,(setf rest-var (process-var (car rest)))))
-                       ,@(and (ll-kwds-keyp llks)
-                              `(&key
-                                ,@(loop for (key type) in keys
-                                        for var = (gensym)
-                                        do (process-var type var)
-                                        collect (if (eq key :key)
-                                                    (let ((var-supplied-p (gensym)))
-                                                      (setf key-arg
-                                                            (cons var var-supplied-p))
-                                                      `((,key ,var) nil ,var-supplied-p))
-                                                    `((,key ,var)))))))))
-
+        (let ((i -1)
+              positional-annotation
+              key-annotation
+              return-annotation)
+          (labels ((annotation-p (x)
+                     (typep x '(cons (member function function-designator))))
+                   (process-positional (type)
+                     (incf i)
+                     (cond ((annotation-p type)
+                            (push (cons i type) positional-annotation)
+                            (car type))
+                           (t
+                            type)))
+                   (process-key (pair)
+                     (cond ((annotation-p (cadr pair))
+                            (destructuring-bind (key value) pair
+                              (setf (getf key-annotation key) value)
+                              (list key (car value))))
+                           (t
+                            pair)))
+                   (process-return (type)
+                     (cond ((annotation-p type)
+                            (setf return-annotation type)
+                            (car type))
+                           (t
+                            type))))
+            (let ((required (mapcar #'process-positional required))
+                  (optional (mapcar #'process-positional optional))
+                  (key (mapcar #'process-key keys))
+                  (return (process-return result-type)))
               (values
-               `(lambda (function ,@lambda-list)
-                  (declare (ignorable ,@vars))
-                  ;; Turn all the (nth-arg n . options) into (arg-lvar . options)
-                  ,@(loop for (lvar args results . options) in call-vars
-                          for rest-p = (typep (car (last args)) '(cons (eql rest-args)))
-                          collect
-                          (labels ((handle-keys (options)
-                                   `(list ,@(loop for (key value) on options by #'cddr
-                                                  collect key
-                                                  collect (if (eq key :key)
-                                                              (destructuring-bind (var . var-p)
-                                                                  key-arg
-                                                                `(and ,var-p
-                                                                      ,var))
-                                                              value))))
-                                   (process-arg (arg)
-                                     (if (consp arg)
-                                         (ecase (car arg)
-                                           (nth-arg
-                                            `(list* ,(nth (cadr arg) lambda-list)
-                                                    ,(handle-keys (cddr arg))))
-                                           (or
-                                            `(list* (list 'or ,@(mapcar #'process-arg (cdr arg))))))
-                                         `(load-time-value (values-specifier-type ',arg)))))
-                            `(and ,lvar
-                                  (funcall function
-                                           ,lvar
-                                           (list*
-                                            ,@(loop for arg in (if rest-p
-                                                                   (butlast args)
-                                                                   args)
-                                                    collect (process-arg arg))
-                                            ,(and rest-p
-                                                  `(loop with rest-options = ',(cdar (last args))
-                                                         for x in ,rest-var
-                                                         collect (list* x rest-options))))
-                                           ,(if results
-                                                (process-arg results)
-                                                '*wild-type*)
-                                           ,@options)))))
-               `(,@(mapcar #'process-type required)
-                 ,@(and optional
-                        `(&optional ,@(mapcar #'process-type optional)))
-                 ,@(and (ll-kwds-restp llks)
-                        `(&rest ,@rest))
-                 ,@(and (ll-kwds-keyp llks)
-                        `(&key
-                          ,@(loop for (key type) in keys
-                                  collect `(,key ,(process-type type)))))
-                 ,@(and (ll-kwds-allowp llks)
-                        '(&allow-other-keys))))))))
-      (values nil arg-types)))
-
+               `(sfunction
+                 (,@required
+                  ,@(and optional `(&optional ,@optional))
+                  ,@(and (ll-kwds-restp llks) `(&rest ,@rest))
+                  ,@(and (ll-kwds-keyp llks) `(&key ,@key))
+                  ,@(and (ll-kwds-allowp llks) '(&allow-other-keys)))
+                 ,return)
+               (when (or positional-annotation key-annotation return-annotation)
+                 `(make-fun-type-annotation :positional ',positional-annotation
+                                            :key ',key-annotation
+                                            :returns ',return-annotation)))))))))
 
 ;;; Return the FUN-INFO for NAME or die trying.
 (declaim (ftype (sfunction (t) fun-info) fun-info-or-lose))

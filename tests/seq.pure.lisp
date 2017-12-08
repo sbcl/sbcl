@@ -248,7 +248,8 @@
                (t t)))
            (test (type expr &key (filter #'safe))
              (checked-compile-and-assert
-                 (:optimize `(:compilation-speed nil :space nil :filter ,filter))
+                 (:optimize `(:compilation-speed nil :space nil :filter ,filter)
+                  :allow-style-warnings t)
                  `(lambda () ,expr)
                (() (condition type)))))
     (test 'sb-kernel:bounding-indices-bad-error

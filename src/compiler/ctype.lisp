@@ -936,33 +936,55 @@ and no value was provided for it." name))))))))))
       type))
 
 ;;; Call FUN with (arg-lvar arg-type)
-(defun map-combination-args-and-types (fun call)
+(defun map-combination-args-and-types (fun call &optional info)
   (declare (type function fun) (type combination call))
   (binding* ((type (lvar-fun-type (combination-fun call)))
              (nil (fun-type-p type) :exit-if-null)
-             (args (combination-args call)))
-    (dolist (req (fun-type-required type))
-      (when (null args) (return-from map-combination-args-and-types))
-      (let ((arg (pop args)))
-        (funcall fun arg req)))
-    (dolist (opt (fun-type-optional type))
-      (when (null args) (return-from map-combination-args-and-types))
-      (let ((arg (pop args)))
-        (funcall fun arg opt)))
+             (annotation (and info
+                              (fun-info-annotation info)))
+             (arg-lvars (resolve-key-args (combination-args call) type))
+             (args (combination-args call))
+             (i -1))
+    (flet ((positional-annotation ()
+             (and annotation
+                  (cdr (assoc (incf i)
+                              (fun-type-annotation-positional annotation)))))
+           (key-annotation (key)
+             (and annotation
+                  (getf (fun-type-annotation-key annotation) key)))
+           (call (arg type &optional annotation)
+             (funcall fun arg type arg-lvars annotation)))
+      (dolist (req (fun-type-required type))
+        (when (null args) (return-from map-combination-args-and-types))
+        (let ((arg (pop args)))
+          (call arg req (positional-annotation))))
+      (dolist (opt (fun-type-optional type))
+        (when (null args) (return-from map-combination-args-and-types))
+        (let ((arg (pop args)))
+          (call arg opt (positional-annotation))))
 
-    (let ((rest (fun-type-rest type)))
-      (when rest
-        (dolist (arg args)
-          (funcall fun arg rest))))
+      (let ((rest (fun-type-rest type)))
+        (when (and rest
+                   (neq rest *universal-type*))
+          (dolist (arg args)
+            (call arg rest))))
 
-    (dolist (key (fun-type-keywords type))
-      (let ((name (key-info-name key)))
-        (do ((arg args (cddr arg)))
-            ((null arg))
-          (let ((keyname (first arg)))
-            (when (and (constant-lvar-p keyname)
-                       (eq (lvar-value keyname) name))
-              (funcall fun (second arg) (key-info-type key)))))))))
+      (let ((key-args (nthcdr (+ (length (fun-type-optional type))
+                                 (length (fun-type-required type)))
+                              arg-lvars)))
+        (dolist (key (fun-type-keywords type))
+          (let* ((name (key-info-name key))
+                 (lvar (getf key-args name)))
+            (when lvar
+              (call lvar (key-info-type key) (key-annotation name)))))))))
+
+(defun apply-type-annotation (fun-name arg type lvars policy &optional annotation)
+  (case (car annotation)
+    (function-designator
+     (assert-function-designator fun-name lvars arg (cdr annotation))
+     t)
+    (t
+     (assert-lvar-type arg type policy))))
 
 ;;; Assert that CALL is to a function of the specified TYPE. It is
 ;;; assumed that the call is legal and has only constants in the
@@ -995,13 +1017,13 @@ and no value was provided for it." name))))))))))
                (fun-info-call-type-deriver info))
           (funcall (fun-info-call-type-deriver info) call trusted)
           (map-combination-args-and-types
-           (lambda (arg type)
-             (when (and (assert-lvar-type arg type policy)
-                        (not trusted))
+           (lambda (arg type lvars &optional annotation)
+             (when (and
+                    (apply-type-annotation name arg type lvars policy annotation)
+                    (not trusted))
                (reoptimize-lvar arg)))
-           call))
-      (when info
-        (assert-callable-args name call))))
+           call
+           info))))
   (values))
 
 ;;;; FIXME: Move to some other file.

@@ -11,55 +11,68 @@
 
 (in-package "SB!C")
 
-(defun assert-callable-args (name call)
-  (map-callable-arguments
-   (lambda (&rest args)
-     (apply #'assert-callable-arg name args))
-   call))
-
-(defun assert-callable-arg (caller lvar args results &key &allow-other-keys)
-  (when args
+(defun assert-function-designator (caller lvars lvar annotation)
+  (destructuring-bind (args &optional results &rest options) annotation
+    (declare (ignore options))
     (multiple-value-bind (arg-specs result-specs deps)
-        (callable-dependant-lvars args results)
+        (callable-dependant-lvars caller lvars args results)
       (assert-function-designator-lvar-type lvar
                                             (make-fun-type
                                              :required
-                                             (if arg-specs
-                                                 (make-list (length args)
-                                                            :initial-element *universal-type*)
-                                                 args)
-                                             :returns (if (ctype-p results)
-                                                          results
-                                                          *wild-type*)
+                                             (make-list (+ (length arg-specs)
+                                                           ;; Count ordinary types without annotations
+                                                           (count-if #'atom args))
+                                                        :initial-element *universal-type*)
+                                             :returns *wild-type*
                                              :designator t)
                                             caller deps arg-specs result-specs))))
 
-(defun callable-dependant-lvars (args results)
-  (collect ((lvars))
-    (let ((arg-position -1))
-      (labels ((process-arg (arg)
-                 (destructuring-bind (lvar . options) arg
+(defun fun-type-positional-count (fun-type)
+  (+ (length (fun-type-required fun-type))
+     (length (fun-type-optional fun-type))))
+
+(defun callable-dependant-lvars (caller lvars args results)
+  (let ((fun-type (info :function :type caller)))
+    (collect ((lvars))
+      (let ((arg-position -1)
+            (positional-count (fun-type-positional-count fun-type)))
+        (labels ((record-lvar (lvar)
                    (lvars lvar)
-                   (list*
-                    (incf arg-position)
-                    (loop for (key value) on options by #'cddr
-                          collect key
-                          collect (cond ((lvar-p value)
-                                         (lvars value)
-                                         (incf arg-position))
-                                        (t
-                                         value))))))
-               (process-args (args)
-                 (loop for arg in args
-                       when (consp arg)
-                       collect
-                       (if (eq (car arg) 'or)
-                           (cons 'or (mapcar #'process-arg (cdr arg)))
-                           (process-arg arg)))))
-        (values (process-args args)
-                (and (consp results)
-                     (process-arg results))
-                (lvars))))))
+                   (incf arg-position))
+                 (handle-keys (options)
+                   (loop for (key value*) on options by #'cddr
+                         for value = (if (eq key :key)
+                                         (let ((lvar (getf (nthcdr positional-count lvars) value*)))
+                                           (and lvar
+                                                (record-lvar lvar)))
+                                         value*)
+                         when value
+                         collect key
+                         and
+                         collect value))
+                 (process-arg (arg)
+                   (ecase (car arg)
+                     (nth-arg
+                      (list
+                       (list* (record-lvar (nth (cadr arg) lvars))
+                              (handle-keys (cddr arg)))))
+                     (rest-args
+                      (loop for lvar in (nthcdr positional-count lvars)
+                            collect
+                            (list* (record-lvar lvar)
+                                   (handle-keys (cdr arg)))))
+                     (or
+                      (list
+                       (list* 'or (process-args (cdr arg)))))))
+                 (process-args (args)
+                   (loop for arg in args
+                         when (consp arg)
+                         nconc
+                         (process-arg arg))))
+          (values (process-args args)
+                  (and (consp results)
+                       (car (process-arg results)))
+                  (lvars)))))))
 
 (defun insert-function-designator-cast-before (next lvar type caller
                                                deps arg-specs result-specs)
@@ -101,8 +114,7 @@
 
 (defun map-key-lvars (function args type)
   (when (fun-type-keyp type)
-    (do* ((non-key (+ (length (fun-type-required type))
-                      (length (fun-type-optional type))))
+    (do* ((non-key (fun-type-positional-count type))
           unknown
           (key (nthcdr non-key args) (cddr key)))
          ((null key) unknown)
@@ -120,35 +132,47 @@
 ;;; they can be passed to FUN-INFO-CALLABLE-CHECK.
 (defun resolve-key-args (args type)
   (if (fun-type-keyp type)
-      (let* ((non-key (+ (length (fun-type-required type))
-                         (length (fun-type-optional type))))
-             key-arguments
-             (unknown (map-key-lvars (lambda (key value)
-                                       (push key key-arguments)
-                                       (push value key-arguments))
-                                     args
-                                     type)))
-        (values (nconc (subseq args 0 non-key)
-                       (nreverse key-arguments))
-                unknown))
+      (let ((non-key (fun-type-positional-count type)))
+        (if (> (length args) non-key)
+            (let* (key-arguments
+                   (unknown (map-key-lvars (lambda (key value)
+                                             (push key key-arguments)
+                                             (push value key-arguments))
+                                           args
+                                           type)))
+              (values (nconc (subseq args 0 non-key)
+                             (nreverse key-arguments))
+                      unknown))
+            (values args nil)))
       (values args nil)))
 
 ;;; The function should accept
-;;; (lvar argument-description result-description
-;;;       &key (no-function-conversion boolean) (arg-lvars list-of-lvars))
+;;; (lvar args results &key (unknown-keys boolean) (no-function-conversion boolean) (arg-lvars list-of-lvars))
 (defun map-callable-arguments (function combination)
   (let* ((comination-name (lvar-fun-name (combination-fun combination) t))
          (type (info :function :type comination-name))
-         (info (info :function :info comination-name)))
-    (when (fun-info-callable-map info)
+         (info (info :function :info comination-name))
+         (annotation (fun-info-annotation info)))
+    (when annotation
       (multiple-value-bind (arg-lvars unknown) (resolve-key-args (combination-args combination) type)
-        (apply (fun-info-callable-map info)
-               (lambda (lvar args results &rest rest)
-                 (apply function lvar args results
-                        :arg-lvars arg-lvars
-                        :unknown-keys unknown
-                        rest))
-               arg-lvars)))))
+        (flet ((call (lvar annotation)
+                 (destructuring-bind (args &optional results . options) annotation
+                   (apply function lvar args results
+                          :arg-lvars arg-lvars
+                          :unknown-keys unknown
+                          options))))
+          (loop for (n kind . annotation) in (fun-type-annotation-positional annotation)
+                when (memq kind '(function function-designator))
+                do
+                (call (nth n arg-lvars) annotation))
+          (loop with keys = (nthcdr (fun-type-positional-count type)
+                                    arg-lvars)
+                for (key (kind . annotation)) on (fun-type-annotation-key annotation) by #'cddr
+                when (memq kind '(function function-designator))
+                do
+                (let ((lvar (getf keys key)))
+                  (when lvar
+                    (call lvar annotation)))))))))
 
 (defun lvar-fun-type (lvar)
   ;; Handle #'function,  'function and (lambda (x y))
@@ -181,8 +205,13 @@
          (fun-name (cond ((or (fun-type-p lvar-type)
                               (functional-p leaf))
                           (cond ((constant-lvar-p lvar)
-                                 #+sb-xc-host (bug "Can't call %FUN-NAME")
-                                 #-sb-xc-host (%fun-name (lvar-value lvar)))
+                                 (let ((value (lvar-value lvar)))
+                                   (etypecase value
+                                     #-sb-xc-host
+                                     (function
+                                      (%fun-name value))
+                                     (symbol
+                                      value))))
                                 ((and (lambda-p leaf)
                                       (eq (lambda-kind leaf) :external))
                                  (leaf-debug-name (lambda-entry-fun leaf)))
@@ -357,7 +386,7 @@
        (warn condition-type
              :format-control
              "The function ~S is called by ~S with ~R argument~:P, but wants at least ~R."
-             :format-control
+             :format-arguments
              (list
               callee
               caller
@@ -369,7 +398,7 @@
        (warn condition-type
              :format-control
              "The function ~S called by ~S with ~R argument~:P, but wants at most ~R."
-             :format-control
+             :format-arguments
              (list
               callee
               caller

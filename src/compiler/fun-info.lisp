@@ -160,11 +160,9 @@
   ;; If non-null, the index of the argument which becomes the result
   ;; of the function.
   (result-arg nil :type (or index null))
-  ;; A function that maps over callable arguments,
-  ;; Used by MAP-CALLABLE-ARGUMENTS
-  (callable-map nil :type (or function null))
   ;; Customizing behavior of ASSERT-CALL-TYPE
-  (call-type-deriver nil :type (or function null)))
+  (call-type-deriver nil :type (or function null))
+  annotation)
 
 (defprinter (fun-info)
   (attributes :test (not (zerop attributes))
