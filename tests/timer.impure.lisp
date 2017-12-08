@@ -254,7 +254,7 @@
 ;;; before they ran) and dying threads were open interrupts.
 (with-test (:name (:timer :parallel-unschedule)
             :skipped-on (not :sb-thread)
-            :broken-on :ppc)
+            :broken-on (or :ppc :win32))
   (let ((timer (sb-ext:make-timer (lambda () 42) :name "parallel schedulers"))
         (other nil))
     (flet ((flop ()
@@ -281,7 +281,8 @@
 ;;;;
 ;;;; Used to have problems in genereal, see comment on (:TIMER
 ;;;; :PARALLEL-UNSCHEDULE).
-(with-test (:name (:timer :schedule-stress) :skipped-on :win32)
+(with-test (:name (:timer :schedule-stress)
+            :broken-on :win32)
   (flet ((test ()
          (let* ((slow-timers
                  (loop for i from 1 upto 1
