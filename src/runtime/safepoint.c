@@ -272,21 +272,16 @@ static inline gc_phase_t gc_phase_next(gc_phase_t old) {
     return (old+1) % GC_NPHASES;
 }
 
-static inline gc_phase_t thread_gc_phase(struct thread* p)
-{
-    boolean inhibit = (read_TLS(GC_INHIBIT,p)==T)||
-        (read_TLS(IN_WITHOUT_GCING,p)==IN_WITHOUT_GCING);
-
-    return
-        inhibit ? GC_INVOKED : GC_NONE;
-}
-
 static inline boolean
 thread_blocks_gc(struct thread *thread)
 {
     /* Note that, unlike thread_may_gc(), this may be called on
      * another thread, and that other thread may be in any state */
-    return thread_gc_phase(thread) != GC_NONE;
+
+    boolean inhibit = (read_TLS(GC_INHIBIT,thread)==T)||
+        (read_TLS(IN_WITHOUT_GCING,thread)==IN_WITHOUT_GCING);
+
+    return inhibit;
 }
 
 static inline void thread_gc_promote(struct thread* p, gc_phase_t cur, gc_phase_t old) {
