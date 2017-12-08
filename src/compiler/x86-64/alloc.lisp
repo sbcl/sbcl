@@ -421,6 +421,28 @@
      (storew header result 0 lowtag))))
 
 #!+immobile-space
+(define-vop (alloc-fixedobj)
+  (:info lowtag size word0 word1)
+  (:temporary (:sc unsigned-reg :to :eval :offset rdi-offset) c-arg1)
+  (:temporary (:sc unsigned-reg :to :eval :offset rsi-offset) c-arg2)
+  (:temporary (:sc unsigned-reg :from :eval :to (:result 0) :offset rax-offset) c-result)
+  (:results (result :scs (descriptor-reg)))
+  (:generator 50
+   (inst mov c-arg1 size)
+   (inst mov c-arg2 word0)
+   ;; RSP needn't be restored because the allocators all return immediately
+   ;; which has that effect
+   (inst and rsp-tn -16)
+   (inst mov temp-reg-tn (make-fixup "alloc_fixedobj" :foreign))
+   (pseudo-atomic
+     (inst call temp-reg-tn)
+     (inst lea result (make-ea :qword :base c-result :disp lowtag))
+     ;; If code, the next word must be set within the P-A
+     ;; otherwise the GC would compute the wrong object size.
+     (when word1
+       (inst mov (make-ea :qword :base result :disp (- n-word-bytes lowtag)) word1)))))
+
+#!+immobile-space
 (macrolet ((def (lisp-name c-name arg-scs &body stuff
                            &aux (argc (length arg-scs)))
              `(define-vop (,lisp-name)
@@ -444,16 +466,6 @@
                   (inst call temp-reg-tn)
                   ,@stuff
                   (move result c-result))))))
-  ;; These VOPs are each used in one place only, and deliberately not
-  ;; specified as transforming the function after which they are named.
   (def alloc-immobile-layout "alloc_layout" ; MAKE-LAYOUT
-       ((descriptor-reg)))
-  (def alloc-immobile-symbol "alloc_sym"    ; MAKE-SYMBOL
-       ((descriptor-reg)))
-  (def alloc-immobile-fdefn  "alloc_fdefn"  ; MAKE-FDEFN
-       ((descriptor-reg)))
-  #!+immobile-code (def alloc-fun-tramp "alloc_fun_tramp" ((descriptor-reg)))
-  #!+(and immobile-code compact-instance-header)
-  (def alloc-generic-function  "alloc_generic_function"
-       ((descriptor-reg)))
-  )
+       ((descriptor-reg))))
+

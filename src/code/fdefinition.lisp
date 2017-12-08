@@ -24,13 +24,14 @@
 
 (defun make-fdefn (name)
   #!-immobile-space (make-fdefn name)
-  ;; This is %primitive because it needs pseudo-atomic,
-  ;; otherwise it would just be an alien-funcall.
   #!+immobile-space
-  (let ((fdefn (truly-the (values fdefn)
-                 (%primitive sb!vm::alloc-immobile-fdefn name))))
-    (%primitive fdefn-makunbound fdefn)
-    fdefn))
+  (let ((fdefn (truly-the (values fdefn &optional)
+                          (sb!vm::alloc-immobile-fdefn))))
+    (sb!vm::%set-fdefn-name fdefn name)
+    ;; Return the result of FDEFN-MAKUNBOUND because it (strangely) returns its
+    ;; argument. Using FDEFN as the value of this function, as if we didn't know
+    ;; that FDEFN-MAKUNBOUND did that, would cause a redundant register move.
+    (truly-the fdefn (fdefn-makunbound fdefn))))
 
 (defun fdefn-name (fdefn)
   (declare (type fdefn fdefn))

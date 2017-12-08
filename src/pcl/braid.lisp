@@ -51,11 +51,8 @@
   (let* ((slots (make-array (layout-length wrapper) :initial-element +slot-unbound+))
          (fin (cond #+(and compact-instance-header immobile-code)
                     ((not (eql (layout-bitmap wrapper) -1))
-                     (let ((f (truly-the funcallable-instance
-                               (sb-sys:%primitive sb-vm::alloc-generic-function slots))))
-                       ;; Set layout prior to writing raw slots
-                       (setf (%funcallable-instance-layout f) wrapper)
-                       (sb-vm::%set-fin-trampoline f)))
+                     (truly-the funcallable-instance
+                                (sb-vm::make-immobile-gf wrapper slots)))
                     (t
                      (let ((f (truly-the funcallable-instance
                                (%make-standard-funcallable-instance

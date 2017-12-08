@@ -172,7 +172,9 @@
 #!+immobile-code
 (progn
 (defun fun-immobilize (fun)
-  (let ((code (%primitive sb!vm::alloc-fun-tramp fun)))
+  (let ((code (truly-the (values code-component &optional)
+                         (sb!vm::alloc-immobile-trampoline))))
+    (setf (%code-debug-info code) fun)
     (let ((sap (code-instructions code))
           (ea (+ (logandc2 (get-lisp-obj-address code) lowtag-mask)
                  (ash code-debug-info-slot word-shift))))
@@ -209,12 +211,12 @@
         (t
          (closurep fun))))
 
-(defun %set-fin-trampoline (fin)
-  (let ((sap (int-sap (- (get-lisp-obj-address fin) fun-pointer-lowtag)))
-        (insts-offs (ash (1+ funcallable-instance-info-offset) word-shift)))
-    (setf (sap-ref-word sap insts-offs) #xFFFFFFE9058B48 ; MOV RAX,[RIP-23]
-          (sap-ref-32 sap (+ insts-offs 7)) #x00FD60FF)) ; JMP [RAX-3]
-  fin)
+(defmacro !set-fin-trampoline (fin)
+  `(let ((sap (int-sap (get-lisp-obj-address ,fin)))
+         (insts-offs (- (ash (1+ funcallable-instance-info-offset) word-shift)
+                        fun-pointer-lowtag)))
+     (setf (sap-ref-word sap insts-offs) #xFFFFFFE9058B48 ; MOV RAX,[RIP-23]
+           (sap-ref-32 sap (+ insts-offs 7)) #x00FD60FF))) ; JMP [RAX-3]
 
 (defun %set-fdefn-fun (fdefn fun)
   (declare (type fdefn fdefn) (type function fun)

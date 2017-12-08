@@ -1521,6 +1521,14 @@ lispobj* find_preceding_object(lispobj* obj)
   }
 }
 
+lispobj* alloc_fixedobj(int nwords, uword_t header)
+{
+    return alloc_immobile_obj(MAKE_ATTR(ALIGN_UP(nwords,2), // spacing
+                                        ALIGN_UP(nwords,2), // size
+                                        0),
+                              header);
+}
+
 #include "genesis/vector.h"
 #include "genesis/instance.h"
 lispobj alloc_layout(lispobj slots)
@@ -1551,73 +1559,9 @@ lispobj alloc_layout(lispobj slots)
     return make_lispobj(l, INSTANCE_POINTER_LOWTAG);
 }
 
-#include "genesis/symbol.h"
-lispobj alloc_sym(lispobj name)
-{
-    // While there are different "kinds" of symbols in the defragmentation
-    // logic, we don't distinguish them when allocating,
-    // on the theory that contiguous allocations are preferable anyway.
-    struct symbol* s = (struct symbol*)
-      alloc_immobile_obj(MAKE_ATTR(ALIGN_UP(SYMBOL_SIZE,2), // spacing
-                                   ALIGN_UP(SYMBOL_SIZE,2), // size
-                                   0),
-                         (SYMBOL_SIZE-1)<<N_WIDETAG_BITS | SYMBOL_WIDETAG);
-    s->value = UNBOUND_MARKER_WIDETAG;
-    s->hash = 0;
-    s->info = NIL;
-    s->name = name;
-    s->package = NIL;
-    return make_lispobj(s, OTHER_POINTER_LOWTAG);
-}
-
-#include "genesis/fdefn.h"
-lispobj alloc_fdefn(lispobj name)
-{
-    struct fdefn* f = (struct fdefn*)
-      alloc_immobile_obj(MAKE_ATTR(ALIGN_UP(FDEFN_SIZE,2), // spacing
-                                   ALIGN_UP(FDEFN_SIZE,2), // size
-                                   0),
-                         (FDEFN_SIZE-1)<<N_WIDETAG_BITS | FDEFN_WIDETAG);
-    f->name = name;
-    f->fun = NIL;
-    f->raw_addr = 0;
-    return make_lispobj(f, OTHER_POINTER_LOWTAG);
-}
-
-// Function trampolines are 6 words long:
-//  4 boxed words: code header, size, debug-info (a callable object), padding
-//  2 raw words: instruction bytes
+// FIXME: Figure out not to hardcode
 #define FUN_TRAMP_SIZE 6
-lispobj alloc_fun_tramp(lispobj callable)
-{
-    lispobj* obj = (lispobj*)
-      alloc_immobile_obj(MAKE_ATTR(FUN_TRAMP_SIZE, FUN_TRAMP_SIZE, 0),
-                         // header indicates 4 boxed words
-                         (4 << N_WIDETAG_BITS) | CODE_HEADER_WIDETAG);
-    obj[1] = make_fixnum(16);
-    obj[2] = callable;
-    obj[3] = 0;
-    return make_lispobj(obj, OTHER_POINTER_LOWTAG);
-}
-
-#if defined(LISP_FEATURE_IMMOBILE_CODE) && defined(LISP_FEATURE_COMPACT_INSTANCE_HEADER)
-#include "genesis/funcallable-instance.h"
-#define GF_SIZE (sizeof(struct funcallable_instance)/sizeof(lispobj)+2) /* = 6 */
-lispobj alloc_generic_function(lispobj slots)
-{
-    // GFs have no C header file to represent the layout, which is 6 words:
-    //   header, entry-point, fin-function, slots, raw data (x2)
-    lispobj* obj = (lispobj*)
-      alloc_immobile_obj(MAKE_ATTR(ALIGN_UP(GF_SIZE,2), // spacing
-                                   ALIGN_UP(GF_SIZE,2), // size
-                                   0),
-                         // 5 payload words following the header
-                         ((GF_SIZE-1)<<N_WIDETAG_BITS) | FUNCALLABLE_INSTANCE_WIDETAG);
-    ((struct funcallable_instance*)obj)->info[0] = slots;
-    ((struct funcallable_instance*)obj)->trampoline = (lispobj)(obj + 4);
-    return make_lispobj(obj, FUN_POINTER_LOWTAG);
-}
-#endif
+#define GF_SIZE 6
 
 #ifdef LISP_FEATURE_IMMOBILE_CODE
 //// Defragmentation

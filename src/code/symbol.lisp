@@ -332,7 +332,7 @@ distinct from the global value. Can also be SETF."
                (char= (char name 0) #\*)
                (char= (char name (1- (length name))) #\*)))
       #!+immobile-symbols t ; always place them there
-      (truly-the (values symbol) (%primitive sb!vm::alloc-immobile-symbol name))
+      (truly-the (values symbol) (sb!vm::make-immobile-symbol name))
       (sb!vm::%%make-symbol name)))
 
 (defun get (symbol indicator &optional (default nil))

@@ -364,4 +364,48 @@
                 other-pointer-lowtag)))
     (setf (%code-debug-info code) nil)
     code))
+
+(defun alloc-immobile-symbol ()
+  (values (%primitive alloc-fixedobj other-pointer-lowtag symbol-size
+                      (logior (ash (1- symbol-size) n-widetag-bits) symbol-widetag)
+                      nil)))
+(defun make-immobile-symbol (name)
+  (let ((symbol (truly-the symbol (alloc-immobile-symbol))))
+    ;; no pin, it's immobile (and obviously live)
+    (setf (sap-ref-lispobj (int-sap (get-lisp-obj-address symbol))
+                           (- (ash symbol-name-slot word-shift) other-pointer-lowtag))
+          name)
+    (%set-symbol-global-value symbol (make-unbound-marker))
+    ;; symbol-hash is 0
+    (setf (symbol-info symbol) nil)
+    (%set-symbol-package symbol nil)
+    symbol))
+
+(defun alloc-immobile-fdefn ()
+  (values (%primitive alloc-fixedobj other-pointer-lowtag fdefn-size
+                      (logior (ash (1- fdefn-size) n-widetag-bits) fdefn-widetag)
+                      nil)))
+
+(defun alloc-immobile-gf ()
+  (values (%primitive alloc-fixedobj fun-pointer-lowtag 6 ; kludge
+                      (logior (ash 5 n-widetag-bits) funcallable-instance-widetag)
+                      nil)))
+(defun make-immobile-gf (layout slot-vector)
+  (let ((gf (truly-the funcallable-instance (alloc-immobile-gf))))
+    ;; Set layout prior to writing raw slots
+    (setf (%funcallable-instance-layout gf) layout)
+    (setf (sap-ref-word (int-sap (get-lisp-obj-address gf))
+                        (- (ash funcallable-instance-trampoline-slot word-shift)
+                           fun-pointer-lowtag))
+          (truly-the word
+           (+ (get-lisp-obj-address gf) (- fun-pointer-lowtag) (ash 4 word-shift))))
+    (%set-funcallable-instance-info gf 0 slot-vector)
+    (sb!vm::!set-fin-trampoline gf)
+    gf))
+
+(defun alloc-immobile-trampoline ()
+  (values (%primitive alloc-fixedobj other-pointer-lowtag 6
+                      (logior (ash 4 n-widetag-bits) code-header-widetag)
+                      (ash (* 2 n-word-bytes) n-fixnum-tag-bits))))
+
 ) ; end PROGN
