@@ -54,12 +54,12 @@
 
 ;; Lack of earmuffs on this symbol allocates it in dynamic space
 (defvar foo)
-(assert (not (sb-kernel:immobile-space-obj-p 'foo)))
+#-immobile-symbols (assert (not (sb-kernel:immobile-space-obj-p 'foo)))
 ;; This compilation causes a side-effect of assigning FOO a TLS index
 ;; DO NOT REMOVE!
 (compile nil '(lambda (foo) (eval 'frob)))
 
-(with-test (:name :symeval-known-tls-index)
+(with-test (:name :symeval-known-tls-index :skipped-on :immobile-symbols)
   ;; When symbol SC is IMMEDIATE:
   ;;    498B942478210000   MOV RDX, [R12+8568]       ; tls: *PRINT-BASE*
   ;;    83FA61             CMP EDX, 97
@@ -77,9 +77,9 @@
 (defvar *blub*) ; immobile space
 (defvar blub)   ; dynamic space
 (assert (sb-kernel:immobile-space-obj-p '*blub*))
-(assert (not (sb-kernel:immobile-space-obj-p 'blub)))
+#-immobile-symbols (assert (not (sb-kernel:immobile-space-obj-p 'blub)))
 
-(with-test (:name :symeval-unknown-tls-index)
+(with-test (:name :symeval-unknown-tls-index :skipped-on :immobile-symbols)
   ;; When symbol SC is immediate:
   ;;    8B142514A24C20     MOV EDX, [#x204CA214]    ; tls_index: *BLUB*
   ;;    498B1414           MOV RDX, [R12+RDX]

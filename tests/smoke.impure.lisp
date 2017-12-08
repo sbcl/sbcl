@@ -15,9 +15,10 @@
 (cl:in-package :cl-user)
 
 ;;; ROOM should run without signalling an error. (bug 247)
-(room)
-(room t)
-(room nil)
+(let ((*standard-output* (make-broadcast-stream)))
+  (room)
+  (room t)
+  (room nil))
 
 ;;; COPY-SYMBOL should work without signalling an error, even if the
 ;;; symbol is unbound.
@@ -36,7 +37,8 @@
     (random 1d0))
   (profile profiled-fun)
   (loop repeat 100000 do (profiled-fun))
-  (report))
+  (let ((*trace-output* (make-broadcast-stream)))
+    (report)))
 
 ;;; Defconstant should behave as the documentation specifies,
 ;;; including documented condition type.
