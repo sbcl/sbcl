@@ -329,7 +329,8 @@ static inline void gc_notify_early()
             if (p==gc_state.collector)
                 continue;
             odxprint(safepoints,"notifying thread %p csp %p",p,*p->csp_around_foreign_call);
-            if (!set_thread_csp_access(p,0)) {
+            boolean was_in_lisp = !set_thread_csp_access(p,0);
+            if (was_in_lisp) {
                 thread_gc_promote(p, gc_state.phase, GC_NONE);
             } else {
                 thread_gc_promote(p, thread_gc_phase(p), GC_NONE);
@@ -348,7 +349,8 @@ static inline void gc_notify_final()
             if (p == gc_state.collector)
                 continue;
             odxprint(safepoints,"notifying thread %p csp %p",p,*p->csp_around_foreign_call);
-            if (!set_thread_csp_access(p,0)) {
+            boolean was_in_lisp = !set_thread_csp_access(p,0);
+            if (was_in_lisp) {
                 thread_gc_promote(p, gc_state.phase, GC_NONE);
             }
         }
@@ -702,7 +704,8 @@ void thread_in_safety_transition(os_context_t *ctxptr)
 
     odxprint(safepoints,"%s","GC safety transition");
     gc_state_lock();
-    if (set_thread_csp_access(self,1)) {
+    boolean was_in_alien = set_thread_csp_access(self,1);
+    if (was_in_alien) {
         gc_state_wait(thread_gc_phase(self));
         gc_state_unlock();
 #ifdef LISP_FEATURE_SB_THRUPTION
@@ -734,7 +737,8 @@ void thread_interrupted(os_context_t *ctxptr)
     odxprint(safepoints,"%s","pending interrupt trap");
     gc_state_lock();
     if (gc_state.phase != GC_NONE) {
-        if (set_thread_csp_access(self,1)) {
+        boolean was_in_alien = set_thread_csp_access(self,1);
+        if (was_in_alien) {
             gc_state_unlock();
             thread_in_safety_transition(ctxptr);
         } else {
