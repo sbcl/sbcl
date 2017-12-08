@@ -340,8 +340,10 @@ static inline void gc_notify_early()
             boolean was_in_lisp = !set_thread_csp_access(p,0);
             if (was_in_lisp) {
                 thread_gc_promote(p, gc_state.phase, GC_NONE);
+            } else if (thread_blocks_gc(p)) {
+                thread_gc_promote(p, GC_INVOKED, GC_NONE);
             } else {
-                thread_gc_promote(p, thread_gc_phase(p), GC_NONE);
+                thread_gc_promote(p, GC_NONE, GC_NONE);
             }
         }
     }
@@ -712,7 +714,11 @@ void thread_in_safety_transition(os_context_t *ctxptr)
     gc_state_lock();
     boolean was_in_alien = set_thread_csp_access(self,1);
     if (was_in_alien) {
-        gc_state_wait(thread_gc_phase(self));
+        if (thread_blocks_gc(self)) {
+            gc_state_wait(GC_INVOKED);
+        } else {
+            gc_state_wait(GC_NONE);
+        }
         gc_state_unlock();
 #ifdef LISP_FEATURE_SB_THRUPTION
         while(check_pending_thruptions(ctxptr));
