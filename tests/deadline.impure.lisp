@@ -2,7 +2,7 @@
 
 (use-package :test-util)
 
-(defmacro assert-timeout ((&optional expected-message) form)
+(defmacro assert-timeout ((expected-message) form)
   (let ((ok (gensym "OK")))
     `(let ((,ok ',ok))
        (unless (eq ,ok
