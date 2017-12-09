@@ -59,10 +59,6 @@ typedef struct mcontext darwin_mcontext;
 
 #endif
 
-#ifdef LISP_FEATURE_SB_THREAD
-pthread_mutex_t mach_exception_lock = PTHREAD_MUTEX_INITIALIZER;
-#endif
-
 #ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
 
 void sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context);
@@ -290,10 +286,6 @@ catch_exception_raise(mach_port_t exception_port,
     siginfo_t* siginfo;
     void (*handler)(int, siginfo_t *, os_context_t *);
 
-#ifdef LISP_FEATURE_SB_THREAD
-    thread_mutex_lock(&mach_exception_lock);
-#endif
-
     x86_thread_state64_t thread_state;
     mach_msg_type_number_t thread_state_count = x86_THREAD_STATE64_COUNT;
 
@@ -448,9 +440,6 @@ catch_exception_raise(mach_port_t exception_port,
     thread_set_state(thread, float_state_flavor,
                      (thread_state_t)&float_state, float_state_count);
   do_not_handle:
-#ifdef LISP_FEATURE_SB_THREAD
-    thread_mutex_unlock(&mach_exception_lock);
-#endif
 
     dealloc_ret = mach_port_deallocate (mach_task_self(), thread);
     if (dealloc_ret) {
