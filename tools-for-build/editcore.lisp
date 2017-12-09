@@ -244,16 +244,20 @@
             (:predicate nil)
             (:copier nil)
             (:constructor make-core-state
-                (fixedobj-space-start fixedobj-space-end
+                (code-space-start code-space-end
+                 fixedobj-space-start fixedobj-space-end
                  &aux (inst-space (get-inst-space))
                       (call-inst (find-inst #b11101000 inst-space))
                       (jmp-inst (find-inst #b11101001 inst-space))
                       (pop-inst (find-inst #x5d inst-space)))))
+  (code-space-start 0 :type fixnum :read-only t)
+  (code-space-end 0 :type fixnum :read-only t)
   (fixedobj-space-start 0 :type fixnum :read-only t)
   (fixedobj-space-end 0 :type fixnum :read-only t)
   (dstate (make-dstate nil) :read-only t)
   (seg (%make-segment :sap-maker (lambda () (error "Bad sap maker"))
                       :virtual-location 0) :read-only t)
+  (fixup-addrs nil)
   (call-inst nil :read-only t)
   (jmp-inst nil :read-only t)
   (pop-inst nil :read-only t))
@@ -339,6 +343,12 @@
               (ceiling nbytes sb-vm:n-word-bytes)
               output #()))))
 
+(defun code-fixup-locs (code spaces)
+  (let ((locs (sb-vm::%code-fixups code)))
+    (unless (eql locs 0)
+      (sb-c::unpack-code-fixup-locs
+       (if (fixnump locs) locs (translate locs spaces))))))
+
 ;;; Disassemble the function pointed to by SAP for LENGTH bytes, returning
 ;;; all instructions that should be emitted using assembly language
 ;;; instead of assembler pseudo-ops. This includes two sets of instructions:
@@ -352,6 +362,8 @@
         (call-inst (cs-call-inst state))
         (jmp-inst (cs-jmp-inst state))
         (pop-inst (cs-pop-inst state))
+        (next-fixup-addr
+         (or (car (cs-fixup-addrs state)) most-positive-word))
         (list))
     (setf (seg-virtual-location seg) load-addr
           (seg-length seg) length
@@ -362,6 +374,13 @@
     (map-segment-instructions
      (lambda (dchunk inst)
        (cond
+         ((< next-fixup-addr (dstate-next-addr dstate))
+          (let ((operand (sap-ref-32 sap (- next-fixup-addr load-addr))))
+            (when (<= (cs-code-space-start state) operand (cs-code-space-end state))
+              (aver (eql (sap-ref-8 sap (- next-fixup-addr load-addr 1)) #xB8)) ; mov rax, imm32
+              (push (list* (dstate-cur-offs dstate) 5 "mov" operand) list)))
+          (pop (cs-fixup-addrs state))
+          (setq next-fixup-addr (or (car (cs-fixup-addrs state)) most-positive-word)))
          ((or (eq inst jmp-inst) (eq inst call-inst))
           (let ((target-addr (+ (near-jump-displacement dchunk dstate)
                                 (dstate-next-addr dstate))))
@@ -447,7 +466,7 @@
           (when (= cur-offset count) (return))
           (aver (= cur-offset until))
           (destructuring-bind (length opcode . operand) (cdr (pop instructions))
-            (when (cond ((integerp operand) ; jmp or call
+            (when (cond ((member opcode '("jmp" "call") :test #'string=)
                          (format stream " ~A 0x~X~%" opcode operand))
                         ((string= opcode "pop")
                          (format stream " ~A ~A~%" opcode operand)
@@ -457,6 +476,9 @@
                                 ;(format stream " .cfi_def_cfa 7, 8~%")
                                 nil)
                                (t)))
+                        ((string= opcode "mov")
+                         (format stream " mov $(__lisp_code_start+0x~x),%eax~%"
+                                 (- operand (cs-code-space-start core-state))))
                         (t))
               (bug "Random annotated opcode ~S" opcode))
             (incf ptr length))
@@ -474,8 +496,10 @@
           (code-space-start (space-addr code-space)) ; target virtual address
           (code-space-end (+ code-space-start (space-size code-space)))
           (code-addr code-space-start)
-          (core-state (make-core-state (car fixedobj-range)
-                                       (+ (car fixedobj-range) (cdr fixedobj-range))))
+          (core-state
+           (make-core-state code-space-start code-space-end
+                            (car fixedobj-range)
+                            (+ (car fixedobj-range) (cdr fixedobj-range))))
           (total-code-size 0)
           (pp-state (cons (make-hash-table :test 'equal)
                           ;; copy no entries for macros/special-operators (flet, etc)
@@ -583,6 +607,10 @@
              (when (> first-fun boxed-end)
                (dumpwords boxed-end (floor (- first-fun boxed-end) n-word-bytes)
                           output)))
+           (setf (cs-fixup-addrs core-state)
+                 (mapcar (lambda (x)
+                           (+ code-addr (ash (code-header-words code) word-shift) x))
+                         (code-fixup-locs code spaces)))
            ;; Loop over all embedded functions.
            ;; Because simple-fun offsets are relative to the code start
            ;; (and not in a linked list as they were in the past),
@@ -625,7 +653,9 @@
                                                    (logandc2 (get-lisp-obj-address code)
                                                              lowtag-mask)))
                                    size output emit-cfi core-state)))
-           (terpri output))
+           (terpri output)
+           ;; All fixups should have been consumed by writing the code out
+           (aver (null (cs-fixup-addrs core-state))))
           (t
            (error "Strange code component: ~S" code)))
         (incf code-addr objsize))))
@@ -1070,17 +1100,11 @@
                       (setq nwords (1+ (integer-length bitmap))))))))
              ;; mixed boxed/unboxed objects
              (#.code-header-widetag
-              (let ((code-fixup-locs (sb-vm::%code-fixups obj)))
-                (unless (eql code-fixup-locs 0)
-                  (dolist (loc (sb-c::unpack-code-fixup-locs
-                                (if (fixnump code-fixup-locs)
-                                    code-fixup-locs
-                                    (translate code-fixup-locs spaces))))
-                    (let ((val (sap-ref-32 (code-instructions obj) loc)))
-                      (when (in-code-space-p val)
-                        (abs32-fixup (sap- (sap+ (code-instructions obj) loc)
-                                           (car spaces))
-                                     val))))))
+              (dolist (loc (code-fixup-locs obj spaces))
+                (let ((val (sap-ref-32 (code-instructions obj) loc)))
+                  (when (in-code-space-p val)
+                    (abs32-fixup (sap- (sap+ (code-instructions obj) loc) (car spaces))
+                                 val))))
               (dotimes (i (code-n-entries obj))
                 (scanptrs (%code-entry-point obj i) 2 5))
               (setq nwords (code-header-words obj)))
