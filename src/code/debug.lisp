@@ -889,7 +889,8 @@ the current thread are replaced with dummy objects which can safely escape."
 
 (defun invoke-debugger (condition)
   "Enter the debugger."
-  (let ((*stack-top-hint* (resolve-stack-top-hint)))
+  (let ((*stack-top-hint* (resolve-stack-top-hint))
+        (sb!impl::*deadline* nil))
     ;; call *INVOKE-DEBUGGER-HOOK* first, so that *DEBUGGER-HOOK* is not
     ;; called when the debugger is disabled
     (run-hook '*invoke-debugger-hook* condition)
