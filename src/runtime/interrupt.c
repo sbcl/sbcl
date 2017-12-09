@@ -1001,9 +1001,12 @@ interrupt_handle_pending(os_context_t *context)
              || (read_TLS(THRUPTION_PENDING,thread) != NIL
                  && read_TLS(INTERRUPTS_ENABLED, thread) != NIL)
 # endif
-            )
+            ) {
             /* We ought to take this chance to do a pitstop now. */
+            fake_foreign_function_call(context);
             thread_in_lisp_raised(context);
+            undo_fake_foreign_function_call(context);
+        }
 #elif defined(LISP_FEATURE_SB_THREAD)
         if (read_TLS(STOP_FOR_GC_PENDING,thread) != NIL) {
             /* STOP_FOR_GC_PENDING and GC_PENDING are cleared by
