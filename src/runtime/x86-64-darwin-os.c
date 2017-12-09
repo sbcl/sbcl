@@ -9,6 +9,7 @@
 #include "x86-64-darwin-os.h"
 #include "x86-64-arch.h"
 #include "genesis/fdefn.h"
+#include "gc-internal.h"
 
 #include <mach/mach.h>
 #include <mach/mach_error.h>
@@ -309,6 +310,23 @@ catch_exception_raise(mach_port_t exception_port,
 
     os_vm_address_t addr;
 
+    thread_get_state(thread, x86_EXCEPTION_STATE64,
+                     (thread_state_t)&exception_state, &exception_state_count);
+
+    if (code_count && exception == EXC_BAD_ACCESS && code_vector[0] == EXC_I386_GPFLT) {
+        /* This can happen for addresses larger than 48 bits,
+           resulting in bogus faultvaddr. */
+        addr = NULL;
+    } else {
+        addr = (void*)exception_state.faultvaddr;
+    }
+
+    /* Just need to unprotect the page and do some bookkeeping, no need
+     * to run it from the faulting thread. */
+    if (exception == EXC_BAD_ACCESS && gencgc_handle_wp_violation(addr)) {
+        goto do_not_handle; 
+    }
+
     struct thread *th;
 
     FSHOW((stderr,"/entering catch_exception_raise with exception: %d\n", exception));
@@ -320,16 +338,8 @@ catch_exception_raise(mach_port_t exception_port,
                      (thread_state_t)&thread_state, &thread_state_count);
     thread_get_state(thread, float_state_flavor,
                      (thread_state_t)&float_state, &float_state_count);
-    thread_get_state(thread, x86_EXCEPTION_STATE64,
-                     (thread_state_t)&exception_state, &exception_state_count);
 
-    if (code_count && exception == EXC_BAD_ACCESS && code_vector[0] == EXC_I386_GPFLT) {
-        /* This can happen for addresses larger than 48 bits,
-           resulting in bogus faultvaddr. */
-        addr = NULL;
-    } else {
-        addr = (void*)exception_state.faultvaddr;
-    }
+
     switch (exception) {
 
     case EXC_BAD_ACCESS:
