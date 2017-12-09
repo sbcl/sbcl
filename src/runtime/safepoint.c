@@ -261,8 +261,12 @@ set_csp_from_context(struct thread *self, os_context_t *ctx)
 #else
     /* Note that the exact value doesn't matter much here, since
      * platforms with precise GC use get_csp() only as a boolean -- the
-     * precise GC already keeps track of the stack pointer itself. */
-    void **sp = (void **) 0xEEEEEEEE;
+     * precise GC already keeps track of the stack pointer itself.
+     * That said, we're either in a foreign function call or have
+     * called fake_foreign_function_call(), and having accurate values
+     * here makes the debugging experience easier and less
+     * disconcerting. */
+    void **sp = (void **) access_control_stack_pointer(self);
 #endif
     *self->csp_around_foreign_call = (lispobj) sp;
 }
