@@ -151,3 +151,46 @@
       (sb-thread:interrupt-thread thread (lambda () 42))
       (let ((seconds-passed (sb-thread:join-thread thread)))
         (assert (< seconds-passed 1.2))))))
+
+;;;; Sleep
+
+(with-test (:name (sb-sys:with-deadline sleep :smoke))
+  (assert-timeout ("A deadline was reached after 0.1 seconds.")
+    (sb-sys:with-deadline (:seconds .1) (sleep 1)))
+
+  (assert-no-signal
+      (sb-sys:with-deadline (:seconds .2) (sleep .1))
+    sb-sys:deadline-timeout))
+
+(with-test (:name (sb-sys:with-deadline sleep :long-sleep))
+  (assert-timeout ("A deadline was reached after 0.1 seconds.")
+    (sb-sys:with-deadline (:seconds .1)
+      (sleep (1+ sb-kernel:internal-seconds-limit)))))
+
+(with-test (:name (sb-sys:with-deadline sleep :no-sleep))
+  ;; When SLEEP is called in the context of an expired deadline, the
+  ;; DEADLINE-TIMEOUT must be signaled even if there is no sleeping to
+  ;; be done.
+  (assert-timeout ("A deadline was reached after 0.1 seconds.")
+    (sb-sys:with-deadline (:seconds .1)
+      (let ((sb-impl::*deadline* nil)) (sleep .2))
+      (sleep 0))))
+
+(with-test (:name (sb-sys:with-deadline sleep sb-sys:defer-deadline))
+  (let ((n 0))
+    (assert-no-signal
+        (handler-bind ((sb-sys:deadline-timeout
+                        (lambda (condition)
+                          (incf n)
+                          (sb-sys:defer-deadline .1 condition))))
+          (sb-sys:with-deadline (:seconds .1) (sleep .5)))
+      sb-sys:deadline-timeout)
+    (assert (plusp n))))
+
+(with-test (:name (sb-sys:with-deadline sleep sb-sys:cancel-deadline))
+  (assert-no-signal
+      (handler-bind ((sb-sys:deadline-timeout
+                      (lambda (condition)
+                        (sb-sys:cancel-deadline condition))))
+        (sb-sys:with-deadline (:seconds .1) (sleep 1)))
+    sb-sys:deadline-timeout))

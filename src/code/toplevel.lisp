@@ -130,6 +130,39 @@ means to wait indefinitely.")
            (truncate seconds)
          (values sec (truncate frac (load-time-value 1f-9 t))))))))
 
+(declaim (inline %nanosleep))
+(defun %nanosleep (sec nsec)
+  ;; nanosleep() accepts time_t as the first argument, but on some
+  ;; platforms it is restricted to 100 million seconds. Maybe someone
+  ;; can actually have a reason to sleep for over 3 years?
+  (loop while (> sec (expt 10 8))
+     do (decf sec (expt 10 8))
+       (sb!unix:nanosleep (expt 10 8) 0))
+  (sb!unix:nanosleep sec nsec))
+
+(declaim (inline %sleep))
+#!-win32
+(defun %sleep (seconds)
+  (typecase seconds
+    (double-float
+     (sb!unix::nanosleep-double seconds))
+    (single-float
+     (sb!unix::nanosleep-float seconds))
+    (integer
+     (%nanosleep seconds 0))
+    (t
+     (multiple-value-call #'%nanosleep (split-ratio-for-sleep seconds)))))
+
+#!+(and win32 sb-thread)
+(defun %sleep (seconds)
+  (if (integerp seconds)
+      (%nanosleep seconds 0)
+      (multiple-value-call #'%nanosleep (split-seconds-for-sleep seconds))))
+
+#!+(and win32 (not sb-thread))
+(defun %sleep (seconds)
+  (sb!win32:millisleep (truncate (* seconds 1000))))
+
 (defun sleep (seconds)
   "This function causes execution to be suspended for SECONDS. SECONDS may be
 any non-negative real number."
@@ -142,31 +175,34 @@ any non-negative real number."
            :format-arguments (list seconds)
            :datum seconds
            :expected-type '(real 0)))
-  #!-(and win32 (not sb-thread))
-  (typecase seconds
-    #!-win32
-    (double-float
-     (sb!unix::nanosleep-double seconds))
-    #!-win32
-    (single-float
-     (sb!unix::nanosleep-float seconds))
-    (t
-     (multiple-value-bind (sec nsec)
-         (if (integerp seconds)
-             (values seconds 0)
-             #!-win32
-             (split-ratio-for-sleep seconds)
-             #!+win32
-             (split-seconds-for-sleep seconds))
-       ;; nanosleep() accepts time_t as the first argument, but on some platforms
-       ;; it is restricted to 100 million seconds. Maybe someone can actually
-       ;; have a reason to sleep for over 3 years?
-       (loop while (> sec (expt 10 8))
-             do (decf sec (expt 10 8))
-                (sb!unix:nanosleep (expt 10 8) 0))
-       (sb!unix:nanosleep sec nsec))))
-  #!+(and win32 (not sb-thread))
-  (sb!win32:millisleep (truncate (* seconds 1000)))
+  (if *deadline*
+      (let ((start (get-internal-real-time))
+            ;; SECONDS can be too large to present as INTERNAL-TIME,
+            ;; use the largest representable value in that case.
+            (timeout (or (seconds-to-maybe-internal-time seconds)
+                         (* safe-internal-seconds-limit
+                            internal-time-units-per-second))))
+        (labels ((sleep-for-a-bit (remaining)
+                   (multiple-value-bind
+                         (timeout-sec timeout-usec stop-sec stop-usec deadlinep)
+                       (decode-timeout (/ remaining internal-time-units-per-second))
+                     (declare (ignore stop-sec stop-usec))
+                     ;; Sleep until either the timeout or the deadline
+                     ;; expires.
+                     (when (or (plusp timeout-sec) (plusp timeout-usec))
+                       (%nanosleep timeout-sec (* 1000 timeout-usec)))
+                     ;; If the deadline expired first, signal the
+                     ;; DEADLINE-TIMEOUT. If the deadline is deferred
+                     ;; or canceled, go back to sleep for the
+                     ;; remaining time (if any).
+                     (when deadlinep
+                       (signal-deadline)
+                       (let ((remaining (- timeout
+                                           (- (get-internal-real-time) start))))
+                         (when (plusp remaining)
+                           (sleep-for-a-bit remaining)))))))
+          (sleep-for-a-bit timeout)))
+      (%sleep seconds))
   nil)
 
 ;;;; the default toplevel function
