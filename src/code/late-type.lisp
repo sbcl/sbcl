@@ -351,7 +351,8 @@
 (!define-type-method (function :complex-intersection2) (type1 type2)
   (cond
     ((and (fun-designator-type-p type2)
-          (csubtypep type1 (specifier-type 'symbol)))
+          (or (csubtypep type1 (specifier-type 'symbol))
+              (csubtypep type1 (specifier-type 'function))))
      type1)
     ((type= type1 (specifier-type 'function)) type2)
     ((csubtypep type1 (specifier-type 'function)) nil)
