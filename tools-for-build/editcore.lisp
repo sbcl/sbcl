@@ -910,13 +910,9 @@
       (with-alien ((rela elf64-rela))
         (dovector (reloc relocs)
           (destructuring-bind (place addend . kind) reloc
-            addend
-            (setf (slot rela 'offset) (+ core-header-size place)
-                  (slot rela 'info) (logior (ash 1 32) ; symbol index
-                                            (ecase kind (:abs 1) (:rel 2)))
-                  (slot rela 'addend) (ecase kind
-                                        (:abs addend)
-                                        (:rel (+ addend #x30)))))
+            (setf (slot rela 'offset) place
+                  (slot rela 'info)   (logior (ash 1 32) kind) ; 1 = symbol index
+                  (slot rela 'addend) addend))
           (setf (%vector-raw-bits buf (+ ptr 0)) (sap-ref-word (alien-value-sap rela) 0)
                 (%vector-raw-bits buf (+ ptr 1)) (sap-ref-word (alien-value-sap rela) 8)
                 (%vector-raw-bits buf (+ ptr 2)) (sap-ref-word (alien-value-sap rela) 16))
@@ -930,8 +926,9 @@
 
 ;;; Return a list of fixups (FIXUP-WHERE KIND ADDEND) to peform in a foreign core
 ;;; whose code space is subject to link-time relocation.
-;;;   #define R_X86_64_64         1  /* Direct 64 bit  */
-;;;   #define R_X86_64_PC32       2  /* PC relative 32 bit signed */
+(defconstant R_X86_64_64    1) ; /* Direct 64 bit  */
+(defconstant R_X86_64_PC32  2) ; /* PC relative 32 bit signed */
+(defconstant R_X86_64_32   10) ; /* Direct 32 bit zero extended */
 ;;;
 (defun collect-relocations (spaces fixups &aux (print nil))
   (binding* (((static-start static-end)
@@ -940,6 +937,13 @@
              ((code-start code-end)
               (let ((space (get-space immobile-varyobj-core-space-id spaces)))
                 (values (space-addr space) (space-end space))))
+             ;; the distance between fixedobj space address (i.e following the pages of
+             ;; dynamic space) in the ELF section which has a presumptive address of 0
+             ;; due to being non-loaded, to where it will be later mapped by coreparse
+             (fixedobj-space-displacement
+              (let ((space (get-space immobile-fixedobj-core-space-id spaces)))
+                (- (* (1+ (space-data-page space)) +backend-page-bytes+) ; 1+ = core header
+                   (space-addr space))))
              (n-abs 0)
              (n-rel 0))
     (labels
@@ -948,13 +952,27 @@
            (when print
               (format t "~x = 0x~(~x~): (a)~%" core-offs (core-to-logical core-offs) #+nil referent))
            (setf (sap-ref-word (car spaces) core-offs) 0)
-           (vector-push-extend `(,core-offs ,(- referent code-start) . :abs) fixups))
+           (vector-push-extend `(,(+ core-header-size core-offs)
+                                 ,(- referent code-start) . ,R_X86_64_64)
+                               fixups))
+         (abs32-fixup (core-offs referent)
+           (incf n-abs)
+           (when print
+              (format t "~x = 0x~(~x~): (a)~%" core-offs (core-to-logical core-offs) #+nil referent))
+           (setf (sap-ref-32 (car spaces) core-offs) 0)
+           (vector-push-extend `(,(+ core-header-size core-offs)
+                                 ,(- referent code-start) . ,R_X86_64_32)
+                               fixups))
          (rel-fixup (core-offs referent)
            (incf n-rel)
            (when print
              (format t "~x = 0x~(~x~): (r)~%" core-offs (core-to-logical core-offs) #+nil referent))
            (setf (sap-ref-32 (car spaces) core-offs) 0)
-           (vector-push-extend `(,core-offs ,(- referent code-start) . :rel) fixups))
+           (vector-push-extend `(,(+ core-header-size core-offs)
+                                 ,(- referent code-start) . ,R_X86_64_PC32)
+                               fixups))
+         (in-code-space-p (ptr)
+           (and (<= code-start ptr) (< ptr code-end)))
          ;; Given a address which is an offset into the data pages of the target core,
          ;; compute the logical address which that offset would be mapped to.
          ;; For example core address 0 is the virtual address of static space.
@@ -979,7 +997,7 @@
                  (i wordindex-min (1+ i)))
                 ((> i wordindex-max) n-fixups)
              (let ((ptr (sap-ref-word sap (ash i word-shift))))
-               (when (and (= (logand ptr 3) 3) (<= code-start ptr code-end))
+               (when (and (= (logand ptr 3) 3) (in-code-space-p ptr))
                  (abs-fixup (+ core-offs (ash i word-shift)) ptr)
                  (incf n-fixups)))))
          (scanptr (obj wordindex)
@@ -988,7 +1006,6 @@
                     &aux (core-offs (- (logandc2 (get-lisp-obj-address obj) lowtag-mask)
                                        (sap-int (car spaces))))
                          (nwords (ceiling size n-word-bytes)))
-;           (format t "~&obj @ physical ~x core addr ~x widetag ~x~%" (get-lisp-obj-address obj) core-offs widetag)
            (when (listp obj)
              (scanptrs obj 0 1)
              (return-from scan-obj))
@@ -1025,26 +1042,21 @@
                      ;; what the fdefn's logical PC will be
                      (fdefn-logical-pc (+ vaddr (ash fdefn-raw-addr-slot word-shift)))
                      (rel32off (signed-sap-ref-32 fdefn-pc-sap 1))
-                     (target (+ fdefn-logical-pc 5 rel32off))
-                     (more-magic
-                      ;; FIXME: figure out a reasonable way to express this magic
+                     (target (+ fdefn-logical-pc 1 rel32off))
+                     (space-displacement
                       (if (<= static-start vaddr static-end)
-                          -537886772
-                          (+ -537886772 (- #x1f8000)))))
-                ;; 5 = length of jmp/call inst
-                (if (<= code-start target code-end)
-                    ;; This addend needs to account for the fact that the location
-                    ;; where fixup occurs is not where the fdefn will actually exist.
-                    (rel-fixup (+ core-offs (ash 3 word-shift) 1)
-                               (+ target more-magic))
-                    (let ((fun (fdefn-fun obj)))
-                      fun
-                      #+nil(warn "fdefn @~x jumps to GF or closure" fdefn-logical-pc))))
+                          (+ (- sb-vm:static-space-start) +backend-page-bytes+)
+                          fixedobj-space-displacement)))
+                (when (in-code-space-p target)
+                  ;; This addend needs to account for the fact that the location
+                  ;; where fixup occurs is not where the fdefn will actually exist.
+                  (rel-fixup (+ core-offs (ash 3 word-shift) 1)
+                             (+ target space-displacement))))
               (return-from scan-obj))
              ((#.closure-widetag #.funcallable-instance-widetag)
               (let ((word (sap-ref-word (int-sap (get-lisp-obj-address obj))
                                         (- n-word-bytes fun-pointer-lowtag))))
-                (when (<= code-start word code-end)
+                (when (in-code-space-p word)
                   (abs-fixup (+ core-offs (ash 1 word-shift)) word)))
               (when (eq widetag funcallable-instance-widetag)
                 (let ((layout (truly-the layout
@@ -1058,6 +1070,17 @@
                       (setq nwords (1+ (integer-length bitmap))))))))
              ;; mixed boxed/unboxed objects
              (#.code-header-widetag
+              (let ((code-fixup-locs (sb-vm::%code-fixups obj)))
+                (unless (eql code-fixup-locs 0)
+                  (dolist (loc (sb-c::unpack-code-fixup-locs
+                                (if (fixnump code-fixup-locs)
+                                    code-fixup-locs
+                                    (translate code-fixup-locs spaces))))
+                    (let ((val (sap-ref-32 (code-instructions obj) loc)))
+                      (when (in-code-space-p val)
+                        (abs32-fixup (sap- (sap+ (code-instructions obj) loc)
+                                           (car spaces))
+                                     val))))))
               (dotimes (i (code-n-entries obj))
                 (scanptrs (%code-entry-point obj i) 2 5))
               (setq nwords (code-header-words obj)))
@@ -1155,6 +1178,7 @@
           (original-total-npages 0)
           (core-offset 0)
           (page-adjust 0)
+          (code-start-fixup-ofs 0) ; where to fixup the core header
           (spaces)
           (copy-actions)
           (fixedobj-range) ; = (START . SIZE-IN-BYTES)
@@ -1199,14 +1223,7 @@
                          id data-page npages addr nwords
                          (= id immobile-varyobj-core-space-id)))
                (cond ((= id immobile-varyobj-core-space-id)
-                      ;; Fixups are all assumed to be after the core header, so subtract
-                      ;; the implicit bias of core-header-size.  Take (- addr) as the
-                      ;; addend so that it cancels out the value in the .o file.
-                      ;; (So the two representations of the core header look the same)
-                      (vector-push-extend
-                       `(,(- (ash (+ index 3) word-shift) core-header-size)
-                         ,(- addr) . :abs)
-                       relocs)
+                      (setq code-start-fixup-ofs (+ index 3))
                       ;; Keep this entry but delete the page count. We need to know
                       ;; where the space was supposed to be mapped and at what size.
                       ;; Subsequent core entries will need to adjust their start page
@@ -1278,10 +1295,13 @@
           (with-open-file (output elf-core-pathname
                                   :direction :output :if-exists :supersede
                                   :element-type '(unsigned-byte 8))
+            (vector-push-extend
+             `(,(ash code-start-fixup-ofs word-shift) 0 . ,R_X86_64_64) relocs)
             (prepare-elf (+ (apply #'+ (mapcar #'space-nbytes-aligned data-spaces))
                             +backend-page-bytes+ ; core header
                             pte-nbytes)
                          relocs output)
+            (setf (%vector-raw-bits core-header code-start-fixup-ofs) 0)
             (write-sequence core-header output) ; Copy prepared header
             (force-output output)
             (dolist (space data-spaces) ; Copy pages from memory
