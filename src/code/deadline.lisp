@@ -244,7 +244,7 @@ it will signal a timeout condition."
                ;; condition. In case we return here (i.e. the deadline
                ;; has been deferred or canceled), pick up the new value
                ;; of *DEADLINE*.
-               ((and (not deadline-timeout) deadline-internal-time)
+               (deadline-internal-time
                 (signal-deadline)
                 (setf deadline *deadline*)
                 (go :restart))
