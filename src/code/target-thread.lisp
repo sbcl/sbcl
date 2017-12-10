@@ -265,7 +265,10 @@ created and old ones may exit at any time."
 
 (declaim (inline current-thread-sap))
 (defun current-thread-sap ()
-  (sb!vm::current-thread-offset-sap sb!vm::thread-this-slot))
+  #!+sb-thread
+  (sb!vm::current-thread-offset-sap sb!vm::thread-this-slot)
+  #!-sb-thread
+  0)
 
 (declaim (inline current-thread-os-thread))
 (defun current-thread-os-thread ()
@@ -281,16 +284,17 @@ created and old ones may exit at any time."
   (/show0 "Entering INIT-INITIAL-THREAD")
   (setf sb!impl::*exit-lock* (make-mutex :name "Exit Lock")
         *make-thread-lock* (make-mutex :name "Make-Thread Lock"))
-  (let ((initial-thread (%make-thread :name "main thread"
-                                      :%alive-p t)))
-    (setf (thread-os-thread initial-thread) (current-thread-os-thread)
-          *initial-thread* initial-thread
-          *current-thread* initial-thread)
+  (let ((thread (%make-thread :name "main thread"
+                              :%alive-p t)))
+    (setf (thread-os-thread thread) (current-thread-os-thread)
+          (thread-primitive-thread thread) (sap-int (current-thread-sap))
+          *initial-thread* thread
+          *current-thread* thread)
     (grab-mutex (thread-result-lock *initial-thread*))
     ;; Either *all-threads* is empty or it contains exactly one thread
     ;; in case we are in reinit since saving core with multiple
     ;; threads doesn't work.
-    (setq *all-threads* (list initial-thread))))
+    (setq *all-threads* (list thread))))
 
 (defun main-thread ()
   "Returns the main thread of the process."
@@ -1419,7 +1423,8 @@ session."
   ;; locks grabbed by SUB-GC wouldn't function.
   ;; Other threads can GC with impunity.
   (setf *current-thread* thread ; is thread-local already
-        (thread-os-thread thread) (current-thread-os-thread))
+        (thread-os-thread thread) (current-thread-os-thread)
+        (thread-primitive-thread thread) (sap-int (current-thread-sap)))
   ;; *ALLOC-SIGNAL* is made thread-local by create_thread_struct()
   ;; so this assigns into TLS, not the global value.
   (setf sb!vm:*alloc-signal* *default-alloc-signal*)
@@ -1704,7 +1709,7 @@ Short version: be careful out there."
     (with-interrupts (funcall function)))
   #!-(and (not sb-thread) win32)
   (let ((os-thread (thread-os-thread thread)))
-    (cond ((not os-thread)
+    (cond ((zerop os-thread)
            (error 'interrupt-thread-error :thread thread))
           (t
            (with-interruptions-lock (thread)
@@ -1777,26 +1782,13 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
   #!+ppc ; only PPC uses a separate symbol for the TLS index lock
   (!defglobal sb!vm::*tls-index-lock* 0)
 
-  (defun %thread-sap (thread)
-    (let ((thread-sap (alien-sap (extern-alien "all_threads" (* t))))
-          (target (thread-os-thread thread)))
-      (loop
-        (when (sap= thread-sap (int-sap 0)) (return nil))
-        (let ((os-thread (sap-ref-word thread-sap
-                                       (* sb!vm:n-word-bytes
-                                          sb!vm::thread-os-thread-slot))))
-          (when (= os-thread target) (return thread-sap))
-          (setf thread-sap
-                (sap-ref-sap thread-sap (* sb!vm:n-word-bytes
-                                           sb!vm::thread-next-slot)))))))
-
 (defun %symbol-value-in-thread (symbol thread)
     ;; Prevent the thread from dying completely while we look for the TLS
     ;; area...
     (with-all-threads-lock
       (if (thread-alive-p thread)
           (let* ((offset (get-lisp-obj-address (symbol-tls-index symbol)))
-                 (obj (sap-ref-lispobj (%thread-sap thread) offset))
+                 (obj (sap-ref-lispobj (int-sap (thread-primitive-thread thread)) offset))
                  (tl-val (get-lisp-obj-address obj)))
             (cond ((zerop offset)
                    (values nil :no-tls-value))
@@ -1808,19 +1800,19 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
           (values nil :thread-dead))))
 
   (defun %set-symbol-value-in-thread (symbol thread value)
-    (with-pinned-objects (value)
-      ;; Prevent the thread from dying completely while we look for the TLS
-      ;; area...
-      (with-all-threads-lock
-        (if (thread-alive-p thread)
-            (let ((offset (get-lisp-obj-address (symbol-tls-index symbol))))
-              (cond ((zerop offset)
-                     (values nil :no-tls-value))
-                    (t
-                     (setf (sap-ref-lispobj (%thread-sap thread) offset)
-                           value)
-                     (values value :ok))))
-            (values nil :thread-dead)))))
+    ;; Prevent the thread from dying completely while we look for the TLS
+    ;; area...
+    (with-all-threads-lock
+      (if (thread-alive-p thread)
+          (let ((offset (get-lisp-obj-address (symbol-tls-index symbol))))
+            (cond ((zerop offset)
+                   (values nil :no-tls-value))
+                  (t
+                   (setf (sap-ref-lispobj (int-sap (thread-primitive-thread thread))
+                                          offset)
+                         value)
+                   (values value :ok))))
+          (values nil :thread-dead))))
 
   (define-alien-variable tls-index-start unsigned-int)
 
