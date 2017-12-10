@@ -586,7 +586,12 @@ callback_wrapper_trampoline(
     if (!th) {                  /* callback invoked in non-lisp thread */
         init_thread_data scribble;
         attach_os_thread(&scribble);
-        funcall3(StaticSymbolFunction(ENTER_FOREIGN_CALLBACK), arg0,arg1,arg2);
+#ifdef LISP_FEATURE_SB_SAFEPOINT
+        WITH_GC_AT_SAFEPOINTS_ONLY()
+#endif
+        {
+            funcall3(StaticSymbolFunction(ENTER_FOREIGN_CALLBACK), arg0,arg1,arg2);
+        }
         detach_os_thread(&scribble);
         return;
     }
