@@ -309,9 +309,17 @@
 
 ;;;; PSEUDO-ATOMIC
 
+#!+sb-safepoint
+(defun emit-safepoint ()
+  (inst ldr zr-tn (@ null-tn
+                     (- (+ gc-safepoint-trap-offset n-word-bytes
+                           other-pointer-lowtag)))))
 
 ;;; handy macro for making sequences look atomic
 (defmacro pseudo-atomic ((flag-tn) &body forms)
+  #!+sb-safepoint-strictly
+  `(progn ,@forms (emit-safepoint))
+  #!-sb-safepoint-strictly
   `(progn
      (without-scheduling ()
        #!-sb-thread
@@ -339,7 +347,9 @@
        (let ((not-interrputed (gen-label)))
          (inst cbz ,flag-tn not-interrputed)
          (inst brk pending-interrupt-trap)
-         (emit-label not-interrputed)))))
+         (emit-label not-interrputed))
+       #!+sb-safepoint
+       (emit-safepoint))))
 
 ;;;; memory accessor vop generators
 

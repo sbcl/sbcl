@@ -235,7 +235,7 @@
           ":GENCGC not supported on selected architecture")
          ("(not (or gencgc cheneygc))"
           "One of :GENCGC or :CHENEYGC must be enabled")
-         ("(and sb-safepoint (not (or ppc x86 x86-64)))"
+         ("(and sb-safepoint (not (or arm64 ppc x86 x86-64)))"
           ":SB-SAFEPOINT not supported on selected architecture")
          ("(and sb-safepoint-strictly (not sb-safepoint))"
           ":SB-SAFEPOINT-STRICTLY requires :SB-SAFEPOINT")

@@ -47,6 +47,10 @@
 	brk trap_PendingInterrupt         ; \
 1:
 #endif
+#ifdef LISP_FEATURE_SB_SAFEPOINT
+/* the CSP page sits right before the thread */
+# define THREAD_SAVED_CSP_OFFSET (-N_WORD_BYTES)
+#endif
 	.align
 	.global	call_into_lisp
 	.type	call_into_lisp, %function
@@ -283,6 +287,15 @@ call_into_c:
 #endif
 
 	LEAVE_PA
+#ifdef LISP_FEATURE_SB_SAFEPOINT
+	/* OK to run GC without stopping this thread from this point on. */
+#  ifdef LISP_FEATURE_SB_THREAD
+	str     reg_CSP, [reg_THREAD, THREAD_SAVED_CSP_OFFSET]
+#  else
+	ldr     reg_NL9, =all_threads
+	str     reg_CSP, [reg_NL9, THREAD_SAVED_CSP_OFFSET]
+#  endif
+#endif
 
         // And call the C function.
         //
@@ -309,6 +322,16 @@ call_into_c:
 #endif
         mov     reg_LEXENV, #0
         mov     reg_CODE, #0
+
+# ifdef LISP_FEATURE_SB_SAFEPOINT
+	/* No longer OK to run GC except at safepoints. */
+#  ifdef LISP_FEATURE_SB_THREAD
+	str     xzr, [reg_THREAD, THREAD_SAVED_CSP_OFFSET]
+#  else
+	ldr     reg_NL9, =all_threads
+	str     xzr, [reg_NL9, THREAD_SAVED_CSP_OFFSET]
+#  endif
+# endif
 
 	ENTER_PA
 
