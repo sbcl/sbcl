@@ -16,7 +16,6 @@
            #:checked-compile-capturing-source-paths
            #:checked-compile-condition-source-paths
 
-           ;; RUNTIME
            #:runtime #:split-string #:shuffle))
 
 (in-package :test-util)
@@ -658,16 +657,19 @@
               with duration = 0
               for n = 1 then (* n 2)
               for total-runs = n then (+ total-runs n)
+              for gc-start = *gc-run-time*
               do (dotimes (i n)
                    (funcall thunk))
-                 (setf duration (- (get-internal-run-time) start))
+                 (setf duration (- (get-internal-run-time) start
+                                   (- *gc-run-time* gc-start)))
               when (> duration precision)
-              return (/ (float duration) (float total-runs)))
+              return (/ (float duration)
+                        (float total-runs)))
         into min-internal-time-units-per-call
         finally (return (/ min-internal-time-units-per-call
                            (float internal-time-units-per-second)))))
 
-(defmacro runtime (form &key (repetitions 3) (precision 10))
+(defmacro runtime (form &key (repetitions 3) (precision 20))
   `(runtime* (lambda () ,form) ,repetitions ,precision))
 
 (defun split-string (string delimiter)
