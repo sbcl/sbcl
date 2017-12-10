@@ -354,11 +354,6 @@
      #!+sb-safepoint
      (emit-safepoint)))
 
-;;; The offset from the fault address reported to the runtime to the
-;;; END of the global safepoint page.
-#!+sb-safepoint
-(defconstant gc-safepoint-trap-offset n-word-bytes)
-
 #!+sb-safepoint
 (defun emit-safepoint ()
   (inst lwz zero-tn null-tn (- (+ gc-safepoint-trap-offset n-word-bytes other-pointer-lowtag))))

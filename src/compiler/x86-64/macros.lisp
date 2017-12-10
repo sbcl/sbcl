@@ -349,11 +349,6 @@
               :disp (* n-word-bytes thread-pseudo-atomic-bits-slot))
     0))
 
-;;; The offset from the fault address reported to the runtime to the
-;;; END of the global safepoint page.
-#!+sb-safepoint
-(defconstant gc-safepoint-trap-offset n-word-bytes)
-
 #!+sb-safepoint
 (defun emit-safepoint ()
   (inst test al-tn (make-ea :byte :disp

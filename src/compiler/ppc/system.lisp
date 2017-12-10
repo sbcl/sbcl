@@ -195,13 +195,6 @@
   (:generator 1
     (inst unimp pending-interrupt-trap)))
 
-#!+sb-safepoint
-(define-vop (insert-safepoint)
-  (:policy :fast-safe)
-  (:translate sb!kernel::gc-safepoint)
-  (:generator 0
-    (emit-safepoint)))
-
 #!+sb-thread
 (defknown current-thread-offset-sap ((unsigned-byte 64))
   system-area-pointer (flushable))

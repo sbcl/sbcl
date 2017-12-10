@@ -161,3 +161,10 @@
 (defun cerror-call (vop error-code &rest values)
   "Cause a continuable error.  ERROR-CODE is the error to cause."
   (emit-error-break vop cerror-trap (error-number-or-lose error-code) values))
+
+#!+sb-safepoint
+(define-vop (insert-safepoint)
+  (:policy :fast-safe)
+  (:translate sb!kernel::gc-safepoint)
+  (:generator 0
+    (emit-safepoint)))

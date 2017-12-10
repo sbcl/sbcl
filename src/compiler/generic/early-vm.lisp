@@ -139,3 +139,8 @@
               (sap-ref-32 (sap offset) `(sb!fasl::bvref-32 ,sap ,offset))
               (sap-ref-word (sap offset) `(sb!fasl::bvref-word ,sap ,offset)))
      ,@body))
+
+#!+sb-safepoint
+;;; The offset from the fault address reported to the runtime to the
+;;; END of the global safepoint page.
+(defconstant gc-safepoint-trap-offset n-word-bytes)
