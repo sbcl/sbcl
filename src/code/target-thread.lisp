@@ -268,7 +268,7 @@ created and old ones may exit at any time."
   #!+sb-thread
   (sb!vm::current-thread-offset-sap sb!vm::thread-this-slot)
   #!-sb-thread
-  0)
+  (int-sap 0))
 
 (declaim (inline current-thread-os-thread))
 (defun current-thread-os-thread ()
