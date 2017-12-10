@@ -324,7 +324,7 @@ catch_exception_raise(mach_port_t exception_port,
     /* Just need to unprotect the page and do some bookkeeping, no need
      * to run it from the faulting thread. */
     if (exception == EXC_BAD_ACCESS && gencgc_handle_wp_violation(addr)) {
-        goto do_not_handle; 
+        goto do_not_handle;
     }
 
     struct thread *th;

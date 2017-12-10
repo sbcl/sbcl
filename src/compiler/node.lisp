@@ -1503,6 +1503,11 @@
   (caller :test caller)
   (arg-specs :test arg-specs)
   (result-specs :test result-specs))
+
+;;; Something will modify this value, warn if it's a constant
+(def!struct (modifying-cast (:include cast) (:copier nil))
+  ;; NIL after a warning has been issued
+  caller)
 
 ;;;; non-local exit support
 ;;;;

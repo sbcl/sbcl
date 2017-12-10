@@ -109,9 +109,6 @@
   ;; further optimiz'ns) is backwards from the return convention for
   ;; transforms. -- WHN 19990917
   (optimizer nil :type (or function null))
-  ;; a function computing the constant or literal arguments which are
-  ;; destructively modified by the call.
-  (destroyed-constant-args nil :type (or function null))
   ;; If true, a special-case LTN annotation method that is used in
   ;; place of the standard type/policy template selection. It may use
   ;; arbitrary code to choose a template, decide to do a full call, or

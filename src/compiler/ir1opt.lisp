@@ -864,18 +864,6 @@
                  (setf (lvar-reoptimize arg) nil))))
            (process-info ()
              (check-important-result node info)
-             (let ((fun (fun-info-destroyed-constant-args info)))
-               (when (and fun
-                          ;; If somebody is really sure that they want to modify
-                          ;; constants, let them.
-                          (policy node (> check-constant-modification 0))
-                          (funcall fun args))
-                 (let ((*compiler-error-context* node))
-                   (warn 'constant-modified
-                         :fun-name (lvar-fun-name
-                                    (basic-combination-fun node) t))
-                   (setf (basic-combination-kind node) :error)
-                   (return-from ir1-optimize-combination))))
              (let ((fun (fun-info-derive-type info)))
                (when fun
                  (let ((res (funcall fun node)))
@@ -2175,6 +2163,37 @@
     (and (basic-combination-p dest)
          (eq (basic-combination-fun dest) lvar))))
 
+(defun may-delete-bound-cast (cast)
+  (when (bound-cast-check cast)
+    (when (constant-lvar-p (bound-cast-bound cast))
+      (setf (cast-asserted-type cast)
+            (specifier-type `(integer 0 (,(lvar-value (bound-cast-bound cast)))))
+            (bound-cast-derived cast) t))
+    (when (policy cast (= insert-array-bounds-checks 0))
+      (flush-combination (bound-cast-check cast))
+      (setf (bound-cast-check cast) nil)))
+  (bound-cast-derived cast))
+
+(defun may-delete-modifying-cast (cast)
+  (or (not (modifying-cast-caller cast)) ;; already warned
+      (let* ((value (cast-value cast))
+             (uses (lvar-uses value))
+             (lvar (or (and (ref-p uses)
+                            (lambda-var-ref-lvar uses))
+                       value)))
+        (when (constant-lvar-p lvar)
+          (let ((*compiler-error-context* cast)
+                (value (lvar-value lvar)))
+            (unless (or (and
+                         (not (consp value))
+                         (not (arrayp value))
+                         (not (type= (cast-asserted-type cast)
+                                     (specifier-type 'hash-table))))
+                        (typep value '(vector * 0)))
+              (warn 'constant-modified
+                    :fun-name (shiftf (modifying-cast-caller cast) nil)) ;; warn once
+              t))))))
+
 (defun may-delete-cast (cast)
   (typecase cast
     (vestigial-exit-cast
@@ -2182,24 +2201,15 @@
     (function-designator-cast
      (may-delete-function-designator-cast cast))
     (bound-cast
-     (bound-cast-derived cast))
+     (may-delete-bound-cast cast))
+    (modifying-cast
+     (may-delete-modifying-cast cast))
     (t t)))
 
 ;;; Delete or move around casts when possible
 (defun maybe-delete-cast (cast)
-  (let ((atype (cast-asserted-type cast))
-        (lvar (cast-lvar cast))
+  (let ((lvar (cast-lvar cast))
         (value (cast-value cast)))
-    (when (and (bound-cast-p cast)
-               (bound-cast-check cast))
-      (when (constant-lvar-p (bound-cast-bound cast))
-        (setf atype
-              (specifier-type `(integer 0 (,(lvar-value (bound-cast-bound cast)))))
-              (cast-asserted-type cast) atype
-              (bound-cast-derived cast) t))
-      (when (policy cast (= insert-array-bounds-checks 0))
-        (flush-combination (bound-cast-check cast))
-        (setf (bound-cast-check cast) nil)))
     (cond ((not (may-delete-cast cast))
            nil)
           ((values-subtypep (lvar-derived-type value)
@@ -2210,7 +2220,8 @@
                 lvar)
            ;; Turn (the vector (if x y #()) into
            ;; (if x (the vector y) #())
-           (let ((ctran (node-next cast))
+           (let ((atype (cast-asserted-type cast))
+                 (ctran (node-next cast))
                  (dest (lvar-dest lvar))
                  next-block)
              (collect ((merges))

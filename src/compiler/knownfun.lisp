@@ -72,7 +72,7 @@
 ;;; Make a FUN-INFO structure with the specified type, attributes
 ;;; and optimizers.
 (defun %defknown (names type attributes location
-                  &key derive-type optimizer destroyed-constant-args result-arg
+                  &key derive-type optimizer result-arg
                        overwrite-fndb-silently
                        call-type-deriver
                        annotation)
@@ -100,7 +100,6 @@
             (make-fun-info :attributes attributes
                            :derive-type derive-type
                            :optimizer optimizer
-                           :destroyed-constant-args destroyed-constant-args
                            :result-arg result-arg
                            :call-type-deriver call-type-deriver
                            :annotation annotation))
@@ -158,8 +157,10 @@
 (defstruct (fun-type-annotation
             (:copier nil))
   positional ;; required and &optional
+  rest
   key
-  returns)
+  returns
+  )
 
 (defun split-type-info (arg-types result-type)
   (if (eq arg-types '*)
@@ -173,44 +174,58 @@
            :silent t)
         (let ((i -1)
               positional-annotation
+              rest-annotation
               key-annotation
               return-annotation)
           (labels ((annotation-p (x)
-                     (typep x '(cons (member function function-designator))))
+                     (typep x '(cons (member function function-designator modifying))))
+                   (strip-annotation (x)
+                     (ecase (car x)
+                       ((function function-designator) (car x))
+                       (modifying (cadr x))))
                    (process-positional (type)
                      (incf i)
                      (cond ((annotation-p type)
                             (push (cons i type) positional-annotation)
-                            (car type))
+                            (strip-annotation type))
                            (t
                             type)))
                    (process-key (pair)
                      (cond ((annotation-p (cadr pair))
                             (destructuring-bind (key value) pair
                               (setf (getf key-annotation key) value)
-                              (list key (car value))))
+                              (list key (strip-annotation value))))
                            (t
                             pair)))
+                   (process-rest (type)
+                     (cond ((annotation-p type)
+                            (setf rest-annotation type)
+                            (strip-annotation type))
+                           (t
+                            type)))
                    (process-return (type)
                      (cond ((annotation-p type)
                             (setf return-annotation type)
-                            (car type))
+                            (strip-annotation type))
                            (t
                             type))))
             (let ((required (mapcar #'process-positional required))
                   (optional (mapcar #'process-positional optional))
+                  (rest (process-rest (car rest)))
                   (key (mapcar #'process-key keys))
                   (return (process-return result-type)))
               (values
                `(sfunction
                  (,@required
                   ,@(and optional `(&optional ,@optional))
-                  ,@(and (ll-kwds-restp llks) `(&rest ,@rest))
+                  ,@(and (ll-kwds-restp llks) `(&rest ,rest))
                   ,@(and (ll-kwds-keyp llks) `(&key ,@key))
                   ,@(and (ll-kwds-allowp llks) '(&allow-other-keys)))
                  ,return)
-               (when (or positional-annotation key-annotation return-annotation)
+               (when (or positional-annotation rest-annotation
+                         key-annotation return-annotation)
                  `(make-fun-type-annotation :positional ',positional-annotation
+                                            :rest ',rest-annotation
                                             :key ',key-annotation
                                             :returns ',return-annotation)))))))))
 
@@ -354,46 +369,6 @@
                      (t
                       ctype))))))))))
 
-(defun remove-non-constants-and-nils (fun)
-  (lambda (list)
-    (remove-if-not #'lvar-value
-                   (remove-if-not #'constant-lvar-p (funcall fun list)))))
-
-;;; FIXME: bad name (first because it uses 1-based indexing; second
-;;; because it doesn't get the nth constant arguments)
-(defun nth-constant-args (&rest indices)
-  (lambda (list)
-    (let (result)
-      (do ((i 1 (1+ i))
-           (list list (cdr list))
-           (indices indices))
-          ((null indices) (nreverse result))
-        (when (= i (car indices))
-          (when (constant-lvar-p (car list))
-            (push (car list) result))
-          (setf indices (cdr indices)))))))
-
-;;; FIXME: a number of the sequence functions not only do not destroy
-;;; their argument if it is empty, but also leave it alone if :start
-;;; and :end bound a null sequence, or if :count is 0.  This test is a
-;;; bit complicated to implement, verging on the impossible, but for
-;;; extra points (fill #\1 "abc" :start 0 :end 0) should not cause a
-;;; warning.
-(defun nth-constant-nonempty-sequence-args (&rest indices)
-  (lambda (list)
-    (let (result)
-      (do ((i 1 (1+ i))
-           (list list (cdr list))
-           (indices indices))
-          ((null indices) (nreverse result))
-        (when (= i (car indices))
-          (when (constant-lvar-p (car list))
-            (let ((value (lvar-value (car list))))
-              (unless (or (typep value 'null)
-                          (typep value '(vector * 0)))
-                (push (car list) result))))
-          (setf indices (cdr indices)))))))
-
 (defun read-elt-type-deriver (skip-arg-p element-type-spec no-hang)
   (lambda (call)
     (let* ((element-type (specifier-type element-type-spec))
@@ -466,12 +441,17 @@
 ;;; ASSERT-CALL-TYPE already asserts the ARRAY type, so it gets an extra
 ;;; assertion that may not get eliminated and requires extra work.
 (defun array-call-type-deriver (call trusted &optional set)
-  (let* ((type (lvar-type (combination-fun call)))
+  (let* ((fun (combination-fun call))
+         (type (lvar-type fun))
          (policy (lexenv-policy (node-lexenv call)))
          (args (combination-args call))
          (required (fun-type-required type)))
-    (flet ((assert-type (arg type)
-             (when (assert-lvar-type arg type policy)
+    (flet ((assert-type (arg type &optional set)
+             (when (if set
+                       (assert-modifying-lvar-type arg type
+                                                   (lvar-fun-name fun)
+                                                   policy)
+                       (assert-lvar-type arg type policy))
                (unless trusted (reoptimize-lvar arg)))))
       (when set
         (assert-type (pop args)
@@ -479,7 +459,8 @@
       (assert-type (pop args)
                    (type-intersection
                     (pop required)
-                    (specifier-type `(array * ,(length args)))))
+                    (specifier-type `(array * ,(length args))))
+                   set)
       (loop for type in required
             do (assert-type (pop args) type))
       (loop for type in (fun-type-optional type)

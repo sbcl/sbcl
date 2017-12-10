@@ -955,7 +955,7 @@ other."
 ;;; A logic shared among THE and TRULY-THE.
 (defun the-in-policy (type value policy start next result)
   (let ((type (if (ctype-p type) type
-                   (compiler-values-specifier-type type))))
+                  (compiler-values-specifier-type type))))
     (cond ((or (eq type *wild-type*)
                (eq type *universal-type*)
                (and (leaf-p value)
@@ -1016,9 +1016,30 @@ care."
   (the-in-policy value-type form **zero-typecheck-policy** start next result))
 
 ;;; THE with some options for the CAST
-(def-ir1-translator the* (((value-type &key context silent-conflict) form)
+(def-ir1-translator the* (((value-type &key context silent-conflict
+                                       truly
+                                       modifying) form)
                           start next result)
-  (let ((cast (the-in-policy value-type form (lexenv-policy *lexenv*) start next result)))
+  (let* ((policy (lexenv-policy *lexenv*))
+         (value-type (compiler-values-specifier-type value-type))
+         (cast (if modifying
+                   (let* ((value-ctran (make-ctran))
+                          (value-lvar (make-lvar))
+                          (cast (make-modifying-cast
+                                 :asserted-type value-type
+                                 :type-to-check (maybe-weaken-check value-type
+                                                                    (if truly
+                                                                        **zero-typecheck-policy**
+                                                                        policy))
+                                 :value value-lvar
+                                 :derived-type (coerce-to-values value-type)
+                                 :caller modifying)))
+                     (ir1-convert start value-ctran value-lvar form)
+                     (link-node-to-previous-ctran cast value-ctran)
+                     (setf (lvar-dest value-lvar) cast)
+                     (use-continuation cast next result)
+                     cast)
+                   (the-in-policy value-type form policy start next result))))
     (when cast
 
       (setf (cast-context cast) context)

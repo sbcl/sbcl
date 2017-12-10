@@ -963,11 +963,20 @@ and no value was provided for it." name))))))))))
         (let ((arg (pop args)))
           (call arg opt (positional-annotation))))
 
-      (let ((rest (fun-type-rest type)))
+      (let ((annotation (and annotation
+                             (fun-type-annotation-rest annotation)))
+            (rest (or (fun-type-rest type)
+                      (and annotation
+                           *universal-type*))))
         (when (and rest
-                   (neq rest *universal-type*))
-          (dolist (arg args)
-            (call arg rest))))
+                   (or annotation
+                       (neq rest *universal-type*)))
+          (let ((butlast (getf (cddr annotation) :butlast)))
+            (loop for (arg . next) on args
+                  when (or (not butlast)
+                           next)
+                  do
+                  (call arg rest annotation)))))
 
       (let ((key-args (nthcdr (+ (length (fun-type-optional type))
                                  (length (fun-type-required type)))
@@ -978,11 +987,30 @@ and no value was provided for it." name))))))))))
             (when lvar
               (call lvar (key-info-type key) (key-annotation name)))))))))
 
+(defun assert-modifying-lvar-type (lvar type caller policy)
+  (let ((internal-lvar (make-lvar))
+        (dest (lvar-dest lvar)))
+    (substitute-lvar internal-lvar lvar)
+    (with-ir1-environment-from-node dest
+      (let ((cast (make-modifying-cast
+                   :asserted-type type
+                   :type-to-check (maybe-weaken-check type policy)
+                   :value lvar
+                   :derived-type (coerce-to-values type)
+                   :caller caller)))
+        (%insert-cast-before dest cast)
+        (use-lvar cast internal-lvar)
+        t))))
+
 (defun apply-type-annotation (fun-name arg type lvars policy &optional annotation)
   (case (car annotation)
     (function-designator
      (assert-function-designator fun-name lvars arg (cdr annotation))
      t)
+    (modifying
+     (if (policy policy (> check-constant-modification 0))
+         (assert-modifying-lvar-type arg type fun-name policy)
+         (assert-lvar-type arg type policy)))
     (t
      (assert-lvar-type arg type policy))))
 
@@ -1019,7 +1047,8 @@ and no value was provided for it." name))))))))))
           (map-combination-args-and-types
            (lambda (arg type lvars &optional annotation)
              (when (and
-                    (apply-type-annotation name arg type lvars policy annotation)
+                    (apply-type-annotation name arg type
+                                           lvars policy annotation)
                     (not trusted))
                (reoptimize-lvar arg)))
            call

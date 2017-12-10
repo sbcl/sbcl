@@ -744,3 +744,31 @@
          (loop for x below 2
                count (zerop (min x x x x x x x x x x))))
     (() 1)))
+
+(with-test (:name :ir1-ir2-dead-code-consistency)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (loop for x below 2
+               count (zerop (min x x x x x x x x x x))))
+    (() 1)))
+
+(with-test (:name (setf svref :constant-modification))
+  (assert
+   (= (length (nth-value 2
+                         (checked-compile
+                          `(lambda (x)
+                             (setf (svref #(a b c) 1) x))
+                          :allow-warnings 'sb-int:constant-modified)))
+            1)))
+
+(with-test (:name (debug :constant-modification))
+  (assert
+   (= (length (nth-value 2
+                         (checked-compile
+                          `(lambda (x)
+                             (declare (optimize (debug 2)))
+                             (let ((m "abc"))
+                               (delete x m)))
+                          :allow-warnings 'sb-int:constant-modified)))
+      1)))

@@ -420,22 +420,27 @@
            (unlink-node node))))
 
 ;;; Make a CAST and insert it into IR1 before node NEXT.
+
 (defun insert-cast-before (next lvar type policy &optional context)
   (declare (type node next) (type lvar lvar) (type ctype type))
   (with-ir1-environment-from-node next
-    (let* ((ctran (node-prev next))
-           (cast (make-cast lvar type policy context))
-           (internal-ctran (make-ctran)))
-      (setf (ctran-next ctran) cast
-            (node-prev cast) ctran)
-      (use-ctran cast internal-ctran)
-      (link-node-to-previous-ctran next internal-ctran)
-      (setf (lvar-dest lvar) cast)
-      (reoptimize-lvar lvar)
-      (when (return-p next)
-        (node-ends-block cast))
-      (setf (block-type-check (node-block cast)) t)
-      cast)))
+    (%insert-cast-before next (make-cast lvar type policy context))))
+
+(defun %insert-cast-before (next cast)
+  (declare (type node next) (type cast cast))
+  (let* ((ctran (node-prev next))
+         (lvar (cast-value cast))
+         (internal-ctran (make-ctran)))
+    (setf (ctran-next ctran) cast
+          (node-prev cast) ctran)
+    (use-ctran cast internal-ctran)
+    (link-node-to-previous-ctran next internal-ctran)
+    (setf (lvar-dest lvar) cast)
+    (reoptimize-lvar lvar)
+    (when (return-p next)
+      (node-ends-block cast))
+    (setf (block-type-check (node-block cast)) t)
+    cast))
 
 ;;;; miscellaneous shorthand functions
 
@@ -725,6 +730,19 @@
           for arg in args
           when (eq var this)
           return arg)))
+
+(defun lambda-var-ref-lvar (ref)
+  (let ((var (ref-leaf ref)))
+    (when (and (lambda-var-p var)
+               (not (lambda-var-sets var)))
+      (let* ((fun (lambda-var-home var))
+             (vars (lambda-vars fun))
+             (combination (lvar-dest (ref-lvar (car (lambda-refs fun))))))
+        (when (combination-p combination)
+          (loop for v in vars
+                for arg in (combination-args combination)
+                when (eq v var)
+                return arg))))))
 
 ;;; This needs to play nice with LVAR-GOOD-FOR-DX-P and friends.
 (defun handle-nested-dynamic-extent-lvars (dx lvar &optional recheck-component)

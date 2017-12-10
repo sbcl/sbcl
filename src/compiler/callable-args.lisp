@@ -78,28 +78,17 @@
                                                deps arg-specs result-specs)
   (declare (type node next) (type lvar lvar) (type ctype type))
   (with-ir1-environment-from-node next
-    (let* ((ctran (node-prev next))
-           (cast (make-function-designator-cast :asserted-type type
+    (let* ((cast (make-function-designator-cast :asserted-type type
                                                 :type-to-check (specifier-type 'function-designator)
                                                 :value lvar
                                                 :derived-type (coerce-to-values type)
                                                 :deps deps
                                                 :arg-specs arg-specs
                                                 :result-specs result-specs
-                                                :caller caller))
-           (internal-ctran (make-ctran)))
+                                                :caller caller)))
       (loop for lvar in deps
             do (push cast (lvar-dependent-casts lvar)))
-      (setf (ctran-next ctran) cast
-            (node-prev cast) ctran)
-      (use-ctran cast internal-ctran)
-      (link-node-to-previous-ctran next internal-ctran)
-      (setf (lvar-dest lvar) cast)
-      (reoptimize-lvar lvar)
-      (when (return-p next)
-        (node-ends-block cast))
-      (setf (block-type-check (node-block cast)) t)
-      cast)))
+      (%insert-cast-before next cast))))
 
 ;;; Similar to assert-lvar-type
 (defun assert-function-designator-lvar-type (lvar type caller
