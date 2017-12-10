@@ -295,7 +295,7 @@
                        (runtime (funcall deriver type-x1 type-y)))))
         ;; Linear scaling is good, quadratical bad. Draw the line
         ;; near the geometric mean of the corresponding SCALEs.
-        (when (> scale 32)
+        (when (> scale 40)
           (error "Bad scaling of ~a: input 10 times but runtime ~a times as large."
                  deriver scale))))))
 

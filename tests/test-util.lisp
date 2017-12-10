@@ -669,7 +669,7 @@
         finally (return (/ min-internal-time-units-per-call
                            (float internal-time-units-per-second)))))
 
-(defmacro runtime (form &key (repetitions 3) (precision 20))
+(defmacro runtime (form &key (repetitions 5) (precision 30))
   `(runtime* (lambda () ,form) ,repetitions ,precision))
 
 (defun split-string (string delimiter)
