@@ -56,6 +56,53 @@ const char* gc_phase_names[GC_NPHASES] = {
     "GC_COLLECT"
 };
 
+/* States and transitions:
+ *
+ * GC_NONE: Free running code.
+ *
+ * GC_NONE -> GC_FLIGHT: unmap_gc_page(), arming the GSP trap.
+ *
+ * GC_FLIGHT: GC triggered normally, waiting for post-allocation
+ * safepoint trap.
+ *
+ * GC_FLIGHT -> GC_MESSAGE: gc_notify_early(), arming the per-thread
+ * CSP traps.
+ *
+ * GC_MESSAGE: Waiting for lisp threads to stop (WITHOUT-GCING threads
+ * will resume at GC_INVOKED).
+ *
+ * GC_MESSAGE -> GC_INVOKED: map_gc_page(), disarming the GSP trap.
+ *
+ * GC_INVOKED: Waiting for WITHOUT-GCING threads to leave
+ * WITHOUT-GCING.
+ *
+ * GC_INVOKED -> GC_QUIET: nothing changes.
+ *
+ * GC_QUIET: GCing threads race to stop the world (and melt with you).
+ *
+ * GC_QUIET -> GC_SETTLED: unmap_gc_page(), gc_notify_final(), arming
+ * GSP and CSP traps again.
+ *
+ * GC_SETTLED: Waiting for remaining lisp threads to stop.
+ *
+ * GC_SETTLED -> GC_COLLECT: map_gc_page(), disarming the GSP trap.
+ *
+ * GC_COLLECT: World is stopped, save for one thread in SUB-GC / FLET
+ * PERFORM-GC, running the garbage collector.
+ *
+ * GC_COLLECT -> GC_NONE: gc_none(), clearing CSP traps and possibly
+ * GC_PENDING.
+ *
+ * GC_NONE: Free running code.
+ *
+ * Note that the system may not actually stop in every state for a GC.
+ * For example, a system with only one thread directly invoking
+ * SB-EXT:GC will advance quickly from GC_NONE to GC_COLLECT, simply
+ * because no other threads exist to prevent it.  That same scenario
+ * with a thread inside WITHOUT-GCING sitting in alien code at the
+ * time will move to GC_INVOKED and then wait for the WITHOUT-GCING
+ * thread to finish up, then proceed to GC_COLLECT. */
+
 #ifdef LISP_FEATURE_SB_THREAD
 #define CURRENT_THREAD_VAR(name) \
     struct thread *name = arch_os_get_current_thread()
@@ -100,45 +147,6 @@ unmap_gc_page()
 }
 #endif /* !LISP_FEATURE_WIN32 */
 
-/* Planned state progressions:
- *
- * none -> flight:
- *
- *     unmap_gc_page(). No blockers (GC_NONE can be left at any * moment).
- *
- * flight -> message:
- *
- *     happens when a master thread enters its trap.
- *
- *     The only blocker for flight mode is the master thread itself
- *     (GC_FLIGHT can't be left until the master thread traps).
- *
- * message -> invoked:
- *
- *     happens after each (other) thread is notified, i.e. it will
- *     eventually stop (already stopped). map_gc_page().
- *
- *     Each thread with empty CSP disagrees to leave GC_MESSAGE phase.
- *
- * invoked -> collect:
- *
- *     happens when every gc-inhibitor comes to completion (that's
- *     normally pending interrupt trap).
- *
- *     NB gc_stop_the_world, if it happens in non-master thread, "takes
- *     over" as a master, also deregistering itself as a blocker
- *     (i.e. it's ready to leave GC_INVOKED, but now it objects to
- *     leaving GC_COLLECT; this "usurpation" doesn't require any change
- *     to GC_COLLECT counter: for the counter, it's immaterial _which_
- *     thread is waiting).
- *
- * collect -> none:
- *
- *     happens at gc_start_the_world (that should always happen in the
- *     master).
- *
- *     Any thread waiting until GC end now continues.
- */
 struct gc_state {
 #ifdef LISP_FEATURE_SB_THREAD
     /* Flag: conditions are initialized */
@@ -320,18 +328,34 @@ static inline void gc_notify_early()
     struct thread *self = arch_os_get_current_thread(), *p;
     odxprint(safepoints,"%s","global notification");
     gc_assert(gc_state.phase == GC_MESSAGE);
+    /* We're setting up the per-thread traps to make sure that all
+     * lisp-side threads get stopped (if they are WITHOUT-GCING then
+     * they can resume once the GSP trap is disarmed), and all
+     * alien-side threads that are inside WITHOUT-GCING get their
+     * chance to run until they exit WITHOUT-GCING. */
     WITH_ALL_THREADS_LOCK {
         for_each_thread(p) {
+            /* This thread is already on a waitcount somewhere. */
             if (p==self)
                 continue;
+            /* If there's a collector thread then it is already on a
+             * waitcount somewhere.  And it may-or-may-not be this
+             * thread. */
             if (p==gc_state.collector)
                 continue;
             odxprint(safepoints,"notifying thread %p csp %p",p,*p->csp_around_foreign_call);
             boolean was_in_lisp = !set_thread_csp_access(p,0);
             if (was_in_lisp) {
+                /* Threads "in-lisp" block leaving GC_MESSAGE, as we
+                 * need them to hit their CSP or the GSP, and we unmap
+                 * the GSP when transitioning to GC_INVOKED. */
                 gc_state.phase_wait[GC_MESSAGE]++;
                 SET_THREAD_STOP_PENDING(p,T);
             } else if (thread_blocks_gc(p)) {
+                /* Threads "in-alien" don't block leaving GC_MESSAGE,
+                 * as the CSP trap is sufficient to catch them, but
+                 * any thread that is WITHOUT-GCING prevents exit from
+                 * GC_INVOKED. */
                 gc_state.phase_wait[GC_INVOKED]++;
                 SET_THREAD_STOP_PENDING(p,T);
             }
@@ -345,6 +369,10 @@ static inline void gc_notify_final()
     odxprint(safepoints,"%s","global notification");
     gc_assert(gc_state.phase == GC_SETTLED);
     gc_state.phase_wait[GC_SETTLED]=0;
+    /* All remaining lisp threads, except for the collector, now need
+     * to be stopped, so that the collector can run the GC.  Any
+     * thread already stopped shows up as being "in-alien", so we
+     * don't bother with them here. */
     WITH_ALL_THREADS_LOCK {
         for_each_thread(p) {
             if (p == gc_state.collector)
@@ -450,6 +478,14 @@ thread_register_gc_trigger()
         if (gc_state.phase == GC_NONE &&
             read_TLS(IN_SAFEPOINT,self)!=T &&
             !thread_blocks_gc(self)) {
+            /* A thread (this thread), while doing allocation, has
+             * determined that we need to run the garbage collector.
+             * But it's in the middle of initializing an object, so we
+             * advance to GC_FLIGHT, arming the GSP trap with the idea
+             * that there is a GSP trap check once the allocated
+             * object is initialized.  Any thread that has GC_PENDING
+             * set and GC_INHIBIT clear can take over from here (see
+             * thread_in_lisp_raised()), but some thread must. */
             gc_advance(GC_FLIGHT,GC_NONE);
         }
     }
@@ -654,26 +690,48 @@ void thread_in_lisp_raised(os_context_t *ctxptr)
     boolean check_gc_and_thruptions = 0;
     odxprint(safepoints,"%s","thread_in_lisp_raised");
 
+    /* Either we just hit the GSP trap, or we took a PIT stop and
+     * there is a stop-for-GC or thruption pending. */
     WITH_GC_STATE_LOCK {
         if (gc_state.phase == GC_FLIGHT &&
             read_TLS(GC_PENDING,self)==T &&
             !thread_blocks_gc(self) &&
             thread_may_gc() && read_TLS(IN_SAFEPOINT,self)!=T) {
+            /* Some thread (possibly even this one) that does not have
+             * GC_INHIBIT set has noticed that a GC is warranted and
+             * advanced the phase to GC_FLIGHT, arming the GSP trap,
+             * which this thread has hit.  This thread doesn't have
+             * GC_INHIBIT set, and has also noticed that a GC is
+             * warranted.  It doesn't matter which thread pushes
+             * things forwards at this point, just that it happens.
+             * This thread is now a candidate for running the GC, so
+             * we advance to GC_QUIET, where the only threads still
+             * running are competing to run the GC. */
             set_csp_from_context(self, ctxptr);
             gc_advance(GC_QUIET,GC_FLIGHT);
             set_thread_csp_access(self,1);
+            /* If a thread has already reached gc_stop_the_world(),
+             * just wait until the world starts again. */
             if (gc_state.collector) {
                 gc_advance(GC_NONE,GC_QUIET);
             } else {
+                /* ??? Isn't this already T? */
                 write_TLS(GC_PENDING,T,self);
             }
             *self->csp_around_foreign_call = 0;
             check_gc_and_thruptions = 1;
         } else {
+            /* This thread isn't a candidate for running the GC
+             * (yet?), so we can't advance past GC_FLIGHT, so wait for
+             * the next phase, GC_MESSAGE, before we do anything. */
             if (gc_state.phase == GC_FLIGHT) {
                 gc_state_wait(GC_MESSAGE);
             }
             if (!thread_blocks_gc(self)) {
+                /* This thread doesn't have GC_INHIBIT set, so sit
+                 * tight and wait for the GC to be over.  The current
+                 * phase is GC_MESSAGE, GC_INVOKED, GC_QUIET, or
+                 * GC_SETTLED. */
                 SET_THREAD_STOP_PENDING(self,NIL);
                 set_thread_csp_access(self,1);
                 set_csp_from_context(self, ctxptr);
@@ -684,11 +742,20 @@ void thread_in_lisp_raised(os_context_t *ctxptr)
                 *self->csp_around_foreign_call = 0;
                 check_gc_and_thruptions = 1;
             } else {
+                /* This thread has GC_INHIBIT set, meaning that it's
+                 * within a WITHOUT-GCING, so advance from wherever we
+                 * are (GC_MESSAGE) to GC_INVOKED so that we can
+                 * continue running.  When we leave the WITHOUT-GCING
+                 * we'll take a PIT stop and wind up in the case
+                 * above...  Or we'll call gc_stop_the_world(). */
                 gc_advance(GC_INVOKED,gc_state.phase);
                 SET_THREAD_STOP_PENDING(self,T);
+                /* Why do we not want to run thruptions here? */
             }
         }
     }
+    /* If we still need to GC, and it's not inhibited, call into
+     * SUB-GC.  Phase is either GC_QUIET or GC_NONE. */
     if (check_gc_and_thruptions) {
         check_pending_gc(ctxptr);
 #ifdef LISP_FEATURE_SB_THRUPTION
@@ -706,13 +773,28 @@ void thread_in_safety_transition(os_context_t *ctxptr)
     WITH_GC_STATE_LOCK {
         was_in_alien = set_thread_csp_access(self,1);
         if (was_in_alien) {
+            /* This is an alien->lisp or alien->alien transition. */
             if (thread_blocks_gc(self)) {
+                /* gc_notify_early() accounted for this thread as not
+                 * being able to leave GC_INVOKED when it armed our
+                 * CSP trap, but some other threads may still be
+                 * holding things back at GC_MESSAGE, so wait for
+                 * GC_INVOKED before continuing.  Don't advance, the
+                 * threads preventing exit from GC_MESSAGE have that
+                 * privilege. */
                 gc_state_wait(GC_INVOKED);
             } else {
+                /* This thread isn't within a WITHOUT-GCING, so just
+                 * wait until the GC is done before continuing. */
                 gc_state_wait(GC_NONE);
             }
         } else {
+            /* This is a lisp->alien or lisp->lisp transition. */
             if (!thread_blocks_gc(self)) {
+                /* This thread doesn't have GC_INHIBIT set, so sit
+                 * tight and wait for the GC to be over.  This is
+                 * virtually the same logic as the similar case in
+                 * thread_in_lisp_raised(). */
                 SET_THREAD_STOP_PENDING(self,NIL);
                 set_csp_from_context(self, ctxptr);
                 if (gc_state.phase <= GC_SETTLED)
@@ -721,6 +803,14 @@ void thread_in_safety_transition(os_context_t *ctxptr)
                     gc_state_wait(GC_NONE);
                 *self->csp_around_foreign_call = 0;
             } else {
+                /* This thread has GC_INHIBIT set, meaning that it's
+                 * within a WITHOUT-GCING, so advance from wherever we
+                 * are (GC_MESSAGE) to GC_INVOKED so that we can
+                 * continue running.  When we leave the WITHOUT-GCING
+                 * we'll take a PIT stop and wind up in the case
+                 * above...  Or we'll call gc_stop_the_world().  This
+                 * logic is identical to the similar case in
+                 * thread_in_lisp_raised(). */
                 gc_advance(GC_INVOKED,gc_state.phase);
                 SET_THREAD_STOP_PENDING(self,T);
             }
@@ -766,9 +856,16 @@ gc_stop_the_world()
     struct thread* self = arch_os_get_current_thread();
     odxprint(safepoints, "stop the world");
     WITH_GC_STATE_LOCK {
+        /* This thread is the collector, and needs special handling in
+         * gc_notify_early() and gc_notify_final() because of it. */
         gc_state.collector = self;
+        /* And we need to control advancement past GC_QUIET. */
         gc_state.phase_wait[GC_QUIET]++;
 
+        /* So, we won the race to get to gc_stop_the_world().  Now we
+         * need to get to GC_COLLECT, where we're the only thread
+         * running, so that we can run the collector.  What we do
+         * depends on what's already been done. */
         switch(gc_state.phase) {
         case GC_NONE:
             gc_advance(GC_QUIET,gc_state.phase);
@@ -787,7 +884,12 @@ gc_stop_the_world()
                 gc_state_wait(GC_QUIET);
             }
         case GC_QUIET:
+            /* Some number of threads were trying to get to GC_QUIET.
+             * But this thread is sufficient to be able to leave
+             * GC_QUIET. */
             gc_state.phase_wait[GC_QUIET]=1;
+            /* Advance through GC_SETTLED to GC_COLLECT, stopping the
+             * other threads that were racing to stop the world. */
             gc_advance(GC_COLLECT,GC_QUIET);
             break;
         case GC_COLLECT:
