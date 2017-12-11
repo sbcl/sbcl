@@ -434,6 +434,10 @@ triggers."
     (if (eq t thread)
         (sb!thread:make-thread function :name (format nil "Timer ~A"
                                                       (%timer-name timer)))
+        ;; Don't run the timer directly in the current thread.
+        ;; The signal that interrupt-thread sends is blocked so it'll get queued
+        ;; and processed after exiting from SIGALRM-HANDLER.
+        ;; That way we process all pending signals and release the *SCHEDULER-LOCK*.
         (let ((thread (or thread sb!thread:*current-thread*)))
           (handler-case
               (sb!thread:interrupt-thread thread function)
