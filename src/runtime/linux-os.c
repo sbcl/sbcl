@@ -463,12 +463,7 @@ os_install_interrupt_handlers(void)
 char *
 os_get_runtime_executable_path(int external)
 {
-    /* XXX: If this code is compiled with MSAN, all is well.
-       But if this code is compiled without MSAN, there is a false positive
-       in copied_string() unless we zero-initialize path[].
-       Basically if you want sanitization, the right thing is to compile
-       *all* the source code with the sanitizer, not just some of it. */
-    char path[PATH_MAX + 1] = {0};
+    char path[PATH_MAX + 1];
     int size;
 
     size = readlink("/proc/self/exe", path, sizeof(path)-1);
