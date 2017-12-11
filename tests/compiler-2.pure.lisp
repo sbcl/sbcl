@@ -341,7 +341,8 @@
                       :allow-style-warnings t))))
 
 (with-test (:name :type-across-hairy-lambda-transforms)
-  (assert (subtypep (sb-kernel:%simple-fun-type (lambda (x) (find 1 (the vector x))))
+  (assert (subtypep (sb-kernel:%simple-fun-type
+                     (checked-compile `(lambda (x) (find 1 (the vector x)))))
                     '(function * (values (or (integer 1 1) null) &optional)))))
 
 (with-test (:name :lea-type-derivation)
