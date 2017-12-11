@@ -436,9 +436,11 @@
     (assert (equal string (string #\Newline)))))
 
 (with-test (:name (:fill-pointer-stream-charpos :displaced))
-  (let ((string (make-array 3 :displaced-to (format nil "~%abc")
-                              :displaced-index-offset 1
-                              :element-type 'character :fill-pointer 0)))
+  (let* ((displaced (format nil "~%abc"))
+         (string (make-array 3 :displaced-to displaced
+                               :displaced-index-offset 1
+                               :element-type (array-element-type displaced)
+                               :fill-pointer 0)))
     (with-output-to-string (stream string)
       (fresh-line stream))
     (assert (equal string ""))))
