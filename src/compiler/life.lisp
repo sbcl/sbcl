@@ -131,7 +131,7 @@
           (let* ((tn (tn-ref-tn ref))
                  (local (tn-local tn))
                  (kind (tn-kind tn)))
-            (unless (member kind '(:component :environment :constant))
+            (unless (member kind '(:component :environment :constant :unused))
               (unless (eq local block)
                 (when (= ltn-num local-tn-limit)
                   (return-from find-local-references vop))
@@ -311,22 +311,23 @@
              (tn-ref-across op)))
         ((null op))
       (let ((tn (tn-ref-tn op)))
-        (assert
-          (flet ((frob (refs)
-                   (do ((ref refs (tn-ref-next ref)))
-                       ((null ref) t)
-                     (when (and (eq (vop-block (tn-ref-vop ref)) block)
-                                (not (eq ref op)))
-                       (return nil)))))
-            (and (frob (tn-reads tn)) (frob (tn-writes tn))))
-          () "More operand ~S used more than once in its VOP." op)
-        (aver (not (find-in #'global-conflicts-next-blockwise tn
-                            (ir2-block-global-tns block)
-                            :key #'global-conflicts-tn)))
+        (unless (eq (tn-kind tn) :unused)
+          (assert
+           (flet ((frob (refs)
+                    (do ((ref refs (tn-ref-next ref)))
+                        ((null ref) t)
+                      (when (and (eq (vop-block (tn-ref-vop ref)) block)
+                                 (not (eq ref op)))
+                        (return nil)))))
+             (and (frob (tn-reads tn)) (frob (tn-writes tn))))
+           () "More operand ~S used more than once in its VOP." op)
+          (aver (not (find-in #'global-conflicts-next-blockwise tn
+                              (ir2-block-global-tns block)
+                              :key #'global-conflicts-tn)))
 
-        (add-global-conflict :read-only tn block num)
-        (setf (tn-local tn) block)
-        (setf (tn-local-number tn) num))))
+          (add-global-conflict :read-only tn block num)
+          (setf (tn-local tn) block)
+          (setf (tn-local-number tn) num)))))
   (values))
 
 (defevent coalesce-more-ltn-numbers

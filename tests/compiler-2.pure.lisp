@@ -773,3 +773,21 @@
                                (delete x m)))
                           :allow-warnings 'sb-int:constant-modified)))
       1)))
+
+(with-test (:name (debug :unused-tn-long-arglist))
+  (checked-compile-and-assert
+      ()
+      `(lambda (n x)
+         (declare (sb-vm:word n))
+         (log (float n))
+         (nth-value 33 (funcall x . #.(loop for i to 35 collect i))))
+    ((10 (lambda (&rest args) (values-list args))) 33)))
+
+(with-test (:name (debug :unused-tn-very-long-arglist))
+  (checked-compile-and-assert
+      ()
+      `(lambda (n x)
+         (declare (sb-vm:word n))
+         (log (float n))
+         (nth-value 33 (funcall x . #.(loop for i to 350 collect i))))
+    ((10 (lambda (&rest args) (values-list args))) 33)))
