@@ -70,7 +70,7 @@ unsigned char build_id[] =
 #endif
 ;
 
-int
+static int
 open_binary(char *filename, int mode)
 {
 #ifdef LISP_FEATURE_WIN32
@@ -617,7 +617,7 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
 #endif
 }
 
-void relocate_heap(struct heap_adjust* adj)
+static void relocate_heap(struct heap_adjust* adj)
 {
     if (!lisp_startup_options.noinform || SHOW_SPACE_RELOCATION) {
         int i;
@@ -649,8 +649,6 @@ void relocate_heap(struct heap_adjust* adj)
 }
 #endif
 
-int merge_core_pages = -1;
-
 static void
 set_adjustment(struct heap_adjust* adj,
                uword_t actual_addr,
@@ -667,7 +665,7 @@ set_adjustment(struct heap_adjust* adj,
 
 static void
 process_directory(int count, struct ndir_entry *entry,
-                  int fd, os_vm_offset_t file_offset,
+                  int fd, os_vm_offset_t file_offset, int merge_core_pages,
                   struct heap_adjust* adj)
 {
     extern void immobile_space_coreparse(uword_t,uword_t);
@@ -900,8 +898,14 @@ process_directory(int count, struct ndir_entry *entry,
 #endif
 }
 
+/* 'merge_core_pages': Tri-state flag to determine whether we attempt to mark
+ * pages as targets for virtual memory deduplication via MADV_MERGEABLE.
+ * 1: Yes
+ * 0: No
+ * -1: default, yes for compressed cores, no otherwise.
+ */
 lispobj
-load_core_file(char *file, os_vm_offset_t file_offset)
+load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
 {
     void *header;
     core_entry_elt_t val, *ptr;
@@ -980,7 +984,7 @@ load_core_file(char *file, os_vm_offset_t file_offset)
             SHOW("NEW_DIRECTORY_CORE_ENTRY_TYPE_CODE case");
             process_directory(remaining_len / NDIR_ENTRY_LENGTH,
                               (struct ndir_entry*)ptr, fd, file_offset,
-                              &adj);
+                              merge_core_pages, &adj);
             break;
 
         case INITIAL_FUN_CORE_ENTRY_TYPE_CODE:

@@ -72,7 +72,7 @@ static int gen_of(lispobj obj) {
     return -1;
 }
 
-const char* classify_obj(lispobj ptr)
+static const char* classify_obj(lispobj ptr)
 {
     extern lispobj* instance_classoid_name(lispobj*);
 
@@ -384,7 +384,7 @@ static lispobj examine_stacks(struct hopscotch_table* targets,
     return 0;
 }
 
-void free_graph(struct layer* layer)
+static void free_graph(struct layer* layer)
 {
     while (layer) {
         free(layer->nodes);
@@ -394,7 +394,7 @@ void free_graph(struct layer* layer)
     }
 }
 
-struct node* find_node(struct layer* layer, lispobj ptr)
+static struct node* find_node(struct layer* layer, lispobj ptr)
 {
     int i;
     for(i=layer->count-1; i>=0; --i)
@@ -429,7 +429,7 @@ static inline lispobj decode_pointer(uint32_t encoding)
         return encoding; // Literal pointer
 }
 
-struct simple_fun* simple_fun_from_pc(char* pc)
+static struct simple_fun* simple_fun_from_pc(char* pc)
 {
     struct code* code = (struct code*)component_ptr_from_pc((lispobj*)pc);
     if (!code) return 0;

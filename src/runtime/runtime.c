@@ -124,7 +124,7 @@ copied_string(char *string)
     return strcpy(successful_malloc(1+strlen(string)), string);
 }
 
-char *
+static char *
 copied_existing_filename_or_null(char *filename)
 {
     struct stat filename_stat;
@@ -136,7 +136,7 @@ copied_existing_filename_or_null(char *filename)
 }
 
 #ifndef LISP_FEATURE_WIN32
-char *
+static char *
 copied_realpath(const char *pathname)
 {
     char *messy, *tidy;
@@ -168,7 +168,7 @@ copied_realpath(const char *pathname)
 
 /* miscellaneous chattiness */
 
-void
+static void
 print_help()
 {
     puts(
@@ -203,13 +203,13 @@ should be installed along with SBCL, and is also available from the\n\
 website <http://www.sbcl.org/>.\n");
 }
 
-void
+static void
 print_version()
 {
     printf("SBCL %s\n", SBCL_VERSION_STRING);
 }
 
-void
+static void
 print_banner()
 {
     printf(
@@ -234,7 +234,7 @@ and resources this platform demands.\n\
 /* Look for a core file to load, first in the directory named by the
  * SBCL_HOME environment variable, then in a hardcoded default
  * location.  Returns a malloced copy of the core filename. */
-char *
+static char *
 search_for_core ()
 {
     char *env_sbcl_home = getenv("SBCL_HOME");
@@ -263,13 +263,13 @@ search_for_core ()
 /* Try to find the path to an executable from argv[0], this is only
  * used when os_get_runtime_executable_path() returns NULL */
 #ifdef LISP_FEATURE_WIN32
-char *
+static char *
 search_for_executable(const char *argv0)
 {
     return NULL;
 }
 #else /* LISP_FEATURE_WIN32 */
-char *
+static char *
 search_for_executable(const char *argv0)
 {
     char *search, *start, *end, *buf;
@@ -318,7 +318,7 @@ search_for_executable(const char *argv0)
 }
 #endif /* LISP_FEATURE_WIN32 */
 
-size_t
+static size_t
 parse_size_arg(char *arg, char *arg_name)
 {
   char *tail, *power_name;
@@ -371,7 +371,7 @@ char *saved_runtime_path = NULL;
 void pthreads_win32_init();
 #endif
 
-void print_locale_variable(const char *name)
+static void print_locale_variable(const char *name)
 {
   char *value = getenv(name);
 
@@ -380,7 +380,7 @@ void print_locale_variable(const char *name)
   }
 }
 
-void setup_locale()
+static void setup_locale()
 {
   if(setlocale(LC_ALL, "") == NULL) {
 #ifndef LISP_FEATURE_WIN32
@@ -414,7 +414,7 @@ void setup_locale()
 #endif
   }
 }
-void print_environment(int argc, char *argv[])
+static void print_environment(int argc, char *argv[])
 {
     int n = 0;
     printf("; Commandline arguments:\n");
@@ -458,6 +458,7 @@ main(int argc, char *argv[], char *envp[])
     boolean debug_environment_p = 0;
 
     lispobj initial_function;
+    int merge_core_pages = -1;
 
 #if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD)
     os_preinit();
@@ -706,9 +707,10 @@ main(int argc, char *argv[], char *envp[])
 
     /* Doing this immediately after the core has been located
      * and before any random malloc() calls occur improves the chance
-     * of mapping dynamic space at our preferred addres (if movable).
+     * of mapping dynamic space at our preferred address (if movable).
      * If not movable, it was already mapped in allocate_spaces(). */
-    initial_function = load_core_file(core, embedded_core_offset);
+    initial_function = load_core_file(core, embedded_core_offset,
+                                      merge_core_pages);
     if (initial_function == NIL) {
         lose("couldn't find initial function\n");
     }

@@ -30,17 +30,7 @@ struct ndir_entry {
 };
 #define NDIR_ENTRY_LENGTH (sizeof (struct ndir_entry)/sizeof (core_entry_elt_t))
 
-/* Tri-state flag to determine whether we attempt to mark pages
- * as targets for virtual memory deduplication (ala MADV_MERGEABLE
- * on Linux).
- *
- * 1: Yes
- * 0: No
- * -1: default, yes for compressed cores, no otherwise.
- */
-extern int merge_core_pages;
-
-extern lispobj load_core_file(char *file, os_vm_offset_t offset);
+extern lispobj load_core_file(char *file, os_vm_offset_t offset, int merge_core_pages);
 extern os_vm_offset_t search_for_embedded_core(char *file);
 
 /* arbitrary string identifying this build, embedded in .core files to

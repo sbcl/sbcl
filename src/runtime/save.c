@@ -210,7 +210,7 @@ output_space(FILE *file, int id, lispobj *addr, lispobj *end,
     write_lispobj((bytes + os_vm_page_size - 1) / os_vm_page_size, file);
 }
 
-FILE *
+static FILE *
 open_core_for_saving(char *filename)
 {
     /* Open the output file. We don't actually need the file yet, but
@@ -220,7 +220,7 @@ open_core_for_saving(char *filename)
     return fopen(filename, "wb");
 }
 
-void
+static void
 smash_enclosing_state(boolean verbose) {
     struct thread *th = all_threads;
 
@@ -394,7 +394,7 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
 
 /* Check if the build_id for the current runtime is present in a
  * buffer. */
-int
+static int
 check_runtime_build_id(void *buf, size_t size)
 {
     size_t idlen;
@@ -415,7 +415,7 @@ check_runtime_build_id(void *buf, size_t size)
  * and return it.  Places the size in bytes of the runtime into
  * 'size_out'.  Returns NULL if the runtime cannot be loaded from
  * 'runtime_path'. */
-void *
+static void *
 load_runtime(char *runtime_path, size_t *size_out)
 {
     void *buf = NULL;
