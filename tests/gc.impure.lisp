@@ -199,7 +199,7 @@
             (- total-code-size code-bytes-consumed)))
       ;; This should be true for all platforms.
       ;; Some have as little as .5% space wasted.
-      (assert (< waste (* 3/100 code-bytes-consumed))))))
+      (assert (<= waste (* 3/100 code-bytes-consumed))))))
 
 (compile 'ensure-code/data-separation)
 
