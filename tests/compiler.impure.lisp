@@ -2758,27 +2758,31 @@
        ((function (function *))       "(FUNCTION (FUNCTION *))")
        ((function (function (eql 1))) "(FUNCTION (FUNCTION (EQL 1))")))))
 
-(with-test (:name :boxed-ref-setf-special)
+(with-test (:name :boxed-ref-setf-special
+            :skipped-on :interpreter)
   (let* ((var (gensym))
          (fun (checked-compile `(lambda ()
                                   (declare (special ,var))
                                   (setf ,var 10d0)))))
     (ctu:assert-no-consing (funcall fun))))
 
-(with-test (:name :boxed-ref-bind-special)
+(with-test (:name :boxed-ref-bind-special
+            :skipped-on :interpreter)
   (let* ((var (gensym))
          (fun (checked-compile `(lambda ()
                                   (let ((,var 10d0))
                                     (declare (special ,var)))))))
     (ctu:assert-no-consing (funcall fun))))
 
-(with-test (:name :boxed-ref-svref)
+(with-test (:name :boxed-ref-svref
+            :skipped-on :interpreter)
   (let ((fun (checked-compile `(lambda (x)
                                  (setf (svref x 0) 10d0))))
         (vector (vector nil)))
     (ctu:assert-no-consing (funcall fun vector))))
 
-(with-test (:name :boxed-ref-instance-set)
+(with-test (:name :boxed-ref-instance-set
+            :skipped-on :interpreter)
   (let* ((name (gensym "STRUCT"))
          (fun (progn
                 (eval `(defstruct ,name x))
@@ -2788,7 +2792,8 @@
          (instance (funcall (sb-int:symbolicate 'make- name))))
     (ctu:assert-no-consing (funcall fun instance))))
 
-(with-test (:name :boxed-ref-car)
+(with-test (:name :boxed-ref-car
+            :skipped-on :interpreter)
   (let ((fun (checked-compile `(lambda (x)
                                  (setf (car x) 10d0)
                                  (setf (cdr x) 10d0))))

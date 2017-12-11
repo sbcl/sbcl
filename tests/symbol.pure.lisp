@@ -55,5 +55,6 @@
 
 (load "compiler-test-util.lisp")
 
-(with-test (:name :fdefinition-no-consing)
+(with-test (:name :fdefinition-no-consing
+            :skipped-on :interpreter)
   (ctu:assert-no-consing (fdefinition 'list)))
