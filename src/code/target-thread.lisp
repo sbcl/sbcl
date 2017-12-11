@@ -1241,7 +1241,8 @@ on this semaphore, then N of them is woken up."
   ;; Lisp-side cleanup
   (with-all-threads-lock
     (setf (thread-%alive-p thread) nil)
-    (setf (thread-os-thread thread) 0)
+    (setf (thread-os-thread thread)
+          (ldb (byte sb!vm:n-word-bits 0) -1))
     (setq *all-threads* (delq thread *all-threads*))
     (when *session*
       (%delete-thread-from-session thread *session*))))
@@ -1709,7 +1710,7 @@ Short version: be careful out there."
     (with-interrupts (funcall function)))
   #!-(and (not sb-thread) win32)
   (let ((os-thread (thread-os-thread thread)))
-    (cond ((zerop os-thread)
+    (cond ((= os-thread (ldb (byte sb!vm:n-word-bits 0) -1))
            (error 'interrupt-thread-error :thread thread))
           (t
            (with-interruptions-lock (thread)
