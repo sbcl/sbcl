@@ -40,10 +40,6 @@
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
 
-#ifdef LISP_FEATURE_GENCGC
-# include "gencgc.h"
-#endif
-
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 # include "immobile-space.h"
 #endif
@@ -306,11 +302,6 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
                  static_space_free_pointer,
                  core_start_pos,
                  core_compression_level);
-#ifdef LISP_FEATURE_GENCGC
-    /* Flush the current_region, updating the tables. */
-    gc_alloc_update_all_page_tables(1);
-    gc_assert(get_alloc_pointer() == (lispobj*)(page_address(find_last_free_page())));
-#endif
     output_space(file,
                  DYNAMIC_CORE_SPACE_ID,
                  current_dynamic_space,

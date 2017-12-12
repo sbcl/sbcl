@@ -57,7 +57,6 @@
 #include "genesis/hash-table.h"
 #include "genesis/instance.h"
 #include "genesis/layout.h"
-#include "gencgc.h"
 #include "hopscotch.h"
 #include "genesis/cons.h"
 #include "forwarding-ptr.h"
@@ -798,6 +797,14 @@ set_generation_alloc_start_page(generation_index_t generation, int page_type_fla
 #endif
 }
 
+static inline void set_highest_used_page(page_index_t end)
+{
+    if (end+1 > last_free_page) {
+        last_free_page = end+1;
+        set_alloc_pointer((lispobj)(page_address(last_free_page)));
+    }
+}
+
 /* Find a new region with room for at least the given number of bytes.
  *
  * It starts looking at the current generation's alloc_start_page. So
@@ -873,12 +880,7 @@ gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *all
         page_table[i].allocated |= OPEN_REGION_PAGE_FLAG;
     }
     /* Bump up last_free_page. */
-    if (last_page+1 > last_free_page) {
-        last_free_page = last_page+1;
-        /* do we only want to call this on special occasions? like for
-         * boxed_region? */
-        set_alloc_pointer((lispobj)page_address(last_free_page));
-    }
+    set_highest_used_page(last_page);
     ret = thread_mutex_unlock(&free_pages_lock);
     gc_assert(ret == 0);
 
@@ -1199,10 +1201,7 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
         add_new_area(first_page, 0, nbytes);
 
     /* Bump up last_free_page */
-    if (last_page+1 > last_free_page) {
-        last_free_page = last_page+1;
-        set_alloc_pointer((lispobj)(page_address(last_free_page)));
-    }
+    set_highest_used_page(last_page);
     ret = thread_mutex_unlock(&free_pages_lock);
     gc_assert(ret == 0);
 
@@ -3620,7 +3619,7 @@ maybe_verify:
     }
 }
 
-page_index_t
+static page_index_t
 find_last_free_page(void)
 {
     page_index_t last_page = -1, i;
@@ -3631,12 +3630,6 @@ find_last_free_page(void)
 
     /* The last free page is actually the first available page */
     return last_page + 1;
-}
-
-void
-update_dynamic_space_free_pointer(void)
-{
-    set_alloc_pointer((lispobj)(page_address(find_last_free_page())));
 }
 
 static void
@@ -3843,7 +3836,8 @@ collect_garbage(generation_index_t last_gen)
     if (last_free_page > high_water_mark)
         high_water_mark = last_free_page;
 
-    update_dynamic_space_free_pointer();
+    last_free_page = find_last_free_page();
+    set_alloc_pointer((lispobj)(page_address(last_free_page)));
 
     /* Update auto_gc_trigger. Make sure we trigger the next GC before
      * running out of heap! */
@@ -4500,6 +4494,15 @@ gc_and_save(char *filename, boolean prepend_runtime,
     /* The dumper doesn't know that pages need to be zeroed before use. */
     zero_all_free_pages();
     do_destructive_cleanup_before_save(lisp_init_function);
+
+    /* All global allocation regions should be empty */
+    gc_assert(boxed_region.last_page < 0
+              && unboxed_region.last_page < 0
+              && code_region.last_page < 0);
+    /* The number of dynamic space pages saved is based on the allocation
+     * pointer, while the number of PTEs is based on last_free_page.
+     * Make sure they agree */
+    gc_assert(get_alloc_pointer() == (lispobj*)(page_address(last_free_page)));
 
     save_to_filehandle(file, filename, lisp_init_function,
                        prepend_runtime, save_runtime_options,
