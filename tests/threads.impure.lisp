@@ -13,10 +13,12 @@
 
 ; WHITE-BOX TESTS
 
-(cl:in-package #:sb-thread)
-(cl:shadowing-import 'assertoid:assert-error)
-(cl:use-package '#:test-util)
-(cl:use-package '#:assertoid)
+
+(shadowing-import 'assertoid:assert-error)
+(use-package :sb-thread)
+(use-package :sb-sys)
+(use-package '#:test-util)
+(use-package '#:assertoid)
 
 (setf sb-unix::*on-dangerous-wait* :error)
 
@@ -109,7 +111,7 @@
 (defincf incf-svref/0 svref 0)
 
 (defmacro def-test-cas (name init incf op)
-  `(with-test (:name ,name)
+  `(with-test (:name ,(sb-int:keywordicate name))
      (flet ((,name (n)
               (declare (fixnum n))
               (let* ((x ,init)
@@ -143,7 +145,8 @@
 (with-test (:name (:threads :more-trivia))
   (let ((old-threads (list-all-threads))
         (thread (make-thread (lambda ()
-                               (assert (find *current-thread* *all-threads*))
+                               (assert (find *current-thread*
+                                             sb-thread::*all-threads*))
                                (sleep 2))))
         (new-threads (list-all-threads)))
     (assert (thread-alive-p thread))
@@ -554,8 +557,8 @@
   (let* ((semaphore (make-semaphore))
          (done nil)
          (thread (make-thread (lambda ()
-                                (let ((mutex (semaphore-mutex semaphore))
-                                      (queue (semaphore-queue semaphore)))
+                                (let ((mutex (sb-thread::semaphore-mutex semaphore))
+                                      (queue (sb-thread::semaphore-queue semaphore)))
                                   (loop :until done :do
                                      (with-mutex (mutex)
                                        (condition-notify queue))))))))
@@ -911,20 +914,20 @@
         (fool1 (cons 1 2))
         (fool2 (cons 2 3)))
     (progv (list mysym) '(nil)
-      (let* ((i (get-lisp-obj-address (sb-kernel:symbol-tls-index mysym)))
+      (let* ((i (sb-kernel:get-lisp-obj-address (sb-kernel:symbol-tls-index mysym)))
              (j (+ i sb-vm:n-word-bytes)))
-        (assert (eql (sap-ref-word (current-thread-sap) j)
+        (assert (eql (sap-ref-word (sb-thread::current-thread-sap) j)
                      sb-vm:no-tls-value-marker-widetag))
-        (setf (sap-ref-lispobj (current-thread-sap) i) fool1
-              (sap-ref-lispobj (current-thread-sap) j) fool2)
+        (setf (sap-ref-lispobj (sb-thread::current-thread-sap) i) fool1
+              (sap-ref-lispobj (sb-thread::current-thread-sap) j) fool2)
         ;; assert that my pointer arithmetic worked as expected
         (assert (eq (symbol-value mysym) fool1))
         ;; assert that FOOL1 is found by the TLS scan and that FOOL2 is not.
-        (let ((list (%thread-local-references)))
-          (assert (memq fool1 list))
-          (assert (not (memq fool2 list))))
+        (let ((list (sb-thread::%thread-local-references)))
+          (assert (member fool1 list))
+          (assert (not (member fool2 list))))
         ;; repair the TLS entry that was corrupted by the test
-        (setf (sap-ref-word (current-thread-sap) j)
+        (setf (sap-ref-word (sb-thread::current-thread-sap) j)
               sb-vm:no-tls-value-marker-widetag)))))
 
 (format t "~&binding test done~%")
