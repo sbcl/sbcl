@@ -24,11 +24,6 @@
 #ifndef LISP_FEATURE_WIN32
 #include <sys/wait.h>
 #endif
-#ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
-#include <mach/mach.h>
-#include <mach/mach_error.h>
-#include <mach/mach_types.h>
-#endif
 #include "runtime.h"
 #include "validate.h"
 #include "thread.h"
