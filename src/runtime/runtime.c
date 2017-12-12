@@ -725,8 +725,6 @@ main(int argc, char *argv[], char *envp[])
                  ((char *)initial_function + -1)) + 23);
 #endif
 
-    gc_initialize_pointers();
-
     arch_install_interrupt_handlers();
 #ifndef LISP_FEATURE_WIN32
     os_install_interrupt_handlers();

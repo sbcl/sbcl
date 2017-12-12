@@ -3523,6 +3523,14 @@ III. initially undefined function references (alphabetically):
         (dolist (space spaces)
           (output-gspace space verbose)))
 
+      #!+gencgc ; Write a vacuous page table
+      (mapc #'write-word
+            `(,page-table-core-entry-type-code
+              5   ; words in this entry
+              0   ; number of elements provided in the page table
+              0   ; file offset (arbitrary)
+              0)) ; number of bytes consumed by entries
+
       ;; Write the initial function.
       (write-word initial-fun-core-entry-type-code)
       (write-word 3)

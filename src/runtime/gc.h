@@ -27,7 +27,6 @@ typedef intptr_t page_index_t;
 typedef signed char generation_index_t;
 
 extern void gc_init(void);
-extern void gc_initialize_pointers(void);
 extern void collect_garbage(generation_index_t last_gen);
 
 extern void set_auto_gc_trigger(os_vm_size_t usage);

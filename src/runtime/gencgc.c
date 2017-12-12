@@ -3913,7 +3913,7 @@ gc_init(void)
     gc_assert(test.write_protected_cleared);
 }
 
-void gc_allocate_ptes()
+static void gc_allocate_ptes()
 {
     page_index_t i;
 
@@ -3980,8 +3980,6 @@ void gc_allocate_ptes()
 #if SEGREGATED_CODE
     gc_set_region_empty(&code_region);
 #endif
-
-    last_free_page = 0;
 }
 
 /*  Pick up the dynamic space from after a core load.
@@ -4014,45 +4012,8 @@ gencgc_pickup_dynamic(void)
     generations[gen].bytes_allocated = bytes_allocated;
 
     gc_assert((os_vm_size_t)(alloc_ptr - (char*)page_address(0)) >= bytes_allocated);
-    // Why do we need this?  I don't think allocation regions can be open yet.
-    gc_alloc_update_all_page_tables(1);
     if (ENABLE_PAGE_PROTECTION)
         write_protect_generation_pages(gen);
-}
-
-void
-gc_initialize_pointers(void)
-{
-    /* !page_table_pages happens once only in self-build and not again.
-     * A trivial table (all pages 100% full except possibly the last)
-     * is fine to start with. Ideally genesis would write this data.
-     * The performance impact from assuming that all pages have a scan_start
-     * of page_address(0) is negligible. (On average, we examine 4x more
-     * objects than would be examined if the bound were tighter) */
-    if (!page_table_pages) {
-        char *alloc_ptr = (char *)get_alloc_pointer();
-        gc_allocate_ptes();
-        page_index_t page, max = find_page_index(alloc_ptr-1);
-        for (page = 0; page <= max; ++page) {
-            // Don't know how much is actually allocated, so say it's all used.
-            set_page_bytes_used(page, GENCGC_CARD_BYTES);
-            // Don't know the allocation type. Use the "anything" value.
-            // With segregated code, the conservative value is CODE,
-            // as it implies a mixture of boxed + unboxed data.
-#if SEGREGATED_CODE
-            page_table[page].allocated = CODE_PAGE_FLAG;
-#else
-            page_table[page].allocated = BOXED_PAGE_FLAG;
-#endif
-            set_page_scan_start_offset(page, page_address(page)-page_address(0));
-        }
-        // Now correct the usage for the last page
-        uword_t calculated = npage_bytes(max+1);
-        uword_t actual = alloc_ptr - page_address(0);
-        page_bytes_t excess = calculated - actual;
-        set_page_bytes_used(max, GENCGC_CARD_BYTES - excess);
-    }
-    gencgc_pickup_dynamic();
 }
 
 
@@ -4520,36 +4481,70 @@ void gc_load_corefile_ptes(core_entry_elt_t n_ptes, core_entry_elt_t total_bytes
                            off_t offset, int fd)
 {
     gc_assert(ALIGN_UP(n_ptes * sizeof (struct corefile_pte), N_WORD_BYTES)
-              == total_bytes);
-    gc_assert(lseek(fd, offset, SEEK_SET) == offset);
+              == (size_t)total_bytes);
 
     // Allocation of PTEs is delayed 'til now so that calloc() doesn't
     // consume addresses that would have been taken by a mapped space.
     gc_allocate_ptes();
 
-    char data[8192];
-    // Process an integral number of ptes on each read.
-    page_index_t max_pages_per_read = sizeof data / sizeof (struct corefile_pte);
-    page_index_t page = 0;
-    while (page < n_ptes) {
-        page_index_t pages_remaining = n_ptes - page;
-        page_index_t npages =
-            pages_remaining < max_pages_per_read ? pages_remaining : max_pages_per_read;
-        size_t bytes = npages * sizeof (struct corefile_pte);
-        size_t nread = read(fd, data, bytes);
-        gc_assert(nread == bytes);
-        int i;
-        for ( i = 0 ; i < npages ; ++i ) {
-            struct corefile_pte pte;
-            memcpy(&pte, data+i*sizeof (struct corefile_pte), sizeof pte);
-            set_page_bytes_used(page+i, pte.bytes_used);
-            // Low 2 bits of the corefile_pte hold the 'allocated' flag.
-            // The other bits become the scan_start_offset
-            set_page_scan_start_offset(page+i, pte.sso & ~0x03);
-            page_table[page+i].allocated = pte.sso & 0x03;
+    if (n_ptes == 0) {
+
+        /* This happens exactly once, in self-build.
+         * A trivial table (all pages 100% full except possibly the last)
+         * is fine to start with. Ideally genesis would write this data.
+         * The performance impact from assuming that all pages have a scan_start
+         * of page_address(0) is negligible. (On average, we examine 4x more
+         * objects than would be examined if the bound were tighter) */
+        char *alloc_ptr = (char *)get_alloc_pointer();
+        page_index_t page, max = find_page_index(alloc_ptr-1);
+        for (page = 0; page <= max; ++page) {
+            // Don't know how much is actually allocated, so say it's all used.
+            set_page_bytes_used(page, GENCGC_CARD_BYTES);
+            // Don't know the allocation type. Use the "anything" value.
+            // With segregated code, the conservative value is CODE,
+            // as it implies a mixture of boxed + unboxed data.
+#if SEGREGATED_CODE
+            page_table[page].allocated = CODE_PAGE_FLAG;
+#else
+            page_table[page].allocated = BOXED_PAGE_FLAG;
+#endif
+            set_page_scan_start_offset(page, page_address(page)-page_address(0));
         }
-        page += npages;
+        // Now correct the usage for the last page
+        uword_t calculated = npage_bytes(max+1);
+        uword_t actual = alloc_ptr - page_address(0);
+        page_bytes_t excess = calculated - actual;
+        set_page_bytes_used(max, GENCGC_CARD_BYTES - excess);
+
+    } else {
+
+        if (lseek(fd, offset, SEEK_SET) != offset) lose("failed seek");
+        char data[8192];
+        // Process an integral number of ptes on each read.
+        page_index_t max_pages_per_read = sizeof data / sizeof (struct corefile_pte);
+        page_index_t page = 0;
+        while (page < n_ptes) {
+            page_index_t pages_remaining = n_ptes - page;
+            page_index_t npages =
+                pages_remaining < max_pages_per_read ? pages_remaining : max_pages_per_read;
+            ssize_t bytes = npages * sizeof (struct corefile_pte);
+            if (read(fd, data, bytes) != bytes) lose("failed read");
+            int i;
+            for ( i = 0 ; i < npages ; ++i ) {
+                struct corefile_pte pte;
+                memcpy(&pte, data+i*sizeof (struct corefile_pte), sizeof pte);
+                set_page_bytes_used(page+i, pte.bytes_used);
+                // Low 2 bits of the corefile_pte hold the 'allocated' flag.
+                // The other bits become the scan_start_offset
+                set_page_scan_start_offset(page+i, pte.sso & ~0x03);
+                page_table[page+i].allocated = pte.sso & 0x03;
+            }
+            page += npages;
+        }
+
     }
+    gencgc_pickup_dynamic();
+    if (n_ptes) gc_assert(n_ptes == last_free_page);
 }
 
 /* Prepare the array of corefile_ptes for save */

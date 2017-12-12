@@ -357,21 +357,6 @@ gc_init(void)
 {
     scavtab[WEAK_POINTER_WIDETAG] = scav_weak_pointer;
 }
-
-void
-gc_initialize_pointers(void)
-{
-    /* FIXME: We do nothing here.  We (briefly) misguidedly attempted
-       to set current_dynamic_space to DYNAMIC_0_SPACE_START here,
-       forgetting that (a) actually it could be the other and (b) it's
-       set in coreparse.c anyway.  There's a FIXME note left here to
-       note that current_dynamic_space is a violation of OAOO: we can
-       tell which dynamic space we're currently in by looking at
-       dynamic_space_free_pointer.  -- CSR, 2002-08-09 */
-}
-
-
-
 
 /* noise to manipulate the gc trigger stuff */
 
