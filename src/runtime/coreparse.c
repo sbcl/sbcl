@@ -46,7 +46,6 @@
 
 #include "validate.h"
 #include "gc-internal.h"
-#include "runtime-options.h"
 #include "pseudo-atomic.h"
 
 #include <errno.h>
@@ -80,45 +79,6 @@ open_binary(char *filename, int mode)
     return open(filename, mode);
 }
 
-
-static struct runtime_options *
-read_runtime_options(int fd)
-{
-    os_vm_size_t optarray[RUNTIME_OPTIONS_WORDS];
-    struct runtime_options *options = NULL;
-
-    if (read(fd, optarray, RUNTIME_OPTIONS_WORDS * sizeof(os_vm_size_t)) !=
-        RUNTIME_OPTIONS_WORDS * sizeof(size_t)) {
-        return NULL;
-    }
-
-    if ((RUNTIME_OPTIONS_MAGIC != optarray[0]) || (0 == optarray[1])) {
-        return NULL;
-    }
-
-    options = successful_malloc(sizeof(struct runtime_options));
-
-    options->dynamic_space_size = optarray[2];
-    options->thread_control_stack_size = optarray[3];
-
-    return options;
-}
-
-void
-maybe_initialize_runtime_options(int fd)
-{
-    struct runtime_options *new_runtime_options;
-    off_t end_offset = sizeof(lispobj) +
-        sizeof(os_vm_offset_t) +
-        (RUNTIME_OPTIONS_WORDS * sizeof(size_t));
-
-    lseek(fd, -end_offset, SEEK_END);
-
-    if ((new_runtime_options = read_runtime_options(fd))) {
-        runtime_options = new_runtime_options;
-    }
-}
-
 #if defined(LISP_FEATURE_LINUX) && defined(LISP_FEATURE_IMMOBILE_CODE)
 #define ELFCORE 1
 extern __attribute__((weak)) lispobj __lisp_code_start, __lisp_code_end;
@@ -136,77 +96,59 @@ extern __attribute__((weak)) lispobj __lisp_code_start, __lisp_code_end;
  * If an embedded core is present, this returns the offset into the
  * file to load the core from, or -1 if no core is present. */
 os_vm_offset_t
-search_for_embedded_core(char *filename)
+search_for_embedded_core(char *filename, struct memsize_options *memsize_options)
 {
-    extern size_t search_for_elf_core(int, os_vm_offset_t*);
-    lispobj header;
+    extern os_vm_offset_t search_for_elf_core(int,int);
+    lispobj header = 0;
     os_vm_offset_t lispobj_size = sizeof(lispobj);
-    os_vm_offset_t trailer_size = lispobj_size + sizeof(os_vm_offset_t);
-    os_vm_offset_t core_start;
-    int fd = -1;
+    int fd;
 
     if ((fd = open_binary(filename, O_RDONLY)) < 0)
-        goto lose;
+        return -1;
 
-    if (read(fd, &header, (size_t)lispobj_size) < lispobj_size)
-        goto lose;
-    if (header == CORE_MAGIC) {
+    if (read(fd, &header, lispobj_size) == lispobj_size && header == CORE_MAGIC) {
         /* This file is a real core, not an embedded core.  Return 0 to
          * indicate where the core starts, and do not look for runtime
          * options in this case. */
+        close(fd);
         return 0;
     }
 
-    if (lseek(fd, -lispobj_size, SEEK_END) < 0)
-        goto lose;
-    if (read(fd, &header, (size_t)lispobj_size) < lispobj_size)
+    if (lseek(fd, -lispobj_size, SEEK_END) < 0 ||
+        read(fd, &header, (size_t)lispobj_size) != lispobj_size)
         goto lose;
 
+    os_vm_offset_t core_start = -1; // invalid value
     if (header == CORE_MAGIC) {
-        if (lseek(fd, -trailer_size, SEEK_END) < 0)
+        // the last word in the file could be CORE_MAGIC by pure coincidence
+        if (lseek(fd, -(lispobj_size + sizeof(os_vm_offset_t)), SEEK_END) < 0 ||
+            read(fd, &core_start, sizeof(os_vm_offset_t)) != sizeof(os_vm_offset_t))
             goto lose;
-        if (read(fd, &core_start, sizeof(os_vm_offset_t)) < 0)
-            goto lose;
-
-        if (lseek(fd, core_start, SEEK_SET) < 0)
-            goto lose;
-
-        if (read(fd, &header, (size_t)lispobj_size) < lispobj_size)
-            goto lose;
-
-        if (header != CORE_MAGIC)
-            goto lose;
-
-        maybe_initialize_runtime_options(fd);
-
-        close(fd);
-        return core_start;
+        if (lseek(fd, core_start, SEEK_SET) != core_start ||
+            read(fd, &header, lispobj_size) != lispobj_size || header != CORE_MAGIC)
+            core_start = -1; // reset to invalid
     }
-
-lose:
-    ;
 #if ELFCORE
-    size_t core_size = search_for_elf_core(fd, &core_start);
-    if (core_size) {
-        int announce = !lisp_startup_options.noinform;
-        if (announce)
-            fprintf(stderr, "Lisp core in ELF section: %lx:%lx\n", core_start, core_start + core_size);
-        // FIXME: saving options at the end of the core is terrible.
-        // They should be in an optional core entry.
-        off_t options_offset = core_start + core_size
-            - (2+RUNTIME_OPTIONS_WORDS) * sizeof (lispobj);
-        struct runtime_options *new_runtime_options;
-        lseek(fd, options_offset, SEEK_SET);
-        if ((new_runtime_options = read_runtime_options(fd))) {
-          runtime_options = new_runtime_options;
-        }
-        return core_start;
+    if (core_start < 0) {
+        if (!(core_start = search_for_elf_core(fd, !lisp_startup_options.noinform)) ||
+            lseek(fd, core_start, SEEK_SET) != core_start ||
+            read(fd, &header, lispobj_size) != lispobj_size || header != CORE_MAGIC)
+            core_start = -1; // reset to invalid
     }
 #endif
-    if (fd != -1)
-        close(fd);
-
-    return -1;
+    if (core_start > 0 && memsize_options) {
+        core_entry_elt_t optarray[RUNTIME_OPTIONS_WORDS];
+        // file is already positioned to the first core header entry
+        if (read(fd, optarray, sizeof optarray) == sizeof optarray
+            && optarray[0] == RUNTIME_OPTIONS_MAGIC) {
+            memsize_options->dynamic_space_size = optarray[2];
+            memsize_options->thread_control_stack_size = optarray[3];
+            memsize_options->present_in_core = 1;
+        }
+    }
+lose:
+    close(fd);
+    return core_start;
 }
 
 #ifndef LISP_FEATURE_HPUX
@@ -1003,6 +945,7 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
             gc_load_corefile_ptes(ptr[0], ptr[1],
                                   file_offset + (ptr[2] + 1) * os_vm_page_size, fd);
             break;
+        case RUNTIME_OPTIONS_MAGIC: break; // already processed
         default:
             lose("unknown core file entry: 0x%"WORD_FMTX"\n", val);
         }

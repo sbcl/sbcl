@@ -50,26 +50,21 @@
 
 #define GENERAL_WRITE_FAILURE_MSG "error writing to core file"
 
-/* write_runtime_options uses a simple serialization scheme that
- * consists of one word of magic, one word indicating whether options
- * are actually saved, and one word per struct field. */
+/* write_memsize_options uses a simple serialization scheme that
+ * consists of one word of magic, one word indicating the size of the
+ * core entry, and one word per struct field. */
 static void
-write_runtime_options(FILE *file, struct runtime_options *options)
+write_memsize_options(FILE *file)
 {
-    size_t optarray[RUNTIME_OPTIONS_WORDS];
-
-    memset(&optarray, 0, sizeof(optarray));
-    optarray[0] = RUNTIME_OPTIONS_MAGIC;
-
-    if (options != NULL) {
-        /* optarray[1] is a flag indicating that options are present */
-        optarray[1] = 1;
-        optarray[2] = options->dynamic_space_size;
-        optarray[3] = options->thread_control_stack_size;
-    }
+    core_entry_elt_t optarray[RUNTIME_OPTIONS_WORDS] = {
+      RUNTIME_OPTIONS_MAGIC,
+      4, // number of words in this core header entry
+      dynamic_space_size,
+      thread_control_stack_size
+    };
 
     if (RUNTIME_OPTIONS_WORDS !=
-        fwrite(optarray, sizeof(size_t), RUNTIME_OPTIONS_WORDS, file)) {
+        fwrite(optarray, sizeof(core_entry_elt_t), RUNTIME_OPTIONS_WORDS, file)) {
         perror("Error writing runtime options to file");
     }
 }
@@ -271,6 +266,13 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     os_vm_offset_t core_start_pos = ftell(file);
     write_lispobj(CORE_MAGIC, file);
 
+    /* If 'save_runtime_options' is specified then the saved thread stack size
+     * and dynamic space size are used in the restarted image and
+     * all command-line arguments are available to Lisp in SB-EXT:*POSIX-ARGV*.
+     * Otherwise command-line processing is performed as normal */
+    if (save_runtime_options)
+        write_memsize_options(file);
+
     int stringlen = strlen((const char *)build_id);
     int string_words = ALIGN_UP(stringlen, sizeof (core_entry_elt_t))
         / sizeof (core_entry_elt_t);
@@ -358,14 +360,6 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
      * prepended to it. */
     fseek(file, 0, SEEK_END);
 
-    /* If NULL runtime options are passed to write_runtime_options,
-     * command-line processing is performed as normal in the SBCL
-     * executable. Otherwise, the saved runtime options are used and
-     * all command-line arguments are available to Lisp in
-     * SB-EXT:*POSIX-ARGV*. */
-    write_runtime_options(file,
-                          (save_runtime_options ? runtime_options : NULL));
-
     if (1 != fwrite(&core_start_pos, sizeof(os_vm_offset_t), 1, file)) {
         perror("Error writing core starting position to file");
         fclose(file);
@@ -414,7 +408,7 @@ load_runtime(char *runtime_path, size_t *size_out)
     size_t size, count;
     os_vm_offset_t core_offset;
 
-    core_offset = search_for_embedded_core (runtime_path);
+    core_offset = search_for_embedded_core (runtime_path, 0);
     if ((input = fopen(runtime_path, "rb")) == NULL) {
         fprintf(stderr, "Unable to open runtime: %s\n", runtime_path);
         goto lose;
@@ -507,6 +501,7 @@ prepare_to_save(char *filename, boolean prepend_runtime, void **runtime_bytes,
 {
     FILE *file;
     char *runtime_path;
+    extern char *saved_runtime_path; // path computed from argv[0]
 
     if (prepend_runtime) {
         runtime_path = os_get_runtime_executable_path(0);

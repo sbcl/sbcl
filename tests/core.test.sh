@@ -120,12 +120,40 @@ chmod u+x "$tmpcore"
     (exit :code 42))
 EOF
 status=$?
+rm "$tmpcore"
 if [ $status != 42 ]; then
     echo "saving runtime options from executable failed"
     exit 1
 fi
 
-rm "$tmpcore"
+# executable core used as "--core" option should not save the memory sizes
+# that were originally saved, but the sizes in the process doing the save.
+run_sbcl_with_args --control-stack-size 160KB --dynamic-space-size 200MB --no-userinit --noprint <<EOF
+  (save-lisp-and-die "$tmpcore" :executable t :save-runtime-options t)
+EOF
+chmod u+x "$tmpcore"
+./"$tmpcore" --no-userinit <<EOF
+  (assert (eql (extern-alien "thread_control_stack_size" unsigned) (* 160 1024)))
+  (assert (eql (dynamic-space-size) (* 200 1048576)))
+EOF
+run_sbcl_with_core "$tmpcore" --control-stack-size 200KB --dynamic-space-size 250MB <<EOF
+  (assert (eql (extern-alien "thread_control_stack_size" unsigned) (* 200 1024)))
+  (assert (eql (dynamic-space-size) (* 250 1048576)))
+  (save-lisp-and-die "${tmpcore}2" :executable t :save-runtime-options t)
+EOF
+chmod u+x "${tmpcore}2"
+./"${tmpcore}2" --no-userinit <<EOF
+  (when (and (eql (extern-alien "thread_control_stack_size" unsigned) (* 200 1024))
+             (eql (dynamic-space-size) (* 250 1048576)))
+    (exit :code 42))
+EOF
+status=$?
+rm "$tmpcore" "${tmpcore}2"
+if [ $status != 42 ]; then
+    echo "re-saved executable used wrong memory size options"
+    exit 1
+fi
+
 run_sbcl <<EOF
   (save-lisp-and-die "$tmpcore" :toplevel (lambda () 42)
                       :compression (and (member :sb-core-compression *features*) t))

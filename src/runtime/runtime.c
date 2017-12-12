@@ -364,8 +364,6 @@ parse_size_arg(char *arg, char *arg_name)
 char **posix_argv;
 char *core_string;
 
-struct runtime_options *runtime_options;
-
 char *saved_runtime_path = NULL;
 #if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD)
 void pthreads_win32_init();
@@ -459,6 +457,7 @@ main(int argc, char *argv[], char *envp[])
 
     lispobj initial_function;
     int merge_core_pages = -1;
+    struct memsize_options memsize_options = {0, 0, 0};
 
 #if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD)
     os_preinit();
@@ -467,8 +466,6 @@ main(int argc, char *argv[], char *envp[])
 
     interrupt_init();
     block_blockable_signals(0);
-
-    runtime_options = NULL;
 
     /* Save the argv[0] derived runtime path in case
      * os_get_runtime_executable_path(1) isn't able to get an
@@ -481,7 +478,8 @@ main(int argc, char *argv[], char *envp[])
     runtime_path = os_get_runtime_executable_path(0);
     if (runtime_path || saved_runtime_path) {
         os_vm_offset_t offset = search_for_embedded_core(
-            runtime_path ? runtime_path : saved_runtime_path);
+            runtime_path ? runtime_path : saved_runtime_path,
+            &memsize_options);
         if (offset != -1) {
             embedded_core_offset = offset;
             core = (runtime_path ? runtime_path :
@@ -495,14 +493,12 @@ main(int argc, char *argv[], char *envp[])
 
     /* Parse our part of the command line (aka "runtime options"),
      * stripping out those options that we handle. */
-    if (runtime_options != NULL) {
-        dynamic_space_size = runtime_options->dynamic_space_size;
-        thread_control_stack_size = runtime_options->thread_control_stack_size;
+    if (memsize_options.present_in_core) {
+        dynamic_space_size = memsize_options.dynamic_space_size;
+        thread_control_stack_size = memsize_options.thread_control_stack_size;
         sbcl_argv = argv;
     } else {
         int argi = 1;
-
-        runtime_options = successful_malloc(sizeof(struct runtime_options));
 
         while (argi < argc) {
             char *arg = argv[argi];
@@ -632,10 +628,6 @@ main(int argc, char *argv[], char *envp[])
 #endif
     thread_control_stack_size &= ~(sword_t)(CONTROL_STACK_ALIGNMENT_BYTES-1);
 
-    /* Preserve the runtime options for possible future core saving */
-    runtime_options->dynamic_space_size = dynamic_space_size;
-    runtime_options->thread_control_stack_size = thread_control_stack_size;
-
     /* KLUDGE: os_vm_page_size is set by os_init(), and on some
      * systems (e.g. Alpha) arch_init() needs need os_vm_page_size, so
      * it must follow os_init(). -- WHN 2000-01-26 */
@@ -698,7 +690,7 @@ main(int argc, char *argv[], char *envp[])
          * before we reach this block, so that there is no observable
          * difference between "embedded" and "bare" images given to
          * --core. */
-        os_vm_offset_t offset = search_for_embedded_core(core);
+        os_vm_offset_t offset = search_for_embedded_core(core, 0);
         if (offset != -1)
             embedded_core_offset = offset;
     }

@@ -30,8 +30,19 @@ struct ndir_entry {
 };
 #define NDIR_ENTRY_LENGTH (sizeof (struct ndir_entry)/sizeof (core_entry_elt_t))
 
+#define RUNTIME_OPTIONS_MAGIC 0x31EBF355
+/* 1 for magic, 1 for core entry size in words, 2 for struct runtime_options fields */
+#define RUNTIME_OPTIONS_WORDS (1 + 1 + 2)
+
+struct memsize_options {
+    os_vm_size_t dynamic_space_size;
+    os_vm_size_t thread_control_stack_size;
+    int present_in_core;
+};
+
 extern lispobj load_core_file(char *file, os_vm_offset_t offset, int merge_core_pages);
-extern os_vm_offset_t search_for_embedded_core(char *file);
+extern os_vm_offset_t search_for_embedded_core(char *file,
+                                               struct memsize_options *memsize_options);
 
 /* arbitrary string identifying this build, embedded in .core files to
  * prevent people mismatching a runtime built e.g. with :SB-SHOW

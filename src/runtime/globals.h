@@ -16,7 +16,7 @@
 # include <sys/types.h>
 # include <unistd.h>
 # include "runtime.h"
-# include "runtime-options.h"
+# include "os.h"
 #endif
 
 #include "sbcl.h"
@@ -34,8 +34,6 @@ extern int foreign_function_call_active;
 
 extern os_vm_size_t dynamic_space_size;
 extern os_vm_size_t thread_control_stack_size;
-
-extern struct runtime_options *runtime_options;
 
 #ifdef LISP_FEATURE_WIN32
 #define ENVIRON _environ
