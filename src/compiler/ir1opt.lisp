@@ -2191,7 +2191,8 @@
                                      (specifier-type 'hash-table))))
                         (typep value '(vector * 0)))
               (warn 'constant-modified
-                    :fun-name (shiftf (modifying-cast-caller cast) nil)) ;; warn once
+                    :fun-name (shiftf (modifying-cast-caller cast) nil) ;; warn once
+                    :value value)
               t))))))
 
 (defun may-delete-cast (cast)

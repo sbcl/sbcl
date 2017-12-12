@@ -837,11 +837,13 @@
   (:report report-duplicate-definition))
 
 (define-condition constant-modified (reference-condition warning)
-  ((fun-name :initarg :fun-name :reader constant-modified-fun-name))
+  ((fun-name :initarg :fun-name :reader constant-modified-fun-name)
+   (value :initarg :value :reader constant-modified-value))
   (:report (lambda (c s)
              (format s "~@<Destructive function ~S called on ~
-                        constant data.~@:>"
-                     (constant-modified-fun-name c))))
+                        constant data: ~s.~@:>"
+                     (constant-modified-fun-name c)
+                     (constant-modified-value c))))
   (:default-initargs :references '((:ansi-cl :special-operator quote)
                                    (:ansi-cl :section (3 2 2 3)))))
 
