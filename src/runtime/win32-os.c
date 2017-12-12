@@ -1856,9 +1856,7 @@ win32_maybe_interrupt_io(void* thread)
                 goto unlock;
             }
             if (ptr_CancelSynchronousIo) {
-                pthread_mutex_lock(&th->os_thread->fiber_lock);
-                done = !!ptr_CancelSynchronousIo(th->os_thread->fiber_group->handle);
-                pthread_mutex_unlock(&th->os_thread->fiber_lock);
+                done = !!ptr_CancelSynchronousIo(th->os_thread->handle);
             }
             done |= !!ptr_CancelIoEx(h,NULL);
         }

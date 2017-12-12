@@ -97,24 +97,6 @@ int pthread_key_create(pthread_key_t *key, void (*destructor)(void*));
 int _sbcl_pthread_sigmask(int how, const sigset_t *set, sigset_t *oldset);
 #endif
 
-/* 1a - Thread non-portable */
-
-void pthread_np_suspend(pthread_t thread);
-void pthread_np_suspend_with_signal(pthread_t thread, int signum);
-
-/* Momentary suspend/getcontext/resume without locking or preventing
-   fiber reentrance.  This call is for asymmetric synchronization,
-   ensuring that the thread sees global state before doing any
-   globally visible stores.
-*/
-void pthread_np_serialize(pthread_t thread);
-
-void pthread_np_resume(pthread_t thread);
-void pthread_np_request_interruption(pthread_t thread);
-CONTEXT* pthread_np_publish_context(CONTEXT* maybe_save_old_one);
-void pthread_np_unpublish_context();
-void pthread_np_get_my_context_subset(CONTEXT* ctx);
-
 /* 2 - Mutex */
 
 typedef struct _pthread_mutex_info {
@@ -219,67 +201,16 @@ typedef struct pthread_thread {
   int detached;
   pthread_thread_state state;
 
-  /* Boolean flag: thread will produce fibers instead of threads with
-     pthread_create */
-  int fiber_factory;
-
-  /* NULL if current thread has no fibers and is not a fiber; LPVOID
-     returned by CreateFiber or ConvertThreadToFiber otherwise */
-  void* fiber;
-
-  /* True if pthreads_win32 created fiber, false if it was already
-     present and just captured. We should delete our fiber when not
-     needed, but external fibers should be left intact. */
-  int own_fiber;
-
-  /* True if thread was created as fiber */
-  int created_as_fiber;
-
   /* For noticed foreign threads, wait_handle contains a result of
      RegisterWaitForSingleObject. */
   HANDLE wait_handle;
 
-  /* FCAT group of a fiber. */
-  pthread_t fiber_group;
-
-  /* Mutex preventing double-entering a fiber */
-  pthread_mutex_t fiber_lock;
-
-  /* When fiber switches to another fiber (dying or not) it makes
-     another's fiber_prev point to it. If it's dead, the fiber entered
-     should clean up. */
-  pthread_t fiber_prev;
-
-  /* For non-running fiber, this field provides context of its
-     last-known running state: not for jumps et al., but for
-     conservative stack GCing.
-
-     With pthread_np_publish_context and pthread_np_unpublish_context
-     application may manage its thread context cooperatively, not
-     requiring real SuspendThread and ResumeThread for threads that
-     don't do anything interesting (as defined by application).
-
-     Esp field of fiber_context is used as a validity flag (must not
-     be NULL). */
-  CONTEXT fiber_context;
-
   /* Thread TEB base (mostly informative/debugging) */
   void* teb;
-
-  /* For fiber-callouts (call-in-fiber) support.  When switched into,
-     any fiber should execute fiber_callback and switch back to
-     fiber_prev. */
-  void (*fiber_callback)(void* context);
-  void *fiber_callback_context;
 
   /* Pthread TLS, detached from windows system TLS */
   void *specifics[PTHREAD_KEYS_MAX];
 } pthread_thread;
-
-#define PTHREAD_ONCE_INIT 0
-
-typedef int pthread_once_t;
-int pthread_once(pthread_once_t *once_control, void (*init_routine)(void));
 
 static inline int pthread_setspecific(pthread_key_t key, const void *value)
 {
@@ -311,21 +242,6 @@ void pthread_np_remove_pending_signal(pthread_t thread, int signum);
 sigset_t pthread_np_other_thread_sigpending(pthread_t thread);
 
 int pthread_np_notice_thread();
-int pthread_np_get_thread_context(pthread_t thread, CONTEXT* context);
-int pthread_np_convert_self_to_fiber();
-int pthread_np_switch_to_fiber(pthread_t fiber);
-int pthread_np_run_in_fiber(pthread_t pth, void (*callback)(void*),
-                            void* context);
-int pthread_np_set_fiber_factory_mode(int on);
-int pthread_np_fiber_save_tls(int slot, int enable);
-HANDLE pthread_np_get_handle(pthread_t pth);
-void* pthread_np_get_lowlevel_fiber(pthread_t pth);
-int pthread_np_delete_lowlevel_fiber(void* ll_fiber);
-int pthread_np_ack_pending_signals(void* ucontext_arg);
-
-/* Fiber context hooks */
-extern void (*pthread_save_context_hook)();
-extern void (*pthread_restore_context_hook)();
 
 int sigemptyset(sigset_t *set);
 int sigfillset(sigset_t *set);
