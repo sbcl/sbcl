@@ -282,7 +282,8 @@
   ;; by default, then the warning already happened above at DEFINE-ALIEN-ROUTINE
   ;; because when that got compiled, it warned, which inhibited further
   ;; warnings for the same foreign symbol.
-  (checked-compile '(lambda () (multiple-value-list (bug-316075)))))
+  (checked-compile '(lambda () (multiple-value-list (bug-316075)))
+                   :allow-style-warnings t))
 
 ;;; Bug #316325: "return values of alien calls assumed truncated to
 ;;; correct width on x86"

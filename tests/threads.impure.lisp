@@ -212,7 +212,7 @@
 (defun fact (n)
   "A function that does work with the CPU."
   (if (zerop n) 1 (* n (fact (1- n)))))
-
+(compile 'fact)
 (with-test (:name :lurking-threads)
   (let ((work (lambda () (fact 15000))))
     (let ((zero (scaling-test work 0))
@@ -751,6 +751,8 @@
 (defun waste (&optional (n 100000))
   (loop repeat n do (make-string 16384)))
 
+(compile 'waste)
+
 (with-test (:name (:one-thread-runs-gc-while-other-conses)
                   :broken-on :win32)
   (loop for i below 100 do
@@ -909,12 +911,18 @@
            (sleep 4))
       (mapc #'sb-thread:terminate-thread threads))))
 
+;; No interpreter stub
+(defun symbol-tls-index (symbol)
+  (sb-kernel:symbol-tls-index symbol))
+(compile 'symbol-tls-index)
+
 (with-test (:name :test-%thread-local-references)
+
   (let ((mysym (gensym))
         (fool1 (cons 1 2))
         (fool2 (cons 2 3)))
     (progv (list mysym) '(nil)
-      (let* ((i (sb-kernel:get-lisp-obj-address (sb-kernel:symbol-tls-index mysym)))
+      (let* ((i (sb-kernel:get-lisp-obj-address (symbol-tls-index mysym)))
              (j (+ i sb-vm:n-word-bytes)))
         (assert (eql (sap-ref-word (sb-thread::current-thread-sap) j)
                      sb-vm:no-tls-value-marker-widetag))
