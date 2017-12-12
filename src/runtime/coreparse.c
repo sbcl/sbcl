@@ -898,6 +898,13 @@ process_directory(int count, struct ndir_entry *entry,
 #endif
 }
 
+#ifdef LISP_FEATURE_GENCGC
+extern void gc_load_corefile_ptes(core_entry_elt_t, core_entry_elt_t,
+                                  off_t offset, int fd);
+#else
+#define gc_load_corefile_ptes(dummy1,dummy2,dummy3,dummy4)
+#endif
+
 /* 'merge_core_pages': Tri-state flag to determine whether we attempt to mark
  * pages as targets for virtual memory deduplication via MADV_MERGEABLE.
  * 1: Yes
@@ -992,34 +999,10 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
             initial_function = adjust_word(&adj, (lispobj)*ptr);
             break;
 
-#ifdef LISP_FEATURE_GENCGC
         case PAGE_TABLE_CORE_ENTRY_TYPE_CODE:
-        {
-            extern void gc_allocate_ptes();
-            extern boolean gc_load_corefile_ptes(char data[], ssize_t,
-                                                 page_index_t, page_index_t*);
-            // Allocation of PTEs is delayed 'til now so that calloc() doesn't
-            // consume addresses that would have been taken by a mapped space.
-            gc_allocate_ptes();
-            core_entry_elt_t n_ptes = ptr[0];
-            os_vm_size_t remaining = ptr[1];
-            gc_assert(remaining >= sizeof (struct corefile_pte) * n_ptes);
-            os_vm_size_t fdoffset = (ptr[2] + 1) * os_vm_page_size;
-            page_index_t page = 0;
-            ssize_t bytes_read;
-            char data[8192];
-            // A corefile_pte is 10 bytes for x86-64
-            // Process an integral number of ptes on each read.
-            os_vm_size_t chunksize = sizeof (struct corefile_pte)
-                * (sizeof data / sizeof (struct corefile_pte));
-            lseek(fd, fdoffset + file_offset, SEEK_SET);
-            while ((bytes_read = read(fd, data,
-                                      remaining < chunksize ? remaining : chunksize)) > 0
-                   && gc_load_corefile_ptes(data, bytes_read, n_ptes, &page))
-                remaining -= bytes_read;
+            gc_load_corefile_ptes(ptr[0], ptr[1],
+                                  file_offset + (ptr[2] + 1) * os_vm_page_size, fd);
             break;
-        }
-#endif
         default:
             lose("unknown core file entry: 0x%"WORD_FMTX"\n", val);
         }

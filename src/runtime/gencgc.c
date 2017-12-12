@@ -4514,28 +4514,42 @@ gc_and_save(char *filename, boolean prepend_runtime,
     lose("Attempt to save core after non-conservative GC failed.\n");
 }
 
-/* Convert corefile ptes to corresponding 'struct page' */
-boolean gc_load_corefile_ptes(char data[], ssize_t bytes_read,
-                              page_index_t n_ptes, page_index_t* ppage)
+/* Read corefile ptes from 'fd' which has already been positioned
+ * and store into the page table */
+void gc_load_corefile_ptes(core_entry_elt_t n_ptes, core_entry_elt_t total_bytes,
+                           off_t offset, int fd)
 {
-    page_index_t page = *ppage;
-    int i = 0;
-    struct corefile_pte pte;
+    core_entry_elt_t expected_size
+        = ALIGN_UP(n_ptes * sizeof (struct corefile_pte), N_WORD_BYTES);
+    gc_assert(total_bytes == expected_size);
+    gc_assert(lseek(fd, offset, SEEK_SET) == offset);
 
-    while (bytes_read) {
-        bytes_read -= sizeof(struct corefile_pte);
-        memcpy(&pte, data+i*sizeof (struct corefile_pte), sizeof pte);
-        set_page_bytes_used(page, pte.bytes_used);
-        // Low 2 bits of the corefile_pte hold the 'allocated' flag.
-        // The other bits become the scan_start_offset
-        set_page_scan_start_offset(page, pte.sso & ~0x03);
-        page_table[page].allocated = pte.sso & 0x03;
-        if (++page == n_ptes)
-            return 0; // No more to go
-        ++i;
+    // Allocation of PTEs is delayed 'til now so that calloc() doesn't
+    // consume addresses that would have been taken by a mapped space.
+    gc_allocate_ptes();
+
+    char data[8192];
+    // Process an integral number of ptes on each read.
+    page_index_t max_pages_per_read = sizeof data / sizeof (struct corefile_pte);
+    page_index_t page = 0;
+    while (page < n_ptes) {
+        page_index_t pages_remaining = n_ptes - page;
+        page_index_t npages =
+            pages_remaining < max_pages_per_read ? pages_remaining : max_pages_per_read;
+        ssize_t bytes = npages * sizeof (struct corefile_pte);
+        gc_assert(read(fd, data, bytes) == bytes);
+        int i;
+        for ( i = 0 ; i < npages ; ++i ) {
+            struct corefile_pte pte;
+            memcpy(&pte, data+i*sizeof (struct corefile_pte), sizeof pte);
+            set_page_bytes_used(page+i, pte.bytes_used);
+            // Low 2 bits of the corefile_pte hold the 'allocated' flag.
+            // The other bits become the scan_start_offset
+            set_page_scan_start_offset(page+i, pte.sso & ~0x03);
+            page_table[page+i].allocated = pte.sso & 0x03;
+        }
+        page += npages;
     }
-    *ppage = page;
-    return 1; // More to go
 }
 
 /* Prepare the array of corefile_ptes for save */
