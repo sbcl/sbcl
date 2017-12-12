@@ -25,9 +25,18 @@
 (defvar *thunk*
   (sb-alien::alien-callback (function c-string) #'thunk))
 
-(assert (equal (with-output-to-string (*standard-output*)
-                 (alien-funcall *thunk*))
-               "hi"))
+(with-test (:name (:callback :c-string)
+            ;; The whole file is broken, report one test
+            ;; and skip the rest.
+            :broken-on :interpreter)
+  (assert (equal (with-output-to-string (*standard-output*)
+                   (alien-funcall *thunk*))
+                 "hi")))
+
+;; WITH-ALIEN is broken when interpreted, e.g.
+;; (with-alien ((x int 10)) x), see lp#992362, lp#1731556
+(when (eq sb-ext:*evaluator-mode* :interpret)
+  (invoke-restart 'run-tests::skip-file))
 
 ;;; simple callback for a symbol
 
