@@ -53,6 +53,9 @@
 (with-test (:name (:interrupt-thread :deferrables-blocked))
   (sb-thread:interrupt-thread sb-thread:*current-thread*
                               (lambda ()
+                                ;; Make sure sb-ext:gc doesn't leave the
+                                ;; deferrables unblocked
+                                (sb-ext:gc) 
                                 (check-deferrables-blocked-or-lose 0))))
 
 (with-test (:name (:interrupt-thread :deferrables-unblocked))
@@ -84,21 +87,6 @@
                           (lambda ()
                             (with-mutex (m :timeout 0.1)
                               t)))))))
-
-(with-test (:name (:interrupt-thread :deferrables-unblocked-by-lock)
-            :broken-on :win32)
-  (let ((lock (sb-thread::make-mutex))
-        (thread (make-join-thread (lambda ()
-                                    (loop (sleep 1))))))
-    (sb-thread::grab-mutex lock)
-    (sb-thread:interrupt-thread thread
-                                (lambda ()
-                                  (check-deferrables-blocked-or-lose 0)
-                                  (sb-thread::grab-mutex lock)
-                                  (check-deferrables-unblocked-or-lose 0)
-                                  (sb-thread:abort-thread)))
-    (sleep 3)
-    (sb-thread::release-mutex lock)))
 
 ;;; compare-and-swap
 

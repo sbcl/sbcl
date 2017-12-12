@@ -125,21 +125,15 @@ WITHOUT-INTERRUPTS in:
                      `(let ((*allow-with-interrupts*
                              ,',outer-allow-with-interrupts))
                         ,@allow-forms))
-                   (with-local-interrupts
-                     (&body with-forms)
-                     `(let ((*allow-with-interrupts*
-                             ,',outer-allow-with-interrupts)
-                            (*interrupts-enabled*
-                             ,',outer-allow-with-interrupts))
-                        (when ,',outer-allow-with-interrupts
-                          (when *unblock-deferrables-on-enabling-interrupts-p*
-                            (setq *unblock-deferrables-on-enabling-interrupts-p*
-                                  nil)
-                            (sb!unix::unblock-deferrable-signals))
-                          (when (or *interrupt-pending*
-                                    #!+sb-thruption *thruption-pending*)
-                            (receive-pending-interrupt)))
-                        (locally ,@with-forms))))
+                   (with-local-interrupts (&body body)
+                     `(dx-flet ((body () ,@body))
+                        (let ((*allow-with-interrupts*
+                                ,',outer-allow-with-interrupts)
+                              (*interrupts-enabled*
+                                ,',outer-allow-with-interrupts))
+                          (with-deferrable-signals-unblocked
+                            ,',outer-allow-with-interrupts
+                            #'body)))))
                 (let ((*interrupts-enabled* nil)
                       (,outer-allow-with-interrupts *allow-with-interrupts*)
                       (*allow-with-interrupts* nil))
@@ -180,14 +174,10 @@ by ALLOW-WITH-INTERRUPTS."
     `(let* ((,allowp *allow-with-interrupts*)
             (,enablep *interrupts-enabled*)
             (*interrupts-enabled* (or ,enablep ,allowp)))
-       (when (and ,allowp (not ,enablep))
-         (when *unblock-deferrables-on-enabling-interrupts-p*
-           (setq *unblock-deferrables-on-enabling-interrupts-p* nil)
-           (sb!unix::unblock-deferrable-signals))
-         (when (or *interrupt-pending*
-                   #!+sb-thruption *thruption-pending*)
-           (receive-pending-interrupt)))
-       (locally ,@body))))
+       (dx-flet ((body () ,@body))
+         (with-deferrable-signals-unblocked
+             (and ,allowp (not ,enablep))
+           #'body)))))
 
 (defmacro allow-with-interrupts (&body body)
   (declare (ignore body))
