@@ -114,11 +114,11 @@ search_for_embedded_core(char *filename, struct memsize_options *memsize_options
         return 0;
     }
 
+    os_vm_offset_t core_start = -1; // invalid value
     if (lseek(fd, -lispobj_size, SEEK_END) < 0 ||
         read(fd, &header, (size_t)lispobj_size) != lispobj_size)
         goto lose;
 
-    os_vm_offset_t core_start = -1; // invalid value
     if (header == CORE_MAGIC) {
         // the last word in the file could be CORE_MAGIC by pure coincidence
         if (lseek(fd, -(lispobj_size + sizeof(os_vm_offset_t)), SEEK_END) < 0 ||

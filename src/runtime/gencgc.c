@@ -4519,9 +4519,8 @@ gc_and_save(char *filename, boolean prepend_runtime,
 void gc_load_corefile_ptes(core_entry_elt_t n_ptes, core_entry_elt_t total_bytes,
                            off_t offset, int fd)
 {
-    core_entry_elt_t expected_size
-        = ALIGN_UP(n_ptes * sizeof (struct corefile_pte), N_WORD_BYTES);
-    gc_assert(total_bytes == expected_size);
+    gc_assert(ALIGN_UP(n_ptes * sizeof (struct corefile_pte), N_WORD_BYTES)
+              == total_bytes);
     gc_assert(lseek(fd, offset, SEEK_SET) == offset);
 
     // Allocation of PTEs is delayed 'til now so that calloc() doesn't
@@ -4536,8 +4535,9 @@ void gc_load_corefile_ptes(core_entry_elt_t n_ptes, core_entry_elt_t total_bytes
         page_index_t pages_remaining = n_ptes - page;
         page_index_t npages =
             pages_remaining < max_pages_per_read ? pages_remaining : max_pages_per_read;
-        ssize_t bytes = npages * sizeof (struct corefile_pte);
-        gc_assert(read(fd, data, bytes) == bytes);
+        size_t bytes = npages * sizeof (struct corefile_pte);
+        size_t nread = read(fd, data, bytes);
+        gc_assert(nread == bytes);
         int i;
         for ( i = 0 ; i < npages ; ++i ) {
             struct corefile_pte pte;
