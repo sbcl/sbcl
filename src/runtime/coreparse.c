@@ -260,6 +260,7 @@ static void inflate_core_bytes(int fd, os_vm_offset_t offset,
 # undef ZLIB_BUFFER_SIZE
 #endif
 
+#define DYNAMIC_SPACE_ADJ_INDEX 0
 struct heap_adjust {
     /* range[0] is dynamic space, ranges[1] and [2] are immobile spaces */
     struct range {
@@ -461,7 +462,8 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
             // Compute the address where the code "was" as the first argument
             // by negating the adjustment for 'where'.
             // Can't call calc_adjustment to get the negative of the adjustment!
-            gencgc_apply_code_fixups((struct code*)((char*)where - adj->range[1].delta),
+            gencgc_apply_code_fixups((struct code*)((char*)where -
+                                                    adj->range[DYNAMIC_SPACE_ADJ_INDEX].delta),
                                      code);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
             // Now that the packed integer comprising the list of fixup locations
