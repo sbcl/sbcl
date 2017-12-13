@@ -431,3 +431,10 @@
                  for (a b) = (multiple-value-list (floor i 5))
                  sum (+ a b))))
     (ctu:assert-no-consing (f 1000))))
+(with-test (:name :destructuring-m-v-list-with-nil)
+  (assert (equal-mod-gensyms
+           (macroexpand-1 '(sb-loop::loop-desetq (x nil z) (multiple-value-list (foo))))
+           '(multiple-value-bind (g1 g2 g3) (foo)
+             (declare (ignore g2))
+             (sb-loop::loop-desetq x g1)
+             (sb-loop::loop-desetq z g3)))))

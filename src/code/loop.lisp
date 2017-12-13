@@ -335,7 +335,12 @@ code to be loaded.
                (return-from loop-desetq-internal
                  (let ((temps (make-gensym-list (length var))))
                    `((multiple-value-bind ,temps ,(cadr val)
-                       ,@(mapcar (lambda (var val) `(loop-desetq ,var ,val))
+                       ,@(when (member nil var)
+                           `((declare (ignore ,@(mapcan (lambda (var val)
+                                                          (unless var (list val)))
+                                                        var temps)))))
+                       ,@(mapcan (lambda (var val)
+                                   (if var (list `(loop-desetq ,var ,val))))
                                  var temps))))))
              ;; returns a list of actions to be performed
              (typecase var
