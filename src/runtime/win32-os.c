@@ -235,14 +235,6 @@ unsigned long block_deferrables_and_return_mask()
     return (unsigned long)sset;
 }
 
-#if defined(LISP_FEATURE_SB_THREAD)
-void apply_sigmask(unsigned long sigmask)
-{
-    sigset_t sset = (sigset_t)sigmask;
-    thread_sigmask(SIG_SETMASK, &sset, 0);
-}
-#endif
-
 /* The exception handling function looks like this: */
 EXCEPTION_DISPOSITION handle_exception(EXCEPTION_RECORD *,
                                        struct lisp_exception_frame *,

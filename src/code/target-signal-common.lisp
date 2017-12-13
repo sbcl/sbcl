@@ -50,24 +50,26 @@
 (defun unblock-deferrable-signals ()
   (%unblock-deferrable-signals 0 0))
 
-(defun with-deferrable-signals-unblocked (unblock function)
-  (if (and unblock
-           *unblock-deferrables-on-enabling-interrupts-p*)
-      (with-alien ((old sigset-t))
-        (unwind-protect
-             (progn
-               (alien-funcall (extern-alien "unblock_deferrable_signals"
-                                            (function (values) int (* sigset-t)))
-                              0 (addr old))
-               (let (*unblock-deferrables-on-enabling-interrupts-p*)
-                 (when (or *interrupt-pending*
-                           #!+sb-thruption *thruption-pending*)
-                   (receive-pending-interrupt))
-                 (funcall function)))
-          (alien-funcall (extern-alien "block_deferrable_signals"
-                                       (function (values) (* sigset-t)))
-                         (addr old))))
-      (funcall function)))
+(defun with-deferrable-signals-unblocked (enable-interrupts function)
+  (cond ((and enable-interrupts
+              *unblock-deferrables-on-enabling-interrupts-p*)
+         (unwind-protect
+              (let (*unblock-deferrables-on-enabling-interrupts-p*)
+                (unblock-deferrable-signals)
+                (when (or *interrupt-pending*
+                          #!+sb-thruption *thruption-pending*)
+                  (receive-pending-interrupt))
+                (funcall function))
+           (alien-funcall (extern-alien "block_deferrable_signals"
+                                        (function (values) int))
+                          0)))
+        (t
+         (when (and enable-interrupts
+                    (or *interrupt-pending*
+                        #!+sb-thruption *thruption-pending*))
+           (receive-pending-interrupt))
+         (funcall function))))
+
 
 (defun invoke-interruption (function)
   (without-interrupts

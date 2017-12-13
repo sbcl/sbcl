@@ -215,5 +215,5 @@
     /* KLUDGE */
     defconstant("fd-setsize", 1024);
     printf("\n");
-    DEFTYPE("sigset-t", int);
+
 }

@@ -270,9 +270,6 @@ main(int argc, char *argv[])
     printf("\n");
 
     printf(";;; signals\n");
-
-    printf("(define-alien-type sigset-t (unsigned %lu))\n", (8LU * sizeof(sigset_t)));
-
     defconstant("sig-dfl", (unsigned long)SIG_DFL);
     defconstant("sig-ign", (unsigned long)SIG_IGN);
 
