@@ -383,7 +383,9 @@ We could try a few things to mitigate this:
 ;;; bytes, including any header and padding. As a special case, if exactly one
 ;;; space named :ALL is requested, then map over the known spaces.
 (defun map-allocated-objects (fun &rest spaces)
-  (declare (type function fun))
+  (declare (type function fun)
+           ;; KLUDGE: rest-arg and self calls do not play nice and it'll get consed
+           (optimize (sb-c::recognize-self-calls 0)))
   (when (and (= (length spaces) 1) (eq (first spaces) :all))
     (return-from map-allocated-objects
      (map-allocated-objects fun
