@@ -4416,8 +4416,7 @@
                         (or (if (= d c)  2 (= 3 b)) 4)))
                    :allow-style-warnings t))
 
-(with-test (:name (compile :bug-913232)
-            :fails-on :interpreter) ; no idea why it fails randomly
+(with-test (:name (compile :bug-913232))
   (checked-compile `(lambda (x)
                       (declare (optimize speed)
                                (type (or (and (or (integer -100 -50)
