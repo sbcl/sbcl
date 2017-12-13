@@ -365,12 +365,12 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
 ;;;; Aliens, low level stuff
 
 (define-alien-routine "kill_safely"
-    integer
+    int
   (os-thread #!-alpha unsigned #!+alpha unsigned-int)
   (signal int))
 
 (define-alien-routine "wake_thread"
-    integer
+    int
   (os-thread unsigned))
 
 #!+sb-thread

@@ -57,7 +57,7 @@
                               (lambda ()
                                 ;; Make sure sb-ext:gc doesn't leave the
                                 ;; deferrables unblocked
-                                (sb-ext:gc) 
+                                (sb-ext:gc)
                                 (check-deferrables-blocked-or-lose 0))))
 
 (with-test (:name (:interrupt-thread :deferrables-unblocked))
