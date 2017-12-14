@@ -348,7 +348,8 @@
                          (signal-index-too-large-error sequence index)
                          (car list)))
                   (declare (type index count)))
-                (progn
+                (locally
+                    (declare (optimize (sb!c::insert-array-bounds-checks 0)))
                   (when (>= index (length sequence))
                     (signal-index-too-large-error sequence index))
                   (aref sequence index))
