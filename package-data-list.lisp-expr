@@ -3146,7 +3146,6 @@ structure representations"
                "SAETP-FIXNUM-P"
                "VALID-BIT-BASH-SAETP-P"
                "*SPECIALIZED-ARRAY-ELEMENT-TYPE-PROPERTIES*"
-               #!-x86
                "SANCTIFY-FOR-EXECUTION"
                "SAP-POINTER-SLOT" "SAP-REG-SC-NUMBER" "SAP-SIZE"
                "SAP-STACK-SC-NUMBER" "SAP-WIDETAG"

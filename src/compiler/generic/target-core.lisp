@@ -117,7 +117,8 @@
       (dotimes (i (pop-fop-stack) (setf (svref fop-stack 0) top))
         (multiple-value-bind (offset kind flavor)
             (sb!fasl::!unpack-fixup-info (pop-fop-stack))
-          (fixup code-obj offset (pop-fop-stack) kind flavor #'find-layout)))))
+          (fixup code-obj offset (pop-fop-stack) kind flavor #'find-layout))))
+    (sb!vm:sanctify-for-execution code-obj))
 
   (defun apply-core-fixups (fixup-notes code-obj)
     (declare (list fixup-notes))
@@ -132,7 +133,8 @@
                ;; an instance of LAYOUT, not a symbol. Those probably should be
                ;; :IMMOBILE-OBJECT fixups. But since they're not, inform the
                ;; fixupper not to call find-layout on them.
-               #'identity)))))
+               #'identity)))
+    (sb!vm:sanctify-for-execution code-obj)))
 
 ;;; Dump a component to core. We pass in the assembler fixups, code
 ;;; vector and node info.

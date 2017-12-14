@@ -60,6 +60,9 @@
               (setf (aref new len) offset)
               new)))))
   nil)
+
+(defun sanctify-for-execution (code)
+  (declare (ignore code)))
 
 ;;;; low-level signal context access functions
 ;;;;

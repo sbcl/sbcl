@@ -1132,9 +1132,6 @@
       (dump-segment code-segment code-length fasl-output)
       (dolist (val entry-offsets) (dump-varint val fasl-output))
 
-      #!-(or x86 (and x86-64 (not immobile-space)))
-      (dump-fop 'fop-sanctify-for-execution fasl-output)
-
       (let ((handle (dump-pop fasl-output)))
         (dolist (patch (patches))
           (push (cons handle (cdr patch))
@@ -1161,8 +1158,6 @@
   (dump-fop 'fop-assembler-code file)
   (dump-word length file)
   (write-segment-contents code-segment (fasl-output-stream file))
-  #!-(or x86 x86-64)
-  (dump-fop 'fop-sanctify-for-execution file)
   (dump-pop file))
 
 ;;; Alter the code object referenced by CODE-HANDLE at the specified

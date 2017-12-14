@@ -2598,10 +2598,6 @@ core and return a descriptor to it."
          (fun (cold-fdefn-fun (cold-fdefinition-object name))))
     (if (cold-null fun) `(:known-fun . ,name) fun)))
 
-#!-(or x86 (and x86-64 (not immobile-space)))
-(define-cold-fop (fop-sanctify-for-execution)
-  (pop-stack))
-
 ;;; Setting this variable shows what code looks like before any
 ;;; fixups (or function headers) are applied.
 #!+sb-show (defvar *show-pre-fixup-code-p* nil)

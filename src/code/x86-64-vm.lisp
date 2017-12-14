@@ -68,8 +68,9 @@
       (setf (%code-fixups code) (cons offset (if (eql fixups 0) nil fixups)))))
   nil)
 
-#!+immobile-space
 (defun sanctify-for-execution (code)
+  (declare (ignorable code))
+  #!+immobile-space
   (let ((fixups (%code-fixups code)))
     (when (listp fixups)
       (setf (%code-fixups code) (sb!c::pack-code-fixup-locs fixups))))

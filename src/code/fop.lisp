@@ -582,11 +582,6 @@
 (!define-fop 65 :not-host (fop-known-fun (name))
   (%coerce-name-to-fun name))
 
-#!-(or x86 (and x86-64 (not immobile-space)))
-(!define-fop 61 :not-host (fop-sanctify-for-execution (component))
-  (sb!vm:sanctify-for-execution component)
-  component)
-
 ;;; Modify a slot in a CONSTANTS object.
 (!define-fop 140 :not-host (fop-alter-code ((:operands index) code value) nil)
   (setf (code-header-ref code index) value)
