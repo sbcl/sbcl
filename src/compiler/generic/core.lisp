@@ -42,48 +42,6 @@
   (setf (gethash info (core-object-entry-table object)) function)
   (values))
 
-;;; Do "load-time" fixups on the code vector.
-;;; But the host never compiles to core, and there is no GET-LISP-OBJ-ADDRESS,
-;;; FIXUP-CODE-OBJECT, or ENSURE-SYMBOL-TLS-INDEX.
-#-sb-xc-host
-(defun do-core-fixups (code fixup-notes)
-  (declare (list fixup-notes))
-  (dolist (note fixup-notes)
-    (let* ((kind (fixup-note-kind note))
-           (fixup (fixup-note-fixup note))
-           (position (fixup-note-position note))
-           (name (fixup-name fixup))
-           (flavor (fixup-flavor fixup))
-           (value (ecase flavor
-                    (:assembly-routine
-                     (or (get-asm-routine name)
-                         (error "undefined assembler routine: ~S" name)))
-                    (:foreign
-                     (aver (stringp name))
-                     ;; FOREIGN-SYMBOL-ADDRESS signals an error
-                     ;; if the symbol isn't found.
-                     (foreign-symbol-address name))
-                    #!+linkage-table
-                    (:foreign-dataref
-                     (aver (stringp name))
-                     (foreign-symbol-address name t))
-                    #!+(or x86 x86-64)
-                    (:code-object
-                     (aver (null name))
-                     (get-lisp-obj-address code))
-                    #!+immobile-space
-                    ((:immobile-object :layout)
-                     (get-lisp-obj-address (the (or layout symbol) name)))
-                    #!+immobile-code
-                    (:named-call
-                     (sb!vm::fdefn-entry-address name))
-                    #!+immobile-code
-                    (:static-call
-                     (sb!vm::function-raw-address name))
-                    (:symbol-tls-index
-                     (ensure-symbol-tls-index (the symbol name))))))
-      (sb!vm:fixup-code-object code position value kind flavor))))
-
 ;;; Stick a reference to the function FUN in CODE-OBJECT at index I. If the
 ;;; function hasn't been compiled yet, make a note in the patch table.
 #-sb-xc-host ; no (SETF CODE-HEADER-REF)

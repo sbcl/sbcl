@@ -16,6 +16,7 @@
   "Returns a string describing the type of the local machine."
   "SPARC")
 
+(defconstant-eqx +fixup-kinds+ #(:call :sethi :add :absolute) #'equalp)
 (!with-bigvec-or-sap
 (defun fixup-code-object (code offset fixup kind &optional flavor)
   (declare (type index offset))

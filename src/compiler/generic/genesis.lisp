@@ -2158,7 +2158,8 @@ core and return a descriptor to it."
                (if (listp key) (cold-list sym) sym))
              'sb!vm::+required-foreign-symbols+)
     (cold-set (cold-intern '*assembler-routines*) (car *cold-assembler-obj*))
-    (to-core (sort *cold-assembler-routines* #'< :key 'cdr)
+    (to-core (setq *cold-assembler-routines*
+                   (sort (copy-list *cold-assembler-routines*) #'< :key 'cdr))
              (lambda (rtn)
                (cold-cons (cold-intern (first rtn)) (make-fixnum-descriptor (cdr rtn))))
              '*!initial-assembler-routines*)))
@@ -2669,7 +2670,7 @@ core and return a descriptor to it."
                      "/#X~8,'0x: #X~8,'0x~%"
                      (+ i (gspace-byte-address (descriptor-gspace des)))
                      (bvref-32 (descriptor-mem des) i)))))
-       des)))
+       (apply-fixups (%fasl-input-stack fasl-input) des))))
 
 #-c-headers-only
 (let ((i (get 'fop-code 'opcode)))
@@ -2733,48 +2734,6 @@ core and return a descriptor to it."
 ;;; For combining all assembler code components into one code component
 ;;; we have to adjust offsets of fixups into the single new component
 (defvar *fixup-offset-addend*)
-(defun read-fixup-offset (stream) (+ (read-word-arg stream) *fixup-offset-addend*))
-
-#!+sb-thread
-(define-cold-fop (fop-symbol-tls-fixup)
-  (let* ((symbol (pop-stack))
-         (kind (pop-stack))
-         (code-object (pop-stack)))
-    (cold-fixup code-object
-                (read-fixup-offset (fasl-input-stream))
-                (ensure-symbol-tls-index symbol)
-                kind))) ; and re-push code-object
-
-(define-cold-fop (fop-foreign-fixup)
-  (let* ((kind (pop-stack))
-         (code-object (pop-stack))
-         (len (read-byte-arg (fasl-input-stream)))
-         (sym (make-string len))
-         (dummy (read-string-as-bytes (fasl-input-stream) sym))
-         (offset (read-fixup-offset (fasl-input-stream)))
-         (value #!+sb-dynamic-core (dyncore-note-symbol sym nil)
-                #!-sb-dynamic-core (cold-foreign-symbol-address sym)))
-    (declare (ignore dummy))
-    (cold-fixup code-object offset value kind :foreign))) ; and re-push code-object
-
-#!+linkage-table
-(define-cold-fop (fop-foreign-dataref-fixup)
-  (let* ((kind (pop-stack))
-         (code-object (pop-stack))
-         (len (read-byte-arg (fasl-input-stream)))
-         (sym (make-string len)))
-    #!-sb-dynamic-core (declare (ignore code-object))
-    (read-string-as-bytes (fasl-input-stream) sym)
-    #!+sb-dynamic-core
-    (let ((offset (read-word-arg (fasl-input-stream)))
-          (value (dyncore-note-symbol sym t)))
-      (cold-fixup code-object offset value kind :foreign-dataref)) ; and re-push code-object
-    #!-sb-dynamic-core
-    (progn
-      (maphash (lambda (k v)
-                 (format *error-output* "~&~S = #X~8X~%" k v))
-               *cold-foreign-symbol-table*)
-      (error "shared foreign symbol in cold load: ~S (~S)" sym kind))))
 
 (define-cold-fop (fop-assembler-code)
   (let* ((length (read-word-arg (fasl-input-stream)))
@@ -2810,74 +2769,52 @@ core and return a descriptor to it."
                                       (fasl-input-stream)
                                       :start start
                                       :end (+ start length)))
-    des))
+    ;; Update the name -> address table.
+    (dotimes (i (descriptor-fixnum (pop-stack)))
+      (let ((offset (apply #'+ (descriptor-fixnum (pop-stack)) (cddr asm-code)))
+            (name (pop-stack)))
+        (push (cons name offset) *cold-assembler-routines*)))
+    (apply-fixups (%fasl-input-stack (fasl-input)) des)))
 
-(define-cold-fop (fop-assembler-routine)
-  (let* ((name (pop-stack))
-         (code-component (pop-stack))
-         (offset (read-word-arg (fasl-input-stream))))
-    (aver (eq code-component (car *cold-assembler-obj*)))
-    (push (cons name (apply #'+ offset (cddr *cold-assembler-obj*)))
-          *cold-assembler-routines*)
-    code-component))
-
-(define-cold-fop (fop-assembler-fixup)
-  (let* ((routine (pop-stack))
-         (kind (pop-stack))
-         (code-object (pop-stack))
-         (offset (read-fixup-offset (fasl-input-stream))))
-    (cold-fixup code-object offset (lookup-assembler-reference routine) kind)))
-
-(define-cold-fop (fop-code-object-fixup)
-  (let* ((kind (pop-stack))
-         (code-object (pop-stack))
-         (offset (read-fixup-offset (fasl-input-stream)))
-         (value (descriptor-bits code-object)))
-    (cold-fixup code-object offset value kind))) ; and re-push code-object
-
-#!+immobile-space
-(progn
-  (define-cold-fop (fop-layout-fixup)
-    (let* ((obj (pop-stack))
-           (kind (pop-stack))
-           (code-object (pop-stack))
-           (offset (read-fixup-offset (fasl-input-stream)))
-           (cold-layout (or (gethash obj *cold-layouts*)
-                            (error "No cold-layout for ~S~%" obj))))
-      (cold-fixup code-object offset
-                  (descriptor-bits cold-layout)
-                  kind :layout)))
-  (define-cold-fop (fop-immobile-obj-fixup)
-    (let ((obj (pop-stack))
-          (kind (pop-stack))
-          (code-object (pop-stack))
-          (offset (read-fixup-offset (fasl-input-stream))))
-      (cold-fixup code-object offset
-                  (descriptor-bits (if (symbolp obj) (cold-intern obj) obj))
-                  kind :immobile-object))))
-
-#!+immobile-code
-(define-cold-fop (fop-named-call-fixup)
-  (let* ((name (pop-stack))
-         (fdefn (cold-fdefinition-object name))
-         (kind (pop-stack))
-         (code-object (pop-stack))
-         (offset (read-fixup-offset (fasl-input-stream))))
-    (cold-fixup code-object offset
-                (+ (descriptor-bits fdefn)
-                   (ash sb!vm:fdefn-raw-addr-slot sb!vm:word-shift)
-                   (- sb!vm:other-pointer-lowtag))
-                kind :named-call)))
-
-#!+immobile-code
-(define-cold-fop (fop-static-call-fixup)
-  (let ((name (pop-stack))
-        (kind (pop-stack))
-        (code-object (pop-stack))
-        (offset (read-fixup-offset (fasl-input-stream))))
-    (push (list name kind code-object offset) *cold-static-call-fixups*)
-    code-object))
-
+;;; Target variant of this is defined in 'target-load'
+(defun apply-fixups (fop-stack code-obj)
+  (dotimes (i (descriptor-fixnum (pop-fop-stack fop-stack)) code-obj)
+    (binding* ((info (descriptor-fixnum (pop-fop-stack fop-stack)))
+               (sym (pop-fop-stack fop-stack))
+               ((offset kind flavor) (!unpack-fixup-info info)))
+      (incf offset *fixup-offset-addend*) ; for assembler routines
+      (if (eq flavor :static-call)
+          (push (list sym kind code-obj offset) *cold-static-call-fixups*)
+          (cold-fixup
+           code-obj offset
+           (ecase flavor
+             (:assembly-routine (lookup-assembler-reference sym))
+             (:foreign
+              (let ((sym (base-string-from-core sym)))
+                #!+sb-dynamic-core (dyncore-note-symbol sym nil)
+                #!-sb-dynamic-core (cold-foreign-symbol-address sym)))
+             (:foreign-dataref
+              (let ((sym (base-string-from-core sym)))
+                #!+sb-dynamic-core (dyncore-note-symbol sym t)
+                #!-sb-dynamic-core
+                (progn (maphash (lambda (k v)
+                                  (format *error-output* "~&~S = #X~8X~%" k v))
+                                *cold-foreign-symbol-table*)
+                       (error "shared foreign symbol in cold load: ~S (~S)" sym kind))))
+             (:code-object (descriptor-bits code-obj))
+             #!+sb-thread ; ENSURE-SYMBOL-TLS-INDEX isn't defined otherwise
+             (:symbol-tls-index (ensure-symbol-tls-index sym))
+             (:layout (descriptor-bits (or (gethash sym *cold-layouts*)
+                                           (error "No cold-layout for ~S~%" sym))))
+             (:immobile-object
+              ;; an interned symbol is represented by its host symbol,
+              ;; but an uninterned symbol is a descriptor.
+              (descriptor-bits (if (symbolp sym) (cold-intern sym) sym)))
+             (:named-call
+              (+ (descriptor-bits (cold-fdefinition-object sym))
+                 (ash sb!vm:fdefn-raw-addr-slot sb!vm:word-shift)
+                 (- sb!vm:other-pointer-lowtag))))
+           kind flavor)))))
 
 ;;;; sanity checking space layouts
 
@@ -3348,7 +3285,7 @@ core and return a descriptor to it."
         (format t "~4<~@R.~> ~A~%" (1+ i) (nth i sections))))
     (format t "=================~2%")
     (format t "I. assembler routines defined in core image:~2%")
-    (dolist (routine (reverse *cold-assembler-routines*))
+    (dolist (routine *cold-assembler-routines*)
       (let ((name (car routine)))
         (format t "~8,'0X: ~S~%" (lookup-assembler-reference name) name)))
     (let ((funs nil)

@@ -1009,66 +1009,58 @@
       (bug "code-length=~W, n-written=~W" code-length n-written)))
   (values))
 
-;;; Dump all the fixups. Currently there are three flavors of fixup:
-;;;  - assembly routines: named by a symbol
+(eval-when (:compile-toplevel)
+  (assert (<= (length +fixup-kinds+) 8))) ; fixup-kind fits in 3 bits
+
+(defconstant-eqx +fixup-flavors+
+  #(:assembly-routine :symbol-tls-index
+    :foreign :foreign-dataref :code-object
+    :layout :immobile-object :named-call :static-call)
+  #'equalp)
+
+;;; Pack the aspects of a fixup into an integer.
+(declaim (inline !pack-fixup-info))
+(defun !pack-fixup-info (offset kind flavor)
+  ;; ARM gets "error during constant folding"
+  #!+arm (declare (notinline position))
+  (logior (ash (the (mod 16) (position flavor +fixup-flavors+)) 3)
+          (the (mod 8) (position kind +fixup-kinds+))
+          (ash offset 7)))
+
+;;; Unpack an integer from DUMP-FIXUPs. Shared by genesis and target fasloader
+(declaim (inline !unpack-fixup-info))
+(defun !unpack-fixup-info (packed-info) ; Return (VALUES offset kind flavor)
+  ;; ARM gets "error during constant folding"
+  #!+arm (declare (notinline aref))
+  (values (ash packed-info -7)
+          (aref +fixup-kinds+ (ldb (byte 3 0) packed-info))
+          (aref +fixup-flavors+ (ldb (byte 4 3) packed-info))))
+
+;;; Dump all the fixups.
 ;;;  - foreign (C) symbols: named by a string
 ;;;  - code object references: don't need a name.
-(defun dump-fixups (fixups fasl-output)
+;;;  - everything else: a symbol for the name.
+(defun dump-fixups (fixups fasl-output &aux (n 0))
   (declare (list fixups) (type fasl-output fasl-output))
   (dolist (note fixups)
-    (let* ((kind (fixup-note-kind note))
-           (fixup (fixup-note-fixup note))
-           (position (fixup-note-position note))
+    (let* ((fixup (fixup-note-fixup note))
            (name (fixup-name fixup))
-           (flavor (fixup-flavor fixup)))
-      (dump-object kind fasl-output)
-      ;; Depending on the flavor, we may have various kinds of
-      ;; noise before the position.
-      (ecase flavor
-        (:assembly-routine
-         (aver (symbolp name))
-         (dump-object name fasl-output)
-         (dump-fop 'fop-assembler-fixup fasl-output))
-        ((:foreign :foreign-dataref)
-         (aver (stringp name))
-         (ecase flavor
-           (:foreign
-            (dump-fop 'fop-foreign-fixup fasl-output))
-           #!+linkage-table
-           (:foreign-dataref
-            (dump-fop 'fop-foreign-dataref-fixup fasl-output)))
-         (let ((len (length name)))
-           (aver (< len 256)) ; (limit imposed by fop definition)
-           (dump-byte len fasl-output)
-           (dotimes (i len)
-             (dump-byte (char-code (schar name i)) fasl-output))))
-        (:code-object
-         (aver (null name))
-         (dump-fop 'fop-code-object-fixup fasl-output))
-        #!+immobile-space
-        (:layout
-         (dump-non-immediate-object (classoid-name (layout-classoid name))
-                                    fasl-output)
-         (dump-fop 'fop-layout-fixup fasl-output))
-        #!+immobile-space
-        (:immobile-object
-         (dump-non-immediate-object (the symbol name) fasl-output)
-         (dump-fop 'fop-immobile-obj-fixup fasl-output))
-        #!+immobile-code
-        (:named-call
-         (dump-non-immediate-object name fasl-output)
-         (dump-fop 'fop-named-call-fixup fasl-output))
-        #!+immobile-code
-        (:static-call
-         (dump-non-immediate-object name fasl-output)
-         (dump-fop 'fop-static-call-fixup fasl-output))
-        (:symbol-tls-index
-         (aver (symbolp name))
-         (dump-non-immediate-object name fasl-output)
-         (dump-fop 'fop-symbol-tls-fixup fasl-output)))
-      ;; No matter what the flavor, we'll always dump the position
-      (dump-word position fasl-output)))
-  (values))
+           (flavor (fixup-flavor fixup))
+           (info (!pack-fixup-info (fixup-note-position note)
+                                   (fixup-note-kind note)
+                                   flavor))
+           (operand
+            (ecase flavor
+              ((:assembly-routine :symbol-tls-index) (the symbol name))
+              ((:foreign #!+linkage-table :foreign-dataref) (the string name))
+              (:code-object (the null name))
+              #!+immobile-space (:layout (classoid-name (layout-classoid name)))
+              #!+immobile-space (:immobile-object (the symbol name))
+              #!+immobile-code  ((:named-call :static-call) name))))
+      (dump-object operand fasl-output)
+      (dump-integer info fasl-output))
+    (incf n))
+  (dump-integer n fasl-output))
 
 ;;; Dump out the constant pool and code-vector for component, push the
 ;;; result in the table, and return the offset.
@@ -1087,6 +1079,7 @@
   (declare (type component component)
            (type index code-length)
            (type fasl-output fasl-output))
+  (dump-fixups fixups fasl-output)
   (let* ((2comp (component-info component))
          (constants (sb!c:ir2-component-constants 2comp))
          (header-length (length constants)))
@@ -1139,10 +1132,6 @@
       (dump-segment code-segment code-length fasl-output)
       (dolist (val entry-offsets) (dump-varint val fasl-output))
 
-      ;; DUMP-FIXUPS does its own internal DUMP-FOPs: the bytes it
-      ;; dumps aren't included in the LENGTH passed to FOP-CODE.
-      (dump-fixups fixups fasl-output)
-
       #!-(or x86 (and x86-64 (not immobile-space)))
       (dump-fop 'fop-sanctify-for-execution fasl-output)
 
@@ -1156,18 +1145,22 @@
 ;;; This is only called from assemfile, which doesn't exist in the target.
 #+sb-xc-host
 (defun dump-assembler-routines (code-segment length fixups routines file)
-  (dump-fop 'fop-assembler-code file)
-  (dump-word length file)
-  (write-segment-contents code-segment (fasl-output-stream file))
-  ;; reversing sorts the entry points in ascending address order
+  (dump-fixups fixups file)
+
+  ;; Mapping from name to address has to be created before applying fixups
+  ;; because a fixup may refer to an entry point in the same code component.
+  ;; So these go on the stack last, i.e. nearest the top.
+  ;; Reversing sorts the entry points in ascending address order
   ;; except possibly when there are multiple entry points to one routine
   (dolist (routine (reverse routines))
     (dump-object (car routine) file)
-    (dump-fop 'fop-assembler-routine file)
-    (dump-word (+ (label-position (cadr routine))
-                  (caddr routine))
-               file))
-  (dump-fixups fixups file)
+    (dump-integer (+ (label-position (cadr routine))
+                     (caddr routine))
+                  file))
+  (dump-integer (length routines) file)
+  (dump-fop 'fop-assembler-code file)
+  (dump-word length file)
+  (write-segment-contents code-segment (fasl-output-stream file))
   #!-(or x86 x86-64)
   (dump-fop 'fop-sanctify-for-execution file)
   (dump-pop file))

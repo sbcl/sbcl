@@ -16,6 +16,9 @@
   "Return a string describing the type of the local machine."
   "Alpha")
 
+(defconstant-eqx +fixup-kinds+
+    #(:jmp-hint :bits-63-48 :bits-47-32 :ldah :lda :absolute32)
+  #'equalp)
 (!with-bigvec-or-sap
 (defun fixup-code-object (code offset value kind &optional flavor)
   (declare (ignore flavor))

@@ -10,6 +10,7 @@
 
 ;;;; FIXUP-CODE-OBJECT
 
+(defconstant-eqx +fixup-kinds+ #(:absolute :jmp :lui :addi) #'equalp)
 (!with-bigvec-or-sap
 (defun fixup-code-object (code offset value kind &optional flavor)
   (declare (type index offset))

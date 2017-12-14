@@ -140,8 +140,8 @@
   (let ((bytes (make-array (* 2 (length list)) :fill-pointer 0 :adjustable t
                            :element-type '(unsigned-byte 8)))
         (prev 0))
+    (setq list (sort list #'<))
     (dolist (x list)
-      (aver (> x prev)) ; the incoming list must be sorted
       (write-var-integer (- x prev) bytes)
       (setq prev x))
     ;; Pack into a single integer

@@ -96,6 +96,44 @@
     (setf (%simple-fun-info res) (entry-info-info entry-info))
     (note-fun entry-info res object)))
 
+(flet ((fixup (code-obj offset sym kind flavor layout-finder)
+         (sb!vm:fixup-code-object
+          code-obj offset
+          (ecase flavor
+            (:assembly-routine (or (get-asm-routine sym)
+                                   (error "undefined assembler routine: ~S" sym)))
+            (:foreign (foreign-symbol-address sym))
+            (:foreign-dataref (foreign-symbol-address sym t))
+            (:code-object (get-lisp-obj-address code-obj))
+            (:symbol-tls-index (ensure-symbol-tls-index sym))
+            (:layout (get-lisp-obj-address (funcall layout-finder sym)))
+            (:immobile-object (get-lisp-obj-address sym))
+            #!+immobile-code (:named-call (sb!vm::fdefn-entry-address sym))
+            #!+immobile-code (:static-call (sb!vm::function-raw-address sym)))
+          kind flavor)))
+
+  (defun apply-fasl-fixups (fop-stack code-obj &aux (top (svref fop-stack 0)))
+    (macrolet ((pop-fop-stack () `(prog1 (svref fop-stack top) (decf top))))
+      (dotimes (i (pop-fop-stack) (setf (svref fop-stack 0) top))
+        (multiple-value-bind (offset kind flavor)
+            (sb!fasl::!unpack-fixup-info (pop-fop-stack))
+          (fixup code-obj offset (pop-fop-stack) kind flavor #'find-layout)))))
+
+  (defun apply-core-fixups (fixup-notes code-obj)
+    (declare (list fixup-notes))
+    (dolist (note fixup-notes)
+      (let ((fixup (fixup-note-fixup note)))
+        (fixup code-obj
+               (fixup-note-position note)
+               (fixup-name fixup)
+               (fixup-note-kind note)
+               (fixup-flavor fixup)
+               ;; Compiling to memory creates layout fixups with the name being
+               ;; an instance of LAYOUT, not a symbol. Those probably should be
+               ;; :IMMOBILE-OBJECT fixups. But since they're not, inform the
+               ;; fixupper not to call find-layout on them.
+               #'identity)))))
+
 ;;; Dump a component to core. We pass in the assembler fixups, code
 ;;; vector and node info.
 (defun make-core-component (component segment length fixup-notes object)
@@ -122,7 +160,7 @@
           (the (simple-array assembly-unit 1) (segment-contents-as-vector segment))
           (code-instructions code-obj))
 
-        (do-core-fixups code-obj fixup-notes)
+        (apply-core-fixups fixup-notes code-obj)
 
         (let* ((entries (ir2-component-entries 2comp))
                (nfuns (length entries))

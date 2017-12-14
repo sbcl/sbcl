@@ -575,6 +575,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
       :doc "private: stuff related to FASL load/dump logic (and GENESIS)"
       :use ("CL" "SB!ALIEN" "SB!ASSEM" "SB!BIGNUM" "SB!C"
                  "SB!EXT" "SB!INT" "SB!KERNEL" "SB!SYS")
+      :import-from (("SB!VM" "+FIXUP-KINDS+"))
       :export ("*ASSEMBLER-ROUTINES*"
                "GET-ASM-ROUTINE"
                "+BACKEND-FASL-FILE-IMPLEMENTATION+"

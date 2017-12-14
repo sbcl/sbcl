@@ -18,6 +18,7 @@
 ;;;; compiler constants
 
 (defconstant +backend-fasl-file-implementation+ :x86)
+(defconstant-eqx +fixup-kinds+ #(:absolute :relative) #'equalp)
 
 ;;; KLUDGE: It would seem natural to set this by asking our C runtime
 ;;; code for it, but mostly we need it for GENESIS, which doesn't in

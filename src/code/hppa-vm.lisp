@@ -6,6 +6,9 @@
   "HPPA")
 
 ;;;; FIXUP-CODE-OBJECT
+(defconstant-eqx +fixup-kinds+
+    #(:absolute :load :load11u :load-short :hi :branch)
+  #'equalp)
 (!with-bigvec-or-sap
 (defun fixup-code-object (code offset value kind &optional flavor)
   (declare (ignore flavor))

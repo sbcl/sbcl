@@ -256,7 +256,8 @@
                     (code-instructions code) 0 code-length)
       (loop for i from (1- nfuns) downto 0
             do (sb!c::new-simple-fun code i (read-varint-arg fasl-input)
-                                     nfuns)))
+                                     nfuns))
+      (sb!c::apply-fasl-fixups stack code))
     code))
 
 ;;;; linkage fixups
