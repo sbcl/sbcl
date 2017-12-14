@@ -20,13 +20,12 @@
 ;;; On the 601, we have less to do than on some other PowerPC chips.
 ;;; This should be what needs to be done in the general case.
 (defun sanctify-for-execution (component)
-  (without-gcing
-    (alien-funcall (extern-alien "ppc_flush_icache"
+  (alien-funcall (extern-alien "ppc_flush_icache"
                                  (function void
                                            system-area-pointer
                                            unsigned-long))
                    (code-instructions component)
-                   (%code-code-size component)))
+                   (%code-code-size component))
   nil)
 
 

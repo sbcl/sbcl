@@ -145,19 +145,21 @@
            (list fixup-notes)
            (type core-object object))
   (let ((debug-info (debug-info-for-component component)))
-    ;; FIXME: use WITHOUT-GCING only for stuff that needs it.
-    ;; Most likely this could be WITH-PINNED-OBJECTS.
     ;; See also the remark in LOAD-CODE about the order of installing
     ;; simple-funs and setting the 'nfuns' value.
-    (without-gcing
-      (let* ((2comp (component-info component))
-             (constants (ir2-component-constants 2comp))
-             (box-num (- (length constants) sb!vm:code-constants-offset))
-             (code-obj (allocate-code-object
-                        (or #!+immobile-code (eq *compile-to-memory-space* :immobile))
-                        box-num length)))
-        (declare (type index box-num length))
+    (let* ((2comp (component-info component))
+           (constants (ir2-component-constants 2comp))
+           (box-num (- (length constants) sb!vm:code-constants-offset))
+           (code-obj (allocate-code-object
+                      (or #!+immobile-code (eq *compile-to-memory-space* :immobile))
+                      box-num length)))
+      (declare (type index box-num length))
 
+      ;; The following operations need the code pinned:
+      ;; 1. copying into code-instructions (a SAP)
+      ;; 2. apply-core-fixups and sanctify-for-execution
+      ;; 3. new-simple-fun via make-fun-entry
+      (with-pinned-objects (code-obj)
          (copy-byte-vector-to-system-area
           (the (simple-array assembly-unit 1) (segment-contents-as-vector segment))
           (code-instructions code-obj))
@@ -168,17 +170,14 @@
                (nfuns (length entries))
                (fun-index nfuns))
           (dolist (entry entries)
-            (make-fun-entry (decf fun-index) entry code-obj object nfuns)))
+            (make-fun-entry (decf fun-index) entry code-obj object nfuns))))
 
-        #!-(or x86 (and x86-64 (not immobile-space)))
-        (sb!vm:sanctify-for-execution code-obj)
+      (push debug-info (core-object-debug-info object))
+      (setf (%code-debug-info code-obj) debug-info)
 
-        (push debug-info (core-object-debug-info object))
-        (setf (%code-debug-info code-obj) debug-info)
-
-        (do ((index sb!vm:code-constants-offset (1+ index)))
-            ((>= index (length constants)))
-          (let ((const (aref constants index)))
+      (do ((index sb!vm:code-constants-offset (1+ index)))
+          ((>= index (length constants)))
+        (let ((const (aref constants index)))
             (etypecase const
               (null)
               (constant
@@ -193,7 +192,7 @@
                         (find-or-create-fdefn (cdr const))))
                  (:known-fun
                   (setf (code-header-ref code-obj index)
-                        (%coerce-name-to-fun (cdr const))))))))))))
+                        (%coerce-name-to-fun (cdr const)))))))))))
   (values))
 
 ;;; Backpatch all the DEBUG-INFOs dumped so far with the specified

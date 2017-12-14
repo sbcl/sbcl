@@ -243,14 +243,11 @@
     (loop for i of-type index from sb!vm:code-constants-offset
           for j of-type index from ptr below debug-info-index
           do (setf (code-header-ref code i) (svref stack j)))
-    (without-gcing
-      ;; FIXME: can this be WITH-PINNED-OBJECTS? Probably.
+    (with-pinned-objects (code)
       ;; We must pin the range of bytes containing instructions,
-      ;; but we also must prevent scavenging the code object until
-      ;; the embedded simple-funs have been installed,
-      ;; otherwise GC could assert that the word referenced by
-      ;; a fun offset does not have the right widetag.
-      ;; This is achieved by not writing the 'nfuns' value
+      ;; but we also must prevent scavenging each embedded simple-fun
+      ;; until its widetag has been set. Otherwise gc would lose.
+      ;; We achieve this by not writing the 'nfuns' value
       ;; until after the loop which stores the offsets.
       (read-n-bytes (%fasl-input-stream fasl-input)
                     (code-instructions code) 0 code-length)

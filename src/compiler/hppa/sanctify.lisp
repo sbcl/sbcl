@@ -16,11 +16,10 @@
 
 ;;; FIXME-lav, can we do this in assembly instead ?
 (defun sanctify-for-execution (component)
-  (without-gcing
-   (alien-funcall (extern-alien "sanctify_for_execution"
+  (alien-funcall (extern-alien "sanctify_for_execution"
                                 (function void
                                           system-area-pointer
                                           unsigned-long))
                   (code-instructions component)
-                  (%code-code-size component)))
+                  (%code-code-size component))
   nil)

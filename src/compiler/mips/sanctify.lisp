@@ -15,11 +15,10 @@
 (in-package "SB!VM")
 
 (defun sanctify-for-execution (component)
-  (without-gcing
-   (alien-funcall (extern-alien "os_flush_icache"
+  (alien-funcall (extern-alien "os_flush_icache"
                                 (function void
                                           system-area-pointer
                                           unsigned-long))
                   (code-instructions component)
-                  (%code-code-size component)))
+                  (%code-code-size component))
   nil)
