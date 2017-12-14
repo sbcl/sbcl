@@ -20,13 +20,12 @@
 ;;; with things (like code instructions) that have to refer to them.
 (defun fixup-code-object (code offset fixup kind &optional flavor)
   (declare (type index offset) (ignorable flavor))
-  (without-gcing
-      (let* ((sap (code-instructions code))
-             (fixup (+ (if (eq kind :absolute64)
-                           (signed-sap-ref-64 sap offset)
-                           (signed-sap-ref-32 sap offset))
-                       fixup)))
-      (ecase kind
+  (let* ((sap (code-instructions code))
+         (fixup (+ (if (eq kind :absolute64)
+                       (signed-sap-ref-64 sap offset)
+                       (signed-sap-ref-32 sap offset))
+                   fixup)))
+    (ecase kind
         (:absolute64
          ;; Word at sap + offset contains a value to be replaced by
          ;; adding that value to fixup.
@@ -49,7 +48,7 @@
                   ;; JMP/CALL are relative to the next instruction,
                   ;; so add 4 bytes for the size of the displacement itself.
                   (- fixup
-                     (the (unsigned-byte 64) (+ (sap-int sap) offset 4))))))))))
+                     (the (unsigned-byte 64) (+ (sap-int sap) offset 4)))))))))
   ;; An absolute fixup is stored in the code header's %FIXUPS slot if it
   ;; references an immobile-space (but not static-space) object.
   ;; This needn't be inside WITHOUT-GCING, because code fixups will point

@@ -23,9 +23,8 @@
   (declare (ignore flavor))
   (unless (zerop (rem offset n-word-bytes))
     (error "Unaligned instruction?  offset=#x~X." offset))
-  (without-gcing
-   (let ((sap (code-instructions code)))
-     (ecase kind
+  (let ((sap (code-instructions code)))
+    (ecase kind
        (:call
         (error "Can't deal with CALL fixups, yet."))
        (:sethi
@@ -36,7 +35,7 @@
               (ldb (byte 10 0) fixup)))
        (:absolute
         (setf (sap-ref-32 sap offset)
-              fixup)))))))
+              fixup))))))
 
 
 ;;;; "Sigcontext" access functions, cut & pasted from alpha-vm.lisp.

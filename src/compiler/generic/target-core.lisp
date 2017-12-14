@@ -97,6 +97,9 @@
     (note-fun entry-info res object)))
 
 (flet ((fixup (code-obj offset sym kind flavor layout-finder)
+         ;; CODE-OBJ must already be pinned in order to legally call this.
+         ;; One call site that reaches here is below at MAKE-CORE-COMPONENT
+         ;; and the other is LOAD-CODE, both of which pin the code.
          (sb!vm:fixup-code-object
           code-obj offset
           (ecase flavor

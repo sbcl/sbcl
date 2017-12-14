@@ -25,8 +25,7 @@
 (defun fixup-code-object (code offset fixup kind &optional flavor)
   (declare (type index offset))
   (declare (ignore flavor))
-  (without-gcing
-   (when
+  (when
      (let* ((obj-start-addr (logandc2 (get-lisp-obj-address code) sb!vm:lowtag-mask))
             (sap (code-instructions code))
             (code-end-addr (+ (sap-int sap) (%code-code-size code))))
@@ -58,7 +57,7 @@
                    (new (replace (make-array (1+ len) :element-type 'sb!vm:word)
                                  fixups)))
               (setf (aref new len) offset)
-              new)))))
+              new))))
   nil)
 
 (defun sanctify-for-execution (code)

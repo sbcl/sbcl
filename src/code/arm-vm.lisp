@@ -16,11 +16,10 @@
   (declare (ignore flavor))
   (unless (zerop (rem offset n-word-bytes))
     (error "Unaligned instruction?  offset=#x~X." offset))
-  (without-gcing
-   (let ((sap (code-instructions code)))
-     (ecase kind
-       (:absolute
-        (setf (sap-ref-32 sap offset) fixup)))))))
+  (let ((sap (code-instructions code)))
+    (ecase kind
+      (:absolute
+       (setf (sap-ref-32 sap offset) fixup))))))
 
 ;;;; "Sigcontext" access functions, cut & pasted from sparc-vm.lisp,
 ;;;; then modified for ARM.

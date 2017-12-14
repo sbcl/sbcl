@@ -14,11 +14,10 @@
   (declare (ignore flavor))
   (unless (zerop (rem offset n-word-bytes))
     (error "Unaligned instruction?  offset=#x~X." offset))
-  (without-gcing
-   (let* ((sap (code-instructions code))
-          (inst (sap-ref-32 sap offset)))
-     (setf (sap-ref-32 sap offset)
-           (ecase kind
+  (let* ((sap (code-instructions code))
+         (inst (sap-ref-32 sap offset)))
+    (setf (sap-ref-32 sap offset)
+          (ecase kind
              (:absolute
               value)
              (:load
@@ -51,7 +50,7 @@
                 (logior (ash bits 3)
                         (mask-field (byte 1 1) inst)
                         (mask-field (byte 3 13) inst)
-                        (mask-field (byte 11 21) inst))))))))))
+                        (mask-field (byte 11 21) inst)))))))))
 
 #-sb-xc-host (progn
 

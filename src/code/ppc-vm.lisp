@@ -16,9 +16,8 @@
   (declare (ignore flavor))
   (unless (zerop (rem offset n-word-bytes))
     (error "Unaligned instruction?  offset=#x~X." offset))
-  (without-gcing
-   (let ((sap (code-instructions code)))
-     (ecase kind
+  (let ((sap (code-instructions code)))
+    (ecase kind
        (:absolute
         (setf (sap-ref-32 sap offset) fixup))
        (:b
@@ -40,7 +39,7 @@
                  (if (logbitp 15 l) (ldb (byte 16 0) (1+ h)) h))))
        (:l
         (setf (ldb (byte 16 0) (sap-ref-32 sap offset))
-              (ldb (byte 16 0) fixup))))))))
+              (ldb (byte 16 0) fixup)))))))
 
 
 ;;;; "Sigcontext" access functions, cut & pasted from x86-vm.lisp then

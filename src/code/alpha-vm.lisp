@@ -24,9 +24,8 @@
   (declare (ignore flavor))
   (unless (zerop (rem offset n-word-bytes))
     (error "Unaligned instruction?  offset=#x~X." offset))
-  (without-gcing
-   (let ((sap (code-instructions code)))
-     (ecase kind
+  (let ((sap (code-instructions code)))
+    (ecase kind
        (:jmp-hint
         (aver (zerop (ldb (byte 2 0) value)))
         #+nil
@@ -52,7 +51,7 @@
         (setf (sap-ref-8 sap offset) (ldb (byte 8 0) value))
         (setf (sap-ref-8 sap (1+ offset)) (ldb (byte 8 8) value)))
        (:absolute32
-        (setf (sap-ref-32 sap offset) value)))))))
+        (setf (sap-ref-32 sap offset) value))))))
 
 ;;;; "sigcontext" access functions, cut & pasted from x86-vm.lisp then
 ;;;; hacked for types.
