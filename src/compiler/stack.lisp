@@ -93,13 +93,30 @@
   ;; over an arbitrarily complex chunk of flow graph that is known to
   ;; have a single entry block.
   (let* ((use-blocks (mapcar #'node-block (find-uses dx-lvar)))
+         ;; We have to back-propagate not just the DX-LVAR, but every
+         ;; UVL or DX LVAR that is live wherever DX-LVAR is USEd
+         ;; (allocated) because we can't move live DX-LVARs to release
+         ;; them.
+         (preserve-lvars (reduce #'merge-uvl-live-sets
+                                 (mapcar (lambda (block)
+                                           (let ((2block (block-info block)))
+                                             (merge-uvl-live-sets
+                                              (ir2-block-end-stack 2block)
+                                              (ir2-block-pushed 2block))))
+                                         use-blocks)))
          (start-block (find-lowest-common-dominator
                        (list* block use-blocks))))
     (labels ((mark-lvar-live-on-path (arc-list)
                (dolist (arc arc-list)
                  (let ((2block (block-info (car arc))))
-                   (pushnew dx-lvar (ir2-block-end-stack 2block))
-                   (pushnew dx-lvar (ir2-block-start-stack 2block)))))
+                   (setf (ir2-block-end-stack 2block)
+                         (merge-uvl-live-sets
+                          preserve-lvars
+                          (ir2-block-end-stack 2block)))
+                   (setf (ir2-block-start-stack 2block)
+                         (merge-uvl-live-sets
+                          preserve-lvars
+                          (ir2-block-start-stack 2block))))))
              (back-propagate-pathwise (current-block path)
                (cond
                  ((member current-block use-blocks)
@@ -185,8 +202,6 @@
     ;; environment) then we need to back-propagate the DX LVARs to
     ;; their allocation sites.  We need to be clever about this
     ;; because some code paths may not allocate all of the DX LVARs.
-    ;;
-    ;; FIXME: Use BLOCK-FLAG to make this happen only once.
     (let ((first-node (ctran-next (block-start block))))
       (when (typep first-node 'entry)
         (let ((cleanup (entry-cleanup first-node)))
