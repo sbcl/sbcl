@@ -31,6 +31,7 @@
           ;; within PCL itself to pass information around, so we can't
           ;; just delete them.
           %class
+          %parameter
           ;; This declaration may also be used within PCL to pass
           ;; information around, I'm not sure. -- WHN 2000-12-30
           %variable-rebinding))

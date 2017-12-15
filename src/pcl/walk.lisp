@@ -308,7 +308,8 @@
   (eq (info :variable :kind var) :macro))
 
 (defun walked-var-declaration-p (declaration)
-  (member declaration '(sb!pcl::%class sb!pcl::%variable-rebinding special)))
+  (member declaration '(sb!pcl::%class sb!pcl::%parameter
+                        sb!pcl::%variable-rebinding special)))
 
 (defun %var-declaration (declaration var env)
   (let ((id (or (var-lexical-p var env) var)))

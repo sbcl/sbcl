@@ -850,7 +850,7 @@ bootstrapping.
                 ;; expression in CAN-OPTIMIZE-ACCESS1. -- WHN
                 ;; 2000-12-30
                 ,@(mapcan (lambda (parameter specializer)
-                            (when (typep specializer 'symbol)
+                            (when (typep specializer '(and symbol (not (eql t))))
                               (list `(%class ,parameter ,specializer))))
                           parameters specializers)
                 ;; These TYPE declarations weren't in the original PCL
@@ -864,6 +864,11 @@ bootstrapping.
                               (parameter-specializer-declaration-in-defmethod
                                proto-gf proto-method par spec specials env))
                             parameters specializers))))
+             (parameter-declarations
+              `(declare
+                ,@(mapcan (lambda (parameter)
+                            (list `(%parameter ,parameter)))
+                          parameters)))
              (method-lambda
               ;; Remove the documentation string and insert the
               ;; appropriate class declarations. The documentation
@@ -887,6 +892,7 @@ bootstrapping.
                  ;; the old PCL behavior. -- WHN 2000-11-24
                  (declare (ignorable ,@required-parameters))
                  ,class-declarations
+                 ,parameter-declarations
                  ,@declarations
                  (block ,(fun-name-block-name generic-function-name)
                    ,@real-body)))
@@ -1789,11 +1795,11 @@ bootstrapping.
                         ;; done in CAN-OPTIMIZE-ACCESS1, since the
                         ;; bindings that will have that declation will
                         ;; never be SETQd.
-                        (when (var-declaration '%class var env)
+                        (when (var-declaration '%parameter var env)
                           ;; If a parameter binding is shadowed by
-                          ;; another binding it won't have a %CLASS
-                          ;; declaration anymore, and this won't get
-                          ;; executed.
+                          ;; another binding it won't have a
+                          ;; %PARAMETER declaration anymore, and this
+                          ;; won't get executed.
                           (pushnew var parameters-setqd :test #'eq))))
                     form)
                (function

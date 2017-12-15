@@ -1140,8 +1140,7 @@
   (assert (equal (bug-1734771 2 3) '(2 3))))
 (with-test (:name (:cnm-assignment :bug-1734771 2))
   (assert (equal (bug-1734771 t 3) '(t 3))))
-(with-test (:name (:cnm-assignment :bug-1734771 3)
-                  :fails-on :sbcl)
+(with-test (:name (:cnm-assignment :bug-1734771 3))
   (assert (equal (bug-1734771 #\c nil) '(#\c nil))))
 
 ;;; Bug reported by Istvan Marko 2003-07-09
