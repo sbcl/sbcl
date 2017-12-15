@@ -60,6 +60,7 @@ $SBCL <<EOF
 (with-compilation-unit ()
   (load "docstrings.lisp"))
 (require :asdf)
+(asdf:initialize-source-registry '(:source-registry :ignore-inherited-configuration))
 (dolist (module (quote ($MODULES)))
   (require module))
 (sb-texinfo:generate-includes "$DOCSTRINGDIR" $PACKAGES)
