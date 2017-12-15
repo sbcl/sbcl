@@ -850,7 +850,7 @@ bootstrapping.
                 ;; expression in CAN-OPTIMIZE-ACCESS1. -- WHN
                 ;; 2000-12-30
                 ,@(mapcan (lambda (parameter specializer)
-                            (when (typep specializer '(and symbol (not (eql t))))
+                            (when (typep specializer 'symbol)
                               (list `(%class ,parameter ,specializer))))
                           parameters specializers)
                 ;; These TYPE declarations weren't in the original PCL

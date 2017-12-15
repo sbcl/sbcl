@@ -8,6 +8,9 @@ changes relative to sbcl-1.4.2:
   * bug fix: fixed heap exhaustion bug when consing millions of small objects
   * bug fix: sb-safepoint builds are now a lot less prone to deadlocks and odd
     crashes (lp#1424031, lp#1268710)
+  * bug fix: argumentless CALL-NEXT-METHOD where specialized-to-T or
+    unspecialized parameters are mutated now uses the original (non-mutated)
+    parameter values (partial fix of lp#1734771)
 
 changes in sbcl-1.4.2 relative to sbcl-1.4.1:
   * minor incompatible change: SB-EXT:QUIT is no longer marked as deprecated
