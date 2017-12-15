@@ -791,3 +791,11 @@
          (log (float n))
          (nth-value 33 (funcall x . #.(loop for i to 350 collect i))))
     ((10 (lambda (&rest args) (values-list args))) 33)))
+
+(with-test (:name (dynamic-extent :recursive-local-functions))
+  (checked-compile
+   `(lambda ()
+      (let ((s (labels ((%f () (%f)))
+                 (%f))))
+        (declare (dynamic-extent s))
+        (car s)))))

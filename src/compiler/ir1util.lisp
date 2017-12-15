@@ -646,24 +646,31 @@
 (defvar *dx-combination-p-check-local* t)
 
 (defun dx-combination-p (use dx)
-  (and (combination-p use)
-       (or
-        ;; Known, and can do DX.
-        (known-dx-combination-p use dx)
-        ;; Possibly a not-yet-eliminated lambda which ends up returning the
-        ;; results of an actual known DX combination.
-        (and *dx-combination-p-check-local*
-             (let* ((fun (combination-fun use))
-                    (ref (principal-lvar-use fun))
-                    (clambda (when (ref-p ref)
-                               (ref-leaf ref)))
-                    (creturn (when (lambda-p clambda)
-                               (lambda-return clambda)))
-                    (result-use (when (return-p creturn)
-                                  (principal-lvar-use (return-result creturn)))))
-               ;; FIXME: We should be able to deal with multiple uses here as well.
-               (and (dx-combination-p result-use dx)
-                    (combination-args-flow-cleanly-p use result-use dx)))))))
+  (let (seen)
+    (labels ((recurse (use)
+               (and (combination-p use)
+                    (not (memq use seen))
+                    (or
+                     ;; Known, and can do DX.
+                     (known-dx-combination-p use dx)
+                     ;; Possibly a not-yet-eliminated lambda which ends up returning the
+                     ;; results of an actual known DX combination.
+                     (and *dx-combination-p-check-local*
+                          (let* ((fun (combination-fun use))
+                                 (ref (principal-lvar-use fun))
+                                 (clambda (when (ref-p ref)
+                                            (ref-leaf ref)))
+                                 (creturn (when (lambda-p clambda)
+                                            (lambda-return clambda)))
+                                 (result-use (when (return-p creturn)
+                                               (principal-lvar-use (return-result creturn)))))
+                            ;; Unlikely to have enough recursive local
+                            ;; functions to warrant a hash-table
+                            (push use seen)
+                            ;; FIXME: We should be able to deal with multiple uses here as well.
+                            (and (recurse result-use)
+                                 (combination-args-flow-cleanly-p use result-use dx))))))))
+      (recurse use))))
 
 (defun combination-args-flow-cleanly-p (combination1 combination2 dx)
   (labels ((recurse (combination)
