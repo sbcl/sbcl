@@ -620,16 +620,19 @@
   (write-string "; ")
   (force-output)
   (dotimes (i 100)
-    (let ((threads '())
+    (let (outer-threads
+          (inner-threads (list nil))
           (parent *current-thread*))
       (dotimes (i 100)
         (push (make-thread
                (lambda ()
                  (interrupt-thread
                   parent
-                  (lambda () (push (make-thread (lambda ())) threads)))))
-              threads)
-        (push (make-thread (lambda ())) threads))
-      (mapc #'join-thread threads))
+                  (lambda () (atomic-push (make-thread (lambda ()))
+                                          (car inner-threads))))))
+              outer-threads)
+        (push (make-thread (lambda ())) outer-threads))
+      (mapc #'join-thread outer-threads)
+      (mapc #'join-thread (car inner-threads)))
     (write-char #\.)
     (force-output)))
