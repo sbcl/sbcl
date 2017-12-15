@@ -103,8 +103,6 @@
        (concatenate 'simple-string (symbol-name key) "=" val)))
    cmucl))
 
-;;;; Import wait3(2) from Unix.
-
 #-win32
 (define-alien-routine ("waitpid" c-waitpid) int
   (pid int)
@@ -320,7 +318,7 @@ status slot."
   process)
 
 (defun get-processes-status-changes ()
-  (let (exited)
+  (let (changed)
     (with-active-processes-lock ()
       (setf *active-processes*
             (delete-if #-win32
@@ -335,10 +333,10 @@ status slot."
                            (when status
                              (setf (process-%status proc) status)
                              (setf (process-%exit-code proc) code)
+                             (when (process-status-hook proc)
+                               (push proc changed))
                              (when (member status '(:exited :signaled))
                                (setf (process-core-dumped proc) core)
-                               (when (process-status-hook proc)
-                                 (push proc exited))
                                t))))
                        #+win32
                        (lambda (proc)
@@ -353,17 +351,16 @@ status slot."
                                  (sb-win32::close-handle handle)
                                  (setf (process-handle proc) nil)
                                  (when (process-status-hook proc)
-                                   (push proc exited))
+                                   (push proc changed))
                                  t)))))
                        *active-processes*)))
     ;; Can't call the hooks before all the processes have been deal
     ;; with, as calling a hook may cause re-entry to
     ;; GET-PROCESS-STATUS-CHANGES. That may be OK when using waitpid,
     ;; but in the Windows implementation it would be deeply bad.
-    (dolist (proc exited)
+    (dolist (proc changed)
       (let ((hook (process-status-hook proc)))
-        (when hook
-          (funcall hook proc))))))
+        (funcall hook proc)))))
 
 ;;;; RUN-PROGRAM and close friends
 
