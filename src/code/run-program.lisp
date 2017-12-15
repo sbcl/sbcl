@@ -112,38 +112,29 @@
   (options int))
 
 #-win32
-(defun waitpid (pid &optional do-not-hang check-for-stopped check-for-continued)
+(defun waitpid (pid)
   "Return any available status information on child process with PID."
   (multiple-value-bind (pid status)
       (c-waitpid pid
-                 (logior (if do-not-hang
-                             sb-unix:wnohang
-                             0)
-                         (if check-for-stopped
-                             sb-unix:wuntraced
-                             0)
-                         (if check-for-continued
-                             sb-unix:wcontinued
-                             0)))
+                 (logior sb-unix:wnohang sb-unix:wuntraced sb-unix:wcontinued))
     (cond ((or (minusp pid)
                (zerop pid))
-           nil)
-          ((and check-for-continued (wifcontinued status))
-           (values pid
-                   :continued
-                   sb-unix:sigcont))
-          ((and check-for-stopped (wifstopped status))
-           (values pid
-                   :stopped
-                   (ldb (byte 8 8) status)))
+           (values nil nil nil))
+          ((wifcontinued status)
+           (values :running
+                   nil
+                   nil))
+          ((wifstopped status)
+           (values :stopped
+                   (ldb (byte 8 8) status)
+                   nil))
           ((zerop (ldb (byte 7 0) status))
-           (values pid
-                   :exited
-                   (ldb (byte 8 8) status)))
+           (values :exited
+                   (ldb (byte 8 8) status)
+                   nil))
           (t
            (let ((signal (ldb (byte 7 0) status)))
-             (values pid
-                     (if (position signal
+             (values (if (position signal
                                    #.(vector
                                       sb-unix:sigstop
                                       sb-unix:sigtstp
@@ -177,7 +168,7 @@
      ,@body))
 
 (deftype process-status ()
-  '(member :running :stopped :continued :exited :signaled))
+  '(member :running :stopped :exited :signaled))
 
 (defstruct (process (:copier nil))
   (pid     nil :type word :read-only t) ; PID of child process
@@ -215,7 +206,7 @@
 
 (defun process-status (process)
   "Return the current status of PROCESS.  The result is one of :RUNNING,
-   :STOPPED, :CONTINUED, :EXITED, or :SIGNALED."
+   :STOPPED, :EXITED, or :SIGNALED."
   (get-processes-status-changes)
   (process-%status process))
 
@@ -249,7 +240,7 @@ PROCESS."
   #-win32
   (loop
       (case (process-status process)
-        (:running :continued)
+        (:running)
         (:stopped
          (when check-for-stopped
            (return)))
@@ -287,17 +278,9 @@ PROCESS."
     (let ((result (if (eq whom :process-group)
                       (sb-unix:unix-killpg pid signal)
                       (sb-unix:unix-kill pid signal))))
-      (cond ((not (eql result 0))
-             (values nil (sb-unix::get-errno)))
-            ((and (eql pid (process-pid process))
-                  (= signal sb-unix:sigcont))
-             (setf (process-%status process) :running)
-             (setf (process-%exit-code process) nil)
-             (when (process-status-hook process)
-               (funcall (process-status-hook process) process))
-             t)
-            (t
-             t)))))
+      (or (zerop result)
+          (values nil (sb-unix::get-errno))))))
+
 #+win32
 (defun process-kill (process signal &optional (whom :pid))
   (declare (ignore signal whom))
@@ -311,7 +294,6 @@ PROCESS."
   "Return T if PROCESS is still alive, NIL otherwise."
   (let ((status (process-status process)))
     (if (or (eq status :running)
-            (eq status :continued)
             (eq status :stopped))
         t
         nil)))
@@ -348,12 +330,12 @@ status slot."
                          ;; WAIT3 call here, but that makes direct
                          ;; WAIT, WAITPID usage impossible due to the
                          ;; race with the SIGCHLD signal handler.
-                         (multiple-value-bind (pid what code core)
-                             (waitpid (process-pid proc) t t t)
-                           (when pid
-                             (setf (process-%status proc) what)
+                         (multiple-value-bind (status code core)
+                             (waitpid (process-pid proc))
+                           (when status
+                             (setf (process-%status proc) status)
                              (setf (process-%exit-code proc) code)
-                             (when (member what '(:exited :signaled))
+                             (when (member status '(:exited :signaled))
                                (setf (process-core-dumped proc) core)
                                (when (process-status-hook proc)
                                  (push proc exited))

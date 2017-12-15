@@ -370,7 +370,24 @@
                                  status to ~S within 20 seconds.~@:>"
                                 process expected-status))))
       (kill-and-check-status sb-posix:sigstop :stopped)
-      (kill-and-check-status sb-posix:sigcont :continued)
+      (kill-and-check-status sb-posix:sigcont :running)
+      (kill-and-check-status sb-posix:sigkill :signaled)
+      (process-wait process)
+      (assert (not (process-alive-p process))))))
+
+(with-test (:name (run-program :stop+continue :posix-kill) :skipped-on :win32)
+  (let ((process (run-program "cat" '() :search t :input :stream :wait nil)))
+    (flet ((kill-and-check-status (signal expected-status)
+             (sb-posix:kill (process-pid process) signal)
+             (loop :repeat 2000
+                :when (eq (process-status process) expected-status)
+                :do (return)
+                :do (sleep 1/100)
+                :finally (error "~@<Process ~A did not change its ~
+                                 status to ~S within 20 seconds.~@:>"
+                                process expected-status))))
+      (kill-and-check-status sb-posix:sigstop :stopped)
+      (kill-and-check-status sb-posix:sigcont :running)
       (kill-and-check-status sb-posix:sigkill :signaled)
       (process-wait process)
       (assert (not (process-alive-p process))))))
