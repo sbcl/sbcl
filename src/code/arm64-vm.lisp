@@ -26,7 +26,8 @@
                (ash (- fixup (+ (sap-int sap) offset)) -2)))
         (:uncond-branch
          (setf (ldb (byte 26 0) (sap-ref-32 sap offset))
-               (ash (- fixup (+ (sap-int sap) offset)) -2)))))))
+               (ash (- fixup (+ (sap-int sap) offset)) -2)))))
+  nil))
 
 ;;;; "Sigcontext" access functions, cut & pasted from sparc-vm.lisp,
 ;;;; then modified for ARM.

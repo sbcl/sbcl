@@ -25,6 +25,7 @@
 #include "thread.h"
 #include "pseudo-atomic.h"
 #include "forwarding-ptr.h"
+#include "var-io.h"
 
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
@@ -538,7 +539,6 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
     os_vm_address_t code_addr = (os_vm_address_t)new_code;
     os_vm_address_t old_addr = (os_vm_address_t)old_code;
     os_vm_size_t displacement = code_addr - old_addr;
-    lispobj fixups = NIL;
 
     ncode_words = code_instruction_words(new_code->code_size);
     nheader_words = code_header_words(*(lispobj *)new_code);
@@ -559,17 +559,15 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
            code_start_addr,code_end_addr));
     */
 
-    fixups = new_code->fixups;
-    /* It will be a Lisp vector if valid, or 0 if there are no fixups */
-    if (fixups == 0 || !is_lisp_pointer(fixups)) {
+    lispobj fixups = new_code->fixups;
+    /* It will be a nonzero integer if valid, or 0 if there are no fixups */
+    if (fixups == 0) {
         /* Check for possible errors. */
         if (check_code_fixups)
             sniff_code_object(new_code, displacement);
 
         return;
     }
-
-    struct vector *fixups_vector = VECTOR(fixups);
 
     /* Could be pointing to a forwarding pointer. */
     /* This is extremely unlikely, because the only referent of the fixups
@@ -578,22 +576,27 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
        enlivening the code, the fixups shouldn't have been forwarded.
        Maybe the vector is on the special binding stack though ... */
     if (is_lisp_pointer(fixups) &&
-        (find_page_index((void*)fixups_vector) != -1) &&
-        forwarding_pointer_p((lispobj*)fixups_vector))  {
+        forwarding_pointer_p(native_pointer(fixups)))  {
         /* If so, then follow it. */
         /*SHOW("following pointer to a forwarding pointer");*/
-        fixups_vector = VECTOR(forwarding_pointer_value((lispobj*)fixups_vector));
+        fixups = forwarding_pointer_value(native_pointer(fixups));
     }
 
     /*SHOW("got fixups");*/
 
-    if (widetag_of(fixups_vector->header) == SIMPLE_ARRAY_WORD_WIDETAG) {
+    if (fixnump(fixups) ||
+        (lowtag_of(fixups) == OTHER_POINTER_LOWTAG
+         && widetag_of(*native_pointer(fixups)) == BIGNUM_WIDETAG)) {
         /* Got the fixups for the code block. Now work through the vector,
            and apply a fixup at each address. */
-        sword_t length = fixnum_value(fixups_vector->length);
-        sword_t i;
-        for (i = 0; i < length; i++) {
-            long offset = fixups_vector->data[i];
+        struct varint_unpacker unpacker;
+        varint_unpacker_init(&unpacker, fixups);
+        int prev_offset = 0, offset;
+        while (varint_unpack(&unpacker, &offset) && offset != 0) {
+            // For extra compactness, each offset is relative to the prior,
+            // so that the magnitudes are smaller.
+            offset += prev_offset;
+            prev_offset = offset;
             /* Now check the current value of offset. */
             os_vm_address_t old_value = *(os_vm_address_t *)(code_start_addr + offset);
 
@@ -615,7 +618,7 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
         /* This used to just print a note to stderr, but a bogus fixup seems to
          * indicate real heap corruption, so a hard hailure is in order. */
         lose("fixup vector %p has a bad widetag: %d\n",
-             fixups_vector, widetag_of(fixups_vector->header));
+             fixups, widetag_of(*native_pointer(fixups)));
     }
 
     /* Check for possible errors. */

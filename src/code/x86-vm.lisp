@@ -19,49 +19,32 @@
 
 ;;; This gets called by LOAD to resolve newly positioned objects
 ;;; with things (like code instructions) that have to refer to them.
-;;;
-;;; Add a fixup offset to the vector of fixup offsets for the given
-;;; code object.
+;;; Return T if and only if the fixup needs to be recorded in %CODE-FIXUPS
 (defun fixup-code-object (code offset fixup kind &optional flavor)
   (declare (type index offset))
   (declare (ignore flavor))
-  (when
-     (let* ((obj-start-addr (logandc2 (get-lisp-obj-address code) sb!vm:lowtag-mask))
-            (sap (code-instructions code))
-            (code-end-addr (+ (sap-int sap) (%code-code-size code))))
-        (ecase kind
-          (:absolute
-           ;; Word at sap + offset contains a value to be replaced by
-           ;; adding that value to fixup.
-           (setf (sap-ref-32 sap offset) (+ fixup (sap-ref-32 sap offset)))
-           ;; Record absolute fixups that point within the code object.
-           (< obj-start-addr (sap-ref-32 sap offset) code-end-addr))
-          (:relative
-           ;; Fixup is the actual address wanted.
-           ;; Replace word with value to add to that loc to get there.
-           (let* ((loc-sap (+ (sap-int sap) offset))
-                  ;; Use modular arithmetic so that if the offset
-                  ;; doesn't fit into signed-byte-32 it'll wrap around
-                  ;; when added to EIP
-                  (rel-val (ldb (byte 32 0)
-                                (- fixup loc-sap n-word-bytes))))
-             (declare (type (unsigned-byte 32) loc-sap rel-val))
-             (setf (sap-ref-32 sap offset) rel-val))
-           ;; Record relative fixups that point outside the code object.
-           (or (< fixup obj-start-addr) (> fixup code-end-addr)))))
-    ;; The preceding logic returns T if and only if the fixup
-    ;; should be preserved for re-fix-up when code is transported.
-    (setf (sb!vm::%code-fixups code)
-          (let ((fixups (sb!vm::%code-fixups code)))
-            (let* ((len (length (the (simple-array sb!vm:word 1) fixups)))
-                   (new (replace (make-array (1+ len) :element-type 'sb!vm:word)
-                                 fixups)))
-              (setf (aref new len) offset)
-              new))))
-  nil)
-
-(defun sanctify-for-execution (code)
-  (declare (ignore code)))
+  (let* ((obj-start-addr (logandc2 (get-lisp-obj-address code) sb!vm:lowtag-mask))
+         (sap (code-instructions code))
+         (code-end-addr (+ (sap-int sap) (%code-code-size code))))
+    (ecase kind
+      (:absolute
+       ;; Word at sap + offset contains a value to be replaced by
+       ;; adding that value to fixup.
+       (setf (sap-ref-32 sap offset) (+ fixup (sap-ref-32 sap offset)))
+       ;; Record absolute fixups that point within the code object.
+       (< obj-start-addr (sap-ref-32 sap offset) code-end-addr))
+      (:relative
+       ;; Fixup is the actual address wanted.
+       ;; Replace word with value to add to that loc to get there.
+       (let* ((loc-sap (+ (sap-int sap) offset))
+              ;; Use modular arithmetic so that if the offset
+              ;; doesn't fit into signed-byte-32 it'll wrap around
+              ;; when added to EIP
+              (rel-val (ldb (byte 32 0) (- fixup loc-sap n-word-bytes))))
+         (declare (type (unsigned-byte 32) loc-sap rel-val))
+         (setf (sap-ref-32 sap offset) rel-val))
+       ;; Record relative fixups that point outside the code object.
+       (or (< fixup obj-start-addr) (> fixup code-end-addr))))))
 
 ;;;; low-level signal context access functions
 ;;;;

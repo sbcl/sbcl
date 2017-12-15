@@ -3675,10 +3675,7 @@ III. initially undefined function references (alphabetically):
       (dolist (pair (sort (%hash-table-alist *code-fixup-notes*) #'< :key #'car))
         (write-wordindexed (make-random-descriptor (car pair))
                            sb!vm::code-fixups-slot
-                           #!+x86 (ub32-vector-in-core (cdr pair))
-                           #!+x86-64 (number-to-core
-                                      (sb!c::pack-code-fixup-locs
-                                       (sort (cdr pair) #'<)))))
+                           (number-to-core (sb!c::pack-code-fixup-locs (cdr pair)))))
       (when core-file-name
         (finish-symbols))
       (finalize-load-time-value-noise)

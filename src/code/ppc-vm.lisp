@@ -39,7 +39,8 @@
                  (if (logbitp 15 l) (ldb (byte 16 0) (1+ h)) h))))
        (:l
         (setf (ldb (byte 16 0) (sap-ref-32 sap offset))
-              (ldb (byte 16 0) fixup)))))))
+              (ldb (byte 16 0) fixup)))))
+  nil))
 
 
 ;;;; "Sigcontext" access functions, cut & pasted from x86-vm.lisp then

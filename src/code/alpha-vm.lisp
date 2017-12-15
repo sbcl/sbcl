@@ -51,7 +51,8 @@
         (setf (sap-ref-8 sap offset) (ldb (byte 8 0) value))
         (setf (sap-ref-8 sap (1+ offset)) (ldb (byte 8 8) value)))
        (:absolute32
-        (setf (sap-ref-32 sap offset) value))))))
+        (setf (sap-ref-32 sap offset) value))))
+  nil))
 
 ;;;; "sigcontext" access functions, cut & pasted from x86-vm.lisp then
 ;;;; hacked for types.

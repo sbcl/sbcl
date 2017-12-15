@@ -19,7 +19,8 @@
   (let ((sap (code-instructions code)))
     (ecase kind
       (:absolute
-       (setf (sap-ref-32 sap offset) fixup))))))
+       (setf (sap-ref-32 sap offset) fixup))))
+  nil))
 
 ;;;; "Sigcontext" access functions, cut & pasted from sparc-vm.lisp,
 ;;;; then modified for ARM.

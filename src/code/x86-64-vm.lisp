@@ -18,6 +18,7 @@
 
 ;;; This gets called by LOAD to resolve newly positioned objects
 ;;; with things (like code instructions) that have to refer to them.
+;;; Return T if and only if the fixup needs to be recorded in %CODE-FIXUPS
 (defun fixup-code-object (code offset fixup kind &optional flavor)
   (declare (type index offset) (ignorable flavor))
   (let* ((sap (code-instructions code))
@@ -59,21 +60,11 @@
   ;;      We can ignore the :RELATIVE kind.
   ;;  (2) :STATIC-CALL fixups point to immobile space, not static space.
   #!+immobile-space
-  (when (and (eq kind :absolute)
+  (return-from fixup-code-object
+        (and (eq kind :absolute)
              (member flavor '(:named-call :layout :immobile-object ; -> fixedobj subspace
-                              :assembly-routine :static-call))) ; -> varyobj subspace
-    (let ((fixups (%code-fixups code)))
-      ;; Sanctifying the code component will compact these into a bignum.
-      (setf (%code-fixups code) (cons offset (if (eql fixups 0) nil fixups)))))
-  nil)
-
-(defun sanctify-for-execution (code)
-  (declare (ignorable code))
-  #!+immobile-space
-  (let ((fixups (%code-fixups code)))
-    (when (listp fixups)
-      (setf (%code-fixups code) (sb!c::pack-code-fixup-locs fixups))))
-  nil)
+                              :assembly-routine :static-call)))) ; -> varyobj subspace
+  nil) ; non-immobile-space builds never record code fixups
 
 #!+(or darwin linux win32)
 (define-alien-routine ("os_context_float_register_addr" context-float-register-addr)

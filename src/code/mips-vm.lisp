@@ -30,7 +30,8 @@
               (ash (1+ (ash value -15)) -1)))
        (:addi
         (setf (ldb (byte 16 0) (sap-ref-32 sap offset))
-              (ldb (byte 16 0) value)))))))
+              (ldb (byte 16 0) value)))))
+  nil))
 
 
 #-sb-xc-host (progn

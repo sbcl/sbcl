@@ -50,7 +50,8 @@
                 (logior (ash bits 3)
                         (mask-field (byte 1 1) inst)
                         (mask-field (byte 3 13) inst)
-                        (mask-field (byte 11 21) inst)))))))))
+                        (mask-field (byte 11 21) inst)))))))
+  nil))
 
 #-sb-xc-host (progn
 
