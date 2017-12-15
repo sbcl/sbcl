@@ -375,7 +375,8 @@
       (process-wait process)
       (assert (not (process-alive-p process))))))
 
-(with-test (:name (run-program :stop+continue :posix-kill) :skipped-on :win32)
+#-win32
+(with-test (:name (run-program :stop+continue :posix-kill))
   (let ((process (run-program "cat" '() :search t :input :stream :wait nil)))
     (flet ((kill-and-check-status (signal expected-status)
              (sb-posix:kill (process-pid process) signal)
