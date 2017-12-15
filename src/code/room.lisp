@@ -699,9 +699,11 @@ We could try a few things to mitigate this:
                             sorted))
            (bytes-width (decimal-with-grouped-digits-width total-bytes))
            (objects-width (decimal-with-grouped-digits-width total-objects))
+           (totals-label (format nil "~:(~A~) instance total" space))
            (types-width (reduce #'max interesting
-                                :key (lambda (x) (length (symbol-name (classoid-name (first x)))))
-                                :initial-value 0))
+                                :key (lambda (x)
+                                       (length (symbol-name (classoid-name (first x)))))
+                                :initial-value (length totals-label)))
            (printed-bytes 0)
            (printed-objects 0))
       (declare (unsigned-byte printed-bytes printed-objects))
@@ -716,12 +718,12 @@ We could try a few things to mitigate this:
              (incf printed-bytes bytes)
              (incf printed-objects objects)
              (type-usage type objects bytes))
+        (terpri)
         (let ((residual-objects (- total-objects printed-objects))
               (residual-bytes (- total-bytes printed-bytes)))
           (unless (zerop residual-objects)
-            (type-usage "Other types" residual-bytes residual-objects)))
-        (type-usage (format nil "~:(~A~) instance total" space)
-                    total-bytes total-objects))))
+            (type-usage "Other types" residual-objects residual-bytes)))
+        (type-usage totals-label total-objects total-bytes))))
   (values))
 
 ;;;; PRINT-ALLOCATED-OBJECTS
