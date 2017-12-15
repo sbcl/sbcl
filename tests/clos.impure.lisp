@@ -1142,6 +1142,20 @@
   (assert (equal (bug-1734771 t 3) '(t 3))))
 (with-test (:name (:cnm-assignment :bug-1734771 3))
   (assert (equal (bug-1734771 #\c nil) '(#\c nil))))
+
+(defgeneric bug-1734771-2 (x &optional y)
+  (:method (x &optional (y nil y-p)) (list x y y-p))
+  (:method ((x integer) &optional (y 0))
+    (incf y)
+    (call-next-method))
+  (:method ((x symbol) &optional (y 0))
+    (call-next-method)))
+(with-test (:name (:cnm-assignment :bug-1734771 4))
+  (assert (equal (bug-1734771-2 2) '(2 nil nil))))
+(with-test (:name (:cnm-assignment :bug-1734771 5))
+  (assert (equal (bug-1734771-2 2 0) '(2 0 t))))
+(with-test (:name (:cnm-assignment :bug-1734771 6))
+  (assert (equal (bug-1734771-2 t) '(t nil nil))))
 
 ;;; Bug reported by Istvan Marko 2003-07-09
 (let ((class-name (gentemp)))

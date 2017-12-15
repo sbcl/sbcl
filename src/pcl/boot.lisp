@@ -868,7 +868,7 @@ bootstrapping.
               `(declare
                 ,@(mapcan (lambda (parameter)
                             (list `(%parameter ,parameter)))
-                          parameters)))
+                          required-parameters)))
              (method-lambda
               ;; Remove the documentation string and insert the
               ;; appropriate class declarations. The documentation
