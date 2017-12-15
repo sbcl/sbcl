@@ -197,8 +197,8 @@ Lzero:
 	# Inform unwinder that the new frame has not been entered yet.
 	# The CFA is what it was (old RBP+16) before the preceding mov.
 	# This sequence encodes DW_CFA_def_cfa_expression
-	# DW_OP_breg7 (rsp): 0 / DW_OP_deref / DW_OP_lit16 / DW_OP_plus
-	.cfi_escape 0x0f, 5, 0x77, 0, 6, 0x40, 0x22
+	# DW_OP_breg6 (rbp): 0 / DW_OP_deref / DW_OP_lit16 / DW_OP_plus
+	.cfi_escape 0x0f, 5, 0x76, 0, 6, 0x40, 0x22
 Lcall:
 	call	*CLOSURE_FUN_OFFSET(%rax)
 	
