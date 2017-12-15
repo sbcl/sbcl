@@ -682,36 +682,48 @@
   ; (format t "~&linker-relocs=~D~%" n-linker-relocs)
   (values total-code-size n-linker-relocs))
 
-(defun extract-required-c-symbols (spaces fixedobj-range asm-file &optional (verbose nil))
-  (flet ((find-target-symbol (package-name symbol-name)
-           (let* ((physaddr (translate-ptr (car fixedobj-range) spaces))
-                  (limit (+ physaddr (car fixedobj-range))))
-             (loop
-               (when (>= physaddr limit) (bug "Can't find symbol"))
-               (multiple-value-bind (obj tag size)
-                   (reconstitute-object (ash physaddr (- n-fixnum-tag-bits)))
-                 (when (and (= tag symbol-widetag)
-                            (string= symbol-name (translate (symbol-name obj) spaces))
-                            (%instancep (symbol-package obj))
-                            (string= package-name
-                                     (translate
-                                      (package-%name
-                                       (truly-the package (translate (symbol-package obj) spaces)))
-                                      spaces)))
-                   (return (%make-lisp-obj (logior physaddr other-pointer-lowtag))))
-                 (incf physaddr size)))))
-         (symbol-fdefn-fun (symbol)
+;;; Return either the physical or logical address of the specified symbol.
+(defun find-target-symbol (package-name symbol-name spaces
+                           &optional (address-mode :physical))
+  (let* ((space (find immobile-fixedobj-core-space-id (cdr spaces) :key #'space-id))
+         (start (translate-ptr (space-addr space) spaces))
+         (end (+ start (space-size space)))
+         (physaddr start))
+    (loop
+      (when (>= physaddr end) (bug "Can't find symbol"))
+      (multiple-value-bind (obj tag size)
+          (reconstitute-object (ash physaddr (- n-fixnum-tag-bits)))
+        (when (and (= tag symbol-widetag)
+                   (string= symbol-name (translate (symbol-name obj) spaces))
+                   (%instancep (symbol-package obj))
+                   (string= package-name
+                            (translate
+                             (package-%name
+                              (truly-the package (translate (symbol-package obj) spaces)))
+                             spaces)))
+          (return (%make-lisp-obj
+                   (logior (ecase address-mode
+                             (:physical physaddr)
+                             (:logical (+ (space-addr space) (- physaddr start))))
+                           other-pointer-lowtag))))
+        (incf physaddr size)))))
+
+(defun extract-required-c-symbols (spaces asm-file &optional (verbose nil))
+  (flet ((symbol-fdefn-fun (symbol)
            (let ((vector (translate (symbol-info-vector symbol) spaces)))
              ;; TODO: allow for (plist . info-vector) in the info slot
              (aver (simple-vector-p vector))
              (translate (fdefn-fun (translate (info-vector-fdefn vector) spaces))
                         spaces))))
     (let ((linkage-info
-           (translate (symbol-global-value (find-target-symbol "SB-SYS" "*LINKAGE-INFO*"))
+           (translate (symbol-global-value
+                       (find-target-symbol "SB-SYS" "*LINKAGE-INFO*" spaces))
                       spaces))
           (dyn-syminfo
            (symbol-fdefn-fun
-            (find-target-symbol "SB-SYS" "ENSURE-DYNAMIC-FOREIGN-SYMBOL-ADDRESS"))))
+            (find-target-symbol "SB-SYS"
+                                "ENSURE-DYNAMIC-FOREIGN-SYMBOL-ADDRESS"
+                                spaces))))
       (aver (= (get-closure-length dyn-syminfo) 3))
       (let* ((ht1 (translate (%closure-index-ref dyn-syminfo 1) spaces))
              (ht2 (translate (%closure-index-ref dyn-syminfo 0) spaces))
@@ -1119,11 +1131,7 @@
                (physical-addr (space-physaddr space spaces))
                (physical-end (sap+ physical-addr size))
                (vaddr-translation (+ (- (sap-int physical-addr)) logical-addr)))
-          (unless (or (= (space-id space) immobile-varyobj-core-space-id)
-                      (= (space-id space) -92 #|dynamic-core-space-id|#))
-            (format t "~&scan range vaddr=~12x:~12x paddr=~12x:~12x~%"
-                    logical-addr (+ logical-addr size)
-                    (sap-int physical-addr) (sap-int physical-end))
+          (unless (= (space-id space) immobile-varyobj-core-space-id)
             (dx-flet ((visit (obj widetag size)
                         ;; Compute the object's intended virtual address
                         (let ((vaddr (+ (logandc2 (get-lisp-obj-address obj) lowtag-mask)
@@ -1133,11 +1141,12 @@
                #'visit
                (ash (sap-int physical-addr) (- n-fixnum-tag-bits))
                (ash (sap-int physical-end) (- n-fixnum-tag-bits))))
-            (when (plusp (logior n-abs n-rel))
+            (when (and (plusp (logior n-abs n-rel)) print)
               (format t "space @ ~x: ~d absolute + ~d relative fixups~%"
                       logical-addr n-abs n-rel))
             (setq n-abs 0 n-rel 0))))))
-  (format t "total of ~D linker fixups~%" (length fixups))
+  (when print
+    (format t "total of ~D linker fixups~%" (length fixups)))
   fixups)
 
 ;;;;
@@ -1190,7 +1199,7 @@
 ;;; is for linking in to a binary that needs no "--core" argument.
 (defun split-core
     (input-pathname asm-pathname
-     &key emit-sizes (verbose t)
+     &key emit-sizes (verbose nil)
      &aux (split-core-pathname
            (merge-pathnames (make-pathname :type "core") asm-pathname))
           (elf-core-pathname
@@ -1332,21 +1341,29 @@
             (setf (%vector-raw-bits core-header code-start-fixup-ofs) 0)
             (write-sequence core-header output) ; Copy prepared header
             (force-output output)
+            ;; Change SB-C::*COMPILE-FILE-TO-MEMORY-SPACE* to :DYNAMIC
+            ;; in case the resulting executable wants to call COMPILE-FILE
+            ;; and then load the resulting fasl.
+            (%set-symbol-global-value
+             (find-target-symbol "SB-C" "*COMPILE-FILE-TO-MEMORY-SPACE*" map)
+             (find-target-symbol "KEYWORD" "DYNAMIC" map :logical))
+            ;;
             (dolist (space data-spaces) ; Copy pages from memory
               (let ((start (space-physaddr space map))
                     (size (space-nbytes-aligned space)))
                 (aver (eql (sb-unix:unix-write (sb-sys:fd-stream-fd output)
                                                start 0 size)
                            size))))
-            (format t "Copying ~d bytes (#x~x) from ptes = ~d PTEs~%"
-                    pte-nbytes pte-nbytes (floor pte-nbytes 10))
+            (when verbose
+              (format t "Copying ~d bytes (#x~x) from ptes = ~d PTEs~%"
+                      pte-nbytes pte-nbytes (floor pte-nbytes 10)))
             (copy-bytes input output pte-nbytes)) ; Copy PTEs from input
 
           ;; There's no relation between emit-sizes and which section to put
           ;; C symbol references in, however it's a safe bet that if sizes
           ;; are supported then so is the .rodata directive.
           (format asm-file (if emit-sizes " .rodata~%" " .data~%"))
-          (extract-required-c-symbols map fixedobj-range asm-file)
+          (extract-required-c-symbols map asm-file)
           (write-assembler-text map fixedobj-range asm-file emit-sizes)))
 
       (format asm-file "~% ~A~%" +noexec-stack-note+))))
