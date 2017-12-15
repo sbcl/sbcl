@@ -931,20 +931,13 @@ struct new_area {
     size_t size;
 };
 static struct new_area (*new_areas)[];
-static size_t new_areas_index;
-size_t max_new_areas;
+static int new_areas_index;
+int new_areas_index_hwm; // high water mark
 
 /* Add a new area to new_areas. */
 static void
 add_new_area(page_index_t first_page, size_t offset, size_t size)
 {
-    size_t new_area_start, c;
-    ssize_t i;
-
-    /* Ignore if full. */
-    if (new_areas_index >= NUM_NEW_AREAS)
-        return;
-
     switch (record_new_objects) {
     case 0:
         return;
@@ -958,8 +951,12 @@ add_new_area(page_index_t first_page, size_t offset, size_t size)
         gc_abort();
     }
 
-    new_area_start = npage_bytes(first_page) + offset;
+    /* Ignore if full. */
+    if (new_areas_index >= NUM_NEW_AREAS)
+        return;
 
+    size_t new_area_start = npage_bytes(first_page) + offset;
+    int i, c;
     /* Search backwards for a prior area that this follows from. If
        found this will save adding a new area. */
     for (i = new_areas_index-1, c = 0; (i >= 0) && (c < 8); i--, c++) {
@@ -992,10 +989,6 @@ add_new_area(page_index_t first_page, size_t offset, size_t size)
            "/new_area %d page %d offset %d size %d\n",
            new_areas_index, first_page, offset, size));*/
     new_areas_index++;
-
-    /* Note the max new_areas used. */
-    if (new_areas_index > max_new_areas)
-        max_new_areas = new_areas_index;
 }
 
 /* Update the tables for the alloc_region. The region may be added to
@@ -2489,6 +2482,14 @@ scavenge_newspace_generation_one_scan(generation_index_t generation)
            generation));
 }
 
+static void reset_new_areas_index()
+{
+    /* Note the max new_areas used. */
+    if (new_areas_index > new_areas_index_hwm)
+        new_areas_index_hwm = new_areas_index;
+    new_areas_index = 0;
+}
+
 /* Do a complete scavenge of the newspace generation. */
 static void
 scavenge_newspace_generation(generation_index_t generation)
@@ -2508,7 +2509,7 @@ scavenge_newspace_generation(generation_index_t generation)
 
     /* Turn on the recording of new areas by gc_alloc(). */
     new_areas = current_new_areas;
-    new_areas_index = 0;
+    reset_new_areas_index();
 
     /* Don't need to record new areas that get scavenged anyway during
      * scavenge_newspace_generation_one_scan. */
@@ -2554,7 +2555,7 @@ scavenge_newspace_generation(generation_index_t generation)
 
         /* Set up for gc_alloc(). */
         new_areas = current_new_areas;
-        new_areas_index = 0;
+        reset_new_areas_index();
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
         scavenge_immobile_newspace();
