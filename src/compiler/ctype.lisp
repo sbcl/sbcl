@@ -1152,7 +1152,7 @@ and no value was provided for it." name))))))))))
                        "~@<Constant ~2I~_~S ~Iconflicts with its ~
                             asserted type ~
                             ~2I~_~/sb!impl::print-type-specifier/.~@:>"
-                       :format-arguments (list (eval detail) atype))
+                       :format-arguments (list (constant-form-value detail) atype))
                  (warn condition
                        :format-control
                        "~@<Derived type of ~S is ~2I~_~S, ~

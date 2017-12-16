@@ -812,3 +812,13 @@
               (checked-compile `(lambda (&optional (x (block 1 10))) x)
                                :allow-failure t)))
   (assert (not (constantp '(block 1 10)))))
+
+(with-test (:name :type-error-reporting)
+  (assert
+   (nth-value 1
+              (checked-compile `(lambda ()
+                                  (lambda ()
+                                    (let ((v3 0))
+                                      (cdr (1- (block b5 (if nil v3 0)))))))
+                               :allow-warnings t))))
+
