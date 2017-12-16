@@ -319,6 +319,14 @@ GNAME(do_pending_interrupt):
 	ret
 	SIZE(GNAME(do_pending_interrupt))
 
+	.globl 	GNAME(memory_fault_emulation_trap)
+	TYPE(GNAME(memory_fault_emulation_trap))
+	.align	align_16byte,0x90
+GNAME(memory_fault_emulation_trap):
+	TRAP
+	.byte 	trap_MemoryFaultEmulation
+	SIZE(GNAME(memory_fault_emulation_trap))
+
 	.globl	GNAME(post_signal_tramp)
 	TYPE(GNAME(post_signal_tramp))
 	.align	align_16byte,0x90

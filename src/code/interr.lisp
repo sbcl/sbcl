@@ -489,13 +489,11 @@
   (error 'undefined-alien-variable-error))
 
 #!-win32
-(define-alien-variable current-memory-fault-address unsigned)
-
-#!-win32
-(defun memory-fault-error ()
+(defun memory-fault-error (context-sap address-sap)
+  (declare (ignore context-sap))
   (let ((sb!debug:*stack-top-hint* (find-interrupted-frame)))
     (error 'memory-fault-error
-           :address current-memory-fault-address)))
+           :address (sap-int address-sap))))
 
 ;;; This is SIGTRAP / EXCEPTION_BREAKPOINT that runtime could not deal
 ;;; with. Prior to Windows we just had a Lisp side handler for

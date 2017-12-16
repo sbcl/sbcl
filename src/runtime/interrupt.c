@@ -2149,18 +2149,10 @@ siginfo_code(siginfo_t *info)
 {
     return info->si_code;
 }
-os_vm_address_t current_memory_fault_address;
 
 void
 lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
 {
-   /* FIXME: This is lossy: if we get another memory fault (eg. from
-    * another thread) before lisp has read this, we lose the information.
-    * However, since this is mostly informative, we'll live with that for
-    * now -- some address is better then no address in this case.
-    */
-    current_memory_fault_address = addr;
-
     /* If we lose on corruption, provide LDB with debugging information. */
     fake_foreign_function_call(context);
 
@@ -2175,19 +2167,67 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
 #endif
                                       );
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-    undo_fake_foreign_function_call(context);
-    unblock_signals_in_context_and_maybe_warn(context);
-    arrange_return_to_lisp_function(context,
-                                    StaticSymbolFunction(MEMORY_FAULT_ERROR));
-#else
-#  ifndef LISP_FEATURE_SB_SAFEPOINT
-    unblock_gc_signals(0, 0);
+#  if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
+#    error memory fault emulation needs validating for this architecture
 #  endif
-    funcall0(StaticSymbolFunction(MEMORY_FAULT_ERROR));
+    /* We're on the altstack, and don't want to run Lisp code here, so
+     * we need to return from this signal handler.  But when we get to
+     * Lisp we'd like to have a signal context (with correct values in
+     * it) to present to the debugger, along with knowledge of what
+     * the faulting address was.  To get a signal context on the main
+     * stack, we arrange to return to a trap instruction.  To get the
+     * correct program counter in the context, we save it on the stack
+     * here and restore it to the context in the trap handler.  To
+     * pass the fault address, we save it on the stack here and pick
+     * it up in the trap handler.  And the stack pointer manipulation
+     * works as long as the on-stack side only pops items in its trap
+     * handler. */
+    extern void memory_fault_emulation_trap(void);
     undo_fake_foreign_function_call(context);
-#endif
+    void **sp = (void **)*os_context_sp_addr(context);
+    *--sp = (void *)*os_context_pc_addr(context);
+    *--sp = addr;
+#  ifdef LISP_FEATURE_X86
+    /* KLUDGE: x86-linux sp_addr doesn't affect the CPU on return */
+    *((void **)os_context_register_addr(context, reg_ESP)) = sp;
+#  else
+    *((void **)os_context_sp_addr(context)) = sp;
+#  endif
+    *os_context_pc_addr(context) =
+        (os_context_register_t)memory_fault_emulation_trap;
+    /* We exit here, letting the signal handler return, picking up at
+     * memory_fault_emulation_trap (in target-assem.S), which will
+     * trap, and the handler calls the function below, where we
+     * restore our state to parallel what a non-x86oid would have, and
+     * then run the common code for handling the error in Lisp. */
 }
+
+void
+handle_memory_fault_emulation_trap(os_context_t *context)
+{
+    void **sp = (void **)*os_context_sp_addr(context);
+    void *addr = *sp++;
+    *os_context_pc_addr(context) = (os_context_register_t)*sp++;
+#  ifdef LISP_FEATURE_X86
+    /* KLUDGE: x86-linux sp_addr doesn't affect the CPU on return */
+    *((void **)os_context_register_addr(context, reg_ESP)) = sp;
+#  else
+    *os_context_sp_addr(context) = (os_context_register_t)sp;
+#  endif
+    fake_foreign_function_call(context);
+#endif /* C_STACK_IS_CONTROL_STACK */
+    /* On x86oids, we're in handle_memory_fault_emulation_trap().
+     * On real computers, we're still in lisp_memory_fault_error(). */
+#ifndef LISP_FEATURE_SB_SAFEPOINT
+    unblock_gc_signals(0, 0);
 #endif
+    DX_ALLOC_SAP(context_sap, context);
+    DX_ALLOC_SAP(fault_address_sap, addr);
+    funcall2(StaticSymbolFunction(MEMORY_FAULT_ERROR),
+             context_sap, fault_address_sap);
+    undo_fake_foreign_function_call(context);
+}
+#endif /* !LISP_FEATURE_WIN32 */
 
 static void
 unhandled_trap_error(os_context_t *context)
@@ -2262,6 +2302,11 @@ handle_trap(os_context_t *context, int trap)
     case trap_Allocation:
         arch_handle_allocation_trap(context);
         arch_skip_instruction(context);
+        break;
+#endif
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+    case trap_MemoryFaultEmulation:
+        handle_memory_fault_emulation_trap(context);
         break;
 #endif
     case trap_Halt:
