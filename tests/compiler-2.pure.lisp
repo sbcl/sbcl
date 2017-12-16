@@ -799,3 +799,16 @@
                  (%f))))
         (declare (dynamic-extent s))
         (car s)))))
+
+(with-test (:name (:bogus-block &key))
+  (assert
+   (nth-value 1
+              (checked-compile `(lambda (&key (x (block 1 10))) x)
+                               :allow-failure t))))
+
+(with-test (:name (:bogus-block constantp))
+  (assert
+   (nth-value 1
+              (checked-compile `(lambda (&optional (x (block 1 10))) x)
+                               :allow-failure t)))
+  (assert (not (constantp '(block 1 10)))))

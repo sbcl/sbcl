@@ -214,7 +214,8 @@
    ;;   ...ANYTHING...)
    ;;
    ;; Right now RETURN-FROM kills the constantness unequivocally.
-   :test (every #'constantp* forms)
+   :test (and (symbolp name)
+              (every #'constantp* forms))
    :eval (constant-form-value* (car (last forms))))
 
 (!defconstantp multiple-value-prog1 (&whole subforms first-form &body forms)
