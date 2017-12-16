@@ -1055,6 +1055,13 @@ somewhat unsafe. @xref{Asynchronous Timeouts}.
 
 @end table
 
+@menu
+* Timeout Parameters::
+* Synchronous Timeouts (Deadlines)::
+* Asynchronous Timeouts::
+* Operations Supporting Timeouts and Deadlines::
+@end menu
+
 @node Timeout Parameters
 @subsection Timeout Parameters
 @cindex Timeout
