@@ -1380,14 +1380,16 @@
           (when return
             (do-uses (node (return-result
                             (lambda-return (main-entry new-fun))))
-              (derive-node-type node type))))
-
-        (locall-analyze-component *current-component*)
-        (when reoptimize-combination
-          ;; This is mainly to call PROPAGATE-LET-ARGS so that the
-          ;; newly converted code gets to better types sooner.
-          (setf (node-reoptimize call) nil)
-          (ir1-optimize-combination call)))))
+              (derive-node-type node type))))))
+    ;; Must be done outside of WITH-COMPONENT-LAST-BLOCK
+    ;; otherwise REMOVE-FROM-DFO might remove that block
+    ;; but new code still will get attached to it.
+    (locall-analyze-component *current-component*))
+  (when reoptimize-combination
+    ;; This is mainly to call PROPAGATE-LET-ARGS so that the
+    ;; newly converted code gets to better types sooner.
+    (setf (node-reoptimize call) nil)
+    (ir1-optimize-combination call))
   (values))
 
 (defun constant-fold-arg-p (name)

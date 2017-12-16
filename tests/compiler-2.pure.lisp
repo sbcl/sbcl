@@ -829,3 +829,14 @@
                                   (restart-bind ((1 3))))
                                :allow-warnings t))))
 
+(with-test (:name :transform-call-dfo-consistency)
+  (assert
+   (nth-value 1
+              (checked-compile
+               `(lambda ()
+                  (flet ((%f (&optional x) x))
+                    (%f)
+                    ;; Two of the %f calls are erroneous, with an extra argument
+                    (flet ((%f6 (&key (k (%f (%f -1 (%f -2 -3))))) 0))
+                      5)))
+               :allow-warnings t))))
