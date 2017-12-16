@@ -56,6 +56,13 @@ foreign function interface definitions. @xref{sb-grovel}.
 SBCL provides a recursive event loop (@code{serve-event}) for doing
 non-blocking IO on multiple streams without using threads.
 
+@item Timeouts and Deadlines
+SBCL allows restricting the execution time of individual operations or
+parts of a computation using @code{:timeout} arguments to certain
+blocking operations, synchronous timeouts and asynchronous timeouts. The
+latter two affect operations without explicit timeout support (such as
+standard functions and macros). @xref{Timeouts and Deadlines}.
+
 @item Metaobject Protocol
 @code{sb-mop} package provides a metaobject protocol for the Common
 Lisp Object System as described in @cite{Art of Metaobject Protocol}.

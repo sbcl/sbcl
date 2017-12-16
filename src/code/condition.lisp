@@ -1189,13 +1189,15 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
                      (standard-pprint-dispatch-table-modified-operation
                       condition))))
   (:default-initargs
-      :references `((:ansi-cl :glossary "standard pprint dispatch table"))))
+   :references `((:ansi-cl :glossary "standard pprint dispatch table"))))
 
 (define-condition timeout (serious-condition)
   ((seconds :initarg :seconds :initform nil :reader timeout-seconds))
   (:report (lambda (condition stream)
              (format stream "Timeout occurred~@[ after ~A second~:P~]."
-                     (timeout-seconds condition)))))
+                     (timeout-seconds condition))))
+  (:documentation
+   "Signaled when an operation does not complete within an allotted time budget."))
 
 (define-condition io-timeout (stream-error timeout)
   ((direction :reader io-timeout-direction :initarg :direction))
@@ -1207,10 +1209,14 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
              (io-timeout-direction condition)
              (stream-error-stream condition)))))
 
-(define-condition deadline-timeout (timeout) ()
+(define-condition deadline-timeout (timeout)
+  ()
   (:report (lambda (condition stream)
              (format stream "A deadline was reached after ~A second~:P."
-                     (timeout-seconds condition)))))
+                     (timeout-seconds condition))))
+  (:documentation
+   "Signaled when an operation in the context of a deadline takes
+longer than permitted by the deadline."))
 
 (define-condition declaration-type-conflict-error (reference-condition
                                                    simple-error)
@@ -1225,7 +1231,6 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
 
 (define-condition step-condition ()
   ((form :initarg :form :reader step-condition-form))
-
   (:documentation "Common base class of single-stepping conditions.
 STEP-CONDITION-FORM holds a string representation of the form being
 stepped."))
