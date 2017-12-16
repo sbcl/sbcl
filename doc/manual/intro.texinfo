@@ -258,9 +258,6 @@ e.g.
 @itemize
 
 @item
-@code{defmethod} without a preceding @code{defgeneric};
-
-@item
 multiple @code{defun}s of the same symbol in different units;
 
 @item
