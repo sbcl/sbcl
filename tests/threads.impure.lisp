@@ -26,6 +26,9 @@
   (mapc (lambda (thread) (sb-thread:join-thread thread :default nil)) threads)
   (assert (not (some #'sb-thread:thread-alive-p threads))))
 
+(defun process-all-interrupts (&optional (thread *current-thread*))
+  (sb-ext:wait-for (null (sb-thread::thread-interruptions thread))))
+
 (with-test (:name (:threads :trivia))
   (assert (eql 1 (length (list-all-threads))))
 
@@ -50,6 +53,7 @@
 (with-test (:name (:interrupt-thread :basics :no-unwinding))
   (let ((a 0))
     (interrupt-thread *current-thread* (lambda () (setq a 1)))
+    (process-all-interrupts)
     (assert (eql a 1))))
 
 (with-test (:name (:interrupt-thread :deferrables-blocked))
@@ -58,20 +62,23 @@
                                 ;; Make sure sb-ext:gc doesn't leave the
                                 ;; deferrables unblocked
                                 (sb-ext:gc)
-                                (check-deferrables-blocked-or-lose 0))))
+                                (check-deferrables-blocked-or-lose 0)))
+  (process-all-interrupts))
 
 (with-test (:name (:interrupt-thread :deferrables-unblocked))
   (sb-thread:interrupt-thread sb-thread:*current-thread*
                               (lambda ()
                                 (with-interrupts
-                                  (check-deferrables-unblocked-or-lose 0)))))
+                                  (check-deferrables-unblocked-or-lose 0))))
+  (process-all-interrupts))
 
 (with-test (:name (:interrupt-thread :nlx))
   (catch 'xxx
     (sb-thread:interrupt-thread sb-thread:*current-thread*
                                 (lambda ()
                                   (check-deferrables-blocked-or-lose 0)
-                                  (throw 'xxx nil))))
+                                  (throw 'xxx nil)))
+    (process-all-interrupts))
   (check-deferrables-unblocked-or-lose 0))
 
 #-sb-thread (sb-ext:exit :code 104)
@@ -567,14 +574,12 @@
 
 (defun test-interrupt (function-to-interrupt &optional quit-p)
   (let ((child  (make-kill-thread function-to-interrupt)))
-    ;;(format t "gdb ./src/runtime/sbcl ~A~%attach ~A~%" child child)
-    (sleep 2)
     (format t "interrupting child ~A~%" child)
     (interrupt-thread child
                       (lambda ()
                         (format t "child pid ~A~%" *current-thread*)
                         (when quit-p (abort-thread))))
-    (sleep 1)
+    (process-all-interrupts child)
     child))
 
 ;; separate tests for (a) interrupting Lisp code, (b) C code, (c) a syscall,
@@ -612,6 +617,7 @@
       (sleep 5)
       (interrupt-thread child (lambda () (format t "l ~A~%" (mutex-value lock))))
       (format t "parent releasing lock~%"))
+    (process-all-interrupts child)
     (terminate-thread child)
     (wait-for-threads (list child))))
 
@@ -630,6 +636,7 @@
                           (force-output)
                           (sb-thread:interrupt-thread thread (lambda ()))))))))
       (wait-for-threads killers)
+      (process-all-interrupts thread)
       (sb-thread:terminate-thread thread)
       (wait-for-threads (list thread))))
   (sb-ext:gc :full t))
@@ -648,6 +655,7 @@
                           (assert (thread-alive-p *current-thread*))
                           (assert
                            (not (logbitp 0 SB-KERNEL:*PSEUDO-ATOMIC-BITS*))))))
+    (process-all-interrupts c)
     (terminate-thread c)
     (wait-for-threads (list c))))
 
@@ -812,7 +820,8 @@
           (sb-thread:interrupt-thread
            thread
            (lambda ()
-             (assert (find-restart 'abort)))))))
+             (assert (find-restart 'abort))))
+          (process-all-interrupts thread))))
 
 (sb-ext:gc :full t)
 
