@@ -35,34 +35,28 @@ character input streams must implement @codew{stream-read-char} and
 (defclass wrapped-stream (fundamental-stream)
   ((stream :initarg :stream :reader stream-of)))
 @end group
-
 @group
 (defmethod stream-element-type ((stream wrapped-stream))
   (stream-element-type (stream-of stream)))
 @end group
-
 @group
 (defmethod close ((stream wrapped-stream) &key abort)
   (close (stream-of stream) :abort abort))
 @end group
-
 @group
 (defclass wrapped-character-input-stream
     (wrapped-stream fundamental-character-input-stream)
   ())
 @end group
-
 @group
 (defmethod stream-read-char ((stream wrapped-character-input-stream))
   (read-char (stream-of stream) nil :eof))
 @end group
-
 @group
 (defmethod stream-unread-char ((stream wrapped-character-input-stream)
                                char)
   (unread-char char (stream-of stream)))
 @end group
-
 @group
 (defclass counting-character-input-stream
     (wrapped-character-input-stream)
@@ -71,7 +65,6 @@ character input streams must implement @codew{stream-read-char} and
    (col-count :initform 1 :accessor col-count-of)
    (prev-col-count :initform 1 :accessor prev-col-count-of)))
 @end group
-
 @group
 (defmethod stream-read-char ((stream counting-character-input-stream))
   (with-accessors ((inner-stream stream-of) (chars char-count-of)
@@ -91,7 +84,6 @@ character input streams must implement @codew{stream-read-char} and
                (incf cols)
                char)))))
 @end group
-
 @group
 (defmethod stream-unread-char ((stream counting-character-input-stream)
                                char)
@@ -156,28 +148,23 @@ that all character output stream classes must implement
 (defclass wrapped-stream (fundamental-stream)
   ((stream :initarg :stream :reader stream-of)))
 @end group
-
 @group
 (defmethod stream-element-type ((stream wrapped-stream))
   (stream-element-type (stream-of stream)))
 @end group
-
 @group
 (defmethod close ((stream wrapped-stream) &key abort)
   (close (stream-of stream) :abort abort))
 @end group
-
 @group
 (defclass wrapped-character-output-stream
     (wrapped-stream fundamental-character-output-stream)
   ((col-index :initform 0 :accessor col-index-of)))
 @end group
-
 @group
 (defmethod stream-line-column ((stream wrapped-character-output-stream))
   (col-index-of stream))
 @end group
-
 @group
 (defmethod stream-write-char ((stream wrapped-character-output-stream)
                               char)
@@ -187,19 +174,16 @@ that all character output stream classes must implement
         (setf cols 0)
         (incf cols))))
 @end group
-
 @group
 (defclass prefixed-character-output-stream
     (wrapped-character-output-stream)
   ((prefix :initarg :prefix :reader prefix-of)))
 @end group
-
 @group
 (defgeneric write-prefix (prefix stream)
   (:method ((prefix string) stream) (write-string prefix stream))
   (:method ((prefix function) stream) (funcall prefix stream)))
 @end group
-
 @group
 (defmethod stream-write-char ((stream prefixed-character-output-stream)
                               char)
