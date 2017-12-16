@@ -611,14 +611,15 @@
   ;; across components, or an explanation of when they do it. ...in the
   ;; meanwhile AVER that our assumption holds true.
   (aver (or (not component) (eq component (node-component use))))
-  (or (dx-combination-p use dx)
-      (and (cast-p use)
-           (not (cast-type-check use))
-           (lvar-good-for-dx-p (cast-value use) dx component))
-      (and (trivial-lambda-var-ref-p use)
-           (let ((uses (lvar-uses (trivial-lambda-var-ref-lvar use))))
-             (or (eq use uses)
-                 (lvar-good-for-dx-p (trivial-lambda-var-ref-lvar use) dx component))))))
+  (and (not (node-to-be-deleted-p use))
+       (or (dx-combination-p use dx)
+           (and (cast-p use)
+                (not (cast-type-check use))
+                (lvar-good-for-dx-p (cast-value use) dx component))
+           (and (trivial-lambda-var-ref-p use)
+                (let ((uses (lvar-uses (trivial-lambda-var-ref-lvar use))))
+                  (or (eq use uses)
+                      (lvar-good-for-dx-p (trivial-lambda-var-ref-lvar use) dx component)))))))
 
 (defun lvar-good-for-dx-p (lvar dx &optional component)
   (let ((uses (lvar-uses lvar)))

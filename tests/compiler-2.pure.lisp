@@ -822,3 +822,10 @@
                                       (cdr (1- (block b5 (if nil v3 0)))))))
                                :allow-warnings t))))
 
+(with-test (:name :dx-on-deleted-nodes)
+  (assert
+   (nth-value 1
+              (checked-compile `(lambda ()
+                                  (restart-bind ((1 3))))
+                               :allow-warnings t))))
+
