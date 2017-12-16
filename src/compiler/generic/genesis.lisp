@@ -2666,7 +2666,7 @@ core and return a descriptor to it."
                      "/#X~8,'0x: #X~8,'0x~%"
                      (+ i (gspace-byte-address (descriptor-gspace des)))
                      (bvref-32 (descriptor-mem des) i)))))
-       (apply-fixups (%fasl-input-stack fasl-input) des))))
+       (apply-fixups (%fasl-input-stack fasl-input) des 0))))
 
 #-c-headers-only
 (let ((i (get 'fop-code 'opcode)))
@@ -2727,10 +2727,6 @@ core and return a descriptor to it."
   (fill **fop-funs** #'cold-fop-fun-entry :start i :end (+ i 4))
   (values))
 
-;;; For combining all assembler code components into one code component
-;;; we have to adjust offsets of fixups into the single new component
-(defvar *fixup-offset-addend*)
-
 (define-cold-fop (fop-assembler-code)
   (let* ((length (read-word-arg (fasl-input-stream)))
          (aligned-length (round-up length (* 2 sb!vm:n-word-bytes)))
@@ -2765,20 +2761,23 @@ core and return a descriptor to it."
                                       (fasl-input-stream)
                                       :start start
                                       :end (+ start length)))
-    ;; Update the name -> address table.
-    (dotimes (i (descriptor-fixnum (pop-stack)))
-      (let ((offset (apply #'+ (descriptor-fixnum (pop-stack)) (cddr asm-code)))
-            (name (pop-stack)))
-        (push (cons name offset) *cold-assembler-routines*)))
-    (apply-fixups (%fasl-input-stack (fasl-input)) des)))
+    ;; Extra offset is the amount by which this assembly code component moves
+    ;; to stick it on to the end of the previous batch of assembly routines.
+    (let ((extra-offset (apply #'+ (cddr asm-code))))
+      ;; Update the name -> address table.
+      (dotimes (i (descriptor-fixnum (pop-stack)))
+        (let ((offset (+ (descriptor-fixnum (pop-stack)) extra-offset))
+              (name (pop-stack)))
+          (push (cons name offset) *cold-assembler-routines*)))
+      (apply-fixups (%fasl-input-stack (fasl-input)) des extra-offset))))
 
 ;;; Target variant of this is defined in 'target-load'
-(defun apply-fixups (fop-stack code-obj)
+(defun apply-fixups (fop-stack code-obj extra-offset)
   (dotimes (i (descriptor-fixnum (pop-fop-stack fop-stack)) code-obj)
     (binding* ((info (descriptor-fixnum (pop-fop-stack fop-stack)))
                (sym (pop-fop-stack fop-stack))
                ((offset kind flavor) (!unpack-fixup-info info)))
-      (incf offset *fixup-offset-addend*) ; for assembler routines
+      (incf offset extra-offset) ; for assembler routines
       (if (eq flavor :static-call)
           (push (list sym kind code-obj offset) *cold-static-call-fixups*)
           (cold-fixup
@@ -3584,7 +3583,6 @@ III. initially undefined function references (alphabetically):
            *cold-static-call-fixups*
            *cold-assembler-routines*
            *cold-assembler-obj*
-           (*fixup-offset-addend* 0)
            (*code-fixup-notes* (make-hash-table))
            (*deferred-known-fun-refs* nil))
 
@@ -3594,10 +3592,8 @@ III. initially undefined function references (alphabetically):
       ;; Load all assembler code
       (flet ((assembler-file-p (name) (tailwise-equal (namestring name) ".assem-obj")))
         (dolist (file-name (remove-if-not #'assembler-file-p object-file-names))
-          (cold-load file-name verbose)
-          (incf *fixup-offset-addend* (cadr *cold-assembler-obj*)))
+          (cold-load file-name verbose))
         (setf object-file-names (remove-if #'assembler-file-p object-file-names)))
-      (setf *fixup-offset-addend* 0)
 
       ;; Prepare for cold load.
       (initialize-layouts)
