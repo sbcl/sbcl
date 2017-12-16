@@ -140,7 +140,6 @@
                                                              (svref x 0)))
 (def-test-cas test-cas-svref/1 (vector nil 0) incf-svref/1 (lambda (x)
                                                              (svref x 1)))
-(format t "~&compare-and-swap tests done~%")
 
 (with-test (:name (:threads :more-trivia))
   (let ((old-threads (list-all-threads))
@@ -566,8 +565,6 @@
     (setf done t)
     (join-thread thread)))
 
-(format t "~&semaphore tests done~%")
-
 (defun test-interrupt (function-to-interrupt &optional quit-p)
   (let ((child  (make-kill-thread function-to-interrupt)))
     ;;(format t "gdb ./src/runtime/sbcl ~A~%attach ~A~%" child child)
@@ -618,8 +615,6 @@
     (terminate-thread child)
     (wait-for-threads (list child))))
 
-(format t "~&locking test done~%")
-
 (defun alloc-stuff () (copy-list '(1 2 3 4 5)))
 
 (with-test (:name (:interrupt-thread :interrupt-consing-child)
@@ -639,8 +634,6 @@
       (wait-for-threads (list thread))))
   (sb-ext:gc :full t))
 
-(format t "~&multi interrupt test done~%")
-
 #+(or x86 x86-64) ;; x86oid-only, see internal commentary.
 (with-test (:name (:interrupt-thread :interrupt-consing-child :again)
                   :broken-on :win32)
@@ -657,8 +650,6 @@
                            (not (logbitp 0 SB-KERNEL:*PSEUDO-ATOMIC-BITS*))))))
     (terminate-thread c)
     (wait-for-threads (list c))))
-
-(format t "~&interrupt test done~%")
 
 (defstruct counter (n 0 :type sb-vm:word))
 (defvar *interrupt-counter* (make-counter))
@@ -691,8 +682,6 @@
       (loop until (= (counter-n *interrupt-counter*) 100) do (sleep 0.1))
       (terminate-thread c)
       (wait-for-threads (list c)))))
-
-(format t "~&interrupt count test done~%")
 
 (defvar *runningp* nil)
 
@@ -816,8 +805,6 @@
     (dolist (thread threads)
       (sb-thread:terminate-thread thread))))
 
-(format t "~&errno test done~%")
-
 (with-test (:name :all-threads-have-abort-restart
                   :broken-on :win32)
   (loop repeat 100 do
@@ -829,8 +816,6 @@
 
 (sb-ext:gc :full t)
 
-(format t "~&thread startup sigmask test done~%")
-
 ;; expose thread creation races by exiting quickly
 (with-test (:name (:no-thread-creation-race :light))
   (make-join-thread (lambda ())))
@@ -840,8 +825,6 @@
         (wait-for-threads
          (loop for i below 100 collect
                (sb-thread:make-thread (lambda ()))))))
-
-(format t "~&creation test done~%")
 
 ;; interrupt handlers are per-thread with pthreads, make sure the
 ;; handler installed in one thread is global
@@ -938,8 +921,6 @@
         (setf (sap-ref-word (sb-thread::current-thread-sap) j)
               sb-vm:no-tls-value-marker-widetag)))))
 
-(format t "~&binding test done~%")
-
 ;;; HASH TABLES
 
 (defvar *errors* nil)
@@ -990,8 +971,6 @@
          (sleep 10)
       (mapc #'sb-thread:terminate-thread threads))))
 
-(format t "~&unsynchronized hash table test done~%")
-
 (with-test (:name (:synchronized-hash-table)
             :broken-on :win32)
   (let* ((hash (make-hash-table :synchronized t))
@@ -1024,8 +1003,6 @@
          (sleep 10)
       (mapc #'sb-thread:terminate-thread threads))
     (assert (not *errors*))))
-
-(format t "~&synchronized hash table test done~%")
 
 (with-test (:name (:hash-table-parallel-readers)
                   :broken-on :win32)
@@ -1067,8 +1044,6 @@
         (mapc #'sb-thread:terminate-thread threads))
       (assert (not *errors*)))))
 
-(format t "~&multiple reader hash table test done~%")
-
 (with-test (:name :hash-table-single-accessor-parallel-gc
                   :broken-on :win32)
   (let ((hash (make-hash-table))
@@ -1093,8 +1068,6 @@
            (sleep 10)
         (mapc #'sb-thread:terminate-thread threads))
       (assert (not *errors*)))))
-
-(format t "~&single accessor hash table test~%")
 
 #|  ;; a cll post from eric marsden
 | (defun crash ()
@@ -1144,8 +1117,6 @@
               (format t "~&(condition-broadcast queue)~%")
               (force-output)
               (condition-broadcast queue)))))
-
-(format t "waitqueue wakeup tests done~%")
 
 ;;; Make sure that a deadline handler is not invoked twice in a row in
 ;;; CONDITION-WAIT. See LP #512914 for a detailed explanation.
@@ -1246,8 +1217,6 @@
     (dotimes (i 500000)
       (setf a (make-mutex)))))
 
-(format t "mutex finalization test done~%")
-
 ;; You have to shoehorn this arbitrary sexpr into a feature expression
 ;; to have the test summary show that a test was disabled.
 #+gencgc
@@ -1270,11 +1239,8 @@
                                        (sb-debug:print-backtrace :count 10))))))))
     (wait-for-threads threads)))
 
-(format t "backtrace test done~%")
-
-(format t "~&starting gc deadlock test: WARNING: THIS TEST WILL HANG ON FAILURE!~%")
-
 (with-test (:name :gc-deadlock)
+  (write-line "WARNING: THIS TEST WILL HANG ON FAILURE!")
   ;; Prior to 0.9.16.46 thread exit potentially deadlocked the
   ;; GC due to *all-threads-lock* and session lock. On earlier
   ;; versions and at least on one specific box this test is good enough
@@ -1309,7 +1275,6 @@
            (sleep 0.1)
            (incf i)))))
 
-(format t "~&gc deadlock test done~%")
 
 (let ((count (make-array 8 :initial-element 0)))
   (defun closure-one ()
@@ -1374,8 +1339,6 @@
             (terminate-thread test)
             (wait-for-threads (list changer test))))))))
 
-(format t "~&funcallable-instance test done~%")
-
 (defun random-type (n)
   `(integer ,(random n) ,(+ n (random n))))
 
@@ -1403,8 +1366,9 @@
 (use-package :test-util)
 (use-package "ASSERTOID")
 
-(format t "parallel defclass test -- WARNING, WILL HANG ON FAILURE!~%")
+
 (with-test (:name :parallel-defclass)
+  (write-line "WARNING, WILL HANG ON FAILURE!")
   (defclass test-1 () ((a :initform :orig-a)))
   (defclass test-2 () ((b :initform :orig-b)))
   (defclass test-3 (test-1 test-2) ((c :initform :orig-c)))
@@ -1450,7 +1414,6 @@
             (format t "~%joined ~S~%" (sb-thread:thread-name th)))
           (list d1 d2 d3 i))
     (force-output)))
-(format t "parallel defclass test done~%")
 
 (with-test (:name (:deadlock-detection :interrupts)
             :broken-on :win32)
