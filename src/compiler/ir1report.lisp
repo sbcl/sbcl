@@ -172,15 +172,36 @@
                (values '(unable to locate source)
                        '((some strange place)))))))))
 
+(defun map-tree (function tree)
+  (if (consp function)
+      (cons (map-tree function (car tree))
+            (map-tree function (cdr tree)))
+      (funcall function tree)))
+
+(defun hide-ir-nodes (form)
+  (map-tree
+   (lambda (x)
+     (typecase x
+       (functional
+        (let ((name (functional-debug-name x)))
+          `(function
+            ,(if (memq (car name) '(xep tl-xep))
+                 (cadr name)
+                 name))))
+       (t
+        x)))
+   form))
+
 ;;; Convert a source form to a string, suitably formatted for use in
 ;;; compiler warnings.
 (defun stringify-form (form &optional (pretty t))
-  (with-standard-io-syntax
-    (with-compiler-io-syntax
+  (let ((form (hide-ir-nodes form)))
+    (with-standard-io-syntax
+      (with-compiler-io-syntax
         (let ((*print-pretty* pretty))
           (if pretty
               (format nil "~<~@;  ~S~:>" (list form))
-              (prin1-to-string form))))))
+              (prin1-to-string form)))))))
 
 ;;; Return a COMPILER-ERROR-CONTEXT structure describing the current
 ;;; error context, or NIL if we can't figure anything out. ARGS is a
