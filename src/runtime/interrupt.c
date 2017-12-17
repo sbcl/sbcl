@@ -1710,11 +1710,6 @@ void reset_control_stack_guard_page(void)
     }
 }
 
-void lower_control_stack_guard_page(void)
-{
-    lower_thread_control_stack_guard_page(arch_os_get_current_thread());
-}
-
 boolean
 handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
 {
@@ -1733,7 +1728,7 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
          * and restore it. */
         if (th->control_stack_guard_page_protected == NIL)
             lose("control_stack_guard_page_protected NIL");
-        lower_control_stack_guard_page();
+        lower_thread_control_stack_guard_page(th);
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
         /* For the unfortunate case, when the control stack is
          * exhausted in a signal handler. */

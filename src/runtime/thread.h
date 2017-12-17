@@ -199,19 +199,17 @@ extern __thread struct thread *current_thread;
 # define THREAD_CSP_PAGE_SIZE BACKEND_PAGE_BYTES
 #endif
 
-#ifdef LISP_FEATURE_WIN32
-/*
- * Win32 doesn't have SIGSTKSZ, and we're not switching stacks anyway,
- * so define it arbitrarily
- */
-#define SIGSTKSZ 1024
+#if defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_MACH_EXCEPTION_HANDLER)
+#define ALT_STACK_SIZE 0
+#else
+#define ALT_STACK_SIZE 32 * SIGSTKSZ
 #endif
 
 #define THREAD_STRUCT_SIZE (thread_control_stack_size + BINDING_STACK_SIZE + \
                             ALIEN_STACK_SIZE +                          \
                             sizeof(struct nonpointer_thread_data) +     \
                             dynamic_values_bytes +                      \
-                            32 * SIGSTKSZ +                             \
+                            ALT_STACK_SIZE +                            \
                             THREAD_ALIGNMENT_BYTES +                    \
                             THREAD_CSP_PAGE_SIZE)
 
