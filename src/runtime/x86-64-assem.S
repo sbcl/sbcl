@@ -319,6 +319,26 @@ GNAME(do_pending_interrupt):
 	ret
 	SIZE(GNAME(do_pending_interrupt))
 
+#ifdef LISP_FEATURE_SB_SAFEPOINT
+	.globl 	GNAME(handle_global_safepoint_violation)
+	TYPE(GNAME(handle_global_safepoint_violation))
+	.align	align_16byte,0x90
+GNAME(handle_global_safepoint_violation):
+	TRAP
+	.byte 	trap_GlobalSafepoint
+	ret
+	SIZE(GNAME(handle_global_safepoint_violation))
+
+	.globl 	GNAME(handle_csp_safepoint_violation)
+	TYPE(GNAME(handle_csp_safepoint_violation))
+	.align	align_16byte,0x90
+GNAME(handle_csp_safepoint_violation):
+	TRAP
+	.byte 	trap_CspSafepoint
+	ret
+	SIZE(GNAME(handle_csp_safepoint_violation))
+#endif /* SB-SAFEPOINT */
+
 	.globl 	GNAME(memory_fault_emulation_trap)
 	TYPE(GNAME(memory_fault_emulation_trap))
 	.align	align_16byte,0x90

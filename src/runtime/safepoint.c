@@ -1072,27 +1072,13 @@ thruption_handler(int signal, siginfo_t *info, os_context_t *ctx)
 # endif
 
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
-
-#define XSTR(s) STR(s)
-#define STR(s) #s
-/* Designed to be of the same type as call_into_lisp.  Ignores its
- * arguments. */
-lispobj
-handle_global_safepoint_violation(lispobj fun, lispobj *args, int nargs)
-{
-
-    asm("int3; .byte " XSTR(trap_GlobalSafepoint));
-    return 0;
-}
-
-lispobj
-handle_csp_safepoint_violation(lispobj fun, lispobj *args, int nargs)
-{
-    asm("int3; .byte " XSTR(trap_CspSafepoint));
-    return 0;
-}
-
-#endif /* C_STACK_IS_CONTROL_STACK */
+/* Trap trampolines are in target-assem.S so that they pick up the
+ * trap instruction selection features automatically. */
+extern lispobj
+handle_global_safepoint_violation(lispobj fun, lispobj *args, int nargs);
+extern lispobj
+handle_csp_safepoint_violation(lispobj fun, lispobj *args, int nargs);
+#endif
 
 int
 handle_safepoint_violation(os_context_t *ctx, os_vm_address_t fault_address)
