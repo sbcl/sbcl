@@ -112,6 +112,7 @@ setup_mach_exception_handling_thread()
     FSHOW((stderr, "Creating mach_exception_handler thread!\n"));
 
     pthread_attr_init(&attr);
+    pthread_attr_setstacksize(&attr, PTHREAD_STACK_MIN);
     pthread_create(&mach_exception_handling_thread,
                    &attr,
                    mach_exception_handler,
