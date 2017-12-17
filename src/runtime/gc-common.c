@@ -1064,35 +1064,31 @@ void scav_hash_table_entries (struct hash_table *hash_table,
                               int (*alivep[5])(lispobj,lispobj),
                               void (*scav_entry)(lispobj*))
 {
-    lispobj *kv_vector;
     uword_t kv_length;
-    lispobj *index_vector;
     uword_t length;
-    lispobj *next_vector;
     uword_t next_vector_length;
-    lispobj *hash_vector;
     uword_t hash_vector_length;
     uword_t i;
 
-    kv_vector = get_array_data(hash_table->table,
-                               SIMPLE_VECTOR_WIDETAG, &kv_length);
+    lispobj *kv_vector = get_array_data(hash_table->table,
+                                        SIMPLE_VECTOR_WIDETAG, &kv_length);
     if (kv_vector == NULL)
         lose("invalid kv_vector %x\n", hash_table->table);
 
-    index_vector = get_array_data(hash_table->index_vector,
-                                  SIMPLE_ARRAY_WORD_WIDETAG, &length);
+    lispobj *index_vector = get_array_data(hash_table->index_vector,
+                                           SIMPLE_ARRAY_WORD_WIDETAG, &length);
     if (index_vector == NULL)
         lose("invalid index_vector %x\n", hash_table->index_vector);
 
-    next_vector = get_array_data(hash_table->next_vector,
-                                 SIMPLE_ARRAY_WORD_WIDETAG,
-                                 &next_vector_length);
+    lispobj *next_vector = get_array_data(hash_table->next_vector,
+                                          SIMPLE_ARRAY_WORD_WIDETAG,
+                                          &next_vector_length);
     if (next_vector == NULL)
         lose("invalid next_vector %x\n", hash_table->next_vector);
 
-    hash_vector = get_array_data(hash_table->hash_vector,
-                                 SIMPLE_ARRAY_WORD_WIDETAG,
-                                 &hash_vector_length);
+    lispobj *hash_vector = get_array_data(hash_table->hash_vector,
+                                          SIMPLE_ARRAY_WORD_WIDETAG,
+                                          &hash_vector_length);
     if (hash_vector != NULL)
         gc_assert(hash_vector_length == next_vector_length);
 
@@ -1261,24 +1257,20 @@ static void
 scan_weak_hash_table (struct hash_table *hash_table,
                       int (*alivep[5])(lispobj,lispobj))
 {
-    lispobj *kv_vector;
-    lispobj *index_vector;
     uword_t length = 0; /* prevent warning */
-    lispobj *next_vector;
     uword_t next_vector_length = 0; /* prevent warning */
-    lispobj *hash_vector;
     int (*alivep_test)(lispobj,lispobj) = alivep[fixnum_value(hash_table->_weakness)];
     uword_t i;
 
-    kv_vector = get_array_data(hash_table->table,
-                               SIMPLE_VECTOR_WIDETAG, NULL);
-    index_vector = get_array_data(hash_table->index_vector,
-                                  SIMPLE_ARRAY_WORD_WIDETAG, &length);
-    next_vector = get_array_data(hash_table->next_vector,
-                                 SIMPLE_ARRAY_WORD_WIDETAG,
-                                 &next_vector_length);
-    hash_vector = get_array_data(hash_table->hash_vector,
-                                 SIMPLE_ARRAY_WORD_WIDETAG, NULL);
+    lispobj *kv_vector = get_array_data(hash_table->table,
+                                        SIMPLE_VECTOR_WIDETAG, NULL);
+    lispobj *index_vector = get_array_data(hash_table->index_vector,
+                                           SIMPLE_ARRAY_WORD_WIDETAG, &length);
+    lispobj *next_vector = get_array_data(hash_table->next_vector,
+                                          SIMPLE_ARRAY_WORD_WIDETAG,
+                                          &next_vector_length);
+    lispobj *hash_vector = get_array_data(hash_table->hash_vector,
+                                          SIMPLE_ARRAY_WORD_WIDETAG, NULL);
 
     for (i = 0; i < length; i++) {
         scan_weak_hash_table_chain(hash_table, &index_vector[i],
