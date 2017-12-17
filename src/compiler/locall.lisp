@@ -303,7 +303,8 @@
   (declare (type ref ref))
   (let ((fun (ref-leaf ref)))
     (unless (or (xep-p fun)
-                (member (functional-kind fun) '(:escape :cleanup)))
+                (member (functional-kind fun) '(:escape :cleanup
+                                                :zombie :deleted)))
       (change-ref-leaf ref (or (functional-entry-fun fun)
                                (make-xep fun))))))
 

@@ -850,3 +850,10 @@
                     (list (%f2 1)
                           (multiple-value-call #'%f2 (values)))))
                :allow-warnings t))))
+
+(with-test (:name :zombie-entry-point-reference)
+  (assert
+   (nth-value 1
+              (checked-compile
+               `(lambda () (labels ((%f ())) (%f #'%f)))
+               :allow-warnings t))))
