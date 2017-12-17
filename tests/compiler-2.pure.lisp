@@ -840,3 +840,13 @@
                     (flet ((%f6 (&key (k (%f (%f -1 (%f -2 -3))))) 0))
                       5)))
                :allow-warnings t))))
+
+(with-test (:name :ir1-optimize-combination-dead-node)
+  (assert
+   (nth-value 1
+              (checked-compile
+               `(lambda ()
+                  (flet ((%f2 (x) x))
+                    (list (%f2 1)
+                          (multiple-value-call #'%f2 (values)))))
+               :allow-warnings t))))

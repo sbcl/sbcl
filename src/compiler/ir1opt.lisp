@@ -855,6 +855,8 @@
 (defun ir1-optimize-combination (node)
   (when (lvar-reoptimize (basic-combination-fun node))
     (propagate-fun-change node)
+    (when (node-deleted node)
+      (return-from ir1-optimize-combination))
     (maybe-terminate-block node nil))
   (let ((args (basic-combination-args node))
         (info (basic-combination-fun-info node)))
