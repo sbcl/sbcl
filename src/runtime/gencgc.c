@@ -3891,11 +3891,11 @@ collect_garbage(generation_index_t last_gen)
     SHOW("returning from collect_garbage");
 }
 
-/* Initialization of gencgc metadata is split into three steps:
+/* Initialization of gencgc metadata is split into two steps:
  * 1. gc_init() - allocation of a fixed-address space via mmap(),
  *    failing which there's no reason to go on. (safepoint only)
  * 2. gc_allocate_ptes() - page table entries
- * 3. gencgc_pickup_dynamic() - calculation of total bytes used */
+ */
 void
 gc_init(void)
 {

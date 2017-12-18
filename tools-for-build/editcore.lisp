@@ -661,8 +661,7 @@
         (incf code-addr objsize))))
 
   ;; coreparse uses unpadded __lisp_code_end to set varyobj_free_pointer
-  (format output "~:[~; .size __lisp_code_start, 0x~x~%~]__lisp_code_end:~%"
-          emit-sizes total-code-size)
+  (format output "__lisp_code_end:~%")
 
   ;; Pad so that non-lisp code can't be colocated on a GC page.
   ;; (Lack of Lisp object headers in C code is the issue)
