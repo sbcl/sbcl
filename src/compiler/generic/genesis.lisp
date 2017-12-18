@@ -74,8 +74,10 @@
 ;;; portable, because as of sbcl-0.7.4 we need somewhat more than
 ;;; 16Mbytes to represent a core, and ANSI only guarantees that
 ;;; ARRAY-DIMENSION-LIMIT is not less than 1024. -- WHN 2002-06-13
-(defstruct bigvec
+(defstruct (bigvec (:constructor %make-bigvec))
   (outer-vector (vector (make-smallvec)) :type (vector smallvec)))
+(defun make-bigvec (&optional (min-size 0))
+  (expand-bigvec (%make-bigvec) min-size))
 
 ;;; analogous to SVREF, but into a BIGVEC
 (defun bvref (bigvec index)
@@ -118,17 +120,18 @@
 
 ;;; Grow BIGVEC (exponentially, so that large increases in size have
 ;;; asymptotic logarithmic cost per byte).
-(defun expand-bigvec (bigvec)
-  (let* ((old-outer-vector (bigvec-outer-vector bigvec))
-         (length-old-outer-vector (length old-outer-vector))
-         (new-outer-vector (make-array (* 2 length-old-outer-vector))))
-    (replace new-outer-vector old-outer-vector)
-    (loop for i from length-old-outer-vector below (length new-outer-vector) do
-          (setf (svref new-outer-vector i)
-                (make-smallvec)))
-    (setf (bigvec-outer-vector bigvec)
-          new-outer-vector))
-  bigvec)
+(defun expand-bigvec (bigvec required-length)
+  (loop
+    (when (>= (bvlength bigvec) required-length)
+      (return bigvec))
+    (let* ((old-outer-vector (bigvec-outer-vector bigvec))
+           (length-old-outer-vector (length old-outer-vector))
+           (new-outer-vector (make-array (* 2 length-old-outer-vector))))
+      (replace new-outer-vector old-outer-vector)
+      (loop for i from length-old-outer-vector below (length new-outer-vector)
+            do (setf (svref new-outer-vector i) (make-smallvec)))
+      (setf (bigvec-outer-vector bigvec)
+            new-outer-vector))))
 
 ;;;; looking up bytes and multi-byte values in a BIGVEC (considering
 ;;;; it as an image of machine memory on the cross-compilation target)
@@ -302,12 +305,8 @@
 (defun gspace-claim-n-words (gspace n-words)
   (let* ((old-free-word-index (gspace-free-word-index gspace))
          (new-free-word-index (+ old-free-word-index n-words)))
-    ;; Grow GSPACE as necessary until it's big enough to handle
-    ;; NEW-FREE-WORD-INDEX.
-    (do ()
-        ((>= (bvlength (gspace-data gspace))
-             (* new-free-word-index sb!vm:n-word-bytes)))
-      (expand-bigvec (gspace-data gspace)))
+    ;; Grow GSPACE as necessary
+    (expand-bigvec (gspace-data gspace) (* new-free-word-index sb!vm:n-word-bytes))
     ;; Now that GSPACE is big enough, we can meaningfully grab a chunk of it.
     (setf (gspace-free-word-index gspace) new-free-word-index)
     old-free-word-index))
