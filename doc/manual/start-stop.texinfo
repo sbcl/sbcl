@@ -357,30 +357,28 @@ not @code{load}; hence initialization files can be used to set startup
 @code{*package*} and @code{*readtable*}, and for proclaiming a global
 optimization policy.
 
-@itemize @w{}
-@item
-@strong{System Initialization File}
+@table @strong
 
+@item System Initialization File
 Defaults to @file{@env{$SBCL_HOME}/sbclrc}, or if that doesn't exist to
 @file{/etc/sbclrc}. Can be overridden with the command line option
-@code{--sysinit} or @code{--no-sysinit}.
+@code{--sysinit} or @code{--no-sysinit} (@pxref{Toplevel Options}).
 
 The system initialization file is intended for system administrators
 and software packagers to configure locations of installed third party
 modules, etc.
 
-@item
-@strong{User Initialization File}
-
+@item User Initialization File
 Defaults to @file{@env{$HOME}/.sbclrc}. Can be overridden with the
-command line option @code{--userinit} or @code{--no-userinit}.
+command line option @code{--userinit} or @code{--no-userinit}
+(@pxref{Toplevel Options}).
 
 The user initialization file is intended for personal customizations,
 such as loading certain modules at startup, defining convenience
 functions to use in the REPL, handling automatic recompilation
 of FASLs (@pxref{FASL Format}), etc.
 
-@end itemize
+@end table
 
 Neither initialization file is required.
 
@@ -392,4 +390,3 @@ SBCL provides hooks into the system initialization and exit.
 
 @include var-sb-ext-star-init-hooks-star.texinfo
 @include var-sb-ext-star-exit-hooks-star.texinfo
-
