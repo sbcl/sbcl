@@ -383,9 +383,28 @@
   (assert (equal (enough-namestring #p"foo" #p"./") "foo")))
 
 ;;; bug reported by Artem V. Andreev: :WILD not handled in unparsing
-;;; directory lists.
-(with-test (:name (namestring :unparse-wild))
-  (assert (equal (namestring #p"/tmp/*/") "/tmp/*/")))
+;;; directory lists. lp#1738775, reported by Richard M. Kreuter, added
+;;; more cases.
+(with-test (:name (namestring :wild :wild-inferiors :up :lp-1738775))
+  (flet ((test (expected pathname)
+           (assert (equal (namestring pathname) expected))))
+    ;; The second variant using MAKE-PATHNAME makes sure we don't just
+    ;; return the original namestring.
+    (test "/tmp/*/" #P"/tmp/*/")
+    (test "/tmp/*/" (make-pathname :directory '(:absolute "tmp" :wild)))
+
+    ;; lp#1738775 reported breakage in case FIRST in (:absolute FIRST
+    ;; ...) is not of type STRING.
+    (test "/*/" #P"/*/")
+    (test "/*/" (make-pathname :directory '(:absolute :wild)))
+
+    (test "/**/" #P"/**/")
+    (test "/**/" (make-pathname :directory '(:absolute :wild-inferiors)))
+
+    ;; FIXME "Invalid combinations" in 19.2.2.4.3 requires :ABSOLUTE
+    ;; :UP to signal a FILE-ERROR, but we don't.
+    (test "/../" #P"/../")
+    (test "/../" (make-pathname :directory '(:absolute :up)))))
 
 ;;; Printing of pathnames; see CLHS 22.1.3.1. This section was started
 ;;; to confirm that pathnames are printed as their namestrings under
