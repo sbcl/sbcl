@@ -225,13 +225,27 @@
 (!defconstantp progv (symbols values &body forms)
    :test (and (constantp* symbols)
               (constantp* values)
-              (let* ((symbol-values (constant-form-value* symbols))
-                     (*special-constant-variables*
-                      (append symbol-values *special-constant-variables*)))
-                (progv
-                    symbol-values
-                    (constant-form-value* values)
-                  (every #'constantp* forms))))
+              (let* ((symbols (constant-form-value* symbols))
+                     (values (constant-form-value* values)))
+                (and (proper-list-p values)
+                     (proper-list-p symbols)
+                     (>= (length values)
+                         (length symbols))
+                     (loop for symbol in symbols
+                           for value in values
+                           always (and (symbolp symbol)
+                                       (not (constantp symbol))
+                                       (memq (info :variable :kind symbol)
+                                             '(:unknown :special))
+                                       (multiple-value-bind (type declaredp)
+                                           (info :variable :type symbol)
+                                         (or (not declaredp)
+                                             (ctypep value type)))))
+                     (let ((*special-constant-variables*
+                             (append symbols *special-constant-variables*)))
+                       (progv symbols values
+                         (and forms
+                              (every #'constantp* forms)))))))
    :eval (progv
              (constant-form-value* symbols)
              (constant-form-value* values)
