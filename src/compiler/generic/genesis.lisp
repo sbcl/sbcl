@@ -2057,8 +2057,8 @@ core and return a descriptor to it."
           sb!vm:word-shift)
      insts-offset-bytes))
 
-(declaim (ftype (function (descriptor sb!vm:word sb!vm:word
-                           keyword &optional keyword) descriptor)
+(declaim (ftype (sfunction (descriptor sb!vm:word sb!vm:word keyword keyword)
+                           descriptor)
                 cold-fixup))
 (defun cold-fixup (code-object after-header value kind flavor)
   (declare (ignorable flavor))
