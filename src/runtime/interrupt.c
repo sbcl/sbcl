@@ -1417,7 +1417,7 @@ sig_stop_for_gc_handler(int signal, siginfo_t *info, os_context_t *context)
 
     /* While waiting for gc to finish occupy ourselves with zeroing
      * the unused portion of the control stack to reduce conservatism.
-     * On hypothetic platforms with threads and exact gc it is
+     * On the platforms with threads and exact gc it is
      * actually a must. */
     scrub_control_stack();
 
