@@ -206,6 +206,7 @@
   (word-address (missing-arg) :type unsigned-byte :read-only t)
   ;; the gspace contents as a BIGVEC
   (data (make-bigvec) :type bigvec :read-only t)
+  (objects nil)
   ;; the index of the next unwritten word (i.e. chunk of
   ;; SB!VM:N-WORD-BYTES bytes) in DATA, or equivalently the number of
   ;; words actually written in DATA. In order to convert to an actual
@@ -234,6 +235,9 @@
              byte-address target-space-alignment)))
   (%make-gspace :name name
                 :identifier identifier
+                ;; Track object boundaries if a page table will be produced.
+                :objects (if (= identifier dynamic-core-space-id)
+                             (make-array 5000 :fill-pointer 0 :adjustable t))
                 :word-address (ash byte-address (- sb!vm:word-shift))))
 
 ;;;; representation of descriptors
@@ -298,6 +302,22 @@
   (let* ((word-index
           (gspace-claim-n-bytes gspace length page-attributes))
          (ptr (+ (gspace-word-address gspace) word-index)))
+    (when (gspace-objects gspace)
+      (let ((this (ash word-index sb!vm:word-shift))
+            (next (ash (gspace-free-word-index gspace) sb!vm:word-shift))
+            (objects (gspace-objects gspace)))
+        (flet ((page-index (offset) (floor offset sb!vm:gencgc-card-bytes)))
+          ;; Record this object's byte offset unless it is unimportant
+          ;; for finding page scan start offsets. Define "unimportant" as:
+          ;; starts and ends on same page, and the preceding object does too.
+          ;; This records more objects than are strictly necessary,
+          ;; but it makes life simpler.
+          (unless (and (plusp (length objects))
+                       (= (page-index (aref objects (1- (length objects))))
+                          (page-index (1- this))
+                          (page-index this)
+                          (page-index (1- next))))
+            (vector-push-extend this objects)))))
     (make-descriptor (logior (ash ptr sb!vm:word-shift) lowtag)
                      gspace
                      word-index)))
@@ -3337,7 +3357,6 @@ III. initially undefined function references (alphabetically):
 ;;;; writing core file
 
 (defvar *core-file*)
-(defvar *data-page*)
 
 ;;; magic numbers to identify entries in a core file
 ;;;
@@ -3367,15 +3386,14 @@ III. initially undefined function references (alphabetically):
                    *core-file*))))
   num)
 
-(defun output-gspace (gspace verbose)
+(defun output-gspace (gspace data-page verbose)
   (force-output *core-file*)
   (let* ((posn (file-position *core-file*))
          (bytes (* (gspace-free-word-index gspace) sb!vm:n-word-bytes))
          (pages (ceiling bytes sb!c:+backend-page-bytes+))
          (total-bytes (* pages sb!c:+backend-page-bytes+)))
 
-    (file-position *core-file*
-                   (* sb!c:+backend-page-bytes+ (1+ *data-page*)))
+    (file-position *core-file* (* sb!c:+backend-page-bytes+ (1+ data-page)))
     (when verbose
       (format t "writing ~S byte~:P [~S page~:P] from ~S~%"
               total-bytes pages gspace))
@@ -3401,11 +3419,51 @@ III. initially undefined function references (alphabetically):
     ;;   PAGE COUNT
     (write-word (gspace-identifier gspace))
     (write-word (gspace-free-word-index gspace))
-    (write-word *data-page*)
+    (write-word data-page)
     (write-word (gspace-byte-address gspace))
     (write-word pages)
 
-    (incf *data-page* pages)))
+    (+ data-page pages)))
+
+#!+gencgc
+(defun output-page-table (gspace data-page verbose)
+  (declare (ignore verbose))
+  ;; Write as many PTEs as there are pages used.
+  ;; A corefile PTE is { uword_t scan_start_offset; page_bytes_t bytes_used; }
+  (let* ((data-bytes (* (gspace-free-word-index gspace) sb!vm:n-word-bytes))
+         (n-ptes (ceiling data-bytes sb!c:+backend-page-bytes+))
+         (sizeof-usage ; see similar expression in 'src/code/room'
+          (if (typep sb!vm:gencgc-card-bytes '(unsigned-byte 16)) 2 4))
+         (sizeof-corefile-pte (+ sb!vm:n-word-bytes sizeof-usage))
+         (pte-bytes (round-up (* sizeof-corefile-pte n-ptes) sb!vm:n-word-bytes))
+         (ptes (make-bigvec))
+         (start 0))
+    (expand-bigvec ptes pte-bytes)
+    (dotimes (page-index n-ptes)
+      ;; compute scan-start-offset
+      (let ((sso (let* ((page-start (* page-index sb!vm:gencgc-card-bytes))
+                        (p (position page-start (gspace-objects gspace)
+                                     :test #'<= :start start)))
+                   (when (> (aref (gspace-objects gspace) p) page-start)
+                     (decf p))
+                   (setq start p)
+                   (- page-start (aref (gspace-objects gspace) p))))
+            (usage sb!vm:gencgc-card-bytes)
+            (pte-offset (* page-index sizeof-corefile-pte)))
+        (when (= page-index (1- n-ptes)) ; calculate last page's exact usage
+          (decf usage (- (* n-ptes sb!vm:gencgc-card-bytes) data-bytes)))
+        ;; #b11 = worst-case assumption: boxed and unboxed data on the page
+        (setf (bvref-word ptes pte-offset) (logior sso #b11))
+        (funcall (if (eql sizeof-usage 2) #'(setf bvref-16) #'(setf bvref-32))
+                 usage ptes (+ pte-offset sb!vm:n-word-bytes))))
+    (force-output *core-file*)
+    (let ((posn (file-position *core-file*)))
+      (file-position *core-file* (* sb!c:+backend-page-bytes+ (1+ data-page)))
+      (write-bigvec-as-sequence ptes *core-file* :end pte-bytes)
+      (force-output *core-file*)
+      (file-position *core-file* posn))
+    (mapc 'write-word ; 5 = number of words in this core header entry
+          `(,page-table-core-entry-type-code 5 ,n-ptes ,pte-bytes ,data-page))))
 
 ;;; Create a core file created from the cold loaded image. (This is
 ;;; the "initial core file" because core files could be created later
@@ -3414,7 +3472,7 @@ III. initially undefined function references (alphabetically):
 (defun write-initial-core-file (filename verbose)
 
   (let ((filenamestring (namestring filename))
-        (*data-page* 0))
+        (data-page 0))
 
     (when verbose
       (format t "[building initial core file in ~S: ~%" filenamestring))
@@ -3452,15 +3510,8 @@ III. initially undefined function references (alphabetically):
         ;; length = (5 words/space) * N spaces + 2 for header.
         (write-word (+ (* (length spaces) 5) 2))
         (dolist (space spaces)
-          (output-gspace space verbose)))
-
-      #!+gencgc ; Write a vacuous page table
-      (mapc #'write-word
-            `(,page-table-core-entry-type-code
-              5   ; words in this entry
-              0   ; number of elements provided in the page table
-              0   ; file offset (arbitrary)
-              0)) ; number of bytes consumed by entries
+          (setq data-page (output-gspace space data-page verbose))))
+      #!+gencgc (output-page-table *dynamic* data-page verbose)
 
       ;; Write the initial function.
       (write-word initial-fun-core-entry-type-code)
