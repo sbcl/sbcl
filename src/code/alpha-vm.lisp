@@ -20,7 +20,7 @@
     #(:jmp-hint :bits-63-48 :bits-47-32 :ldah :lda :absolute32)
   #'equalp)
 (!with-bigvec-or-sap
-(defun fixup-code-object (code offset value kind &optional flavor)
+(defun fixup-code-object (code offset value kind flavor)
   (declare (ignore flavor))
   (unless (zerop (rem offset n-word-bytes))
     (error "Unaligned instruction?  offset=#x~X." offset))

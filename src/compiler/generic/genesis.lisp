@@ -2060,13 +2060,13 @@ core and return a descriptor to it."
 (declaim (ftype (function (descriptor sb!vm:word sb!vm:word
                            keyword &optional keyword) descriptor)
                 cold-fixup))
-(defun cold-fixup (code-object after-header value kind &optional flavor)
+(defun cold-fixup (code-object after-header value kind flavor)
   (declare (ignorable flavor))
   (let* ((offset-within-code-object (calc-offset code-object after-header))
          (gspace-byte-offset (+ (descriptor-byte-offset code-object)
                                 offset-within-code-object)))
     #!-(or x86 x86-64)
-    (sb!vm::fixup-code-object code-object gspace-byte-offset value kind)
+    (sb!vm::fixup-code-object code-object gspace-byte-offset value kind flavor)
 
     #!+(or x86 x86-64)
     (let* ((gspace-data (descriptor-mem code-object))

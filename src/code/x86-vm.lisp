@@ -20,7 +20,7 @@
 ;;; This gets called by LOAD to resolve newly positioned objects
 ;;; with things (like code instructions) that have to refer to them.
 ;;; Return T if and only if the fixup needs to be recorded in %CODE-FIXUPS
-(defun fixup-code-object (code offset fixup kind &optional flavor)
+(defun fixup-code-object (code offset fixup kind flavor)
   (declare (type index offset))
   (declare (ignore flavor))
   (let* ((obj-start-addr (logandc2 (get-lisp-obj-address code) sb!vm:lowtag-mask))

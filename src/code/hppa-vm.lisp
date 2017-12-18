@@ -10,7 +10,7 @@
     #(:absolute :load :load11u :load-short :hi :branch)
   #'equalp)
 (!with-bigvec-or-sap
-(defun fixup-code-object (code offset value kind &optional flavor)
+(defun fixup-code-object (code offset value kind flavor)
   (declare (ignore flavor))
   (unless (zerop (rem offset n-word-bytes))
     (error "Unaligned instruction?  offset=#x~X." offset))

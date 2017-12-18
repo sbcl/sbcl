@@ -11,7 +11,7 @@
 
 (defconstant-eqx +fixup-kinds+ #(:absolute) #'equalp)
 (!with-bigvec-or-sap
-(defun fixup-code-object (code offset fixup kind &optional flavor)
+(defun fixup-code-object (code offset fixup kind flavor)
   (declare (type index offset))
   (declare (ignore flavor))
   (unless (zerop (rem offset n-word-bytes))
