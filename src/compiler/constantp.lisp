@@ -180,25 +180,11 @@
 (!defconstantp the (type form)
    ;; We can't call TYPEP because the form might be (THE (FUNCTION (t) t) #<fn>)
    ;; which is valid for declaration but not for discrimination.
-   ;; Instead use %%TYPEP in non-strict mode. FIXME:
-   ;; (1) CAREFUL-SPECIFIER-TYPE should never fail. See lp#1395910.
-   ;; (2) CONTAINS-UNKNOWN-TYPE-P should grovel into ARRAY-TYPE-ELEMENT-TYPE
-   ;; so that (C-U-T-P (SPECIFIER-TYPE '(OR (VECTOR BAD) FUNCTION))) => T
-   ;; and then we can parse, check for unknowns, and get rid of HANDLER-CASE.
+   ;; CTYPEP handles unknown types and SATISFIES with non-foldable functions.
    :test (and (constantp* form)
-              (handler-case
-                  ;; in case the type-spec is malformed!
-                  (let ((parsed (careful-specifier-type type)))
-                    ;; xc can't rely on a "non-strict" mode of TYPEP.
-                    (and parsed
-                         #+sb-xc-host
-                         (typep (constant-form-value* form)
-                                (let ((*unparse-fun-type-simplify* t))
-                                  (declare (special *unparse-fun-type-simplify*))
-                                  (type-specifier parsed)))
-                         #-sb-xc-host
-                         (%%typep (constant-form-value* form) parsed nil)))
-                (error () nil)))
+              (let ((parsed (careful-specifier-type type)))
+                (and parsed
+                     (ctypep (constant-form-value* form) parsed))))
    :eval (constant-form-value* form))
 
 (!defconstantp unwind-protect (&whole subforms protected-form &body cleanup-forms)

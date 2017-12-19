@@ -34,3 +34,11 @@
    (not (constantp '(progv '(pi) '(10) 10))))
   (assert
    (not (constantp '(progv '(sb-c::**world-lock**) '(10) 10)))))
+
+(with-test (:name :the)
+  (assert
+   (not (constantp '(the (satisfies eval) 10))))
+  (assert
+   (not (constantp '(the (array abc) #()))))
+  (assert
+   (not (constantp '(the (cons (satisfies error)) '("a"))))))
