@@ -19,7 +19,10 @@
     (return-from %constantp
       (constant-quasiquote-form-p (cadr form) environment envp)))
   (let ((form (if envp
-                  (%macroexpand form environment)
+                  (handler-case
+                      (%macroexpand form environment)
+                    (error ()
+                      (return-from %constantp)))
                   form)))
     (typecase form
       ;; This INFO test catches KEYWORDs as well as explicitly

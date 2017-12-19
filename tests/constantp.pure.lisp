@@ -42,3 +42,10 @@
    (not (constantp '(the (array abc) #()))))
   (assert
    (not (constantp '(the (cons (satisfies error)) '("a"))))))
+
+(with-test (:name :bad-macros)
+  (assert
+   (nth-value 1
+              (checked-compile
+              `(lambda () (coerce 'integer (restart-bind foo)))
+               :allow-failure t))))
