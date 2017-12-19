@@ -365,11 +365,13 @@ void hopscotch_create(tableptr ht, int hashfun,
     hopscotch_realloc(ht, size, hop_range);
 }
 
+#define need_to_zero(h) (h->count!=0)
+
 /* Delete the storage associated with 'ht' */
 void hopscotch_destroy(tableptr ht)
 {
     if (ht->mem_size) { // Free it, zero-filling if ever used.
-        cached_deallocate((char*)ht->keys, ht->count ? ht->mem_size : 0);
+        cached_deallocate((char*)ht->keys, need_to_zero(ht) ? ht->mem_size : 0);
         ht->keys   = 0;
         ht->hops   = 0;
         ht->values = 0;
@@ -379,7 +381,7 @@ void hopscotch_destroy(tableptr ht)
 /* Prepare 'ht' for re-use. Same as CLRHASH */
 void hopscotch_reset(tableptr ht)
 {
-    if (ht->count) {
+    if (need_to_zero(ht)) {
         bzero(ht->keys, ht->mem_size);
         ht->count = 0;
     }
@@ -500,9 +502,14 @@ static inline unsigned int bitmask_of_width(int n) {
 
 #define put_pair(i,k,v) ht->keys[i] = k; if(ht->values) set_val(ht, i, v)
 
-/* Add key/val to 'ht'. 'val' is ignored for a hash-set */
+/* Add key/val to 'ht'. 'val' is ignored for a hash-set.
+ * Key MUST NOT be present in the table */
 int hopscotch_insert(tableptr ht, uword_t key, sword_t val)
 {
+    // Because a 1 bit in the hops bitmask indicates an occupied cell, there is
+    // not a technical requirement to reserve a value as the empty cell marker.
+    // However the algorithms currently make a simplifying assumption
+    // that a key of 0 means "not found"
     gc_dcheck(key);
     // 'desired_index' is where 'key' logically belongs, but it
     // may physically go in any cell to the right up to (range-1) away.
@@ -703,6 +710,31 @@ found0:
 }
 
 #undef probe
+
+boolean hopscotch_delete(tableptr ht, uword_t key)
+{
+    gc_dcheck(key);
+    int logical_index = hash(ht, key) & ht->mask;
+    int physical_index = logical_index;
+    unsigned bits = get_hop_mask(ht, logical_index);
+    // Finding the item to delete is not unrolled
+    if (ht->compare) { // Custom comparator
+        for ( ; bits ; bits >>= 1, ++physical_index )
+            if ((bits & 1) && ht->compare(ht->keys[physical_index], key))
+                break;
+    } else {
+        for ( ; bits ; bits >>= 1, ++physical_index )
+            if ((bits & 1) && ht->keys[physical_index] == key)
+                break;
+    }
+    if (!bits)
+        return 0;
+    ht->keys[physical_index] = 0;
+    set_val(ht, physical_index, 0);
+    ht->hops[logical_index] ^= (1<<(physical_index - logical_index));
+    --ht->count;
+    return 1;
+}
 
 #if 0
 #include <stdio.h>
