@@ -3444,8 +3444,18 @@ III. initially undefined function references (alphabetically):
       (let ((sso (let* ((page-start (* page-index sb!vm:gencgc-card-bytes))
                         (p (position page-start (gspace-objects gspace)
                                      :test #'<= :start start)))
-                   (when (> (aref (gspace-objects gspace) p) page-start)
-                     (decf p))
+                   ;; P is the position in OBJECTS of the first object whose start
+                   ;; is >= PAGE-START. If page-spanning, we want the preceding object
+                   ;; because SCAN-START must satisfy the condition that it points to
+                   ;; an object such that scanning from it will cover every byte of the
+                   ;; page. If the very last item in OBJECTS spans pages, P will be NIL,
+                   ;; because no object's start is >= PAGE-START.
+                   (cond ((not p)
+                          (setq p (1- (length (gspace-objects gspace)))))
+                         ((> (aref (gspace-objects gspace) p) page-start)
+                          (decf p)))
+                   ;; This is an optimization, not a correctness requirement:
+                   ;; the next scan-start object can't be at an index less than P.
                    (setq start p)
                    (- page-start (aref (gspace-objects gspace) p))))
             (usage sb!vm:gencgc-card-bytes)
