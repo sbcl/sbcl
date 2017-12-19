@@ -850,3 +850,13 @@
               (checked-compile
                `(lambda () (labels ((%f ())) (%f #'%f)))
                :allow-warnings t))))
+
+(with-test (:name (:ctypep :hairy-types))
+  (checked-compile
+   `(lambda ()
+      (the (cons (satisfies error)) '("a"))))
+  (assert
+   (nth-value 3
+              (checked-compile
+               `(lambda () (the (array abc) #()))
+               :allow-style-warnings t))))

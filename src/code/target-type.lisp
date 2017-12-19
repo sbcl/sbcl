@@ -32,12 +32,24 @@
     ((or numeric-type
          named-type
          member-type
-         array-type
          character-set-type
          built-in-classoid
-         cons-type
          #!+sb-simd-pack simd-pack-type)
-     (values (%%typep obj type) t))
+     (values (%%typep obj type)
+             t))
+    (array-type
+     (if (contains-unknown-type-p type)
+         (values nil nil)
+         (values (%%typep obj type) t)))
+    (cons-type
+     ;; Do not use %%TYPEP because of SATISFIES
+     (if (consp obj)
+         (multiple-value-bind (typep valid)
+             (ctypep (car obj) (cons-type-car-type type))
+           (if typep
+               (ctypep (cdr obj) (cons-type-cdr-type type))
+               (values nil valid)))
+         (values nil t)))
     (classoid
      (if (if (csubtypep type (specifier-type 'function))
              (funcallable-instance-p obj)
