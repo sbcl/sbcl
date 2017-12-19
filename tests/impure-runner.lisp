@@ -1,5 +1,6 @@
-(load "test-util")
-(load "assertoid")
+(with-compilation-unit ()
+  (load "test-util")
+  (load "assertoid"))
 
 (defpackage :run-tests
   (:use :cl :test-util :sb-ext))
