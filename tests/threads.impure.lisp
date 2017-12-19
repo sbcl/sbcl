@@ -224,7 +224,7 @@
     (let ((zero (scaling-test work 0))
           (four (scaling-test work 4)))
       ;; a slightly weak assertion, but good enough for starters.
-      (assert (< four (* 1.5 zero))))))
+      (assert (< four (* 2 zero))))))
 
 ;;; For one of the interupt-thread tests, we want a foreign function
 ;;; that does not make syscalls
