@@ -62,8 +62,9 @@
 #include "forwarding-ptr.h"
 
 /* forward declarations */
+#define SINGLE_OBJECT_FLAG 0x80
 page_index_t  gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
-                                    int page_type_flag);
+                                    int page_type_flag, generation_index_t gen);
 
 
 /*
@@ -849,7 +850,10 @@ gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *all
     ret = thread_mutex_lock(&free_pages_lock);
     gc_assert(ret == 0);
     first_page = generation_alloc_start_page(gc_alloc_generation, page_type_flag, 0);
-    last_page=gc_find_freeish_pages(&first_page, nbytes, page_type_flag);
+    last_page = gc_find_freeish_pages(&first_page, nbytes,
+                                      ((nbytes >= (sword_t)GENCGC_CARD_BYTES) ?
+                                       SINGLE_OBJECT_FLAG : 0) | page_type_flag,
+                                      gc_alloc_generation);
 
     /* Set up the alloc_region. */
     alloc_region->first_page = first_page;
@@ -1122,10 +1126,14 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
         first_page = alloc_region->last_page+1;
     }
 
-    last_page=gc_find_freeish_pages(&first_page,nbytes, page_type_flag);
+    last_page = gc_find_freeish_pages(&first_page,nbytes,
+                                      SINGLE_OBJECT_FLAG | page_type_flag,
+                                      gc_alloc_generation);
 
     gc_assert(first_page > alloc_region->last_page);
 
+    // FIXME: Should this be 1+last_page ?
+    // (Doesn't matter too much since it'll be skipped on restart if unusable)
     set_generation_alloc_start_page(gc_alloc_generation, page_type_flag, 1, last_page);
 
     /* Large objects don't share pages with other objects. */
@@ -1278,11 +1286,12 @@ page_extensible_p(page_index_t index, generation_index_t gen, int allocated) {
 /* Search for at least nbytes of space, possibly picking up any
  * remaining space on the tail of a page that was not fully used.
  *
- * Non-small allocations are guaranteed to be page-aligned.
+ * The found space is guaranteed to be page-aligned if the SINGLE_OBJECT_FLAG
+ * bit is set in page_type_flag.
  */
 page_index_t
 gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t bytes,
-                      int page_type_flag)
+                      int page_type_flag, generation_index_t gen)
 {
     page_index_t most_bytes_found_from = 0, most_bytes_found_to = 0;
     page_index_t first_page, last_page, restart_page = *restart_page_ptr;
@@ -1290,14 +1299,8 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t bytes,
     os_vm_size_t nbytes_goal = nbytes;
     os_vm_size_t bytes_found = 0;
     os_vm_size_t most_bytes_found = 0;
-    /* Note that this definition of "small" is not the complement
-     * of "large" as used in gc_alloc_large(). That's fine.
-     * The constraint we must respect is that a large object
-     * MUST NOT share any of its pages with another object.
-     * It should also be page-aligned, though that's not a restriction
-     * per se, but a fairly obvious consequence of not sharing.
-     */
-    boolean small_object = nbytes < GENCGC_CARD_BYTES;
+    int allow_spanning = !(page_type_flag & SINGLE_OBJECT_FLAG);
+    page_type_flag &= ~SINGLE_OBJECT_FLAG;
     /* FIXME: assert(free_pages_lock is held); */
 
     if (nbytes_goal < gencgc_alloc_granularity)
@@ -1322,8 +1325,8 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t bytes,
         if (page_free_p(first_page)) {
             gc_dcheck(!page_bytes_used(first_page));
             bytes_found = GENCGC_CARD_BYTES;
-        } else if (small_object &&
-                   page_extensible_p(first_page, gc_alloc_generation, page_type_flag)) {
+        } else if (allow_spanning &&
+                   page_extensible_p(first_page, gen, page_type_flag)) {
             bytes_found = GENCGC_CARD_BYTES - page_bytes_used(first_page);
             // XXX: Prefer to start non-code on new pages.
             //      This is temporary until scavenging of small-object pages
