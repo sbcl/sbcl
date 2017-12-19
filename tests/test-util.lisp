@@ -58,71 +58,76 @@
   (let ((*print-pretty* nil))
     (apply #'log-msg args)))
 
+(defun run-test (test-function name fails-on)
+  (start-test)
+  (let (#+sb-thread (threads (sb-thread:list-all-threads))
+        (*threads-to-join* nil)
+        (*threads-to-kill* nil))
+    (handler-bind ((error (lambda (error)
+                            (if (expected-failure-p fails-on)
+                                (fail-test :expected-failure name error)
+                                (fail-test :unexpected-failure name error))
+                            (return-from run-test))))
+      ;; Non-pretty is for cases like (with-test (:name (let ...)) ...
+      (log-msg/non-pretty "Running ~S" name)
+      (funcall test-function)
+      #+sb-thread
+      (let ((any-leftover nil))
+        (dolist (thread *threads-to-join*)
+          (ignore-errors (sb-thread:join-thread thread)))
+        (dolist (thread *threads-to-kill*)
+          (ignore-errors (sb-thread:terminate-thread thread)))
+        (setf threads (union (union *threads-to-kill*
+                                    *threads-to-join*)
+                             threads))
+        #+(and sb-safepoint-strictly (not win32))
+        (dolist (thread (sb-thread:list-all-threads))
+          (when (typep thread 'sb-thread:signal-handling-thread)
+            (ignore-errors (sb-thread:join-thread thread))))
+        (dolist (thread (sb-thread:list-all-threads))
+          (unless (or (not (sb-thread:thread-alive-p thread))
+                      (eql (the sb-thread:thread thread)
+                           sb-thread:*current-thread*)
+                      (member thread threads)
+                      (sb-thread:thread-ephemeral-p thread))
+            (setf any-leftover thread)
+            #-win32
+            (ignore-errors (sb-thread:terminate-thread thread))))
+        (when any-leftover
+          (fail-test :leftover-thread name any-leftover)
+          (return-from run-test)))
+      (if (expected-failure-p fails-on)
+          (fail-test :unexpected-success name nil)
+          ;; Non-pretty is for cases like (with-test (:name (let ...)) ...
+          (log-msg/non-pretty "Success ~S" name)))))
+
 (defmacro with-test ((&key fails-on broken-on skipped-on name)
                      &body body)
-  (let ((block-name (gensym))
-        #+sb-thread (threads (gensym "THREADS")))
-    (flet ((name-ok (x y)
-             (declare (ignore y))
-             (typecase x
-               (symbol (let ((package (symbol-package x)))
-                         (or (null package)
-                             (eql package (find-package "CL"))
-                             (eql package (find-package "KEYWORD"))
-                             (eql (mismatch "SB-" (package-name package)) 3))))
-               (integer t))))
-      (unless (tree-equal name name :test #'name-ok)
-        (error "test name must be all-keywords: ~S" name)))
-    `(progn
-       (start-test)
-       (cond
-         ((broken-p ',broken-on)
-          (fail-test :skipped-broken ',name "Test broken on this platform"))
-         ((skipped-p ',skipped-on)
-          (fail-test :skipped-disabled ',name "Test disabled for this combination of platform and features"))
-         (t
-          (let (#+sb-thread (,threads (sb-thread:list-all-threads))
-                (*threads-to-join* nil)
-                (*threads-to-kill* nil))
-            (block ,block-name
-              (handler-bind ((error (lambda (error)
-                                      (if (expected-failure-p ',fails-on)
-                                          (fail-test :expected-failure ',name error)
-                                          (fail-test :unexpected-failure ',name error))
-                                      (return-from ,block-name))))
-                (progn
-                  ;; Non-pretty is for cases like (with-test (:name (let ...)) ...
-                  (log-msg/non-pretty "Running ~S" ',name)
-                  ,@body
-                  #+sb-thread
-                  (let ((any-leftover nil))
-                    (dolist (thread *threads-to-join*)
-                      (ignore-errors (sb-thread:join-thread thread)))
-                    (dolist (thread *threads-to-kill*)
-                      (ignore-errors (sb-thread:terminate-thread thread)))
-                    (setf ,threads (union (union *threads-to-kill*
-                                                 *threads-to-join*)
-                                          ,threads))
-                    #+(and sb-safepoint-strictly (not win32))
-                    (dolist (thread (sb-thread:list-all-threads))
-                      (when (typep thread 'sb-thread:signal-handling-thread)
-                        (ignore-errors (sb-thread:join-thread thread))))
-                    (dolist (thread (sb-thread:list-all-threads))
-                      (unless (or (not (sb-thread:thread-alive-p thread))
-                                  (eql (the sb-thread:thread thread)
-                                       sb-thread:*current-thread*)
-                                  (member thread ,threads)
-                                  (sb-thread:thread-ephemeral-p thread))
-                        (setf any-leftover thread)
-                        #-win32
-                        (ignore-errors (sb-thread:terminate-thread thread))))
-                    (when any-leftover
-                      (fail-test :leftover-thread ',name any-leftover)
-                      (return-from ,block-name)))
-                  (if (expected-failure-p ',fails-on)
-                      (fail-test :unexpected-success ',name nil)
-                      ;; Non-pretty is for cases like (with-test (:name (let ...)) ...
-                      (log-msg/non-pretty "Success ~S" ',name)))))))))))
+  (flet ((name-ok (x y)
+           (declare (ignore y))
+           (typecase x
+             (symbol (let ((package (symbol-package x)))
+                       (or (null package)
+                           (eql package (find-package "CL"))
+                           (eql package (find-package "KEYWORD"))
+                           (eql (mismatch "SB-" (package-name package)) 3))))
+             (integer t))))
+    (unless (tree-equal name name :test #'name-ok)
+      (error "test name must be all-keywords: ~S" name)))
+  (cond
+    ((broken-p broken-on)
+     `(progn
+        (start-test)
+        (fail-test :skipped-broken ',name "Test broken on this platform")))
+    ((skipped-p skipped-on)
+     `(progn
+        (start-test)
+        (fail-test :skipped-disabled ',name "Test disabled for this combination of platform and features")))
+    (t
+     `(run-test (lambda ()
+                  ,@body)
+                ',name
+                ',fails-on))))
 
 (defun report-test-status ()
   (with-standard-io-syntax
