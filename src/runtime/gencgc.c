@@ -937,7 +937,7 @@ struct new_area {
     size_t offset;
     size_t size;
 };
-static struct new_area (*new_areas)[];
+static struct new_area *new_areas;
 static int new_areas_index;
 int new_areas_index_hwm; // high water mark
 
@@ -962,30 +962,19 @@ add_new_area(page_index_t first_page, size_t offset, size_t size)
        found this will save adding a new area. */
     for (i = new_areas_index-1, c = 0; (i >= 0) && (c < 8); i--, c++) {
         size_t area_end =
-            npage_bytes((*new_areas)[i].page)
-            + (*new_areas)[i].offset
-            + (*new_areas)[i].size;
+            npage_bytes(new_areas[i].page) + new_areas[i].offset + new_areas[i].size;
         /*FSHOW((stderr,
                "/add_new_area S1 %d %d %d %d\n",
                i, c, new_area_start, area_end));*/
         if (new_area_start == area_end) {
-            /*FSHOW((stderr,
-                   "/adding to [%d] %d %d %d with %d %d %d:\n",
-                   i,
-                   (*new_areas)[i].page,
-                   (*new_areas)[i].offset,
-                   (*new_areas)[i].size,
-                   first_page,
-                   offset,
-                    size);*/
-            (*new_areas)[i].size += size;
+            new_areas[i].size += size;
             return;
         }
     }
 
-    (*new_areas)[new_areas_index].page = first_page;
-    (*new_areas)[new_areas_index].offset = offset;
-    (*new_areas)[new_areas_index].size = size;
+    new_areas[new_areas_index].page = first_page;
+    new_areas[new_areas_index].offset = offset;
+    new_areas[new_areas_index].size = size;
     /*FSHOW((stderr,
            "/new_area %d page %d offset %d size %d\n",
            new_areas_index, first_page, offset, size));*/
@@ -2487,34 +2476,16 @@ scavenge_newspace_generation_one_scan(generation_index_t generation)
            generation));
 }
 
-static void reset_new_areas_index()
-{
-    /* Note the max new_areas used. */
-    if (new_areas_index > new_areas_index_hwm)
-        new_areas_index_hwm = new_areas_index;
-    new_areas_index = 0;
-}
-
 /* Do a complete scavenge of the newspace generation. */
 static void
 scavenge_newspace_generation(generation_index_t generation)
 {
-    size_t i;
-
-    /* the new_areas array currently being written to by gc_alloc() */
-    struct new_area (*current_new_areas)[] = &new_areas_1;
-    size_t current_new_areas_index;
-
-    /* the new_areas created by the previous scavenge cycle */
-    struct new_area (*previous_new_areas)[] = NULL;
-    size_t previous_new_areas_index;
-
     /* Flush the current regions updating the tables. */
     gc_alloc_update_all_page_tables(0);
 
-    /* Turn on the recording of new areas by gc_alloc(). */
-    new_areas = current_new_areas;
-    reset_new_areas_index();
+    /* Turn on the recording of new areas. */
+    gc_assert(new_areas_index == 0);
+    new_areas = new_areas_1;
 
     /* Start with a full scavenge. */
     scavenge_newspace_generation_one_scan(generation);
@@ -2529,31 +2500,21 @@ scavenge_newspace_generation(generation_index_t generation)
     /* Flush the current regions updating the tables. */
     gc_alloc_update_all_page_tables(0);
 
-    /* Grab new_areas_index. */
-    current_new_areas_index = new_areas_index;
-
     /*FSHOW((stderr,
              "The first scan is finished; current_new_areas_index=%d.\n",
              current_new_areas_index));*/
 
-    while (current_new_areas_index > 0 || immobile_scav_queue_count) {
+    while (new_areas_index > 0 || immobile_scav_queue_count) {
         /* Move the current to the previous new areas */
-        previous_new_areas = current_new_areas;
-        previous_new_areas_index = current_new_areas_index;
+        struct new_area *previous_new_areas = new_areas;
+        int previous_new_areas_index = new_areas_index;
+        /* Note the max new_areas used. */
+        if (new_areas_index > new_areas_index_hwm)
+            new_areas_index_hwm = new_areas_index;
 
-        /* Scavenge all the areas in previous new areas. Any new areas
-         * allocated are saved in current_new_areas. */
-
-        /* Allocate an array for current_new_areas; alternating between
-         * new_areas_1 and 2 */
-        if (previous_new_areas == &new_areas_1)
-            current_new_areas = &new_areas_2;
-        else
-            current_new_areas = &new_areas_1;
-
-        /* Set up for gc_alloc(). */
-        new_areas = current_new_areas;
-        reset_new_areas_index();
+        /* Prepare to record new areas. Alternate between using new_areas_1 and 2 */
+        new_areas = (new_areas == new_areas_1) ? new_areas_2 : new_areas_1;
+        new_areas_index = 0;
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
         scavenge_immobile_newspace();
@@ -2572,11 +2533,12 @@ scavenge_newspace_generation(generation_index_t generation)
 
         } else {
 
+            int i;
             /* Work through previous_new_areas. */
             for (i = 0; i < previous_new_areas_index; i++) {
-                page_index_t page = (*previous_new_areas)[i].page;
-                size_t offset = (*previous_new_areas)[i].offset;
-                size_t size = (*previous_new_areas)[i].size;
+                page_index_t page = previous_new_areas[i].page;
+                size_t offset = previous_new_areas[i].offset;
+                size_t size = previous_new_areas[i].size;
                 gc_assert(size % (2*N_WORD_BYTES) == 0);
                 lispobj *start = (lispobj*)(page_address(page) + offset);
                 heap_scavenge(start, (lispobj*)((char*)start + size));
@@ -2588,16 +2550,12 @@ scavenge_newspace_generation(generation_index_t generation)
 
         /* Flush the current regions updating the tables. */
         gc_alloc_update_all_page_tables(0);
-
-        current_new_areas_index = new_areas_index;
-
-        /*FSHOW((stderr,
-                 "The re-scan has finished; current_new_areas_index=%d.\n",
-                 current_new_areas_index));*/
     }
 
     /* Turn off recording of allocation regions. */
     record_new_regions_below = 0;
+    new_areas = NULL;
+    new_areas_index = 0;
 
 #ifdef SC_NS_GEN_CK
     {
