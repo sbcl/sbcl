@@ -907,14 +907,7 @@ gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *all
     }
 }
 
-/* If the record_new_objects flag is 2 then all new regions created
- * are recorded.
- *
- * If it's 1 then then it is only recorded if the first page of the
- * current region is <= new_areas_ignore_page. This helps avoid
- * unnecessary recording when doing full scavenge pass.
- *
- * The new_object structure holds the page, byte offset, and size of
+/* The new_object structure holds the page, byte offset, and size of
  * new regions of objects. Each new area is placed in the array of
  * these structures pointer to by new_areas. new_areas_index holds the
  * offset into new_areas.
@@ -923,8 +916,22 @@ gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *all
  * later code must detect this and handle it, probably by doing a full
  * scavenge of a generation. */
 #define NUM_NEW_AREAS 512
-static int record_new_objects = 0;
-static page_index_t new_areas_ignore_page;
+
+/* 'record_new_regions_below' is the page number (strictly) below which
+ * allocations must be tracked. Choosing the boundary cases with care allows
+ * for all the required modes of operation without an additional control flag:
+ * (1) When allocating from Lisp code, we need not record regions into areas.
+ *     In this case 'record_new_regions_below' is 0,
+ *     because no page index is less than that value.
+ * (2) When performing a full scavenge of newspace, we record regions below the
+ *     highest scavenged page thus far. Pages ahead of (at a higher index than)
+ *     the pointer which walks all pages can be ignored, because those pages
+ *     will be scavenged in the future regardless of where allocations occur.
+ * (3) When iteratively scavenging newspace, all regions are tracked in areas,
+ *     so this variable is set to 1+page_table_pages,
+ *     because every page index is less than that sentinel value.
+ */
+static page_index_t record_new_regions_below;
 struct new_area {
     page_index_t page;
     size_t offset;
@@ -938,20 +945,14 @@ int new_areas_index_hwm; // high water mark
 static void
 add_new_area(page_index_t first_page, size_t offset, size_t size)
 {
-    switch (record_new_objects) {
-    case 0:
+    if (!(first_page < record_new_regions_below))
         return;
-    case 1:
-        if (first_page > new_areas_ignore_page)
-            return;
-        break;
-    case 2:
-        break;
-    default:
-        gc_abort();
-    }
 
     /* Ignore if full. */
+    // Technically overflow occurs at 1+ this number, but it's not worth
+    // losing sleep (or splitting hairs) over one potentially wasted array cell.
+    // i.e. overflow did not necessarily happen if we needed _exactly_ this
+    // many areas. But who cares? The limit should not be approached at all.
     if (new_areas_index >= NUM_NEW_AREAS)
         return;
 
@@ -2467,9 +2468,11 @@ scavenge_newspace_generation_one_scan(generation_index_t generation)
                     break;
             }
 
+            // FIXME: I cannot see how any page of newspace could be write-protected.
+            // This really deserves an explanation.
             /* Do a limited check for write-protected pages.  */
             if (!all_wp) {
-                new_areas_ignore_page = last_page;
+                record_new_regions_below = 1 + last_page;
                 heap_scavenge(page_scan_start(i),
                               (lispobj*)(page_address(last_page)
                                          + page_bytes_used(last_page)));
@@ -2477,6 +2480,8 @@ scavenge_newspace_generation_one_scan(generation_index_t generation)
             i = last_page;
         }
     }
+    /* Enable recording of all new allocation regions */
+    record_new_regions_below = 1 + page_table_pages;
     FSHOW((stderr,
            "/done with one full scan of newspace generation %d\n",
            generation));
@@ -2511,15 +2516,8 @@ scavenge_newspace_generation(generation_index_t generation)
     new_areas = current_new_areas;
     reset_new_areas_index();
 
-    /* Don't need to record new areas that get scavenged anyway during
-     * scavenge_newspace_generation_one_scan. */
-    record_new_objects = 1;
-
     /* Start with a full scavenge. */
     scavenge_newspace_generation_one_scan(generation);
-
-    /* Record all new areas now. */
-    record_new_objects = 2;
 
     /* Give a chance to weak hash tables to make other objects live.
      * FIXME: The algorithm implemented here for weak hash table gcing
@@ -2570,14 +2568,7 @@ scavenge_newspace_generation(generation_index_t generation)
                 SHOW("new_areas overflow, doing full scavenge");
             }
 
-            /* Don't need to record new areas that get scavenged
-             * anyway during scavenge_newspace_generation_one_scan. */
-            record_new_objects = 1;
-
             scavenge_newspace_generation_one_scan(generation);
-
-            /* Record all new areas now. */
-            record_new_objects = 2;
 
         } else {
 
@@ -2605,8 +2596,8 @@ scavenge_newspace_generation(generation_index_t generation)
                  current_new_areas_index));*/
     }
 
-    /* Turn off recording of areas allocated by gc_alloc(). */
-    record_new_objects = 0;
+    /* Turn off recording of allocation regions. */
+    record_new_regions_below = 0;
 
 #ifdef SC_NS_GEN_CK
     {
