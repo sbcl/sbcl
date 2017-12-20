@@ -538,7 +538,10 @@
                      ;; on a function whose code ends in pad bytes that are not an integral
                      ;; number of instructions, and maybe you're so unlucky as to be
                      ;; on the exact last page of your heap.
-                     (if (< bytes-remaining (/ dchunk-bits 8))
+                     ;; For 8-byte words and 7-byte dchunks, we use SAP-REF-WORD, which reads
+                     ;; 8 bytes, so make sure the number of bytes to go is 8,
+                     ;; never mind that dchunk-bits is less.
+                     (if (< bytes-remaining sb!vm:n-word-bytes)
                          (let ((sap (vector-sap (dstate-scratch-buf dstate))))
                            (setf (sap-ref-word sap 0) 0)
                            (system-area-ub8-copy (dstate-segment-sap dstate)
