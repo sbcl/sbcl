@@ -98,7 +98,7 @@ extern __attribute__((weak)) lispobj __lisp_code_start, __lisp_code_end;
 os_vm_offset_t
 search_for_embedded_core(char *filename, struct memsize_options *memsize_options)
 {
-    extern os_vm_offset_t search_for_elf_core(int,int);
+    extern os_vm_offset_t search_for_elf_core(int);
     lispobj header = 0;
     os_vm_offset_t lispobj_size = sizeof(lispobj);
     int fd;
@@ -130,7 +130,7 @@ search_for_embedded_core(char *filename, struct memsize_options *memsize_options
     }
 #if ELFCORE
     if (core_start < 0) {
-        if (!(core_start = search_for_elf_core(fd, !lisp_startup_options.noinform)) ||
+        if (!(core_start = search_for_elf_core(fd)) ||
             lseek(fd, core_start, SEEK_SET) != core_start ||
             read(fd, &header, lispobj_size) != lispobj_size || header != CORE_MAGIC)
             core_start = -1; // reset to invalid

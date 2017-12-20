@@ -6,7 +6,7 @@
 #include <elf.h>
 
 // Return the offset to a file section named 'lisp.core' if there is one
-off_t search_for_elf_core(int fd, int print)
+off_t search_for_elf_core(int fd)
 {
     Elf64_Ehdr ehdr;
 
@@ -36,9 +36,6 @@ off_t search_for_elf_core(int fd, int print)
         if (read(fd, &shdr, sizeof shdr) == sizeof shdr
             && !strcmp(&shstrtab_strbuf[shdr.sh_name], "lisp.core")) {
             result = shdr.sh_offset;
-            if (print)
-                fprintf(stderr, "Lisp core in ELF section @ %lx:%lx\n",
-                        result, result + shdr.sh_size);
             break;
         }
     if (shstrtab_strbuf)

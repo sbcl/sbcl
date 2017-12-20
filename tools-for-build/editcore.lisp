@@ -223,19 +223,15 @@
                  ;; Other than that, we avoid finding host symbols
                  ;; because the externalness could be wrong and misleading.
                  ;; It's a very subtle point, but best to get it right.
-                 (cond ((string= package-name "COMMON-LISP")
-                        (find-symbol name *cl-package*))
-                       ((and (string= package-name "KEYWORD")
-                             (find-symbol name package-name))) ; if existing keyword, use it
-                       ((string= package-name "SB-PCL")
-                        (or (find-symbol name "SB-PCL")
-                            (error "FIND-SYMBOL failed? ~S ~S" name package-name)))
-                       (t
-                        (make-core-sym (if (string= package-name "KEYWORD") nil package-name)
-                                       name
-                                       (if compute-externals
-                                           (find name externals :test 'string=)
-                                           t))))))))
+                 (if (member package-name '("COMMON-LISP" "KEYWORD" "SB-PCL")
+                             :test #'string=)
+                     ; NIL can't occur, because it has list-pointer-lowtag
+                     (find-symbol name package-name) ; if existing symbol, use it
+                     (make-core-sym (if (string= package-name "KEYWORD") nil package-name)
+                                    name
+                                    (if compute-externals
+                                        (find name externals :test 'string=)
+                                        t)))))))
         ((stringp x) x)
         (t "?"))))))
 
@@ -1340,12 +1336,14 @@
             (setf (%vector-raw-bits core-header code-start-fixup-ofs) 0)
             (write-sequence core-header output) ; Copy prepared header
             (force-output output)
-            ;; Change SB-C::*COMPILE-FILE-TO-MEMORY-SPACE* to :DYNAMIC
-            ;; in case the resulting executable wants to call COMPILE-FILE
-            ;; and then load the resulting fasl.
-            (%set-symbol-global-value
-             (find-target-symbol "SB-C" "*COMPILE-FILE-TO-MEMORY-SPACE*" map)
-             (find-target-symbol "KEYWORD" "DYNAMIC" map :logical))
+            ;; Change SB-C::*COMPILE[-FILE]-TO-MEMORY-SPACE* to :DYNAMIC
+            ;; in case the resulting executable needs to compile anything.
+            ;; (Call frame info will be missing, but at least it's something.)
+            (dolist (name '("*COMPILE-FILE-TO-MEMORY-SPACE*"
+                            "*COMPILE-TO-MEMORY-SPACE*"))
+              (%set-symbol-global-value
+               (find-target-symbol "SB-C" name map)
+               (find-target-symbol "KEYWORD" "DYNAMIC" map :logical)))
             ;;
             (dolist (space data-spaces) ; Copy pages from memory
               (let ((start (space-physaddr space map))
