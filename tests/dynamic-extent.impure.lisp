@@ -826,6 +826,20 @@
                                       (list 1)))))
                        (declare (dynamic-extent *))))))
 
+(with-test (:name :bug-1739308)
+  ;; STACK analysis wasn't propagating DX LVARs back from ENTRY to
+  ;; allocation through non-local-entry environments (below, the CATCH
+  ;; entry point), causing problems when such is the ONLY live path
+  ;; back to the allocation.
+  (checked-compile '(lambda (x y)
+                     (let ((s
+                            (multiple-value-prog1
+                                (list x)
+                              (catch 'ct1
+                                (throw 'ct8 30)))))
+                       (declare (dynamic-extent s))
+                       (funcall (the function y) s)))))
+
 ;;; bug reported by Svein Ove Aas
 (defun svein-2005-ii-07 (x y)
   (declare (optimize (speed 3) (space 2) (safety 0) (debug 0)))

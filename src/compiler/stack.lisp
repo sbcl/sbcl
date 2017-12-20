@@ -46,6 +46,10 @@
   (values))
 
 ;;;; Computation of live UVL sets
+(defun nle-block-p (block)
+  (and (eq (component-head (block-component block))
+           (first (block-pred block)))
+       (not (bind-p (block-start-node block)))))
 (defun nle-block-nlx-info (block)
   (let* ((start-node (block-start-node block))
          (nlx-ref (ctran-next (node-next start-node)))
@@ -127,7 +131,14 @@
                   (mark-lvar-live-on-path path))
                  ;; Don't go back past START-BLOCK.
                  ((not (eq current-block start-block))
-                  (dolist (pred-block (block-pred current-block))
+                  (dolist (pred-block (if (nle-block-p current-block)
+                                          ;; Follow backwards through
+                                          ;; NLEs to the start of
+                                          ;; their environment
+                                          (list* (nle-block-entry-block
+                                                  current-block)
+                                                 (block-pred current-block))
+                                          (block-pred current-block)))
                     (let ((new-arc (cons current-block pred-block)))
                       (declare (dynamic-extent new-arc))
                       ;; Never follow the same path segment twice.
@@ -223,9 +234,7 @@
       ;;
       ;; TODO: Insert a check that no values are discarded in UWP. Or,
       ;; maybe, we just don't need to create NLX-ENTRY for UWP?
-      (when (and (eq (component-head (block-component block))
-                     (first (block-pred block)))
-                 (not (bind-p (block-start-node block))))
+      (when (nle-block-p block)
         (let* ((nlx-info (nle-block-nlx-info block))
                (cleanup (nlx-info-cleanup nlx-info)))
           (unless (eq (cleanup-kind cleanup) :unwind-protect)
