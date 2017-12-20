@@ -154,20 +154,7 @@
   (let* ((bytes-per-word (/ n-word-bits bitsize))
          (byte-offset `(integer 0 (,bytes-per-word)))
          (byte-count `(integer 1 (,bytes-per-word)))
-         (max-bytes (ash sb!xc:most-positive-fixnum
-                         ;; FIXME: this reflects code contained in the
-                         ;; original bit-bash.lisp, but seems very
-                         ;; nonsensical.  Why shouldn't we be able to
-                         ;; handle M-P-FIXNUM bits?  And if we can't,
-                         ;; are these other shift amounts bogus, too?
-                         (ecase bitsize
-                           (1 -2)
-                           (2 -1)
-                           (4  0)
-                           (8  0)
-                           (16 0)
-                           (32 0)
-                           (64 0))))
+         (max-bytes sb!xc:most-positive-fixnum)
          (offset `(integer 0 ,max-bytes))
          (max-word-offset (ceiling max-bytes bytes-per-word))
          (word-offset `(integer 0 ,max-word-offset))
