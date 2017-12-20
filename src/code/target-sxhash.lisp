@@ -339,7 +339,16 @@
                         (sxhash (char-code x)))) ; through DEFTRANSFORM
                ;; general, inefficient case of NUMBER
                (number (sxhash-number x))
-               (funcallable-instance (fsc-instance-hash x))
+               (funcallable-instance
+                (typecase x
+                  #!+sb-fasteval
+                  (sb!interpreter:interpreted-function
+                   9550684)
+                  #!+sb-eval
+                  (sb!eval:interpreted-function
+                   9550684)
+                  (t
+                   (fsc-instance-hash x))))
                (t 42))))
     (sxhash-recurse x +max-hash-depthoid+)))
 

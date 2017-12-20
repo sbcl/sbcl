@@ -206,6 +206,10 @@
 
  ("src/code/early-float"   :not-host)
  ("src/pcl/early-low" :not-host)
+  ;; Define at most one INTERPRETED-FUNCTION type based on target features
+ #!+sb-eval ("src/code/early-full-eval" :not-host)
+ #!+sb-fasteval ("src/interpreter/function" :not-host)
+
  ("src/code/target-sxhash" :not-host) ; needs most-fooative-foo-float constants
 
  ("src/code/list"   :not-host)
@@ -353,9 +357,6 @@
 
  ("src/code/debug-info" :c-headers)
  ("src/code/source-location")
- ;; Define at most one INTERPRETED-FUNCTION type based on target features
- #!+sb-eval ("src/code/early-full-eval" :not-host)
- #!+sb-fasteval ("src/interpreter/function" :not-host)
  ("src/code/early-class")
  ("src/code/condition" :not-host)
  ("src/code/toplevel"  :not-host)
