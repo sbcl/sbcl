@@ -143,7 +143,7 @@
            ,*break-on-failure*
            ,*break-on-expected-failure*
            ,*break-on-error*
-           ,(eq sb-ext:*evaluator-mode* :interpret)))))
+           ,(eq *test-evaluator-mode* :interpret)))))
 
 (defun impure-runner (files test-fun)
   (when files
