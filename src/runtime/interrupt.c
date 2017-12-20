@@ -1334,7 +1334,6 @@ low_level_interrupt_handle_now(int signal, siginfo_t *info,
     check_blockables_blocked_or_lose(0);
     check_interrupts_enabled_or_lose(context);
     (*interrupt_low_level_handlers[signal])(signal, info, context);
-    /* No Darwin context fixage needed, caller does that. */
 }
 
 static void
