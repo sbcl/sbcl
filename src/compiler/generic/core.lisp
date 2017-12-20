@@ -30,32 +30,6 @@
   ;; backpatch with the source info.
   (debug-info () :type list))
 
-;;; Note the existence of FUNCTION.
-#-sb-xc-host ; There is no (SETF CODE-HEADER-REF) so this can't work.
-(defun note-fun (info function object)
-  (declare (type function function)
-           (type core-object object))
-  (let ((patch-table (core-object-patch-table object)))
-    (dolist (patch (gethash info patch-table))
-      (setf (code-header-ref (car patch) (the index (cdr patch))) function))
-    (remhash info patch-table))
-  (setf (gethash info (core-object-entry-table object)) function)
-  (values))
-
-;;; Stick a reference to the function FUN in CODE-OBJECT at index I. If the
-;;; function hasn't been compiled yet, make a note in the patch table.
-#-sb-xc-host ; no (SETF CODE-HEADER-REF)
-(defun reference-core-fun (code-obj i fun object)
-  (declare (type core-object object) (type functional fun)
-           (type index i))
-  (let* ((info (leaf-info fun))
-         (found (gethash info (core-object-entry-table object))))
-    (if found
-        (setf (code-header-ref code-obj i) found)
-        (push (cons code-obj i)
-              (gethash info (core-object-patch-table object)))))
-  (values))
-
 ;;; Call the top level lambda function dumped for ENTRY, returning the
 ;;; values. ENTRY may be a :TOPLEVEL-XEP functional.
 (defun core-call-toplevel-lambda (entry object)

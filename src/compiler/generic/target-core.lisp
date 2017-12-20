@@ -30,65 +30,57 @@
   #!-gencgc
   (%primitive allocate-code-object boxed unboxed))
 
-;; OFFSET is in bytes from the start of the code component's raw bytes
-(defun new-simple-fun (code fun-index offset nfuns)
-  (declare (type (unsigned-byte 27) fun-index)
-           (type index offset)
-           (type (unsigned-byte 14) nfuns))
-  (unless (zerop (logand offset sb!vm:lowtag-mask))
-    (bug "unaligned function object, offset = #X~X" offset))
-  (let ((header-data (get-header-data code)))
-    (if (> fun-index 0)
-        (let* ((n-header-words (logand header-data sb!vm:short-header-max-words))
-               (index (+ (- sb!vm:other-pointer-lowtag)
-                         (ash n-header-words sb!vm:word-shift)
-                         (ash (1- fun-index) 2))))
-          (aver (eql (sap-ref-32 (int-sap (get-lisp-obj-address code)) index) 0))
-          (setf (sap-ref-32 (int-sap (get-lisp-obj-address code)) index) offset))
-        ;; Special case for the first simple-fun:
-        ;; The value range of 'offset' and 'nfuns' is the same
-        ;; regardless of word size.
-        ;; It's as if it's a positive 32-bit fixnum (29 significant bits).
-        ;; 16 bits is enough for the offset because it only needs to
-        ;; skip over the unboxed constants.
-        #!-64-bit
-        (let ((newval (logior (ash (the (mod #x8000) offset) 14) nfuns)))
-          (aver (eql (sb!vm::%code-n-entries code) 0))
-          (setf (sb!vm::%code-n-entries code) newval))
-        #!+64-bit
-        (let ((newval (logior (ash (the (mod #x8000) offset) 16) nfuns)))
-          (aver (eql (ldb (byte 32 24) header-data) 0))
-          (set-header-data code (dpb newval (byte 32 24) header-data)))))
-  (let ((fun (truly-the function (%primitive sb!c:compute-fun code offset))))
-    ;; x86 backends store the address of the entrypoint in 'self'
-    #!+(or x86 x86-64)
-    (with-pinned-objects (fun)
-      #!+(and compact-instance-header x86-64)
-      (setf (sap-ref-32 (int-sap (get-lisp-obj-address fun))
-                        (- 4 sb!vm:fun-pointer-lowtag))
-            (truly-the (unsigned-byte 32)
-                       (get-lisp-obj-address #.(find-layout 'function))))
-      (setf (%simple-fun-self fun)
-            (%make-lisp-obj
-             (truly-the word (+ (get-lisp-obj-address fun)
-                                (ash sb!vm:simple-fun-code-offset sb!vm:word-shift)
-                                (- sb!vm:fun-pointer-lowtag))))))
-    ;; non-x86 backends store the function itself (what else?) in 'self'
-    #!-(or x86 x86-64)
-    (setf (%simple-fun-self fun) fun)
-    fun))
-
-;;; Make a function entry, filling in slots from the ENTRY-INFO.
-(defun make-fun-entry (fun-index entry-info code-obj object nfuns)
-  (declare (type entry-info entry-info) (type core-object object))
-  (let ((res (new-simple-fun code-obj fun-index
-                             (label-position (entry-info-offset entry-info))
-                             nfuns)))
-    (setf (%simple-fun-name res) (entry-info-name entry-info))
-    (setf (%simple-fun-arglist res) (entry-info-arguments entry-info))
-    (setf (%simple-fun-type res) (entry-info-type entry-info))
-    (setf (%simple-fun-info res) (entry-info-info entry-info))
-    (note-fun entry-info res object)))
+;;; Assign all simple-fun offsets in CODE, then set N-ENTRIES so that GC sees
+;;; a nonzero number of functions only after their addresses are assigned.
+;;; Otherwise GC would see their offsets as all 0 and bad things would happen.
+;;; Each element of OFFSETS is a byte number beyond (CODE-INSTRUCTIONS CODE).
+(defun set-code-entrypoints (code offsets)
+  (let* ((nfuns (the (unsigned-byte 14) (length offsets)))
+         (fun-index nfuns))
+    (dolist (offset offsets)
+      (declare (type index offset))
+      (unless (zerop (logand offset sb!vm:lowtag-mask))
+        (bug "unaligned function object, offset = #X~X" offset))
+      (decf fun-index)
+      (let ((header-data (get-header-data code)))
+        (if (> fun-index 0)
+            (let* ((n-header-words (logand header-data sb!vm:short-header-max-words))
+                   (index (+ (- sb!vm:other-pointer-lowtag)
+                             (ash n-header-words sb!vm:word-shift)
+                             (ash (1- fun-index) 2))))
+              (aver (eql (sap-ref-32 (int-sap (get-lisp-obj-address code)) index) 0))
+              (setf (sap-ref-32 (int-sap (get-lisp-obj-address code)) index) offset))
+            ;; Special case for the first simple-fun:
+            ;; The value range of 'offset' and 'nfuns' is the same
+            ;; regardless of word size.
+            ;; It's as if it's a positive 32-bit fixnum (29 significant bits).
+            ;; 16 bits is enough for the offset because it only needs to
+            ;; skip over the unboxed constants.
+            #!-64-bit
+            (let ((newval (logior (ash (the (mod #x8000) offset) 14) nfuns)))
+              (aver (eql (sb!vm::%code-n-entries code) 0))
+              (setf (sb!vm::%code-n-entries code) newval))
+            #!+64-bit
+            (let ((newval (logior (ash (the (mod #x8000) offset) 16) nfuns)))
+              (aver (eql (ldb (byte 32 24) header-data) 0))
+              (set-header-data code (dpb newval (byte 32 24) header-data)))))
+      ;; COMPUTE-FUN is ok even if code-obj is not pinned (which it is)
+      (let ((fun (truly-the function (%primitive sb!c:compute-fun code offset))))
+        #!+(and compact-instance-header x86-64)
+        (setf (sap-ref-32 (int-sap (get-lisp-obj-address fun))
+                          (- 4 sb!vm:fun-pointer-lowtag))
+              (truly-the (unsigned-byte 32)
+                         (get-lisp-obj-address #.(find-layout 'function))))
+        (setf (%simple-fun-self fun)
+              ;; x86 backends store the address of the entrypoint in 'self'
+              #!+(or x86 x86-64)
+              (%make-lisp-obj
+               (truly-the word (+ (get-lisp-obj-address fun)
+                                  (ash sb!vm:simple-fun-code-offset sb!vm:word-shift)
+                                  (- sb!vm:fun-pointer-lowtag))))
+              ;; non-x86 backends store the function itself (what else?) in 'self'
+              #!-(or x86 x86-64)
+              (setf (%simple-fun-self fun) fun))))))
 
 (flet ((fixup (code-obj offset sym kind flavor layout-finder)
          ;; CODE-OBJ must already be pinned in order to legally call this.
@@ -144,6 +136,30 @@
           (push offset preserved-fixups))))
       (finish-fixups code-obj preserved-fixups)))
 
+;;; Note the existence of FUNCTION.
+(defun note-fun (info function object)
+  (declare (type function function)
+           (type core-object object))
+  (let ((patch-table (core-object-patch-table object)))
+    (dolist (patch (gethash info patch-table))
+      (setf (code-header-ref (car patch) (the index (cdr patch))) function))
+    (remhash info patch-table))
+  (setf (gethash info (core-object-entry-table object)) function)
+  (values))
+
+;;; Stick a reference to the function FUN in CODE-OBJECT at index I. If the
+;;; function hasn't been compiled yet, make a note in the patch table.
+(defun reference-core-fun (code-obj i fun object)
+  (declare (type core-object object) (type functional fun)
+           (type index i))
+  (let* ((info (leaf-info fun))
+         (found (gethash info (core-object-entry-table object))))
+    (if found
+        (setf (code-header-ref code-obj i) found)
+        (push (cons code-obj i)
+              (gethash info (core-object-patch-table object)))))
+  (values))
+
 ;;; Dump a component to core. We pass in the assembler fixups, code
 ;;; vector and node info.
 (defun make-core-component (component segment length fixup-notes object)
@@ -166,7 +182,7 @@
       ;; The following operations need the code pinned:
       ;; 1. copying into code-instructions (a SAP)
       ;; 2. apply-core-fixups and sanctify-for-execution
-      ;; 3. new-simple-fun via make-fun-entry
+      ;; 3. set-code-entrypointa
       (with-pinned-objects (code-obj)
          (copy-byte-vector-to-system-area
           (the (simple-array assembly-unit 1) (segment-contents-as-vector segment))
@@ -174,11 +190,21 @@
 
         (apply-core-fixups fixup-notes code-obj)
 
-        (let* ((entries (ir2-component-entries 2comp))
-               (nfuns (length entries))
-               (fun-index nfuns))
-          (dolist (entry entries)
-            (make-fun-entry (decf fun-index) entry code-obj object nfuns))))
+        (set-code-entrypoints
+         code-obj (mapcar (lambda (entry-info)
+                            (label-position (entry-info-offset entry-info)))
+                          (ir2-component-entries 2comp))))
+
+      ;; Don't need code pinned now
+      (let* ((entries (ir2-component-entries 2comp))
+             (fun-index (length entries)))
+        (dolist (entry-info entries)
+          (let ((fun (%code-entry-point code-obj (decf fun-index))))
+            (setf (%simple-fun-name fun) (entry-info-name entry-info))
+            (setf (%simple-fun-arglist fun) (entry-info-arguments entry-info))
+            (setf (%simple-fun-type fun) (entry-info-type entry-info))
+            (setf (%simple-fun-info fun) (entry-info-info entry-info))
+            (note-fun entry-info fun object))))
 
       (push debug-info (core-object-debug-info object))
       (setf (%code-debug-info code-obj) debug-info)

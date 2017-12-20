@@ -244,16 +244,10 @@
           for j of-type index from ptr below debug-info-index
           do (setf (code-header-ref code i) (svref stack j)))
     (with-pinned-objects (code)
-      ;; We must pin the range of bytes containing instructions,
-      ;; but we also must prevent scavenging each embedded simple-fun
-      ;; until its widetag has been set. Otherwise gc would lose.
-      ;; We achieve this by not writing the 'nfuns' value
-      ;; until after the loop which stores the offsets.
       (read-n-bytes (%fasl-input-stream fasl-input)
                     (code-instructions code) 0 code-length)
-      (loop for i from (1- nfuns) downto 0
-            do (sb!c::new-simple-fun code i (read-varint-arg fasl-input)
-                                     nfuns))
+      (sb!c::set-code-entrypoints
+       code (loop repeat nfuns collect (read-varint-arg fasl-input)))
       (sb!c::apply-fasl-fixups stack code))
     code))
 
