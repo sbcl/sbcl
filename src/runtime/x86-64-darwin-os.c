@@ -32,7 +32,6 @@
 #if __DARWIN_UNIX03
 
 typedef struct __darwin_ucontext darwin_ucontext;
-typedef struct __darwin_mcontext64 darwin_mcontext;
 
 #define rip __rip
 #define rsp __rsp
@@ -57,8 +56,13 @@ typedef struct __darwin_mcontext64 darwin_mcontext;
 #else
 
 typedef struct ucontext darwin_ucontext;
-typedef struct mcontext darwin_mcontext;
 
+#endif
+
+#ifdef x86_AVX_STATE64_COUNT
+typedef _STRUCT_MCONTEXT_AVX64 darwin_mcontext;
+#else
+typedef _STRUCT_MCONTEXT64 darwin_mcontext;
 #endif
 
 #ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
@@ -138,20 +142,18 @@ void *stack_allocate(struct thread * th, x86_thread_state64_t *context, size_t s
     return (void*)context->rsp;
 }
 
-void signal_emulation_wrapper(x86_thread_state64_t *thread_state,
-                              x86_float_state64_t *float_state,
+void signal_emulation_wrapper(darwin_mcontext *mcontext,
                               int signal,
                               os_vm_address_t addr,
                               void (*handler)(int, siginfo_t *, void *))
 {
     siginfo_t siginfo;
     darwin_ucontext context;
-    darwin_mcontext regs;
 
     siginfo.si_signo = signal;
     siginfo.si_addr = addr;
 
-    context.uc_mcontext = &regs;
+    context.uc_mcontext = (_STRUCT_MCONTEXT64 *)mcontext;
 
     /* when BSD signals are fired, they mask they signals in sa_mask
        which always seem to be the blockable_sigset, for us, so we
@@ -161,20 +163,19 @@ void signal_emulation_wrapper(x86_thread_state64_t *thread_state,
        3) call the signal handler
        4) restore the sigmask */
 
-    build_fake_signal_context(&context, thread_state, float_state);
+    block_blockable_signals(&context.uc_sigmask);
 
     handler(signal, &siginfo, &context);
 
-    update_thread_state_from_context(thread_state, float_state, &context);
+    thread_sigmask(SIG_SETMASK, &context.uc_sigmask, NULL);
 
     /* Trap to restore the signal context. */
     asm volatile (".quad 0xffffffffffff0b0f"
-                  : : "a" (thread_state), "b" (float_state));
+                  : : "a" (mcontext));
 }
 
 void call_signal_emulator_in_context(x86_thread_state64_t *context,
-                                     x86_thread_state64_t * thread_state,
-                                     void * float_state,
+                                     darwin_mcontext *mcontext,
                                      int signal,
                                      os_vm_address_t addr,
                                      void* handler)
@@ -182,11 +183,10 @@ void call_signal_emulator_in_context(x86_thread_state64_t *context,
 
     align_context_stack(context);
     push_context(context->rip, context);
-    context->rdi = (u64) thread_state;
-    context->rsi = (u64) float_state;
-    context->rdx = signal;
-    context->rcx = (u64) addr;
-    context->r8 = (u64) handler;
+    context->rdi = (u64) mcontext;
+    context->rsi = signal;
+    context->rdx = (u64) addr;
+    context->rcx = (u64) handler;
 
     context->rip = (u64) signal_emulation_wrapper;
 }
@@ -247,14 +247,10 @@ catch_exception_raise(mach_port_t exception_port,
     mach_msg_type_number_t thread_state_count = x86_THREAD_STATE64_COUNT;
 
 #ifdef x86_AVX_STATE64_COUNT
-    x86_avx_state64_t float_state;
     mach_msg_type_number_t float_state_count = avx_supported? x86_AVX_STATE64_COUNT : x86_FLOAT_STATE64_COUNT;
-    x86_avx_state64_t *target_float_state;
     int float_state_flavor = avx_supported? x86_AVX_STATE64 : x86_FLOAT_STATE64;
 #else
-    x86_float_state64_t float_state;
     mach_msg_type_number_t float_state_count = x86_FLOAT_STATE64_COUNT;
-    x86_float_state64_t *target_float_state;
     int float_state_flavor = x86_FLOAT_STATE64;
 #endif
 
@@ -262,7 +258,6 @@ catch_exception_raise(mach_port_t exception_port,
     mach_msg_type_number_t exception_state_count = x86_EXCEPTION_STATE64_COUNT;
 
     x86_thread_state64_t backup_thread_state;
-    x86_thread_state64_t *target_thread_state;
 
     os_vm_address_t addr;
 
@@ -292,8 +287,6 @@ catch_exception_raise(mach_port_t exception_port,
     }
     thread_get_state(thread, x86_THREAD_STATE64,
                      (thread_state_t)&thread_state, &thread_state_count);
-    thread_get_state(thread, float_state_flavor,
-                     (thread_state_t)&float_state, &float_state_count);
 
     boolean stack_unprotected = 0;
 
@@ -333,16 +326,16 @@ catch_exception_raise(mach_port_t exception_port,
     case EXC_BAD_INSTRUCTION:
 
         if (*((u64 *)thread_state.rip) == 0xffffffffffff0b0f) {
-            /* fake sigreturn. */
+            /* Fake sigreturn. See the end of signal_emulation_wrapper() */
 
-            /* When we get here, thread_state.rax is a pointer to a
-             * thread_state to restore. */
-            /* thread_state = *((thread_state_t *)thread_state.rax); */
+            /* Apply any modifications done to the context, */
+
+            darwin_mcontext *mcontext = (darwin_mcontext *) thread_state.rax;
 
             thread_set_state(thread, x86_THREAD_STATE64,
-                             (thread_state_t) thread_state.rax, thread_state_count);
+                             (thread_state_t) &mcontext->ss, thread_state_count);
             thread_set_state(thread, float_state_flavor,
-                             (thread_state_t) thread_state.rbx, float_state_count);
+                             (thread_state_t) &mcontext->fs, float_state_count);
             goto do_not_handle;
         } else if (*((unsigned short *)thread_state.rip) == 0x0b0f) {
             signal = SIGTRAP;
@@ -376,26 +369,22 @@ catch_exception_raise(mach_port_t exception_port,
     if (will_exhaust_stack(th, &thread_state,
                            /* Won't be passing much to stack_exhausted_error */
                            stack_unprotected ? N_WORD_BYTES*4 :
-                           ALIGN_UP(sizeof(*target_thread_state) +
-                                    sizeof (*target_float_state) +
-                                    N_WORD_BYTES, /* RSP */
+                           ALIGN_UP(sizeof(darwin_mcontext) +
+                                    N_WORD_BYTES, /* return address */
                                     N_WORD_BYTES*2))
         || stack_unprotected) {
         call_stack_exhausted_in_context(&thread_state);
     } else {
 
-        /* Save thread state */
-        target_thread_state = stack_allocate(th, &thread_state, sizeof(*target_thread_state));
-        (*target_thread_state) = backup_thread_state;
+        darwin_mcontext *mcontext = stack_allocate(th, &thread_state, sizeof(darwin_mcontext));
 
-        target_thread_state->rip += rip_offset;
-        /* Save float state */
-        target_float_state = stack_allocate(th, &thread_state, sizeof(*target_float_state));
-        (*target_float_state) = float_state;
+        backup_thread_state.rip += rip_offset;
+        mcontext->ss = backup_thread_state;
+
+        thread_get_state(thread, float_state_flavor, (thread_state_t) &mcontext->fs, &float_state_count);
 
         call_signal_emulator_in_context(&thread_state,
-                                        target_thread_state,
-                                        target_float_state,
+                                        mcontext,
                                         signal,
                                         addr,
                                         handler);
