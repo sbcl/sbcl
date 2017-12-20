@@ -238,8 +238,11 @@
       (return-from try-to-leak-alien-stack 'going))
     (locally (declare (muffle-conditions style-warning))
       (never))))
-(with-test (:name :nlx-causes-alien-stack-leak
-                  :fails-on :interpreter) ; should it work?
+
+;;; Can't stack allocate aliens with an interpreter
+(compile 'try-to-leak-alien-stack)
+
+(with-test (:name :nlx-causes-alien-stack-leak)
   (let ((*sap-int* nil))
     (loop repeat 1024
           do (try-to-leak-alien-stack t))))
