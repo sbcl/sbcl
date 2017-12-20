@@ -860,3 +860,10 @@
               (checked-compile
                `(lambda () (the (array abc) #()))
                :allow-style-warnings t))))
+
+(with-test (:name (coerce :bad-type-specifier))
+  (assert
+   (nth-value 1
+              (checked-compile
+               `(lambda () (coerce (list 2) 1))
+               :allow-warnings t))))
