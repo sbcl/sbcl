@@ -9,6 +9,8 @@
 (use-package :test-util)
 (use-package :assertoid)
 
+(in-package :run-tests)
+
 (defvar *break-on-error*)
 
 (load "test-funs")
@@ -36,7 +38,8 @@
                                    (type-of condition) condition)
                            (sb-debug:print-backtrace)))
                     (invoke-restart 'skip-file))))
-        (funcall test-fun file))
+        (let ((*package* (find-package :cl-user)))
+          (funcall test-fun file)))
     (skip-file ()
       (format t ">>>~a<<<~%"*failures*)))
   (report-test-status)

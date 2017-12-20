@@ -117,7 +117,7 @@
           (skip-file ())))
       (append-failures))))
 
-(defun run-in-child-sbcl (eval)
+(defun run-in-child-sbcl (load eval)
   (process-exit-code
    (sb-ext:run-program
     (first *POSIX-ARGV*)
@@ -127,23 +127,23 @@
            "--no-userinit"
            "--noprint"
            "--disable-debugger"
-           "--eval" (let ((*package* #.*package*))
-                      (write-to-string eval
-                                       :right-margin 1000)))
+           "--load" load
+           "--eval" (write-to-string eval
+                                     :right-margin 1000))
     :output t
     :input t)))
 
 (defun run-impure-in-child-sbcl (test-file test-fun)
   (clear-test-status)
   (run-in-child-sbcl
-   `(progn
-      (load "impure-runner")
-      (run ,(enough-namestring test-file)
-           ',test-fun
-           ,*break-on-failure*
-           ,*break-on-expected-failure*
-           ,*break-on-error*
-           ,(eq *test-evaluator-mode* :interpret)))))
+   "impure-runner"
+   `(run-tests::run
+     ,(enough-namestring test-file)
+     ',test-fun
+     ,*break-on-failure*
+     ,*break-on-expected-failure*
+     ,*break-on-error*
+     ,(eq *test-evaluator-mode* :interpret))))
 
 (defun impure-runner (files test-fun)
   (when files
