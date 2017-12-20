@@ -137,6 +137,7 @@
 
 ;;; Shamelessly piggybacking on the approach above to grab a page
 ;;; which adjoins an unreadable page for testing the disassembler.
+#-win32 ;; no sb-posix:mmap
 (with-test (:name :disassembler-overrun :skipped-on (not (or :x86 :x86-64)))
   (let* ((n-bytes 7)
          (first (sb-posix:mmap nil (* sb-c:+backend-page-bytes+ 2)
