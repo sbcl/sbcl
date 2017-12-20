@@ -302,6 +302,7 @@
   (let* ((word-index
           (gspace-claim-n-bytes gspace length page-attributes))
          (ptr (+ (gspace-word-address gspace) word-index)))
+    #!+gencgc
     (when (gspace-objects gspace)
       (let ((this (ash word-index sb!vm:word-shift))
             (next (ash (gspace-free-word-index gspace) sb!vm:word-shift))
