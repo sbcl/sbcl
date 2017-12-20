@@ -80,7 +80,7 @@ undefined_alien_handler(int signal, siginfo_t *siginfo, os_context_t *context) {
 void build_fake_signal_context(darwin_ucontext *context,
                                x86_thread_state64_t *thread_state,
                                x86_float_state64_t *float_state) {
-    thread_sigmask(0, NULL, &context->uc_sigmask);
+    block_blockable_signals(&context->uc_sigmask);
     context->uc_mcontext->ss = *thread_state;
     context->uc_mcontext->fs = *float_state;
 }
@@ -162,8 +162,6 @@ void signal_emulation_wrapper(x86_thread_state64_t *thread_state,
        4) restore the sigmask */
 
     build_fake_signal_context(&context, thread_state, float_state);
-
-    block_blockable_signals(0);
 
     handler(signal, &siginfo, &context);
 
