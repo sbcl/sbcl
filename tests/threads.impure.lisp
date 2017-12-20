@@ -210,10 +210,8 @@
                           (with-mutex (mutex)
                             (sb-thread:condition-wait queue mutex))
                           (sb-thread:abort-thread))))
-    (let ((start-time (get-internal-run-time)))
-      (funcall function)
-      (prog1 (- (get-internal-run-time) start-time)
-        (sb-thread:condition-broadcast queue)))))
+    (prog1 (runtime (funcall function))
+      (sb-thread:condition-broadcast queue))))
 
 (defun fact (n)
   "A function that does work with the CPU."
