@@ -1223,13 +1223,16 @@ the thrown values will be returned."
   ;; We represent the possibility of the control transfer by making an
   ;; "escape function" that does a lexical exit, and instantiate the
   ;; cleanup using %WITHIN-CLEANUP.
-  (ir1-convert
-   start next result
-   (with-unique-names (exit-block)
-     `(block ,exit-block
-        (%within-cleanup
-         :catch (%catch (%escape-fun ,exit-block) ,tag)
-         ,@body)))))
+  (let* ((tag-ctran (make-ctran))
+         (tag-lvar (make-lvar)))
+    (ir1-convert start tag-ctran tag-lvar tag)
+    (ir1-convert
+     tag-ctran next result
+     (with-unique-names (exit-block)
+       `(block ,exit-block
+          (%within-cleanup
+           :catch (%catch (%escape-fun ,exit-block) ,tag-lvar)
+           ,@body))))))
 
 ;;; Since NSP is restored on unwind we only need to protect against
 ;;; local transfers of control, basically the same as special

@@ -1100,7 +1100,8 @@
         (dolist (arg args)
           (cond ((lvar-p arg)
                  (aver (not (lvar-dest arg)))
-                 (arg-lvars arg))
+                 (arg-lvars arg)
+                 (setf (lvar-dest arg) node))
                 (t
                  (setf this-start
                        (maybe-instrument-progn-like this-start forms arg))

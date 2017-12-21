@@ -866,3 +866,14 @@
               (checked-compile
                `(lambda () (coerce (list 2) 1))
                :allow-warnings t))))
+
+
+(with-test (:name (catch :evaluate-tag-before-%catch))
+  (checked-compile-and-assert
+      (:allow-style-warnings t)
+      `(lambda (z)
+         (catch (multiple-value-call #'+
+                  (if z 1 (values 1 2)))
+           :done))
+    ((t) :done)
+    ((nil) :done)))
