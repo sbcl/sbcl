@@ -980,6 +980,11 @@ void scan_weak_pointers(void)
                 wp->value = UNBOUND_MARKER_WIDETAG;
         }
 #endif
+#ifdef LISP_FEATURE_GENCGC
+        // Large objects are "moved" by touching the page table gen field.
+        // Do nothing if the target of this weak pointer had that happen.
+        else if (new_space_p(pointee)) { }
+#endif
         else
             lose("unbreakable pointer %p", wp);
     }

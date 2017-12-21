@@ -239,6 +239,13 @@ from_space_p(lispobj obj)
         && !pinned_p(obj, page_index);
 }
 
+static boolean __attribute__((unused)) new_space_p(lispobj obj)
+{
+    gc_dcheck(compacting_p());
+    page_index_t page_index = find_page_index((void*)obj);
+    return page_index >= 0 && page_table[page_index].gen == new_space;
+}
+
 #include "genesis/weak-pointer.h"
 static inline void add_to_weak_pointer_list(struct weak_pointer *wp) {
     /* Since we overwrite the 'next' field, we have to make
