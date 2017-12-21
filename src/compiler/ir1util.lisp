@@ -91,11 +91,11 @@
 
 (defun principal-lvar-dest (lvar)
   (labels ((pld (lvar)
-             (declare (type lvar lvar))
-             (let ((dest (lvar-dest lvar)))
-               (if (cast-p dest)
-                   (pld (cast-lvar dest))
-                   dest))))
+             (and lvar
+                  (let ((dest (lvar-dest lvar)))
+                    (if (cast-p dest)
+                        (pld (cast-lvar dest))
+                        dest)))))
     (pld lvar)))
 
 ;;; Update lvar use information so that NODE is no longer a use of its
