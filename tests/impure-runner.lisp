@@ -22,8 +22,9 @@
         *break-on-expected-failure* break-on-expected-failure
         *break-on-error* break-on-error)
   (when interpret
-    (setf *evaluator-mode* :interpret)
+    (setf *test-evaluator-mode* :interpret)
     (push :interpreter *features*))
+  (setf sb-ext:*evaluator-mode* *test-evaluator-mode*)
   (format t "// Running ~a in ~a evaluator mode~%"
           file *evaluator-mode*)
   (restart-case
