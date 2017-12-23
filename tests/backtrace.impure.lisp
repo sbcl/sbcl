@@ -602,9 +602,9 @@
 (with-test (:name :long-string-abbreviation)
   (let ((backtrace (mega-string-replace-fail '(#\- 1))))
     (assert (search (concatenate 'string
-                                 "\"-"
-                                 (make-string 49 :initial-element #\z)
-                                 "...\"")
+                                 "-"
+                                 (make-string 199 :initial-element #\z)
+                                 "...")
                     backtrace))))
 
 (defclass cannot-print-this () ())

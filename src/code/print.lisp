@@ -823,35 +823,49 @@ variable: an unreadable object representing the error is printed instead.")
 
 (defmethod print-object ((vector vector) stream)
   (let ((readably *print-readably*))
-    (cond ((stringp vector)
-           (cond ((and readably (not (typep vector '(vector character))))
-                  (output-unreadable-array-readably vector stream))
-                 ((or *print-escape* readably)
-                  (write-char #\" stream)
-                  (quote-string vector stream)
-                  (write-char #\" stream))
-                 (t
-                  (write-string vector stream))))
-          ((not (or *print-array* readably))
-           (output-terse-array vector stream))
-          ((bit-vector-p vector)
-           (write-string "#*" stream)
-           (dovector (bit vector)
-             ;; (Don't use OUTPUT-OBJECT here, since this code
-             ;; has to work for all possible *PRINT-BASE* values.)
-             (write-char (if (zerop bit) #\0 #\1) stream)))
-          ((or (not readably) (array-readably-printable-p vector))
-           (descend-into (stream)
-             (write-string "#(" stream)
-             (dotimes (i (length vector))
-               (unless (zerop i)
-                 (write-char #\space stream))
-               (punt-print-if-too-long i stream)
-               (output-object (aref vector i) stream))
-             (write-string ")" stream)))
+    (flet ((cut-length ()
+             (when (and (not readably)
+                        *print-sequence-length*
+                        (> (length vector) *print-sequence-length*))
+               (print-unreadable-object (vector stream :type t :identity t)
+                 (format stream "~A..."
+                         (make-array *print-sequence-length*
+                                     :element-type (array-element-type vector)
+                                     :displaced-to vector)))
+               t)))
+      (cond ((stringp vector)
+             (cond ((and readably (not (typep vector '(vector character))))
+                    (output-unreadable-array-readably vector stream))
+                   ((and *print-escape*
+                         (cut-length)))
+                   ((or *print-escape* readably)
+                    (write-char #\" stream)
+                    (quote-string vector stream)
+                    (write-char #\" stream))
+                   (t
+                    (write-string vector stream))))
+            ((not (or *print-array* readably))
+             (output-terse-array vector stream))
+            ((bit-vector-p vector)
+             (cond ((cut-length))
+                   (t
+                    (write-string "#*" stream)
+                    (dovector (bit vector)
+                      ;; (Don't use OUTPUT-OBJECT here, since this code
+                      ;; has to work for all possible *PRINT-BASE* values.)
+                      (write-char (if (zerop bit) #\0 #\1) stream)))))
+            ((or (not readably) (array-readably-printable-p vector))
+             (descend-into (stream)
+               (write-string "#(" stream)
+               (dotimes (i (length vector))
+                 (unless (zerop i)
+                   (write-char #\space stream))
+                 (punt-print-if-too-long i stream)
+                 (output-object (aref vector i) stream))
+               (write-string ")" stream)))
 
-          (t
-           (output-unreadable-array-readably vector stream)))))
+            (t
+             (output-unreadable-array-readably vector stream))))))
 
 ;;; This function outputs a string quoting characters sufficiently
 ;;; so that someone can read it in again. Basically, put a slash in
