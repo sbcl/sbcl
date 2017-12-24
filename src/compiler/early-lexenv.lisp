@@ -79,7 +79,8 @@
                     (default-structure-print lexenv stream depth))))
              (:copier nil)
              (:constructor make-null-lexenv ())
-             (:constructor make-almost-null-lexenv (%policy handled-conditions))
+             (:constructor make-almost-null-lexenv (%policy handled-conditions
+                                                    flushable))
              (:constructor make-package-lock-lexenv
                            (disabled-package-locks %policy
                             &aux (handled-conditions nil)))
