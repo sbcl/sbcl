@@ -1581,7 +1581,10 @@
                                     (* &optional
                                        (constant-arg (member 1))))
                   '(let ((res (,ufun x)))
-                     (values res (- x res)))))))
+                    (values res (locally
+                                    (declare (flushable %single-float
+                                                        %double-float))
+                                  (- x res))))))))
   (define-frobs truncate %unary-truncate)
   (define-frobs round %unary-round))
 
