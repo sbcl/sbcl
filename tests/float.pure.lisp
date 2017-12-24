@@ -437,8 +437,10 @@
   (let ((f (checked-compile
             '(lambda (x)
               (values (truncate (the double-float x)))))))
-    (ctu:assert-no-consing (funcall f 1d0)))
+    (ctu:assert-no-consing (funcall f 1d0))
+    (ctu:assert-no-consing (funcall f (float most-negative-fixnum 1d0))))
   (let ((f (checked-compile
             '(lambda (x)
               (values (truncate (the single-float x)))))))
-    (ctu:assert-no-consing (funcall f 1f0))))
+    (ctu:assert-no-consing (funcall f 1f0))
+    (ctu:assert-no-consing (funcall f (float most-negative-fixnum 1f0)))))
