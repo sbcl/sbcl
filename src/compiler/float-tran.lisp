@@ -1616,14 +1616,19 @@
                             (and (constant-lvar-p y) (= 1 (lvar-value y))))
                         (if compute-all
                             `(let ((res (,',unary x)))
-                               (values res (- x (,',coerce res))))
+                               (values res (- x (locally
+                                                    ;; Can be flushed as it will produce no errors.
+                                                    (declare (flushable ,',coerce))
+                                                    (,',coerce res)))))
                             `(let ((res (,',unary x)))
                                ;; Dummy secondary value!
                                (values res x)))
                         (if compute-all
                             `(let* ((f (,',coerce y))
                                     (res (,',unary (/ x f))))
-                               (values res (- x (* f (,',coerce res)))))
+                               (values res (- x (* f (locally
+                                                         (declare (flushable ,',coerce))
+                                                       (,',coerce res))))))
                             `(let* ((f (,',coerce y))
                                     (res (,',unary (/ x f))))
                                ;; Dummy secondary value!

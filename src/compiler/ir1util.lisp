@@ -473,17 +473,20 @@
   (declare (type combination call))
   (let ((kind (combination-kind call))
         (info (combination-fun-info call)))
-    (when (and (eq kind :known) (fun-info-p info))
-      (let ((attr (fun-info-attributes info)))
-        (when (and (not (ir1-attributep attr call))
-                   ;; FIXME: For now, don't consider potentially flushable
-                   ;; calls flushable when they have the CALL attribute.
-                   ;; Someday we should look at the functional args to
-                   ;; determine if they have any side effects.
-                   (if (policy call (= safety 3))
-                       (ir1-attributep attr flushable)
-                       (ir1-attributep attr unsafely-flushable)))
-          t)))))
+    (or (when (and (eq kind :known) (fun-info-p info))
+          (let ((attr (fun-info-attributes info)))
+            (when (and (not (ir1-attributep attr call))
+                       ;; FIXME: For now, don't consider potentially flushable
+                       ;; calls flushable when they have the CALL attribute.
+                       ;; Someday we should look at the functional args to
+                       ;; determine if they have any side effects.
+                       (if (policy call (= safety 3))
+                           (ir1-attributep attr flushable)
+                           (ir1-attributep attr unsafely-flushable)))
+              t)))
+        ;; Is it declared flushable locally?
+        (let ((name (lvar-fun-name (combination-fun call) t)))
+          (memq name (lexenv-flushable (node-lexenv call)))))))
 
 ;;;; BLOCK UTILS
 
@@ -944,7 +947,8 @@
                          (disabled-package-locks
                           (lexenv-disabled-package-locks default))
                          (policy (lexenv-policy default))
-                         (user-data (lexenv-user-data default)))
+                         (user-data (lexenv-user-data default))
+                         (flushable (lexenv-flushable default)))
   (macrolet ((frob (var slot)
                `(let ((old (,slot default)))
                   (if ,var
@@ -956,6 +960,7 @@
      (frob blocks lexenv-blocks)
      (frob tags lexenv-tags)
      (frob type-restrictions lexenv-type-restrictions)
+     (frob flushable lexenv-flushable)
      lambda
      cleanup handled-conditions disabled-package-locks
      policy
@@ -990,6 +995,7 @@
      nil
      nil
      (lexenv-type-restrictions lexenv) ; XXX
+     nil
      nil
      nil
      (lexenv-handled-conditions lexenv)

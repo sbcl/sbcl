@@ -107,7 +107,7 @@
                             (sb!c::lexenv-funs old-lexenv))
                    (nconc-2 (mapcar #'to-native-vars new-vars)
                             (sb!c::lexenv-vars old-lexenv))
-                   nil nil nil nil nil
+                   nil nil nil nil nil nil
                    (sb!c::lexenv-handled-conditions old-lexenv)
                    (sb!c::lexenv-disabled-package-locks old-lexenv)
                    (sb!c::lexenv-policy old-lexenv) ; = (OR %POLICY *POLICY*)
@@ -183,7 +183,7 @@
 (defun make-null-environment ()
   (%make-env nil nil nil nil nil nil nil nil
              (sb!c::internal-make-lexenv
-              nil nil
+              nil nil nil
               nil nil nil nil nil nil nil
               sb!c::*policy*
               nil nil)))

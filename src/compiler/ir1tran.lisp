@@ -1644,6 +1644,10 @@
          :default res
          :disabled-package-locks (process-package-lock-decl
                                   spec (lexenv-disabled-package-locks res))))
+       (flushable
+        (make-lexenv
+         :default res
+         :flushable (cdr spec)))
        ;; We may want to detect LAMBDA-LIST and VALUES decls here,
        ;; and report them as "Misplaced" rather than "Unrecognized".
        (t

@@ -86,6 +86,7 @@
              (:constructor internal-make-lexenv
                            (funs vars blocks tags
                             type-restrictions
+                            flushable
                             lambda cleanup handled-conditions
                             disabled-package-locks %policy user-data
                             parent)))
@@ -140,7 +141,12 @@
   ;; Cache of all visible variables, including the ones coming from
   ;; (call-lexenv lambda)
   ;; Used for LEAF-VISIBLE-TO-DEBUGGER-P
-  (var-cache nil :type (or null hash-table)))
+  (var-cache nil :type (or null hash-table))
+  ;; A list of functions that can be removed when unused.
+  ;; Similar to the FLUSHABLE attribute in DEFKNOWN, but can applied
+  ;; locally to things that are generally not flushable but can be
+  ;; flushed in some circumstances.
+  (flushable nil :type list))
 
 ;;; the lexical environment we are currently converting in
 (defvar *lexenv*)
