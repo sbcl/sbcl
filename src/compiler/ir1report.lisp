@@ -173,10 +173,19 @@
                        '((some strange place)))))))))
 
 (defun map-tree (function tree)
-  (if (consp function)
-      (cons (map-tree function (car tree))
-            (map-tree function (cdr tree)))
-      (funcall function tree)))
+  (let (seen)
+    (labels ((recurse (tree)
+               (cond ((atom tree)
+                      (funcall function tree))
+                     ((getf seen tree))
+                     (t
+                      (let ((cons (setf (getf seen tree) (list 0))))
+                        (setf (car cons)
+                              (recurse (car tree))
+                              (cdr cons)
+                              (recurse (cdr tree)))
+                        cons)))))
+      (recurse tree))))
 
 (defun hide-ir-nodes (form)
   (map-tree
@@ -185,7 +194,7 @@
        (functional
         (let ((name (functional-debug-name x)))
           `(function
-            ,(if (memq (car name) '(xep tl-xep))
+            ,(if (typep name '(cons (member xep tl-xep)))
                  (cadr name)
                  name))))
        (t
