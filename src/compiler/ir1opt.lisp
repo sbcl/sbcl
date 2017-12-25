@@ -1970,49 +1970,42 @@
 (defun ir1-optimize-mv-call (node)
   (let ((fun (basic-combination-fun node))
         (*compiler-error-context* node)
-        (ref (lvar-uses (basic-combination-fun node)))
+        (uses (lvar-uses (basic-combination-fun node)))
         (args (basic-combination-args node)))
-    (when (ref-p ref)
-      (multiple-value-bind (min max) (fun-type-nargs (lvar-type fun))
-        (let ((total-nvals
-                (loop for arg in args
-                      for nvals = (nth-value 1 (values-types (lvar-derived-type arg)))
-                      when (eq nvals :unknown) return nil
-                      sum nvals)))
-          (when total-nvals
-            (when (and min (< total-nvals min))
-              (compiler-warn
-               "MULTIPLE-VALUE-CALL with ~R values when the function expects ~
-              at least ~R."
-               total-nvals min)
-              (setf (basic-combination-kind node) :error)
-              (return-from ir1-optimize-mv-call))
-            (when (and max (> total-nvals max))
-              (compiler-warn
-               "MULTIPLE-VALUE-CALL with ~R values when the function expects ~
-              at most ~R."
-               total-nvals max)
-              (setf (basic-combination-kind node) :error)
-              (return-from ir1-optimize-mv-call)))
-          (let ((count (cond (total-nvals)
-                             ((and (policy node (zerop verify-arg-count))
-                                   (eql min max))
-                              min)
-                             (t nil))))
-            (when count
-              (with-ir1-environment-from-node node
-                (let* ((dums (make-gensym-list count))
-                       (ignore (gensym))
-                       (leaf (ref-leaf ref))
-                       (fun (ir1-convert-lambda
-                             `(lambda (&optional ,@dums &rest ,ignore)
-                                (declare (ignore ,ignore))
-                                (%funcall ,leaf ,@dums))
-                             :debug-name (leaf-%debug-name leaf))))
-                  (change-ref-leaf ref fun)
-                  (aver (eq (basic-combination-kind node) :full))
-                  (locall-analyze-component *current-component*)
-                  (aver (eq (basic-combination-kind node) :local))))))))))
+    (multiple-value-bind (min max) (fun-type-nargs (lvar-fun-type fun))
+      (let ((total-nvals
+              (loop for arg in args
+                    for nvals = (nth-value 1 (values-types (lvar-derived-type arg)))
+                    when (eq nvals :unknown) return nil
+                    sum nvals)))
+        (let ((count (cond (total-nvals)
+                           ((and (policy node (zerop verify-arg-count))
+                                 (eql min max))
+                            min)
+                           (t nil))))
+          (when count
+            (with-ir1-environment-from-node node
+              (let* ((dums (make-gensym-list count))
+                     (ignore (gensym))
+                     (ref-p (ref-p uses))
+                     (new-fun (ir1-convert-lambda
+                               `(lambda (&optional ,@dums &rest ,ignore)
+                                  (declare (ignore ,ignore))
+                                  ;; REFERENCE-LEAF does a better job referencing
+                                  ;; DEFINED-FUNs than just using the LVAR.
+                                  ,(cond (ref-p
+                                          `(%funcall ,(ref-leaf uses) ,@dums))
+                                         (t
+                                          `(%funcall-lvar ,fun ,@dums)))))))
+                (cond (ref-p
+                       (change-ref-leaf uses new-fun))
+                      (t
+                       (reoptimize-lvar fun)
+                       (setf (basic-combination-fun node)
+                             (insert-ref-before new-fun node))))
+                (aver (eq (basic-combination-kind node) :full))
+                (locall-analyze-component *current-component*)
+                (aver (eq (basic-combination-kind node) :local)))))))))
   (values))
 
 ;;; If we see:

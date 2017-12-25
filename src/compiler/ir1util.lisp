@@ -441,6 +441,20 @@
       (node-ends-block cast))
     (setf (block-type-check (node-block cast)) t)
     cast))
+
+(defun insert-ref-before (leaf node)
+  (let* ((ref (make-ref leaf))
+         (lvar (make-lvar node))
+         (ctran (make-ctran))
+         (node-ctran (node-prev node)))
+    (push ref (leaf-refs leaf))
+    (setf (leaf-ever-used leaf) t)
+    (setf (ctran-next node-ctran) ref
+          (node-prev ref) node-ctran)
+    (use-ctran ref ctran)
+    (use-lvar ref lvar)
+    (link-node-to-previous-ctran node ctran)
+    lvar))
 
 ;;;; miscellaneous shorthand functions
 
