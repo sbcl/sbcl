@@ -17,6 +17,7 @@ changes relative to sbcl-1.4.2:
   * bug fix: pathnames with a directory component of the form
     (:absolute {:up,:wild,:wild-inferiors}) no longer fail to unparse.
     (lp#1738775)
+  * bug fix: more reliable signal handling on macOS.
 
 changes in sbcl-1.4.2 relative to sbcl-1.4.1:
   * minor incompatible change: SB-EXT:QUIT is no longer marked as deprecated
