@@ -197,6 +197,11 @@
             ,(if (typep name '(cons (member xep tl-xep)))
                  (cadr name)
                  name))))
+       (global-var
+        (let ((name (leaf-source-name x)))
+          (if (eq (global-var-kind x) :global-function)
+              `(function ,name)
+              name)))
        (t
         x)))
    form))
