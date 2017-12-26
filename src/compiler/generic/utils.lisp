@@ -104,6 +104,17 @@
                      (nth n *register-arg-offsets*))
       (make-wired-tn *backend-t-primitive-type* control-stack-sc-number n)))
 
+;;; Same as above but marks stack locations as :arg-pass
+(defun standard-call-arg-location (n)
+  (declare (type unsigned-byte n))
+  (if (< n register-arg-count)
+      (make-wired-tn *backend-t-primitive-type* descriptor-reg-sc-number
+                     (nth n *register-arg-offsets*))
+      (let ((tn
+              (make-wired-tn *backend-t-primitive-type* control-stack-sc-number n)))
+        (setf (tn-kind tn) :arg-pass)
+        tn)))
+
 (defun standard-arg-location-sc (n)
   (declare (type unsigned-byte n))
   (if (< n register-arg-count)

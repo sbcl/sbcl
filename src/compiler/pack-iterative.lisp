@@ -618,9 +618,10 @@
     ;; them in the graph for targeting purposes.
     (do ((tn (ir2-component-wired-tns 2comp) (tn-next tn)))
         ((null tn))
-      (pack-wired-tn tn optimize)
-      (unless (unbounded-tn-p tn)
-        (vertices (make-vertex tn :wired))))
+      (unless (eq (tn-kind tn) :arg-pass)
+        (pack-wired-tn tn optimize)
+        (unless (unbounded-tn-p tn)
+          (vertices (make-vertex tn :wired)))))
 
     ;; Preallocate vertices that *must* be in this finite SC.  If
     ;; targeting is improved, giving them a high priority in regular

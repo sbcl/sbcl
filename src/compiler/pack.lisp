@@ -1332,6 +1332,7 @@
   (declare (type tn tn) (type sc sc))
   (do-target-tns (target tn)
     (awhen (and (tn-offset target)
+                (neq (tn-kind target) :arg-pass)
                 (check-ok-target target tn sc))
       (return-from find-ok-target-offset it))))
 
@@ -1699,7 +1700,8 @@
   ;; Pack wired TNs first.
   (do ((tn (ir2-component-wired-tns 2comp) (tn-next tn)))
       ((null tn))
-    (pack-wired-tn tn optimize))
+    (unless (eq (tn-kind tn) :arg-pass)
+      (pack-wired-tn tn optimize)))
 
   ;; Then, pack restricted TNs, ones that are live over the whole
   ;; component first (they cause no fragmentation).  Sort by TN cost

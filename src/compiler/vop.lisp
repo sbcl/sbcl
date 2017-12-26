@@ -921,7 +921,8 @@
         :type (member :normal :environment :debug-environment
                       :save :save-once  :load :constant
                       :component :alias :unused
-                      #!-fp-and-pc-standard-save :specified-save))
+                      #!-fp-and-pc-standard-save :specified-save
+                      :arg-pass))
   ;; the primitive-type for this TN's value. Null in restricted or
   ;; wired TNs.
   (primitive-type nil :type (or primitive-type null))

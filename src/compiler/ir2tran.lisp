@@ -1060,7 +1060,7 @@
       (let ((last nil)
             (first nil))
         (dotimes (num nargs)
-          (locs (standard-arg-location num))
+          (locs (sb!vm::standard-call-arg-location num))
           (let ((ref (reference-tn (lvar-tn node block (elt args num))
                                    nil)))
             (if last
