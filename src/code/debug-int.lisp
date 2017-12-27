@@ -1127,35 +1127,30 @@ register."
                        (sap-ref-32 catch
                                    (* catch-block-cfp-slot
                                       n-word-bytes))))
-            (let* (#!-(or x86 x86-64)
-                   (lra (stack-ref catch catch-block-entry-pc-slot))
-                   #!+(or x86 x86-64)
-                   (ra (sap-ref-sap
-                        catch (* catch-block-entry-pc-slot
-                                 n-word-bytes)))
-                   #!-(or x86 x86-64)
-                   (component
-                    (stack-ref catch catch-block-code-slot))
-                   #!+(or x86 x86-64)
-                   (component (code-header-from-pc ra))
-                   (offset
-                    #!-(or x86 x86-64)
-                    (* (- (1+ (get-header-data lra))
-                          (code-header-words component))
-                       n-word-bytes)
-                    #!+(or x86 x86-64)
-                    (- (sap-int ra)
-                       (- (get-lisp-obj-address component)
-                          other-pointer-lowtag)
-                       (* (code-header-words component) n-word-bytes))))
-              (push (cons #!-(or x86 x86-64)
-                          (stack-ref catch catch-block-tag-slot)
-                          #!+(or x86 x86-64)
-                          (make-lisp-obj
-                           (sap-ref-word catch (* catch-block-tag-slot
-                                                  n-word-bytes)))
+            (labels ((catch-ref (slot)
+                       (sap-ref-lispobj catch (* slot n-word-bytes)))
+                     #!-(or x86 x86-64)
+                     (catch-entry-offset ()
+                       (let ((lra (catch-ref catch-block-entry-pc-slot))
+                             (component (catch-ref catch-block-code-slot)))
+                         (* (- (1+ (get-header-data lra))
+                               (code-header-words component))
+                            n-word-bytes)))
+                     #!+(or x86 x86-64)
+                     (catch-entry-offset ()
+                       (let* ((ra (sap-ref-sap
+                                   catch (* catch-block-entry-pc-slot
+                                            n-word-bytes)))
+                              (component (code-header-from-pc ra)))
+                         (- (sap-int ra)
+                            (- (get-lisp-obj-address component)
+                               other-pointer-lowtag)
+                            (* (code-header-words component)
+                               n-word-bytes)))))
+              (declare (inline catch-ref catch-entry-offset))
+              (push (cons (catch-ref catch-block-tag-slot)
                           (make-compiled-code-location
-                           offset (frame-debug-fun frame)))
+                           (catch-entry-offset) (frame-debug-fun frame)))
                     reversed-result)))
           (setf catch
                 #!-alpha
@@ -1184,19 +1179,12 @@ register."
                                       (* catch-block-cfp-slot
                                          n-word-bytes))))
                (let ((current-tag
-                      #!-(or x86 x86-64)
-                      (stack-ref catch catch-block-tag-slot)
-                      #!+(or x86 x86-64)
-                      (make-lisp-obj
-                       (sap-ref-word catch (* catch-block-tag-slot
-                                              n-word-bytes)))))
+                      (sap-ref-lispobj catch (* catch-block-tag-slot
+                                                n-word-bytes))))
                  (when (eq current-tag old-tag)
-                   #!-(or x86 x86-64)
-                   (setf (stack-ref catch catch-block-tag-slot) new-tag)
-                   #!+(or x86 x86-64)
-                   (setf (sap-ref-word catch (* catch-block-tag-slot
-                                                n-word-bytes))
-                         (get-lisp-obj-address new-tag)))))
+                   (setf (sap-ref-lispobj catch (* catch-block-tag-slot
+                                                   n-word-bytes))
+                         new-tag))))
           do (setf catch
                    #!-alpha
                    (sap-ref-sap catch
