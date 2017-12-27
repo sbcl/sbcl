@@ -78,3 +78,20 @@
   (let ((addr (context-register-addr context index)))
     (declare (type (alien (* unsigned)) addr))
         (setf (deref addr) new)))
+
+;; For the next two, note that if we convert to using SAP-REF-LISPOBJ
+;; then we need to account for 32-bit lispobjs on 64-bit registers on
+;; big-endian systems correctly.
+
+;; FIXME: We have SAP-REF-LISPOBJ, use it!
+(defun boxed-context-register (context index)
+  (without-gcing
+    (make-lisp-obj (mask-field (byte n-word-bits 0)
+                               (context-register context index)) nil)))
+
+;; FIXME: We have (SETF SAP-REF-LISPOBJ), use it!
+(defun %set-boxed-context-register (context index new)
+  (with-pinned-objects (new)
+    (setf (context-register context index)
+          (get-lisp-obj-address new)))
+  new)
