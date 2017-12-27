@@ -2188,6 +2188,12 @@ register."
                                  (sb!c:sc-offset-offset sc-offset))))
                       ,@forms)
                     :invalid-value-for-unescaped-register-storage))
+             (escaped-boxed-value ()
+               `(if escaped
+                    (boxed-context-register
+                     escaped
+                     (sb!c:sc-offset-offset sc-offset))
+                    :invalid-value-for-unescaped-register-storage))
              (escaped-float-value (format)
                `(if escaped
                     (sb!vm:context-float-register
@@ -2223,9 +2229,7 @@ register."
     (ecase (sb!c:sc-offset-scn sc-offset)
       ((#.sb!vm:any-reg-sc-number
         #.sb!vm:descriptor-reg-sc-number)
-       (without-gcing
-        (with-escaped-value (val)
-          (values (make-lisp-obj (mask-field (byte #.sb!vm:n-word-bits 0) val) nil)))))
+       (escaped-boxed-value))
       (#.sb!vm:character-reg-sc-number
        (with-escaped-value (val)
          (code-char val)))
@@ -2360,6 +2364,13 @@ register."
                            (sb!c:sc-offset-offset sc-offset))
                           ,val)
                     value))
+             (set-escaped-boxed-value (val)
+               `(if escaped
+                    (setf (boxed-context-register
+                           escaped
+                           (sb!c:sc-offset-offset sc-offset))
+                          ,val)
+                    value))
              (set-escaped-float-value (format val)
                `(if escaped
                     (setf (sb!vm:context-float-register
@@ -2399,9 +2410,7 @@ register."
     (ecase (sb!c:sc-offset-scn sc-offset)
       ((#.sb!vm:any-reg-sc-number
         #.sb!vm:descriptor-reg-sc-number)
-       (without-gcing
-        (set-escaped-value
-          (get-lisp-obj-address value))))
+       (set-escaped-boxed-value value))
       (#.sb!vm:character-reg-sc-number
        (set-escaped-value (char-code value)))
       (#.sb!vm:sap-reg-sc-number
@@ -3312,18 +3321,15 @@ register."
                         scp
                         #!-(or x86 x86-64) sb!vm::ocfp-offset
                         #!+(or x86 x86-64) sb!vm::ebx-offset)))
-        (nargs (make-lisp-obj
-                (sb!vm:context-register scp sb!vm::nargs-offset)))
+        (nargs (boxed-context-register scp sb!vm::nargs-offset))
         (reg-arg-offsets '#.sb!vm::*register-arg-offsets*)
         (results nil))
-    (without-gcing
-      (dotimes (arg-num nargs)
-        (push (if reg-arg-offsets
-                  (make-lisp-obj
-                   (sb!vm:context-register scp (pop reg-arg-offsets)))
-                  (stack-ref ocfp (+ arg-num
-                                     #!+(or x86 x86-64) sb!vm::sp->fp-offset)))
-              results)))
+    (dotimes (arg-num nargs)
+      (push (if reg-arg-offsets
+                (boxed-context-register scp (pop reg-arg-offsets))
+                (stack-ref ocfp (+ arg-num
+                                   #!+(or x86 x86-64) sb!vm::sp->fp-offset)))
+            results))
     (nreverse results)))
 
 ;;;; MAKE-BOGUS-LRA (used for :FUN-END breakpoints)
