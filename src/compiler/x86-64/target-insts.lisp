@@ -547,7 +547,7 @@
            (and (not (member name exclude :test 'equal))
                 (or (not include) (member name include :test 'equal))))
          (ambiguous-name-p (fun funs)
-           ;; Return T if FUN occurs not more than once in FUNS
+           ;; Return T if FUN occurs more than once in FUNS
            (declare (simple-vector funs))
            (dotimes (i (length funs))
              (when (eq (svref funs i) fun)
