@@ -1111,7 +1111,7 @@ register."
 ;;; CODE-LOCATIONs at which execution would continue with frame as the
 ;;; top frame if someone threw to the corresponding tag.
 (defun frame-catches (frame)
-  (let ((catch (descriptor-sap sb!vm:*current-catch-block*))
+  (let ((catch (descriptor-sap *current-catch-block*))
         (reversed-result nil)
         (fp (frame-pointer frame)))
     (loop until (zerop (sap-int catch))
@@ -1120,93 +1120,93 @@ register."
           (when (sap= fp
                       #!-alpha
                       (sap-ref-sap catch
-                                   (* sb!vm:catch-block-cfp-slot
-                                      sb!vm:n-word-bytes))
+                                   (* catch-block-cfp-slot
+                                      n-word-bytes))
                       #!+alpha
                       (int-sap
                        (sap-ref-32 catch
-                                   (* sb!vm:catch-block-cfp-slot
-                                      sb!vm:n-word-bytes))))
+                                   (* catch-block-cfp-slot
+                                      n-word-bytes))))
             (let* (#!-(or x86 x86-64)
-                   (lra (stack-ref catch sb!vm:catch-block-entry-pc-slot))
+                   (lra (stack-ref catch catch-block-entry-pc-slot))
                    #!+(or x86 x86-64)
                    (ra (sap-ref-sap
-                        catch (* sb!vm:catch-block-entry-pc-slot
-                                 sb!vm:n-word-bytes)))
+                        catch (* catch-block-entry-pc-slot
+                                 n-word-bytes)))
                    #!-(or x86 x86-64)
                    (component
-                    (stack-ref catch sb!vm:catch-block-code-slot))
+                    (stack-ref catch catch-block-code-slot))
                    #!+(or x86 x86-64)
                    (component (code-header-from-pc ra))
                    (offset
                     #!-(or x86 x86-64)
                     (* (- (1+ (get-header-data lra))
                           (code-header-words component))
-                       sb!vm:n-word-bytes)
+                       n-word-bytes)
                     #!+(or x86 x86-64)
                     (- (sap-int ra)
                        (- (get-lisp-obj-address component)
-                          sb!vm:other-pointer-lowtag)
-                       (* (code-header-words component) sb!vm:n-word-bytes))))
+                          other-pointer-lowtag)
+                       (* (code-header-words component) n-word-bytes))))
               (push (cons #!-(or x86 x86-64)
-                          (stack-ref catch sb!vm:catch-block-tag-slot)
+                          (stack-ref catch catch-block-tag-slot)
                           #!+(or x86 x86-64)
                           (make-lisp-obj
-                           (sap-ref-word catch (* sb!vm:catch-block-tag-slot
-                                                  sb!vm:n-word-bytes)))
+                           (sap-ref-word catch (* catch-block-tag-slot
+                                                  n-word-bytes)))
                           (make-compiled-code-location
                            offset (frame-debug-fun frame)))
                     reversed-result)))
           (setf catch
                 #!-alpha
                 (sap-ref-sap catch
-                             (* sb!vm:catch-block-previous-catch-slot
-                                sb!vm:n-word-bytes))
+                             (* catch-block-previous-catch-slot
+                                n-word-bytes))
                 #!+alpha
                 (int-sap
                  (sap-ref-32 catch
-                             (* sb!vm:catch-block-previous-catch-slot
-                                sb!vm:n-word-bytes)))))))
+                             (* catch-block-previous-catch-slot
+                                n-word-bytes)))))))
 
 ;;; Modify the value of the OLD-TAG catches in FRAME to NEW-TAG
 (defun replace-frame-catch-tag (frame old-tag new-tag)
-  (let ((catch (descriptor-sap sb!vm:*current-catch-block*))
+  (let ((catch (descriptor-sap *current-catch-block*))
         (fp (frame-pointer frame)))
     (loop until (zerop (sap-int catch))
           do (when (sap= fp
                          #!-alpha
                          (sap-ref-sap catch
-                                      (* sb!vm:catch-block-cfp-slot
-                                         sb!vm:n-word-bytes))
+                                      (* catch-block-cfp-slot
+                                         n-word-bytes))
                          #!+alpha
                          (int-sap
                           (sap-ref-32 catch
-                                      (* sb!vm:catch-block-cfp-slot
-                                         sb!vm:n-word-bytes))))
+                                      (* catch-block-cfp-slot
+                                         n-word-bytes))))
                (let ((current-tag
                       #!-(or x86 x86-64)
-                      (stack-ref catch sb!vm:catch-block-tag-slot)
+                      (stack-ref catch catch-block-tag-slot)
                       #!+(or x86 x86-64)
                       (make-lisp-obj
-                       (sap-ref-word catch (* sb!vm:catch-block-tag-slot
-                                              sb!vm:n-word-bytes)))))
+                       (sap-ref-word catch (* catch-block-tag-slot
+                                              n-word-bytes)))))
                  (when (eq current-tag old-tag)
                    #!-(or x86 x86-64)
-                   (setf (stack-ref catch sb!vm:catch-block-tag-slot) new-tag)
+                   (setf (stack-ref catch catch-block-tag-slot) new-tag)
                    #!+(or x86 x86-64)
-                   (setf (sap-ref-word catch (* sb!vm:catch-block-tag-slot
-                                                sb!vm:n-word-bytes))
+                   (setf (sap-ref-word catch (* catch-block-tag-slot
+                                                n-word-bytes))
                          (get-lisp-obj-address new-tag)))))
           do (setf catch
                    #!-alpha
                    (sap-ref-sap catch
-                                (* sb!vm:catch-block-previous-catch-slot
-                                   sb!vm:n-word-bytes))
+                                (* catch-block-previous-catch-slot
+                                   n-word-bytes))
                    #!+alpha
                    (int-sap
                     (sap-ref-32 catch
-                                (* sb!vm:catch-block-previous-catch-slot
-                                   sb!vm:n-word-bytes)))))))
+                                (* catch-block-previous-catch-slot
+                                   n-word-bytes)))))))
 
 
 
