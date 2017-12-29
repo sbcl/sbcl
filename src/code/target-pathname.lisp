@@ -692,59 +692,27 @@ a host-structure or string."
 
 (defun pathname-host (pathname &key (case :local))
   "Return PATHNAME's host."
-  (declare (type pathname-designator pathname)
-           (type (member :local :common) case)
-           (values host)
-           (ignore case))
+  (declare (ignore case))
   (with-pathname (pathname pathname)
     (%pathname-host pathname)))
 
-(defun pathname-device (pathname &key (case :local))
-  "Return PATHNAME's device."
-  (declare (type pathname-designator pathname)
-           (type (member :local :common) case))
-  (with-pathname (pathname pathname)
-    (maybe-diddle-case (%pathname-device pathname)
-                       (and (eq case :common)
-                            (eq (host-customary-case
-                                 (%pathname-host pathname))
-                                :lower)))))
+(macrolet ((frob (name component docstring)
+             `(defun ,name (pathname &key (case :local))
+                ,docstring
+                (with-pathname (pathname pathname)
+                  (let ((effective-case (and (eq case :common)
+                                             (eq (host-customary-case
+                                                  (%pathname-host pathname))
+                                                 :lower))))
+                    (maybe-diddle-case (,component pathname) effective-case))))))
 
-(defun pathname-directory (pathname &key (case :local))
-  "Return PATHNAME's directory."
-  (declare (type pathname-designator pathname)
-           (type (member :local :common) case))
-  (with-pathname (pathname pathname)
-    (maybe-diddle-case (%pathname-directory pathname)
-                       (and (eq case :common)
-                            (eq (host-customary-case
-                                 (%pathname-host pathname))
-                                :lower)))))
-(defun pathname-name (pathname &key (case :local))
-  "Return PATHNAME's name."
-  (declare (type pathname-designator pathname)
-           (type (member :local :common) case))
-  (with-pathname (pathname pathname)
-    (maybe-diddle-case (%pathname-name pathname)
-                       (and (eq case :common)
-                            (eq (host-customary-case
-                                 (%pathname-host pathname))
-                                :lower)))))
-
-(defun pathname-type (pathname &key (case :local))
-  "Return PATHNAME's type."
-  (declare (type pathname-designator pathname)
-           (type (member :local :common) case))
-  (with-pathname (pathname pathname)
-    (maybe-diddle-case (%pathname-type pathname)
-                       (and (eq case :common)
-                            (eq (host-customary-case
-                                 (%pathname-host pathname))
-                                :lower)))))
+  (frob pathname-device    %pathname-device    "Return PATHNAME's device.")
+  (frob pathname-directory %pathname-directory "Return PATHNAME's directory.")
+  (frob pathname-name      %pathname-name      "Return PATHNAME's name.")
+  (frob pathname-type      %pathname-type      "Return PATHNAME's type."))
 
 (defun pathname-version (pathname)
   "Return PATHNAME's version."
-  (declare (type pathname-designator pathname))
   (with-pathname (pathname pathname)
     (%pathname-version pathname)))
 
