@@ -432,72 +432,68 @@ the operating system native pathname conventions."
   (with-native-pathname (pathname pathspec)
     pathname))
 
-;;; Change the case of thing if DIDDLE-P.
-(defun maybe-diddle-case (thing diddle-p)
-  (if (and diddle-p (not (or (symbolp thing) (integerp thing))))
-      (labels ((check-for (pred in)
-                 (typecase in
-                   (pattern
-                    (dolist (piece (pattern-pieces in))
-                      (when (typecase piece
-                              (simple-string
-                               (check-for pred piece))
-                              (cons
-                               (case (car piece)
-                                 (:character-set
-                                  (check-for pred (cdr piece))))))
-                        (return t))))
-                   (list
-                    (dolist (x in)
-                      (when (check-for pred x)
-                        (return t))))
-                   (simple-string
-                    (dotimes (i (length in))
-                      (when (funcall pred (schar in i))
-                        (return t))))
-                   (t nil)))
-               (diddle-with (fun thing)
-                 (typecase thing
-                   (pattern
-                    (make-pattern
-                     (mapcar (lambda (piece)
-                               (typecase piece
-                                 (simple-string
-                                  (funcall fun piece))
-                                 (cons
-                                  (case (car piece)
-                                    (:character-set
-                                     (cons :character-set
-                                           (funcall fun (cdr piece))))
-                                    (t
-                                     piece)))
-                                 (t
-                                  piece)))
-                             (pattern-pieces thing))))
-                   (list
-                    (mapcar fun thing))
-                   (simple-string
-                    (funcall fun thing))
-                   (t
-                    thing))))
+;;; Recursively (e.g. for the directory component) change the case of
+;;; the pathname component THING.
+(declaim (type (sfunction ((or symbol integer string pattern list))
+                          (or symbol integer string pattern list))
+               diddle-case))
+(defun diddle-case (thing)
+  (labels ((check-for (pred in)
+             (typecase in
+               (pattern
+                (some (lambda (piece)
+                        (typecase piece
+                          (simple-string
+                           (check-for pred piece))
+                          ((cons (eql :character-set))
+                           (check-for pred (cdr piece)))))
+                      (pattern-pieces in)))
+               (list
+                (some (lambda (element)
+                        (check-for pred element))
+                      in))
+               (simple-string
+                (some pred in))))
+           (diddle-with (fun thing)
+             (typecase thing
+               (pattern
+                (make-pattern
+                 (mapcar (lambda (piece)
+                           (typecase piece
+                             (simple-string
+                              (funcall fun piece))
+                             ((cons (eql :character-set))
+                              (funcall fun (cdr piece)))
+                             (t
+                              piece)))
+                         (pattern-pieces thing))))
+               (list
+                (mapcar (lambda (element)
+                          (if (stringp element)
+                              (funcall fun element)
+                              element))
+                        thing))
+               (simple-string
+                (funcall fun thing))
+               (t
+                thing))))
+    (if (not (or (symbolp thing) (integerp thing)))
         (let ((any-uppers (check-for #'upper-case-p thing))
               (any-lowers (check-for #'lower-case-p thing)))
-          (cond ((and any-uppers any-lowers)
-                 ;; mixed case, stays the same
+          (cond ((and any-uppers any-lowers) ; mixed case, stays the same
                  thing)
-                (any-uppers
-                 ;; all uppercase, becomes all lower case
-                 (diddle-with (lambda (x) (if (stringp x)
-                                              (string-downcase x)
-                                              x)) thing))
-                (any-lowers
-                 ;; all lowercase, becomes all upper case
-                 (diddle-with (lambda (x) (if (stringp x)
-                                              (string-upcase x)
-                                              x)) thing))
-                (t
-                 ;; no letters?  I guess just leave it.
-                 thing))))
+                (any-uppers ; all uppercase, becomes all lower case
+                 (diddle-with 'string-downcase thing))
+                (any-lowers ; all lowercase, becomes all upper case
+                 (diddle-with 'string-upcase thing))
+                (t ; no letters?  I guess just leave it.
+                 thing)))
+        thing)))
+
+(declaim (inline maybe-diddle-case))
+(defun maybe-diddle-case (thing diddle-p)
+  (if diddle-p
+      (diddle-case thing)
       thing))
 
 (defun merge-directories (dir1 dir2 diddle-case)
@@ -528,34 +524,32 @@ the operating system native pathname conventions."
            (type pathname-designator defaults)
            (values pathname))
   (with-pathname (defaults defaults)
-    (let ((pathname (let ((*default-pathname-defaults* defaults))
-                      (pathname pathname))))
-      (let* ((default-host (%pathname-host defaults))
-             (pathname-host (%pathname-host pathname))
-             (diddle-case
-              (and default-host pathname-host
-                   (not (eq (host-customary-case default-host)
-                            (host-customary-case pathname-host)))))
-             (directory (merge-directories (%pathname-directory pathname)
-                                           (%pathname-directory defaults)
-                                           diddle-case)))
+    (let* ((pathname (let ((*default-pathname-defaults* defaults))
+                       (pathname pathname)))
+           (default-host (%pathname-host defaults))
+           (pathname-host (%pathname-host pathname))
+           (diddle-case
+             (and default-host pathname-host
+                  (not (eq (host-customary-case default-host)
+                           (host-customary-case pathname-host)))))
+           (directory (merge-directories (%pathname-directory pathname)
+                                         (%pathname-directory defaults)
+                                         diddle-case)))
+      (macrolet ((merged-component (component)
+                   `(or (,component pathname)
+                        (let ((default (,component defaults)))
+                          (if diddle-case
+                              (diddle-case default)
+                              default)))))
         (%make-maybe-logical-pathname
          (or pathname-host default-host)
-         (and ;; The device of ~/ shouldn't be merged,
-              ;; because the expansion may have a different device
-              (not (and (>= (length directory) 2)
-                        (eql (car directory) :absolute)
-                        (eql (cadr directory) :home)))
-              (or (%pathname-device pathname)
-                  (maybe-diddle-case (%pathname-device defaults)
-                                     diddle-case)))
+         ;; The device of ~/ shouldn't be merged, because the
+         ;; expansion may have a different device
+         (unless (typep directory '(cons (eql :absolute) (cons (eql :home))))
+           (merged-component %pathname-device))
          directory
-         (or (%pathname-name pathname)
-             (maybe-diddle-case (%pathname-name defaults)
-                                diddle-case))
-         (or (%pathname-type pathname)
-             (maybe-diddle-case (%pathname-type defaults)
-                                diddle-case))
+         (merged-component %pathname-name)
+         (merged-component %pathname-type)
          (or (%pathname-version pathname)
              (and (not (%pathname-name pathname)) (%pathname-version defaults))
              default-version))))))
