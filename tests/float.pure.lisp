@@ -433,7 +433,8 @@
                       (declare (optimize (debug 2)))
                       (typep #c(1.0 1.0) '(member #c(1.0 1.0))))))))
 
-(with-test (:name (truncate float :no-consing))
+(with-test (:name (truncate float :no-consing)
+                  :skipped-on :interpreter)
   (let ((f (checked-compile
             '(lambda (x)
               (values (truncate (the double-float x)))))))
