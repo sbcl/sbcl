@@ -448,10 +448,6 @@ the operating system native pathname conventions."
                           ((cons (eql :character-set))
                            (check-for pred (cdr piece)))))
                       (pattern-pieces in)))
-               (list
-                (some (lambda (element)
-                        (check-for pred element))
-                      in))
                (simple-string
                 (some pred in))))
            (diddle-with (fun thing)
@@ -467,27 +463,25 @@ the operating system native pathname conventions."
                              (t
                               piece)))
                          (pattern-pieces thing))))
-               (list
-                (mapcar (lambda (element)
-                          (if (stringp element)
-                              (funcall fun element)
-                              element))
-                        thing))
                (simple-string
                 (funcall fun thing))
                (t
-                thing))))
+                thing)))
+           (maybe-diddle-part (thing)
+             (if (listp thing)
+                 (mapcar #'maybe-diddle-part thing)
+                 (let ((any-uppers (check-for #'upper-case-p thing))
+                       (any-lowers (check-for #'lower-case-p thing)))
+                   (cond ((and any-uppers any-lowers) ; mixed case, stays the same
+                          thing)
+                         (any-uppers ; all uppercase, becomes all lower case
+                          (diddle-with 'string-downcase thing))
+                         (any-lowers ; all lowercase, becomes all upper case
+                          (diddle-with 'string-upcase thing))
+                         (t ; no letters?  I guess just leave it.
+                          thing))))))
     (if (not (or (symbolp thing) (integerp thing)))
-        (let ((any-uppers (check-for #'upper-case-p thing))
-              (any-lowers (check-for #'lower-case-p thing)))
-          (cond ((and any-uppers any-lowers) ; mixed case, stays the same
-                 thing)
-                (any-uppers ; all uppercase, becomes all lower case
-                 (diddle-with 'string-downcase thing))
-                (any-lowers ; all lowercase, becomes all upper case
-                 (diddle-with 'string-upcase thing))
-                (t ; no letters?  I guess just leave it.
-                 thing)))
+        (maybe-diddle-part thing)
         thing)))
 
 (declaim (inline maybe-diddle-case))
@@ -651,7 +645,6 @@ a host-structure or string."
          (diddle-defaults
           (not (eq (host-customary-case host)
                    (host-customary-case default-host))))
-         (dev (if devp device (if defaults (%pathname-device defaults))))
          (dir (import-directory directory diddle-args))
          (ver (cond
                (versionp version)
@@ -677,12 +670,13 @@ a host-structure or string."
                                             diddle-defaults))
                         (t
                          nil))))
-      (%make-maybe-logical-pathname host
-                                    dev ; forced to :UNSPECIFIC when logical
-                                    dir
-                                    (pick name namep %pathname-name)
-                                    (pick type typep %pathname-type)
-                                    ver))))
+      (%make-maybe-logical-pathname
+       host
+       (pick device devp %pathname-device) ; forced to :UNSPECIFIC when logical
+       dir
+       (pick name namep %pathname-name)
+       (pick type typep %pathname-type)
+       ver))))
 
 (defun pathname-host (pathname &key (case :local))
   "Return PATHNAME's host."

@@ -50,6 +50,89 @@
         (assert (equal (pathname-name stream2) name))
         (assert (equal (pathname-type stream1) type))
         (assert (equal (pathname-type stream2) type))))))
+
+(labels ((unpattern (thing)
+           (typecase thing
+             (cons
+              (list* (unpattern (first thing))
+                     (map 'list #'unpattern (rest thing))))
+             (sb-impl::pattern
+              (sb-impl::pattern-pieces thing))
+             (t
+              thing)))
+         (pattern (thing)
+           (typecase thing
+             ((cons (member :absolute :relative))
+              (list* (pattern (first thing))
+                     (map 'list #'pattern (cdr thing))))
+             (cons
+              (sb-impl::make-pattern thing))
+             (t
+              thing)))
+         (accessor-cases (initarg accessor cases)
+           (map nil (lambda (test-case)
+                      (destructuring-bind (pathname case expected) test-case
+                        ;; Check accessor directory.
+                        (let ((result (funcall accessor pathname :case case)))
+                          (assert (equal (unpattern result) expected)))
+                        ;; Check roundtrip.
+                        (let* ((pathname (make-pathname initarg (pattern expected) :case case))
+                               (result (funcall accessor pathname :case case)))
+                          (assert (equal (unpattern result) expected)))))
+                cases)))
+
+  (with-test (:name (pathname-device :case))
+    (accessor-cases
+     :device #'pathname-device
+     `((,(make-pathname :device "foo") :local  "foo")
+       (,(make-pathname :device "FOO") :local  "FOO")
+       (,(make-pathname :device "Foo") :local  "Foo")
+
+       (,(make-pathname :device "foo") :common "FOO")
+       (,(make-pathname :device "FOO") :common "foo")
+       (,(make-pathname :device "Foo") :common "Foo"))))
+
+  (with-test (:name (pathname-directory :case))
+    (accessor-cases
+     :directory #'pathname-directory
+     `((,#P"/ab/cd/" :local  (:absolute "ab" "cd"))
+       (,#P"/AB/CD/" :local  (:absolute "AB" "CD"))
+       (,#P"/Ab/Cd/" :local  (:absolute "Ab" "Cd"))
+       (,#P"/AB/cd/" :local  (:absolute "AB" "cd"))
+       (,#P"/a*b/"   :local  (:absolute ("a" :multi-char-wild "b")))
+
+       (,#P"/ab/cd/" :common (:absolute "AB" "CD"))
+       (,#P"/AB/CD/" :common (:absolute "ab" "cd"))
+       (,#P"/Ab/Cd/" :common (:absolute "Ab" "Cd"))
+       (,#P"/AB/cd/" :common (:absolute "ab" "CD"))
+       (,#P"/a*b/"   :common (:absolute ("A" :multi-char-wild "B"))))))
+
+  (with-test (:name (pathname-name :case))
+    (accessor-cases
+     :name #'pathname-name
+     `((,#P"foo" :local  "foo")
+       (,#P"FOO" :local  "FOO")
+       (,#P"Foo" :local  "Foo")
+       (,#P"a*b" :local  ("a" :multi-char-wild "b"))
+
+       (,#P"foo" :common "FOO")
+       (,#P"FOO" :common "foo")
+       (,#P"Foo" :common "Foo")
+       (,#P"a*b" :common ("A" :multi-char-wild "B")))))
+
+  (with-test (:name (pathname-type :case))
+    (accessor-cases
+     :type #'pathname-type
+     `((,#P"n.foo" :local  "foo")
+       (,#P"n.FOO" :local  "FOO")
+       (,#P"n.Foo" :local  "Foo")
+       (,#P"n.a*b" :local  ("a" :multi-char-wild "b"))
+
+       (,#P"n.foo" :common "FOO")
+       (,#P"n.FOO" :common "foo")
+       (,#P"n.Foo" :common "Foo")
+       (,#P"n.a*b" :common ("A" :multi-char-wild "B"))))))
+
 
 ;;;; Logical pathnames
 
@@ -67,7 +150,7 @@
 
 ;;; some things SBCL-0.6.9 used not to parse correctly:
 ;;;
-;;; SBCL used to throw an error saying there's no translation.
+;;; SBCL used to signal an error saying there's no translation.
 (with-test (:name (:logical-pathname 1))
   (assert (equal (namestring (translate-logical-pathname "demo0:file.lisp"))
                  "/tmp/file.lisp")))

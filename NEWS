@@ -3,6 +3,9 @@
 changes relative to sbcl-1.4.3:
   * bug fix: pathname accessors such as PATHNAME-DIRECTORY work on
     SYNONYM-STREAMs.
+  * bug fix: (pathname-{device,directory,name,type} ... :case :common) works
+    as expected. In particular MAKE-PATHNAME composed with the accessors
+    roundtrips properly when both use the same :case. (lp#1739906)
 
 changes in sbcl-1.4.3 relative to sbcl-1.4.2:
   * enhancement: SLEEP respects deadlines established by SB-SYS:WITH-DEADLINE.
