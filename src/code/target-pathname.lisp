@@ -341,7 +341,10 @@
     `(let ((,pathname (etypecase ,pathname-designator
                         (pathname ,pathname-designator)
                         (string (parse-namestring ,pathname-designator))
-                        (file-stream (file-name ,pathname-designator)))))
+                        (file-stream (file-name ,pathname-designator))
+                        (synonym-stream
+                         (file-name (stream-file-stream-or-lose
+                                     ,pathname-designator))))))
        ,@body)))
 
 (sb!xc:defmacro with-native-pathname ((pathname pathname-designator) &body body)

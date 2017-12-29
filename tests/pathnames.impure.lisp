@@ -19,6 +19,39 @@
 
 (load "test-util.lisp")
 (use-package "TEST-UTIL")
+
+;;;; Pathname accessors
+
+(with-test (:name (pathname :accessors :stream-not-associated-to-file type-error))
+  (let ((*stream* (make-string-output-stream)))
+    (declare (special *stream*))
+    (checked-compile-and-assert ()
+        '(lambda (pathname) (pathname-host pathname))
+      (((make-string-output-stream))     (condition 'type-error))
+      (((make-synonym-stream '*stream*)) (condition 'type-error)))))
+
+(with-test (:name (pathname :accessors file-stream))
+  (let* ((name "pathnames.impure")
+         (type "lisp"))
+    (with-open-file (stream (make-pathname :name name :type type))
+      (assert (equal (pathname-name stream) name))
+      (assert (equal (pathname-type stream) type)))))
+
+(with-test (:name (pathname :accessors synonym-stream))
+  (let* ((name "pathnames.impure")
+         (type "lisp"))
+    (with-open-file (stream (make-pathname :name name :type type))
+      (let* ((*stream1* stream)
+             (stream1 (make-synonym-stream '*stream1*))
+             (*stream2* stream1)
+             (stream2 (make-synonym-stream '*stream2*)))
+        (declare (special *stream1* *stream2*))
+        (assert (equal (pathname-name stream1) name))
+        (assert (equal (pathname-name stream2) name))
+        (assert (equal (pathname-type stream1) type))
+        (assert (equal (pathname-type stream2) type))))))
+
+;;;; Logical pathnames
 
 (setf (logical-pathname-translations "demo0")
       '(("**;*.*.*" "/tmp/")))
