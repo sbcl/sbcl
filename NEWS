@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-1.4.2:
+changes in sbcl-1.4.3 relative to sbcl-1.4.2:
   * enhancement: SLEEP respects deadlines established by SB-SYS:WITH-DEADLINE.
   * bug fix: DECODE-TIMEOUT and operators accepting a timeout no longer signal
     an error when called with an argument that is of type (real 0) but not
