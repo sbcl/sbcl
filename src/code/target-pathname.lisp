@@ -627,7 +627,7 @@ a host-structure or string."
            (type (or integer pathname-component-tokens (member :newest))
                  version)
            (type (or pathname-designator null) defaults)
-           (type (member :common :local) case))
+           (type pathname-component-case case))
   (let* ((defaults (when defaults
                      (with-pathname (defaults defaults) defaults)))
          (default-host (if defaults

@@ -168,6 +168,8 @@
   '(or string pathname #+sb-xc-host stream #-sb-xc-host synonym-stream #-sb-xc-host file-stream))
 (sb!xc:deftype logical-host-designator ()
   '(or host string))
+(sb!xc:deftype pathname-component-case ()
+  '(member :local :common))
 
 (sb!xc:deftype package-designator () '(or string-designator package))
 ;;; a designator for a list of symbols

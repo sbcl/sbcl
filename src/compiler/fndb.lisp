@@ -1482,25 +1482,25 @@
        (:directory (or pathname-directory string (member :wild)))
        (:name (or pathname-name string (member :wild)))
        (:type (or pathname-type string (member :wild)))
-       (:version pathname-version) (:case (member :local :common)))
+       (:version pathname-version) (:case pathname-component-case))
   pathname (unsafely-flushable))
 
 (defknown pathnamep (t) boolean (movable flushable))
 
 (defknown pathname-host (pathname-designator
-                         &key (:case (member :local :common)))
+                         &key (:case pathname-component-case))
   pathname-host (flushable))
 (defknown pathname-device (pathname-designator
-                           &key (:case (member :local :common)))
+                           &key (:case pathname-component-case))
   pathname-device (flushable))
 (defknown pathname-directory (pathname-designator
-                              &key (:case (member :local :common)))
+                              &key (:case pathname-component-case))
   pathname-directory (flushable))
 (defknown pathname-name (pathname-designator
-                         &key (:case (member :local :common)))
+                         &key (:case pathname-component-case))
   pathname-name (flushable))
 (defknown pathname-type (pathname-designator
-                         &key (:case (member :local :common)))
+                         &key (:case pathname-component-case))
   pathname-type (flushable))
 (defknown pathname-version (pathname-designator)
   pathname-version (flushable))
