@@ -997,7 +997,7 @@ Users Manual for details about the PROCESS structure.
      (values (fd-stream-fd stream) nil (stream-external-format stream)))
     (synonym-stream
      (get-stream-fd-and-external-format
-      (symbol-value (synonym-stream-symbol stream)) direction))
+      (resolve-synonym-stream stream) direction))
     (two-way-stream
      (ecase direction
        (:input

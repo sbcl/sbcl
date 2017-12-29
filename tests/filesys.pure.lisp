@@ -96,6 +96,14 @@
   (assert (typep (nth-value 1 (ignore-errors (file-length *terminal-io*)))
                  'type-error)))
 
+(with-test (:name (file-length synonym-stream))
+  (with-open-file (*stream* "filesys.pure.lisp" :direction :input)
+    (declare (special *stream*))
+    (assert (integerp (file-length (make-synonym-stream '*stream*))))
+    (let ((*stream2* (make-synonym-stream '*stream*)))
+      (declare (special *stream2*))
+      (assert (integerp (file-length (make-synonym-stream '*stream2*)))))))
+
 ;;; A few cases Windows does have enough marbles to pass right now
 (with-test (:name (sb-ext:native-namestring :win32)
                   :skipped-on (not :win32))

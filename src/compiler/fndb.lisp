@@ -1542,7 +1542,7 @@
 (defknown file-position (stream &optional
                                 (or unsigned-byte (member :start :end)))
   (or unsigned-byte (member t nil)))
-(defknown file-length (stream) (or unsigned-byte null) (unsafely-flushable))
+(defknown file-length ((or file-stream synonym-stream broadcast-stream)) (or unsigned-byte null) (unsafely-flushable))
 
 (defknown load
   ((or filename stream)

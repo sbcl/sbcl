@@ -102,10 +102,24 @@
   (symbol nil :type symbol :read-only t))
 (declaim (freeze-type synonym-stream))
 
+(defun maybe-resolve-synonym-stream (stream)
+  (labels ((recur (stream)
+             (if (synonym-stream-p stream)
+                 (recur (symbol-value (synonym-stream-symbol stream)))
+                 stream)))
+    (recur stream)))
+
+(declaim (inline resolve-synonym-stream))
+(defun resolve-synonym-stream (stream)
+  (let ((result (symbol-value (synonym-stream-symbol stream))))
+    (if (synonym-stream-p result)
+        (maybe-resolve-synonym-stream result)
+        result)))
+
 (defun ansi-stream-input-stream-p (stream)
   (declare (type ansi-stream stream))
   (if (synonym-stream-p stream)
-      (input-stream-p (symbol-value (synonym-stream-symbol stream)))
+      (input-stream-p (resolve-synonym-stream stream))
       (and (not (eq (ansi-stream-in stream) #'closed-flame))
        ;;; KLUDGE: It's probably not good to have EQ tests on function
        ;;; values like this. What if someone's redefined the function?
@@ -123,7 +137,7 @@
 (defun ansi-stream-output-stream-p (stream)
   (declare (type ansi-stream stream))
   (if (synonym-stream-p stream)
-      (output-stream-p (symbol-value (synonym-stream-symbol stream)))
+      (output-stream-p (resolve-synonym-stream stream))
       (and (not (eq (ansi-stream-in stream) #'closed-flame))
            (or (not (eq (ansi-stream-out stream) #'ill-out))
                (not (eq (ansi-stream-bout stream) #'ill-bout))))))
@@ -232,27 +246,29 @@
 ;;; qualification for operations like FILE-LENGTH (so that ANSI was
 ;;; probably thinking of something like what Unix calls block devices)
 ;;; but I can't see any better way to do it. -- WHN 2001-04-14
-(defun stream-associated-with-file-p (x)
-  "Test for the ANSI concept \"stream associated with a file\"."
-  (or (typep x 'file-stream)
-      (and (synonym-stream-p x)
-           (stream-associated-with-file-p (symbol-value
-                                           (synonym-stream-symbol x))))))
+(defun stream-file-stream (stream)
+  "Test for the ANSI concept \"stream associated with a file\".
 
-(defun stream-must-be-associated-with-file (stream)
+   Return NIL or the underlying FILE-STREAM."
+  (typecase stream
+    (file-stream stream)
+    (synonym-stream
+     (stream-file-stream (resolve-synonym-stream stream)))))
+
+(defun stream-file-stream-or-lose (stream)
   (declare (type stream stream))
-  (unless (stream-associated-with-file-p stream)
-    (error 'simple-type-error
-           ;; KLUDGE: The ANSI spec for FILE-LENGTH specifically says
-           ;; this should be TYPE-ERROR. But what then can we use for
-           ;; EXPECTED-TYPE? This SATISFIES type (with a nonstandard
-           ;; private predicate function..) is ugly and confusing, but
-           ;; I can't see any other way. -- WHN 2001-04-14
-           :datum stream
-           :expected-type '(satisfies stream-associated-with-file-p)
-           :format-control
-           "~@<The stream ~2I~_~S ~I~_isn't associated with a file.~:>"
-           :format-arguments (list stream))))
+  (or (stream-file-stream stream)
+      (error 'simple-type-error
+             ;; KLUDGE: The ANSI spec for FILE-LENGTH specifically says
+             ;; this should be TYPE-ERROR. But what then can we use for
+             ;; EXPECTED-TYPE? This SATISFIES type (with a nonstandard
+             ;; private predicate function..) is ugly and confusing, but
+             ;; I can't see any other way. -- WHN 2001-04-14
+             :datum stream
+             :expected-type '(satisfies stream-file-stream)
+             :format-control
+             "~@<The stream ~2I~_~S ~I~_isn't associated with a file.~:>"
+             :format-arguments (list stream))))
 
 (defun file-string-length (stream object)
   (funcall (ansi-stream-misc stream) stream :file-string-length object))
@@ -983,9 +999,6 @@
 (defun make-two-way-stream (input-stream output-stream)
   "Return a bidirectional stream which gets its input from INPUT-STREAM and
    sends its output to OUTPUT-STREAM."
-  ;; FIXME: This idiom of the-real-stream-of-a-possibly-synonym-stream
-  ;; should be encapsulated in a function, and used here and most of
-  ;; the other places that SYNONYM-STREAM-P appears.
   (unless (output-stream-p output-stream)
     (error 'type-error
            :datum output-stream
@@ -2355,21 +2368,13 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
 
 ;;; like FILE-POSITION, only using :FILE-LENGTH
 (defun file-length (stream)
-  ;; FIXME: the FIXME following this one seems wrong on 2 counts:
-  ;;  1. since when does cross-compiler hangup occur on undefined types?
-  ;;  2. why is that the correct set of types to check for?
-  ;; FIXME: The following declaration uses yet undefined types, which
-  ;; cause cross-compiler hangup.
-  ;;
-  ;; (declare (type (or file-stream synonym-stream) stream))
-  ;;
   ;; The description for FILE-LENGTH says that an error must be raised
   ;; for streams not associated with files (which broadcast streams
   ;; aren't according to the glossary). However, the behaviour of
   ;; FILE-LENGTH for broadcast streams is explicitly described in the
   ;; BROADCAST-STREAM entry.
   (unless (typep stream 'broadcast-stream)
-    (stream-must-be-associated-with-file stream))
+    (stream-file-stream-or-lose stream))
   (funcall (ansi-stream-misc stream) stream :file-length))
 
 ;; Placing this definition (formerly in "toplevel") after the important
@@ -2379,8 +2384,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     (fd-stream
      stream)
     (synonym-stream
-     (stream-output-stream
-      (symbol-value (synonym-stream-symbol stream))))
+     (stream-output-stream (resolve-synonym-stream stream)))
     (two-way-stream
      (stream-output-stream
       (two-way-stream-output-stream stream)))

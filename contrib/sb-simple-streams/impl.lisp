@@ -1077,7 +1077,7 @@ is supported only on simple-streams."
     (simple-stream
      (%file-length stream))
     (ansi-stream
-     (sb-impl::stream-must-be-associated-with-file stream)
+     (sb-impl::stream-file-stream-or-lose stream)
      (funcall (sb-kernel:ansi-stream-misc stream) stream :file-length))))
 
 (defun charpos (&optional (stream *standard-output*))
