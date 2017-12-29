@@ -2243,10 +2243,9 @@
                (dolist (use (merges))
                  (merge-tail-sets use))))))))
 
-(defun ir1-optimize-cast (cast &optional do-not-optimize)
+(defun ir1-optimize-cast (cast)
   (declare (type cast cast))
-  (when (or do-not-optimize
-            (not (maybe-delete-cast cast)))
+  (unless (maybe-delete-cast cast)
     (let* ((value (cast-value cast))
            (atype (cast-asserted-type cast))
            (value-type (lvar-derived-type value))
@@ -2302,5 +2301,13 @@
                  (values-subtypep value-type
                                   (cast-type-to-check cast)))
         (setf (cast-%type-check cast) nil))
-      (unless do-not-optimize
-        (setf (node-reoptimize cast) nil)))))
+      (setf (node-reoptimize cast) nil))))
+
+(defun cast-type-check (cast)
+  (declare (type cast cast))
+  (if (cast-reoptimize cast)
+      (when (and (cast-%type-check cast)
+                 (values-subtypep (lvar-derived-type (cast-value cast))
+                                  (cast-type-to-check cast)))
+        (setf (cast-%type-check cast) nil))
+      (cast-%type-check cast)))

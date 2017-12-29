@@ -876,4 +876,17 @@
                   (if z 1 (values 1 2)))
            :done))
     ((t) :done)
-    ((nil) :done)))
+      ((nil) :done)))
+
+(with-test (:name :fewer-cast-conversions)
+  (multiple-value-bind (fun failed)
+      (checked-compile
+       `(lambda ()
+          (let* ((v (cons 0 (catch 'ct (the integer nil)))))
+            (declare (dynamic-extent v))
+            (flet ((%f (x) x))
+              (%f (cdr v)))))
+       :allow-warnings t)
+    (assert failed)
+    (handler-bind ((error (lambda (c) c (throw 'ct 33))))
+      (assert (= (funcall fun) 33)))))
