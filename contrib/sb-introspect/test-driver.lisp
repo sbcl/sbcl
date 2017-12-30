@@ -409,10 +409,9 @@
 (defun assert-large-page/gen/boxedp (thing-name page gen boxedp)
   (sb-ext:gc :gen gen)
   (let ((props (nth-value 1 (allocation-information (symbol-value thing-name)))))
-    ;; This FORMAT call has the effect of consuming enough stack space
-    ;; to clobber a lingering pointer to THING from the stack.
+    ;; Don't leave any pointers to THING from the stack.
     ;; Without it, the next test iteration (after next GC) will fail.
-    (format (make-string-output-stream) "~S~%" props)
+    (sb-sys:scrub-control-stack)
     ;; Check that uncopyableness isn't due to pin,
     ;; or else the test proves nothing.
     (and (eq (getf props :pinned :missing) nil)
