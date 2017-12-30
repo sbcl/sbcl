@@ -111,11 +111,11 @@ run_sbcl <<EOF
   (save-lisp-and-die "$tmpcore" :executable t)
 EOF
 chmod u+x "$tmpcore"
-./"$tmpcore" --no-userinit <<EOF
+./"$tmpcore" --no-userinit --no-sysinit <<EOF
   (save-lisp-and-die "$tmpcore" :executable t :save-runtime-options t)
 EOF
 chmod u+x "$tmpcore"
-./"$tmpcore" --no-userinit --version --eval '(exit)' <<EOF
+./"$tmpcore" --no-userinit --no-sysinit --version --eval '(exit)' <<EOF
   (when (equal *posix-argv* '("./$tmpcore" "--version" "--eval" "(exit)"))
     (exit :code 42))
 EOF
@@ -128,21 +128,21 @@ fi
 
 # executable core used as "--core" option should not save the memory sizes
 # that were originally saved, but the sizes in the process doing the save.
-run_sbcl_with_args --control-stack-size 160KB --dynamic-space-size 200MB --no-userinit --noprint <<EOF
+run_sbcl_with_args --control-stack-size 160KB --dynamic-space-size 200MB --no-userinit --no-sysinit --noprint <<EOF
   (save-lisp-and-die "$tmpcore" :executable t :save-runtime-options t)
 EOF
 chmod u+x "$tmpcore"
-./"$tmpcore" --no-userinit <<EOF
+./"$tmpcore" --no-userinit --no-sysinit <<EOF
   (assert (eql (extern-alien "thread_control_stack_size" unsigned) (* 160 1024)))
   (assert (eql (dynamic-space-size) (* 200 1048576)))
 EOF
-run_sbcl_with_core "$tmpcore" --control-stack-size 200KB --dynamic-space-size 250MB <<EOF
+run_sbcl_with_core "$tmpcore" --control-stack-size 200KB --dynamic-space-size 250MB --no-userinit --no-sysinit <<EOF
   (assert (eql (extern-alien "thread_control_stack_size" unsigned) (* 200 1024)))
   (assert (eql (dynamic-space-size) (* 250 1048576)))
   (save-lisp-and-die "${tmpcore}2" :executable t :save-runtime-options t)
 EOF
 chmod u+x "${tmpcore}2"
-./"${tmpcore}2" --no-userinit <<EOF
+./"${tmpcore}2" --no-userinit --no-sysinit <<EOF
   (when (and (eql (extern-alien "thread_control_stack_size" unsigned) (* 200 1024))
              (eql (dynamic-space-size) (* 250 1048576)))
     (exit :code 42))
