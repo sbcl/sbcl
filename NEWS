@@ -10,6 +10,9 @@ changes relative to sbcl-1.4.3:
     *DEFAULT-PATHNAME-DEFAULTS* has a name or type component. (lp#1740563)
   * bug fix: pattern pieces in pathname components are correctly escaped
     during unparsing
+  * bug fix: DELETE-DIRECTORY no longer signals an error when the directory is
+    supplied as a pathname with name and/or type components containing escaped
+    characters. (lp#1740624)
 
 changes in sbcl-1.4.3 relative to sbcl-1.4.2:
   * enhancement: SLEEP respects deadlines established by SB-SYS:WITH-DEADLINE.

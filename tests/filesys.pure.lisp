@@ -319,3 +319,28 @@
 (with-test (:name :parse-native-namestring-canon :skipped-on (not :unix))
   (let ((pathname (parse-native-namestring "foo/bar//baz")))
     (assert (string= (car (last (pathname-directory pathname))) "bar"))))
+
+
+;;;; DELETE-DIRECTORY
+
+(with-test (:name (delete-directory :as-file :complicated-name-or-type :lp-1740624))
+  (labels ((prepare (namestring)
+             #-win32 (substitute #\\ #\E namestring)
+             #+win32 (substitute #\^ #\E namestring))
+           (test (namestring/file namestring/directory)
+             (let* ((test-directory (concatenate
+                                     'string
+                                     (sb-posix:getenv "TEST_DIRECTORY") "/"))
+                    (delete-directory (merge-pathnames
+                                       (prepare namestring/file)
+                                       test-directory)))
+               (ensure-directories-exist (merge-pathnames
+                                          (prepare namestring/directory)
+                                          test-directory))
+               (unwind-protect
+                    (progn
+                      (delete-directory delete-directory)
+                      (assert (not (probe-file delete-directory))))
+                 (delete-directory test-directory :recursive t)))))
+    (test "aE*b"     "aE*b/")
+    (test "foo.aE*b" "foo.aE*b/")))

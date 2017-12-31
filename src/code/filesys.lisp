@@ -538,13 +538,23 @@ per standard Unix unlink() behaviour."
   t)
 
 (defun directorize-pathname (pathname)
-  (if (or (pathname-name pathname)
-          (pathname-type pathname))
-      (make-pathname :directory (append (pathname-directory pathname)
-                                        (list (file-namestring pathname)))
-                     :host (pathname-host pathname)
-                     :device (pathname-device pathname))
+  (cond
+    ((wild-pathname-p pathname)
+     (simple-file-perror
+      "Cannot compute directory pathname for wild pathname ~S"
       pathname))
+    ((or (pathname-name pathname)
+         (pathname-type pathname))
+     (let ((from-file (format nil "~@[~A~]~@[.~A~]"
+                              (pathname-name pathname)
+                              (pathname-type pathname))))
+       (make-pathname
+        :host (pathname-host pathname)
+        :device (pathname-device pathname)
+        :directory (append (pathname-directory pathname)
+                           (list from-file)))))
+    (t
+     pathname)))
 
 (defun delete-directory (pathspec &key recursive)
   "Deletes the directory designated by PATHSPEC (a pathname designator).
@@ -566,44 +576,44 @@ Both
 delete the \"foo\" subdirectory of \"/tmp\", or signal an error if it does not
 exist or if is a file or a symbolic link."
   (declare (type pathname-designator pathspec))
-  (let ((physical (directorize-pathname
-                   (physicalize-pathname
-                    (merge-pathnames
-                     pathspec (sane-default-pathname-defaults))))))
-    (labels ((recurse-merged (dir)
-               (lambda (sub)
-                 (recurse (merge-pathnames sub dir))))
-             (delete-merged (dir)
-               (lambda (file)
-                 (delete-file (merge-pathnames file dir))))
-             (recurse (dir)
-               (map-directory (recurse-merged dir) dir
-                              :files nil
-                              :directories t
-                              :classify-symlinks nil)
-               (map-directory (delete-merged dir) dir
-                              :files t
-                              :directories nil
-                              :classify-symlinks nil)
-               (delete-dir dir))
-             (delete-dir (dir)
-               (let ((namestring (native-namestring dir :as-file t)))
-                 (multiple-value-bind (res errno)
-                     #!+win32
-                     (or (sb!win32::native-delete-directory namestring)
-                         (values nil (sb!win32:get-last-error)))
-                     #!-win32
-                     (values
-                      (not (minusp (alien-funcall
-                                    (extern-alien "rmdir"
-                                                  (function int c-string))
-                                    namestring)))
-                      (get-errno))
-                     (if res
-                         dir
-                         (simple-file-perror
-                          "Could not delete directory ~A"
-                          namestring errno))))))
+  (labels ((recurse-merged (dir)
+             (lambda (sub)
+               (recurse (merge-pathnames sub dir))))
+           (delete-merged (dir)
+             (lambda (file)
+               (delete-file (merge-pathnames file dir))))
+           (recurse (dir)
+             (map-directory (recurse-merged dir) dir
+                            :files nil
+                            :directories t
+                            :classify-symlinks nil)
+             (map-directory (delete-merged dir) dir
+                            :files t
+                            :directories nil
+                            :classify-symlinks nil)
+             (delete-dir dir))
+           (delete-dir (dir)
+             (let ((namestring (native-namestring dir :as-file t)))
+               (multiple-value-bind (res errno)
+                 #!+win32
+                 (or (sb!win32::native-delete-directory namestring)
+                     (values nil (sb!win32:get-last-error)))
+                 #!-win32
+                 (values
+                  (not (minusp (alien-funcall
+                                (extern-alien "rmdir"
+                                              (function int c-string))
+                                namestring)))
+                  (get-errno))
+                 (if res
+                     dir
+                     (simple-file-perror
+                      "Could not delete directory ~A"
+                      namestring errno))))))
+    (let ((physical (directorize-pathname
+                     (physicalize-pathname
+                      (merge-pathnames
+                       pathspec (sane-default-pathname-defaults))))))
       (if recursive
           (recurse physical)
           (delete-dir physical)))))
