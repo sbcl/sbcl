@@ -881,7 +881,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "*DISASSEMBLE-ANNOTATE*"
                "PRINT-SYMBOL-WITH-PREFIX"
                "PRINT-TYPE-SPECIFIER" "PRINT-TYPE"
-               "*PRINT-SEQUENCE-LENGTH*"
+               "*PRINT-VECTOR-LENGTH*"
                "DECIMAL-WITH-GROUPED-DIGITS-WIDTH"
 
                ;; stepping interface

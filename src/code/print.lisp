@@ -825,11 +825,11 @@ variable: an unreadable object representing the error is printed instead.")
   (let ((readably *print-readably*))
     (flet ((cut-length ()
              (when (and (not readably)
-                        *print-sequence-length*
-                        (> (length vector) *print-sequence-length*))
+                        *print-vector-length*
+                        (> (length vector) *print-vector-length*))
                (print-unreadable-object (vector stream :type t :identity t)
                  (format stream "~A..."
-                         (make-array *print-sequence-length*
+                         (make-array *print-vector-length*
                                      :element-type (array-element-type vector)
                                      :displaced-to vector)))
                t)))
