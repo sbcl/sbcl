@@ -291,129 +291,133 @@
       (simple-file-perror
        "Can't find the ~*~A~2:* of wild pathname ~A~* (physicalized from ~A)."
        pathname nil query-for pathspec))
-    (macrolet  ((fail (format-control pathname errno &rest format-arguments)
-                  `(if errorp
-                       (simple-file-perror
-                        ,format-control ,pathname ,errno ,@format-arguments)
-                       (return-from query-file-system nil))))
-      (let ((filename (native-namestring pathname :as-file t)))
-        #!+win32
-        (case query-for
-          ((:existence :truename)
-           (multiple-value-bind (file kind)
-               (sb!win32::native-probe-file-name filename)
-             (when (and (not file) kind)
-               (setf file filename))
-             ;; The following OR was an AND, but that breaks files like NUL,
-             ;; for which GetLongPathName succeeds yet GetFileAttributesEx
-             ;; fails to return the file kind. --DFL
-             (if (or file kind)
-                 (values
-                  (parse-native-namestring
-                   file
-                   (pathname-host pathname)
-                   (sane-default-pathname-defaults)
-                   :as-directory (eq :directory kind)))
-                 (fail "Failed to find the ~A of ~A"
-                       filename (sb!win32:get-last-error) query-for))))
-          (:write-date
-           (or (sb!win32::native-file-write-date filename)
-               (fail "Failed to find the ~A of ~A"
-                     filename (sb!win32:get-last-error) query-for))))
-        #!-win32
-        (multiple-value-bind (existsp errno ino mode nlink uid gid rdev size
-                                      atime mtime)
-            (sb!unix:unix-stat filename)
-          (declare (ignore ino nlink gid rdev size atime))
-          (labels ((parse (filename &key (as-directory
-                                          (eql (logand mode
-                                                       sb!unix:s-ifmt)
-                                               sb!unix:s-ifdir)))
-                     (values
-                      (parse-native-namestring
-                       filename
-                       (pathname-host pathname)
-                       (sane-default-pathname-defaults)
-                       :as-directory as-directory)))
-                   (resolve-problematic-symlink (&optional realpath-failed)
-                     ;; SBCL has for many years had a policy that a pathname
-                     ;; that names an existing, dangling or self-referential
-                     ;; symlink denotes the symlink itself.  stat(2) fails
-                     ;; and sets errno to ENOENT or ELOOP respectively, but
-                     ;; we must distinguish cases where the symlink exists
-                     ;; from ones where there's a loop in the apparent
-                     ;; containing directory.
-                     ;; Also handles symlinks in /proc/pid/fd/ to
-                     ;; pipes or sockets on Linux
-                     (multiple-value-bind (linkp ignore ino mode nlink uid gid rdev
-                                           size atime mtime)
-                         (sb!unix:unix-lstat filename)
-                       (declare (ignore ignore ino mode nlink gid rdev size atime))
-                       (when (and (or (= errno sb!unix:enoent)
-                                      (= errno sb!unix:eloop)
-                                      realpath-failed)
-                                  linkp)
-                         (return-from query-file-system
-                           (case query-for
-                             (:existence
-                              ;; We do this reparse so as to return a
-                              ;; normalized pathname.
-                              (parse filename :as-directory nil))
-                             (:truename
-                              ;; So here's a trick: since lstat succeded,
-                              ;; FILENAME exists, so its directory exists and
-                              ;; only the non-directory part is loopy.  So
-                              ;; let's resolve FILENAME's directory part with
-                              ;; realpath(3), in order to get a canonical
-                              ;; absolute name for the directory, and then
-                              ;; return a pathname having PATHNAME's name,
-                              ;; type, and version, but the rest from the
-                              ;; truename of the directory.  Since we turned
-                              ;; PATHNAME into FILENAME "as a file", FILENAME
-                              ;; does not end in a slash, and so we get the
-                              ;; directory part of FILENAME by reparsing
-                              ;; FILENAME and masking off its name, type, and
-                              ;; version bits.  But note not to call ourselves
-                              ;; recursively, because we don't want to
-                              ;; re-merge against *DEFAULT-PATHNAME-DEFAULTS*,
-                              ;; since PATHNAME may be a relative pathname.
-                              (merge-pathnames
-                               (parse
-                                (multiple-value-bind (realpath errno)
-                                    (sb!unix:unix-realpath
-                                     (native-namestring
-                                      (make-pathname
-                                       :name :unspecific
-                                       :type :unspecific
-                                       :version :unspecific
-                                       :defaults (parse filename
-                                                        :as-directory nil))))
-                                  (or realpath
-                                      (fail "couldn't resolve ~A" filename errno)))
-                                :as-directory t)
-                               (if (directory-pathname-p pathname)
-                                   (parse (car (last (pathname-directory pathname)))
-                                          :as-directory nil)
-                                   pathname)))
-                             (:author (sb!unix:uid-username uid))
-                             (:write-date (+ unix-to-universal-time mtime))))))
-                     ;; If we're still here, the file doesn't exist; error.
-                     (fail "Failed to find the ~A of ~A"
-                           pathspec errno query-for)))
-            (if existsp
-                (case query-for
-                  (:existence (parse filename))
-                  (:truename
-                   ;; Note: in case the file is stat'able, POSIX
-                   ;; realpath(3) gets us a canonical absolute
-                   ;; filename, even if the post-merge PATHNAME
-                   ;; is not absolute
-                   (parse (or (sb!unix:unix-realpath filename)
-                              (resolve-problematic-symlink t))))
-                  (:author (sb!unix:uid-username uid))
-                  (:write-date (+ unix-to-universal-time mtime)))
-                (resolve-problematic-symlink))))))))
+    (%query-file-system pathname query-for errorp)))
 
+#!+win32
+(defun %query-file-system (pathname query-for errorp)
+  (let ((filename (native-namestring pathname :as-file t)))
+    (case query-for
+      ((:existence :truename)
+       (multiple-value-bind (file kind)
+           (sb!win32::native-probe-file-name filename)
+         (when (and (not file) kind)
+           (setf file filename))
+         ;; The following OR was an AND, but that breaks files like NUL,
+         ;; for which GetLongPathName succeeds yet GetFileAttributesEx
+         ;; fails to return the file kind. --DFL
+         (cond
+           ((or file kind)
+            (values (parse-native-namestring
+                     file
+                     (pathname-host pathname)
+                     (sane-default-pathname-defaults)
+                     :as-directory (eq :directory kind))))
+           (errop
+            (simple-file-perror
+             "Failed to find the ~*~A~2:* of ~A"
+             filename (sb!win32:get-last-error) query-for)))))
+      (:write-date
+       (cond
+         ((sb!win32::native-file-write-date filename))
+         (errop
+          (simple-file-perror
+           "Failed to find the ~*~A~2:* of ~A"
+           filename (sb!win32:get-last-error) query-for)))))))
+
+#!-win32
+(defun %query-file-system (pathname query-for errorp)
+  (labels ((parse (filename &key as-directory)
+             (values (parse-native-namestring
+                      filename
+                      (pathname-host pathname)
+                      (sane-default-pathname-defaults)
+                      :as-directory as-directory)))
+           (directory-part-realpath (filename)
+             ;; So here's a trick: since lstat succeeded, FILENAME
+             ;; exists, so its directory exists and only the
+             ;; non-directory part is loopy.  So let's resolve
+             ;; FILENAME's directory part with realpath(3), in order
+             ;; to get a canonical absolute name for the directory,
+             ;; and then return a pathname having PATHNAME's name,
+             ;; type, and version, but the rest from the truename of
+             ;; the directory.  Since we turned PATHNAME into FILENAME
+             ;; "as a file", FILENAME does not end in a slash, and so
+             ;; we get the directory part of FILENAME by reparsing
+             ;; FILENAME and masking off its name, type, and version
+             ;; bits.  But note not to call ourselves recursively,
+             ;; because we don't want to re-merge against
+             ;; *DEFAULT-PATHNAME-DEFAULTS*, since PATHNAME may be a
+             ;; relative pathname.
+             (multiple-value-bind (realpath errno)
+                 (sb!unix:unix-realpath
+                  (native-namestring
+                   (make-pathname
+                    :name :unspecific
+                    :type :unspecific
+                    :version :unspecific
+                    :defaults (parse filename))))
+               (cond
+                 (realpath
+                  (parse realpath :as-directory t))
+                 (errorp
+                  (simple-file-perror "couldn't resolve ~A" filename errno)))))
+           (resolve-problematic-symlink (filename errno realpath-failed)
+             ;; SBCL has for many years had a policy that a pathname
+             ;; that names an existing, dangling or self-referential
+             ;; symlink denotes the symlink itself.  stat(2) fails
+             ;; and sets errno to ENOENT or ELOOP respectively, but
+             ;; we must distinguish cases where the symlink exists
+             ;; from ones where there's a loop in the apparent
+             ;; containing directory.
+             ;; Also handles symlinks in /proc/pid/fd/ to
+             ;; pipes or sockets on Linux
+             (multiple-value-bind (linkp ignore ino mode nlink uid gid rdev
+                                         size atime mtime)
+                 (sb!unix:unix-lstat filename)
+               (declare (ignore ignore ino mode nlink gid rdev size atime))
+               (cond
+                 ((and (or (= errno sb!unix:enoent)
+                           (= errno sb!unix:eloop)
+                           realpath-failed)
+                       linkp)
+                  (case query-for
+                    (:existence
+                     ;; We do this reparse so as to return a
+                     ;; normalized pathname.
+                     (parse filename))
+                    (:truename
+                     (let ((realpath (directory-part-realpath filename)))
+                       (when realpath
+                         (merge-pathnames
+                          realpath
+                          (if (directory-pathname-p pathname)
+                              (parse (car (last (pathname-directory pathname))))
+                              pathname)))))
+                    (:author (sb!unix:uid-username uid))
+                    (:write-date (+ unix-to-universal-time mtime))))
+                 ;; The file doesn't exist; maybe error.
+                 (errorp
+                  (simple-file-perror "Failed to find the ~*~A~2:* of ~A"
+                                      pathname errno query-for))))))
+    (binding* ((filename (native-namestring pathname :as-file t))
+               ((existsp errno nil mode nil uid nil nil nil nil mtime)
+                (sb!unix:unix-stat filename)))
+      (if existsp
+          (case query-for
+            (:existence
+             (parse filename :as-directory (eql (logand mode sb!unix:s-ifmt)
+                                                sb!unix:s-ifdir)))
+            (:truename
+             ;; Note: in case the file is stat'able, POSIX
+             ;; realpath(3) gets us a canonical absolute filename,
+             ;; even if the post-merge PATHNAME is not absolute
+             (parse (or (sb!unix:unix-realpath filename)
+                        (resolve-problematic-symlink filename errno t))
+                    :as-directory (eql (logand mode sb!unix:s-ifmt)
+                                       sb!unix:s-ifdir)))
+            (:author (sb!unix:uid-username uid))
+            (:write-date (+ unix-to-universal-time mtime)))
+          (resolve-problematic-symlink filename errno nil)))))
 
 (defun probe-file (pathspec)
   "Return the truename of PATHSPEC if the truename can be found,
