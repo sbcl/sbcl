@@ -1415,21 +1415,20 @@
     (cond ((not (ir1-attributep attr foldable))
            nil)
           ((ir1-attributep attr call)
-           (and (every (lambda (lvar)
-                         (or (lvar-fun-name lvar t)
-                             (constant-lvar-p lvar)))
-                       args)
-                (block nil
-                  (map-callable-arguments
-                   (lambda (lvar args result &key unknown-keys &allow-other-keys)
-                     (declare (ignore args result))
-                     (when unknown-keys
-                       (return nil))
-                     (unless (constant-fold-arg-p (or (lvar-fun-name lvar t)
-                                                      (lvar-value lvar)))
-                       (return nil)))
-                   combination)
-                  t)))
+           (map-combination-args-and-types
+            (lambda (arg type lvars &optional annotation)
+              (declare (ignore type lvars))
+              (unless (if (eql (car annotation) 'function-designator)
+                          (let ((fun (or (lvar-fun-name arg t)
+                                         (and (constant-lvar-p arg)
+                                              (lvar-value arg)))))
+                            (and fun
+                                 (constant-fold-arg-p fun)))
+                          (constant-lvar-p arg))
+                (return-from constant-fold-call-p)))
+            combination
+            info)
+           t)
           (t
            (every #'constant-lvar-p args)))))
 

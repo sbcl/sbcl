@@ -890,3 +890,7 @@
     (assert failed)
     (handler-bind ((error (lambda (c) c (throw 'ct 33))))
       (assert (= (funcall fun) 33)))))
+
+(with-test (:name :constant-folding-with-callable-args)
+  (checked-compile '(lambda () (count #'%f '(a)))
+                   :allow-style-warnings t))

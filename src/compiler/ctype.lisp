@@ -935,7 +935,7 @@ and no value was provided for it." name))))))))))
                      :returns (fun-type-returns type))
       type))
 
-;;; Call FUN with (arg-lvar arg-type)
+;;; Call FUN with (arg-lvar arg-type lvars &optional annotation)
 (defun map-combination-args-and-types (fun call &optional info)
   (declare (type function fun) (type combination call))
   (binding* ((type (lvar-fun-type (combination-fun call)))
