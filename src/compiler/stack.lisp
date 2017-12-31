@@ -102,12 +102,12 @@
          ;; (allocated) because we can't move live DX-LVARs to release
          ;; them.
          (preserve-lvars (reduce #'merge-uvl-live-sets
-                                 (mapcar (lambda (block)
-                                           (let ((2block (block-info block)))
-                                             (merge-uvl-live-sets
-                                              (ir2-block-end-stack 2block)
-                                              (ir2-block-pushed 2block))))
-                                         use-blocks)))
+                                 use-blocks
+                                 :key (lambda (block)
+                                        (let ((2block (block-info block)))
+                                          (merge-uvl-live-sets
+                                           (ir2-block-end-stack 2block)
+                                           (ir2-block-pushed 2block))))))
          (start-block (find-lowest-common-dominator
                        (list* block use-blocks))))
     (labels ((mark-lvar-live-on-path (arc-list)
