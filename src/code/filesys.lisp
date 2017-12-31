@@ -694,15 +694,14 @@ matching filenames."
                    (do-physical-pathnames pathname))))
       (declare (truly-dynamic-extent #'record))
       (do-pathnames (merge-pathnames pathspec)))
-    (mapcar #'cdr
-            ;; Sorting isn't required by the ANSI spec, but sorting into some
-            ;; canonical order seems good just on the grounds that the
-            ;; implementation should have repeatable behavior when possible.
-            (sort (loop for namestring being each hash-key in truenames
-                        using (hash-value truename)
-                        collect (cons namestring truename))
-                  #'string<
-                  :key #'car))))
+    ;; Sorting isn't required by the ANSI spec, but sorting into some
+    ;; canonical order seems good just on the grounds that the
+    ;; implementation should have repeatable behavior when possible.
+    (let ((result (sort (loop for namestring being each hash-key in truenames
+                              using (hash-value truename)
+                              collect (cons namestring truename))
+                        #'string< :key #'car)))
+      (map-into result #'cdr result))))
 
 (defun canonicalize-pathname (pathname)
   ;; We're really only interested in :UNSPECIFIC -> NIL, :BACK and :UP,
