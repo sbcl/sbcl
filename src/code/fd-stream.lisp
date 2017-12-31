@@ -444,19 +444,22 @@
   of bytes per element.")
 
 ;;; common idioms for reporting low-level stream and file problems
-(defun simple-stream-perror (note-format stream errno)
+(defun simple-stream-perror (format-control stream &optional errno &rest format-arguments)
   (declare (optimize allow-non-returning-tail-call))
   (error 'simple-stream-error
          :stream stream
-         :format-control "~@<~?: ~2I~_~A~:>"
-         :format-arguments (list note-format (list stream) (strerror errno))))
-(defun simple-file-perror (note-format pathname errno)
+         :format-control "~@<~?~@[: ~2I~_~A~]~:>"
+         :format-arguments (list format-control
+                                 (list* stream format-arguments)
+                                 (when errno (strerror errno)))))
+(defun simple-file-perror (format-control pathname &optional errno &rest format-arguments)
   (declare (optimize allow-non-returning-tail-call))
   (error 'simple-file-error
          :pathname pathname
-         :format-control "~@<~?: ~2I~_~A~:>"
-         :format-arguments
-         (list note-format (list pathname) (strerror errno))))
+         :format-control "~@<~?~@[: ~2I~_~A~]~:>"
+         :format-arguments (list format-control
+                                 (list* pathname format-arguments)
+                                 (when errno (strerror errno)))))
 
 (defun c-string-encoding-error (external-format code)
   (declare (optimize allow-non-returning-tail-call))
@@ -2463,11 +2466,9 @@
                              (okay
                               (when (and output (= (logand orig-mode #o170000)
                                                    #o40000))
-                                (error 'simple-file-error
-                                       :pathname pathname
-                                       :format-control
-                                       "can't open ~S for output: is a directory"
-                                       :format-arguments (list namestring)))
+                                (simple-file-perror
+                                 "can't open ~A for output: is a directory"
+                                 pathname))
                               (setf mode (logand orig-mode #o777))
                               t)
                              ((eql err/dev sb!unix:enoent)
@@ -2702,9 +2703,7 @@
   (case operation
     (:file-position
      (if arg1
-         (error 'simple-stream-error
-                :format-control "~S is not positionable"
-                :format-arguments (list stream))
+         (simple-stream-perror "~S is not positionable" stream)
          (fd-stream-get-file-position stream)))
     (t ; call next method
      (fd-stream-misc-routine stream operation arg1 arg2))))

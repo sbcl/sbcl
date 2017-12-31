@@ -288,17 +288,14 @@
                     (pathname pathspec)
                     (sane-default-pathname-defaults)))))
     (when (wild-pathname-p pathname)
-      (error 'simple-file-error
-             :pathname pathname
-             :format-control "~@<can't find the ~A of wild pathname ~A~
-                              (physicalized from ~A).~:>"
-             :format-arguments (list query-for pathname pathspec)))
-    (macrolet ((fail (note-format pathname errno)
-                 ;; Do this as a macro to avoid evaluating format
-                 ;; calls when ERROP is NIL
-                 `(if errorp
-                      (simple-file-perror ,note-format ,pathname ,errno)
-                      (return-from query-file-system nil))))
+      (simple-file-perror
+       "Can't find the ~*~A~2:* of wild pathname ~A~* (physicalized from ~A)."
+       pathname nil query-for pathspec))
+    (macrolet  ((fail (format-control pathname errno &rest format-arguments)
+                  `(if errorp
+                       (simple-file-perror
+                        ,format-control ,pathname ,errno ,@format-arguments)
+                       (return-from query-file-system nil))))
       (let ((filename (native-namestring pathname :as-file t)))
         #!+win32
         (case query-for
@@ -317,12 +314,12 @@
                    (pathname-host pathname)
                    (sane-default-pathname-defaults)
                    :as-directory (eq :directory kind)))
-                 (fail (format nil "Failed to find the ~A of ~~A" query-for) filename
-                       (sb!win32:get-last-error)))))
+                 (fail "Failed to find the ~A of ~A"
+                       filename (sb!win32:get-last-error) query-for))))
           (:write-date
            (or (sb!win32::native-file-write-date filename)
-               (fail (format nil "Failed to find the ~A of ~~A" query-for) filename
-                       (sb!win32:get-last-error)))))
+               (fail "Failed to find the ~A of ~A"
+                     filename (sb!win32:get-last-error) query-for))))
         #!-win32
         (multiple-value-bind (existsp errno ino mode nlink uid gid rdev size
                                       atime mtime)
@@ -401,9 +398,8 @@
                              (:author (sb!unix:uid-username uid))
                              (:write-date (+ unix-to-universal-time mtime))))))
                      ;; If we're still here, the file doesn't exist; error.
-                     (fail
-                      (format nil "Failed to find the ~A of ~~A" query-for)
-                      pathspec errno)))
+                     (fail "Failed to find the ~A of ~A"
+                           pathspec errno query-for)))
             (if existsp
                 (case query-for
                   (:existence (parse filename))
