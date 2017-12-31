@@ -11,21 +11,8 @@
 
 (in-package "CL-USER")
 
-;;; In sbcl-0.6.9 FOO-NAMESTRING functions  returned "" instead of NIL.
-(with-test (:name (file-namestring directory-namestring :name))
-  (let ((pathname0 (make-pathname :host nil
-                                  :directory
-                                  (pathname-directory
-                                   *default-pathname-defaults*)
-                                  :name "getty"))
-        (pathname1 (make-pathname :host nil
-                                  :directory nil
-                                  :name nil)))
-    (assert (equal (file-namestring pathname0) "getty"))
-    (assert (equal (directory-namestring pathname0)
-                   (directory-namestring *default-pathname-defaults*)))
-    (assert (equal (file-namestring pathname1) ""))
-    (assert (equal (directory-namestring pathname1) ""))))
+
+;;;; DIRECTORY
 
 ;;; In sbcl-0.6.9 DIRECTORY failed on paths with :WILD or
 ;;; :WILD-INFERIORS in their directory components.
@@ -47,6 +34,47 @@
                        (search "filesys.pure.lisp"
                                (namestring pathname)))
                      dir))))
+
+;;; Canonicalization of pathnames for DIRECTORY
+(with-test (:name (directory :/.))
+  (assert (equal (directory #p".") (directory #p"./")))
+  (assert (equal (directory #p".") (directory #p""))))
+(with-test (:name (directory :/..))
+  (assert (equal (directory #p"..") (directory #p"../"))))
+(with-test (:name (directory :unspecific))
+  (assert (equal (directory #p".")
+                 (directory (make-pathname
+                             :name :unspecific
+                             :type :unspecific)))))
+
+;;; This used to signal a TYPE-ERROR.
+(with-test (:name (directory :..*))
+  (directory "somedir/..*"))
+
+;;; DIRECTORY used to treat */** as **.
+(with-test (:name (directory :*/**))
+  (assert (equal (directory "*/**/*.*")
+                 (mapcan (lambda (directory)
+                           (directory (merge-pathnames "**/*.*" directory)))
+                         (directory "*/")))))
+
+;;;; OPEN
+
+;;; In sbcl-0.6.9 FOO-NAMESTRING functions  returned "" instead of NIL.
+(with-test (:name (file-namestring directory-namestring :name))
+  (let ((pathname0 (make-pathname :host nil
+                                  :directory
+                                  (pathname-directory
+                                   *default-pathname-defaults*)
+                                  :name "getty"))
+        (pathname1 (make-pathname :host nil
+                                  :directory nil
+                                  :name nil)))
+    (assert (equal (file-namestring pathname0) "getty"))
+    (assert (equal (directory-namestring pathname0)
+                   (directory-namestring *default-pathname-defaults*)))
+    (assert (equal (file-namestring pathname1) ""))
+    (assert (equal (directory-namestring pathname1) ""))))
 
 ;;; Set *default-pathname-defaults* to something other than the unix
 ;;; cwd, to catch functions which access the filesystem without
@@ -196,29 +224,6 @@
   (assert (not (file-author (user-homedir-pathname)))))
 (with-test (:name (file-write-date integerp))
   (assert (integerp (file-write-date (user-homedir-pathname)))))
-
-;;; Canonicalization of pathnames for DIRECTORY
-(with-test (:name (directory :/.))
-  (assert (equal (directory #p".") (directory #p"./")))
-  (assert (equal (directory #p".") (directory #p""))))
-(with-test (:name (directory :/..))
-  (assert (equal (directory #p"..") (directory #p"../"))))
-(with-test (:name (directory :unspecific))
-  (assert (equal (directory #p".")
-                 (directory (make-pathname
-                             :name :unspecific
-                             :type :unspecific)))))
-
-;;; This used to signal a TYPE-ERROR.
-(with-test (:name (directory :..*))
-  (directory "somedir/..*"))
-
-;;; DIRECTORY used to treat */** as **.
-(with-test (:name (directory :*/**))
-  (assert (equal (directory "*/**/*.*")
-                 (mapcan (lambda (directory)
-                           (directory (merge-pathnames "**/*.*" directory)))
-                         (directory "*/")))))
 
 ;;; Generated with
 ;;; (loop for exist in '(nil t)
