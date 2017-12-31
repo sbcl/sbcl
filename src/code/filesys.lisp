@@ -243,17 +243,15 @@
 (defun extract-name-type-and-version (namestr start end escape-char)
   (declare (type simple-string namestr)
            (type index start end))
-  (let* ((last-dot (position #\. namestr :start (1+ start) :end end
-                             :from-end t)))
-    (cond
-      (last-dot
-       (values (maybe-make-pattern namestr start last-dot escape-char)
-               (maybe-make-pattern namestr (1+ last-dot) end escape-char)
-               :newest))
-      (t
-       (values (maybe-make-pattern namestr start end escape-char)
-               nil
-               :newest)))))
+  (let ((last-dot (position #\. namestr :start (1+ start) :end end
+                            :from-end t)))
+    (if last-dot
+        (values (maybe-make-pattern namestr start last-dot escape-char)
+                (maybe-make-pattern namestr (1+ last-dot) end escape-char)
+                :newest)
+        (values (maybe-make-pattern namestr start end escape-char)
+                nil
+                :newest))))
 
 (/show0 "filesys.lisp 200")
 
