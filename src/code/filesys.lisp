@@ -658,8 +658,8 @@ matching filenames."
                                    ;; operation causes an error.  It's not clear
                                    ;; what the right thing to do is, though.  --
                                    ;; CSR, 2003-10-13
-                                   (query-file-system pathname :truename nil)
-                                   (query-file-system pathname :existence nil))))
+                                   (%query-file-system pathname :truename nil)
+                                   (%query-file-system pathname :existence nil))))
                  (when truename
                    (setf (gethash (namestring truename) truenames)
                          truename))))
@@ -832,7 +832,7 @@ Experimental: interface subject to change."
   (let* ((fun (%coerce-callable-to-fun function))
          (as-files (eq :as-files directories))
          (physical (physicalize-pathname directory))
-         (realname (query-file-system physical :existence nil))
+         (realname (%query-file-system physical :existence nil))
          (canonical (if realname
                         (parse-native-namestring realname
                                                  (pathname-host physical)
@@ -867,7 +867,7 @@ Experimental: interface subject to change."
                                       (parse-native-namestring
                                        name nil physical :as-directory nil)
                                       physical))
-                            (truename (query-file-system tmpname :truename nil)))
+                            (truename (%query-file-system tmpname :truename nil)))
                        (if (or (not truename)
                                (or (pathname-name truename) (pathname-type truename)))
                            (when files
@@ -902,7 +902,7 @@ Experimental: interface subject to change."
                                             :name nil
                                             :type nil
                                             :version nil))
-             (starting-point (or (probe-file starting-point)
+             (starting-point (or (%query-file-system starting-point :truename nil)
                                  starting-point)))
     (case mode
       (:wild-inferiors

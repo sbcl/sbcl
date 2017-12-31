@@ -57,6 +57,38 @@
                  (mapcan (lambda (directory)
                            (directory (merge-pathnames "**/*.*" directory)))
                          (directory "*/")))))
+
+(with-test (:name (directory *default-pathname-defaults*))
+  (let* ((test-directory (concatenate 'string (sb-posix:getenv "TEST_DIRECTORY") "/")))
+    (ensure-directories-exist test-directory)
+    (close (open (merge-pathnames "a.txt" test-directory) :if-does-not-exist :create))
+    (close (open (merge-pathnames "b.lisp" test-directory) :if-does-not-exist :create))
+    (unwind-protect
+         (flet ((directory* (pattern &rest d-p-d-components)
+                  (let ((*default-pathname-defaults*
+                         (apply #'make-pathname
+                                :defaults *default-pathname-defaults*
+                                d-p-d-components)))
+                    (directory pattern))))
+           (let* ((*default-pathname-defaults* (pathname test-directory))
+                  (expected-wild (directory "*.*"))
+                  (expected-one-file (directory "a.txt"))
+                  (cases '((:name nil   :type "txt")
+                           (:name nil   :type :wild)
+                           (:name "a"   :type nil)
+                           (:name "a"   :type "txt")
+                           (:name "a"   :type :wild)
+                           (:name :wild :type nil)
+                           (:name :wild :type :wild)
+                           (:name :wild :type "txt"))))
+             (dolist (components cases)
+               (assert (equal (apply #'directory* "*.*" components)
+                              expected-wild))
+               (assert (equal (apply #'directory* "a.txt" components)
+                              expected-one-file)))
+             (assert (equal (directory* "" :name :wild :type :wild)
+                            expected-wild))))
+      (delete-directory test-directory :recursive t))))
 
 ;;;; OPEN
 
