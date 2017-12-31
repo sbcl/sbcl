@@ -67,25 +67,19 @@
 ;;; if they are fed wild pathname designators; firstly, with wild
 ;;; pathnames that don't correspond to any files:
 (with-test (:name (open :wild file-error 1))
-  (assert (typep (nth-value 1 (ignore-errors (open "non-existent*.lisp")))
-                 'file-error)))
+  (assert-error (open "non-existent*.lisp") file-error))
 (with-test (:name (load :wild file-error 1))
-  (assert (typep (nth-value 1 (ignore-errors (load "non-existent*.lisp")))
-                 'file-error)))
+  (assert-error (load "non-existent*.lisp") file-error))
 ;;; then for pathnames that correspond to precisely one:
 (with-test (:name (open :wild file-error 2))
-  (assert (typep (nth-value 1 (ignore-errors (open "filesys.pur*.lisp")))
-                 'file-error)))
+  (assert-error (open "filesys.pur*.lisp") file-error))
 (with-test (:name (load :wild file-error 2))
-  (assert (typep (nth-value 1 (ignore-errors (load "filesys.pur*.lisp")))
-                 'file-error)))
+  (assert-error (load "filesys.pur*.lisp") file-error))
 ;;; then for pathnames corresponding to many:
 (with-test (:name (open :wild file-error 3))
-  (assert (typep (nth-value 1 (ignore-errors (open "*.lisp")))
-                 'file-error)))
+  (assert-error (open "*.lisp") file-error))
 (with-test (:name (load :wild file-error 3))
-  (assert (typep (nth-value 1 (ignore-errors (load "*.lisp")))
-                 'file-error)))
+  (assert-error (load "*.lisp") file-error))
 
 ;;; ANSI: FILE-LENGTH should signal an error of type TYPE-ERROR if
 ;;; STREAM is not a stream associated with a file.
@@ -93,8 +87,7 @@
 ;;; (Peter Van Eynde's ansi-test suite caught this, and Eric Marsden
 ;;; reported a fix for CMU CL, which was ported to sbcl-0.6.12.35.)
 (with-test (:name (file-length *terminal-io* type-error))
-  (assert (typep (nth-value 1 (ignore-errors (file-length *terminal-io*)))
-                 'type-error)))
+  (assert-error (file-length *terminal-io*) type-error))
 
 (with-test (:name (file-length synonym-stream))
   (with-open-file (*stream* "filesys.pure.lisp" :direction :input)
