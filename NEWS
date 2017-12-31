@@ -8,6 +8,8 @@ changes relative to sbcl-1.4.3:
     roundtrips properly when both use the same :case. (lp#1739906)
   * bug fix: DIRECTORY no longer gets confused when the value of
     *DEFAULT-PATHNAME-DEFAULTS* has a name or type component. (lp#1740563)
+  * bug fix: pattern pieces in pathname components are correctly escaped
+    during unparsing
 
 changes in sbcl-1.4.3 relative to sbcl-1.4.2:
   * enhancement: SLEEP respects deadlines established by SB-SYS:WITH-DEADLINE.

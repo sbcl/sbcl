@@ -150,53 +150,82 @@
           (t
            (make-pattern (pattern))))))
 
+(declaim (ftype (sfunction ((or (eql :wild) simple-string pattern) character)
+                           simple-string)
+                unparse-physical-piece))
 (defun unparse-physical-piece (thing escape-char)
-  (etypecase thing
-    ((member :wild) "*")
-    (simple-string
-     (let* ((srclen (length thing))
-            (dstlen srclen))
-       (dotimes (i srclen)
-         (let ((char (schar thing i)))
-           (case char
-             ((#\* #\? #\[)
-              (incf dstlen))
-             (t (when (char= char escape-char)
-                  (incf dstlen))))))
-       (let ((result (make-string dstlen))
-             (dst 0))
-         (dotimes (src srclen)
-           (let ((char (schar thing src)))
-             (case char
-               ((#\* #\? #\[)
-                (setf (schar result dst) escape-char)
-                (incf dst))
-               (t (when (char= char escape-char)
-                    (setf (schar result dst) escape-char)
-                    (incf dst))))
-             (setf (schar result dst) char)
-             (incf dst)))
-         result)))
-    (pattern
-     (with-simple-output-to-string (s)
-       (dolist (piece (pattern-pieces thing))
-         (etypecase piece
-           (simple-string
-            (write-string piece s))
-           (symbol
-            (ecase piece
-              (:multi-char-wild
-               (write-string "*" s))
-              (:single-char-wild
-               (write-string "?" s))))
-           (cons
-            (case (car piece)
-              (:character-set
-               (write-string "[" s)
-               (write-string (cdr piece) s)
-               (write-string "]" s))
-              (t
-               (error "invalid pattern piece: ~S" piece))))))))))
+  (let ((length 0)
+        (complicated nil))
+    (declare (type index length))
+    (labels ((inspect-fragment (fragment)
+               (etypecase fragment
+                 ((eql :wild)
+                  (incf length)
+                  t)
+                 (simple-string
+                  (incf length (length fragment))
+                  (Loop with complicated = nil
+                        for char across (the simple-string fragment)
+                        when (or (char= char #\*) (char= char #\?)
+                                 (char= char #\[) (char= char escape-char))
+                        do (setf complicated t)
+                           (incf length)
+                        finally (return complicated)))
+                 (pattern
+                  (mapcar (lambda (piece)
+                            (etypecase piece
+                              (simple-string
+                               (inspect-fragment piece))
+                              ((member :multi-char-wild :single-char-wild)
+                               (incf length 1)
+                               t)
+                              ((cons (eql :character-set))
+                               (incf length (+ 2 (length (cdr piece))))
+                               t)))
+                          (pattern-pieces fragment))))))
+      (setf complicated (inspect-fragment thing)))
+    (unless complicated
+      (return-from unparse-physical-piece thing))
+    (let ((result (make-string length))
+          (index 0))
+      (declare (type (simple-array character 1) result)
+               (type index index))
+      (labels ((output (character)
+                 (setf (aref result index) character)
+                 (incf index))
+               (output-string (string)
+                 (declare (type (simple-array character 1) string))
+                 (setf (subseq result index) string)
+                 (incf index (length string)))
+               (unparse-fragment (fragment)
+                 (etypecase fragment
+                   ((eql :wild)
+                    (output #\*))
+                   (simple-string
+                    (loop for char across (the simple-string fragment)
+                          when (or (char= char #\*) (char= char #\?)
+                                   (char= char #\[) (char= char escape-char))
+                          do (output escape-char)
+                          do (output char)))
+                   (pattern
+                    (mapc (lambda (piece piece-complicated)
+                            (etypecase piece
+                              (simple-string
+                               (if piece-complicated
+                                   (unparse-fragment piece)
+                                   (output-string piece)))
+                              ((eql :multi-char-wild)
+                               (output #\*))
+                              ((eql :single-char-wild)
+                               (output #\?))
+                              ((cons (eql :character-set))
+                               (output #\[)
+                               (output-string (cdr piece))
+                               (output #\]))))
+                          (pattern-pieces fragment) complicated)))))
+        (declare (inline output output-string))
+        (unparse-fragment thing))
+      result)))
 
 (defun make-matcher (piece)
   (cond ((eq piece :wild)

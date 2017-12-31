@@ -498,6 +498,8 @@
 (with-test (:name enough-namestring)
   (assert (equal (enough-namestring #p"foo" #p"./") "foo")))
 
+;;;; NAMESTRING
+
 ;;; bug reported by Artem V. Andreev: :WILD not handled in unparsing
 ;;; directory lists. lp#1738775, reported by Richard M. Kreuter, added
 ;;; more cases.
@@ -521,6 +523,18 @@
     ;; :UP to signal a FILE-ERROR, but we don't.
     (test "/../" #P"/../")
     (test "/../" (make-pathname :directory '(:absolute :up)))))
+
+(with-test (:name (namestring :escape-pattern-pieces))
+  (labels ((prepare (namestring)
+             #-win32 (substitute #\\ #\E namestring)
+             #+win32 (substitute #\^ #\E namestring))
+           (test (expected namestring)
+             (let ((pathname (pathname (prepare namestring))))
+               (assert (string= (prepare expected) (namestring pathname))))))
+    (test "*E?"    "*E?")
+    (test "*E*"    "*E*")
+    (test "*E[ab]" "*E[ab]")
+    (test "*EE"    "*EE")))
 
 ;;; Printing of pathnames; see CLHS 22.1.3.1. This section was started
 ;;; to confirm that pathnames are printed as their namestrings under

@@ -756,7 +756,7 @@ a host-structure or string."
        (namestring-parse-error (condition)
          (values nil (namestring-parse-error-offset condition)))))
     (t
-     (let* ((end (%check-vector-sequence-bounds namestr start end)))
+     (let ((end (%check-vector-sequence-bounds namestr start end)))
        (multiple-value-bind (new-host device directory file type version)
            ;; Comments below are quotes from the HyperSpec
            ;; PARSE-NAMESTRING entry, reproduced here to demonstrate
