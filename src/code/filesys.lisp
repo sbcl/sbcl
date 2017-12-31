@@ -312,14 +312,14 @@
                      (pathname-host pathname)
                      (sane-default-pathname-defaults)
                      :as-directory (eq :directory kind))))
-           (errop
+           (errorp
             (simple-file-perror
              "Failed to find the ~*~A~2:* of ~A"
              filename (sb!win32:get-last-error) query-for)))))
       (:write-date
        (cond
          ((sb!win32::native-file-write-date filename))
-         (errop
+         (errorp
           (simple-file-perror
            "Failed to find the ~*~A~2:* of ~A"
            filename (sb!win32:get-last-error) query-for)))))))
