@@ -531,10 +531,10 @@
            (test (expected namestring)
              (let ((pathname (pathname (prepare namestring))))
                (assert (string= (prepare expected) (namestring pathname))))))
-    (test "*E?"    "*E?")
-    (test "*E*"    "*E*")
-    (test "*E[ab]" "*E[ab]")
-    (test "*EE"    "*EE")))
+    #-win32 (test "*E?"    "*E?")
+    #-win32 (test "*E*"    "*E*")
+            (test "*E[ab]" "*E[ab]")
+            (test "*EE"    "*EE")))
 
 ;;; Printing of pathnames; see CLHS 22.1.3.1. This section was started
 ;;; to confirm that pathnames are printed as their namestrings under
