@@ -798,14 +798,6 @@ set_generation_alloc_start_page(generation_index_t generation, int page_type_fla
 #endif
 }
 
-static inline void set_highest_used_page(page_index_t end)
-{
-    if (end+1 > last_free_page) {
-        last_free_page = end+1;
-        set_alloc_pointer((lispobj)(page_address(last_free_page)));
-    }
-}
-
 /* Find a new region with room for at least the given number of bytes.
  *
  * It starts looking at the current generation's alloc_start_page. So
@@ -883,8 +875,6 @@ gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *all
             addr_diff(page_address(i), alloc_region->start_addr));
         page_table[i].allocated |= OPEN_REGION_PAGE_FLAG;
     }
-    /* Bump up last_free_page. */
-    set_highest_used_page(last_page);
     ret = thread_mutex_unlock(&free_pages_lock);
     gc_assert(ret == 0);
 
@@ -1191,8 +1181,6 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
     if (BOXED_PAGE_FLAG & page_type_flag)
         add_new_area(first_page, 0, nbytes);
 
-    /* Bump up last_free_page */
-    set_highest_used_page(last_page);
     ret = thread_mutex_unlock(&free_pages_lock);
     gc_assert(ret == 0);
 
@@ -1378,6 +1366,12 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t bytes,
     }
 
     gc_assert(most_bytes_found_to);
+    // most_bytes_found_to is the upper exclusive bound on the found range.
+    // last_free_page is the high water mark of most_bytes_found_to.
+    if (most_bytes_found_to > last_free_page) {
+        last_free_page = most_bytes_found_to;
+        set_alloc_pointer((lispobj)(page_address(last_free_page)));
+    }
     *restart_page_ptr = most_bytes_found_from;
     return most_bytes_found_to-1;
 }
