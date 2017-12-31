@@ -2802,7 +2802,7 @@
 
 
 (with-test (:name :ftype-return-type-conflict)
-  (declaim (ftype (function () fixnum) ftype-return-type-conflict))
+  (proclaim '(ftype (function () fixnum) ftype-return-type-conflict))
   (checked-compile-and-assert (:optimize :safe :allow-warnings t)
       `(sb-int:named-lambda ftype-return-type-conflict () nil)
     (() (condition 'type-error))))
