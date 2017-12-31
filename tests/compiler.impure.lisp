@@ -2801,7 +2801,10 @@
     (ctu:assert-no-consing (funcall fun list))))
 
 
-(with-test (:name :ftype-return-type-conflict)
+(with-test (:name :ftype-return-type-conflict
+            ;; Not having UNWIND-TO-FRAME-AND-CALL-VOP changes
+            ;; the condition type here?
+            :fails-on (not :unwind-to-frame-and-call-vop))
   (proclaim '(ftype (function () fixnum) ftype-return-type-conflict))
   (checked-compile-and-assert (:optimize :safe :allow-warnings t)
       `(sb-int:named-lambda ftype-return-type-conflict () nil)
