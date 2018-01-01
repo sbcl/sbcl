@@ -548,8 +548,8 @@
   )
 (defknown %map (type-specifier function-designator &rest sequence) consed-sequence (call))
 (defknown %map-for-effect-arity-1 (function-designator sequence) null (call))
-(defknown %map-to-list-arity-1 (function-designator sequence) list (flushable call))
-(defknown %map-to-simple-vector-arity-1 (function-designator sequence) simple-vector
+(defknown %map-to-list-arity-1 ((function-designator ((nth-arg 1 :sequence t))) sequence) list (flushable call))
+(defknown %map-to-simple-vector-arity-1 ((function-designator ((nth-arg 1 :sequence t))) sequence) simple-vector
   (flushable call))
 
 (defknown map-into ((modifying sequence)
@@ -578,8 +578,10 @@
 
 (defknown reduce ((function-designator ((nth-arg 1 :sequence t :key :key)
                                         (nth-arg 1 :sequence t :key :key)))
-                  sequence &rest t &key (:from-end t) (:start index)
-                  (:end sequence-end) (:initial-value t)
+                  sequence &rest t &key (:from-end t)
+                  (:start (inhibit-flushing index 0))
+                  (:end (inhibit-flushing sequence-end nil))
+                  (:initial-value t)
                   (:key (function-designator ((nth-arg 1 :sequence t)))))
   t
   (foldable flushable call))
@@ -600,7 +602,8 @@
     (t sequence &rest t &key (:from-end t)
      (:test (function-designator ((nth-arg 0) (nth-arg 1 :sequence t :key :key))))
      (:test-not (function-designator ((nth-arg 0) (nth-arg 1 :sequence t :key :key))))
-     (:start index) (:end sequence-end)
+     (:start (inhibit-flushing index 0))
+     (:end (inhibit-flushing sequence-end nil))
      (:count sequence-count)
      (:key (function-designator ((nth-arg 1 :sequence t)))))
   consed-sequence
@@ -611,7 +614,8 @@
   (t t sequence &rest t &key (:from-end t)
      (:test (function-designator ((nth-arg 1) (nth-arg 2 :sequence t :key :key))))
      (:test-not (function-designator ((nth-arg 1) (nth-arg 2 :sequence t :key :key))))
-     (:start index) (:end sequence-end)
+     (:start (inhibit-flushing index 0))
+     (:end (inhibit-flushing sequence-end nil))
      (:count sequence-count)
      (:key (function-designator ((nth-arg 2 :sequence t)))))
   consed-sequence
@@ -620,8 +624,9 @@
 
 (defknown (remove-if remove-if-not)
   ((function-designator ((nth-arg 1 :sequence t :key :key))) sequence
-   &rest t &key (:from-end t) (:start index)
-   (:end sequence-end) (:count sequence-count)
+   &rest t &key (:from-end t)
+   (:start (inhibit-flushing index 0))
+   (:end (inhibit-flushing sequence-end nil))
    (:key (function-designator ((nth-arg 1 :sequence t)))))
   consed-sequence
   (flushable call)
@@ -629,8 +634,10 @@
 
 (defknown (substitute-if substitute-if-not)
   (t (function-designator ((nth-arg 2 :sequence t :key :key))) sequence
-     &rest t &key (:from-end t) (:start index)
-     (:end sequence-end) (:count sequence-count)
+     &rest t &key (:from-end t)
+     (:start (inhibit-flushing index 0))
+     (:end (inhibit-flushing sequence-end nil))
+     (:count sequence-count)
      (:key (function-designator ((nth-arg 2 :sequence t)))))
   consed-sequence
   (flushable call)
@@ -644,7 +651,7 @@
      (:count sequence-count)
      (:key (function-designator ((nth-arg 1 :sequence t)))))
   sequence
-  (flushable call important-result)
+  (call important-result)
   :derive-type (sequence-result-nth-arg 2))
 
 (defknown nsubstitute
@@ -655,7 +662,7 @@
      (:count sequence-count)
      (:key (function-designator ((nth-arg 2 :sequence t)))))
   sequence
-  (flushable call)
+  (call)
   :derive-type (sequence-result-nth-arg 3))
 
 (defknown (delete-if delete-if-not)
@@ -664,7 +671,7 @@
    (:end sequence-end) (:count sequence-count)
    (:key (function-designator ((nth-arg 1 :sequence t)))))
   sequence
-  (flushable call important-result)
+  (call important-result)
   :derive-type (sequence-result-nth-arg 2))
 
 (defknown (nsubstitute-if nsubstitute-if-not)
@@ -673,7 +680,7 @@
      (:end sequence-end) (:count sequence-count)
      (:key (function-designator ((nth-arg 2 :sequence t)))))
   sequence
-  (flushable call)
+  (call)
   :derive-type (sequence-result-nth-arg 3))
 
 (defknown remove-duplicates
@@ -682,11 +689,12 @@
                                         (nth-arg 0 :sequence t :key :key))))
             (:test-not (function-designator ((nth-arg 0 :sequence t :key :key)
                                         (nth-arg 0 :sequence t :key :key))))
-            (:start index)
-            (:from-end t) (:end sequence-end)
+            (:start (inhibit-flushing index 0))
+            (:end (inhibit-flushing sequence-end nil))
+            (:from-end t)
             (:key (function-designator ((nth-arg 0 :sequence t)))))
   consed-sequence
-  (unsafely-flushable call)
+  (flushable call)
   :derive-type (sequence-result-nth-arg 1))
 
 (defknown delete-duplicates
@@ -700,23 +708,25 @@
    (:from-end t) (:end sequence-end)
    (:key (function-designator ((nth-arg 0 :sequence t)))))
   sequence
-  (unsafely-flushable call important-result)
+  (call important-result)
   :derive-type (sequence-result-nth-arg 1))
 
 (defknown find
   (t sequence &rest t &key
      (:test (function-designator ((nth-arg 0) (nth-arg 1 :sequence t :key :key))))
      (:test-not (function-designator ((nth-arg 0) (nth-arg 1 :sequence t :key :key))))
-     (:start index) (:from-end t)
-     (:end sequence-end)
+     (:start (inhibit-flushing index 0))
+     (:end (inhibit-flushing sequence-end nil))
+     (:from-end t)
      (:key (function-designator ((nth-arg 1 :sequence t)))))
   t
   (foldable flushable call))
 
 (defknown (find-if find-if-not)
   ((function-designator ((nth-arg 1 :sequence t :key :key))) sequence
-   &rest t &key (:from-end t) (:start index)
-   (:end sequence-end)
+   &rest t &key (:from-end t)
+   (:start (inhibit-flushing index 0))
+   (:end (inhibit-flushing sequence-end nil))
    (:key (function-designator ((nth-arg 1 :sequence t)))))
   t
   (foldable flushable call))
@@ -725,16 +735,18 @@
  (t sequence &rest t &key
     (:test (function-designator ((nth-arg 0) (nth-arg 1 :sequence t :key :key))))
     (:test-not (function-designator ((nth-arg 0) (nth-arg 1 :sequence t :key :key))))
-    (:start index) (:from-end t)
-    (:end sequence-end)
+    (:start (inhibit-flushing index 0))
+    (:end (inhibit-flushing sequence-end nil))
+    (:from-end t)
     (:key (function-designator ((nth-arg 1 :sequence t)))))
   (or (mod #.(1- sb!xc:array-dimension-limit)) null)
   (foldable flushable call))
 
 (defknown (position-if position-if-not)
   ((function-designator ((nth-arg 1 :sequence t :key :key))) sequence
-   &rest t &key (:from-end t) (:start index)
-   (:end sequence-end)
+   &rest t &key (:from-end t)
+   (:start (inhibit-flushing index 0))
+    (:end (inhibit-flushing sequence-end nil))
    (:key (function-designator ((nth-arg 1 :sequence t)))))
   (or (mod #.(1- sb!xc:array-dimension-limit)) null)
   (foldable flushable call))
@@ -743,16 +755,18 @@
   (t sequence &rest t &key
      (:test (function-designator ((nth-arg 0) (nth-arg 1 :sequence t :key :key))))
      (:test-not (function-designator ((nth-arg 0) (nth-arg 1 :sequence t :key :key))))
-     (:start index) (:from-end t)
-     (:end sequence-end)
+     (:from-end t)
+     (:start (inhibit-flushing index 0))
+     (:end (inhibit-flushing sequence-end nil))
      (:key (function-designator ((nth-arg 1 :sequence t)))))
   index
   (foldable flushable call))
 
 (defknown (count-if count-if-not)
   ((function-designator ((nth-arg 1 :sequence t :key :key))) sequence
-   &rest t &key (:from-end t) (:start index)
-   (:end sequence-end)
+   &rest t &key (:from-end t)
+   (:start (inhibit-flushing index 0))
+   (:end (inhibit-flushing sequence-end nil))
    (:key (function-designator ((nth-arg 1 :sequence t)))))
   index
   (foldable flushable call))
@@ -763,8 +777,8 @@
                                 (nth-arg 1 :sequence t :key :key))))
    (:test-not (function-designator ((nth-arg 0 :sequence t :key :key)
                                     (nth-arg 1 :sequence t :key :key))))
-   (:start1 index) (:end1 sequence-end)
-   (:start2 index) (:end2 sequence-end)
+   (:start1 (inhibit-flushing index 0)) (:end1 (inhibit-flushing sequence-end nil))
+   (:start2 (inhibit-flushing index 0)) (:end2 (inhibit-flushing sequence-end nil))
    (:key (function-designator ((or (nth-arg 0 :sequence t)
                                    (nth-arg 1 :sequence t))))))
   (or index null)
@@ -1146,16 +1160,18 @@
 (defknown schar (simple-string index) character (foldable flushable))
 
 (defknown (string= string-equal)
-  (string-designator string-designator &key (:start1 index) (:end1 sequence-end)
-              (:start2 index) (:end2 sequence-end))
+  (string-designator string-designator &key
+    (:start1 (inhibit-flushing index 0)) (:end1 (inhibit-flushing sequence-end nil))
+    (:start2 (inhibit-flushing index 0)) (:end2 (inhibit-flushing sequence-end nil)))
   boolean
   (foldable flushable))
 
 (defknown (string< string> string<= string>= string/= string-lessp
                    string-greaterp string-not-lessp string-not-greaterp
                    string-not-equal)
-  (string-designator string-designator &key (:start1 index) (:end1 sequence-end)
-              (:start2 index) (:end2 sequence-end))
+  (string-designator string-designator &key
+   (:start1 (inhibit-flushing index 0)) (:end1 (inhibit-flushing sequence-end nil))
+   (:start2 (inhibit-flushing index 0)) (:end2 (inhibit-flushing sequence-end nil)))
   (or index null)
   (foldable flushable))
 
@@ -1179,7 +1195,9 @@
   (sequence string-designator) string (flushable))
 
 (defknown (string-upcase string-downcase string-capitalize)
-  (string-designator &key (:start index) (:end sequence-end))
+  (string-designator &key
+   (:start (inhibit-flushing index 0))
+   (:end (inhibit-flushing sequence-end nil)))
   simple-string (flushable))
 
 (defknown (nstring-upcase nstring-downcase nstring-capitalize)
@@ -1192,12 +1210,16 @@
 ;;;; internal non-keyword versions of string predicates:
 
 (defknown (string<* string>* string<=* string>=* string/=*)
-  (string-designator string-designator index sequence-end index sequence-end)
+    (string-designator string-designator
+                       (inhibit-flushing index 0) (inhibit-flushing sequence-end nil)
+                       (inhibit-flushing index 0) (inhibit-flushing sequence-end nil))
   (or index null)
   (foldable flushable))
 
 (defknown string=*
-  (string-designator string-designator index sequence-end index sequence-end)
+  (string-designator string-designator
+                     (inhibit-flushing index 0) (inhibit-flushing sequence-end nil)
+                     (inhibit-flushing index 0) (inhibit-flushing sequence-end nil))
   boolean
   (foldable flushable))
 
@@ -1795,7 +1817,7 @@
 (defknown array-bounding-indices-bad-error (t t t) nil)
 (defknown sequence-bounding-indices-bad-error (t t t) nil)
 (defknown %find-position
-    (t sequence t index sequence-end function function)
+    (t sequence t index sequence-end (function (t)) (function (t t)))
   (values t (or index null))
   (flushable call))
 (defknown (%find-position-if %find-position-if-not)
@@ -1821,49 +1843,49 @@
     (foldable flushable))
 
 (defknown (%adjoin-key %adjoin-key-eq)
-    (t list function)
+    (t list (function (t)))
     list
     (flushable call))
 
 (defknown (%member-key %member-key-eq
            %assoc-key %assoc-key-eq %rassoc-key %rassoc-key-eq)
-  (t list function)
+  (t list (function (t)))
   list
   (foldable flushable call))
 
 (defknown (%assoc-if %assoc-if-not %rassoc-if %rassoc-if-not
            %member-if %member-if-not)
-  (function list)
+  ((function (t)) list)
   list
   (foldable flushable call))
 
 (defknown (%assoc-if-key %assoc-if-not-key %rassoc-if-key %rassoc-if-not-key
            %member-if-key %member-if-not-key)
-  (function list function)
+  ((function (t)) list (function (t)))
   list
   (foldable flushable call))
 
 (defknown (%adjoin-test %adjoin-test-not)
-    (t list function)
+    (t list (function (t t)))
     list
     (flushable call))
 
 (defknown (%member-test %member-test-not
            %assoc-test %assoc-test-not
            %rassoc-test %rassoc-test-not)
-    (t list function)
+    (t list (function (t t)))
     list
     (foldable flushable call))
 
 (defknown (%adjoin-key-test %adjoin-key-test-not)
-    (t list function function)
+    (t list (function (t)) (function (t t)))
     list
     (flushable call))
 
 (defknown (%member-key-test %member-key-test-not
            %assoc-key-test %assoc-key-test-not
            %rassoc-key-test %rassoc-key-test-not)
-    (t list function function)
+    (t list (function (t)) (function (t t)))
     list
     (foldable flushable call))
 

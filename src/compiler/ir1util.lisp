@@ -483,21 +483,65 @@
   (awhen (node-lvar node)
     (lvar-dynamic-extent it)))
 
+(defun flushable-callable-arg-p (name arg-count)
+  (typecase name
+    (null
+     t)
+    (symbol
+     (let* ((info (info :function :info name))
+            (attributes (and info
+                             (fun-info-attributes info))))
+       (and info
+            (ir1-attributep attributes flushable)
+            (not (ir1-attributep attributes call))
+            (let ((type (proclaimed-ftype name)))
+              (multiple-value-bind (min max) (fun-type-arg-limits type)
+                (cond ((and (not min) (not max))
+                       nil)
+                      ((< arg-count min)
+                       nil)
+                      ((and max (> arg-count max))
+                       nil)
+                      (t
+                       ;; Just check for T to ensure it won't signal type errors.
+                       (not (find *universal-type*
+                                  (fun-type-n-arg-types arg-count type)
+                                  :test-not #'eql)))))))))))
+
+(defun flushable-combination-args-p (combination info)
+  (block nil
+    (map-combination-args-and-types
+     (lambda (arg type lvars &optional annotation)
+       (declare (ignore type lvars))
+       (case (car annotation)
+         (function-designator
+          (let ((fun (or (lvar-fun-name arg t)
+                         (and (constant-lvar-p arg)
+                              (lvar-value arg)))))
+            (unless (and fun
+                         (flushable-callable-arg-p fun (length (cadr annotation))))
+              (return))))
+         (inhibit-flushing
+          (let* ((except (cddr annotation)))
+            (unless (and except
+                         (constant-lvar-p arg)
+                         (memq (lvar-value arg) except))
+              (return))
+            nil))))
+     combination
+     info)
+    t))
+
 (defun flushable-combination-p (call)
   (declare (type combination call))
   (let ((kind (combination-kind call))
         (info (combination-fun-info call)))
     (or (when (and (eq kind :known) (fun-info-p info))
           (let ((attr (fun-info-attributes info)))
-            (when (and (not (ir1-attributep attr call))
-                       ;; FIXME: For now, don't consider potentially flushable
-                       ;; calls flushable when they have the CALL attribute.
-                       ;; Someday we should look at the functional args to
-                       ;; determine if they have any side effects.
-                       (if (policy call (= safety 3))
-                           (ir1-attributep attr flushable)
-                           (ir1-attributep attr unsafely-flushable)))
-              t)))
+            (and (if (policy call (= safety 3))
+                     (ir1-attributep attr flushable)
+                     (ir1-attributep attr unsafely-flushable))
+                 (flushable-combination-args-p call info))))
         ;; Is it declared flushable locally?
         (let ((name (lvar-fun-name (combination-fun call) t)))
           (memq name (lexenv-flushable (node-lexenv call)))))))

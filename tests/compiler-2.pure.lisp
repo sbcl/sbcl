@@ -894,3 +894,8 @@
 (with-test (:name :constant-folding-with-callable-args)
   (checked-compile '(lambda () (count #'%f '(a)))
                    :allow-style-warnings t))
+
+(with-test (:name :flushable-with-callable-args)
+  (let ((fun (checked-compile '(lambda (y) (let ((x (count y '(1 2 3))))
+                                             (declare (ignore x)))))))
+    (assert (not (ctu:find-named-callees fun)))))

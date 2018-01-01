@@ -159,8 +159,7 @@
   positional ;; required and &optional
   rest
   key
-  returns
-  )
+  returns)
 
 (defun split-type-info (arg-types result-type)
   (if (eq arg-types '*)
@@ -178,11 +177,12 @@
               key-annotation
               return-annotation)
           (labels ((annotation-p (x)
-                     (typep x '(cons (member function function-designator modifying))))
+                     (typep x '(cons (member function function-designator modifying
+                                      inhibit-flushing))))
                    (strip-annotation (x)
                      (ecase (car x)
                        ((function function-designator) (car x))
-                       (modifying (cadr x))))
+                       ((modifying inhibit-flushing) (cadr x))))
                    (process-positional (type)
                      (incf i)
                      (cond ((annotation-p type)
