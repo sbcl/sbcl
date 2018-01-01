@@ -1427,7 +1427,9 @@
                           (constant-lvar-p arg))
                 (return-from constant-fold-call-p)))
             combination
-            info)
+            info
+            (lambda ()
+              (return-from constant-fold-call-p)))
            t)
           (t
            (every #'constant-lvar-p args)))))

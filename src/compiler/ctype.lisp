@@ -936,13 +936,15 @@ and no value was provided for it." name))))))))))
       type))
 
 ;;; Call FUN with (arg-lvar arg-type lvars &optional annotation)
-(defun map-combination-args-and-types (fun call &optional info)
+(defun map-combination-args-and-types (fun call &optional info
+                                                          unknown-keys-fun)
   (declare (type function fun) (type combination call))
   (binding* ((type (lvar-fun-type (combination-fun call)))
              (nil (fun-type-p type) :exit-if-null)
              (annotation (and info
                               (fun-info-annotation info)))
-             (arg-lvars (resolve-key-args (combination-args call) type))
+             ((arg-lvars unknown-keys)
+              (resolve-key-args (combination-args call) type))
              (args (combination-args call))
              (i -1))
     (flet ((positional-annotation ()
@@ -985,7 +987,10 @@ and no value was provided for it." name))))))))))
           (let* ((name (key-info-name key))
                  (lvar (getf key-args name)))
             (when lvar
-              (call lvar (key-info-type key) (key-annotation name)))))))))
+              (call lvar (key-info-type key) (key-annotation name)))))
+        (when (and unknown-keys-fun
+                   unknown-keys)
+          (funcall unknown-keys-fun))))))
 
 (defun assert-modifying-lvar-type (lvar type caller policy)
   (let ((internal-lvar (make-lvar))
