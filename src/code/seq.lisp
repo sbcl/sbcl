@@ -2624,33 +2624,49 @@ many elements are copied."
 
 (eval-when (:compile-toplevel :execute)
 
-(sb!xc:defmacro vector-count-if (notp from-end-p predicate sequence)
+(sb!xc:defmacro vector-count-if (notp from-end-p predicate sequence
+                                 &key two-arg-predicate)
   (let ((next-index (if from-end-p '(1- index) '(1+ index)))
-        (pred `(funcall ,predicate (apply-key key (aref ,sequence index)))))
+        (pred (if two-arg-predicate
+                  `(funcall ,predicate ,two-arg-predicate (apply-key key (aref ,sequence index)))
+                  `(funcall ,predicate (apply-key key (aref ,sequence index))))))
     `(let ((%start ,(if from-end-p '(1- end) 'start))
            (%end ,(if from-end-p '(1- start) 'end)))
-      (do ((index %start ,next-index)
-           (count 0))
-          ((= index (the fixnum %end)) count)
-        (declare (fixnum index count))
-        (,(if notp 'unless 'when) ,pred
-          (setq count (1+ count)))))))
+       (do ((index %start ,next-index)
+            (count 0))
+           ((= index (the fixnum %end)) count)
+         (declare (fixnum index count))
+         ,(if two-arg-predicate
+              `(when (if ,pred
+                         (not ,notp)
+                         ,notp)
+                 (setq count (1+ count)))
+              `(,(if notp 'unless 'when) ,pred
+                (setq count (1+ count))))))))
 
-(sb!xc:defmacro list-count-if (notp from-end-p predicate sequence)
-  (let ((pred `(funcall ,predicate (apply-key key (pop sequence)))))
+(sb!xc:defmacro list-count-if (notp from-end-p predicate sequence
+                               &key two-arg-predicate)
+  (let ((pred (if two-arg-predicate
+                  `(funcall ,predicate ,two-arg-predicate (apply-key key (pop sequence)))
+                  `(funcall ,predicate (apply-key key (pop sequence))))))
     `(let ((%start ,(if from-end-p '(- length end) 'start))
            (%end ,(if from-end-p '(- length start) 'end))
            (sequence ,(if from-end-p '(reverse sequence) 'sequence)))
-      (do ((sequence (nthcdr %start ,sequence))
-           (index %start (1+ index))
-           (count 0))
-          ((or (= index (the fixnum %end)) (null sequence)) count)
-        (declare (fixnum index count))
-        (,(if notp 'unless 'when) ,pred
-          (setq count (1+ count)))))))
+       (do ((sequence (nthcdr %start ,sequence))
+            (index %start (1+ index))
+            (count 0))
+           ((or (= index (the fixnum %end)) (null sequence)) count)
+         (declare (fixnum index count))
+         ,(if two-arg-predicate
+              `(when (if ,pred
+                         (not ,notp)
+                         ,notp)
+                 (setq count (1+ count)))
+              `(,(if notp 'unless 'when) ,pred
+                (setq count (1+ count))))))))
 
 
-) ; EVAL-WHEN
+  )                                     ; EVAL-WHEN
 
 (define-sequence-traverser count-if
     (pred sequence &rest args &key from-end start end key)
@@ -2703,23 +2719,19 @@ many elements are copied."
   (when (and test-p test-not-p)
     ;; Use the same wording as EFFECTIVE-FIND-POSITION-TEST
     (error "can't specify both :TEST and :TEST-NOT"))
-  (let ((%test (if test-not-p
-                   (lambda (x)
-                     (not (funcall test-not item x)))
-                   (lambda (x)
-                     (funcall test item x)))))
+  (let ((test (or test-not test)))
     (seq-dispatch-checking sequence
-      (let ((end (or end length)))
-        (declare (type index end))
-        (if from-end
-            (list-count-if nil t %test sequence)
-            (list-count-if nil nil %test sequence)))
-      (let ((end (or end length)))
-        (declare (type index end))
-        (if from-end
-            (vector-count-if nil t %test sequence)
-            (vector-count-if nil nil %test sequence)))
-      (apply #'sb!sequence:count item sequence args))))
+        (let ((end (or end length)))
+          (declare (type index end))
+          (if from-end
+              (list-count-if test-not-p t test sequence :two-arg-predicate item)
+              (list-count-if test-not-p nil test sequence :two-arg-predicate item)))
+        (let ((end (or end length)))
+          (declare (type index end))
+          (if from-end
+              (vector-count-if test-not-p t test sequence :two-arg-predicate item)
+              (vector-count-if test-not-p nil test sequence :two-arg-predicate item)))
+        (apply #'sb!sequence:count item sequence args))))
 
 ;;;; MISMATCH
 

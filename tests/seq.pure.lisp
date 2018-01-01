@@ -462,3 +462,11 @@
   (checked-compile-and-assert ()
     `(lambda (e) (search '(a) '(b) :end1 e))
     ((0) 0)))
+
+(with-test (:name (count :no-consing)
+            :skipped-on :interpreter)
+  (let ((f (checked-compile
+            '(lambda (x)
+              (count 1 x)))))
+    (ctu:assert-no-consing (funcall f #(1 2 3 4)))
+    (ctu:assert-no-consing (funcall f '(1 2 3 4)))))
