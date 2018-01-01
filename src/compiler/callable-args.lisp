@@ -106,13 +106,16 @@
     (let ((key-args (nthcdr (fun-type-positional-count type)
                             args))
           (key-types (fun-type-keywords type))
+          seen
           unknown)
       (loop for (key lvar) on key-args by #'cddr
             for key-value = (and (constant-lvar-p key)
                                  (lvar-value key))
             for key-info = (find key-value key-types :key #'key-info-name)
             do (cond (key-info
-                      (funcall function key-value lvar))
+                      (unless (memq key-value seen)
+                        (funcall function key-value lvar)
+                        (push key-value seen)))
                      ((eq key-value
                           :allow-other-keys)
                       (funcall function key-value lvar))

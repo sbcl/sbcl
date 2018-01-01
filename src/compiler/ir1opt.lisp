@@ -1442,13 +1442,17 @@
 ;;; If there is more than one value, then we transform the call into a
 ;;; VALUES form.
 (defun constant-fold-call (call)
-  (let ((args (mapcar (lambda (lvar)
-                        (let ((name (lvar-fun-name lvar t)))
-                          (if name
-                              (fdefinition name)
-                              (lvar-value lvar))))
-                      (combination-args call)))
-        (fun-name (combination-fun-source-name call)))
+  (let* ((fun-name (lvar-fun-name (combination-fun call) t))
+         (type (info :function :type fun-name))
+         (args (mapcar (lambda (lvar)
+                         (if (lvar-p lvar)
+                             (let ((name (lvar-fun-name lvar t)))
+                               (if name
+                                   (fdefinition name)
+                                   (lvar-value lvar)))
+                             lvar))
+                       (resolve-key-args (combination-args call)
+                                         type))))
     (multiple-value-bind (values win)
         (careful-call fun-name
                       args
