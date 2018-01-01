@@ -625,6 +625,7 @@
 (defknown (remove-if remove-if-not)
   ((function-designator ((nth-arg 1 :sequence t :key :key))) sequence
    &rest t &key (:from-end t)
+   (:count sequence-count)
    (:start (inhibit-flushing index 0))
    (:end (inhibit-flushing sequence-end nil))
    (:key (function-designator ((nth-arg 1 :sequence t)))))

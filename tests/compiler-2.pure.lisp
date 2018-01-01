@@ -899,3 +899,15 @@
   (let ((fun (checked-compile '(lambda (y) (let ((x (count y '(1 2 3))))
                                              (declare (ignore x)))))))
     (assert (not (ctu:find-named-callees fun)))))
+
+(with-test (:name (remove :count))
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (remove x "aaa" :count 2))
+   ((#\a) "a"))
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (remove-if (lambda (y) (eql y x)) "aaa" :count 2))
+   ((#\a) "a")))
