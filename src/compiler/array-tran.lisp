@@ -597,6 +597,11 @@
             (values nil t)))
       (values nil t)))
 
+(defun proper-sequence-p (sequence)
+  (if (consp sequence)
+      (proper-list-p sequence)
+      (typep sequence 'sequence)))
+
 ;;; This baby is a bit of a monster, but it takes care of any MAKE-ARRAY
 ;;; call which creates a vector with a known element type -- and tries
 ;;; to do a good job with all the different ways it can happen.
@@ -769,7 +774,9 @@
                   ;; To make matters worse, the time grows superlinearly,
                   ;; and it's not entirely obvious that passing a constant array
                   ;; of 100x100 things is responsible for such an explosion.
-                  (<= (length (lvar-value initial-contents)) 1000))
+                  (let ((initial-contents (lvar-value initial-contents)))
+                    (and (proper-sequence-p initial-contents)
+                         (<= (length initial-contents) 1000))))
              (let ((contents (lvar-value initial-contents)))
                (unless (= c-length (length contents))
                  (abort-ir1-transform "~S has ~S elements, vector length is ~S."

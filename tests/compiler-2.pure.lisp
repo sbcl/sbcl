@@ -911,3 +911,11 @@
    `(lambda (x)
       (remove-if (lambda (y) (eql y x)) "aaa" :count 2))
    ((#\a) "a")))
+
+
+(with-test (:name (make-array :bad-initial-contents))
+  (assert
+   (nth-value 1
+              (checked-compile
+               `(lambda () (make-array '(1) :initial-contents 'foo))
+               :allow-warnings t))))
