@@ -919,3 +919,11 @@
               (checked-compile
                `(lambda () (make-array '(1) :initial-contents 'foo))
                :allow-warnings t))))
+
+
+(with-test (:name (:constant-fold :allow-other-keys))
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (reduce #'+ '(1 2 3)  :allow-other-keys t :bad x))
+   ((1) 6)))

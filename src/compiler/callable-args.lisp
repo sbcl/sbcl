@@ -103,19 +103,22 @@
 
 (defun map-key-lvars (function args type)
   (when (fun-type-keyp type)
-    (do* ((non-key (fun-type-positional-count type))
-          unknown
-          (key (nthcdr non-key args) (cddr key)))
-         ((null key) unknown)
-      (let ((key (first key))
-            (value (second key)))
-        (if (constant-lvar-p key)
-            (let* ((name (lvar-value key))
-                   (info (find name (fun-type-keywords type)
-                               :key #'key-info-name)))
-              (when info
-                (funcall function name value)))
-            (setf unknown t))))))
+    (let ((key-args (nthcdr (fun-type-positional-count type)
+                            args))
+          (key-types (fun-type-keywords type))
+          unknown)
+      (loop for (key lvar) on key-args by #'cddr
+            for key-value = (and (constant-lvar-p key)
+                                 (lvar-value key))
+            for key-info = (find key-value key-types :key #'key-info-name)
+            do (cond (key-info
+                      (funcall function key-value lvar))
+                     ((eq key-value
+                          :allow-other-keys)
+                      (funcall function key-value lvar))
+                     (t
+                      (setf unknown t))))
+      unknown)))
 
 ;;; Turn constant LVARs in keyword arg positions to constants so that
 ;;; they can be passed to FUN-INFO-CALLABLE-CHECK.
