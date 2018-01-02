@@ -607,12 +607,13 @@ lra:
 	add reg_LIP,reg_CODE,reg_LIP
 	la reg_LIP,-OTHER_POINTER_LOWTAG(reg_LIP)
 
+        /* Debugger expects LR to be valid when we come out of PA */
+	mtlr reg_LIP
+
 	/* No longer atomic */
 	subi reg_ALLOC, reg_ALLOC, flag_PseudoAtomic
 	andi. reg_NL3, reg_ALLOC, flag_PseudoAtomicInterrupted
 	twnei reg_NL3, 0
-
-	mtlr reg_LIP
 	
 	/* Reset the lisp stack. */
 	mr reg_CSP,reg_CFP
