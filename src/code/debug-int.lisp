@@ -942,21 +942,21 @@
   (declare (type system-area-pointer frame-pointer))
   (/noshow0 "entering FIND-ESCAPED-FRAME")
   (dotimes (index *free-interrupt-context-index* (values nil 0 nil))
-    (let ((scp (nth-interrupt-context index)))
-      (/noshow0 "got SCP")
+    (let ((context (nth-interrupt-context index)))
+      (/noshow0 "got CONTEXT")
       (when (= (sap-int frame-pointer)
-               (sb!vm:context-register scp sb!vm::cfp-offset))
+               (sb!vm:context-register context sb!vm::cfp-offset))
         (without-gcing
           (/noshow0 "in WITHOUT-GCING")
           (let ((code (code-object-from-bits
-                       (sb!vm:context-register scp sb!vm::code-offset))))
+                       (sb!vm:context-register context sb!vm::code-offset))))
             (/noshow0 "got CODE")
             (when (symbolp code)
-              (return (values code 0 scp)))
+              (return (values code 0 context)))
             (let* ((code-header-len (* (code-header-words code)
                                        sb!vm:n-word-bytes))
                    (pc-offset
-                     (- (sap-int (sb!vm:context-pc scp))
+                     (- (sap-int (sb!vm:context-pc context))
                         (- (get-lisp-obj-address code)
                            sb!vm:other-pointer-lowtag)
                         code-header-len)))
@@ -964,7 +964,7 @@
                 (unless (<= 0 pc-offset code-size)
                   ;; We were in an assembly routine.
                   (multiple-value-bind (new-pc-offset computed-return)
-                      (find-pc-from-assembly-fun code scp)
+                      (find-pc-from-assembly-fun code context)
                     (setf pc-offset new-pc-offset)
                     (unless (<= 0 pc-offset code-size)
                       (cerror
@@ -976,11 +976,11 @@
                        #X~X~:@_COMPUTED RETURN: #X~X.~:>"
                        :format-arguments
                        (list pc-offset
-                             (sap-int (sb!vm:context-pc scp))
+                             (sap-int (sb!vm:context-pc context))
                              code
                              (%code-entry-point code 0)
                              #!-(or arm arm64)
-                             (sb!vm:context-register scp sb!vm::lra-offset)
+                             (sb!vm:context-register context sb!vm::lra-offset)
                              #!+(or arm arm64)
                              (stack-ref frame-pointer lra-save-offset)
                              computed-return))
@@ -996,7 +996,7 @@
                       (values (lra-code-header real-lra)
                               (get-header-data real-lra)
                               nil))
-                    (values code pc-offset scp))))))))))
+                    (values code pc-offset context))))))))))
 
 #!-(or x86 x86-64)
 (defun find-pc-from-assembly-fun (code scp)
