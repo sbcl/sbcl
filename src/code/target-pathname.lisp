@@ -397,7 +397,7 @@
                      ;; implementor, and in SBCL we don't do it, so
                      ;; it must be a logical host.
                      (find-logical-host ,host-designator))
-                    ((or null (member :unspecific))
+                    (absent-pathname-component
                      ;; CLHS says that HOST=:UNSPECIFIC has
                      ;; implementation-defined behavior. We
                      ;; just turn it into NIL.
@@ -1621,9 +1621,8 @@ unspecified elements into a completed to-pathname based on the to-wildname."
     (let* ((name (%pathname-name pathname))
            (type (%pathname-type pathname))
            (version (%pathname-version pathname))
-           (type-supplied (not (or (null type) (eq type :unspecific))))
-           (version-supplied (not (or (null version)
-                                      (eq version :unspecific)))))
+           (type-supplied (pathname-component-present-p type))
+           (version-supplied (pathname-component-present-p version)))
       (when name
         (when (and (null type)
                    (typep name 'string)

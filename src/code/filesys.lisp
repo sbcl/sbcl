@@ -1097,8 +1097,8 @@ Experimental: interface subject to change."
          (cond
            ((eq one :wild) two)
            ((eq two :wild) one)
-           ((or (null one) (eq one :unspecific)) two)
-           ((or (null two) (eq two :unspecific)) one)
+           ((not (pathname-component-present-p one)) two)
+           ((not (pathname-component-present-p two)) one)
            ((eql one two) one)
            (t nil)))
        (intersect-name/type (one two)
@@ -1107,8 +1107,8 @@ Experimental: interface subject to change."
          (cond
            ((eq one :wild) two)
            ((eq two :wild) one)
-           ((or (null one) (eq one :unspecific)) two)
-           ((or (null two) (eq two :unspecific)) one)
+           ((not (pathname-component-present-p one)) two)
+           ((not (pathname-component-present-p two)) one)
            ((string= one two) one)
            (t (return-from pathname-intersections nil))))
        (intersect-directory (one two)
@@ -1117,8 +1117,8 @@ Experimental: interface subject to change."
          (cond
            ((eq one :wild) two)
            ((eq two :wild) one)
-           ((or (null one) (eq one :unspecific)) two)
-           ((or (null two) (eq two :unspecific)) one)
+           ((not (pathname-component-present-p one)) two)
+           ((not (pathname-component-present-p two)) one)
            (t (aver (eq (car one) (car two)))
               (mapcar
                (lambda (x) (cons (car one) x))

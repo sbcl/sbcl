@@ -210,7 +210,7 @@
   (declare (type pathname pathname))
   (let ((device (pathname-device pathname))
         (directory (pathname-directory pathname)))
-    (cond ((or (null device) (eq device :unspecific))
+    (cond ((not (pathname-component-present-p device))
            "")
           ((eq device :unc)
            (if native "\\" "/"))
@@ -351,8 +351,7 @@
                      (bug "Bad fallthrough in ~S" 'unparse-unix-enough)))))
         (strings (unparse-physical-directory-list result-directory #\^)))
       (let* ((pathname-type (%pathname-type pathname))
-             (type-needed (and pathname-type
-                               (not (eq pathname-type :unspecific))))
+             (type-needed (pathname-component-present-p pathname-type))
              (pathname-name (%pathname-name pathname))
              (name-needed (or type-needed
                               (and pathname-name
@@ -367,7 +366,7 @@
             (error "too many dots in the name: ~S" pathname))
           (strings (unparse-physical-piece pathname-name #\^)))
         (when type-needed
-          (when (or (null pathname-type) (eq pathname-type :unspecific))
+          (unless (pathname-component-present-p pathname-type)
             (lose))
           (when (typep pathname-type 'simple-string)
             (when (position #\. pathname-type)

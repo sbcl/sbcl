@@ -84,6 +84,9 @@
   (sb!xc:deftype pathname-component-tokens ()
     '(member nil :unspecific :wild :unc)))
 
+(deftype absent-pathname-component ()
+  '(member nil :unspecific))
+
 (sb!xc:defstruct (pathname (:conc-name %pathname-)
                            (:copier nil)
                            (:constructor %%make-pathname
@@ -140,7 +143,7 @@
 
 (declaim (inline pathname-component-present-p))
 (defun pathname-component-present-p (component)
-  (not (typep component '(or null (eql :unspecific)))))
+  (not (typep component 'absent-pathname-component)))
 
 ;;; The following functions are used both for Unix and Windows: while
 ;;; we accept both \ and / as directory separators on Windows, we
