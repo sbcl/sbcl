@@ -942,4 +942,10 @@
       (member nil '(1 2 3) :key #'evenp :key x))
    ((1) '(1 2 3) :test #'equal)))
 
-
+(with-test (:name (make-string-output-stream :bad-element-type))
+  (assert
+   (nth-value 1
+              (checked-compile
+               `(lambda ()
+                  (make-string-output-stream :element-type '((x))))
+               :allow-warnings t))))
