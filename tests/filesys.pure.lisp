@@ -58,8 +58,8 @@
                            (directory (merge-pathnames "**/*.*" directory)))
                          (directory "*/")))))
 
-(with-test (:name (directory *default-pathname-defaults*))
-  (let* ((test-directory (concatenate 'string (sb-posix:getenv "TEST_DIRECTORY") "/")))
+(with-test (:name (directory *default-pathname-defaults* :bug-1740563))
+  (let ((test-directory (concatenate 'string (sb-posix:getenv "TEST_DIRECTORY") "/")))
     (ensure-directories-exist test-directory)
     (close (open (merge-pathnames "a.txt" test-directory) :if-does-not-exist :create))
     (close (open (merge-pathnames "b.lisp" test-directory) :if-does-not-exist :create))
@@ -323,7 +323,7 @@
 
 ;;;; DELETE-DIRECTORY
 
-(with-test (:name (delete-directory :as-file :complicated-name-or-type :lp-1740624))
+(with-test (:name (delete-directory :as-file :complicated-name-or-type :bug-1740624))
   (labels ((prepare (namestring)
              #-win32 (substitute #\\ #\E namestring)
              #+win32 (substitute #\^ #\E namestring))
