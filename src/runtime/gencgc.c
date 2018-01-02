@@ -1097,10 +1097,7 @@ gc_alloc_update_page_tables(int page_type_flag, struct alloc_region *alloc_regio
 void *
 gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_region)
 {
-    boolean more;
-    page_index_t first_page, next_page, last_page;
-    os_vm_size_t byte_cnt;
-    os_vm_size_t bytes_used;
+    page_index_t first_page, last_page;
     int ret;
 
     ret = thread_mutex_lock(&free_pages_lock);
@@ -1116,7 +1113,7 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
         first_page = alloc_region->last_page+1;
     }
 
-    last_page = gc_find_freeish_pages(&first_page,nbytes,
+    last_page = gc_find_freeish_pages(&first_page, nbytes,
                                       SINGLE_OBJECT_FLAG | page_type_flag,
                                       gc_alloc_generation);
 
@@ -1126,54 +1123,26 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
     // (Doesn't matter too much since it'll be skipped on restart if unusable)
     set_generation_alloc_start_page(gc_alloc_generation, page_type_flag, 1, last_page);
 
-    /* Large objects don't share pages with other objects. */
-    gc_assert(page_bytes_used(first_page) == 0);
-
     /* Set up the pages. */
-    page_table[first_page].allocated = page_type_flag;
-    page_table[first_page].gen = gc_alloc_generation;
-    page_table[first_page].large_object = 1;
-
-    byte_cnt = 0;
-
-    /* Calc. the number of bytes used in this page. This is not
-     * always the number of new bytes, unless it was free. */
-    more = 0;
-    if ((bytes_used = nbytes) > GENCGC_CARD_BYTES) {
-        bytes_used = GENCGC_CARD_BYTES;
-        more = 1;
+    page_index_t page;
+    for (page = first_page; page <= last_page; ++page) {
+        /* Large objects don't share pages with other objects. */
+        gc_assert(page_bytes_used(page) == 0);
+        page_table[page].allocated = page_type_flag;
+        page_table[page].gen = gc_alloc_generation;
+        page_table[page].large_object = 1;
     }
-    set_page_bytes_used(first_page, bytes_used);
-    byte_cnt += bytes_used;
-
-    next_page = first_page+1;
-
-    /* All the rest of the pages should be free. We need to set their
-     * scan_start_offset pointer to the start of the region, and set
-     * the bytes_used. */
-    while (more) {
-        gc_assert(page_free_p(next_page));
-        gc_assert(page_bytes_used(next_page) == 0);
-        page_table[next_page].allocated = page_type_flag;
-        page_table[next_page].gen = gc_alloc_generation;
-        page_table[next_page].large_object = 1;
-
-        set_page_scan_start_offset(next_page, npage_bytes(next_page-first_page));
-
-        /* Calculate the number of bytes used in this page. */
-        more = 0;
-        bytes_used = nbytes - byte_cnt;
-        if (bytes_used > GENCGC_CARD_BYTES) {
-            bytes_used = GENCGC_CARD_BYTES;
-            more = 1;
-        }
-        set_page_bytes_used(next_page, bytes_used);
-        byte_cnt += bytes_used;
-        next_page++;
+    os_vm_size_t scan_start_offset = 0;
+    for (page = first_page; page < last_page; ++page) {
+        set_page_scan_start_offset(page, scan_start_offset);
+        set_page_bytes_used(page, GENCGC_CARD_BYTES);
+        scan_start_offset += GENCGC_CARD_BYTES;
     }
-
-    gc_assert(byte_cnt == (size_t)nbytes);
-
+    page_bytes_t final_bytes_used = nbytes - scan_start_offset;
+    gc_dcheck((nbytes % GENCGC_CARD_BYTES ? nbytes % GENCGC_CARD_BYTES
+               : GENCGC_CARD_BYTES) == final_bytes_used);
+    set_page_scan_start_offset(last_page, scan_start_offset);
+    set_page_bytes_used(last_page, final_bytes_used);
     bytes_allocated += nbytes;
     generations[gc_alloc_generation].bytes_allocated += nbytes;
 
@@ -1184,6 +1153,10 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
     ret = thread_mutex_unlock(&free_pages_lock);
     gc_assert(ret == 0);
 
+    /* FIXME: zero-fill prior to setting bytes_used so that concurrent
+     * heap walk does not see random detritus on pages which may have
+     * previously held unboxed data. But we want to keep this expensive
+     * step outside of the mutex scope */
     zero_dirty_pages(first_page, last_page);
 
     return page_address(first_page);
