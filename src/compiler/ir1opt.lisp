@@ -2326,9 +2326,10 @@
 
 (defun cast-type-check (cast)
   (declare (type cast cast))
-  (if (cast-reoptimize cast)
-      (when (and (cast-%type-check cast)
-                 (values-subtypep (lvar-derived-type (cast-value cast))
-                                  (cast-type-to-check cast)))
-        (setf (cast-%type-check cast) nil))
-      (cast-%type-check cast)))
+  (let ((check (cast-%type-check cast)))
+    (if (and check
+             (cast-reoptimize cast)
+             (values-subtypep (lvar-derived-type (cast-value cast))
+                              (cast-type-to-check cast)))
+        (setf (cast-%type-check cast) nil)
+        check)))

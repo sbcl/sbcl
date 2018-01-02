@@ -892,3 +892,17 @@
          (flet ((%f1 (x y) (+ x y)))
            (apply #'%f1 a (list 0))))
     ((3) 3)))
+
+(with-test (:name :cast-type-check-external)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x)
+         (declare (notinline +))
+         (gcd
+          (loop for lv2 below 1
+                count (logbitp 0
+                               (if x
+                                   (return x)
+                                   1)))
+          0))
+    ((334) 334)))
