@@ -320,34 +320,37 @@
                              (setq res new-ptype)
                              (return (any)))))))))))
         (intersection-type
-         (let ((types (intersection-type-types type))
-               (res (any)))
-           ;; why NIL for the exact?  Well, we assume that the
-           ;; intersection type is in fact doing something for us:
-           ;; that is, that each of the types in the intersection is
-           ;; in fact cutting off some of the type lattice.  Since no
-           ;; intersection type is represented by a primitive type and
-           ;; primitive types are mutually exclusive, it follows that
-           ;; no intersection type can represent the entirety of the
-           ;; primitive type.  (And NIL is the conservative answer,
-           ;; anyway).  -- CSR, 2006-09-14
-           (dolist (type types (values res nil))
-             (multiple-value-bind (ptype)
-                 (primitive-type type)
-               (cond
-                 ;; if the result so far is (any), any improvement on
-                 ;; the specificity of the primitive type is valid.
-                 ((eq res (any))
-                  (setq res ptype))
-                 ;; if the primitive type returned is (any), the
-                 ;; result so far is valid.  Likewise, if the
-                 ;; primitive type is the same as the result so far,
-                 ;; everything is fine.
-                 ((or (eq ptype (any)) (eq ptype res)))
-                 ;; otherwise, we have something hairy and confusing,
-                 ;; such as (and condition funcallable-instance).
-                 ;; Punt.
-                 (t (return (any))))))))
+         (if (types-equal-or-intersect (specifier-type 'function) type)
+             ;; Things like (AND STANDARD-OBJECT FUNCTION) are callable as functions.
+             (part-of function)
+             (let ((types (intersection-type-types type))
+                   (res (any)))
+               ;; why NIL for the exact?  Well, we assume that the
+               ;; intersection type is in fact doing something for us:
+               ;; that is, that each of the types in the intersection is
+               ;; in fact cutting off some of the type lattice.  Since no
+               ;; intersection type is represented by a primitive type and
+               ;; primitive types are mutually exclusive, it follows that
+               ;; no intersection type can represent the entirety of the
+               ;; primitive type.  (And NIL is the conservative answer,
+               ;; anyway).  -- CSR, 2006-09-14
+               (dolist (type types (values res nil))
+                 (multiple-value-bind (ptype)
+                     (primitive-type type)
+                   (cond
+                     ;; if the result so far is (any), any improvement on
+                     ;; the specificity of the primitive type is valid.
+                     ((eq res (any))
+                      (setq res ptype))
+                     ;; if the primitive type returned is (any), the
+                     ;; result so far is valid.  Likewise, if the
+                     ;; primitive type is the same as the result so far,
+                     ;; everything is fine.
+                     ((or (eq ptype (any)) (eq ptype res)))
+                     ;; otherwise, we have something hairy and confusing,
+                     ;; such as (and condition funcallable-instance).
+                     ;; Punt.
+                     (t (return (any)))))))))
         (member-type
          (let (res)
            (block nil

@@ -949,3 +949,12 @@
                `(lambda ()
                   (make-string-output-stream :element-type '((x))))
                :allow-warnings t))))
+
+(with-test (:name :function-and-instance-primitive-type)
+  (checked-compile-and-assert
+      ()
+      `(lambda (f)
+         (declare (function f))
+         (the standard-object f)
+         (funcall f #'list t))
+    ((#'documentation) (documentation #'list t))))
