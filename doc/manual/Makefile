@@ -66,8 +66,8 @@ html-stamp: $(DOCFILES) docstrings
 	@rm -f $(HTMLFILES)
 #	$(MAKEINFO) $(I_FLAGS) --html --css-include=style-multi.css $(SBCLTEXI)
 #	$(MAKEINFO) --html --css-include=style-multi.css $(ASDFTEXI)
-	$(MAKEINFO) $(I_FLAGS) --html --no-split --css-include=style-single.css $(SBCLTEXI)
-	$(MAKEINFO) --html --no-split --css-include=style-single.css $(ASDFTEXI)
+	$(MAKEINFO) $(I_FLAGS) --html --no-split --css-include=style-common.css --css-include=style-single.css $(SBCLTEXI)
+	$(MAKEINFO) --html --no-split --css-include=style-common.css --css-include=style-single.css $(ASDFTEXI)
 	touch html-stamp
 
 # Postscript documentation
