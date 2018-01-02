@@ -79,3 +79,12 @@
                `(lambda (&aux (nil 10))
                   nil)
                :allow-failure t))))
+
+(with-test (:name :mv-call-too-many-values)
+  (assert
+   (nth-value 1
+              (checked-compile
+               `(lambda (a)
+                  (flet ((%f1 (x) x))
+                    (apply #'%f1 a 2 (list 0))))
+               :allow-warnings t))))

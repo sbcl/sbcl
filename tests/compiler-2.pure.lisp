@@ -885,3 +885,10 @@
          (funcall f #'list t))
     ((#'documentation) (documentation #'list t))))
 
+(with-test (:name :mv-call-safety-0)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (flet ((%f1 (x y) (+ x y)))
+           (apply #'%f1 a (list 0))))
+    ((3) 3)))

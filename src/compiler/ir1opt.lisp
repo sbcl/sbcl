@@ -1972,45 +1972,61 @@
 
   (values))
 
+(defun count-values (call &optional min)
+  (loop for arg in (basic-combination-args call)
+        for nvals = (nth-value 1 (values-types (lvar-derived-type arg)))
+        if (eq nvals :unknown)
+        do (unless min
+             (return))
+        else
+        sum nvals))
+
+(defun check-mv-call-arguments (call)
+  (let ((*compiler-error-context* call)
+        (max-accepted (nth-value 1 (fun-type-nargs
+                                    (lvar-fun-type
+                                     (basic-combination-fun call)))))
+        (min-args (count-values call t)))
+    (cond ((not min-args))
+          ((and max-accepted (> min-args max-accepted))
+           (compiler-warn
+            "MULTIPLE-VALUE-CALL with at least ~R values when the function expects ~
+              at most ~R."
+            min-args max-accepted)
+           (setf (basic-combination-kind call) :error)
+           nil)
+          (t))))
+
 (defun ir1-optimize-mv-call (node)
-  (let ((fun (basic-combination-fun node))
-        (*compiler-error-context* node)
-        (uses (lvar-uses (basic-combination-fun node)))
-        (args (basic-combination-args node)))
-    (multiple-value-bind (min max) (fun-type-nargs (lvar-fun-type fun))
-      (let ((total-nvals
-              (loop for arg in args
-                    for nvals = (nth-value 1 (values-types (lvar-derived-type arg)))
-                    when (eq nvals :unknown) return nil
-                    sum nvals)))
-        (let ((count (cond (total-nvals)
-                           ((and (policy node (zerop verify-arg-count))
-                                 (eql min max))
-                            min)
-                           (t nil))))
-          (when count
-            (with-ir1-environment-from-node node
-              (let* ((dums (make-gensym-list count))
-                     (ignore (gensym))
-                     (ref-p (ref-p uses))
-                     (new-fun (ir1-convert-lambda
-                               `(lambda (&optional ,@dums &rest ,ignore)
-                                  (declare (ignore ,ignore))
-                                  ;; REFERENCE-LEAF does a better job referencing
-                                  ;; DEFINED-FUNs than just using the LVAR.
-                                  ,(cond (ref-p
-                                          `(%funcall ,(ref-leaf uses) ,@dums))
-                                         (t
-                                          `(%funcall-lvar ,fun ,@dums)))))))
-                (cond (ref-p
-                       (change-ref-leaf uses new-fun))
-                      (t
-                       (reoptimize-lvar fun)
-                       (setf (basic-combination-fun node)
-                             (insert-ref-before new-fun node))))
-                (aver (eq (basic-combination-kind node) :full))
-                (locall-analyze-component *current-component*)
-                (aver (eq (basic-combination-kind node) :local)))))))))
+  (let* ((fun (basic-combination-fun node))
+         (uses (lvar-uses (basic-combination-fun node)))
+         (count (count-values node)))
+    (if count
+        (with-ir1-environment-from-node node
+          (let* ((dums (make-gensym-list count))
+                 (ignore (gensym))
+                 (ref-p (ref-p uses))
+                 (new-fun (ir1-convert-lambda
+                           `(lambda (&optional ,@dums &rest ,ignore)
+                              (declare (ignore ,ignore))
+                              ;; REFERENCE-LEAF does a better job referencing
+                              ;; DEFINED-FUNs than just using the LVAR.
+                              ,(cond (ref-p
+                                      `(%funcall ,(ref-leaf uses) ,@dums))
+                                     (t
+                                      `(%funcall-lvar ,fun ,@dums)))))))
+            (cond (ref-p
+                   (change-ref-leaf uses new-fun))
+                  (t
+                   (reoptimize-lvar fun)
+                   (setf (basic-combination-fun node)
+                         (insert-ref-before new-fun node))))
+            (aver (eq (basic-combination-kind node) :full))
+            (locall-analyze-component *current-component*)
+            (aver (eq (basic-combination-kind node) :local))))
+        ;; The total argument count is not known, but all the known
+        ;; values can already cause a conflict.
+        (check-mv-call-arguments node)))
   (values))
 
 ;;; If we see:
