@@ -919,11 +919,11 @@
               ;; function in the runtime.
               (return (values code 0 context)))
             (let* ((code-header-len (* (code-header-words code)
-                                       sb!vm:n-word-bytes))
+                                       n-word-bytes))
                    (pc-offset
                      (- (sap-int pc)
                         (- (get-lisp-obj-address code)
-                           sb!vm:other-pointer-lowtag)
+                           other-pointer-lowtag)
                         code-header-len)))
               (/noshow "got PC-OFFSET")
               (unless (<= 0 pc-offset (%code-code-size code))
@@ -945,20 +945,20 @@
     (let ((context (nth-interrupt-context index)))
       (/noshow0 "got CONTEXT")
       (when (= (sap-int frame-pointer)
-               (sb!vm:context-register context sb!vm::cfp-offset))
+               (context-register context sb!vm::cfp-offset))
         (without-gcing
           (/noshow0 "in WITHOUT-GCING")
           (let ((code (code-object-from-bits
-                       (sb!vm:context-register context sb!vm::code-offset))))
+                       (context-register context sb!vm::code-offset))))
             (/noshow0 "got CODE")
             (when (symbolp code)
               (return (values code 0 context)))
             (let* ((code-header-len (* (code-header-words code)
-                                       sb!vm:n-word-bytes))
+                                       n-word-bytes))
                    (pc-offset
-                     (- (sap-int (sb!vm:context-pc context))
+                     (- (sap-int (context-pc context))
                         (- (get-lisp-obj-address code)
-                           sb!vm:other-pointer-lowtag)
+                           other-pointer-lowtag)
                         code-header-len)))
               (let ((code-size (%code-code-size code)))
                 (unless (<= 0 pc-offset code-size)
@@ -976,11 +976,11 @@
                        #X~X~:@_COMPUTED RETURN: #X~X.~:>"
                        :format-arguments
                        (list pc-offset
-                             (sap-int (sb!vm:context-pc context))
+                             (sap-int (context-pc context))
                              code
                              (%code-entry-point code 0)
                              #!-(or arm arm64)
-                             (sb!vm:context-register context sb!vm::lra-offset)
+                             (context-register context sb!vm::lra-offset)
                              #!+(or arm arm64)
                              (stack-ref frame-pointer lra-save-offset)
                              computed-return))
