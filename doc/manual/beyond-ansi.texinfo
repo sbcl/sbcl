@@ -1178,15 +1178,19 @@ and its context.
 @subsection Operations Supporting Timeouts and Deadlines
 
 @multitable @columnfractions .5 .25 .25
-@headitem Operation                                  @tab Timeout Parameter @tab Affected by Deadlines
-@item     @code{cl:sleep}                            @tab -                 @tab since SBCL 1.4.3
-@item     @code{cl:read-line}, etc.                  @tab no                @tab yes
-@item     @ref{Macro sb-ext:wait-for}                @tab yes               @tab yes
-@item     @ref{Function sb-ext:process-wait}         @tab no                @tab yes
-@item     @ref{Function sb-thread:grab-mutex}        @tab yes               @tab yes
-@item     @ref{Function sb-thread:condition-wait}    @tab yes               @tab yes
-@item     @ref{Function sb-thread:wait-on-semaphore} @tab yes               @tab yes
-@item     @ref{Function sb-thread:join-thread}       @tab yes               @tab yes
+@headitem Operation                                            @tab Timeout Parameter @tab Affected by Deadlines
+@item     @code{cl:sleep}                                      @tab -                 @tab since SBCL 1.4.3
+@item     @code{cl:read-line}, etc.                            @tab no                @tab yes
+@item     @ref{Macro sb-ext:wait-for}                          @tab yes               @tab yes
+@item     @ref{Function sb-ext:process-wait}                   @tab no                @tab yes
+@item     @ref{Function sb-thread:grab-mutex}                  @tab yes               @tab yes
+@item     @ref{Function sb-thread:condition-wait}              @tab yes               @tab yes
+@item     @ref{Function sb-thread:wait-on-semaphore}           @tab yes               @tab yes
+@item     @ref{Function sb-thread:join-thread}                 @tab yes               @tab yes
+@item     @ref{Function sb-concurrency:receive-message}        @tab yes               @tab yes?
+@item     @ref{Function sb-concurrency:wait-on-gate}           @tab yes               @tab yes?
+@item     @ref{Macro sb-concurrency:frlock-write}              @tab yes               @tab yes?
+@item     @ref{Function sb-concurrency:grab-frlock-write-lock} @tab yes               @tab yes?
 @end multitable
 
 @node    Miscellaneous Extensions
