@@ -355,11 +355,12 @@
   (let ((names (make-repeated-name-check :signal-via signal-via))
         (keywords (make-repeated-name-check
                    :kind "keyword" :signal-via signal-via)))
-    (flet ((check-name (name)
+    (flet ((check-name (name &key allow-repeating)
              (check-variable-name-for-binding
               name :context context :signal-via signal-via
               :allow-symbol-macro allow-symbol-macro)
-             (funcall names name)))
+             (unless allow-repeating
+               (funcall names name))))
       (mapc #'check-name required)
       (mapc (lambda (spec)
               (multiple-value-bind (name default suppliedp-var)
@@ -370,6 +371,12 @@
                   (check-name (first suppliedp-var)))))
             optional)
       (mapc #'check-name rest)
+      (mapc (lambda (spec)
+              (check-name (if (consp spec)
+                              (car spec)
+                              spec)
+                          :allow-repeating t))
+            aux)
       (mapc (lambda (spec)
               (multiple-value-bind (keyword name default suppliedp-var)
                   (parse-key-arg-spec spec)
