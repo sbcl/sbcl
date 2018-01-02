@@ -928,9 +928,18 @@
       (reduce #'+ '(1 2 3)  :allow-other-keys t :bad x))
    ((1) 6)))
 
+(with-test (:name (:constant-fold :allow-other-keys.2))
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (reduce #'+ '(1 2 3)  :allow-other-keys x))
+   ((1) 6)))
+
 (with-test (:name (:constant-fold :repeat-keys))
   (checked-compile-and-assert
    ()
    `(lambda (x)
       (member nil '(1 2 3) :key #'evenp :key x))
    ((1) '(1 2 3) :test #'equal)))
+
+

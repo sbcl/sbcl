@@ -117,8 +117,7 @@
                         (funcall function key-value lvar)
                         (push key-value seen)))
                      ((eq key-value
-                          :allow-other-keys)
-                      (funcall function key-value lvar))
+                          :allow-other-keys))
                      (t
                       (setf unknown t))))
       unknown)))
