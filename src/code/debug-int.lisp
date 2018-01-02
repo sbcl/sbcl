@@ -942,10 +942,10 @@
   (declare (type system-area-pointer frame-pointer))
   (/noshow0 "entering FIND-ESCAPED-FRAME")
   (dotimes (index *free-interrupt-context-index* (values nil 0 nil))
-    (let ((context (nth-interrupt-context index)))
+    (let* ((context (nth-interrupt-context index))
+           (cfp (int-sap (context-register context sb!vm::cfp-offset))))
       (/noshow0 "got CONTEXT")
-      (when (= (sap-int frame-pointer)
-               (context-register context sb!vm::cfp-offset))
+      (when (sap= frame-pointer cfp)
         (without-gcing
           (/noshow0 "in WITHOUT-GCING")
           (let ((code (code-object-from-bits
