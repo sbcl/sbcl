@@ -683,11 +683,20 @@
         (pointer (frame-pointer frame))
         (escaped (compiled-frame-escaped frame)))
     (if escaped
-        (values
-         (sub-access-debug-var-slot
-          pointer (sb!c::compiled-debug-fun-old-fp c-d-f) escaped)
-         (sub-access-debug-var-slot
-          pointer (sb!c::compiled-debug-fun-return-pc c-d-f) escaped))
+        (let ((pc-offset (nth-value 1 (escaped-frame-from-context escaped))))
+          (values
+           (sub-access-debug-var-slot
+            pointer
+            (if (>= pc-offset (sb!c::compiled-debug-fun-cfp-saved-pc c-d-f))
+                (sb!c::compiled-debug-fun-old-fp c-d-f)
+                sb!c:old-fp-passing-offset)
+            escaped)
+           (sub-access-debug-var-slot
+            pointer
+            (if (>= pc-offset (sb!c::compiled-debug-fun-lra-saved-pc c-d-f))
+                (sb!c::compiled-debug-fun-return-pc c-d-f)
+                (sb!c::compiled-debug-fun-return-pc-pass c-d-f))
+            escaped)))
         (values
          (stack-ref pointer ocfp-save-offset)
          (stack-ref pointer lra-save-offset)))))
