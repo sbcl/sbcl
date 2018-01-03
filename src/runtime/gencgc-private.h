@@ -47,7 +47,8 @@ void zero_dirty_pages(page_index_t start, page_index_t end);
 //#define SCAN_START_OFS_MAX 0x3fff
 #define SCAN_START_OFS_MAX UINT_MAX
 
-static void set_page_scan_start_offset(page_index_t index, os_vm_size_t offset)
+static void __attribute__((unused))
+set_page_scan_start_offset(page_index_t index, os_vm_size_t offset)
 {
     // If the offset is nonzero and page-aligned
     unsigned int lsb = offset !=0 && IS_ALIGNED(offset, GENCGC_CARD_BYTES);
@@ -77,7 +78,7 @@ static os_vm_size_t scan_start_offset_iterated(page_index_t index)
     return (os_vm_size_t)tot_offset_in_pages << GENCGC_CARD_SHIFT;
 }
 
-static os_vm_size_t page_scan_start_offset(page_index_t index)
+static os_vm_size_t  __attribute__((unused)) page_scan_start_offset(page_index_t index)
 {
     return page_table[index].scan_start_offset_ != SCAN_START_OFS_MAX
         ? (os_vm_size_t)(page_table[index].scan_start_offset_ & ~1)

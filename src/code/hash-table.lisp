@@ -14,8 +14,19 @@
 
 ;;; ** weak_hash_entry_alivep_fun[] in gc-common must
 ;;;    coincide with this ordering of table kinds
+;;;
+;;; Putting :KEY-OR-VALUE specifically at index 3, and :KEY-AND-VALUE
+;;; at index 4, is not haphazard. When adding objects to the set of objects
+;;; which trigger another object to become live, we can interpret the bit
+;;; indices in 'weakness' as follows:
+;;;   bit 0 : key triggers value
+;;;   bit 1 : value triggers key
+;;;   both  : each triggers the other
+;;; :KEY-AND-VALUE (low 2 bits 0) is such that neither half triggers the other.
+;;; The AND relation is essentially like a pair of weak pointers,
+;;; and each must be live in its own right for the pair to be live.
 (defconstant-eqx weak-hash-table-kinds
-    #(nil :key :value :key-and-value :key-or-value)
+    #(nil :key :value :key-or-value :key-and-value)
   #'equalp)
 
 ;;; HASH-TABLE is implemented as a STRUCTURE-OBJECT.

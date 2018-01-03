@@ -28,6 +28,7 @@
 #include "thread.h"              /* genesis/primitive-objects.h needs this */
 #include <errno.h>
 #include <stdlib.h>
+#include <inttypes.h>
 
 /* FSHOW and odxprint provide debugging output for low-level information
  * (signal handling, exceptions, safepoints) which is hard to debug by
@@ -290,12 +291,15 @@ static void print_unknown(lispobj obj)
   printf("unknown object: %p", (void *)obj);
 }
 
-#if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_64_BIT)
-# define OBJ_FMTd "lld"
-#elif defined(LISP_FEATURE_64_BIT)
-# define OBJ_FMTd "ld"
-#else
+/* Except for Alpha, we define sword_t as intptr_t, and 32-bit Darwin
+ * defines intptr_t as long, so the printf conversion is "ld", not "d".
+ * Alpha (32-on-64) defines sword_t as s32, so we need just "d". */
+#ifdef LISP_FEATURE_ALPHA
 # define OBJ_FMTd "d"
+#elif defined(PRIdPTR)
+# define OBJ_FMTd PRIdPTR
+#else
+# error "Your inttypes.h is lame"
 #endif
 
 static void brief_fixnum(lispobj obj)
