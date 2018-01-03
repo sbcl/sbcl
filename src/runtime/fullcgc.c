@@ -12,6 +12,7 @@
 #include "gc.h"
 #include "gc-internal.h"
 #include "gc-private.h"
+#include "gencgc-private.h"
 #include "genesis/gc-tables.h"
 #include "genesis/closure.h"
 #include "genesis/layout.h"
@@ -58,15 +59,16 @@ struct unbounded_queue {
 static page_index_t free_page;
 
 /* The whole-page allocator works backwards from the end of dynamic space.
- * If it collides with 'last_free_page', then you lose. */
+ * If it collides with 'last_free_page', then you lose.
+ * TOOD: It would be reasonably simple to have this request more memory from
+ * the OS instead of failing on overflow */
 static void* get_free_page() {
     --free_page;
     if (free_page < last_free_page)
         lose("Needed more space to GC\n");
+    page_table[free_page].allocated = UNBOXED_PAGE_FLAG;
     char* mem = page_address(free_page);
-    if (page_need_to_zero(free_page))
-        memset(mem, 0, GENCGC_CARD_BYTES);
-    set_page_need_to_zero(free_page, 1);
+    zero_dirty_pages(free_page, free_page);
     return mem;
 }
 
@@ -547,4 +549,7 @@ void execute_full_sweep_phase()
                        OS_VM_PROT_READ | OS_VM_PROT_EXECUTE);
             first_page = last_page;
         }
+    while (free_page < page_table_pages) {
+        page_table[free_page++].allocated = FREE_PAGE_FLAG;
+    }
 }

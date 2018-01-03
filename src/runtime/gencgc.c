@@ -668,8 +668,7 @@ zero_pages(page_index_t start, page_index_t end) {
  * pages that are known to already zeroed. Mark all pages in the
  * ranges as non-zeroed.
  */
-static void
-zero_dirty_pages(page_index_t start, page_index_t end) {
+void zero_dirty_pages(page_index_t start, page_index_t end) {
     page_index_t i, j;
 
 #ifdef READ_PROTECT_FREE_PAGES
