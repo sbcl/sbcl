@@ -286,6 +286,8 @@ static void trace_object(lispobj* where)
                 gc_assert(hash_table->next_weak_hash_table == NIL);
                 hash_table->next_weak_hash_table = (lispobj)weak_hash_tables;
                 weak_hash_tables = hash_table;
+                if (hash_table->_weakness != make_fixnum(WEAKNESS_KEY_AND_VALUE))
+                    scav_hash_table_entries(hash_table, alivep_funs, mark_pair);
             }
             return;
         }
@@ -357,22 +359,17 @@ void execute_full_mark_phase()
         where += lowtag_of(obj) != LIST_POINTER_LOWTAG
                    ? sizetab[widetag_of(*where)](where) : 2;
     }
- again:
-    while (scav_queue.head_block->count) {
+    do {
         lispobj ptr = gc_dequeue();
         gc_dcheck(ptr != 0);
         if (lowtag_of(ptr) != LIST_POINTER_LOWTAG)
             trace_object(native_pointer(ptr));
         else
             mark_pair((lispobj*)(ptr - LIST_POINTER_LOWTAG));
-    }
-    if (weak_hash_tables) {
-        scav_weak_hash_tables(alivep_funs, mark_pair);
-        if (scav_queue.head_block->count) {
-            dprintf(("looping due to weak objects\n"));
-            goto again;
-        }
-    }
+    } while (scav_queue.head_block->count ||
+             (test_weak_triggers(pointer_survived_gc_yet, gc_mark_obj) &&
+              scav_queue.head_block->count));
+    gc_dispose_private_pages();
 #if HAVE_GETRUSAGE
     getrusage(RUSAGE_SELF, &after);
 #define timediff(b,a,field) \

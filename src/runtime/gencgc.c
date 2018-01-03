@@ -2444,13 +2444,6 @@ scavenge_newspace_generation(generation_index_t generation)
     /* Start with a full scavenge. */
     scavenge_newspace_generation_one_scan(generation);
 
-    /* Give a chance to weak hash tables to make other objects live.
-     * FIXME: The algorithm implemented here for weak hash table gcing
-     * is O(W^2+N) as Bruno Haible warns in
-     * http://www.haible.de/bruno/papers/cs/weak/WeakDatastructures-writeup.html
-     * see "Implementation 2". */
-    scav_weak_hash_tables(weak_ht_alivep_funs, gc_scav_pair);
-
     /* Flush the current regions updating the tables. */
     gc_alloc_update_all_page_tables(0);
 
@@ -2458,7 +2451,18 @@ scavenge_newspace_generation(generation_index_t generation)
              "The first scan is finished; current_new_areas_index=%d.\n",
              current_new_areas_index));*/
 
-    while (new_areas_index > 0 || immobile_scav_queue_count) {
+    while (1) {
+        if (!new_areas_index && !immobile_scav_queue_count) { // possible stopping point
+            if (!test_weak_triggers(0, 0))
+                break; // no work to do
+            // testing of triggers can't detect whether any triggering object
+            // actually entails new work - it only knows which triggers were removed
+            // from the pending list. So check again if allocations occurred,
+            // which is only if not all triggers referenced already-live objects.
+            gc_alloc_update_all_page_tables(0); // update new_areas from regions
+            if (!new_areas_index && !immobile_scav_queue_count)
+                break; // still no work to do
+        }
         /* Move the current to the previous new areas */
         struct new_area *previous_new_areas = new_areas;
         int previous_new_areas_index = new_areas_index;
@@ -2499,9 +2503,6 @@ scavenge_newspace_generation(generation_index_t generation)
             }
 
         }
-
-        scav_weak_hash_tables(weak_ht_alivep_funs, gc_scav_pair);
-
         /* Flush the current regions updating the tables. */
         gc_alloc_update_all_page_tables(0);
     }
@@ -2510,6 +2511,9 @@ scavenge_newspace_generation(generation_index_t generation)
     record_new_regions_below = 0;
     new_areas = NULL;
     new_areas_index = 0;
+
+    /* Return private-use pages to the general pool so that Lisp can have them */
+    gc_dispose_private_pages();
 
 #ifdef SC_NS_GEN_CK
     {
@@ -3144,7 +3148,6 @@ garbage_collect_generation(generation_index_t generation, int raise)
 
     /* Check that weak hash tables were processed in the previous GC. */
     gc_assert(weak_hash_tables == NULL);
-    gc_assert(weak_AND_hash_tables == NULL);
 
     /* Initialize the weak pointer list. */
     weak_pointers = NULL;
@@ -3854,7 +3857,7 @@ static void gc_allocate_ptes()
     page_table = calloc(1+page_table_pages, sizeof(struct page));
     gc_assert(page_table);
 
-    hopscotch_init();
+    weakobj_init();
 #ifdef PIN_GRANULARITY_LISPOBJ
     hopscotch_create(&pinned_objects, HOPSCOTCH_HASH_FUN_DEFAULT, 0 /* hashset */,
                      32 /* logical bin count */, 0 /* default range */);
