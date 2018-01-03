@@ -925,26 +925,32 @@
       (when (sap= frame-pointer cfp)
         (without-gcing
           (/noshow0 "in WITHOUT-GCING")
-          (let ((code (code-object-from-context context)))
-            (/noshow0 "got CODE")
-            (when (null code)
-              ;; KLUDGE: Detect undefined functions by a range-check
-              ;; against the trampoline address and the following
-              ;; function in the runtime.
-              (return (values code 0 context)))
-            (multiple-value-bind
-                  (pc-offset valid-p)
-                (context-code-pc-offset context code)
-              (unless valid-p
-                ;; We were in an assembly routine. Therefore, use the
-                ;; LRA as the pc.
-                ;;
-                ;; FIXME: Should this be WARN or ERROR or what?
-                (format t "** pc-offset ~S not in code obj ~S?~%"
-                        pc-offset code))
-              (/noshow0 "returning from FIND-ESCAPED-FRAME")
-              (return
-                (values code pc-offset context)))))))))
+          (return (escaped-frame-from-context context)))))))
+
+#!+(or x86 x86-64)
+(defun escaped-frame-from-context (context)
+  (declare (type (sb!alien:alien (* os-context-t)) context))
+  (block nil
+    (let ((code (code-object-from-context context)))
+      (/noshow0 "got CODE")
+      (when (null code)
+        ;; KLUDGE: Detect undefined functions by a range-check
+        ;; against the trampoline address and the following
+        ;; function in the runtime.
+        (return (values code 0 context)))
+      (multiple-value-bind
+            (pc-offset valid-p)
+          (context-code-pc-offset context code)
+        (unless valid-p
+          ;; We were in an assembly routine. Therefore, use the
+          ;; LRA as the pc.
+          ;;
+          ;; FIXME: Should this be WARN or ERROR or what?
+          (format t "** pc-offset ~S not in code obj ~S?~%"
+                  pc-offset code))
+        (/noshow0 "returning from FIND-ESCAPED-FRAME")
+        (return
+          (values code pc-offset context))))))
 
 #!-(or x86 x86-64)
 (defun find-escaped-frame (frame-pointer)
@@ -957,49 +963,55 @@
       (when (sap= frame-pointer cfp)
         (without-gcing
           (/noshow0 "in WITHOUT-GCING")
-          (let ((code (code-object-from-context context)))
-            (/noshow0 "got CODE")
-            (when (symbolp code)
-              (return (values code 0 context)))
-            (multiple-value-bind
-                  (pc-offset valid-p code-size)
-                (context-code-pc-offset context code)
-              (unless valid-p
-                ;; We were in an assembly routine.
-                (multiple-value-bind (new-pc-offset computed-return)
-                    (find-pc-from-assembly-fun code context)
-                  (setf pc-offset new-pc-offset)
-                  (unless (<= 0 pc-offset code-size)
-                    (cerror
-                     "Set PC-OFFSET to zero and continue backtrace."
-                     'bug
-                     :format-control
-                     "~@<PC-OFFSET (~D) not in code object. Frame details:~
-                       ~2I~:@_PC: #X~X~:@_CODE: ~S~:@_CODE FUN: ~S~:@_LRA: ~
-                       #X~X~:@_COMPUTED RETURN: #X~X.~:>"
-                     :format-arguments
-                     (list pc-offset
-                           (sap-int (context-pc context))
-                           code
-                           (%code-entry-point code 0)
-                           #!-(or arm arm64)
-                           (context-register context sb!vm::lra-offset)
-                           #!+(or arm arm64)
-                           (stack-ref frame-pointer lra-save-offset)
-                           computed-return))
-                    ;; We failed to pinpoint where PC is, but set
-                    ;; pc-offset to 0 to keep the backtrace from
-                    ;; exploding.
-                    (setf pc-offset 0))))
-              (/noshow0 "returning from FIND-ESCAPED-FRAME")
-              (return
-                (if (eq (%code-debug-info code) :bogus-lra)
-                    (let ((real-lra (code-header-ref code
-                                                     real-lra-slot)))
-                      (values (lra-code-header real-lra)
-                              (get-header-data real-lra)
-                              nil))
-                    (values code pc-offset context))))))))))
+          (return (escaped-frame-from-context context)))))))
+
+#!-(or x86 x86-64)
+(defun escaped-frame-from-context (context)
+  (declare (type (sb!alien:alien (* os-context-t)) context))
+  (block nil
+    (let ((code (code-object-from-context context)))
+      (/noshow0 "got CODE")
+      (when (symbolp code)
+        (return (values code 0 context)))
+      (multiple-value-bind
+            (pc-offset valid-p code-size)
+          (context-code-pc-offset context code)
+        (unless valid-p
+          ;; We were in an assembly routine.
+          (multiple-value-bind (new-pc-offset computed-return)
+              (find-pc-from-assembly-fun code context)
+            (setf pc-offset new-pc-offset)
+            (unless (<= 0 pc-offset code-size)
+              (cerror
+               "Set PC-OFFSET to zero and continue backtrace."
+               'bug
+               :format-control
+               "~@<PC-OFFSET (~D) not in code object. Frame details:~
+                   ~2I~:@_PC: #X~X~:@_CODE: ~S~:@_CODE FUN: ~S~:@_LRA: ~
+                   #X~X~:@_COMPUTED RETURN: #X~X.~:>"
+               :format-arguments
+               (list pc-offset
+                     (sap-int (context-pc context))
+                     code
+                     (%code-entry-point code 0)
+                     #!-(or arm arm64)
+                     (context-register context sb!vm::lra-offset)
+                     #!+(or arm arm64)
+                     (stack-ref frame-pointer lra-save-offset)
+                     computed-return))
+              ;; We failed to pinpoint where PC is, but set
+              ;; pc-offset to 0 to keep the backtrace from
+              ;; exploding.
+              (setf pc-offset 0))))
+        (/noshow0 "returning from FIND-ESCAPED-FRAME")
+        (return
+          (if (eq (%code-debug-info code) :bogus-lra)
+              (let ((real-lra (code-header-ref code
+                                               real-lra-slot)))
+                (values (lra-code-header real-lra)
+                        (get-header-data real-lra)
+                        nil))
+              (values code pc-offset context)))))))
 
 #!-(or x86 x86-64)
 (defun find-pc-from-assembly-fun (code scp)
