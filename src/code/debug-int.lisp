@@ -667,6 +667,25 @@
     (when saved-fp
       (compute-calling-frame saved-fp saved-pc up-frame t))))
 
+(defun frame-saved-cfp-and-lra (frame debug-fun)
+  (declare (ignorable debug-fun))
+  (let (#!-fp-and-pc-standard-save
+        (c-d-f (compiled-debug-fun-compiler-debug-fun
+                debug-fun)))
+    (values
+     (get-context-value
+      frame ocfp-save-offset
+      #!-fp-and-pc-standard-save
+      (sb!c::compiled-debug-fun-old-fp c-d-f)
+      #!+fp-and-pc-standard-save
+      sb!c:old-fp-passing-offset)
+     (get-context-value
+      frame lra-save-offset
+      #!-fp-and-pc-standard-save
+      (sb!c::compiled-debug-fun-return-pc c-d-f)
+      #!+fp-and-pc-standard-save
+      sb!c:return-pc-passing-offset))))
+
 ;;; Return the frame immediately below FRAME on the stack; or when
 ;;; FRAME is the bottom of the stack, return NIL.
 (defun frame-down (frame)
@@ -680,23 +699,12 @@
           (setf (frame-%down frame)
                 (etypecase debug-fun
                   (compiled-debug-fun
-                   (let (#!-fp-and-pc-standard-save
-                         (c-d-f (compiled-debug-fun-compiler-debug-fun
-                                 debug-fun)))
+                   (multiple-value-bind
+                         (old-fp lra)
+                       (frame-saved-cfp-and-lra frame debug-fun)
                      (compute-calling-frame
-                      (descriptor-sap
-                       (get-context-value
-                        frame ocfp-save-offset
-                        #!-fp-and-pc-standard-save
-                        (sb!c::compiled-debug-fun-old-fp c-d-f)
-                        #!+fp-and-pc-standard-save
-                        sb!c:old-fp-passing-offset))
-                      (get-context-value
-                       frame lra-save-offset
-                       #!-fp-and-pc-standard-save
-                       (sb!c::compiled-debug-fun-return-pc c-d-f)
-                       #!+fp-and-pc-standard-save
-                       sb!c:return-pc-passing-offset)
+                      (descriptor-sap old-fp)
+                      lra
                       frame)))
                   (bogus-debug-fun
                    (let ((fp (frame-pointer frame)))
