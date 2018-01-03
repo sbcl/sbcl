@@ -332,8 +332,18 @@
 
 (defoptimizer (%make-array derive-type)
     ((dims widetag n-bits &key adjustable fill-pointer displaced-to
-                          &allow-other-keys))
+           &allow-other-keys)
+     node)
   (declare (ignore n-bits))
+  (when (constant-lvar-p dims)
+    (let ((dims (lvar-value dims)))
+      (unless (or (typep dims 'index)
+                  (and (proper-list-p dims)
+                       (every (lambda (x)
+                                (typep x 'index))
+                              dims)))
+        (let ((*compiler-error-context* node))
+          (compiler-warn "Bad array dimensions: ~a" dims)))))
   (let ((saetp (and (constant-lvar-p widetag)
                     (find (lvar-value widetag)
                           sb!vm:*specialized-array-element-type-properties*

@@ -113,3 +113,17 @@
                `(lambda ()
                   (make-array 10 :element-type '((x))))
                :allow-warnings t))))
+
+(with-test (:name (make-array :bad-dimensions))
+  (assert
+   (nth-value 1
+              (checked-compile
+               `(lambda ()
+                  (make-array '(x)))
+               :allow-warnings t)))
+  (assert
+   (nth-value 1
+              (checked-compile
+               `(lambda ()
+                  (make-array '(-10)))
+               :allow-warnings t))))
