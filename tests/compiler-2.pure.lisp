@@ -906,3 +906,11 @@
                                    1)))
           0))
     ((334) 334)))
+
+(with-test (:name :flush-combination-non-fun-type)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (rassoc-if-not #'values '((1 . a)) :allow-other-keys t)
+         1)
+    (() 1)))

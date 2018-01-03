@@ -495,18 +495,20 @@
             (ir1-attributep attributes flushable)
             (not (ir1-attributep attributes call))
             (let ((type (proclaimed-ftype name)))
-              (multiple-value-bind (min max) (fun-type-arg-limits type)
-                (cond ((and (not min) (not max))
-                       nil)
-                      ((< arg-count min)
-                       nil)
-                      ((and max (> arg-count max))
-                       nil)
-                      (t
-                       ;; Just check for T to ensure it won't signal type errors.
-                       (not (find *universal-type*
-                                  (fun-type-n-arg-types arg-count type)
-                                  :test-not #'eql)))))))))))
+              (or
+               (not (fun-type-p type)) ;; Functions that accept anything, e.g. VALUES
+               (multiple-value-bind (min max) (fun-type-arg-limits type)
+                 (cond ((and (not min) (not max))
+                        nil)
+                       ((< arg-count min)
+                        nil)
+                       ((and max (> arg-count max))
+                        nil)
+                       (t
+                        ;; Just check for T to ensure it won't signal type errors.
+                        (not (find *universal-type*
+                                   (fun-type-n-arg-types arg-count type)
+                                   :test-not #'eql))))))))))))
 
 (defun flushable-combination-args-p (combination info)
   (block nil
