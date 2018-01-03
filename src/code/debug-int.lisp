@@ -912,7 +912,6 @@
                 (<= 0 pc-offset code-size)
                 code-size)))))
 
-#!+(or x86 x86-64)
 (defun find-escaped-frame (frame-pointer)
   (declare (type system-area-pointer frame-pointer))
   (/noshow0 "entering FIND-ESCAPED-FRAME")
@@ -920,6 +919,7 @@
     (let* ((context (nth-interrupt-context index))
            (cfp (int-sap (context-register context sb!vm::cfp-offset))))
       (/noshow0 "got CONTEXT")
+      #!+(or x86 x86-64)
       (unless (control-stack-pointer-valid-p cfp)
         (return (values nil nil nil t)))
       (when (sap= frame-pointer cfp)
@@ -951,19 +951,6 @@
         (/noshow0 "returning from FIND-ESCAPED-FRAME")
         (return
           (values code pc-offset context))))))
-
-#!-(or x86 x86-64)
-(defun find-escaped-frame (frame-pointer)
-  (declare (type system-area-pointer frame-pointer))
-  (/noshow0 "entering FIND-ESCAPED-FRAME")
-  (dotimes (index *free-interrupt-context-index* (values nil 0 nil))
-    (let* ((context (nth-interrupt-context index))
-           (cfp (int-sap (context-register context sb!vm::cfp-offset))))
-      (/noshow0 "got CONTEXT")
-      (when (sap= frame-pointer cfp)
-        (without-gcing
-          (/noshow0 "in WITHOUT-GCING")
-          (return (escaped-frame-from-context context)))))))
 
 #!-(or x86 x86-64)
 (defun escaped-frame-from-context (context)
