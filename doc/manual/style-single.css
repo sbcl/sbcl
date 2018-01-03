@@ -1,8 +1,7 @@
-.node {
-    visibility:hidden;
-    height: 0px;
+.header {
+    display: none;
 }
+
 .menu {
-    visibility:hidden;
-    height: 0px;
+    display: none;
 }
