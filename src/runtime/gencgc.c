@@ -613,7 +613,6 @@ void fast_bzero(void*, size_t); /* in <arch>-assem.S */
  * OS. Generally done after a large GC.
  */
 void zero_pages_with_mmap(page_index_t start, page_index_t end) {
-    page_index_t i;
     void *addr = page_address(start), *new_addr;
     os_vm_size_t length = npage_bytes(1+end-start);
 
@@ -647,9 +646,6 @@ void zero_pages_with_mmap(page_index_t start, page_index_t end) {
                  start, new_addr);
         }
     }
-
-    for (i = start; i <= end; i++)
-        set_page_need_to_zero(i, 0);
 }
 
 /* Zero the pages from START to END (inclusive). Generally done just after
@@ -666,15 +662,6 @@ zero_pages(page_index_t start, page_index_t end) {
     bzero(page_address(start), npage_bytes(1+end-start));
 #endif
 
-}
-
-static void
-zero_and_mark_pages(page_index_t start, page_index_t end) {
-    page_index_t i;
-
-    zero_pages(start, end);
-    for (i = start; i <= end; i++)
-        set_page_need_to_zero(i, 0);
 }
 
 /* Zero the pages from START to END (inclusive), except for those
@@ -3557,7 +3544,7 @@ remap_page_range (page_index_t from, page_index_t to)
      * "Re: patch: standalone executable redux".
      */
 #if defined(LISP_FEATURE_SUNOS)
-    zero_and_mark_pages(from, to);
+    zero_pages(from, to);
 #else
     const page_index_t
             release_granularity = gencgc_release_granularity/GENCGC_CARD_BYTES,
@@ -3569,13 +3556,16 @@ remap_page_range (page_index_t from, page_index_t to)
     if (aligned_from < aligned_end) {
         zero_pages_with_mmap(aligned_from, aligned_end-1);
         if (aligned_from != from)
-            zero_and_mark_pages(from, aligned_from-1);
+            zero_pages(from, aligned_from-1);
         if (aligned_end != end)
-            zero_and_mark_pages(aligned_end, end-1);
+            zero_pages(aligned_end, end-1);
     } else {
-        zero_and_mark_pages(from, to);
+        zero_pages(from, to);
     }
 #endif
+    page_index_t i;
+    for (i = from; i <= to; i++)
+        set_page_need_to_zero(i, 0);
 }
 
 static void
