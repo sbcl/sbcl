@@ -47,5 +47,10 @@
                               ;; force the 0th bit to 1, for the layout
                               ;; (Shouldn't LENGTH be right? Doesn't seem to be)
                               (logior #-compact-instance-header 1
-                                      (1- (ash 1 len))))))))))))
+                                      (1- (ash 1 len)))))))))
+           (unless (plusp (length (sb-kernel:layout-equalp-tests obj)))
+             (let ((n (- (sb-kernel:layout-length obj) sb-vm:instance-data-start)))
+               (when (>= n 0)
+                 (setf (sb-kernel:layout-equalp-tests obj)
+                       (make-array n :initial-element 0))))))))
      :all)))
