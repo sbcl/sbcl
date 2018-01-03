@@ -88,3 +88,11 @@
                   (flet ((%f1 (x) x))
                     (apply #'%f1 a 2 (list 0))))
                :allow-warnings t))))
+
+(with-test (:name :mv-call-too-many-values)
+  (assert
+   (nth-value 1
+              (checked-compile
+               `(lambda ()
+                  (make-array (list 'x)))
+               :allow-warnings t))))

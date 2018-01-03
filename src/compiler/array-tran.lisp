@@ -643,23 +643,26 @@
          (typecode (sb!vm:saetp-typecode saetp))
          (n-pad-elements (sb!vm:saetp-n-pad-elements saetp))
          (n-words-form
-           (if c-length
-               (ceiling (* (+ c-length n-pad-elements) n-bits)
-                        sb!vm:n-word-bits)
-               (let ((padded-length-form (if (zerop n-pad-elements)
-                                             'length
-                                             `(+ length ,n-pad-elements))))
-                 (cond
-                   ((= n-bits 0) 0)
-                   ((>= n-bits sb!vm:n-word-bits)
-                    `(* ,padded-length-form
-                        ;; i.e., not RATIO
-                        ,(the fixnum (/ n-bits sb!vm:n-word-bits))))
-                   (t
-                    (let ((n-elements-per-word (/ sb!vm:n-word-bits n-bits)))
-                      (declare (type index n-elements-per-word)) ; i.e., not RATIO
-                      `(ceiling (truly-the index ,padded-length-form)
-                                ,n-elements-per-word)))))))
+           (cond ((not c-length)
+                  (let ((padded-length-form (if (zerop n-pad-elements)
+                                                'length
+                                                `(+ length ,n-pad-elements))))
+                    (cond
+                      ((= n-bits 0) 0)
+                      ((>= n-bits sb!vm:n-word-bits)
+                       `(* ,padded-length-form
+                           ;; i.e., not RATIO
+                           ,(the fixnum (/ n-bits sb!vm:n-word-bits))))
+                      (t
+                       (let ((n-elements-per-word (/ sb!vm:n-word-bits n-bits)))
+                         (declare (type index n-elements-per-word)) ; i.e., not RATIO
+                         `(ceiling (truly-the index ,padded-length-form)
+                                   ,n-elements-per-word))))))
+                 ((fixnump c-length)
+                  (ceiling (* (+ c-length n-pad-elements) n-bits)
+                           sb!vm:n-word-bits))
+                 (t
+                  (give-up-ir1-transform))))
          (data-result-spec
            `(simple-array ,(sb!vm:saetp-specifier saetp) (,(or c-length '*))))
          (result-spec
