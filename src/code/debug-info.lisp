@@ -228,14 +228,20 @@
         (values start-pc elsewhere-pc closure-save
                 #!+unwind-to-frame-and-call-vop bsp-save)))))
 
-(macrolet ((def (index name)
-             `(defun ,name (cdf)
-                (nth-value ,index (cdf-decode-locs cdf)))))
-  (def 0 compiled-debug-fun-start-pc)
-  (def 1 compiled-debug-fun-elsewhere-pc)
-  ;; Most compiled-debug-funs don't need these
-  (def 2 compiled-debug-fun-closure-save)
-  #!+unwind-to-frame-and-call-vop (def 3 compiled-debug-fun-bsp-save))
+(macrolet ((def (&rest names)
+             `(progn
+                ,@(loop
+                     for name in names
+                     for index from 0
+                     collect
+                       `(defun ,name (cdf)
+                          (nth-value ,index (cdf-decode-locs cdf)))))))
+  (def
+    compiled-debug-fun-start-pc
+    compiled-debug-fun-elsewhere-pc
+    ;; Most compiled-debug-funs don't need these
+    compiled-debug-fun-closure-save
+    #!+unwind-to-frame-and-call-vop compiled-debug-fun-bsp-save))
 
 (def!struct (compiled-debug-fun-optional (:include compiled-debug-fun)
                                          #-sb-xc-host (:pure t)
