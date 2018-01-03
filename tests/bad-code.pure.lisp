@@ -96,3 +96,11 @@
                `(lambda ()
                   (make-array (list 'x)))
                :allow-warnings t))))
+
+(with-test (:name (map :values-type))
+  (assert
+   (nth-value 1
+              (checked-compile
+               `(lambda ()
+                  (map '* #'+ #(1) #(2)))
+               :allow-warnings t))))

@@ -255,16 +255,18 @@
     (give-up-ir1-transform "RESULT-TYPE argument not constant"))
   (flet ( ;; 1-valued SUBTYPEP, fails unless second value of SUBTYPEP is true
          (1subtypep (x y)
-           (multiple-value-bind (subtype-p valid-p) (sb!xc:subtypep x y)
+           (multiple-value-bind (subtype-p valid-p)
+               (csubtypep x (specifier-type y))
              (if valid-p
                  subtype-p
                  (give-up-ir1-transform
                   "can't analyze sequence type relationship")))))
     (let* ((result-type-value (lvar-value result-type))
+           (result-type-ctype (specifier-type-or-warn-and-give-up result-type-value))
            (result-supertype (cond ((null result-type-value) 'null)
-                                   ((1subtypep result-type-value 'vector)
+                                   ((1subtypep result-type-ctype 'vector)
                                     'vector)
-                                   ((1subtypep result-type-value 'list)
+                                   ((1subtypep result-type-ctype 'list)
                                     'list)
                                    (t
                                     (give-up-ir1-transform
