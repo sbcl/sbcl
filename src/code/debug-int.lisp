@@ -897,6 +897,21 @@
 (defun static-foreign-symbol-sap (name)
   (int-sap (static-foreign-symbol-address name)))
 
+(defun context-code-pc-offset (context code)
+  (declare (type (sb!alien:alien (* os-context-t)) context)
+           (type code-component code))
+  (let ((code-header-len (* (code-header-words code)
+                            n-word-bytes)))
+    (with-pinned-objects (code)
+      (let ((pc-offset (- (sap-int (context-pc context))
+                          (- (get-lisp-obj-address code)
+                             other-pointer-lowtag)
+                          code-header-len))
+            (code-size (%code-code-size code)))
+        (values pc-offset
+                (<= 0 pc-offset code-size)
+                code-size)))))
+
 #!+(or x86 x86-64)
 (defun find-escaped-frame (frame-pointer)
   (declare (type system-area-pointer frame-pointer))
@@ -953,41 +968,36 @@
             (/noshow0 "got CODE")
             (when (symbolp code)
               (return (values code 0 context)))
-            (let* ((code-header-len (* (code-header-words code)
-                                       n-word-bytes))
-                   (pc-offset
-                     (- (sap-int (context-pc context))
-                        (- (get-lisp-obj-address code)
-                           other-pointer-lowtag)
-                        code-header-len)))
-              (let ((code-size (%code-code-size code)))
-                (unless (<= 0 pc-offset code-size)
-                  ;; We were in an assembly routine.
-                  (multiple-value-bind (new-pc-offset computed-return)
-                      (find-pc-from-assembly-fun code context)
-                    (setf pc-offset new-pc-offset)
-                    (unless (<= 0 pc-offset code-size)
-                      (cerror
-                       "Set PC-OFFSET to zero and continue backtrace."
-                       'bug
-                       :format-control
-                       "~@<PC-OFFSET (~D) not in code object. Frame details:~
+            (multiple-value-bind
+                  (pc-offset valid-p code-size)
+                (context-code-pc-offset context code)
+              (unless valid-p
+                ;; We were in an assembly routine.
+                (multiple-value-bind (new-pc-offset computed-return)
+                    (find-pc-from-assembly-fun code context)
+                  (setf pc-offset new-pc-offset)
+                  (unless (<= 0 pc-offset code-size)
+                    (cerror
+                     "Set PC-OFFSET to zero and continue backtrace."
+                     'bug
+                     :format-control
+                     "~@<PC-OFFSET (~D) not in code object. Frame details:~
                        ~2I~:@_PC: #X~X~:@_CODE: ~S~:@_CODE FUN: ~S~:@_LRA: ~
                        #X~X~:@_COMPUTED RETURN: #X~X.~:>"
-                       :format-arguments
-                       (list pc-offset
-                             (sap-int (context-pc context))
-                             code
-                             (%code-entry-point code 0)
-                             #!-(or arm arm64)
-                             (context-register context sb!vm::lra-offset)
-                             #!+(or arm arm64)
-                             (stack-ref frame-pointer lra-save-offset)
-                             computed-return))
-                      ;; We failed to pinpoint where PC is, but set
-                      ;; pc-offset to 0 to keep the backtrace from
-                      ;; exploding.
-                      (setf pc-offset 0)))))
+                     :format-arguments
+                     (list pc-offset
+                           (sap-int (context-pc context))
+                           code
+                           (%code-entry-point code 0)
+                           #!-(or arm arm64)
+                           (context-register context sb!vm::lra-offset)
+                           #!+(or arm arm64)
+                           (stack-ref frame-pointer lra-save-offset)
+                           computed-return))
+                    ;; We failed to pinpoint where PC is, but set
+                    ;; pc-offset to 0 to keep the backtrace from
+                    ;; exploding.
+                    (setf pc-offset 0))))
               (/noshow0 "returning from FIND-ESCAPED-FRAME")
               (return
                 (if (eq (%code-debug-info code) :bogus-lra)
