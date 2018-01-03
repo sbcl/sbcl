@@ -183,6 +183,8 @@
   #!-fp-and-pc-standard-save
   (return-pc (missing-arg) :type sc-offset)
   #!-fp-and-pc-standard-save
+  (return-pc-pass (missing-arg) :type sc-offset)
+  #!-fp-and-pc-standard-save
   (old-fp (missing-arg) :type sc-offset)
   ;; An integer which contains between 2 and 4 varint-encoded fields:
   ;; START-PC -

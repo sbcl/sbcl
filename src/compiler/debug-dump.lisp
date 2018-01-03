@@ -604,6 +604,8 @@
              :name name
              #!-fp-and-pc-standard-save :return-pc
              #!-fp-and-pc-standard-save (tn-sc-offset (ir2-physenv-return-pc 2env))
+             #!-fp-and-pc-standard-save :return-pc-pass
+             #!-fp-and-pc-standard-save (tn-sc-offset (ir2-physenv-return-pc-pass 2env))
              #!-fp-and-pc-standard-save :old-fp
              #!-fp-and-pc-standard-save (tn-sc-offset (ir2-physenv-old-fp 2env))
              :encoded-locs
