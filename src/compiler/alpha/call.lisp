@@ -31,6 +31,9 @@
 (defun make-old-fp-passing-location ()
   (make-wired-tn *fixnum-primitive-type* immediate-arg-scn ocfp-offset))
 
+(defconstant old-fp-passing-offset
+  (make-sc-offset descriptor-reg-sc-number ocfp-offset))
+
 ;;; These functions make the TNs used to hold Old-FP and Return-PC
 ;;; within the current function. We treat these specially so that the
 ;;; debugger can find them at a known location.
