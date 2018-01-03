@@ -2418,12 +2418,6 @@ is :ANY, the function name is not checked."
   (deffrob specifier-type careful-specifier-type compiler-specifier-type ir1-transform-specifier-type)
   (deffrob values-specifier-type careful-values-specifier-type compiler-values-specifier-type ir1-transform-values-specifier-type))
 
-(defun specifier-type-or-warn-and-give-up (x)
-  (multiple-value-bind (specifier error) (careful-specifier-type x)
-    (cond (specifier)
-          (t
-           (apply #'compiler-warn error)
-           (give-up-ir1-transform)))))
 
 ;;;; utilities used at run-time for parsing &KEY args in IR1
 

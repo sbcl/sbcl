@@ -262,7 +262,7 @@
                  (give-up-ir1-transform
                   "can't analyze sequence type relationship")))))
     (let* ((result-type-value (lvar-value result-type))
-           (result-type-ctype (specifier-type-or-warn-and-give-up result-type-value))
+           (result-type-ctype (ir1-transform-specifier-type result-type-value))
            (result-supertype (cond ((null result-type-value) 'null)
                                    ((1subtypep result-type-ctype 'vector)
                                     'vector)

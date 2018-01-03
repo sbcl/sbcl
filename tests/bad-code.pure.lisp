@@ -104,3 +104,12 @@
                `(lambda ()
                   (map '* #'+ #(1) #(2)))
                :allow-warnings t))))
+
+
+(with-test (:name :bad-type-specifier)
+  (assert
+   (nth-value 1
+              (checked-compile
+               `(lambda ()
+                  (make-array 10 :element-type '((x))))
+               :allow-warnings t))))

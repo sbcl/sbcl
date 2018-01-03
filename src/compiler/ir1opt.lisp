@@ -2213,6 +2213,17 @@
                     :value value)
               t))))))
 
+(defun may-delete-cast-with-hook (cast)
+  (or (not (cast-with-hook-hook cast)) ;; run once
+      (let ((value (cast-value cast)))
+        (when (constant-lvar-p value)
+          (let ((*compiler-error-context* cast))
+            (funcall (cast-with-hook-hook cast)
+                     (lvar-value value))
+            ;; Run once
+            (setf (cast-with-hook-hook cast) nil))
+          t))))
+
 (defun may-delete-cast (cast)
   (typecase cast
     (vestigial-exit-cast
@@ -2223,6 +2234,8 @@
      (may-delete-bound-cast cast))
     (modifying-cast
      (may-delete-modifying-cast cast))
+    (cast-with-hook
+     (may-delete-cast-with-hook cast))
     (t t)))
 
 ;;; Delete or move around casts when possible

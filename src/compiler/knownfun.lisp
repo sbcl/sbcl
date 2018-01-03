@@ -177,35 +177,38 @@
               key-annotation
               return-annotation)
           (labels ((annotation-p (x)
-                     (typep x '(cons (member function function-designator modifying
-                                      inhibit-flushing))))
+                     (typep x '(or (cons (member function function-designator modifying
+                                          inhibit-flushing))
+                                (member type-specifier))))
                    (strip-annotation (x)
-                     (ecase (car x)
-                       ((function function-designator) (car x))
-                       ((modifying inhibit-flushing) (cadr x))))
+                     (if (consp x)
+                         (ecase (car x)
+                           ((function function-designator) (car x))
+                           ((modifying inhibit-flushing) (cadr x)))
+                         x))
                    (process-positional (type)
                      (incf i)
                      (cond ((annotation-p type)
-                            (push (cons i type) positional-annotation)
+                            (push (cons i (ensure-list type)) positional-annotation)
                             (strip-annotation type))
                            (t
                             type)))
                    (process-key (pair)
                      (cond ((annotation-p (cadr pair))
                             (destructuring-bind (key value) pair
-                              (setf (getf key-annotation key) value)
+                              (setf (getf key-annotation key) (ensure-list value))
                               (list key (strip-annotation value))))
                            (t
                             pair)))
                    (process-rest (type)
                      (cond ((annotation-p type)
-                            (setf rest-annotation type)
+                            (setf rest-annotation (ensure-list type))
                             (strip-annotation type))
                            (t
                             type)))
                    (process-return (type)
                      (cond ((annotation-p type)
-                            (setf return-annotation type)
+                            (setf return-annotation (ensure-list type))
                             (strip-annotation type))
                            (t
                             type))))

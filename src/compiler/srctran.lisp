@@ -5017,7 +5017,7 @@
   (let ((element-type (cond ((not element-type)
                              'character)
                             ((constant-lvar-p element-type)
-                             (let ((specifier (specifier-type-or-warn-and-give-up
+                             (let ((specifier (ir1-transform-specifier-type
                                                (lvar-value element-type))))
                                (and (csubtypep specifier (specifier-type 'character))
                                     (type-specifier specifier)))))))
