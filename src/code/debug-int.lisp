@@ -963,8 +963,7 @@
       (when (sap= frame-pointer cfp)
         (without-gcing
           (/noshow0 "in WITHOUT-GCING")
-          (let ((code (code-object-from-bits
-                       (context-register context sb!vm::code-offset))))
+          (let ((code (code-object-from-context context)))
             (/noshow0 "got CODE")
             (when (symbolp code)
               (return (values code 0 context)))
@@ -1025,9 +1024,9 @@ register."
 ;;; bits and return it. We assume bogus functions correspond to the
 ;;; undefined-function.
 #!-(or x86 x86-64)
-(defun code-object-from-bits (bits)
-  (declare (type word bits))
-  (let ((object (make-lisp-obj bits nil)))
+(defun code-object-from-context (context)
+  (declare (type (sb!alien:alien (* os-context-t)) context))
+  (let ((object (boxed-context-register context sb!vm::code-offset)))
     (if (functionp object)
         (or (fun-code-header object)
             :undefined-function)
