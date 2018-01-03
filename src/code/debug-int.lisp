@@ -933,15 +933,10 @@
               ;; against the trampoline address and the following
               ;; function in the runtime.
               (return (values code 0 context)))
-            (let* ((code-header-len (* (code-header-words code)
-                                       n-word-bytes))
-                   (pc-offset
-                     (- (sap-int pc)
-                        (- (get-lisp-obj-address code)
-                           other-pointer-lowtag)
-                        code-header-len)))
-              (/noshow "got PC-OFFSET")
-              (unless (<= 0 pc-offset (%code-code-size code))
+            (multiple-value-bind
+                  (pc-offset valid-p)
+                (context-code-pc-offset context code)
+              (unless valid-p
                 ;; We were in an assembly routine. Therefore, use the
                 ;; LRA as the pc.
                 ;;
