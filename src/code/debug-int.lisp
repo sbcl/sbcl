@@ -925,8 +925,7 @@
       (when (sap= frame-pointer cfp)
         (without-gcing
           (/noshow0 "in WITHOUT-GCING")
-          (let* ((pc (context-pc context))
-                 (code (code-header-from-pc pc)))
+          (let ((code (code-object-from-context context)))
             (/noshow0 "got CODE")
             (when (null code)
               ;; KLUDGE: Detect undefined functions by a range-check
@@ -1018,6 +1017,11 @@ register."
 ;;; Find the code object corresponding to the object represented by
 ;;; bits and return it. We assume bogus functions correspond to the
 ;;; undefined-function.
+#!+(or x86 x86-64)
+(defun code-object-from-context (context)
+  (declare (type (sb!alien:alien (* os-context-t)) context))
+  (code-header-from-pc (context-pc context)))
+
 #!-(or x86 x86-64)
 (defun code-object-from-context (context)
   (declare (type (sb!alien:alien (* os-context-t)) context))
