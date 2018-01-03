@@ -31,3 +31,10 @@
   (:vop-var vop)
   (:generator 0
     (funcall (symbol-function name) vop x y)))
+
+;;; Emit a label for sub-block (or sub-node) reference.
+(define-vop (emit-label)
+  (:info the-label)
+  (:vop-var vop)
+  (:generator 0
+     (emit-label the-label)))

@@ -1391,11 +1391,24 @@
                      (entry-2env (physenv-info (lambda-physenv entry-fun))))
                  (setf (ir2-physenv-closure-save-tn 2env)
                        (ir2-physenv-closure-save-tn entry-2env)))))))
+    #!-fp-and-pc-standard-save
+    (let ((lab (gen-label)))
+      ;; KLUDGE: Technically, we should be doing this before VOP
+      ;; COUNT-ME for XEPs (above), but :SB-DYNCOUNT isn't used or
+      ;; expected to work anyway, so there's no real window to worry
+      ;; about.
+      (vop emit-label node block lab)
+      (setf (ir2-physenv-cfp-saved-pc env) lab))
 
     (emit-move node
                block
                (ir2-physenv-return-pc-pass env)
                (ir2-physenv-return-pc env))
+    #!-fp-and-pc-standard-save
+    (let ((lab (gen-label)))
+      (vop emit-label node block lab)
+      (setf (ir2-physenv-lra-saved-pc env) lab))
+
     #!+unwind-to-frame-and-call-vop
     (when (and (lambda-allow-instrumenting fun)
                (not (lambda-inline-expanded fun))

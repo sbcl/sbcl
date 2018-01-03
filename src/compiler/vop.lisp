@@ -358,6 +358,14 @@
   ;; implementations we may use a call instruction that requires the
   ;; return PC to be passed in a particular place.
   (return-pc-pass (missing-arg) :type tn :read-only t)
+  ;; a label that marks the first instruction after the RETURN-PC has
+  ;; been moved from its passing location to its save location.
+  #!-fp-and-pc-standard-save
+  (lra-saved-pc nil :type (or label null))
+  ;; a label that marks the first instruction after the OLD-FP has
+  ;; been moved from its passing location to its save location.
+  #!-fp-and-pc-standard-save
+  (cfp-saved-pc nil :type (or label null))
   ;; True if this function has a frame on the number stack. This is
   ;; set by representation selection whenever it is possible that some
   ;; function in our tail set will make use of the number stack.
