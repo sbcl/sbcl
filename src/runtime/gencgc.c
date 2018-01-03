@@ -1117,11 +1117,6 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
                                       SINGLE_OBJECT_FLAG | page_type_flag,
                                       gc_alloc_generation);
 
-    // FIXME: this assertion doesn't make a ton of sense - there is no
-    // underlying reason to require finding pages at a strictly higher index
-    // than we started with. In fact wraparound at the end should be allowed.
-    gc_assert(first_page > alloc_region->last_page);
-
     // FIXME: Should this be 1+last_page ?
     // (Doesn't matter too much since it'll be skipped on restart if unusable)
     set_generation_alloc_start_page(gc_alloc_generation, page_type_flag, 1, last_page);
@@ -1276,10 +1271,8 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t bytes,
     page_type_flag &= ~SINGLE_OBJECT_FLAG;
 
     /* Toggled by gc_and_save for heap compaction, normally -1. */
-    if (gencgc_alloc_start_page != -1
-        && gencgc_alloc_start_page > restart_page) {
+    if (gencgc_alloc_start_page != -1)
         restart_page = gencgc_alloc_start_page;
-    }
 
     /* FIXME: This is on bytes instead of nbytes pending cleanup of
      * long from the interface. */
