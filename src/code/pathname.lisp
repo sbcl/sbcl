@@ -241,7 +241,7 @@
          (when (pathname-component-present-p type)
            (unless (stringp type)       ; some kind of wild field
              (no-native-namestring-error
-              pathname "of the :~S component ~S" :type type))
+              pathname "of the ~S component ~S" :type type))
            (fragments ".")
            (fragments type)))
         ((pathname-component-present-p type) ; type without a name
