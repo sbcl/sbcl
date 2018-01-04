@@ -1333,7 +1333,7 @@
                   (emit-move node block pass home))))
           (incf n))))
 
-    (emit-move node block (make-old-fp-passing-location t)
+    (emit-move node block (make-old-fp-passing-location)
                (ir2-physenv-old-fp env)))
 
   (values))
