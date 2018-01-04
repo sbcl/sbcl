@@ -33,6 +33,8 @@
 #include "thread.h"
 #include "arch.h"
 
+#include "private-cons.inc"
+
 /* So you need to debug? */
 #if 0
 #define PRINTNOISE

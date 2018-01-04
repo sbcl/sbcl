@@ -783,6 +783,7 @@ set_generation_alloc_start_page(generation_index_t generation, int page_type_fla
         generations[generation].alloc_start_page = page;
 #endif
 }
+#include "private-cons.inc"
 
 /* Find a new region with room for at least the given number of bytes.
  *
