@@ -324,30 +324,58 @@
 ;;;; DELETE-DIRECTORY
 
 (with-test (:name (delete-directory :as-file :complicated-name-or-type :bug-1740624))
-  (labels ((prepare (namestring)
-             #-win32 (substitute #\\ #\E namestring)
-             #+win32 (substitute #\^ #\E namestring))
-           (test (namestring/file namestring/directory)
+  ;; This test creates directories whose names are in some way
+  ;; complicated to express as the filename part of a pathname, for
+  ;; example by including characters that need escaping in namestrings
+  ;; or looking like a :type component without a :name
+  ;; component. DELETE-DIRECTORY is applied to pathnames with filename
+  ;; parts to delete these directories. The intention is testing the
+  ;; translation from filename part to directory component employed by
+  ;; DELETE-DIRECTORY.
+  (labels ((prepare (string)
+             #-win32 (substitute #\\ #\E string)
+             #+win32 (substitute #\^ #\E string))
+           (make-type (type)
+             (make-pathname :type (prepare type)))
+           (make-unspecific (namep typep)
+             (apply #'make-pathname
+                    :directory '(:relative "foo")
+                    (append (when namep '(:name :unspecific))
+                            (when typep '(:type :unspecific)))))
+           (test (as-file as-directory)
              (let* ((test-directory (concatenate
                                      'string
                                      (sb-posix:getenv "TEST_DIRECTORY") "/"))
                     (delete-directory (merge-pathnames
-                                       (prepare namestring/file)
+                                       (typecase as-file
+                                         (string (prepare as-file))
+                                         (pathname as-file))
                                        test-directory)))
                (ensure-directories-exist (merge-pathnames
-                                          (prepare namestring/directory)
+                                          (prepare as-directory)
                                           test-directory))
                (unwind-protect
                     (progn
                       (delete-directory delete-directory)
-                      (assert (not (probe-file delete-directory))))
+                      (assert (not (probe-file (prepare as-directory)))))
                  (delete-directory test-directory :recursive t)))))
-    #-win32 (test "aE?b"        "aE?b/")
-    #-win32 (test "aE*b"        "aE*b/")
-            (test "aE[cd]b"     "aE[cd]b/")
-            (test "aEEb"        "aEEb/")
-
-    #-win32 (test "foo.aE?b"    "foo.aE?b/")
-    #-win32 (test "foo.aE*b"    "foo.aE*b/")
-            (test "foo.aE[cd]b" "foo.aE[cd]b/")
-            (test "foo.aEEb"    "foo.aEEb/")))
+    ;; Name component present
+    #-win32 (test "aE?b"                    "aE?b/")
+    #-win32 (test "aE*b"                    "aE*b/")
+            (test "aE[cd]b"                 "aE[cd]b/")
+            (test "aEEb"                    "aEEb/")
+    ;; Type component
+    #-win32 (test (make-type "a?b")         ".aE?b/")
+    #-win32 (test (make-type "a*b")         ".aE*b/")
+            (test (make-type "a[cd]b")      ".aE[cd]b/")
+            (test (make-type "aEb")         ".aEEb/")
+    ;; Name and type components present
+    #-win32 (test "foo.aE?b"                "foo.aE?b/")
+    #-win32 (test "foo.aE*b"                "foo.aE*b/")
+            (test "foo.aE[cd]b"             "foo.aE[cd]b/")
+            (test "foo.aEEb"                "foo.aEEb/")
+    ;; Name and/or type :unspecific
+            (test (make-unspecific nil nil) "foo/")
+            (test (make-unspecific nil t)   "foo/")
+            (test (make-unspecific t   nil) "foo/")
+            (test (make-unspecific t   t)   "foo/")))

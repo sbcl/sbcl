@@ -541,16 +541,18 @@ per standard Unix unlink() behaviour."
      (simple-file-perror
       "Cannot compute directory pathname for wild pathname ~S"
       pathname))
-    ((or (pathname-name pathname)
-         (pathname-type pathname))
-     (let ((from-file (format nil "~@[~A~]~@[.~A~]"
-                              (pathname-name pathname)
-                              (pathname-type pathname))))
-       (make-pathname
-        :host (pathname-host pathname)
-        :device (pathname-device pathname)
-        :directory (append (pathname-directory pathname)
-                           (list from-file)))))
+    ((let* ((name (pathname-name pathname))
+            (namep (pathname-component-present-p name))
+            (type (pathname-type pathname))
+            (typep (pathname-component-present-p type)))
+       (when (or namep typep)
+         (let ((from-file (format nil "~:[~*~;~A~]~:[~*~;.~A~]"
+                                  namep name typep type)))
+           (make-pathname
+            :host (pathname-host pathname)
+            :device (pathname-device pathname)
+            :directory (append (pathname-directory pathname)
+                               (list from-file)))))))
     (t
      pathname)))
 
