@@ -679,14 +679,18 @@
       sb!c:return-pc-passing-offset))
   #!-fp-and-pc-standard-save
   (let ((c-d-f (compiled-debug-fun-compiler-debug-fun
-                debug-fun)))
-    (values
-     (get-context-value
-      frame ocfp-save-offset
-      (sb!c::compiled-debug-fun-old-fp c-d-f))
-     (get-context-value
-      frame lra-save-offset
-      (sb!c::compiled-debug-fun-return-pc c-d-f)))))
+                debug-fun))
+        (pointer (frame-pointer frame))
+        (escaped (compiled-frame-escaped frame)))
+    (if escaped
+        (values
+         (sub-access-debug-var-slot
+          pointer (sb!c::compiled-debug-fun-old-fp c-d-f) escaped)
+         (sub-access-debug-var-slot
+          pointer (sb!c::compiled-debug-fun-return-pc c-d-f) escaped))
+        (values
+         (stack-ref pointer ocfp-save-offset)
+         (stack-ref pointer lra-save-offset)))))
 
 ;;; Return the frame immediately below FRAME on the stack; or when
 ;;; FRAME is the bottom of the stack, return NIL.
