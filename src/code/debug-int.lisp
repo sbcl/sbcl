@@ -683,7 +683,8 @@
         (pointer (frame-pointer frame))
         (escaped (compiled-frame-escaped frame)))
     (if escaped
-        (let ((pc-offset (nth-value 1 (escaped-frame-from-context escaped))))
+        (let ((pc-offset (compiled-code-location-pc
+                          (frame-code-location frame))))
           (values
            (sub-access-debug-var-slot
             pointer
