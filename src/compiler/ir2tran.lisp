@@ -1287,8 +1287,6 @@
       (vop xep-allocate-frame node block start-label)
       ;; Arg verification needs to be done before the stack pointer is adjusted
       ;; so that the extra arguments are still present when the error is signalled
-      #!-precise-arg-count-error
-      (vop xep-setup-sp node block)
       (let ((verified (unless (eq (functional-kind fun) :toplevel)
                         (setf arg-count-tn (make-arg-count-location))
                         (xep-verify-arg-count node block fun arg-count-tn))))
@@ -1297,10 +1295,11 @@
        (cond ((and (optional-dispatch-p ef)
                    (optional-dispatch-more-entry ef)
                    (neq (functional-kind (optional-dispatch-more-entry ef)) :deleted))
-              ;; COPY-MORE-ARG does the job of XEP-SETUP-SP on +precise-arg-count-error
+              ;; COPY-MORE-ARG does the job of XEP-SETUP-SP on some architectures
+              #!-(or arm arm64 x86 x86-64)
+              (vop xep-setup-sp node block)
               (vop copy-more-arg node block (optional-dispatch-max-args ef)
                    #!+x86-64 verified))
-             #!+precise-arg-count-error
              (t
               (vop xep-setup-sp node block))))
       (when (ir2-physenv-closure env)
