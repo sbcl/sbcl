@@ -194,7 +194,9 @@
   (encoded-locs (missing-arg) :type unsigned-byte :read-only t))
 
 (defun cdf-encode-locs (start-pc elsewhere-pc closure-save
-                        #!+unwind-to-frame-and-call-vop bsp-save)
+                        #!+unwind-to-frame-and-call-vop bsp-save
+                        #!-fp-and-pc-standard-save lra-saved-pc
+                        #!-fp-and-pc-standard-save cfp-saved-pc)
   (dx-let ((bytes (make-array (* 5 4) :fill-pointer 0
                                       :element-type '(unsigned-byte 8))))
     ;; ELSEWHERE is encoded first to simplify the C backtrace logic,
@@ -203,6 +205,10 @@
     (write-var-integer start-pc bytes)
     #!+unwind-to-frame-and-call-vop
     (write-var-integer (if bsp-save (1+ bsp-save) 0) bytes)
+    #!-fp-and-pc-standard-save
+    (progn
+      (write-var-integer lra-saved-pc bytes)
+      (write-var-integer cfp-saved-pc bytes))
     ;; More often the BSP-SAVE is non-null than CLOSURE-SAVE is non-null,
     ;; so the encoding is potentially smaller with CLOSURE-SAVE being last.
     (when closure-save
@@ -224,8 +230,14 @@
             #!+unwind-to-frame-and-call-vop
             ;; 0 -> NULL, 1 -> 0, ...
             (bsp-save (let ((i (decode-varint))) (unless (zerop i) (1- i))))
+            #!-fp-and-pc-standard-save
+            (lra-saved-pc (decode-varint))
+            #!-fp-and-pc-standard-save
+            (cfp-saved-pc (decode-varint))
             (closure-save (let ((i (decode-varint))) (unless (zerop i) (1- i)))))
         (values start-pc elsewhere-pc closure-save
+                #!-fp-and-pc-standard-save lra-saved-pc
+                #!-fp-and-pc-standard-save cfp-saved-pc
                 #!+unwind-to-frame-and-call-vop bsp-save)))))
 
 (macrolet ((def (&rest names)
@@ -241,6 +253,8 @@
     compiled-debug-fun-elsewhere-pc
     ;; Most compiled-debug-funs don't need these
     compiled-debug-fun-closure-save
+    #!-fp-and-pc-standard-save compiled-debug-fun-lra-saved-pc
+    #!-fp-and-pc-standard-save compiled-debug-fun-cfp-saved-pc
     #!+unwind-to-frame-and-call-vop compiled-debug-fun-bsp-save))
 
 (def!struct (compiled-debug-fun-optional (:include compiled-debug-fun)
