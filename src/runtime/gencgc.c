@@ -3459,7 +3459,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
 #endif
 
     scan_binding_stack();
-    scan_weak_hash_tables(weak_ht_alivep_funs);
+    cull_weak_hash_tables(weak_ht_alivep_funs);
     scan_weak_pointers();
     wipe_nonpinned_words();
 #ifdef LISP_FEATURE_IMMOBILE_SPACE

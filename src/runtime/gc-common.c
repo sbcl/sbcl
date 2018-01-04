@@ -1042,8 +1042,6 @@ static inline int pointer_survived_gc_yet(lispobj obj)
 
 #define HT_ENTRY_LIVENESS_FUN_ARRAY_NAME weak_ht_alivep_funs
 #include "weak-hash-pred.inc"
-/* magic number. cf WEAK-HASH-TABLE-KINDS in 'hash-table.lisp' */
-#define WEAKNESS_KEY_AND_VALUE 3
 
 /* Return the beginning of data in ARRAY (skipping the header and the
  * length) or NULL if it isn't an array of the specified widetag after
@@ -1228,7 +1226,7 @@ scav_weak_hash_tables (int (*alivep[5])(lispobj,lispobj),
 /* Walk through the chain whose first element is *FIRST and remove
  * dead weak entries. */
 static inline void
-scan_weak_hash_table_chain (struct hash_table *hash_table, lispobj *prev,
+cull_weak_hash_table_bucket(struct hash_table *hash_table, lispobj *prev,
                             lispobj *kv_vector, lispobj *index_vector,
                             lispobj *next_vector, lispobj *hash_vector,
                             int (*alivep_test)(lispobj,lispobj))
@@ -1259,7 +1257,7 @@ scan_weak_hash_table_chain (struct hash_table *hash_table, lispobj *prev,
 }
 
 static void
-scan_weak_hash_table (struct hash_table *hash_table,
+cull_weak_hash_table (struct hash_table *hash_table,
                       int (*alivep[5])(lispobj,lispobj))
 {
     uword_t length = 0; /* prevent warning */
@@ -1278,15 +1276,15 @@ scan_weak_hash_table (struct hash_table *hash_table,
                                           SIMPLE_ARRAY_WORD_WIDETAG, NULL);
 
     for (i = 0; i < length; i++) {
-        scan_weak_hash_table_chain(hash_table, &index_vector[i],
-                                   kv_vector, index_vector, next_vector,
-                                   hash_vector, alivep_test);
+        cull_weak_hash_table_bucket(hash_table, &index_vector[i],
+                                    kv_vector, index_vector, next_vector,
+                                    hash_vector, alivep_test);
     }
 }
 
 /* Fix one <k,v> pair in a weak key-AND-value hashtable.
  * Do not call scavenge(), just follow forwarding pointers */
-static void pair_follow_fps(lispobj* ht_entry)
+static void pair_follow_fps(lispobj ht_entry[2])
 {
     lispobj obj = ht_entry[0];
     if (is_lisp_pointer(obj) && forwarding_pointer_p(native_pointer(obj)))
@@ -1297,8 +1295,7 @@ static void pair_follow_fps(lispobj* ht_entry)
 }
 
 /* Remove dead entries from weak hash tables. */
-void
-scan_weak_hash_tables (int (*alivep[5])(lispobj,lispobj))
+void cull_weak_hash_tables(int (*alivep[5])(lispobj,lispobj))
 {
     struct hash_table *table, *next;
 
@@ -1306,7 +1303,7 @@ scan_weak_hash_tables (int (*alivep[5])(lispobj,lispobj))
         next = (struct hash_table *)table->next_weak_hash_table;
         NON_FAULTING_STORE(table->next_weak_hash_table = NIL,
                            &table->next_weak_hash_table);
-        scan_weak_hash_table(table, alivep);
+        cull_weak_hash_table(table, alivep);
     }
     weak_hash_tables = NULL;
 
@@ -1317,7 +1314,7 @@ scan_weak_hash_tables (int (*alivep[5])(lispobj,lispobj))
         // Scavenge once to chase forwarded objects.
         scav_hash_table_entries(table, alivep, pair_follow_fps);
         // Then remove non-surviving entries as usual.
-        scan_weak_hash_table(table, alivep);
+        cull_weak_hash_table(table, alivep);
     }
     weak_AND_hash_tables = NULL;
 }

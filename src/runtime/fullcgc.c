@@ -508,7 +508,7 @@ void execute_full_sweep_phase()
 {
     long words_zeroed[1+PSEUDO_STATIC_GENERATION]; // One count per generation
 
-    scan_weak_hash_tables(alivep_funs);
+    cull_weak_hash_tables(alivep_funs);
     smash_weak_pointers();
 
 #ifdef LOG_SWEEP_ACTIONS

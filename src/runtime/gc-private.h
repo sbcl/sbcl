@@ -94,7 +94,7 @@ extern void scav_weak_hash_tables(int (*[5])(lispobj,lispobj),
                                   void (*)(lispobj*));
 extern void scav_binding_stack(lispobj*, lispobj*, void(*)(lispobj));
 extern void scan_binding_stack(void);
-extern void scan_weak_hash_tables(int (*[5])(lispobj,lispobj));
+extern void cull_weak_hash_tables(int (*[5])(lispobj,lispobj));
 extern void scan_weak_pointers(void);
 extern void scav_hash_table_entries (struct hash_table *hash_table,
                                      int (*[5])(lispobj,lispobj),

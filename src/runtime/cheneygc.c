@@ -182,7 +182,7 @@ collect_garbage(generation_index_t ignore)
 #ifdef PRINTNOISE
     printf("Scanning weak hash tables ...\n");
 #endif
-    scan_weak_hash_tables(weak_ht_alivep_funs);
+    cull_weak_hash_tables(weak_ht_alivep_funs);
 
     /* Scan the weak pointers. */
 #ifdef PRINTNOISE
