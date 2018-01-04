@@ -341,10 +341,8 @@
     `(let ((,pathname (etypecase ,pathname-designator
                         (pathname ,pathname-designator)
                         (string (parse-namestring ,pathname-designator))
-                        (file-stream (file-name ,pathname-designator))
-                        (synonym-stream
-                         (file-name (stream-file-stream-or-lose
-                                     ,pathname-designator))))))
+                        ((or file-stream synonym-stream)
+                         (stream-file-name-or-lose ,pathname-designator)))))
        ,@body)))
 
 (sb!xc:defmacro with-native-pathname ((pathname pathname-designator) &body body)
@@ -860,12 +858,8 @@ a host-structure or string."
                     ~S and ~S."
                     defaulted-host (%pathname-host thing))))
          (values thing start))
-        (stream
-         (let ((name (file-name thing)))
-           (unless name
-             (error "can't figure out the file associated with stream:~%  ~S"
-                    thing))
-           (values name nil)))))))
+        ((or file-stream synonym-stream)
+         (values (stream-file-name-or-lose thing) nil))))))
 
 (defun %parse-native-namestring (namestr host defaults start end junk-allowed
                                  as-directory)
@@ -959,13 +953,8 @@ directory."
                      ~S and ~S."
                     defaulted-host (%pathname-host thing))))
          (values thing start))
-        (stream
-         ;; FIXME
-         (let ((name (file-name thing)))
-           (unless name
-             (error "can't figure out the file associated with stream:~%  ~S"
-                    thing))
-           (values name nil)))))))
+        ((or file-stream synonym-stream)
+         (values (stream-file-name-or-lose thing) nil))))))
 
 (defun namestring (pathname)
   "Construct the full (name)string form of the pathname."

@@ -270,6 +270,11 @@
              "~@<The stream ~2I~_~S ~I~_isn't associated with a file.~:>"
              :format-arguments (list stream))))
 
+(defun stream-file-name-or-lose (stream)
+  (or (file-name (stream-file-stream-or-lose stream))
+      (error "~@<The stream ~2I~_~S ~I~_is not associated with a named file.~:>"
+             stream)))
+
 (defun file-string-length (stream object)
   (funcall (ansi-stream-misc stream) stream :file-string-length object))
 
