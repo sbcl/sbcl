@@ -1320,8 +1320,7 @@ register."
 (defun all-args-available-p (frame)
   (let ((error (interrupted-frame-error frame))
         (df (frame-debug-fun frame)))
-    (or #!+precise-arg-count-error
-        (and (eq error 'invalid-arg-count-error)
+    (or (and (eq error 'invalid-arg-count-error)
              (eq (debug-fun-kind df) :external))
         (and (eq error 'undefined-fun-error)
              (bogus-debug-fun-p df)))))

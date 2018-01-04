@@ -504,8 +504,8 @@ thread, NIL otherwise."
 
 ;;; When the frame is interrupted before any of the function code is called
 ;;; we can recover all the arguments, include the extra ones.
-;;; This includes the ARG-COUNT-ERROR on #+precise-arg-count-error and
-;;; UNDEFINED-FUNCTION coming from undefined-tramp
+;;; This includes the ARG-COUNT-ERROR and UNDEFINED-FUNCTION coming from
+;;; undefined-tramp.
 (defun early-frame-nth-arg (n frame)
   (let* ((escaped (sb!di::compiled-frame-escaped frame))
          (pointer (sb!di::frame-pointer frame))
@@ -578,24 +578,6 @@ thread, NIL otherwise."
 
 (defun clean-xep (frame name args info)
   (values name
-          #!-precise-arg-count-error
-          (if (consp args)
-              (let* ((count (first args))
-                     (real-args (rest args)))
-                (if (and (integerp count)
-                         (sb!di::all-args-available-p frame))
-                    ;; So, this is a cheap trick -- but makes backtraces for
-                    ;; too-many-arguments-errors much, much easier to to
-                    ;; understand.
-                    (loop repeat count
-                          for arg = (if real-args
-                                        (pop real-args)
-                                        (make-unprintable-object "unknown"))
-                          collect arg)
-                    real-args))
-              args)
-          ;; Clip arg-count.
-          #!+precise-arg-count-error
           (if (and (consp args)
                    ;; EARLY-FRAME-ARGS doesn't include arg-count
                    (not (sb!di::all-args-available-p frame)))

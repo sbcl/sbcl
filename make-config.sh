@@ -643,7 +643,7 @@ if [ "$sbcl_arch" = "x86" ]; then
     printf ' :compare-and-swap-vops :unwind-to-frame-and-call-vop :raw-instance-init-vops' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
-    printf ' :alien-callbacks :cycle-counter :inline-constants :precise-arg-count-error' >> $ltf
+    printf ' :alien-callbacks :cycle-counter :inline-constants' >> $ltf
     printf ' :memory-barrier-vops :multiply-high-vops :ash-right-vops :symbol-info-vops' >> $ltf
     printf ' :fp-and-pc-standard-save :raw-signed-word' >> $ltf
     case "$sbcl_os" in
@@ -664,7 +664,7 @@ if [ "$sbcl_arch" = "x86" ]; then
 elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :64-bit :64-bit-registers :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack :linkage-table' >> $ltf
     printf ' :compare-and-swap-vops :unwind-to-frame-and-call-vop :raw-instance-init-vops' >> $ltf
-    printf ' :precise-arg-count-error :fp-and-pc-standard-save :unbind-n-vop' >> $ltf
+    printf ' :fp-and-pc-standard-save :unbind-n-vop' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks :cycle-counter :complex-float-vops :raw-signed-word' >> $ltf
@@ -745,11 +745,11 @@ elif [ "$sbcl_arch" = "arm" ]; then
     printf ' :ash-right-vops :multiply-high-vops :symbol-info-vops' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-closures' >> $ltf
-    printf ' :precise-arg-count-error :unwind-to-frame-and-call-vop' >> $ltf
+    printf ' :unwind-to-frame-and-call-vop' >> $ltf
     printf ' :fp-and-pc-standard-save :relocatable-heap' >> $ltf
 elif [ "$sbcl_arch" = "arm64" ]; then
     printf ' :64-bit :64-bit-registers :gencgc :linkage-table :fp-and-pc-standard-save' >> $ltf
-    printf ' :alien-callbacks :precise-arg-count-error :inline-constants' >> $ltf
+    printf ' :alien-callbacks :inline-constants' >> $ltf
     printf ' :ash-right-vops :multiply-high-vops :symbol-info-vops' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-closures' >> $ltf
