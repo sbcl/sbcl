@@ -733,16 +733,8 @@
                              (find-saved-frame-down fp frame)))
                        #!-(or x86 x86-64)
                        (compute-calling-frame
-                        #!-alpha
-                        (sap-ref-sap fp (* ocfp-save-offset
-                                           sb!vm:n-word-bytes))
-                        #!+alpha
-                        (int-sap
-                         (sap-ref-32 fp (* ocfp-save-offset
-                                           sb!vm:n-word-bytes)))
-
+                        (descriptor-sap (stack-ref fp ocfp-save-offset))
                         (stack-ref fp lra-save-offset)
-
                         frame)))))))
         down)))
 
@@ -1152,15 +1144,8 @@ register."
           finally (return (nreverse reversed-result))
           do
           (when (sap= fp
-                      #!-alpha
-                      (sap-ref-sap catch
-                                   (* catch-block-cfp-slot
-                                      n-word-bytes))
-                      #!+alpha
-                      (int-sap
-                       (sap-ref-32 catch
-                                   (* catch-block-cfp-slot
-                                      n-word-bytes))))
+                      (descriptor-sap
+                       (sap-ref-lispobj catch (* catch-block-cfp-slot n-word-bytes))))
             (labels ((catch-ref (slot)
                        (sap-ref-lispobj catch (* slot n-word-bytes)))
                      #!-(or x86 x86-64)
@@ -1187,15 +1172,8 @@ register."
                            (catch-entry-offset) (frame-debug-fun frame)))
                     reversed-result)))
           (setf catch
-                #!-alpha
-                (sap-ref-sap catch
-                             (* catch-block-previous-catch-slot
-                                n-word-bytes))
-                #!+alpha
-                (int-sap
-                 (sap-ref-32 catch
-                             (* catch-block-previous-catch-slot
-                                n-word-bytes)))))))
+                (descriptor-sap
+                 (sap-ref-lispobj catch (* catch-block-previous-catch-slot n-word-bytes)))))))
 
 ;;; Modify the value of the OLD-TAG catches in FRAME to NEW-TAG
 (defun replace-frame-catch-tag (frame old-tag new-tag)
@@ -1203,15 +1181,8 @@ register."
         (fp (frame-pointer frame)))
     (loop until (zerop (sap-int catch))
           do (when (sap= fp
-                         #!-alpha
-                         (sap-ref-sap catch
-                                      (* catch-block-cfp-slot
-                                         n-word-bytes))
-                         #!+alpha
-                         (int-sap
-                          (sap-ref-32 catch
-                                      (* catch-block-cfp-slot
-                                         n-word-bytes))))
+                         (descriptor-sap
+                          (sap-ref-lispobj catch (* catch-block-cfp-slot n-word-bytes))))
                (let ((current-tag
                       (sap-ref-lispobj catch (* catch-block-tag-slot
                                                 n-word-bytes))))
@@ -1220,15 +1191,8 @@ register."
                                                    n-word-bytes))
                          new-tag))))
           do (setf catch
-                   #!-alpha
-                   (sap-ref-sap catch
-                                (* catch-block-previous-catch-slot
-                                   n-word-bytes))
-                   #!+alpha
-                   (int-sap
-                    (sap-ref-32 catch
-                                (* catch-block-previous-catch-slot
-                                   n-word-bytes)))))))
+                         (descriptor-sap
+                          (sap-ref-lispobj catch (* catch-block-previous-catch-slot n-word-bytes)))))))
 
 
 
