@@ -1008,7 +1008,9 @@
                      #!-(or arm arm64)
                      (context-register context sb!vm::lra-offset)
                      #!+(or arm arm64)
-                     (stack-ref frame-pointer lra-save-offset)
+                     (stack-ref (int-sap (context-register context
+                                                           sb!vm::cfp-offset))
+                                lra-save-offset)
                      computed-return))
               ;; We failed to pinpoint where PC is, but set
               ;; pc-offset to 0 to keep the backtrace from
