@@ -661,6 +661,7 @@
       ((not (frame-p frame)))
     (setf (frame-number frame) number)))
 
+#!+(or x86 x86-64)
 (defun find-saved-frame-down (fp up-frame)
   (multiple-value-bind (saved-fp saved-pc)
       (sb!alien-internals:find-saved-fp-and-pc fp)
