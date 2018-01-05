@@ -4460,15 +4460,13 @@
       `(values-list list)))
 
 (deftransform %rest-ref ((n list context count &optional length-checked-p))
-  (cond ((rest-var-more-context-ok list)
-         (if (and (constant-lvar-p length-checked-p)
-                  (lvar-value length-checked-p))
-             `(%more-arg context n)
-             `(and (< (the index n) count) (%more-arg context n))))
-        ((and (constant-lvar-p n) (zerop (lvar-value n)))
-         `(car list))
+  (cond ((not (rest-var-more-context-ok list))
+         `(nth n list))
+        ((and (constant-lvar-p length-checked-p)
+              (lvar-value length-checked-p))
+         `(%more-arg context n))
         (t
-         `(nth n list))))
+         `(and (< (the index n) count) (%more-arg context n)))))
 
 (deftransform %rest-length ((list context count))
   (if (rest-var-more-context-ok list)

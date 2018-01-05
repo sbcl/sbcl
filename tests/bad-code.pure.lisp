@@ -135,3 +135,10 @@
                `(lambda ()
                   (make-array '(10) :initial-contents (do)))
                :allow-failure t))))
+
+(with-test (:name :&rest-ref-bad-n)
+  (assert
+   (nth-value 1
+              (checked-compile
+               `(lambda (&rest a) (lambda () (nth nil a)))
+               :allow-warnings t))))
