@@ -5060,6 +5060,15 @@
   (deftransform symbol-value ((symbol))
     (xform symbol :special `(symeval symbol))))
 
+(deftransform symeval ((symbol) ((constant-arg symbol)))
+  (let* ((symbol (lvar-value symbol))
+         (kind (info :variable :kind symbol)))
+    (if (and (eq kind :constant)
+             (boundp symbol)
+             (typep (symbol-value symbol) '(or number character symbol)))
+        symbol
+        (give-up-ir1-transform))))
+
 (flet ((xform (symbol match-kind)
          (let* ((symbol (lvar-value symbol))
                 (kind (info :variable :kind symbol)))
