@@ -921,3 +921,13 @@
       `(lambda ()
          (sb-kernel:symeval nil))
     (() nil)))
+
+(with-test (:name (:physenv-analyze :deleted-lambda))
+  (checked-compile-and-assert
+      ()
+      `(lambda (log)
+         (loop for str in nil
+               for i from 0
+               do
+               (ignore-errors (format log ""))))
+    ((t) nil)))

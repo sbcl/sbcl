@@ -547,31 +547,32 @@
 (defun find-cleanup-points (component)
   (declare (type component component))
   (do-blocks (block1 component)
-    (let ((env1 (block-physenv block1))
-          (cleanup1 (block-end-cleanup block1)))
-      (dolist (block2 (block-succ block1))
-        (when (block-start block2)
-          (let ((env2 (block-physenv block2))
-                (cleanup2 (block-start-cleanup block2)))
-            (unless (or (not (eq env2 env1))
-                        (eq cleanup1 cleanup2)
-                        (and cleanup2
-                             (eq (node-enclosing-cleanup
-                                  (cleanup-mess-up cleanup2))
-                                 cleanup1)))
-              ;; If multiple blocks with the same cleanups end up at the same block
-              ;; issue only one cleanup, e.g. (let (*) (if x 1 2))
-              ;;
-              ;; Possible improvement: (let (*) (if x (let (**) 1) 2))
-              ;; unbinding * only once.
-              (emit-cleanups (loop for pred in (block-pred block2)
-                                   when (or (eq pred block1)
-                                            (and
-                                             (block-start pred)
-                                             (eq (block-end-cleanup pred) cleanup1)
-                                             (eq (block-physenv pred) env2)))
-                                   collect pred)
-                             block2)))))))
+    (unless (block-to-be-deleted-p block1)
+      (let ((env1 (block-physenv block1))
+            (cleanup1 (block-end-cleanup block1)))
+        (dolist (block2 (block-succ block1))
+          (when (block-start block2)
+            (let ((env2 (block-physenv block2))
+                  (cleanup2 (block-start-cleanup block2)))
+              (unless (or (not (eq env2 env1))
+                          (eq cleanup1 cleanup2)
+                          (and cleanup2
+                               (eq (node-enclosing-cleanup
+                                    (cleanup-mess-up cleanup2))
+                                   cleanup1)))
+                ;; If multiple blocks with the same cleanups end up at the same block
+                ;; issue only one cleanup, e.g. (let (*) (if x 1 2))
+                ;;
+                ;; Possible improvement: (let (*) (if x (let (**) 1) 2))
+                ;; unbinding * only once.
+                (emit-cleanups (loop for pred in (block-pred block2)
+                                     when (or (eq pred block1)
+                                              (and
+                                               (block-start pred)
+                                               (eq (block-end-cleanup pred) cleanup1)
+                                               (eq (block-physenv pred) env2)))
+                                     collect pred)
+                               block2))))))))
   (values))
 
 ;;; Mark optimizable tail-recursive uses of function result
