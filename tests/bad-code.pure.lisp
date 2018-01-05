@@ -127,3 +127,11 @@
                `(lambda ()
                   (make-array '(-10)))
                :allow-warnings t))))
+
+(with-test (:name (make-array :initial-contents :bad-macro))
+  (assert
+   (nth-value 1
+              (checked-compile
+               `(lambda ()
+                  (make-array '(10) :initial-contents (do)))
+               :allow-failure t))))
