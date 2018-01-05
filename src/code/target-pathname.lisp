@@ -956,21 +956,6 @@ directory."
         ((or file-stream synonym-stream)
          (values (stream-file-name-or-lose thing) nil))))))
 
-(defun namestring (pathname)
-  "Construct the full (name)string form of the pathname."
-  (declare (type pathname-designator pathname))
-  (with-pathname (pathname pathname)
-    (when pathname
-      (or (%pathname-namestring pathname)
-          (let ((host (%pathname-host pathname)))
-            (if (not host)
-                (no-namestring-error
-                 pathname "there is no ~S component." :host)
-                (setf (%pathname-namestring pathname)
-                      (logically-readonlyize
-                       (possibly-base-stringize
-                        (funcall (host-unparse host) pathname))))))))))
-
 (defun native-namestring (pathname &key as-file)
   "Construct the full native (name)string form of PATHNAME.  For
 file systems whose native conventions allow directories to be
@@ -981,59 +966,54 @@ system's syntax for files."
   (declare (type pathname-designator pathname))
   (with-native-pathname (pathname pathname)
     (when pathname
-      (let ((host (%pathname-host pathname)))
-        (unless host
-          (error "can't determine the native namestring for pathnames with no ~
-                  host:~%  ~S" pathname))
+      (let ((host (or (%pathname-host pathname)
+                      (no-native-namestring-error
+                       pathname "there is no ~S component." :host))))
         (funcall (host-unparse-native host) pathname as-file)))))
 
-(defun host-namestring (pathname)
-  "Return a string representation of the name of the host in the pathname."
-  (declare (type pathname-designator pathname))
-  (with-pathname (pathname pathname)
-    (let ((host (%pathname-host pathname)))
-      (if host
-          (funcall (host-unparse-host host) pathname)
-          (error
-           "can't determine the namestring for pathnames with no host:~%  ~S"
-           pathname)))))
+(flet ((pathname-host-or-no-namestring (pathname)
+         (or (%pathname-host pathname)
+             (no-namestring-error
+              pathname "there is no ~S component." :host))))
 
-(defun directory-namestring (pathname)
-  "Return a string representation of the directories used in the pathname."
-  (declare (type pathname-designator pathname))
-  (with-pathname (pathname pathname)
-    (let ((host (%pathname-host pathname)))
-      (if host
-          (funcall (host-unparse-directory host) pathname)
-          (error
-           "can't determine the namestring for pathnames with no host:~%  ~S"
-           pathname)))))
+  (defun namestring (pathname)
+    "Construct the full (name)string form PATHNAME."
+    (with-pathname (pathname pathname)
+      (when pathname
+        (or (%pathname-namestring pathname)
+            (let ((host (pathname-host-or-no-namestring pathname)))
+              (setf (%pathname-namestring pathname)
+                    (logically-readonlyize
+                     (possibly-base-stringize
+                      (funcall (host-unparse host) pathname)))))))))
 
-(defun file-namestring (pathname)
-  "Return a string representation of the name used in the pathname."
-  (declare (type pathname-designator pathname))
-  (with-pathname (pathname pathname)
-    (let ((host (%pathname-host pathname)))
-      (if host
-          (funcall (host-unparse-file host) pathname)
-          (error
-           "can't determine the namestring for pathnames with no host:~%  ~S"
-           pathname)))))
+  (defun host-namestring (pathname)
+    "Return a string representation of the name of the host in PATHNAME."
+    (with-pathname (pathname pathname)
+      (let ((host (pathname-host-or-no-namestring pathname)))
+        (funcall (host-unparse-host host) pathname))))
 
-(defun enough-namestring (pathname
-                          &optional
-                          (defaults *default-pathname-defaults*))
-  "Return an abbreviated pathname sufficient to identify the pathname relative
-   to the defaults."
-  (declare (type pathname-designator pathname))
-  (with-pathname (pathname pathname)
-    (let ((host (%pathname-host pathname)))
-      (if host
-          (with-pathname (defaults defaults)
-            (funcall (host-unparse-enough host) pathname defaults))
-          (error
-           "can't determine the namestring for pathnames with no host:~%  ~S"
-           pathname)))))
+  (defun directory-namestring (pathname)
+    "Return a string representation of the directory in PATHNAME."
+    (with-pathname (pathname pathname)
+      (let ((host (pathname-host-or-no-namestring pathname)))
+        (funcall (host-unparse-directory host) pathname))))
+
+  (defun file-namestring (pathname)
+    "Return a string representation of the name in PATHNAME."
+    (with-pathname (pathname pathname)
+      (let ((host (pathname-host-or-no-namestring pathname)))
+        (funcall (host-unparse-file host) pathname))))
+
+  (defun enough-namestring (pathname
+                            &optional
+                            (defaults *default-pathname-defaults*))
+    "Return an abbreviated pathname sufficient to identify PATHNAME
+relative to DEFAULTS."
+    (with-pathname (pathname pathname)
+      (let ((host (pathname-host-or-no-namestring pathname)))
+        (with-pathname (defaults defaults)
+          (funcall (host-unparse-enough host) pathname defaults))))))
 
 ;;;; wild pathnames
 
