@@ -666,7 +666,7 @@ be a lambda expression."
       (let ((cname (lvar-constant-global-fun-name lvar)))
         (cond (cname
                ;; Don't lose type restrictions
-               (if (and (cast-p (lvar-use lvar))
+               (if (and (cast-p (lvar-uses lvar))
                         (fun-type-p (cast-asserted-type (lvar-use lvar))))
                    `(global-function-preserve-cast ,cname ,lvar)
                    `(global-function ,cname)))

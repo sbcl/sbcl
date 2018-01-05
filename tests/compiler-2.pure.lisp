@@ -931,3 +931,10 @@
                do
                (ignore-errors (format log ""))))
     ((t) nil)))
+
+(with-test (:name (:ensure-lvar-fun-form :lvar-uses))
+  (checked-compile-and-assert
+      ()
+      `(lambda (op) (funcall (case op (equal '=) (t '=)) 1 2))
+    (('equal) nil)
+    ((t) nil)))
