@@ -11,7 +11,18 @@ FASL=$(DEST)/$(SYSTEM).fasl
 ASD=$(DEST)/$(SYSTEM).asd
 
 ifeq (SunOS,$(UNAME))
-  EXTRA_CFLAGS+=-D_XOPEN_SOURCE=500 -D__EXTENSIONS__
+  # _XOPEN_SOURCE tells your compiler to include definitions for some
+  # *extra* functions that are defined in the X/Open and POSIX standards.
+  # The numbers refer to different versions of the standard:
+  # 500 - X/Open 5, incorporating POSIX 1995
+  # 600 - X/Open 6, incorporating POSIX 2004
+  # 700 - X/Open 7, incorporating POSIX 2008
+  # OpenCSW GCC 5.5.0 and Oracle Studio compiler 12.5 both throw
+  # "Compiler or options invalid for pre-UNIX 03 X/Open applications and
+  #  pre-2001 POSIX applications" with -D_XOPEN_SOURCE=500.
+  EXTRA_CFLAGS+=-D_XOPEN_SOURCE=600 -D__EXTENSIONS__
+  # OpenCSW GCC 5.5.0 cannot compile foo.c successfully.
+  CC:=/usr/bin/cc
   PATH:=/usr/xpg4/bin:${PATH}
 endif
 ifeq (CYGWIN,$(findstring CYGWIN,$(UNAME)))

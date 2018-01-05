@@ -307,7 +307,9 @@ static void brief_fixnum(lispobj obj)
     /* KLUDGE: Rather than update the tables in print_obj(), we
        declare all fixnum-or-unknown tags to be fixnums and sort it
        out here with a guard clause. */
-    if (!fixnump(obj)) return print_unknown(obj);
+    if (!fixnump(obj)) {
+        print_unknown(obj); return;
+    }
     printf("%"OBJ_FMTd, fixnum_value(obj));
 }
 
@@ -316,7 +318,9 @@ static void print_fixnum(lispobj obj)
     /* KLUDGE: Rather than update the tables in print_obj(), we
        declare all fixnum-or-unknown tags to be fixnums and sort it
        out here with a guard clause. */
-    if (!fixnump(obj)) return print_unknown(obj);
+    if (!fixnump(obj)) {
+        print_unknown(obj); return;
+    }
     printf(": %"OBJ_FMTd, fixnum_value(obj));
 }
 

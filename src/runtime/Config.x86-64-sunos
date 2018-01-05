@@ -1,12 +1,36 @@
+# -*- makefile -*- for the C-level run-time support for SBCL
+
+# This software is part of the SBCL system. See the README file for
+# more information.
+#
+# This software is derived from the CMU CL system, which was
+# written at Carnegie Mellon University and released into the
+# public domain. The software is in the public domain and is
+# provided with absolutely no warranty. See the COPYING and CREDITS
+# files for more information.
+
+# The following configurations are confirmed working on Solaris 10 1/13 (Update 11),
+# with the following installed compilers:
+
+# 1. Oracle Studio 12.5 (/usr/bin/cc)
+# 2. OpenCSW GCC 5.5.0 (/opt/csw/bin/gcc)
+
 CC=gcc
-CFLAGS = -m64 -g -O2 -Wall -D__EXTENSIONS__ -D_POSIX_C_SOURCE=199506L -DSVR4 -D_REENTRANT -fno-omit-frame-pointer
+
+# -D_POSIX_C_SOURCE=199506L was removed, because OpenCSW GCC 5.5.0 doesn't support
+# "pre-UNIX 03 X/Open applications and pre-2001 POSIX applications" any more.
+# -- Chun Tian (binghe), Jan 5, 2018
+CFLAGS = -m64 -g -O2 -Wall -D__EXTENSIONS__ -DSVR4 -D_REENTRANT -fno-omit-frame-pointer
 LINKFLAGS = -m64 -g
 ASFLAGS = -m64 -Wall
 NM = nm -xgp
 GREP = ggrep
 
-#CC=/opt/SunStudioExpress/bin/cc
-#CFLAGS = -xarch=generic64 -g -O2 -Wall -D__EXTENSIONS__ -D_POSIX_C_SOURCE=199506L -DSVR4 -D_REENTRANT -fno-omit-frame-pointer
+# NOTE: Oracle Studio compiler 12.5 is confirmed *not* working, it stops at x86-64-assem.S
+# However, Sun compilers (cc) must be used for compiling contrib code (foo.c).
+# Also see contrib/asdf-module.mk. -- Chun Tian (binghe), Jan 5, 2018
+#CC=/usr/bin/cc
+#CFLAGS = -xarch=generic64 -g -O2 -Wall -D__EXTENSIONS__ -DSVR4 -D_REENTRANT -fno-omit-frame-pointer
 #ASFLAGS = -xarch=generic64 -Wall
 
 ASSEM_SRC = x86-64-assem.S ldso-stubs.S
