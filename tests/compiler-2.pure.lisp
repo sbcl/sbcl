@@ -914,3 +914,10 @@
          (rassoc-if-not #'values '((1 . a)) :allow-other-keys t)
          1)
     (() 1)))
+
+(with-test (:name :symeval-nil)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (sb-kernel:symeval nil))
+    (() nil)))

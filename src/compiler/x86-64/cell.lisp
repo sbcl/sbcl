@@ -206,7 +206,8 @@
 
     ;; This code is tested by 'codegen.impure.lisp'
     (defun emit-symeval (value symbol symbol-reg check-boundp vop)
-      (let ((known-symbol (and (sc-is symbol constant immediate) (tn-value symbol))))
+      (let* ((known-symbol-p (sc-is symbol constant immediate))
+             (known-symbol (and known-symbol-p (tn-value symbol))))
         ;; In order from best to worst.
         (cond
          ((symbol-always-has-tls-value-p known-symbol) ; e.g. *HANDLER-CLUSTERS*
@@ -220,9 +221,9 @@
              (when (sc-is symbol constant)
                (inst mov symbol-reg symbol))) ; = MOV Rxx, [RIP-N]
 
-            (known-symbol ; unknown TLS index, possibly 0
+            (known-symbol-p ; unknown TLS index, possibly 0
              (sc-case symbol
-              (immediate
+               (immediate
                ;; load the TLS index from the symbol. TODO: use [RIP-n] mode
                ;; for immobile code to make it automatically relocatable.
                (inst mov (reg-in-size value :dword)
@@ -230,7 +231,8 @@
                      (symbol-slot-ea known-symbol 1/2 :dword))
                ;; read the TLS value using that index
                (inst mov value (access-tls-val value :qword)))
-              (constant
+               (constant
+
                ;; These reads are inextricably data-dependent
                (inst mov symbol-reg symbol) ; = MOV REG, [RIP-N]
                (inst mov (reg-in-size value :dword) (tls-index-of symbol-reg))
@@ -244,7 +246,7 @@
           ;; Load the global value if the TLS value didn't exist
           (inst cmp (reg-in-size value :dword) no-tls-value-marker-widetag)
           (inst cmov :e value
-                (if (and known-symbol (sc-is symbol immediate))
+                (if (and known-symbol-p (sc-is symbol immediate))
                     (symbol-slot-ea known-symbol symbol-value-slot) ; MOV Rxx, imm32
                     (access-value-slot symbol-reg)))))
 
