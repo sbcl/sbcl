@@ -1147,7 +1147,7 @@
                                           (list (parse-key-arg-spec spec) t))
                                         key-list))))
             (allow (when (ll-kwds-allowp llks) '(&allow-other-keys))))
-        (compiler-specifier-type `(function (,@reqs ,@opts ,@rest ,@keys ,@allow) *))))))
+        (careful-specifier-type `(function (,@reqs ,@opts ,@rest ,@keys ,@allow) *))))))
 
 ;;; Get a DEFINED-FUN object for a function we are about to define. If
 ;;; the function has been forward referenced, then substitute for the
@@ -1167,8 +1167,8 @@
                                           :defined-here)
                           :type (if (eq :declared where-from)
                                     (leaf-type found)
-                                    (if lp
-                                        (ftype-from-lambda-list lambda-list)
+                                    (or (and lp
+                                             (ftype-from-lambda-list lambda-list))
                                         (specifier-type 'function))))))
                (substitute-leaf res found)
                (setf (gethash name *free-funs*) res)))

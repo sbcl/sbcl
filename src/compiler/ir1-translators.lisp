@@ -957,8 +957,14 @@ other."
 
 ;;; A logic shared among THE and TRULY-THE.
 (defun the-in-policy (type value policy start next result)
-  (let ((type (if (ctype-p type) type
-                  (compiler-values-specifier-type type))))
+  (let ((type (cond ((ctype-p type)
+                     type)
+                    ((compiler-values-specifier-type type))
+                    (t
+                     (ir1-convert start next result
+                                  `(error "Bad type specifier: ~a"
+                                          ,type))
+                     (return-from the-in-policy)))))
     (cond ((or (eq type *wild-type*)
                (eq type *universal-type*)
                (and (leaf-p value)
@@ -1024,7 +1030,7 @@ care."
                                        modifying) form)
                           start next result)
   (let* ((policy (lexenv-policy *lexenv*))
-         (value-type (compiler-values-specifier-type value-type))
+         (value-type (values-specifier-type value-type))
          (cast (if modifying
                    (let* ((value-ctran (make-ctran))
                           (value-lvar (make-lvar))

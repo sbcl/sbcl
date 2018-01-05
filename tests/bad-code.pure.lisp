@@ -142,3 +142,12 @@
               (checked-compile
                `(lambda (&rest a) (lambda () (nth nil a)))
                :allow-warnings t))))
+
+(with-test (:name :bad-type-specifier-handling)
+  (multiple-value-bind (fun failure warnings)
+      (checked-compile
+       `(lambda (v) (typep v '(unsigned-byte 8 x (error ~s v))))
+       :allow-warnings t)
+    (declare (ignore fun))
+    (assert failure)
+    (mapcar #'princ-to-string warnings)))

@@ -226,9 +226,8 @@
       (checked-compile `(lambda (x)
                           (declare (type (0) x))
                           x)
-                       :allow-failure t)
-    (assert failure-p)
-    (assert-error (funcall fun 1) program-error)))
+                       :allow-warnings t)
+    (assert failure-p)))
 
 (with-test (:name (compile make-array :bad-type-specifier :bug-181))
   (multiple-value-bind (fun failure-p warnings)
@@ -4526,8 +4525,10 @@
    sb-int:simple-program-error))
 
 (with-test (:name (compile :malformed-type-declaraions))
-  (checked-compile '(lambda (a) (declare (type (integer 1 2 . 3) a)))
-                   :allow-failure t))
+  (assert (nth-value 1
+                     (checked-compile
+                      '(lambda (a) (declare (type (integer 1 2 . 3) a)) a)
+                      :allow-warnings t))))
 
 (with-test (:name :compiled-program-error-escaped-source)
   (assert

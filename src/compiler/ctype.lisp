@@ -1037,10 +1037,7 @@ and no value was provided for it." name))))))))))
                             (lambda (value)
                               (unless (and (eql value :default)
                                            (eq fun-name 'open))
-                                (multiple-value-bind (ctype error)
-                                    (careful-specifier-type value)
-                                  (unless ctype
-                                    (apply #'compiler-warn error)))))))
+                                (compiler-specifier-type value)))))
     (t
      (assert-lvar-type arg type policy))))
 

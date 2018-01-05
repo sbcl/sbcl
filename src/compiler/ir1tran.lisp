@@ -1248,64 +1248,66 @@
                  (when (typep type-specifier 'type-specifier)
                    (check-deprecated-type type-specifier))
                  (compiler-specifier-type type-specifier))))
-    (collect ((restr nil cons)
-             (new-vars nil cons))
-      (dolist (var-name (rest decl))
-        (unless (symbolp var-name)
-          (compiler-error "Variable name is not a symbol: ~S." var-name))
-        (unless (eq (info :variable :kind var-name) :unknown)
-          (program-assert-symbol-home-package-unlocked
-           context var-name "declaring the type of ~A"))
-        (let* ((bound-var (find-in-bindings vars var-name))
-               (var (or bound-var
-                        (lexenv-find var-name vars)
-                        (find-free-var var-name))))
-          (etypecase var
-            (leaf
-             (flet
-                 ((process-var (var bound-var)
-                    (let* ((old-type (or (lexenv-find var type-restrictions)
-                                         (leaf-type var)))
-                           (int (if (or (fun-type-p type)
-                                        (fun-type-p old-type))
-                                    type
-                                    (type-approx-intersection2
-                                     old-type type))))
-                      (cond ((eq int *empty-type*)
-                             (unless (policy *lexenv* (= inhibit-warnings 3))
-                               (warn
-                                'type-warning
-                                :format-control
-                                 "The type declarations ~
+    (if type
+        (collect ((restr nil cons)
+                  (new-vars nil cons))
+          (dolist (var-name (rest decl))
+            (unless (symbolp var-name)
+              (compiler-error "Variable name is not a symbol: ~S." var-name))
+            (unless (eq (info :variable :kind var-name) :unknown)
+              (program-assert-symbol-home-package-unlocked
+               context var-name "declaring the type of ~A"))
+            (let* ((bound-var (find-in-bindings vars var-name))
+                   (var (or bound-var
+                            (lexenv-find var-name vars)
+                            (find-free-var var-name))))
+              (etypecase var
+                (leaf
+                 (flet
+                     ((process-var (var bound-var)
+                        (let* ((old-type (or (lexenv-find var type-restrictions)
+                                             (leaf-type var)))
+                               (int (if (or (fun-type-p type)
+                                            (fun-type-p old-type))
+                                        type
+                                        (type-approx-intersection2
+                                         old-type type))))
+                          (cond ((eq int *empty-type*)
+                                 (unless (policy *lexenv* (= inhibit-warnings 3))
+                                   (warn
+                                    'type-warning
+                                    :format-control
+                                    "The type declarations ~
                                   ~/sb!impl:print-type/ and ~
                                   ~/sb!impl:print-type/ for ~
                                   ~S conflict."
-                                :format-arguments
-                                (list old-type type var-name))))
-                            (bound-var
-                             (setf (leaf-type bound-var) int
-                                   (leaf-where-from bound-var) :declared))
-                            (t
-                             (restr (cons var int)))))))
-               (process-var var bound-var)
-               (awhen (and (lambda-var-p var)
-                           (lambda-var-specvar var))
-                      (process-var it nil))))
-            (cons
-             ;; FIXME: non-ANSI weirdness. [See lp#309122]
-             (aver (eq (car var) 'macro))
-             (new-vars `(,var-name . (macro . (the ,(first decl)
-                                                ,(cdr var))))))
-            (heap-alien-info
-             (compiler-error
-              "~S is an alien variable, so its type can't be declared."
-              var-name)))))
+                                    :format-arguments
+                                    (list old-type type var-name))))
+                                (bound-var
+                                 (setf (leaf-type bound-var) int
+                                       (leaf-where-from bound-var) :declared))
+                                (t
+                                 (restr (cons var int)))))))
+                   (process-var var bound-var)
+                   (awhen (and (lambda-var-p var)
+                               (lambda-var-specvar var))
+                     (process-var it nil))))
+                (cons
+                 ;; FIXME: non-ANSI weirdness. [See lp#309122]
+                 (aver (eq (car var) 'macro))
+                 (new-vars `(,var-name . (macro . (the ,(first decl)
+                                                       ,(cdr var))))))
+                (heap-alien-info
+                 (compiler-error
+                  "~S is an alien variable, so its type can't be declared."
+                  var-name)))))
 
-      (if (or (restr) (new-vars))
-          (make-lexenv :default res
-                       :type-restrictions (restr)
-                       :vars (new-vars))
-          res))))
+          (if (or (restr) (new-vars))
+              (make-lexenv :default res
+                           :type-restrictions (restr)
+                           :vars (new-vars))
+              res))
+        res)))
 
 ;;; This is somewhat similar to PROCESS-TYPE-DECL, but handles
 ;;; declarations for function variables. In addition to allowing
@@ -1315,7 +1317,8 @@
 (defun process-ftype-decl (type-specifier res names fvars context)
   (declare (type list names fvars)
            (type lexenv res))
-  (let ((type (compiler-specifier-type type-specifier)))
+  (let ((type (or (compiler-specifier-type type-specifier)
+                  (return-from process-ftype-decl res))))
     (check-deprecated-type type-specifier)
     (unless (csubtypep type (specifier-type 'function))
       (compiler-style-warn "ignoring declared FTYPE: ~S (not a function type)"

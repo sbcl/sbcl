@@ -27,9 +27,11 @@
       (destructuring-bind (typespec restart-name) clause
         (let ((type (compiler-specifier-type typespec))
               (ospec (rassoc restart-name new :test #'eq)))
-          (if ospec
-              (setf (car ospec) (type-union (car ospec) type))
-              (push (cons type restart-name) new)))))))
+          (cond ((not type))
+                (ospec
+                 (setf (car ospec) (type-union (car ospec) type)))
+                (t
+                 (push (cons type restart-name) new))))))))
 
 (declaim (ftype (function (list list) list)
                 process-muffle-conditions-decl))
@@ -43,17 +45,17 @@
 (defun process-unhandle-conditions-decl (spec list)
   (let ((new (copy-alist list)))
     (dolist (clause (cdr spec) new)
-      (destructuring-bind (typespec restart-name) clause
-        (let ((ospec (rassoc restart-name new :test #'eq)))
-          (if ospec
-              (let ((type (type-intersection
-                           (car ospec)
-                           (compiler-specifier-type `(not ,typespec)))))
-                (if (type= type *empty-type*)
-                    (setq new (delete restart-name new :test #'eq :key #'cdr))
-                    (setf (car ospec) type)))
-              ;; do nothing?
-              nil))))))
+      (block nil
+       (destructuring-bind (typespec restart-name) clause
+         (let ((ospec (rassoc restart-name new :test #'eq)))
+           (when ospec
+             (let ((type (type-intersection
+                          (car ospec)
+                          (or (compiler-specifier-type `(not ,typespec))
+                              (return)))))
+               (if (type= type *empty-type*)
+                   (setq new (delete restart-name new :test #'eq :key #'cdr))
+                   (setf (car ospec) type))))))))))
 
 (declaim (ftype (function (list list) list)
                 process-unmuffle-conditions-decl))

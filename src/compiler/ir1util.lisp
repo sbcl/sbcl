@@ -2400,21 +2400,21 @@ is :ANY, the function name is not checked."
        `(progn
           (defun ,careful (specifier)
             (handler-case (,basic specifier)
-              ((or sb!kernel::arg-count-error
-                type-error) (condition)
-                (values nil (list (princ-to-string condition))))
-              (simple-error (condition)
-                (values nil (list* (simple-condition-format-control condition)
-                                   (simple-condition-format-arguments condition))))))
+              (error (condition)
+                (values nil condition))))
           (defun ,compiler (specifier)
-            (multiple-value-bind (type error-args) (,careful specifier)
-              (or type
-                  (apply #'compiler-error error-args))))
+            (handler-case (,basic specifier)
+              (simple-error (condition)
+                (apply #'compiler-warn
+                       (simple-condition-format-control condition)
+                       (simple-condition-format-arguments condition)))
+              (error (condition)
+                (compiler-warn "~a" condition))))
           (defun ,transform (specifier)
-            (multiple-value-bind (type error-args) (,careful specifier)
+            (multiple-value-bind (type condition) (,careful specifier)
               (or type
-                  (apply #'give-up-ir1-transform
-                         error-args)))))))
+                  (give-up-ir1-transform
+                   (princ-to-string condition))))))))
   (deffrob specifier-type careful-specifier-type compiler-specifier-type ir1-transform-specifier-type)
   (deffrob values-specifier-type careful-values-specifier-type compiler-values-specifier-type ir1-transform-values-specifier-type))
 

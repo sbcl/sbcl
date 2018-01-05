@@ -2698,8 +2698,10 @@
   (catch-compiled-program-error
    '(lambda (x) (typep x '(values 10)))
    1)
-  (catch-compiled-program-error
-   '(lambda () (declare (sb-ext:muffle-conditions 10)))))
+  (assert (nth-value 1
+                     (checked-compile
+                      '(lambda () (declare (sb-ext:muffle-conditions 10)))
+                      :allow-warnings t))))
 
 (with-test (:name :coverage-and-errors)
   (ctu:file-compile
