@@ -53,6 +53,7 @@ static void release_pages_impl()
         free(list);
     }
     private_cons_chain = NULL;
+    private_cons_n_avail = 0;
 }
 
 #else
@@ -103,7 +104,8 @@ static void release_pages_impl()
              list = (struct cons*)list->cdr) {
             page_index_t index = find_page_index(list);
             if (PRIVATE_CONS_DEBUG)
-                fprintf(stderr, "Freeing GC-private page @ %p (index %ld)\n", list, index);
+                fprintf(stderr, "Freeing GC-private page @ %p (index %ld)\n",
+                        list, (long)index);
             set_page_bytes_used(index, 0);
             reset_page_flags(index);
         }
