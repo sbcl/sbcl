@@ -21,8 +21,9 @@ ifeq (SunOS,$(UNAME))
   # "Compiler or options invalid for pre-UNIX 03 X/Open applications and
   #  pre-2001 POSIX applications" with -D_XOPEN_SOURCE=500.
   EXTRA_CFLAGS+=-D_XOPEN_SOURCE=600 -D__EXTENSIONS__
-  # OpenCSW GCC 5.5.0 cannot compile foo.c successfully.
-  CC:=/usr/bin/cc
+  # OpenCSW GCC 5.5.0 cannot compile foo.c successfully. On Solaris 11,
+  # c99 is required.
+  CC:=c99
   PATH:=/usr/xpg4/bin:${PATH}
 endif
 ifeq (CYGWIN,$(findstring CYGWIN,$(UNAME)))
