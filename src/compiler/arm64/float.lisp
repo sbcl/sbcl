@@ -681,7 +681,7 @@
                 (inst str imag
                       (@ nfp (load-store-offset (+ (* offset n-word-bytes) 4)))))
                ((ldp-stp-offset-p offset 32)
-                (inst stp real imag (@ nfp offset)))
+                (inst stp real imag (@ nfp (* offset n-word-bytes))))
                (t
                 (storew real nfp offset)
                 (inst str imag
@@ -711,7 +711,7 @@
          (cond ((location= real r)
                 (storew imag nfp (1+ offset)))
                ((ldp-stp-offset-p offset 64)
-                (inst stp real imag (@ nfp offset)))
+                (inst stp real imag (@ nfp (* offset n-word-bytes))))
                (t
                 (storew real nfp offset)
                 (storew imag nfp (1+ offset)))))))))
