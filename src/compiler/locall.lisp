@@ -1208,11 +1208,8 @@
               (let ((use-component (node-component use)))
                 (substitute-leaf-if
                  (lambda (ref)
-                   (cond ((eq (node-component ref) use-component)
-                          (setf done-something t))
-                         (t
-                          (aver (lambda-toplevelish-p (lambda-home fun)))
-                          nil)))
+                   (when (eq (node-component ref) use-component)
+                     (setf done-something t)))
                  leaf var)))
              ;; otherwise, we can still play LVAR-level tricks for single
              ;;  destination variables.
