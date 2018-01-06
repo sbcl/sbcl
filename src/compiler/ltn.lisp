@@ -411,7 +411,7 @@
 ;;; conditional template, then don't annotate the lvar so that IR2
 ;;; conversion knows not to emit any code, otherwise annotate as an
 ;;; ordinary lvar. Since we only use a conditional template if the
-;;; call immediately precedes the IF node in the same block, we know
+;;; call immediately precedes the IF node, we know
 ;;; that any predicate will already be annotated.
 (defun ltn-analyze-if (node)
   (declare (type cif node))

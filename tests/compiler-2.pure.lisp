@@ -946,3 +946,14 @@
                  (loop)
                  (%r f)))
         (%r (lambda ()))))))
+
+(with-test (:name :split-ir2-blocks-cmov)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (let ((v (list 0)))
+           (if (block nil
+                 (eq v (cdr v)))
+               1
+               2)))
+    (() 2)))

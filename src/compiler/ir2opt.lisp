@@ -168,32 +168,34 @@
 ;; Since conditional branches are always at the end of blocks,
 ;; it suffices to look at the last VOP in each block.
 (defun maybe-convert-one-cmov (2block)
-  (let* ((block (ir2-block-block 2block))
-         (succ (block-succ block))
-         (a    (first succ))
-         (b    (second succ))
-         (vop  (or (ir2-block-last-vop 2block)
-                   (return-from maybe-convert-one-cmov)))
-         (node (vop-node vop)))
+  (let ((vop (or (ir2-block-last-vop 2block)
+                 (return-from maybe-convert-one-cmov))))
     (unless (eq (vop-name vop) 'branch-if)
       (return-from maybe-convert-one-cmov))
-    (destructuring-bind (jump-target flags not-p) (vop-codegen-info vop)
-      (multiple-value-bind (label target value-a value-b)
-          (cmovp jump-target a b)
-        (unless label
-          (return-from maybe-convert-one-cmov))
-        (multiple-value-bind (cmove-vop arg-a arg-b res info)
-            (convert-conditional-move-p node target value-a value-b)
-          (unless cmove-vop
+    ;; The test and branch-if may be split between two IR1 blocks
+    ;; due to cleanups, can't use bloc-succ of the ir2-block-block
+    (let* ((node (vop-node vop))
+           (succ (block-succ (node-block node)))
+           (a    (first succ))
+           (b    (second succ)))
+
+      (destructuring-bind (jump-target flags not-p) (vop-codegen-info vop)
+        (multiple-value-bind (label target value-a value-b)
+            (cmovp jump-target a b)
+          (unless label
             (return-from maybe-convert-one-cmov))
-          (when not-p
-            (rotatef value-a value-b)
-            (rotatef arg-a arg-b))
-          (convert-one-cmov cmove-vop value-a arg-a
-                                      value-b arg-b
-                                      target  res
-                                      flags info
-                            label vop node 2block))))))
+          (multiple-value-bind (cmove-vop arg-a arg-b res info)
+              (convert-conditional-move-p node target value-a value-b)
+            (unless cmove-vop
+              (return-from maybe-convert-one-cmov))
+            (when not-p
+              (rotatef value-a value-b)
+              (rotatef arg-a arg-b))
+            (convert-one-cmov cmove-vop value-a arg-a
+                              value-b arg-b
+                              target  res
+                              flags info
+                              label vop node 2block)))))))
 
 (defun convert-cmovs (component)
   (do-ir2-blocks (2block component (values))
