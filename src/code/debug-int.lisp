@@ -702,6 +702,14 @@
    (return-pc-offset-for-location debug-fun (frame-code-location frame))
    (compiled-frame-escaped frame)))
 
+(defun (setf frame-saved-lra) (new-lra frame debug-fun)
+  (sub-set-debug-var-slot
+   (frame-pointer frame)
+   (return-pc-offset-for-location debug-fun (frame-code-location frame))
+   new-lra
+   (compiled-frame-escaped frame))
+  new-lra)
+
 ;;; Return the frame immediately below FRAME on the stack; or when
 ;;; FRAME is the bottom of the stack, return NIL.
 (defun frame-down (frame)
@@ -2908,31 +2916,20 @@ register."
   (lambda (frame breakpoint)
     (declare (ignore breakpoint)
              (type frame frame))
-    (let ((lra-sc-offset
-            #!-fp-and-pc-standard-save
-            (sb!c::compiled-debug-fun-return-pc
-             (compiled-debug-fun-compiler-debug-fun debug-fun))
-            #!+fp-and-pc-standard-save
-            sb!c:return-pc-passing-offset))
-      (multiple-value-bind (lra component offset)
-          (make-bogus-lra
-           (get-context-value frame
-                              lra-save-offset
-                              lra-sc-offset))
-        (setf (get-context-value frame
-                                 lra-save-offset
-                                 lra-sc-offset)
-              lra)
-        (let ((end-bpts (breakpoint-%info starter-bpt)))
-          (let ((data (breakpoint-data component offset)))
-            (setf (breakpoint-data-breakpoints data) end-bpts)
-            (dolist (bpt end-bpts)
-              (setf (breakpoint-internal-data bpt) data)))
-          (let ((cookie (make-fun-end-cookie lra debug-fun)))
-            (setf (gethash component *fun-end-cookies*) cookie)
-            (dolist (bpt end-bpts)
-              (let ((fun (breakpoint-cookie-fun bpt)))
-                (when fun (funcall fun frame cookie))))))))))
+    (multiple-value-bind (lra component offset)
+        (make-bogus-lra
+         (frame-saved-lra frame debug-fun))
+      (setf (frame-saved-lra frame debug-fun) lra)
+      (let ((end-bpts (breakpoint-%info starter-bpt)))
+        (let ((data (breakpoint-data component offset)))
+          (setf (breakpoint-data-breakpoints data) end-bpts)
+          (dolist (bpt end-bpts)
+            (setf (breakpoint-internal-data bpt) data)))
+        (let ((cookie (make-fun-end-cookie lra debug-fun)))
+          (setf (gethash component *fun-end-cookies*) cookie)
+          (dolist (bpt end-bpts)
+            (let ((fun (breakpoint-cookie-fun bpt)))
+              (when fun (funcall fun frame cookie)))))))))
 
 ;;; This takes a FUN-END-COOKIE and a frame, and it returns
 ;;; whether the cookie is still valid. A cookie becomes invalid when
