@@ -690,18 +690,17 @@
         (sb!c::compiled-debug-fun-old-fp c-d-f)
         sb!c:old-fp-passing-offset)))
 
-(defun frame-saved-cfp-and-lra (frame debug-fun)
-  (let ((pointer (frame-pointer frame))
-        (escaped (compiled-frame-escaped frame)))
-    (values
-     (sub-access-debug-var-slot
-      pointer
-      (old-fp-offset-for-location debug-fun (frame-code-location frame))
-      escaped)
-     (sub-access-debug-var-slot
-      pointer
-      (return-pc-offset-for-location debug-fun (frame-code-location frame))
-      escaped))))
+(defun frame-saved-cfp (frame debug-fun)
+  (sub-access-debug-var-slot
+   (frame-pointer frame)
+   (old-fp-offset-for-location debug-fun (frame-code-location frame))
+   (compiled-frame-escaped frame)))
+
+(defun frame-saved-lra (frame debug-fun)
+  (sub-access-debug-var-slot
+   (frame-pointer frame)
+   (return-pc-offset-for-location debug-fun (frame-code-location frame))
+   (compiled-frame-escaped frame)))
 
 ;;; Return the frame immediately below FRAME on the stack; or when
 ;;; FRAME is the bottom of the stack, return NIL.
@@ -716,13 +715,10 @@
           (setf (frame-%down frame)
                 (etypecase debug-fun
                   (compiled-debug-fun
-                   (multiple-value-bind
-                         (old-fp lra)
-                       (frame-saved-cfp-and-lra frame debug-fun)
-                     (compute-calling-frame
-                      (descriptor-sap old-fp)
-                      lra
-                      frame)))
+                   (compute-calling-frame
+                    (descriptor-sap (frame-saved-cfp frame debug-fun))
+                    (frame-saved-lra frame debug-fun)
+                    frame))
                   (bogus-debug-fun
                    (let ((fp (frame-pointer frame)))
                      (when (control-stack-pointer-valid-p fp)
