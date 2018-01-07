@@ -668,16 +668,22 @@
     (when saved-fp
       (compute-calling-frame saved-fp saved-pc up-frame t))))
 
-#!-fp-and-pc-standard-save
 (defun return-pc-offset-for-location (debug-fun location)
+  (declare (ignorable debug-fun location))
+  #!+fp-and-pc-standard-save
+  sb!c:return-pc-passing-offset
+  #!-fp-and-pc-standard-save
   (let ((c-d-f (compiled-debug-fun-compiler-debug-fun debug-fun))
         (pc-offset (compiled-code-location-pc location)))
     (if (>= pc-offset (sb!c::compiled-debug-fun-lra-saved-pc c-d-f))
         (sb!c::compiled-debug-fun-return-pc c-d-f)
         (sb!c::compiled-debug-fun-return-pc-pass c-d-f))))
 
-#!-fp-and-pc-standard-save
 (defun old-fp-offset-for-location (debug-fun location)
+  (declare (ignorable debug-fun location))
+  #!+fp-and-pc-standard-save
+  sb!c:old-fp-passing-offset
+  #!-fp-and-pc-standard-save
   (let ((c-d-f (compiled-debug-fun-compiler-debug-fun debug-fun))
         (pc-offset (compiled-code-location-pc location)))
     (if (>= pc-offset (sb!c::compiled-debug-fun-cfp-saved-pc c-d-f))
@@ -685,16 +691,6 @@
         sb!c:old-fp-passing-offset)))
 
 (defun frame-saved-cfp-and-lra (frame debug-fun)
-  (declare (ignorable debug-fun))
-  #!+fp-and-pc-standard-save
-  (values
-     (get-context-value
-      frame ocfp-save-offset
-      sb!c:old-fp-passing-offset)
-     (get-context-value
-      frame lra-save-offset
-      sb!c:return-pc-passing-offset))
-  #!-fp-and-pc-standard-save
   (let ((pointer (frame-pointer frame))
         (escaped (compiled-frame-escaped frame)))
     (values
