@@ -513,9 +513,13 @@
   (define-shutdown-tests :output)
   (define-shutdown-tests :io))
 
+(defun poor-persons-random-address ()
+  (let ((base (expt 36 8)))
+    (format nil "~36R" (+ base (random base (make-random-state t))))))
+
 #+linux
 (deftest abstract.smoke
-    (let* ((address "J9dbfDNuVewDs")
+    (let* ((address (poor-persons-random-address))
            (message "message")
            (buffer (make-string (length message))))
       (with-client-and-server ((local-abstract-socket :type :stream)
@@ -528,7 +532,7 @@
 
 #+linux
 (deftest abstract.socket-peername
-    (let ((address "J9dbfDNuVewDs"))
+    (let ((address (poor-persons-random-address)))
       (with-client-and-server ((local-abstract-socket :type :stream)
                                (listener address)
                                (client address)
