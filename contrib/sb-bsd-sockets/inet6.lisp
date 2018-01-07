@@ -35,18 +35,18 @@ Examples:
      (endpoint-string/v6 address port))))
 
 (defun unparse-inet6-address (address)
-  (let ((max-length sockint::INET6-ADDRSTRLEN))
-    (sb-alien:with-alien ((octets (array char 16))
-                          (storage (sb-alien:c-string) (make-string max-length)))
-      (dotimes (i 16)
-        (setf (sb-alien:deref octets i) (elt address i)))
-      (socket-error-case ("inet_ntop"
-                          (sockint::inet-ntop
-                           sockint::af-inet6
-                           (sb-alien:cast octets (* sb-alien:unsigned-char))
-                           storage max-length)
-                          result (null result))
-          result))))
+  (sb-alien:with-alien ((octets (array sb-alien:unsigned-char 16))
+                        (storage (array sb-alien:char #.sockint::INET6-ADDRSTRLEN)))
+    (dotimes (i 16)
+      (setf (sb-alien:deref octets i) (elt address i)))
+    (socket-error-case ("inet_ntop"
+                        (sockint::inet-ntop
+                         sockint::af-inet6
+                         (sb-alien:cast octets (* t))
+                         (sb-alien:cast storage (* sb-alien:char))
+                         sockint::INET6-ADDRSTRLEN)
+                        result (null result))
+        result)))
 
 (defun make-inet6-address (colon-separated-integers)
   "Return a vector of octets given a string representation of an IPv6
