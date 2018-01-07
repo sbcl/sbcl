@@ -668,6 +668,22 @@
     (when saved-fp
       (compute-calling-frame saved-fp saved-pc up-frame t))))
 
+#!-fp-and-pc-standard-save
+(defun return-pc-offset-for-location (debug-fun location)
+  (let ((c-d-f (compiled-debug-fun-compiler-debug-fun debug-fun))
+        (pc-offset (compiled-code-location-pc location)))
+    (if (>= pc-offset (sb!c::compiled-debug-fun-lra-saved-pc c-d-f))
+        (sb!c::compiled-debug-fun-return-pc c-d-f)
+        (sb!c::compiled-debug-fun-return-pc-pass c-d-f))))
+
+#!-fp-and-pc-standard-save
+(defun old-fp-offset-for-location (debug-fun location)
+  (let ((c-d-f (compiled-debug-fun-compiler-debug-fun debug-fun))
+        (pc-offset (compiled-code-location-pc location)))
+    (if (>= pc-offset (sb!c::compiled-debug-fun-cfp-saved-pc c-d-f))
+        (sb!c::compiled-debug-fun-old-fp c-d-f)
+        sb!c:old-fp-passing-offset)))
+
 (defun frame-saved-cfp-and-lra (frame debug-fun)
   (declare (ignorable debug-fun))
   #!+fp-and-pc-standard-save
@@ -679,25 +695,17 @@
       frame lra-save-offset
       sb!c:return-pc-passing-offset))
   #!-fp-and-pc-standard-save
-  (let ((c-d-f (compiled-debug-fun-compiler-debug-fun
-                debug-fun))
-        (pointer (frame-pointer frame))
+  (let ((pointer (frame-pointer frame))
         (escaped (compiled-frame-escaped frame)))
-    (let ((pc-offset (compiled-code-location-pc
-                      (frame-code-location frame))))
-      (values
-       (sub-access-debug-var-slot
-        pointer
-        (if (>= pc-offset (sb!c::compiled-debug-fun-cfp-saved-pc c-d-f))
-            (sb!c::compiled-debug-fun-old-fp c-d-f)
-            sb!c:old-fp-passing-offset)
-        escaped)
-       (sub-access-debug-var-slot
-        pointer
-        (if (>= pc-offset (sb!c::compiled-debug-fun-lra-saved-pc c-d-f))
-            (sb!c::compiled-debug-fun-return-pc c-d-f)
-            (sb!c::compiled-debug-fun-return-pc-pass c-d-f))
-        escaped)))))
+    (values
+     (sub-access-debug-var-slot
+      pointer
+      (old-fp-offset-for-location debug-fun (frame-code-location frame))
+      escaped)
+     (sub-access-debug-var-slot
+      pointer
+      (return-pc-offset-for-location debug-fun (frame-code-location frame))
+      escaped))))
 
 ;;; Return the frame immediately below FRAME on the stack; or when
 ;;; FRAME is the bottom of the stack, return NIL.
