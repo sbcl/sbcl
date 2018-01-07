@@ -278,16 +278,18 @@ static void trace_object(lispobj* where)
             __mark_obj(lhash_table);
             struct hash_table* hash_table
               = (struct hash_table *)native_pointer(lhash_table);
-            if (!hash_table->_weakness) {
-                scav_hash_table_entries(hash_table, alivep_funs, mark_pair);
+            if (!hashtable_weakp(hash_table)) {
+                scav_hash_table_entries(hash_table, 0, mark_pair);
             } else {
                 // An object can only be removed from the queue once.
                 // Therefore the 'next' pointer has got to be nil.
                 gc_assert(hash_table->next_weak_hash_table == NIL);
                 hash_table->next_weak_hash_table = (lispobj)weak_hash_tables;
                 weak_hash_tables = hash_table;
-                if (hash_table->_weakness != make_fixnum(WEAKNESS_KEY_AND_VALUE))
-                    scav_hash_table_entries(hash_table, alivep_funs, mark_pair);
+                int weakness = hashtable_weakness(hash_table);
+                if (weakness != WEAKNESS_KEY_AND_VALUE)
+                    scav_hash_table_entries(hash_table, alivep_funs[weakness],
+                                            mark_pair);
             }
             return;
         }

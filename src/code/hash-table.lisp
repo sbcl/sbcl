@@ -12,23 +12,6 @@
 
 (in-package "SB!IMPL")
 
-;;; ** weak_hash_entry_alivep_fun[] in gc-common must
-;;;    coincide with this ordering of table kinds
-;;;
-;;; Putting :KEY-OR-VALUE specifically at index 3, and :KEY-AND-VALUE
-;;; at index 4, is not haphazard. When adding objects to the set of objects
-;;; which trigger another object to become live, we can interpret the bit
-;;; indices in 'weakness' as follows:
-;;;   bit 0 : key triggers value
-;;;   bit 1 : value triggers key
-;;;   both  : each triggers the other
-;;; :KEY-AND-VALUE (low 2 bits 0) is such that neither half triggers the other.
-;;; The AND relation is essentially like a pair of weak pointers,
-;;; and each must be live in its own right for the pair to be live.
-(defconstant-eqx weak-hash-table-kinds
-    #(nil :key :value :key-or-value :key-and-value)
-  #'equalp)
-
 ;;; HASH-TABLE is implemented as a STRUCTURE-OBJECT.
 (sb!xc:defstruct (hash-table (:copier nil)
                              (:constructor %make-hash-table
@@ -39,11 +22,10 @@
                                 rehash-threshold
                                 rehash-trigger
                                 table
-                                %weakness
                                 index-vector
                                 next-vector
                                 hash-vector
-                                synchronized-p)))
+                                flags)))
   ;; The type of hash table this is. Only used for printing and as
   ;; part of the exported interface.
   (test nil :type symbol :read-only t)
@@ -72,9 +54,8 @@
   ;; This slot is used to link weak hash tables during GC. When the GC
   ;; isn't running it is always NIL.
   (next-weak-hash-table nil :type null)
-  ;; Non-NIL if this is some kind of weak hash table. For details see
-  ;; the docstring of MAKE-HASH-TABLE.
-  (%weakness nil :type (integer 0 4) :read-only t)
+  ;; 2 bits for weakness kind, 1 bit for synchronized, 1 bit for weakp
+  (flags 0 :type (unsigned-byte 4) :read-only t)
   ;; Index into the Next vector chaining together free slots in the KV
   ;; vector.
   (next-free-kv 0 :type index)
@@ -98,8 +79,6 @@
   ;; Used for locking GETHASH/(SETF GETHASH)/REMHASH
   (lock (sb!thread:make-mutex :name "hash-table lock")
         :type sb!thread:mutex :read-only t)
-  ;; Has user requested synchronization?
-  (synchronized-p nil :type (member nil t) :read-only t)
   ;; For detecting concurrent accesses.
   #!+sb-hash-table-debug
   (signal-concurrent-access t :type (member nil t))

@@ -9,6 +9,7 @@
 #include "genesis/cons.h"
 #include "genesis/constants.h"
 #include "genesis/gc-tables.h"
+#include "genesis/hash-table.h"
 #include "genesis/instance.h"
 #include "genesis/layout.h"
 #include "genesis/package.h"
@@ -750,6 +751,27 @@ static uword_t build_refs(lispobj* where, lispobj* end,
         case FDEFN_WIDETAG:
             check_ptr(fdefn_callee_lispobj((struct fdefn*)where));
             scan_limit = 3;
+            break;
+        case SIMPLE_VECTOR_WIDETAG:
+            // For weak hash-table vectors, a <k,v> pair may participate in
+            // a path from the root only if it does not involve whichever
+            // object is definitely weak. This fails on weak key-OR-value
+            // tables since we can't decide whether to allow the entry.
+            if (is_vector_subtype(*where, VectorValidHashing)) {
+                lispobj lhash_table = where[2];
+                gc_assert(lowtag_of(lhash_table) == INSTANCE_POINTER_LOWTAG);
+                struct hash_table* hash_table =
+                  (struct hash_table *)native_pointer(lhash_table);
+                int weakness = hashtable_weakness(hash_table);
+                if (hashtable_weakp(hash_table) &&
+                    (weakness == 1 || weakness == 2)) { // 1=key, 2=value
+                    // Skip the first 4 words which are:
+                    //  header, length, vector->table backpointer, rehash-p
+                    int start = (weakness == 1) ? 5 : 4;
+                    for(i=start; i<scan_limit; i+=2) check_ptr(where[i]);
+                    continue;
+                }
+            }
             break;
         default:
             if (!(other_immediate_lowtag_p(widetag) && lowtag_for_widetag[widetag>>2]))

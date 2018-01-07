@@ -14,14 +14,31 @@
 
 ;;;; utilities
 
+;;; T if and only if table has non-null weakness kind.
+(declaim (inline hash-table-weak-p))
+(defun hash-table-weak-p (ht) (logbitp 0 (hash-table-flags ht)))
+
+;;; Value of :synchronized constructor argument.
+(declaim (inline hash-table-synchronized-p))
+(defun hash-table-synchronized-p (ht) (logbitp 1 (hash-table-flags ht)))
+
+;;; Keep in sync with weak_ht_alivep_funs[] in gc-common
+(declaim (inline decode-hash-table-weakness))
+(defun decode-hash-table-weakness (x)
+  ;; The bits of 'weakness' are interpreted as follows:
+  ;;   bit 0 : live key forces value to be live
+  ;;   bit 1 : live value forces key to be live
+  ;;   both  : either forces the other to be live
+  ;; :KEY-AND-VALUE has two zero bits, as neither object livens the other
+  (aref #(:key-and-value :key :value :key-or-value) x))
+
+;;; Non-NIL if this is some kind of weak hash table. For details see
+;;; the docstring of MAKE-HASH-TABLE.
 (defun hash-table-weakness (ht)
   "Return the WEAKNESS of HASH-TABLE which is one of NIL, :KEY,
 :VALUE, :KEY-AND-VALUE, :KEY-OR-VALUE."
-  (aref weak-hash-table-kinds (hash-table-%weakness ht)))
-
-(declaim (inline hash-table-weak-p))
-(defun hash-table-weak-p (ht)
-  (not (zerop (hash-table-%weakness ht))))
+  (and (hash-table-weak-p ht)
+       (decode-hash-table-weakness (ash (hash-table-flags ht) -2))))
 
 ;;; Code for detecting concurrent accesses to the same table from
 ;;; multiple threads. Only compiled in when the :SB-HASH-TABLE-DEBUG
@@ -400,6 +417,12 @@ Examples:
                                     '(unsigned-byte #.sb!vm:n-word-bits)))
            (kv-vector (make-array (* 2 size+1)
                                   :initial-element +empty-ht-slot+))
+           (weakness (if weakness
+                         (or (loop for i below 4
+                                   when (eq (decode-hash-table-weakness i) weakness)
+                                   do (return (logior (ash i 2) 1)))
+                             (bug "Unreachable"))
+                         0))
            (table (%make-hash-table
                    test
                    test-fun
@@ -408,7 +431,6 @@ Examples:
                    rehash-threshold
                    size
                    kv-vector
-                   (position weakness weak-hash-table-kinds :test #'eq)
                    index-vector
                    next-vector
                    (unless (eq test 'eq)
@@ -417,7 +439,7 @@ Examples:
                                  :element-type '(unsigned-byte
                                                  #.sb!vm:n-word-bits)
                                  :initial-element +magic-hash-vector-value+))
-                   synchronized)))
+                   (logior (if synchronized 2 0) weakness))))
       (declare (type index size+1 scaled-size length))
       (setf (kv-vector-needs-rehash kv-vector) 0)
       ;; Set up the free list, all free. These lists are 0 terminated.
@@ -561,7 +583,7 @@ multiple threads accessing the same hash-table without locking."
                  (setf (aref new-next-vector i) next)
                  (setf (aref new-index-vector index) i)))
               (t
-               ;; EQ base hash.
+               ;; EQ-based hash.
                ;; Enable GC tricks.
                (set-header-data new-kv-vector
                                 sb!vm:vector-valid-hashing-subtype)
@@ -628,7 +650,7 @@ multiple threads accessing the same hash-table without locking."
                  (setf (aref next-vector i) next)
                  (setf (aref index-vector index) i)))
               (t
-               ;; EQ base hash.
+               ;; EQ-based hash.
                ;; Enable GC tricks.
                (set-header-data kv-vector sb!vm:vector-valid-hashing-subtype)
                (let* ((hashing (pointer-hash key))
