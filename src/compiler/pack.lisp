@@ -791,6 +791,18 @@
           (when (eq (vop-info-save-p (vop-info vop)) t)
             (let ((penalty (+ save-penalty (vop-depth-cost vop))))
               (do-live-tns (tn (vop-save-set vop) block)
+                #!-fp-and-pc-standard-save
+                (let ((save-tn (tn-save-tn tn)))
+                  (when (and save-tn (eq :specified-save (tn-kind save-tn)))
+                    ;; If we're expecting to spill a TN with a
+                    ;; specified save slot (the OCFP or LRA save TNs),
+                    ;; force it to the stack now.  If we don't, then
+                    ;; it might not end up on the stack, which may
+                    ;; lead to some useless loads in some code, and
+                    ;; will lead to race conditions in the debugger
+                    ;; involving backtraces from asynchronous
+                    ;; interrupts.
+                    (setf (tn-sc tn) (tn-sc save-tn))))
                 (decf (tn-cost tn) penalty))))))
 
       (do ((tn (ir2-component-normal-tns (component-info component))
@@ -805,6 +817,28 @@
               ((null ref))
             (incf cost (+ write-cost (vop-depth-cost (tn-ref-vop ref)))))
           (setf (tn-cost tn) cost))))))
+
+;;; If we're not assigning costs, and on a system where it matters, go
+;;; through and force TNs with specified save locations (OCFP and LRA
+;;; save locations) to the stack if they are going to be spilled.  See
+;;; the comment in ASSIGN-TN-COSTS for consequences of not doing so.
+#!-fp-and-pc-standard-save
+(defun maybe-force-specified-saves-to-stack (component)
+  (do-ir2-blocks (block component)
+    (do ((vop (ir2-block-start-vop block) (vop-next vop)))
+        ((null vop))
+      (when (eq (vop-info-save-p (vop-info vop)) t)
+        (do-live-tns (tn (vop-save-set vop) block)
+          (let ((save-tn (tn-save-tn tn)))
+            (when (and save-tn (eq :specified-save (tn-kind save-tn)))
+              ;; If we're expecting to spill a TN with a
+              ;; specified save slot (the OCFP or LRA save TNs),
+              ;; force it to the stack now.  If we don't, then
+              ;; it might not end up on the stack, which may
+              ;; lead to some useless loads in some code, and
+              ;; race conditions in the debugger involving
+              ;; backtraces from asynchronous interrupts.
+              (setf (tn-sc tn) (tn-sc save-tn)))))))))
 
 ;;; Iterate over the normal TNs, folding over the depth of the looops
 ;;; that the TN is used in and storing the result in TN-LOOP-DEPTH.
@@ -1619,8 +1653,10 @@
 
          ;; Assign costs to normal TNs so we know which ones should always
          ;; be packed on the stack, and which are important not to spill.
-         (when *pack-assign-costs*
-           (assign-tn-costs component))
+         (if *pack-assign-costs*
+             (assign-tn-costs component)
+             #!-fp-and-pc-standard-save
+             (maybe-force-specified-saves-to-stack component))
 
          ;; Actually allocate registers for most TNs. After this, only
          ;; :normal tns may be left unallocated (or TNs :restricted to
