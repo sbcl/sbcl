@@ -286,8 +286,19 @@
   (declare (ignore index))
   (assert-new-value-type new-value array))
 
+(defun check-array-dimensions (dims node)
+  (or (typep dims 'index)
+      (and (proper-list-p dims)
+           (every (lambda (x)
+                    (typep x 'index))
+                  dims))
+      (let ((*compiler-error-context* node))
+        (setf (combination-kind node) :error)
+        (compiler-warn "Bad array dimensions: ~a" dims))))
+
 (defun derive-make-array-type (dims element-type adjustable
-                               fill-pointer displaced-to)
+                               fill-pointer displaced-to
+                               node)
   (let* ((simple (and (unsupplied-or-nil adjustable)
                       (unsupplied-or-nil displaced-to)
                       (unsupplied-or-nil fill-pointer)))
@@ -308,6 +319,8 @@
                  ,(cond ((constant-lvar-p dims)
                          (let* ((val (lvar-value dims))
                                 (cdims (ensure-list val)))
+                           (unless (check-array-dimensions val node)
+                             (return-from derive-make-array-type))
                            (if simple
                                cdims
                                (length cdims))))
@@ -326,24 +339,17 @@
 
 (defoptimizer (make-array derive-type)
     ((dims &key element-type adjustable fill-pointer displaced-to
-           &allow-other-keys))
+           &allow-other-keys)
+     node)
   (derive-make-array-type dims element-type adjustable
-                          fill-pointer displaced-to))
+                          fill-pointer displaced-to
+                          node))
 
 (defoptimizer (%make-array derive-type)
     ((dims widetag n-bits &key adjustable fill-pointer displaced-to
            &allow-other-keys)
      node)
   (declare (ignore n-bits))
-  (when (constant-lvar-p dims)
-    (let ((dims (lvar-value dims)))
-      (unless (or (typep dims 'index)
-                  (and (proper-list-p dims)
-                       (every (lambda (x)
-                                (typep x 'index))
-                              dims)))
-        (let ((*compiler-error-context* node))
-          (compiler-warn "Bad array dimensions: ~a" dims)))))
   (let ((saetp (and (constant-lvar-p widetag)
                     (find (lvar-value widetag)
                           sb!vm:*specialized-array-element-type-properties*
@@ -351,7 +357,8 @@
     (derive-make-array-type dims (if saetp
                                      (sb!vm:saetp-ctype saetp)
                                      *wild-type*)
-                            adjustable fill-pointer displaced-to)))
+                            adjustable fill-pointer displaced-to
+                            node)))
 
 
 ;;;; constructors
@@ -467,7 +474,7 @@
 (define-source-transform make-array (dims-form &rest rest &environment env
                                                &aux dims dims-constp)
   (cond ((and (sb!xc:constantp dims-form env)
-              (listp (setq dims (constant-form-value dims-form env)))
+              (proper-list-p (setq dims (constant-form-value dims-form env)))
               (not (singleton-p dims))
               (every (lambda (x) (typep x 'index)) dims))
          (setq dims-constp t))
@@ -1010,12 +1017,11 @@
           (element-type-ctype (and (constant-lvar-p element-type)
                                    (ir1-transform-specifier-type
                                     (lvar-value element-type)))))
-      (when (contains-unknown-type-p element-type-ctype)
+      (when (or (contains-unknown-type-p element-type-ctype)
+                (not (proper-list-p dims)))
         (give-up-ir1-transform))
-      (unless (every (lambda (x) (typep x '(integer 0))) dims)
-        (give-up-ir1-transform
-         "The dimension list contains something other than an integer: ~S"
-         dims))
+      (unless (check-array-dimensions dims call)
+          (give-up-ir1-transform))
       (cond ((singleton-p dims)
              (transform-make-array-vector (car dims) element-type
                                           initial-element initial-contents call

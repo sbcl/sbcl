@@ -402,8 +402,8 @@
                 (assert failure-p)
                 (assert (= 1 (length warnings))))
                (notinline
-                (assert (not failure-p))
-                (assert (null warnings))))
+                (assert failure-p)
+                (assert (= 1 (length warnings)))))
              (assert-error (funcall fun) type-error))))
     (test 'inline)
     (test 'notinline)))

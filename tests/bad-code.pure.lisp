@@ -128,6 +128,24 @@
                   (make-array '(-10)))
                :allow-warnings t))))
 
+(with-test (:name (make-array :bad-dimensions.2))
+  (assert
+   (nth-value 1
+              (checked-compile
+               `(lambda ()
+                  (make-array '(0 . 2)))
+               :allow-warnings t))))
+
+(with-test (:name (make-array :bad-dimensions.3))
+  (assert
+   (nth-value 1
+              (checked-compile
+               `(lambda ()
+                  (make-array '(0 . 2)
+                              :element-type 'fixnum
+                              :adjustable t))
+               :allow-warnings t))))
+
 (with-test (:name (make-array :initial-contents :bad-macro))
   (assert
    (nth-value 1
