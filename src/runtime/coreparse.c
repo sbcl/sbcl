@@ -593,6 +593,7 @@ static void relocate_heap(struct heap_adjust* adj)
 }
 #endif
 
+#ifdef LISP_FEATURE_RELOCATABLE_HEAP
 static void
 set_adjustment(struct heap_adjust* adj,
                uword_t actual_addr,
@@ -606,6 +607,7 @@ set_adjustment(struct heap_adjust* adj,
     adj->range[j].delta = actual_addr - desired_addr;
     adj->n_ranges = j+1;
 }
+#endif
 
 static void
 process_directory(int count, struct ndir_entry *entry,

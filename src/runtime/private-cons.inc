@@ -70,7 +70,7 @@ static struct cons* private_cons_impl()
         cons = (struct cons*)(page_address(page) + bytes_used);
     } else {
         page = generation_alloc_start_page(0, UNBOXED_PAGE_FLAG, 0);
-        page_index_t last_page =
+        page_index_t last_page __attribute__((unused)) =
             gc_find_freeish_pages(&page, GENCGC_CARD_BYTES,
                                   SINGLE_OBJECT_FLAG | UNBOXED_PAGE_FLAG, 0);
         // See question about last_page in gc_alloc_large

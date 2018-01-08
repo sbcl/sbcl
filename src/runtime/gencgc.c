@@ -4341,7 +4341,7 @@ gc_and_save(char *filename, boolean prepend_runtime,
     /* The number of dynamic space pages saved is based on the allocation
      * pointer, while the number of PTEs is based on last_free_page.
      * Make sure they agree */
-    gc_assert(get_alloc_pointer() == (lispobj*)(page_address(last_free_page)));
+    gc_assert((char*)get_alloc_pointer() == page_address(last_free_page));
 
     save_to_filehandle(file, filename, lisp_init_function,
                        prepend_runtime, save_runtime_options,
