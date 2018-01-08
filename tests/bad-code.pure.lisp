@@ -151,3 +151,10 @@
     (declare (ignore fun))
     (assert failure)
     (mapcar #'princ-to-string warnings)))
+
+(with-test (:name :ldb-transform-macroexpand)
+  (assert
+   (nth-value 1
+              (checked-compile
+               `(lambda () (ldb (do) 0))
+               :allow-failure t))))

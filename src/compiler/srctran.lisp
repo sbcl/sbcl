@@ -2498,7 +2498,9 @@
 ;;;; A transform approximates that, but fails when BYTE is produced by an
 ;;;; inline function and not a macro.
 (flet ((xform (bytespec-form env int fun &optional (new nil setter-p))
-         (let ((spec (%macroexpand bytespec-form env)))
+         (let ((spec (handler-case (%macroexpand bytespec-form env)
+                       (error ()
+                         (return-from xform (values nil t))))))
            (if (and (consp spec) (eq (car spec) 'byte))
                (if (proper-list-of-length-p (cdr spec) 2)
                    (values `(,fun ,@(if setter-p (list new))
