@@ -50,8 +50,7 @@
 (declaim (simple-vector **finalizer-store**))
 
 (defun finalize (object function &key dont-save
-                        &aux (item
-                              (list (if dont-save (list function) function))))
+                        &aux (item (if dont-save (list function) function)))
   (declare (type callable function))
   "Arrange for the designated FUNCTION to be called when there
 are no more references to OBJECT, including references in
@@ -105,7 +104,15 @@ Examples:
     (let ((id (gethash object (finalizer-id-map store))))
       (cond (id ; object already has at least one finalizer
              ;; Multiple finalizers are invoked in the order added.
-             (setf (svref store id) (nconc (svref store id) item)))
+             (let* ((old (svref store id))
+                    (new (make-array (if (simple-vector-p old)
+                                         (1+ (length old)) ; already > 1
+                                         2))))             ; was singleton
+               (if (= (length new) 2)
+                   (setf (aref new 0) old) ; upgrade singleton to vector
+                   (replace new old))
+               (setf (aref new (1- (length new))) item
+                     (svref store id) new)))
             (t ; assign the next available ID to this object
              (cond ((finalizer-recycle-bin store)
                     ;; We must operate atomically with respect to producers,
@@ -145,8 +152,18 @@ Examples:
              (make-finalizer-store (max (1+ (finalizer-max-id old-store))
                                         +finalizers-initial-size+)))
             (old-objects (finalizer-id-map old-store)))
-        (maphash (lambda (object old-id)
-                   (awhen (delete-if #'consp (svref old-store old-id))
+        (maphash (lambda (object old-id &aux (old (svref old-store old-id)))
+                   ;; OLD is either a vector of finalizers or a single finalizer.
+                   ;; Each finalizer is either a callable (a symbol or function)
+                   ;; or a singleton list of a callable.
+                   ;; Delete any finalizer wrapped in a cons, meaning "don't save".
+                   (awhen (cond ((simple-vector-p old)
+                                 (let ((new (remove-if #'consp old)))
+                                   (case (length new)
+                                     (0 nil) ; all deleted
+                                     (1 (svref new 0)) ; reduced to singleton
+                                     (t new))))
+                                ((atom old) old)) ; a single finalizer to be saved
                      (let ((new-id (incf (finalizer-max-id new-store))))
                        (setf (gethash object (finalizer-id-map new-store)) new-id
                              (svref new-store new-id) it))))
@@ -228,11 +245,14 @@ Examples:
               ;; on (CAR CELL) and STORE. (Alpha with threads, anyone?)
               (finalizers (svref store id))) ; [1] load
          (setf (svref store id) 0)           ; [2] store
-         (dolist (finalizer finalizers)
-           (let ((fun (if (consp finalizer) (car finalizer) finalizer)))
-             (handler-case (funcall fun)
-               (error (c)
-                 (warn "Error calling finalizer ~S:~%  ~S" fun c)))))
+         (flet ((call (finalizer)
+                  (let ((fun (if (consp finalizer) (car finalizer) finalizer)))
+                    (handler-case (funcall fun)
+                      (error (c)
+                        (warn "Error calling finalizer ~S:~%  ~S" fun c))))))
+           (if (simple-vector-p finalizers)
+               (map nil #'call finalizers)
+               (call finalizers)))
          ;; While the assignment to (SVREF STORE ID) should have been adequate,
          ;; we don't know that the vector is current - a new vector could have
          ;; gotten assigned into **FINALIZER-STORE** in between [1] and [2],
@@ -246,9 +266,11 @@ Examples:
          ;;   then you must have been able to find via the hash-table the
          ;;   object that maps to that index, which means it wasn't dead,
          ;;   so we must not be here trying to call finalizers for it.
-         ;; Smashing the CAR and CDR of 'finalizers' is a good extra step
-         ;; in terms of removing dangling references.
-         (setf (car finalizers) 0 (cdr finalizers) 0)
+         ;; Smashing 'finalizers' is a good extra step in terms of
+         ;; removing dangling references, but if it's just a function,
+         ;; there's nothing to smash.
+         (cond ((simple-vector-p finalizers) (fill finalizers 0))
+               ((consp finalizers) (rplaca finalizers 0)))
          ;; Recycle the ID by linking CELL into the recycle bin.
          (let* ((list (svref store 0))
                 (old (cdr list)))
