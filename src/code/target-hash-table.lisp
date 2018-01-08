@@ -38,7 +38,7 @@
   "Return the WEAKNESS of HASH-TABLE which is one of NIL, :KEY,
 :VALUE, :KEY-AND-VALUE, :KEY-OR-VALUE."
   (and (hash-table-weak-p ht)
-       (decode-hash-table-weakness (ash (hash-table-flags ht) -2))))
+       (decode-hash-table-weakness (ash (hash-table-flags ht) -3))))
 
 ;;; Code for detecting concurrent accesses to the same table from
 ;;; multiple threads. Only compiled in when the :SB-HASH-TABLE-DEBUG
@@ -420,7 +420,7 @@ Examples:
            (weakness (if weakness
                          (or (loop for i below 4
                                    when (eq (decode-hash-table-weakness i) weakness)
-                                   do (return (logior (ash i 2) 1)))
+                                   do (return (logior (ash i 3) 1)))
                              (bug "Unreachable"))
                          0))
            (table (%make-hash-table

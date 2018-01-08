@@ -1,4 +1,4 @@
-;;;; finalization based on weak pointers
+;;;; finalization based on weak-keyed hash-table
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -11,16 +11,47 @@
 
 (in-package "SB!IMPL")
 
-(defglobal **finalizer-store** nil)
+(defmacro with-finalizer-store ((var) &body body)
+  `(let ((mutex (hash-table-lock (finalizer-id-map **finalizer-store**))))
+     ;; This does not inhibit GC, though the hashtable operations will,
+     ;; as is (currently) required for tables with non-null weakness.
+     (sb!thread::with-recursive-system-lock (mutex)
+       ;; Grab the store again inside the lock in case the array was enlarged
+       ;; after we referenced the mutex but before we acquired it.
+       (let ((,var **finalizer-store**))
+         ,@body))))
 
-(defglobal **finalizer-store-lock**
-  (sb!thread:make-mutex :name "Finalizer store lock."))
+(defmacro finalizer-recycle-bin (store) `(cdr (elt ,store 0)))
+(defmacro finalizer-id-map (store) `(elt ,store 1))
+(defmacro finalizer-max-id (store) `(elt ,store 2))
 
-(defmacro with-finalizer-store-lock (&body body)
-  `(sb!thread::with-system-mutex (**finalizer-store-lock** :without-gcing t)
-     ,@body))
+(defun make-finalizer-store (array-length)
+  (let* ((v (make-array (the index array-length)))
+         (ht (make-hash-table :test 'eq :weakness :key)))
+    (macrolet ((frob-hash-table-flag-bit (slot-name val)
+                 (let ((dsd (find slot-name
+                                  (dd-slots (find-defstruct-description 'hash-table))
+                                  :key 'dsd-name)))
+                   `(setf (%instance-ref ht ,(dsd-index dsd))
+                          (logior (%instance-ref ht ,(dsd-index dsd)) ,val)))))
+      (frob-hash-table-flag-bit flags 4))
+    ;; The recycle bin has a dummy item in front so that the simple-vector
+    ;; is growable without messing up RUN-PENDING-FINALIZERS when it atomically
+    ;; pushes items into the recycle bin - it is unaffected by looking at
+    ;; an obsolete **FINALIZER-STORE** if FINALIZE has assigned a new one.
+    (setf (elt v 0) (list 0)
+          (finalizer-id-map v) ht
+          (finalizer-max-id v) 2)
+    v))
 
-(defun finalize (object function &key dont-save)
+(defconstant +finalizers-initial-size+ 50) ; arbitrary
+(define-load-time-global **finalizer-store**
+  (make-finalizer-store +finalizers-initial-size+))
+(declaim (simple-vector **finalizer-store**))
+
+(defun finalize (object function &key dont-save
+                        &aux (item
+                              (list (if dont-save (list function) function))))
   (declare (type callable function))
   "Arrange for the designated FUNCTION to be called when there
 are no more references to OBJECT, including references in
@@ -70,58 +101,156 @@ Examples:
             ; -> ERROR, caught, WARNING signalled"
   (unless object
     (error "Cannot finalize NIL."))
-  (with-finalizer-store-lock
-    (push (list (make-weak-pointer object) function dont-save)
-          **finalizer-store**))
+  (with-finalizer-store (store)
+    (let ((id (gethash object (finalizer-id-map store))))
+      (cond (id ; object already has at least one finalizer
+             ;; Multiple finalizers are invoked in the order added.
+             (setf (svref store id) (nconc (svref store id) item)))
+            (t ; assign the next available ID to this object
+             (cond ((finalizer-recycle-bin store)
+                    ;; We must operate atomically with respect to producers,
+                    ;; because RUN-PENDING-FINALIZERS is lock-free.
+                    ;; The initial test above said that the bin is nonempty,
+                    ;; so we can't fail to obtain an item, as the list can't
+                    ;; shrink except through here, which is mutually exclusive
+                    ;; with other consumers of recycled items.
+                    (setq id (atomic-pop (finalizer-recycle-bin store))))
+                   (t
+                    (setq id (incf (finalizer-max-id store)))
+                    (unless (< id (length store))
+                      (sb!thread:barrier (:write)
+                        ;; We must completely copy the old vector into the new
+                        ;; before publishing the new in **FINALIZER-STORE**.
+                        ;; Perhaps a cleverer way to size up is to have a tree
+                        ;; of vectors; never remove cells already created,
+                        ;; but simply graft new limbs on to the tree.
+                        (setq store (adjust-array store (* (length store) 2)
+                                                  :initial-element 0)))
+                      (setq **finalizer-store** store))))
+             ;; Clear out lingering junk from (SVREF STORE ID) before
+             ;; establishing that OBJECT maps to that index.
+             (setf (svref store id) item
+                   (gethash object (finalizer-id-map store)) id)))))
   object)
 
 (defun finalizers-deinit ()
   ;; remove :dont-save finalizers
-  (with-finalizer-store-lock
-    (setf **finalizer-store** (delete-if #'third **finalizer-store**)))
-  nil)
+  ;; Renumber the ID range as well, but leave the array size as-is. We could
+  ;; probably delete *all* finalizers prior to image dump, because saved
+  ;; finalizers can in practice almost never be run, as pseudo-static objects
+  ;; don't die, making this more-or-less an exercise in futility.
+  (with-finalizer-store (old-store)
+    (without-gcing
+      (let ((new-store
+             (make-finalizer-store (max (1+ (finalizer-max-id old-store))
+                                        +finalizers-initial-size+)))
+            (old-objects (finalizer-id-map old-store)))
+        (maphash (lambda (object old-id)
+                   (awhen (delete-if #'consp (svref old-store old-id))
+                     (let ((new-id (incf (finalizer-max-id new-store))))
+                       (setf (gethash object (finalizer-id-map new-store)) new-id
+                             (svref new-store new-id) it))))
+                 old-objects)
+        (clrhash old-objects)
+        (fill old-store 0)
+        (setq **finalizer-store** new-store)))))
+
+;;; Replace the finalizer store with a copy.  Tenured (gen6 = pseudo-static)
+;;; vectors are problematic in many ways for gencgc, unless immutable.
+;;; Among the problems is this: after sizing **FINALIZER-STORE** up,
+;;; Lisp doesn't know when there are no readers of the old vector
+;;; (due to the lock-free algorithm for RUN-PENDING-FINALIZERS),
+;;; so we can't safely zero-fill the old vector. Making sure that it
+;;; is not immortal (i.e. not in gen6), is a reasonable workaround.
+;;; [Actually, in this particular algorithm, it is slightly OK to zero-fill
+;;; due to the fact that 0 is not a list; therefore if (SVREF V INDEX) is 0,
+;;; we can chase down the correct value by reloading **FINALIZER-STORE**.
+;;; Of course the zero-fill noise is itself a workaround for accidental
+;;; transitive immortalization, which is issue that merits a general fix]
+(defun finalizers-reinit ()
+  ;; This must be called inside WITHOUT-GCING and with no other threads.
+  (aver *gc-inhibit*)
+  (let* ((old-store **finalizer-store**)
+         (new-store (make-finalizer-store (length old-store)))
+         (old-objects (finalizer-id-map old-store))
+         (new-objects (finalizer-id-map new-store)))
+    ;; Copy the max-id and all the finalizers.
+    ;; The recycle bin is empty, and the hash-table is newly consed.
+    (replace new-store old-store :start1 2 :start2 2)
+    ;; Copy the hash-table.
+    ;; Or should the old just be assigned into the new finalizer-store?
+    ;; Probably not, because immortable hash-tables have a similar
+    ;; problem as cited above, unless strictly constant.
+    ;; (Though mitigated by a FILL in REHASH)
+    (maphash (lambda (object id) (setf (gethash object new-objects) id))
+             old-objects)
+    (clrhash old-objects)
+    (fill old-store 0)
+    (setq **finalizer-store** new-store)))
 
 (defun cancel-finalization (object)
-  "Cancel any finalization for OBJECT."
-  ;; Check for NIL to avoid deleting finalizers that are waiting to be
-  ;; run.
+  "Cancel all finalizations for OBJECT."
   (when object
-    (with-finalizer-store-lock
-        (setf **finalizer-store**
-              (delete object **finalizer-store**
-                      :key (lambda (list)
-                             (weak-pointer-value (car list))))))
+    (with-finalizer-store (store)
+     (let ((hashtable (finalizer-id-map store)))
+       (awhen (gethash object hashtable)
+         (remhash object hashtable)
+         ;; Clear old function(s) before publishing the ID as available.
+         ;; Not strictly necessary to do this: the next FINALIZE claiming
+         ;; the same ID would assign a fresh list anyway.
+         (setf (svref store it) 0)
+         (atomic-push it (finalizer-recycle-bin store)))))
     object))
 
+;;; TODO: start a thread dedicated to finalizations.
+;;; It just needs to wait on a semaphore signaled each time GC finishes.
+;;; As well, this function can be run in more than one thread concurrently,
+;;; if anyone wanted to do that.
 (defun run-pending-finalizers ()
-  (let (pending)
-    ;; We want to run the finalizer bodies outside the lock in case
-    ;; finalization of X causes finalization to be added for Y.
-    ;; And to avoid consing we can reuse the deleted conses from the
-    ;; store to build the list of functions.
-    (with-finalizer-store-lock
-      (loop with list = **finalizer-store**
-          with previous
-          for finalizer = (car list)
-          do
-          (unless finalizer
-            (if previous
-                (setf (cdr previous) nil)
-                (setf **finalizer-store** nil))
-            (return))
-          unless (weak-pointer-value (car finalizer))
-          do
-          (psetf pending finalizer
-                 (car finalizer) (second finalizer)
-                 (cdr finalizer) pending
-                 (car list) (cadr list)
-                 (cdr list) (cddr list))
-          else
-          do (setf previous list
-                   list (cdr list))))
-    (dolist (fun pending)
-      (handler-case
-          (funcall fun)
-        (error (c)
-          (warn "Error calling finalizer ~S:~%  ~S" fun c)))))
-  nil)
+  ;; This nevers acquire the finalizer store lock. Code accordingly.
+  (let ((hashtable (finalizer-id-map **finalizer-store**)))
+    (loop
+     (let ((cell (hash-table-culled-values hashtable)))
+       ;; Remove an item from the pending list
+       (unless cell (return))
+       ;; This is like atomic-pop, but its obtains the first cons cell
+       ;; in the list, not the car of the first cons.
+       (loop (let ((actual (cas (hash-table-culled-values hashtable)
+                                cell (cdr cell))))
+               (if (eq actual cell) (return) (setq cell actual))))
+       (let* ((id (car cell))
+              ;; No other thread can modify **FINALIZER-STORE** at index ID
+              ;; because the table no longer contains an object mapping to
+              ;; that element; however the vector could be grown at any point,
+              ;; so always load the vector again before dereferencing.
+              (store **finalizer-store**)
+              ;; I don't think we need a barrier; this has a data dependency
+              ;; on (CAR CELL) and STORE. (Alpha with threads, anyone?)
+              (finalizers (svref store id))) ; [1] load
+         (setf (svref store id) 0)           ; [2] store
+         (dolist (finalizer finalizers)
+           (let ((fun (if (consp finalizer) (car finalizer) finalizer)))
+             (handler-case (funcall fun)
+               (error (c)
+                 (warn "Error calling finalizer ~S:~%  ~S" fun c)))))
+         ;; While the assignment to (SVREF STORE ID) should have been adequate,
+         ;; we don't know that the vector is current - a new vector could have
+         ;; gotten assigned into **FINALIZER-STORE** in between [1] and [2],
+         ;; in which case the store was performed into the wrong vector.
+         ;; It doesn't actually matter. Using CAS isn't an improvement, because
+         ;; the vector itself is potentially wrong. But the load was valid
+         ;; because the the cell's value is frozen, just duplicated into more
+         ;; than one vector (in fact, an arbitrary number of vectors).
+         ;; A reductio ad absurdum argument shows this:
+         ;; - if you had a way to alter the contents of (SVREF STORE ID),
+         ;;   then you must have been able to find via the hash-table the
+         ;;   object that maps to that index, which means it wasn't dead,
+         ;;   so we must not be here trying to call finalizers for it.
+         ;; Smashing the CAR and CDR of 'finalizers' is a good extra step
+         ;; in terms of removing dangling references.
+         (setf (car finalizers) 0 (cdr finalizers) 0)
+         ;; Recycle the ID by linking CELL into the recycle bin.
+         (let* ((list (svref store 0))
+                (old (cdr list)))
+           (loop (let ((actual (cas (cdr list) old (rplacd cell old))))
+                   (if (eq actual old) (return) (setq old actual))))))))))

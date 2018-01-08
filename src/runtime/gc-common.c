@@ -1321,6 +1321,7 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table, lispobj *prev,
                             lispobj *next_vector, lispobj *hash_vector,
                             int (*alivep_test)(lispobj,lispobj),
                             void (*fix_pointers)(lispobj[2]),
+                            boolean save_culled_values,
                             boolean *rehash)
 {
     const lispobj empty_symbol = UNBOUND_MARKER_WIDETAG;
@@ -1338,6 +1339,18 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table, lispobj *prev,
             next_vector[index] = fixnum_value(hash_table->next_free_kv);
             hash_table->next_free_kv = make_fixnum(index);
             kv_vector[2 * index] = empty_symbol;
+            if (save_culled_values) {
+                lispobj val = kv_vector[2 * index + 1];
+                gc_assert(is_lisp_immediate(val));
+                struct cons *cons = (struct cons*)
+                  gc_general_alloc(sizeof(struct cons), BOXED_PAGE_FLAG, ALLOC_QUICK);
+                // Lisp code which manipulates the culled_values slot must use
+                // compare-and-swap, but C code need not, because GC runs in one
+                // thread and has stopped the Lisp world.
+                cons->cdr = hash_table->culled_values;
+                hash_table->culled_values = make_lispobj(cons, LIST_POINTER_LOWTAG);
+                cons->car = val;
+            }
             kv_vector[2 * index + 1] = empty_symbol;
             if (hash_vector)
                 hash_vector[index] = MAGIC_HASH_VECTOR_VALUE;
@@ -1375,11 +1388,12 @@ cull_weak_hash_table (struct hash_table *hash_table,
                                           SIMPLE_ARRAY_WORD_WIDETAG, NULL);
 
     boolean rehash = 0;
+    boolean save_culled_values = (hash_table->flags & MAKE_FIXNUM(4)) != 0;
     for (i = 0; i < length; i++) {
         cull_weak_hash_table_bucket(hash_table, &index_vector[i],
                                     kv_vector, index_vector, next_vector,
                                     hash_vector, alivep_test, fix_pointers,
-                                    &rehash);
+                                    save_culled_values, &rehash);
     }
     /* If an EQ-based key has moved, mark the hash-table for rehash */
     if (rehash)

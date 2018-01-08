@@ -15,6 +15,8 @@ changes relative to sbcl-1.4.3:
     characters. (lp#1740624)
   * bug fix: weak hash-tables no longer cause GC time to scale superlinearly
     (lp#1241771)
+  * bug fix: CANCEL-FINALIZATION is no longer quadratic in the number
+    of finalizers (lp#1587983)
 
 changes in sbcl-1.4.3 relative to sbcl-1.4.2:
   * enhancement: SLEEP respects deadlines established by SB-SYS:WITH-DEADLINE.

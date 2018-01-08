@@ -54,8 +54,9 @@
   ;; This slot is used to link weak hash tables during GC. When the GC
   ;; isn't running it is always NIL.
   (next-weak-hash-table nil :type null)
-  ;; 2 bits for weakness kind, 1 bit for synchronized, 1 bit for weakp
-  (flags 0 :type (unsigned-byte 4) :read-only t)
+  ;; flags: WEAKNESS-KIND | FINALIZERSP | SYNCHRONIZEDP | WEAKP
+  ;; WEAKNESS-KIND is 2 bits, the rest are 1 bit each
+  (flags 0 :type (unsigned-byte 5) :read-only t)
   ;; Index into the Next vector chaining together free slots in the KV
   ;; vector.
   (next-free-kv 0 :type index)
@@ -79,6 +80,8 @@
   ;; Used for locking GETHASH/(SETF GETHASH)/REMHASH
   (lock (sb!thread:make-mutex :name "hash-table lock")
         :type sb!thread:mutex :read-only t)
+  ;; List of values culled out during GC of weak hash table.
+  (culled-values nil :type list)
   ;; For detecting concurrent accesses.
   #!+sb-hash-table-debug
   (signal-concurrent-access t :type (member nil t))

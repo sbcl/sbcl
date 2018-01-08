@@ -3463,6 +3463,8 @@ garbage_collect_generation(generation_index_t generation, int raise)
 
     scan_binding_stack();
     cull_weak_hash_tables(weak_ht_alivep_funs);
+    // Close the region used when pushing items to the finalizer queue
+    gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &boxed_region);
     scan_weak_pointers();
     wipe_nonpinned_words();
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
