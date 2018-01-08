@@ -808,7 +808,9 @@
                (not (lambda-var-sets var)))
       (let* ((fun (lambda-var-home var))
              (vars (lambda-vars fun))
-             (combination (lvar-dest (ref-lvar (car (lambda-refs fun))))))
+             (lvar (ref-lvar (car (lambda-refs fun))))
+             (combination (and lvar
+                               (lvar-dest lvar))))
         (when (combination-p combination)
           (loop for v in vars
                 for arg in (combination-args combination)
