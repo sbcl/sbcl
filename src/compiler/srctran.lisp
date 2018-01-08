@@ -3942,6 +3942,14 @@
            ;; They are both rationals and complexp is the same.
            ;; Convert to EQL.
            '(eql x y))
+          ((or (and (csubtypep x-type (specifier-type 'real))
+                    (csubtypep y-type
+                               (specifier-type '(complex rational))))
+               (and (csubtypep y-type (specifier-type 'real))
+                    (csubtypep x-type
+                               (specifier-type '(complex rational)))))
+           ;; Can't be EQL since imagpart can't be 0.
+           nil)
           (t
            (give-up-ir1-transform
             "The operands might not be the same type.")))))

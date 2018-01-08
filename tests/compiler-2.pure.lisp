@@ -957,3 +957,17 @@
                1
                2)))
     (() 2)))
+
+(with-test (:name :=-rational-complex-rational-fold)
+  (let ((fun (checked-compile '(lambda (x)
+                                (declare ((complex integer) x))
+                                (= x 10))))
+        (fun2 (checked-compile '(lambda (x)
+                                (declare ((complex rational) x))
+                                (= x 10d0)))))
+    (assert (equal (sb-kernel:%simple-fun-type fun)
+                   '(function ((complex integer)) (values null &optional))))
+    (assert (not (funcall fun #C(10 10))))
+    (assert (equal (sb-kernel:%simple-fun-type fun2)
+                   '(function ((complex rational)) (values null &optional))))
+    (assert (not (funcall fun2 #C(10 10))))))
