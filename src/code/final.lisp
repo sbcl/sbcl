@@ -21,6 +21,7 @@
      ,@body))
 
 (defun finalize (object function &key dont-save)
+  (declare (type callable function))
   "Arrange for the designated FUNCTION to be called when there
 are no more references to OBJECT, including references in
 FUNCTION itself.
@@ -74,7 +75,7 @@ Examples:
           **finalizer-store**))
   object)
 
-(defun deinit-finalizers ()
+(defun finalizers-deinit ()
   ;; remove :dont-save finalizers
   (with-finalizer-store-lock
     (setf **finalizer-store** (delete-if #'third **finalizer-store**)))

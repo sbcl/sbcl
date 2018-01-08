@@ -298,7 +298,7 @@ sufficiently motivated to do lengthy fixes."
   (float-deinit)
   (profile-deinit)
   (foreign-deinit)
-  (deinit-finalizers)
+  (finalizers-deinit)
   (fill *pathnames* nil)
   (drop-all-hash-caches)
   ;; Must clear this cache if asm routines are movable.
