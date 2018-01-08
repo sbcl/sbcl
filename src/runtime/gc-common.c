@@ -1173,15 +1173,16 @@ void weakobj_init()
 /* Only need to worry about scavenging the _real_ entries in the
  * table. The vector element at index 0 (the hash table itself)
  * was scavenged already. */
-void scav_hash_table_entries (struct hash_table *hash_table,
-                              int (*predicate)(lispobj,lispobj),
-                              void (*scav_entry)(lispobj*))
+boolean scav_hash_table_entries(struct hash_table *hash_table,
+                                int (*predicate)(lispobj,lispobj),
+                                void (*scav_entry)(lispobj*))
 {
     uword_t kv_length;
     uword_t length;
     uword_t next_vector_length;
     uword_t hash_vector_length;
     uword_t i;
+    boolean any_deferred = 0;
 
     lispobj *kv_vector = get_array_data(hash_table->table,
                                         SIMPLE_VECTOR_WIDETAG, &kv_length);
@@ -1224,7 +1225,7 @@ void scav_hash_table_entries (struct hash_table *hash_table,
     for (i = 1; i < next_vector_length; i++) {                                 \
         lispobj key = kv_vector[2*i], value = kv_vector[2*i+1];                \
         if (is_lisp_pointer(key|value)) {                                      \
-          if (!entry_alivep) { defer; } else {                                 \
+          if (!entry_alivep) { defer; any_deferred = 1; } else {               \
             /* Scavenge the key and value. */                                  \
             scav_entry(&kv_vector[2*i]);                                       \
             /* If an EQ-based key has moved, mark the hash-table for rehash */ \
@@ -1236,6 +1237,11 @@ void scav_hash_table_entries (struct hash_table *hash_table,
         int weakness = hashtable_weakness(hash_table);
         SCAV_ENTRIES(predicate(key, value),
                      add_kv_triggers(&kv_vector[2*i], weakness));
+        if (!any_deferred && debug_weak_ht)
+            fprintf(stderr,
+                    "will skip rescan of weak ht: %d/%d items\n",
+                    (int)fixnum_value(hash_table->number_entries),
+                    (int)fixnum_value(hash_table->rehash_trigger));
     } else { // The entries are always live
         SCAV_ENTRIES(1,);
     }
@@ -1244,6 +1250,7 @@ void scav_hash_table_entries (struct hash_table *hash_table,
     // element 1 on a write-protected page.
     if (rehash)
         NON_FAULTING_STORE(kv_vector[1] = make_fixnum(1), &kv_vector[1]);
+    return any_deferred;
 }
 
 sword_t
@@ -1300,14 +1307,30 @@ scav_vector (lispobj *where, lispobj header)
     if (!hashtable_weakp(hash_table)) {
         scav_hash_table_entries(hash_table, 0, gc_scav_pair);
     } else if (hash_table->next_weak_hash_table == NIL) {
-        NON_FAULTING_STORE(hash_table->next_weak_hash_table
-                           = (lispobj)weak_hash_tables,
-                           &hash_table->next_weak_hash_table);
-        weak_hash_tables = hash_table;
         int weakness = hashtable_weakness(hash_table);
+        boolean defer = 1;
+        /* Key-AND-Value means that no scavenging can/will be performed as
+         * a consequence of visiting the table. Each entry is looked at once
+         * only, after _all_ other work is done, and then it's either live
+         * or it isn't based on whether both halves are live. So the initial
+         * value of 'defer = 1' is correct. For all other weakness kinds,
+         * we might be able to skip rescan depending on whether all entries
+         * are actually live right now, as opposed to provisionally live */
         if (weakness != WEAKNESS_KEY_AND_VALUE)
-            scav_hash_table_entries(hash_table, weak_ht_alivep_funs[weakness],
-                                    gc_scav_pair);
+            defer = scav_hash_table_entries(hash_table,
+                                            weak_ht_alivep_funs[weakness],
+                                            gc_scav_pair);
+        /* There is a down-side to *not* pushing the table into the list,
+         * but it should not matter too much: if we attempt to scavenge more
+         * than once (when and only when the newspace areas overflow),
+         * then we don't know that we didn't already do it, and we'll do it
+         * again. This is the same as occurs on all other objects */
+        if (defer) {
+            NON_FAULTING_STORE(hash_table->next_weak_hash_table
+                               = (lispobj)weak_hash_tables,
+                               &hash_table->next_weak_hash_table);
+            weak_hash_tables = hash_table;
+        }
     }
 
     return (ALIGN_UP(kv_length + 2, 2));

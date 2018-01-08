@@ -224,7 +224,7 @@ Examples:
 ;;; As well, this function can be run in more than one thread concurrently,
 ;;; if anyone wanted to do that.
 (defun run-pending-finalizers ()
-  ;; This nevers acquire the finalizer store lock. Code accordingly.
+  ;; This never acquires the finalizer store lock. Code accordingly.
   (let ((hashtable (finalizer-id-map **finalizer-store**)))
     (loop
      (let ((cell (hash-table-culled-values hashtable)))

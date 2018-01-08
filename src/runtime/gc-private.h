@@ -94,9 +94,9 @@ extern void scav_binding_stack(lispobj*, lispobj*, void(*)(lispobj));
 extern void scan_binding_stack(void);
 extern void cull_weak_hash_tables(int (*[4])(lispobj,lispobj));
 extern void scan_weak_pointers(void);
-extern void scav_hash_table_entries (struct hash_table *hash_table,
-                                     int (*)(lispobj,lispobj),
-                                     void (*)(lispobj*));
+extern boolean scav_hash_table_entries(struct hash_table *hash_table,
+                                       int (*)(lispobj,lispobj),
+                                       void (*)(lispobj*));
 extern int (*weak_ht_alivep_funs[4])(lispobj,lispobj);
 extern void gc_scav_pair(lispobj where[2]);
 extern void weakobj_init();
