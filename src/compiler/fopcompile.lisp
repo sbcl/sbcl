@@ -68,7 +68,9 @@
   ;; executing all other toplevel forms.
   (flet ((expand (form)
            (if expand
-               (%macroexpand form *lexenv*)
+               (handler-case
+                   (%macroexpand form *lexenv*)
+                 (error () (return-from fopcompilable-p)))
                (values form nil)))
          (expand-cm (form)
            (if expand
