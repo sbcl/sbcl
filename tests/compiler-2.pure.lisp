@@ -990,3 +990,16 @@
                           nil))
                     (ff1)))
            (identity (ff1))))))
+
+(with-test (:name (:substitute-lvar-uses :deleted-code-and-dx-lvars))
+  (assert (nth-value 1
+                     (checked-compile
+                      `(lambda ()
+                         (let ((v (values
+                                   (the integer
+                                        (flet ((%f5 (x) x))
+                                          (%f5)))
+                                   (unwind-protect 1))))
+                           (declare (dynamic-extent v))
+                           v))
+                      :allow-warnings t))))

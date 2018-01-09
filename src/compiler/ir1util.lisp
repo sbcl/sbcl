@@ -214,6 +214,40 @@
                           (node-prev dest))
                   (return-from almost-immediately-used-p t))))))))
 
+;;;; BLOCK UTILS
+
+(declaim (inline block-to-be-deleted-p))
+(defun block-to-be-deleted-p (block)
+  (or (block-delete-p block)
+      (eq (functional-kind (block-home-lambda block)) :deleted)))
+
+;;; Checks whether NODE is in a block to be deleted
+(declaim (inline node-to-be-deleted-p))
+(defun node-to-be-deleted-p (node)
+  (block-to-be-deleted-p (node-block node)))
+
+(declaim (ftype (sfunction (clambda) cblock) lambda-block))
+(defun lambda-block (clambda)
+  (node-block (lambda-bind clambda)))
+(declaim (ftype (sfunction (clambda) component) lambda-component))
+(defun lambda-component (clambda)
+  (block-component (lambda-block clambda)))
+
+(declaim (ftype (sfunction (cblock) node) block-start-node))
+(defun block-start-node (block)
+  (ctran-next (block-start block)))
+
+;;; Return the enclosing cleanup for environment of the first or last
+;;; node in BLOCK.
+(defun block-start-cleanup (block)
+  (node-enclosing-cleanup (block-start-node block)))
+(defun block-end-cleanup (block)
+  (node-enclosing-cleanup (block-last block)))
+
+;;; Return the lexenv of the last node in BLOCK.
+(defun block-end-lexenv (block)
+  (node-lexenv (block-last block)))
+
 ;;;; lvar substitution
 
 (defun update-dependent-casts (new old)
@@ -254,7 +288,6 @@
   (declare (type lvar old)
            (type (or lvar null) new)
            (type boolean propagate-dx))
-
   (cond (new
          (update-dependent-casts new old)
          (do-uses (node old)
@@ -268,7 +301,8 @@
              (setf (cleanup-info it) (subst new old (cleanup-info it)))))
          (when (lvar-dynamic-extent new)
            (do-uses (node new)
-             (node-ends-block node))))
+             (unless (node-to-be-deleted-p node)
+               (node-ends-block node)))))
         (t (flush-dest old)))
 
   (values))
@@ -547,40 +581,6 @@
         ;; Is it declared flushable locally?
         (let ((name (lvar-fun-name (combination-fun call) t)))
           (memq name (lexenv-flushable (node-lexenv call)))))))
-
-;;;; BLOCK UTILS
-
-(declaim (inline block-to-be-deleted-p))
-(defun block-to-be-deleted-p (block)
-  (or (block-delete-p block)
-      (eq (functional-kind (block-home-lambda block)) :deleted)))
-
-;;; Checks whether NODE is in a block to be deleted
-(declaim (inline node-to-be-deleted-p))
-(defun node-to-be-deleted-p (node)
-  (block-to-be-deleted-p (node-block node)))
-
-(declaim (ftype (sfunction (clambda) cblock) lambda-block))
-(defun lambda-block (clambda)
-  (node-block (lambda-bind clambda)))
-(declaim (ftype (sfunction (clambda) component) lambda-component))
-(defun lambda-component (clambda)
-  (block-component (lambda-block clambda)))
-
-(declaim (ftype (sfunction (cblock) node) block-start-node))
-(defun block-start-node (block)
-  (ctran-next (block-start block)))
-
-;;; Return the enclosing cleanup for environment of the first or last
-;;; node in BLOCK.
-(defun block-start-cleanup (block)
-  (node-enclosing-cleanup (block-start-node block)))
-(defun block-end-cleanup (block)
-  (node-enclosing-cleanup (block-last block)))
-
-;;; Return the lexenv of the last node in BLOCK.
-(defun block-end-lexenv (block)
-  (node-lexenv (block-last block)))
 
 ;;; Return the non-LET LAMBDA that holds BLOCK's code, or NIL
 ;;; if there is none.
