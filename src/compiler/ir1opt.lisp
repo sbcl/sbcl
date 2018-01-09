@@ -1451,8 +1451,10 @@
                                    (fdefinition name)
                                    (lvar-value lvar)))
                              lvar))
-                       (resolve-key-args (combination-args call)
-                                         type))))
+                       (let ((args (combination-args call)))
+                         (if (fun-type-p type)
+                             (resolve-key-args args type)
+                             args)))))
     (multiple-value-bind (values win)
         (careful-call fun-name
                       args

@@ -2847,3 +2847,8 @@
                          (setf (lambda-var-ref-lvar-null-x :b) nil
                                (lambda-var-ref-lvar-null-y a) 0))
                       :allow-warnings t))))
+
+(sb-c:defknown blah * * (sb-c:foldable))
+(defun blah (x) (- x))
+(with-test (:name :foldable-wild-args-fun)
+  (assert (eql (funcall (checked-compile '(lambda () (blah (+ 1 2))))) -3)))
