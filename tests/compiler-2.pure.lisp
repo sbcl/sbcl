@@ -1017,3 +1017,15 @@
          (restart-case (list)
            (my-restart () (declare))))
     (() ())))
+
+(with-test (:name (handler-case :declaration-processing))
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (handler-case (list 1 2) (error (e) "foo" "bar" e)))
+    (() '(1 2)))
+  (assert (nth-value 1
+                     (checked-compile
+                      `(lambda ()
+                         (handler-case (declare)))
+                      :allow-failure t))))

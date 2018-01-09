@@ -190,4 +190,4 @@
    (nth-value 1
               (checked-compile
                `(lambda () (declare (values 0)))
-               :allow-failure t))))
+               :allow-warnings t))))

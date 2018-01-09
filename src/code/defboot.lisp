@@ -805,22 +805,23 @@ specification."
                      ,@(remove no-error-clause cases)))))))
         (let* ((local-funs nil)
                (annotated-cases
-                (mapcar (lambda (case)
-                          (with-current-source-form (case)
-                            (with-unique-names (tag fun)
-                              (destructuring-bind (type ll &body body) case
-                                (unless (and (listp ll)
-                                             (symbolp (car ll))
-                                             (null (cdr ll)))
-                                  (error "Malformed HANDLER-CASE lambda-list. Should be either () or (symbol), not ~s."
-                                         ll))
-
-                                (push `(,fun ,ll ,@body) local-funs)
-                                (list tag type ll fun)))))
-                        cases)))
+                 (mapcar (lambda (case)
+                           (with-current-source-form (case)
+                             (with-unique-names (tag fun)
+                               (destructuring-bind (type ll &body body) case
+                                 (unless (and (listp ll)
+                                              (symbolp (car ll))
+                                              (null (cdr ll)))
+                                   (error "Malformed HANDLER-CASE lambda-list. Should be either () or (symbol), not ~s."
+                                          ll))
+                                 (multiple-value-bind (body declarations)
+                                     (parse-body body nil)
+                                   (push `(,fun ,ll ,@declarations (progn ,@body)) local-funs))
+                                 (list tag type ll fun)))))
+                         cases)))
           (with-unique-names (block cell form-fun)
             `(dx-flet ((,form-fun ()
-                         #!-x86 ,form
+                         #!-x86 (progn ,form) ;; no declarations are accepted
                          ;; Need to catch FP errors here!
                          #!+x86 (multiple-value-prog1 ,form (float-wait)))
                        ,@(reverse local-funs))
