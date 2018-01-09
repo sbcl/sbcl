@@ -1210,6 +1210,7 @@
 
 ;;; Make NODE the LAST node in its block, splitting the block if necessary.
 ;;; The new block is added to the DFO immediately following NODE's block.
+;;; Returns the new block if it's created.
 (defun node-ends-block (node)
   (declare (type node node))
   (let* ((block (node-block node))
@@ -1221,9 +1222,9 @@
                  (not (block-delete-p block))))
       (let* ((succ (block-succ block))
              (new-block
-              (make-block-key :start start
-                              :component (block-component block)
-                              :succ succ :last last)))
+               (make-block-key :start start
+                               :component (block-component block)
+                               :succ succ :last last)))
         (setf (ctran-kind start) :block-start)
         (setf (ctran-use start) nil)
         (setf (block-last block) node)
@@ -1238,8 +1239,8 @@
 
         (do ((ctran start (node-next (ctran-next ctran))))
             ((not ctran))
-          (setf (ctran-block ctran) new-block)))))
-  (values))
+          (setf (ctran-block ctran) new-block))
+        new-block))))
 
 ;;;; deleting stuff
 

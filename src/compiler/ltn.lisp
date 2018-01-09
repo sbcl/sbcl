@@ -83,6 +83,17 @@
         (setf (ir2-block-popped old-ir2-block) (old-popped))
         (setf (ir2-block-popped new-ir2-block) (new-popped))))))
 
+(defun ir2-change-node-successor (node next-block)
+  (let* ((node-block (node-block node))
+         (old-next-block
+           (if (eq node (block-last node-block))
+               (first (block-succ node-block))
+               (let ((old-next-block (node-ends-block node)))
+                 (fixup-ir2-blocks-for-split-block node-block old-next-block)
+                 old-next-block))))
+    (unlink-blocks node-block old-next-block)
+    (link-blocks node-block next-block)))
+
 ;;; an annotated lvar's primitive-type
 #!-sb-fluid (declaim (inline lvar-ptype))
 (defun lvar-ptype (lvar)
@@ -159,16 +170,12 @@
   (declare (type basic-combination call))
   (let ((tails (and (node-tail-p call)
                     (lambda-tail-set (node-home-lambda call)))))
-    (when tails
-      (cond ((eq (return-info-kind (tail-set-info tails)) :unknown)
-             (node-ends-block call)
-             (let* ((block (node-block call))
-                    (new-block (first (block-succ block))))
-               (fixup-ir2-blocks-for-split-block block new-block)
-               (unlink-blocks block new-block)
-               (link-blocks block (component-tail (block-component block)))))
-            (t
-             (setf (node-tail-p call) nil)))))
+    (cond ((not tails))
+          ((eq (return-info-kind (tail-set-info tails)) :unknown)
+           (ir2-change-node-successor call
+                                      (component-tail (block-component (node-block call)))))
+          (t
+           (setf (node-tail-p call) nil))))
   (values))
 
 ;;; We set the kind to :FULL or :FUNNY, depending on whether there is
@@ -392,12 +399,7 @@
         (callee (combination-lambda call)))
     (aver (eq (lambda-tail-set caller)
               (lambda-tail-set (lambda-home callee))))
-    (node-ends-block call)
-    (let* ((block (node-block call))
-           (new-block (first (block-succ block))))
-      (fixup-ir2-blocks-for-split-block block new-block)
-      (unlink-blocks block new-block)
-      (link-blocks block (lambda-block callee))))
+    (ir2-change-node-successor call (lambda-block callee)))
   (values))
 
 ;;; Annotate the value lvar.

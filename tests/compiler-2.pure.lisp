@@ -978,3 +978,15 @@
       `(lambda (x)
          (find 1 x :key #'values))
     (('(1)) 1)))
+
+(with-test (:name :tail-call-ltn-annotation)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x)
+         (labels ((ff1 ()
+                    (multiple-value-call #'print
+                      (if x
+                          (values t t)
+                          nil))
+                    (ff1)))
+           (identity (ff1))))))
