@@ -25,11 +25,10 @@
                   ;; or a declaration). Hence:
                 remaining-forms
                 (if doc
-                      ;; .. and says that the consequences of multiple
-                      ;; doc strings are unspecified.
-                      ;; That's probably not something the programmer intends.
-                      ;; We raise an error so that this won't pass unnoticed.
-                    (error "duplicate doc string ~S" x)
+                    ;; .. and says that the consequences of multiple
+                    ;; doc strings are unspecified.
+                    ;; That's probably not something the programmer intends.
+                    (sb!c:compiler-warn "Duplicate doc string ~S" x)
                     t)))
          (declaration-p (x)
            (when (listp x)
