@@ -1768,8 +1768,9 @@
     (unless (eq key-fun 'identity)
       (acond ((info :function :info key-fun)
               (let ((type (info :function :type key-fun)))
-                (awhen (fun-type-required type)
-                  (return-from find-derive-type-optimizer
+                (return-from find-derive-type-optimizer
+                  (awhen (and (fun-type-p type)
+                              (fun-type-required type))
                     (type-union (first it) (specifier-type 'null))))))
              ((structure-instance-accessor-p key-fun)
               (return-from find-derive-type-optimizer
@@ -1777,14 +1778,13 @@
   ;; Otherwise maybe FIND returns ITEM itself (or an EQL number).
   ;; :TEST is allowed only if EQ or EQL (where NIL means EQL).
   ;; :KEY is allowed only if IDENTITY or NIL.
-  (if (and (or (not test)
-               (lvar-fun-is test '(eq eql))
-               (and (constant-lvar-p test) (null (lvar-value test))))
-           (or (not key)
-               (lvar-fun-is key '(identity))
-               (and (constant-lvar-p key) (null (lvar-value key)))))
-        (type-union (lvar-type item) (specifier-type 'null))
-        (specifier-type 't)))
+  (when (and (or (not test)
+                 (lvar-fun-is test '(eq eql))
+                 (and (constant-lvar-p test) (null (lvar-value test))))
+             (or (not key)
+                 (lvar-fun-is key '(identity))
+                 (and (constant-lvar-p key) (null (lvar-value key)))))
+    (type-union (lvar-type item) (specifier-type 'null))))
 
 ;;; We want to make sure that %FIND-POSITION is inline-expanded into
 ;;; %FIND-POSITION-IF only when %FIND-POSITION-IF has an inline

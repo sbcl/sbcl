@@ -971,3 +971,10 @@
     (assert (equal (sb-kernel:%simple-fun-type fun2)
                    '(function ((complex rational)) (values null &optional))))
     (assert (not (funcall fun2 #C(10 10))))))
+
+(with-test (:name :find-type-deriver)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x)
+         (find 1 x :key #'values))
+    (('(1)) 1)))
