@@ -184,3 +184,10 @@
               (checked-compile
                `(lambda () (ldb (do) 0))
                :allow-failure t))))
+
+(with-test (:name :bad-values-ftype)
+  (assert
+   (nth-value 1
+              (checked-compile
+               `(lambda () (declare (values 0)))
+               :allow-failure t))))
