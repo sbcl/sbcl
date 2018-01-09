@@ -1003,3 +1003,17 @@
                            (declare (dynamic-extent v))
                            v))
                       :allow-warnings t))))
+
+(with-test (:name (restart-case :declaration-processing))
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (restart-case (list)
+           (my-restart (x) "foo" "bar" x)))
+    (() ()))
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (restart-case (list)
+           (my-restart () (declare))))
+    (() ())))

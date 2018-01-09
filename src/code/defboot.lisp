@@ -585,15 +585,22 @@ evaluated as a PROGN."
              (make-apply-and-return (clause-data)
                (destructuring-bind (name tag keywords lambda-list body) clause-data
                  (declare (ignore name keywords))
-                 `(,tag (return-from ,block-tag
-                          ,(cond ((null lambda-list)
-                                  `(progn ,@body))
-                                 ((and (null (cdr lambda-list))
-                                       (not (member (car lambda-list)
-                                                    '(&optional &key &aux))))
-                                  `(funcall (lambda ,lambda-list ,@body) ,temp-var))
-                                 (t
-                                  `(apply (lambda ,lambda-list ,@body) ,temp-var))))))))
+                 (multiple-value-bind (body declarations) (parse-body body nil)
+                   `(,tag (return-from ,block-tag
+                            ,(cond ((null lambda-list)
+                                    `(locally ,@declarations ,@body))
+                                   ((and (null (cdr lambda-list))
+                                         (not (member (car lambda-list)
+                                                      '(&optional &key &aux))))
+                                    `(funcall (lambda ,lambda-list
+                                                ,@declarations
+                                                (progn ,@body))
+                                              ,temp-var))
+                                   (t
+                                    `(apply (lambda ,lambda-list
+                                              ,@declarations
+                                              (progn ,@body))
+                                            ,temp-var)))))))))
       (let ((clauses-data (mapcar #'parse-clause clauses)))
         `(block ,block-tag
            (let ((,temp-var nil))
