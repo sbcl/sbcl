@@ -478,7 +478,10 @@
               (not (singleton-p dims))
               (every (lambda (x) (typep x 'index)) dims))
          (setq dims-constp t))
-        ((and (cond ((typep (setq dims (sb!xc:macroexpand dims-form env))
+        ((and (cond ((typep (setq dims (handler-case
+                                           (sb!xc:macroexpand dims-form env)
+                                         (error ()
+                                           (return-from make-array (values nil t)))))
                             '(cons (eql list)))
                      (setq dims (cdr dims))
                      t)

@@ -154,6 +154,14 @@
                   (make-array '(10) :initial-contents (do)))
                :allow-failure t))))
 
+(with-test (:name (make-array :dimensions :bad-macro))
+  (assert
+   (nth-value 1
+              (checked-compile
+               `(lambda ()
+                  (make-array (do)))
+               :allow-failure t))))
+
 (with-test (:name :&rest-ref-bad-n)
   (assert
    (nth-value 1
