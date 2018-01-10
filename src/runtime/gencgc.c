@@ -3390,36 +3390,6 @@ garbage_collect_generation(generation_index_t generation, int raise)
      * more objects are moved into the new generation */
     scavenge_newspace_generation(new_space);
 
-    /* FIXME: I tried reenabling this check when debugging unrelated
-     * GC weirdness ca. sbcl-0.6.12.45, and it failed immediately.
-     * Since the current GC code seems to work well, I'm guessing that
-     * this debugging code is just stale, but I haven't tried to
-     * figure it out. It should be figured out and then either made to
-     * work or just deleted. */
-
-#define RESCAN_CHECK 0
-#if RESCAN_CHECK
-    /* As a check re-scavenge the newspace once; no new objects should
-     * be found. */
-    {
-        os_vm_size_t old_bytes_allocated = bytes_allocated;
-        os_vm_size_t bytes_allocated;
-
-        /* Start with a full scavenge. */
-        scavenge_newspace_generation_one_scan(new_space);
-
-        /* Flush the current regions, updating the tables. */
-        gc_alloc_update_all_page_tables(1);
-
-        bytes_allocated = bytes_allocated - old_bytes_allocated;
-
-        if (bytes_allocated != 0) {
-            lose("Rescan of new_space allocated %d more bytes.\n",
-                 bytes_allocated);
-        }
-    }
-#endif
-
     scan_binding_stack();
     cull_weak_hash_tables(weak_ht_alivep_funs);
     // Close the region used when pushing items to the finalizer queue
