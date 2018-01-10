@@ -1236,20 +1236,19 @@ page_extensible_p(page_index_t index, generation_index_t gen, int allocated) {
  * bit is set in page_type_flag.
  */
 page_index_t
-gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t bytes,
+gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
                       int page_type_flag, generation_index_t gen)
 {
     page_index_t most_bytes_found_from = 0, most_bytes_found_to = 0;
     page_index_t first_page, last_page, restart_page = *restart_page_ptr;
-    os_vm_size_t nbytes = bytes;
-    os_vm_size_t nbytes_goal = nbytes;
-    os_vm_size_t bytes_found = 0;
-    os_vm_size_t most_bytes_found = 0;
+    sword_t nbytes_goal = nbytes;
+    sword_t bytes_found = 0;
+    sword_t most_bytes_found = 0;
     int multi_object = !(page_type_flag & SINGLE_OBJECT_FLAG);
     /* FIXME: assert(free_pages_lock is held); */
 
     if (multi_object) {
-        if (nbytes_goal < gencgc_alloc_granularity)
+        if (nbytes_goal < (sword_t)gencgc_alloc_granularity)
             nbytes_goal = gencgc_alloc_granularity;
 #if !defined(LISP_FEATURE_64_BIT) && SEGREGATED_CODE
         // Increase the region size to avoid excessive fragmentation
@@ -1263,9 +1262,7 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t bytes,
     if (gencgc_alloc_start_page != -1)
         restart_page = gencgc_alloc_start_page;
 
-    /* FIXME: This is on bytes instead of nbytes pending cleanup of
-     * long from the interface. */
-    gc_assert(bytes>=0);
+    gc_assert(nbytes>=0);
     first_page = restart_page;
     while (first_page < page_table_pages) {
         bytes_found = 0;
