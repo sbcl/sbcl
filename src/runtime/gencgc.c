@@ -1245,16 +1245,18 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t bytes,
     os_vm_size_t nbytes_goal = nbytes;
     os_vm_size_t bytes_found = 0;
     os_vm_size_t most_bytes_found = 0;
-    int allow_spanning = !(page_type_flag & SINGLE_OBJECT_FLAG);
+    int multi_object = !(page_type_flag & SINGLE_OBJECT_FLAG);
     /* FIXME: assert(free_pages_lock is held); */
 
-    if (nbytes_goal < gencgc_alloc_granularity)
-        nbytes_goal = gencgc_alloc_granularity;
+    if (multi_object) {
+        if (nbytes_goal < gencgc_alloc_granularity)
+            nbytes_goal = gencgc_alloc_granularity;
 #if !defined(LISP_FEATURE_64_BIT) && SEGREGATED_CODE
-    // Increase the region size to avoid excessive fragmentation
-    if (page_type_flag == CODE_PAGE_FLAG && nbytes_goal < 65536)
-        nbytes_goal = 65536;
+        // Increase the region size to avoid excessive fragmentation
+        if (page_type_flag == CODE_PAGE_FLAG && nbytes_goal < 65536)
+            nbytes_goal = 65536;
 #endif
+    }
     page_type_flag &= ~SINGLE_OBJECT_FLAG;
 
     /* Toggled by gc_and_save for heap compaction, normally -1. */
@@ -1270,7 +1272,7 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t bytes,
         if (page_free_p(first_page)) {
             gc_dcheck(!page_bytes_used(first_page));
             bytes_found = GENCGC_CARD_BYTES;
-        } else if (allow_spanning &&
+        } else if (multi_object &&
                    page_extensible_p(first_page, gen, page_type_flag)) {
             bytes_found = GENCGC_CARD_BYTES - page_bytes_used(first_page);
             // XXX: Prefer to start non-code on new pages.
