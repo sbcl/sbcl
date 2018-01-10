@@ -666,8 +666,7 @@ status slot."
                     #+win32 (escape-arguments t))
   #.(concatenate
      'base-string
-     ;; The Texinfoizer is sensitive to whitespace, so mind the
-     ;; placement of the #-win32 pseudosplicings.
+     ;; The Texinfoizer is sensitive to whitespace
      "RUN-PROGRAM creates a new process specified by the PROGRAM
 argument. ARGS are the standard arguments that can be passed to a
 program. For no arguments, use NIL (which means that just the
@@ -683,13 +682,13 @@ Users Manual for details about the PROCESS structure.
 
    - The SBCL implementation of RUN-PROGRAM, like Perl and many other
      programs, but unlike the original CMU CL implementation, copies
-     the Unix environment by default."#-win32"
+     the Unix environment by default.
    - Running Unix programs from a setuid process, or in any other
      situation where the Unix environment is under the control of someone
      else, is a mother lode of security problems. If you are contemplating
      doing this, read about it first. (The Perl community has a lot of good
      documentation about this and other security issues in script-like
-     programs.)""
+     programs.)
 
    The &KEY arguments have the following meanings:
    :ENVIRONMENT
@@ -704,33 +703,35 @@ Users Manual for details about the PROCESS structure.
       environment variable.  Otherwise an absolute pathname is required.
    :WAIT
       If non-NIL (default), wait until the created process finishes.  If
-      NIL, continue running Lisp until the program finishes."#-win32"
-   :PTY
+      NIL, continue running Lisp until the program finishes.
+   :PTY (not supported on win32)
       Either T, NIL, or a stream.  Unless NIL, the subprocess is established
       under a PTY.  If :pty is a stream, all output to this pty is sent to
       this stream, otherwise the PROCESS-PTY slot is filled in with a stream
-      connected to pty that can read output and write input.""
+      connected to pty that can read output and write input.
    :INPUT
-      Either T, NIL, a pathname, a stream, or :STREAM.  If T, the standard
-      input for the current process is inherited.  If NIL, "
-      #-win32"/dev/null"#+win32"nul""
-      is used.  If a pathname, the file so specified is used.  If a stream,
-      all the input is read from that stream and sent to the subprocess.  If
-      :STREAM, the PROCESS-INPUT slot is filled in with a stream that sends
-      its output to the process. Defaults to NIL.
+      Either T, NIL, a pathname, a stream, or :STREAM. 
+      T: the standard input for the current process is inherited.
+      NIL: /dev/null (nul on win32) is used.
+      pathname: the specified file is used.
+      stream: all the input is read from that stream and sent to the
+      subprocess.
+      :STREAM: the PROCESS-INPUT slot is filled in with a stream that sends
+      its output to the process.
+      Defaults to NIL.
    :IF-INPUT-DOES-NOT-EXIST (when :INPUT is the name of a file)
       can be one of:
          :ERROR to generate an error
          :CREATE to create an empty file
          NIL (the default) to return NIL from RUN-PROGRAM
    :OUTPUT
-      Either T, NIL, a pathname, a stream, or :STREAM.  If T, the standard
-      output for the current process is inherited.  If NIL, "
-      #-win32"/dev/null"#+win32"nul""
-      is used.  If a pathname, the file so specified is used.  If a stream,
-      all the output from the process is written to this stream. If
-      :STREAM, the PROCESS-OUTPUT slot is filled in with a stream that can
-      be read to get the output.
+      Either T, NIL, a pathname, a stream, or :STREAM.
+      T: the standard output for the current process is inherited. 
+      NIL: /dev/null (nul on win32) is used.
+      pathname: the specified file is used.
+      stream: all the output from the process is written to this stream. 
+      :STREAM: the PROCESS-OUTPUT slot is filled in with a stream that can be
+      read to get the output.
       Defaults to NIL.
    :ERROR
       Same as :OUTPUT, additionally accepts :OUTPUT, making all error
