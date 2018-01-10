@@ -2132,7 +2132,7 @@ update_page_write_prot(page_index_t page)
         return (0);
 
     /* Scan the page for pointers to younger generations or the
-     * top temp. generation. */
+     * temp generation, which is numerically 7 but logically younger */
 
     /* This is conservative: any word satisfying is_lisp_pointer() is
      * assumed to be a pointer. To do otherwise would require a family
@@ -2146,13 +2146,14 @@ update_page_write_prot(page_index_t page)
             continue;
         /* Check that it's in the dynamic space */
         if ((index = find_page_index(ptr)) != -1) {
+            int pointee_gen = page_table[index].gen;
             if (/* Does it point to a younger or the temp. generation? */
-                ((page_bytes_used(index) != 0)
-                 && ((page_table[index].gen < gen)
-                     || (page_table[index].gen == SCRATCH_GENERATION)))
+                (pointee_gen < gen || pointee_gen == SCRATCH_GENERATION) &&
 
-                /* Or does it point within a current gc_alloc() region? */
-                || (IN_BOXED_REGION_P(ptr) || IN_REGION_P(ptr,unboxed))) {
+                /* and an in-use part of the page? */
+                (((lispobj)ptr & (GENCGC_CARD_BYTES-1)) < page_bytes_used(index) ||
+                 ((page_table[index].allocated & OPEN_REGION_PAGE_FLAG)
+                  && (IN_BOXED_REGION_P(ptr) || IN_REGION_P(ptr,unboxed))))) {
                 wp_it = 0;
                 break;
             }
@@ -2167,7 +2168,7 @@ update_page_write_prot(page_index_t page)
             // Consider an unboxed word that looks like a pointer to a word that
             // looks like simple-fun-widetag. We can't naively back up to the
             // underlying code object since the alleged header might not be one.
-            int obj_gen = gen; // Make comparison fail if we fall through
+            int pointee_gen = gen; // Make comparison fail if we fall through
             if (lowtag_of((lispobj)ptr) == FUN_POINTER_LOWTAG &&
                 widetag_of(header) == SIMPLE_FUN_WIDETAG) {
                 lispobj* code = fun_code_header((lispobj)ptr - FUN_POINTER_LOWTAG);
@@ -2176,13 +2177,13 @@ update_page_write_prot(page_index_t page)
                 // the guard conditions here.
                 if (immobile_space_p((lispobj)code)
                     && widetag_of(*code) == CODE_HEADER_WIDETAG)
-                    obj_gen = __immobile_obj_generation(code);
+                    pointee_gen = __immobile_obj_generation(code);
             } else {
-                obj_gen = __immobile_obj_generation(native_pointer((lispobj)ptr));
+                pointee_gen = __immobile_obj_generation(native_pointer((lispobj)ptr));
             }
             // A bogus generation number implies a not-really-pointer,
             // but it won't cause misbehavior.
-            if (obj_gen < gen || obj_gen == SCRATCH_GENERATION) {
+            if (pointee_gen < gen || pointee_gen == SCRATCH_GENERATION) {
                 wp_it = 0;
                 break;
             }
