@@ -664,10 +664,7 @@ status slot."
                     (external-format :default)
                     directory
                     #+win32 (escape-arguments t))
-  #.(concatenate
-     'base-string
-     ;; The Texinfoizer is sensitive to whitespace
-     "RUN-PROGRAM creates a new process specified by the PROGRAM
+  "RUN-PROGRAM creates a new process specified by the PROGRAM
 argument. ARGS are the standard arguments that can be passed to a
 program. For no arguments, use NIL (which means that just the
 name of the program is passed as arg 0).
@@ -710,7 +707,7 @@ Users Manual for details about the PROCESS structure.
       this stream, otherwise the PROCESS-PTY slot is filled in with a stream
       connected to pty that can read output and write input.
    :INPUT
-      Either T, NIL, a pathname, a stream, or :STREAM. 
+      Either T, NIL, a pathname, a stream, or :STREAM.
       T: the standard input for the current process is inherited.
       NIL: /dev/null (nul on win32) is used.
       pathname: the specified file is used.
@@ -726,10 +723,10 @@ Users Manual for details about the PROCESS structure.
          NIL (the default) to return NIL from RUN-PROGRAM
    :OUTPUT
       Either T, NIL, a pathname, a stream, or :STREAM.
-      T: the standard output for the current process is inherited. 
+      T: the standard output for the current process is inherited.
       NIL: /dev/null (nul on win32) is used.
       pathname: the specified file is used.
-      stream: all the output from the process is written to this stream. 
+      stream: all the output from the process is written to this stream.
       :STREAM: the PROCESS-OUTPUT slot is filled in with a stream that can be
       read to get the output.
       Defaults to NIL.
@@ -758,7 +755,7 @@ Users Manual for details about the PROCESS structure.
 
    Windows specific options:
    :ESCAPE-ARGUMENTS (default T)
-      Controls escaping of the arguments passed to CreateProcess.")
+      Controls escaping of the arguments passed to CreateProcess."
   (when (and env-p environment-p)
     (error "can't specify :ENV and :ENVIRONMENT simultaneously"))
   (let* (;; Clear various specials used by GET-DESCRIPTOR-FOR to
