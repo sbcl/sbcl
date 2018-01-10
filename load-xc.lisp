@@ -11,9 +11,7 @@
 (load-or-cload-xcompiler #'host-cload-stem)
 ;; (load-or-cload-xcompiler #'host-load-stem) ;; if the FASLs are already compiled
 
-(rename-package :sb-xc :sb-xc '(:sb!xc))
-
 (defun xc-compile-file (file)
-  (sb-xc:with-compilation-unit ()
-    (sb-xc:compile-file file :trace-file *standard-output*)
+  (sb!xc:with-compilation-unit ()
+    (sb!xc:compile-file file :trace-file *standard-output*)
     (setf sb!c::*undefined-warnings* nil)))
