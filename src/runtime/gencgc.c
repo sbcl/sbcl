@@ -787,7 +787,7 @@ set_generation_alloc_start_page(generation_index_t generation, int page_type_fla
  * keeps the allocation contiguous when scavenging the newspace.
  *
  * The alloc_region should have been closed by a call to
- * gc_alloc_update_page_tables(), and will thus be in an empty state.
+ * gc_close_region(), and will thus be in an empty state.
  *
  * To assist the scavenging functions write-protected pages are not
  * used. Free pages should not be write-protected.
@@ -957,7 +957,7 @@ add_new_area(page_index_t first_page, size_t offset, size_t size)
     new_areas_index++;
 }
 
-/* Update the tables for the alloc_region. The region may be added to
+/* Update the PTEs for the alloc_region. The region may be added to
  * the new_areas.
  *
  * When done the alloc_region is set up so that the next quick alloc
@@ -965,7 +965,7 @@ add_new_area(page_index_t first_page, size_t offset, size_t size)
  * it is safe to try to re-update the page table of this reset
  * alloc_region. */
 void
-gc_alloc_update_page_tables(int page_type_flag, struct alloc_region *alloc_region)
+gc_close_region(int page_type_flag, struct alloc_region *alloc_region)
 {
     /* Catch an unused alloc_region. */
     if (alloc_region->last_page == -1)
@@ -1355,7 +1355,7 @@ gc_alloc_with_region(sword_t nbytes,int page_type_flag, struct alloc_region *my_
         if (!quick_p &&
             addr_diff(my_region->end_addr,my_region->free_pointer) <= 32) {
             /* If so, finished with the current region. */
-            gc_alloc_update_page_tables(page_type_flag, my_region);
+            gc_close_region(page_type_flag, my_region);
             /* Set up a new region. */
             gc_alloc_new_region(32 /*bytes*/, page_type_flag, my_region);
         }
@@ -1366,7 +1366,7 @@ gc_alloc_with_region(sword_t nbytes,int page_type_flag, struct alloc_region *my_
     /* Else not enough free space in the current region: retry with a
      * new region. */
 
-    gc_alloc_update_page_tables(page_type_flag, my_region);
+    gc_close_region(page_type_flag, my_region);
     gc_alloc_new_region(nbytes, page_type_flag, my_region);
     return gc_alloc_with_region(nbytes, page_type_flag, my_region,0);
 }
@@ -2066,13 +2066,8 @@ preserve_pointer(void *addr)
  * to younger generations or the top temp. generation, if no
  * suspicious pointers are found then the page is write-protected.
  *
- * Care is taken to check for pointers to the current gc_alloc()
- * region if it is a younger generation or the temp. generation. This
- * frees the caller from doing a gc_alloc_update_page_tables(). Actually
- * the gc_alloc_generation does not need to be checked as this is only
- * called from scavenge_generation() when the gc_alloc generation is
- * younger, so it just checks if there is a pointer to the current
- * region.
+ * Care is taken to check for pointers to any open allocation regions,
+ * which by design contain younger objects.
  *
  * We return 1 if the page was write-protected, else 0.
  *
@@ -2430,7 +2425,7 @@ static void
 scavenge_newspace_generation(generation_index_t generation)
 {
     /* Flush the current regions updating the tables. */
-    gc_alloc_update_all_page_tables(0);
+    gc_close_all_regions(0);
 
     /* Turn on the recording of new areas. */
     gc_assert(new_areas_index == 0);
@@ -2440,7 +2435,7 @@ scavenge_newspace_generation(generation_index_t generation)
     scavenge_newspace_generation_one_scan(generation);
 
     /* Flush the current regions updating the tables. */
-    gc_alloc_update_all_page_tables(0);
+    gc_close_all_regions(0);
 
     /*FSHOW((stderr,
              "The first scan is finished; current_new_areas_index=%d.\n",
@@ -2454,7 +2449,7 @@ scavenge_newspace_generation(generation_index_t generation)
             // actually entails new work - it only knows which triggers were removed
             // from the pending list. So check again if allocations occurred,
             // which is only if not all triggers referenced already-live objects.
-            gc_alloc_update_all_page_tables(0); // update new_areas from regions
+            gc_close_all_regions(0); // update new_areas from regions
             if (!new_areas_index && !immobile_scav_queue_count)
                 break; // still no work to do
         }
@@ -2499,7 +2494,7 @@ scavenge_newspace_generation(generation_index_t generation)
 
         }
         /* Flush the current regions updating the tables. */
-        gc_alloc_update_all_page_tables(0);
+        gc_close_all_regions(0);
     }
 
     /* Turn off recording of allocation regions. */
@@ -3393,7 +3388,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
     scan_binding_stack();
     cull_weak_hash_tables(weak_ht_alivep_funs);
     // Close the region used when pushing items to the finalizer queue
-    gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &boxed_region);
+    gc_close_region(BOXED_PAGE_FLAG, &boxed_region);
     scan_weak_pointers();
     wipe_nonpinned_words();
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
@@ -3562,7 +3557,7 @@ collect_garbage(generation_index_t last_gen)
     }
 
     /* Flush the alloc regions updating the tables. */
-    gc_alloc_update_all_page_tables(1);
+    gc_close_all_regions(1);
 
     /* Verify the new objects created by Lisp code. */
     if (pre_verify_gen_0) {
@@ -4096,11 +4091,11 @@ unhandled_sigmemoryfault(void *addr)
 {}
 
 static void
-update_thread_page_tables(struct thread *th)
+close_thread_regions(struct thread *th)
 {
-    gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &th->alloc_region);
+    gc_close_region(BOXED_PAGE_FLAG, &th->alloc_region);
 #if defined(LISP_FEATURE_SB_SAFEPOINT_STRICTLY) && !defined(LISP_FEATURE_WIN32)
-    gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &th->sprof_alloc_region);
+    gc_close_region(BOXED_PAGE_FLAG, &th->sprof_alloc_region);
 #endif
 }
 
@@ -4108,26 +4103,26 @@ update_thread_page_tables(struct thread *th)
    collection happen in the GC thread, so it is sufficient to update
    all the the page tables once at the beginning of a collection and
    update only page tables of the GC thread during the collection. */
-void gc_alloc_update_all_page_tables(int for_all_threads)
+void gc_close_all_regions(int for_all_threads)
 {
     /* Flush the alloc regions updating the tables. */
     struct thread *th;
     if (for_all_threads) {
         for_each_thread(th) {
-            update_thread_page_tables(th);
+            close_thread_regions(th);
         }
     }
     else {
         th = arch_os_get_current_thread();
         if (th) {
-            update_thread_page_tables(th);
+            close_thread_regions(th);
         }
     }
 #if SEGREGATED_CODE
-    gc_alloc_update_page_tables(CODE_PAGE_FLAG, &code_region);
+    gc_close_region(CODE_PAGE_FLAG, &code_region);
 #endif
-    gc_alloc_update_page_tables(UNBOXED_PAGE_FLAG, &unboxed_region);
-    gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &boxed_region);
+    gc_close_region(UNBOXED_PAGE_FLAG, &unboxed_region);
+    gc_close_region(BOXED_PAGE_FLAG, &boxed_region);
 }
 
 void

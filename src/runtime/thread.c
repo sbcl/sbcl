@@ -388,9 +388,9 @@ undo_init_new_thread(struct thread *th, init_thread_data *scribble)
      */
 #ifdef LISP_FEATURE_SB_SAFEPOINT
     block_blockable_signals(0);
-    gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &th->alloc_region);
+    gc_close_region(BOXED_PAGE_FLAG, &th->alloc_region);
 #if defined(LISP_FEATURE_SB_SAFEPOINT_STRICTLY) && !defined(LISP_FEATURE_WIN32)
-    gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &th->sprof_alloc_region);
+    gc_close_region(BOXED_PAGE_FLAG, &th->sprof_alloc_region);
 #endif
     pop_gcing_safety(&scribble->safety);
     lock_ret = pthread_mutex_lock(&all_threads_lock);
@@ -408,9 +408,9 @@ undo_init_new_thread(struct thread *th, init_thread_data *scribble)
     lock_ret = pthread_mutex_lock(&all_threads_lock);
     gc_assert(lock_ret == 0);
 
-    gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &th->alloc_region);
+    gc_close_region(BOXED_PAGE_FLAG, &th->alloc_region);
 #if defined(LISP_FEATURE_SB_SAFEPOINT_STRICTLY) && !defined(LISP_FEATURE_WIN32)
-    gc_alloc_update_page_tables(BOXED_PAGE_FLAG, &th->sprof_alloc_region);
+    gc_close_region(BOXED_PAGE_FLAG, &th->sprof_alloc_region);
 #endif
     unlink_thread(th);
     pthread_mutex_unlock(&all_threads_lock);
