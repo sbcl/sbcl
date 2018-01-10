@@ -749,8 +749,8 @@
                              (find-saved-frame-down fp frame)))
                        #!-(or x86 x86-64)
                        (compute-calling-frame
-                        (descriptor-sap (stack-ref fp ocfp-save-offset))
-                        (stack-ref fp lra-save-offset)
+                        (descriptor-sap (frame-saved-cfp frame debug-fun))
+                        (frame-saved-lra frame debug-fun)
                         frame)))))))
         down)))
 
