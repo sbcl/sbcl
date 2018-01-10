@@ -754,42 +754,6 @@
                         frame)))))))
         down)))
 
-;;; Get the old FP or return PC out of FRAME. STACK-SLOT is the
-;;; standard save location offset on the stack. LOC is the saved
-;;; SC-OFFSET describing the main location.
-(defun get-context-value (frame stack-slot loc)
-  (declare (type compiled-frame frame) (type unsigned-byte stack-slot)
-           (type sb!c:sc-offset loc))
-  (let ((pointer (frame-pointer frame))
-        (escaped (compiled-frame-escaped frame)))
-    (if escaped
-        (sub-access-debug-var-slot pointer loc escaped)
-        #!-(or x86 x86-64)
-        (stack-ref pointer stack-slot)
-        #!+(or x86 x86-64)
-        (ecase stack-slot
-          (#.ocfp-save-offset
-           (stack-ref pointer stack-slot))
-          (#.lra-save-offset
-           (sap-ref-sap pointer (sb!vm::frame-byte-offset stack-slot)))))))
-
-(defun (setf get-context-value) (value frame stack-slot loc)
-  (declare (type compiled-frame frame) (type unsigned-byte stack-slot)
-           (type sb!c:sc-offset loc))
-  (let ((pointer (frame-pointer frame))
-        (escaped (compiled-frame-escaped frame)))
-    (if escaped
-        (sub-set-debug-var-slot pointer loc value escaped)
-        #!-(or x86 x86-64)
-        (setf (stack-ref pointer stack-slot) value)
-        #!+(or x86 x86-64)
-        (ecase stack-slot
-          (#.ocfp-save-offset
-           (setf (stack-ref pointer stack-slot) value))
-          (#.lra-save-offset
-           (setf (sap-ref-sap pointer (sb!vm::frame-byte-offset stack-slot))
-                 value))))))
-
 (defun foreign-function-backtrace-name (sap)
   (let ((name (sap-foreign-symbol sap)))
     (if name
