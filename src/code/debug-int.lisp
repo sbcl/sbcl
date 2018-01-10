@@ -734,24 +734,20 @@
           (/noshow0 "in DOWN :UNPARSED case")
           (setf (frame-%down frame)
                 (etypecase debug-fun
-                  (compiled-debug-fun
+                  ((or compiled-debug-fun
+                       #!-(or x86 x86-64) bogus-debug-fun)
                    (compute-calling-frame
                     (descriptor-sap (frame-saved-cfp frame debug-fun))
                     (frame-saved-lra frame debug-fun)
                     frame))
+                  #!+(or x86 x86-64)
                   (bogus-debug-fun
                    (let ((fp (frame-pointer frame)))
                      (when (control-stack-pointer-valid-p fp)
-                       #!+(or x86 x86-64)
                        (multiple-value-bind (ok ra ofp) (x86-call-context fp)
                          (if ok
                              (compute-calling-frame ofp ra frame)
-                             (find-saved-frame-down fp frame)))
-                       #!-(or x86 x86-64)
-                       (compute-calling-frame
-                        (descriptor-sap (frame-saved-cfp frame debug-fun))
-                        (frame-saved-lra frame debug-fun)
-                        frame)))))))
+                             (find-saved-frame-down fp frame)))))))))
         down)))
 
 (defun foreign-function-backtrace-name (sap)
