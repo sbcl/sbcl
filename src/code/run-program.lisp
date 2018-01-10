@@ -740,7 +740,7 @@ Users Manual for details about the PROCESS structure.
    :ERROR and :IF-ERROR-EXISTS
       Same as :OUTPUT and :IF-OUTPUT-EXISTS, except that :ERROR can also be
       specified as :OUTPUT in which case all error output is routed to the
-      same place as normal output.
+      same place as normal output. Defaults to :OUTPUT.
    :STATUS-HOOK
       This is a function the system calls whenever the status of the
       process changes.  The function takes the process as an argument.
