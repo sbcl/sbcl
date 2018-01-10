@@ -730,17 +730,22 @@ Users Manual for details about the PROCESS structure.
       is used.  If a pathname, the file so specified is used.  If a stream,
       all the output from the process is written to this stream. If
       :STREAM, the PROCESS-OUTPUT slot is filled in with a stream that can
-      be read to get the output. Defaults to NIL.
+      be read to get the output.
+      Defaults to NIL.
+   :ERROR
+      Same as :OUTPUT, additionally accepts :OUTPUT, making all error
+      output routed to the same place as normal output.
+      Defaults to :OUTPUT.
    :IF-OUTPUT-EXISTS (when :OUTPUT is the name of a file)
       can be one of:
          :ERROR (the default) to generate an error
          :SUPERSEDE to supersede the file with output from the program
          :APPEND to append output from the program to the file
          NIL to return NIL from RUN-PROGRAM, without doing anything
-   :ERROR and :IF-ERROR-EXISTS
-      Same as :OUTPUT and :IF-OUTPUT-EXISTS, except that :ERROR can also be
-      specified as :OUTPUT in which case all error output is routed to the
-      same place as normal output. Defaults to :OUTPUT.
+   :IF-ERROR-EXISTS
+      Same as :IF-OUTPUT-EXISTS, controlling :ERROR output to files.
+      Ignored when :ERROR :OUTPUT.
+      Defaults to :ERROR.
    :STATUS-HOOK
       This is a function the system calls whenever the status of the
       process changes.  The function takes the process as an argument.
