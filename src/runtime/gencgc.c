@@ -111,11 +111,6 @@ boolean pre_verify_gen_0 = 0;
 /* Should we check that newly allocated regions are zero filled? */
 boolean gencgc_zero_check = 0;
 
-/* Should we check that the free space is zero filled? */
-/* Don't use this - you'll get more mileage out of READ_PROTECT_FREE_PAGES,
- * because we zero-fill lazily. This switch should probably be removed. */
-boolean gencgc_enable_verify_zero_fill = 0;
-
 /* If defined, free pages are read-protected to ensure that nothing
  * accesses them.
  */
@@ -2975,48 +2970,6 @@ walk_generation(uword_t (*proc)(lispobj*,lispobj*,uword_t),
     return 0;
 }
 
-/* Check that all the free space is zero filled. */
-static void
-verify_zero_fill(void)
-{
-    page_index_t page;
-
-    for (page = 0; page < last_free_page; page++) {
-        if (page_free_p(page)) {
-            /* The whole page should be zero filled. */
-            sword_t *start_addr = (sword_t *)page_address(page);
-            sword_t i;
-            for (i = 0; i < (sword_t)GENCGC_CARD_BYTES/N_WORD_BYTES; i++) {
-                if (start_addr[i] != 0) {
-                    lose("free page not zero at %p\n", start_addr + i);
-                }
-            }
-        } else {
-            sword_t free_bytes = GENCGC_CARD_BYTES - page_bytes_used(page);
-            if (free_bytes > 0) {
-                sword_t *start_addr =
-                    (sword_t *)(page_address(page) + page_bytes_used(page));
-                sword_t size = free_bytes / N_WORD_BYTES;
-                sword_t i;
-                for (i = 0; i < size; i++) {
-                    if (start_addr[i] != 0) {
-                        lose("free region not zero at %p\n", start_addr + i);
-                    }
-                }
-            }
-        }
-    }
-}
-
-/* External entry point for verify_zero_fill */
-void
-gencgc_verify_zero_fill(void)
-{
-    /* Flush the alloc regions updating the tables. */
-    gc_alloc_update_all_page_tables(1);
-    SHOW("verifying zero fill");
-    verify_zero_fill();
-}
 
 /* Write-protect all the dynamic boxed pages in the given generation. */
 static void
