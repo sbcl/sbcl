@@ -2954,20 +2954,13 @@ register."
 ;;; repeated parsing of the stack and consing when asking whether a
 ;;; series of cookies is valid.
 (defun fun-end-cookie-valid-p (frame cookie)
-  (let ((lra (fun-end-cookie-bogus-lra cookie))
-        (lra-sc-offset
-          #!-fp-and-pc-standard-save
-          (sb!c::compiled-debug-fun-return-pc
-           (compiled-debug-fun-compiler-debug-fun
-            (fun-end-cookie-debug-fun cookie)))
-          #!+fp-and-pc-standard-save
-          sb!c:return-pc-passing-offset))
+  (let ((lra (fun-end-cookie-bogus-lra cookie)))
     (do ((frame frame (frame-down frame)))
         ((not frame) nil)
       (when (and (compiled-frame-p frame)
                  (#!-(or x86 x86-64) eq #!+(or x86 x86-64) sap=
                   lra
-                  (get-context-value frame lra-save-offset lra-sc-offset)))
+                  (frame-saved-lra frame (frame-debug-fun frame))))
         (return t)))))
 
 ;;;; ACTIVATE-BREAKPOINT
