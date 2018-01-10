@@ -673,22 +673,34 @@
   #!+fp-and-pc-standard-save
   sb!c:return-pc-passing-offset
   #!-fp-and-pc-standard-save
-  (let ((c-d-f (compiled-debug-fun-compiler-debug-fun debug-fun))
-        (pc-offset (compiled-code-location-pc location)))
-    (if (>= pc-offset (sb!c::compiled-debug-fun-lra-saved-pc c-d-f))
-        (sb!c::compiled-debug-fun-return-pc c-d-f)
-        (sb!c::compiled-debug-fun-return-pc-pass c-d-f))))
+  (etypecase debug-fun
+    (compiled-debug-fun
+     (let ((c-d-f (compiled-debug-fun-compiler-debug-fun debug-fun))
+           (pc-offset (compiled-code-location-pc location)))
+       (if (>= pc-offset (sb!c::compiled-debug-fun-lra-saved-pc c-d-f))
+           (sb!c::compiled-debug-fun-return-pc c-d-f)
+           (sb!c::compiled-debug-fun-return-pc-pass c-d-f))))
+    (bogus-debug-fun
+     ;; No handy backend (or compiler) defined constant for this one,
+     ;; so construct it here and now.
+     (sb!c:make-sc-offset control-stack-sc-number lra-save-offset))))
 
 (defun old-fp-offset-for-location (debug-fun location)
   (declare (ignorable debug-fun location))
   #!+fp-and-pc-standard-save
   sb!c:old-fp-passing-offset
   #!-fp-and-pc-standard-save
-  (let ((c-d-f (compiled-debug-fun-compiler-debug-fun debug-fun))
-        (pc-offset (compiled-code-location-pc location)))
-    (if (>= pc-offset (sb!c::compiled-debug-fun-cfp-saved-pc c-d-f))
-        (sb!c::compiled-debug-fun-old-fp c-d-f)
-        sb!c:old-fp-passing-offset)))
+  (etypecase debug-fun
+    (compiled-debug-fun
+     (let ((c-d-f (compiled-debug-fun-compiler-debug-fun debug-fun))
+           (pc-offset (compiled-code-location-pc location)))
+       (if (>= pc-offset (sb!c::compiled-debug-fun-cfp-saved-pc c-d-f))
+           (sb!c::compiled-debug-fun-old-fp c-d-f)
+           sb!c:old-fp-passing-offset)))
+    (bogus-debug-fun
+     ;; No handy backend (or compiler) defined constant for this one,
+     ;; so construct it here and now.
+     (sb!c:make-sc-offset control-stack-sc-number ocfp-save-offset))))
 
 (defun frame-saved-cfp (frame debug-fun)
   (sub-access-debug-var-slot
