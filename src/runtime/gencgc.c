@@ -2420,12 +2420,21 @@ scavenge_newspace_generation_one_scan(generation_index_t generation)
            generation));
 }
 
+static void gc_close_all_regions()
+{
+#if SEGREGATED_CODE
+    gc_close_region(CODE_PAGE_FLAG, &code_region);
+#endif
+    gc_close_region(UNBOXED_PAGE_FLAG, &unboxed_region);
+    gc_close_region(BOXED_PAGE_FLAG, &boxed_region);
+}
+
 /* Do a complete scavenge of the newspace generation. */
 static void
 scavenge_newspace_generation(generation_index_t generation)
 {
-    /* Flush the current regions updating the tables. */
-    gc_close_all_regions(0);
+    /* Flush the current regions updating the page table. */
+    gc_close_all_regions();
 
     /* Turn on the recording of new areas. */
     gc_assert(new_areas_index == 0);
@@ -2434,8 +2443,8 @@ scavenge_newspace_generation(generation_index_t generation)
     /* Start with a full scavenge. */
     scavenge_newspace_generation_one_scan(generation);
 
-    /* Flush the current regions updating the tables. */
-    gc_close_all_regions(0);
+    /* Flush the current regions updating the page table. */
+    gc_close_all_regions();
 
     /*FSHOW((stderr,
              "The first scan is finished; current_new_areas_index=%d.\n",
@@ -2449,7 +2458,7 @@ scavenge_newspace_generation(generation_index_t generation)
             // actually entails new work - it only knows which triggers were removed
             // from the pending list. So check again if allocations occurred,
             // which is only if not all triggers referenced already-live objects.
-            gc_close_all_regions(0); // update new_areas from regions
+            gc_close_all_regions(); // update new_areas from regions
             if (!new_areas_index && !immobile_scav_queue_count)
                 break; // still no work to do
         }
@@ -2493,8 +2502,8 @@ scavenge_newspace_generation(generation_index_t generation)
             }
 
         }
-        /* Flush the current regions updating the tables. */
-        gc_close_all_regions(0);
+        /* Flush the current regions updating the page table. */
+        gc_close_all_regions();
     }
 
     /* Turn off recording of allocation regions. */
@@ -3556,8 +3565,27 @@ collect_garbage(generation_index_t last_gen)
         last_gen = 0;
     }
 
-    /* Flush the alloc regions updating the tables. */
-    gc_close_all_regions(1);
+    /* Flush the alloc regions updating the page table.
+     *
+     * GC is single-threaded and all memory allocations during a collection
+     * happen in the GC thread, so it is sufficient to update PTEs for the
+     * per-thread regions exactly once at the beginning of a collection
+     * and update only from the GC's regions thereafter during collection.
+     *
+     * The GC's regions are probably empty already, except:
+     * - The code region is shared across all threads
+     * - The boxed region is used in lieu of thread-specific regions
+     *   in a unithread build.
+     * So we need to close them for those two cases.
+     */
+    struct thread *th;
+    for_each_thread(th) {
+        gc_close_region(BOXED_PAGE_FLAG, &th->alloc_region);
+#if defined(LISP_FEATURE_SB_SAFEPOINT_STRICTLY) && !defined(LISP_FEATURE_WIN32)
+        gc_close_region(BOXED_PAGE_FLAG, &th->sprof_alloc_region);
+#endif
+    }
+    gc_close_all_regions();
 
     /* Verify the new objects created by Lisp code. */
     if (pre_verify_gen_0) {
@@ -4089,41 +4117,6 @@ gencgc_handle_wp_violation(void* fault_addr)
 void
 unhandled_sigmemoryfault(void *addr)
 {}
-
-static void
-close_thread_regions(struct thread *th)
-{
-    gc_close_region(BOXED_PAGE_FLAG, &th->alloc_region);
-#if defined(LISP_FEATURE_SB_SAFEPOINT_STRICTLY) && !defined(LISP_FEATURE_WIN32)
-    gc_close_region(BOXED_PAGE_FLAG, &th->sprof_alloc_region);
-#endif
-}
-
-/* GC is single-threaded and all memory allocations during a
-   collection happen in the GC thread, so it is sufficient to update
-   all the the page tables once at the beginning of a collection and
-   update only page tables of the GC thread during the collection. */
-void gc_close_all_regions(int for_all_threads)
-{
-    /* Flush the alloc regions updating the tables. */
-    struct thread *th;
-    if (for_all_threads) {
-        for_each_thread(th) {
-            close_thread_regions(th);
-        }
-    }
-    else {
-        th = arch_os_get_current_thread();
-        if (th) {
-            close_thread_regions(th);
-        }
-    }
-#if SEGREGATED_CODE
-    gc_close_region(CODE_PAGE_FLAG, &code_region);
-#endif
-    gc_close_region(UNBOXED_PAGE_FLAG, &unboxed_region);
-    gc_close_region(BOXED_PAGE_FLAG, &boxed_region);
-}
 
 void
 gc_set_region_empty(struct alloc_region *region)

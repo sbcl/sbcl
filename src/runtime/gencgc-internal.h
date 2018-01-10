@@ -162,7 +162,6 @@ extern page_index_t page_table_pages;
 
 void update_dynamic_space_free_pointer(void);
 void gc_close_region(int page_type_flag, struct alloc_region *alloc_region);
-void gc_close_all_regions(int);
 void gc_set_region_empty(struct alloc_region *region);
 
 /*
