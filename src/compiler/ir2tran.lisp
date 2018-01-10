@@ -1731,28 +1731,27 @@ not stack-allocated LVAR ~S." source-lvar)))))
    (with-unique-names (bind unbind)
      (once-only ((n-save-bs '(%primitive current-binding-pointer)))
        `(unwind-protect
-             (progn
-               (labels ((,unbind (vars)
-                          (declare (optimize (speed 2) (debug 0)))
-                          (let ((unbound-marker (%primitive make-unbound-marker)))
-                            (dolist (var vars)
-                              ;; CLHS says "bound and then made to have no value" -- user
-                              ;; should not be able to tell the difference between that and this.
-                              (about-to-modify-symbol-value var 'progv)
-                              (%primitive dynbind unbound-marker var))))
-                        (,bind (vars vals)
-                          (declare (optimize (speed 2) (debug 0)
-                                             (insert-debug-catch 0)))
-                          (cond ((null vars))
-                                ((null vals) (,unbind vars))
-                                (t
-                                 (let ((val (car vals))
-                                       (var (car vars)))
-                                   (about-to-modify-symbol-value var 'progv val t)
-                                   (%primitive dynbind val var))
-                                 (,bind (cdr vars) (cdr vals))))))
-                 (,bind ,vars ,vals))
-               nil
+             (labels ((,unbind (vars)
+                        (declare (optimize (speed 2) (debug 0)))
+                        (let ((unbound-marker (%primitive make-unbound-marker)))
+                          (dolist (var vars)
+                            ;; CLHS says "bound and then made to have no value" -- user
+                            ;; should not be able to tell the difference between that and this.
+                            (about-to-modify-symbol-value var 'progv)
+                            (%primitive dynbind unbound-marker var))))
+                      (,bind (vars vals)
+                        (declare (optimize (speed 2) (debug 0)
+                                           (insert-debug-catch 0))
+                                 (list vars vals))
+                        (cond ((null vars))
+                              ((null vals) (,unbind vars))
+                              (t
+                               (let ((val (car vals))
+                                     (var (car vars)))
+                                 (about-to-modify-symbol-value var 'progv val t)
+                                 (%primitive dynbind val var))
+                               (,bind (cdr vars) (cdr vals))))))
+               (,bind ,vars ,vals)
                ,@body)
           ;; Technically ANSI CL doesn't allow declarations at the
           ;; start of the cleanup form. SBCL happens to allow for

@@ -191,3 +191,15 @@
               (checked-compile
                `(lambda () (declare (values 0)))
                :allow-warnings t))))
+
+(with-test (:name :bad-progv)
+  (assert
+   (nth-value 1
+              (checked-compile
+               `(lambda (x) (progv x 1))
+               :allow-warnings t)))
+  (assert
+   (nth-value 1
+              (checked-compile
+               `(lambda (x) (progv 1 x))
+               :allow-warnings t))))

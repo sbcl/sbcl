@@ -664,7 +664,7 @@ status slot."
                     (external-format :default)
                     directory
                     #+win32 (escape-arguments t))
-  "RUN-PROGRAM creates a new process specified by PROGRAM. 
+  "RUN-PROGRAM creates a new process specified by PROGRAM.
 ARGS are passed as the arguments to the program.
 
 The program arguments and the environment are encoded using the
