@@ -664,10 +664,8 @@ status slot."
                     (external-format :default)
                     directory
                     #+win32 (escape-arguments t))
-  "RUN-PROGRAM creates a new process specified by the PROGRAM
-argument. ARGS are the standard arguments that can be passed to a
-program. For no arguments, use NIL (which means that just the
-name of the program is passed as arg 0).
+  "RUN-PROGRAM creates a new process specified by PROGRAM. 
+ARGS are passed as the arguments to the program.
 
 The program arguments and the environment are encoded using the
 default external format for streams.
