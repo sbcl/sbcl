@@ -2708,7 +2708,7 @@ is_in_stack_space(lispobj ptr)
 
 struct verify_state {
     lispobj *object_start, *object_end;
-    lispobj *virtual_where;
+    lispobj *vaddr;
     uword_t flags;
     int errors;
     generation_index_t object_gen;
@@ -2754,7 +2754,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
     if (++state->errors > 25) lose("Too many errors"); \
     else fprintf(stderr, "Ptr %p @ %"OBJ_FMTX" sees %s\n", \
                  (void*)(uintptr_t)thing, \
-                 (lispobj)(state->virtual_where ? state->virtual_where : where), \
+                 (lispobj)(state->vaddr ? state->vaddr : where), \
                  why); }
 
             /* Does it point to the dynamic space? */
@@ -2769,6 +2769,12 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                 /* Check that its not in the RO space as it would then be a
                  * pointer from the RO to the dynamic space. */
                 FAIL_IF(is_in_readonly_space, "dynamic space from RO space");
+                page_index_t my_page_index =
+                    find_page_index(state->vaddr ? state->vaddr : where);
+                FAIL_IF(my_page_index >= 0 &&
+                        page_table[my_page_index].write_protected &&
+                        page_table[page_index].gen < page_table[my_page_index].gen,
+                        "younger obj from WP page");
             } else if (to_immobile_space) {
                 // the object pointed to must not have been discarded as garbage
                 FAIL_IF(!other_immediate_lowtag_p(*native_pointer(thing)) ||
@@ -2855,9 +2861,9 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                 callee = fdefn_callee_lispobj((struct fdefn*)where);
                 /* For a more intelligible error, don't say that the word that
                  * contains an errant pointer is in stack space if it isn't. */
-                state->virtual_where = where + 3;
+                state->vaddr = where + 3;
                 verify_range(&callee, 1, state);
-                state->virtual_where = 0;
+                state->vaddr = 0;
                 count = ALIGN_UP(sizeof (struct fdefn)/sizeof(lispobj), 2);
                 break;
         }
