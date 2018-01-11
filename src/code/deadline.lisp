@@ -216,40 +216,40 @@ it will signal a timeout condition."
     (let ((timeout (when seconds
                      (seconds-to-maybe-internal-time seconds)))
           (deadline *deadline*))
-      (when (not (or timeout deadline))
-        (return-no-timeout))
       ;; Use either TIMEOUT or DEADLINE to produce both a timeout and
       ;; deadline in internal-time units.
-      (tagbody
-       :restart
-         (let* ((now (get-internal-real-time))
-                (deadline-internal-time (when deadline
-                                          (deadline-internal-time deadline)))
-                (deadline-timeout
-                 (when deadline-internal-time
-                   (let ((time-left (- deadline-internal-time now)))
-                     (when (plusp time-left) time-left)))))
-           (return-from decode-timeout
-             (cond
-               ;; We have a timeout and a non-expired deadline. Use the
-               ;; one that expires earlier.
-               ((and timeout deadline-timeout)
-                (if (< timeout deadline-timeout)
-                    (return-timeout timeout (+ timeout now) nil)
-                    (return-timeout deadline-timeout deadline-internal-time t)))
-               ;; Non-expired deadline.
-               (deadline-timeout
-                (return-timeout deadline-timeout deadline-internal-time t))
-               ;; Expired deadline. Signal the DEADLINE-TIMEOUT
-               ;; condition. In case we return here (i.e. the deadline
-               ;; has been deferred or canceled), pick up the new value
-               ;; of *DEADLINE*.
-               (deadline-internal-time
-                (signal-deadline)
-                (setf deadline *deadline*)
-                (go :restart))
-               ;; There is no deadline but a timeout.
-               (timeout
-                (return-timeout timeout (+ timeout now) nil))
-               (t
-                (return-no-timeout)))))))))
+      (if (or timeout deadline)
+          (tagbody
+           :restart
+             (let* ((now (get-internal-real-time))
+                    (deadline-internal-time (when deadline
+                                              (deadline-internal-time deadline)))
+                    (deadline-timeout
+                      (when deadline-internal-time
+                        (let ((time-left (- deadline-internal-time now)))
+                          (when (plusp time-left) time-left)))))
+               (return-from decode-timeout
+                 (cond
+                   ;; We have a timeout and a non-expired deadline. Use the
+                   ;; one that expires earlier.
+                   ((and timeout deadline-timeout)
+                    (if (< timeout deadline-timeout)
+                        (return-timeout timeout (+ timeout now) nil)
+                        (return-timeout deadline-timeout deadline-internal-time t)))
+                   ;; Non-expired deadline.
+                   (deadline-timeout
+                    (return-timeout deadline-timeout deadline-internal-time t))
+                   ;; Expired deadline. Signal the DEADLINE-TIMEOUT
+                   ;; condition. In case we return here (i.e. the deadline
+                   ;; has been deferred or canceled), pick up the new value
+                   ;; of *DEADLINE*.
+                   (deadline-internal-time
+                    (signal-deadline)
+                    (setf deadline *deadline*)
+                    (go :restart))
+                   ;; There is no deadline but a timeout.
+                   (timeout
+                    (return-timeout timeout (+ timeout now) nil))
+                   (t
+                    (return-no-timeout))))))
+          (return-no-timeout)))))
