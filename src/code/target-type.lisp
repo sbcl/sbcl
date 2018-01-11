@@ -39,7 +39,7 @@
              t))
     (array-type
      (if (contains-unknown-type-p type)
-         (values nil nil)
+         (values nil (not (arrayp obj)))
          (values (%%typep obj type) t)))
     (cons-type
      ;; Do not use %%TYPEP because of SATISFIES

@@ -210,3 +210,19 @@
               (checked-compile
                '(lambda () (coerce (list t) nil))
                :allow-warnings t))))
+
+(with-test (:name :unknown-vector-type-conflict)
+  (assert
+   (nth-value 1
+              (checked-compile
+               '(lambda () (the (vector nonsense-type) nil))
+               :allow-warnings t
+               :allow-style-warnings t))))
+
+(with-test (:name :subseq-unknown-vector-type)
+  (assert
+   (nth-value 1
+              (checked-compile
+               '(lambda () (subseq (the (vector nonsense-type) :x) 0 1))
+               :allow-warnings t
+               :allow-style-warnings t))))
