@@ -295,9 +295,6 @@ os_init(char *argv[], char *envp[])
              * way we might as well continue, and hope that the random
              * memory maps are ok this time around.
              */
-            fprintf(stderr, "WARNING:\
-\nCouldn't re-execute SBCL with proper personality flags (/proc isn't mounted? setuid?)\
-\nTrying to continue anyway.\n");
         } else if (getenv("SBCL_IS_RESTARTING")) {
             /* We restarted due to previously enabled ASLR.  Now,
              * reenable it for fork()'ed children. */
