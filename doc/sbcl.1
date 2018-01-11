@@ -128,15 +128,11 @@ system that identical pages may be shared between processes until they
 are written to. This can be useful to reduce the memory usage on
 systems with multiple SBCL processes started from similar but
 differently\-named core files, or from compressed cores. Without
-platform support, do nothing.
+platform support, do nothing. By default only compressed cores trigger
+hinting.
 .TP 3
 .B \-\-no-merge\-core\-pages
 Ensures that no sharing hint is provided to the operating system.
-.TP 3
-.B \-\-default\-merge\-core\-pages
-Reverts the sharing hint policy to the default: only compressed cores
-trigger hinting. Uncompressed cores are mapped directly from the core
-file, which is usually enough to ensure sharing.
 .TP 3
 .B \-\-help
 Print some basic information about SBCL, then exit.
