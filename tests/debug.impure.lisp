@@ -320,10 +320,7 @@
       (error "Missed: ~S" targets))
     (assert (not oops))))
 
-(with-test (:name (:debugger :source 1)
-            ;; Division is done by an assembly routine on ppc
-            ;; and it can't locate the div-by-zero error there
-            :fails-on :ppc)
+(with-test (:name (:debugger :source 1))
   (test-debugger
    "d
     source 0
