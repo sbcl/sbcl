@@ -203,3 +203,10 @@
               (checked-compile
                `(lambda (x) (progv 1 x))
                :allow-warnings t))))
+
+(with-test (:name :coerce-to-nil)
+  (assert
+   (nth-value 1
+              (checked-compile
+               '(lambda () (coerce (list t) nil))
+               :allow-warnings t))))

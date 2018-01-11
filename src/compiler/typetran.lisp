@@ -906,91 +906,95 @@
     (give-up-ir1-transform))
   (let* ((tval (lvar-value type))
          (tspec (ir1-transform-specifier-type tval)))
-    (if (csubtypep (lvar-type x) tspec)
-        'x
-        ;; Note: The THE forms we use to wrap the results make sure that
-        ;; specifiers like (SINGLE-FLOAT 0.0 1.0) can raise a TYPE-ERROR.
-        (cond
-          ((csubtypep tspec (specifier-type 'double-float))
-           `(the ,tval (%double-float x)))
-          ;; FIXME: #!+long-float (t ,(error "LONG-FLOAT case needed"))
-          ((csubtypep tspec (specifier-type 'float))
-           `(the ,tval (%single-float x)))
-          ((csubtypep tspec (specifier-type 'complex))
-           (multiple-value-bind (part-type result-type)
-               (cond ((and (numeric-type-p tspec)
-                           (numeric-type-format tspec))) ; specific FLOAT type
-                     ((csubtypep tspec (specifier-type '(complex float)))
-                      ;; unspecific FLOAT type
-                      'float)
-                     ((csubtypep tspec (specifier-type '(complex rational)))
-                      (values 'rational `(or ,tval rational)))
-                     (t
-                      (values t `(or ,tval rational))))
-             (let ((result-type (or result-type tval)))
-               `(cond
-                  ((not (typep x 'complex))
-                   (the ,result-type (complex (coerce x ',part-type))))
-                  ((typep x ',tval)
-                   x)
-                  (t     ; X is COMPLEX, but not of the requested type
-                   (the ,result-type
-                        (complex (coerce (realpart x) ',part-type)
-                                 (coerce (imagpart x) ',part-type))))))))
-          ;; Special case STRING and SIMPLE-STRING as they are union types
-          ;; in SBCL.
-          ((member tval '(string simple-string))
-           `(the ,tval
-                 (if (typep x ',tval)
-                     x
-                     (replace (make-array (length x) :element-type 'character) x))))
-          ((eq tval 'character)
-           `(character x))
-          ;; Special case VECTOR
-          ((eq tval 'vector)
-           `(the ,tval
-                 (if (vectorp x)
-                     x
-                     (replace (make-array (length x)) x))))
-          ;; Handle specialized element types for 1D arrays.
-          ((csubtypep tspec (specifier-type '(array * (*))))
-           ;; Can we avoid checking for dimension issues like (COERCE FOO
-           ;; '(SIMPLE-VECTOR 5)) returning a vector of length 6?
-           ;;
-           ;; CLHS actually allows this for all code with SAFETY < 3,
-           ;; but we're a conservative bunch.
-           (if (or (policy node (zerop safety)) ; no need in unsafe code
-                   (and (array-type-p tspec) ; no need when no dimensions
-                        (equal (array-type-dimensions tspec) '(*))))
-               ;; We can!
-               (multiple-value-bind (vtype etype upgraded) (simplify-vector-type tspec)
-                 (unless upgraded
-                   (give-up-ir1-transform))
-                 (let ((vtype (type-specifier vtype)))
-                   `(the ,vtype
-                         (if (typep x ',vtype)
-                             x
-                             (replace
-                              (make-array (length x)
-                                          ,@(and (not (eq etype *universal-type*))
-                                                 (not (eq etype *wild-type*))
-                                                 `(:element-type ',(type-specifier etype))))
-                              x)))))
-               ;; No, duh. Dimension checking required.
-               (give-up-ir1-transform
-                "~@<~S specifies dimensions other than (*) in safe code.~:@>"
-                tval)))
-          ((type= tspec (specifier-type 'list))
-           `(coerce-to-list x))
-          ((csubtypep tspec (specifier-type 'function))
-           (if (csubtypep (lvar-type x) (specifier-type 'symbol))
-               `(coerce-symbol-to-fun x)
-               ;; if X can later be derived as FUNCTION then we don't want
-               ;; to call COERCE-TO-FUN, because there's no smartness
-               ;; that can undo that and see that it's really (IDENTITY X).
-               (progn (delay-ir1-transform node :constraint)
-                      `(coerce-to-fun x))))
-          (t
+    ;; Note: The THE forms we use to wrap the results make sure that
+    ;; specifiers like (SINGLE-FLOAT 0.0 1.0) can raise a TYPE-ERROR.
+    (cond
+      ((eq tspec *empty-type*)
+       (compiler-warn "Can't coerce to NIL.")
+       (setf (combination-kind node) :error)
+       (give-up-ir1-transform))
+      ((csubtypep (lvar-type x) tspec)
+       'x)
+      ((csubtypep tspec (specifier-type 'double-float))
+       `(the ,tval (%double-float x)))
+      ;; FIXME: #!+long-float (t ,(error "LONG-FLOAT case needed"))
+      ((csubtypep tspec (specifier-type 'float))
+       `(the ,tval (%single-float x)))
+      ((csubtypep tspec (specifier-type 'complex))
+       (multiple-value-bind (part-type result-type)
+           (cond ((and (numeric-type-p tspec)
+                       (numeric-type-format tspec))) ; specific FLOAT type
+                 ((csubtypep tspec (specifier-type '(complex float)))
+                  ;; unspecific FLOAT type
+                  'float)
+                 ((csubtypep tspec (specifier-type '(complex rational)))
+                  (values 'rational `(or ,tval rational)))
+                 (t
+                  (values t `(or ,tval rational))))
+         (let ((result-type (or result-type tval)))
+           `(cond
+              ((not (typep x 'complex))
+               (the ,result-type (complex (coerce x ',part-type))))
+              ((typep x ',tval)
+               x)
+              (t         ; X is COMPLEX, but not of the requested type
+               (the ,result-type
+                    (complex (coerce (realpart x) ',part-type)
+                             (coerce (imagpart x) ',part-type))))))))
+      ;; Special case STRING and SIMPLE-STRING as they are union types
+      ;; in SBCL.
+      ((member tval '(string simple-string))
+       `(the ,tval
+             (if (typep x ',tval)
+                 x
+                 (replace (make-array (length x) :element-type 'character) x))))
+      ((eq tval 'character)
+       `(character x))
+      ;; Special case VECTOR
+      ((eq tval 'vector)
+       `(the ,tval
+             (if (vectorp x)
+                 x
+                 (replace (make-array (length x)) x))))
+      ;; Handle specialized element types for 1D arrays.
+      ((csubtypep tspec (specifier-type '(array * (*))))
+       ;; Can we avoid checking for dimension issues like (COERCE FOO
+       ;; '(SIMPLE-VECTOR 5)) returning a vector of length 6?
+       ;;
+       ;; CLHS actually allows this for all code with SAFETY < 3,
+       ;; but we're a conservative bunch.
+       (if (or (policy node (zerop safety)) ; no need in unsafe code
+               (and (array-type-p tspec) ; no need when no dimensions
+                    (equal (array-type-dimensions tspec) '(*))))
+           ;; We can!
+           (multiple-value-bind (vtype etype upgraded) (simplify-vector-type tspec)
+             (unless upgraded
+               (give-up-ir1-transform))
+             (let ((vtype (type-specifier vtype)))
+               `(the ,vtype
+                     (if (typep x ',vtype)
+                         x
+                         (replace
+                          (make-array (length x)
+                                      ,@(and (not (eq etype *universal-type*))
+                                             (not (eq etype *wild-type*))
+                                             `(:element-type ',(type-specifier etype))))
+                          x)))))
+           ;; No, duh. Dimension checking required.
            (give-up-ir1-transform
-            "~@<open coding coercion to ~S not implemented.~:@>"
-            tval))))))
+            "~@<~S specifies dimensions other than (*) in safe code.~:@>"
+            tval)))
+      ((type= tspec (specifier-type 'list))
+       `(coerce-to-list x))
+      ((csubtypep tspec (specifier-type 'function))
+       (if (csubtypep (lvar-type x) (specifier-type 'symbol))
+           `(coerce-symbol-to-fun x)
+           ;; if X can later be derived as FUNCTION then we don't want
+           ;; to call COERCE-TO-FUN, because there's no smartness
+           ;; that can undo that and see that it's really (IDENTITY X).
+           (progn (delay-ir1-transform node :constraint)
+                  `(coerce-to-fun x))))
+      (t
+       (give-up-ir1-transform
+        "~@<open coding coercion to ~S not implemented.~:@>"
+        tval)))))

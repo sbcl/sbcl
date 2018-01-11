@@ -605,6 +605,7 @@
              (length (1- (length x)))
              (ctype (careful-values-specifier-type type)))
         (if (and ctype
+                 (neq ctype *empty-type*)
                  (csubtypep ctype (specifier-type '(array * (*)))))
             (multiple-value-bind (type element-type upgraded had-dimensions)
                 (simplify-vector-type ctype)
