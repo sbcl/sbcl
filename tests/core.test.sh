@@ -128,7 +128,7 @@ fi
 
 # executable core used as "--core" option should not save the memory sizes
 # that were originally saved, but the sizes in the process doing the save.
-run_sbcl_with_args --control-stack-size 160KB --dynamic-space-size 200MB --no-userinit --no-sysinit --noprint <<EOF
+run_sbcl_with_args --control-stack-size 160KB --dynamic-space-size 200MB --disable-debugger --no-userinit --no-sysinit --noprint <<EOF
   (save-lisp-and-die "$tmpcore" :executable t :save-runtime-options t)
 EOF
 chmod u+x "$tmpcore"
