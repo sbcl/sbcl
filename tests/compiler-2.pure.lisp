@@ -148,6 +148,7 @@
   (ctu:assert-no-consing (sb-vm::space-bytes :static)))
 
 (with-test (:name (sb-vm::map-allocated-objects :no-consing)
+                  :fails-on :cheneygc
                   :skipped-on :interpreter)
   (let ((n 0))
     (sb-int:dx-flet ((f (obj type size)
