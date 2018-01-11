@@ -17,6 +17,8 @@ changes relative to sbcl-1.4.3:
     (lp#1241771)
   * bug fix: CANCEL-FINALIZATION operates in approximately constant time
     per operation (lp#1587983)
+  * bug fix: big-endian MIPS systems now (mostly) work again (broken since
+    1.3.14.x).
 
 changes in sbcl-1.4.3 relative to sbcl-1.4.2:
   * enhancement: SLEEP respects deadlines established by SB-SYS:WITH-DEADLINE.

@@ -35,6 +35,22 @@
 ;;; some other package, perhaps SB-KERNEL.
 (define-alien-type os-context-t (struct os-context-t-struct))
 
+;; KLUDGE: Linux/MIPS signal context fields are 64 bits wide, even on
+;; 32-bit systems.  On big-endian implementations, simply using a
+;; pointer to a narrower type DOES NOT WORK because it reads the upper
+;; half of the value, not the lower half.  On such systems, we must
+;; either read the entire value (and mask down, in case the system
+;; sign-extends the value, which has been seen to happen), or offset
+;; the pointer in order to read the lower half.  This has been broken
+;; at least twice in the past.  MIPS also appears to be the ONLY
+;; system for which the signal context field size may differ from
+;; n-word-bits (well, and ALPHA, but that's a separate matter), but
+;; this entire thing will likely need to be revisited when we add x32
+;; or n32 ABI support.
+(defconstant kludge-big-endian-short-pointer-offset
+  (+ 0
+     #!+(and mips big-endian (not 64-bit)) 1))
+
 (declaim (inline context-pc-addr))
 (define-alien-routine ("os_context_pc_addr" context-pc-addr) (* unsigned)
   (context (* os-context-t)))
@@ -44,21 +60,22 @@
   (declare (type (alien (* os-context-t)) context))
   (let ((addr (context-pc-addr context)))
     (declare (type (alien (* unsigned)) addr))
-    (int-sap (deref addr))))
+    (int-sap (deref addr kludge-big-endian-short-pointer-offset))))
 
 (declaim (inline incf-context-pc))
 (defun incf-context-pc (context offset)
   (declare (type (alien (* os-context-t)) context))
   (let ((addr (context-pc-addr context)))
     (declare (type (alien (* unsigned)) addr))
-    (setf (deref addr) (+ (deref addr) offset))))
+    (setf (deref addr kludge-big-endian-short-pointer-offset)
+          (+ (deref addr kludge-big-endian-short-pointer-offset) offset))))
 
 (declaim (inline set-context-pc))
 (defun set-context-pc (context new)
   (declare (type (alien (* os-context-t)) context))
   (let ((addr (context-pc-addr context)))
     (declare (type (alien (* unsigned)) addr))
-    (setf (deref addr) new)))
+    (setf (deref addr kludge-big-endian-short-pointer-offset) new)))
 
 (declaim (inline context-register-addr))
 (define-alien-routine ("os_context_register_addr" context-register-addr)
@@ -71,13 +88,13 @@
   (declare (type (alien (* os-context-t)) context))
   (let ((addr (context-register-addr context index)))
     (declare (type (alien (* unsigned)) addr))
-    (deref addr)))
+    (deref addr kludge-big-endian-short-pointer-offset)))
 
 (defun %set-context-register (context index new)
   (declare (type (alien (* os-context-t)) context))
   (let ((addr (context-register-addr context index)))
     (declare (type (alien (* unsigned)) addr))
-        (setf (deref addr) new)))
+        (setf (deref addr kludge-big-endian-short-pointer-offset) new)))
 
 ;; For the next two, note that if we convert to using SAP-REF-LISPOBJ
 ;; then we need to account for 32-bit lispobjs on 64-bit registers on
