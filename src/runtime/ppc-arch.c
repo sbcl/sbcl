@@ -642,10 +642,6 @@ arch_write_linkage_table_jmp(char *reloc_addr, void *target_addr)
 
   inst_ptr = (int*) reloc_addr;
 
-  /*
-   * Split the target address into hi and lo parts for the sethi
-   * instruction.  hi is the top 22 bits.  lo is the low 10 bits.
-   */
   hi = (unsigned long) target_addr;
   lo = hi & 0xffff;
   hi >>= 16;

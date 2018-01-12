@@ -483,10 +483,9 @@ arch_write_linkage_table_jmp(char *reloc_addr, void *target_addr)
 {
     reloc_addr[0] = 0xFF; /* Opcode for near jump to absolute reg/mem64. */
     reloc_addr[1] = 0x25; /* ModRM #b00 100 101, i.e. RIP-relative. */
-    UNALIGNED_STORE32((reloc_addr+2), 0); /* 32-bit displacement field = 0 */
-    UNALIGNED_STORE64((reloc_addr+6), (uword_t)target_addr);
-    /* write a nop for good measure. */
-    reloc_addr[14] = 0x90;
+    UNALIGNED_STORE32((reloc_addr+2), 2); /* 32-bit displacement field = 2 */
+    reloc_addr[6] = 0x66; reloc_addr[7] = 0x90; /* 2-byte NOP */
+    *(void**)(reloc_addr+8) = target_addr;
 }
 
 void
