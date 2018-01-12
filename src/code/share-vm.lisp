@@ -94,21 +94,23 @@
   (declare (type (alien (* os-context-t)) context))
   (let ((addr (context-register-addr context index)))
     (declare (type (alien (* unsigned)) addr))
-        (setf (deref addr kludge-big-endian-short-pointer-offset) new)))
+    (setf (deref addr kludge-big-endian-short-pointer-offset) new)))
 
-;; For the next two, note that if we convert to using SAP-REF-LISPOBJ
-;; then we need to account for 32-bit lispobjs on 64-bit registers on
-;; big-endian systems correctly.
-
-;; FIXME: We have SAP-REF-LISPOBJ, use it!
 (defun boxed-context-register (context index)
-  (without-gcing
-    (make-lisp-obj (mask-field (byte n-word-bits 0)
-                               (context-register context index)) nil)))
+  (declare (type (alien (* os-context-t)) context))
+  (let ((addr (context-register-addr context index)))
+    (declare (type (alien (* unsigned)) addr))
+    ;; No LISPOBJ alien type, so grab the SAP and use SAP-REF-LISPOBJ.
+    (sap-ref-lispobj (alien-sap addr)
+                     (* kludge-big-endian-short-pointer-offset
+                        n-word-bytes))))
 
-;; FIXME: We have (SETF SAP-REF-LISPOBJ), use it!
 (defun %set-boxed-context-register (context index new)
-  (with-pinned-objects (new)
-    (setf (context-register context index)
-          (get-lisp-obj-address new)))
-  new)
+  (declare (type (alien (* os-context-t)) context))
+  (let ((addr (context-register-addr context index)))
+    (declare (type (alien (* unsigned)) addr))
+    ;; No LISPOBJ alien type, so grab the SAP and use SAP-REF-LISPOBJ.
+    (setf (sap-ref-lispobj (alien-sap addr)
+                           (* kludge-big-endian-short-pointer-offset
+                              n-word-bytes))
+          new)))
