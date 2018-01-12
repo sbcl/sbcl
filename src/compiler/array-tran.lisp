@@ -1749,7 +1749,9 @@
 ;;; Pick off some constant cases.
 (defoptimizer (array-header-p derive-type) ((array))
   (let ((type (lvar-type array)))
-    (cond ((not (array-type-p type))
+    (cond ((not (types-equal-or-intersect type (specifier-type 'simple-array)))
+           (specifier-type '(eql t)))
+          ((not (array-type-p type))
            ;; FIXME: use analogue of ARRAY-TYPE-DIMENSIONS-OR-GIVE-UP
            nil)
           (t
