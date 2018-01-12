@@ -72,6 +72,7 @@
     "LEXENV", "NARGS", "NFP", "OCFP", "CFP", "CSP", "TMP", "NULL", \
     "CODE", "LR", "NSP"
 
+/* OAOOM: Same as compiler/arm64/vm.lisp */
 #define BOXED_REGISTERS { \
     reg_R0, reg_R1, reg_R2, reg_R3, reg_R4, reg_R5, reg_R6, \
     reg_R7, reg_R8, reg_R9, REG(20), reg_LEXENV, reg_CODE   \

@@ -76,6 +76,12 @@
   (defregset descriptor-regs
     a0 a1 a2 a3 a4 a5 fdefn lexenv ocfp lra l0 l1 l2)
 
+  ;; OAOOM: Same as runtime/hppa-lispregs.h
+  (defregset boxed-regs
+      code fdefn lexenv ocfp lra
+      a0 a1 a2 a3 a4 a5
+      l0 l1 l2 nfp)
+
   (defregset *register-arg-offsets*
     a0 a1 a2 a3 a4 a5)
 

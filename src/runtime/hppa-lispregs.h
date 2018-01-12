@@ -46,6 +46,7 @@
     "A2", "A3", "A4", "A5", "L0", "L1", "L2", "NL3", \
     "NL2", "NL1", "NL0", "DP", "NL4", "NL5", "NSP", "LIP"
 
+/* OAOOM: Same as compiler/hppa/vm.lisp */
 #define BOXED_REGISTERS { \
     reg_CODE, reg_FDEFN, reg_LEXENV, reg_OCFP, reg_LRA, \
     reg_A0, reg_A1, reg_A2, reg_A3, reg_A4, reg_A5, \

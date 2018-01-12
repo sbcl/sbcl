@@ -41,6 +41,7 @@
         "R8",           "NFP",          "NULL",         "CFP", \
         "NARGS",        "NSP",          "LR",           "PC"
 
+/* OAOOM: Same as compiler/arm/vm.lisp */
 #define BOXED_REGISTERS { \
     reg_R0, reg_R1, reg_R2, reg_LEXENV, reg_R8, reg_CODE \
 }

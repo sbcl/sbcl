@@ -79,6 +79,11 @@
   (defregset *register-arg-offsets*
       a0 a1 a2 a3 a4 a5)
 
+  ;; OAOOM: Same as runtime/mips-lispregs.h
+  (defregset boxed-regs
+      a0 a1 a2 a3 a4 a5 fdefn lexenv
+      nfp ocfp lra l0 l1 code)
+
   (defregset reserve-descriptor-regs
       fdefn lexenv)
 

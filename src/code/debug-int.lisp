@@ -1016,24 +1016,7 @@ register."
   (declare (type (sb!alien:alien (* os-context-t)) context))
   (code-header-from-pc (context-pc context)))
 
-#!-(or x86 x86-64 ppc)
-(defun code-object-from-context (context)
-  (declare (type (sb!alien:alien (* os-context-t)) context))
-  (let ((object (boxed-context-register context sb!vm::code-offset)))
-    (if (functionp object)
-        (or (fun-code-header object)
-            :undefined-function)
-        (let ((lowtag (lowtag-of object)))
-          (when (= lowtag sb!vm:other-pointer-lowtag)
-            (let ((widetag (widetag-of object)))
-              (cond ((= widetag sb!vm:code-header-widetag)
-                     object)
-                    ((= widetag sb!vm:return-pc-widetag)
-                     (lra-code-header object))
-                    (t
-                     nil))))))))
-
-#!+ppc
+#!-(or x86 x86-64)
 (defun code-object-from-context (context)
   (declare (type (sb!alien:alien (* os-context-t)) context))
   ;; The GC constraint on the program counter on precisely-scavenged

@@ -87,6 +87,11 @@
   (defregset descriptor-regs
       a0 a1 a2 a3 a4 a5 ocfp lra cname lexenv l0)
 
+  ;; OAOOM: Same as runtime/sparc-lispregs.h
+  (defregset boxed-regs
+      a0 a1 a2 a3 a4 a5 fdefn lexenv
+      ocfp lra l0 code)
+
   (defregset *register-arg-offsets*
       a0 a1 a2 a3 a4 a5))
 

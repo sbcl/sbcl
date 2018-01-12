@@ -80,6 +80,12 @@
   (defregset descriptor-regs
     fdefn lexenv nargs ocfp lra a0 a1 a2 a3 a4 a5 l0 l1 l2)
 
+  ;; OAOOM: Same as runtime/alpha-lispregs.h
+  (defregset boxed-regs
+      code fdefn lexenv nargs ocfp lra
+      a0 a1 a2 a3 a4 a5
+      l0 l1 l2)
+
   (defregset *register-arg-offsets*
     a0 a1 a2 a3 a4 a5)
   (defparameter register-arg-names '(a0 a1 a2 a3 a4 a5)))
