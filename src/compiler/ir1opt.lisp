@@ -289,7 +289,9 @@
     (unless (eq initial-type rtype)
       (let ((int (values-type-intersection node-type rtype))
             (lvar (node-lvar node)))
-        (when (type/= initial-type int)
+        ;; Don't use type/=, it will return NIL on unknown types.
+        ;; Instead of checking the second value just negate TYPE=
+        (unless (type= initial-type int)
           (when (and *check-consistency*
                      (eq int *empty-type*)
                      (not (eq rtype *empty-type*)))

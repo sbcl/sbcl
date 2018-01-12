@@ -226,3 +226,13 @@
                '(lambda () (subseq (the (vector nonsense-type) :x) 0 1))
                :allow-warnings t
                :allow-style-warnings t))))
+(with-test (:name :derive-node-type-unknown-type)
+  (assert
+   (nth-value 3
+              (checked-compile
+               '(lambda (x)
+                 (let ((k (make-array 8 :element-type '(unsigned-byte 8))))
+                   (setf (aref k 0) (the unknown-type (the integer x)))
+                   (setf k (subseq "y" 0))))
+               :allow-warnings t
+               :allow-style-warnings t))))
