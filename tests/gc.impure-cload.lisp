@@ -49,7 +49,7 @@
           (copy-layout (sb-kernel:%instance-layout myfoo)))
     nil))
 
-(defconstant n-conses-per-page 
+(defconstant n-conses-per-page
   (/ sb-vm:gencgc-card-bytes (* 2 sb-vm:n-word-bytes)))
 
 (defparameter *junk*

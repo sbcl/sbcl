@@ -123,7 +123,7 @@
   (flushable))
 
 #!+gencgc
-(defknown generation-of (t) (signed-byte 8) (flushable movable))
+(defknown generation-of (t) (or (signed-byte 8) null) (flushable movable))
 
 ;;; WIDETAG-OF needs extra code to handle LIST and FUNCTION lowtags.
 ;;; When dealing with known other-pointers (dispatching on array

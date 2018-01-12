@@ -394,20 +394,22 @@ count_generation_pages(generation_index_t generation)
     return count;
 }
 
-#if QSHOW
-static page_index_t
-count_dont_move_pages(void)
+static void show_pinnedobj_count()
 {
-    page_index_t i;
-    page_index_t count = 0;
-    for (i = 0; i < last_free_page; i++) {
-        if (!page_free_p(i) && page_table[i].dont_move) {
-            ++count;
+    page_index_t page;
+    int nbytes = 0;
+    int n_pinned_largeobj = 0;
+    for (page = 0; page < last_free_page; ++page) {
+        if (page_table[page].gen == from_space && page_table[page].dont_move) {
+            nbytes += page_bytes_used(page);
+            if (page_starts_contiguous_block_p(page))
+                ++n_pinned_largeobj;
         }
     }
-    return count;
+    fprintf(stderr,
+            "/pinned objects(g%d): large=%d (%d bytes), small=%d\n",
+            from_space, n_pinned_largeobj, nbytes, pinned_objects.count);
 }
-#endif /* QSHOW */
 
 /* Work through the pages and add up the number of bytes used for the
  * given generation. */
@@ -3233,15 +3235,8 @@ garbage_collect_generation(generation_index_t generation, int raise)
     }
 #endif
 
-#if QSHOW
-    if (gencgc_verbose > 1) {
-        sword_t num_dont_move_pages = count_dont_move_pages();
-        fprintf(stderr,
-                "/non-movable pages due to conservative pointers = %ld (%lu bytes)\n",
-                num_dont_move_pages,
-                npage_bytes(num_dont_move_pages));
-    }
-#endif
+    if (gencgc_verbose > 1)
+        show_pinnedobj_count();
 
     /* Now that all of the pinned (dont_move) pages are known, and
      * before we start to scavenge (and thus relocate) objects,
