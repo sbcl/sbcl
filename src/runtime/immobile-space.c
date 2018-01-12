@@ -744,13 +744,6 @@ scavenge_immobile_roots(generation_index_t min_gen, generation_index_t max_gen)
     scavenge_immobile_newspace();
 }
 
-#include "genesis/layout.h"
-#define LAYOUT_SIZE (sizeof (struct layout)/N_WORD_BYTES)
-/// First 5 layouts: T, FUNCTION, STRUCTURE-OBJECT, LAYOUT, PACKAGE
-/// (These #defines ought to be emitted by genesis)
-#define LAYOUT_OF_LAYOUT  ((FIXEDOBJ_SPACE_START+3*LAYOUT_ALIGN)|INSTANCE_POINTER_LOWTAG)
-#define LAYOUT_OF_PACKAGE ((FIXEDOBJ_SPACE_START+4*LAYOUT_ALIGN)|INSTANCE_POINTER_LOWTAG)
-
 void write_protect_immobile_space()
 {
     immobile_scav_queue_head = 0;

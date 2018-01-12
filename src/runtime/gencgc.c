@@ -2044,12 +2044,6 @@ preserve_pointer(void *addr)
  * But because the fdefn is in a register, it is pinned, therefore it is live,
  * therefore all its slots will be traced on this GC.
  * In fact update_page_write_prot() won't even be called on the fdefn's page.
- * The final problem is compact-instance-header layouts. Conditions and
- * structures can't point to younger layouts, so that much is easy.
- * Standard-objects can. I think those layouts are kept live by the
- * voluminous amount of metadata that CLOS insists on maintaining,
- * though I'm not 100% sure, and would not be surprised if there is a bug
- * related to GC of those layouts.
  */
 static int
 update_page_write_prot(page_index_t page)
@@ -2057,7 +2051,7 @@ update_page_write_prot(page_index_t page)
     generation_index_t gen = page_table[page].gen;
     sword_t j;
     int wp_it = 1;
-    void **page_addr = (void **)page_address(page);
+    lispobj *page_addr = (lispobj*)page_address(page);
     sword_t num_words = page_bytes_used(page) / N_WORD_BYTES;
 
     /* Shouldn't be a free page. */
@@ -2080,12 +2074,22 @@ update_page_write_prot(page_index_t page)
      * assumed to be a pointer. To do otherwise would require a family
      * of scavenge-like functions. */
     for (j = 0; j < num_words; j++) {
-        void *ptr = *(page_addr+j);
+        void *ptr;
         page_index_t index;
         lispobj __attribute__((unused)) header;
 
-        if (!is_lisp_pointer((lispobj)ptr))
+        lispobj word = page_addr[j];
+        if (is_lisp_pointer(word))
+            ptr = (void*)word;
+#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
+        else if (is_lisp_pointer(word>>32) &&
+                 (widetag_of(word)==INSTANCE_WIDETAG||
+                  widetag_of(word)==FUNCALLABLE_INSTANCE_WIDETAG))
+            ptr = (void*)(word >> 32);
+#endif
+        else
             continue;
+
         /* Check that it's in the dynamic space */
         if ((index = find_page_index(ptr)) != -1) {
             int pointee_gen = page_table[index].gen;
@@ -2776,8 +2780,14 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
             // are at the moment valid fixnums by blind luck.
             case INSTANCE_WIDETAG:
                 if (instance_layout(where)) {
+                    struct layout *layout = LAYOUT(instance_layout(where));
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+                    if (instance_layout(layout) != LAYOUT_OF_LAYOUT)
+                        lose("Implausible layout. obj=%p layout=%p",
+                             where, (void*)layout);
+#endif
                     sword_t nslots = instance_length(thing) | 1;
-                    lispobj bitmap = LAYOUT(instance_layout(where))->bitmap;
+                    lispobj bitmap = layout->bitmap;
                     gc_assert(fixnump(bitmap)
                               || widetag_of(*native_pointer(bitmap))==BIGNUM_WIDETAG);
                     instance_scan((void (*)(lispobj*, sword_t, uword_t))verify_range,
