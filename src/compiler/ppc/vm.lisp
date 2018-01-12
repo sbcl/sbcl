@@ -83,6 +83,12 @@
   (defregset descriptor-regs
       fdefn a0 a1 a2 a3  ocfp lra cname lexenv l0 l1 #!-sb-thread l2 )
 
+  ;; OAOOM: Same as runtime/ppc-lispregs.h
+  (defregset boxed-regs
+      fdefn code cname lexenv ocfp lra
+      a0 a1 a2 a3
+      l0 l1 #!-sb-thread l2 #!+sb-thread thread)
+
 
  (defregset *register-arg-offsets*  a0 a1 a2 a3)
  (defparameter register-arg-names '(a0 a1 a2 a3)))

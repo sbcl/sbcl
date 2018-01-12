@@ -71,6 +71,7 @@
         "A0",           "A1",           "A2",           "A3", \
         "L0",           "L1",           REG30_NAME,     "LIP"
 
+/* OAOOM: Same as compiler/ppc/vm.lisp */
 #define BOXED_REGISTERS { \
     reg_FDEFN, reg_CODE, reg_CNAME, reg_LEXENV, reg_OCFP, reg_LRA, \
     reg_A0, reg_A1, reg_A2, reg_A3, \
