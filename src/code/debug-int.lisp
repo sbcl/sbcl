@@ -1000,13 +1000,14 @@
   "Finds the PC for the return from an assembly routine properly.
 For some architectures (such as PPC) this will not be the $LRA
 register."
-  (let ((return-machine-address (sb!vm::return-machine-address scp))
-        (code-header-len (* (code-header-words code) sb!vm:n-word-bytes)))
-    (values (- return-machine-address
-               (- (get-lisp-obj-address code)
-                  sb!vm:other-pointer-lowtag)
-               code-header-len)
-            return-machine-address)))
+  (with-pinned-objects (code)
+    (let ((return-machine-address (sb!vm::return-machine-address scp))
+          (code-header-len (* (code-header-words code) sb!vm:n-word-bytes)))
+      (values (- return-machine-address
+                 (- (get-lisp-obj-address code)
+                    sb!vm:other-pointer-lowtag)
+                 code-header-len)
+              return-machine-address))))
 
 ;;; Find the code object corresponding to the object represented by
 ;;; bits and return it. We assume bogus functions correspond to the
