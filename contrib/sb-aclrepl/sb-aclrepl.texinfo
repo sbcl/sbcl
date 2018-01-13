@@ -18,6 +18,16 @@ To start @code{sb-aclrepl} as your read-eval-print loop, put the form
 
 in your @file{~/.sbclrc} initialization file.
 
+@subsection Customization
+
+The following customization variables are available:
+
+@include var-sb-aclrepl-star-command-char-star.texinfo
+@include var-sb-aclrepl-star-prompt-star.texinfo
+@include var-sb-aclrepl-star-exit-on-eof-star.texinfo
+@include var-sb-aclrepl-star-use-short-package-name-star.texinfo
+@include var-sb-aclrepl-star-max-history-star.texinfo
+
 @subsection Example Initialization
 
 Here's a longer example of a @file{~/.sbclrc} file that shows off
