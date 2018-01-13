@@ -34,6 +34,8 @@ extern void clear_auto_gc_trigger(void);
 
 extern boolean maybe_gc(os_context_t *context);
 
+extern boolean gc_active_p;
+
 extern os_vm_size_t bytes_consed_between_gcs;
 
 /// Maximum number of word backwards from a simple-fun

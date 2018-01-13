@@ -52,6 +52,8 @@ lispobj *new_space_free_pointer;
 /* This does nothing. It's only to satisfy a reference from gc-common. */
 char gc_coalesce_string_literals = 0;
 
+boolean gc_active_p = 0;
+
 static void scavenge_newspace(void);
 
 
@@ -104,6 +106,8 @@ collect_garbage(generation_index_t ignore)
     getrusage(RUSAGE_SELF, &start_rusage);
     gettimeofday(&start_tv, (struct timezone *) 0);
 #endif
+
+    gc_active_p = 1;
 
     /* it's possible that signals are blocked already if this was called
      * from a signal handler (e.g. with the sigsegv gc_trigger stuff) */
@@ -223,6 +227,7 @@ collect_garbage(generation_index_t ignore)
     set_auto_gc_trigger(size_retained+bytes_consed_between_gcs);
     thread_sigmask(SIG_SETMASK, &old, 0);
 
+    gc_active_p = 0;
 
 #ifdef PRINTNOISE
     gettimeofday(&stop_tv, (struct timezone *) 0);
