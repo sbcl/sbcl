@@ -2032,3 +2032,7 @@
 (defknown find-class (symbol &optional t lexenv-designator) (or class null) ())
 (defknown class-of (t) class (flushable))
 (defknown class-name (class) symbol (flushable))
+
+(defknown finalize
+    (t (function-designator () * :no-function-conversion t) &key (:dont-save t))
+    *)

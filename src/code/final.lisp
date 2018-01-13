@@ -51,7 +51,6 @@
 
 (defun finalize (object function &key dont-save
                         &aux (item (if dont-save (list function) function)))
-  (declare (type callable function))
   "Arrange for the designated FUNCTION to be called when there
 are no more references to OBJECT, including references in
 FUNCTION itself.
