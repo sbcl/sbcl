@@ -90,12 +90,14 @@
     (declare (type (alien (* unsigned)) addr))
     (deref addr kludge-big-endian-short-pointer-offset)))
 
+(declaim (inline %set-context-register))
 (defun %set-context-register (context index new)
   (declare (type (alien (* os-context-t)) context))
   (let ((addr (context-register-addr context index)))
     (declare (type (alien (* unsigned)) addr))
     (setf (deref addr kludge-big-endian-short-pointer-offset) new)))
 
+(declaim (inline boxed-context-register))
 (defun boxed-context-register (context index)
   (declare (type (alien (* os-context-t)) context))
   (let ((addr (context-register-addr context index)))
@@ -105,6 +107,7 @@
                      (* kludge-big-endian-short-pointer-offset
                         n-word-bytes))))
 
+(declaim (inline %set-boxed-context-register))
 (defun %set-boxed-context-register (context index new)
   (declare (type (alien (* os-context-t)) context))
   (let ((addr (context-register-addr context index)))
