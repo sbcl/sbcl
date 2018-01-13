@@ -588,6 +588,9 @@
 
 ;;;; (OR X86 X86-64) support
 
+#!+(or x86 x86-64)
+(progn
+
 (defun compute-lra-data-from-pc (pc)
   (declare (type system-area-pointer pc))
   (let ((code (code-header-from-pc pc)))
@@ -599,9 +602,6 @@
                             code-header-len)))
          ;;(format t "c-lra-fpc ~A ~A ~A~%" pc code pc-offset)
          (values pc-offset code)))))
-
-#!+(or x86 x86-64)
-(progn
 
 (defconstant sb!vm::nargs-offset #.sb!vm::ecx-offset)
 
