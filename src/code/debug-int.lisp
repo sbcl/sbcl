@@ -3514,8 +3514,8 @@ register."
 ;;; Given a signal context, fetch the step-info that's been stored in
 ;;; the debug info at the trap point.
 (defun single-step-info-from-context (context)
-  (multiple-value-bind (pc-offset code)
-      (compute-lra-data-from-pc (context-pc context))
+  (multiple-value-bind (code pc-offset)
+      (escaped-frame-from-context context)
     (let* ((debug-fun (debug-fun-from-pc code pc-offset))
            (location (code-location-from-pc debug-fun
                                             pc-offset
