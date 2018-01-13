@@ -29,7 +29,7 @@
 
 #define reg_ZERO        GREG(0)
 #define reg_ALLOC       GREG(1)
-#define reg_NIL         GREG(2)
+#define reg_NULL        GREG(2)
 #define reg_CSP         GREG(3)
 #define reg_CFP         GREG(4)
 #define reg_BSP         GREG(5)
@@ -68,11 +68,11 @@
         "NL4",          "NL5",          "NSP",          "NARGS", \
         "A0",           "A1",           "A2",           "A3", \
         "A4",           "A5",           "OCFP",         "LRA", \
-        "FDEFN",        "LEXENV",       "L0",           "NFP", \
+        "CNAME",        "LEXENV",       "L0",           "NFP", \
         "CFUNC",        "CODE",         "???",          "LIP"
 
 /* OAOOM: Same as compiler/sparc/vm.lisp */
 #define BOXED_REGISTERS { \
-    reg_A0, reg_A1, reg_A2, reg_A3, reg_A4, reg_A5, reg_FDEFN, reg_LEXENV, \
+    reg_A0, reg_A1, reg_A2, reg_A3, reg_A4, reg_A5, reg_CNAME, reg_LEXENV, \
     reg_OCFP, reg_LRA, reg_L0, reg_CODE \
 }
