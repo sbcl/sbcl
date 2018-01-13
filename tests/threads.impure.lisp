@@ -728,7 +728,8 @@
                                   (throw 'xxx *runningp*)))
     (assert (sb-thread:join-thread thread))))
 
-(with-test (:name (:two-threads-running-gc))
+(with-test (:name (:two-threads-running-gc)
+                  :broken-on :sb-safepoint)
   (let (a-done b-done)
     (make-join-thread (lambda ()
                         (dotimes (i 100)
