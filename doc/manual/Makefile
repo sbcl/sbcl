@@ -15,14 +15,6 @@ DOCSTRINGDIR="docstrings/"
 CONTRIB_SRC_DIR="../../contrib/"
 CONTRIB_OBJ_DIR="../../obj/asdf-cache/"
 I_FLAGS=-I $(DOCSTRINGDIR) -I $(CONTRIB_SRC_DIR)
-# List of contrib modules that docstring docs will be created for.
-MODULES=':sb-md5 :sb-queue :sb-concurrency :sb-rotate-byte :sb-grovel \
-         :sb-sprof :sb-bsd-sockets :sb-cover :sb-posix'
-# List of package names that docstring docs will be created for.
-PACKAGES=":COMMON-LISP :SB-ALIEN :SB-DEBUG :SB-EXT :SB-GRAY :SB-MOP \
-          :SB-PCL :SB-SYS :SB-SEQUENCE :SB-UNICODE \
-          :SB-PROFILE :SB-THREAD :SB-MD5 :SB-QUEUE :SB-ROTATE-BYTE  \
-          :SB-SPROF :SB-BSD-SOCKETS :SB-COVER :SB-POSIX :SB-CONCURRENCY"
 
 # SBCL_SYSTEM is an optional argument to this make program. If this
 # variable is set, its contents are used as the command line for
@@ -101,15 +93,7 @@ info: $(INFOFILES)
 # are in $(CONTRIB_OBJ_DIR).
 CONTRIB_FASLS=$(shell find $(shell echo $(MODULES) | sed "s|:|$(CONTRIB_OBJ_DIR)|g") -name '*.fasl')
 docstrings: $(CONTRIB_FASLS) tempfiles-stamp
-	for module in $(shell echo $(MODULES)); do \
-		test -f $(CONTRIB_OBJ_DIR)/`echo $$module | tr -d :`/test-passed.test-report \
-		|| { echo "The documented contrib $$module seems \
-                           to have failed its tests." && exit 1; } \
-	done
-	DOCSTRINGDIR=$(DOCSTRINGDIR) \
-	PACKAGES=$(PACKAGES) \
-	MODULES=$(MODULES) \
-	sh make-tempfiles.sh "$(SBCL_SYSTEM)" && touch $(DOCSTRINGDIR)
+	sh make-tempfiles.sh "$(SBCL_SYSTEM)" "$(DOCSTRINGDIR)" && touch $(DOCSTRINGDIR)
 
 tempfiles-stamp:
 	touch tempfiles-stamp

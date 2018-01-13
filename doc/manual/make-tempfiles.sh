@@ -14,8 +14,7 @@
 # We create the documentation from the in-tree sbcl if it is found,
 # else an installed sbcl is used.
 
-if [ -z "$1" ]
-then
+if [ -z "$1" ] ; then
     . ../../sbcl-pwd.sh
     sbcl_pwd
 
@@ -31,60 +30,16 @@ then
     fi
 else
     SBCLRUNTIME="$1"
+    shift
 fi
 
-SBCL="$SBCLRUNTIME --noinform --no-sysinit --no-userinit --noprint --disable-debugger"
-
-# extract version and date
-VERSION=`$SBCL --eval '(write-line (lisp-implementation-version))' --eval '(sb-ext:exit)'`
-MONTH=`date "+%Y-%m"`
-
-sed -e "s/@VERSION@/$VERSION/" \
-    -e "s/@MONTH@/$MONTH/" < variables.template > variables.texinfo || exit 1
-
-# Output directory.  This has to end with a slash (it's interpreted by
-# Lisp's `pathname' function) or you lose.  This is normally set from
-# Makefile.
-DOCSTRINGDIR="${DOCSTRINGDIR:-docstrings/}"
-
-# List of contrib modules that docstring docs will be created for.
-# This is normally set from Makefile.
-#MODULES="${MODULES:-sb-md5 :sb-rotate-byte}"
-
-# List of package names that documentation will be created for.  This
-# is normally set from Makefile.
-#PACKAGES="${PACKAGES:-:COMMON-LISP :SB-ALIEN :SB-DEBUG :SB-EXT :SB-GRAY :SB-MOP :SB-PROFILE :SB-THREAD}"
-
-echo /creating docstring snippets from SBCL=\'$SBCLRUNTIME\' for packages \'$PACKAGES\'
-$SBCL <<EOF
-(with-compilation-unit ()
-  (load "docstrings.lisp"))
-(require :asdf)
-(asdf:initialize-source-registry '(:source-registry :ignore-inherited-configuration))
-(dolist (module (quote ($MODULES)))
-  (require module))
-(sb-texinfo:generate-includes "$DOCSTRINGDIR" $PACKAGES)
-(sb-ext:exit))
-EOF
-
-echo /creating package-locks.texi-temp
-if $SBCL --eval "(let ((plp (find-symbol \"PACKAGE-LOCKED-P\" :sb-ext))) (exit :code (if (and plp (fboundp plp)) 0 1)))";
-then
-    cp package-locks-extended.texinfo package-locks.texi-temp
+if [ -z "$1" ] ; then
+    DOCSTRINGDIR="${DOCSTRINGDIR:-docstrings/}"
 else
-    cp package-locks-basic.texinfo package-locks.texi-temp
+    DOCSTRINGDIR="$1"
+    shift
 fi
 
-echo /creating encodings.texi-temp
-$SBCL <<EOF
-(with-open-file (s "encodings.texi-temp" :direction :output :if-exists :supersede)
-  (let (result)
-    (sb-int:dohash ((key val) sb-impl::*external-formats*)
-      (declare (ignore key))
-      (pushnew (sb-impl::ef-names val) result :test #'equal))
-    (setq result (sort result #'string< :key #'car))
-    (format s "@table @code~%~%")
-    (loop for (cname . names) in result
-          do (format s "@item ~S~%~{@code{~S}~^, ~}~%~%" cname names))
-    (format s "@end table~%")))
-EOF
+${SBCLRUNTIME}                                                          \
+    --noinform --no-sysinit --no-userinit --noprint --disable-debugger  \
+    --script generate-texinfo.lisp "${SBCLRUNTIME}" "${DOCSTRINGDIR}"
