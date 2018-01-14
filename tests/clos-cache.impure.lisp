@@ -11,12 +11,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(defpackage "CLOS-CACHE-TEST"
-  (:use "COMMON-LISP"))
-
-(in-package "CLOS-CACHE-TEST")
-
-(test-util:with-test (:name :probe-cache-smoke-test)
+(with-test (:name :probe-cache-smoke-test)
   (let ((layout
          (sb-kernel::make-layout :clos-hash #xAd00d
                                  :classoid (sb-kernel::make-undefined-classoid 'x)))
@@ -84,17 +79,19 @@
       (sb-ext:exit :code 1)))
   (note "/~S done" sb-thread:*current-thread*))
 
-#+sb-thread
-(let ((threads (loop repeat 32
-                     collect (sb-thread:make-thread 'test-loop))))
-  (setf *run-cache-test* t)
-  (mapcar #'sb-thread:join-thread threads))
+(with-test (:name :clos-cache-test
+            :broken-on :sb-safepoint)
+  #+sb-thread
+  (let ((threads (loop repeat 32
+                       collect (sb-thread:make-thread 'test-loop))))
+    (setf *run-cache-test* t)
+    (mapcar #'sb-thread:join-thread threads))
 
-#-sb-thread
-(progn
-  (setf *run-cache-test* t)
-  (loop repeat 4
-        do (test-loop)))
+  #-sb-thread
+  (progn
+    (setf *run-cache-test* t)
+    (loop repeat 4
+          do (test-loop)))
 
-;;; Check that the test tests what it was supposed to test: the cache.
-(assert (sb-pcl::cache-p (sb-pcl::gf-dfun-cache #'cache-test)))
+  ;; Check that the test tests what it was supposed to test: the cache.
+  (assert (sb-pcl::cache-p (sb-pcl::gf-dfun-cache #'cache-test))))
