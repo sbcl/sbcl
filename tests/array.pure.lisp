@@ -84,14 +84,11 @@
         do (setf (nth i list) 0)
         do (setf vector (make-array 64 :element-type 'bit
                                        :initial-contents list))
-        do (assert (= (funcall
-                       (compile nil
-                                `(lambda (rmdr)
-                                  (declare (type (simple-array bit (*)) rmdr)
-                                           (optimize (speed 3) (safety 0)))
-                                  (aref rmdr ,i)))
-                       vector)
-                      0))))
+        do (checked-compile-and-assert (:optimize '(:speed 3 :safety 0))
+               `(lambda (rmdr)
+                  (declare (type (simple-array bit (*)) rmdr))
+                  (aref rmdr ,i))
+             ((vector) 0))))
 
 ;;; Following refactoring of sequence functions to detect bad type
 ;;; specifiers, REVERSE was left broken on vectors with fill pointers.
@@ -214,15 +211,18 @@
 (let ((array (make-array nil :initial-contents nil)))
   (assert (eql (aref array) nil)))
 
-(let ((f (compile nil '(lambda ()
-                        (let ((a (make-array '(4)
-                                             :element-type 'base-char
-                                             :initial-element #\z)))
-                          (setf (aref a 0) #\a)
-                          (setf (aref a 1) #\b)
-                          (setf (aref a 2) #\c)
-                          a)))))
-  (assert (= (length (funcall f)) 4)))
+(with-test (:name (make-array (setf aref) length))
+  (checked-compile-and-assert ()
+      '(lambda ()
+         (let ((a (make-array '(4)
+                              :element-type 'base-char
+                              :initial-element #\z)))
+           (setf (aref a 0) #\a)
+           (setf (aref a 1) #\b)
+           (setf (aref a 2) #\c)
+           a))
+    (() 4 :test (lambda (values expected)
+                  (= (length (first values)) (first expected))))))
 
 (let ((x (make-array nil :initial-element 'foo)))
   (adjust-array x nil)
@@ -231,19 +231,20 @@
 ;;; BUG 315: "no bounds check for access to displaced array"
 ;;;  reported by Bruno Haible sbcl-devel "various SBCL bugs" from CLISP
 ;;;  test suite.
-(locally (declare (optimize (safety 3) (speed 0)))
-  (let* ((x (make-array 10 :fill-pointer 4 :element-type 'character
-                        :initial-element #\space :adjustable t))
-         (y (make-array 10 :fill-pointer 4 :element-type 'character
-                        :displaced-to x)))
-    (assert (eq x (adjust-array x '(5))))
-    (assert (eq :error (handler-case
-                           (char y 0)
-                         (sb-int:invalid-array-error (e)
-                           (assert (eq y (type-error-datum e)))
-                           (assert (equal `(vector character 10)
-                                          (type-error-expected-type e)))
-                           :error))))))
+(with-test (:name (:displaced-to aref sb-int:invalid-array-index-error :bug-315))
+  (locally (declare (optimize (safety 3) (speed 0)))
+    (let* ((x (make-array 10 :fill-pointer 4 :element-type 'character
+                          :initial-element #\space :adjustable t))
+           (y (make-array 10 :fill-pointer 4 :element-type 'character
+                          :displaced-to x)))
+      (assert (eq x (adjust-array x '(5))))
+      (assert (eq :error (handler-case
+                             (char y 0)
+                           (sb-int:invalid-array-error (e)
+                             (assert (eq y (type-error-datum e)))
+                             (assert (equal `(vector character 10)
+                                            (type-error-expected-type e)))
+                             :error)))))))
 
 ;;; MISC.527: bit-vector bitwise operations used LENGTH to get a size
 ;;; of a vector
@@ -363,15 +364,9 @@
                     #(5 10)))))
 
 (with-test (:name (:make-array-transform-unknown-type :bug-1156095))
-  (assert
-   (handler-case
-       (compile nil `(lambda () (make-array '(1 2)
-                                            :element-type ',(gensym))))
-     (style-warning ()
-       t)
-     (:no-error (&rest args)
-       (declare (ignore args))
-       nil))))
+  (assert (nth-value 3 (checked-compile
+                        `(lambda () (make-array '(1 2) :element-type ',(gensym)))
+                        :allow-style-warnings t))))
 
 (with-test (:name :dont-make-array-bad-keywords)
   ;; This used to get a heap exhaustion error because of trying
@@ -429,25 +424,21 @@
     (assert (not (eq a b)))))
 
 (with-test (:name :check-bound-elision)
-  (assert-error (funcall (checked-compile
-                          `(lambda (x)
-                             (char "abcd" x)))
-                         4)
-                sb-int:invalid-array-index-error)
-  (assert (eql (funcall (checked-compile
-                         `(lambda (x)
-                            (declare (optimize (safety 0)))
-                            ;; Strings are null-terminated for C interoperability
-                            (char "abcd" x)))
-                        4)
-               #\Nul)))
+  (checked-compile-and-assert (:optimize :safe)
+      `(lambda (x)
+         (char "abcd" x))
+    ((4) (condition 'sb-int:invalid-array-index-error)))
+  (checked-compile-and-assert (:optimize '(:safety 0))
+      `(lambda (x)
+         ;; Strings are null-terminated for C interoperability
+         (char "abcd" x))
+    ((4) #\Nul)))
 
 (with-test (:name (adjust-array :transform))
-  (assert (equalp (funcall
-                  (checked-compile
-                   `(lambda ()
-                      (adjust-array #(1 2 3) 3 :displaced-to #(4 5 6)))))
-                 #(4 5 6))))
+  (checked-compile-and-assert ()
+      `(lambda ()
+         (adjust-array #(1 2 3) 3 :displaced-to #(4 5 6)))
+    (() #(4 5 6) :test #'equalp)))
 
 (with-test (:name (adjust-array :fill-pointer))
   (let ((array (make-array 10 :fill-pointer t)))
@@ -455,12 +446,10 @@
                2))))
 
 (with-test (:name (adjust-array :initial-element))
-  (assert (equal (funcall
-                  (checked-compile
-                   `(lambda (x)
-                      (adjust-array x 5 :initial-element #\x)))
-                  "abc")
-                 "abcxx")))
+  (checked-compile-and-assert ()
+      `(lambda (x)
+         (adjust-array x 5 :initial-element #\x))
+    (("abc") "abcxx")))
 
 (with-test (:name (make-array :initial-contents 1))
   (flet ((f (x y)
@@ -498,12 +487,14 @@
     (assert-error (funcall fun) error)))
 
 (with-test (:name (adjust-array :element-type))
-  (let ((fun (checked-compile '(lambda (array)
-                                (adjust-array array 3 :element-type '(signed-byte 2))))))
-    (assert-error (funcall fun #(1 2 3))))
-  (let ((fun (checked-compile '(lambda (array)
-                                (adjust-array array 5 :displaced-to #(1 2 3))))))
-    (assert-error (funcall fun (make-array 5 :adjustable t :element-type 'fixnum)))))
+  (checked-compile-and-assert ()
+      `(lambda (array)
+         (adjust-array array 3 :element-type '(signed-byte 2)))
+    ((#(1 2 3)) (condition 'error)))
+  (checked-compile-and-assert ()
+      `(lambda (array)
+         (adjust-array array 5 :displaced-to #(1 2 3)))
+    (((make-array 5 :adjustable t :element-type 'fixnum)) (condition 'error))))
 
 (with-test (:name (make-array :transform :fill-pointer nil))
   (flet ((test (form)
@@ -531,7 +522,6 @@
     (assert (= (length (funcall fun nil)) 3))))
 
 (with-test (:name :check-bound-fixnum-check)
-  (assert-error
-   (funcall (checked-compile `(lambda (x) (aref #100(a) x)))
-            #\Nul)
-   type-error))
+  (checked-compile-and-assert (:optimize :safe)
+      `(lambda (x) (aref #100(a) x))
+    ((#\Nul) (condition 'type-error))))
