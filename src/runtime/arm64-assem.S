@@ -89,9 +89,16 @@ call_into_lisp:
 	mov	reg_LEXENV, x0
 
 #ifdef LISP_FEATURE_SB_THREAD
+#ifdef LISP_FEATURE_GCC_TLS
+	adrp	x0, :gottprel:current_thread
+	ldr	x0, [x0, #:gottprel_lo12:current_thread]
+	mrs	reg_THREAD, tpidr_el0
+	ldr	reg_THREAD, [reg_THREAD,x0]
+#else
         ldr	x0, specials
         bl      pthread_getspecific
         mov     reg_THREAD, x0
+#endif
 #else
         mov     reg_R10, #0
 #endif

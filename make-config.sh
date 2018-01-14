@@ -477,6 +477,7 @@ case "$sbcl_os" in
         printf ' :unix' >> $ltf
         printf ' :elf' >> $ltf
         printf ' :linux' >> $ltf
+        printf ' :gcc-tls' >> $ltf
 
         # If you add other platforms here, don't forget to edit
         # src/runtime/Config.foo-linux too.
