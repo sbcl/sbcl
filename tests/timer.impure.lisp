@@ -306,8 +306,9 @@
   (loop repeat 10 do (test))))
 
 (with-test (:name (:timer :threaded-stress)
-                  :skipped-on (not :sb-thread)
-                  :fails-on :win32)
+            :skipped-on (not :sb-thread)
+            :broken-on :x86
+            :fails-on :win32)
   #+win32
   (error "fixme")
   (let ((barrier (sb-thread:make-semaphore))
