@@ -550,9 +550,9 @@
   (checked-compile `(lambda ()
                       (make-array nil :initial-element 11))))
 
-(assert-error (funcall (eval #'open) "assertoid.lisp"
+(assert-error (funcall (eval #'open) "compiler.pure.lisp"
                        :external-format '#:nonsense))
-(assert-error (funcall (eval #'load) "assertoid.lisp"
+(assert-error (funcall (eval #'load) "compiler.pure.lisp"
                        :external-format '#:nonsense))
 
 (assert (= (the (values integer symbol) (values 1 'foo 13)) 1))
