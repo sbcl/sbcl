@@ -15,8 +15,9 @@
 
 (load "assertoid.lisp")
 
-(defpackage "CLOS-1"
+(cl:defpackage "CLOS-1"
   (:use "CL" "ASSERTOID" "TEST-UTIL"))
+(cl:in-package "CLOS-1")
 
 ;;; tests that various optimization paths for slot-valuish things
 ;;; respect class redefinitions.
