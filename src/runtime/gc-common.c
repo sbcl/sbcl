@@ -1428,10 +1428,12 @@ cull_weak_hash_table (struct hash_table *hash_table,
 static void pair_follow_fps(lispobj ht_entry[2])
 {
     lispobj obj = ht_entry[0];
-    if (is_lisp_pointer(obj) && forwarding_pointer_p(native_pointer(obj)))
+    if (is_lisp_pointer(obj) && from_space_p (obj) && 
+        forwarding_pointer_p(native_pointer(obj)))
         ht_entry[0] = forwarding_pointer_value(native_pointer(obj));
     obj = ht_entry[1];
-    if (is_lisp_pointer(obj) && forwarding_pointer_p(native_pointer(obj)))
+    if (is_lisp_pointer(obj) && from_space_p (obj) && 
+        forwarding_pointer_p(native_pointer(obj)))
         ht_entry[1] = forwarding_pointer_value(native_pointer(obj));
 }
 

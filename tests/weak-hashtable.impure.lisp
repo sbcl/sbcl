@@ -47,3 +47,9 @@
   (assert (weak-pointer-value *foo*))
   (assert (pathnamep (gethash (weak-pointer-value *foo*) *a*)))
   (assert (pathnamep (gethash (weak-pointer-value *foo*) *b*))))
+
+(with-test (:name :invalid-objects)
+  (let ((hash (make-hash-table :weakness :key-and-value)))
+    (setf (gethash 10 hash) (sb-kernel:%make-lisp-obj sb-vm:other-pointer-lowtag))
+    (sb-ext:gc :full t)
+    hash))
