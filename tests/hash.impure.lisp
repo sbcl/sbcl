@@ -287,14 +287,11 @@
            (loop repeat 20000 do (setq *cons-here* (cons nil nil)))
            ;; KLUDGE: Clean the argument passing regs.
            (apply #'take (loop repeat 36 collect #'cons))))
-     (let ((*s* (make-array 300)))
-       (declare (special *s*)
-                (dynamic-extent *s*))
-       ;; ... and use a larger DX allocation to try to clear the stack
-       ;; (thus, roots, conservative or otherwise) where we executed
-       ;; the BODY (this definitely clears stack space, the
-       ;; uncertainty is if it covers all of the space used by BODY).
-       (take *s*)))
+     ;; ... and then arrange to have the no-longer-used parts of the
+     ;; control stack cleared.  Note that we still want the headroom
+     ;; above around the actual allocation because of the stack space
+     ;; required for alien call-out.
+     (sb-sys:scrub-control-stack))
   #+sb-thread
   (let ((values (gensym))
         (sem (gensym)))
