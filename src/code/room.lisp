@@ -1067,6 +1067,7 @@ We could try a few things to mitigate this:
   (let* ((addr (get-lisp-obj-address object))
          (page (find-page-index addr)))
     (cond ((>= page 0) (slot (deref page-table page) 'gen))
+          #+immobile-space
           ((immobile-space-addr-p addr)
            ;; SIMPLE-FUNs don't contain a generation byte
            (when (simple-fun-p object)
