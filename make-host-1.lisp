@@ -91,6 +91,7 @@
 
 ;;; propagate structure offset and other information to the C runtime
 ;;; support code.
+ (load "tools-for-build/corefile.lisp" :verbose nil)
  (host-cload-stem "src/compiler/generic/genesis" nil)
 ) ; END with-compilation-unit
 

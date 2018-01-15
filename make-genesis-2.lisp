@@ -10,6 +10,7 @@
   (with-open-file (s "output/object-filenames-for-genesis.lisp-expr"
                      :direction :input)
     (read s)))
+(load "tools-for-build/corefile.lisp" :verbose nil)
 (host-cload-stem "src/compiler/generic/genesis" nil)
 
 (sb-cold:genesis :object-file-names *target-object-file-names*

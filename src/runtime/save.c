@@ -288,7 +288,7 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
     if (nwrote != (int)(sizeof (core_entry_elt_t) * string_words))
         perror(GENERAL_WRITE_FAILURE_MSG);
 
-    write_lispobj(NEW_DIRECTORY_CORE_ENTRY_TYPE_CODE, file);
+    write_lispobj(DIRECTORY_CORE_ENTRY_TYPE_CODE, file);
     write_lispobj(/* (word count = N spaces described by 5 words each, plus the
           * entry type code, plus this count itself) */
          (5 * MAX_CORE_SPACE_ID) + 2, file);

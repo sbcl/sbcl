@@ -579,14 +579,10 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
       :export ("*ASSEMBLER-ROUTINES*"
                "GET-ASM-ROUTINE"
                "+BACKEND-FASL-FILE-IMPLEMENTATION+"
-               "BUILD-ID-CORE-ENTRY-TYPE-CODE"
                "*FASL-FILE-TYPE*"
                "CLOSE-FASL-OUTPUT"
-               "DEFLATED-CORE-SPACE-ID-FLAG"
                "DUMP-ASSEMBLER-ROUTINES"
                "DUMP-FOP" "DUMP-OBJECT"
-               "DYNAMIC-CORE-SPACE-ID"
-               "END-CORE-ENTRY-TYPE-CODE"
                "FASL-CONSTANT-ALREADY-DUMPED-P"
                "+FASL-FILE-VERSION+"
                "FASL-DUMP-COMPONENT"
@@ -597,20 +593,11 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "FASL-OUTPUT" "FASL-OUTPUT-P"
                "FASL-OUTPUT-ENTRY-TABLE" "FASL-OUTPUT-STREAM"
                "FASL-VALIDATE-STRUCTURE"
-               "IMMOBILE-FIXEDOBJ-CORE-SPACE-ID"
-               "IMMOBILE-VARYOBJ-CORE-SPACE-ID"
-               "INITIAL-FUN-CORE-ENTRY-TYPE-CODE"
                "*!LOAD-TIME-VALUES*"
-               "MAX-CORE-SPACE-ID"
-               ;; FIXME: this are listed here so that genesis
-               ;; puts them into .h files, but they are not present in the resulting core
-               "NEW-DIRECTORY-CORE-ENTRY-TYPE-CODE"
-               "OPEN-FASL-OUTPUT" "PAGE-TABLE-CORE-ENTRY-TYPE-CODE"
-               "READ-ONLY-CORE-SPACE-ID"
+               "OPEN-FASL-OUTPUT"
                "*!COLD-DEFCONSTANTS*" "*!COLD-DEFUNS*"
                "*!COLD-SETF-MACROS*"  "*!COLD-TOPLEVELS*"
-               "COLD-CONS" "COLD-INTERN" "COLD-PUSH" "COLD-TARGET-PUSH"
-               "STATIC-CORE-SPACE-ID"))
+               "COLD-CONS" "COLD-INTERN" "COLD-PUSH" "COLD-TARGET-PUSH"))
 
    ;; This package is a grab bag for things which used to be internal
    ;; symbols in package COMMON-LISP. Lots of these symbols are accessed

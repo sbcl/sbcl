@@ -933,15 +933,13 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
                 lose("can't load .core for different runtime, sorry\n");
             }
 
-        case NEW_DIRECTORY_CORE_ENTRY_TYPE_CODE:
-            SHOW("NEW_DIRECTORY_CORE_ENTRY_TYPE_CODE case");
+        case DIRECTORY_CORE_ENTRY_TYPE_CODE:
             process_directory(remaining_len / NDIR_ENTRY_LENGTH,
                               (struct ndir_entry*)ptr, fd, file_offset,
                               merge_core_pages, &adj);
             break;
 
         case INITIAL_FUN_CORE_ENTRY_TYPE_CODE:
-            SHOW("INITIAL_FUN_CORE_ENTRY_TYPE_CODE case");
             initial_function = adjust_word(&adj, (lispobj)*ptr);
             break;
 

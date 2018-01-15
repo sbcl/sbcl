@@ -28,7 +28,9 @@
 
 (in-package "SB!FASL")
 
-;;; a magic number used to identify our core files
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (use-package "SB-COREFILE")) ; not SB!COREFILE
+
 (defconstant core-magic
   (logior (ash (sb!xc:char-code #\S) 24)
           (ash (sb!xc:char-code #\B) 16)
@@ -176,24 +178,16 @@
 ;;; copying GC is in use), then only the active dynamic space gets
 ;;; dumped to core.
 (defvar *dynamic*)
-(defconstant dynamic-core-space-id 1)
-
 (defvar *static*)
-(defconstant static-core-space-id 2)
-
 (defvar *read-only*)
-(defconstant read-only-core-space-id 3)
 
 #!+immobile-space
 (progn
   (defvar *immobile-fixedobj*)
   (defvar *immobile-varyobj*)
-  (defconstant immobile-fixedobj-core-space-id 4)
-  (defconstant immobile-varyobj-core-space-id 5)
   (defvar *immobile-space-map* nil))
 
 (defconstant max-core-space-id (+ 3 #!+immobile-space 2))
-(defconstant deflated-core-space-id-flag 8)
 
 ;;; a GENESIS-time representation of a memory space (e.g. read-only
 ;;; space, dynamic space, or static space)
@@ -2929,7 +2923,10 @@ core and return a descriptor to it."
                             ;; We also propagate magic numbers
                             ;; related to file format,
                             ;; which live here instead of SB!VM.
-                            "SB!FASL"))
+                            "SB!FASL"
+                            ;; Home package of some constants which aren't
+                            ;; in the target Lisp but are propagated to C.
+                            "SB-COREFILE"))
       (do-external-symbols (symbol (find-package package-name))
         (when (constantp symbol)
           (let ((name (symbol-name symbol)))
@@ -3359,22 +3356,6 @@ III. initially undefined function references (alphabetically):
 
 (defvar *core-file*)
 
-;;; magic numbers to identify entries in a core file
-;;;
-;;; (In case you were wondering: No, AFAIK there's no special magic about
-;;; these which requires them to be in the 38xx range. They're just
-;;; arbitrary words, tested not for being in a particular range but just
-;;; for equality. However, if you ever need to look at a .core file and
-;;; figure out what's going on, it's slightly convenient that they're
-;;; all in an easily recognizable range, and displacing the range away from
-;;; zero seems likely to reduce the chance that random garbage will be
-;;; misinterpreted as a .core file.)
-(defconstant build-id-core-entry-type-code 3860)
-(defconstant new-directory-core-entry-type-code 3861)
-(defconstant initial-fun-core-entry-type-code 3863)
-(defconstant page-table-core-entry-type-code 3880)
-(defconstant end-core-entry-type-code 3840)
-
 (declaim (ftype (function (sb!vm:word) sb!vm:word) write-word))
 (defun write-word (num)
   (ecase sb!c:*backend-byte-order*
@@ -3512,8 +3493,8 @@ III. initially undefined function references (alphabetically):
         (dovector (char build-id) (write-byte (sb!xc:char-code char) *core-file*))
         (dotimes (j (- padding)) (write-byte #xff *core-file*)))
 
-      ;; Write the New Directory entry header.
-      (write-word new-directory-core-entry-type-code)
+      ;; Write the Directory entry header.
+      (write-word directory-core-entry-type-code)
       (let ((spaces (nconc (list *read-only* *static*)
                            #!+immobile-space
                            (list *immobile-fixedobj* *immobile-varyobj*)

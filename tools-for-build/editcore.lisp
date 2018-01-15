@@ -18,9 +18,11 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (require :sb-posix)) ; for mmap
 
+(load (merge-pathnames "corefile.lisp" *load-pathname*))
+
 (defpackage "SB-EDITCORE"
-  (:use "CL" "SB-VM" "SB-INT" "SB-EXT" "SB-KERNEL" "SB-SYS"
-        "SB-ALIEN")
+  (:use "CL" "SB-ALIEN" "SB-COREFILE" "SB-INT" "SB-EXT"
+        "SB-KERNEL" "SB-SYS" "SB-VM")
   (:import-from "SB-ALIEN-INTERNALS"
                 #:alien-type-bits #:parse-alien-type
                 #:alien-value-sap #:alien-value-type)
@@ -49,17 +51,6 @@
           (ash (char-code #\B) 16)
           (ash (char-code #\C) 8)
           (char-code #\L)))
-
-(defconstant build-id-core-entry-type-code 3860)
-(defconstant new-directory-core-entry-type-code 3861)
-(defconstant initial-fun-core-entry-type-code 3863)
-(defconstant page-table-core-entry-type-code 3880)
-(defconstant end-core-entry-type-code 3840)
-
-(defconstant dynamic-core-space-id 1)
-(defconstant static-core-space-id 2)
-(defconstant immobile-fixedobj-core-space-id 4)
-(defconstant immobile-varyobj-core-space-id 5)
 
 (defglobal +noexec-stack-note+ ".section .note.GNU-stack, \"\", @progbits")
 
@@ -1242,7 +1233,7 @@
                                           :element-type 'base-char)))
                  (%byte-blt core-header (* (1+ ptr) n-word-bytes) string 0 (length string))
                  (format t "Build ID [~a]~%" string))))
-            (#.new-directory-core-entry-type-code
+            (#.directory-core-entry-type-code
              (do-directory-entry ((index ptr len) core-header)
                (incf original-total-npages npages)
                (push (make-space id addr data-page page-adjust nwords) spaces)
