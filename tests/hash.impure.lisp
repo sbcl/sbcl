@@ -267,7 +267,7 @@
 
 (defvar *cons-here*)
 
-(declaim (notinline args))
+(declaim (notinline take))
 (defun take (&rest args)
   (declare (ignore args)))
 
@@ -275,10 +275,26 @@
   "Execute BODY and try to reduce the chance of leaking a conservative root."
   #-sb-thread
   `(multiple-value-prog1
-       (progn ,@body)
-     (loop repeat 20000 do (setq *cons-here* (cons nil nil)))
-     ;; KLUDGE: Clean the argument passing regs.
-     (apply #'take (loop repeat 36 collect #'cons)))
+       (let ((*s* (make-array 25)))
+         (declare (special *s*)
+                  (dynamic-extent *s*))
+         ;; We can't "just" arrange to run the allocation on a separate
+         ;; thread stack, then deallocate the thread before doing
+         ;; whatever, so start by giving ourselves some headroom via a
+         ;; DX allocation around the actual allocation...
+         (multiple-value-prog1
+             (progn ,@body)
+           (loop repeat 20000 do (setq *cons-here* (cons nil nil)))
+           ;; KLUDGE: Clean the argument passing regs.
+           (apply #'take (loop repeat 36 collect #'cons))))
+     (let ((*s* (make-array 300)))
+       (declare (special *s*)
+                (dynamic-extent *s*))
+       ;; ... and use a larger DX allocation to try to clear the stack
+       ;; (thus, roots, conservative or otherwise) where we executed
+       ;; the BODY (this definitely clears stack space, the
+       ;; uncertainty is if it covers all of the space used by BODY).
+       (take *s*)))
   #+sb-thread
   (let ((values (gensym))
         (sem (gensym)))
