@@ -89,6 +89,6 @@ thread=`run_sbcl --eval '(princ (or #+sb-thread "\"main thread\":TLS:"
 t1=`awk 'NR==1 && /C stack.+'"${func}"'.+cons.+FOO.+cons.+vector.+cons/{print "PASS\n"}' $tmpfilename`
 t2=`awk 'NR==2 && /'"${thread}"'\*FRED/{print "PASS\n"}' $tmpfilename`
 t3=`awk 'NR==3 && /bindings:\*FRED/{print "PASS\n"}' $tmpfilename`
-t4=`awk 'NR==4 && /C stack.+->0x[^0]/{print "PASS\n"}' $tmpfilename`
+t4=`awk 'NR==4 && /C stack.+->#x[^0]/{print "PASS\n"}' $tmpfilename`
 
 test z$t1 = zPASS -a z$t2 = zPASS -a z$t3 = zPASS -a z$t4 = zPASS && exit $EXIT_TEST_WIN
