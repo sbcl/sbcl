@@ -1039,3 +1039,15 @@
                           (%f)
                           (%f 1)))
                       :allow-warnings t))))
+
+(with-test (:name (:equal-transform :nil-types))
+  (assert (nth-value 1
+                     (checked-compile
+                      '(lambda ()
+                        (loop for y below 3
+                              count (or
+                                     (not (or (>= y y) (equal y -787357528)))
+                                     (the integer (or (>= y y) (equal y -787357528))))))
+                      :allow-warnings t))))
+
+

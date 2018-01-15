@@ -3806,6 +3806,9 @@
                                    (csubtypep x equal-types))
                                  element-types))))))
       (cond
+        ((or (eq x-type *empty-type*)
+             (eq y-type *empty-type*))
+         nil)
         ((same-leaf-ref-p x y) t)
         ((array-type-dimensions-mismatch x-type y-type)
          nil)
