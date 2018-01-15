@@ -51,4 +51,9 @@
                            (concatenate 'string (stem-remap-target stem)
                                         ".trace")
                            srcname))))
-        (target-compile-stem stem flags)))))
+        (handler-bind ((warning
+                        (lambda (c)
+                          (when (search "reserved by ANSI CL"
+                                        (write-to-string c :escape nil :pretty nil))
+                            (muffle-warning)))))
+          (target-compile-stem stem flags))))))
