@@ -13,20 +13,21 @@
 
 ;;; Test for monotonicity of GET-INTERNAL-RUN-TIME. (On OpenBSD, this
 ;;; is not a given, because of a longstanding bug in getrusage().)
-(funcall (compile nil
-                  '(lambda (n-seconds)
-                     (declare (type fixnum n-seconds))
-                     (let* ((n-internal-time-units
-                             (* n-seconds
-                                internal-time-units-per-second))
-                            (time0 (get-internal-run-time))
-                            (time1 (+ time0 n-internal-time-units)))
-                       (loop
-                        (let ((time (get-internal-run-time)))
-                          (assert (>= time time0))
-                          (when (>= time time1)
-                            (return)))))))
-         3)
+(with-test (:name (get-internal-run-time :monotonic))
+  (checked-compile-and-assert (:optimize nil)
+      '(lambda (n-seconds)
+         (declare (type fixnum n-seconds))
+         (let* ((n-internal-time-units
+                 (* n-seconds
+                    internal-time-units-per-second))
+                (time0 (get-internal-run-time))
+                (time1 (+ time0 n-internal-time-units)))
+           (loop for time = (get-internal-run-time)
+                 while (< time time1)
+                 always (>= time time0))))
+    ((1) t)))
 
-(with-test (:name :time/lambdas-converted)
-  (time (compile nil '(lambda () 42))))
+(with-test (:name (time :lambdas-converted))
+  (let ((output (with-output-to-string (*trace-output*)
+                  (time (checked-compile '(lambda () 42))))))
+    (assert (search "1 lambda converted" output))))
