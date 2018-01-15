@@ -1039,6 +1039,7 @@
         (let ((this-call (node-dest ref)))
           (when (and this-call
                      (node-tail-p this-call)
+                     (not (node-to-be-deleted-p this-call))
                      (eq (node-home-lambda this-call) fun))
             (setf (node-tail-p this-call) nil)
             (ecase (functional-kind called)

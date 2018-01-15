@@ -1030,3 +1030,12 @@
                       `(lambda ()
                          (handler-case (declare)))
                       :allow-failure t))))
+
+(with-test (:name (:unconvert-tail-calls :deleted-call))
+  (assert (nth-value 1
+                     (checked-compile
+                      '(lambda ()
+                        (labels ((%f (&optional (x (* 2 nil (%f)))) x))
+                          (%f)
+                          (%f 1)))
+                      :allow-warnings t))))
