@@ -451,11 +451,14 @@ static void maybe_show_object_name(lispobj obj, FILE* stream)
     if (lowtag_of(obj)==OTHER_POINTER_LOWTAG)
         switch(widetag_of(*native_pointer(obj))) {
         case SYMBOL_WIDETAG:
-            package = SYMBOL(obj)->package;
-            package_name = ((struct package*)native_pointer(package))->_name;
             putc(',', stream);
-            safely_show_lstring(native_pointer(package_name), 0, stream);
-            fputs("::", stream);
+            if ((package = SYMBOL(obj)->package) == NIL) {
+                fprintf(stream, "#:");
+            } else {
+                package_name = ((struct package*)native_pointer(package))->_name;
+                safely_show_lstring(native_pointer(package_name), 0, stream);
+                fputs("::", stream);
+            }
             safely_show_lstring(native_pointer(SYMBOL(obj)->name), 0, stream);
             break;
         }
@@ -635,7 +638,7 @@ static void trace1(lispobj object,
             fprintf(file, "(g%d,", gen_of(ptr));
         fputs(classify_obj(ptr), file);
         maybe_show_object_name(ptr, file);
-        fprintf(file, ")%p[%d]->", (void*)ptr, next.wordindex);
+        fprintf(file, ")#x%"OBJ_FMTX"[%d]->", ptr, next.wordindex);
         target = native_pointer(ptr)[next.wordindex];
         // Special-case a few combinations of <type,wordindex>
         switch (next.wordindex) {
@@ -669,7 +672,7 @@ static void trace1(lispobj object,
             gc_assert(object == target);
         }
     }
-    fprintf(file, "%p.\n", (void*)target);
+    fprintf(file, "#x%"OBJ_FMTX".\n", target);
     fflush(file);
 }
 
