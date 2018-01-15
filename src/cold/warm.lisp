@@ -68,7 +68,11 @@
          (dolist (stem list)
           ;; Do like SB-COLD::LPNIFY-STEM for consistency, though parse/xlate/unparse
           ;; would probably also work. I don't think that's better.
-          (let ((fullname (format nil "SYS:~:@(~A~).LISP" (substitute #\; #\/ stem)))
+          (let ((fullname (sb-int:logically-readonlyize
+                           (format nil "SYS:~:@(~A~).LISP" (substitute #\; #\/ stem))
+                           ;; indicate shareable string even if not dumped as
+                           ;; a literal (when compiling in the LOAD step)
+                           t))
                 (output
                   (compile-file-pathname stem
                    :output-file

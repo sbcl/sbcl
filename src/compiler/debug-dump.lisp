@@ -269,7 +269,6 @@
   (let ((file-info (get-toplevelish-file-info info)))
     (make-debug-source
      :compiled (source-info-start-time info)
-
      :namestring (or *source-namestring*
                      (make-file-info-namestring
                       (let ((pathname
