@@ -1025,31 +1025,43 @@ default-value-8
   (:info fixed)
   (:vop-var vop)
   (:generator 20
-    ;; KLUDGE: Inlined XEP-COPY-SP body, to clean up our interface.
-    ;; There is still an interrupt-safety concern here in that setting
-    ;; CSP-TN this early can leave stack arguments unprotected with
-    ;; respect to stray interrupts.
-    (inst addi csp-tn cfp-tn
+    ;; Compute the end of the fixed stack frame (start of the MORE arg
+    ;; area) into RESULT.
+    (inst addi result cfp-tn
           (* n-word-bytes (sb-allocated-size 'control-stack)))
+    ;; We can set up the NFP any time we want (can't we?), so lets get
+    ;; it out of the way early.
     (let ((nfp-tn (current-nfp-tn vop)))
       (when nfp-tn
         (let ((nbytes (bytes-needed-for-non-descriptor-stack-frame)))
           (when (> nbytes number-stack-displacement)
             (inst stwu nsp-tn nsp-tn (- nbytes))
             (inst addi nfp-tn nsp-tn number-stack-displacement)))))
-    (when (< fixed register-arg-count)
-      ;; Save a pointer to the results so we can fill in register args.
-      ;; We don't need this if there are more fixed args than reg args.
-      (move result csp-tn))
-    ;; Allocate the space on the stack.
+    ;; Compute the end of the MORE arg area (and our overall frame
+    ;; allocation) into the stack pointer, skipping the rest of the
+    ;; VOP if there are no MORE args.  FIXME: If there are more fixed
+    ;; args than there are slots allocated for the control stack frame
+    ;; then this can expose some of the MORE args to being clobbered
+    ;; if we take an asynchronous interrupt before they are copied to
+    ;; their proper location.
     (cond ((zerop fixed)
            (inst cmpwi nargs-tn 0)
-           (inst add csp-tn csp-tn nargs-tn)
+           (inst add csp-tn result nargs-tn)
            (inst beq DONE))
           (t
            (inst addic. count nargs-tn (- (fixnumize fixed)))
-           (inst ble DONE)
-           (inst add csp-tn csp-tn count)))
+           (inst ble (assemble (*elsewhere*)
+                       FIX-CSP
+                       ;; If the fixed args aren't fully supplied, the
+                       ;; (INST ADD CSP-TN RESULT COUNT) below could
+                       ;; expose part of our stack area, so branch to
+                       ;; *ELSEWHERE* and do a straight move instead.
+                       (move csp-tn result)
+                       (inst b DONE)
+                       ;; VALUES here to prevent ASSEMBLE from
+                       ;; emitting it as a label (again).
+                       (values FIX-CSP)))
+           (inst add csp-tn result count)))
     (when (< fixed register-arg-count)
       ;; We must stop when we run out of stack args, not when we run out of
       ;; more args.
