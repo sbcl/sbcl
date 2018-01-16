@@ -1295,8 +1295,14 @@
        (cond ((and (optional-dispatch-p ef)
                    (optional-dispatch-more-entry ef)
                    (neq (functional-kind (optional-dispatch-more-entry ef)) :deleted))
-              ;; COPY-MORE-ARG does the job of XEP-SETUP-SP on some architectures
-              #!-(or arm arm64 x86 x86-64)
+              ;; XEP-SETUP-SP opens a window for an interrupt
+              ;; clobbering any "more args" that may be on the stack.
+              ;; As such, COPY-MORE-ARG is being given the
+              ;; responsibility for setting up the stack pointer, but
+              ;; not all backends have been updated yet.  On backends
+              ;; that have not been updated, we still need to use
+              ;; XEP-SETUP-SP here.
+              #!+(or alpha hppa mips ppc sparc)
               (vop xep-setup-sp node block)
               (vop copy-more-arg node block (optional-dispatch-max-args ef)
                    #!+x86-64 verified))
