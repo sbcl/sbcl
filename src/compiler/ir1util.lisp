@@ -740,7 +740,9 @@
   (labels ((recurse (combination)
              (or (eq combination combination2)
                  (if (known-dx-combination-p combination dx)
-                     (let ((dest (lvar-dest (combination-lvar combination))))
+                     (let* ((lvar (combination-lvar combination))
+                            (dest (and lvar
+                                       (lvar-dest lvar))))
                        (and (combination-p dest)
                             (recurse dest)))
                      (let* ((fun1 (combination-fun combination))

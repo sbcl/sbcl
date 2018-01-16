@@ -1056,3 +1056,15 @@
   (checked-compile '(lambda (x)
                      (lambda ()
                        (labels ((f (&optional a) (values x a #'f))))))))
+
+(with-test (:name (:combination-args-flow-cleanly-p :unused-result))
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (let ((v (flet ((%f (x)
+                           (list x)
+                           (list 1)))
+                    (%f 2))))
+           (declare (dynamic-extent v))
+           (car v)))
+    (() 1)))
