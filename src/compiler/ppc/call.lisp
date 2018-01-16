@@ -1023,7 +1023,20 @@ default-value-8
   (:temporary (:sc any-reg :offset nl3-offset) dst)
   (:temporary (:sc descriptor-reg :offset l0-offset) temp)
   (:info fixed)
+  (:vop-var vop)
   (:generator 20
+    ;; KLUDGE: Inlined XEP-COPY-SP body, to clean up our interface.
+    ;; There is still an interrupt-safety concern here in that setting
+    ;; CSP-TN this early can leave stack arguments unprotected with
+    ;; respect to stray interrupts.
+    (inst addi csp-tn cfp-tn
+          (* n-word-bytes (sb-allocated-size 'control-stack)))
+    (let ((nfp-tn (current-nfp-tn vop)))
+      (when nfp-tn
+        (let ((nbytes (bytes-needed-for-non-descriptor-stack-frame)))
+          (when (> nbytes number-stack-displacement)
+            (inst stwu nsp-tn nsp-tn (- nbytes))
+            (inst addi nfp-tn nsp-tn number-stack-displacement)))))
     (when (< fixed register-arg-count)
       ;; Save a pointer to the results so we can fill in register args.
       ;; We don't need this if there are more fixed args than reg args.
