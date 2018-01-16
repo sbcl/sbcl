@@ -8,8 +8,6 @@
 
 ;;; A CLAMBDA is deemed to be "externally referenced" if:
 ;;;   - It is of KIND :TOPLEVEL (a toplevel CLAMBDA).
-;;;   - It is of KIND :OPTIONAL (an OPTIONAL-DISPATCH entry point,
-;;;     which may not be deleted even if it is not referenced).
 ;;;   - It is LAMBDA-HAS-EXTERNAL-REFERENCES-P true (from COMPILE
 ;;;     or from the fopcompiler, possibly other causes).
 ;;;   - It has a REF which has a NODE-COMPONENT other than the
@@ -22,7 +20,7 @@
 ;;; implement.
 (defun lambda-externally-referenced-p (clambda)
   (or (lambda-has-external-references-p clambda)
-      (member (lambda-kind clambda) '(:toplevel :optional))
+      (eq (lambda-kind clambda) :toplevel)
       (let ((home-component (lambda-component clambda)))
         (some (lambda (ref)
                 (not (eq (node-component ref)

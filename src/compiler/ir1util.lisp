@@ -1783,6 +1783,8 @@
                      ;; the CAST will get a note, no need to note
                      ;; twice.
                      (not (cast-p node))
+                     ;; Nothing interesting in BIND nodes
+                     (not (bind-p node))
                      (or (eq first 'original-source-start)
                          (and (atom first)
                               (or (not (symbolp first))

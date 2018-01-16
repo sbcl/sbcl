@@ -1051,3 +1051,8 @@
                       :allow-warnings t))))
 
 
+
+(with-test (:name (:delete-recursive-optional))
+  (checked-compile '(lambda (x)
+                     (lambda ()
+                       (labels ((f (&optional a) (values x a #'f))))))))
