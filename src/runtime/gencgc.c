@@ -158,10 +158,12 @@ lispobj lisp_init_function;
 ///   #define UNBOXED_PAGE_FLAG 2
 ///   #define OPEN_REGION_PAGE_FLAG 4
 
+#if 0
 /// Return true if  'allocated' bits are: {001, 010, 011}, false if 1zz or 000.
 static inline boolean page_allocated_no_region_p(page_index_t page) {
     return (page_table[page].allocated ^ OPEN_REGION_PAGE_FLAG) > OPEN_REGION_PAGE_FLAG;
 }
+#endif
 
 static inline boolean page_free_p(page_index_t page) {
     return (page_table[page].allocated == FREE_PAGE_FLAG);
@@ -1334,8 +1336,103 @@ gc_alloc_with_region(sword_t nbytes,int page_type_flag, struct alloc_region *my_
     return gc_alloc_with_region(nbytes, page_type_flag, my_region,0);
 }
 
-/* Copy a large object. If the object is on a large object page then
+/* Free any trailing pages of the object starting at 'first_page'
+ * that are currently unused due to object shrinkage.
+ * Possibly assign different 'gen' and 'allocated' values.
+ *
+ * maybe_adjust_large_object() specifies 'from_space' for 'new_gen'
+ * and copy_large_object() specifies 'new_space'
+ */
+
+static uword_t adjust_obj_ptes(page_index_t first_page,
+                               sword_t nwords,
+                               generation_index_t new_gen,
+                               int new_allocated)
+{
+    int old_allocated = page_table[first_page].allocated;
+    page_index_t page = first_page;
+    sword_t remaining_bytes = nwords * N_WORD_BYTES;
+
+    /* The assignments to the page table here affect only one object
+     * since its pages can't be shared with other objects */
+#define CHECK_AND_SET_PTE_FIELDS() \
+        gc_assert(page_table[page].large_object); \
+        gc_assert(page_table[page].allocated == old_allocated); \
+        gc_assert(page_table[page].gen == from_space); \
+        gc_assert(page_scan_start_offset(page) == npage_bytes(page-first_page)); \
+        gc_assert(!page_table[page].write_protected); \
+        page_table[page].gen = new_gen; \
+        page_table[page].allocated = new_allocated
+
+    gc_assert(page_starts_contiguous_block_p(first_page));
+    while (remaining_bytes > (sword_t)GENCGC_CARD_BYTES) {
+        gc_assert(page_bytes_used(page) == GENCGC_CARD_BYTES);
+        CHECK_AND_SET_PTE_FIELDS();
+        remaining_bytes -= GENCGC_CARD_BYTES;
+        page++;
+    }
+
+    /* Now at most one page of data in use by the object remains,
+     * but there may be more unused pages beyond which will be freed. */
+
+    /* This page must have at least as many bytes in use as expected */
+    gc_assert(page_bytes_used(page) >= remaining_bytes);
+    CHECK_AND_SET_PTE_FIELDS();
+
+    /* Adjust the bytes_used. */
+    page_bytes_t prev_bytes_used = page_bytes_used(page);
+    set_page_bytes_used(page, remaining_bytes);
+
+    uword_t bytes_freed = prev_bytes_used - remaining_bytes;
+
+    /* Free unused pages that were originally allocated to this object. */
+    page++;
+    while (prev_bytes_used == GENCGC_CARD_BYTES &&
+           page_table[page].gen == from_space &&
+           page_table[page].allocated == old_allocated &&
+           page_table[page].large_object &&
+           page_scan_start_offset(page) == npage_bytes(page - first_page)) {
+        // These pages are part of oldspace, which was un-write-protected.
+        gc_assert(!page_table[page].write_protected);
+
+        /* Zeroing must have been done before shrinking the object.
+         * (It is strictly necessary for correctness with objects other
+         * than simple-vector, but pragmatically it reduces accidental
+         * conservativism when done for simple-vectors as well) */
+#ifdef DEBUG
+        { lispobj* words = (lispobj*)page_address(page);
+          int i;
+          for(i=0; i<(int)(GENCGC_CARD_BYTES/N_WORD_BYTES); ++i)
+              if (words[i])
+                lose("non-zeroed trailer of shrunken object @ %p\n",
+                     page_address(first_page));
+        }
+#endif
+        /* It checks out OK, free the page. */
+        prev_bytes_used = page_bytes_used(page);
+        page_table[page].bytes_used_ = 0; // also clears need-to-zero bit
+        reset_page_flags(page);
+        bytes_freed += prev_bytes_used;
+        page++;
+    }
+
+    if ((bytes_freed > 0) && gencgc_verbose) {
+        FSHOW((stderr,
+               "/adjust_obj_ptes() freed %"OS_VM_SIZE_FMT"\n",
+               bytes_freed));
+    }
+    return bytes_freed;
+}
+
+/* Copy a large object. If the object is on large object pages,
+ * and satisifies the condition to remain where it is,
  * it is simply promoted, else it is copied.
+ * To stay on large-object pages, the object must either be at least
+ * LARGE_OBJECT_SIZE, or must waste fewer than about 1% of the space
+ * on its allocated pages. Using 32k pages as a reference point:
+ *   3 pages - ok if size >= 97552
+ *   2 pages - ...   size >= 65040
+ *   1 page  - ...   size >= 32528
  *
  * Bignums and vectors may have shrunk. If the object is not copied
  * the space needs to be reclaimed, and the page_tables corrected.
@@ -1352,143 +1449,37 @@ gc_alloc_with_region(sword_t nbytes,int page_type_flag, struct alloc_region *my_
 lispobj
 copy_large_object(lispobj object, sword_t nwords, int page_type_flag)
 {
-    lispobj *new;
     page_index_t first_page;
-    boolean boxedp = page_type_flag != UNBOXED_PAGE_FLAG;
 
     CHECK_COPY_PRECONDITIONS(object, nwords);
 
     if ((nwords > 1024*1024) && gencgc_verbose) {
-        FSHOW((stderr, "/general_copy_large_object: %d bytes\n",
-               nwords*N_WORD_BYTES));
+        FSHOW((stderr, "/copy_large_object: %"OS_VM_SIZE_FMT"\n", nwords));
     }
 
     /* Check whether it's a large object. */
     first_page = find_page_index((void *)object);
     gc_assert(first_page >= 0);
 
-    // An objects that shrank but was allocated on a large-object page
-    // is a candidate for copying if its current size is non-large.
-    if (page_table[first_page].large_object
-        && nwords >= LARGE_OBJECT_SIZE / N_WORD_BYTES) {
-        /* Promote the object. Note: Unboxed objects may have been
-         * allocated to a BOXED region so it may be necessary to
-         * change the region to UNBOXED. */
-        os_vm_size_t remaining_bytes;
-        os_vm_size_t bytes_freed;
-        page_index_t next_page;
-        page_bytes_t old_bytes_used;
+    os_vm_size_t nbytes = nwords * N_WORD_BYTES;
+    os_vm_size_t rounded = ALIGN_UP(nbytes, GENCGC_CARD_BYTES);
+    if (page_table[first_page].large_object &&
+        (nbytes >= LARGE_OBJECT_SIZE || (rounded - nbytes < rounded / 128))) {
 
-        /* FIXME: This comment is somewhat stale.
-         *
-         * Note: Any page write-protection must be removed, else a
-         * later scavenge_newspace may incorrectly not scavenge these
-         * pages. This would not be necessary if they are added to the
-         * new areas, but let's do it for them all (they'll probably
-         * be written anyway?). */
+        os_vm_size_t bytes_freed =
+          adjust_obj_ptes(first_page, nwords, new_space, page_type_flag);
 
-        gc_assert(page_starts_contiguous_block_p(first_page));
-        next_page = first_page;
-        remaining_bytes = nwords*N_WORD_BYTES;
-
-        /* FIXME: can we share code with maybe_adjust_large_object ? */
-        while (remaining_bytes > GENCGC_CARD_BYTES) {
-            gc_assert(page_table[next_page].gen == from_space);
-            gc_assert(page_table[next_page].large_object);
-            gc_assert(page_scan_start_offset(next_page) ==
-                      npage_bytes(next_page-first_page));
-            gc_assert(page_bytes_used(next_page) == GENCGC_CARD_BYTES);
-            /* Should have been unprotected by unprotect_oldspace()
-             * for boxed objects, and after promotion unboxed ones
-             * should not be on protected pages at all. */
-            gc_assert(!page_table[next_page].write_protected);
-
-            if (boxedp)
-                gc_assert(page_boxed_p(next_page));
-            else {
-                gc_assert(page_allocated_no_region_p(next_page));
-                page_table[next_page].allocated = UNBOXED_PAGE_FLAG;
-            }
-            page_table[next_page].gen = new_space;
-
-            remaining_bytes -= GENCGC_CARD_BYTES;
-            next_page++;
-        }
-
-        /* Now only one page remains, but the object may have shrunk so
-         * there may be more unused pages which will be freed. */
-
-        /* Object may have shrunk but shouldn't have grown - check. */
-        gc_assert(page_bytes_used(next_page) >= remaining_bytes);
-
-        page_table[next_page].gen = new_space;
-
-        if (boxedp)
-            gc_assert(page_boxed_p(next_page));
-        else
-            page_table[next_page].allocated = UNBOXED_PAGE_FLAG;
-
-        /* Adjust the bytes_used. */
-        old_bytes_used = page_bytes_used(next_page);
-        set_page_bytes_used(next_page, remaining_bytes);
-
-        bytes_freed = old_bytes_used - remaining_bytes;
-
-        /* Free any remaining pages; needs care. */
-        next_page++;
-        while ((old_bytes_used == GENCGC_CARD_BYTES) &&
-               (page_table[next_page].gen == from_space) &&
-               /* FIXME: It is not obvious to me why this is necessary
-                * as a loop condition: it seems to me that the
-                * scan_start_offset test should be sufficient, but
-                * experimentally that is not the case. --NS
-                * 2011-11-28 */
-               (boxedp ?
-                page_boxed_p(next_page) :
-                page_allocated_no_region_p(next_page)) &&
-               page_table[next_page].large_object &&
-               (page_scan_start_offset(next_page) ==
-                npage_bytes(next_page - first_page))) {
-            /* Checks out OK, free the page. Don't need to both zeroing
-             * pages as this should have been done before shrinking the
-             * object. These pages shouldn't be write-protected, even if
-             * boxed they should be zero filled. */
-            gc_assert(!page_table[next_page].write_protected);
-
-            old_bytes_used = page_bytes_used(next_page);
-            reset_page_flags(next_page);
-            set_page_bytes_used(next_page, 0);
-            bytes_freed += old_bytes_used;
-            next_page++;
-        }
-
-        if ((bytes_freed > 0) && gencgc_verbose) {
-            FSHOW((stderr,
-                   "/general_copy_large_object bytes_freed=%"OS_VM_SIZE_FMT"\n",
-                   bytes_freed));
-        }
-
-        generations[from_space].bytes_allocated -= nwords*N_WORD_BYTES
-            + bytes_freed;
-        generations[new_space].bytes_allocated += nwords*N_WORD_BYTES;
+        generations[from_space].bytes_allocated -= (bytes_freed + nbytes);
+        generations[new_space].bytes_allocated += nbytes;
         bytes_allocated -= bytes_freed;
 
         /* Add the region to the new_areas if requested. */
-        if (boxedp)
-            add_new_area(first_page,0,nwords*N_WORD_BYTES);
+        if (page_type_flag & BOXED_PAGE_FLAG)
+            add_new_area(first_page, 0, nbytes);
 
-        return(object);
-
-    } else {
-        /* Allocate space. */
-        new = gc_general_alloc(nwords*N_WORD_BYTES, page_type_flag, ALLOC_QUICK);
-
-        /* Copy the object. */
-        memcpy(new,native_pointer(object),nwords*N_WORD_BYTES);
-
-        /* Return Lisp pointer of new object. */
-        return make_lispobj(new, lowtag_of(object));
+        return object;
     }
+    return gc_general_copy_object(object, nwords, page_type_flag);
 }
 
 /* to copy unboxed objects */
@@ -1630,12 +1621,6 @@ static void
 maybe_adjust_large_object(page_index_t first_page, sword_t nwords)
 {
     lispobj* where = (lispobj*)page_address(first_page);
-    page_index_t next_page;
-
-    uword_t remaining_bytes;
-    uword_t bytes_freed;
-    uword_t old_bytes_used;
-
     int page_type_flag;
 
     /* Check whether it's a vector or bignum object. */
@@ -1647,81 +1632,10 @@ maybe_adjust_large_object(page_index_t first_page, sword_t nwords)
     else
         return;
 
-    /* Note: Any page write-protection must be removed, else a later
-     * scavenge_newspace may incorrectly not scavenge these pages.
-     * This would not be necessary if they are added to the new areas,
-     * but lets do it for them all (they'll probably be written
-     * anyway?). */
-
-    gc_assert(page_starts_contiguous_block_p(first_page));
-
-    next_page = first_page;
-    remaining_bytes = nwords*N_WORD_BYTES;
-    while (remaining_bytes > GENCGC_CARD_BYTES) {
-        gc_assert(page_table[next_page].gen == from_space);
-        // We can't assert that page_table[next_page].allocated is correct,
-        // because unboxed objects are initially allocated on boxed pages.
-        gc_assert(page_allocated_no_region_p(next_page));
-        gc_assert(page_table[next_page].large_object);
-        gc_assert(page_scan_start_offset(next_page) ==
-                  npage_bytes(next_page-first_page));
-        gc_assert(page_bytes_used(next_page) == GENCGC_CARD_BYTES);
-
-        // This affects only one object, since large objects don't share pages.
-        page_table[next_page].allocated = page_type_flag;
-
-        /* Shouldn't be write-protected at this stage. Essential that the
-         * pages aren't. */
-        gc_assert(!page_table[next_page].write_protected);
-        remaining_bytes -= GENCGC_CARD_BYTES;
-        next_page++;
-    }
-
-    /* Now only one page remains, but the object may have shrunk so
-     * there may be more unused pages which will be freed. */
-
-    /* Object may have shrunk but shouldn't have grown - check. */
-    gc_assert(page_bytes_used(next_page) >= remaining_bytes);
-
-    page_table[next_page].allocated = page_type_flag;
-
-    /* Adjust the bytes_used. */
-    old_bytes_used = page_bytes_used(next_page);
-    set_page_bytes_used(next_page, remaining_bytes);
-
-    bytes_freed = old_bytes_used - remaining_bytes;
-
-    /* Free any remaining pages; needs care. */
-    next_page++;
-    while ((old_bytes_used == GENCGC_CARD_BYTES) &&
-           (page_table[next_page].gen == from_space) &&
-           page_allocated_no_region_p(next_page) &&
-           page_table[next_page].large_object &&
-           (page_scan_start_offset(next_page) ==
-            npage_bytes(next_page - first_page))) {
-        /* It checks out OK, free the page. We don't need to bother zeroing
-         * pages as this should have been done before shrinking the
-         * object. These pages shouldn't be write protected as they
-         * should be zero filled. */
-        gc_assert(!page_table[next_page].write_protected);
-
-        old_bytes_used = page_bytes_used(next_page);
-        reset_page_flags(next_page);
-        set_page_bytes_used(next_page, 0);
-        bytes_freed += old_bytes_used;
-        next_page++;
-    }
-
-    if ((bytes_freed > 0) && gencgc_verbose) {
-        FSHOW((stderr,
-               "/maybe_adjust_large_object() freed %d\n",
-               bytes_freed));
-    }
-
+    os_vm_size_t bytes_freed =
+      adjust_obj_ptes(first_page, nwords, from_space, page_type_flag);
     generations[from_space].bytes_allocated -= bytes_freed;
     bytes_allocated -= bytes_freed;
-
-    return;
 }
 
 #ifdef PIN_GRANULARITY_LISPOBJ

@@ -1323,8 +1323,8 @@ scav_vector (lispobj *where, lispobj header)
         /* There is a down-side to *not* pushing the table into the list,
          * but it should not matter too much: if we attempt to scavenge more
          * than once (when and only when the newspace areas overflow),
-         * then we don't know that we didn't already do it, and we'll do it
-         * again. This is the same as occurs on all other objects */
+         * then we don't know that we already did it, and we'll do it again.
+         * This is the same as occurs on all other objects */
         if (defer) {
             NON_FAULTING_STORE(hash_table->next_weak_hash_table
                                = (lispobj)weak_hash_tables,
