@@ -1024,52 +1024,49 @@ default-value-8
   (:temporary (:sc descriptor-reg :offset l0-offset) temp)
   (:info fixed)
   (:generator 20
-    (let ((loop (gen-label))
-          (do-regs (gen-label))
-          (done (gen-label)))
-      (when (< fixed register-arg-count)
-        ;; Save a pointer to the results so we can fill in register args.
-        ;; We don't need this if there are more fixed args than reg args.
-        (move result csp-tn))
-      ;; Allocate the space on the stack.
-      (cond ((zerop fixed)
-             (inst cmpwi nargs-tn 0)
-             (inst add csp-tn csp-tn nargs-tn)
-             (inst beq done))
-            (t
-             (inst addic. count nargs-tn (- (fixnumize fixed)))
-             (inst ble done)
-             (inst add csp-tn csp-tn count)))
-      (when (< fixed register-arg-count)
-        ;; We must stop when we run out of stack args, not when we run out of
-        ;; more args.
-        (inst addic. count nargs-tn (- (fixnumize register-arg-count)))
-        ;; Everything of interest is in registers.
-        (inst ble do-regs))
-      ;; Initialize dst to be end of stack.
-      (move dst csp-tn)
-      ;; Initialize src to be end of args.
-      (inst add src cfp-tn nargs-tn)
+    (when (< fixed register-arg-count)
+      ;; Save a pointer to the results so we can fill in register args.
+      ;; We don't need this if there are more fixed args than reg args.
+      (move result csp-tn))
+    ;; Allocate the space on the stack.
+    (cond ((zerop fixed)
+           (inst cmpwi nargs-tn 0)
+           (inst add csp-tn csp-tn nargs-tn)
+           (inst beq DONE))
+          (t
+           (inst addic. count nargs-tn (- (fixnumize fixed)))
+           (inst ble DONE)
+           (inst add csp-tn csp-tn count)))
+    (when (< fixed register-arg-count)
+      ;; We must stop when we run out of stack args, not when we run out of
+      ;; more args.
+      (inst addic. count nargs-tn (- (fixnumize register-arg-count)))
+      ;; Everything of interest is in registers.
+      (inst ble DO-REGS))
+    ;; Initialize dst to be end of stack.
+    (move dst csp-tn)
+    ;; Initialize src to be end of args.
+    (inst add src cfp-tn nargs-tn)
 
-      (emit-label loop)
-      ;; *--dst = *--src, --count
-      (inst lwzu temp src (- n-word-bytes))
-      (inst addic. count count (- (fixnumize 1)))
-      (inst stwu temp dst (- n-word-bytes))
-      (inst bgt loop)
+    LOOP
+    ;; *--dst = *--src, --count
+    (inst lwzu temp src (- n-word-bytes))
+    (inst addic. count count (- (fixnumize 1)))
+    (inst stwu temp dst (- n-word-bytes))
+    (inst bgt LOOP)
 
-      (emit-label do-regs)
-      (when (< fixed register-arg-count)
-        ;; Now we have to deposit any more args that showed up in registers.
-        (inst subic. count nargs-tn (fixnumize fixed))
-        (do ((i fixed (1+ i)))
-            ((>= i register-arg-count))
-          ;; Don't deposit any more than there are.
-          (inst beq done)
-          (inst subic. count count (fixnumize 1))
-          ;; Store it relative to the pointer saved at the start.
-          (storew (nth i *register-arg-tns*) result (- i fixed))))
-      (emit-label done))))
+    DO-REGS
+    (when (< fixed register-arg-count)
+      ;; Now we have to deposit any more args that showed up in registers.
+      (inst subic. count nargs-tn (fixnumize fixed))
+      (do ((i fixed (1+ i)))
+          ((>= i register-arg-count))
+        ;; Don't deposit any more than there are.
+        (inst beq DONE)
+        (inst subic. count count (fixnumize 1))
+        ;; Store it relative to the pointer saved at the start.
+        (storew (nth i *register-arg-tns*) result (- i fixed))))
+    DONE))
 
 
 ;;; More args are stored consecutively on the stack, starting
