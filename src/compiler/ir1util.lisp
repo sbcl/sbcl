@@ -1506,9 +1506,13 @@
 (defun delete-ref (ref)
   (declare (type ref ref))
   (let* ((leaf (ref-leaf ref))
-         (refs (delq ref (leaf-refs leaf))))
+         (refs (delq ref (leaf-refs leaf)))
+         (home (node-home-lambda ref)))
     (setf (leaf-refs leaf) refs)
-
+    (when (and (typep leaf '(or clambda lambda-var))
+               (not (find home refs :key #'node-home-lambda)))
+      ;; It was the last reference from this lambda, remove it
+      (sset-delete leaf (lambda-calls-or-closes home)))
     (cond ((null refs)
            (typecase leaf
              (lambda-var
