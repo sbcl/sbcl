@@ -1163,7 +1163,8 @@ and no value was provided for it." name))))))))))
                                       &key cast-context
                                            (condition 'type-warning))
   (let ((*compiler-error-context* node))
-    (cond ((eq cast-context :ftype)
+    (cond ((eq atype nil))
+          ((eq cast-context :ftype)
            (warn condition
                  :format-control
                  "~@<Derived type of ~S is ~2I~_~S, ~

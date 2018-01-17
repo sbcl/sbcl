@@ -881,8 +881,7 @@ the current thread are replaced with dummy objects which can safely escape."
     ;; using PRINT statements, he'd tend to lose the last line of output
     ;; or so, which'd be confusing.
     (flush-standard-output-streams)
-    (funcall-with-debug-io-syntax #'%invoke-debugger condition)
-    (aver nil)))
+    (funcall-with-debug-io-syntax #'%invoke-debugger condition)))
 
 (defun %print-debugger-invocation-reason (condition stream)
   (format stream "~2&")

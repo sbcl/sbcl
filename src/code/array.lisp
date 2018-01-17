@@ -735,25 +735,22 @@ of specialized arrays is supported."
              (let* ((type (sb!vm:saetp-specifier saetp))
                     (atype `(simple-array ,type (*))))
                `(named-lambda (optimized-data-vector-set ,type) (vector index new-value)
-                  (declare (optimize speed (safety 0))
-                           (ignorable index new-value))
+                  (declare (optimize speed (safety 0)))
                   ;; Impossibly setting an elt of an (ARRAY NIL)
                   ;; returns no value. And nobody cares.
                   (declare (muffle-conditions compiler-note))
-                  ,(if type
-                       `(data-vector-set (the ,atype vector)
-                                         (locally
-                                             (declare (optimize (safety 1)))
-                                           (the index
-                                                (,@check-form index)))
-                                         (locally
-                                             ;; SPEED 1 needed to avoid the compiler
-                                             ;; from downgrading the type check to
-                                             ;; a cheaper one.
-                                             (declare (optimize (speed 1)
-                                                                (safety 1)))
-                                           (the* (,type :context :aref) new-value)))
-                       `(sb!c::%type-check-error/c vector 'sb!kernel:nil-array-accessed-error nil))
+                  (data-vector-set (the ,atype vector)
+                                   (locally
+                                       (declare (optimize (safety 1)))
+                                     (the index
+                                       (,@check-form index)))
+                                   (locally
+                                       ;; SPEED 1 needed to avoid the compiler
+                                       ;; from downgrading the type check to
+                                       ;; a cheaper one.
+                                       (declare (optimize (speed 1)
+                                                          (safety 1)))
+                                     (the* (,type :context :aref) new-value)))
                   ;; For specialized arrays, the return from
                   ;; data-vector-set would have to be reboxed to be a
                   ;; (Lisp) return value; instead, we use the

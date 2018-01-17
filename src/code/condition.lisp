@@ -1702,8 +1702,7 @@ a variable."))
 (defun muffle-warning (&optional condition)
   "Transfer control to a restart named MUFFLE-WARNING, signalling a
    CONTROL-ERROR if none exists."
-  (invoke-restart (find-restart-or-control-error 'muffle-warning condition))
-  (aver nil))
+  (invoke-restart (find-restart-or-control-error 'muffle-warning condition)))
 
 (defun try-restart (name condition &rest arguments)
   (let ((restart (find-restart name condition)))

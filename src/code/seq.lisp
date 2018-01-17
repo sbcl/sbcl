@@ -1323,12 +1323,7 @@ many elements are copied."
         (declare (truly-dynamic-extent args))
         (when (eql index end)
           (return-from mapping))
-        (typecase data
-          ((simple-array nil (*))
-           (apply fun args)
-           (data-nil-vector-ref data index))
-          (t
-           (setf (aref data index) (apply fun args))))
+        (setf (aref data index) (apply fun args))
         (incf index)))
     index))
 

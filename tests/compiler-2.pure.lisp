@@ -1087,13 +1087,8 @@
                         c))))
 
 (with-test (:name (the :nil-type))
-  (assert (nth-value 1
-                     (checked-compile
-                      `(lambda ()
-                         (flet ((f () (the nil 0)))
-                           (oddp (f))))
-                      :allow-warnings t))))
+  (checked-compile
+   `(lambda ()
+      (flet ((f () (the nil 0)))
+        (oddp (f))))))
 
-(with-test (:name :initialize-nil-array)
-  (checked-compile `(lambda (x)
-                      (make-array 1 :element-type nil :initial-contents (list x)))))
