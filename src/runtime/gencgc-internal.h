@@ -173,10 +173,7 @@ static void inline gc_set_region_empty(struct alloc_region *region)
 {
     /* last_page is not reset. It can be used as a hint where to resume
      * allocating after closing and re-opening the region */
-    region->start_addr = 0;
-    /* Honestly I don't know why these should be dereference-able addresses.
-     * But so it is. */
-    region->free_pointer = region->end_addr = page_address(0);
+    region->start_addr = region->free_pointer = region->end_addr = 0;
 }
 
 static void inline gc_init_region(struct alloc_region *region)
