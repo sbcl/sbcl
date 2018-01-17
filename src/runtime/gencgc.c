@@ -1381,7 +1381,7 @@ static uword_t adjust_obj_ptes(page_index_t first_page,
      * but there may be more unused pages beyond which will be freed. */
 
     /* This page must have at least as many bytes in use as expected */
-    gc_assert(page_bytes_used(page) >= remaining_bytes);
+    gc_assert((sword_t)page_bytes_used(page) >= remaining_bytes);
     CHECK_AND_SET_PTE_FIELDS();
 
     /* Adjust the bytes_used. */
