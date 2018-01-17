@@ -888,16 +888,18 @@ lexically apparent function definition in the enclosing environment."
       (compiler-error "Malformed FLET definitions: ~s" definitions))
     (multiple-value-bind (names defs)
         (extract-flet-vars definitions 'flet)
-      (let ((fvars (mapcar (lambda (n d)
-                             (ir1-convert-lambda
-                              d :source-name n
+      (let ((fvars (mapcar (lambda (n d original)
+                             (let ((*current-path* (ensure-source-path original)))
+                               (ir1-convert-lambda
+                                d
+                                :source-name n
                                 :maybe-add-debug-catch t
                                 :debug-name
                                 (let ((n (if (and (symbolp n) (not (symbol-package n)))
                                              (string n)
                                              n)))
-                                  (debug-name 'flet n t))))
-                           names defs)))
+                                  (debug-name 'flet n t)))))
+                           names defs definitions)))
         (processing-decls (decls nil fvars next result)
           (let ((*lexenv* (make-lexenv :funs (pairlis names fvars))))
             (ir1-convert-fbindings start next result fvars forms)))))))
@@ -928,12 +930,13 @@ other."
              ;; includes the dummy LABELS functions
              (real-funs
               (let ((*lexenv* (make-lexenv :funs placeholder-fenv)))
-                (mapcar (lambda (name def)
-                          (ir1-convert-lambda def
-                                              :source-name name
-                                              :maybe-add-debug-catch t
-                                              :debug-name (debug-name 'labels name t)))
-                        names defs))))
+                (mapcar (lambda (name def original)
+                          (let ((*current-path* (ensure-source-path original)))
+                            (ir1-convert-lambda def
+                                                :source-name name
+                                                :maybe-add-debug-catch t
+                                                :debug-name (debug-name 'labels name t))))
+                        names defs definitions))))
 
         ;; Modify all the references to the dummy function leaves so
         ;; that they point to the real function leaves.
