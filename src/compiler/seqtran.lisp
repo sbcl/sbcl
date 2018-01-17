@@ -1687,7 +1687,8 @@
         ((and (union-type-p type)
               (csubtypep type (specifier-type 'string))
               (loop for type in (union-type-types type)
-                    always (equal (array-type-dimensions type) '(*))))
+                    always (and (array-type-p type)
+                                (equal (array-type-dimensions type) '(*)))))
          #!+sb-unicode
          sb!vm:simple-character-string-widetag
          #!-sb-unicode

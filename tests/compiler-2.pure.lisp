@@ -1092,3 +1092,7 @@
       (flet ((f () (the nil 0)))
         (oddp (f))))))
 
+(with-test (:name :concatenate-transform-hairy-type)
+  (checked-compile
+      '(lambda (x)
+        (concatenate '(and string (satisfies eval)) x))))
