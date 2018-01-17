@@ -9,27 +9,41 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package "CL-USER")
+
+;;;; Utilities
 
-(test-util:with-test (:name :typexpand-check-lexenv)
+(defun ctype= (left right)
+  (sb-kernel:type= (sb-kernel:specifier-type left)
+                   (sb-kernel:specifier-type right)))
+
+(defmacro assert-tri-eq (expected-result expected-certainp form)
+  (sb-int:with-unique-names (result certainp)
+    `(multiple-value-bind (,result ,certainp) ,form
+       (assert (eq ,expected-result ,result))
+       (assert (eq ,expected-certainp ,certainp)))))
+
+;;;; Tests
+
+(with-test (:name (typexpand-1 typexpand typexpand-all :check-lexenv))
   (flet ((try (f) (assert-error (funcall f 'hash-table 3))))
     (mapc #'try '(typexpand-1 typexpand typexpand-all))))
 
-(locally
-  (declare (notinline mapcar))
-  (mapcar (lambda (args)
-            (destructuring-bind (obj type-spec result) args
-              (flet ((matches-result? (x)
-                       (eq (if x t nil) result)))
-                (assert (matches-result? (typep obj type-spec)))
-                (assert (matches-result? (sb-kernel:ctypep
-                                          obj
-                                          (sb-kernel:specifier-type
-                                           type-spec)))))))
-          '((nil (or null vector)              t)
-            (nil (or number vector)            nil)
-            (12  (or null vector)              nil)
-            (12  (and (or number vector) real) t))))
+(with-test (:name (typep sb-kernel:ctypep))
+  (locally
+      (declare (notinline mapcar))
+    (mapcar (lambda (args)
+              (destructuring-bind (obj type-spec result) args
+                (flet ((matches-result? (x)
+                         (eq (if x t nil) result)))
+                  (assert (matches-result? (typep obj type-spec)))
+                  (assert (matches-result? (sb-kernel:ctypep
+                                            obj
+                                            (sb-kernel:specifier-type
+                                             type-spec)))))))
+            '((nil (or null vector)              t)
+              (nil (or number vector)            nil)
+              (12  (or null vector)              nil)
+              (12  (and (or number vector) real) t)))))
 
 
 ;;; This test is motivated by bug #195, which previously had (THE REAL
@@ -39,133 +53,127 @@
 ;;; something similar (e.g. CHARACTER can unparse to BASE-CHAR, since
 ;;; the types are equivalent in current SBCL, and EXTENDED-CHAR can
 ;;; unparse to NIL, since there are no EXTENDED-CHARs currently).
-(let ((standard-types '(;; from table 4-2 in section 4.2.3 in the
-                        ;; CLHS.
-                        arithmetic-error
-                        function
-                        simple-condition
-                        array
-                        generic-function
-                        simple-error
-                        atom
-                        hash-table
-                        simple-string
-                        base-char
-                        integer
-                        simple-type-error
-                        base-string
-                        keyword
-                        simple-vector
-                        bignum
-                        list
-                        simple-warning
-                        bit
-                        logical-pathname
-                        single-float
-                        bit-vector
-                        long-float
-                        standard-char
-                        broadcast-stream
-                        method
-                        standard-class
-                        built-in-class
-                        method-combination
-                        standard-generic-function
-                        cell-error
-                        nil
-                        standard-method
-                        character
-                        null
-                        standard-object
-                        class
-                        number
-                        storage-condition
-                        compiled-function
-                        package
-                        stream
-                        complex
-                        package-error
-                        stream-error
-                        concatenated-stream
-                        parse-error
-                        string
-                        condition
-                        pathname
-                        string-stream
-                        cons
-                        print-not-readable
-                        structure-class
-                        control-error
-                        program-error
-                        structure-object
-                        division-by-zero
-                        random-state
-                        style-warning
-                        double-float
-                        ratio
-                        symbol
-                        echo-stream
-                        rational
-                        synonym-stream
-                        end-of-file
-                        reader-error
-                        t
-                        error
-                        readtable
-                        two-way-stream
-                        extended-char
-                        real
-                        type-error
-                        file-error
-                        restart
-                        unbound-slot
-                        file-stream
-                        sequence
-                        unbound-variable
-                        fixnum
-                        serious-condition
-                        undefined-function
-                        float
-                        short-float
-                        unsigned-byte
-                        floating-point-inexact
-                        signed-byte
-                        vector
-                        floating-point-invalid-operation
-                        simple-array
-                        warning
-                        floating-point-overflow
-                        simple-base-string
-                        floating-point-underflow
-                        simple-bit-vector)))
-  (dolist (type standard-types)
-    #+nil (format t "~&~S~%" type)
-    (assert (not (sb-kernel:unknown-type-p (sb-kernel:specifier-type type))))
-    (assert (atom (sb-kernel:type-specifier (sb-kernel:specifier-type type))))))
+(with-test (:name :standard-types)
+  (let ((standard-types '(;; from table 4-2 in section 4.2.3 in the
+                          ;; CLHS.
+                          arithmetic-error
+                          function
+                          simple-condition
+                          array
+                          generic-function
+                          simple-error
+                          atom
+                          hash-table
+                          simple-string
+                          base-char
+                          integer
+                          simple-type-error
+                          base-string
+                          keyword
+                          simple-vector
+                          bignum
+                          list
+                          simple-warning
+                          bit
+                          logical-pathname
+                          single-float
+                          bit-vector
+                          long-float
+                          standard-char
+                          broadcast-stream
+                          method
+                          standard-class
+                          built-in-class
+                          method-combination
+                          standard-generic-function
+                          cell-error
+                          nil
+                          standard-method
+                          character
+                          null
+                          standard-object
+                          class
+                          number
+                          storage-condition
+                          compiled-function
+                          package
+                          stream
+                          complex
+                          package-error
+                          stream-error
+                          concatenated-stream
+                          parse-error
+                          string
+                          condition
+                          pathname
+                          string-stream
+                          cons
+                          print-not-readable
+                          structure-class
+                          control-error
+                          program-error
+                          structure-object
+                          division-by-zero
+                          random-state
+                          style-warning
+                          double-float
+                          ratio
+                          symbol
+                          echo-stream
+                          rational
+                          synonym-stream
+                          end-of-file
+                          reader-error
+                          t
+                          error
+                          readtable
+                          two-way-stream
+                          extended-char
+                          real
+                          type-error
+                          file-error
+                          restart
+                          unbound-slot
+                          file-stream
+                          sequence
+                          unbound-variable
+                          fixnum
+                          serious-condition
+                          undefined-function
+                          float
+                          short-float
+                          unsigned-byte
+                          floating-point-inexact
+                          signed-byte
+                          vector
+                          floating-point-invalid-operation
+                          simple-array
+                          warning
+                          floating-point-overflow
+                          simple-base-string
+                          floating-point-underflow
+                          simple-bit-vector)))
+    (dolist (type standard-types)
+      #+nil (format t "~&~S~%" type)
+      (assert (not (sb-kernel:unknown-type-p (sb-kernel:specifier-type type))))
+      (assert (atom (sb-kernel:type-specifier (sb-kernel:specifier-type type)))))))
 
 ;;; a bug underlying the reported bug #221: The SB-KERNEL type code
 ;;; signalled an error on this expression.
-(subtypep '(function (fixnum) (values package boolean))
-          '(function (t) (values package boolean)))
+(with-test (:name (subtypep function values :bug-221))
+  (subtypep '(function (fixnum) (values package boolean))
+            '(function (t) (values package boolean))))
 
 ;;; bug reported by Valtteri Vuorik
-(compile nil '(lambda () (member (char "foo" 0) '(#\. #\/) :test #'char=)))
-(assert (not (equal (multiple-value-list
-                     (subtypep '(function ()) '(function (&rest t))))
-                    '(nil t))))
-
-(assert (not (equal (multiple-value-list
-                     (subtypep '(function (&rest t)) '(function ())))
-                    '(t t))))
-
-(assert (subtypep '(function)
-                  '(function (&optional * &rest t))))
-(assert (equal (multiple-value-list
-                (subtypep '(function)
-                          '(function (t &rest t))))
-               '(nil t)))
-(assert (and (subtypep 'function '(function))
-             (subtypep '(function) 'function)))
+(with-test (:name (subtypep function &rest))
+  (checked-compile '(lambda () (member (char "foo" 0) '(#\. #\/) :test #'char=)))
+  (assert-tri-eq t   t (subtypep '(function ()) '(function (&rest t))))
+  (assert-tri-eq nil t (subtypep '(function (&rest t)) '(function ())))
+  (assert-tri-eq t   t (subtypep '(function)
+                                 '(function (&optional * &rest t))))
+  (assert-tri-eq nil t (subtypep '(function) '(function (t &rest t))))
+  (assert-tri-eq t   t (subtypep 'function '(function)))
+  (assert-tri-eq t   t (subtypep '(function) 'function)))
 
 ;;; Absent any exciting generalizations of |R, the type RATIONAL is
 ;;; partitioned by RATIO and INTEGER.  Ensure that the type system
@@ -173,71 +181,85 @@
 ;;; NIL for these, so if future maintenance breaks these tests that
 ;;; way, that's fine.  What the SUBTYPEP calls are _not_ allowed to
 ;;; return is NIL, T, because that's completely wrong. ]
-(assert (subtypep '(or integer ratio) 'rational))
-(assert (subtypep 'rational '(or integer ratio)))
+(with-test (:name (subtypep integer ratio rational))
+  (assert-tri-eq t t (subtypep '(or integer ratio) 'rational))
+  (assert-tri-eq t t (subtypep 'rational '(or integer ratio))))
+
 ;;; Likewise, these are allowed to return NIL, NIL, but shouldn't
 ;;; return NIL, T:
-(assert (subtypep t '(or real (not real))))
-(assert (subtypep t '(or keyword (not keyword))))
-(assert (subtypep '(and cons (not (cons symbol integer)))
-                  '(or (cons (not symbol) *) (cons * (not integer)))))
-(assert (subtypep '(or (cons (not symbol) *) (cons * (not integer)))
-                  '(and cons (not (cons symbol integer)))))
-(assert (subtypep '(or (eql 0) (rational (0) 10))
-                  '(rational 0 10)))
-(assert (subtypep '(rational 0 10)
-                  '(or (eql 0) (rational (0) 10))))
+(with-test (:name (subtypep or and not))
+  (assert-tri-eq t t (subtypep t '(or real (not real))))
+  (assert-tri-eq t t (subtypep t '(or keyword (not keyword))))
+  (assert-tri-eq t t (subtypep '(and cons (not (cons symbol integer)))
+                               '(or (cons (not symbol) *) (cons * (not integer)))))
+  (assert-tri-eq t t (subtypep '(or (cons (not symbol) *) (cons * (not integer)))
+                               '(and cons (not (cons symbol integer)))))
+  (assert-tri-eq t t (subtypep '(or (eql 0) (rational (0) 10))
+                               '(rational 0 10)))
+  (assert-tri-eq t t (subtypep '(rational 0 10)
+                               '(or (eql 0) (rational (0) 10)))))
+
 ;;; Until sbcl-0.7.13.7, union of CONS types when the CDRs were the
 ;;; same type gave exceedingly wrong results
-(assert (null (subtypep '(or (cons fixnum single-float)
-                             (cons bignum single-float))
-                        '(cons single-float single-float))))
-(assert (subtypep '(cons integer single-float)
-                  '(or (cons fixnum single-float) (cons bignum single-float))))
+(with-test (:name (subtypep cons :same-cdr))
+  (let ((a '(or (cons fixnum single-float) (cons bignum single-float)))
+        (b '(cons single-float single-float))
+        (c '(cons integer single-float)))
+    (assert-tri-eq nil t (subtypep a b))
+    (assert-tri-eq t   t (subtypep c a))))
 
-(assert (not (nth-value 1 (subtypep '(and null some-unknown-type)
-                                    'another-unknown-type))))
+(with-test (:name (subtypep :unknown-type))
+  (checked-compile-and-assert (:allow-style-warnings t)
+      '(lambda ()
+         (subtypep '(and null some-unknown-type) 'another-unknown-type))
+    (() (values nil nil) :allow-conditions 'sb-kernel:parse-unknown-type)))
 
 ;;; bug 46c
-(with-test (:name :coerce-function-on-macro)
+(with-test (:name (coerce function :on :macro))
   (dolist (fun '(and if))
     (assert-error (coerce fun 'function))))
 
-(dotimes (i 100)
-  (let ((x (make-array 0 :element-type `(unsigned-byte ,(1+ i)))))
-    (eval `(typep ,x (class-of ,x)))))
+(with-test (:name (typep array class-of))
+  (dotimes (i 100)
+    (let ((x (make-array 0 :element-type `(unsigned-byte ,(1+ i)))))
+      (eval `(typep ,x (class-of ,x))))))
 
-(assert (not (typep #c(1 2) '(member #c(2 1)))))
-(assert (typep #c(1 2) '(member #c(1 2))))
-(assert (subtypep 'nil '(complex nil)))
-(assert (subtypep '(complex nil) 'nil))
-(assert (subtypep 'nil '(complex (eql 0))))
-(assert (subtypep '(complex (eql 0)) 'nil))
-(assert (subtypep 'nil '(complex (integer 0 0))))
-(assert (subtypep '(complex (integer 0 0)) 'nil))
-(assert (subtypep 'nil '(complex (rational 0 0))))
-(assert (subtypep '(complex (rational 0 0)) 'nil))
-(assert (subtypep 'complex '(complex real)))
-(assert (subtypep '(complex real) 'complex))
-(assert (subtypep '(complex (eql 1)) '(complex (member 1 2))))
-(assert (subtypep '(complex ratio) '(complex rational)))
-(assert (subtypep '(complex ratio) 'complex))
-(assert (equal (multiple-value-list
-                (subtypep '(complex (integer 1 2))
-                          '(member #c(1 1) #c(1 2) #c(2 1) #c(2 2))))
-               '(nil t)))
+(with-test (:name (typep complex member))
+  (assert (not (typep #c(1 2) '(member #c(2 1)))))
+  (assert (typep #c(1 2) '(member #c(1 2)))))
 
-(assert (typep 0 '(real #.(ash -1 10000) #.(ash 1 10000))))
-(assert (subtypep '(real #.(ash -1 1000) #.(ash 1 1000))
-                  '(real #.(ash -1 10000) #.(ash 1 10000))))
-(assert (subtypep '(real (#.(ash -1 1000)) (#.(ash 1 1000)))
-                  '(real #.(ash -1 1000) #.(ash 1 1000))))
+(with-test (:name (subtypep complex))
+  (assert-tri-eq t   t (subtypep 'nil '(complex nil)))
+  (assert-tri-eq t   t (subtypep '(complex nil) 'nil))
+  (assert-tri-eq t   t (subtypep 'nil '(complex (eql 0))))
+  (assert-tri-eq t   t (subtypep '(complex (eql 0)) 'nil))
+  (assert-tri-eq t   t (subtypep 'nil '(complex (integer 0 0))))
+  (assert-tri-eq t   t (subtypep '(complex (integer 0 0)) 'nil))
+  (assert-tri-eq t   t (subtypep 'nil '(complex (rational 0 0))))
+  (assert-tri-eq t   t (subtypep '(complex (rational 0 0)) 'nil))
+  (assert-tri-eq t   t (subtypep 'complex '(complex real)))
+  (assert-tri-eq t   t (subtypep '(complex real) 'complex))
+  (assert-tri-eq t   t (subtypep '(complex (eql 1)) '(complex (member 1 2))))
+  (assert-tri-eq t   t (subtypep '(complex ratio) '(complex rational)))
+  (assert-tri-eq t   t (subtypep '(complex ratio) 'complex))
+  (assert-tri-eq nil t (subtypep '(complex (integer 1 2))
+                                 '(member #c(1 1) #c(1 2) #c(2 1) #c(2 2)))))
+
+(with-test (:name (typep real))
+  (assert (typep 0 '(real #.(ash -1 10000) #.(ash 1 10000)))))
+
+(with-test (:name (subtypep real))
+  (assert-tri-eq t t (subtypep '(real #.(ash -1 1000) #.(ash 1 1000))
+                               '(real #.(ash -1 10000) #.(ash 1 10000))))
+  (assert-tri-eq t t (subtypep '(real (#.(ash -1 1000)) (#.(ash 1 1000)))
+                               '(real #.(ash -1 1000) #.(ash 1 1000)))))
 
 ;;; Bug, found by Paul F. Dietz
-(let* ((x (eval #c(-1 1/2)))
-       (type (type-of x)))
-  (assert (subtypep type '(complex rational)))
-  (assert (typep x type)))
+(with-test (:name (typep subtypep complex rational))
+  (let* ((x (eval #c(-1 1/2)))
+         (type (type-of x)))
+    (assert (subtypep type '(complex rational)))
+    (assert (typep x type))))
 
 ;;; Test derivation of LOG{AND,IOR,XOR} bounds for unsigned arguments.
 ;;;
@@ -275,7 +297,7 @@
       (dolist (op '(logand logior logxor))
         (let ((deriver (intern (format nil "~A-DERIVE-UNSIGNED-BOUNDS" op)
                                (find-package :sb-c))))
-          (format t "testing type derivation: ~A~%" deriver)
+          #+(or) (format t "testing type derivation: ~A~%" deriver)
           (loop for a from 0 below size do
                 (loop for b from a below size do
                       (loop for c from 0 below size do
@@ -299,83 +321,63 @@
           (error "Bad scaling of ~a: input 10 times but runtime ~a times as large."
                  deriver scale))))))
 
-;;; subtypep on CONS types wasn't taking account of the fact that a
+;;; SUBTYPEP on CONS types wasn't taking account of the fact that a
 ;;; CONS type could be the empty type (but no other non-CONS type) in
-;;; disguise.
-(multiple-value-bind (yes win)
-    (subtypep '(and function stream) 'nil)
-  (multiple-value-bind (cyes cwin)
-      (subtypep '(cons (and function stream) t)
-                '(cons nil t))
-    (assert (eq yes cyes))
-    (assert (eq win cwin))))
+;;; disguise
+(with-test (:name (subtypep cons :empty))
+  (multiple-value-bind (yes win)
+      (subtypep '(and function stream) 'nil)
+    (multiple-value-bind (cyes cwin)
+        (subtypep '(cons (and function stream) t)
+                  '(cons nil t))
+      (assert (eq yes cyes))
+      (assert (eq win cwin)))))
 
-;;; CONS type subtypep could be too enthusiastic about thinking it was
+;;; CONS type SUBTYPEP could be too enthusiastic about thinking it was
 ;;; certain
-(multiple-value-bind (yes win)
-    (subtypep '(satisfies foo) '(satisfies bar))
-  (assert (null yes))
-  (assert (null win))
-  (multiple-value-bind (cyes cwin)
-      (subtypep '(cons (satisfies foo) t)
-                '(cons (satisfies bar) t))
-    (assert (null cyes))
-    (assert (null cwin))))
+(with-test (:name (subtypep cons satisfies))
+  (assert-tri-eq nil nil (subtypep '(satisfies foo) '(satisfies bar)))
+  (assert-tri-eq nil nil (subtypep '(cons (satisfies foo) t)
+                                   '(cons (satisfies bar) t))))
 
-(multiple-value-bind (yes win)
-    (subtypep 'generic-function 'function)
-  (assert yes)
-  (assert win))
+(with-test (:name (subtypep generic-function function))
+  (assert-tri-eq t t (subtypep 'generic-function 'function)))
+
 ;;; this would be in some internal test suite like type.before-xc.lisp
 ;;; except that generic functions don't exist at that stage.
-(multiple-value-bind (yes win)
-    (subtypep 'generic-function 'sb-kernel:funcallable-instance)
-  (assert yes)
-  (assert win))
+(with-test (:name (subtypep generic-function sb-kernel:funcallable-instance))
+  (assert-tri-eq t t (subtypep 'generic-function
+                               'sb-kernel:funcallable-instance)))
 
 ;;; all sorts of answers are right for this one, but it used to
 ;;; trigger an AVER instead.
-(subtypep '(function ()) '(and (function ()) (satisfies identity)))
+(with-test (:name (subtypep function satisfies :smoke))
+  (subtypep '(function ()) '(and (function ()) (satisfies identity))))
 
-(assert (sb-kernel:unknown-type-p (sb-kernel:specifier-type 'an-unkown-type)))
+(with-test (:name (sb-kernel:specifier-type :unknown-type))
+  (assert (sb-kernel:unknown-type-p (sb-kernel:specifier-type 'an-unkown-type))))
 
-(assert
- (sb-kernel:type=
-  (sb-kernel:specifier-type '(or (simple-array an-unkown-type (*))
-                              (simple-array an-unkown-type)))
-  (sb-kernel:specifier-type '(or (simple-array an-unkown-type (*))
-                              (simple-array an-unkown-type)))))
+(with-test (:name (sb-kernel:type= array))
+  (assert-tri-eq t   t (ctype= '(or (simple-array an-unkown-type (*))
+                                    (simple-array an-unkown-type))
+                               '(or (simple-array an-unkown-type (*))
+                                    (simple-array an-unkown-type))))
+  (assert-tri-eq t   t (ctype= '(simple-array an-unkown-type (*))
+                               '(simple-array an-unkown-type (*))))
+  (assert-tri-eq nil t (ctype= '(simple-array an-unkown-type (*))
+                               '(array an-unkown-type (*))))
+  (assert-tri-eq nil t (ctype= '(simple-array an-unkown-type (7))
+                               '(simple-array an-unkown-type (8)))))
 
-(assert
- (sb-kernel:type=
-  (sb-kernel:specifier-type '(simple-array an-unkown-type (*)))
-  (sb-kernel:specifier-type '(simple-array an-unkown-type (*)))))
+(with-test (:name (sb-kernel:type= cons))
+  (assert-tri-eq nil t (ctype= 'cons '(cons single-float single-float)))
+  (assert-tri-eq nil t (ctype= '(cons integer) '(cons))))
 
-(assert
- (not
-  (sb-kernel:type=
-   (sb-kernel:specifier-type '(simple-array an-unkown-type (*)))
-   (sb-kernel:specifier-type '(array an-unkown-type (*))))))
+(with-test (:name (typep subtypep sb-kernel:instance))
+  (assert (typep #p"" 'sb-kernel:instance))
+  (assert-tri-eq t t (subtypep '(member #p"") 'sb-kernel:instance)))
 
-(assert
- (not
-  (sb-kernel:type=
-   (sb-kernel:specifier-type '(simple-array an-unkown-type (7)))
-   (sb-kernel:specifier-type '(simple-array an-unkown-type (8))))))
-
-(assert
- (sb-kernel:type/= (sb-kernel:specifier-type 'cons)
-                   (sb-kernel:specifier-type '(cons single-float single-float))))
-
-(multiple-value-bind (match win)
-    (sb-kernel:type= (sb-kernel:specifier-type '(cons integer))
-                     (sb-kernel:specifier-type '(cons)))
-  (assert (and (not match) win)))
-
-(assert (typep #p"" 'sb-kernel:instance))
-(assert (subtypep '(member #p"") 'sb-kernel:instance))
-
-(with-test (:name (:typep :character-set :negation))
+(with-test (:name (typep :character-set :negation))
   (flet ((generate-chars ()
            (loop repeat 100
                  collect (code-char (random char-code-limit)))))
@@ -392,7 +394,7 @@
               (assert (not (typep char type)))
               (assert (typep char not-type)))))))))
 
-(with-test (:name (:check-type :store-value :complex-place))
+(with-test (:name (check-type :store-value :complex-place))
   (let ((a (cons 0.0 2))
         (handler-invoked nil))
     (handler-bind ((error
@@ -407,15 +409,15 @@
 ;;; The VOP FIXNUMP/UNSIGNED-BYTE-64 was broken on x86-64, failing
 ;;; the first ASSERT below. The second ASSERT takes care that the fix
 ;;; doesn't overshoot the mark.
-(with-test (:name (:typep :fixnum-if-unsigned-byte))
-  (let ((f (compile nil
-                    '(lambda (x)
-                      (declare (type (unsigned-byte #.sb-vm:n-word-bits) x))
-                      (typep x (quote fixnum))))))
-    (assert (not (funcall f (1+ most-positive-fixnum))))
-    (assert (funcall f most-positive-fixnum))))
+(with-test (:name (typep :fixnum-if-unsigned-byte))
+  (checked-compile-and-assert ()
+      '(lambda (x)
+        (declare (type (unsigned-byte #.sb-vm:n-word-bits) x))
+        (typep x (quote fixnum)))
+    (((1+ most-positive-fixnum)) nil)
+    ((most-positive-fixnum)      t)))
 
-(with-test (:name (:typep :member-uses-eql))
+(with-test (:name (typep :member :uses eql))
   (assert (eval '(typep 1/3 '(member 1/3 nil))))
   (assert (eval '(typep 1.0 '(member 1.0 t))))
   (assert (eval '(typep #c(1.1 1.2) '(member #c(1.1 1.2)))))
@@ -448,25 +450,25 @@
           (assert (sb-c::type= i (sb-c::values-type-intersection i x)))
           (assert (sb-c::type= i (sb-c::values-type-intersection i y))))))))
 
-(with-test (:name :bug-485972)
-  (assert (equal (multiple-value-list (subtypep 'symbol 'keyword)) '(nil t)))
-  (assert (equal (multiple-value-list (subtypep 'keyword 'symbol)) '(t t))))
+(with-test (:name (subtypep keyword symbol :bug-485972))
+  (assert-tri-eq nil t (subtypep 'symbol 'keyword))
+  (assert-tri-eq t   t (subtypep 'keyword 'symbol)))
 
 ;; WARNING: this test case would fail by recursing into the stack's guard page.
-(with-test (:name :bug-883498)
+(with-test (:name (sb-kernel:specifier-type or and satisfies :bug-883498))
   (sb-kernel:specifier-type
-   `(or (INTEGER -2 -2)
-        (AND (SATISFIES FOO) (RATIONAL -3/2 -3/2)))))
+   '(or (integer -2 -2)
+        (and (satisfies foo) (rational -3/2 -3/2)))))
 
 ;; The infinite recursion mentioned in the previous test was caused by an
 ;; attempt to get the following right.
 (with-test (:name :quirky-integer-rational-union)
-  (assert (subtypep `(or (integer * -1)
-                         (and (rational * -1/2) (not integer)))
-                    `(rational * -1/2)))
-  (assert (subtypep `(rational * -1/2)
-                    `(or (integer * -1)
-                         (and (rational * -1/2) (not integer))))))
+  (assert-tri-eq t t (subtypep '(or (integer * -1)
+                                    (and (rational * -1/2) (not integer)))
+                               '(rational * -1/2)))
+  (assert-tri-eq t t (subtypep '(rational * -1/2)
+                               '(or (integer * -1)
+                                    (and (rational * -1/2) (not integer))))))
 
 ;; for the longest time (at least 05525d3a), single-value-type would
 ;; return CHARACTER on this.
@@ -502,10 +504,10 @@
                        '(and (bit-vector 5) (not simple-array))))
         (assert (equal (type-of hairy-bit) '(bit-vector 5)))))))
 
-(with-test (:name :bug-309098)
+(with-test (:name (subtypep array :bug-309098))
   (let ((u `(or ,@(map 'list (lambda (x) `(array ,(sb-vm:saetp-specifier x)))
                        sb-vm:*specialized-array-element-type-properties*))))
-    (assert (equal (multiple-value-list (subtypep 'array u)) '(t t)))))
+    (assert-tri-eq t t (subtypep 'array u))))
 
 (with-test (:name :bug-1258716)
   (let ((intersection (sb-kernel:type-intersection
@@ -535,12 +537,11 @@
                               (sb-kernel:specifier-type 'bit)))))
 
 ;; lp#1333731
-(with-test (:name :adjust-array-changes-type-of)
+(with-test (:name (adjust-array :changes type-of))
   (let ((a (make-array 10 :adjustable t)))
     (assert (equal (type-of a) '(vector t 10)))
     (adjust-array a 20)
     (assert (equal (type-of a) '(vector t 20)))))
-
 
 (with-test (:name :unknown-type-strongly-uncacheable)
   ;; VALUES-SPECIFIER-TYPE should not cache a specifier any part of which
@@ -562,13 +563,13 @@
                  sb-kernel:parse-unknown-type 2)) ; expect 2 signals
 
 (in-package "SB-KERNEL")
+
 (test-util:with-test (:name :partition-array-into-simple/hairy)
   ;; Some tests that (simple-array | hairy-array) = array
   ;; At present this works only for wild element-type.
-  (multiple-value-bind (eq winp)
-      (type= (specifier-type '(not (and array (not simple-array))))
-             (specifier-type '(or (not array) simple-array)))
-    (assert (and eq winp)))
+  (cl-user::assert-tri-eq
+   t t (type= (specifier-type '(not (and array (not simple-array))))
+              (specifier-type '(or (not array) simple-array))))
 
   ;; if X is neither simple-array nor hairy-array, it is not an array
   (assert (type= (specifier-type '(and (not simple-array)
@@ -604,30 +605,20 @@
     ;; Classoids and classes should work as type specifiers
     ;; in the atom form, not as lists.
     ;; Their legality or lack thereof is equivalent in all cases.
-    (flet ((expect-win (type)
-             (multiple-value-bind (f warn err)
-                 (compile nil `(lambda (x) (declare (,type x)) x))
-               (assert (and f (not warn) (not err))))
-             (multiple-value-bind (f warn err)
-                 (compile nil `(lambda (x) (declare (type ,type x)) x))
-               (assert (and f (not warn) (not err))))))
-      (expect-win classoid))
+    (test-util:checked-compile `(lambda (x) (declare (,classoid x)) x))
+    (test-util:checked-compile `(lambda (x) (declare (type ,classoid x)) x))
     ;; Negative tests come in two flavors:
     ;; In the case of (DECLARE (TYPE ...)), parsing the following thing
     ;; as a type should fail. But when 'TYPE is implied, "canonization"
     ;; should do nothing, because the following form is not a type,
     ;; so we get an error about an unrecognized declaration instead.
     (flet ((expect-lose (type)
-             (multiple-value-bind (f warn err)
-                 (let ((*error-output* (make-broadcast-stream)))
-                   (compile nil `(lambda (x) (declare (,type x)) x)))
-               (declare (ignore f warn))
-               (assert err))
-             (multiple-value-bind (f warn err)
-                 (let ((*error-output* (make-broadcast-stream)))
-                   (compile nil `(lambda (x) (declare (type ,type x)) x)))
-               (declare (ignore f warn))
-               (assert err))))
+             (assert (nth-value 1 (test-util:checked-compile
+                                   `(lambda (x) (declare (,type x)) x)
+                                   :allow-warnings t)))
+             (assert (nth-value 1 (test-util:checked-compile
+                                   `(lambda (x) (declare (,type x)) x)
+                                   :allow-warnings t)))))
       (expect-lose `(,classoid))
       (expect-lose `(,classoid 1 100)))))
 
