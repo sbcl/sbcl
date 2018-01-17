@@ -729,7 +729,7 @@ be a lambda expression."
 (defun extract-letish-vars (bindings context)
   (collect ((vars)
             (vals))
-    (let ((names (unless (eq context 'let)
+    (let ((names (unless (eq context 'let*)
                    (make-repeated-name-check :context context))))
       (dolist (spec bindings)
         (with-current-source-form (spec)
