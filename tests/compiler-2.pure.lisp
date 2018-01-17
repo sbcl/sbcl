@@ -1093,3 +1093,7 @@
                          (flet ((f () (the nil 0)))
                            (oddp (f))))
                       :allow-warnings t))))
+
+(with-test (:name :initialize-nil-array)
+  (checked-compile `(lambda (x)
+                      (make-array 1 :element-type nil :initial-contents (list x)))))

@@ -657,10 +657,13 @@
                        (lvar-value element-type) ; enforces const-ness.
                        t))
          (elt-ctype (ir1-transform-specifier-type elt-spec))
-         (saetp (if (unknown-type-p elt-ctype)
-                    (give-up-ir1-transform "~S is an unknown type: ~S"
-                                           :element-type elt-spec)
-                    (find-saetp-by-ctype elt-ctype)))
+         (saetp (cond ((unknown-type-p elt-ctype)
+                       (give-up-ir1-transform "~S is an unknown type: ~S"
+                                              :element-type elt-spec))
+                      ((eq elt-ctype *empty-type*)
+                       (give-up-ir1-transform))
+                      (t
+                       (find-saetp-by-ctype elt-ctype))))
          (default-initial-element (sb!vm:saetp-initial-element-default saetp))
          (n-bits (sb!vm:saetp-n-bits saetp))
          (typecode (sb!vm:saetp-typecode saetp))
