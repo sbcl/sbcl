@@ -3285,9 +3285,11 @@ garbage_collect_generation(generation_index_t generation, int raise)
      * to its normal generation number */
     if (!raise) {
         for (i = 0; i < last_free_page; i++)
-            if ((page_bytes_used(i) != 0)
-                && (page_table[i].gen == SCRATCH_GENERATION))
+            if (page_table[i].gen == SCRATCH_GENERATION) {
+                gc_assert(page_bytes_used(i));
                 page_table[i].gen = generation;
+
+            }
         gc_assert(generations[generation].bytes_allocated == 0);
         generations[generation].bytes_allocated =
             generations[SCRATCH_GENERATION].bytes_allocated;
