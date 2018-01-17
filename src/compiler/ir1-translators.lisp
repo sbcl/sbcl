@@ -725,27 +725,37 @@ be a lambda expression."
 ;;; variables are marked as such. Context is the name of the form, for
 ;;; error reporting purposes.
 (declaim (ftype (function (list symbol) (values list list))
-                extract-let-vars))
-(defun extract-let-vars (bindings context)
+                extract-letish-vars))
+(defun extract-letish-vars (bindings context)
   (collect ((vars)
             (vals))
-    (let ((names (make-repeated-name-check :context context)))
+    (let ((names (unless (eq context 'let)
+                   (make-repeated-name-check :context context))))
       (dolist (spec bindings)
-        (multiple-value-bind (name value)
-            (cond ((atom spec)
-                   (values spec nil))
-                  (t
-                   (unless (proper-list-of-length-p spec 1 2)
-                     (compiler-error "The ~S binding spec ~S is malformed."
-                                     context spec))
-                   (values (first spec) (second spec))))
-          (check-variable-name-for-binding
-           name :context context :allow-symbol-macro nil)
-          (unless (eq context 'let*)
-            (funcall names name))
-          (vars (varify-lambda-arg name))
-          (vals value))))
+        (with-current-source-form (spec)
+          (multiple-value-bind (name value)
+              (cond ((atom spec)
+                     (values spec nil))
+                    (t
+                     (unless (proper-list-of-length-p spec 1 2)
+                       (compiler-error "The ~S binding spec ~S is malformed."
+                                       context spec))
+                     (values (first spec) (second spec))))
+            (check-variable-name-for-binding
+             name :context context :allow-symbol-macro nil)
+            (unless (eq context 'let*)
+              (funcall names name))
+            (vars (varify-lambda-arg name))
+            (vals value)))))
     (values (vars) (vals))))
+
+(defun parse-letish (bindings body context)
+  (multiple-value-bind (forms declarations) (parse-body body nil)
+    (with-current-source-form (bindings)
+      (unless (listp bindings)
+        (compiler-error "Malformed ~A bindings: ~S." context bindings))
+      (multiple-value-call #'values
+        (extract-letish-vars bindings context) forms declarations))))
 
 (def-ir1-translator let ((bindings &body body) start next result)
   "LET ({(var [value]) | var}*) declaration* form*
@@ -763,24 +773,21 @@ have been evaluated."
                       (let ((nsp (gensym "NSP")))
                         `(let ((,nsp (%primitive current-nsp)))
                            (restoring-nsp ,nsp ,@body)))))
-        ((listp bindings)
-         (multiple-value-bind (forms decls) (parse-body body nil)
-           (multiple-value-bind (vars values) (extract-let-vars bindings 'let)
-             (binding* ((ctran (make-ctran))
-                        (fun-lvar (make-lvar))
-                        ((next result)
-                         (processing-decls (decls vars nil next result
-                                                  post-binding-lexenv)
-                           (let ((fun (ir1-convert-lambda-body
-                                       forms
-                                       vars
-                                       :post-binding-lexenv post-binding-lexenv
-                                       :debug-name (debug-name 'let bindings))))
-                             (reference-leaf start ctran fun-lvar fun))
-                           (values next result))))
-               (ir1-convert-combination-args fun-lvar ctran next result values)))))
         (t
-         (compiler-error "Malformed LET bindings: ~S." bindings))))
+         (binding* (((vars values forms decls) (parse-letish bindings body 'let))
+                    (ctran (make-ctran))
+                    (fun-lvar (make-lvar))
+                    ((next result)
+                     (processing-decls (decls vars nil next result
+                                              post-binding-lexenv)
+                       (let ((fun (ir1-convert-lambda-body
+                                   forms
+                                   vars
+                                   :post-binding-lexenv post-binding-lexenv
+                                   :debug-name (debug-name 'let bindings))))
+                         (reference-leaf start ctran fun-lvar fun))
+                       (values next result))))
+           (ir1-convert-combination-args fun-lvar ctran next result values)))))
 
 (def-ir1-translator let* ((bindings &body body)
                           start next result)
@@ -788,18 +795,10 @@ have been evaluated."
 
 Similar to LET, but the variables are bound sequentially, allowing each VALUE
 form to reference any of the previous VARS."
-  (if (listp bindings)
-      (multiple-value-bind (forms decls) (parse-body body nil)
-        (multiple-value-bind (vars values) (extract-let-vars bindings 'let*)
-          (processing-decls (decls vars nil next result post-binding-lexenv)
-            (ir1-convert-aux-bindings start
-                                      next
-                                      result
-                                      forms
-                                      vars
-                                      values
-                                      post-binding-lexenv))))
-      (compiler-error "Malformed LET* bindings: ~S." bindings)))
+  (multiple-value-bind (vars values forms decls) (parse-letish bindings body 'let*)
+    (processing-decls (decls vars nil next result post-binding-lexenv)
+      (ir1-convert-aux-bindings
+       start next result forms vars values post-binding-lexenv))))
 
 ;;; logic shared between IR1 translators for LOCALLY, MACROLET,
 ;;; and SYMBOL-MACROLET
@@ -831,27 +830,36 @@ also processed as top level forms."
 ;;;
 ;;; The function names are checked for legality. CONTEXT is the name
 ;;; of the form, for error reporting.
-(declaim (ftype (function (list symbol) (values list list)) extract-flet-vars))
-(defun extract-flet-vars (definitions context)
+(declaim (ftype (function (list symbol) (values list list)) extract-fletish-vars))
+(defun extract-fletish-vars (definitions context)
   (collect ((names)
             (defs))
-    (dolist (def definitions)
-      (when (or (atom def) (< (length def) 2))
-        (compiler-error "The ~S definition spec ~S is malformed." context def))
-
-      (let ((name (first def)))
-        (check-fun-name name)
-        (when (fboundp name)
-          (program-assert-symbol-home-package-unlocked
-           :compile name "binding ~A as a local function"))
-        (names name)
-        (multiple-value-bind (forms decls doc) (parse-body (cddr def) t)
-          (defs `(lambda ,(second def)
-                   ,@(when doc (list doc))
-                   ,@decls
-                   (block ,(fun-name-block-name name)
-                     . ,forms))))))
+    (dolist (definition definitions)
+      (with-current-source-form (definition)
+        (unless (list-of-length-at-least-p definition 2)
+          (compiler-error "The ~S definition spec ~S is malformed."
+                          context definition))
+        (destructuring-bind (name lambda-list &body body) definition
+          (check-fun-name name)
+          (when (fboundp name)
+            (program-assert-symbol-home-package-unlocked
+             :compile name "binding ~A as a local function"))
+          (names name)
+          (multiple-value-bind (forms decls doc) (parse-body body t)
+            (defs `(lambda ,lambda-list
+                     ,@(when doc (list doc))
+                     ,@decls
+                     (block ,(fun-name-block-name name)
+                       . ,forms)))))))
     (values (names) (defs))))
+
+(defun parse-fletish (definitions body context)
+  (multiple-value-bind (forms declarations) (parse-body body nil)
+    (with-current-source-form (definitions)
+      (unless (listp definitions)
+        (compiler-error "Malformed ~A definitions: ~S." context definitions))
+      (multiple-value-call #'values
+        (extract-fletish-vars definitions context) forms declarations))))
 
 (defun ir1-convert-fbindings (start next result funs body)
   (let ((ctran (make-ctran))
@@ -883,26 +891,22 @@ also processed as top level forms."
 Evaluate the BODY-FORMS with local function definitions. The bindings do
 not enclose the definitions; any use of NAME in the FORMS will refer to the
 lexically apparent function definition in the enclosing environment."
-  (multiple-value-bind (forms decls) (parse-body body nil)
-    (unless (listp definitions)
-      (compiler-error "Malformed FLET definitions: ~s" definitions))
-    (multiple-value-bind (names defs)
-        (extract-flet-vars definitions 'flet)
-      (let ((fvars (mapcar (lambda (n d original)
-                             (let ((*current-path* (ensure-source-path original)))
-                               (ir1-convert-lambda
-                                d
-                                :source-name n
-                                :maybe-add-debug-catch t
-                                :debug-name
-                                (let ((n (if (and (symbolp n) (not (symbol-package n)))
-                                             (string n)
-                                             n)))
-                                  (debug-name 'flet n t)))))
-                           names defs definitions)))
-        (processing-decls (decls nil fvars next result)
-          (let ((*lexenv* (make-lexenv :funs (pairlis names fvars))))
-            (ir1-convert-fbindings start next result fvars forms)))))))
+  (binding* (((names defs forms decls) (parse-fletish definitions body 'flet))
+             (fvars (mapcar (lambda (name def original)
+                              (let ((*current-path* (ensure-source-path original)))
+                                (ir1-convert-lambda
+                                 def
+                                 :source-name name
+                                 :maybe-add-debug-catch t
+                                 :debug-name
+                                 (let ((n (if (and (symbolp name) (not (symbol-package name)))
+                                              (string name)
+                                              name)))
+                                   (debug-name 'flet n t)))))
+                            names defs definitions)))
+    (processing-decls (decls nil fvars next result)
+      (let ((*lexenv* (make-lexenv :funs (pairlis names fvars))))
+        (ir1-convert-fbindings start next result fvars forms)))))
 
 (def-ir1-translator labels ((definitions &body body) start next result)
   "LABELS ({(name lambda-list declaration* form*)}*) declaration* body-form*
@@ -910,12 +914,8 @@ lexically apparent function definition in the enclosing environment."
 Evaluate the BODY-FORMS with local function definitions. The bindings enclose
 the new definitions, so the defined functions can call themselves or each
 other."
-  (multiple-value-bind (forms decls) (parse-body body nil)
-    (unless (listp definitions)
-      (compiler-error "Malformed LABELS definitions: ~s" definitions))
-    (multiple-value-bind (names defs)
-        (extract-flet-vars definitions 'labels)
-      (let* (;; dummy LABELS functions, to be used as placeholders
+  (binding* (((names defs forms decls) (parse-fletish definitions body 'labels))
+             ;; dummy LABELS functions, to be used as placeholders
              ;; during construction of real LABELS functions
              (placeholder-funs (mapcar (lambda (name)
                                          (make-functional
@@ -938,22 +938,22 @@ other."
                                                 :debug-name (debug-name 'labels name t))))
                         names defs definitions))))
 
-        ;; Modify all the references to the dummy function leaves so
-        ;; that they point to the real function leaves.
-        (loop for real-fun in real-funs and
-              placeholder-cons in placeholder-fenv do
-              (substitute-leaf real-fun (cdr placeholder-cons))
-              (setf (cdr placeholder-cons) real-fun))
+    ;; Modify all the references to the dummy function leaves so
+    ;; that they point to the real function leaves.
+    (loop for real-fun in real-funs and
+       placeholder-cons in placeholder-fenv do
+         (substitute-leaf real-fun (cdr placeholder-cons))
+         (setf (cdr placeholder-cons) real-fun))
 
-        ;; Voila.
-        (processing-decls (decls nil real-funs next result)
-          (let ((*lexenv* (make-lexenv
-                           ;; Use a proper FENV here (not the
-                           ;; placeholder used earlier) so that if the
-                           ;; lexical environment is used for inline
-                           ;; expansion we'll get the right functions.
-                           :funs (pairlis names real-funs))))
-            (ir1-convert-fbindings start next result real-funs forms)))))))
+    ;; Voila.
+    (processing-decls (decls nil real-funs next result)
+      (let ((*lexenv* (make-lexenv
+                       ;; Use a proper FENV here (not the
+                       ;; placeholder used earlier) so that if the
+                       ;; lexical environment is used for inline
+                       ;; expansion we'll get the right functions.
+                       :funs (pairlis names real-funs))))
+        (ir1-convert-fbindings start next result real-funs forms)))))
 
 
 ;;;; the THE special operator, and friends

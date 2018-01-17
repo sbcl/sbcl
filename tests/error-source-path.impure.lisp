@@ -171,7 +171,39 @@
    (flet ((f ())))
    (0 1)))
 
+(with-test (:name (:source-path flet :malformed))
+  (assert-condition-source-paths
+   (flet ((f)))
+   (0 1))
+  (assert-condition-source-paths
+   (flet #())
+   ()))
+
 (with-test (:name (:source-path labels :unused))
   (assert-condition-source-paths
    (labels ((f ())))
    (0 1)))
+
+(with-test (:name (:source-path labels :malformed))
+  (assert-condition-source-paths
+   (labels ((f)))
+   (0 1))
+  (assert-condition-source-paths
+   (labels #())
+   ()))
+
+(with-test (:name (:source-path let :malformed))
+  (assert-condition-source-paths
+   (let ((x 1 2)))
+   (0 1))
+  (assert-condition-source-paths
+   (let #())
+   ()))
+
+(with-test (:name (:source-path let* :malformed))
+  (assert-condition-source-paths
+   (let* ((x 1 2)))
+   (0 1))
+  (assert-condition-source-paths
+   (let* #())
+   ()))
