@@ -18,7 +18,8 @@
 (defun !cold-lose (msg)
   (%primitive print msg)
   (%primitive print "too early in cold init to recover from errors")
-  (%halt))
+  (%halt)
+  (aver nil))
 
 ;;; last-ditch error reporting for things which should never happen
 ;;; and which, if they do happen, are sufficiently likely to torpedo
@@ -27,7 +28,8 @@
 (defun critically-unreachable (where)
   (%primitive print "internal error: Control should never reach here, i.e.")
   (%primitive print where)
-  (%halt))
+  (%halt)
+  (aver nil))
 
 ;;;; !COLD-INIT
 

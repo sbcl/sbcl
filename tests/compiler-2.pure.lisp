@@ -1087,7 +1087,9 @@
                         c))))
 
 (with-test (:name (the :nil-type))
-  (checked-compile
-   `(lambda ()
-      (flet ((f () (the nil 0)))
-        (oddp (f))))))
+  (assert (nth-value 1
+                     (checked-compile
+                      `(lambda ()
+                         (flet ((f () (the nil 0)))
+                           (oddp (f))))
+                      :allow-warnings t))))

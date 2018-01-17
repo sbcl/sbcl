@@ -457,8 +457,11 @@
                        (assert-lvar-type arg type policy))
                (unless trusted (reoptimize-lvar arg)))))
       (when set
-        (assert-type (pop args)
-                     (pop required)))
+        (let ((value (pop args))
+              (type (pop required)))
+          ;; Don't bother with NIL arrays
+          (unless (eq type *empty-type*)
+            (assert-type value type))))
       (assert-type (pop args)
                    (type-intersection
                     (pop required)
