@@ -1019,7 +1019,6 @@ default-value-8
 (define-vop (copy-more-arg)
   (:temporary (:sc any-reg :offset nl0-offset) result)
   (:temporary (:sc any-reg :offset nl1-offset) count)
-  (:temporary (:sc any-reg :offset nl2-offset) src)
   (:temporary (:sc any-reg :offset nl3-offset) dst)
   (:temporary (:sc descriptor-reg :offset l0-offset) temp)
   (:info fixed)
@@ -1070,15 +1069,35 @@ default-value-8
       (inst ble DO-REGS))
     ;; Initialize dst to be end of stack.
     (move dst csp-tn)
-    ;; Initialize src to be end of args.
-    (inst add src cfp-tn nargs-tn)
 
     LOOP
-    ;; *--dst = *--src, --count
-    (inst lwzu temp src (- n-word-bytes))
-    (inst addic. count count (- (fixnumize 1)))
-    (inst stwu temp dst (- n-word-bytes))
-    (inst bgt LOOP)
+    ;; FIXME: This loop can end up copying more argument words than
+    ;; strictly necessary.  This doesn't cause incorrect operation,
+    ;; but is slightly wasteful.
+    (let ((delta (- (sb-allocated-size 'control-stack) fixed)))
+      (cond ((zerop delta)
+             ;; If DELTA is zero then all of the MORE args are in the
+             ;; right place, so we don't really need to do anything.
+             )
+            ((plusp delta)
+             ;; If DELTA is positive then the allocated stack frame is
+             ;; overlapping some of the MORE args, and we need to copy
+             ;; the list starting from the end (so that we don't
+             ;; overwrite any elements before they're copied).
+             (inst lwz temp dst (- (* (1+ delta) n-word-bytes)))
+             (inst stwu temp dst (- n-word-bytes))
+             (inst cmpw dst result)
+             (inst bgt LOOP))
+            (t
+             ;; If DELTA is negative then the start of the MORE args
+             ;; is beyond the end of the allocated stack frame, and we
+             ;; need to copy the list from the start in order to close
+             ;; the gap.
+             (inst lwz temp result (- (* delta n-word-bytes)))
+             (inst stw temp result 0)
+             (inst addi result result n-word-bytes)
+             (inst cmpw dst result)
+             (inst bgt LOOP))))
 
     DO-REGS
     (when (< fixed register-arg-count)
