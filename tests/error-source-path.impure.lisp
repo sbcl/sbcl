@@ -165,3 +165,13 @@
   (assert-condition-source-paths
    (with-accessors ((even evenp) (odd oddp 1)) 1)
    (1 1)))
+
+(with-test (:name (:source-path flet :unused))
+  (assert-condition-source-paths
+   (flet ((f ())))
+   (0 1)))
+
+(with-test (:name (:source-path labels :unused))
+  (assert-condition-source-paths
+   (labels ((f ())))
+   (0 1)))
