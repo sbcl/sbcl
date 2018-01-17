@@ -1085,3 +1085,9 @@
                                  (f2)))
                         (f4)
                         c))))
+
+(with-test (:name (the :nil-type))
+  (checked-compile
+   `(lambda ()
+      (flet ((f () (the nil 0)))
+        (oddp (f))))))

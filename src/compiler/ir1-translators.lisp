@@ -987,6 +987,8 @@ other."
              (link-node-to-previous-ctran cast value-ctran)
              (setf (lvar-dest value-lvar) cast)
              (use-continuation cast next result)
+             (when (eq type *empty-type*)
+               (maybe-terminate-block cast t))
              cast)))))
 
 ;;; Assert that FORM evaluates to the specified type (which may be a
