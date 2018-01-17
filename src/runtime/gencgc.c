@@ -753,6 +753,14 @@ set_generation_alloc_start_page(generation_index_t generation, int page_type_fla
 }
 #include "private-cons.inc"
 
+static inline boolean region_closed_p(struct alloc_region* region) {
+    return !region->start_addr;
+}
+#define ASSERT_REGIONS_CLOSED() \
+    gc_assert(!((uintptr_t)boxed_region.start_addr \
+               |(uintptr_t)unboxed_region.start_addr \
+               |(uintptr_t)code_region.start_addr))
+
 /* Find a new region with room for at least the given number of bytes.
  *
  * It starts looking at the current generation's alloc_start_page. So
@@ -791,9 +799,7 @@ gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *all
     */
 
     /* Check that the region is in a reset state. */
-    gc_assert((alloc_region->first_page == 0)
-              && (alloc_region->last_page == -1)
-              && (alloc_region->free_pointer == alloc_region->end_addr));
+    gc_assert(region_closed_p(alloc_region));
     ret = thread_mutex_lock(&free_pages_lock);
     gc_assert(ret == 0);
     first_page = generation_alloc_start_page(gc_alloc_generation, page_type_flag, 0);
@@ -803,7 +809,6 @@ gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *all
                                       gc_alloc_generation);
 
     /* Set up the alloc_region. */
-    alloc_region->first_page = first_page;
     alloc_region->last_page = last_page;
     alloc_region->start_addr = page_address(first_page) + page_bytes_used(first_page);
     alloc_region->free_pointer = alloc_region->start_addr;
@@ -936,15 +941,15 @@ add_new_area(page_index_t first_page, size_t offset, size_t size)
  * When done the alloc_region is set up so that the next quick alloc
  * will fail safely and thus a new region will be allocated. Further
  * it is safe to try to re-update the page table of this reset
- * alloc_region. */
+ * alloc_region.
+ *
+ * This is the internal implementation of ensure_region_closed(),
+ * and not to be invoked as the interface to closing a region.
+ */
 void
 gc_close_region(int page_type_flag, struct alloc_region *alloc_region)
 {
-    /* Catch an unused alloc_region. */
-    if (alloc_region->last_page == -1)
-        return;
-
-    page_index_t first_page = alloc_region->first_page;
+    page_index_t first_page = find_page_index(alloc_region->start_addr);
     page_index_t next_page = first_page+1;
     char *page_base = page_address(first_page);
     char *free_pointer = alloc_region->free_pointer;
@@ -1320,7 +1325,7 @@ gc_alloc_with_region(sword_t nbytes,int page_type_flag, struct alloc_region *my_
         if (!quick_p &&
             addr_diff(my_region->end_addr,my_region->free_pointer) <= 32) {
             /* If so, finished with the current region. */
-            gc_close_region(page_type_flag, my_region);
+            ensure_region_closed(page_type_flag, my_region);
             /* Set up a new region. */
             gc_alloc_new_region(32 /*bytes*/, page_type_flag, my_region);
         }
@@ -1331,7 +1336,7 @@ gc_alloc_with_region(sword_t nbytes,int page_type_flag, struct alloc_region *my_
     /* Else not enough free space in the current region: retry with a
      * new region. */
 
-    gc_close_region(page_type_flag, my_region);
+    ensure_region_closed(page_type_flag, my_region);
     gc_alloc_new_region(nbytes, page_type_flag, my_region);
     return gc_alloc_with_region(nbytes, page_type_flag, my_region,0);
 }
@@ -2295,9 +2300,9 @@ scavenge_newspace_generation_one_scan(generation_index_t generation)
 
 static void gc_close_all_regions()
 {
-    gc_close_region(CODE_PAGE_FLAG, &code_region);
-    gc_close_region(UNBOXED_PAGE_FLAG, &unboxed_region);
-    gc_close_region(BOXED_PAGE_FLAG, &boxed_region);
+    ensure_region_closed(CODE_PAGE_FLAG, &code_region);
+    ensure_region_closed(UNBOXED_PAGE_FLAG, &unboxed_region);
+    ensure_region_closed(BOXED_PAGE_FLAG, &boxed_region);
 }
 
 /* Do a complete scavenge of the newspace generation. */
@@ -3261,7 +3266,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
     scan_binding_stack();
     cull_weak_hash_tables(weak_ht_alivep_funs);
     // Close the region used when pushing items to the finalizer queue
-    gc_close_region(BOXED_PAGE_FLAG, &boxed_region);
+    ensure_region_closed(BOXED_PAGE_FLAG, &boxed_region);
     scan_weak_pointers();
     wipe_nonpinned_words();
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
@@ -3271,9 +3276,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
     sweep_immobile_space(raise);
 #endif
 
-    gc_assert(boxed_region.last_page < 0);
-    gc_assert(unboxed_region.last_page < 0);
-    gc_assert(code_region.last_page < 0);
+    ASSERT_REGIONS_CLOSED();
 #ifdef PIN_GRANULARITY_LISPOBJ
     hopscotch_log_stats(&pinned_objects, "pins");
 #endif
@@ -3436,9 +3439,9 @@ collect_garbage(generation_index_t last_gen)
      */
     struct thread *th;
     for_each_thread(th) {
-        gc_close_region(BOXED_PAGE_FLAG, &th->alloc_region);
+        ensure_region_closed(BOXED_PAGE_FLAG, &th->alloc_region);
 #if defined(LISP_FEATURE_SB_SAFEPOINT_STRICTLY) && !defined(LISP_FEATURE_WIN32)
-        gc_close_region(BOXED_PAGE_FLAG, &th->sprof_alloc_region);
+        ensure_region_closed(BOXED_PAGE_FLAG, &th->sprof_alloc_region);
 #endif
     }
     gc_close_all_regions();
@@ -3547,9 +3550,10 @@ collect_garbage(generation_index_t last_gen)
         write_protect_generation_pages(gen_to_wp);
     }
 
-    /* Set gc_alloc() back to generation 0. The current regions should
-     * be flushed after the above GCs. */
-    gc_assert(boxed_region.free_pointer == boxed_region.start_addr);
+    /* Set gc_alloc() back to generation 0. The global regions were
+     * already asserted to be closed after each generation's collection.
+     * i.e. no more allocations can accidentally occur to any other
+     * generation than 0 */
     gc_alloc_generation = 0;
 
     /* Save the high-water mark before updating last_free_page */
@@ -3695,9 +3699,9 @@ static void gc_allocate_ptes()
 
     /* Initialize gc_alloc. */
     gc_alloc_generation = 0;
-    gc_set_region_empty(&boxed_region);
-    gc_set_region_empty(&unboxed_region);
-    gc_set_region_empty(&code_region);
+    gc_init_region(&boxed_region);
+    gc_init_region(&unboxed_region);
+    gc_init_region(&code_region);
 }
 
 
@@ -3939,7 +3943,7 @@ gencgc_handle_wp_violation(void* fault_addr)
                         "  page.generation: %d\n",
                         fault_addr,
                         page_index,
-                        boxed_region.first_page,
+                        find_page_index(boxed_region.start_addr),
                         boxed_region.last_page,
                         page_scan_start_offset(page_index),
                         page_bytes_used(page_index),
@@ -3962,16 +3966,6 @@ gencgc_handle_wp_violation(void* fault_addr)
 void
 unhandled_sigmemoryfault(void *addr)
 {}
-
-void
-gc_set_region_empty(struct alloc_region *region)
-{
-    region->first_page = 0;
-    region->last_page = -1;
-    region->start_addr = page_address(0);
-    region->free_pointer = page_address(0);
-    region->end_addr = page_address(0);
-}
 
 static void
 zero_all_free_pages() /* called only by gc_and_save() */
@@ -4097,9 +4091,8 @@ gc_and_save(char *filename, boolean prepend_runtime,
     do_destructive_cleanup_before_save(lisp_init_function);
 
     /* All global allocation regions should be empty */
-    gc_assert(boxed_region.last_page < 0
-              && unboxed_region.last_page < 0
-              && code_region.last_page < 0);
+    ASSERT_REGIONS_CLOSED();
+
     /* The number of dynamic space pages saved is based on the allocation
      * pointer, while the number of PTEs is based on last_free_page.
      * Make sure they agree */

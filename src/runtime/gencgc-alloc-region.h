@@ -16,7 +16,11 @@ struct alloc_region {
     void  *end_addr; /* pointer to the byte after the last usable byte */
 
     /* These are needed when closing the region. */
-    page_index_t  first_page;
+    /* 'last_page' is identical to 'find_page_index((char*)end_addr - 1)'
+     * whenever the region is in an open state. The value is preserved on
+     * closing so that allocation can potentially resume where it left off,
+     * though that's not quite how things are implemented at present.
+     */
     page_index_t  last_page;
     void  *start_addr;
 };

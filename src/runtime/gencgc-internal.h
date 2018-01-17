@@ -162,7 +162,28 @@ extern page_index_t page_table_pages;
 
 void update_dynamic_space_free_pointer(void);
 void gc_close_region(int page_type_flag, struct alloc_region *alloc_region);
-void gc_set_region_empty(struct alloc_region *region);
+static void inline ensure_region_closed(int page_type_flag,
+                                        struct alloc_region *alloc_region)
+{
+    if (alloc_region->start_addr)
+        gc_close_region(page_type_flag, alloc_region);
+}
+
+static void inline gc_set_region_empty(struct alloc_region *region)
+{
+    /* last_page is not reset. It can be used as a hint where to resume
+     * allocating after closing and re-opening the region */
+    region->start_addr = 0;
+    /* Honestly I don't know why these should be dereference-able addresses.
+     * But so it is. */
+    region->free_pointer = region->end_addr = page_address(0);
+}
+
+static void inline gc_init_region(struct alloc_region *region)
+{
+    region->last_page = 0; // must always be a valid page index
+    gc_set_region_empty(region);
+}
 
 /*
  * predicates
