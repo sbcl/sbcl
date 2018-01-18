@@ -11,6 +11,87 @@
 ;;;; absoluely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+
+(defconstant min-code-header-bytes
+  (let ((min-header-words (* 2 (ceiling sb-vm:code-constants-offset 2))))
+    (* min-header-words sb-vm:n-word-bytes)))
+
+;;; A newly opened region must not start on a page that has 0 bytes available.
+;;; The effect of that was to cause start_addr to be the next page's address,
+;;; where the OPEN_REGION_PAGE_FLAG was already set on each page in the region
+;;; including the one that was completely full. This caused a failure when
+;;; closing the region because find_page_index(start_addr) was not the *first*
+;;; page on which the open flag should be removed.
+;;; Strangely, the assertion that caught this was far removed from the
+;;; point of failure, in conservative_root_p()
+#+gencgc
+(with-test (:name :gc-region-pickup)
+  (flet ((allocate-code-bytes (nbytes)
+           ;; Make a code component occupying exactly NBYTES bytes in total.
+           (assert (zerop (mod nbytes (* 2 sb-vm:n-word-bytes))))
+           (assert (>= nbytes min-code-header-bytes))
+           (sb-c::allocate-code-object nil 0 (- nbytes min-code-header-bytes)))
+         (get-code-region (a)
+           (declare (type (simple-array sb-ext:word (4)) a))
+           ;; Return array of 4: free-ptr, end-addr, last-page, start-addr
+           (dotimes (i 4 a)
+             (setf (aref a i)
+                   (deref (extern-alien "gc_alloc_region" (array unsigned 12))
+                          ;; code region is the third region in the GC global
+                          ;; regions. Each region is described by 4 words.
+                          (+ 8 i))))))
+    (let ((a (make-array 4 :element-type 'sb-ext:word))
+          (max-non-large-code-code
+           (- (* 4 sb-vm:gencgc-card-bytes) (* 2 sb-vm:n-word-bytes)))
+          (saved-region-start)
+          (saved-region-end))
+      (symbol-macrolet ((free-ptr (aref a 0))
+                        (end-addr (aref a 1))
+                        (last-page (aref a 2))
+                        (start-addr (aref a 3)))
+        (gc) ; This will leave the code region in a closed state
+        (get-code-region a)
+        (assert (= free-ptr end-addr))
+        ;; Allocate a teency amount to start a new region
+        (sb-c::allocate-code-object nil 0 0)
+        (get-code-region a)
+        (setq saved-region-start start-addr
+              saved-region-end end-addr)
+        (multiple-value-bind (n-chunks remainder)
+            (floor (- end-addr free-ptr) max-non-large-code-code)
+          ;; (Maybe) use up a few bytes more so that the larger objects
+          ;; exactly consume the entirety of the region.
+          (when (plusp remainder)
+            (allocate-code-bytes (max remainder min-code-header-bytes))
+            (get-code-region a)
+            (multiple-value-setq (n-chunks remainder)
+              (floor (- end-addr free-ptr) max-non-large-code-code)))
+          (when (plusp remainder)
+            ;; This happens only if the MAX expression above bumped the
+            ;; remainder up, so now there is a different remainder.
+            (allocate-code-bytes remainder))
+          (dotimes (i (1- n-chunks))
+            (allocate-code-bytes max-non-large-code-code))
+          ;; Now make two more objects, one consuming almost the entirety
+          ;; of the region, and one touching just the final page.
+          (allocate-code-bytes (- max-non-large-code-code 128))
+          (let ((c (allocate-code-bytes 128)))
+            (get-code-region a)
+            ;; The region should be the same region we started with,
+            ;; not a new one.
+            (assert (= start-addr saved-region-start))
+            (assert (= end-addr saved-region-end))
+            ;; It should be totally full
+            (assert (= free-ptr end-addr))
+            ;; Create an object to open a new region where the last one
+            ;; ended. It should start on the next completely empty page,
+            ;; not the prior totally full page.
+            (allocate-code-bytes 128)
+            ;; This GC failed
+            (gc)
+            ;; Return C (so that it has to be kept live on the stack).
+            c))))))
+
 ;;; This test pertains only to the compact-instance-header feature.
 #-compact-instance-header (exit :code 104)
 

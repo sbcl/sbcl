@@ -813,6 +813,7 @@ gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *all
     alloc_region->start_addr = page_address(first_page) + page_bytes_used(first_page);
     alloc_region->free_pointer = alloc_region->start_addr;
     alloc_region->end_addr = page_address(last_page+1);
+    gc_assert(find_page_index(alloc_region->start_addr) == first_page);
 
     /* Set up the pages. */
 
@@ -1235,8 +1236,11 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
             gc_dcheck(!page_bytes_used(first_page));
             bytes_found = GENCGC_CARD_BYTES;
         } else if (multi_object &&
+                   // Never return a range starting with a 100% full page
+                   (bytes_found = GENCGC_CARD_BYTES
+                    - page_bytes_used(first_page)) > 0 &&
+                   // "extensible" means all PTE fields are compatible
                    page_extensible_p(first_page, gen, page_type_flag)) {
-            bytes_found = GENCGC_CARD_BYTES - page_bytes_used(first_page);
             // XXX: Prefer to start non-code on new pages.
             //      This is temporary until scavenging of small-object pages
             //      is made a little more intelligent (work in progress).
