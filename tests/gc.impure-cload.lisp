@@ -25,7 +25,7 @@
 ;;; Strangely, the assertion that caught this was far removed from the
 ;;; point of failure, in conservative_root_p()
 #+gencgc
-(with-test (:name :gc-region-pickup)
+(with-test (:name :gc-region-pickup :skipped-on (not (or :x86 :x86-64)))
   (flet ((allocate-code-bytes (nbytes)
            ;; Make a code component occupying exactly NBYTES bytes in total.
            (assert (zerop (mod nbytes (* 2 sb-vm:n-word-bytes))))
@@ -41,8 +41,9 @@
                           ;; regions. Each region is described by 4 words.
                           (+ 8 i))))))
     (let ((a (make-array 4 :element-type 'sb-ext:word))
-          (max-non-large-code-code
-           (- (* 4 sb-vm:gencgc-card-bytes) (* 2 sb-vm:n-word-bytes)))
+          (code-size
+           #+64-bit 10240
+           #-64-bit (- (* 4 sb-vm:gencgc-card-bytes) (* 2 sb-vm:n-word-bytes)))
           (saved-region-start)
           (saved-region-end))
       (symbol-macrolet ((free-ptr (aref a 0))
@@ -58,23 +59,23 @@
         (setq saved-region-start start-addr
               saved-region-end end-addr)
         (multiple-value-bind (n-chunks remainder)
-            (floor (- end-addr free-ptr) max-non-large-code-code)
+            (floor (- end-addr free-ptr) code-size)
           ;; (Maybe) use up a few bytes more so that the larger objects
           ;; exactly consume the entirety of the region.
           (when (plusp remainder)
             (allocate-code-bytes (max remainder min-code-header-bytes))
             (get-code-region a)
             (multiple-value-setq (n-chunks remainder)
-              (floor (- end-addr free-ptr) max-non-large-code-code)))
+              (floor (- end-addr free-ptr) code-size)))
           (when (plusp remainder)
             ;; This happens only if the MAX expression above bumped the
             ;; remainder up, so now there is a different remainder.
             (allocate-code-bytes remainder))
           (dotimes (i (1- n-chunks))
-            (allocate-code-bytes max-non-large-code-code))
+            (allocate-code-bytes code-size))
           ;; Now make two more objects, one consuming almost the entirety
           ;; of the region, and one touching just the final page.
-          (allocate-code-bytes (- max-non-large-code-code 128))
+          (allocate-code-bytes (- code-size 128))
           (let ((c (allocate-code-bytes 128)))
             (get-code-region a)
             ;; The region should be the same region we started with,
