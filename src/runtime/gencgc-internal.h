@@ -25,7 +25,6 @@
 #include "genesis/code.h"
 #include "hopscotch.h"
 
-void gc_free_heap(void);
 extern char *page_address(page_index_t);
 int gencgc_handle_wp_violation(void *);
 
