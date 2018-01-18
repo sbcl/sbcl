@@ -9,17 +9,16 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(cl:in-package :cl-user)
-
 ;;; If *BREAK-ON-SIGNALS* has a bogus value, don't go off in an infinite
 ;;; recursion.
-(assert
-  (catch 'ok
-    (handler-bind
-        ((error
-          (lambda (condition)
-            (when (search "NOT-A-TYPE-SPECIFIER" (princ-to-string condition))
-              (throw 'ok t)))))
-      (let ((*break-on-signals* '#:not-a-type-specifier))
-        (signal "foo"))
-    nil)))
+(with-test (:name (*break-on-signals* :smoke))
+  (assert
+   (catch 'ok
+     (handler-bind
+         ((error
+           (lambda (condition)
+             (when (search "NOT-A-TYPE-SPECIFIER" (princ-to-string condition))
+               (throw 'ok t)))))
+       (let ((*break-on-signals* '#:not-a-type-specifier))
+         (signal "foo"))
+       nil))))
