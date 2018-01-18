@@ -974,7 +974,6 @@ gc_close_region(int page_type_flag, struct alloc_region *alloc_region)
         /* Update the first page. */
         if (!orig_first_page_bytes_used)
             gc_assert(page_starts_contiguous_block_p(first_page));
-        page_table[first_page].allocated &= ~(OPEN_REGION_PAGE_FLAG);
 
         gc_assert(page_table[first_page].allocated == page_type_flag);
         gc_assert(page_table[first_page].gen == gc_alloc_generation);
