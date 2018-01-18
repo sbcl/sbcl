@@ -560,13 +560,19 @@
 ;;;
 ;;; Elements of CASES are of the form
 ;;;
-;;;   ((&rest ARGUMENT-FORMS) VALUES-FORM &optional TEST)
+;;;   ((&rest ARGUMENT-FORMS) VALUES-FORM &key TEST ALLOW-CONDITIONS)
 ;;;
 ;;; where ARGUMENT-FORMS are evaluated to produce the arguments for
 ;;; one call of the function and VALUES-FORM is evaluated to produce
-;;; the expected return values for that function call. TEST is used to
-;;; compare a list of the values returned by the function call to the
-;;; list of values obtained by calling VALUES-FORM.
+;;; the expected return values for that function call.
+;;;
+;;; TEST is used to compare a list of the values returned by the
+;;; function call to the list of values obtained by calling
+;;; VALUES-FORM.
+;;;
+;;; If supplied, the value of ALLOW-CONDITIONS is a type-specifier
+;;; indicating which conditions should be allowed (and ignored) during
+;;; the function call.
 ;;;
 ;;; If VALUES-FORM is of the form
 ;;;
@@ -590,7 +596,7 @@
                                          form &body cases)
   (flet ((make-case-form (case)
            (destructuring-bind (args values &key (test ''equal testp)
-                                                 allow-conditions)
+                                     allow-conditions)
                case
              (let ((conditionp (typep values '(cons (eql condition) (cons t null)))))
                (when (and testp conditionp)
