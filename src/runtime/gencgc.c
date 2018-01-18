@@ -248,7 +248,7 @@ static inline void reset_page_flags(page_index_t page) {
     // Any C compiler worth its salt should merge these into one store
     page_table[page].allocated = page_table[page].write_protected
         = page_table[page].write_protected_cleared
-        = page_table[page].dont_move = page_table[page].has_pins
+        = page_table[page].dont_move = page_table[page].filler
         = page_table[page].large_object = 0;
 }
 
@@ -402,7 +402,8 @@ static void show_pinnedobj_count()
     int nbytes = 0;
     int n_pinned_largeobj = 0;
     for (page = 0; page < last_free_page; ++page) {
-        if (page_table[page].gen == from_space && page_table[page].dont_move) {
+        if (page_table[page].gen == from_space && page_table[page].dont_move
+	        && page_table[page].large_object) {
             nbytes += page_bytes_used(page);
             if (page_starts_contiguous_block_p(page))
                 ++n_pinned_largeobj;
@@ -1177,8 +1178,7 @@ page_extensible_p(page_index_t index, generation_index_t gen, int allocated) {
     /* Test all 5 conditions above as a single comparison against a mask.
      * (The C compiler doesn't understand how to do that)
      * Any bit that has a 1 in this mask must match the desired input.
-     * The two 0 bits are for "has_pins" and "write_protected_cleared".
-     * has_pins is irrelevant- it won't be 1 except during gc.
+     * The two 0 bits are for "write_protected_cleared" and a filler bit.
      * wp_cleared is probably 0, but needs to be masked out to be sure.
      * All other flag bits must be zero to pass the test.
      *
@@ -1724,8 +1724,7 @@ wipe_nonpinned_words()
 // This macro asserts that space accounting happens exactly
 // once per affected page (a page with any pins, no matter how many)
 #define adjust_gen_usage(i) \
-            gc_assert(page_table[i].has_pins); \
-            page_table[i].has_pins = 0; \
+            gc_assert(page_table[i].gen == from_space); \
             bytes_moved += page_bytes_used(i); \
             page_table[i].gen = new_space
 
@@ -1924,9 +1923,8 @@ preserve_pointer(void *addr)
          * and page protection bugs are scary */
         gc_assert(!page_table[page].write_protected);
 
-        /* Mark the page static. */
+        /* Mark the page immovable. */
         page_table[page].dont_move = 1;
-        page_table[page].has_pins = !page_table[page].large_object;
     }
 
     if (page_table[first_page].large_object)
@@ -2214,7 +2212,7 @@ scavenge_generations(generation_index_t from, generation_index_t to)
  * scavenge.
  *
  * Write-protected pages are not scanned except if they are marked
- * dont_move in which case they may have been promoted and still have
+ * pinned, in which case they may have been promoted and still have
  * pointers to the from space.
  *
  * Write-protected pages could potentially be written by alloc however
@@ -2958,13 +2956,9 @@ move_pinned_pages_to_newspace()
      * be evacuated, so move them to newspace directly. */
 
     for (i = 0; i < last_free_page; i++) {
-        if (page_table[i].dont_move &&
-            /* dont_move is cleared lazily, so test the 'gen' field as well. */
-            page_table[i].gen == from_space) {
-            if (page_table[i].has_pins) {
-                // do not move to newspace after all, this will be word-wiped
-                continue;
-            }
+        /* dont_move is cleared lazily, so test the 'gen' field as well. */
+        if (page_table[i].gen == from_space
+            && page_table[i].dont_move && page_table[i].large_object) {
             page_table[i].gen = new_space;
             /* And since we're moving the pages wholesale, also adjust
              * the generation allocation counters. */
