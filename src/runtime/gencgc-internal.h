@@ -121,7 +121,11 @@ struct page {
         /* If this page should not be moved during a GC then this flag
          * is set. It's only valid during a GC for allocated pages. */
         dont_move :1,
-        filler :1,
+        // FIXME: this should be identical to (dont_move & !large_object),
+        // so we don't need to store it as a bit unto itself.
+        /* If this page is not a large object page and contains
+         * any objects which are pinned */
+        has_pins :1,
         /* If the page is part of a large object then this flag is
          * set. No other objects should be allocated to these pages.
          * This is only valid when the page is allocated. */
@@ -201,19 +205,16 @@ find_page_index(void *addr)
 #ifndef GENCGC_IS_PRECISE
 #error "GENCGC_IS_PRECISE must be #defined as 0 or 1"
 #endif
-#define page_has_smallobj_pins(page) \
-  (page_table[page].dont_move && !page_table[page].large_object)
 static inline boolean pinned_p(lispobj obj, page_index_t page)
 {
     extern struct hopscotch_table pinned_objects;
     gc_dcheck(compacting_p());
 #if !GENCGC_IS_PRECISE
-    return page_has_smallobj_pins(page)
+    return page_table[page].has_pins
         && hopscotch_containsp(&pinned_objects, obj);
 #else
     /* There is almost never anything in the hashtable on precise platforms */
-    if (!pinned_objects.count || !page_has_smallobj_pins(page))
-        return 0;
+    if (!pinned_objects.count || !page_table[page].has_pins) return 0;
 # ifdef RETURN_PC_WIDETAG
     /* Conceivably there could be a precise GC without RETURN-PC objects */
     if (widetag_of(*native_pointer(obj)) == RETURN_PC_WIDETAG)
