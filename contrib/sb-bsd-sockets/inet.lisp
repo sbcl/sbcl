@@ -2,12 +2,13 @@
 
 ;;;
 
-(define-condition unknown-protocol ()
+(define-condition unknown-protocol (error)
   ((name :initarg :name
          :reader unknown-protocol-name))
-  (:report (lambda (c s)
-             (format s "Protocol not found: ~a" (prin1-to-string
-                                                 (unknown-protocol-name c))))))
+  (:report (lambda (condition stream)
+             (format stream "Protocol not found: ~A"
+                     (prin1-to-string (unknown-protocol-name condition))))))
+
 (defvar *protocols*
   `((:tcp ,sockint::ipproto_tcp "tcp" "TCP")
     (:udp ,sockint::ipproto_udp "udp" "UDP")
