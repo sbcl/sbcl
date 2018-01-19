@@ -495,8 +495,8 @@ EXPERIMENTAL: Interface subject to change."
                     (note :page-faults page-faults #'zerop)
                     ;; cycle counting isn't supported everywhere.
                     (when cycles
-                      (note :processor-cycles cycles #'zerop)
-                    (note :lambdas-converted sb!c::*lambda-conversions* #'zerop))
+                      (note :processor-cycles cycles #'zerop))
+                    (note :lambdas-converted sb!c::*lambda-conversions* #'zerop)
                     (note :eval-calls *eval-calls* #'zerop)
                     (note :gc-run-time-ms gc-internal-run-time)
                     (note :system-run-time-us system-run-time)
