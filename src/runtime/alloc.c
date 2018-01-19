@@ -1,6 +1,5 @@
 /*
- * allocation routines for C code.  For allocation done by Lisp look
- * instead at src/compiler/target/alloc.lisp and .../macros.lisp
+ * C half of code-component allocator for Lisp with gencgc.
  */
 
 /*
@@ -21,6 +20,10 @@
 #include "genesis/code.h"
 
 #ifdef LISP_FEATURE_GENCGC
+#ifdef LISP_FEATURE_SB_THREAD
+/* This lock is used to protect non-thread-local allocation. */
+static pthread_mutex_t allocation_lock = PTHREAD_MUTEX_INITIALIZER;
+#endif
 lispobj alloc_code_object (unsigned boxed, unsigned unboxed)
 {
     /* It used to be that even on gencgc builds the
@@ -44,8 +47,18 @@ lispobj alloc_code_object (unsigned boxed, unsigned unboxed)
      * actaully need to be pseudo-atomic, this is just to appease the
      * assertions in general_alloc() */
     set_pseudo_atomic_atomic(th);
+
+    /* Allocations of code are all serialized. We might also acquire
+     * free_pages_lock depending on availability of space in the region */
+    int result = thread_mutex_lock(&allocation_lock);
+    gc_assert(!result);
     code = (struct code *)
-      general_alloc(boxedwords*N_WORD_BYTES + unboxed_aligned, CODE_PAGE_FLAG);
+      lisp_alloc(boxedwords*N_WORD_BYTES + unboxed_aligned, CODE_PAGE_FLAG,
+                 &gc_alloc_region[CODE_PAGE_FLAG-1],
+                 arch_os_get_current_thread());
+    result = thread_mutex_unlock(&allocation_lock);
+    gc_assert(!result);
+
     clear_pseudo_atomic_atomic(th);
 
     code->header = (boxedwords << N_WIDETAG_BITS) | CODE_HEADER_WIDETAG;

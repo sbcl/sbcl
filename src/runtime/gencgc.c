@@ -345,8 +345,6 @@ page_index_t last_free_page;
  * seized before all accesses to generations[] or to parts of
  * page_table[] that other threads may want to see */
 static pthread_mutex_t free_pages_lock = PTHREAD_MUTEX_INITIALIZER;
-/* This lock is used to protect non-thread-local allocation. */
-static pthread_mutex_t allocation_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
 extern os_vm_size_t gencgc_release_granularity;
@@ -3709,9 +3707,8 @@ static void gc_allocate_ptes()
  * The check for a GC trigger is only performed when the current
  * region is full, so in most cases it's not needed. */
 
-static inline lispobj *
-general_alloc_internal(sword_t nbytes, int page_type_flag, struct alloc_region *region,
-                       struct thread *thread)
+lispobj *lisp_alloc(sword_t nbytes, int page_type_flag,
+                    struct alloc_region *region, struct thread *thread)
 {
 #ifndef LISP_FEATURE_WIN32
     lispobj alloc_signal;
@@ -3803,37 +3800,6 @@ general_alloc_internal(sword_t nbytes, int page_type_flag, struct alloc_region *
     return (new_obj);
 }
 
-lispobj *
-general_alloc(sword_t nbytes, int page_type_flag)
-{
-    struct thread *thread = arch_os_get_current_thread();
-    /* Select correct region, and call general_alloc_internal with it.
-     * For other then boxed allocation we must lock first, since the
-     * region is shared. */
-    if (page_type_flag == BOXED_PAGE_FLAG) {
-#ifdef LISP_FEATURE_SB_THREAD
-        struct alloc_region *region = (thread ? &(thread->alloc_region) : &boxed_region);
-#else
-        struct alloc_region *region = &boxed_region;
-#endif
-        return general_alloc_internal(nbytes, page_type_flag, region, thread);
-    } else if (page_type_flag == UNBOXED_PAGE_FLAG ||
-               page_type_flag == CODE_PAGE_FLAG) {
-        struct alloc_region *region =
-            page_type_flag == CODE_PAGE_FLAG ? &code_region : &unboxed_region;
-        lispobj * obj;
-        int result;
-        result = thread_mutex_lock(&allocation_lock);
-        gc_assert(!result);
-        obj = general_alloc_internal(nbytes, page_type_flag, region, thread);
-        result = thread_mutex_unlock(&allocation_lock);
-        gc_assert(!result);
-        return obj;
-    } else {
-        lose("bad page type flag: %d", page_type_flag);
-    }
-}
-
 lispobj AMD64_SYSV_ABI *
 alloc(sword_t nbytes)
 {
@@ -3846,7 +3812,13 @@ alloc(sword_t nbytes)
     gc_assert(get_pseudo_atomic_atomic(arch_os_get_current_thread()));
 #endif
 
-    lispobj *result = general_alloc(nbytes, BOXED_PAGE_FLAG);
+    struct thread *thread = arch_os_get_current_thread();
+#ifdef LISP_FEATURE_SB_THREAD
+    struct alloc_region *region = &thread->alloc_region;
+#else
+    struct alloc_region *region = &boxed_region;
+#endif
+    lispobj *result = lisp_alloc(nbytes, BOXED_PAGE_FLAG, region, thread);
 
 #ifdef LISP_FEATURE_SB_SAFEPOINT_STRICTLY
     if (!was_pseudo_atomic)
