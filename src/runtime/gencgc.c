@@ -156,14 +156,7 @@ lispobj lisp_init_function;
 /// Constants defined in gc-internal:
 ///   #define BOXED_PAGE_FLAG 1
 ///   #define UNBOXED_PAGE_FLAG 2
-///   #define OPEN_REGION_PAGE_FLAG 4
-
-#if 0
-/// Return true if  'allocated' bits are: {001, 010, 011}, false if 1zz or 000.
-static inline boolean page_allocated_no_region_p(page_index_t page) {
-    return (page_table[page].allocated ^ OPEN_REGION_PAGE_FLAG) > OPEN_REGION_PAGE_FLAG;
-}
-#endif
+///   #define OPEN_REGION_PAGE_FLAG 8
 
 static inline boolean page_free_p(page_index_t page) {
     return (page_table[page].allocated == FREE_PAGE_FLAG);
@@ -173,16 +166,16 @@ static inline boolean page_boxed_p(page_index_t page) {
     return (page_table[page].allocated & BOXED_PAGE_FLAG);
 }
 
-/// Return true if 'allocated' bits are: {001, 011}, false otherwise.
+/// Return true if 'allocated' bits are 0zz1, false otherwise (z = don't-care)
 /// i.e. true of pages which could hold boxed or partially boxed objects.
 static inline boolean page_boxed_no_region_p(page_index_t page) {
-    return (page_table[page].allocated & 5) == BOXED_PAGE_FLAG;
+    return (page_table[page].allocated & 9) == BOXED_PAGE_FLAG;
 }
 
 /// Return true if page MUST NOT hold boxed objects (including code).
 static inline boolean page_unboxed_p(page_index_t page) {
     /* Both flags set == boxed code page */
-    return (page_table[page].allocated & 3) == UNBOXED_PAGE_FLAG;
+    return (page_table[page].allocated & 7) == UNBOXED_PAGE_FLAG;
 }
 
 static inline boolean protect_page_p(page_index_t page, generation_index_t generation) {
@@ -248,8 +241,7 @@ static inline void reset_page_flags(page_index_t page) {
     // Any C compiler worth its salt should merge these into one store
     page_table[page].allocated = page_table[page].write_protected
         = page_table[page].write_protected_cleared
-        = page_table[page].dont_move = page_table[page].filler
-        = page_table[page].large_object = 0;
+        = page_table[page].dont_move = page_table[page].large_object = 0;
 }
 
 /// External function for calling from Lisp.
@@ -403,7 +395,7 @@ static void show_pinnedobj_count()
     int n_pinned_largeobj = 0;
     for (page = 0; page < last_free_page; ++page) {
         if (page_table[page].gen == from_space && page_table[page].dont_move
-	        && page_table[page].large_object) {
+                && page_table[page].large_object) {
             nbytes += page_bytes_used(page);
             if (page_starts_contiguous_block_p(page))
                 ++n_pinned_largeobj;
@@ -1178,19 +1170,18 @@ page_extensible_p(page_index_t index, generation_index_t gen, int allocated) {
     /* Test all 5 conditions above as a single comparison against a mask.
      * (The C compiler doesn't understand how to do that)
      * Any bit that has a 1 in this mask must match the desired input.
-     * The two 0 bits are for "write_protected_cleared" and a filler bit.
-     * wp_cleared is probably 0, but needs to be masked out to be sure.
+     * The wp_cleared bit is probably 0, but needs to be masked out to be sure.
      * All other flag bits must be zero to pass the test.
      *
-     *    large -\     /-- WP
-     *            v   v
-     * #b11111111_10101111
-     *              ^  ^^^
+     *    large -\    /--- WP
+     *            v  v
+     * #b11111111_10111111
+     *              ^ ^^^^
      *       !move /      \ allocated
      *
      * The flags reside at 1 byte prior to 'gen' in the page structure.
      */
-    return (*(int16_t*)(&page_table[index].gen-1) & 0xFFAF) == ((gen<<8)|allocated);
+    return (*(int16_t*)(&page_table[index].gen-1) & 0xFFBF) == ((gen<<8)|allocated);
 #endif
 }
 

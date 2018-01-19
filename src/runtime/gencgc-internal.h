@@ -107,7 +107,7 @@ struct page {
          * xxx_PAGE_FLAG definitions.
          *
          * If the page is free, all the following fields are zero. */
-        allocated :3,
+        allocated :4,
         /* This is set when the page is write-protected. This should
          * always reflect the actual write_protect status of a page.
          * (If the page is written into, we catch the exception, make
@@ -121,7 +121,6 @@ struct page {
         /* If this page should not be moved during a GC then this flag
          * is set. It's only valid during a GC for allocated pages. */
         dont_move :1,
-        filler :1,
         /* If the page is part of a large object then this flag is
          * set. No other objects should be allocated to these pages.
          * This is only valid when the page is allocated. */
@@ -135,11 +134,11 @@ struct page {
 };
 extern struct page *page_table;
 #ifdef LISP_FEATURE_BIG_ENDIAN
-#define WRITE_PROTECTED_BIT (1<<4)
-#define WP_CLEARED_BIT (1<<3)
+# define WP_CLEARED_BIT      (1<<2)
+# define WRITE_PROTECTED_BIT (1<<3)
 #else
-#define WRITE_PROTECTED_BIT (1<<3)
-#define WP_CLEARED_BIT (1<<4)
+# define WRITE_PROTECTED_BIT (1<<4)
+# define WP_CLEARED_BIT      (1<<5)
 #endif
 
 struct __attribute__((packed)) corefile_pte {

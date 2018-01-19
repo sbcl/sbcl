@@ -825,23 +825,20 @@ Experimental: interface subject to change."
                          (let* ((index (sb-vm::find-page-index addr))
                                 (flags (sb-alien:slot page 'sb-vm::flags))
                                 .
-                                ;; The unused fields WP-CLR and PINS are
-                                ;; to make it easier for the human to count.
+                                ;; The unused WP-CLR is for ease of counting
                                 #+big-endian
-                                ((allocated (ldb (byte 3 5) flags))
-                                 (wp        (logbitp 4 flags))
-                                 (wp-clr    (logbitp 3 flags))
-                                 (dontmove  (logbitp 2 flags))
-                                 (pins      (logbitp 1 flags))
+                                ((allocated (ldb (byte 4 4) flags))
+                                 (wp        (logbitp 3 flags))
+                                 (wp-clr    (logbitp 2 flags))
+                                 (dontmove  (logbitp 1 flags))
                                  (large     (logbitp 0 flags)))
                                 #+little-endian
-                                ((allocated (ldb (byte 3 0) flags))
-                                 (wp        (logbitp 3 flags))
-                                 (wp-clr    (logbitp 4 flags))
-                                 (dontmove  (logbitp 5 flags))
-                                 (pins      (logbitp 6 flags))
+                                ((allocated (ldb (byte 4 0) flags))
+                                 (wp        (logbitp 4 flags))
+                                 (wp-clr    (logbitp 5 flags))
+                                 (dontmove  (logbitp 6 flags))
                                  (large     (logbitp 7 flags))))
-                           (declare (ignore wp-clr pins))
+                           (declare (ignore wp-clr))
                            (list :space space
                                  :generation (sb-alien:slot page 'sb-vm::gen)
                                  :write-protected wp
