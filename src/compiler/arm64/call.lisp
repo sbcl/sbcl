@@ -367,7 +367,8 @@
     ;; actually setting up the "real" NFP.
     (let ((result (make-random-tn :kind :normal
                                   :sc (sc-or-lose 'any-reg)
-                                  :offset nfp-offset)))
+                                  :offset nfp-offset))
+          (delta (- (sb-allocated-size 'control-stack) fixed)))
       ;; And we use ASSEMBLE here so that we get "implcit labels"
       ;; rather than having to use GEN-LABEL and EMIT-LABEL.
       (assemble ()
@@ -386,7 +387,9 @@
                (inst csel csp-tn result csp-tn :le)
                (inst b :le DONE)
                (inst add dest result (lsl count (- word-shift n-fixnum-tag-bits)))
-               (move csp-tn dest)))
+               ;; Don't leave the arguments unprotected when moving below the stack pointer
+               (when (>= delta 0)
+                 (move csp-tn dest))))
 
         (when (< fixed register-arg-count)
           ;; We must stop when we run out of stack args, not when we
@@ -405,23 +408,25 @@
         ;; moved.
 
         LOOP
-        (let ((delta (- (sb-allocated-size 'control-stack) fixed)))
-          (cond ((zerop delta)) ;; nothing to move
-                ((plusp delta)  ;; copy backward
+        (cond ((zerop delta)) ;; nothing to move
+              ((plusp delta)   ;; copy backward
+               (inst cmp dest result)
+               (inst b :le DO-REGS)
+               (inst ldr temp (@ dest (load-store-offset
+                                       (- (* (1+ delta) n-word-bytes)))))
+               (inst str temp (@ dest (- n-word-bytes) :pre-index))
+               (inst b LOOP))
+              (t ;; copy forward
+               (assemble ()
                  (inst cmp dest result)
-                 (inst b :le DO-REGS)
-                 (inst ldr temp (@ dest (load-store-offset
-                                         (- (* (1+ delta) n-word-bytes)))))
-                 (inst str temp (@ dest (- n-word-bytes) :pre-index))
-                 (inst b LOOP))
-                (t ;; copy forward
-                 (inst cmp dest result)
-                 (inst b :le DO-REGS)
+                 (inst b :le DONE)
                  (inst ldr temp (@ result (load-store-offset
                                            (- (* delta n-word-bytes)))))
                  (inst str temp (@ result n-word-bytes :post-index))
-                 (inst b LOOP))))
-
+                 (inst b LOOP)
+                 DONE
+                 (inst mov csp-tn dest))))
+        
         DO-REGS
         (when (< fixed register-arg-count)
           ;; Now we have to deposit any more args that showed up in registers.
