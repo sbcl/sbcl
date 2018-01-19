@@ -327,7 +327,7 @@ trans_code(struct code *code)
     sword_t nheader_words = code_header_words(code->header);
     sword_t ncode_words = code_instruction_words(code->code_size);
     lispobj l_new_code = copy_large_object(l_code, nheader_words + ncode_words,
-                                           CODE_PAGE_FLAG);
+                                           CODE_PAGE_ALLOCATED);
 
 #ifdef LISP_FEATURE_GENCGC
     if (l_new_code == l_code)

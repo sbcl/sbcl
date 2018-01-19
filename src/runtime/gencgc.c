@@ -716,7 +716,7 @@ void zero_dirty_pages(page_index_t start, page_index_t end) {
 struct alloc_region gc_alloc_region[3];
 #define boxed_region   gc_alloc_region[BOXED_PAGE_FLAG-1]
 #define unboxed_region gc_alloc_region[UNBOXED_PAGE_FLAG-1]
-#define code_region    gc_alloc_region[CODE_PAGE_FLAG-1]
+#define code_region    gc_alloc_region[CODE_PAGE_ALLOCATED-1]
 
 /* The generation currently being allocated to. */
 static generation_index_t gc_alloc_generation;
@@ -1206,7 +1206,7 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
             nbytes_goal = gencgc_alloc_granularity;
 #if !defined(LISP_FEATURE_64_BIT)
         // Increase the region size to avoid excessive fragmentation
-        if (page_type_flag == CODE_PAGE_FLAG && nbytes_goal < 65536)
+        if (page_type_flag == CODE_PAGE_ALLOCATED && nbytes_goal < 65536)
             nbytes_goal = 65536;
 #endif
     }
@@ -1232,7 +1232,7 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
             // XXX: Prefer to start non-code on new pages.
             //      This is temporary until scavenging of small-object pages
             //      is made a little more intelligent (work in progress).
-            if (bytes_found < nbytes && page_type_flag != CODE_PAGE_FLAG) {
+            if (bytes_found < nbytes && page_type_flag != CODE_PAGE_ALLOCATED) {
                 if (bytes_found > most_bytes_found)
                     most_bytes_found = bytes_found;
                 first_page++;
@@ -1547,7 +1547,7 @@ conservative_root_p(lispobj addr, page_index_t addr_page_index)
     /* quick check 1: Address is quite likely to have been invalid. */
     struct page* page = &page_table[addr_page_index];
     if ((addr & (GENCGC_CARD_BYTES - 1)) >= page_bytes_used(addr_page_index) ||
-        (!is_lisp_pointer(addr) && page->allocated != CODE_PAGE_FLAG) ||
+        (!is_lisp_pointer(addr) && page->allocated != CODE_PAGE_ALLOCATED) ||
         (compacting_p() && (page->gen != from_space ||
                             (page->large_object && page->dont_move))))
         return 0;
@@ -1562,7 +1562,7 @@ conservative_root_p(lispobj addr, page_index_t addr_page_index)
      * But if this doesn't pass, there's no point in proceeding to the
      * definitive test which involves searching for the containing object. */
 
-    if (page->allocated != CODE_PAGE_FLAG) {
+    if (page->allocated != CODE_PAGE_ALLOCATED) {
         lispobj* obj = native_pointer(addr);
         if (lowtag_of(addr) == LIST_POINTER_LOWTAG) {
             if (!is_cons_half(obj[0]) || !is_cons_half(obj[1]))
@@ -2293,7 +2293,7 @@ scavenge_newspace_generation_one_scan(generation_index_t generation)
 
 static void gc_close_all_regions()
 {
-    ensure_region_closed(CODE_PAGE_FLAG, &code_region);
+    ensure_region_closed(CODE_PAGE_ALLOCATED, &code_region);
     ensure_region_closed(UNBOXED_PAGE_FLAG, &unboxed_region);
     ensure_region_closed(BOXED_PAGE_FLAG, &boxed_region);
 }

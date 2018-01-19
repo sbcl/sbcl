@@ -126,11 +126,11 @@ code_n_funs(struct code* code) { return fixnum_value((code)->n_entries) & 0x3FFF
 /* values for the *_alloc_* parameters, also see the commentary for
  * struct page in gencgc-internal.h. These constants are used in gc-common,
  * so they can't easily be made gencgc-only */
-#define FREE_PAGE_FLAG 0
-#define BOXED_PAGE_FLAG 1
-#define UNBOXED_PAGE_FLAG 2
+#define FREE_PAGE_FLAG        0
+#define BOXED_PAGE_FLAG       1
+#define UNBOXED_PAGE_FLAG     2
 #define OPEN_REGION_PAGE_FLAG 8
-#define CODE_PAGE_FLAG        (BOXED_PAGE_FLAG|UNBOXED_PAGE_FLAG)
+#define CODE_PAGE_ALLOCATED   (BOXED_PAGE_FLAG|UNBOXED_PAGE_FLAG)
 
 extern sword_t (*sizetab[256])(lispobj *where);
 #define OBJECT_SIZE(header,where) \
