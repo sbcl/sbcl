@@ -1713,18 +1713,25 @@ Short version: be careful out there."
     (cond ((= os-thread (ldb (byte sb!vm:n-word-bits 0) -1))
            (error 'interrupt-thread-error :thread thread))
           (t
-           (with-interruptions-lock (thread)
-             ;; Append to the end of the interruptions queue. It's
-             ;; O(N), but it does not hurt to slow interruptors down a
-             ;; bit when the queue gets long.
-             (setf (thread-interruptions thread)
-                   (append (thread-interruptions thread)
-                           (list (lambda ()
-                                   (without-interrupts
-                                     (allow-with-interrupts
-                                       (funcall function))))))))
-           (when (minusp (wake-thread os-thread))
-             (error 'interrupt-thread-error :thread thread))))))
+           (let (invoked)
+             (with-interruptions-lock (thread)
+               ;; Append to the end of the interruptions queue. It's
+               ;; O(N), but it does not hurt to slow interruptors down a
+               ;; bit when the queue gets long.
+               (setf (thread-interruptions thread)
+                     (append (thread-interruptions thread)
+                             (list (lambda ()
+                                     (setf invoked t)
+                                     (barrier (:memory))
+                                     (without-interrupts
+                                       (allow-with-interrupts
+                                         (funcall function))))))))
+             (when (and (minusp (wake-thread os-thread))
+                        ;; The interrupt queue has been processed by
+                        ;; some other interrupt.
+                        (progn (barrier (:memory))
+                               (not invoked)))
+               (error 'interrupt-thread-error :thread thread)))))))
 
 (defun terminate-thread (thread)
   "Terminate the thread identified by THREAD, by interrupting it and
