@@ -374,7 +374,7 @@ count_write_protect_generation_pages(generation_index_t generation)
 }
 
 /* Count the number of pages within the given generation. */
-static page_index_t
+static page_index_t __attribute__((unused))
 count_generation_pages(generation_index_t generation)
 {
     page_index_t i;
@@ -455,50 +455,30 @@ write_generation_stats(FILE *file)
             "Gen  Boxed Unboxed   LgBox LgUnbox  Pin       Alloc     Waste        Trig      WP GCs Mem-age\n");
 
     for (i = 0; i <= SCRATCH_GENERATION; i++) {
-        page_index_t j;
-        page_index_t boxed_cnt = 0;
-        page_index_t unboxed_cnt = 0;
-        page_index_t large_boxed_cnt = 0;
-        page_index_t large_unboxed_cnt = 0;
-        page_index_t pinned_cnt=0;
+        page_index_t page;
+        // page kinds: small boxed, small unboxed, large boxed, large unboxed
+        page_index_t pagect[4], pinned_cnt = 0, tot_pages = 0;
 
-        for (j = 0; j < last_free_page; j++)
-            if (page_table[j].gen == i) {
-
-                /* Count the number of boxed pages within the given
-                 * generation. */
-                if (page_boxed_p(j)) {
-                    if (page_table[j].large_object)
-                        large_boxed_cnt++;
-                    else
-                        boxed_cnt++;
-                }
-                if(page_table[j].dont_move) pinned_cnt++;
-                /* Count the number of unboxed pages within the given
-                 * generation. */
-                if (page_unboxed_p(j)) {
-                    if (page_table[j].large_object)
-                        large_unboxed_cnt++;
-                    else
-                        unboxed_cnt++;
-                }
+        memset(pagect, 0, sizeof pagect);
+        for (page = 0; page < last_free_page; page++)
+            if (!page_free_p(page) && page_table[page].gen == i) {
+                int k = (page_table[page].large_object<<1) | !page_boxed_p(page);
+                pagect[k]++;
+                if (page_table[page].dont_move) pinned_cnt++;
             }
-
+        tot_pages = pagect[0] + pagect[1] + pagect[2] + pagect[3];
         gc_assert(generations[i].bytes_allocated
                   == count_generation_bytes_allocated(i));
         fprintf(file,
                 " %d %7"PAGE_INDEX_FMT" %7"PAGE_INDEX_FMT" %7"PAGE_INDEX_FMT
-                " %7"PAGE_INDEX_FMT" %4"PAGE_INDEX_FMT,
-                i,
-                boxed_cnt, unboxed_cnt, large_boxed_cnt, large_unboxed_cnt,
-                pinned_cnt);
-        fprintf(file,
+                " %7"PAGE_INDEX_FMT" %4"PAGE_INDEX_FMT
                 " %11"OS_VM_SIZE_FMT
                 " %9"OS_VM_SIZE_FMT
                 " %11"OS_VM_SIZE_FMT
                 " %7"PAGE_INDEX_FMT" %3d %7.4f\n",
+                i, pagect[0], pagect[1], pagect[2], pagect[3], pinned_cnt,
                 generations[i].bytes_allocated,
-                (npage_bytes(count_generation_pages(i)) - generations[i].bytes_allocated),
+                npage_bytes(tot_pages) - generations[i].bytes_allocated,
                 generations[i].gc_trigger,
                 count_write_protect_generation_pages(i),
                 generations[i].num_gc,
