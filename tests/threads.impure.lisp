@@ -1234,7 +1234,8 @@
                                        (sb-debug:print-backtrace :count 10))))))))
     (wait-for-threads threads)))
 
-(with-test (:name :gc-deadlock)
+(with-test (:name :gc-deadlock
+            :broken-on :win32)
   (write-line "WARNING: THIS TEST WILL HANG ON FAILURE!")
   ;; Prior to 0.9.16.46 thread exit potentially deadlocked the
   ;; GC due to *all-threads-lock* and session lock. On earlier
