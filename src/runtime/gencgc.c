@@ -452,7 +452,7 @@ write_generation_stats(FILE *file)
 
     /* Print the heap stats. */
     fprintf(file,
-            " Gen  StaPg UbSta LaSta Boxed Unbox    LB   LUB !move    Alloc  Waste     Trig   WP GCs Mem-age\n");
+            "Gen  Boxed Unboxed   LgBox LgUnbox  Pin       Alloc     Waste        Trig      WP GCs Mem-age\n");
 
     for (i = 0; i <= SCRATCH_GENERATION; i++) {
         page_index_t j;
@@ -487,21 +487,16 @@ write_generation_stats(FILE *file)
         gc_assert(generations[i].bytes_allocated
                   == count_generation_bytes_allocated(i));
         fprintf(file,
-                "   %1d: %5ld %5ld %5ld",
+                " %d %7"PAGE_INDEX_FMT" %7"PAGE_INDEX_FMT" %7"PAGE_INDEX_FMT
+                " %7"PAGE_INDEX_FMT" %4"PAGE_INDEX_FMT,
                 i,
-                (long)generations[i].alloc_start_page,
-                (long)generations[i].alloc_unboxed_start_page,
-                (long)generations[i].alloc_large_start_page);
+                boxed_cnt, unboxed_cnt, large_boxed_cnt, large_unboxed_cnt,
+                pinned_cnt);
         fprintf(file,
-                " %5"PAGE_INDEX_FMT" %5"PAGE_INDEX_FMT" %5"PAGE_INDEX_FMT
-                " %5"PAGE_INDEX_FMT" %5"PAGE_INDEX_FMT,
-                boxed_cnt, unboxed_cnt, large_boxed_cnt,
-                large_unboxed_cnt, pinned_cnt);
-        fprintf(file,
-                " %8"OS_VM_SIZE_FMT
-                " %6"OS_VM_SIZE_FMT
-                " %8"OS_VM_SIZE_FMT
-                " %4"PAGE_INDEX_FMT" %3d %7.4f\n",
+                " %11"OS_VM_SIZE_FMT
+                " %9"OS_VM_SIZE_FMT
+                " %11"OS_VM_SIZE_FMT
+                " %7"PAGE_INDEX_FMT" %3d %7.4f\n",
                 generations[i].bytes_allocated,
                 (npage_bytes(count_generation_pages(i)) - generations[i].bytes_allocated),
                 generations[i].gc_trigger,
@@ -509,8 +504,8 @@ write_generation_stats(FILE *file)
                 generations[i].num_gc,
                 generation_average_age(i));
     }
-    fprintf(file,"   Total bytes allocated    = %"OS_VM_SIZE_FMT"\n", bytes_allocated);
-    fprintf(file,"   Dynamic-space-size bytes = %"OS_VM_SIZE_FMT"\n", dynamic_space_size);
+    fprintf(file,"           Total bytes allocated    = %13"OS_VM_SIZE_FMT"\n", bytes_allocated);
+    fprintf(file,"           Dynamic-space-size bytes = %13"OS_VM_SIZE_FMT"\n", dynamic_space_size);
 
 #ifdef LISP_FEATURE_X86
     fpu_restore(fpu_state);
