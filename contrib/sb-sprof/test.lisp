@@ -38,12 +38,10 @@
                           #-(or freebsd arm) :sample-interval
                           #-(or freebsd arm) 0.0001
                           #+arm :sample-interval #+arm 0.1
-                          :report :graph :loop nil)
-    (let ((target (+ (get-universal-time) 15)))
-      (princ #\.)
-      (force-output)
-      (loop while (< (get-universal-time) target)
-         do (consalot)))))
+                          :report :graph)
+    (loop with target = (+ (get-universal-time) 3)
+          while (< (get-universal-time) target)
+          do (consalot))))
 
 (defun run-tests ()
   (test)
