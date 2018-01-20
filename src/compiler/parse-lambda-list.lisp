@@ -777,13 +777,16 @@
                                   (if sup-p-var `(values ,val-form t) val-form)
                                   def)))
              (cond ((not sup-p-var) (bind-pat var vals))
-                   ((symbolp var) (bind `((,var ,suppliedp) ,vals)))
-                   (t
+                   ((not (symbolp var))
                     (let ((var-temp (sb!xc:gensym))
                           (sup-p-temp (copy-symbol suppliedp)))
                       (bind `((,var-temp ,sup-p-temp) ,vals))
                       (descend var var-temp)
-                      (bind `(,suppliedp ,sup-p-temp)))))))
+                      (bind `(,suppliedp ,sup-p-temp))))
+                   ((eq var suppliedp)
+                    (bind `((nil ,suppliedp) ,vals)))
+                   (t
+                    (bind `((,var ,suppliedp) ,vals))))))
          (gen-test (sense test then else)
            (cond ((eq sense t) `(if ,test ,then ,@(if else (list else))))
                  (else `(if ,test ,else ,then)) ; flip the branches

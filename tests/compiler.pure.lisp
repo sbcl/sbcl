@@ -515,7 +515,7 @@
                 (x &rest x)
                 (x &rest (y x))
                 (x &optional (y nil x))
-                (x &optional (y nil y)) ; TODO this case prints "caught ERROR: ..." but doesn't set failure-p
+                (x &optional (y nil y))
                 (x &key x)
                 (x &key (y nil x))
                 (&key (y nil z) (z nil w))
@@ -527,8 +527,7 @@
                                             (bar (&environment env)
                                               `',(macro-function 'foo env)))
                                    (bar)))
-                              ;; FIXME  :allow-failure is for the annotated case above
-                              :allow-failure t :allow-style-warnings t))))
+                              :allow-style-warnings t))))
       (assert style-warnings))))
 
 ;; Uh, this test is semi-bogus - it's trying to test that you can't
