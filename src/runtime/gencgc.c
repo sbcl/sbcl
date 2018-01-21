@@ -270,14 +270,6 @@ addr_diff(void *x, void *y)
  * deal with the FIXME there...
  */
 struct generation {
-
-    // A distinct start page per nonzero value of 'page_type_flag'.
-    // The zeroth index is the large object start page.
-    page_index_t alloc_start_page_[4];
-#define alloc_large_start_page alloc_start_page_[0]
-#define alloc_start_page alloc_start_page_[BOXED_PAGE_FLAG]
-#define alloc_unboxed_start_page alloc_start_page_[UNBOXED_PAGE_FLAG]
-
     /* the bytes allocated to this generation */
     os_vm_size_t bytes_allocated;
 
@@ -696,26 +688,30 @@ struct alloc_region gc_alloc_region[3];
 /* The generation currently being allocated to. */
 static generation_index_t gc_alloc_generation;
 
+static page_index_t
+  alloc_start_pages[4], // one each for large, boxed, unboxed, code
+  gencgc_alloc_start_page; // initializer for the preceding array
+
+#define RESET_ALLOC_START_PAGES() \
+        alloc_start_pages[0] = gencgc_alloc_start_page; \
+        alloc_start_pages[1] = gencgc_alloc_start_page; \
+        alloc_start_pages[2] = gencgc_alloc_start_page; \
+        alloc_start_pages[3] = gencgc_alloc_start_page
+
 static inline page_index_t
-generation_alloc_start_page(generation_index_t generation, int page_type_flag, int large)
+alloc_start_page(int page_type_flag, int large)
 {
     if (!(page_type_flag >= 1 && page_type_flag <= 3))
         lose("bad page_type_flag: %d", page_type_flag);
-    if (large)
-        return generations[generation].alloc_large_start_page;
-    return generations[generation].alloc_start_page_[page_type_flag];
+    return alloc_start_pages[large ? 0 : page_type_flag];
 }
 
 static inline void
-set_generation_alloc_start_page(generation_index_t generation, int page_type_flag, int large,
-                                page_index_t page)
+set_alloc_start_page(int page_type_flag, int large, page_index_t page)
 {
     if (!(page_type_flag >= 1 && page_type_flag <= 3))
         lose("bad page_type_flag: %d", page_type_flag);
-    if (large)
-        generations[generation].alloc_large_start_page = page;
-    else
-        generations[generation].alloc_start_page_[page_type_flag] = page;
+    alloc_start_pages[large ? 0 : page_type_flag] = page;
 }
 #include "private-cons.inc"
 
@@ -768,7 +764,7 @@ gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *all
     gc_assert(region_closed_p(alloc_region));
     ret = thread_mutex_lock(&free_pages_lock);
     gc_assert(ret == 0);
-    first_page = generation_alloc_start_page(gc_alloc_generation, page_type_flag, 0);
+    first_page = alloc_start_page(page_type_flag, 0);
     last_page = gc_find_freeish_pages(&first_page, nbytes,
                                       ((nbytes >= (sword_t)GENCGC_CARD_BYTES) ?
                                        SINGLE_OBJECT_FLAG : 0) | page_type_flag,
@@ -985,9 +981,8 @@ gc_close_region(int page_type_flag, struct alloc_region *alloc_region)
         bytes_allocated += region_size;
         generations[gc_alloc_generation].bytes_allocated += region_size;
 
-        /* Set the generations alloc restart page to the last page of
-         * the region. */
-        set_generation_alloc_start_page(gc_alloc_generation, page_type_flag, 0, next_page-1);
+        /* Set the alloc restart page to the last page of the region. */
+        set_alloc_start_page(page_type_flag, 0, next_page-1);
 
         /* Add the region to the new_areas if requested. */
         if (BOXED_PAGE_FLAG & page_type_flag)
@@ -1021,7 +1016,7 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
     ret = thread_mutex_lock(&free_pages_lock);
     gc_assert(ret == 0);
 
-    first_page = generation_alloc_start_page(gc_alloc_generation, page_type_flag, 1);
+    first_page = alloc_start_page(page_type_flag, 1);
     // FIXME: really we want to try looking for space following the highest of
     // the last page of all other small object regions. That's impossible - there's
     // not enough information. At best we can skip some work in only the case where
@@ -1037,7 +1032,7 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
 
     // FIXME: Should this be 1+last_page ?
     // (Doesn't matter too much since it'll be skipped on restart if unusable)
-    set_generation_alloc_start_page(gc_alloc_generation, page_type_flag, 1, last_page);
+    set_alloc_start_page(page_type_flag, 1, last_page);
 
     /* Set up the pages. */
     page_index_t page;
@@ -1077,8 +1072,6 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
 
     return page_address(first_page);
 }
-
-static page_index_t gencgc_alloc_start_page = -1;
 
 void
 gc_heap_exhausted_error_or_lose (sword_t available, sword_t requested)
@@ -1186,10 +1179,6 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
 #endif
     }
     page_type_flag &= ~SINGLE_OBJECT_FLAG;
-
-    /* Toggled by gc_and_save for heap compaction, normally -1. */
-    if (gencgc_alloc_start_page != -1)
-        restart_page = gencgc_alloc_start_page;
 
     gc_assert(nbytes>=0);
     first_page = restart_page;
@@ -2984,8 +2973,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
 
     /* Change to a new space for allocation, resetting the alloc_start_page */
         gc_alloc_generation = new_space;
-        bzero(generations[new_space].alloc_start_page_,
-              sizeof generations[new_space].alloc_start_page_);
+        RESET_ALLOC_START_PAGES();
 
     /* Before any pointers are preserved, the dont_move flags on the
      * pages need to be cleared. */
@@ -3263,8 +3251,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
     }
 
     /* Reset the alloc_start_page for generation. */
-    bzero(generations[generation].alloc_start_page_,
-          sizeof generations[generation].alloc_start_page_);
+    RESET_ALLOC_START_PAGES();
 
     /* Set the new gc trigger for the GCed generation. */
     generations[generation].gc_trigger =
@@ -3648,9 +3635,6 @@ static void gc_allocate_ptes()
 
     /* Initialize the generations. */
     for (i = 0; i < NUM_GENERATIONS; i++) {
-        generations[i].alloc_start_page = 0;
-        generations[i].alloc_unboxed_start_page = 0;
-        generations[i].alloc_large_start_page = 0;
         generations[i].bytes_allocated = 0;
         generations[i].gc_trigger = 2000000;
         generations[i].num_gc = 0;
@@ -4000,6 +3984,34 @@ gc_and_save(char *filename, boolean prepend_runtime,
     /* Collect twice: once into relatively high memory, and then back
      * into low memory. This compacts the retained data into the lower
      * pages, minimizing the size of the core file.
+     *
+     * But note: There is no assurance that this technique actually works,
+     * and that the final GC can fit all data below the starting allocation
+     * page in the penultimate GC. If it doesn't fit, things are technically
+     * ok, but horrible in terms of core file size.  Consider:
+     *
+     * Penultimate GC: (moves all objects higher in memory)
+     *   | ... from_space ... |
+     *                        ^--  gencgc_alloc_start_page = last_free_page
+     *                        | ... to_space ... |
+     *                                           ^ new last_free_page
+     *
+     * Utimate GC: (moves all objects lower in memory)
+     *   | ... to_space ...   | ... from_space ...| ... |
+     *                                                  ^ new last_free_page ?
+     * Question:
+     *  In the ultimate GC, can last_free_page actually increase past
+     *  its ending value from the penultimate GC?
+     * Answer:
+     *  Yes- Suppose the sequence of copying is so adversarial to the allocator
+     *  that attempts to fit an object in a region fail often, and require
+     *  frequent opening of new regions. (And/or imagine a particularly bad mix
+     *  of boxed and non-boxed allocations such that the logic for resuming
+     *  at the tail of a partially filled page in gc_find_freeish_pages()
+     *  is seldom applicable)  If this occurs, then some allocation must
+     *  be on a higher page than all of to_space and from_space.
+     *  Then the entire (zeroed) from_space will be present in the saved core
+     *  as empty pages, because we can't represent discontiguous ranges.
      */
     prepare_for_final_gc();
     gencgc_alloc_start_page = last_free_page;
@@ -4011,6 +4023,8 @@ gc_and_save(char *filename, boolean prepend_runtime,
         printf("[coalescing similar vectors... ");
         fflush(stdout);
     }
+    /* FIXME: add comment explaining why coalescing is deferred until
+     * after the penultimate GC. Must it wait ? */
     coalesce_similar_objects();
     if (gc_coalesce_string_literals && verbose)
         printf("done]\n");
@@ -4018,7 +4032,7 @@ gc_and_save(char *filename, boolean prepend_runtime,
     /* FIXME: now that relocate_heap() works, can we just memmove() everything
      * down and perform a relocation instead of a collection? */
     prepare_for_final_gc();
-    gencgc_alloc_start_page = -1;
+    gencgc_alloc_start_page = 0;
     collect_garbage(HIGHEST_NORMAL_GENERATION+1);
 
     if (prepend_runtime)
