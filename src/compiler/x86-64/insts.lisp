@@ -3010,7 +3010,6 @@
   (define-insert-sse-instruction pinsrb #x66 #x3a #x20)
   (define-insert-sse-instruction pinsrw #x66 #xc4 nil)
   (define-insert-sse-instruction pinsrd #x66 #x3a #x22)
-  (define-insert-sse-instruction insertps #x66 #x3a #x21)
 
   (define-extract-sse-instruction pextrb #x66 #x3a #x14)
   (define-extract-sse-instruction pextrd #x66 #x3a #x16)
@@ -3183,6 +3182,8 @@
   (regular-2byte-sse-inst-imm pcmpestri #x66 #x3a #x61)
   (regular-2byte-sse-inst-imm pcmpistrm #x66 #x3a #x62)
   (regular-2byte-sse-inst-imm pcmpistri #x66 #x3a #x63)
+
+  (regular-2byte-sse-inst-imm insertps #x66 #x3a #x21)
 
   (regular-2byte-sse-inst-imm aeskeygenassist #x66 #x3a #xdf))
 
