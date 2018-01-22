@@ -450,11 +450,8 @@
                   (mapcar (lambda (pl) (make-direct-slotd class pl))
                           direct-slots))
             (slot-value class 'direct-slots)))
-  (if direct-default-initargs-p
-      (setf (plist-value class 'direct-default-initargs)
-            direct-default-initargs)
-      (setq direct-default-initargs
-            (plist-value class 'direct-default-initargs)))
+  (when direct-default-initargs-p
+    (setf (plist-value class 'direct-default-initargs) direct-default-initargs))
   (setf (plist-value class 'class-slot-cells)
         (let ((old-class-slot-cells (plist-value class 'class-slot-cells))
               (safe (safe-p class))
