@@ -1991,7 +1991,7 @@ update_page_write_prot(page_index_t page)
         if (is_lisp_pointer(word))
             ptr = (void*)word;
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-        else if (is_lisp_pointer(word>>32) &&
+        else if (lowtag_of(word>>32)==INSTANCE_POINTER_LOWTAG &&
                  (widetag_of(word)==INSTANCE_WIDETAG||
                   widetag_of(word)==FUNCALLABLE_INSTANCE_WIDETAG))
             ptr = (void*)(word >> 32);
