@@ -192,7 +192,7 @@ invoked. In that case it will store into PLACE and start over."
                                 :accessor 'sb!c::compiler-macro-args)))
     `(progn
           (eval-when (:compile-toplevel)
-           (sb!c::%compiler-defmacro :compiler-macro-function ',name t))
+           (sb!c::%compiler-defmacro :compiler-macro-function ',name))
           (eval-when (:compile-toplevel :load-toplevel :execute)
            (sb!c::%define-compiler-macro ',name ,def)))))
 

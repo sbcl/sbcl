@@ -426,7 +426,7 @@
                  (inst b LOOP)
                  DONE
                  (inst mov csp-tn dest))))
-        
+
         DO-REGS
         (when (< fixed register-arg-count)
           ;; Now we have to deposit any more args that showed up in registers.

@@ -34,7 +34,7 @@
          ;; %COMPILER-DEFMACRO just performs a check for duplicate definitions
          ;; within a file.
          (eval-when (:compile-toplevel)
-           (sb!c::%compiler-defmacro :macro-function ',name t))
+           (sb!c::%compiler-defmacro :macro-function ',name))
          (eval-when (:compile-toplevel :load-toplevel :execute)
            (sb!c::%defmacro ',name ,def (sb!c:source-location)))))))
 
