@@ -1363,8 +1363,7 @@ handled by any other handler, it will be muffled.")
     namestring))
 
 (defun interesting-function-redefinition-warning-p (warning old)
-  (let ((new (function-redefinition-warning-new-function warning))
-        (source-location (redefinition-warning-new-location warning)))
+  (let ((new (function-redefinition-warning-new-function warning)))
     (or
      ;; compiled->interpreted is interesting.
      (and (typep old 'compiled-function)
@@ -1372,14 +1371,11 @@ handled by any other handler, it will be muffled.")
      ;; fin->regular is interesting except for interpreted->compiled.
      (and (typep new '(not funcallable-instance))
           (typep old '(and funcallable-instance
-                           #!+sb-fasteval (not sb!interpreter:interpreted-function)
-                           #!+sb-eval (not sb!eval:interpreted-function))))
+                       #!+sb-fasteval (not sb!interpreter:interpreted-function)
+                       #!+sb-eval (not sb!eval:interpreted-function))))
      ;; different file or unknown location is interesting.
      (let* ((old-namestring (function-file-namestring old))
-            (new-namestring
-             (or (function-file-namestring new)
-                 (when source-location
-                   (sb!c::definition-source-location-namestring source-location)))))
+            (new-namestring (function-file-namestring new)))
        (and (or (not old-namestring)
                 (not new-namestring)
                 (not (string= old-namestring new-namestring))))))))

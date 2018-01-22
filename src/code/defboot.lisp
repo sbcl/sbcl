@@ -217,8 +217,7 @@ evaluated as a PROGN."
       `(progn
          (eval-when (:compile-toplevel)
            (sb!c:%compiler-defun ',name ,inline-thing t))
-         (%defun ',name ,named-lambda (sb!c:source-location)
-                 ,@(and inline-thing (list inline-thing)))
+         (%defun ',name ,named-lambda ,@(and inline-thing (list inline-thing)))
          ;; This warning, if produced, comes after the DEFUN happens.
          ;; When compiling, there's no real difference, but when interpreting,
          ;; if there is a handler for style-warning that nonlocally exits,
@@ -230,14 +229,13 @@ evaluated as a PROGN."
                ',name))))))
 
 #-sb-xc-host
-(defun %defun (name def source-location &optional inline-lambda)
+(defun %defun (name def &optional inline-lambda)
   (declare (type function def))
   ;; should've been checked by DEFMACRO DEFUN
   (aver (legal-fun-name-p name))
   (sb!c:%compiler-defun name inline-lambda nil)
   (when (fboundp name)
-    (warn 'redefinition-with-defun
-          :name name :new-function def :new-location source-location))
+    (warn 'redefinition-with-defun :name name :new-function def))
   (setf (fdefinition name) def)
   ;; %COMPILER-DEFUN doesn't do this except at compile-time, when it
   ;; also checks package locks. By doing this here we let (SETF

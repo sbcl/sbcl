@@ -175,7 +175,7 @@
   (!with-init-wrappers
    (dolist (x *!cold-defuns*)
      (destructuring-bind (name . inline-expansion) x
-       (%defun name (fdefinition name) nil inline-expansion))))
+       (%defun name (fdefinition name) inline-expansion))))
 
   ;; KLUDGE: Why are fixups mixed up with toplevel forms? Couldn't
   ;; fixups be done separately? Wouldn't that be clearer and better?

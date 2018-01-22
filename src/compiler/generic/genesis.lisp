@@ -1856,12 +1856,7 @@ core and return a descriptor to it."
      (ash sb!vm:simple-fun-code-offset sb!vm:word-shift)))
 
 ;;; Handle a DEFUN in cold-load.
-(defun cold-fset (name defn source-loc &optional inline-expansion)
-  ;; SOURCE-LOC can be ignored, because functions intrinsically store
-  ;; their location as part of the code component.
-  ;; The argument is supplied here only to provide context for
-  ;; a redefinition warning, which can't happen in cold load.
-  (declare (ignore source-loc))
+(defun cold-fset (name defn &optional inline-expansion)
   (sb!int:binding* (((cold-name warm-name)
                      ;; (SETF f) was descriptorized when dumped, symbols were not.
                      (if (symbolp name)
@@ -1876,8 +1871,8 @@ core and return a descriptor to it."
     (push (cold-cons cold-name inline-expansion) *!cold-defuns*)
     (write-wordindexed fdefn sb!vm:fdefn-fun-slot defn)
     (let ((fun-entry-addr
-           (+ (logandc2 (descriptor-bits defn) sb!vm:lowtag-mask)
-              (ash sb!vm:simple-fun-code-offset sb!vm:word-shift))))
+            (+ (logandc2 (descriptor-bits defn) sb!vm:lowtag-mask)
+               (ash sb!vm:simple-fun-code-offset sb!vm:word-shift))))
       (declare (ignorable fun-entry-addr)) ; sparc and arm don't need
       #!+(and immobile-code x86-64)
       (write-wordindexed/raw fdefn sb!vm:fdefn-raw-addr-slot
