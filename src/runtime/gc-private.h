@@ -24,18 +24,15 @@
 #ifdef LISP_FEATURE_GENCGC
 #include "gencgc-alloc-region.h"
 void *
-gc_alloc_with_region(sword_t nbytes,int page_type_flag, struct alloc_region *my_region,
-                     int quick_p);
+gc_alloc_with_region(struct alloc_region *my_region, sword_t nbytes,
+                     int page_type_flag, int quick_p);
 static inline void *
 gc_general_alloc(sword_t nbytes, int page_type_flag, int quick_p)
 {
-    struct alloc_region *my_region;
-    if (1 <= page_type_flag && page_type_flag <= 3) {
-        my_region = &gc_alloc_region[page_type_flag-1];
-    } else {
-        lose("bad page type flag: %d", page_type_flag);
-    }
-    return gc_alloc_with_region(nbytes, page_type_flag, my_region, quick_p);
+    if (1 <= page_type_flag && page_type_flag <= 3)
+        return gc_alloc_with_region(&gc_alloc_region[page_type_flag-1],
+                                    nbytes, page_type_flag, quick_p);
+    lose("bad page type flag: %d", page_type_flag);
 }
 #else
 extern void *gc_general_alloc(sword_t nbytes,int page_type_flag,int quick_p);

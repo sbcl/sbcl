@@ -412,7 +412,7 @@ __attribute__((unused)) static char *fillerp(lispobj* where)
     page_index_t page;
     if (where[0] | where[1])
         return "cons";
-    if ((page = find_page_index(where)) >= 0 && page_table[page].large_object)
+    if ((page = find_page_index(where)) >= 0 && page_table[page].singleton)
         return "cons (largeobj filler)";
     return "cons (filler)";
 }

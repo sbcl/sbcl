@@ -53,10 +53,9 @@ lispobj alloc_code_object (unsigned boxed, unsigned unboxed)
     int result = thread_mutex_lock(&allocation_lock);
     gc_assert(!result);
     code = (struct code *)
-      lisp_alloc(boxedwords*N_WORD_BYTES + unboxed_aligned,
-                 CODE_PAGE_ALLOCATED,
-                 &gc_alloc_region[CODE_PAGE_ALLOCATED-1],
-                 arch_os_get_current_thread());
+      lisp_alloc(&gc_alloc_region[CODE_PAGE_ALLOCATED-1],
+                 boxedwords*N_WORD_BYTES + unboxed_aligned,
+                 CODE_PAGE_ALLOCATED, arch_os_get_current_thread());
     result = thread_mutex_unlock(&allocation_lock);
     gc_assert(!result);
 

@@ -97,11 +97,11 @@ struct page {
     // !!! If bit positions are changed, be sure to reflect the changes into
     // page_extensible_p() as well as ALLOCATION-INFORMATION in sb-introspect
     unsigned char
-        /*  000 free
-         *  ?01 boxed data
-         *  ?10 unboxed data
-         *  ?11 code
-         *  1?? open region
+        /*  0000 free
+         *  ?001 boxed data
+         *  ?010 unboxed data
+         *  ?011 code
+         *  1??? open region
          *
          * Constants for this field are defined in gc-internal.h, the
          * xxx_PAGE_FLAG definitions.
@@ -120,11 +120,13 @@ struct page {
         write_protected_cleared :1,
         /* If this page should not be moved during a GC then this flag
          * is set. It's only valid during a GC for allocated pages. */
-        dont_move :1,
+        pinned :1,
         /* If the page is part of a large object then this flag is
-         * set. No other objects should be allocated to these pages.
-         * This is only valid when the page is allocated. */
-        large_object :1;
+         * set. Exactly one object can reside on pages so marked.
+         * This is only meaningful when the page is allocated. */
+        // This might be better as one more bit in 'allocated'
+        // rather than a separate field.
+        singleton :1;
 
     /* the generation that this page belongs to. This should be valid
      * for all pages that may have objects allocated, even current
@@ -155,12 +157,12 @@ extern page_index_t page_table_pages;
 /* forward declarations */
 
 void update_dynamic_space_free_pointer(void);
-void gc_close_region(int page_type_flag, struct alloc_region *alloc_region);
-static void inline ensure_region_closed(int page_type_flag,
-                                        struct alloc_region *alloc_region)
+void gc_close_region(struct alloc_region *alloc_region, int page_type_flag);
+static void inline ensure_region_closed(struct alloc_region *alloc_region,
+                                        int page_type_flag)
 {
     if (alloc_region->start_addr)
-        gc_close_region(page_type_flag, alloc_region);
+        gc_close_region(alloc_region, page_type_flag);
 }
 
 static void inline gc_set_region_empty(struct alloc_region *region)
@@ -201,7 +203,7 @@ find_page_index(void *addr)
 #error "GENCGC_IS_PRECISE must be #defined as 0 or 1"
 #endif
 #define page_has_smallobj_pins(page) \
-  (page_table[page].dont_move && !page_table[page].large_object)
+  (page_table[page].pinned && !page_table[page].singleton)
 static inline boolean pinned_p(lispobj obj, page_index_t page)
 {
     extern struct hopscotch_table pinned_objects;
