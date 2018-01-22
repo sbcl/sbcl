@@ -2438,8 +2438,6 @@ free_oldspace(void)
         do {
             /* Free the page. */
             bytes_freed += page_bytes_used(last_page);
-            generations[page_table[last_page].gen].bytes_allocated -=
-                page_bytes_used(last_page);
             reset_page_flags(last_page);
             set_page_bytes_used(last_page, 0);
             /* Should already be unprotected by unprotect_oldspace(). */
@@ -2447,8 +2445,8 @@ free_oldspace(void)
             last_page++;
         }
         while ((last_page < last_free_page)
-               && (page_bytes_used(last_page) != 0)
-               && (page_table[last_page].gen == from_space));
+               && page_table[last_page].gen == from_space
+               && page_bytes_used(last_page));
 
 #ifdef TRAVERSE_FREED_OBJECTS
         /* At this point we could attempt to recycle unused TLS indices
@@ -2484,6 +2482,7 @@ free_oldspace(void)
         first_page = last_page;
     } while (first_page < last_free_page);
 
+    generations[from_space].bytes_allocated -= bytes_freed;
     bytes_allocated -= bytes_freed;
     return bytes_freed;
 }
