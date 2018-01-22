@@ -1626,8 +1626,12 @@ scavenge_pinned_ranges()
     }
 }
 
-void add_filler (lispobj * filler, sword_t nwords) {
-    filler[0] = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
+void deposit_filler(uword_t addr, sword_t nbytes) {
+    gc_assert(nbytes >= 0);
+    if (nbytes > 0) {
+        sword_t nwords = nbytes >> WORD_SHIFT;
+        *(lispobj*)addr = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
+    }
 }
 
 /* Deposit filler objects on small object pinned pages.
@@ -1704,11 +1708,7 @@ wipe_nonpinned_words()
         page_index_t begin_page_index = find_page_index(obj);
         // Create a filler object occupying space from 'fill_from' up to but
         // excluding 'obj'. If obj directly abuts its predecessor then don't.
-        if ((uword_t)obj > fill_from) {
-            lispobj* filler = (lispobj*)fill_from;
-            int nwords = obj - filler;
-            add_filler(filler, nwords);
-        }
+        deposit_filler(fill_from, (uword_t)obj - fill_from);
         if (fill_from == page_base((uword_t)obj)) {
             adjust_gen_usage(begin_page_index);
             // This pinned object started a new page of pins.
@@ -1720,8 +1720,8 @@ wipe_nonpinned_words()
         // ensure that those pages' scan_starts point at the same address
         // that this page's scan start does, which could be this page or earlier.
         size_t nwords = OBJECT_SIZE(*obj, obj);
-        lispobj* obj_end = obj + nwords; // non-inclusive address bound
-        page_index_t end_page_index = find_page_index(obj_end - 1); // inclusive bound
+        uword_t obj_end = (uword_t)(obj + nwords); // non-inclusive address bound
+        page_index_t end_page_index = find_page_index((char*)obj_end - 1); // inclusive bound
 
         if (end_page_index > begin_page_index) {
             char *scan_start = page_scan_start(begin_page_index);
@@ -1733,21 +1733,17 @@ wipe_nonpinned_words()
             }
         }
         // Compute page base address of last page touched by this obj.
-        uword_t obj_end_pageaddr = page_base((uword_t)obj_end - 1);
+        uword_t obj_end_pageaddr = page_base(obj_end - 1);
         // See if there's another pinned object on this page.
         // There is always a next object, due to the sentinel.
         if (pinned_objects.keys[i+1] < obj_end_pageaddr + GENCGC_CARD_BYTES) {
             // Next object starts within the same page.
-            fill_from = (uword_t)obj_end;
+            fill_from = obj_end;
         } else {
             // Next pinned object does not start on the same page this obj ends on.
             // Any bytes following 'obj' up to its page end are garbage.
             uword_t page_end = obj_end_pageaddr + page_bytes_used(end_page_index);
-            long nbytes = page_end - (uword_t)obj_end;
-            gc_assert(nbytes >= 0);
-            if (nbytes) {
-                add_filler(obj_end, nbytes / N_WORD_BYTES);
-            }
+            deposit_filler(obj_end, page_end - obj_end);
             fill_from = page_base(pinned_objects.keys[i+1]);
         }
     }
