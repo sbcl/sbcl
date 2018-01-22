@@ -93,7 +93,7 @@
                            (short-combine-methods
                             type-name options operator ioa new-method doc))
                          args))
-            :definition-source source-location))
+            'source source-location))
     (when old-method
       (remove-method #'find-method-combination old-method))
     (add-method #'find-method-combination new-method)
@@ -116,7 +116,7 @@
                  :options options
                  :operator operator
                  :identity-with-one-argument ioa
-                 :definition-source method
+                 'source method
                  :documentation doc))
 
 (defmethod invalid-qualifiers ((gf generic-function)
@@ -189,7 +189,7 @@
                                            :args-lambda-list args-lambda-list
                                            :documentation doc))
                           args))
-             :definition-source source-location)))
+             'source source-location)))
     (setf (gethash type-name *long-method-combination-functions*) function)
     (when old-method (remove-method #'find-method-combination old-method))
     (add-method #'find-method-combination new-method)

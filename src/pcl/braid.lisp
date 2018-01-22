@@ -486,7 +486,7 @@
                                      :slot-name slot-name
                                      :object-class class-name
                                      :method-class-function (constantly (find-class accessor-class))
-                                     :definition-source source-location))))))
+                                     'source source-location))))))
 
 (defun !bootstrap-accessor-definitions1 (class-name
                                          slot-name
@@ -615,7 +615,7 @@
 
 (defun !make-class-predicate (class name source-location)
   (let* ((gf (ensure-generic-function name :lambda-list '(object)
-                                      :definition-source source-location))
+                                      'source source-location))
          (mlist (if (eq **boot-state** 'complete)
                     (early-gf-methods gf)
                     (generic-function-methods gf))))

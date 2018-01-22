@@ -422,7 +422,7 @@
     :reader short-combination-identity-with-one-argument
     :initarg :identity-with-one-argument)))
 
-(defclass slot-definition (metaobject)
+(defclass slot-definition (metaobject definition-source-mixin)
   ((name
     :initform nil
     :initarg :name
@@ -445,8 +445,7 @@
     ;; KLUDGE: we need a reader for bootstrapping purposes, in
     ;; COMPUTE-EFFECTIVE-SLOT-DEFINITION-INITARGS.
     :reader %slot-definition-documentation)
-   (%class :initform nil :initarg :class :accessor slot-definition-class)
-   (source :initform nil :initarg source :accessor definition-source)))
+   (%class :initform nil :initarg :class :accessor slot-definition-class)))
 
 (defclass standard-slot-definition (slot-definition)
   ((allocation
@@ -707,7 +706,7 @@
   ((source
     :initform nil
     :reader definition-source
-    :initarg :definition-source)))
+    :initarg source)))
 
 (defclass plist-mixin (standard-object)
   ((plist :initform () :accessor object-plist :initarg plist)))

@@ -366,7 +366,7 @@ bootstrapping.
   (apply #'ensure-generic-function
          fun-name
          :lambda-list lambda-list
-         :definition-source source-location
+         'source source-location
          initargs))
 
 (define-condition generic-function-lambda-list-error
@@ -1850,7 +1850,7 @@ bootstrapping.
               :qualifiers qualifiers :specializers specializers))))
   (let ((method (apply #'add-named-method
                        gf-spec qualifiers specializers lambda-list
-                       :definition-source source-location
+                       'source source-location
                        initargs)))
     (unless (or (eq method-class 'standard-method)
                 (eq (find-class method-class nil) (class-of method)))
@@ -2289,7 +2289,7 @@ bootstrapping.
                                             &key (lambda-list nil
                                                               lambda-list-p)
                                             argument-precedence-order
-                                            definition-source
+                                            ((source source))
                                             documentation
                                             &allow-other-keys)
   (declare (ignore keys))
@@ -2300,7 +2300,7 @@ bootstrapping.
         ((assoc spec *!generic-function-fixups* :test #'equal)
          (if existing
              (make-early-gf spec lambda-list lambda-list-p existing
-                            argument-precedence-order definition-source
+                            argument-precedence-order source
                             documentation)
              (bug "The function ~S is not already defined." spec)))
         (existing
@@ -2309,7 +2309,7 @@ bootstrapping.
         (t
          (pushnew spec *!early-generic-functions* :test #'equal)
          (make-early-gf spec lambda-list lambda-list-p nil
-                        argument-precedence-order definition-source
+                        argument-precedence-order source
                         documentation))))
 
 (defun make-early-gf (spec &optional lambda-list lambda-list-p
@@ -2562,7 +2562,7 @@ bootstrapping.
 
 (defun !early-make-a-method (class qualifiers arglist specializers initargs doc
                             &key slot-name object-class method-class-function
-                            definition-source)
+                            ((source source)))
   (aver (notany #'sb-pcl::eql-specializer-p specializers))
   (binding*
       ;; Figure out whether we got class objects or class names as the
@@ -2600,14 +2600,14 @@ bootstrapping.
                (when slot-name
                  (list :slot-name slot-name :object-class object-class
                        :method-class-function method-class-function))
-               (list :definition-source definition-source)))))
+               (list 'source source)))))
     (initialize-method-function initargs result)
     result))
 
 (defun real-make-a-method
        (class qualifiers lambda-list specializers initargs doc
         &rest args &key slot-name object-class method-class-function
-        definition-source)
+                        ((source source)))
   (if method-class-function
       (let* ((object-class (if (classp object-class) object-class
                                (find-class object-class)))
@@ -2623,7 +2623,7 @@ bootstrapping.
           (apply #'make-instance
                  (apply method-class-function object-class slot-definition
                         initargs)
-                 :definition-source definition-source
+                 'source source
                  initargs)))
       (apply #'make-instance class :qualifiers qualifiers
              :lambda-list lambda-list :specializers specializers
@@ -2683,7 +2683,7 @@ bootstrapping.
 
 (defun !early-add-named-method (generic-function-name qualifiers
                                specializers arglist &rest initargs
-                               &key documentation definition-source
+                               &key documentation ((source source))
                                &allow-other-keys)
   (let* (;; we don't need to deal with the :generic-function-class
          ;; argument here because the default,
@@ -2699,7 +2699,7 @@ bootstrapping.
           (make-method-spec gf qualifiers specializers))
     (let ((new (make-a-method 'standard-method qualifiers arglist
                               specializers initargs documentation
-                              :definition-source definition-source)))
+                              'source source)))
       (when existing (remove-method gf existing))
       (add-method gf new))))
 
@@ -2843,7 +2843,7 @@ bootstrapping.
                          (make-a-method
                           'standard-method
                           qualifiers lambda-list specializers initargs nil
-                          :definition-source (translate-source-location fun))))))
+                          'source (translate-source-location fun))))))
             (setf (generic-function-method-class gf)
                   *the-class-standard-method*
                   (generic-function-method-combination gf)
