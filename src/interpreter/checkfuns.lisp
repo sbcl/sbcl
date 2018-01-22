@@ -188,8 +188,3 @@
   ())
 (define-condition compiler-environment-too-complex-error (simple-error)
   ())
-
-(defun ip-error (format-control &rest format-arguments)
-  (error 'sb-int:simple-program-error
-         :format-control format-control
-         :format-arguments format-arguments))

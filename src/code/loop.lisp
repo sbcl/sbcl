@@ -557,9 +557,8 @@ code to be loaded.
 
 (defun loop-error (format-string &rest format-args)
   #-sb-xc-host(declare (optimize allow-non-returning-tail-call))
-  (error 'simple-program-error
-         :format-control "~?~%current LOOP context:~{ ~S~}."
-         :format-arguments (list format-string format-args (loop-context))))
+  (%program-error "~?~%current LOOP context:~{ ~S~}."
+                  format-string format-args (loop-context)))
 
 (defun loop-warn (format-string &rest format-args)
   (warn "~?~%current LOOP context:~{ ~S~}."

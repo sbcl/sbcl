@@ -88,9 +88,13 @@
 
 (define-condition simple-control-error (simple-condition control-error) ())
 (define-condition simple-file-error    (simple-condition file-error)    ())
-(define-condition simple-program-error (simple-condition program-error) ())
 (define-condition simple-stream-error  (simple-condition stream-error)  ())
 (define-condition simple-parse-error   (simple-condition parse-error)   ())
+
+(define-condition simple-program-error (simple-condition program-error) ())
+(defun %program-error (&optional datum &rest arguments)
+  (error (apply #'coerce-to-condition datum
+                'simple-program-error '%program-error arguments)))
 
 (define-condition character-coding-error (error)
   ((external-format :initarg :external-format :reader character-coding-error-external-format)))

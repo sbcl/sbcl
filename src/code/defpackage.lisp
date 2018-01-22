@@ -56,20 +56,15 @@
         (seen nil))
     (dolist (option options)
       (unless (consp option)
-        (error 'simple-program-error
-               :format-control "bogus DEFPACKAGE option: ~S"
-               :format-arguments (list option)))
+        (%program-error "bogus DEFPACKAGE option: ~S" option))
       (setq optname (car option) optval (cdr option))
       (case optname
         ((:documentation :size #+sb-package-locks :lock)
          (when (memq optname seen)
-           (error 'simple-program-error
-                  :format-control "can't specify ~S more than once."
-                  :format-arguments (list optname)))
+           (%program-error "can't specify ~S more than once." optname))
          (unless (typep optval '(cons t null))
-           (error 'simple-program-error
-                  :format-control "~S expects a single argument. Got ~S"
-                  :format-arguments (list (car option) (cdr option))))
+           (%program-error "~S expects a single argument. Got ~S"
+                          (car option) (cdr option)))
          (push optname seen)
          (setq optval (car optval))))
       (case optname
@@ -87,9 +82,7 @@
         (:size
          (if (typep optval 'unsigned-byte)
              (setf size optval)
-             (error 'simple-program-error
-                    :format-control ":SIZE is not a positive integer: ~S"
-                    :format-arguments (cdr option))))
+             (%program-error ":SIZE is not a positive integer: ~S" option)))
         (:shadow
          (setf shadows (append shadows (stringify-string-designators optval))))
         (:shadowing-import-from
@@ -124,9 +117,7 @@
         (:documentation
          (setf doc (possibly-base-stringize optval)))
         (t
-         (error 'simple-program-error
-                :format-control "bogus DEFPACKAGE option: ~S"
-                :format-arguments (list option)))))
+         (%program-error "bogus DEFPACKAGE option: ~S" option))))
     (check-disjoint `(:intern ,@interns) `(:export  ,@exports))
     (check-disjoint `(:intern ,@interns)
                     `(:import-from
@@ -157,10 +148,9 @@
       with x = (car list)
       for y in (rest list)
       for z = (remove-duplicates (intersection (cdr x)(cdr y) :test #'string=))
-      when z do (error 'simple-program-error
-                       :format-control "Parameters ~S and ~S must be disjoint ~
-                                        but have common elements ~%   ~S"
-                       :format-arguments (list (car x)(car y) z)))))
+      when z do (%program-error "Parameters ~S and ~S must be disjoint ~
+                                 but have common elements ~%   ~S"
+                                (car x) (car y) z))))
 
 (flet ((designator-to-string (kind designator)
          (cond ((and (eq kind 'package) (packagep designator))

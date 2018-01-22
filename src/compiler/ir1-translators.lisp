@@ -308,28 +308,27 @@ Evaluate the FORMS in the specified SITUATIONS (any of :COMPILE-TOPLEVEL,
 ;;; further split so that the special-case MACROLET processing code in
 ;;; EVAL can likewise make use of it.
 (defun macrolet-definitionize-fun (context lexenv)
-  (flet ((fail (control &rest args)
-           (ecase context
-             (:compile (apply #'compiler-error control args))
-             (:eval (error 'simple-program-error
-                           :format-control control
-                           :format-arguments args)))))
-    (lambda (definition)
-      (unless (list-of-length-at-least-p definition 2)
-        (fail "The list ~S is too short to be a legal local macro definition."
-              definition))
-      (destructuring-bind (name arglist &body body) definition
-        (unless (symbolp name)
-          (fail "The local macro name ~S is not a symbol." name))
-        (when (fboundp name)
-          (program-assert-symbol-home-package-unlocked
-           context name "binding ~A as a local macro"))
-        (unless (listp arglist)
-          (fail "The local macro argument list ~S is not a list."
-                arglist))
-        `(,name macro .
-                ,(compile-in-lexenv (make-macro-lambda nil arglist body 'macrolet name)
-                                    lexenv))))))
+  (let ((signal-via (ecase context
+                      (:compile #'compiler-error)
+                      (:eval #'%program-error))))
+    (flet ((fail (control &rest args)
+             (apply signal-via control args)))
+      (lambda (definition)
+        (unless (list-of-length-at-least-p definition 2)
+          (fail "The list ~S is too short to be a legal local macro definition."
+                definition))
+        (destructuring-bind (name arglist &body body) definition
+          (unless (symbolp name)
+            (fail "The local macro name ~S is not a symbol." name))
+          (when (fboundp name)
+            (program-assert-symbol-home-package-unlocked
+             context name "binding ~A as a local macro"))
+          (unless (listp arglist)
+            (fail "The local macro argument list ~S is not a list."
+                  arglist))
+          `(,name macro .
+                  ,(compile-in-lexenv (make-macro-lambda nil arglist body 'macrolet name)
+                                      lexenv)))))))
 
 (defun funcall-in-macrolet-lexenv (definitions fun context)
   (%funcall-in-foomacrolet-lexenv
@@ -351,27 +350,26 @@ destructuring lambda list, and the FORMS evaluate to the expansion."
    :compile))
 
 (defun symbol-macrolet-definitionize-fun (context)
-  (flet ((fail (control &rest args)
-           (ecase context
-             (:compile (apply #'compiler-error control args))
-             (:eval (error 'simple-program-error
-                           :format-control control
-                           :format-arguments args)))))
-    (lambda (definition)
-      (unless (proper-list-of-length-p definition 2)
-        (fail "malformed symbol/expansion pair: ~S" definition))
-      (destructuring-bind (name expansion) definition
-        (unless (symbolp name)
-          (fail "The local symbol macro name ~S is not a symbol." name))
-        (when (or (boundp name) (eq (info :variable :kind name) :macro))
-          (program-assert-symbol-home-package-unlocked
-           context name "binding ~A as a local symbol-macro"))
-        (let ((kind (info :variable :kind name)))
-          (when (member kind '(:special :constant :global))
-            (fail "Attempt to bind a ~(~A~) variable with SYMBOL-MACROLET: ~S"
-                  kind name)))
-        ;; A magical cons that MACROEXPAND-1 understands.
-        `(,name . (macro . ,expansion))))))
+  (let ((signal-via (ecase context
+                      (:compile #'compiler-error)
+                      (:eval #'%program-error))))
+    (flet ((fail (control &rest args)
+             (apply signal-via control args)))
+      (lambda (definition)
+        (unless (proper-list-of-length-p definition 2)
+          (fail "malformed symbol/expansion pair: ~S" definition))
+        (destructuring-bind (name expansion) definition
+          (unless (symbolp name)
+            (fail "The local symbol macro name ~S is not a symbol." name))
+          (when (or (boundp name) (eq (info :variable :kind name) :macro))
+            (program-assert-symbol-home-package-unlocked
+             context name "binding ~A as a local symbol-macro"))
+          (let ((kind (info :variable :kind name)))
+            (when (member kind '(:special :constant :global))
+              (fail "Attempt to bind a ~(~A~) variable with SYMBOL-MACROLET: ~S"
+                    kind name)))
+          ;; A magical cons that MACROEXPAND-1 understands.
+          `(,name . (macro . ,expansion)))))))
 
 (defun funcall-in-symbol-macrolet-lexenv (definitions fun context)
   (%funcall-in-foomacrolet-lexenv

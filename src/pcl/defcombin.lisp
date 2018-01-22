@@ -396,11 +396,11 @@
     ;; ARGS-LAMBDA-LIST into NREQ and NOPT, and set WHOLE to the
     ;; name of a &WHOLE parameter, if any.
     (when (member '&whole (rest args-lambda-list))
-      (error 'simple-program-error
-             :format-control "~@<The value of the :ARGUMENTS option of ~
-                DEFINE-METHOD-COMBINATION is~2I~_~S,~I~_but &WHOLE may ~
-                only appear first in the lambda list.~:>"
-             :format-arguments (list args-lambda-list)))
+      (%program-error "~@<The value of the :ARGUMENTS option of ~
+                       DEFINE-METHOD-COMBINATION is~2I~_~S,~I~_but ~
+                       &WHOLE may only appear first in the lambda ~
+                       list.~:>"
+                      args-lambda-list))
     (loop with state = 'required
           for arg in args-lambda-list do
             (if (memq arg lambda-list-keywords)

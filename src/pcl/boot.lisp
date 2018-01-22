@@ -251,17 +251,13 @@ bootstrapping.
 (defmacro defgeneric (fun-name lambda-list &body options)
   (declare (type list lambda-list))
   (unless (legal-fun-name-p fun-name)
-    (error 'simple-program-error
-           :format-control "illegal generic function name ~S"
-           :format-arguments (list fun-name)))
+    (%program-error "illegal generic function name ~S" fun-name))
   (with-current-source-form (lambda-list)
     (check-gf-lambda-list lambda-list))
   (let ((initargs ())
         (methods ()))
     (flet ((duplicate-option (name)
-             (error 'simple-program-error
-                    :format-control "The option ~S appears more than once."
-                    :format-arguments (list name)))
+             (%program-error "The option ~S appears more than once." name))
            (expand-method-definition (qab) ; QAB = qualifiers, arglist, body
              (let* ((arglist-pos (position-if #'listp qab))
                     (arglist (elt qab arglist-pos))
@@ -276,10 +272,9 @@ bootstrapping.
               (declare
                (dolist (spec (cdr option))
                  (unless (consp spec)
-                   (error 'simple-program-error
-                          :format-control "~@<Invalid declaration specifier in ~
-                                           DEFGENERIC: ~S~:@>"
-                          :format-arguments (list spec)))
+                   (%program-error "~@<Invalid declaration specifier in ~
+                                    DEFGENERIC: ~S~:@>"
+                                   spec))
                  (when (member (first spec)
                                ;; FIXME: this list is slightly weird.
                                ;; ANSI (on the DEFGENERIC page) in one
@@ -292,10 +287,9 @@ bootstrapping.
                                ;; Very strange.  -- CSR, 2002-10-21
                                '(declaration ftype function
                                  inline notinline special))
-                   (error 'simple-program-error
-                          :format-control "The declaration specifier ~S ~
-                                         is not allowed inside DEFGENERIC."
-                          :format-arguments (list spec)))
+                   (%program-error "The declaration specifier ~S is ~
+                                    not allowed inside DEFGENERIC."
+                                  spec))
                  (if (or (eq 'optimize (first spec))
                          (info :declaration :recognized (first spec)))
                      (push spec (initarg :declarations))
@@ -305,26 +299,22 @@ bootstrapping.
                (when (initarg car-option)
                  (duplicate-option car-option))
                (unless (symbolp (cadr option))
-                 (error 'simple-program-error
-                        :format-control "METHOD-COMBINATION name not a ~
-                                         symbol: ~S"
-                        :format-arguments (list (cadr option))))
+                 (%program-error "METHOD-COMBINATION name not a symbol: ~
+                                  ~S"
+                                (cadr option)))
                (setf (initarg car-option)
                      `',(cdr option)))
               (:argument-precedence-order
                (let* ((required (nth-value 1 (parse-lambda-list lambda-list)))
                       (supplied (cdr option)))
                  (unless (= (length required) (length supplied))
-                   (error 'simple-program-error
-                          :format-control "argument count discrepancy in ~
-                                           :ARGUMENT-PRECEDENCE-ORDER clause."
-                          :format-arguments nil))
+                   (%program-error "argument count discrepancy in ~
+                                    :ARGUMENT-PRECEDENCE-ORDER clause."))
                  (when (set-difference required supplied)
-                   (error 'simple-program-error
-                          :format-control "unequal sets for ~
-                                           :ARGUMENT-PRECEDENCE-ORDER clause: ~
-                                           ~S and ~S"
-                          :format-arguments (list required supplied)))
+                   (%program-error "unequal sets for ~
+                                    :ARGUMENT-PRECEDENCE-ORDER clause: ~
+                                    ~S and ~S"
+                                   required supplied))
                  (setf (initarg car-option)
                        `',(cdr option))))
               ((:documentation :generic-function-class :method-class)
@@ -334,13 +324,11 @@ bootstrapping.
                    (duplicate-option car-option)
                    (setf (initarg car-option) `',(cadr option))))
               (:method
-               (push (cdr option) methods))
+                  (push (cdr option) methods))
               (t
                ;; ANSI requires that unsupported things must get a
                ;; PROGRAM-ERROR.
-               (error 'simple-program-error
-                      :format-control "unsupported option ~S"
-                      :format-arguments (list option))))))
+               (%program-error "unsupported option ~S" option)))))
 
         (when (initarg :declarations)
           (setf (initarg :declarations)
@@ -1521,21 +1509,15 @@ bootstrapping.
            (cond ((null args)
                   (if (eql nreq 0)
                       (invoke-fast-method-call emf nil)
-                      (error 'simple-program-error
-                             :format-control "invalid number of arguments: 0"
-                             :format-arguments nil)))
+                      (%program-error "invalid number of arguments: 0")))
                  ((null (cdr args))
                   (if (eql nreq 1)
                       (invoke-fast-method-call emf nil (car args))
-                      (error 'simple-program-error
-                             :format-control "invalid number of arguments: 1"
-                             :format-arguments nil)))
+                      (%program-error "invalid number of arguments: 1")))
                  ((null (cddr args))
                   (if (eql nreq 2)
                       (invoke-fast-method-call emf nil (car args) (cadr args))
-                      (error 'simple-program-error
-                             :format-control "invalid number of arguments: 2"
-                             :format-arguments nil)))
+                      (%program-error "invalid number of arguments: 2")))
                  (t
                   (apply (fast-method-call-function emf)
                          (fast-method-call-pv emf)
@@ -1547,9 +1529,7 @@ bootstrapping.
             (method-call-call-method-args emf)))
     (fixnum
      (cond ((null args)
-            (error 'simple-program-error
-                   :format-control "invalid number of arguments: 0"
-                   :format-arguments nil))
+            (%program-error "invalid number of arguments: 0"))
            ((null (cdr args))
             (let* ((slots (get-slots (car args)))
                    (value (clos-slots-ref slots emf)))
@@ -1559,14 +1539,10 @@ bootstrapping.
            ((null (cddr args))
             (setf (clos-slots-ref (get-slots (cadr args)) emf)
                   (car args)))
-           (t (error 'simple-program-error
-                     :format-control "invalid number of arguments"
-                     :format-arguments nil))))
+           (t (%program-error "invalid number of arguments"))))
     (fast-instance-boundp
      (if (or (null args) (cdr args))
-         (error 'simple-program-error
-                :format-control "invalid number of arguments"
-                :format-arguments nil)
+         (%program-error "invalid number of arguments")
          (let ((slots (get-slots (car args))))
            (not (unbound-marker-p
                  (clos-slots-ref slots (fast-instance-boundp-index emf)))))))
@@ -1750,9 +1726,8 @@ bootstrapping.
                 (.dummy0.
                  ,@(when (eq state 'optional)
                      `((unless (null ,args-tail)
-                         (error 'simple-program-error
-                                :format-control "surplus arguments: ~S"
-                                :format-arguments (list ,args-tail)))))))
+                         (%program-error "surplus arguments: ~S"
+                                         ,args-tail))))))
            (declare (ignorable ,args-tail .dummy0.))
            ,@body)))))
 
@@ -2140,11 +2115,10 @@ bootstrapping.
                                (early-method-lambda-list method)
                                (method-lambda-list method)))
     (flet ((lose (string &rest args)
-             (error 'simple-program-error
-                    :format-control "~@<attempt to add the method~2I~_~S~I~_~
-                                     to the generic function~2I~_~S;~I~_~
-                                     but ~?~:>"
-                    :format-arguments (list method gf string args)))
+             (%program-error "~@<attempt to add the method~2I~_~S~I~_~
+                              to the generic function~2I~_~S;~I~_ but ~
+                              ~?~:>"
+                             method gf string args))
            (comparison-description (x y)
              (if (> x y) "more" "fewer")))
       (let ((gf-nreq (arg-info-number-required arg-info))

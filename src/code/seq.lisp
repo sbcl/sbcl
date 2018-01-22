@@ -227,9 +227,7 @@
   ;; On the other hand, I'm not sure it deserves to be a type-error,
   ;; either. -- bem, 2005-08-10
   (declare (optimize allow-non-returning-tail-call))
-  (error 'simple-program-error
-         :format-control "~S is too hairy for sequence functions."
-         :format-arguments (list type-spec)))
+  (%program-error "~S is too hairy for sequence functions." type-spec))
 
 (sb!xc:defmacro when-extended-sequence-type
     ((type-specifier type

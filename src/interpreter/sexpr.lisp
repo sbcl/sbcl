@@ -496,18 +496,20 @@
 (defun err-too-few-args (fun n-args)
   (declare (explicit-check))
   (let ((frame (interpreted-function-frame fun)))
-    (ip-error "~S received ~D argument~:P but expects~:[ at least~;~] ~D."
-           (name-for-fun fun) n-args
-           (eql (lambda-frame-min-args frame) (lambda-frame-max-args frame))
-           (lambda-frame-min-args frame))))
+    (%program-error "~S received ~D argument~:P but expects~:[ at least~;~] ~D."
+                    (name-for-fun fun) n-args
+                    (eql (lambda-frame-min-args frame)
+                         (lambda-frame-max-args frame))
+                    (lambda-frame-min-args frame))))
 
 (defun err-too-many-args (fun n-args)
   (declare (explicit-check))
   (let ((frame (interpreted-function-frame fun)))
-    (ip-error "~S received ~D argument~:P but expects~:[ at most~;~] ~D"
-           (name-for-fun fun) n-args
-           (eql (lambda-frame-min-args frame) (lambda-frame-max-args frame))
-           (lambda-frame-max-args frame))))
+    (%program-error "~S received ~D argument~:P but expects~:[ at most~;~] ~D"
+                    (name-for-fun fun) n-args
+                    (eql (lambda-frame-min-args frame)
+                         (lambda-frame-max-args frame))
+                    (lambda-frame-max-args frame))))
 
 (defmacro with-lambda-frame ((frame-var fun if-invalid) &body if-valid)
   ;; If any global variable has changed its :KIND, this function's lambda
@@ -530,7 +532,7 @@
                (if (oddp n-more)
                    (fail-odd-length (+ n-seen n-more)))))
            (fail-odd-length (n)
-             (ip-error "odd number of &KEY arguments: ~D" n))
+             (%program-error "odd number of &KEY arguments: ~D" n))
            (fail-other-key ()
              (let ((n-allowed (keyword-bits-n-keys control-bits)) bad)
                (loop for (key val) on list by #'cddr ; rescan to collect them
@@ -538,10 +540,11 @@
                                 (find key allowed :end n-allowed))
                      do (pushnew key bad))
                (let ((plural (cdr bad)))
-                 (ip-error "Keyword~*~:[~;s~]~2:* ~{~S~^,~} ~:[is~;are~] not ~
-                            ~:[allowed.~;in the allowed set ~:*~S~]"
-                           (nreverse bad) plural
-                           (replace (make-list n-allowed) allowed))))))
+                 (%program-error "Keyword~*~:[~;s~]~2:* ~{~S~^,~} ~
+                                  ~:[is~;are~] not ~:[allowed.~;in the ~
+                                  allowed set ~:*~S~]"
+                                 (nreverse bad) plural
+                                 (replace (make-list n-allowed) allowed))))))
     (if (keyword-bits-allowp control-bits)
         (check-odd-length list 0)
         (let ((n-allowed (keyword-bits-n-keys control-bits))
@@ -950,7 +953,7 @@ Test case.
 
 (defun arglist-to-sexprs (args)
   (let ((argc (or (list-length args)
-                  (ip-error "Malformed function call"))))
+                  (%program-error "Malformed function call"))))
     (values (mapcar #'%sexpr args) argc)))
 
 ;;; Return a handler which decides whether its supplied SEXPR needs

@@ -128,9 +128,8 @@
   (maplist (lambda (sublist)
              (let ((option-name (first (pop sublist))))
                (when (member option-name sublist :key #'first :test #'eq)
-                 (error 'simple-program-error
-                        :format-control "Multiple ~S options in DEFCLASS ~S."
-                        :format-arguments (list option-name class-name)))))
+                 (%program-error "Multiple ~S options in DEFCLASS ~S."
+                                 option-name class-name))))
            options)
   (let (metaclass
         default-initargs
@@ -143,20 +142,19 @@
           (:metaclass
            (let ((maybe-metaclass (second option)))
              (unless (and maybe-metaclass (legal-class-name-p maybe-metaclass))
-               (error 'simple-program-error
-                      :format-control "~@<The value of the :metaclass option (~S) ~
-                         is not a legal class name.~:@>"
-                      :format-arguments (list maybe-metaclass)))
+               (%program-error "~@<The value of the :metaclass ~
+                                option (~S) is not a legal class ~
+                                name.~:@>"
+                               maybe-metaclass))
              (setf metaclass maybe-metaclass)))
           (:default-initargs
            (let (initargs arg-names)
              (doplist (key val) (cdr option)
                (when (member key arg-names :test #'eq)
-                 (error 'simple-program-error
-                        :format-control "~@<Duplicate initialization argument ~
-                                           name ~S in :DEFAULT-INITARGS of ~
-                                           DEFCLASS ~S.~:>"
-                        :format-arguments (list key class-name)))
+                 (%program-error "~@<Duplicate initialization argument ~
+                                  name ~S in :DEFAULT-INITARGS of ~
+                                  DEFCLASS ~S.~:>"
+                                 key class-name))
                (push key arg-names)
                (push ``(,',key ,',val ,,(make-initfunction val)) initargs))
              (setf default-initargs t)
@@ -186,12 +184,10 @@
         (when (atom spec)
           (setf spec (list spec)))
        (when (and (cdr spec) (null (cddr spec)))
-         (error 'simple-program-error
-                :format-control "~@<in DEFCLASS ~S, the slot specification ~S ~
-                                is invalid; the probable intended meaning may ~
-                                be achieved by specifiying ~S instead.~:>"
-                :format-arguments (list class-name spec
-                                        `(,(car spec) :initform ,(cadr spec)))))
+         (%program-error "~@<in DEFCLASS ~S, the slot specification ~S ~
+                          is invalid; the probable intended meaning may ~
+                          be achieved by specifiying ~S instead.~:>"
+                         class-name spec `(,(car spec) :initform ,(cadr spec))))
        (let* ((name (car spec))
               (plist (cdr spec))
               (readers ())
@@ -205,10 +201,9 @@
          (push name *slot-names-for-this-defclass*)
          (flet ((note-reader (x)
                   (unless (symbolp x)
-                    (error 'simple-program-error
-                           :format-control "Slot reader name ~S for slot ~S in ~
-                                           DEFCLASS ~S is not a symbol."
-                           :format-arguments (list x name class-name)))
+                    (%program-error "Slot reader name ~S for slot ~S in ~
+                                     DEFCLASS ~S is not a symbol."
+                                    x name class-name))
                   (push x readers)
                   (push x *readers-for-this-defclass*))
                 (note-writer (x)
@@ -221,10 +216,9 @@
                (:writer   (note-writer val))
                (:initarg
                 (unless (symbolp val)
-                  (error 'simple-program-error
-                         :format-control "Slot initarg name ~S for slot ~S in ~
-                                         DEFCLASS ~S is not a symbol."
-                         :format-arguments (list val name class-name)))
+                  (%program-error "Slot initarg name ~S for slot ~S in ~
+                                   DEFCLASS ~S is not a symbol."
+                                  val name class-name))
                 (push val initargs))
                (otherwise
                 (when (member key '(:initform :allocation :type :documentation))
@@ -233,10 +227,9 @@
                   (when (eq key :type)
                     (setf type val))
                   (when (get-properties others (list key))
-                    (error 'simple-program-error
-                           :format-control "Duplicate slot option ~S for slot ~
-                                           ~S in DEFCLASS ~S."
-                           :format-arguments (list key name class-name))))
+                    (%program-error "Duplicate slot option ~S for slot ~
+                                     ~S in DEFCLASS ~S."
+                                    key name class-name)))
                 ;; For non-standard options multiple entries go in a list
                 (push val (getf others key))))))
          ;; Unwrap singleton lists (AMOP 5.4.2)
@@ -256,10 +249,9 @@
 
 (defun check-slot-name-for-defclass (name class-name env)
   (flet ((slot-name-illegal (reason)
-           (error 'simple-program-error
-                  :format-control "~@<In DEFCLASS ~S, the slot name ~S ~
-                                   is ~A.~@:>"
-                  :format-arguments (list class-name name reason))))
+           (%program-error "~@<In DEFCLASS ~S, the slot name ~S is ~
+                            ~A.~@:>"
+                           class-name name reason)))
     (cond ((not (symbolp name))
            (slot-name-illegal "not a symbol"))
           ((keywordp name)
@@ -267,9 +259,8 @@
           ((constantp name env)
            (slot-name-illegal "a constant"))
           ((member name *slot-names-for-this-defclass* :test #'eq)
-           (error 'simple-program-error
-                  :format-control "Multiple slots named ~S in DEFCLASS ~S."
-                  :format-arguments (list name class-name))))))
+           (%program-error "Multiple slots named ~S in DEFCLASS ~S."
+                           name class-name)))))
 
 (defun make-initfunction (initform)
   (cond ((or (eq initform t)

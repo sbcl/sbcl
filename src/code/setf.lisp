@@ -237,9 +237,7 @@
              (let ((place (car a))
                    (value-form (cadr a)))
                (when (and (not (symbolp place)) (eq operator 'psetq))
-                 (error 'simple-program-error
-                        :format-control "Place ~S in PSETQ is not a SYMBOL"
-                        :format-arguments (list place)))
+                 (%program-error "Place ~S in PSETQ is not a SYMBOL" place))
                (multiple-value-bind (temps vals stores setter)
                    (sb!xc:get-setf-expansion place env)
                  (let*-bindings (mapcar #'list temps vals))
@@ -592,4 +590,3 @@
     #!+(and (not sb-doc) (host-feature sb-xc-host)) (setq doc nil)
     `(eval-when (:compile-toplevel :load-toplevel :execute)
        (%defsetf ',access-fn ,def ,@(and doc `(,doc))))))
-

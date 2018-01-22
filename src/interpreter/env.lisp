@@ -618,7 +618,7 @@
   (declare (ignore env))
   (dolist (name symbols)
     (unless (symbolp name)
-      (ip-error "~A is not a symbol" name))
+      (%program-error "~A is not a symbol" name))
     ;; Same logic as SB-C::PROCESS-SPECIAL-DECL
     (let ((kind (info :variable :kind name)))
       (unless (member kind '(:special :unknown))

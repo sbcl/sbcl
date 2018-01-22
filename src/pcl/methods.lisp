@@ -731,10 +731,9 @@
        (specializer-class specializer)))
 
 (defun error-need-at-least-n-args (function n)
-  (error 'simple-program-error
-         :format-control "~@<The function ~2I~_~S ~I~_requires ~
-                          at least ~W argument~:P.~:>"
-         :format-arguments (list function n)))
+  (%program-error "~@<The function ~2I~_~S ~I~_requires at least ~W ~
+                   argument~:P.~:>"
+                  function n))
 
 (defun types-from-args (generic-function arguments &optional type-modifier)
   (multiple-value-bind (nreq applyp metatypes nkeys arg-info)

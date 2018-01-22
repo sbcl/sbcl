@@ -575,18 +575,16 @@
         (loop
            (when (>= i more-count)
              (when (and (invalid) (not allow-other-keys))
-               (error 'simple-program-error
-                      :format-control "~@<invalid keyword argument~P: ~
-                                   ~{~S~^, ~} (valid keys are ~{~S~^, ~}).~@:>"
-                      :format-arguments (list (length (invalid)) (invalid) valid-keys)))
+               (%program-error "~@<invalid keyword argument~P: ~
+                                ~{~S~^, ~} (valid keys are ~{~S~^, ~}).~@:>"
+                               (length (invalid)) (invalid) valid-keys))
              (return))
            (let ((key (current-value)))
              (incf i)
              (cond
                ((not (symbolp key))
-                (error 'simple-program-error
-                       :format-control "~@<keyword argument not a symbol: ~S.~@:>"
-                       :format-arguments (list key)))
+                (%program-error "~@<keyword argument not a symbol: ~S.~@:>"
+                                key))
                ((= i more-count)
                 (sb-c::%odd-key-args-error))
                ((eq key :allow-other-keys)

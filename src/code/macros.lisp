@@ -165,15 +165,13 @@ invoked. In that case it will store into PLACE and start over."
       (setf (info :variable :kind name) :macro)
       (setf (info :variable :macro-expansion name) expansion))
      (t
-      (error 'simple-program-error
-             :format-control "Symbol ~S is already defined as ~A."
-             :format-arguments (list name
-                                     (case kind
-                                       (:alien "an alien variable")
-                                       (:constant "a constant")
-                                       (:special "a special variable")
-                                       (:global "a global variable")
-                                       (t kind)))))))
+      (%program-error "Symbol ~S is already defined as ~A."
+                      name (case kind
+                             (:alien "an alien variable")
+                             (:constant "a constant")
+                             (:special "a special variable")
+                             (:global "a global variable")
+                             (t kind))))))
   name)
 
 ;;;; DEFINE-COMPILER-MACRO
@@ -182,9 +180,8 @@ invoked. In that case it will store into PLACE and start over."
   "Define a compiler-macro for NAME."
   (legal-fun-name-or-type-error name)
   (when (and (symbolp name) (special-operator-p name))
-    (error 'simple-program-error
-           :format-control "cannot define a compiler-macro for a special operator: ~S"
-           :format-arguments (list name)))
+    (%program-error "cannot define a compiler-macro for a special operator: ~S"
+                    name))
   ;; DEBUG-NAME is called primarily for its side-effect of asserting
   ;; that (COMPILER-MACRO-FUNCTION x) is not a legal function name.
   (let ((def (make-macro-lambda (sb!c::debug-name 'compiler-macro name)

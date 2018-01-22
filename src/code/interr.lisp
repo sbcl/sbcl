@@ -163,9 +163,7 @@
 
 (deferr invalid-arg-count-error (nargs)
   (restart-case
-      (error 'simple-program-error
-             :format-control "invalid number of arguments: ~S"
-             :format-arguments (list nargs))
+      (%program-error "invalid number of arguments: ~S" nargs)
     #!+(or x86-64 arm64)
     (replace-function (value)
       :report (lambda (stream)
@@ -189,9 +187,8 @@
                                     0))))
 
 (deferr local-invalid-arg-count-error (nargs name)
-  (error 'simple-program-error
-         :format-control "~S called with invalid number of arguments: ~S"
-         :format-arguments (list name nargs)))
+  (%program-error "~S called with invalid number of arguments: ~S"
+                  name nargs))
 
 (deferr bogus-arg-to-values-list-error (list)
   (with-simple-restart (continue "Ignore the last CDR")
@@ -308,8 +305,7 @@
          :expected-type (layout-classoid layout)))
 
 (deferr odd-key-args-error ()
-  (error 'simple-program-error
-         :format-control "odd number of &KEY arguments"))
+  (%program-error "odd number of &KEY arguments"))
 
 (deferr unknown-key-arg-error (key-name)
   (let ((context (sb!di:error-context)))

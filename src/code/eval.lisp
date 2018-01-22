@@ -67,10 +67,9 @@
 (defun simple-eval-progn-body (progn-body lexenv)
   (unless (list-with-length-p progn-body)
     (let ((*print-circle* t))
-      (error 'simple-program-error
-             :format-control
-             "~@<not a proper list in PROGN or implicit PROGN: ~2I~_~S~:>"
-             :format-arguments (list progn-body))))
+      (%program-error "~@<not a proper list in PROGN or implicit PROGN: ~
+                       ~2I~_~S~:>"
+                      progn-body)))
   ;; Note:
   ;;   * We can't just use (MAP NIL #'EVAL PROGN-BODY) here, because we
   ;;     need to take care to return all the values of the final EVAL.

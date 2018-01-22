@@ -150,24 +150,19 @@
 
 ;;;; WITH-PACKAGE-ITERATOR
 
-(sb!xc:defmacro with-package-iterator ((mname package-list
-                                                  &rest symbol-types)
-                                           &body body)
+(sb!xc:defmacro with-package-iterator ((mname package-list &rest symbol-types)
+                                       &body body)
   "Within the lexical scope of the body forms, MNAME is defined via macrolet
 such that successive invocations of (MNAME) will return the symbols, one by
 one, from the packages in PACKAGE-LIST. SYMBOL-TYPES may be any
 of :INHERITED :EXTERNAL :INTERNAL."
   ;; SYMBOL-TYPES should really be named ACCESSIBILITY-TYPES.
   (when (null symbol-types)
-    (error 'simple-program-error
-           :format-control
-           "At least one of :INTERNAL, :EXTERNAL, or :INHERITED must be supplied."))
+    (%program-error "At least one of :INTERNAL, :EXTERNAL, or :INHERITED must be supplied."))
   (dolist (symbol symbol-types)
     (unless (member symbol '(:internal :external :inherited))
-      (error 'simple-program-error
-             :format-control
-             "~S is not one of :INTERNAL, :EXTERNAL, or :INHERITED."
-             :format-arguments (list symbol))))
+      (%program-error "~S is not one of :INTERNAL, :EXTERNAL, or :INHERITED."
+                      symbol)))
   (with-unique-names (bits index sym-vec pkglist symbol kind)
     (let ((state (list bits index sym-vec pkglist))
           (select (logior (if (member :internal  symbol-types) 1 0)
