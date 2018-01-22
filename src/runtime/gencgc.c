@@ -1626,10 +1626,45 @@ scavenge_pinned_ranges()
     }
 }
 
+void visit_freed_objects(char *start, sword_t nbytes)
+{
+#ifdef TRAVERSE_FREED_OBJECTS
+    /* At this point we could attempt to recycle unused TLS indices
+     * as follows: For each now-garbage symbol that had a nonzero index,
+     * return that index to a "free TLS index" pool, perhaps a linked list
+     * or bitmap. Then either always try the free pool first (for better
+     * locality) or if ALLOC-TLS-INDEX detects exhaustion (for speed). */
+    lispobj* where = (lispobj*)start;
+    lispobj* end = (lispobj*)(start + nbytes);
+    while (where < end) {
+        lispobj word = *where;
+        if (forwarding_pointer_p(where)) { // live oject
+            lispobj* fwd_where = native_pointer(forwarding_pointer_value(where));
+            fprintf(stderr, "%p: -> %p\n", where, fwd_where);
+            where += OBJECT_SIZE(*fwd_where, fwd_where);
+        } else { // dead object
+            fprintf(stderr, "%p: %"OBJ_FMTX" %"OBJ_FMTX"\n", where, where[0], where[1]);
+            if (is_cons_half(word)) {
+                /* Can't do much useful with conses because often we can't distinguish
+                 * filler from data. visit_freed_objects is called on ranges of pages
+                 * without regard to whether each intervening page was completely full.
+                 * (This is not usually the way, but freeing of pages is slightly
+                 * imprecise in that regard) */
+                where += 2;
+            } else {
+                // Do something interesting
+                where += sizetab[widetag_of(word)](where);
+            }
+        }
+    }
+#endif
+}
+
 void deposit_filler(uword_t addr, sword_t nbytes) {
     gc_assert(nbytes >= 0);
     if (nbytes > 0) {
         sword_t nwords = nbytes >> WORD_SHIFT;
+        visit_freed_objects((char*)addr, nbytes);
         *(lispobj*)addr = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
     }
 }
@@ -2431,9 +2466,11 @@ free_oldspace(void)
         /* Find the last page of this region. */
         last_page = first_page;
 
+        page_bytes_t last_page_bytes;
         do {
             /* Free the page. */
-            bytes_freed += page_bytes_used(last_page);
+            last_page_bytes = page_bytes_used(last_page);
+            bytes_freed += last_page_bytes;
             reset_page_flags(last_page);
             set_page_bytes_used(last_page, 0);
             /* Should already be unprotected by unprotect_oldspace(). */
@@ -2444,31 +2481,13 @@ free_oldspace(void)
                && page_table[last_page].gen == from_space
                && page_bytes_used(last_page));
 
-#ifdef TRAVERSE_FREED_OBJECTS
-        /* At this point we could attempt to recycle unused TLS indices
-         * as follows: For each now-garbage symbol that had a nonzero index,
-         * return that index to a "free TLS index" pool, perhaps a linked list
-         * or bitmap. Then either always try the free pool first (for better
-         * locality) or if ALLOC-TLS-INDEX detects exhaustion (for speed). */
-        {
-            lispobj* where = (lispobj*)page_address(first_page);
-            lispobj* end = (lispobj*)page_address(last_page);
-            while (where < end) {
-                lispobj word = *where;
-                if (forwarding_pointer_p(where)) {
-                    word = *native_pointer(forwarding_pointer_value(where));
-                    where += OBJECT_SIZE(word,
-                                         native_pointer(forwarding_pointer_value(where)));
-                } else if (is_cons_half(word)) {
-                    // Print something maybe
-                    where += 2;
-                } else {
-                    // Print something maybe
-                    where += sizetab[widetag_of(word)](where);
-                }
-            }
-        }
-#endif
+        /* 'last_page' is the exclusive upper bound on the page range starting
+         * at 'first'page'. We have an accurate count of the bytes in use on
+         * last_page but there may be intervening pages not 100% full which are
+         * treated as full. This can spuriously visit some (0 . 0) conses
+         * but is otherwise not a big deal */
+        visit_freed_objects(page_address(first_page),
+                            npage_bytes(last_page-first_page-1) + last_page_bytes);
 
 #ifdef READ_PROTECT_FREE_PAGES
         os_protect(page_address(first_page),
