@@ -1510,8 +1510,10 @@ conservative_root_p(lispobj addr, page_index_t addr_page_index)
 {
     /* quick check 1: Address is quite likely to have been invalid. */
     struct page* page = &page_table[addr_page_index];
+    boolean enforce_lowtag = page->allocated != CODE_PAGE_ALLOCATED;
+
     if ((addr & (GENCGC_CARD_BYTES - 1)) >= page_bytes_used(addr_page_index) ||
-        (!is_lisp_pointer(addr) && page->allocated != CODE_PAGE_ALLOCATED) ||
+        (!is_lisp_pointer(addr) && enforce_lowtag) ||
         (compacting_p() && (page->gen != from_space ||
                             (page->singleton && page->pinned))))
         return 0;
@@ -1526,7 +1528,7 @@ conservative_root_p(lispobj addr, page_index_t addr_page_index)
      * But if this doesn't pass, there's no point in proceeding to the
      * definitive test which involves searching for the containing object. */
 
-    if (page->allocated != CODE_PAGE_ALLOCATED) {
+    if (enforce_lowtag) {
         lispobj* obj = native_pointer(addr);
         if (listp(addr)) {
             if (!is_cons_half(obj[0]) || !is_cons_half(obj[1]))
