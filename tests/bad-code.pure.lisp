@@ -250,3 +250,10 @@
                                         t)))
                            (macro)))
                       :allow-warnings t))))
+
+(with-test (:name :complex-member-type)
+  (assert (nth-value 2
+                     (checked-compile
+                      `(lambda (x)
+                         (typep x '(complex (eql t))))
+                      :allow-warnings t))))

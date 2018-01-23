@@ -2068,7 +2068,10 @@
                    ((typep ctype 'member-type)
                     (apply #'type-union
                            (mapcar-member-type-members
-                            (lambda (x) (do-complex (ctype-of x)))
+                            (lambda (x)
+                              (if (realp x)
+                                  (do-complex (ctype-of x))
+                                  (not-real)))
                             ctype)))
                    ((and (typep ctype 'intersection-type)
                          ;; FIXME: This is very much a
