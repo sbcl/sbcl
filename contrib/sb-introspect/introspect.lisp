@@ -827,24 +827,22 @@ Experimental: interface subject to change."
                                 .
                                 ;; The unused WP-CLR is for ease of counting
                                 #+big-endian
-                                ((allocated (ldb (byte 4 4) flags))
-                                 (wp        (logbitp 3 flags))
-                                 (wp-clr    (logbitp 2 flags))
-                                 (dontmove  (logbitp 1 flags))
-                                 (large     (logbitp 0 flags)))
+                                ((type      (ldb (byte 5 3) flags))
+                                 (wp        (logbitp 2 flags))
+                                 (wp-clr    (logbitp 1 flags))
+                                 (dontmove  (logbitp 0 flags)))
                                 #+little-endian
-                                ((allocated (ldb (byte 4 0) flags))
-                                 (wp        (logbitp 4 flags))
-                                 (wp-clr    (logbitp 5 flags))
-                                 (dontmove  (logbitp 6 flags))
-                                 (large     (logbitp 7 flags))))
+                                ((type      (ldb (byte 5 0) flags))
+                                 (wp        (logbitp 5 flags))
+                                 (wp-clr    (logbitp 6 flags))
+                                 (dontmove  (logbitp 7 flags))))
                            (declare (ignore wp-clr))
                            (list :space space
                                  :generation (sb-alien:slot page 'sb-vm::gen)
                                  :write-protected wp
-                                 :boxed (logbitp 0 allocated)
+                                 :boxed (logbitp 0 type)
                                  :pinned dontmove
-                                 :large large
+                                 :large (logbitp 4 type)
                                  :page index)))
                        (list :space space))
                    #-gencgc

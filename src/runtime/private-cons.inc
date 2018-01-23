@@ -82,7 +82,7 @@ static struct cons* private_cons_impl()
         gc_assert(last_page == page);
         gc_assert(!page_table[page].write_protected);
         page_table[page].gen = 0;
-        page_table[page].allocated = UNBOXED_PAGE_FLAG;
+        page_table[page].type = UNBOXED_PAGE_FLAG;
         zero_dirty_pages(page, page);
         page_index_t tail = private_cons_page_chain;
         page_header->car = 0; // unused

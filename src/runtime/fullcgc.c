@@ -66,7 +66,7 @@ static void* get_free_page() {
     --free_page;
     if (free_page < last_free_page)
         lose("Needed more space to GC\n");
-    page_table[free_page].allocated = UNBOXED_PAGE_FLAG;
+    page_table[free_page].type = UNBOXED_PAGE_FLAG;
     char* mem = page_address(free_page);
     zero_dirty_pages(free_page, free_page);
     return mem;
@@ -411,7 +411,7 @@ __attribute__((unused)) static char *fillerp(lispobj* where)
     page_index_t page;
     if (where[0] | where[1])
         return "cons";
-    if ((page = find_page_index(where)) >= 0 && page_table[page].singleton)
+    if ((page = find_page_index(where)) >= 0 && page_single_obj_p(page))
         return "cons (largeobj filler)";
     return "cons (filler)";
 }
@@ -552,6 +552,6 @@ void execute_full_sweep_phase()
             first_page = last_page;
         }
     while (free_page < page_table_pages) {
-        page_table[free_page++].allocated = FREE_PAGE_FLAG;
+        page_table[free_page++].type = FREE_PAGE_FLAG;
     }
 }

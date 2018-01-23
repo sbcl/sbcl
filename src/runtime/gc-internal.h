@@ -130,7 +130,7 @@ code_n_funs(struct code* code) { return fixnum_value((code)->n_entries) & 0x3FFF
 #define BOXED_PAGE_FLAG       1
 #define UNBOXED_PAGE_FLAG     2
 #define OPEN_REGION_PAGE_FLAG 8
-#define CODE_PAGE_ALLOCATED   (BOXED_PAGE_FLAG|UNBOXED_PAGE_FLAG)
+#define CODE_PAGE_TYPE        (BOXED_PAGE_FLAG|UNBOXED_PAGE_FLAG)
 
 extern sword_t (*sizetab[256])(lispobj *where);
 #define OBJECT_SIZE(header,where) \

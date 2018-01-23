@@ -227,8 +227,8 @@ static inline void unprotect_page_index(page_index_t page_index)
 {
     os_protect(page_address(page_index), GENCGC_CARD_BYTES, OS_VM_PROT_ALL);
     unsigned char *pflagbits = (unsigned char*)&page_table[page_index].gen - 1;
-    __sync_fetch_and_or(pflagbits, WP_CLEARED_BIT);
-    __sync_fetch_and_and(pflagbits, ~WRITE_PROTECTED_BIT);
+    __sync_fetch_and_or(pflagbits, WP_CLEARED_FLAG);
+    __sync_fetch_and_and(pflagbits, ~WRITE_PROTECTED_FLAG);
 }
 
 static inline void protect_page(void* page_addr, page_index_t page_index)
