@@ -763,46 +763,46 @@
 ;;; when, so we ignore policy and always do them.
 (defun %source-transform-typep (object type)
   (let ((ctype (careful-specifier-type type)))
-    (or (when (not ctype)
-          (compiler-warn "illegal type specifier for TYPEP: ~S" type)
-          (return-from %source-transform-typep (values nil t)))
-        (multiple-value-bind (constantp value) (type-singleton-p ctype)
-          (and constantp
-               `(eql ,object ',value)))
-        (let ((pred (cdr (assoc ctype *backend-type-predicates*
-                                :test #'type=))))
-          (when pred `(,pred ,object)))
-        (typecase ctype
-          (hairy-type
-           (source-transform-hairy-typep object ctype))
-          (negation-type
-           (source-transform-negation-typep object ctype))
-          (union-type
-           (source-transform-union-typep object ctype))
-          (intersection-type
-           (source-transform-intersection-typep object ctype))
-          (member-type
-           `(if (member ,object ',(member-type-members ctype)) t))
-          (args-type
-           (compiler-warn "illegal type specifier for TYPEP: ~S" type)
-           (return-from %source-transform-typep (values nil t)))
-          (t nil))
-        (typecase ctype
-          (numeric-type
-           (source-transform-numeric-typep object ctype))
-          (classoid
-           `(%instance-typep ,object ',type))
-          (array-type
-           (source-transform-array-typep object ctype))
-          (cons-type
-           (source-transform-cons-typep object ctype))
-          (character-set-type
-           (source-transform-character-set-typep object ctype))
-          #!+sb-simd-pack
-          (simd-pack-type
-           (source-transform-simd-pack-typep object ctype))
-          (t nil))
-        `(%typep ,object ',type))))
+    (if ctype
+        (or
+         (multiple-value-bind (constantp value) (type-singleton-p ctype)
+           (and constantp
+                `(eql ,object ',value)))
+         (let ((pred (cdr (assoc ctype *backend-type-predicates*
+                                 :test #'type=))))
+           (when pred `(,pred ,object)))
+         (typecase ctype
+           (hairy-type
+            (source-transform-hairy-typep object ctype))
+           (negation-type
+            (source-transform-negation-typep object ctype))
+           (union-type
+            (source-transform-union-typep object ctype))
+           (intersection-type
+            (source-transform-intersection-typep object ctype))
+           (member-type
+            `(if (member ,object ',(member-type-members ctype)) t))
+           (args-type
+            (compiler-warn "illegal type specifier for TYPEP: ~S" type)
+            (return-from %source-transform-typep (values nil t)))
+           (t nil))
+         (typecase ctype
+           (numeric-type
+            (source-transform-numeric-typep object ctype))
+           (classoid
+            `(%instance-typep ,object ',type))
+           (array-type
+            (source-transform-array-typep object ctype))
+           (cons-type
+            (source-transform-cons-typep object ctype))
+           (character-set-type
+            (source-transform-character-set-typep object ctype))
+           #!+sb-simd-pack
+           (simd-pack-type
+            (source-transform-simd-pack-typep object ctype))
+           (t nil))
+         `(%typep ,object ',type))
+        (values nil t))))
 
 (defun source-transform-typep (object type)
   (when (typep type 'type-specifier)
