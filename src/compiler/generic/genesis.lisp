@@ -3408,7 +3408,7 @@ III. initially undefined function references (alphabetically):
   ;; Write as many PTEs as there are pages used.
   ;; A corefile PTE is { uword_t scan_start_offset; page_bytes_t bytes_used; }
   (let* ((data-bytes (* (gspace-free-word-index gspace) sb!vm:n-word-bytes))
-         (n-ptes (ceiling data-bytes sb!c:+backend-page-bytes+))
+         (n-ptes (ceiling data-bytes sb!vm:gencgc-card-bytes))
          (sizeof-usage ; see similar expression in 'src/code/room'
           (if (typep sb!vm:gencgc-card-bytes '(unsigned-byte 16)) 2 4))
          (sizeof-corefile-pte (+ sb!vm:n-word-bytes sizeof-usage))
