@@ -3841,6 +3841,11 @@ gencgc_handle_wp_violation(void* fault_addr)
         return 0;
 
     } else {
+        // There can not be an open region. gc_close_region() does not attempt
+        // to flip that bit atomically. Other threads in the wp violation handler
+        // concurrently for the same page are fine because they're all doing
+        // the same bit operations.
+        gc_assert(!(page_table[page_index].allocated & OPEN_REGION_PAGE_FLAG));
         unsigned char *pflagbits = (unsigned char*)&page_table[page_index].gen - 1;
         unsigned char flagbits = __sync_fetch_and_add(pflagbits, 0);
         if (flagbits & WRITE_PROTECTED_BIT) {
