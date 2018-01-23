@@ -236,3 +236,17 @@
                    (setf k (subseq "y" 0))))
                :allow-warnings t
                :allow-style-warnings t))))
+
+(with-test (:name :highly-nested-type-error)
+  (assert (nth-value 1
+                     (checked-compile
+                      `(lambda ()
+                         (macrolet ((macro ()
+                                      `((lambda (x)
+                                          (declare (number x))
+                                          ',@ (loop repeat 10000
+                                                    for cons = (list 1) then (list cons)
+                                                    finally (return cons)))
+                                        t)))
+                           (macro)))
+                      :allow-warnings t))))

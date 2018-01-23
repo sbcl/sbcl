@@ -131,9 +131,10 @@
   (values))
 
 (defun source-to-string (source)
-  (write-to-string source
-                   :escape t :readably nil :pretty t
-                   :circle t :array nil))
+  (with-sane-io-syntax
+    (write-to-string source
+                     :escape t :pretty t
+                     :circle t :array nil)))
 
 (defun make-compiler-error-form (condition source)
   `(error 'compiled-program-error
