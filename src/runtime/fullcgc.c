@@ -163,7 +163,7 @@ static inline int pointer_survived_gc_yet(lispobj pointer)
 {
     if (!interesting_pointer_p(pointer))
         return 1;
-    if (lowtag_of(pointer) == LIST_POINTER_LOWTAG)
+    if (listp(pointer))
         return cons_markedp(pointer);
     lispobj header = *native_pointer(pointer);
     if (widetag_of(header) == BIGNUM_WIDETAG)
@@ -178,7 +178,7 @@ void __mark_obj(lispobj pointer)
     gc_dcheck(is_lisp_pointer(pointer));
     if (!interesting_pointer_p(pointer))
         return;
-    if (lowtag_of(pointer) != LIST_POINTER_LOWTAG) {
+    if (!listp(pointer)) {
         lispobj* base = native_pointer(pointer);
         lispobj header = *base;
         if (widetag_of(header) == BIGNUM_WIDETAG) {
@@ -362,13 +362,12 @@ void execute_full_mark_phase()
     while (where < end) {
         lispobj obj = compute_lispobj(where);
         gc_enqueue(obj);
-        where += lowtag_of(obj) != LIST_POINTER_LOWTAG
-                   ? sizetab[widetag_of(*where)](where) : 2;
+        where += listp(obj) ? 2 : sizetab[widetag_of(*where)](where);
     }
     do {
         lispobj ptr = gc_dequeue();
         gc_dcheck(ptr != 0);
-        if (lowtag_of(ptr) != LIST_POINTER_LOWTAG)
+        if (!listp(ptr))
             trace_object(native_pointer(ptr));
         else
             mark_pair((lispobj*)(ptr - LIST_POINTER_LOWTAG));

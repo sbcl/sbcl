@@ -1773,8 +1773,7 @@ static void fixup_space(lispobj* where, size_t n_words)
           if (is_vector_subtype(header_word, VectorValidHashing)) {
               struct vector* v = (struct vector*)where;
               lispobj* data = v->data;
-              gc_assert(v->length > 0 &&
-                        lowtag_of(data[0]) == INSTANCE_POINTER_LOWTAG &&
+              gc_assert(v->length > 0 && instancep(data[0]) &&
                         !(fixnum_value(v->length) & 1));  // length must be even
               boolean needs_rehash = 0;
               int i;

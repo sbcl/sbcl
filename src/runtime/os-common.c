@@ -194,7 +194,7 @@ void os_link_runtime()
     for (j = 0 ; j < n ; ++j)
     {
         lispobj item = symbols->data[j];
-        datap = lowtag_of(item) == LIST_POINTER_LOWTAG;
+        datap = listp(item);
         symbol_name = datap ? CONS(item)->car : item;
         namechars = (void*)(intptr_t)(VECTOR(symbol_name)->data);
 #ifdef MEMORY_SANITIZER

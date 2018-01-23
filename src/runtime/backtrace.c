@@ -73,19 +73,19 @@ debug_function_from_pc (struct code* code, void *pc)
     struct vector *v;
     int i, len;
 
-    if (lowtag_of(code->debug_info) != INSTANCE_POINTER_LOWTAG)
+    if (!instancep(code->debug_info))
         return NULL;
 
     di = (struct compiled_debug_info *) native_pointer(code->debug_info);
 
-    if (lowtag_of(di->fun_map) != INSTANCE_POINTER_LOWTAG)
+    if (!instancep(di->fun_map))
         return NULL;
 
     v = VECTOR(di->fun_map);
 
     len = fixnum_value(v->length);
 
-    if (lowtag_of(v->data[0]) != INSTANCE_POINTER_LOWTAG)
+    if (!instancep(v->data[0]))
         return NULL;
 
     df = (struct compiled_debug_fun *) native_pointer(v->data[0]);
@@ -156,10 +156,10 @@ static int string_equal (struct vector *vector, char *string)
 static void
 print_entry_name (lispobj name)
 {
-    if (lowtag_of (name) == LIST_POINTER_LOWTAG) {
+    if (listp(name)) {
         putchar('(');
         while (name != NIL) {
-            if (lowtag_of (name) != LIST_POINTER_LOWTAG) {
+            if (!listp(name)) {
                 printf("%p: unexpected lowtag while printing a cons\n",
                        (void*)name);
                 return;
@@ -313,8 +313,7 @@ call_info_from_context(struct call_info *info, os_context_t *context)
 
     info->interrupted = 1;
 #if !defined(LISP_FEATURE_ARM) && !defined(LISP_FEATURE_ARM64)
-    if (lowtag_of(*os_context_register_addr(context, reg_CODE))
-        == FUN_POINTER_LOWTAG) {
+    if (functionp(*os_context_register_addr(context, reg_CODE))) {
         /* We tried to call a function, but crapped out before $CODE could
          * be fixed up. Probably an undefined function. */
         info->frame =

@@ -121,8 +121,7 @@ static void add_to_layer(lispobj* obj, int wordindex,
 /// otherwise return obj directly.
 static lispobj canonical_obj(lispobj obj)
 {
-    if (lowtag_of(obj) == FUN_POINTER_LOWTAG &&
-        widetag_of(*native_pointer(obj)) == SIMPLE_FUN_WIDETAG)
+    if (functionp(obj) && widetag_of(*native_pointer(obj)) == SIMPLE_FUN_WIDETAG)
         return make_lispobj(fun_code_header(obj-FUN_POINTER_LOWTAG),
                             OTHER_POINTER_LOWTAG);
     return obj;
@@ -643,14 +642,12 @@ static void trace1(lispobj object,
         // Special-case a few combinations of <type,wordindex>
         switch (next.wordindex) {
         case 0:
-            if (lowtag_of(ptr) == INSTANCE_POINTER_LOWTAG  ||
-                lowtag_of(ptr) == FUN_POINTER_LOWTAG)
+            if (instancep(ptr) || functionp(ptr))
                 target = instance_layout(native_pointer(ptr));
             break;
 #if FUN_SELF_FIXNUM_TAGGED
         case 1:
-            if (lowtag_of(ptr) == FUN_POINTER_LOWTAG &&
-                widetag_of(*native_pointer(ptr)) == CLOSURE_WIDETAG)
+            if (functionp(ptr) && widetag_of(*native_pointer(ptr)) == CLOSURE_WIDETAG)
                 target -= FUN_RAW_ADDR_OFFSET;
             break;
 #endif
@@ -762,7 +759,7 @@ static uword_t build_refs(lispobj* where, lispobj* end,
             // tables since we can't decide whether to allow the entry.
             if (is_vector_subtype(*where, VectorValidHashing)) {
                 lispobj lhash_table = where[2];
-                gc_assert(lowtag_of(lhash_table) == INSTANCE_POINTER_LOWTAG);
+                gc_assert(instancep(lhash_table));
                 struct hash_table* hash_table =
                   (struct hash_table *)native_pointer(lhash_table);
                 int weakness = hashtable_weakness(hash_table);
@@ -913,9 +910,7 @@ void gc_prove_liveness(void(*context_scanner)(),
 {
     int n_watched = 0, n_live = 0, n_bad = 0;
     lispobj list;
-    for ( list = objects ;
-          list != NIL && lowtag_of(list) == LIST_POINTER_LOWTAG ;
-          list = CONS(list)->cdr ) {
+    for (list = objects ; list != NIL && listp(list) ; list = CONS(list)->cdr) {
         ++n_watched;
         lispobj car = CONS(list)->car;
         if ((lowtag_of(car) != OTHER_POINTER_LOWTAG ||
@@ -925,7 +920,7 @@ void gc_prove_liveness(void(*context_scanner)(),
             n_live += ((struct weak_pointer*)native_pointer(car))->value
                 != UNBOUND_MARKER_WIDETAG;
     }
-    if (lowtag_of(list) != LIST_POINTER_LOWTAG || n_bad) {
+    if (!listp(list) || n_bad) {
         fprintf(stderr, "; Bad value in liveness tracker\n");
         return;
     }

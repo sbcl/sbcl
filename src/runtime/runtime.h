@@ -275,6 +275,16 @@ HeaderValue(lispobj obj)
   return obj >> N_WIDETAG_BITS;
 }
 
+static inline int listp(lispobj obj) {
+    return lowtag_of(obj) == LIST_POINTER_LOWTAG;
+}
+static inline int instancep(lispobj obj) {
+    return lowtag_of(obj) == INSTANCE_POINTER_LOWTAG;
+}
+static inline int functionp(lispobj obj) {
+    return lowtag_of(obj) == FUN_POINTER_LOWTAG;
+}
+
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 #define HEADER_VALUE_MASKED(x) (HeaderValue(x) & SHORT_HEADER_MAX_WORDS)
 #else

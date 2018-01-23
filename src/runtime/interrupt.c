@@ -705,8 +705,7 @@ build_fake_control_stack_frames(struct thread *th,os_context_t *context)
         == access_control_frame_pointer(th)) {
         /* There is a small window during call where the callee's
          * frame isn't built yet. */
-        if (lowtag_of(*os_context_register_addr(context, reg_CODE))
-            == FUN_POINTER_LOWTAG) {
+        if (functionp(*os_context_register_addr(context, reg_CODE))) {
             /* We have called, but not built the new frame, so
              * build it for them. */
             access_control_frame_pointer(th)[0] =
@@ -1152,7 +1151,7 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
          * support decides to pass on it. */
         lose("no handler for signal %d in interrupt_handle_now(..)\n", signal);
 
-    } else if (lowtag_of(handler.lisp) == FUN_POINTER_LOWTAG) {
+    } else if (functionp(handler.lisp)) {
         /* Once we've decided what to do about contexts in a
          * return-elsewhere world (the original context will no longer
          * be available; should we copy it or was nobody using it anyway?)

@@ -777,7 +777,7 @@ create_thread_struct(lispobj initial_function) {
     for (i = 0; i < tls_init->length; i += make_fixnum(1)) {
         lispobj binding = tls_init->data[fixnum_value(i)];
         lispobj value = NIL;
-        if (lowtag_of(binding) == LIST_POINTER_LOWTAG) {
+        if (listp(binding)) {
             value = SYMBOL(CONS(binding)->car)->value;
             binding = CONS(binding)->cdr;
         }

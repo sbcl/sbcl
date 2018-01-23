@@ -383,7 +383,7 @@ static void brief_list(lispobj obj)
         printf("NIL");
     else {
         putchar('(');
-        while (lowtag_of(obj) == LIST_POINTER_LOWTAG) {
+        while (listp(obj)) {
             if (space)
                 putchar(' ');
             if (++length >= max_length) {
@@ -566,7 +566,7 @@ static void print_slots(char **slots, int count, lispobj *ptr)
 static lispobj symbol_function(lispobj* symbol)
 {
     lispobj info = ((struct symbol*)symbol)->info;
-    if (lowtag_of(info) == LIST_POINTER_LOWTAG)
+    if (listp(info))
         info = CONS(info)->cdr;
     if (lowtag_of(info) == OTHER_POINTER_LOWTAG) {
         struct vector* v = VECTOR(info);
@@ -937,16 +937,14 @@ struct vector * layout_classoid_name(lispobj * layout)
   if (forwarding_pointer_p(layout))
       layout = native_pointer(forwarding_pointer_value(layout));
   lispobj classoid = ((struct layout*)layout)->classoid;
-  return lowtag_of(classoid) != INSTANCE_POINTER_LOWTAG ? NULL
-    : classoid_name(native_pointer(classoid));
+  return instancep(classoid) ? classoid_name(native_pointer(classoid)) : NULL;
 }
 struct vector * instance_classoid_name(lispobj * instance)
 {
   if (forwarding_pointer_p(instance))
       instance = native_pointer(forwarding_pointer_value(instance));
   lispobj layout = instance_layout(instance);
-  return lowtag_of(layout) != INSTANCE_POINTER_LOWTAG ? NULL
-    : layout_classoid_name(native_pointer(layout));
+  return instancep(layout) ? layout_classoid_name(native_pointer(layout)) : NULL;
 }
 void safely_show_lstring(struct vector * string, int quotes, FILE *s)
 {

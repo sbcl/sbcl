@@ -377,7 +377,7 @@ ptrans_list(lispobj thing, boolean constant)
 
         /* And count this cell. */
         length++;
-    } while (lowtag_of(thing) == LIST_POINTER_LOWTAG &&
+    } while (listp(thing) &&
              dynamic_pointer_p(thing) &&
              !(forwarding_pointer_p(*native_pointer(thing))));
 

@@ -289,7 +289,7 @@ static lispobj trans_short_boxed(lispobj object);
 static sword_t
 scav_fun_pointer(lispobj *where, lispobj object)
 {
-    gc_dcheck(lowtag_of(object) == FUN_POINTER_LOWTAG);
+    gc_dcheck(functionp(object));
 
     /* Object is a pointer into from_space - not a FP. */
     lispobj *first_pointer = native_pointer(object);
@@ -486,7 +486,7 @@ trans_fun_header(lispobj object)
 static lispobj
 trans_instance(lispobj object)
 {
-    gc_dcheck(lowtag_of(object) == INSTANCE_POINTER_LOWTAG);
+    gc_dcheck(instancep(object));
     lispobj header = *(lispobj*)(object - INSTANCE_POINTER_LOWTAG);
     return copy_object(object, 1 + (instance_length(header)|1));
 }
@@ -515,7 +515,7 @@ static lispobj trans_list(lispobj object);
 static sword_t
 scav_list_pointer(lispobj *where, lispobj object)
 {
-    gc_dcheck(lowtag_of(object) == LIST_POINTER_LOWTAG);
+    gc_dcheck(listp(object));
 
     lispobj copy = trans_list(object);
     gc_dcheck(copy != object);
@@ -541,7 +541,7 @@ trans_list(lispobj object)
 
     /* Try to linearize the list in the cdr direction to help reduce
      * paging. */
-    while (lowtag_of(cdr) == LIST_POINTER_LOWTAG && from_space_p(cdr)) {
+    while (listp(cdr) && from_space_p(cdr)) {
         lispobj* native_cdr = (lispobj*)CONS(cdr);
         if (forwarding_pointer_p(native_cdr)) {  // Might as well fix now.
             cdr = forwarding_pointer_value(native_cdr);
@@ -1610,7 +1610,7 @@ properly_tagged_p_internal(lispobj pointer, lispobj *start_addr)
             }
         }
 #endif
-        if (lowtag_of(pointer) == FUN_POINTER_LOWTAG) {
+        if (functionp(pointer)) {
             struct simple_fun *pfun =
                 (struct simple_fun*)(pointer-FUN_POINTER_LOWTAG);
             for_each_simple_fun(i, function, (struct code*)start_addr, 0, {

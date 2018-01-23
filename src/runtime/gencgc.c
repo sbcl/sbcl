@@ -1528,7 +1528,7 @@ conservative_root_p(lispobj addr, page_index_t addr_page_index)
 
     if (page->allocated != CODE_PAGE_ALLOCATED) {
         lispobj* obj = native_pointer(addr);
-        if (lowtag_of(addr) == LIST_POINTER_LOWTAG) {
+        if (listp(addr)) {
             if (!is_cons_half(obj[0]) || !is_cons_half(obj[1]))
                 return 0;
         } else {
@@ -1565,8 +1565,7 @@ conservative_root_p(lispobj addr, page_index_t addr_page_index)
      * than necessary and then shrunk to fit, leaving what look like
      * (0 . 0) CONSes at the end.  These appear valid to
      * properly_tagged_descriptor_p(), so pick them off here. */
-    if (((lowtag_of(addr) == LIST_POINTER_LOWTAG) &&
-         page_table[addr_page_index].singleton)
+    if ((listp(addr) && page_table[addr_page_index].singleton)
         || !properly_tagged_descriptor_p((void*)addr, object_start))
         return 0;
 
@@ -2007,8 +2006,7 @@ update_page_write_prot(page_index_t page)
             // looks like simple-fun-widetag. We can't naively back up to the
             // underlying code object since the alleged header might not be one.
             int pointee_gen = gen; // Make comparison fail if we fall through
-            if (lowtag_of((lispobj)ptr) == FUN_POINTER_LOWTAG &&
-                widetag_of(header) == SIMPLE_FUN_WIDETAG) {
+            if (functionp((lispobj)ptr) && widetag_of(header) == SIMPLE_FUN_WIDETAG) {
                 lispobj* code = fun_code_header((lispobj)ptr - FUN_POINTER_LOWTAG);
                 // This is a heuristic, since we're not actually looking for
                 // an object boundary. Precise scanning of 'page' would obviate
@@ -3982,7 +3980,7 @@ gc_and_save(char *filename, boolean prepend_runtime,
     {
         int i;
         for (i=0; i<NSIG; ++i)
-            if (lowtag_of(interrupt_handlers[i].lisp) == FUN_POINTER_LOWTAG)
+            if (functionp(interrupt_handlers[i].lisp))
                 interrupt_handlers[i].lisp = 0;
     }
 #endif

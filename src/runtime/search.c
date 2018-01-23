@@ -167,7 +167,7 @@ lispobj* find_symbol(char* symbol_name, char* package_name, unsigned int* hint)
                 && string->length == make_fixnum(namelen)
                 && !memcmp(string->data, package_name, namelen)) {
                 element = cells->data[i+1];
-                if (lowtag_of(element) == LIST_POINTER_LOWTAG)
+                if (listp(element))
                     element = CONS(element)->car;
                 return search_package_symbols(element, symbol_name, hint);
             }

@@ -488,7 +488,7 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
               struct vector* v = (struct vector*)where;
               gc_assert(v->length > 0 &&
                         !(v->length & make_fixnum(1)) && // length must be even
-                        lowtag_of(v->data[0]) == INSTANCE_POINTER_LOWTAG);
+                        instancep(v->data[0]));
               lispobj* data = (lispobj*)v->data;
               adjust_pointers(&data[0], 1, adj); // adjust the hash-table structure
               boolean needs_rehash = 0;
@@ -964,7 +964,7 @@ os_vm_address_t get_asm_routine_by_name(const char* name)
 #else
     struct code* code = (struct code*)READ_ONLY_SPACE_START;
 #endif
-    if (lowtag_of(code->debug_info) == LIST_POINTER_LOWTAG) {
+    if (listp(code->debug_info)) {
         struct hash_table* ht =
             (struct hash_table*)native_pointer(CONS(code->debug_info)->car);
         struct vector* table = VECTOR(ht->table);
