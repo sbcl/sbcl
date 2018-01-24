@@ -137,7 +137,7 @@ code:
     (as-c "        return 1;")
     (as-c "    }")
     (printf "(cl:in-package #:~A)" package-name)
-    (printf "(cl:eval-when (:compile-toplevel)")
+    (printf "(cl:eval-when (:compile-toplevel :execute)")
     (printf "  (cl:defparameter *integer-sizes* (cl:make-hash-table))")
     (dolist (type '("char" "short" "long long" "long" "int"))
       (printf "  (cl:setf (cl:gethash %ld *integer-sizes*) 'sb-alien:~A)" (substitute #\- #\Space type)
@@ -188,6 +188,8 @@ code:
              (definitions (read i)))
         (print-c-source  f headers definitions package)))))
 
+#+asdf
+(progn
 (defclass grovel-constants-file (cl-source-file)
   ((package :accessor constants-package :initarg :package)
    (do-not-grovel :accessor do-not-grovel
@@ -277,3 +279,4 @@ code:
     (multiple-value-bind (output warnings-p failure-p)
         (compile-file* tmp-constants :output-file output-file :warnings-file warnings-file)
       (check-lisp-compile-results output warnings-p failure-p context-format context-arguments)))))
+) ; end PROGN
