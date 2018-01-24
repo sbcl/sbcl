@@ -242,17 +242,6 @@
            n-word-bytes))
       0))
 
-(defun object-size (object)
-  (+ (primitive-object-size object)
-     (typecase object
-       (sb-mop:funcallable-standard-object
-        (primitive-object-size
-         (sb-pcl::standard-funcallable-instance-clos-slots object)))
-       (standard-object
-        (primitive-object-size
-         (sb-pcl::standard-instance-slots object)))
-       (t 0))))
-
 ;;; Given the address (untagged, aligned, and interpreted as a FIXNUM)
 ;;; of a lisp object, return the object, its "type code" (either
 ;;; LIST-POINTER-LOWTAG or a header widetag), and the number of octets

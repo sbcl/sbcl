@@ -224,3 +224,14 @@ sb-impl::
 (defmethod make-load-form ((host (eql *physical-host*)) &optional env)
   (declare (ignore env))
   '*physical-host*)
+
+sb-vm::(defun object-size (object)
+  (+ (primitive-object-size object)
+     (typecase object
+       (sb-mop:funcallable-standard-object
+        (primitive-object-size
+         (sb-pcl::standard-funcallable-instance-clos-slots object)))
+       (standard-object
+        (primitive-object-size
+         (sb-pcl::standard-instance-slots object)))
+       (t 0))))
