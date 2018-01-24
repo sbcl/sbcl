@@ -204,40 +204,52 @@
       #-64-bit (oddp (get-lisp-obj-address object))
       (let ((words
              (typecase object
-              (cons 2)
-              (instance (1+ (%instance-length object)))
-              (function
-               (when (= (fun-subtype object) simple-fun-widetag)
-                 (return-from object-size
-                   (object-size (fun-code-header object))))
-               (1+ (get-closure-length object)))
-              ;; NIL is larger than a symbol. I don't care to think about
-              ;; why these fudge factors are right, but they make the result
-              ;; equal to what MAP-ALLOCATED-OBJECTS reports.
-              (null (+ symbol-size 1 #+64-bit 1))
-              ;; Anything else is an OTHER pointer.
-              ;; Use a sizing function when we have one,
-              ;; otherwise the general case is correct.
-              (t
-               (let ((room-info
-                      (aref *room-info* (%other-pointer-widetag object))))
-                 (typecase object
-                  (array
-                   (cond ((array-header-p object)
-                          (+ array-dimensions-offset (array-rank object)))
-                         ((simple-array-nil-p object) 2)
-                         (t
-                          (return-from object-size
-                            (nth-value 2 (reconstitute-vector
-                                          object room-info))))))
-                  (code-component
-                   (return-from object-size (code-component-size object)))
-                  (t
-                   ;; Other things (symbol, fdefn, value-cell, etc)
-                   ;; don't have a sizer, so use GET-HEADER-DATA
-                   (1+ (logand (get-header-data object)
-                               (logand (get-header-data object)
-                                       (room-info-mask room-info)))))))))))
+               (cons 2)
+               (instance (+ 1
+                            (%instance-length object)
+                            (if (typep object 'standard-object)
+                                (truncate (object-size
+                                           (sb-pcl::standard-instance-slots object))
+                                          n-word-bytes)
+                                0)))
+               (function
+                (when (= (fun-subtype object) simple-fun-widetag)
+                  (return-from object-size
+                    (object-size (fun-code-header object))))
+                (+ 1
+                   (get-closure-length object)
+                   (if (typep object 'funcallable-instance)
+                       (truncate (object-size
+                                  (sb-pcl::standard-funcallable-instance-clos-slots object))
+                                 n-word-bytes)
+                       0)))
+               ;; NIL is larger than a symbol. I don't care to think about
+               ;; why these fudge factors are right, but they make the result
+               ;; equal to what MAP-ALLOCATED-OBJECTS reports.
+               (null (+ symbol-size 1 #+64-bit 1))
+               ;; Anything else is an OTHER pointer.
+               ;; Use a sizing function when we have one,
+               ;; otherwise the general case is correct.
+               (t
+                (let ((room-info
+                        (aref *room-info* (%other-pointer-widetag object))))
+                  (typecase object
+                    (array
+                     (cond ((array-header-p object)
+                            (+ array-dimensions-offset (array-rank object)))
+                           ((simple-array-nil-p object) 2)
+                           (t
+                            (return-from object-size
+                              (nth-value 2 (reconstitute-vector
+                                            object room-info))))))
+                    (code-component
+                     (return-from object-size (code-component-size object)))
+                    (t
+                     ;; Other things (symbol, fdefn, value-cell, etc)
+                     ;; don't have a sizer, so use GET-HEADER-DATA
+                     (1+ (logand (get-header-data object)
+                                 (logand (get-header-data object)
+                                         (room-info-mask room-info)))))))))))
         (* (logandc2 (1+ words) 1) ; round-to-even
            n-word-bytes))
         0))
