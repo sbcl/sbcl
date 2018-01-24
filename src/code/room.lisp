@@ -61,7 +61,7 @@
                           'bignum :other))
 
     (setf (svref infos closure-widetag)
-          (make-room-info 0 'closure :closure))
+          (make-room-info short-header-max-words 'closure :closure))
 
     (dotimes (i (length *specialized-array-element-type-properties*))
       (let ((saetp (aref *specialized-array-element-type-properties* i)))
@@ -78,7 +78,7 @@
           (make-room-info 0 'instance :instance))
 
     (setf (svref infos funcallable-instance-widetag)
-          (make-room-info 0 'funcallable-instance :closure))
+          (make-room-info short-header-max-words 'funcallable-instance :closure))
 
     (let ((cons-info (make-room-info 0 'cons :list)))
       ;; A cons consists of two words, both of which may be either a
@@ -192,12 +192,63 @@
             (round-to-dualword (+ (* vector-data-offset n-word-bytes)
                                   n-data-octets)))))
 
+(defun code-component-size (x) ; in bytes
+  (declare (code-component x))
+  (round-to-dualword
+   (+ (* (logand (get-header-data x) short-header-max-words) n-word-bytes)
+      (%code-code-size x))))
+
+(defun object-size (object)
+  "Return number of bytes of heap or stack directly consumed by OBJECT"
+  (if #+64-bit (= (logand (get-lisp-obj-address object) 3) 3)
+      #-64-bit (oddp (get-lisp-obj-address object))
+      (let ((words
+             (typecase object
+              (cons 2)
+              (instance (1+ (%instance-length object)))
+              (function
+               (when (= (fun-subtype object) simple-fun-widetag)
+                 (return-from object-size
+                   (object-size (fun-code-header object))))
+               (1+ (get-closure-length object)))
+              ;; NIL is larger than a symbol. I don't care to think about
+              ;; why these fudge factors are right, but they make the result
+              ;; equal to what MAP-ALLOCATED-OBJECTS reports.
+              (null (+ symbol-size 1 #+64-bit 1))
+              ;; Anything else is an OTHER pointer.
+              ;; Use a sizing function when we have one,
+              ;; otherwise the general case is correct.
+              (t
+               (let ((room-info
+                      (aref *room-info* (%other-pointer-widetag object))))
+                 (typecase object
+                  (array
+                   (cond ((array-header-p object)
+                          (+ array-dimensions-offset (array-rank object)))
+                         ((simple-array-nil-p object) 2)
+                         (t
+                          (return-from object-size
+                            (nth-value 2 (reconstitute-vector
+                                          object room-info))))))
+                  (code-component
+                   (return-from object-size (code-component-size object)))
+                  (t
+                   ;; Other things (symbol, fdefn, value-cell, etc)
+                   ;; don't have a sizer, so use GET-HEADER-DATA
+                   (1+ (logand (get-header-data object)
+                               (logand (get-header-data object)
+                                       (room-info-mask room-info)))))))))))
+        (* (logandc2 (1+ words) 1) ; round-to-even
+           n-word-bytes))
+        0))
+
 ;;; Given the address (untagged, aligned, and interpreted as a FIXNUM)
 ;;; of a lisp object, return the object, its "type code" (either
 ;;; LIST-POINTER-LOWTAG or a header widetag), and the number of octets
 ;;; required for its storage (including padding and alignment).  Note
 ;;; that this function is designed to NOT CONS, even if called
 ;;; out-of-line.
+;;; FIXME: size calculation should be via OBJECT-SIZE, not reinvented
 (defun reconstitute-object (address)
   (let* ((object-sap (int-sap (get-lisp-obj-address address)))
          (header (sap-ref-word object-sap 0))
@@ -253,10 +304,7 @@
            (let ((c (tagged-object other-pointer-lowtag)))
              (values c
                      code-header-widetag
-                     (round-to-dualword
-                      (+ (* (logand header-value short-header-max-words)
-                            n-word-bytes)
-                         (%code-code-size (truly-the code-component c)))))))))))))
+                     (code-component-size c))))))))))
 
 ;;; Iterate over all the objects in the contiguous block of memory
 ;;; with the low address at START and the high address just before

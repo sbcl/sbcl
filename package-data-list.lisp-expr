@@ -870,6 +870,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "PRINT-TYPE-SPECIFIER" "PRINT-TYPE"
                "*PRINT-VECTOR-LENGTH*"
                "DECIMAL-WITH-GROUPED-DIGITS-WIDTH"
+               "OBJECT-SIZE"
 
                ;; stepping interface
                "STEP-CONDITION" "STEP-FORM-CONDITION" "STEP-FINISHED-CONDITION"
