@@ -21,7 +21,6 @@ changes relative to sbcl-1.4.3:
     1.3.14.x).
   * enhancement: warnings and errors referring to bindings established by LET,
     LET*, FLET and LABELS point to the offending form more accurately.
-  * enhancement: implement SB-EXT:OBJECT-SIZE (lp#1636910)
 
 changes in sbcl-1.4.3 relative to sbcl-1.4.2:
   * enhancement: SLEEP respects deadlines established by SB-SYS:WITH-DEADLINE.

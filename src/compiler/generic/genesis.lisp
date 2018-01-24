@@ -866,13 +866,13 @@ core and return a descriptor to it."
 
 ;; Simulate *FREE-TLS-INDEX*. This is a count, not a displacement.
 ;; In C, sizeof counts 1 word for the variable-length interrupt_contexts[]
-;; but primitive-object-size counts 0, so add 1, though in fact the C code
+;; but primitive-object-length counts 0, so add 1, though in fact the C code
 ;; implies that it might have overcounted by 1. We could make this agnostic
 ;; of MAX-INTERRUPTS by moving the thread base register up by TLS-SIZE words,
 ;; using negative offsets for all dynamically assigned indices.
 (defvar *genesis-tls-counter*
   (+ 1 sb!vm:max-interrupts
-     (sb!vm:primitive-object-size
+     (sb!vm:primitive-object-length
       (find 'sb!vm::thread sb!vm:*primitive-objects*
             :key #'sb!vm:primitive-object-name))))
 

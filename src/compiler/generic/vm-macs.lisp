@@ -50,7 +50,7 @@
   (lowtag nil :type symbol :read-only t)
   (options nil :type list :read-only t)
   (slots nil :type list :read-only t)
-  (size 0 :type fixnum :read-only t)
+  (length 0 :type fixnum :read-only t)
   (variable-length-p nil :type (member t nil) :read-only t))
 
 (declaim (freeze-type prim-object-slot primitive-object))
@@ -156,7 +156,7 @@
                                      :widetag widetag
                                      :lowtag lowtag
                                      :slots (slots)
-                                     :size offset
+                                     :length offset
                                      :variable-length-p variable-length-p))
            ,@(constants)
            ,@(specials))
