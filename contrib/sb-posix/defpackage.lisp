@@ -25,7 +25,7 @@
            #:flock-pid
 
            ;; libc routines
-           #:strtod
+           #:getenv #:strtod
            ))
 
 #+win32

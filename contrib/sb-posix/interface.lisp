@@ -816,10 +816,6 @@ not supported."
 
 ;;; environment
 
-(eval-when (:compile-toplevel :load-toplevel)
-  ;; Do this at compile-time as Win32 code below refers to it as
-  ;; sb-posix:getenv.
-  (export 'getenv :sb-posix))
 (defun getenv (name)
   (let ((r (alien-funcall
             (extern-alien "getenv" (function (* char) (c-string :not-null t)))
