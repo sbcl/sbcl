@@ -573,6 +573,7 @@ HOLDING-MUTEX-P."
 #!+sb-thread
 (defun %%wait-for-mutex (mutex new-owner to-sec to-usec stop-sec stop-usec)
   (declare (type mutex mutex) (optimize (speed 3)))
+  (declare (sb!ext:muffle-conditions sb!ext:compiler-note))
   #!-sb-futex
   (declare (ignore to-sec to-usec))
   #!-sb-futex
