@@ -28,13 +28,31 @@
         (reg-in-size y :dword))
   (inst test (reg-in-size temp :byte)
         fixnum-tag-mask))
-)
 
-#+sb-xc-host
-(defmacro static-fun-addr (name)
-  #!+immobile-code `(make-fixup ,name :static-call)
+(defun !static-fun-addr (name)
+  #!+immobile-code (make-fixup name :static-call)
   #!-immobile-code
-  `(make-ea :qword :disp (+ nil-value (static-fun-offset ,name))))
+  (make-ea :qword :disp (+ nil-value (static-fun-offset name))))
+
+(defun !call-static-fun (fun arg-count)
+  (inst push rbp-tn)
+  (inst mov rbp-tn rsp-tn)
+  (inst sub rsp-tn (* n-word-bytes 2))
+  (inst mov (make-ea :qword :base rsp-tn) rbp-tn)
+  (inst mov rbp-tn rsp-tn)
+  (inst mov rcx-tn (fixnumize arg-count))
+  (inst call (!static-fun-addr fun))
+  (inst pop rbp-tn))
+
+(defun !tail-call-static-fun (fun arg-count)
+  (inst push rbp-tn)
+  (inst mov rbp-tn rsp-tn)
+  (inst sub rsp-tn n-word-bytes)
+  (inst push (make-ea :qword :base rbp-tn
+                             :disp (frame-byte-offset return-pc-save-offset)))
+  (inst mov rcx-tn (fixnumize arg-count))
+  (inst jmp (!static-fun-addr fun))))
+
 
 ;;;; addition, subtraction, and multiplication
 
@@ -60,14 +78,7 @@
                 (inst ret)
 
                 DO-STATIC-FUN
-                ;; Same as: (inst enter (* n-word-bytes 1))
-                (inst push rbp-tn)
-                (inst mov rbp-tn rsp-tn)
-                (inst sub rsp-tn (* n-word-bytes 1))
-                (inst push (make-ea :qword :base rbp-tn
-                            :disp (frame-byte-offset return-pc-save-offset)))
-                (inst mov rcx (fixnumize 2)) ; arg count
-                (inst jmp (static-fun-addr ',(symbolicate "TWO-ARG-" fun))))))
+                (!tail-call-static-fun ',(symbolicate "TWO-ARG-" fun) 2))))
 
   #.`
   (define-generic-arith-routine (+ 10)
@@ -148,13 +159,7 @@
   (inst test (reg-in-size x :byte) fixnum-tag-mask)
   (inst jmp :z FIXNUM)
 
-  (inst push rbp-tn)
-  (inst mov rbp-tn rsp-tn)
-  (inst sub rsp-tn n-word-bytes)
-  (inst push (make-ea :qword :base rbp-tn
-                      :disp (frame-byte-offset return-pc-save-offset)))
-  (inst mov rcx (fixnumize 1))    ; arg count
-  (inst jmp (static-fun-addr '%negate))
+  (!tail-call-static-fun '%negate 1)
 
   FIXNUM
   (move res x)
@@ -190,29 +195,13 @@
                 (inst ret)
 
                 DO-STATIC-FUN
-                (inst push rbp-tn)
-                (inst mov rbp-tn rsp-tn)
-                (inst sub rsp-tn (* n-word-bytes 3))
-                (inst mov (make-ea :qword :base rsp-tn
-                                   :disp (frame-byte-offset
-                                          (+ sp->fp-offset
-                                             -3
-                                             ocfp-save-offset)))
-                      rbp-tn)
-                (inst lea rbp-tn (make-ea :qword :base rsp-tn
-                                          :disp (frame-byte-offset
-                                          (+ sp->fp-offset
-                                             -3
-                                             ocfp-save-offset))))
-                (inst mov rcx (fixnumize 2))
-                (inst call (static-fun-addr ',static-fn))
+                (!call-static-fun ',static-fn 2)
                 ;; HACK: We depend on NIL having the lowest address of all
                 ;; static symbols (including T)
                 ,@(ecase test
                     (:l `((inst mov y (1+ nil-value))
                           (inst cmp y x)))
-                    (:g `((inst cmp x (1+ nil-value)))))
-                (inst pop rbp-tn))))
+                    (:g `((inst cmp x (1+ nil-value))))))))
   (define-cond-assem-rtn generic-< < two-arg-< :l)
   (define-cond-assem-rtn generic-> > two-arg-> :g))
 
@@ -236,24 +225,8 @@
   (inst ret)
 
   DO-STATIC-FUN
-  (inst push rbp-tn)
-  (inst mov rbp-tn rsp-tn)
-  (inst sub rsp-tn (* n-word-bytes 3))
-  (inst mov (make-ea :qword :base rsp-tn
-                     :disp (frame-byte-offset
-                            (+ sp->fp-offset
-                               -3
-                               ocfp-save-offset)))
-        rbp-tn)
-  (inst lea rbp-tn (make-ea :qword :base rsp-tn
-                            :disp (frame-byte-offset
-                                   (+ sp->fp-offset
-                                      -3
-                                      ocfp-save-offset))))
-  (inst mov rcx (fixnumize 2))
-  (inst call (static-fun-addr 'eql))
-  (inst cmp x (+ nil-value (static-symbol-offset t)))
-  (inst pop rbp-tn))
+  (!call-static-fun 'eql 2)
+  (inst cmp x (+ nil-value (static-symbol-offset t))))
 
 (define-assembly-routine (generic-=
                           (:translate =)
@@ -274,25 +247,8 @@
   (inst ret)
 
   DO-STATIC-FUN
-  (inst push rbp-tn)
-  (inst mov rbp-tn rsp-tn)
-  (inst sub rsp-tn (* n-word-bytes 3))
-  (inst mov (make-ea :qword :base rsp-tn
-                     :disp (frame-byte-offset
-                            (+ sp->fp-offset
-                               -3
-                               ocfp-save-offset)))
-        rbp-tn)
-  (inst lea rbp-tn (make-ea :qword :base rsp-tn
-                            :disp (frame-byte-offset
-                                   (+ sp->fp-offset
-                                      -3
-                                      ocfp-save-offset))))
-
-  (inst mov rcx (fixnumize 2))
-  (inst call (static-fun-addr 'two-arg-=))
-  (inst cmp x (+ nil-value (static-symbol-offset t)))
-  (inst pop rbp-tn))
+  (!call-static-fun 'two-arg-= 2)
+  (inst cmp x (+ nil-value (static-symbol-offset t))))
 
 #+sb-assembling
 (define-assembly-routine (logcount)
@@ -300,6 +256,10 @@
                           (:temp mask unsigned-reg rcx-offset)
                           (:temp temp unsigned-reg rax-offset))
   (inst push temp) ; save RAX
+
+
+
+
   (let ((result arg))
     ;; See the comments below for how the algorithm works. The tricks
     ;; used can be found for example in AMD's software optimization
