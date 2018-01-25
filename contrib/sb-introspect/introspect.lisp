@@ -1012,3 +1012,14 @@ Experimental: interface subject to change."
             (warn "~&MAP-ROOT: Unknown widetag ~S: ~S~%"
                   (sb-kernel:widetag-of object) object)))))))
   object)
+
+(defun object-size (object)
+  (+ (sb-vm::primitive-object-size object)
+     (typecase object
+       (sb-mop:funcallable-standard-object
+        (primitive-object-size
+         (sb-pcl::standard-funcallable-instance-clos-slots object)))
+       (standard-object
+        (sb-vm::primitive-object-size
+         (sb-pcl::standard-instance-slots object)))
+       (t 0))))
