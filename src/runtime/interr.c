@@ -33,6 +33,7 @@
 #include "breakpoint.h"
 #include "var-io.h"
 #include "sc-offset.h"
+#include "gc.h"
 
 /* the way that we shut down the system on a fatal error */
 
