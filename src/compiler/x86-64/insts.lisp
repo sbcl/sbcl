@@ -147,8 +147,10 @@
   :printer #'print-reg-default-qword)
 
 (define-arg-type imm-addr
-  :prefilter (lambda (dstate)
-               (read-suffix (width-bits (inst-operand-size dstate)) dstate))
+  ;; imm-addr is used only with opcodes #xA0 through #xA3 which take a 64-bit
+  ;; address unless overridden to 32-bit by the #x67 prefix that we don't parse.
+  ;; i.e. we don't have (INST-ADDR-SIZE DSTATE), so always take it to be 64 bits.
+  :prefilter (lambda (dstate) (read-suffix 64 dstate))
   :printer #'print-label)
 
 ;;; Normally, immediate values for an operand size of :qword are of size
@@ -1271,14 +1273,14 @@
 ;;; registers is used that can only be accessed using a REX prefix, we
 ;;; need only to test R and B, because X is only used for the index
 ;;; register of an effective address and therefore never byte-sized.
-;;; For R we can avoid to calculate the size of the TN because it is
+;;; For R we can avoid calculating the size of the TN because it is
 ;;; always OPERAND-SIZE. The size of B must be calculated here because
 ;;; B can be address-sized (if it is the base register of an effective
 ;;; address), of OPERAND-SIZE (if the instruction operates on two
 ;;; registers) or of some different size (in the instructions that
 ;;; combine arguments of different sizes: MOVZX, MOVSX, MOVSXD and
 ;;; several SSE instructions, e.g. CVTSD2SI). We don't distinguish
-;;; between general-purpose and floating point registers for this cause
+;;; between general-purpose and floating point registers for this case
 ;;; because only general-purpose registers can be byte-sized at all.
 (defun maybe-emit-rex-prefix (segment operand-size r x b)
   (declare (type (member nil :byte :word :dword :qword :do-not-set)
@@ -1312,9 +1314,9 @@
         (emit-rex-byte segment #b0100 rex-w rex-r rex-x rex-b)))))
 
 ;;; Emit a REX prefix if necessary. The operand size is determined from
-;;; THING or can be overwritten by OPERAND-SIZE. This and REG are always
+;;; THING or can be overridden by OPERAND-SIZE. This and REG are always
 ;;; passed to MAYBE-EMIT-REX-PREFIX. Additionally, if THING is an EA we
-;;; pass its index and base registers, if it is a register TN, we pass
+;;; pass its index and base registers; if it is a register TN, we pass
 ;;; only itself.
 ;;; In contrast to EMIT-EA above, neither stack TNs nor fixups need to
 ;;; be treated specially here: If THING is a stack TN, neither it nor
@@ -1467,9 +1469,6 @@
                                          value))
                  (imm nil :type 'signed-imm-data/asm-routine))
             '(:name :tab reg ", " imm))
-  ;; absolute mem to/from accumulator
-  (:printer simple-dir ((op #b101000) (imm nil :type 'imm-addr))
-            `(:name :tab ,(swap-if 'dir 'accum ", " '("[" imm "]"))))
   ;; register to/from register/memory
   (:printer reg-reg/mem-dir ((op #b100010)))
   ;; immediate to register/memory
@@ -1551,6 +1550,30 @@
             (emit-absolute-fixup segment src))
            (t
             (error "bogus arguments to MOV: ~S ~S" dst src))))))
+
+;;; MOVABS is not a mnemonic according to the CPU vendors, but every (dis)assembler
+;;; in popular use chooses this mnemonic instead of MOV with an 8-byte operand.
+;;; (Even with Intel-compatible syntax, LLVM produces MOVABS).
+;;; A possible motive is that it makes round-trip disassembly + reassembly faithful
+;;; to the original encoding.  If MOVABS were rendered as MOV on account of the
+;;; operand fitting by chance in 4 bytes, then information loss would occur.
+;;; On the other hand, information loss occurs with other operands whose immediate
+;;; value could fit in 1 byte or 4 bytes, so I don't know that that's the full
+;;; reasoning. But in this disassembler anyway, an EA holds only a 32-bit integer
+;;; so it doesn't really work to shoehorn this into the MOV instruction emitter.
+(define-instruction movabs (segment dst src)
+  ;; absolute mem to/from accumulator
+  (:printer simple-dir ((op #b101000) (imm nil :type 'imm-addr))
+            `(:name :tab ,(swap-if 'dir 'accum ", " '("[" imm "]"))))
+  (:emitter
+   (multiple-value-bind (reg ea dir-bit)
+       (if (register-p dst) (values dst src 0) (values src dst 2))
+     (aver (and (accumulator-p reg) (typep ea 'word)))
+     (let ((size (operand-size reg)))
+       (maybe-emit-operand-size-prefix segment size)
+       (maybe-emit-rex-prefix segment size nil nil nil)
+       (emit-byte segment (logior (if (eq size :byte) #xA0 #xA1) dir-bit))
+       (emit-qword segment ea)))))
 
 ;;; Emit a sign-extending (if SIGNED-P is true) or zero-extending move.
 ;;; To achieve the shortest possible encoding zero extensions into a
