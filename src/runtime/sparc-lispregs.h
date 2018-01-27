@@ -53,7 +53,7 @@
 #define reg_OCFP        LREG(6)
 #define reg_LRA         LREG(7)
 
-#define reg_FDEFN       IREG(0)
+#define reg_CNAME       IREG(0)
 #define reg_LEXENV      IREG(1)
 #define reg_L0          IREG(2)
 #define reg_NFP         IREG(3)
