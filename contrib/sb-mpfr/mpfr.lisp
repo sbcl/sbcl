@@ -1225,7 +1225,7 @@
         (mpfr-float
          (mul y x)))))
 
-(defun sqare (x &optional (round *mpfr-rnd*))
+(defun square (x &optional (round *mpfr-rnd*))
   (let ((r (make-mpfr-float)))
     (values r (mpfr_sqr (mpfr-float-ref r) (mpfr-float-ref x) round))))
 
