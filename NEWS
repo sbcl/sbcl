@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-1.4.3:
+changes in sbcl-1.4.4 relative to sbcl-1.4.3:
   * bug fix: pathname accessors such as PATHNAME-DIRECTORY work on
     SYNONYM-STREAMs.
   * bug fix: (pathname-{device,directory,name,type} ... :case :common) works
