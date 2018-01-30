@@ -19,8 +19,15 @@ changes relative to sbcl-1.4.3:
     per operation (lp#1587983)
   * bug fix: big-endian MIPS systems now (mostly) work again (broken since
     1.3.14.x).
+  * bug fix: backtrace from arg-count errors on systems other than x86, x86-64,
+    ARM, and ARM64 now works again.
+  * bug fix: backtrace from asynchronous interrupts on non-x86, non-x86-64
+    systems should now be more reliable.
   * enhancement: warnings and errors referring to bindings established by LET,
     LET*, FLET and LABELS point to the offending form more accurately.
+  * enhancement: backtrace for invalid argument count produces the exact
+    supplied arguments including the extra ones on all platforms (no longer
+    just x86, x86-64, ARM, and ARM64).
 
 changes in sbcl-1.4.3 relative to sbcl-1.4.2:
   * enhancement: SLEEP respects deadlines established by SB-SYS:WITH-DEADLINE.
