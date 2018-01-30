@@ -307,7 +307,11 @@ static int get_hint(int attributes, int *page)
     if (hint_index > (int)(sizeof page_hints / sizeof (long)))
         lose("Unexpectedly large fixedobj allocation request");
     for ( ; hint_index <= limit; ++hint_index ) {
+#ifdef __ATOMIC_SEQ_CST
         __atomic_load(&page_hints[hint_index], &hint, __ATOMIC_SEQ_CST);
+#else
+        hint = __sync_fetch_and_add(&page_hints[hint_index], 0);
+#endif
         if (hint_attributes(hint) == attributes) {
             *page = hint_page(hint);
             return hint_index;
