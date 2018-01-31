@@ -1,7 +1,6 @@
 \input texinfo   @c -*-texinfo-*-
 @c %**start of header
 @setfilename sbcl.info
-@settitle SBCL User Manual
 @documentencoding UTF-8
 @c %**end of header
 @afourwide
