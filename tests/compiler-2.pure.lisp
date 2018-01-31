@@ -1096,3 +1096,12 @@
   (checked-compile
       '(lambda (x)
         (concatenate '(and string (satisfies eval)) x))))
+
+(with-test (:name :make-array-transform-deletion-notes)
+  (assert (null (nth-value 4
+                           (checked-compile
+                            `(lambda (vector)
+                               (let* ((length (length vector))
+                                      (new (make-array length :adjustable t
+                                                              :fill-pointer length)))
+                                 new)))))))

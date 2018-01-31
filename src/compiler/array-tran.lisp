@@ -726,31 +726,31 @@
                     (let* ((constant-fill-pointer-p (constant-lvar-p fill-pointer))
                            (fill-pointer-value (and constant-fill-pointer-p
                                                     (lvar-value fill-pointer))))
-                      `(let ((length (the index ,(or c-length 'length))))
+                      `(let ((%length (the index ,(or c-length 'length))))
                          (truly-the
                           ,result-spec
                           (make-array-header* ,(or (sb!vm:saetp-complex-typecode saetp)
                                                    sb!vm:complex-vector-widetag)
                                               ;; fill-pointer
                                               ,(cond ((eq fill-pointer-value t)
-                                                      'length)
+                                                      '%length)
                                                      (fill-pointer-value)
                                                      ((and fill-pointer
                                                            (not constant-fill-pointer-p))
                                                       `(cond ((or (eq fill-pointer t)
                                                                   (null fill-pointer))
-                                                              length)
-                                                             ((> fill-pointer length)
+                                                              %length)
+                                                             ((> fill-pointer %length)
                                                               (error "Invalid fill-pointer ~a" fill-pointer))
                                                              (t
                                                               fill-pointer)))
                                                      (t
-                                                      'length))
+                                                      '%length))
                                               ;; fill-pointer-p
                                               ,(and fill-pointer
                                                     `(and fill-pointer t))
                                               ;; elements
-                                              length
+                                              %length
                                               ;; data
                                               (let ((data ,data-alloc-form))
                                                 ,(or data-wrapper 'data))
@@ -761,7 +761,7 @@
                                               ;; displaced-from
                                               nil
                                               ;; dimensions
-                                              length)))))
+                                              %length)))))
                    (data-wrapper
                     (subst data-alloc-form 'data data-wrapper))
                    (t
