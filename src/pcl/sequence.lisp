@@ -83,10 +83,10 @@
   (:method ((s list) length &key
             (initial-element nil iep) (initial-contents nil icp))
     (cond
-      ((and icp iep) (error "bar"))
+      ((and icp iep) (error "supplied both ~S and ~S to ~S" :initial-element :initial-contents 'make-sequence-like))
       (iep (make-list length :initial-element initial-element))
       (icp (unless (= (length initial-contents) length)
-             (error "foo"))
+             (error "length mismatch in ~S" 'make-sequence-like))
            (let ((result (make-list length)))
              (replace result initial-contents)
              result))
@@ -94,7 +94,7 @@
   (:method ((s vector) length &key
             (initial-element nil iep) (initial-contents nil icp))
     (cond
-      ((and icp iep) (error "foo"))
+      ((and icp iep) (error "supplied both ~S and ~S to ~S" :initial-element :initial-contents 'make-sequence-like))
       (iep (make-array length :element-type (array-element-type s)
                        :initial-element initial-element))
       (icp (make-array length :element-type (array-element-type s)
