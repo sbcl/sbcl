@@ -271,7 +271,9 @@
   (:save-p t)
   (:generator 0
     (move rbx function)
-    (emit-c-call vop rax rbx args #!+sb-safepoint pc-save)))
+    (emit-c-call vop rax rbx args
+                 sb!alien::*alien-fun-type-varargs-default*
+                 #!+sb-safepoint pc-save)))
 
 ;;; Calls to C can generally be made without loading a register
 ;;; with the function. We receive the function name as an info argument.
@@ -279,7 +281,7 @@
 (define-vop (call-out-named)
   (:args (args :more t))
   (:results (results :more t))
-  (:info c-symbol)
+  (:info c-symbol varargsp)
   (:temporary (:sc unsigned-reg :offset rax-offset :to :result) rax)
   #!+sb-safepoint
   (:temporary (:sc unsigned-stack :from :eval :to :result) pc-save)
@@ -287,9 +289,9 @@
   (:vop-var vop)
   (:save-p t)
   (:generator 0
-    (emit-c-call vop rax c-symbol args #!+sb-safepoint pc-save)))
+    (emit-c-call vop rax c-symbol args varargsp #!+sb-safepoint pc-save)))
 
-(defun emit-c-call (vop rax fun args #!+sb-safepoint pc-save)
+(defun emit-c-call (vop rax fun args varargsp #!+sb-safepoint pc-save)
   ;; Current PC - don't rely on function to keep it in a form that
   ;; GC understands
   #!+sb-safepoint
@@ -309,11 +311,12 @@
   #!-win32
   ;; ABI: AL contains amount of arguments passed in XMM registers
   ;; for vararg calls.
-  (move-immediate rax
+  (when varargsp
+    (move-immediate rax
                   (loop for tn-ref = args then (tn-ref-across tn-ref)
                         while tn-ref
                         count (eq (sb-name (sc-sb (tn-sc (tn-ref-tn tn-ref))))
-                                  'float-registers)))
+                                  'float-registers))))
   #!+sb-safepoint
   ;; Store SP in thread struct
   (storew rsp-tn thread-base-tn thread-saved-csp-offset)
