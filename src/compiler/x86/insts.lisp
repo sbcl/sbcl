@@ -744,22 +744,8 @@
 (defun operand-size (thing)
   (typecase thing
     (tn
-     ;; FIXME: might as well be COND instead of having to use #. readmacro
-     ;; to hack up the code
-     (case (sc-name (tn-sc thing))
-       (#.*dword-sc-names*
-        :dword)
-       (#.*word-sc-names*
-        :word)
-       (#.*byte-sc-names*
-        :byte)
-       ;; added by jrd: float-registers is a separate size (?)
-       (#.sb!vm::*float-sc-names*
-        :float)
-       (#.sb!vm::*double-sc-names*
-        :double)
-       (t
-        (error "can't tell the size of ~S ~S" thing (sc-name (tn-sc thing))))))
+     (or (sb!c:sc-operand-size (tn-sc thing))
+         (error "can't tell the size of ~S ~S" thing (sc-name (tn-sc thing)))))
     (ea
      (ea-size thing))
     (t
