@@ -59,11 +59,11 @@
 
 ;;; a map from package names to packages
 (define-load-time-global *package-names* nil)
-(declaim (type hash-table *package-names*))
+(declaim (type info-hashtable *package-names*))
 
-(defmacro with-package-names ((names &key) &body body)
-  `(let ((,names *package-names*))
-     (with-locked-system-table (,names)
+(defmacro with-package-names ((table-var &key) &body body)
+  `(let ((,table-var *package-names*))
+     (sb!thread::with-recursive-system-lock ((info-env-mutex ,table-var))
        ,@body)))
 
 ;;;; PACKAGE-HASHTABLE stuff
@@ -543,9 +543,11 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
 
 ;;; Perform (GETHASH NAME TABLE) and then unwrap the value if it is a list.
 ;;; List vs nonlist disambiguates a nickname from the primary name.
+;;; And never return the symbol :DELETED.
 (defun %get-package (name table)
-  (let ((found (gethash name table)))
-    (if (listp found) (car found) found)))
+  (let ((found (info-gethash name table)))
+    (cond ((listp found) (car found))
+          ((neq found :deleted) found))))
 
 ;;; This is undocumented and unexported for now, but the idea is that by
 ;;; making this a generic function then packages with custom package classes
@@ -626,10 +628,49 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
                (decf (package-hashtable-deleted table))))) ; tombstone
       (declare (fixnum i)))))
 
+;;; Insert a mapping from NAME (a string) to OBJECT (a package or singleton
+;;; list of a package) into TABLE (the hashtable in *PACKAGE-NAMES*),
+;;; taking care to adjust the count of phantom entries.
+(defun %register-package (table name object)
+  (let ((oldval (info-gethash name table)))
+    (unless oldval ; if any value existed, no new physical cell is claimed
+      (when (> (info-env-tombstones table)
+               (floor (info-storage-capacity (info-env-storage table)) 4))
+        ;; Otherwise, when >1/4th of the table consists of tombstones,
+        ;; then rebuild the table.
+        (%rebuild-package-names table)
+        (when (eq oldval :deleted)
+          (setq oldval nil))))
+    (setf (info-gethash name table) object)
+    (when (eq oldval :deleted)
+      (decf (info-env-tombstones table)))))
+
+;;; Rebuild the *PACKAGE-NAMES* table.
+;;; The calling thread must own the mutex on *PACKAGE-NAMES* so that
+;;; this is synchronized across all insertion and deletion operations.
+(defun %rebuild-package-names (old)
+  (let ((new (copy-structure old))
+        (nondeleted-count (- (info-env-count old)
+                             (info-env-tombstones old))))
+    (setf (info-env-storage new) (make-info-storage nondeleted-count)
+          (info-env-count new) 0
+          (info-env-tombstones new) 0)
+    (info-maphash (lambda (key value)
+                    (unless (eq value :deleted)
+                      (setf (info-gethash key new) value)))
+                  old)
+    (setf (info-env-storage old) (info-env-storage new)
+          (info-env-count old) (info-env-count new)
+          (info-env-tombstones old) 0)
+    old))
+
 ;;; Resize the package hashtables of all packages so that their load
 ;;; factor is *PACKAGE-HASHTABLE-IMAGE-LOAD-FACTOR*. Called from
 ;;; SAVE-LISP-AND-DIE to optimize space usage in the image.
 (defun tune-hashtable-sizes-of-all-packages ()
+  (with-package-names (table)
+    (when (plusp (info-env-tombstones table))
+      (%rebuild-package-names table)))
   (flet ((tune-table-size (table)
            (resize-package-hashtable
             table
@@ -701,30 +742,30 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
       (resize-package-hashtable table (* used 2)))))
 
 ;;; Enter any new NICKNAMES for PACKAGE into *PACKAGE-NAMES*. If there is a
-;;; conflict then give the user a chance to do something about it. Caller is
-;;; responsible for having acquired the mutex via WITH-PACKAGES.
+;;; conflict then give the user a chance to do something about it.
+;;; Package names do not affect the uses/used-by relation,
+;;; so this can be done without the package graph lock held.
 (defun %enter-new-nicknames (package nicknames &aux (val (list package)))
   (declare (type list nicknames))
-  (dolist (n nicknames)
-    (let ((found (with-package-names (names)
-                    (or (%get-package (the simple-string n) names)
-                        (progn
-                          (setf (gethash n names) val)
-                          (push n (package-%nicknames package))
-                          package)))))
+  (dolist (nickname nicknames)
+    (let ((found (or (%get-package (the simple-string nickname) *package-names*)
+                     (with-package-names (table)
+                       (%register-package table nickname val)
+                       (push nickname (package-%nicknames package))
+                       package))))
       (cond ((eq found package))
-            ((string= (the string (package-%name found)) n)
+            ((string= (the string (package-%name found)) nickname)
              (signal-package-cerror
               package
               "Ignore this nickname."
               "~S is a package name, so it cannot be a nickname for ~S."
-              n (package-%name package)))
+              nickname (package-%name package)))
             (t
              (signal-package-cerror
               package
               "Leave this nickname alone."
               "~S is already a nickname for ~S."
-              n (package-%name found)))))))
+              nickname (package-%name found)))))))
 
 ;;; ANSI specifies that:
 ;;;  (1) MAKE-PACKAGE and DEFPACKAGE use the same default package-use-list
@@ -779,8 +820,34 @@ implementation it is ~S." *!default-package-use-list*)
          ;; USE-PACKAGE, but I need to check what kinds of errors can be caused by
          ;; USE-PACKAGE, too.
          (%enter-new-nicknames package nicks)
-         (return (setf (gethash name *package-names*) package))))
+         ;; The name table is actually multi-writer concurrent, but due to
+         ;; lazy removal of :DELETED entries we want to enforce a single-writer.
+         ;; We're inside WITH-PACKAGE-GRAPH so this is already synchronized with
+         ;; other MAKE-PACKAGE operations, but we need the additional lock
+         ;; so that it synchronizes with RENAME-PACKAGE.
+         (with-package-names (table)
+           (%register-package table name package))
+         (return package)))
      (bug "never")))
+
+(flet ((remove-names (package name-table)
+         ;; An INFO-HASHTABLE does not support REMHASH. We can simulate it
+         ;; by changing the value to :DELETED.
+         ;; (NIL would be preferable, but INFO-GETHASH does not return
+         ;; a secondary value indicating whether the NIL was by default
+         ;; or found, not does it take a different default to return).
+         ;; At some point the table might contain more deleted values than
+         ;; useful values. We call %REBUILD-PACKAGE-NAMES to rectify that.
+         (dx-let ((names (cons (package-name package)
+                               (package-nicknames package)))
+                  (i 0))
+           (dolist (name names)
+             ;; Aver that the following SETF doesn't insert a new <k,v> pair.
+             (aver (info-gethash name name-table))
+             (setf (info-gethash name name-table) :deleted)
+             (incf i))
+           (incf (info-env-tombstones name-table) i))
+         nil))
 
 ;;; Change the name if we can, blast any old nicknames and then
 ;;; add in any new ones.
@@ -810,16 +877,14 @@ implementation it is ~S." *!default-package-use-list*)
            (assert-package-unlocked
             package "renaming as ~A~@[ with nickname~*~P ~1@*~{~A~^, ~}~]"
             name nicks (length nicks)))
-         (with-package-names (names)
+         (with-package-names (table)
            ;; Check for race conditions now that we have the lock.
            (unless (eq package (find-package package-designator))
              (go :restart))
            ;; Do the renaming.
-           (remhash (package-%name package) names)
-           (dolist (n (package-%nicknames package))
-             (remhash n names))
+           (remove-names package table)
+           (%register-package table name package)
            (setf (package-%name package) name
-                 (gethash name names) package
                  (package-%nicknames package) ()))
          (%enter-new-nicknames package nicks))
        (return package))))
@@ -877,10 +942,8 @@ implementation it is ~S." *!default-package-use-list*)
                   ;; many smaller tables for no good reason.
                   (do-symbols (sym package)
                     (unintern sym package))
-                  (with-package-names (names)
-                    (remhash (package-name package) names)
-                    (dolist (nick (package-nicknames package))
-                      (remhash nick names))
+                  (with-package-names (table)
+                    (remove-names package table)
                     (setf (package-%name package) nil
                           ;; Setting PACKAGE-%NAME to NIL is required in order to
                           ;; make PACKAGE-NAME return NIL for a deleted package as
@@ -896,17 +959,24 @@ implementation it is ~S." *!default-package-use-list*)
                         (package-external-symbols package)
                         (make-package-hashtable 0)))
                 (return-from delete-package t)))))))
+) ; end FLET
+
+(defmacro !do-packages ((package) &body body)
+  ;; INFO-MAPHASH is not intrinsically threadsafe - but actually
+  ;; quite easy to fix - so meanwhile until it's fixed, grab the lock.
+  `(with-package-names (.table.)
+      (info-maphash
+       (lambda (.name. ,package)
+         (declare (ignore .name.))
+         (unless (or (listp ,package) (eq ,package :deleted))
+           ,@body))
+       .table.)))
 
 (defun list-all-packages ()
   "Return a list of all existing packages."
-  (let ((res ()))
-    (with-package-names (names)
-      (maphash (lambda (k v)
-                 (declare (ignore k))
-                 (unless (listp v)
-                   (push v res)))
-               names))
-    res))
+  (let ((result ()))
+    (!do-packages (package) (push package result))
+    result))
 
 (macrolet ((find/intern (function &rest more-args)
              ;; Both %FIND-SYMBOL and %INTERN require a SIMPLE-STRING,
@@ -1470,15 +1540,11 @@ PACKAGE."
 (defun find-all-symbols (string-or-symbol)
   "Return a list of all symbols in the system having the specified name."
   (let ((string (string string-or-symbol))
-        (res ()))
-    (with-package-names (names)
-      (maphash (lambda (k v)
-                 (declare (ignore k))
-                 (unless (listp v) ; ignore nickname entries
-                   (multiple-value-bind (s w) (find-symbol string v)
-                     (when w (pushnew s res)))))
-               names))
-    res))
+        (result ()))
+    (!do-packages (package)
+      (multiple-value-bind (symbol found) (find-symbol string package)
+        (when found (pushnew symbol result))))
+    result))
 
 ;;;; APROPOS and APROPOS-LIST
 
@@ -1539,7 +1605,10 @@ PACKAGE."
 
 (defun !package-cold-init ()
   (setf *package-graph-lock* (sb!thread:make-mutex :name "Package Graph Lock")
-        *package-names* (make-hash-table :test 'equal :synchronized t))
+        *package-names*
+        (make-info-hashtable
+         :comparator (lambda (a b) (and (not (eql a 0)) (string= a b)))
+         :hash-function #'sxhash))
   (with-package-names (names)
     (dolist (spec *!initial-symbols*)
       (let ((pkg (car spec)) (symbols (cdr spec)))
@@ -1556,9 +1625,9 @@ PACKAGE."
         (setf (package-%local-nicknames pkg) nil
               (package-%locally-nicknamed-by pkg) nil
               (package-source-location pkg) nil
-              (gethash (package-%name pkg) names) pkg)
+              (info-gethash (package-%name pkg) names) pkg)
         (dolist (nick (package-%nicknames pkg))
-          (setf (gethash nick names) (list pkg)))
+          (setf (info-gethash nick names) (list pkg)))
         #!+sb-package-locks
         (setf (package-lock pkg) nil
               (package-%implementation-packages pkg) nil))))

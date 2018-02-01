@@ -87,6 +87,14 @@
   (comparator #'equal :type function)
   (hash-function #'globaldb-sxhashoid :type function)
   (mutex (sb!thread:make-mutex))
+  ;; the number of phantom entries for simulated deletion.
+  ;; Our tombstones are not the usual ones. Ordinarily an open-addressing
+  ;; table will use tombstone keys that can be written over if inserting a new
+  ;; pair into a dead entry. That doesn't work for the lockfree algorithm
+  ;; as we lack a portable way to atomically load a <k,v> pair and therefore
+  ;; a means to detect having read a value for the wrong key in the case of
+  ;; insert K1 / delete K1 / insert K2 where K1 and K2 hash to the same bin.
+  (tombstones 0 :type word)
   ;; COUNT is always at *least* as large as the key count.
   ;; If no insertions are in progress, it is exactly right.
   (count 0 :type word))
