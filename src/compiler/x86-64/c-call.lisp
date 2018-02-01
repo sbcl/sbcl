@@ -271,6 +271,24 @@
   (:save-p t)
   (:generator 0
     (move rbx function)
+    (emit-c-call vop rax rbx args #!+sb-safepoint pc-save)))
+
+;;; Calls to C can generally be made without loading a register
+;;; with the function. We receive the function name as an info argument.
+(define-vop (call-out-named)
+  (:args (args :more t))
+  (:results (results :more t))
+  (:info c-symbol)
+  (:temporary (:sc unsigned-reg :offset rax-offset :to :result) rax)
+  #!+sb-safepoint
+  (:temporary (:sc unsigned-stack :from :eval :to :result) pc-save)
+  (:ignore results)
+  (:vop-var vop)
+  (:save-p t)
+  (:generator 0
+    (emit-c-call vop rax c-symbol args #!+sb-safepoint pc-save)))
+
+(defun emit-c-call (vop rax fun args #!+sb-safepoint pc-save)
     ;; Current PC - don't rely on function to keep it in a form that
     ;; GC understands
     #!+sb-safepoint
@@ -299,14 +317,22 @@
     ;; Store SP in thread struct
     (storew rsp-tn thread-base-tn thread-saved-csp-offset)
     #!+win32 (inst sub rsp-tn #x20) ;MS_ABI: shadow zone
-    (inst call rbx)
+    ;; From immobile space we use the "CALL rel32" format to the linkage
+    ;; table jump, and from dynamic space we use "CALL [ea]" format
+    ;; where ea is the address of the linkage table entry's operand.
+    ;; So while the former is a jump to a jump, we can optimize out
+    ;; one jump in a statically linked executable.
+    (inst call (cond ((tn-p fun) fun)
+                     ((sb!c::code-immobile-p (sb!c::vop-node vop))
+                      (make-fixup fun :foreign))
+                     (t (make-ea :qword :disp (make-fixup fun :foreign 8)))))
     #!+win32 (inst add rsp-tn #x20) ;MS_ABI: remove shadow space
     #!+sb-safepoint
     ;; Zero the saved CSP
     (inst xor (make-ea-for-object-slot thread-base-tn thread-saved-csp-offset 0)
           rsp-tn)
     ;; To give the debugger a clue. XX not really internal-error?
-    (note-this-location vop :internal-error)))
+    (note-this-location vop :internal-error))
 
 (define-vop (alloc-number-stack-space)
   (:info amount)

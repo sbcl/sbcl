@@ -132,6 +132,7 @@
 #+immobile-code
 (with-test (:name :static-unlinker)
   (let ((sb-c::*compile-to-memory-space* :immobile))
+    (declare (muffle-conditions style-warning))
     (flet ((disassembly-lines (name)
              (split-string
               (with-output-to-string (s)
@@ -159,3 +160,14 @@
         (defun g (x) (- x)))
       (let ((lines (disassembly-lines 'c)))
         (expect "#<FDEFN G>" lines)))))
+
+(with-test (:name :c-call)
+  (let* ((lines (split-string
+                 (with-output-to-string (s)
+                   (let ((sb-disassem:*disassem-location-column-width* 0))
+                     (disassemble 'sb-sys:deallocate-system-memory :stream s)))
+                 #\newline))
+         (c-call (find "os_deallocate" lines :test #'search)))
+    ;; Depending on #+immobile-code it's either direct or memory indirect.
+    #+immobile-code (assert (search "CALL #x" c-call))
+    #-immobile-code (assert (search "CALL [#x" c-call))))

@@ -610,7 +610,8 @@
     (let ((alien-type (alien-type-type-alien-type type)))
       (unless (alien-fun-type-p alien-type)
         (give-up-ir1-transform))
-      (let ((arg-types (alien-fun-type-arg-types alien-type)))
+      (let ((arg-types (alien-fun-type-arg-types alien-type))
+            (ignore-fun))
         (unless (= (length args) (length arg-types))
           (abort-ir1-transform
            "wrong number of arguments; expected ~W, got ~W"
@@ -625,9 +626,26 @@
           (let ((return-type (alien-fun-type-result-type alien-type))
                 ;; Innermost, we DEPORT the parameters (e.g. by taking SAPs
                 ;; to them) and do the call.
-                (body `(%alien-funcall (deport function ',alien-type)
-                                       ',alien-type
-                                       ,@(deports))))
+                (body
+                 ;; If FUNCTION's source looks like
+                 ;;  (%SAP-ALIEN (FOREIGN-SYMBOL-SAP "sym") #<anything>)
+                 ;; then snarf out the string and use it as the funarg
+                 ;; unless the backend lacks the CALL-OUT-NAMED vop.
+                 `(%alien-funcall
+                   ,(or (when (and (gethash 'call-out-named *backend-parsed-vops*)
+                                   (lvar-matches function :fun-names '(%sap-alien)
+                                                          :arg-count 2))
+                          (let ((sap (first (combination-args (lvar-use function)))))
+                            (when (lvar-matches sap :fun-names '(foreign-symbol-sap)
+                                                    :arg-count 1)
+                              (let ((sym (first (combination-args (lvar-use sap)))))
+                                (when (and (constant-lvar-p sym)
+                                           (stringp (lvar-value sym)))
+                                  (setq ignore-fun t)
+                                  (lvar-value sym))))))
+                        `(deport function ',alien-type))
+                   ',alien-type
+                   ,@(deports))))
             ;; Wrap that in a WITH-PINNED-OBJECTS to ensure the values
             ;; the SAPs are taken for won't be moved by the GC. (If
             ;; needed: some alien types won't need it).
@@ -664,16 +682,16 @@
               (setf body `(invoke-with-saved-fp-and-pc (lambda () ,body))))
             (/noshow "returning from DEFTRANSFORM ALIEN-FUNCALL" (params) body)
             `(lambda (function ,@(params))
+               ,@(when ignore-fun '((declare (ignore function))))
                (declare (optimize (let-conversion 3)))
                ,body)))))))
 
 (defoptimizer (%alien-funcall derive-type) ((function type &rest args))
   (declare (ignore function args))
-  (unless (constant-lvar-p type)
+  (unless (and (constant-lvar-p type)
+               (alien-fun-type-p (lvar-value type)))
     (error "Something is broken."))
   (let ((type (lvar-value type)))
-    (unless (alien-fun-type-p type)
-      (error "Something is broken."))
     (values-specifier-type
      (compute-alien-rep-type
       (alien-fun-type-result-type type)
@@ -684,7 +702,9 @@
   (declare (ignore type ltn-policy))
   (setf (basic-combination-info node) :funny)
   (setf (node-tail-p node) nil)
-  (annotate-ordinary-lvar function)
+  (unless (and (constant-lvar-p function)
+               (stringp function))
+    (annotate-ordinary-lvar function))
   (dolist (arg args)
     (annotate-ordinary-lvar arg)))
 
@@ -778,11 +798,21 @@
                   (vop sb!vm::move-single-to-int-arg call block
                        float-tn i1-tn))))))
       (aver (null args))
-      (let ((result-tns (ensure-list result-tns)))
-        (vop* call-out call block
-              ((lvar-tn call block function)
-               (reference-tn-list (remove-if-not #'tn-p (flatten-list arg-tns)) nil))
-              ((reference-tn-list (remove-if-not #'tn-p result-tns) t)))
+      (let* ((result-tns (ensure-list result-tns))
+             (arg-operands
+              (reference-tn-list (remove-if-not #'tn-p (flatten-list arg-tns)) nil))
+             (result-operands
+              (reference-tn-list (remove-if-not #'tn-p result-tns) t)))
+        (cond #.(if (gethash 'call-out-named *backend-parsed-vops*)
+                    '((and (constant-lvar-p function)
+                           (stringp (lvar-value function)))
+                      (vop* call-out-named call block
+                       (arg-operands) (result-operands) (lvar-value function)))
+                    (values))
+              (t
+               (vop* call-out call block
+                     ((lvar-tn call block function) arg-operands)
+                     (result-operands))))
         #!-c-stack-is-control-stack
         (vop dealloc-number-stack-space call block stack-frame-size)
         #!+c-stack-is-control-stack
