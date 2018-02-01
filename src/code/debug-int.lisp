@@ -1515,6 +1515,9 @@ register."
   (typecase vector
     (simple-vector
      (svref vector index))
+    (string
+     (aver (zerop index))
+     vector)
     (vector
      (aref vector index))
     (t
@@ -1523,6 +1526,8 @@ register."
 
 (defun compact-vector-length (vector)
   (typecase vector
+    (string
+     1)
     (vector
      (length vector))
     (t
@@ -1960,10 +1965,9 @@ register."
                 (compiled-code-location-context code-location))))
             (t context)))))
 
-(defun error-context ()
-  (let ((frame sb!debug:*stack-top-hint*))
-    (when frame
-      (code-location-context (frame-code-location frame)))))
+(defun error-context (&optional (frame sb!debug:*stack-top-hint*))
+  (when frame
+    (code-location-context (frame-code-location frame))))
 
 (defun decode-arithmetic-error-operands (context)
   (let* ((alien-context (sb!alien:sap-alien context (* os-context-t)))

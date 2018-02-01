@@ -335,7 +335,8 @@
 
 (defun compact-vector (sequence)
   (cond ((and (= (length sequence) 1)
-              (not (vectorp (elt sequence 0))))
+              (not (typep (elt sequence 0) '(and vector
+                                             (not string)))))
          (elt sequence 0))
         (t
          (coerce-to-smallest-eltype sequence))))
