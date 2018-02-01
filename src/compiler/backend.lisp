@@ -25,12 +25,12 @@
 
 ;;; the number of references that a TN must have to offset the
 ;;; overhead of saving the TN across a call
-(defvar *backend-register-save-penalty* 3)
+(defglobal *backend-register-save-penalty* 3)
 (declaim (type index *backend-register-save-penalty*))
 
 ;;; the byte order of the target machine. :BIG-ENDIAN has the MSB first (e.g.
 ;;; IBM RT), :LITTLE-ENDIAN has the MSB last (e.g. DEC VAX).
-(defvar *backend-byte-order*
+(defglobal *backend-byte-order*
   #!+little-endian :little-endian
   #!+big-endian :big-endian)
 (declaim (type (member nil :little-endian :big-endian) *backend-byte-order*))
@@ -38,7 +38,7 @@
 ;;; translation from SC numbers to SC info structures. SC numbers are always
 ;;; used instead of names at run time, so changing this vector changes all the
 ;;; references.
-(defvar *backend-sc-numbers* (make-array sc-number-limit :initial-element nil))
+(defglobal *backend-sc-numbers* (make-array sc-number-limit :initial-element nil))
 (declaim (type sc-vector *backend-sc-numbers*))
 
 ;;; a vector of all the SBs defined, so that we can easily iterate over them
@@ -63,7 +63,7 @@
 ;;; whatever. These names can only be used as the :ARG-TYPES or
 ;;; :RESULT-TYPES for VOPs and can map to anything else that can be
 ;;; used as :ARG-TYPES or :RESULT-TYPES (e.g. :OR, :CONSTANT).
-(defvar *backend-primitive-type-aliases* nil)
+(defglobal *backend-primitive-type-aliases* nil)
 (declaim (type list *backend-primitive-type-aliases*))
 
 ;;; The primitive type T is somewhat magical, in that it is the only
@@ -167,7 +167,7 @@ conditionalization.
 ;;; The default value of NIL means use only unguarded VOPs. The
 ;;; initial value is customizeable via
 ;;; customize-backend-subfeatures.lisp
-(defvar *backend-subfeatures*
+(defglobal *backend-subfeatures*
   '#.(sort (copy-list sb-cold:*shebang-backend-subfeatures*) #'string<))
 
 ;;; possible *BACKEND-SUBFEATURES* values:
