@@ -525,3 +525,13 @@
          (form2 (copy-tree form1)))
     (assert (eq (sb-alien::coerce-to-interpreted-function form1)
                 (sb-alien::coerce-to-interpreted-function form2)))))
+
+(with-test (:name :undefined-alien-name
+            :skipped-on (not (and :linkage-table
+                                  (or :x86-64 :arm :arm64))))
+  (handler-case (funcall (checked-compile `(lambda ()
+                                             (alien-funcall (extern-alien "bar" (function (values)))))
+                                          :allow-style-warnings t))
+    (t (c)
+      (assert (typep c 'sb-kernel::undefined-alien-function-error))
+      (assert (equal (cell-error-name c) "bar")))))

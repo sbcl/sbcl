@@ -289,50 +289,53 @@
     (emit-c-call vop rax c-symbol args #!+sb-safepoint pc-save)))
 
 (defun emit-c-call (vop rax fun args #!+sb-safepoint pc-save)
-    ;; Current PC - don't rely on function to keep it in a form that
-    ;; GC understands
-    #!+sb-safepoint
-    (let ((label (gen-label)))
-      (inst lea (reg-in-size rax :immobile-code-pc) (make-fixup nil :code-object label))
-      (emit-label label)
-      (move-dword-if-immobile-code pc-save rax))
-    (when sb!c::*msan-compatible-stack-unpoison*
-      (inst mov rax (static-symbol-value-ea 'msan-param-tls))
-      ;; Unpoison parameters
-      (do ((n 0 (+ n n-word-bytes))
-           (arg args (tn-ref-across arg)))
-          ((null arg))
-        ;; KLUDGE: assume all parameters are 8 bytes or less
-        (inst fs)
-        (inst mov (make-ea :qword :base rax :disp n) 0)))
-    #!-win32
-    ;; ABI: AL contains amount of arguments passed in XMM registers
-    ;; for vararg calls.
-    (move-immediate rax
-                    (loop for tn-ref = args then (tn-ref-across tn-ref)
-                          while tn-ref
-                          count (eq (sb-name (sc-sb (tn-sc (tn-ref-tn tn-ref))))
-                                    'float-registers)))
-    #!+sb-safepoint
-    ;; Store SP in thread struct
-    (storew rsp-tn thread-base-tn thread-saved-csp-offset)
-    #!+win32 (inst sub rsp-tn #x20) ;MS_ABI: shadow zone
-    ;; From immobile space we use the "CALL rel32" format to the linkage
-    ;; table jump, and from dynamic space we use "CALL [ea]" format
-    ;; where ea is the address of the linkage table entry's operand.
-    ;; So while the former is a jump to a jump, we can optimize out
-    ;; one jump in a statically linked executable.
-    (inst call (cond ((tn-p fun) fun)
-                     ((sb!c::code-immobile-p (sb!c::vop-node vop))
-                      (make-fixup fun :foreign))
-                     (t (make-ea :qword :disp (make-fixup fun :foreign 8)))))
-    #!+win32 (inst add rsp-tn #x20) ;MS_ABI: remove shadow space
-    #!+sb-safepoint
-    ;; Zero the saved CSP
-    (inst xor (make-ea-for-object-slot thread-base-tn thread-saved-csp-offset 0)
-          rsp-tn)
-    ;; To give the debugger a clue. XX not really internal-error?
+  ;; Current PC - don't rely on function to keep it in a form that
+  ;; GC understands
+  #!+sb-safepoint
+  (let ((label (gen-label)))
+    (inst lea (reg-in-size rax :immobile-code-pc) (make-fixup nil :code-object label))
+    (emit-label label)
+    (move-dword-if-immobile-code pc-save rax))
+  (when sb!c::*msan-compatible-stack-unpoison*
+    (inst mov rax (static-symbol-value-ea 'msan-param-tls))
+    ;; Unpoison parameters
+    (do ((n 0 (+ n n-word-bytes))
+         (arg args (tn-ref-across arg)))
+        ((null arg))
+      ;; KLUDGE: assume all parameters are 8 bytes or less
+      (inst fs)
+      (inst mov (make-ea :qword :base rax :disp n) 0)))
+  #!-win32
+  ;; ABI: AL contains amount of arguments passed in XMM registers
+  ;; for vararg calls.
+  (move-immediate rax
+                  (loop for tn-ref = args then (tn-ref-across tn-ref)
+                        while tn-ref
+                        count (eq (sb-name (sc-sb (tn-sc (tn-ref-tn tn-ref))))
+                                  'float-registers)))
+  #!+sb-safepoint
+  ;; Store SP in thread struct
+  (storew rsp-tn thread-base-tn thread-saved-csp-offset)
+  #!+win32 (inst sub rsp-tn #x20)       ;MS_ABI: shadow zone
+  ;; From immobile space we use the "CALL rel32" format to the linkage
+  ;; table jump, and from dynamic space we use "CALL [ea]" format
+  ;; where ea is the address of the linkage table entry's operand.
+  ;; So while the former is a jump to a jump, we can optimize out
+  ;; one jump in a statically linked executable.
+
+  (inst call (cond ((tn-p fun) fun)
+                   ((sb!c::code-immobile-p (sb!c::vop-node vop))
+                    (make-fixup fun :foreign))
+                   (t (make-ea :qword :disp (make-fixup fun :foreign 8)))))
+  (let ((*location-context* (and (stringp fun)
+                                 fun)))
+    ;; For the undefined alien error
     (note-this-location vop :internal-error))
+  #!+win32 (inst add rsp-tn #x20)       ;MS_ABI: remove shadow space
+  #!+sb-safepoint
+  ;; Zero the saved CSP
+  (inst xor (make-ea-for-object-slot thread-base-tn thread-saved-csp-offset 0)
+        rsp-tn))
 
 (define-vop (alloc-number-stack-space)
   (:info amount)

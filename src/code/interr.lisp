@@ -154,8 +154,10 @@
 (deferr undefined-alien-fun-error (address)
   (error 'undefined-alien-function-error
          :name
-         (and (integerp address)
-              (sap-foreign-symbol (int-sap address)))))
+         (or (sb!di:error-context
+              (sb!di:frame-down sb!debug:*stack-top-hint*))
+             (and (integerp address)
+                  (sap-foreign-symbol (int-sap address))))))
 
 #!-(or arm arm64 x86-64)
 (defun undefined-alien-fun-error ()
