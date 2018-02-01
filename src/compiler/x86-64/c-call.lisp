@@ -275,6 +275,7 @@
 
 ;;; Calls to C can generally be made without loading a register
 ;;; with the function. We receive the function name as an info argument.
+#!+sb-dynamic-core ;; broken when calling ldso-stubs
 (define-vop (call-out-named)
   (:args (args :more t))
   (:results (results :more t))
