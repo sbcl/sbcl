@@ -199,8 +199,8 @@
 
 ;;;; SC definitions
 
-(!define-storage-classes
-
+(eval-when (:compile-toplevel :execute)
+(defparameter *storage-class-defs* '(
   ;; non-immediate constants in the constant pool
   (constant constant)
 
@@ -379,9 +379,8 @@
                   :alternate-scs (single-sse-stack))
 
   (catch-block stack :element-size catch-block-size)
-  (unwind-block stack :element-size unwind-block-size))
+  (unwind-block stack :element-size unwind-block-size)))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
 (defparameter *byte-sc-names*
   '(#!-sb-unicode character-reg byte-reg #!-sb-unicode character-stack))
 (defparameter *word-sc-names* '(word-reg))
@@ -399,9 +398,24 @@
 (defparameter *complex-sc-names* '(complex-single-reg complex-single-stack
                                    complex-double-reg complex-double-stack))
 #!+sb-simd-pack
+;;; FIXME: there is no SSE-STACK storage class
 (defparameter *oword-sc-names* '(sse-reg int-sse-reg single-sse-reg double-sse-reg
                                  sse-stack int-sse-stack single-sse-stack double-sse-stack))
 ) ; EVAL-WHEN
+(!define-storage-classes
+  . #.(mapcar (lambda (class-spec)
+                (let ((size
+                       (case (car class-spec)
+                         (#.*oword-sc-names*   :oword)
+                         (#.*qword-sc-names*   :qword)
+                         (#.*dword-sc-names*   :dword)
+                         (#.*word-sc-names*    :word)
+                         (#.*byte-sc-names*    :byte)
+                         (#.*float-sc-names*   :float)
+                         (#.*double-sc-names*  :double)
+                         (#.*complex-sc-names* :complex))))
+                  (append class-spec (if size (list :operand-size size)))))
+              *storage-class-defs*))
 
 ;;;; miscellaneous TNs for the various registers
 
@@ -570,22 +584,18 @@
          (offset (tn-offset tn)))
     (ecase sb
       (registers
-       (let* ((sc-name (sc-name sc))
-              (index (ash offset -1))
-              (name-vec (cond ((member sc-name *byte-sc-names*)
-                               +byte-register-names+)
-                              ((member sc-name *word-sc-names*)
-                               +word-register-names+)
-                              ((member sc-name *dword-sc-names*)
-                               +dword-register-names+)
-                              ((member sc-name *qword-sc-names*)
-                               +qword-register-names+))))
+       (let ((index (ash offset -1))
+             (name-vec (case (sb!c:sc-operand-size sc)
+                         (:byte  +byte-register-names+)
+                         (:word  +word-register-names+)
+                         (:dword +dword-register-names+)
+                         (:qword +qword-register-names+))))
          (or (and name-vec
                   (evenp offset)
                   (< -1 index (length name-vec))
                   (svref name-vec index))
              ;; FIXME: Shouldn't this be an ERROR?
-             (format nil "<unknown reg: off=~W, sc=~A>" offset sc-name))))
+             (format nil "<unknown reg: off=~W, sc=~A>" offset (sc-name sc)))))
       (float-registers (format nil "FLOAT~D" offset))
       (stack (format nil "S~D" offset))
       (constant (format nil "Const~D" offset))

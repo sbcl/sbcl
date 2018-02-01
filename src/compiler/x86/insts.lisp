@@ -18,8 +18,7 @@
             register-p ; FIXME: rename to GPR-P
             make-ea ea-disp width-bits) "SB!VM")
   ;; Imports from SB-VM into this package
-  (import '(sb!vm::*byte-sc-names* sb!vm::*word-sc-names* sb!vm::*dword-sc-names*
-            sb!vm::frame-byte-offset
+  (import '(sb!vm::frame-byte-offset
             sb!vm::registers sb!vm::float-registers sb!vm::stack))) ; SB names
 
 (setf *disassem-inst-alignment-bytes* 1)
@@ -724,8 +723,7 @@
 (defun dword-reg-p (thing)
   (and (tn-p thing)
        (eq (sb-name (sc-sb (tn-sc thing))) 'registers)
-       (member (sc-name (tn-sc thing)) *dword-sc-names*)
-       t))
+       (eq (sb!c:sc-operand-size (tn-sc thing)) :dword)))
 
 (defun register-p (thing)
   (and (tn-p thing)

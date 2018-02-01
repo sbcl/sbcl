@@ -19,12 +19,9 @@
             ea-p sized-ea
             make-ea ea-disp) "SB!VM")
   ;; Imports from SB-VM into this package
-  (import '(sb!vm::*byte-sc-names* sb!vm::*word-sc-names*
-            sb!vm::*dword-sc-names* sb!vm::*qword-sc-names*
-            sb!vm::frame-byte-offset
+  (import '(sb!vm::frame-byte-offset
             sb!vm::registers sb!vm::float-registers sb!vm::stack))) ; SB names
 
-;;; Note: In CMU CL, this used to be a call to SET-DISASSEM-PARAMS.
 (setf *disassem-inst-alignment-bytes* 1)
 
 ;;; This type is used mostly in disassembly and represents legacy
@@ -1183,14 +1180,12 @@
 (defun dword-reg-p (thing)
   (and (tn-p thing)
        (eq (sb-name (sc-sb (tn-sc thing))) 'registers)
-       (member (sc-name (tn-sc thing)) *dword-sc-names*)
-       t))
+       (eq (sb!c:sc-operand-size (tn-sc thing)) :dword)))
 
 (defun qword-reg-p (thing)
   (and (tn-p thing)
        (eq (sb-name (sc-sb (tn-sc thing))) 'registers)
-       (member (sc-name (tn-sc thing)) *qword-sc-names*)
-       t))
+       (eq (sb!c:sc-operand-size (tn-sc thing)) :qword)))
 
 ;;; Return true if THING is a general-purpose register TN.
 (defun register-p (thing)
@@ -1308,36 +1303,8 @@
 (defun operand-size (thing)
   (typecase thing
     (tn
-     ;; FIXME: might as well be COND instead of having to use #. readmacro
-     ;; to hack up the code
-     (case (sc-name (tn-sc thing))
-       #!+sb-simd-pack
-       (#.sb!vm::*oword-sc-names*
-        :oword)
-       (#.*qword-sc-names*
-        :qword)
-       (#.*dword-sc-names*
-        :dword)
-       (#.*word-sc-names*
-        :word)
-       (#.*byte-sc-names*
-        :byte)
-       ;; added by jrd: float-registers is a separate size (?)
-       ;; The only place in the code where we are called with THING
-       ;; being a float-register is in MAYBE-EMIT-REX-PREFIX when it
-       ;; checks whether THING is a byte register. Thus our result in
-       ;; these cases could as well be :dword and :qword. I leave it as
-       ;; :float and :double which is more likely to trigger an aver
-       ;; instead of silently doing the wrong thing in case this
-       ;; situation should change. Lutz Euler, 2005-10-23.
-       (#.sb!vm::*float-sc-names*
-        :float)
-       (#.sb!vm::*double-sc-names*
-        :double)
-       (#.sb!vm::*complex-sc-names*
-        :complex)
-       (t
-        (error "can't tell the size of ~S ~S" thing (sc-name (tn-sc thing))))))
+     (or (sb!c:sc-operand-size (tn-sc thing))
+         (error "can't tell the size of ~S" thing)))
     (ea
      (ea-size thing))
     (fixup

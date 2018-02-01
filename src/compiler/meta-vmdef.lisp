@@ -96,8 +96,9 @@
 ;;;   A list of the names of all the constant SCs that can be loaded into this
 ;;;   SC by a move function.
 (defmacro !define-storage-class (name number sb-name &key (element-size '1)
-                                     (alignment '1) locations reserve-locations
-                                     save-p alternate-scs constant-scs)
+                                      (alignment '1) locations reserve-locations
+                                      save-p alternate-scs constant-scs
+                                      operand-size)
   (declare (type symbol name))
   (declare (type sc-number number))
   (declare (type symbol sb-name))
@@ -140,6 +141,7 @@
                              :name ',name :number ',number
                              :sb (sb-or-lose ',sb-name)
                              :element-size ,element-size
+                             :operand-size ,operand-size
                              :alignment ,alignment
                              :locations (make-sc-locations ',locations)
                              :reserve-locations (make-sc-locations ',reserve-locations)

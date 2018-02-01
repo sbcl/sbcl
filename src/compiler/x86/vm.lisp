@@ -123,7 +123,8 @@
 
 ;;;; SC definitions
 
-(!define-storage-classes
+(eval-when (:compile-toplevel :execute)
+(defparameter *storage-class-defs* '(
 
   ;; non-immediate constants in the constant pool
   (constant constant)
@@ -285,9 +286,8 @@
                     :alternate-scs (complex-long-stack))
 
   (catch-block stack :element-size catch-block-size)
-  (unwind-block stack :element-size unwind-block-size))
+  (unwind-block stack :element-size unwind-block-size)))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
 (defparameter *byte-sc-names*
   '(#!-sb-unicode character-reg byte-reg #!-sb-unicode character-stack))
 (defparameter *word-sc-names* '(word-reg))
@@ -302,6 +302,17 @@
 (defparameter *float-sc-names* '(single-reg))
 (defparameter *double-sc-names* '(double-reg double-stack))
 ) ; EVAL-WHEN
+(!define-storage-classes
+  . #.(mapcar (lambda (class-spec)
+                (let ((size
+                       (case (car class-spec)
+                         (#.*dword-sc-names*   :dword)
+                         (#.*word-sc-names*    :word)
+                         (#.*byte-sc-names*    :byte)
+                         (#.*float-sc-names*   :float)
+                         (#.*double-sc-names*  :double))))
+                  (append class-spec (if size (list :operand-size size)))))
+              *storage-class-defs*))
 
 ;;;; miscellaneous TNs for the various registers
 
@@ -430,13 +441,10 @@
          (offset (tn-offset tn)))
     (ecase sb
       (registers
-       (let* ((sc-name (sc-name sc))
-              (name-vec (cond ((member sc-name *byte-sc-names*)
-                               +byte-register-names+)
-                              ((member sc-name *word-sc-names*)
-                               +word-register-names+)
-                              ((member sc-name *dword-sc-names*)
-                               +dword-register-names+))))
+       (let ((name-vec (case (sb!c:sc-operand-size sc)
+                         (:byte  +byte-register-names+)
+                         (:word  +word-register-names+)
+                         (:dword +dword-register-names+))))
          (or (and name-vec
                   (< -1 offset (length name-vec))
                   (svref name-vec offset))

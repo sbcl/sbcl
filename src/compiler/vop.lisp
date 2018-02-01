@@ -803,6 +803,8 @@
   (element-size 0 :type index)
   ;; if our SB is finite, a vector of the locations in this SC
   (locations (missing-arg) :type sc-locations :read-only t)
+  ;; information for the assembler when moving to/from the locations
+  (operand-size nil :type (or null keyword) :read-only t)
   ;; a list of the alternate (save) SCs for this SC
   (alternate-scs nil :type list)
   ;; a list of the constant SCs that can me moved into this SC
