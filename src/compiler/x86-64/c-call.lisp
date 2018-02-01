@@ -329,10 +329,8 @@
                    ((sb!c::code-immobile-p (sb!c::vop-node vop))
                     (make-fixup fun :foreign))
                    (t (make-ea :qword :disp (make-fixup fun :foreign 8)))))
-  (let ((*location-context* (and (stringp fun)
-                                 fun)))
-    ;; For the undefined alien error
-    (note-this-location vop :internal-error))
+  ;; For the undefined alien error
+  (note-this-location vop :internal-error)
   #!+win32 (inst add rsp-tn #x20)       ;MS_ABI: remove shadow space
   #!+sb-safepoint
   ;; Zero the saved CSP

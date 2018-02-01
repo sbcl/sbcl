@@ -77,10 +77,44 @@
                         :disp (- (* closure-fun-slot n-word-bytes)
                                  fun-pointer-lowtag))))
 
+#!-sb-dynamic-core
 (define-assembly-routine
     (undefined-alien-tramp (:return-style :none))
     ()
-  (inst pop (make-ea :qword :base rbp-tn :disp n-word-bytes))
+  ;; Unlike in the above UNDEFINED-TRAMP, we *should* *not* issue "POP [RBP+8]"
+  ;; because that would overwrite the PC to which the calling function is
+  ;; supposed to return with the address from which this alien call was made
+  ;; (a PC within that same function) since C convention does not arrange
+  ;; for RBP to hold the new frame pointer prior to making a call.
+  ;; This wouldn't matter much because the only restart availableis to throw
+  ;; to toplevel, so a lost frame is not hugely important, but it's annoying.
+  (error-call nil 'undefined-alien-fun-error rbx-tn))
+
+#!+sb-dynamic-core
+(define-assembly-routine
+    (undefined-alien-tramp (:return-style :none))
+    ()
+  (inst push rax-tn) ; save registers in case we want to see the old values
+  (inst push rbx-tn)
+  ;; load RAX with the PC after the call site
+  (inst mov rax-tn (make-ea :qword :base rsp-tn :disp 16))
+  ;; load RBX with the signed 32-bit immediate from the call instruction
+  (inst movsx rbx-tn (make-ea :dword :base rax-tn :disp -4))
+  ;; if at [PC-5] we see #x25 then it was a call with 32-bit mem addr
+  ;; if ...              #xE8 then ...                32-bit offset
+  (inst cmp (make-ea :byte :base rax-tn :disp -5) #x25)
+  (inst jmp :e ABSOLUTE)
+  (inst cmp (make-ea :byte :base rax-tn :disp -5) #xE8)
+  (inst jmp :e RELATIVE)
+  ;; failing those, assume RBX was valid. ("can't happen")
+  (inst mov rbx-tn (make-ea :qword :base rsp-tn)) ; restore pushed value of RBX
+  (inst jmp trap)
+  ABSOLUTE
+  (inst lea rbx-tn (make-ea :qword :base rbx-tn :disp -8))
+  (inst jmp TRAP)
+  RELATIVE
+  (inst add rbx-tn rax-tn)
+  TRAP
   (error-call nil 'undefined-alien-fun-error rbx-tn))
 
 ;;; the closure trampoline - entered when a global function is a closure
