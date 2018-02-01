@@ -552,9 +552,6 @@
 
  ("src/compiler/target/subprim")
  ("src/compiler/target/debug")
- ;; src/compiler/sparc/c-call contains a deftransform for
- ;; %ALIEN-FUNCALL -- CSR
- ("src/compiler/early-aliencomp")
  ("src/compiler/target/c-call")
  ("src/compiler/target/cell")
  ("src/compiler/target/values")

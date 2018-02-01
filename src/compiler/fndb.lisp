@@ -1921,6 +1921,8 @@
 
 ;;;; ALIEN and call-out-to-C stuff
 
+(defknown %alien-funcall (system-area-pointer alien-type &rest *) *)
+
 ;; Used by WITH-PINNED-OBJECTS
 #!+(or x86 x86-64)
 (defknown sb!vm::touch-object (t) (values)
