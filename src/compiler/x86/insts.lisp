@@ -721,43 +721,11 @@
                                                  #b11000000)))
     (emit-ea segment thing op)))
 
-(defun byte-reg-p (thing)
-  (and (tn-p thing)
-       (eq (sb-name (sc-sb (tn-sc thing))) 'registers)
-       (member (sc-name (tn-sc thing)) *byte-sc-names*)
-       t))
-
-(defun byte-ea-p (thing)
-  (typecase thing
-    (ea (eq (ea-size thing) :byte))
-    (tn
-     (and (member (sc-name (tn-sc thing)) *byte-sc-names*) t))
-    (t nil)))
-
-(defun word-reg-p (thing)
-  (and (tn-p thing)
-       (eq (sb-name (sc-sb (tn-sc thing))) 'registers)
-       (member (sc-name (tn-sc thing)) *word-sc-names*)
-       t))
-
-(defun word-ea-p (thing)
-  (typecase thing
-    (ea (eq (ea-size thing) :word))
-    (tn (and (member (sc-name (tn-sc thing)) *word-sc-names*) t))
-    (t nil)))
-
 (defun dword-reg-p (thing)
   (and (tn-p thing)
        (eq (sb-name (sc-sb (tn-sc thing))) 'registers)
        (member (sc-name (tn-sc thing)) *dword-sc-names*)
        t))
-
-(defun dword-ea-p (thing)
-  (typecase thing
-    (ea (eq (ea-size thing) :dword))
-    (tn
-     (and (member (sc-name (tn-sc thing)) *dword-sc-names*) t))
-    (t nil)))
 
 (defun register-p (thing)
   (and (tn-p thing)
