@@ -231,11 +231,11 @@
     ;; FIXME: What about Windows?
     (def-mk*temp mkdtemp "mkdtemp" (* char) null-alien t nil))
   (define-call-internally ioctl-without-arg "ioctl" int minusp
-                          (fd file-descriptor) (cmd int))
+                          (fd file-descriptor) (cmd unsigned-long))
   (define-call-internally ioctl-with-int-arg "ioctl" int minusp
-                          (fd file-descriptor) (cmd int) (arg int))
+                          (fd file-descriptor) (cmd unsigned-long) (arg int))
   (define-call-internally ioctl-with-pointer-arg "ioctl" int minusp
-                          (fd file-descriptor) (cmd int)
+                          (fd file-descriptor) (cmd unsigned-long)
                           (arg alien-pointer-to-anything-or-nil))
   (define-entry-point "ioctl" (fd cmd &optional (arg nil argp))
     (if argp

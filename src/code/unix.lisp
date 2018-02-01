@@ -534,8 +534,8 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 #!-win32
 (defun unix-ioctl (fd cmd arg)
   (declare (type unix-fd fd)
-           (type (signed-byte 32) cmd))
-  (void-syscall ("ioctl" int int (* char)) fd cmd arg))
+           (type word cmd))
+  (void-syscall ("ioctl" int unsigned-long (* char)) fd cmd arg))
 
 ;;;; sys/resource.h
 
