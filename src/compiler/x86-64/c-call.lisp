@@ -292,6 +292,7 @@
     (emit-c-call vop rax c-symbol args varargsp #!+sb-safepoint pc-save)))
 
 (defun emit-c-call (vop rax fun args varargsp #!+sb-safepoint pc-save)
+  (declare (ignorable varargsp))
   ;; Current PC - don't rely on function to keep it in a form that
   ;; GC understands
   #!+sb-safepoint
