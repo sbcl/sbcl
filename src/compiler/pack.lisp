@@ -40,7 +40,7 @@
 ;;;    it is local to.
 ;;;
 ;;; If there is a conflict, returns the first such conflicting offset.
-(declaim (ftype (sfunction (tn sc index) (or null index)) conflicts-in-sc))
+(declaim (ftype (sfunction (tn storage-class index) (or null index)) conflicts-in-sc))
 (defun conflicts-in-sc (tn sc offset)
   (let* ((confs (tn-global-conflicts tn))
          (kind (tn-kind tn))
@@ -100,7 +100,7 @@
 ;;; -- If the TN is local, then we just do the block it is local to,
 ;;;    setting always-live and OR'ing in the local conflicts.
 (defun add-location-conflicts (tn sc offset optimize)
-  (declare (type tn tn) (type sc sc) (type index offset))
+  (declare (type tn tn) (type storage-class sc) (type index offset))
   (let ((confs (tn-global-conflicts tn))
         (sb (sc-sb sc))
         (kind (tn-kind tn)))
@@ -218,7 +218,7 @@
 ;;; the SC element size, whichever is larger. If NEEDED-SIZE is
 ;;; larger, then use that size.
 (defun grow-sc (sc &optional (needed-size 0))
-  (declare (type sc sc) (type index needed-size))
+  (declare (type storage-class sc) (type index needed-size))
   (let* ((sb (sc-sb sc))
          (size (finite-sb-current-size sb))
          (align-mask (1- (sc-alignment sc)))
@@ -1082,7 +1082,7 @@
 ;;; iterate over the SC's locations. If we can't find a legal
 ;;; location, return NIL.
 (defun select-load-tn-location (op sc)
-  (declare (type tn-ref op) (type sc sc))
+  (declare (type tn-ref op) (type storage-class sc))
 
   ;; Check any target location first.
   (let ((target (tn-ref-target op)))
@@ -1136,7 +1136,7 @@
 ;;; argument or result TN. The only way we can fail is if all
 ;;; locations in SC are used by load-TNs or temporaries in VOP.
 (defun unpack-for-load-tn (sc op)
-  (declare (type sc sc) (type tn-ref op))
+  (declare (type storage-class sc) (type tn-ref op))
   (let ((sb (sc-sb sc))
         (normal-tns (ir2-component-normal-tns
                      (component-info *component-being-compiled*)))
@@ -1297,7 +1297,7 @@
 ;;; then return the offset to pack at, otherwise return NIL. TARGET
 ;;; must be already packed.
 (defun check-ok-target (target tn sc)
-  (declare (type tn target tn) (type sc sc) (inline member))
+  (declare (type tn target tn) (type storage-class sc) (inline member))
   (let* ((loc (tn-offset target))
          (target-sc (tn-sc target))
          (target-sb (sc-sb target-sc)))
@@ -1363,7 +1363,7 @@
        (%call-with-target-tns ,source-tn #',callback ,@keys))))
 
 (defun find-ok-target-offset (tn sc)
-  (declare (type tn tn) (type sc sc))
+  (declare (type tn tn) (type storage-class sc))
   (do-target-tns (target tn)
     (awhen (and (tn-offset target)
                 (neq (tn-kind target) :arg-pass)
@@ -1385,7 +1385,7 @@
 ;;; on register-starved architectures (x86) this seems to be a bad
 ;;; strategy. -- JES 2004-09-11
 (defun select-location (tn sc &key use-reserved-locs optimize)
-  (declare (type tn tn) (type sc sc))
+  (declare (type tn tn) (type storage-class sc))
   (let* ((sb (sc-sb sc))
          (element-size (sc-element-size sc))
          (alignment (sc-alignment sc))

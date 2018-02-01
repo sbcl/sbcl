@@ -394,7 +394,7 @@
 ;;; whichever operand makes more sense, without worrying about which
 ;;; operand has the type info.
 (defun find-move-vop (op-tn write-p other-sc other-ptype slot)
-  (declare (type tn op-tn) (type sc other-sc)
+  (declare (type tn op-tn) (type storage-class other-sc)
            (type primitive-type other-ptype)
            (type function slot))
   (let* ((op-sc (tn-sc op-tn))

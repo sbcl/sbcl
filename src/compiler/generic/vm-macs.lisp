@@ -179,7 +179,7 @@
                (let* ((sc-number (or (cdr (assoc sc-name fixed-numbers))
                                      (1- (incf index))))
                       (constant-name (symbolicate sc-name "-SC-NUMBER")))
-                 `((define-storage-class ,sc-name ,sc-number
+                 `((!define-storage-class ,sc-name ,sc-number
                      ,sb-name ,@args)
                    (defconstant ,constant-name ,sc-number))))))
       `(progn ,@(mapcan #'process-class classes)))))

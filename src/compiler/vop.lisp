@@ -790,9 +790,9 @@
 (defmacro finite-sb-last-block-count (sb)
   `(fsb-last-block-count (svref *finite-sbs* (finite-sb-index ,sb))))
 
-;;; the SC structure holds the storage base that storage is allocated
+;;; the STORAGE-CLASS structure holds the storage base that storage is allocated
 ;;; in and information used to select locations within the SB
-(def!struct (sc (:copier nil))
+(def!struct (storage-class (:conc-name "SC-") (:copier nil) (:predicate nil))
   ;; name, for printing and reference
   (name nil :type symbol)
   ;; the number used to index SC cost vectors
@@ -860,7 +860,7 @@
   ;; for operand loading. This prevents load-TN packing from thrashing
   ;; by spilling a lot.
   (reserve-locations (missing-arg) :type sc-locations :read-only t))
-(defprinter (sc)
+(defprinter (storage-class :conc-name "SC-")
   name)
 
 ;;;; TNs
@@ -980,7 +980,7 @@
   (save-tn nil :type (or tn null))
   ;; After pack, the SC we packed into. Beforehand, the SC we want to
   ;; pack into, or null if we don't know.
-  (sc nil :type (or sc null))
+  (sc nil :type (or storage-class null))
   ;; the offset within the SB that this TN is packed into. This is what
   ;; indicates that the TN is packed
   (offset nil :type (or index null))

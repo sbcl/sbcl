@@ -169,7 +169,7 @@
 
   ;; Now, in approximate order of descending popularity.
   ;; If we exceed 255 error numbers, trailing ones can be deleted arbitrarily.
-  (sb!c:sc object-not-storage-class) ; the single most popular type
+  sb!c:storage-class ; the single most popular type
   sb!c:tn-ref
   index
   ctype

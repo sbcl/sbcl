@@ -21,7 +21,7 @@
 ;;; Return the SC structure, SB structure or SC number corresponding
 ;;; to a name, or die trying.
 (defun sc-or-lose (x)
-  (the sc
+  (the storage-class
        (or (gethash x *backend-sc-names*)
            (error "~S is not a defined storage class." x))))
 (defun sb-or-lose (x)
@@ -44,7 +44,7 @@
 ;;; Compute at compiler load time the costs for moving between all SCs that
 ;;; can be loaded from FROM-SC and to TO-SC given a base move cost Cost.
 (defun compute-move-costs (from-sc to-sc cost)
-  (declare (type sc from-sc to-sc) (type index cost))
+  (declare (type storage-class from-sc to-sc) (type index cost))
   (let ((to-scn (sc-number to-sc))
         (from-costs (sc-load-costs from-sc)))
     (dolist (dest-sc (cons to-sc (sc-alternate-scs to-sc)))
@@ -73,7 +73,7 @@
 ;;; Return true if SC is either one of PTYPE's SC's, or one of those
 ;;; SC's alternate or constant SCs.
 (defun sc-allowed-by-primitive-type (sc ptype)
-  (declare (type sc sc) (type primitive-type ptype))
+  (declare (type storage-class sc) (type primitive-type ptype))
   (let ((scn (sc-number sc)))
     (dolist (allowed (primitive-type-scs ptype) nil)
       (when (eql allowed scn)
