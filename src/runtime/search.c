@@ -154,19 +154,23 @@ lispobj* find_symbol(char* symbol_name, char* package_name, unsigned int* hint)
     lispobj* package_names = search_package_symbols(kernel_package, "*PACKAGE-NAMES*",
                                                     &kernelpkg_hint);
     lispobj namelen = strlen(package_name);
-    struct hash_table* names = (struct hash_table*)
-      native_pointer(((struct symbol*)package_names)->value);
-    struct vector* cells = (struct vector*)native_pointer(names->table);
+    struct instance* names = (struct instance*)
+        native_pointer(((struct symbol*)package_names)->value);
+    struct vector* cells = (struct vector*)
+        native_pointer(names->slots[INSTANCE_DATA_START]);
+#define LFHASH_KEY_OFFSET 3 /* KLUDGE */
+    int n = (fixnum_value(cells->length) - LFHASH_KEY_OFFSET) >> 1;
+    gc_assert(make_fixnum(n) == cells->data[0]);
     int i;
     // Search *PACKAGE-NAMES* for the package
-    for (i=2; i<fixnum_value(cells->length); i += 2) {
-        lispobj element = cells->data[i];
+    for (i=0; i<n; ++i) {
+        lispobj element = cells->data[LFHASH_KEY_OFFSET+i];
         if (is_lisp_pointer(element)) {
             struct vector* string = (struct vector*)native_pointer(element);
             if (widetag_of(string->header) == SIMPLE_BASE_STRING_WIDETAG
                 && string->length == make_fixnum(namelen)
                 && !memcmp(string->data, package_name, namelen)) {
-                element = cells->data[i+1];
+                element = cells->data[LFHASH_KEY_OFFSET+n+i];
                 if (listp(element))
                     element = CONS(element)->car;
                 return search_package_symbols(element, symbol_name, hint);
