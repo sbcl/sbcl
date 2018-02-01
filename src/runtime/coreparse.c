@@ -828,7 +828,7 @@ process_directory(int count, struct ndir_entry *entry,
     struct range range1 =
         {FIXEDOBJ_SPACE_START, FIXEDOBJ_SPACE_START + FIXEDOBJ_SPACE_SIZE};
     struct range range2 =
-        {VARYOBJ_SPACE_START, VARYOBJ_SPACE_START + VARYOBJ_SPACE_SIZE};
+        {VARYOBJ_SPACE_START, VARYOBJ_SPACE_START + varyobj_space_size};
     if (range2.start < range1.start) { // swap
         struct range temp = range1;
         range1 = range2;
