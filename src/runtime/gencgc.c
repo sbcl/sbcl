@@ -1830,12 +1830,6 @@ pin_object(lispobj* base_addr)
  * It is also assumed that the current gc_alloc() region has been
  * flushed and the tables updated. */
 
-#if defined(__GNUC__) && defined(MEMORY_SANITIZER)
-#define NO_SANITIZE_MEMORY __attribute__((no_sanitize_memory))
-#else
-#define NO_SANITIZE_MEMORY
-#endif
-
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 extern void immobile_space_preserve_pointer(void*);
 #else
@@ -2919,12 +2913,6 @@ move_pinned_pages_to_newspace()
         }
     }
 }
-
-#if defined(__GNUC__) && defined(ADDRESS_SANITIZER)
-#define NO_SANITIZE_ADDRESS __attribute__((no_sanitize_address))
-#else
-#define NO_SANITIZE_ADDRESS
-#endif
 
 /* Garbage collect a generation. If raise is 0 then the remains of the
  * generation are not raised to the next generation. */

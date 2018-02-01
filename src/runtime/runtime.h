@@ -473,4 +473,16 @@ extern struct lisp_startup_options lisp_startup_options;
 # define ignore_value(x) ((void) (x))
 #endif
 
+#if defined(__GNUC__) && defined(ADDRESS_SANITIZER)
+#define NO_SANITIZE_ADDRESS __attribute__((no_sanitize_address))
+#else
+#define NO_SANITIZE_ADDRESS
+#endif
+
+#if defined(__GNUC__) && defined(MEMORY_SANITIZER)
+#define NO_SANITIZE_MEMORY __attribute__((no_sanitize_memory))
+#else
+#define NO_SANITIZE_MEMORY
+#endif
+
 #endif /* _SBCL_RUNTIME_H_ */

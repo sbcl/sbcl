@@ -222,7 +222,7 @@ static inline int interestingp(lispobj ptr, struct hopscotch_table* targets)
 /* Try to find the call frame that contains 'addr', which is the address
  * in which a conservative root was seen.
  * Return the program counter associated with that frame. */
-static char* deduce_thread_pc(struct thread* th, void** addr)
+static char* NO_SANITIZE_MEMORY deduce_thread_pc(struct thread* th, void** addr)
 {
     uword_t* fp = __builtin_frame_address(0);
     char* return_pc = 0;
@@ -251,8 +251,8 @@ static void compare_pointer(void *addr) {
 
 /* Figure out which thread's control stack contains 'pointer'
  * and the PC within the active function in the referencing frame  */
-static struct thread* deduce_thread(void (*context_scanner)(),
-                                    uword_t pointer, char** pc)
+static struct thread* NO_SANITIZE_MEMORY
+deduce_thread(void (*context_scanner)(), uword_t pointer, char** pc)
 {
     struct thread *th;
 
