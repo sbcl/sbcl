@@ -2045,11 +2045,8 @@
 (defun get-internal-error-name (errnum)
   (cadr (svref sb!c:+backend-internal-errors+ errnum)))
 
-(defun get-sc-name (sc-offs)
+(defun get-random-tn-name (sc-offs)
   (sb!c:location-print-name
-   ;; FIXME: This seems like an awful lot of computation just to get a name.
-   ;; Couldn't we just use lookup in *BACKEND-SC-NAMES*, without having to cons
-   ;; up a new object?
    (sb!c:make-random-tn :kind :normal
                         :sc (svref sb!c:*backend-sc-numbers*
                                    (sb!c:sc-offset-scn sc-offs))
@@ -2102,7 +2099,7 @@
               (note-code-constant (* (1- (sb!c:sc-offset-offset sc-offs))
                                      sb!vm:n-word-bytes)
                                   dstate)
-              (emit-note (get-sc-name sc-offs))))))
+              (emit-note (get-random-tn-name sc-offs))))))
     (incf (dstate-next-offs dstate) adjust)))
 
 ;;; arm64 stores an error-number in the instruction bytes,
