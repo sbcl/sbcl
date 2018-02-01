@@ -17,6 +17,7 @@
 #include "genesis/closure.h"
 #include "genesis/layout.h"
 #include "genesis/hash-table.h"
+#include "immobile-space.h"
 #include "queue.h"
 
 #include <stdio.h>

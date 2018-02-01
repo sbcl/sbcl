@@ -264,6 +264,10 @@ sufficiently motivated to do lengthy fixes."
           (setf lisp-init-function 0)) ; only reach here on save error
         #-gencgc
         (progn
+          ;; Coalescing after GC will do no good - the un-needed dups
+          ;; of things won't actually go away. Do it before.
+          (alien-funcall (extern-alien "coalesce_similar_objects"
+                                       (function void)))
           (if purify (purify :root-structures root-structures) (gc))
           (without-gcing
             (save name

@@ -132,8 +132,6 @@ extern void fixup_immobile_refs(lispobj (*)(lispobj), lispobj, struct code*);
 // because a simple-fun header does not contain a generation.
 #define __immobile_obj_generation(x) (__immobile_obj_gen_bits(x) & IMMOBILE_OBJ_GENERATION_MASK)
 
-typedef int low_page_index_t;
-
 #ifdef LISP_FEATURE_LITTLE_ENDIAN
 static inline int immobile_obj_gen_bits(lispobj* pointer) // native pointer
 {
@@ -257,19 +255,6 @@ static inline void protect_page(void* page_addr, page_index_t page_index)
 
 #define NON_FAULTING_STORE(operation, addr) operation
 
-#endif
-
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-static inline void *
-fixedobj_page_address(low_page_index_t page_num)
-{
-    return (void*)(FIXEDOBJ_SPACE_START + (page_num * IMMOBILE_CARD_BYTES));
-}
-static inline void *
-varyobj_page_address(low_page_index_t page_num)
-{
-    return (void*)(VARYOBJ_SPACE_START + (page_num * IMMOBILE_CARD_BYTES));
-}
 #endif
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE

@@ -36,13 +36,9 @@
 #include "thread.h"
 #include "arch.h"
 #include "pseudo-atomic.h"
-
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
-
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-# include "immobile-space.h"
-#endif
+#include "immobile-space.h"
 
 #ifdef LISP_FEATURE_SB_CORE_COMPRESSION
 # include <zlib.h>
