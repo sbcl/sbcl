@@ -78,11 +78,10 @@
                    :output-file
                    ;; Specifying the directory name for :OUTPUT-FILE is enough.
                    ;; It does the right thing. (Does it work on Windows? I hope so)
-                   (truename
-                    (concatenate
+                   (concatenate
                      'string sb-fasl::*!target-obj-prefix*
                      ;; OR: (namestring (make-pathname :directory (pathname-directory stem)))
-                     (subseq stem 0 (1+ (position #\/ stem :from-end t))))))))
+                     (subseq stem 0 (1+ (position #\/ stem :from-end t)))))))
            (flet ((report-recompile-restart (stream)
                     (format stream "Recompile file ~S" stem))
                   (report-continue-restart (stream)
@@ -92,6 +91,7 @@
                 (multiple-value-bind (output-truename warnings-p failure-p)
                     (ecase (if (boundp '*compile-files-p*) *compile-files-p* t)
                      ((t)   (let ((sb-c::*source-namestring* fullname))
+                              (ensure-directories-exist output)
                               (compile-file stem :output-file output)))
                      ((nil) output))
                   (declare (ignore warnings-p))
