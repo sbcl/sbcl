@@ -618,6 +618,13 @@ case "$sbcl_os" in
         exit 1
         ;;
 esac
+case "$sbcl_os" in
+    win32)
+        ;;
+    *)
+        printf ' :relocatable-heap' >> $ltf
+        ;;
+esac
 cd "$original_dir"
 
 # FIXME: Things like :c-stack-grows-..., etc, should be
@@ -658,8 +665,6 @@ if [ "$sbcl_arch" = "x86" ]; then
         # of course it doesn't provide dlopen, but there is
         # roughly-equivalent magic nevertheless.
         printf ' :os-provides-dlopen' >> $ltf
-    else
-        printf ' :relocatable-heap' >> $ltf
     fi
     if [ "$sbcl_os" = "openbsd" ]; then
         rm -f src/runtime/openbsd-sigcontext.h
@@ -678,7 +683,6 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
     case "$sbcl_os" in
     linux | darwin | *bsd)
         printf ' :immobile-space :immobile-code :compact-instance-header' >> $ltf
-        printf ' :relocatable-heap' >> $ltf
     esac
 elif [ "$sbcl_arch" = "mips" ]; then
     printf ' :cheneygc :linkage-table' >> $ltf
@@ -690,7 +694,6 @@ elif [ "$sbcl_arch" = "ppc" ]; then
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :linkage-table :raw-instance-init-vops :memory-barrier-vops' >> $ltf
     printf ' :compare-and-swap-vops :multiply-high-vops :alien-callbacks' >> $ltf
-    printf ' :relocatable-heap' >> $ltf
     if [ "$sbcl_os" = "linux" ]; then
         # Use a C program to detect which kind of glibc we're building on,
         # to bandage across the break in source compatibility between
@@ -717,7 +720,7 @@ elif [ "$sbcl_arch" = "sparc" ]; then
     # as well.
     sh tools-for-build/sparc-funcdef.sh > src/runtime/sparc-funcdef.h
     if [ "$sbcl_os" = "sunos" ] || [ "$sbcl_os" = "linux" ]; then
-        printf ' :gencgc :relocatable-heap' >> $ltf
+        printf ' :gencgc' >> $ltf
     else
         echo '***'
         echo '*** You are running SPARC on non-SunOS, non-Linux.  Since'
@@ -750,7 +753,7 @@ elif [ "$sbcl_arch" = "arm" ]; then
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-closures' >> $ltf
     printf ' :unwind-to-frame-and-call-vop' >> $ltf
-    printf ' :fp-and-pc-standard-save :relocatable-heap' >> $ltf
+    printf ' :fp-and-pc-standard-save' >> $ltf
 elif [ "$sbcl_arch" = "arm64" ]; then
     printf ' :64-bit :64-bit-registers :gencgc :linkage-table :fp-and-pc-standard-save' >> $ltf
     printf ' :alien-callbacks :inline-constants' >> $ltf
@@ -759,7 +762,6 @@ elif [ "$sbcl_arch" = "arm64" ]; then
     printf ' :stack-allocatable-vectors :stack-allocatable-closures' >> $ltf
     printf ' :unbind-n-vop :unwind-to-frame-and-call-vop :raw-signed-word' >> $ltf
     printf ' :compare-and-swap-vops :memory-barrier-vops :undefined-fun-restarts' >> $ltf
-    printf ' :relocatable-heap' >> $ltf
 else
     # Nothing need be done in this case, but sh syntax wants a placeholder.
     echo > /dev/null
