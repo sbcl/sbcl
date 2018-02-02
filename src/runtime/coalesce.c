@@ -120,7 +120,7 @@ static void coalesce_obj(lispobj* where, struct hopscotch_table* ht)
     }
 }
 
-/* FIXME: there are nearly 10 variants of the skeleton of an object traverser.
+/* FIXME: there are 10+ variants of the skeleton of an object traverser.
  * Pick one and try to make it customizable. I tried a callback-based approach,
  * but it's too slow. Next best thing is a ".inc" file which defines the shape
  * of the function, with pieces inserted by #define.
@@ -132,10 +132,11 @@ static void coalesce_obj(lispobj* where, struct hopscotch_table* ht)
  * (4) fullcgc's trace_object()
  * (5) coreparse's relocate_space()
  * (6) traceroot's find_ref() and build_refs() which itself has two modes
- * (7) purify()
- * (8) this one - coalesce_range()
+ * (7) cheneygc's print_garbage()
+ * (8) purify()
+ * (9) coalesce_range()
  * plus the Lisp variant:
- * (9) map-referencing-objects
+ * (10) map-referencing-objects
  * and if you want to count 'print.c' as another, there's that.
  */
 

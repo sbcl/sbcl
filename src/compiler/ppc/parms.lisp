@@ -109,19 +109,15 @@
 (progn
   #!-gencgc
   (progn
-    (defconstant dynamic-0-space-start #x4f000000)
-    (defconstant dynamic-0-space-end   #x66fff000)
-    (defconstant dynamic-1-space-start #x67000000)
-    (defconstant dynamic-1-space-end   #x7efff000)))
+    (defparameter dynamic-0-space-start #x4f000000)
+    (defparameter dynamic-0-space-end   #x66fff000)))
 
 #!+netbsd
 (progn
   #!-gencgc
   (progn
-    (defconstant dynamic-0-space-start #x4f000000)
-    (defconstant dynamic-0-space-end   #x66fff000)
-    (defconstant dynamic-1-space-start #x67000000)
-    (defconstant dynamic-1-space-end   #x7efff000)))
+    (defparameter dynamic-0-space-start #x4f000000)
+    (defparameter dynamic-0-space-end   #x66fff000)))
 
 ;;; Text and data segments start at #x01800000.  Range for randomized
 ;;; malloc() starts #x20000000 (MAXDSIZ) after end of data seg and
@@ -134,20 +130,15 @@
 (progn
   #!-gencgc
   (progn
-    (defconstant dynamic-0-space-start #x4f000000)
-    (defconstant dynamic-0-space-end   #x5cfff000)
-    (defconstant dynamic-1-space-start #x5f000000)
-    (defconstant dynamic-1-space-end   #x6cfff000)))
+    (defparameter dynamic-0-space-start #x4f000000)
+    (defparameter dynamic-0-space-end   #x5cfff000)))
 
 #!+darwin
 (progn
   #!-gencgc
   (progn
-    (defconstant dynamic-0-space-start #x10000000)
-    (defconstant dynamic-0-space-end   #x3ffff000)
-
-    (defconstant dynamic-1-space-start #x40000000)
-    (defconstant dynamic-1-space-end   #x6ffff000)))
+    (defparameter dynamic-0-space-start #x10000000)
+    (defparameter dynamic-0-space-end   #x3ffff000)))
 
 ;;;; Other miscellaneous constants.
 

@@ -241,8 +241,8 @@
           ":SB-SAFEPOINT-STRICTLY requires :SB-SAFEPOINT")
          ("(and sb-dynamic-core (not linkage-table))"
           ":SB-DYNAMIC-CORE requires :LINKAGE-TABLE")
-         ("(and relocatable-heap (or cheneygc win32))"
-          "Relocatable heap requires gencgc + not win32")
+         ("(and relocatable-heap win32)"
+          "Relocatable heap requires (not win32)")
          ("(and sb-linkable-runtime (not sb-dynamic-core))"
           ":SB-LINKABLE-RUNTIME requires :SB-DYNAMIC-CORE")
          ("(and sb-linkable-runtime (not (or x86 x86-64)))"

@@ -24,14 +24,12 @@
 #include "validate.h"
 #include "interr.h"                     /* for declaration of lose */
 
-#if defined(LISP_FEATURE_RELOCATABLE_HEAP) && defined(LISP_FEATURE_GENCGC)
+#if defined(LISP_FEATURE_RELOCATABLE_HEAP)
+#ifdef LISP_FEATURE_CHENEYGC
+uword_t DYNAMIC_0_SPACE_START, DYNAMIC_1_SPACE_START;
+#else
 uword_t DYNAMIC_SPACE_START;
 #endif
-#if defined(LISP_FEATURE_RELOCATABLE_HEAP) && defined(LISP_FEATURE_IMMOBILE_SPACE)
-uword_t FIXEDOBJ_SPACE_START, VARYOBJ_SPACE_START;
-uword_t immobile_space_lower_bound, immobile_space_max_offset;
-unsigned int immobile_range_1_max_offset, immobile_range_2_min_offset;
-unsigned int varyobj_space_size = VARYOBJ_SPACE_SIZE;
 #endif
 
 static void

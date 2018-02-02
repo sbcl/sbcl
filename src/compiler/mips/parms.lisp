@@ -75,10 +75,8 @@
   (defconstant static-space-start    #x06000000)
   (defconstant static-space-end      #x08000000)
 
-  (defconstant dynamic-0-space-start #x08000000)
-  (defconstant dynamic-0-space-end   #x0c000000)
-  (defconstant dynamic-1-space-start #x0c000000)
-  (defconstant dynamic-1-space-end   #x10000000))
+  (defparameter dynamic-0-space-start #x08000000)
+  (defparameter dynamic-0-space-end   #x0c000000))
 
 #!+linux
 (progn
@@ -92,10 +90,8 @@
   (defconstant static-space-end      #x0fff0000)
   ;; C runtime read/write segment starts at 0x10000000, heap and DSOs
   ;; start at 0x2a000000
-  (defconstant dynamic-0-space-start #x30000000)
-  (defconstant dynamic-0-space-end   #x4fff0000)
-  (defconstant dynamic-1-space-start #x50000000)
-  (defconstant dynamic-1-space-end   #x6fff0000)
+  (defparameter dynamic-0-space-start #x30000000)
+  (defparameter dynamic-0-space-end   #x4fff0000)
 
   (defconstant linkage-table-space-start #x70000000)
   (defconstant linkage-table-space-end   #x71000000)

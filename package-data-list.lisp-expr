@@ -3201,9 +3201,7 @@ structure representations"
                "DYNAMIC-SPACE-START" "DYNAMIC-SPACE-END"
                #!+gencgc("MAX-DYNAMIC-SPACE-END")
                #!-gencgc("DYNAMIC-0-SPACE-START"
-                         "DYNAMIC-0-SPACE-END"
-                         "DYNAMIC-1-SPACE-START"
-                         "DYNAMIC-1-SPACE-END")
+                         "DYNAMIC-0-SPACE-END")
                #!+immobile-space("IMMOBILE-CARD-BYTES"
                                  "FIXEDOBJ-SPACE-START" "FIXEDOBJ-SPACE-SIZE"
                                  "VARYOBJ-SPACE-START" "VARYOBJ-SPACE-SIZE"

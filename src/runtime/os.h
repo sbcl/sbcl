@@ -20,33 +20,6 @@
 #include "sbcl.h"
 #include "runtime.h"
 
-#if defined(LISP_FEATURE_RELOCATABLE_HEAP) && defined(LISP_FEATURE_GENCGC)
-extern uword_t DYNAMIC_SPACE_START;
-#endif
-#if defined(LISP_FEATURE_RELOCATABLE_HEAP) && defined(LISP_FEATURE_IMMOBILE_SPACE)
-extern uword_t FIXEDOBJ_SPACE_START, VARYOBJ_SPACE_START;
-extern uword_t immobile_space_lower_bound, immobile_space_max_offset;
-extern unsigned int immobile_range_1_max_offset, immobile_range_2_min_offset;
-extern unsigned int varyobj_space_size;
-#endif
-
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-static inline boolean immobile_space_p(lispobj obj)
-{
-/* To test the two immobile ranges, we first check that a pointer is within
- * the outer bounds, and then that is not in the excluded middle (if any).
- * This requires only 1 comparison to weed out dynamic-space pointers,
- * vs doing the more obvious 2 tests, provided that dynamic space starts
- * above 4GB. range_1_max == range_2_min if there is no discontinuity. */
-    uword_t offset = obj - immobile_space_lower_bound;
-    if (offset >= immobile_space_max_offset) return 0;
-    return !(immobile_range_1_max_offset <= offset
-             && offset < immobile_range_2_min_offset);
-}
-#else
-static inline boolean immobile_space_p(lispobj obj) { return 0; }
-#endif
-
 #if defined(LISP_FEATURE_GENCGC) && !defined(ENABLE_PAGE_PROTECTION)
 /* Should we use page protection to help avoid the scavenging of pages
  * that don't have pointers to younger generations?

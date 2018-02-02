@@ -35,6 +35,20 @@ extern int foreign_function_call_active;
 extern os_vm_size_t dynamic_space_size;
 extern os_vm_size_t thread_control_stack_size;
 
+#if defined(LISP_FEATURE_RELOCATABLE_HEAP)
+#ifdef LISP_FEATURE_CHENEYGC
+extern uword_t DYNAMIC_0_SPACE_START, DYNAMIC_1_SPACE_START;
+#else
+extern uword_t DYNAMIC_SPACE_START;
+#endif
+#endif
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+extern uword_t FIXEDOBJ_SPACE_START, VARYOBJ_SPACE_START;
+extern uword_t immobile_space_lower_bound, immobile_space_max_offset;
+extern unsigned int immobile_range_1_max_offset, immobile_range_2_min_offset;
+extern unsigned int varyobj_space_size;
+#endif
+
 #ifdef LISP_FEATURE_WIN32
 #define ENVIRON _environ
 #else

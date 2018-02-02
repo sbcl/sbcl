@@ -64,10 +64,8 @@
 (defconstant static-space-start    #x4e000000)
 (defconstant static-space-end      #x4fff0000)
 
-(defconstant dynamic-0-space-start   #x50000000)
-(defconstant dynamic-0-space-end     #x5fff0000)
-(defconstant dynamic-1-space-start   #x60000000)
-(defconstant dynamic-1-space-end     #x6fff0000)
+(defparameter dynamic-0-space-start  #x50000000)
+(defparameter dynamic-0-space-end    #x5fff0000)
 
 ); eval-when
 

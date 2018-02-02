@@ -581,7 +581,11 @@ static void relocate_heap(struct heap_adjust* adj)
     SYMBOL(FUNCTION_LAYOUT)->value = \
         adjust_word(adj, SYMBOL(FUNCTION_LAYOUT)->value >> 32) << 32;
 #endif
+#ifdef LISP_FEATURE_CHENEYGC
+    relocate_space(DYNAMIC_0_SPACE_START, (lispobj*)get_alloc_pointer(), adj);
+#else
     relocate_space(DYNAMIC_SPACE_START, (lispobj*)get_alloc_pointer(), adj);
+#endif
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     // Pointers within varyobj space to varyobj space do not need adjustment
@@ -593,9 +597,7 @@ static void relocate_heap(struct heap_adjust* adj)
     relocate_space(VARYOBJ_SPACE_START, varyobj_free_pointer, adj);
 #endif
 }
-#endif
 
-#ifdef LISP_FEATURE_RELOCATABLE_HEAP
 static void
 set_adjustment(struct heap_adjust* adj,
                uword_t actual_addr,
@@ -629,7 +631,10 @@ process_directory(int count, struct ndir_entry *entry,
 #ifdef LISP_FEATURE_GENCGC
         {dynamic_space_size, 0, DYNAMIC_SPACE_START, 0},
 #else
-        {0, 0, 0, 0},
+        // Whatever address the core's dynamic space has
+        // becomes subspace 0. The other is subspace 1.
+        // It makes no difference which has the lower address.
+        {dynamic_space_size, 0, DYNAMIC_0_SPACE_START, 0},
 #endif
         // This order is determined by constants in compiler/generic/genesis
         {0, 0, STATIC_SPACE_START, &static_space_free_pointer},
@@ -688,16 +693,6 @@ process_directory(int count, struct ndir_entry *entry,
         // than code space (4K). So don't assert the alignment.
         if (enforce_address) {
             int fail;
-#ifdef LISP_FEATURE_CHENEYGC
-            if (id == DYNAMIC_CORE_SPACE_ID) {
-                if ((fail = (addr != DYNAMIC_0_SPACE_START) &&
-                            (addr != DYNAMIC_1_SPACE_START)) != 0)
-                    fprintf(stderr, "in core: %p; in runtime: %p or %p\n",
-                            (void*)addr,
-                            (void*)DYNAMIC_0_SPACE_START,
-                            (void*)DYNAMIC_1_SPACE_START);
-            } else
-#endif
             if ((fail = (addr != spaces[id].base)) != 0)
                 fprintf(stderr, "in core: %p; in runtime: %p\n",
                         (void*)addr, (void*)spaces[id].base);
@@ -745,12 +740,29 @@ process_directory(int count, struct ndir_entry *entry,
                 break;
 #endif
             case DYNAMIC_CORE_SPACE_ID:
+#ifdef LISP_FEATURE_CHENEYGC
+                aligned_start = ALIGN_UP(addr, BACKEND_PAGE_BYTES);
+                /* Misalignment can happen only if page size exceeds OS page.
+                 * Drop one page to avoid overrunning the allocated space */
+                if (aligned_start > addr) // not page-aligned
+                    dynamic_space_size -= BACKEND_PAGE_BYTES;
+                DYNAMIC_0_SPACE_START = addr = aligned_start;
+                current_dynamic_space = (lispobj*)addr;
+                { // Request that much again now
+                  uword_t addr1 = (uword_t)os_allocate(request);
+                  aligned_start = ALIGN_UP(addr1, BACKEND_PAGE_BYTES);
+                  if (aligned_start > addr) // same test again
+                      dynamic_space_size -= BACKEND_PAGE_BYTES;
+                  DYNAMIC_1_SPACE_START = aligned_start;
+                }
+#else
                 aligned_start = ALIGN_UP(addr, GENCGC_CARD_BYTES);
                 /* Misalignment can happen only if card size exceeds OS page.
                  * Drop one card to avoid overrunning the allocated space */
                 if (aligned_start > addr) // not card-aligned
                     dynamic_space_size -= GENCGC_CARD_BYTES;
                 DYNAMIC_SPACE_START = addr = aligned_start;
+#endif
                 break;
             }
 #endif /* LISP_FEATURE_RELOCATABLE_HEAP */
@@ -795,17 +807,23 @@ process_directory(int count, struct ndir_entry *entry,
     }
 
 #ifdef LISP_FEATURE_RELOCATABLE_HEAP
+#  ifdef LISP_FEATURE_GENCGC
     set_adjustment(adj, DYNAMIC_SPACE_START, // actual
                    spaces[DYNAMIC_CORE_SPACE_ID].base, // expected
                    spaces[DYNAMIC_CORE_SPACE_ID].len);
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
+#    ifdef LISP_FEATURE_IMMOBILE_SPACE
     set_adjustment(adj, FIXEDOBJ_SPACE_START, // actual
                    spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].base, // expected
                    spaces[IMMOBILE_FIXEDOBJ_CORE_SPACE_ID].len);
     set_adjustment(adj, VARYOBJ_SPACE_START, // actual
                    spaces[IMMOBILE_VARYOBJ_CORE_SPACE_ID].base, // expected
                    spaces[IMMOBILE_VARYOBJ_CORE_SPACE_ID].len);
-#endif
+#    endif
+#  else
+    set_adjustment(adj, DYNAMIC_0_SPACE_START, // actual
+                   spaces[DYNAMIC_CORE_SPACE_ID].base, // expected
+                   spaces[DYNAMIC_CORE_SPACE_ID].len);
+#  endif // LISP_FEATURE_GENCGC
     if (adj->range[0].delta | adj->range[1].delta | adj->range[2].delta)
         relocate_heap(adj);
 #endif

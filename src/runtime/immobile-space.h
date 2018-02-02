@@ -55,6 +55,23 @@ static inline low_page_index_t find_varyobj_page_index(void *addr)
   }
   return -1;
 }
+
+static inline boolean immobile_space_p(lispobj obj)
+{
+/* To test the two immobile ranges, we first check that a pointer is within
+ * the outer bounds, and then that is not in the excluded middle (if any).
+ * This requires only 1 comparison to weed out dynamic-space pointers,
+ * vs doing the more obvious 2 tests, provided that dynamic space starts
+ * above 4GB. range_1_max == range_2_min if there is no discontinuity. */
+    uword_t offset = obj - immobile_space_lower_bound;
+    if (offset >= immobile_space_max_offset) return 0;
+    return !(immobile_range_1_max_offset <= offset
+             && offset < immobile_range_2_min_offset);
+}
+#else
+
+static inline boolean immobile_space_p(lispobj obj) { return 0; }
+
 #endif
 
 #endif // _IMMOBILE_SPACE_H_

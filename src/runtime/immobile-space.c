@@ -77,6 +77,11 @@ FILE * logfile;
 
 void defrag_immobile_space(int* components, boolean verbose);
 
+uword_t FIXEDOBJ_SPACE_START, VARYOBJ_SPACE_START;
+uword_t immobile_space_lower_bound, immobile_space_max_offset;
+unsigned int immobile_range_1_max_offset, immobile_range_2_min_offset;
+unsigned int varyobj_space_size = VARYOBJ_SPACE_SIZE;
+
 unsigned asm_routines_end;
 
 // This table is for objects fixed in size, as opposed to variable-sized.

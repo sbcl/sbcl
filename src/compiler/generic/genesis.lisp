@@ -2845,9 +2845,7 @@ core and return a descriptor to it."
       (assert (zerop (rem sb!vm:fixedobj-space-size
                           (* 32 sb!vm:immobile-card-bytes))))
       #!-gencgc
-      (progn
-        (check sb!vm:dynamic-0-space-start sb!vm:dynamic-0-space-end :dynamic-0)
-        (check sb!vm:dynamic-1-space-start sb!vm:dynamic-1-space-end :dynamic-1))
+      (check sb!vm:dynamic-0-space-start sb!vm:dynamic-0-space-end :dynamic-0)
       #!+linkage-table
       (check sb!vm:linkage-table-space-start sb!vm:linkage-table-space-end :linkage-table))))
 
@@ -3027,15 +3025,16 @@ core and return a descriptor to it."
     (terpri))
 
   (format t "#define BACKEND_PAGE_BYTES ~D~%" sb!c:+backend-page-bytes+)
-  #!+gencgc
-  (progn
-    ;; value never needed in Lisp, so therefore not a defconstant
-    (format t "#define GENCGC_CARD_SHIFT ~D~%"
+  #!+gencgc ; value never needed in Lisp, so therefore not a defconstant
+  (format t "#define GENCGC_CARD_SHIFT ~D~%"
             (1- (integer-length sb!vm:gencgc-card-bytes)))
-    ;; symbol intentionally internal to sb-vm so that it won't add a #define
+
+  (let ((size #!+cheneygc (- sb!vm:dynamic-0-space-end sb!vm:dynamic-0-space-start)
+              #!+gencgc sb!vm::default-dynamic-space-size))
+  ;; "-DDEFAULT_DYNAMIC_SPACE_SIZE=n" in CFLAGS will override this.
     (format t "#ifndef DEFAULT_DYNAMIC_SPACE_SIZE
 #define DEFAULT_DYNAMIC_SPACE_SIZE ~D /* ~:*0x~X */
-#endif~2%" sb!vm::default-dynamic-space-size))
+#endif~2%" size))
 
   ;; writing information about internal errors
   ;; Assembly code needs only the constants for UNDEFINED_[ALIEN_]FUN_ERROR
