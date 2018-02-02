@@ -474,10 +474,6 @@
            two-arg-char-not-greaterp)
     (character character) boolean (movable foldable flushable))
 
-(defknown char-equal-constant (character character character)
-  boolean
-  (movable foldable flushable))
-
 (defknown character (t) character (movable foldable unsafely-flushable))
 (defknown char-code (character) char-code (movable foldable flushable))
 (defknown (char-upcase char-downcase) (character) character

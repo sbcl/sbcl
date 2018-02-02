@@ -690,11 +690,6 @@ is either numeric or alphabetic."
              (or (= (aref cases index) (char-code c2)) ;; lower case
                  (= (aref cases (1+ index)) (char-code c2))))))))
 
-(defun char-equal-constant (x char reverse-case-char)
-  (declare (type character x) (explicit-check))
-  (or (eq char x)
-      (eq reverse-case-char x)))
-
 (defun two-arg-char-not-equal (c1 c2)
   (declare (inline two-arg-char-equal))
   (not (two-arg-char-equal c1 c2)))
