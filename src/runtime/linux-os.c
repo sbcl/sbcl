@@ -320,7 +320,14 @@ os_init(char *argv[], char *envp[])
  * information loss, we have to make sure it allocates all its ram in the
  * 0-2Gb region.  */
 
-static void * under_2gb_free_pointer=DYNAMIC_1_SPACE_END;
+static void * under_2gb_free_pointer;
+os_set_cheneygc_spaces(uword_t space0_start, uword_t space1_start)
+{
+    uword_t max;
+    max = (space1_start > space0_start) ? space1_start : space0_start;
+    under_2gb_free_pointer = max + dynamic_space_size;
+}
+
 #endif
 
 os_vm_address_t
