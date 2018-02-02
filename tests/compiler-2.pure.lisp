@@ -629,6 +629,14 @@
        (equalp a b))
     (("" #*) t)))
 
+(with-test (:name :equalp-transform-zero-string)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (equalp "" a))
+   ((#*) t)
+   ((#()) t)))
+
 (with-test (:name :fill-transform-returning-array-data)
   (let ((vector (make-array 10 :fill-pointer 2)))
     (checked-compile-and-assert ()
