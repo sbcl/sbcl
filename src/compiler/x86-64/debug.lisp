@@ -46,18 +46,6 @@
           (make-ea :qword :base sap :disp (frame-byte-offset 0) :index temp
                    :scale (ash 1 (- word-shift n-fixnum-tag-bits))))))
 
-(define-vop (read-control-stack-c)
-  (:translate stack-ref)
-  (:policy :fast-safe)
-  (:args (sap :scs (sap-reg)))
-  (:info index)
-  (:arg-types system-area-pointer (:constant (signed-byte 29)))
-  (:results (result :scs (descriptor-reg)))
-  (:result-types *)
-  (:generator 5
-    (inst mov result (make-ea :qword :base sap
-                              :disp (frame-byte-offset index)))))
-
 (define-vop (write-control-stack)
   (:translate %set-stack-ref)
   (:policy :fast-safe)
@@ -74,20 +62,6 @@
     (inst mov
           (make-ea :qword :base sap :disp (frame-byte-offset 0) :index temp
                    :scale (ash 1 (- word-shift n-fixnum-tag-bits)))
-          value)
-    (move result value)))
-
-(define-vop (write-control-stack-c)
-  (:translate %set-stack-ref)
-  (:policy :fast-safe)
-  (:args (sap :scs (sap-reg))
-         (value :scs (descriptor-reg) :target result))
-  (:info index)
-  (:arg-types system-area-pointer (:constant (signed-byte 29)) *)
-  (:results (result :scs (descriptor-reg)))
-  (:result-types *)
-  (:generator 5
-    (inst mov (make-ea :qword :base sap :disp (frame-byte-offset index))
           value)
     (move result value)))
 
