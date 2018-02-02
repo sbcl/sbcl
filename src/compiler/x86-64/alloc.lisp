@@ -423,8 +423,10 @@
 #!+immobile-space
 (define-vop (alloc-fixedobj)
   (:info lowtag size word0 word1)
-  (:temporary (:sc unsigned-reg :to :eval :offset rdi-offset) c-arg1)
-  (:temporary (:sc unsigned-reg :to :eval :offset rsi-offset) c-arg2)
+  (:temporary (:sc unsigned-reg :to :eval
+               :offset #.(first *c-call-register-arg-offsets*)) c-arg1)
+  (:temporary (:sc unsigned-reg :to :eval
+               :offset #.(second *c-call-register-arg-offsets*)) c-arg2)
   (:temporary (:sc unsigned-reg :from :eval :to (:result 0) :offset rax-offset) c-result)
   (:results (result :scs (descriptor-reg)))
   (:generator 50
@@ -449,11 +451,13 @@
                 (:args ,@(if (>= argc 1) `((arg1 :scs ,(first arg-scs) :target c-arg1)))
                        ,@(if (>= argc 2) `((arg2 :scs ,(second arg-scs) :target c-arg2))))
                 ,@(if (>= argc 1)
-                      '((:temporary (:sc unsigned-reg :from (:argument 0)
-                                     :to :eval :offset rdi-offset) c-arg1)))
+                      `((:temporary (:sc unsigned-reg :from (:argument 0)
+                                     :to :eval :offset ,(first *c-call-register-arg-offsets*))
+                                    c-arg1)))
                 ,@(if (>= argc 2)
-                      '((:temporary (:sc unsigned-reg :from (:argument 1)
-                                     :to :eval :offset rsi-offset) c-arg2)))
+                      `((:temporary (:sc unsigned-reg :from (:argument 1)
+                                     :to :eval :offset ,(second *c-call-register-arg-offsets*))
+                                    c-arg2)))
                 (:temporary (:sc unsigned-reg :from :eval :to (:result 0)
                              :offset rax-offset) c-result)
                 (:results (result :scs (descriptor-reg)))

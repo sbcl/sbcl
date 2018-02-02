@@ -45,7 +45,11 @@ ifdef LISP_FEATURE_SB_CORE_COMPRESSION
   OS_LIBS += -lz
 endif
 
-GC_SRC = fullcgc.c gencgc.c traceroot.c
+ifdef LISP_FEATURE_IMMOBILE_SPACE
+  GC_SRC = fullcgc.c gencgc.c traceroot.c immobile-space.c
+else
+  GC_SRC = fullcgc.c gencgc.c traceroot.c
+endif
 
 CFLAGS =  -g -W -Wall \
        -Wno-unused-function \
