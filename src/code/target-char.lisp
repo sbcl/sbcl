@@ -16,7 +16,7 @@
 (declaim (inline standard-char-p graphic-char-p alpha-char-p
                  alphanumericp))
 (declaim (maybe-inline upper-case-p lower-case-p both-case-p
-                       digit-char-p two-arg-char-equal))
+                       digit-char-p))
 
 (deftype char-code ()
   `(integer 0 (,sb!xc:char-code-limit)))
@@ -662,6 +662,7 @@ is either numeric or alphabetic."
               code
               down-code)))))
 
+(declaim (inline two-arg-char-equal))
 (defun two-arg-char-equal (c1 c2)
   (flet ((base-char-equal-p ()
            (let* ((code1 (char-code c1))
@@ -691,8 +692,8 @@ is either numeric or alphabetic."
                  (= (aref cases (1+ index)) (char-code c2))))))))
 
 (defun two-arg-char-not-equal (c1 c2)
-  (declare (inline two-arg-char-equal))
   (not (two-arg-char-equal c1 c2)))
+(declaim (notinline two-arg-char-equal))
 
 (macrolet ((def (name test doc)
              `(defun ,name (character &rest more-characters)
