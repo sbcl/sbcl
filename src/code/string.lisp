@@ -303,20 +303,21 @@
   (let ((end-test (if (= end 1)
                       `(= index1 (the fixnum end1))
                       `(= index2 (the fixnum end2)))))
-    `(locally (declare (inline two-arg-char-equal))
-       (do ((index1 start1 (1+ index1))
-            (index2 start2 (1+ index2)))
-           (,(if abortp
-                 end-test
-                 `(or ,end-test
-                      (not (char-equal (schar string1 index1)
-                                       (schar string2 index2)))))
-            ,end-value)
-         (declare (fixnum index1 index2))
-         ,@(if abortp
-               `((if (not (char-equal (schar string1 index1)
-                                      (schar string2 index2)))
-                     (return ,abort-value))))))))
+    `(do ((index1 start1 (1+ index1))
+         (index2 start2 (1+ index2)))
+        (,(if abortp
+              end-test
+              `(or ,end-test
+                   (not (two-arg-char-equal-inline
+                         (schar string1 index1)
+                         (schar string2 index2)))))
+         ,end-value)
+      (declare (fixnum index1 index2))
+      ,@(if abortp
+            `((if (not (two-arg-char-equal-inline
+                        (schar string1 index1)
+                        (schar string2 index2)))
+                  (return ,abort-value)))))))
 
 ) ; EVAL-WHEN
 
@@ -389,24 +390,23 @@
 (sb!xc:defmacro string-less-greater-equal (lessp equalp)
   (multiple-value-bind (length-test character-test)
       (string-less-greater-equal-tests lessp equalp)
-    `(locally (declare (inline two-arg-char-equal))
-       (with-two-strings string1 string2 start1 end1 offset1 start2 end2
-         (let ((slen1 (- (the fixnum end1) start1))
-               (slen2 (- (the fixnum end2) start2)))
-           (declare (fixnum slen1 slen2))
-           (do ((index1 start1 (1+ index1))
-                (index2 start2 (1+ index2))
-                (char1)
-                (char2))
-               ((or (= index1 (the fixnum end1)) (= index2 (the fixnum end2)))
-                (if (,length-test slen1 slen2) (- index1 offset1)))
-             (declare (fixnum index1 index2))
-             (setq char1 (schar string1 index1))
-             (setq char2 (schar string2 index2))
-             (if (not (char-equal char1 char2))
-                 (if ,character-test
-                     (return (- index1 offset1))
-                     (return ())))))))))
+    `(with-two-strings string1 string2 start1 end1 offset1 start2 end2
+       (let ((slen1 (- (the fixnum end1) start1))
+             (slen2 (- (the fixnum end2) start2)))
+         (declare (fixnum slen1 slen2))
+         (do ((index1 start1 (1+ index1))
+              (index2 start2 (1+ index2))
+              (char1)
+              (char2))
+             ((or (= index1 (the fixnum end1)) (= index2 (the fixnum end2)))
+              (if (,length-test slen1 slen2) (- index1 offset1)))
+           (declare (fixnum index1 index2))
+           (setq char1 (schar string1 index1))
+           (setq char2 (schar string2 index2))
+           (if (not (two-arg-char-equal-inline char1 char2))
+               (if ,character-test
+                   (return (- index1 offset1))
+                   (return ()))))))))
 
 ) ; EVAL-WHEN
 

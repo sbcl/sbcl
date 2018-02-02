@@ -662,8 +662,8 @@ is either numeric or alphabetic."
               code
               down-code)))))
 
-(declaim (inline two-arg-char-equal))
-(defun two-arg-char-equal (c1 c2)
+(declaim (inline two-arg-char-equal-inline))
+(defun two-arg-char-equal-inline (c1 c2)
   (flet ((base-char-equal-p ()
            (let* ((code1 (char-code c1))
                   (code2 (char-code c2))
@@ -691,9 +691,12 @@ is either numeric or alphabetic."
              (or (= (aref cases index) (char-code c2)) ;; lower case
                  (= (aref cases (1+ index)) (char-code c2))))))))
 
+;;; There are transforms on two-arg-char-equal, don't make it inlinable itself.
+(defun two-arg-char-equal (c1 c2)
+  (two-arg-char-equal-inline c1 c2))
+
 (defun two-arg-char-not-equal (c1 c2)
-  (not (two-arg-char-equal c1 c2)))
-(declaim (notinline two-arg-char-equal))
+  (not (two-arg-char-equal-inline c1 c2)))
 
 (macrolet ((def (name test doc)
              `(defun ,name (character &rest more-characters)
