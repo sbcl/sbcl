@@ -33,8 +33,9 @@
 
 ;;; Used by the interpreter stuff. When it's non-NIL, it's a function
 ;;; that will invoke PPRINT-POP in the right lexical environemnt.
-(declaim (type (or null function) *logical-block-popper*))
 (defvar *logical-block-popper* nil)
+(declaim (type (or null function) *logical-block-popper*)
+         (always-bound *logical-block-popper*))
 
 ;;; Used by the expander stuff. This is bindable so that ~<...~:>
 ;;; can change it.

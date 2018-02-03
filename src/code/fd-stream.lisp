@@ -438,7 +438,7 @@
 
 ;;;; output routines and related noise
 
-(defvar *output-routines* ()
+(defglobal *output-routines* ()
   "List of all available output routines. Each element is a list of the
   element-type output, the kind of buffering, the function name, and the number
   of bytes per element.")
