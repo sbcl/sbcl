@@ -19,9 +19,11 @@
 (!defvar *read-default-float-format* 'single-float)
 (declaim (type (member short-float single-float double-float long-float)
                *read-default-float-format*))
-
+(declaim (always-bound *read-default-float-format*))
 (defvar *readtable*)
 (declaim (type readtable *readtable*))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (info :variable :always-bound '*readtable*) :always-bound))
 (setf (fdocumentation '*readtable* 'variable)
       "Variable bound to current readtable.")
 

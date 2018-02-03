@@ -30,6 +30,6 @@
 ;;; Cross-compilation does not rely on introspection for anything.
 (declaim (declaration sb!c::lambda-list))
 
-(declaim (declaration explicit-check))
+(declaim (declaration explicit-check always-bound))
 
 (defgeneric sb!xc:make-load-form (obj &optional env))

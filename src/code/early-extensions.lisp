@@ -1595,6 +1595,7 @@ NOTE: This interface is experimental and subject to change."
 (!defvar *print-vector-length* nil
   "Like *PRINT-LENGTH* but works on strings and bit-vectors.
 Does not affect the cases that are already controlled by *PRINT-LENGTH*")
+(declaim (always-bound *print-vector-length*))
 
 (defun call-with-sane-io-syntax (function)
   (declare (type function function))
@@ -1628,7 +1629,7 @@ Does not affect the cases that are already controlled by *PRINT-LENGTH*")
   "Toggle between different evaluator implementations. If set to :COMPILE,
 an implementation of EVAL that calls the compiler will be used. If set
 to :INTERPRET, an interpreter will be used.")
-
+(declaim (always-bound *evaluator-mode*))
 ;; This is not my preferred name for this function, but chosen for harmony
 ;; with everything else that refers to these as 'hash-caches'.
 ;; Hashing is just one particular way of memoizing, and it would have been
