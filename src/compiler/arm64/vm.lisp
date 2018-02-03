@@ -226,7 +226,7 @@
 (macrolet ((defregtn (name sc)
                (let ((offset-sym (symbolicate name "-OFFSET"))
                      (tn-sym (symbolicate name "-TN")))
-                 `(defparameter ,tn-sym
+                 `(defglobal ,tn-sym
                    (make-random-tn :kind :normal
                     :sc (sc-or-lose ',sc)
                     :offset ,offset-sym)))))
