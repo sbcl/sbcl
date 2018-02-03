@@ -50,6 +50,10 @@
 
 (define-load-time-global *package-graph-lock* nil)
 
+(defmacro with-package-graph ((&key) &body forms)
+  `(flet ((thunk () ,@forms))
+     (declare (dynamic-extent #'thunk))
+     (call-with-package-graph #'thunk)))
 (defun call-with-package-graph (function)
   (declare (function function))
   ;; FIXME: Since name conflicts can be signalled while holding the
@@ -66,6 +70,79 @@
      (sb!thread::with-recursive-system-lock ((info-env-mutex ,table-var))
        ,@body)))
 
+(defmethod make-load-form ((p package) &optional environment)
+  (declare (ignore environment))
+  `(find-undeleted-package-or-lose ,(package-name p)))
+
+;;;; iteration macros
+
+(defmacro with-package-iterator ((mname package-list &rest symbol-types) &body body)
+  "Within the lexical scope of the body forms, MNAME is defined via macrolet
+such that successive invocations of (MNAME) will return the symbols, one by
+one, from the packages in PACKAGE-LIST. SYMBOL-TYPES may be any
+of :INHERITED :EXTERNAL :INTERNAL."
+  ;; SYMBOL-TYPES should really be named ACCESSIBILITY-TYPES.
+  (when (null symbol-types)
+    (%program-error "At least one of :INTERNAL, :EXTERNAL, or :INHERITED must be supplied."))
+  (dolist (symbol symbol-types)
+    (unless (member symbol '(:internal :external :inherited))
+      (%program-error "~S is not one of :INTERNAL, :EXTERNAL, or :INHERITED."
+                      symbol)))
+  (with-unique-names (bits index sym-vec pkglist symbol kind)
+    (let ((state (list bits index sym-vec pkglist))
+          (select (logior (if (member :internal  symbol-types) 1 0)
+                          (if (member :external  symbol-types) 2 0)
+                          (if (member :inherited symbol-types) 4 0))))
+      `(multiple-value-bind ,state (package-iter-init ,select ,package-list)
+         (let (,symbol ,kind)
+           (macrolet
+               ((,mname ()
+                   '(if (eql 0 (multiple-value-setq (,@state ,symbol ,kind)
+                                 (package-iter-step ,@state)))
+                        nil
+                        (values t ,symbol ,kind
+                                (car (truly-the list ,pkglist))))))
+             ,@body))))))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun expand-pkg-iterator (range var body result-form)
+    (multiple-value-bind (forms decls) (parse-body body nil)
+      (with-unique-names (iterator winp next)
+        `(block nil
+           (with-package-iterator (,iterator ,@range)
+             (tagbody
+                  ,next
+                  (multiple-value-bind (,winp ,var) (,iterator)
+                    (declare (ignorable ,var))
+                    ,@decls
+                    (if ,winp
+                        (tagbody ,@forms (go ,next))
+                        (return ,result-form))))))))))
+
+(defmacro do-symbols ((var &optional (package '*package*) result-form)
+                           &body body-decls)
+  "DO-SYMBOLS (VAR [PACKAGE [RESULT-FORM]]) {DECLARATION}* {TAG | FORM}*
+   Executes the FORMs at least once for each symbol accessible in the given
+   PACKAGE with VAR bound to the current symbol."
+  (expand-pkg-iterator `((find-undeleted-package-or-lose ,package)
+                       :internal :external :inherited)
+                       var body-decls result-form))
+
+(defmacro do-external-symbols ((var &optional (package '*package*) result-form)
+                                    &body body-decls)
+  "DO-EXTERNAL-SYMBOLS (VAR [PACKAGE [RESULT-FORM]]) {DECL}* {TAG | FORM}*
+   Executes the FORMs once for each external symbol in the given PACKAGE with
+   VAR bound to the current symbol."
+  (expand-pkg-iterator `((find-undeleted-package-or-lose ,package) :external)
+                       var body-decls result-form))
+
+(defmacro do-all-symbols ((var &optional result-form) &body body-decls)
+  "DO-ALL-SYMBOLS (VAR [RESULT-FORM]) {DECLARATION}* {TAG | FORM}*
+   Executes the FORMs once for each symbol in every package with VAR bound
+   to the current symbol."
+  (expand-pkg-iterator '((list-all-packages) :internal :external)
+                       var body-decls result-form))
+
 ;;;; PACKAGE-HASHTABLE stuff
 
 (defmethod print-object ((table package-hashtable) stream)

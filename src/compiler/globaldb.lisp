@@ -266,28 +266,6 @@
       (when hookp
         (funcall (truly-the function (cdr hook)) name info-number answer nil))
       (values answer nil))))
-
-;; Call FUNCTION once for each Name in globaldb that has information associated
-;; with it, passing the function the Name as its only argument.
-;;
-(defun call-with-each-globaldb-name (fun-designator)
-  (let ((function (coerce fun-designator 'function)))
-    (with-package-iterator (iter (list-all-packages) :internal :external)
-      (loop (multiple-value-bind (winp symbol access package) (iter)
-              (declare (ignore access))
-              (if (not winp) (return))
-              ;; Try to process each symbol at most once by associating it with
-              ;; a single package. If a symbol is apparently uninterned,
-              ;; always keep it since we can't know if it has been seen once.
-              (when (or (not (symbol-package symbol))
-                        (eq package (symbol-package symbol)))
-                (dolist (name (info-vector-name-list symbol))
-                  (funcall function name))))))
-    #-sb-xc-host
-    (info-maphash (lambda (name data)
-                    (declare (ignore data))
-                    (funcall function name))
-                  *info-environment*)))
 
 ;;;; ":FUNCTION" subsection - Data pertaining to globally known functions.
 
