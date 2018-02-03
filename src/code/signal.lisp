@@ -71,13 +71,13 @@
   (dolist (symbol '(*unblock-deferrables-on-enabling-interrupts-p*
                     *interrupts-enabled*
                     *interrupt-pending*
-                    *thruption-pending*
+                    #!+sb-thruption *thruption-pending*
                     *allow-with-interrupts*))
     ;; Force these to be always bound despite absence of a compile-time binding.
     ;; (Avoid accidentally installing a value into symbol->value in cold-load)
     ;; Not only are they always bound, 4 of them always have a thread-local value.
     ;; We don't as yet have a way to elide the check for no-tls-value though.
-    (setf  (info :variable :always-bound symbol) :always-bound)))
+    (setf (info :variable :always-bound symbol) :always-bound)))
 
 (defmacro without-interrupts (&body body)
   "Executes BODY with all deferrable interrupts disabled. Deferrable
