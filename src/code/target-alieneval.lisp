@@ -307,10 +307,7 @@ Examples:
         (malloc-error bytes (get-errno))
         sap)))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defvar *saved-fp-and-pcs* nil)
-  ;; Can't use DECLAIM since always-bound is a non-standard declaration
-  (sb!xc:proclaim '(sb!ext:always-bound *saved-fp-and-pcs*)))
+(!define-thread-local *saved-fp-and-pcs* nil)
 
 #!+c-stack-is-control-stack
 (declaim (inline invoke-with-saved-fp-and-pc))
