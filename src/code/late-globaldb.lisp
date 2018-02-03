@@ -38,6 +38,6 @@
   ;; In host mode we can not use INFO-MAPHASH because the lockfree hashtable
   ;; is target-only code.  We don't have a deep dependence on this for the host,
   ;; but make-host-2 does iterate over globaldb post-build
-  ;; to detect possible inlining failures 
+  ;; to detect possible inlining failures
   (def :compile-toplevel)
   (def :load-toplevel :execute))

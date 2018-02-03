@@ -371,7 +371,7 @@
     (define-float-fop 52 fop-long-float long-float)))
 
 #!+sb-simd-pack
-(!define-fop 88 (fop-simd-pack)
+(!define-fop 88 :not-host (fop-simd-pack)
   (with-fast-read-byte ((unsigned-byte 8) (fasl-input-stream))
     (%make-simd-pack (fast-read-s-integer 8)
                      (fast-read-u-integer 8)

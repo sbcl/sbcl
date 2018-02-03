@@ -15,7 +15,9 @@
 
 (macrolet ((def (name &optional (args '(x)))
              `(defun ,name ,args
-                (,@(if (listp name) `(funcall #',name) `(,name)) ,@args))))
+                (,@(if (listp name) `(funcall #',name) `(,name)) ,@args)))
+           (def* (&rest defs)
+             `(progn ,@(mapcar (lambda (x) `(def ,@x)) defs))))
   (def get-header-data)
   (def set-header-data (x val))
   (def get-closure-length)
@@ -53,4 +55,13 @@
   (def %code-debug-info)
   #+(or x86 immobile-space) (def sb-vm::%code-fixups)
   (def %funcallable-instance-layout)
-  (def %set-funcallable-instance-layout (x new-value)))
+  (def %set-funcallable-instance-layout (x new-value))
+  #+sb-simd-pack
+  (def* (%make-simd-pack (tag low high))
+        (%make-simd-pack-single (x y z w))
+        (%make-simd-pack-double (low high))
+        (%make-simd-pack-ub64 (low high))
+        (%simd-pack-tag)
+        (%simd-pack-low)
+        (%simd-pack-high))
+  )

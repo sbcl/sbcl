@@ -748,6 +748,8 @@
   "src/code/external-formats/enc-jpn"
   "src/code/external-formats/enc-utf")
 
+ ("src/code/stubs")
+
  ;; CLOS, derived from the PCL reference implementation
  ;;
  ;; This PCL build order is based on a particular
@@ -787,7 +789,6 @@
   "src/pcl/precom2")
 
  ("src/code/setf-funs"
-  "src/code/stubs"
   ;; miscellaneous functionality which depends on CLOS
   "src/code/late-condition"
 
