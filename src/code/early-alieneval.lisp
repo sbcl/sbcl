@@ -11,6 +11,8 @@
 
 (defglobal *alien-type-classes* (make-hash-table :test 'eq))
 
+(!define-thread-local *saved-fp-and-pcs* nil)
+
 (defvar *new-auxiliary-types* nil)
 
 ;;; the list of record types that have already been unparsed. This is

@@ -164,7 +164,6 @@
  ;; accessors and inline functions defined here can be compiled inline
  ;; later. (Avoiding full calls increases efficiency)
  ("src/code/type-class" :c-headers)
- ("src/code/early-alieneval")  ; for funs and vars needed at build and run time
 
  ("src/code/cas" :not-host)
  ("src/compiler/early-c" :c-headers)
@@ -178,6 +177,7 @@
  ("src/compiler/globaldb" :c-headers)
  ("src/code/primordial-type" :c-headers)
  ("src/code/early-classoid" :c-headers)
+ ("src/code/early-alieneval" :c-headers)  ; for funs and vars needed at build and run time
 
  ("src/code/sysmacs" :not-host)
 

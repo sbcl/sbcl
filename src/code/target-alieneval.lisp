@@ -307,8 +307,6 @@ Examples:
         (malloc-error bytes (get-errno))
         sap)))
 
-(!define-thread-local *saved-fp-and-pcs* nil)
-
 #!+c-stack-is-control-stack
 (declaim (inline invoke-with-saved-fp-and-pc))
 ;;; On :c-stack-is-control-stack platforms, this DEFUN must appear prior to the
