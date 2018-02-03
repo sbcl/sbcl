@@ -83,7 +83,9 @@
     (error "Cannot proclaim a non-symbol as ~A: ~S" kind name))
 
   (when (and (eq kind 'always-bound) (eq info-value :always-bound)
-             (not (boundp name)))
+             (not (boundp name))
+             ;; Allow it to be unbound at compile-time.
+             (not *compile-time-eval*))
     (error "Cannot proclaim an unbound symbol as ~A: ~S" kind name))
 
   (multiple-value-bind (allowed test)

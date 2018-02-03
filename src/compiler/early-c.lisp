@@ -310,6 +310,10 @@ the stack without triggering overflow protection.")
 ;;; compiler debugging, rather than policy control.)
 (defvar *assembly-optimize* t)
 
+;;; Bound during eval-when :compile-time evaluation.
+(defvar *compile-time-eval* nil)
+(declaim (always-bound *compile-time-eval*))
+
 (in-package "SB!ALIEN")
 
 ;;; Information describing a heap-allocated alien.
