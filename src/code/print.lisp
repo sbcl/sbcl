@@ -56,12 +56,6 @@
   "Suppress printer errors when the condition is of the type designated by this
 variable: an unreadable object representing the error is printed instead.")
 
-(declaim (always-bound *print-readably* *print-escape* *print-pretty*
-                       *print-base* *print-radix* *print-level* *print-length*
-                       *print-circle* *print-case* *print-array* *print-gensym*
-                       *print-lines* *print-right-margin* *print-miser-width*
-                       *print-pprint-dispatch* *suppress-print-errors*))
-
 ;; duplicate defglobal because this file is compiled before "reader"
 (defglobal *standard-readtable* nil)
 
