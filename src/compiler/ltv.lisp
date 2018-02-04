@@ -25,7 +25,7 @@
             ;; Another similar case - this allows the printer to work
             ;; immediately in cold-init. (See SETUP-PRINTER-STATE.)
             ((cons (eql function)
-                   (cons (satisfies sb!int:legal-fun-name-p) null))
+                   (cons (satisfies legal-fun-name-p) null))
              'function)
             ;; Case(s) that should only happen in the cross-compiler.
             #+sb-xc-host

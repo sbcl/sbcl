@@ -98,6 +98,6 @@
                     (probe-file lisp-path))))
       (when file
         (handler-bind
-            (((or style-warning sb!int:package-at-variance) #'muffle-warning))
+            (((or style-warning package-at-variance) #'muffle-warning))
           (load file))
         t))))

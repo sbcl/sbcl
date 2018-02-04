@@ -312,7 +312,7 @@
        (setf (segment-run-scheduler ,seg) ,var))))
 
 (defmacro note-dependencies ((segment inst) &body body)
-  (sb!int:once-only ((segment segment) (inst inst))
+  (once-only ((segment segment) (inst inst))
     `(macrolet ((reads (loc) `(note-read-dependency ,',segment ,',inst ,loc))
                 (writes (loc &rest keys)
                   `(note-write-dependency ,',segment ,',inst ,loc ,@keys)))
@@ -395,12 +395,12 @@
   #!+sb-show-assem (format *trace-output* "~&queuing ~S~%" inst)
   #!+sb-show-assem (format *trace-output*
                            "  reads ~S~%  writes ~S~%"
-                           (sb!int:collect ((reads))
+                           (collect ((reads))
                              (do-sset-elements (read
                                                 (inst-read-dependencies inst))
                                 (reads read))
                              (reads))
-                           (sb!int:collect ((writes))
+                           (collect ((writes))
                              (do-sset-elements (write
                                                 (inst-write-dependencies inst))
                                 (writes write))
@@ -1309,7 +1309,7 @@
 ;;; single integer and then emits the bytes of that integer in the
 ;;; correct order based on the endianness of the target-backend.
 (defmacro define-bitfield-emitter (name total-bits &rest byte-specs)
-  (sb!int:collect ((arg-names) (arg-types))
+  (collect ((arg-names) (arg-types))
     (let* ((total-bits (eval total-bits))
            (overall-mask (ash -1 total-bits))
            (num-bytes (multiple-value-bind (quo rem)

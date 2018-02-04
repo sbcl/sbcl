@@ -17,7 +17,7 @@
 
 (declaim (type (simple-array (unsigned-byte 32) (*)) **block-ranges**))
 (sb!impl::defglobal **block-ranges**
-  #.(sb!int:!coerce-to-specialized
+  #.(!coerce-to-specialized
      (sb-cold:read-from-file "output/blocks.lisp-expr")
      '(unsigned-byte 32)))
 

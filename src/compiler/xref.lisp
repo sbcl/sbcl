@@ -154,7 +154,7 @@
                           (list-all-packages))) t))
          #+sb-xc-host   ; again, special case like in genesis and dump
          (multiple-value-bind (cl-symbol cl-status)
-             (find-symbol (symbol-name what) sb!int:*cl-package*)
+             (find-symbol (symbol-name what) *cl-package*)
            (and (eq what cl-symbol) (eq cl-status :external)))))
     (t t)))
 

@@ -950,12 +950,12 @@
     ;; see comment in genesis: we need this here for repeatable fasls
     #+sb-xc-host
     (multiple-value-bind (cl-symbol cl-status)
-        (find-symbol (symbol-name s) sb!int:*cl-package*)
+        (find-symbol (symbol-name s) *cl-package*)
       (when (and (eq s cl-symbol)
                  (eq cl-status :external))
         ;; special case, to work around possible xc host "design
         ;; choice" weirdness in COMMON-LISP package
-        (setq pkg sb!int:*cl-package*)))
+        (setq pkg *cl-package*)))
 
     (cond ((null pkg)
            (let ((this-base-p base-string-p))
@@ -972,9 +972,9 @@
                    (dump-fop 'fop-copy-symbol-save file
                              (gethash lookalike (fasl-output-eq-table file)))
                    (return (setq dumped-as-copy t)))))))
-          ((eq pkg sb!int:*cl-package*)
+          ((eq pkg *cl-package*)
            (dump-fop 'fop-lisp-symbol-save file length+flag))
-          ((eq pkg sb!int:*keyword-package*)
+          ((eq pkg *keyword-package*)
            (dump-fop 'fop-keyword-symbol-save file length+flag))
           (t
            (let ((pkg-index (dump-package pkg file)))

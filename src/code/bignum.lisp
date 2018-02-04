@@ -465,8 +465,8 @@
                                 (start2 '0)
                                 end2
                                 from-end)
-  (sb!int:once-only ((n-dest dest)
-                     (n-src src))
+  (once-only ((n-dest dest)
+              (n-src src))
     (with-unique-names (n-start1 n-end1 n-start2 n-end2 i1 i2)
       (let ((end1 (or end1 `(%bignum-length ,n-dest)))
             (end2 (or end2 `(%bignum-length ,n-src))))
@@ -494,8 +494,7 @@
 
 (sb!xc:defmacro with-bignum-buffers (specs &body body)
   "WITH-BIGNUM-BUFFERS ({(var size [init])}*) Form*"
-  (sb!int:collect ((binds)
-                   (inits))
+  (collect ((binds) (inits))
     (dolist (spec specs)
       (let ((name (first spec))
             (size (second spec)))

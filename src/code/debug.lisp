@@ -1899,12 +1899,12 @@ forms that explicitly control this kind of evaluation.")
 ;;;; debug loop command utilities
 
 (defun read-prompting-maybe (prompt)
-  (unless (sb!int:listen-skip-whitespace *debug-io*)
+  (unless (listen-skip-whitespace *debug-io*)
     (princ prompt *debug-io*)
     (force-output *debug-io*))
   (read *debug-io*))
 
 (defun read-if-available (default)
-  (if (sb!int:listen-skip-whitespace *debug-io*)
+  (if (listen-skip-whitespace *debug-io*)
       (read *debug-io*)
       default))

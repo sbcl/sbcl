@@ -25,7 +25,7 @@
           ((not (typep (layout-info res) 'defstruct-description))
            (error "Class is not a structure class: ~S" name))
           (t
-           (sb!int:check-deprecated-type name)
+           (check-deprecated-type name)
            res))))
 
 (defun compiler-layout-ready-p (name)

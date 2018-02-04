@@ -531,8 +531,8 @@
                    `(progn
                       (when (atom subform) (return))
                       (let ((fm (car subform)))
-                        (when (sb!int:comma-p fm)
-                          (setf fm (sb!int:comma-expr fm)))
+                        (when (comma-p fm)
+                          (setf fm (comma-expr fm)))
                         (cond ((consp fm)
                                ;; If it's a cons, recurse.
                                (sub-find-source-paths fm (cons pos path)))

@@ -464,8 +464,7 @@
                          ;; other operations, but I don't see any good
                          ;; candidates in a quick read-through of
                          ;; src/code/fop.lisp.)
-                         ((and (eq operator
-                                   'sb!int:find-undeleted-package-or-lose)
+                         ((and (eq operator 'find-undeleted-package-or-lose)
                                (= 1 (length args))
                                for-value-p)
                           (fopcompile (first args) path t)

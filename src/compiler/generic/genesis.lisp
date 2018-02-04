@@ -937,9 +937,8 @@ core and return a descriptor to it."
 
 (defun unbound-cold-symbol-handler (symbol)
   (let ((host-val (and (boundp symbol) (symbol-value symbol))))
-    (if (typep host-val 'sb!kernel:named-type)
-        (let ((target-val (ctype-to-core (sb!kernel:named-type-name host-val)
-                                         host-val)))
+    (if (typep host-val 'named-type)
+        (let ((target-val (ctype-to-core (named-type-name host-val) host-val)))
           ;; Though it looks complicated to assign cold symbols on demand,
           ;; it avoids writing code to build the layout of NAMED-TYPE in the
           ;; way we build other primordial stuff such as layout-of-layout.
@@ -1142,7 +1141,7 @@ core and return a descriptor to it."
        (cond ((dd-predicate-name (layout-info (classoid-layout classoid))))
              ;; All early INSTANCEs should be STRUCTURE-OBJECTs.
              ;; Except: see hack for CONDITIONs in CLASS-DEPTHOID.
-             ((eq type-name 'structure-object) 'sb!kernel:%instancep)))
+             ((eq type-name 'structure-object) '%instancep)))
       (built-in-classoid
        (let ((translation (specifier-type type-name)))
          (aver (not (contains-unknown-type-p translation)))
@@ -1150,7 +1149,7 @@ core and return a descriptor to it."
                                 :test #'type= :key #'car)))
            (cond (predicate (cdr predicate))
                  ((eq type-name 'stream) 'streamp)
-                 ((eq type-name 't) 'sb!int:constantly-t)
+                 ((eq type-name 't) 'constantly-t)
                  (t (error "No predicate for builtin: ~S" type-name))))))
       (null
        #+nil (format t "~&; PREDICATE-FOR-SPECIALIZER: no classoid for ~S~%"
@@ -1857,8 +1856,8 @@ core and return a descriptor to it."
 
 ;;; Handle a DEFUN in cold-load.
 (defun cold-fset (name defn &optional inline-expansion)
-  (sb!int:binding* (((cold-name warm-name)
-                     ;; (SETF f) was descriptorized when dumped, symbols were not.
+  (binding* (((cold-name warm-name)
+              ;; (SETF f) was descriptorized when dumped, symbols were not.
                      (if (symbolp name)
                          (values (cold-intern name) name)
                          (values name (warm-fun-name name))))

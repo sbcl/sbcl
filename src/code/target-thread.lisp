@@ -1229,7 +1229,7 @@ on this semaphore, then N of them is woken up."
 
 (defmacro with-new-session (args &body forms)
   (declare (ignore args))               ;for extensibility
-  (sb!int:with-unique-names (fb-name)
+  (with-unique-names (fb-name)
     `(labels ((,fb-name () ,@forms))
       (call-with-new-session (function ,fb-name)))))
 
@@ -1413,7 +1413,7 @@ session."
                  (with-new-session ()
                    (unwind-protect
                         (sb!impl::toplevel-repl nil)
-                     (sb!int:flush-standard-output-streams))))))
+                     (flush-standard-output-streams))))))
       (make-thread #'thread-repl))))
 
 

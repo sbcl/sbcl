@@ -1088,7 +1088,7 @@ register."
                  (if escaped ;; See the comment below
                      (>= pc first-elsewhere-pc)
                      (> pc first-elsewhere-pc))))
-          (declare (type sb!int:index i))
+          (declare (type index i))
           (loop
            (when (or (= i len)
                      (let ((next-pc (if elsewhere-p
@@ -2608,8 +2608,8 @@ register."
                                 '(progn
                                   (when (atom subform) (return))
                                   (let ((fm (car subform)))
-                                    (when (sb!int:comma-p fm)
-                                      (setf fm (sb!int:comma-expr fm)))
+                                    (when (comma-p fm)
+                                      (setf fm (comma-expr fm)))
                                     (cond ((consp fm)
                                            (translate1 fm (cons pos path)))
                                           ((eq 'quote fm)
@@ -2739,8 +2739,8 @@ register."
         (more-count nil))
     (unless (debug-var-info-available fun)
       (debug-signal 'no-debug-vars :debug-fun fun))
-    (sb!int:collect ((binds)
-                     (specs))
+    (collect ((binds)
+              (specs))
       (do-debug-fun-vars (var fun)
         (let ((validity (debug-var-validity var loc)))
           (unless (eq validity :invalid)
