@@ -231,6 +231,8 @@ Examples:
 ;;; Is NAME something that no conforming program can rely on
 ;;; defining?
 (defun name-reserved-by-ansi-p (name kind)
+  (declare (ignorable name kind))
+  #-sb-xc-host ; always return NIL in the cross-compiler
   (ecase kind
     (:function
      (eq (symbol-package (fun-name-block-name name))
