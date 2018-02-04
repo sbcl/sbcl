@@ -1661,16 +1661,18 @@ variable: an unreadable object representing the error is printed instead.")
                 (values "#.(~S #X~16,'0X #X~16,'0X)"
                         '%make-simd-pack-ub64 #'%simd-pack-ub64s)))
            (multiple-value-call
-            #'format stream format maker (funcall extractor pack))))
+               #'format stream format maker (funcall extractor pack))))
+        (*print-readably*
+         (print-not-readable-error pack stream))
         (t
          (print-unreadable-object (pack stream)
            (flet ((all-ones-p (value start end &aux (mask (- (ash 1 end) (ash 1 start))))
-                      (= (logand value mask) mask))
+                    (= (logand value mask) mask))
                   (split-num (value start)
-                      (loop
-                         for i from 0 to 3
-                         and v = (ash value (- start)) then (ash v -8)
-                         collect (logand v #xFF))))
+                    (loop
+                       for i from 0 to 3
+                       and v = (ash value (- start)) then (ash v -8)
+                       collect (logand v #xFF))))
              (multiple-value-bind (low high)
                  (%simd-pack-ub64s pack)
                (etypecase pack

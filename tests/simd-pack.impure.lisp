@@ -61,12 +61,39 @@
                             (multiple-value-list (sb-kernel:%simd-pack-doubles pack)))))))
 
 #+sb-simd-pack
-(with-test (:name :print-simd-pack-smoke-test)
+(with-test (:name (simd-pack print :smoke))
   (let ((packs (multiple-value-list (make-constant-packs))))
-    (format t "Standard~%~{~A~%~}" packs)
-    (let ((*print-readably* t)
-          (*read-eval* t))
-      (format t "Readably~%~{~A~%~}" packs))
-    (let ((*print-readably* t)
-          (*read-eval* nil))
-      (format t "Readably, no read-eval~%~{~A~%~}" packs))))
+    (flet ((print-them (expect)
+             (dolist (pack packs)
+               (flet ((do-it ()
+                        (with-output-to-string (stream)
+                          (write pack :stream stream :pretty t :escape nil))))
+                 (case expect
+                   (print-not-readable
+                    (assert-error (do-it) print-not-readable))
+                   (t
+                    (typecase pack
+                      ((simd-pack single-float)
+                       (if (and *print-readably*
+                                (some #'float-nan-p (multiple-value-list
+                                                     (%simd-pack-singles pack))))
+                           (assert-error (do-it) print-not-readable)
+                           (do-it)))
+                      ((simd-pack double-float)
+                       (if (and *print-readably*
+                                (some #'float-nan-p (multiple-value-list
+                                                     (%simd-pack-doubles pack))))
+                           (assert-error (do-it) print-not-readable)
+                           (do-it)))
+                      (t
+                       (do-it)))))))))
+      ;; Default
+      (print-them t)
+      ;; Readably
+      (let ((*print-readably* t)
+            (*read-eval* t))
+        (print-them t))
+      ;; Want readably but can't without *READ-EVAL*.
+      (let ((*print-readably* t)
+            (*read-eval* nil))
+        (print-them 'print-not-readable)))))
