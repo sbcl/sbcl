@@ -48,35 +48,35 @@
 ;;; as could bounds-checks (ARRAY-DIMENSION). This technique led to confusing
 ;;; code within the compiler and was abandoned in favor of the hashtable.
 
-#-sb-xc-host
-;; The target code is trivial
-(defmacro !make-specialized-array (length element-type &optional contents)
-  `(make-array ,length :element-type ,element-type
-               ,@(if contents `(:initial-contents ,contents))))
+;; Use this only for array specializations that are not required by ANSI.
+;; Because this is not performance-critical, we can just punt to a function.
+;; If no contents given, explicitly 0-fill in case element-type upgrades to T
+;; and would get a default of NIL where we would use 0 in our specialization.
+(defun !make-specialized-array (dims element-type &optional (contents nil contentsp))
+  (register-specialized-array
+   (apply #'make-array dims
+          :element-type element-type
+          (if contentsp `(:initial-contents ,contents) `(:initial-element 0)))
+   element-type))
+(defun !coerce-to-specialized (data element-type)
+  (register-specialized-array (coerce data `(simple-array ,element-type 1))
+                              element-type))
+;; The specialized array registry has file-wide scope. Hacking that aspect
+;; into the xc build scaffold seemed preferable to hacking the compiler.
+(defun register-specialized-array (array element-type)
+  (setf (gethash array sb-cold::*array-to-specialization*) element-type)
+  array)
+(defun !specialized-array-element-type (array)
+  (cond ((gethash array sb-cold::*array-to-specialization*))
+        ((bit-vector-p array) 'bit)
+        ((stringp array) 'base-char)
+        (t t)))
 
-#+sb-xc-host
-(progn
-  ;; Use this only for array specializations that are not required by ANSI.
-  (defmacro !make-specialized-array (length element-type &optional contents)
-    (once-only ((et element-type))
-      `(register-specialized-array
-        (make-array ,length :element-type ,et
-                    ,@(if contents
-                          `(:initial-contents ,contents)
-                          ;; Initialize in case it upgrades to (ARRAY T)
-                          ;; and gets filled with NIL where SBCL would 0-fill.
-                          `(:initial-element 0)))
-        ,et)))
-  (defun !coerce-to-specialized (data element-type)
-    (register-specialized-array (coerce data `(simple-array ,element-type 1))
-                                element-type))
-  ;; The specialized array registry has file-wide scope. Hacking that aspect
-  ;; into the xc build scaffold seemed preferable to hacking the compiler.
-  (defun register-specialized-array (array element-type)
-    (setf (gethash array sb-cold::*array-to-specialization*) element-type)
-    array)
-  (defun !specialized-array-element-type (array)
-    (cond ((gethash array sb-cold::*array-to-specialization*))
-          ((bit-vector-p array) 'bit)
-          ((stringp array) 'base-char)
-          (t t))))
+;; Just transform to make-array for normal target code.  This macro does not
+;; persist into the target as there is no use of it after cross-compilation.
+(setf (sb!xc:compiler-macro-function '!make-specialized-array)
+      (lambda (form env)
+        (declare (ignore env))
+        (destructuring-bind (length element-type &optional contents) (cdr form)
+          `(make-array ,length :element-type ,element-type
+                       ,@(if contents `(:initial-contents ,contents))))))

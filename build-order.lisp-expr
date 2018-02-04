@@ -131,8 +131,6 @@
  ("src/compiler/parse-lambda-list" :c-headers)
  ("src/code/restart" :not-host) ; %DEFCONSTANT can bind a restart
 
- ("src/code/specializable-array")
-
  ("src/code/early-cl")
  ("src/code/ansi-stream" :not-host)
  ("src/code/early-fasl" :c-headers)
@@ -289,6 +287,7 @@
 
  ("src/compiler/constantp" :c-headers)
  ("src/compiler/info-functions" :c-headers)
+ ("src/code/specializable-array" :not-target)
 
  ("src/compiler/generic/vm-macs" :c-headers)
  ("src/compiler/generic/objdef" :c-headers)
