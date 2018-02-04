@@ -131,8 +131,8 @@
 ;;; *DEBUGGER-HOOK*, but we want SIGINT's BREAK to respect it, so that
 ;;; SIGINT in --disable-debugger mode will cleanly terminate the system
 ;;; (by respecting the *DEBUGGER-HOOK* established in that mode).
-(eval-when (:compile-toplevel :execute)
-  (sb!xc:defmacro define-signal-handler (name what &optional (function 'error))
+(macrolet
+  ((define-signal-handler (name what &optional (function 'error))
     `(defun ,name (signal info context)
        (declare (ignore signal info))
        (declare (type system-area-pointer context))
@@ -149,6 +149,7 @@
 (define-signal-handler sigbus-handler "bus error")
 #!-(or linux android)
 (define-signal-handler sigsys-handler "bad argument to a system call")
+) ; end MACROLET
 
 (defun sigint-handler (signal info
                        sb!kernel:*current-internal-error-context*)

@@ -933,13 +933,12 @@
     (tab0 (+ location-column-width 1 label-column-width) stream)
     ))
 
-(eval-when (:compile-toplevel :execute)
-  (sb!xc:defmacro with-print-restrictions (&rest body)
-    `(let ((*print-pretty* t)
-           (*print-lines* 2)
-           (*print-length* 4)
-           (*print-level* 3))
-       ,@body)))
+(macrolet ((with-print-restrictions (&rest body)
+             `(let ((*print-pretty* t)
+                    (*print-lines* 2)
+                    (*print-length* 4)
+                    (*print-level* 3))
+                ,@body)))
 
 ;;; Print a newline to STREAM, inserting any pending notes in DSTATE
 ;;; as end-of-line comments. If there is more than one note, a
@@ -959,6 +958,11 @@
       (terpri stream))
     (fresh-line stream)
     (setf (dstate-notes dstate) nil)))
+
+(defun prin1-short (thing stream)
+  (with-print-restrictions
+    (prin1 thing stream)))
+) ; end MACROLET
 
 ;;; Print NUM instruction bytes to STREAM as hex values.
 (defun print-inst (num stream dstate &key (offset 0) (trailing-space t))
@@ -1877,10 +1881,6 @@
   (declare (type (or string function) note)
            (type disassem-state dstate))
   (setf (dstate-notes dstate) (nconc (dstate-notes dstate) (list note))))
-
-(defun prin1-short (thing stream)
-  (with-print-restrictions
-    (prin1 thing stream)))
 
 (defun prin1-quoted-short (thing stream)
   (if (self-evaluating-p thing)
