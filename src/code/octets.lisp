@@ -477,7 +477,7 @@
              (replacement-handlerify entry replacement)
              entry))))))
 
-(defun !unintern-symbols ()
+(push
   `("SB-IMPL"
     char-class char-class2 char-class3
     ,@(let (macros)
@@ -490,4 +490,5 @@
                          (eql (mismatch name "DEFINE-") 7)
                          (or (ends-with-p name "->STRING")
                              (ends-with-p name "->STRING*")))
-                (push s macros))))))))
+                (push s macros)))))))
+  sb!impl::*!removable-symbols*)

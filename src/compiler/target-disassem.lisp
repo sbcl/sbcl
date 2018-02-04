@@ -2144,7 +2144,7 @@
       (or (find repr (cdr table) :test 'equalp)
           (car (push repr (cdr table)))))))
 
-(defun !unintern-symbols ()
+(defun !remove-bootstrap-symbols ()
   ;; Remove compile-time-only metadata. This preserves compatibility with the
   ;; older disassembler macros which wrapped GEN-ARG-TYPE-DEF-FORM and such
   ;; in (EVAL-WHEN (:COMPILE-TOPLEVEL :EXECUTE)), which in turn required that
@@ -2161,13 +2161,12 @@
   ;; initial instruction space is built, so it can all be removed.
   ;; But if you need all these macros to exist for some reason,
   ;; then define one of the two following features to keep them:
-  #!+(or sb-fluid sb-retain-assembler-macros)
-  (return-from !unintern-symbols nil)
-
+  #!-(or sb-fluid sb-retain-assembler-macros)
   (do-symbols (symbol sb!assem::*backend-instruction-set-package*)
     (remf (symbol-plist symbol) 'arg-type)
-    (remf (symbol-plist symbol) 'inst-format))
+    (remf (symbol-plist symbol) 'inst-format)))
 
+(push
   ;; Get rid of functions that only make sense with metadata available.
   `("SB-DISASSEM"
     %def-arg-type %def-inst-format %gen-arg-forms
@@ -2181,4 +2180,5 @@
     gen-arg-forms make-arg-temp-bindings make-funstate massage-arg
     maybe-listify modify-arg pd-error pick-printer-choice
     preprocess-chooses preprocess-conditionals preprocess-printer
-    preprocess-test sharing-cons sharing-mapcar))
+    preprocess-test sharing-cons sharing-mapcar)
+  sb!impl::*!removable-symbols*)

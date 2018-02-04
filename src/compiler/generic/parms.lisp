@@ -244,7 +244,5 @@
   (defconstant +highest-normal-generation+ 5)
   (defconstant +pseudo-static-generation+ 6))
 
-(defun !unintern-symbols ()
-  '("SB-VM"
-    +c-callable-fdefns+
-    +common-static-symbols+))
+(push '("SB-VM" +c-callable-fdefns+ +common-static-symbols+)
+      sb!impl::*!removable-symbols*)

@@ -445,15 +445,15 @@ process to continue normally."
     (%cold-print x 0))
   (values))
 
-(in-package "SB!INT")
-(defun !unintern-symbols ()
     ;; For some reason uninterning these:
     ;;    DEF!TYPE DEF!CONSTANT DEF!STRUCT
     ;; does not work, they stick around as uninterned symbols.
     ;; Some other macros must expand into them. Ugh.
+(push
   '("SB-INT"
     defenum defun-cached with-globaldb-name
     .
     #!+sb-show ()
     #!-sb-show (/hexstr /nohexstr /noshow /noshow0 /noxhow
-                /primitive-print /show /show0 /xhow)))
+                /primitive-print /show /show0 /xhow))
+  sb!impl::*!removable-symbols*)

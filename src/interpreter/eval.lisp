@@ -244,7 +244,7 @@
         ;; affect the policy in an interpreter environment.
         (%eval form interpreter-env))))
 
-(defun !unintern-symbols ()
+(push
   (let ((this-pkg (find-package "SB-INTERPRETER")))
     `("SB-INTERPRETER"
       %%eval ; got inlined
@@ -254,4 +254,5 @@
                        (macro-function s)
                        (not (member s '(defspecial with-subforms do-decl-spec)))) ; for SB-CLTL2
               (push s macros)))
-          macros))))
+          macros)))
+  sb-impl::*!removable-symbols*)

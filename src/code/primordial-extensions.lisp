@@ -285,3 +285,5 @@
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      (sb!c::%defconstant ',name ,value (sb!c:source-location)
                          ,@(and docp `(',doc)))))
+
+(defvar *!removable-symbols* nil)
