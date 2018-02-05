@@ -469,5 +469,5 @@
     (delete-file *tmp-filename*))
   ;; Not really a test of the bugfix, but a reminder that asdf-dependency-grovel
   ;; uses this internal macro and that we should endeavor not to break the syntax.
-  (macroexpand '(sb-c::do-forms-from-info
+  (macroexpand '(sb-c:do-forms-from-info
                  ((myform myindex) my-source-info) (something))))

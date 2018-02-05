@@ -1069,7 +1069,7 @@ is supported only on simple-streams."
     (simple-stream
      (%file-position stream position))
     (ansi-stream
-     (sb-impl::ansi-stream-file-position stream position))))
+     (sb-kernel:ansi-stream-file-position stream position))))
 
 (defun file-length (stream)
   "This function returns the length of the file that File-Stream is open to."

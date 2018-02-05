@@ -1551,7 +1551,7 @@
   (labels ((fp-mode ()
              (let ((reserved-bits #+x86 (ash #b1110000011000000 16)
                                   #-x86 0))
-               (logandc2 (dpb 0 sb-vm::float-sticky-bits (sb-vm:floating-point-modes))
+               (logandc2 (dpb 0 sb-vm:float-sticky-bits (sb-vm:floating-point-modes))
                          reserved-bits)))
            (test ()
              (let* ((fp-mode (fp-mode))
@@ -1566,6 +1566,6 @@
       (test))
     (setf (sb-vm:floating-point-modes)
           (dpb sb-vm:float-divide-by-zero-trap-bit
-               sb-vm::float-traps-byte
+               sb-vm:float-traps-byte
                (sb-vm:floating-point-modes)))
     (test)))

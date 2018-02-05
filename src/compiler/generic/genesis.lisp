@@ -3070,9 +3070,9 @@ core and return a descriptor to it."
                sb!c:+backend-page-bytes+
                (- sb!vm:gc-safepoint-trap-offset)))
 
-  (dolist (symbol '(sb!vm::float-traps-byte
+  (dolist (symbol '(sb!vm:float-traps-byte
                     sb!vm::float-exceptions-byte
-                    sb!vm::float-sticky-bits
+                    sb!vm:float-sticky-bits
                     sb!vm::float-rounding-mode))
     (format t "#define ~A_POSITION ~A /* ~:*0x~X */~%"
             (c-symbol-name symbol)

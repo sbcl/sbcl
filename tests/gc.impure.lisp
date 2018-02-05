@@ -169,7 +169,7 @@
                *pin-test-object-address*))))
 
 (defun ensure-code/data-separation ()
-  (let* ((n-bits (+ sb-vm::last-free-page 10))
+  (let* ((n-bits (+ sb-vm:last-free-page 10))
          (code-bits (make-array n-bits :element-type 'bit))
          (data-bits (make-array n-bits :element-type 'bit))
          (total-code-size 0))

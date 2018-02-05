@@ -199,10 +199,34 @@
 (progn
   (load "src/code/shaketree")
   (sb-impl::shake-packages
-   (lambda (symbol)
-     ;; Retain all symbols satisfying this predicate
-     (or (sb-kernel:symbol-info symbol)
-         (and (boundp symbol) (not (keywordp symbol))))))
+   ;; Retain all symbols satisfying this predicate
+   (lambda (symbol accessibility)
+     (case (symbol-package symbol)
+      (#.(find-package "SB-VM")
+       (or (eq accessibility :external)
+           ;; overapproximate what we need for contribs and tests
+           (member symbol '(sb-vm::map-referencing-objects
+                            sb-vm::map-stack-references
+                            sb-vm::primitive-object-size))
+           (search "-OFFSET" (string symbol))
+           (search "-TN" (string symbol))))
+      ((#.(find-package "SB-C")
+        #.(find-package "SB-ASSEM")
+        #.(find-package "SB-DISASSEM")
+        #.(find-package "SB-FASL")
+        #.(find-package "SB-IMPL")
+        #.(find-package "SB-KERNEL"))
+       ;; Assume all and only external symbols must be retained
+       (eq accessibility :external))
+      (#.(find-package "SB-BIGNUM")
+       ;; bignum has 1 important external symbol for sb-gmp.
+       ;; Other externals can disappear.
+       (member symbol '(sb-bignum:%allocate-bignum)))
+      (t
+       ;; By default, retain any symbol with any attachments
+       (or (sb-kernel:symbol-info symbol)
+           (and (boundp symbol) (not (keywordp symbol)))))))
+   :verbose t :print nil)
   (unintern 'sb-impl::shake-packages 'sb-impl))
 
 ;;; Use historical (stupid) behavior for storing pathname namestrings

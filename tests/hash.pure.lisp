@@ -45,11 +45,11 @@
   ;; but it's best to verify the assumption that each cons bumps the count
   ;; by 1, lest it be violated in a way that affects the quality of CTYPE
   ;; hashes.
-  (let ((win 0) (n-trials 10) (prev (sb-impl::address-based-counter-val)))
+  (let ((win 0) (n-trials 10) (prev (sb-int:address-based-counter-val)))
     (dotimes (i n-trials)
       (declare (notinline cons)) ; it's flushable, but don't flush it
       (cons 1 2)
-      (let ((ptr (sb-impl::address-based-counter-val)))
+      (let ((ptr (sb-int:address-based-counter-val)))
         (when (= ptr (1+ prev))
           (incf win))
         (setq prev ptr)))

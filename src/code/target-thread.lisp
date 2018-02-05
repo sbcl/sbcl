@@ -1515,7 +1515,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
            (real-function (coerce function 'function))
            (arguments     (ensure-list arguments))
            #!+(or win32 darwin)
-           (fp-modes (dpb 0 sb!vm::float-sticky-bits ;; clear accrued bits
+           (fp-modes (dpb 0 sb!vm:float-sticky-bits ;; clear accrued bits
                           (sb!vm:floating-point-modes))))
       (declare (dynamic-extent setup-sem))
       (dx-flet ((initial-thread-function ()

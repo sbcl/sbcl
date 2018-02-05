@@ -202,7 +202,7 @@ sets the floating point modes to their current values (and thus is a no-op)."
        ;; Reset the accumulated exceptions, may be needed on other
        ;; platforms too, at least Linux doesn't seem to require it.
        #!+(or sunos (and hppa linux))
-       (setf (ldb sb!vm::float-sticky-bits (floating-point-modes)) 0)
+       (setf (ldb sb!vm:float-sticky-bits (floating-point-modes)) 0)
        (error (or (cdr (assoc code +sigfpe-code-error-alist+))
                   'floating-point-exception)
               :operation op

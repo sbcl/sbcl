@@ -821,7 +821,7 @@
                      (make-double-float #x1fffff #xfffffffe)
                      #!+long-float
                      (error "(/ least-positive-long-float long-float-epsilon)")))
-                   (traps (ldb sb!vm::float-sticky-bits
+                   (traps (ldb sb!vm:float-sticky-bits
                                (sb!vm:floating-point-modes))))
                 ;; Overflow raised or (underflow raised and rho <
                 ;; lambda/eps)

@@ -107,7 +107,7 @@
            (multiple-value-bind (op operands)
                (sb!di::decode-arithmetic-error-operands context-sap)
              ;; Reset the accumulated exceptions
-             (setf (ldb sb!vm::float-sticky-bits (sb!vm:floating-point-modes)) 0)
+             (setf (ldb sb!vm:float-sticky-bits (sb!vm:floating-point-modes)) 0)
              (error condition-name :operation op
                                    :operands operands)))
           ((eq condition-name 'memory-fault-error)

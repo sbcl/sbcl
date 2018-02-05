@@ -403,7 +403,7 @@ appear."
          (sb-c::lambda-var
           (setf binding :lexical
                 localp t
-                ignorep (sb-c::lambda-var-ignorep var)))
+                ignorep (sb-c:lambda-var-ignorep var)))
          ;; FIXME: IGNORE doesn't make sense for specials or constants
          ;; -- though it is _possible_ to declare them ignored, but
          ;; we don't keep the information around.
