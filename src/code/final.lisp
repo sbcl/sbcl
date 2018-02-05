@@ -287,14 +287,14 @@ Examples:
       (sb!thread:make-mutex :name "finalizer"))
   (define-load-time-global *finalizer-queue*
       (sb!thread:make-waitqueue :name "finalizer")))
-#!-sb-thread
-(defconstant *finalizer-thread* nil)
 
 (defun run-pending-finalizers ()
   (when (hash-table-culled-values (finalizer-id-map **finalizer-store**))
-    (cond ((%instancep *finalizer-thread*)
+    (cond #!+sb-thread
+          ((%instancep *finalizer-thread*)
            (sb!thread::with-system-mutex (*finalizer-queue-lock*)
              (sb!thread:condition-notify *finalizer-queue*)))
+          #!+sb-thread
           ((eq *finalizer-thread* t) ; Create a new thread
            (sb!thread:make-thread
             (lambda ()
