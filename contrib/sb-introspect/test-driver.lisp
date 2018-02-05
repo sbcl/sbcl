@@ -768,3 +768,7 @@
      (car (sb-introspect:find-definition-sources-by-name
            'cl-user::with-a-local-function :function)))
   0)
+
+(deftest object-size
+    (plusp (sb-introspect::object-size #'print-object))
+  t)

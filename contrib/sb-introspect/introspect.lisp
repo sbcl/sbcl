@@ -1017,7 +1017,7 @@ Experimental: interface subject to change."
   (+ (sb-vm::primitive-object-size object)
      (typecase object
        (sb-mop:funcallable-standard-object
-        (primitive-object-size
+        (sb-vm::primitive-object-size
          (sb-pcl::standard-funcallable-instance-clos-slots object)))
        (standard-object
         (sb-vm::primitive-object-size
