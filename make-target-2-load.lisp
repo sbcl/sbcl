@@ -219,9 +219,10 @@
        ;; Assume all and only external symbols must be retained
        (eq accessibility :external))
       (#.(find-package "SB-BIGNUM")
-       ;; bignum has 1 important external symbol for sb-gmp.
+       ;; There are 2 important external symbols for sb-gmp.
        ;; Other externals can disappear.
-       (member symbol '(sb-bignum:%allocate-bignum)))
+       (member symbol '(sb-bignum:%allocate-bignum
+                        sb-bignum:make-small-bignum)))
       (t
        ;; By default, retain any symbol with any attachments
        (or (sb-kernel:symbol-info symbol)
