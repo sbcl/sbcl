@@ -33,6 +33,11 @@ echo //entering finalize.test.sh
 
 (gc :full t)
 (gc :full t)
+;; Stopping the finalizer thread ensures that queued finalizers execute.
+;; [I don't think it's possible for it to stop before draining the queue,
+;; but that isn't part of the contract with stopping. If this test fails,
+;; try inserting a call to RUN-PENDING-FINALIZERS after this line]
+(sb-impl::finalizer-thread-stop)
 
 (if (= *count* 10000)
     (with-open-file (f "finalize-test-passed" :direction :output)

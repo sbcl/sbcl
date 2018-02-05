@@ -182,7 +182,7 @@
   ;; -- WHN 19991204
   (/show0 "doing cold toplevel forms and fixups")
   (unless (!c-runtime-noinform-p)
-    (write `("Length(TLFs)= " ,(length *!cold-toplevels*)))
+    (write `("Length(TLFs)=" ,(length *!cold-toplevels*)) :escape nil)
     (terpri))
   ;; only the basic external formats are present at this point.
   (setq sb!impl::*default-external-format* :latin-1)
@@ -356,6 +356,7 @@ process to continue normally."
   (if (or abort *exit-in-process*)
       (os-exit (or code 1) :abort t)
       (let ((code (or code 0)))
+        #!+sb-thread (finalizer-thread-stop)
         (with-deadline (:seconds nil :override t)
           (sb!thread:grab-mutex *exit-lock*))
         (setf *exit-in-process* code

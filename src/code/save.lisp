@@ -222,6 +222,11 @@ sufficiently motivated to do lengthy fixes."
     (labels ((restart-lisp ()
                (handling-end-of-the-world
                  (reinit)
+                 ;; REINIT can not discern between a restarted image and a
+                 ;; failure to save. It doesn't make a lot of sense to start
+                 ;; a finalizer thread in the failed case, so we set the flag
+                 ;; here, not in REINIT which would do it for both cases.
+                 #+sb-thread (setq *finalizer-thread* t)
                  #+hpux (%primitive sb-vm::setup-return-from-lisp-stub)
                  (funcall toplevel)))
              (foreign-bool (value)
@@ -292,6 +297,10 @@ sufficiently motivated to do lengthy fixes."
   (call-hooks "save" *save-hooks*)
   #+sb-wtimer
   (itimer-emulation-deinit)
+  ;; Terminate finalizer thread now, especially given that the thread runs
+  ;; user-supplied code that might not even work in later steps of deinit.
+  ;; See also the comment at definition of THREAD-EPHEMERAL-P.
+  #+sb-thread (finalizer-thread-stop)
   (let ((threads (sb-thread:list-all-threads)))
     (unless (= 1 (length threads))
       (let* ((interactive (sb-thread::interactive-threads))

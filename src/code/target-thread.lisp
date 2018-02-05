@@ -210,9 +210,12 @@ potentially stale even before the function returns, as the thread may exit at
 any time."
   (thread-%alive-p thread))
 
+;; NB: ephemeral threads must terminate strictly before the test of NTHREADS>1
+;; in DEINIT, i.e. this is not a promise that the thread will terminate
+;; just-in-time for the final call out to save, but rather by an earlier time.
 (defun thread-ephemeral-p (thread)
   "Return T if THREAD is `ephemeral', which indicates that this thread is
-used by SBCL for internal purposes, and specifically that it knows how to
+used by SBCL for internal purposes, and specifically that our runtime knows how
 to terminate this thread cleanly prior to core file saving without signalling
 an error in that case."
   (thread-%ephemeral-p thread))
