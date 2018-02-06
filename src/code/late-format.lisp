@@ -188,6 +188,7 @@
     (catch 'need-orig-args
       (let* ((*simple-args* nil)
              (*only-simple-args* t)
+             (control-string (coerce control-string 'simple-string))
              (guts (expand-control-string control-string)) ; can throw
              (required nil)
              (optional nil))

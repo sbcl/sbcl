@@ -66,3 +66,17 @@
     (format s "~/sb-ext:print-symbol-with-prefix/" 'cl-user::test)
     (sb-int:unencapsulate 'sb-ext:print-symbol-with-prefix 'test)
     (assert (string= "{{COMMON-LISP-USER::TEST}}" (get-output-stream-string s)))))
+
+(with-test (:name :non-simple-string)
+  (let ((control (make-array 2 :element-type 'base-char
+                               :initial-element #\A
+                               :fill-pointer 1)))
+    (checked-compile-and-assert
+        ()
+        `(lambda () (with-output-to-string (stream)
+                      (funcall (formatter ,control) stream)))
+      (() "A" :test #'equal))
+    (checked-compile-and-assert
+        ()
+        `(lambda () (format nil ,control))
+      (() "A" :test #'equal))))

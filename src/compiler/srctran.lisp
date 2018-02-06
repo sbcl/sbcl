@@ -4639,7 +4639,7 @@
 (deftransform format ((stream control &rest args) (null (constant-arg string) &rest string))
   (let ((tokenized
           (handler-case
-              (sb!format::tokenize-control-string (lvar-value control))
+              (sb!format::tokenize-control-string (coerce (lvar-value control) 'simple-string))
             (sb!format:format-error ()
               (give-up-ir1-transform)))))
     (unless (concatenate-format-p tokenized args)
