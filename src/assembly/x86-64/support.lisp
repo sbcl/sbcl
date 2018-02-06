@@ -11,14 +11,18 @@
 
 (defun invoke-asm-routine (inst routine vop temp-reg)
   (declare (ignorable vop))
-  (cond #!+immobile-code
-        ((sb!c::code-immobile-p (sb!c::vop-node vop))
-         (setq temp-reg (make-fixup routine :assembly-routine)))
-        (t
-         (inst mov temp-reg (make-fixup routine :assembly-routine))))
-  (ecase inst
-   (jmp  (inst jmp temp-reg))
-   (call (inst call temp-reg))))
+  (declare (ignore temp-reg))
+  (let ((where
+         (cond #!+immobile-code
+               ((sb!c::code-immobile-p (sb!c::vop-node vop))
+                (make-fixup routine :assembly-routine))
+               (t
+                (make-ea :qword
+                         :disp (make-fixup routine :assembly-routine
+                                           -8))))))
+    (ecase inst
+      (jmp  (inst jmp where))
+      (call (inst call where)))))
 
 (defun generate-call-sequence (name style vop options)
   ;; It will be nice if we can eliminate the global assumption that

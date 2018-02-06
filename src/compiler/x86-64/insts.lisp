@@ -2288,7 +2288,8 @@
 
 (define-instruction call (segment where)
   (:printer near-jump ((op #xE8)))
-  (:printer reg/mem-default-qword ((op '(#b11111111 #b010))))
+  (:printer reg/mem-default-qword ((op '(#b11111111 #b010))
+                                   (reg/mem nil :printer #'print-jmp-ea)))
   (:emitter
    (typecase where
      (label
@@ -2309,7 +2310,8 @@
   ;; unconditional jumps
   (:printer short-jump ((op #b1011)))
   (:printer near-jump ((op #xE9)))
-  (:printer reg/mem-default-qword ((op '(#b11111111 #b100))))
+  (:printer reg/mem-default-qword ((op '(#b11111111 #b100))
+                                   (reg/mem nil :printer #'print-jmp-ea)))
   (:emitter
    (cond (where
           (emit-chooser

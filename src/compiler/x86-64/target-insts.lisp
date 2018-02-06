@@ -132,6 +132,14 @@
   (print-reg/mem-with-width
    value (inst-operand-size-default-qword dstate) t stream dstate))
 
+(defun print-jmp-ea (value stream dstate)
+  (print-sized-reg/mem-default-qword value stream dstate)
+  (when (and (not (machine-ea-base value))
+             (not (machine-ea-index value)))
+    (let ((addr (machine-ea-disp value)))
+      (awhen (sb!disassem::find-assembler-routine (+ addr 8))
+             (note (lambda (stream) (princ it stream)) dstate)))))
+
 (defun print-sized-byte-reg/mem (value stream dstate)
   (print-reg/mem-with-width value :byte t stream dstate))
 
@@ -275,7 +283,7 @@
                (or (minusp disp)
                    (nth-value 1 (note-code-constant-absolute disp dstate))
                    (maybe-note-assembler-routine disp nil dstate)
-                   ;; Static symbols coming frorm CELL-REF
+                   ;; Static symbols coming from CELL-REF
                    (maybe-note-static-symbol (+ disp (- other-pointer-lowtag
                                                         n-word-bytes))
                                              dstate)))

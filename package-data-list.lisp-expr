@@ -3016,6 +3016,7 @@ structure representations"
                "CLOSURE-HEADER-WIDETAG" ; don't use
                "CLOSURE-WIDETAG"
                "CLOSURE-INFO-OFFSET"
+               "CODE-COMPONENT-SIZE"
                "CODE-CODE-SIZE-SLOT" "CODE-CONSTANTS-OFFSET"
                "CODE-DEBUG-INFO-SLOT"
                "CODE-HEADER-WIDETAG" "COMPLEX-ARRAY-WIDETAG"
