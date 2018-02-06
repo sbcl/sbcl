@@ -2112,6 +2112,12 @@ core and return a descriptor to it."
               #!+x86-64
               (member flavor '(:named-call :layout :immobile-object
                                :assembly-routine :static-call)))
+             #!+x86-64
+             (:absolute64
+              (setf (bvref-64 gspace-data gspace-byte-offset)
+                    (the (unsigned-byte 64) addr))
+              ;; Never record it. (FIXME: this is a problem for relocatable heap)
+              nil)
              (:relative ; (used for arguments to X86 relative CALL instruction)
               (setf (bvref-32 gspace-data gspace-byte-offset)
                     (the (signed-byte 32)
