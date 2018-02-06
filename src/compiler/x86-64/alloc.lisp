@@ -128,12 +128,13 @@
     (:results (result :scs (descriptor-reg) :from :load))
     (:arg-types positive-fixnum positive-fixnum positive-fixnum)
     (:policy :fast-safe)
+    (:node-var node)
     (:generator 100
       ;; The LET generates instructions that needn't be pseudoatomic
       ;; so don't move it inside.
       (let ((size (calc-size-in-bytes words result)))
         (pseudo-atomic
-         (allocation result size nil nil other-pointer-lowtag)
+         (allocation result size node nil other-pointer-lowtag)
          (put-header result type length t)))))
 
   (define-vop (allocate-vector-on-stack)
