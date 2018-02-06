@@ -159,7 +159,7 @@
   ;; However that comment seems inapplicable here because:
   ;; - PAD-DATA-BLOCK quite clearly enforces double-word alignment,
   ;;   contradicting "... unfortunately not enforced by ..."
-  ;; - It's not the job of WITH-FIXED-ALLOCATION to realign anything.
+  ;; - It's not the job of FIXED-ALLOC to realign anything.
   ;; - The real issue is that it's not obvious that the stack is
   ;;   16-byte-aligned at *all* times. Maybe it is, maybe it isn't.
   (inst and rsp-tn #.(lognot lowtag-mask))
@@ -265,18 +265,14 @@
 ;;; Allocate an other-pointer object of fixed SIZE with a single word
 ;;; header having the specified WIDETAG value. The result is placed in
 ;;; RESULT-TN.
-(defmacro with-fixed-allocation ((result-tn widetag size &optional inline stack-allocate-p)
-                                 &body forms)
-  (unless forms
-    (bug "empty &body in WITH-FIXED-ALLOCATION"))
+(defmacro fixed-alloc (result-tn widetag size node &optional stack-allocate-p)
   (once-only ((result-tn result-tn) (size size) (stack-allocate-p stack-allocate-p))
     `(maybe-pseudo-atomic ,stack-allocate-p
-      (allocation ,result-tn (pad-data-block ,size) ,inline ,stack-allocate-p
+      (allocation ,result-tn (pad-data-block ,size) ,node ,stack-allocate-p
                   other-pointer-lowtag)
       (storew* (logior (ash (1- ,size) n-widetag-bits) ,widetag)
                ,result-tn 0 other-pointer-lowtag
-               (not ,stack-allocate-p))
-      ,@forms)))
+               (not ,stack-allocate-p)))))
 
 ;;;; error code
 (defun emit-error-break (vop kind code values)

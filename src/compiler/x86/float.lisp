@@ -412,11 +412,7 @@
   (:node-var node)
   (:note "float to pointer coercion")
   (:generator 13
-     (with-fixed-allocation (y
-                             single-float-widetag
-                             single-float-size node)
-       ;; w-f-a checks for empty body
-       nil)
+     (fixed-alloc y single-float-widetag single-float-size node)
      (with-tn@fp-top(x)
        (inst fst (ea-for-sf-desc y)))))
 (define-move-vop move-from-single :move
@@ -428,11 +424,7 @@
   (:node-var node)
   (:note "float to pointer coercion")
   (:generator 13
-     (with-fixed-allocation (y
-                             double-float-widetag
-                             double-float-size
-                             node)
-       nil)
+     (fixed-alloc y double-float-widetag double-float-size node)
      (with-tn@fp-top(x)
        (inst fstd (ea-for-df-desc y)))))
 (define-move-vop move-from-double :move
@@ -445,11 +437,7 @@
   (:node-var node)
   (:note "float to pointer coercion")
   (:generator 13
-     (with-fixed-allocation (y
-                             long-float-widetag
-                             long-float-size
-                             node)
-       nil)
+     (fixed-alloc y long-float-widetag long-float-size node)
      (with-tn@fp-top(x)
        (store-long-float (ea-for-lf-desc y)))))
 #!+long-float
@@ -522,16 +510,13 @@
   (:node-var node)
   (:note "complex float to pointer coercion")
   (:generator 13
-    (with-fixed-allocation (y
-                            complex-single-float-widetag
-                            complex-single-float-size
-                            node)
-      (let ((real-tn (complex-single-reg-real-tn x)))
-        (with-tn@fp-top(real-tn)
-          (inst fst (ea-for-csf-real-desc y))))
-      (let ((imag-tn (complex-single-reg-imag-tn x)))
-        (with-tn@fp-top(imag-tn)
-          (inst fst (ea-for-csf-imag-desc y)))))))
+    (fixed-alloc y complex-single-float-widetag complex-single-float-size node)
+    (let ((real-tn (complex-single-reg-real-tn x)))
+      (with-tn@fp-top(real-tn)
+        (inst fst (ea-for-csf-real-desc y))))
+    (let ((imag-tn (complex-single-reg-imag-tn x)))
+      (with-tn@fp-top(imag-tn)
+        (inst fst (ea-for-csf-imag-desc y))))))
 (define-move-vop move-from-complex-single :move
   (complex-single-reg) (descriptor-reg))
 
@@ -541,16 +526,13 @@
   (:node-var node)
   (:note "complex float to pointer coercion")
   (:generator 13
-     (with-fixed-allocation (y
-                             complex-double-float-widetag
-                             complex-double-float-size
-                             node)
-       (let ((real-tn (complex-double-reg-real-tn x)))
-         (with-tn@fp-top(real-tn)
-           (inst fstd (ea-for-cdf-real-desc y))))
-       (let ((imag-tn (complex-double-reg-imag-tn x)))
-         (with-tn@fp-top(imag-tn)
-           (inst fstd (ea-for-cdf-imag-desc y)))))))
+     (fixed-alloc y complex-double-float-widetag complex-double-float-size node)
+     (let ((real-tn (complex-double-reg-real-tn x)))
+       (with-tn@fp-top(real-tn)
+         (inst fstd (ea-for-cdf-real-desc y))))
+     (let ((imag-tn (complex-double-reg-imag-tn x)))
+       (with-tn@fp-top(imag-tn)
+         (inst fstd (ea-for-cdf-imag-desc y))))))
 (define-move-vop move-from-complex-double :move
   (complex-double-reg) (descriptor-reg))
 
@@ -561,16 +543,13 @@
   (:node-var node)
   (:note "complex float to pointer coercion")
   (:generator 13
-     (with-fixed-allocation (y
-                             complex-long-float-widetag
-                             complex-long-float-size
-                             node)
-       (let ((real-tn (complex-long-reg-real-tn x)))
-         (with-tn@fp-top(real-tn)
-           (store-long-float (ea-for-clf-real-desc y))))
-       (let ((imag-tn (complex-long-reg-imag-tn x)))
-         (with-tn@fp-top(imag-tn)
-           (store-long-float (ea-for-clf-imag-desc y)))))))
+     (fixed-alloc y complex-long-float-widetag complex-long-float-size node)
+     (let ((real-tn (complex-long-reg-real-tn x)))
+       (with-tn@fp-top(real-tn)
+         (store-long-float (ea-for-clf-real-desc y))))
+     (let ((imag-tn (complex-long-reg-imag-tn x)))
+       (with-tn@fp-top(imag-tn)
+         (store-long-float (ea-for-clf-imag-desc y))))))
 #!+long-float
 (define-move-vop move-from-complex-long :move
   (complex-long-reg) (descriptor-reg))

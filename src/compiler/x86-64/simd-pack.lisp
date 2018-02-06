@@ -87,23 +87,20 @@
   (:node-var node)
   (:note "SSE to pointer coercion")
   (:generator 13
-     (with-fixed-allocation (y
-                             simd-pack-widetag
-                             simd-pack-size
-                             node)
+     (fixed-alloc y simd-pack-widetag simd-pack-size node)
        ;; see *simd-pack-element-types*
-       (storew (fixnumize
-                (sc-case x
-                  (single-sse-reg 1)
-                  (double-sse-reg 2)
-                  (int-sse-reg 0)
-                  (t 0)))
-           y simd-pack-tag-slot other-pointer-lowtag)
-       (let ((ea (make-ea-for-object-slot
-                  y simd-pack-lo-value-slot other-pointer-lowtag)))
-         (if (float-sse-p x)
-             (inst movaps ea x)
-             (inst movdqa ea x))))))
+     (storew (fixnumize
+              (sc-case x
+                (single-sse-reg 1)
+                (double-sse-reg 2)
+                (int-sse-reg 0)
+                (t 0)))
+         y simd-pack-tag-slot other-pointer-lowtag)
+     (let ((ea (make-ea-for-object-slot
+                y simd-pack-lo-value-slot other-pointer-lowtag)))
+       (if (float-sse-p x)
+           (inst movaps ea x)
+           (inst movdqa ea x)))))
 (define-move-vop move-from-sse :move
   (int-sse-reg single-sse-reg double-sse-reg) (descriptor-reg))
 
@@ -183,17 +180,11 @@
   (:result-types t)
   (:node-var node)
   (:generator 13
-    (with-fixed-allocation (dst
-                            simd-pack-widetag
-                            simd-pack-size
-                            node)
+    (fixed-alloc dst simd-pack-widetag simd-pack-size node)
       ;; see *simd-pack-element-types*
-      (storew tag
-          dst simd-pack-tag-slot other-pointer-lowtag)
-      (storew lo
-          dst simd-pack-lo-value-slot other-pointer-lowtag)
-      (storew hi
-          dst simd-pack-hi-value-slot other-pointer-lowtag))))
+    (storew tag dst simd-pack-tag-slot other-pointer-lowtag)
+    (storew lo dst simd-pack-lo-value-slot other-pointer-lowtag)
+    (storew hi dst simd-pack-hi-value-slot other-pointer-lowtag)))
 
 (define-vop (%make-simd-pack-ub64)
   (:translate %make-simd-pack-ub64)
