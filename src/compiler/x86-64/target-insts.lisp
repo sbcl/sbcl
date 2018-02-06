@@ -134,7 +134,8 @@
 
 (defun print-jmp-ea (value stream dstate)
   (print-sized-reg/mem-default-qword value stream dstate)
-  (when (and (not (machine-ea-base value))
+  (when (and (not (integerp value))
+             (not (machine-ea-base value))
              (not (machine-ea-index value)))
     (let ((addr (machine-ea-disp value)))
       (awhen (sb!disassem::find-assembler-routine (+ addr 8))
