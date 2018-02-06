@@ -7,7 +7,7 @@ changes relative to sbcl-1.4.4:
     thread so that a user thread which invokes GC is unblocked from performing
     work as soon it returns from GC and invokes any post-GC hooks.
     As such, it is more important than before to avoid assumptions about
-    special variables bindings in finalizers even in single-threaded code.
+    special variable bindings in finalizers, even in single-threaded code.
 
 changes in sbcl-1.4.4 relative to sbcl-1.4.3:
   * bug fix: pathname accessors such as PATHNAME-DIRECTORY work on
