@@ -62,13 +62,6 @@
 (defmacro popw (ptr &optional (slot 0) (lowtag 0))
   `(inst pop (make-ea-for-object-slot ,ptr ,slot ,lowtag)))
 
-(defun call-indirect (offset)
-  (typecase offset
-    ((signed-byte 32)
-     (inst call (make-ea :qword :disp offset)))
-    (t
-     (inst mov temp-reg-tn offset)
-     (inst call (make-ea :qword :base temp-reg-tn)))))
 
 ;;;; macros to generate useful values
 
