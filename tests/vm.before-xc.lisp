@@ -39,7 +39,7 @@
 (dotimes (i (ash 1 6))
   (labels ((make-tns (n)
              (mapcar 'copy-structure
-                     (subseq `sb-vm::(,rax-tn ,rbx-tn ,rcx-tn) 0 n)))
+                     (subseq `(,sb-vm::rax-tn ,sb-vm::rbx-tn ,sb-vm::rcx-tn) 0 n)))
            (link (list)
              (when list
                (setf (sb-c::tn-next (car list)) (link (cdr list)))
