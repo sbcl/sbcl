@@ -723,7 +723,7 @@
                           (if atsign "+" "")))
              (signlen (length signstr)))
         (multiple-value-bind (str strlen ig2 ig3 pointplace)
-            (sb!impl::flonum-to-string number nil d nil)
+            (sb!impl::flonum-to-string (abs number) nil d nil)
           (declare (ignore ig2 ig3 strlen))
           (when colon
             (write-string signstr stream))

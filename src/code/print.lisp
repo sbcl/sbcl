@@ -1184,9 +1184,6 @@ variable: an unreadable object representing the error is printed instead.")
 
 (defun flonum-to-string (x &optional width fdigits scale fmin)
   (declare (type float x))
-  ;; FIXME: I think only FORMAT-DOLLARS calls FLONUM-TO-STRING with
-  ;; possibly-negative X.
-  (setf x (abs x))
   (multiple-value-bind (e string)
       (if fdigits
           (flonum-to-digits x (min (- (+ fdigits (or scale 0)))
