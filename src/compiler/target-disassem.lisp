@@ -637,8 +637,7 @@
                         (setf (dstate-next-offs dstate)
                               (+ (dstate-cur-offs dstate)
                                  (inst-length inst)))
-                        (let ((orig-next (dstate-next-offs dstate))
-                              (control (inst-control inst)))
+                        (let ((orig-next (dstate-next-offs dstate)))
                           (when stream
                             (print-inst (inst-length inst) stream dstate
                                         :trailing-space nil))
@@ -682,9 +681,8 @@
                               (incf prefix-len (+ (inst-length inst)
                                                   suffix-len)))
                             (if prefix-p
-                                (let ((name (inst-print-name inst)))
-                                  (when name
-                                    (push name prefix-print-names)))
+                                (awhen (inst-print-name inst)
+                                  (push it prefix-print-names))
                                 (progn
                                   ;; PREFIX-LEN includes the length of the
                                   ;; current (non-prefix) instruction here.
@@ -695,8 +693,8 @@
 
                           (funcall function chunk inst)
 
-                          (when control
-                            (funcall control chunk inst stream dstate))))))))))
+                          (awhen (inst-control inst)
+                            (funcall it chunk inst stream dstate))))))))))
 
       (setf (dstate-cur-offs dstate) (dstate-next-offs dstate))
 
