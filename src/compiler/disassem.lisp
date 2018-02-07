@@ -355,9 +355,11 @@
         ',format-name ',include ,length-in-bits nil
         ,@(mapcar (lambda (arg) `(list ',(car arg) ,@(massage-arg arg :compile)))
                   arg-specs)))
-     ,@(mapcan
-        (lambda (arg-spec)
-          (awhen (getf (cdr arg-spec) :reader)
+     #-sb-xc-host ; Host doesn't execute any stuff that comes with
+     (progn       ; format definitions, including dchunk readers
+      ,@(mapcan
+         (lambda (arg-spec)
+           (awhen (getf (cdr arg-spec) :reader)
             `((defun ,it (dchunk dstate)
                 (declare (ignorable dchunk dstate))
                 (flet ((local-filtered-value (offset)
@@ -380,12 +382,11 @@
                                 (expr (arg-value-form arg funstate :numeric)))
                            `(let* ,(make-arg-temp-bindings funstate) ,expr))))
                     (reader)))))))
-        arg-specs)
-     #-sb-xc-host ; Host doesn't need the real definition.
-     (%def-inst-format
-      ',format-name ',include ,length-in-bits ,default-printer
-      ,@(mapcar (lambda (arg) `(list ',(car arg) ,@(massage-arg arg :eval)))
-                arg-specs))))
+         arg-specs)
+      (%def-inst-format
+       ',format-name ',include ,length-in-bits ,default-printer
+       ,@(mapcar (lambda (arg) `(list ',(car arg) ,@(massage-arg arg :eval)))
+                 arg-specs)))))
 
 (defun %def-inst-format (name inherit length printer &rest arg-specs)
   (let ((args (if inherit (copy-list (format-args (format-or-lose inherit)))))
