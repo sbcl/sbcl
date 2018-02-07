@@ -37,8 +37,6 @@
   (defparameter sb!assem::*backend-instruction-set-package*
     (find-package #.(sb-cold::backend-asm-package-name))))
 
-(defvar *disassem-inst-space* nil)
-
 ;; How many columns of output to allow for the address preceding each line.
 ;; If NIL, use the minimum possible width for the disassembly range.
 ;; If 0, do not print addresses.
@@ -154,56 +152,6 @@
   (declare (type dchunk x))
   (logcount x))
 
-(defstruct (instruction (:conc-name inst-)
-                        (:constructor
-                         make-instruction (name format-name print-name
-                                           length mask id printer labeller
-                                           prefilters control))
-                        (:copier nil))
-  (name nil :type (or symbol string) :read-only t)
-  (format-name nil :type (or symbol string) :read-only t)
-
-  (mask dchunk-zero :type dchunk :read-only t)   ; bits in the inst that are constant
-  (id dchunk-zero :type dchunk :read-only t)     ; value of those constant bits
-
-  (length 0 :type disassem-length :read-only t)  ; in bytes
-
-  (print-name nil :type symbol :read-only t)
-
-  ;; disassembly "functions"
-  (prefilters nil :type list :read-only t)
-  (labeller nil :type (or list vector) :read-only t)
-  (printer nil :type (or null function) :read-only t)
-  (control nil :type (or null function) :read-only t)
-
-  ;; instructions that are the same as this instruction but with more
-  ;; constraints
-  (specializers nil :type list))
-(declaim (freeze-type instruction))
-(defmethod print-object ((inst instruction) stream)
-  (print-unreadable-object (inst stream :type t :identity t)
-    (format stream "~A(~A)" (inst-name inst) (inst-format-name inst))))
-
-;;;; an instruction space holds all known machine instructions in a
-;;;; form that can be easily searched
-
-(defstruct (inst-space (:conc-name ispace-)
-                       (:copier nil))
-  (valid-mask dchunk-zero :type dchunk) ; applies to *children*
-  (choices nil :type list))
-(declaim (freeze-type inst-space))
-(defmethod print-object ((ispace inst-space) stream)
-  (print-unreadable-object (ispace stream :type t :identity t)))
-
-;;; now that we've defined the structure, we can declaim the type of
-;;; the variable:
-(declaim (type (or null inst-space) *disassem-inst-space*))
-
-(defstruct (inst-space-choice (:conc-name ischoice-)
-                              (:copier nil))
-  (common-id dchunk-zero :type dchunk)  ; applies to *parent's* mask
-  (subspace (missing-arg) :type (or inst-space instruction)))
-
 (defstruct (arg (:constructor %make-arg (name))
                 (:copier nil)
                 (:predicate nil))
@@ -938,23 +886,6 @@
            (compile-test subj key funstate))
           (t
            (pd-error "bogus test-form: ~S" test)))))
-
-(defun compute-mask-id (args)
-  (let ((mask dchunk-zero)
-        (id dchunk-zero))
-    (dolist (arg args (values mask id))
-      (let ((av (arg-value arg)))
-        (when av
-          (do ((fields (arg-fields arg) (cdr fields))
-               (values (if (atom av) (list av) av) (cdr values)))
-              ((null fields))
-            (let ((field-mask (dchunk-make-mask (car fields))))
-              (when (/= (dchunk-and mask field-mask) dchunk-zero)
-                (pd-error "The field ~S in arg ~S overlaps some other field."
-                          (car fields)
-                          (arg-name arg)))
-              (dchunk-insertf id (car fields) (car values))
-              (dchunk-orf mask field-mask))))))))
 
 #!-sb-fluid (declaim (inline bytes-to-bits))
 (declaim (maybe-inline sign-extend aligned-p align tab tab0))

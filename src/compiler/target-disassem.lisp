@@ -15,6 +15,36 @@
 ;;;; would use the SB!DI package. And some more would go away if it would
 ;;;; use SB!SYS (in order to get to the SAP-FOO operators).
 
+(defstruct (instruction (:conc-name inst-)
+                        (:constructor
+                         make-instruction (name format-name print-name
+                                           length mask id printer labeller
+                                           prefilters control))
+                        (:copier nil))
+  (name nil :type (or symbol string) :read-only t)
+  (format-name nil :type (or symbol string) :read-only t)
+
+  (mask dchunk-zero :type dchunk :read-only t)   ; bits in the inst that are constant
+  (id dchunk-zero :type dchunk :read-only t)     ; value of those constant bits
+
+  (length 0 :type disassem-length :read-only t)  ; in bytes
+
+  (print-name nil :type symbol :read-only t)
+
+  ;; disassembly "functions"
+  (prefilters nil :type list :read-only t)
+  (labeller nil :type (or list vector) :read-only t)
+  (printer nil :type (or null function) :read-only t)
+  (control nil :type (or null function) :read-only t)
+
+  ;; instructions that are the same as this instruction but with more
+  ;; constraints
+  (specializers nil :type list))
+(declaim (freeze-type instruction))
+(defmethod print-object ((inst instruction) stream)
+  (print-unreadable-object (inst stream :type t :identity t)
+    (format stream "~A(~A)" (inst-name inst) (inst-format-name inst))))
+
 ;;;; combining instructions where one specializes another
 
 ;;; Return non-NIL if the instruction SPECIAL is a more specific
@@ -89,6 +119,27 @@
           (return spec)))
       inst))
 
+;;;; an instruction space holds all known machine instructions in a
+;;;; form that can be easily searched
+
+(defstruct (inst-space (:conc-name ispace-)
+                       (:copier nil))
+  (valid-mask dchunk-zero :type dchunk) ; applies to *children*
+  (choices nil :type list))
+(declaim (freeze-type inst-space))
+(defmethod print-object ((ispace inst-space) stream)
+  (print-unreadable-object (ispace stream :type t :identity t)))
+
+;;; now that we've defined the structure, we can declaim the type of
+;;; the variable:
+(defglobal *disassem-inst-space* nil)
+(declaim (type (or null inst-space) *disassem-inst-space*))
+
+(defstruct (inst-space-choice (:conc-name ischoice-)
+                              (:copier nil))
+  (common-id dchunk-zero :type dchunk)  ; applies to *parent's* mask
+  (subspace (missing-arg) :type (or inst-space instruction)))
+
 ;;;; searching for an instruction in instruction space
 
 ;;; Return the instruction object within INST-SPACE corresponding to the
@@ -761,6 +812,23 @@
                   (format nil "L~W" max)))))
       (setf (dstate-labels dstate) labels))))
 
+(defun compute-mask-id (args)
+  (let ((mask dchunk-zero)
+        (id dchunk-zero))
+    (dolist (arg args (values mask id))
+      (let ((av (arg-value arg)))
+        (when av
+          (do ((fields (arg-fields arg) (cdr fields))
+               (values (if (atom av) (list av) av) (cdr values)))
+              ((null fields))
+            (let ((field-mask (dchunk-make-mask (car fields))))
+              (when (/= (dchunk-and mask field-mask) dchunk-zero)
+                (pd-error "The field ~S in arg ~S overlaps some other field."
+                          (car fields)
+                          (arg-name arg)))
+              (dchunk-insertf id (car fields) (car values))
+              (dchunk-orf mask field-mask))))))))
+
 (defun collect-inst-variants (base-name package variants cache)
   (loop for printer in variants
         for index from 1
