@@ -21,7 +21,7 @@
                                            length mask id printer labeller
                                            prefilters control))
                         (:copier nil))
-  (name nil :type (or symbol string) :read-only t)
+  (name nil :type symbol :read-only t)
   (format-name nil :type (or symbol string) :read-only t)
 
   (mask dchunk-zero :type dchunk :read-only t)   ; bits in the inst that are constant
@@ -834,8 +834,7 @@
      (destructuring-bind (format-name
                           (&rest arg-constraints)
                           &optional (printer :default)
-                          &key (print-name
-                                (without-package-locks (intern base-name package)))
+                          &key (print-name (intern (string-upcase base-name) package))
                                control)
          printer
        (declare (type (or symbol string) print-name))
@@ -869,9 +868,7 @@
     (do-symbols (symbol package)
       (awhen (get symbol 'instruction-flavors)
         (setf (get symbol 'instruction-flavors)
-              (collect-inst-variants
-               (logically-readonlyize (string-upcase symbol))
-               package it cache))))
+              (collect-inst-variants symbol package it cache))))
     (unless (sb!impl::!c-runtime-noinform-p)
       (apply 'format t
              "~&Disassembler: ~D printers, ~D prefilters, ~D labelers~%"
