@@ -510,6 +510,7 @@
  ;; the host lisp have setf expanders rather than setf functions).
  ("src/compiler/late-vmdef")
 
+ ("src/compiler/target-dstate" :not-host)
  ("src/compiler/target/insts")
  ("src/compiler/target/macros")
  ("src/compiler/generic/pinned-objects")
