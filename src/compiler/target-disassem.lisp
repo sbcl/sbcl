@@ -2234,19 +2234,7 @@
     (remf (symbol-plist symbol) 'arg-type)
     (remf (symbol-plist symbol) 'inst-format)))
 
-(push
-  ;; Get rid of functions that only make sense with metadata available.
-  `("SB-DISASSEM"
-    %def-arg-type %def-inst-format %gen-arg-forms
-    all-arg-refs-relevant-p arg-or-lose arg-position arg-value-form
-    collect-labelish-operands collect-prefiltering-args
-    compare-fields-form compile-inst-printer compile-print
-    compile-printer-body compile-printer-list compile-test
-    correct-dchunk-bytespec-for-endianness
-    define-arg-type define-instruction-format
-    find-first-field-name find-printer-fun format-or-lose
-    gen-arg-forms make-arg-temp-bindings make-funstate massage-arg
-    maybe-listify modify-arg pd-error pick-printer-choice
-    preprocess-chooses preprocess-conditionals preprocess-printer
-    preprocess-test sharing-cons sharing-mapcar)
-  sb!impl::*!removable-symbols*)
+;; Remove macros that only make sense with metadata available.
+;; Tree shaker will remove everything that the macros depended on.
+(push '("SB-DISASSEM" define-arg-type define-instruction-format)
+      sb!impl::*!removable-symbols*)
