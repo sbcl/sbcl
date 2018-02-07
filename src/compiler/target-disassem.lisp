@@ -354,6 +354,13 @@
   (- offset (seg-initial-offset segment)))
 
 
+;;; Is ADDRESS aligned on a SIZE byte boundary?
+(declaim (inline aligned-p))
+(defun aligned-p (address size)
+  (declare (type address address)
+           (type alignment size))
+  (zerop (logand (1- size) address)))
+
 #!-(or x86 x86-64)
 (defun lra-hook (chunk stream dstate)
   (declare (type dchunk chunk)
@@ -399,6 +406,13 @@
   (incf (dstate-next-offs dstate)
         (words-to-bytes sb!vm:simple-fun-code-offset)))
 
+;;; Return ADDRESS aligned *upward* to a SIZE byte boundary.
+(declaim (inline align-up))
+(defun align-up (address size)
+  (declare (type address address)
+           (type alignment size))
+  (logandc1 (1- size) (+ (1- size) address)))
+
 (defun alignment-hook (chunk stream dstate)
   (declare (type dchunk chunk)
            (ignore chunk)
@@ -414,7 +428,7 @@
                 (dstate-argument-column dstate)
                 alignment))
       (incf (dstate-next-offs dstate)
-            (- (align location alignment) location)))
+            (- (align-up location alignment) location)))
     nil))
 
 (defun rewind-current-segment (dstate segment)

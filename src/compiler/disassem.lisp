@@ -888,7 +888,7 @@
            (pd-error "bogus test-form: ~S" test)))))
 
 #!-sb-fluid (declaim (inline bytes-to-bits))
-(declaim (maybe-inline sign-extend aligned-p align tab tab0))
+(declaim (maybe-inline sign-extend tab tab0))
 
 (defun bytes-to-bits (bytes)
   (declare (type disassem-length bytes))
@@ -908,18 +908,6 @@
   (if (logbitp (1- size) int)
       (dpb int (byte size 0) -1)
       int))
-
-;;; Is ADDRESS aligned on a SIZE byte boundary?
-(defun aligned-p (address size)
-  (declare (type address address)
-           (type alignment size))
-  (zerop (logand (1- size) address)))
-
-;;; Return ADDRESS aligned *upward* to a SIZE byte boundary.
-(defun align (address size)
-  (declare (type address address)
-           (type alignment size))
-  (logandc1 (1- size) (+ (1- size) address)))
 
 (defun tab (column stream)
   (funcall (formatter "~V,1t") stream column)
