@@ -22,7 +22,7 @@
   (import '(sb!vm::frame-byte-offset
             sb!vm::registers sb!vm::float-registers sb!vm::stack))) ; SB names
 
-(setf *disassem-inst-alignment-bytes* 1)
+(defconstant +disassem-inst-alignment-bytes+ 1)
 
 ;;; This type is used mostly in disassembly and represents legacy
 ;;; registers only. R8-R15 are handled separately.

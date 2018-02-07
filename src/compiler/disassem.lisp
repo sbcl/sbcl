@@ -39,10 +39,6 @@
 
 (defvar *disassem-inst-space* nil)
 
-;;; minimum alignment of instructions, in bytes
-(defvar *disassem-inst-alignment-bytes* sb!vm:n-word-bytes)
-(declaim (type alignment *disassem-inst-alignment-bytes*))
-
 ;; How many columns of output to allow for the address preceding each line.
 ;; If NIL, use the minimum possible width for the disassembly range.
 ;; If 0, do not print addresses.

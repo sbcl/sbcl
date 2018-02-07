@@ -137,7 +137,7 @@
 
 ;;;; Initial disassembler setup.
 
-(setf *disassem-inst-alignment-bytes* 4)
+(defconstant +disassem-inst-alignment-bytes+ 4)
 
 (defvar *disassem-use-lisp-reg-names* t)
 
