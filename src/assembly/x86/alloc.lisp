@@ -56,13 +56,12 @@
   (def edi)
   (def esi))
 
-;;; FIXME: This is dead, right? Can it go?
 #+sb-assembling
 (defun frob-allocation-assembly-routine (obj lowtag arg-tn)
   `(define-assembly-routine (,(intern (format nil "ALLOCATE-~A-TO-~A" obj arg-tn)))
      ((:temp ,arg-tn descriptor-reg ,(intern (format nil "~A-OFFSET" arg-tn))))
      (pseudo-atomic
-      (allocation ,arg-tn (pad-data-block ,(intern (format nil "~A-SIZE" obj))))
+      (allocation ,arg-tn (pad-data-block ,(intern (format nil "~A-SIZE" obj))) nil)
       (inst lea ,arg-tn (make-ea :byte :base ,arg-tn :disp ,lowtag)))))
 
 #+sb-assembling

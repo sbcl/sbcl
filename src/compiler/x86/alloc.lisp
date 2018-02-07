@@ -11,6 +11,165 @@
 
 (in-package "SB!VM")
 
+;;;; allocation helpers
+
+;;; Allocation within alloc_region (which is thread local) can be done
+;;; inline.  If the alloc_region is overflown allocation is done by
+;;; calling the C alloc() function.
+
+;;; C calls for allocation don't /seem/ to make an awful lot of
+;;; difference to speed. On pure consing it's about a 25%
+;;; gain. Guessing from historical context, it looks like inline
+;;; allocation was introduced before pseudo-atomic, at which time all
+;;; calls to alloc() would have needed a syscall to mask signals for
+;;; the duration.  Now we have pseudoatomic there's no need for that
+;;; overhead.
+
+(defun allocation-dynamic-extent (alloc-tn size lowtag)
+  (aver (not (location= alloc-tn esp-tn)))
+  (inst sub esp-tn size)
+  ;; FIXME: SIZE _should_ be double-word aligned (suggested but
+  ;; unfortunately not enforced by PAD-DATA-BLOCK and
+  ;; FIXED-ALLOC), so that ESP is always divisible by 8 (for
+  ;; 32-bit lispobjs).  In that case, this AND instruction is
+  ;; unneccessary and could be removed.  If not, explain why.  -- CSR,
+  ;; 2004-03-30
+  (inst and esp-tn (lognot lowtag-mask))
+  (inst lea alloc-tn (make-ea :byte :base esp-tn :disp lowtag))
+  (values))
+
+(defun allocation-notinline (alloc-tn size)
+  (let* ((alloc-tn-offset (tn-offset alloc-tn))
+         ;; C call to allocate via dispatch routines. Each
+         ;; destination has a special entry point. The size may be a
+         ;; register or a constant.
+         (tn-text (ecase alloc-tn-offset
+                    (#.eax-offset "eax")
+                    (#.ecx-offset "ecx")
+                    (#.edx-offset "edx")
+                    (#.ebx-offset "ebx")
+                    (#.esi-offset "esi")
+                    (#.edi-offset "edi")))
+         (size-text (case size (8 "8_") (16 "16_") (t ""))))
+    (unless (or (eql size 8) (eql size 16))
+      (unless (and (tn-p size) (location= alloc-tn size))
+        (inst mov alloc-tn size)))
+    (inst call (make-fixup (concatenate 'string
+                                         "alloc_" size-text
+                                         "to_" tn-text)
+                           :foreign))))
+
+(defun allocation-inline (alloc-tn size)
+  (let* ((ok (gen-label))
+         (done (gen-label))
+         #!+(and sb-thread win32)
+         (scratch-tns (loop for my-tn in `(,eax-tn ,ebx-tn ,edx-tn ,ecx-tn)
+                            when (and (not (location= alloc-tn my-tn))
+                                      (or (not (tn-p size))
+                                          (not (location= size my-tn))))
+                            collect my-tn))
+         (tls-prefix #!+sb-thread :fs)
+         #!+(and sb-thread win32) (scratch-tn (pop scratch-tns))
+         #!+(and sb-thread win32) (swap-tn (pop scratch-tns))
+         (free-pointer
+           ;; thread->alloc_region.free_pointer
+           (make-ea :dword
+                    :base (or #!+(and sb-thread win32)
+                              scratch-tn)
+                    :disp
+                    #!+sb-thread (* n-word-bytes thread-alloc-region-slot)
+                    #!-sb-thread (make-fixup "gc_alloc_region" :foreign)))
+         (end-addr
+            ;; thread->alloc_region.end_addr
+           (make-ea :dword
+                    :base (or #!+(and sb-thread win32)
+                              scratch-tn)
+                    :disp
+                    #!+sb-thread (* n-word-bytes (1+ thread-alloc-region-slot))
+                    #!-sb-thread (make-fixup "gc_alloc_region" :foreign 4))))
+    (unless (and (tn-p size) (location= alloc-tn size))
+      (inst mov alloc-tn size))
+    #!+(and sb-thread win32)
+    (progn
+      (inst push scratch-tn)
+      (inst push swap-tn)
+      (inst mov scratch-tn
+            (make-ea :dword :disp
+                     +win32-tib-arbitrary-field-offset+) tls-prefix)
+      (setf tls-prefix nil))
+    (inst add alloc-tn free-pointer tls-prefix)
+    (inst cmp alloc-tn end-addr tls-prefix)
+    (inst jmp :be ok)
+    (let ((dst (ecase (tn-offset alloc-tn)
+                 (#.eax-offset "alloc_overflow_eax")
+                 (#.ecx-offset "alloc_overflow_ecx")
+                 (#.edx-offset "alloc_overflow_edx")
+                 (#.ebx-offset "alloc_overflow_ebx")
+                 (#.esi-offset "alloc_overflow_esi")
+                 (#.edi-offset "alloc_overflow_edi"))))
+      (inst call (make-fixup dst :foreign)))
+    (inst jmp-short done)
+    (emit-label ok)
+    ;; Swap ALLOC-TN and FREE-POINTER
+    (cond ((and (tn-p size) (location= alloc-tn size))
+           ;; XCHG is extremely slow, use the xor swap trick
+           #!-(and sb-thread win32)
+           (progn
+             (inst xor alloc-tn free-pointer tls-prefix)
+             (inst xor free-pointer alloc-tn tls-prefix)
+             (inst xor alloc-tn free-pointer tls-prefix))
+           #!+(and sb-thread win32)
+           (progn
+             (inst mov swap-tn free-pointer tls-prefix)
+             (inst mov free-pointer alloc-tn tls-prefix)
+             (inst mov alloc-tn swap-tn)))
+          (t
+           ;; It's easier if SIZE is still available.
+           (inst mov free-pointer alloc-tn tls-prefix)
+           (inst sub alloc-tn size)))
+    (emit-label done)
+    #!+(and sb-thread win32)
+    (progn
+      (inst pop swap-tn)
+      (inst pop scratch-tn))
+    (values)))
+
+;;; Emit code to allocate an object with a size in bytes given by
+;;; SIZE.  The size may be an integer or a TN. If Inline is a VOP
+;;; node-var then it is used to make an appropriate speed vs size
+;;; decision.
+
+;;; Allocation should only be used inside a pseudo-atomic section, which
+;;; should also cover subsequent initialization of the object.
+
+;;; (FIXME: so why aren't we asserting this?)
+
+(defun allocation (alloc-tn size node &optional dynamic-extent lowtag)
+  (declare (ignorable node))
+  (cond
+    (dynamic-extent
+     (allocation-dynamic-extent alloc-tn size lowtag))
+    ;; Inline allocation can't work if (and (not sb-thread) sb-dynamic-core)
+    ;; because boxed_region points to the linkage table, not the alloc region.
+    #!+(or sb-thread (not sb-dynamic-core))
+    ((or (null node) (policy node (>= speed space)))
+     (allocation-inline alloc-tn size))
+    (t
+     (allocation-notinline alloc-tn size)))
+  (when (and lowtag (not dynamic-extent))
+    (inst lea alloc-tn (make-ea :byte :base alloc-tn :disp lowtag)))
+  (values))
+
+;;; Allocate an other-pointer object of fixed SIZE with a single word
+;;; header having the specified WIDETAG value. The result is placed in
+;;; RESULT-TN.
+(defun fixed-alloc (result-tn widetag size node &optional stack-allocate-p)
+  (maybe-pseudo-atomic stack-allocate-p
+      (allocation result-tn (pad-data-block size) node stack-allocate-p
+                  other-pointer-lowtag)
+      (storew (logior (ash (1- size) n-widetag-bits) widetag)
+              result-tn 0 other-pointer-lowtag)))
+
 ;;;; CONS, LIST and LIST*
 (define-vop (list-or-list*)
   (:args (things :more t))
@@ -77,6 +236,7 @@
               positive-fixnum
               positive-fixnum)
   (:policy :fast-safe)
+  (:node-var node)
   (:generator 100
     (let ((size (sc-case words
                   (immediate
@@ -92,7 +252,7 @@
                    (inst and result (lognot lowtag-mask))
                    result))))
       (pseudo-atomic
-       (allocation result size)
+       (allocation result size node)
        (inst lea result (make-ea :byte :base result :disp other-pointer-lowtag))
        (sc-case type
          (immediate
