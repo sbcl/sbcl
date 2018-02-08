@@ -1123,3 +1123,8 @@
                                (setf (aref p i)
                                      (ignore-errors i)))))
                         :allow-warnings t))))
+
+(with-test (:name :call-type-validation)
+  (checked-compile
+   `(lambda ()
+      (funcall (the (or cons function) *debugger-hook*)))))

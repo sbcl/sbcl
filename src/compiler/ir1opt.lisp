@@ -1096,9 +1096,6 @@
   (let* ((where (when fun (leaf-where-from fun)))
          (same-file-p (eq :defined-here where)))
     (cond ((not (fun-type-p type))
-           (aver (multiple-value-bind (val win)
-                     (csubtypep type (specifier-type 'function))
-                   (or val (not win))))
            ;; Using the defined-type too early is a bit of a waste: during
            ;; conversion we cannot use the untrusted ASSERT-CALL-TYPE, etc.
            (when (and fun (not ir1-converting-not-optimizing-p))
@@ -1154,8 +1151,7 @@
        (multiple-value-bind (leaf info)
            (let* ((uses (lvar-uses fun-lvar))
                   (leaf (when (ref-p uses) (ref-leaf uses))))
-             (validate-call-type call (or (lvar-fun-type fun-lvar)
-                                          (lvar-type fun-lvar)) leaf))
+             (validate-call-type call (lvar-fun-type fun-lvar) leaf))
          (cond ((functional-p leaf)
                 (convert-call-if-possible
                  (lvar-uses (basic-combination-fun call))
