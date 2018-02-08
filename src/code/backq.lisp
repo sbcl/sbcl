@@ -11,8 +11,6 @@
 
 (in-package "SB!IMPL")
 
-(/show0 "entering backq.lisp")
-
 ;; An unquoting COMMA struct.
 (defstruct (comma (:constructor unquote (expr &optional (kind 0)))
                   #+sb-xc-host (:include structure!object)
@@ -40,8 +38,6 @@
 (defvar *backquote-depth* 0 "how deep we are into backquotes")
 (defvar *bq-error* "Comma not inside a backquote.")
 
-(/show0 "backq.lisp 50")
-
 ;;; the actual character macro
 (defun backquote-charmacro (stream char)
   (declare (ignore char))
@@ -53,8 +49,6 @@
         (simple-reader-error
          stream "~S is not a well-formed backquote expression" result)
         result)))
-
-(/show0 "backq.lisp 64")
 
 (defun comma-charmacro (stream char)
   (declare (ignore char))
@@ -75,8 +69,6 @@
                            (svref #("comma" "comma-dot" "comma-at") flag)))
     (unquote (let ((*backquote-depth* (1- *backquote-depth*)))
                (read stream t nil t)) flag)))
-
-(/show0 "backq.lisp 83")
 
 ;; KLUDGE: 'sfunction' is not a defined type yet.
 (declaim (ftype (function (t fixnum boolean) (values t t &optional))
@@ -139,8 +131,6 @@
                                (t 'unquote*))
                          subexpr)
                    operator)))))
-
-(/show0 "backq.lisp 139")
 
 ;; Find the longest suffix comprised wholly of self-evaluating and/or quoted
 ;; SUBFORMS. DOTTED-P indicates that the last item represents what was in the
@@ -335,5 +325,3 @@
 #+sb-xc-host ; proper definition happens for the target
 (defun simple-reader-error (stream format-string &rest format-args)
   (error "READER-ERROR on stream ~S: ~?" stream format-string format-args))
-
-(/show0 "done with backq.lisp")

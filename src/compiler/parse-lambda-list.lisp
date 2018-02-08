@@ -9,8 +9,6 @@
 
 (in-package "SB!C")
 
-(/show0 "parse-lambda-list.lisp 12")
-
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defconstant-eqx lambda-list-parser-states
     #(:required &optional &rest &more &key &aux &environment &whole
@@ -1168,7 +1166,6 @@
               ;; MACROLET doesn't produce an object capable of reflection,
               ;; so don't bother inserting a different lambda-list.
               ,@(unless (eq kind 'macrolet)
-
                   `((declare ,declared-lambda-list)))
               ,@(if outer-decls (list outer-decls))
               ,@(and (not env) (eq envp t) `((declare (ignore ,@ll-env))))
@@ -1212,5 +1209,3 @@
          ;; It is harmful to the space-saving effect of this function
          ;; if reconstituting the list results in an unnecessary copy.
          (if (equal new lambda-list) lambda-list new))))))
-
-(/show0 "parse-lambda-list.lisp end of file")

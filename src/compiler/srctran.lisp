@@ -79,7 +79,6 @@
 ;;; Don't transform CAD*R, they are treated specially for &more args
 ;;; optimizations
 
-(/show0 "about to set CxR source transforms")
 (loop for i of-type index from 2 upto 4 do
       ;; Iterate over BUF = all names CxR where x = an I-element
       ;; string of #\A or #\D characters.
@@ -96,7 +95,6 @@
                           :test #'equal)
             (setf (info :function :source-transform (intern buf))
                   #'source-transform-cxr)))))
-(/show0 "done setting CxR source transforms")
 
 ;;; Turn FIRST..FOURTH and REST into the obvious synonym, assuming
 ;;; whatever is right for them is right for us. FIFTH..TENTH turn into

@@ -18,7 +18,6 @@
 ;; but it's compiled after this file is.
 (!defglobal *user-hash-table-tests* nil)
 
-(sb!int::/show0 "fdefinition.lisp 22")
 
 ;;;; fdefinition (fdefn) objects
 
