@@ -49,6 +49,17 @@
   (declare (type reg value) (type disassem-state dstate))
   (if (dstate-getprop dstate +rex-b+) (+ value 8) value))
 
+;; This reader extracts the 'imm' operand in "MOV reg,imm" format.
+;; KLUDGE: the REG instruction format can not define a reader
+;; because it has no field specification and no prefilter.
+;; (It's specified directly in the MOV instruction definition)
+(defun reg-imm-data (dchunk dstate) dchunk
+  (aref (sb!disassem::dstate-filtered-values dstate) 4))
+
+(defun regrm-inst-reg (dchunk dstate)
+  (logior (if (logtest (sb!disassem::dstate-inst-properties dstate) +rex-r+) 8 0)
+          (!regrm-inst-reg dchunk dstate)))
+
 (defstruct (machine-ea (:include sb!disassem::filtered-arg)
                        (:copier nil)
                        (:predicate nil)
@@ -133,13 +144,7 @@
    value (inst-operand-size-default-qword dstate) t stream dstate))
 
 (defun print-jmp-ea (value stream dstate)
-  (print-sized-reg/mem-default-qword value stream dstate)
-  (when (and (not (integerp value))
-             (not (machine-ea-base value))
-             (not (machine-ea-index value)))
-    (let ((addr (machine-ea-disp value)))
-      (awhen (sb!disassem::find-assembler-routine (+ addr 8))
-             (note (lambda (stream) (princ it stream)) dstate)))))
+  (print-sized-reg/mem-default-qword value stream dstate))
 
 (defun print-sized-byte-reg/mem (value stream dstate)
   (print-reg/mem-with-width value :byte t stream dstate))
@@ -390,7 +395,7 @@
        ;; But ordinarily we get the string. Either way, the r/m arg reveals the
        ;; EA calculation. DCHUNK-ZERO is a meaningless value - any would do -
        ;; because the EA was computed in a prefilter.
-       (print-mem-ref :compute (reg-r/m-inst-r/m-arg dchunk-zero dstate)
+       (print-mem-ref :compute (regrm-inst-r/m dchunk-zero dstate)
                       width stream dstate)
        (setq addr value)
        (when (stringp value) (setq fmt "= ~A"))))

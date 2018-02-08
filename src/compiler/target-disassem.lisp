@@ -1892,8 +1892,10 @@
 
 (defglobal *assembler-routines-by-addr* nil)
 
-;;; Return the name of the primitive Lisp assembler routine or foreign
-;;; symbol located at ADDRESS, or NIL if there isn't one.
+;;; Return the name of the primitive Lisp assembler routine that contains
+;;; ADDRESS, or foreign symbol located at ADDRESS, or NIL if there isn't one.
+;;; If found, and the answer is an assembler routine, also return the displacement
+;;; from the start of the containing routine as a secondary value.
 (defun find-assembler-routine (address &aux (addr->name *assembler-routines-by-addr*))
   (declare (type address address))
   (when (null addr->name)
@@ -1918,7 +1920,20 @@
                       sb!c:+backend-page-bytes+
                       (- sb!vm:gc-safepoint-trap-offset)) addr->name)
           "safepoint"))
-  (gethash address addr->name))
+  (let ((found (gethash address addr->name)))
+    (cond (found
+           (values found 0))
+          (t
+           (let* ((code sb!fasl::*assembler-routines*)
+                  (start (sap-int (code-instructions code)))
+                  (end (+ start (1- (%code-code-size code)))))
+             (when (<= start address end) ; it has to be an asm routine
+               (let ((me (- address start)))
+                 (dohash ((name locs) (car (%code-debug-info code)))
+                   (when (<= (car locs) me (cdr locs))
+                     (return-from find-assembler-routine
+                      (values name (- address (+ start (car locs))))))))))
+           (values nil nil)))))
 
 ;;;; some handy function for machine-dependent code to use...
 
@@ -2042,15 +2057,19 @@
   (declare (type disassem-state dstate))
   (unless (typep address 'address)
     (return-from maybe-note-assembler-routine nil))
-  (let ((name (or
-               (find-assembler-routine address)
-               #!+linkage-table
-               (sap-foreign-symbol (int-sap address)))))
-    (unless (null name)
-      (note (lambda (stream)
-              (if note-address-p
-                  (format stream "#x~8,'0x: ~a" address name)
-                  (princ name stream)))
+  (multiple-value-bind (name offs) (find-assembler-routine address)
+    #!+linkage-table
+    (unless name
+      (setq name (sap-foreign-symbol (int-sap address))))
+    (when name
+      (when (eql offs 0)
+        (setq offs nil))
+      (note (cond (note-address-p
+                   (format nil "#x~8,'0x: ~a~@[ +~d~]" address name offs))
+                  (offs
+                   (format nil "~a +~d" name offs))
+                  (t
+                   (string name)))
             dstate))
     name))
 

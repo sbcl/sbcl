@@ -385,14 +385,15 @@
   (accum :type 'accum)
   (imm))
 
+(declaim (inline !regrm-inst-reg))
 (define-instruction-format (reg-reg/mem 16
                                         :default-printer
                                         `(:name :tab reg ", " reg/mem))
   (op      :field (byte 7 1))
   (width   :field (byte 1 0)    :type 'width)
   (reg/mem :fields (list (byte 2 14) (byte 3 8))
-           :type 'reg/mem :reader reg-r/m-inst-r/m-arg)
-  (reg     :field (byte 3 11)   :type 'reg)
+           :type 'reg/mem :reader regrm-inst-r/m)
+  (reg     :field (byte 3 11)   :type 'reg :reader !regrm-inst-reg)
   ;; optional fields
   (imm))
 
@@ -438,7 +439,8 @@
                                         :default-printer
                                         '(:name :tab reg/mem ", " imm))
   (reg/mem :type 'sized-reg/mem)
-  (imm     :type 'signed-imm-data/asm-routine))
+  (imm     :type 'signed-imm-data/asm-routine
+           :reader reg/mem-imm-data))
 
 ;;; Same as reg/mem, but with using the accumulator in the default printer
 (define-instruction-format
@@ -1479,7 +1481,7 @@
            (t
             (error "bogus arguments to MOV: ~S ~S" dst src))))))
 
-(define-instruction qword (segment qword)
+(define-instruction quad (segment qword)
   (:emitter
    (etypecase qword
      (integer (emit-qword segment qword))
