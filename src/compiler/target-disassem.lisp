@@ -414,8 +414,9 @@
         (words-to-bytes sb!vm:simple-fun-code-offset)))
 
 ;;; Return ADDRESS aligned *upward* to a SIZE byte boundary.
-(declaim (inline align-up))
-(defun align-up (address size)
+;;; KLUDGE: should be ALIGN-UP but old Slime uses it
+(declaim (inline align))
+(defun align (address size)
   (declare (type address address)
            (type alignment size))
   (logandc1 (1- size) (+ (1- size) address)))
@@ -435,7 +436,7 @@
                 (dstate-argument-column dstate)
                 alignment))
       (incf (dstate-next-offs dstate)
-            (- (align-up location alignment) location)))
+            (- (align location alignment) location)))
     nil))
 
 (defun rewind-current-segment (dstate segment)
