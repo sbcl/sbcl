@@ -19,9 +19,15 @@
 (with-test (:name :pprint-dispatch-order-preserving)
   (let ((tbl (sb-pretty::make-pprint-dispatch-table)))
     (handler-bind ((warning #'muffle-warning)) ; nonexistent types
-      (set-pprint-dispatch 'foo1 #'pprint-fill 5 tbl)
-      (set-pprint-dispatch 'fool #'pprint-fill 0 tbl)
-      (set-pprint-dispatch 'foo2 #'pprint-fill 5 tbl))
+      ;; use EVAL because there are *two* warnings to muffle: first time
+      ;; is when the compiler sees a symbol used as an unknown type-specifier,
+      ;; then again when SET-PPRINT-DISPATCH can't associate to a known type.
+      ;; The latter is handled by the HANDLER-BIND, but the former is issued
+      ;; by the compiler when it digests these forms. I do not know why
+      ;; (DECLARE (MUFFLE-CONDITIONS STYLE-WARNING) doesn't work for that.
+      (set-pprint-dispatch (eval ''foo1) #'pprint-fill 5 tbl)
+      (set-pprint-dispatch (eval ''fool) #'pprint-fill 0 tbl)
+      (set-pprint-dispatch (eval ''foo2) #'pprint-fill 5 tbl))
     (let ((entries (sb-pretty::pp-dispatch-entries tbl)))
       (assert (equal (mapcar #'sb-pretty::pprint-dispatch-entry-type entries)
                      '(foo1 foo2 fool))))))
