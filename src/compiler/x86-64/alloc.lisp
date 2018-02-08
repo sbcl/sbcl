@@ -121,11 +121,11 @@
                (inst mov alloc-tn temp-reg-tn))
            (assemble (*elsewhere*)
              (emit-label NOT-INLINE)
-             (cond ((numberp size)
-                    (allocation-tramp temp-reg-tn size nil))
-                   (t
+             (cond ((and (tn-p size) (location= size alloc-tn)) ; recover SIZE
                     (inst sub alloc-tn free-pointer)
-                    (allocation-tramp temp-reg-tn alloc-tn nil)))
+                    (allocation-tramp temp-reg-tn alloc-tn nil))
+                   (t ; SIZE is intact
+                    (allocation-tramp temp-reg-tn size nil)))
              (inst jmp DONE))))
     (values)))
 
