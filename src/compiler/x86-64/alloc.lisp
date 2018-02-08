@@ -525,16 +525,32 @@
                  ;; XXX: should layout fixups use a name, not a layout object?
                  (make-fixup type :layout))))))))
 
+;;; Allocate a non-vector variable-length object.
+;;; Exactly 4 allocators are rendered via this vop:
+;;;  BIGNUM               (%ALLOCATE-BIGNUM)
+;;;  FUNCALLABLE-INSTANCE (%MAKE-FUNCALLABLE-INSTANCE)
+;;;  CLOSURE              (%COPY-CLOSURE)
+;;;  INSTANCE             (%MAKE-INSTANCE)
+;;; WORDS accounts for the mandatory slots *including* the header.
+;;; EXTRA is the variable payload, also measured in words.
 (define-vop (var-alloc)
   (:args (extra :scs (any-reg)))
   (:arg-types positive-fixnum)
   (:info name words type lowtag)
   (:ignore name)
   (:results (result :scs (descriptor-reg) :from (:eval 1)))
-  (:temporary (:sc any-reg :from :eval :to (:eval 1)) bytes)
-  (:temporary (:sc any-reg :from :eval :to :result) header)
+  (:temporary (:sc unsigned-reg :from :eval :to (:eval 1)) bytes)
+  (:temporary (:sc unsigned-reg :from :eval :to :result) header)
   (:node-var node)
   (:generator 50
+   ;; With the exception of bignums, these objects have effectively
+   ;; 32-bit headers because the high half contains other data.
+   (multiple-value-bind (bytes header extra)
+      (if (= type bignum-widetag)
+          (values bytes header extra)
+          (values (reg-in-size bytes  :dword)
+                  (reg-in-size header :dword)
+                  (reg-in-size extra  :dword)))
     (inst lea bytes
           (make-ea :qword :disp (* (1+ words) n-word-bytes) :index extra
                    :scale (ash 1 (- word-shift n-fixnum-tag-bits))))
@@ -543,10 +559,9 @@
     (inst lea header                    ; (w-1 << 8) | type
           (make-ea :qword :base header
                    :disp (+ (ash -2 n-widetag-bits) type)))
-    (inst and bytes (lognot lowtag-mask))
+    (inst and bytes (lognot lowtag-mask)))
     (pseudo-atomic
-     (allocation result bytes node)
-     (inst lea result (make-ea :byte :base result :disp lowtag))
+     (allocation result bytes node nil lowtag)
      (storew header result 0 lowtag))))
 
 #!+immobile-space
