@@ -1106,10 +1106,20 @@
         (concatenate '(and string (satisfies eval)) x))))
 
 (with-test (:name :make-array-transform-deletion-notes)
-  (assert (null (nth-value 4
-                           (checked-compile
-                            `(lambda (vector)
-                               (let* ((length (length vector))
-                                      (new (make-array length :adjustable t
-                                                              :fill-pointer length)))
-                                 new)))))))
+  (checked-compile
+   `(lambda (vector)
+      (let* ((length (length vector))
+             (new (make-array length :adjustable t
+                                     :fill-pointer length)))
+        new))
+   :allow-notes nil))
+
+(with-test (:name :ltn-analyze-cast-unlink)
+  (assert (nth-value 1 (checked-compile
+                        `(lambda (n)
+                           (* 2 n)
+                           (let ((p (make-array n :element-type 'double-float)))
+                             (dotimes (i n)
+                               (setf (aref p i)
+                                     (ignore-errors i)))))
+                        :allow-warnings t))))

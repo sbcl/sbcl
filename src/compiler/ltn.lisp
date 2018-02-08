@@ -877,7 +877,7 @@
     (labels ((unlink (lvar)
                (do-uses (node lvar)
                  (if (cast-p node)
-                     (unlink (cast-value cast))
+                     (unlink (cast-value node))
                      (setf (node-lvar node) nil)))))
       (unlink (cast-value cast))))
   (values))
