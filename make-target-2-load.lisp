@@ -200,6 +200,12 @@
   (load "src/code/shaketree")
   (sb-impl::shake-packages
    ;; Retain all symbols satisfying this predicate
+   #+sb-devel
+   (lambda (symbol)
+    ;; Retain all symbols satisfying this predicate
+    (or (sb-kernel:symbol-info symbol)
+        (and (boundp symbol) (not (keywordp symbol)))))
+   #-sb-devel
    (lambda (symbol accessibility)
      (case (symbol-package symbol)
       (#.(find-package "SB-VM")
