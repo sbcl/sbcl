@@ -82,7 +82,8 @@ variable: an unreadable object representing the error is printed instead.")
         (*read-eval* t)
         (*read-suppress* nil)
         (*readtable* *standard-readtable*)
-        (*suppress-print-errors* nil))
+        (*suppress-print-errors* nil)
+        (*print-vector-length* nil))
     (funcall function)))
 
 ;;;; routines to print objects

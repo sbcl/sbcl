@@ -155,6 +155,7 @@
          *READ-SUPPRESS*                  NIL
          *READTABLE*                      the standard readtable
   SB-EXT:*SUPPRESS-PRINT-ERRORS*          NIL
+  SB-EXT:*PRINT-VECTOR-LENGTH*            NIL
 "
   (let ((name (make-symbol "THUNK")))
     `(dx-flet ((,name () ,@body))
