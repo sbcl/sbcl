@@ -33,7 +33,9 @@
   ;; is used to mark buckets that used to contain an element, but no
   ;; longer do.
   (vector #() :type simple-vector)
-  ;; How many buckets currently contain or used to contain an element.
+  ;; How many elements can be inserted before rehashing.
+  ;; This is not the actual amount of free elements, but a ratio
+  ;; calculated from +sset-rehash-threshold+.
   (free 0 :type index)
   ;; How many elements are currently members of the set.
   (count 0 :type index))
@@ -79,31 +81,36 @@
     (declare (fixnum number))
     (logior 1 number)))
 
-;;; Double the size of the hash vector of SET.
-(defun sset-grow (set)
-  (let* ((vector (sset-vector set))
-         (new-vector (make-array (if (zerop (length vector))
-                                     2
-                                     (* (length vector) 2))
-                                 :initial-element 0)))
-    (setf (sset-vector set) new-vector
-          (sset-free set) (length new-vector)
-          (sset-count set) 0)
-    (loop for element across vector
-          do (unless (member element '(0 +deleted+))
-               (sset-adjoin element set)))))
-
 ;;; Rehash the sset when the proportion of free cells in the set is
 ;;; lower than this, the value is a reciprocal.
 (defconstant +sset-rehash-threshold+ 4)
+
+;;; Double the size of the hash vector of SET.
+(defun sset-grow (set)
+  (let* ((vector (sset-vector set))
+         (length (if (zerop (length vector))
+                     2
+                     (* (length vector) 2)))
+         (new-vector (make-array length
+                                 :initial-element 0)))
+    (setf (sset-vector set) new-vector
+          ;; SSET-ADJOIN below will decrement this and shouldn't reach zero
+          (sset-free set) length
+          (sset-count set) 0)
+    (loop for element across vector
+          do (unless (member element '(0 +deleted+))
+               (sset-adjoin element set)))
+    ;; Now the real amount of elements which can be inserted before rehashing
+    (setf (sset-free set) (- (sset-free set)
+                             (max 1 (truncate length
+                                              +sset-rehash-threshold+))))))
+
 
 ;;; Destructively add ELEMENT to SET. If ELEMENT was not in the set,
 ;;; then we return true, otherwise we return false.
 (declaim (ftype (sfunction (sset-element sset) boolean) sset-adjoin))
 (defun sset-adjoin (element set)
-  (when (<= (sset-free set)
-            (max 1 (truncate (length (sset-vector set))
-                       +sset-rehash-threshold+)))
+  (when (= (sset-free set) 0)
     (sset-grow set))
   (loop with vector = (sset-vector set)
         with mask of-type fixnum = (1- (length vector))
