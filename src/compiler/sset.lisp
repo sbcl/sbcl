@@ -108,18 +108,20 @@
   (loop with vector = (sset-vector set)
         with mask of-type fixnum = (1- (length vector))
         with secondary-hash = (sset-hash2 element)
+        with deleted-index
         for hash of-type index = (logand mask (sset-hash1 element)) then
           (logand mask (+ hash secondary-hash))
         for current = (aref vector hash)
         do (cond ((eql current 0)
                   (incf (sset-count set))
-                  (decf (sset-free set))
-                  (setf (aref vector hash) element)
+                  (cond (deleted-index
+                         (setf (aref vector deleted-index) element))
+                        (t
+                         (decf (sset-free set))
+                         (setf (aref vector hash) element)))
                   (return t))
                  ((eql current '+deleted+)
-                  (incf (sset-count set))
-                  (setf (aref vector hash) element)
-                  (return t))
+                  (setf deleted-index hash))
                  ((eq current element)
                   (return nil)))))
 
