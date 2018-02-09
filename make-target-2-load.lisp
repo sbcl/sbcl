@@ -201,10 +201,11 @@
   (sb-impl::shake-packages
    ;; Retain all symbols satisfying this predicate
    #+sb-devel
-   (lambda (symbol)
-    ;; Retain all symbols satisfying this predicate
-    (or (sb-kernel:symbol-info symbol)
-        (and (boundp symbol) (not (keywordp symbol)))))
+   (lambda (symbol accessibility)
+     (declare (ignore accessibility))
+     ;; Retain all symbols satisfying this predicate
+     (or (sb-kernel:symbol-info symbol)
+         (and (boundp symbol) (not (keywordp symbol)))))
    #-sb-devel
    (lambda (symbol accessibility)
      (case (symbol-package symbol)
