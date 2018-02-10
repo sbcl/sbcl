@@ -31,7 +31,7 @@
   ;; array, but we now do the array size management manually for
   ;; performance reasons (as of 2006-05-13 hairy array operations
   ;; are rather slow compared to simple ones).
-  (buffer (make-array 0 :element-type 'assembly-unit)
+  (buffer (load-time-value (!make-specialized-array 0 'assembly-unit))
           :type (or null (simple-array assembly-unit 1)))
   ;; whether or not to run the scheduler. Note: if the instruction
   ;; definitions were not compiled with the scheduler turned on, this
