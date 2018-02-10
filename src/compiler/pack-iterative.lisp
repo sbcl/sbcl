@@ -45,29 +45,6 @@
 ;;;; (http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.107.9598)
 
 ;;; Interference graph data structure
-(defstruct (ordered-set
-            (:include sset)
-            (:copier nil)
-            (:conc-name #:oset-))
-  (members nil :type list))
-
-(defun oset-adjoin (oset element)
-  (when (sset-adjoin element oset)
-    (push element (oset-members oset))
-    t))
-
-(defun oset-delete (oset element)
-  (when (sset-delete element oset)
-    (setf (oset-members oset)
-          (delete element (oset-members oset)))
-    t))
-
-(defun oset-member (oset element)
-  (sset-member element oset))
-
-(defmacro do-oset-elements ((variable oset &optional return) &body body)
-  `(dolist (,variable (oset-members ,oset) ,return)
-     ,@body))
 
 ;; vertex in an interference graph
 (def!struct (vertex
@@ -75,7 +52,7 @@
              (:copier nil)
              (:constructor %make-vertex (tn element-size pack-type)))
   ;; incidence set, as an ordered list (for reproducibility)
-  (full-incidence  (make-ordered-set) :type ordered-set :read-only t)
+  (full-incidence  (make-oset) :type oset :read-only t)
   (incidence       (vector)           :type simple-vector)
   (incidence-count 0                  :type index)
   ;; list of potential locations in the TN's preferred SB for the

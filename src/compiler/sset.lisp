@@ -40,6 +40,15 @@
   (free 0 :type index)
   ;; How many elements are currently members of the set.
   (count 0 :type index))
+
+;;; Ordered set
+(defstruct (oset
+            (:include sset)
+            (:copier nil))
+  (members nil :type list))
+
+(declaim (freeze-type sset))
+
 (defprinter (sset) vector)
 
 ;;; Iterate over the elements in SSET, binding VAR to each element in
@@ -243,3 +252,24 @@
                (when (sset-adjoin element set1)
                  (setf modified t))))
         finally (return modified)))
+
+;;; Ordered set
+
+(defun oset-adjoin (oset element)
+  (when (sset-adjoin element oset)
+    (push element (oset-members oset))
+    t))
+
+(defun oset-delete (oset element)
+  (when (sset-delete element oset)
+    (setf (oset-members oset)
+          (delete element (oset-members oset)))
+    t))
+
+(declaim (inline oset-member))
+(defun oset-member (oset element)
+  (sset-member element oset))
+
+(defmacro do-oset-elements ((variable oset &optional return) &body body)
+  `(dolist (,variable (oset-members ,oset) ,return)
+     ,@body))
