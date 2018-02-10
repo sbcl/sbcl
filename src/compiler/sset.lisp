@@ -46,7 +46,7 @@
 ;;; turn.
 (defmacro do-sset-elements ((var sset &optional result) &body body)
   `(loop for ,var across (sset-vector ,sset)
-         do (unless (member ,var '(0 -1))
+         do (unless (fixnump ,var)
               ,@body)
          finally (return ,result)))
 
@@ -99,7 +99,7 @@
           (sset-free set) length
           (sset-count set) 0)
     (loop for element across vector
-          do (unless (member element '(0 -1))
+          do (unless (fixnump element)
                (sset-adjoin element set)))
     ;; Now the real amount of elements which can be inserted before rehashing
     (setf (sset-free set) (- (sset-free set)
@@ -206,7 +206,7 @@
 (defun sset-union (set1 set2)
   (loop with modified = nil
         for element across (sset-vector set2)
-        do (unless (member element '(0 -1))
+        do (unless (fixnump element)
              (when (sset-adjoin element set1)
                (setf modified t)))
         finally (return modified)))
@@ -214,7 +214,7 @@
   (loop with modified = nil
         for element across (sset-vector set1)
         for index of-type index from 0
-        do (unless (member element '(0 -1))
+        do (unless (fixnump element)
              (unless (sset-member element set2)
                (decf (sset-count set1))
                (setf (aref (sset-vector set1) index) -1
@@ -224,7 +224,7 @@
   (loop with modified = nil
         for element across (sset-vector set1)
         for index of-type index from 0
-        do (unless (member element '(0 -1))
+        do (unless (fixnump element)
              (when (sset-member element set2)
                (decf (sset-count set1))
                (setf (aref (sset-vector set1) index) -1
@@ -238,7 +238,7 @@
 (defun sset-union-of-difference (set1 set2 set3)
   (loop with modified = nil
         for element across (sset-vector set2)
-        do (unless (member element '(0 -1))
+        do (unless (fixnump element)
              (unless (sset-member element set3)
                (when (sset-adjoin element set1)
                  (setf modified t))))
