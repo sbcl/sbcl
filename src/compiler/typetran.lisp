@@ -658,15 +658,32 @@
            ;; though probably extremely weird. Also the PRED should be set in
            ;; that event, but it isn't.
            ((and (eq (classoid-state class) :sealed) layout
-                 (not (classoid-subclasses class)))
-            ;; Sealed and has no subclasses.
+                 (or (not (classoid-subclasses class))
+                     (eql (hash-table-count (classoid-subclasses class))
+                          1)))
+            ;; Sealed and at most one subclass.
             ;; The crummy dual expressions for the same result are because
             ;; (BLOCK (RETURN ...)) seems to emit a forward branch in the
             ;; passing case, but AND emits a forward branch in the failing
             ;; case which I believe is the better choice.
-            (if pred
-                `(and ,pred (eq ,get-layout ',layout))
-                `(block typep (eq ,get-layout-or-return-false ',layout))))
+            (let ((other-layout (and
+                                 (classoid-subclasses class)
+                                 (dohash ((classoid layout)
+                                          (classoid-subclasses class)
+                                          :locked t)
+                                   (declare (ignore classoid))
+                                   (return layout)))))
+              (flet ((check-layout (layout-getter)
+                       (if other-layout
+                           ;; It's faster to compare two layouts than
+                           ;; doing whatever is done below
+                           `(let ((object-layout ,layout-getter))
+                              (or (eq object-layout ',layout)
+                                  (eq object-layout ',other-layout)))
+                           `(eq ,layout-getter ',layout))))
+                (if pred
+                    `(and ,pred ,(check-layout get-layout))
+                    `(block typep ,(check-layout get-layout-or-return-false))))))
 
            ((and (typep class 'structure-classoid) layout)
             ;; structure type tests; hierarchical layout depths
@@ -681,26 +698,26 @@
                    (abstract-base-p (awhen (layout-info layout)
                                       (not (dd-constructors it))))
                    (get-ancestor
-                    ;; Use DATA-VECTOR-REF directly, since that's what SVREF in
-                    ;; a SAFETY 0 lexenv will eventually be transformed to.
-                    ;; This can give a large compilation speedup, since
-                    ;; %INSTANCE-TYPEPs are frequently created during
-                    ;; GENERATE-TYPE-CHECKS, and the normal aref transformation
-                    ;; path is pretty heavy.
-                    `(locally (declare (optimize (safety 0)))
-                       (data-vector-ref (layout-inherits ,n-layout) ,depthoid)))
+                     ;; Use DATA-VECTOR-REF directly, since that's what SVREF in
+                     ;; a SAFETY 0 lexenv will eventually be transformed to.
+                     ;; This can give a large compilation speedup, since
+                     ;; %INSTANCE-TYPEPs are frequently created during
+                     ;; GENERATE-TYPE-CHECKS, and the normal aref transformation
+                     ;; path is pretty heavy.
+                     `(locally (declare (optimize (safety 0)))
+                        (data-vector-ref (layout-inherits ,n-layout) ,depthoid)))
                    (ancestor-layout-eq
-                    ;; Layouts are immediate constants in immobile space.
-                    ;; It would be far nicer if we had a pattern-matching pass
-                    ;; wherein the backend would recognize that
-                    ;; (eq (data-vector-ref ...) k) has a single instruction form,
-                    ;; but lacking that, force it into a single call
-                    ;; that a vop can translate.
-                    #!+(and immobile-space x86-64)
-                    `(sb!vm::layout-inherits-ref-eq ; only implemented on x86-64
-                      (layout-inherits ,n-layout) ,depthoid ,layout)
-                    #!-(and immobile-space x86-64)
-                    `(eq ,get-ancestor ,layout))
+                     ;; Layouts are immediate constants in immobile space.
+                     ;; It would be far nicer if we had a pattern-matching pass
+                     ;; wherein the backend would recognize that
+                     ;; (eq (data-vector-ref ...) k) has a single instruction form,
+                     ;; but lacking that, force it into a single call
+                     ;; that a vop can translate.
+                     #!+(and immobile-space x86-64)
+                     `(sb!vm::layout-inherits-ref-eq ; only implemented on x86-64
+                       (layout-inherits ,n-layout) ,depthoid ,layout)
+                     #!-(and immobile-space x86-64)
+                     `(eq ,get-ancestor ,layout))
                    (deeper-p `(> (layout-depthoid ,n-layout) ,depthoid)))
               (aver (equal pred '(%instancep object)))
               `(and ,pred
@@ -728,23 +745,22 @@
             (let* ((depthoid (layout-depthoid layout))
                    (n-inherits (gensym))
                    (guts
-                    `((when (layout-invalid ,n-layout)
-                        (setq ,n-layout (update-object-layout-or-invalid
-                                         object ',layout)))
-                      (let ((,n-inherits (layout-inherits
-                                          (truly-the layout ,n-layout))))
-                        (declare (optimize (safety 0)))
-                        (eq (if (> (vector-length ,n-inherits) ,depthoid)
-                                (data-vector-ref ,n-inherits ,depthoid)
-                                ,n-layout)
-                            ,layout)))))
+                     `((when (layout-invalid ,n-layout)
+                         (setq ,n-layout (update-object-layout-or-invalid
+                                          object ',layout)))
+                       (let ((,n-inherits (layout-inherits
+                                           (truly-the layout ,n-layout))))
+                         (declare (optimize (safety 0)))
+                         (eq (if (> (vector-length ,n-inherits) ,depthoid)
+                                 (data-vector-ref ,n-inherits ,depthoid)
+                                 ,n-layout)
+                             ,layout)))))
               (if pred
                   `(and ,pred (let ((,n-layout ,get-layout)) ,@guts))
                   `(block typep
                      (let ((,n-layout ,get-layout-or-return-false)) ,@guts)))))
 
            (t
-            (/noshow "default case -- ,PRED and CLASS-CELL-TYPEP")
             `(classoid-cell-typep ',(find-classoid-cell name :create t)
                                   object))))))))
 
