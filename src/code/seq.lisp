@@ -679,36 +679,65 @@
                      :start start
                      :end (%check-generic-sequence-bounds sequence start end))))
 
+
+(defmacro word-specialized-vector-tag-p (tag)
+  `(or
+    ,@(loop for saetp across sb!vm:*specialized-array-element-type-properties*
+            when (and (eq (sb!vm:saetp-n-bits saetp) sb!vm:n-word-bits)
+                      (not (eq (sb!vm:saetp-specifier saetp) t)))
+            collect `(eq ,tag ,(sb!vm:saetp-typecode saetp)))))
+
 ;;;; REPLACE
+(defun vector-replace (vector1 vector2 start1 start2 end1 diff)
+  (declare (index start1 start2)
+           ((or (eql -1) index) end1)
+           (optimize (sb!c::insert-array-bounds-checks 0))
+           ((integer -1 1) diff))
+  (let ((tag1 (%other-pointer-widetag vector1))
+        (tag2 (%other-pointer-widetag vector2)))
+    (macrolet ((copy (&body body)
+                 `(do ((index1 start1 (+ index1 diff))
+                       (index2 start2 (+ index2 diff)))
+                      ((= index1 end1))
+                    (declare (fixnum index1 index2))
+                    ,@body)))
+      (cond ((= tag1 tag2 sb!vm:simple-vector-widetag)
+             (copy
+              (setf (svref vector1 index1) (svref vector2 index2))))
+            ;; TODO: can do the same with small specialized arrays
+            ((and (= tag1 tag2)
+                  (word-specialized-vector-tag-p tag1))
+             (copy
+              (setf (%vector-raw-bits vector1 index1)
+                    (%vector-raw-bits vector2 index2))))
+            (t
+             (let ((getter (the function (svref %%data-vector-reffers%% tag2)))
+                   (setter (the function (svref %%data-vector-setters%% tag1))))
+               (copy
+                (funcall setter vector1 index1
+                         (funcall getter vector2 index2))))))))
+  vector1)
 
 (eval-when (:compile-toplevel :execute)
 
 ;;; If we are copying around in the same vector, be careful not to copy the
 ;;; same elements over repeatedly. We do this by copying backwards.
-(sb!xc:defmacro mumble-replace-from-mumble ()
-  `(if (and (eq target-sequence source-sequence) (> target-start source-start))
-       (let ((nelts (min (- target-end target-start)
-                         (- source-end source-start))))
-         (do ((target-index (+ (the fixnum target-start) (the fixnum nelts) -1)
-                            (1- target-index))
-              (source-index (+ (the fixnum source-start) (the fixnum nelts) -1)
-                            (1- source-index)))
-             ((= target-index (the fixnum (1- target-start))) target-sequence)
-           (declare (fixnum target-index source-index))
-           ;; disable bounds checking
-           (declare (optimize (safety 0)))
-           (setf (aref target-sequence target-index)
-                 (aref source-sequence source-index))))
-       (do ((target-index target-start (1+ target-index))
-            (source-index source-start (1+ source-index)))
-           ((or (= target-index (the fixnum target-end))
-                (= source-index (the fixnum source-end)))
-            target-sequence)
-         (declare (fixnum target-index source-index))
-         ;; disable bounds checking
-         (declare (optimize (safety 0)))
-         (setf (aref target-sequence target-index)
-               (aref source-sequence source-index)))))
+(sb!xc:defmacro vector-replace-from-vector ()
+  `(let ((nelts (min (- target-end target-start)
+                     (- source-end source-start))))
+     (with-array-data ((data1 target-sequence) (start1 target-start) (end1 target-end))
+       (with-array-data ((data2 source-sequence) (start2 source-start) (end2 source-end))
+         (if (and (eq target-sequence source-sequence)
+                  (> start1 start2))
+             (let ((nelts (min (- end1 start1)
+                               (- end2 start2))))
+               (vector-replace data1 data2
+                               (the fixnum (+ start1 (the fixnum nelts) -1))
+                               (the fixnum (+ start2 (the fixnum nelts) -1))
+                               (1- target-start)
+                               -1))
+             (vector-replace data1 data2 start1 start2 (the fixnum (+ start1 nelts)) 1))))
+     target-sequence))
 
 (sb!xc:defmacro list-replace-from-list ()
   `(if (and (eq target-sequence source-sequence) (> target-start source-start))
@@ -736,7 +765,7 @@
          (declare (fixnum target-index source-index))
          (rplaca target-sequence-ref (car source-sequence-ref)))))
 
-(sb!xc:defmacro list-replace-from-mumble ()
+(sb!xc:defmacro list-replace-from-vector ()
   `(do ((target-index target-start (1+ target-index))
         (source-index source-start (1+ source-index))
         (target-sequence-ref (nthcdr target-start target-sequence)
@@ -748,7 +777,7 @@
      (declare (fixnum source-index target-index))
      (rplaca target-sequence-ref (aref source-sequence source-index))))
 
-(sb!xc:defmacro mumble-replace-from-list ()
+(sb!xc:defmacro vector-replace-from-list ()
   `(do ((target-index target-start (1+ target-index))
         (source-index source-start (1+ source-index))
         (source-sequence (nthcdr source-start source-sequence)
@@ -776,20 +805,20 @@
                                   target-end source-start source-end)
   (when (null target-end) (setq target-end (length target-sequence)))
   (when (null source-end) (setq source-end (length source-sequence)))
-  (list-replace-from-mumble))
+  (list-replace-from-vector))
 
 (defun vector-replace-from-list* (target-sequence source-sequence target-start
                                   target-end source-start source-end)
   (when (null target-end) (setq target-end (length target-sequence)))
   (when (null source-end) (setq source-end (length source-sequence)))
-  (mumble-replace-from-list))
+  (vector-replace-from-list))
 
 (defun vector-replace-from-vector* (target-sequence source-sequence
                                     target-start target-end source-start
                                     source-end)
   (when (null target-end) (setq target-end (length target-sequence)))
   (when (null source-end) (setq source-end (length source-sequence)))
-  (mumble-replace-from-mumble))
+  (vector-replace-from-vector))
 
 #!+sb-unicode
 (defun simple-character-string-replace-from-simple-character-string*
@@ -798,7 +827,7 @@
   (declare (type (simple-array character (*)) target-sequence source-sequence))
   (when (null target-end) (setq target-end (length target-sequence)))
   (when (null source-end) (setq source-end (length source-sequence)))
-  (mumble-replace-from-mumble))
+  (vector-replace-from-vector))
 
 (define-sequence-traverser replace
     (sequence1 sequence2 &rest args &key start1 end1 start2 end2)
@@ -824,11 +853,11 @@ many elements are copied."
     (seq-dispatch-checking target-sequence
       (seq-dispatch-checking source-sequence
         (return-from replace (list-replace-from-list))
-        (return-from replace (list-replace-from-mumble))
+        (return-from replace (list-replace-from-vector))
         nil)
       (seq-dispatch-checking source-sequence
-        (return-from replace (mumble-replace-from-list))
-        (return-from replace (mumble-replace-from-mumble))
+        (return-from replace (vector-replace-from-list))
+        (return-from replace (vector-replace-from-vector))
         nil)
       t)
     ;; If sequence1 is an extended-sequence, we know nothing about sequence2.
@@ -858,13 +887,6 @@ many elements are copied."
   (do ((new-list ()))
       ((endp list) new-list)
     (push (pop list) new-list)))
-
-(defmacro word-specialized-vector-tag-p (tag)
-  `(or
-    ,@(loop for saetp across sb!vm:*specialized-array-element-type-properties*
-           when (and (eq (sb!vm:saetp-n-bits saetp) sb!vm:n-word-bits)
-                     (not (eq (sb!vm:saetp-specifier saetp) t)))
-           collect `(eq ,tag ,(sb!vm:saetp-typecode saetp)))))
 
 (defun reverse-word-specialized-vector (from to end)
   (declare (vector from))
