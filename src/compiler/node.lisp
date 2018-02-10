@@ -13,7 +13,7 @@
 (in-package "SB!C")
 
 (declaim (type fixnum *compiler-sset-counter*))
-(!define-thread-local *compiler-sset-counter* 0)
+(defvar *compiler-sset-counter* 0)
 
 ;;; The front-end data structure (IR1) is composed of nodes,
 ;;; representing actual evaluations. Linear sequences of nodes in

@@ -74,7 +74,7 @@
      (* fdefn-raw-addr-slot n-word-bytes)))
 
 ;;; Various error-code generating helpers
-(defvar *adjustable-vectors* nil)
+(defvar *adjustable-vectors*)
 
 (defmacro with-adjustable-vector ((var) &rest body)
   `(let ((,var (or (pop *adjustable-vectors*)
@@ -88,10 +88,13 @@
      ;; more than 16 elements. Maybe we should make it nonadjustable?
      (declare (type (vector (unsigned-byte 8)) ,var))
      (setf (fill-pointer ,var) 0)
-     (unwind-protect
-         (progn
-           ,@body)
-       (push ,var *adjustable-vectors*))))
+     ;; No UNWIND-PROTECT here - semantics are unaffected by nonlocal exit,
+     ;; and this macro is about speeding up the compiler, not slowing it down.
+     ;; GC will clean up any debris, and since the vector does not point
+     ;; to anything, even an accidental promotion to a higher generation
+     ;; will not cause transitive garbage retention.
+     ,@body
+     (push ,var *adjustable-vectors*)))
 
 ;;;; interfaces to IR2 conversion
 

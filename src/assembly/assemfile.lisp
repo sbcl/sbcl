@@ -39,6 +39,7 @@
          (*elsewhere* nil)
          (*assembly-optimize* nil)
          (*fixup-notes* nil)
+         (sb!vm::*adjustable-vectors* nil)
          #!+immobile-code (*code-is-immobile* t)
          #!+inline-constants (*unboxed-constants* nil))
     (unwind-protect
