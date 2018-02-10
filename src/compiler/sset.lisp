@@ -27,7 +27,8 @@
                          (:copier nil))
   (number nil :type (or index null)))
 
-(defstruct (sset (:copier nil))
+(defstruct (sset (:copier nil)
+                 (:constructor make-sset (&optional vector free count)))
   ;; Vector containing the set values. 0 is used for empty (since
   ;; initializing a vector with 0 is cheaper than with NIL), +DELETED+
   ;; is used to mark buckets that used to contain an element, but no
@@ -185,17 +186,17 @@
 ;;; Return a new copy of SET.
 (declaim (ftype (sfunction (sset) sset) copy-sset))
 (defun copy-sset (set)
-  (make-sset :vector (let* ((vector (sset-vector set))
-                            (new-vector (make-array (length vector))))
-                       (declare (type simple-vector vector new-vector)
-                                (optimize speed (safety 0)))
-                       ;; There's no REPLACE deftransform for simple-vectors.
-                       (dotimes (i (length vector))
-                         (setf (aref new-vector i)
-                               (aref vector i)))
-                       new-vector)
-             :count (sset-count set)
-             :free (sset-free set)))
+  (make-sset (let* ((vector (sset-vector set))
+                    (new-vector (make-array (length vector))))
+               (declare (type simple-vector vector new-vector)
+                        (optimize speed (safety 0)))
+               ;; There's no REPLACE deftransform for simple-vectors.
+               (dotimes (i (length vector))
+                 (setf (aref new-vector i)
+                       (aref vector i)))
+               new-vector)
+             (sset-free set)
+             (sset-count set)))
 
 ;;; Perform the appropriate set operation on SET1 and SET2 by
 ;;; destructively modifying SET1. We return true if SET1 was modified,
