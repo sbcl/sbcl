@@ -190,9 +190,6 @@
       (assert (= 42 (join-thread child)))
       (assert (eq :from-child (symbol-value 'this-is-new))))))
 
-;;; Disabled on Darwin due to deadlocks caused by apparent OS specific deadlocks,
-;;; wich _appear_ to be caused by malloc() and free() not being thread safe: an
-;;; interrupted malloc in one thread can apparently block a free in another.
 (with-test (:name :symbol-value-in-thread.3
             :skipped-on (not :sb-thread))
   (let* ((parent *current-thread*)
@@ -215,12 +212,14 @@
         (force-output))
       (let* ((mom-mark (cons t t))
              (kid-mark (cons t t))
-             (child (make-thread (lambda ()
-                                   (wait-on-semaphore semaphore)
-                                   (let ((old (symbol-value-in-thread 'this-is-new parent)))
-                                     (setf (symbol-value-in-thread 'this-is-new parent)
-                                           (make-array 24 :initial-element kid-mark))
-                                     old)))))
+             (child (make-thread
+                     (lambda ()
+                       (if (wait-on-semaphore semaphore :timeout 10)
+                           (let ((old (symbol-value-in-thread 'this-is-new parent)))
+                             (setf (symbol-value-in-thread 'this-is-new parent)
+                                   (make-array 24 :initial-element kid-mark))
+                             old)
+                           :timeout)))))
         (progv '(this-is-new) (list (make-array 24 :initial-element mom-mark))
           (signal-semaphore semaphore)
           (assert (eq mom-mark (aref (join-thread child) 0)))
