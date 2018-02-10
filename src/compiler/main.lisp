@@ -1214,7 +1214,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                       :policy *policy*
                       :handled-conditions *handled-conditions*
                       :disabled-package-locks *disabled-package-locks*))
-           (*compiler-sset-counter* 0)
+           (*compiler-sset-counter* 1)
            (fun (make-functional-from-toplevel-lambda lambda-expression
                                                       :name name
                                                       :path path)))
@@ -1722,7 +1722,7 @@ necessary, since type inference may take arbitrarily long to converge.")
            (declare (ignore error))
            (return-from sub-compile-file (values t t t))))
         (*current-path* nil)
-        (*compiler-sset-counter* 0)
+        (*compiler-sset-counter* 1)
         (sb!xc:*gensym-counter* 0))
     (handler-case
         (handler-bind (((satisfies handle-condition-p) #'handle-condition-handler))

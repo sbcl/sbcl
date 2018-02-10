@@ -12,6 +12,9 @@
 
 (in-package "SB!C")
 
+(declaim (type fixnum *compiler-sset-counter*))
+(!define-thread-local *compiler-sset-counter* 0)
+
 ;;; The front-end data structure (IR1) is composed of nodes,
 ;;; representing actual evaluations. Linear sequences of nodes in
 ;;; control-flow order are combined into blocks (but see
@@ -121,7 +124,9 @@
   (setf (lvar-%externally-checkable-type lvar) nil))
 
 (def!struct (node (:constructor nil)
-                  (:include sset-element (number (incf *compiler-sset-counter*)))
+                  (:include sset-element
+                            (number (unless (eql *compiler-sset-counter* 0)
+                                      (incf *compiler-sset-counter*))))
                   (:copier nil))
   ;; unique ID for debugging
   #!+sb-show (id (new-object-id) :read-only t)
@@ -673,7 +678,9 @@
 ;;; structures. A reference to a LEAF is indicated by a REF node. This
 ;;; allows us to easily substitute one for the other without actually
 ;;; hacking the flow graph.
-(def!struct (leaf (:include sset-element (number (incf *compiler-sset-counter*)))
+(def!struct (leaf (:include sset-element
+                            (number (unless (eql *compiler-sset-counter* 0)
+                                      (incf *compiler-sset-counter*))))
                   (:copier nil)
                   (:constructor nil))
   ;; unique ID for debugging

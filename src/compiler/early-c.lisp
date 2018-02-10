@@ -155,9 +155,6 @@ the stack without triggering overflow protection.")
   `(sb!thread:with-recursive-lock (**world-lock**)
      ,@body))
 
-(declaim (type fixnum *compiler-sset-counter*))
-(defvar *compiler-sset-counter* 0)
-
 ;;; unique ID for the next object created (to let us track object
 ;;; identity even across GC, useful for understanding weird compiler
 ;;; bugs where something is supposed to be unique but is instead
