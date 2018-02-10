@@ -214,7 +214,7 @@
     #!+sb-dynamic-core +required-foreign-symbols+
 
     ;; List of Lisp specials bindings made by create_thread_struct()
-    ;; other than the per-thread-c-interface-symbols.
+    ;; excluding the names in !PER-THREAD-C-INTERFACE-SYMBOLS.
     sb!thread::*thread-initial-bindings*
 
     ;;; The following symbols aren't strictly required to be static

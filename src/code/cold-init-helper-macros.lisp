@@ -109,7 +109,7 @@
 ;;; that would exist in the target system, if exposed more generally.
 ;;; (Among the issues is the very restricted initialization form)
 (defmacro !define-thread-local (name initform &optional docstring)
-  (check-type initform symbol)
+  (check-type initform (or fixnum symbol))
   #!-sb-thread `(progn
                   (eval-when (:compile-toplevel :load-toplevel :execute)
                     (setf (info :variable :always-bound ',name) :always-bound))
@@ -121,6 +121,11 @@
                     (setf (info :variable :always-bound ',name) :always-bound))
                   (defvar ,name ,initform ,docstring)))
 
+;;; Note that this mechanism for creation of thread-locals complements the
+;;; mechanism for initializing variables that affect GC and interrupts.
+;;; Those other thread-locals are defined with an ordinary DEFVAR, but the
+;;; full list of such symbols is enumerated by !PER-THREAD-C-INTERFACE-SYMBOLS
+;;; which specifies both the list and the initial value of each symbol.
 (defvar *!thread-initial-bindings* nil)
 #+sb-xc-host
 (setf (get '!%define-thread-local :sb-cold-funcall-handler/for-effect)

@@ -1521,6 +1521,7 @@ core and return a descriptor to it."
                          (gspace (symbol-value *cold-symbol-gspace*))
                     &aux (package (symbol-package-for-target-symbol symbol)))
 
+  (declare (symbol symbol))
   ;; Anything on the cross-compilation host which refers to the target
   ;; machinery through the host SB!XC package should be translated to
   ;; something on the target which refers to the same machinery
@@ -1667,11 +1668,18 @@ core and return a descriptor to it."
     ;; Assign the initialization vector for create_thread_struct()
     (cold-set 'sb!thread::*thread-initial-bindings*
               (vector-in-core
-               (mapcar (lambda (pair)
-                         (let* ((name (cold-intern (car pair)))
+               (mapcar (lambda (pair &aux (name (car pair)))
+                         ;; Sanity check - no overlap with GC/interrupt controls
+                         (aver (not (member name sb!vm::!per-thread-c-interface-symbols)))
+                         (let* ((name (cold-intern name))
                                 (value (cdr pair))
-                                (initform (cold-intern value)))
-                           (aver (symbolp value))
+                                (initform
+                                 (cond ((symbolp value)
+                                        (cold-intern value))
+                                       ((is-fixnum-lowtag (descriptor-lowtag value))
+                                        value)
+                                       (t
+                                        (bug "Unsupported thread-local initform")))))
                            (if (null value) name (cold-cons initform name))))
                        bindings)))
     (dolist (binding bindings)
@@ -3214,7 +3222,7 @@ core and return a descriptor to it."
 
 (defun write-thread-init (stream)
   (dolist (binding sb!vm::!per-thread-c-interface-symbols)
-    (format stream "write_TLS(~A, ~A, th);~%" ; KLUDGE: 'th' is a thread
+    (format stream "INITIALIZE_TLS(~A, ~A);~%"
             (c-symbol-name (if (listp binding) (car binding) binding) "*")
             (if (listp binding) (second binding)))))
 

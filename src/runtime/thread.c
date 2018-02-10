@@ -767,6 +767,16 @@ create_thread_struct(lispobj initial_function) {
     th->interrupt_data->allocation_trap_context = 0;
 #endif
 
+#ifdef LISP_FEATURE_SB_THREAD
+// This macro is the same as "write_TLS(sym,val,th)" but can't be spelled thus.
+// 'sym' would get substituted prior to token pasting, so you end up with a bad
+// token "(*)_tlsindex" because all symbols are #defined to "(*)" so that #ifdef
+// remains meaningful to the preprocessor, while use of 'sym' itself yields
+// a deliberate syntax error if you try to compile an expression involving it.
+#  define INITIALIZE_TLS(sym,val) write_TLS_index(sym##_tlsindex, val, th, _ignored_)
+#else
+#  define INITIALIZE_TLS(sym,val) SYMBOL(sym)->value = val
+#endif
 #include "genesis/thread-init.inc"
 #ifdef LISP_FEATURE_SB_THREAD
     /* Each initial binding is a cons whose car is a symbol evaluated as if
@@ -778,7 +788,8 @@ create_thread_struct(lispobj initial_function) {
         lispobj binding = tls_init->data[fixnum_value(i)];
         lispobj value = NIL;
         if (listp(binding)) {
-            value = SYMBOL(CONS(binding)->car)->value;
+            lispobj val_form = CONS(binding)->car;
+            value = fixnump(val_form) ? val_form : SYMBOL(val_form)->value;
             binding = CONS(binding)->cdr;
         }
         struct symbol* sym = SYMBOL(binding);
