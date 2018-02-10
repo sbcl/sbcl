@@ -30,7 +30,7 @@
 (defstruct (sset (:copier nil)
                  (:constructor make-sset (&optional vector free count)))
   ;; Vector containing the set values. 0 is used for empty (since
-  ;; initializing a vector with 0 is cheaper than with NIL), +DELETED+
+  ;; initializing a vector with 0 is cheaper than with NIL), -1
   ;; is used to mark buckets that used to contain an element, but no
   ;; longer do.
   (vector #() :type simple-vector)
@@ -46,7 +46,7 @@
 ;;; turn.
 (defmacro do-sset-elements ((var sset &optional result) &body body)
   `(loop for ,var across (sset-vector ,sset)
-         do (unless (member ,var '(0 +deleted+))
+         do (unless (member ,var '(0 -1))
               ,@body)
          finally (return ,result)))
 
@@ -99,7 +99,7 @@
           (sset-free set) length
           (sset-count set) 0)
     (loop for element across vector
-          do (unless (member element '(0 +deleted+))
+          do (unless (member element '(0 -1))
                (sset-adjoin element set)))
     ;; Now the real amount of elements which can be inserted before rehashing
     (setf (sset-free set) (- (sset-free set)
@@ -128,7 +128,7 @@
                          (decf (sset-free set))
                          (setf (aref vector hash) element)))
                   (return t))
-                 ((eql current '+deleted+)
+                 ((eql current -1)
                   (setf deleted-index hash))
                  ((eq current element)
                   (return nil)))))
@@ -149,7 +149,7 @@
                   (return nil))
                  ((eq current element)
                   (decf (sset-count set))
-                  (setf (aref vector hash) '+deleted+)
+                  (setf (aref vector hash) -1)
                   (return t)))))
 
 ;;; Return true if ELEMENT is in SET, false otherwise.
@@ -206,7 +206,7 @@
 (defun sset-union (set1 set2)
   (loop with modified = nil
         for element across (sset-vector set2)
-        do (unless (member element '(0 +deleted+))
+        do (unless (member element '(0 -1))
              (when (sset-adjoin element set1)
                (setf modified t)))
         finally (return modified)))
@@ -214,20 +214,20 @@
   (loop with modified = nil
         for element across (sset-vector set1)
         for index of-type index from 0
-        do (unless (member element '(0 +deleted+))
+        do (unless (member element '(0 -1))
              (unless (sset-member element set2)
                (decf (sset-count set1))
-               (setf (aref (sset-vector set1) index) '+deleted+
+               (setf (aref (sset-vector set1) index) -1
                      modified t)))
         finally (return modified)))
 (defun sset-difference (set1 set2)
   (loop with modified = nil
         for element across (sset-vector set1)
         for index of-type index from 0
-        do (unless (member element '(0 +deleted+))
+        do (unless (member element '(0 -1))
              (when (sset-member element set2)
                (decf (sset-count set1))
-               (setf (aref (sset-vector set1) index) '+deleted+
+               (setf (aref (sset-vector set1) index) -1
                      modified t)))
         finally (return modified)))
 
@@ -238,7 +238,7 @@
 (defun sset-union-of-difference (set1 set2 set3)
   (loop with modified = nil
         for element across (sset-vector set2)
-        do (unless (member element '(0 +deleted+))
+        do (unless (member element '(0 -1))
              (unless (sset-member element set3)
                (when (sset-adjoin element set1)
                  (setf modified t))))
