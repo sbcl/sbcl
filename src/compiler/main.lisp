@@ -401,7 +401,6 @@ Examples:
 ;;; I'd have liked the data to be associated with the fasl, except that
 ;;; as indicated above, the second line hides some information.
 (defun style-warn-once (thing fmt &rest args)
-  (declare (special *compile-object*))
   (declare (notinline style-warn)) ; See COMPILER-STYLE-WARN for rationale
   (let* ((source-info *source-info*)
          (file-info (and (source-info-p source-info)
@@ -660,23 +659,15 @@ necessary, since type inference may take arbitrarily long to converge.")
               (sb!disassem:disassemble-assem-segment *code-segment*
                                                      *compiler-trace-output*))
 
-            (etypecase *compile-object*
-              (fasl-output
-               (maybe-mumble "fasl")
-               (fasl-dump-component component
-                                    *code-segment*
-                                    code-length
-                                    fixup-notes
-                                    *compile-object*))
-              #-sb-xc-host ; no compiling to core
-              (core-object
-               (maybe-mumble "core")
-               (make-core-component component
-                                    *code-segment*
-                                    code-length
-                                    fixup-notes
-                                    *compile-object*))
-              (null))))))
+            (let ((object *compile-object*))
+              (funcall (etypecase object
+                        (fasl-output (maybe-mumble "fasl") #'fasl-dump-component)
+                        #-sb-xc-host ; no compiling to core
+                        (core-object (maybe-mumble "core") #'make-core-component)
+                        (null (lambda (&rest dummies)
+                                (declare (ignore dummies)))))
+                       component *code-segment* code-length fixup-notes
+                       object))))))
 
   ;; We're done, so don't bother keeping anything around.
   (setf (component-info component) :dead)
@@ -1205,8 +1196,7 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;;
 ;;; If NAME is provided, then we try to use it as the name of the
 ;;; function for debugging/diagnostic information.
-(defun %compile (lambda-expression
-                 *compile-object*
+(defun %compile (lambda-expression object
                  &key
                  name
                  (path
@@ -1215,7 +1205,8 @@ necessary, since type inference may take arbitrarily long to converge.")
                   ;; from the CMU CL code and experiment, so it's a
                   ;; nice default for things where we don't have a
                   ;; real source path (as in e.g. inside CL:COMPILE).
-                  '(original-source-start 0 0)))
+                  '(original-source-start 0 0))
+                 &aux (*compile-object* object))
   (when name
     (legal-fun-name-or-type-error name))
   (with-ir1-namespace
@@ -1243,11 +1234,9 @@ necessary, since type inference may take arbitrarily long to converge.")
           (compile-component component-from-dfo)
           (replace-toplevel-xeps component-from-dfo))
 
-        (let ((entry-table (etypecase *compile-object*
-                             (fasl-output (fasl-output-entry-table
-                                           *compile-object*))
-                             (core-object (core-object-entry-table
-                                           *compile-object*)))))
+        (let ((entry-table (etypecase object
+                             (fasl-output (fasl-output-entry-table object))
+                             (core-object (core-object-entry-table object)))))
           (multiple-value-bind (result found-p)
               (gethash (leaf-info fun) entry-table)
             (aver found-p)
@@ -1286,10 +1275,10 @@ necessary, since type inference may take arbitrarily long to converge.")
               ;; work when it has been compiled as part of the top-level
               ;; EVAL strategy of compiling everything inside (LAMBDA ()
               ;; ...).  -- CSR, 2002-11-02
-              (when (core-object-p *compile-object*)
+              (when (core-object-p object)
                 #+sb-xc-host (error "Can't compile to core")
                 #-sb-xc-host
-                (fix-core-source-info *source-info* *compile-object*
+                (fix-core-source-info *source-info* object
                                       (and (policy (lambda-bind fun)
                                                (> eval-store-source-form 0))
                                            result)))
