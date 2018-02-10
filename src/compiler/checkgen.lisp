@@ -385,7 +385,18 @@
            (%interr-symbol-for-type-spec external-spec)))
     (if interr-symbol
         `(%type-check-error/c ,var ',interr-symbol ',context)
-        `(%type-check-error ,var ',external-spec ',context))))
+        `(%type-check-error
+          ,var
+          ',(typecase type
+              ;; These are already loaded into the constants vector
+              (structure-classoid
+               ;; Can't use CLASSOID-LAYOUT as it may mismatch due to redefinition
+               (info :type :compiler-layout (classoid-name type)))
+              (standard-classoid
+               (find-classoid-cell (classoid-name type) :create t))
+              (t
+               external-spec))
+          ',context))))
 
 ;;; Return a lambda form that we can convert to do a type check
 ;;; of the specified TYPES. TYPES is a list of the format returned by

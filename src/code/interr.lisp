@@ -298,7 +298,13 @@
                  'layout-invalid
                  'type-error)
              :datum object
-             :expected-type type
+             :expected-type (typecase type
+                              (classoid-cell
+                               (classoid-cell-name type))
+                              (layout
+                               (layout-proper-name type))
+                              (t
+                               type))
              :context (sb!di:error-context))))
 
 (deferr layout-invalid-error (object layout)
