@@ -161,7 +161,6 @@
     *alloc-signal*
     sb!sys:*interrupt-pending*
     #!+sb-thruption sb!sys:*thruption-pending*
-    #!+sb-thruption sb!kernel:*restart-clusters*
     *in-without-gcing*
     *gc-inhibit*
     *gc-pending*

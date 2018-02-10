@@ -540,13 +540,6 @@ thread_may_thrupt(os_context_t *ctx)
         return 0;
 #endif
 
-    if (read_TLS(RESTART_CLUSTERS, self) == NIL)
-        /* This special case prevents TERMINATE-THREAD from hitting
-         * during INITIAL-THREAD-FUNCTION before it's ready.  Curiously,
-         * deferrables are already unblocked there.  Further
-         * investigation may be in order. */
-        return 0;
-
     return 1;
 }
 
