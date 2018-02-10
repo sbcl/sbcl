@@ -47,13 +47,13 @@
 ;;; Interference graph data structure
 
 ;; vertex in an interference graph
-(def!struct (vertex
+(defstruct (vertex
              (:include sset-element)
              (:copier nil)
              (:constructor %make-vertex (tn element-size pack-type)))
   ;; incidence set, as an ordered list (for reproducibility)
   (full-incidence  (make-oset) :type oset :read-only t)
-  (incidence       (vector)           :type simple-vector)
+  (incidence       #()                :type simple-vector)
   (incidence-count 0                  :type index)
   ;; list of potential locations in the TN's preferred SB for the
   ;; vertex, taking into account reserve locations and preallocated
@@ -80,7 +80,7 @@
   (tn-sc (vertex-tn vertex)))
 
 ;; interference graph
-(def!struct (interference-graph
+(defstruct (interference-graph
              (:copier nil)
              (:constructor %make-interference-graph)
              (:conc-name #:ig-))
@@ -92,7 +92,7 @@
   ;; A function that maps TNs to vertices, and then to the vertex's
   ;; assigned offset, if any.  The offset (or NIL) is returned first,
   ;; then the vertex as a second value.
-  (tn-vertex-mapping (bug "missing arg") :type function :read-only t))
+  (tn-vertex-mapping (missing-arg) :type function :read-only t))
 
 ;;; Interference graph construction
 ;;;
