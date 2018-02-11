@@ -598,12 +598,19 @@
                      ~2I~_~S~:>"
              'values-list (type-error-datum condition)))))
 
-(define-condition unbound-variable (cell-error) ()
+(define-condition unbound-variable (cell-error)
+  ((not-yet-loaded :initform nil :reader not-yet-loaded :initarg :not-yet-loaded))
   (:report
    (lambda (condition stream)
      (format stream
-             "The variable ~S is unbound."
-             (cell-error-name condition)))))
+             "~@<The variable ~S is unbound.~@?~@:>"
+             (cell-error-name condition)
+             (case (not-yet-loaded condition)
+               (:local
+                "~:@_It is a local variable ~
+                       not available at compile-time.")
+               (t
+                ""))))))
 
 (define-condition retry-unbound-variable
     (simple-condition unbound-variable) ())

@@ -207,7 +207,7 @@
   (with-simple-restart (continue "Ignore the last CDR")
     (error 'values-list-argument-error :datum list :expected-type 'list)))
 
-(defun restart-unbound (symbol context)
+(defun restart-unbound (symbol condition context)
   (multiple-value-bind (tn-offset pc-offset)
       (sb!c::decode-restart-location context)
     (labels ((retry-value (value)
@@ -253,13 +253,19 @@
                              (format stream "Set specified value and use it."))
                    :interactive read-evaluated-form
                    (set-value value t)))))
-      (try (make-condition 'unbound-variable :name symbol)))))
+      (try condition))))
 
 (deferr unbound-symbol-error (symbol)
-  (let* ((context (sb!di:error-context)))
+  (let* ((context (sb!di:error-context))
+         (condition (make-condition 'unbound-variable
+                                    :name symbol
+                                    :not-yet-loaded
+                                    (cond ((and (boundp 'sb!c:*lexenv*)
+                                                (sb!c:lexenv-find symbol vars))
+                                           :local)))))
     (if context
-        (restart-unbound symbol context)
-        (error 'unbound-variable :name symbol))))
+        (restart-unbound symbol condition context)
+        (error condition))))
 
 (deferr invalid-unwind-error ()
   (error 'simple-control-error
