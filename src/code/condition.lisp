@@ -608,13 +608,22 @@
 (define-condition retry-unbound-variable
     (simple-condition unbound-variable) ())
 
-(define-condition undefined-function (cell-error) ()
+(define-condition undefined-function (cell-error)
+  ((not-yet-loaded :initform nil :reader not-yet-loaded :initarg :not-yet-loaded))
   (:report
    (lambda (condition stream)
      (let ((*package* (find-package :keyword)))
        (format stream
-               "The function ~S is undefined."
-               (cell-error-name condition))))))
+               "~@<The function ~S is undefined.~@?~@:>"
+               (cell-error-name condition)
+               (case (not-yet-loaded condition)
+                 (:local
+                  "~:@_It is a local function ~
+                       not available at compile-time.")
+                 ((t) "~:@_It is defined earlier in the ~
+                           file but is not available at compile-time.")
+                 (t
+                  "")))))))
 
 (define-condition retry-undefined-function
     (simple-condition undefined-function) ())

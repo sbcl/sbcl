@@ -45,7 +45,7 @@
 (defvar *current-internal-error-args*)
 
 #!+undefined-fun-restarts
-(defun restart-undefined (name fdefn-or-symbol context)
+(defun restart-undefined (name condition fdefn-or-symbol context)
   (multiple-value-bind (tn-offset pc-offset)
       (if context
           (sb!c::decode-restart-location context)
@@ -127,28 +127,39 @@
                                        (declare (ignore args))
                                        (values))
                                      retrying)))))))
-      (try (make-condition 'undefined-function :name name)))))
+      (try condition))))
 
 (deferr undefined-fun-error (fdefn-or-symbol)
-  (let ((name (etypecase fdefn-or-symbol
-                (symbol fdefn-or-symbol)
-                (fdefn (let ((name (fdefn-name fdefn-or-symbol)))
-                         ;; fasteval stores weird things in the NAME slot
-                         ;; of fdefns of special forms. Have to grab the
-                         ;; special form name out of that.
-                         (cond #!+(and sb-fasteval immobile-code)
-                               ((and (listp name) (functionp (car name)))
-                                (cadr (%fun-name (car name))))
-                               (t
-                                name))))))
-        #!+undefined-fun-restarts
-        context)
+  (let* ((name (etypecase fdefn-or-symbol
+                 (symbol fdefn-or-symbol)
+                 (fdefn (let ((name (fdefn-name fdefn-or-symbol)))
+                          ;; fasteval stores weird things in the NAME slot
+                          ;; of fdefns of special forms. Have to grab the
+                          ;; special form name out of that.
+                          (cond #!+(and sb-fasteval immobile-code)
+                                ((and (listp name) (functionp (car name)))
+                                 (cadr (%fun-name (car name))))
+                                (t
+                                 name))))))
+         (condition
+           (make-condition 'undefined-function
+                           :name name
+                           :not-yet-loaded
+                           (cond ((member name sb!c::*fun-names-in-this-file*
+                                          :test #'equal)
+                                  t)
+                                 ((and (boundp 'sb!c:*lexenv*)
+                                       (sb!c::fun-locally-defined-p
+                                        name sb!c:*lexenv*))
+                                  :local))))
+         #!+undefined-fun-restarts
+         context)
     (cond #!+undefined-fun-restarts
           ((or (= *current-internal-trap-number* sb!vm:cerror-trap)
                (integerp (setf context (sb!di:error-context))))
-           (restart-undefined name fdefn-or-symbol context))
+           (restart-undefined name condition fdefn-or-symbol context))
           (t
-           (error 'undefined-function :name name)))))
+           (error condition)))))
 
 #!+(or arm arm64 x86-64)
 (deferr undefined-alien-fun-error (address)
