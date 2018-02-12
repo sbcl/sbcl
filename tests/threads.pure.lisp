@@ -222,7 +222,7 @@
                            :timeout)))))
         (progv '(this-is-new) (list (make-array 24 :initial-element mom-mark))
           (signal-semaphore semaphore)
-          (assert (eq mom-mark (aref (join-thread child) 0)))
+          (assert (eq mom-mark (aref (join-thread child :timeout 10) 0)))
           (assert (eq kid-mark (aref (symbol-value 'this-is-new) 0))))))
     (setf running nil)
     (join-thread noise)))
