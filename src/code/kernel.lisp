@@ -89,7 +89,7 @@
   (let (values)
     (do-closure-values (elt closure)
       (push elt values))
-    (nreverse values)))
+    values)) ; no need to reverse - this has no promised iteration order
 
 (defun %set-vector-raw-bits (object offset value)
   (setf (%vector-raw-bits object offset) value))
