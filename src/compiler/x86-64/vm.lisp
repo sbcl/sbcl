@@ -423,7 +423,7 @@
                (dolist (reg-name reg-names `(progn ,@(forms)))
                  (let ((tn-name (symbolicate reg-name "-TN"))
                        (offset-name (symbolicate reg-name "-OFFSET")))
-                   (forms `(defconstant-eqx ,tn-name
+                   (forms `(!possibly-defconstant-eqx ,tn-name
                              (make-random-tn :kind :normal
                                              :sc (sc-or-lose ',sc-name)
                                              :offset ,offset-name)
@@ -467,7 +467,7 @@
 ;; (DEFCONSTANT TEMP-REG-TN '#<SB-C:TN {addr}>)
 ;; But this rendering needs a MAKE-LOAD-FORM method on TN.
 ;; Hiding the constant-ness from the macro dumbs it down enough to work.
-(defconstant-eqx temp-reg-tn (symbol-value 'r11-tn) (constantly t))
+(!possibly-defconstant-eqx temp-reg-tn (symbol-value 'r11-tn) (constantly t))
 
 ;;; TNs for registers used to pass arguments
 ;;; This can't be a DEFCONSTANT-EQX, for a similar reason to above, but worse.
@@ -480,7 +480,7 @@
             (symbol-value (symbolicate register-arg-name "-TN")))
           *register-arg-names*))
 
-(defconstant-eqx thread-base-tn (symbol-value 'r12-tn) (constantly t))
+(!possibly-defconstant-eqx thread-base-tn (symbol-value 'r12-tn) (constantly t))
 
 ;;; If value can be represented as an immediate constant, then return
 ;;; the appropriate SC number, otherwise return NIL.

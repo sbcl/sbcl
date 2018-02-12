@@ -1123,6 +1123,9 @@ possibly temporarily, because it might be used internally."
                "C-STRING-DECODING-ERROR"
                "ATTEMPT-RESYNC" "FORCE-END-OF-FILE"
 
+               ;; bug workaround. Or not. I don't know if it's a bug
+               "!POSSIBLY-DEFCONSTANT-EQX"
+
                ;; bootstrapping magic, to make things happen both in
                ;; the cross-compilation host compiler's environment and
                ;; in the cross-compiler's environment
