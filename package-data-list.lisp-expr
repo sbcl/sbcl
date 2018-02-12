@@ -519,6 +519,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
       :export ("+DISASSEM-INST-ALIGNMENT-BYTES+"
                "*DISASSEM-NOTE-COLUMN*" "*DISASSEM-OPCODE-COLUMN-WIDTH*"
                "*DISASSEM-LOCATION-COLUMN-WIDTH*"
+               "ALIGN" ;;  prevent it from being removed, older Slime versions are using it
                "ARG-VALUE" "DISASSEM-STATE"
                "DISASSEMBLE-CODE-COMPONENT"
                "DISASSEMBLE-FUN" "DISASSEMBLE-MEMORY"
