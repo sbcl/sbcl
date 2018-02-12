@@ -48,7 +48,7 @@
 (!def-primitive-type signed-byte-64 (signed-reg descriptor-reg)
   :type (signed-byte 64))
 
-(defvar *fixnum-primitive-type* (primitive-type-or-lose 'fixnum))
+(define-load-time-global *fixnum-primitive-type* (primitive-type-or-lose 'fixnum))
 
 (/show0 "primtype.lisp 53")
 (!def-primitive-type-alias tagged-num '(:or positive-fixnum fixnum))

@@ -10,9 +10,10 @@
 ;;;; files for more information.
 (in-package "SB!VM")
 
-(defparameter *immediate-types*
+(defconstant-eqx +immediate-types+
   (list unbound-marker-widetag character-widetag
-        #!+64-bit single-float-widetag))
+        #!+64-bit single-float-widetag)
+  #'equal)
 
 ;; Given a list of widetags in HEADERS, compress into a minimal list of ranges
 ;; and/or singletons that should be tested.
@@ -83,7 +84,7 @@
                        t))
          (lowtags (remove lowtag-limit type-codes :test #'<))
          (extended (remove lowtag-limit type-codes :test #'>))
-         (immediates (intersection extended *immediate-types* :test #'eql))
+         (immediates (intersection extended +immediate-types+ :test #'eql))
          ;; To collapse the range of widetags comprising real numbers on 64-bit
          ;; machines, consider SHORT-FLOAT-WIDETAG both a header and immediate.
          ;; No OTHER-POINTER-LOWTAG object can ever have that header tag.
@@ -97,8 +98,8 @@
                    (if (and (= n-word-bits 64)
                             (member (- single-float-widetag 4) extended)
                             (member (+ single-float-widetag 4) extended))
-                       (remove single-float-widetag *immediate-types*)
-                       *immediate-types*)
+                       (remove single-float-widetag +immediate-types+)
+                       +immediate-types+)
                    :test #'eql))
          (function-p (if (intersection headers +fun-header-widetags+)
                          (if (subsetp headers +fun-header-widetags+)
