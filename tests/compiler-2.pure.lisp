@@ -1128,3 +1128,11 @@
   (checked-compile
    `(lambda ()
       (funcall (the (or cons function) *debugger-hook*)))))
+
+(with-test (:name :setf-schar-hairy-types)
+  (checked-compile-and-assert
+      ()
+      `(lambda (s v)
+         (setf (schar (the (satisfies eval) s) 0) v)
+         s)
+    (((copy-seq "abc") #\m) "mbc" :test #'equal)))

@@ -1327,7 +1327,7 @@
     (setf (lambda-bind clambda) nil)
 
     (labels ((delete-children (lambda)
-               (dolist (child (:dbg (lambda-children lambda)))
+               (dolist (child (lambda-children lambda))
                  (cond ((eq (functional-kind child) :deleted)
                         (delete-children child))
                        ;; Can happen when all optional entries produce
