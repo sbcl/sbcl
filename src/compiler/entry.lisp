@@ -100,8 +100,12 @@
                         :%source-name (functional-%source-name ef)
                         :%debug-name (functional-%debug-name ef)
                         :lexenv (make-null-lexenv)))
-                  (closure (physenv-closure
-                            (lambda-physenv (main-entry ef)))))
+                  (main-entry (main-entry ef))
+                  (closure (and
+                            ;; It may have been deleted due to none of
+                            ;; the optional entries reaching it.
+                            (neq (functional-kind main-entry) :deleted)
+                            (physenv-closure (lambda-physenv main-entry)))))
              (dolist (ref (leaf-refs lambda))
                (let ((ref-component (node-component ref)))
                  (cond ((eq ref-component component))

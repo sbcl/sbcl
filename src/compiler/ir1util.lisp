@@ -1327,9 +1327,15 @@
     (setf (lambda-bind clambda) nil)
 
     (labels ((delete-children (lambda)
-               (dolist (child (lambda-children lambda))
+               (dolist (child (:dbg (lambda-children lambda)))
                  (cond ((eq (functional-kind child) :deleted)
                         (delete-children child))
+                       ;; Can happen when all optional entries produce
+                       ;; errors, making the main entry unreachable,
+                       ;; but the XEP should not be deleted, as it can
+                       ;; still be reachable.
+                       ((and (eq (functional-kind child) :external)
+                             (eq (main-entry (functional-entry-fun child)) clambda)))
                        (t
                         (delete-lambda child))))
                (setf (lambda-children lambda) nil)

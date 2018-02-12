@@ -258,3 +258,12 @@
                                     (typep x '(complex (eql t))))
                                  :allow-warnings t)))
              1)))
+
+(with-test (:name :bad-optionals)
+  (assert (nth-value 1
+                     (checked-compile
+                      '(lambda (z)
+                        (lambda (&optional (a nil x))
+                          (declare (type integer x))
+                          z))
+                      :allow-warnings t))))
