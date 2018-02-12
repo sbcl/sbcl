@@ -287,3 +287,57 @@
                          ,@(and docp `(',doc)))))
 
 (defvar *!removable-symbols* nil)
+
+(defun %defconstant-eqx-value (symbol expr eqx)
+  (declare (type function eqx))
+  (if (boundp symbol)
+      (let ((oldval (symbol-value symbol)))
+        ;; %DEFCONSTANT will give a choice of how to proceeed on error.
+        (if (funcall eqx oldval expr) oldval expr))
+      expr))
+
+;;; generalization of DEFCONSTANT to values which are the same not
+;;; under EQL but under e.g. EQUAL or EQUALP
+;;;
+;;; DEFCONSTANT-EQX is to be used instead of DEFCONSTANT for values
+;;; which are appropriately compared using the function given by the
+;;; EQX argument instead of EQL.
+;;;
+#+sb-xc-host
+(defmacro defconstant-eqx (symbol expr eqx &optional doc)
+  ;; CLISP needs the EVAL-WHEN here, or else the symbol defined is unavailable
+  ;; for later uses within the same file. For instance, in x86-64/vm, defining
+  ;; TEMP-REG-TN as R11-TN would get an error that R11-TN is unbound.
+  ;; We don't want that junk in our expansion, especially as our requirement
+  ;; is to separate the compile-time and load-time effect.
+  `(eval-when (:compile-toplevel :load-toplevel :execute)
+     (defconstant ,symbol (%defconstant-eqx-value ',symbol ,expr ,eqx)
+       ,@(when doc (list doc)))))
+
+;;; This is the expansion as it should be for us, but notice that this
+;;; recapitulation of the macro is actually not defined at compile-time.
+#-sb-xc-host
+(let ()
+  (defmacro defconstant-eqx (symbol expr eqx &optional doc)
+    `(defconstant ,symbol (%defconstant-eqx-value ',symbol ,expr ,eqx)
+       ,@(when doc (list doc)))))
+
+;;; Special variant at cross-compile-time. Face it: the "croak-if-not-EQx" test
+;;; is irrelevant - there can be no pre-existing value to test against.
+;;; The extra magic is that we need to discern between constants simple enough
+;;; to assigned during genesis (cold-load) from those assigned in cold-init.
+;;; This choice informs the compiler how to emit references to the symbol.
+(defvar sb!c::*!const-value-deferred* '())
+#-sb-xc-host
+(eval-when (:compile-toplevel)
+  (sb!xc:defmacro defconstant-eqx (symbol expr eqx &optional doc)
+    (let ((constp (sb!xc:constantp expr)))
+      `(progn
+         (eval-when (:compile-toplevel)
+           (sb!xc:defconstant ,symbol (%defconstant-eqx-value ',symbol ,expr ,eqx))
+           ,@(unless constp
+               `((push ',symbol sb!c::*!const-value-deferred*))))
+         (eval-when (:load-toplevel)
+           (sb!c::%defconstant ',symbol
+             ,(if constp `',(constant-form-value expr) expr)
+             (sb!c:source-location) ,@(when doc (list doc))))))))

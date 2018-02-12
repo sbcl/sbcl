@@ -2055,11 +2055,18 @@ SPEED and COMPILATION-SPEED optimization values, and the
         (throw 'pending-init circular-ref)))
     ;; If this is a global constant reference, we can call SYMBOL-GLOBAL-VALUE
     ;; during LOAD as a fasl op, and not compile a lambda.
-    (when namep
+    ;; However: the cross-compiler can not always emit fop-funcall for this,
+    ;; because the order of load-time actions is not strictly preserved as it
+    ;; would be for normal compilation. If the symbol's value needs computation,
+    ;; then it is unbound during genesis.
+    ;; So check if assignment was deferred, and if so, also defer the use.
+    (when (and namep #+sb-xc-host (not (member name *!const-value-deferred*)))
       (fopcompile `(symbol-global-value ',name) nil t nil)
       (fasl-note-handle-for-constant constant (sb!fasl::dump-pop fasl) fasl)
       (return-from emit-make-load-form nil))
-    (multiple-value-bind (creation-form init-form) (%make-load-form constant)
+    (multiple-value-bind (creation-form init-form)
+        (cond (namep (values `(symbol-global-value ',name) nil))
+              (t (%make-load-form constant)))
       (case creation-form
         (sb!fasl::fop-struct
          (fasl-validate-structure constant fasl)

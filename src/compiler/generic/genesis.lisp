@@ -2567,6 +2567,10 @@ core and return a descriptor to it."
             (%svset (apply 'cold-svset args))
             (t (call fun :sb-cold-funcall-handler/for-effect args)))))))
 
+;;; Needed for certain L-T-V lambdas that use the -NO-SKIP variant of funcall.
+(setf (svref **fop-funs** (get 'fop-funcall-no-skip 'opcode))
+      (svref **fop-funs** (get 'fop-funcall 'opcode)))
+
 (defun finalize-load-time-value-noise ()
   (cold-set '*!load-time-values*
             (allocate-vector-object *dynamic*
