@@ -20,7 +20,7 @@
 (macrolet ((defreg (name offset)
              (let ((offset-sym (symbolicate name "-OFFSET")))
                `(eval-when (:compile-toplevel :load-toplevel :execute)
-                  (def!constant ,offset-sym ,offset)
+                  (defconstant ,offset-sym ,offset)
                   (setf (svref *register-names* ,offset-sym) ,(symbol-name name)))))
 
            (defregset (name &rest regs)

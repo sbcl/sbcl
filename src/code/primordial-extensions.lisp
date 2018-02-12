@@ -199,7 +199,7 @@
                          (if (consp id)
                              (values (car id) (cdr id))
                              (values id nil))
-                       `(def!constant ,sym ,value ,@docstring))))
+                       `(defconstant ,sym ,value ,@docstring))))
                  identifiers))))
 
 ;;; a helper function for various macros which expect clauses of a

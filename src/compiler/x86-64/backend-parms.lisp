@@ -45,4 +45,4 @@
 ;;; This must be a multiple of the OS page size.
 (defconstant gencgc-release-granularity +backend-page-bytes+)
 ;;; The card size for immobile/low space
-#!+immobile-space (def!constant immobile-card-bytes 4096)
+#!+immobile-space (defconstant immobile-card-bytes 4096)

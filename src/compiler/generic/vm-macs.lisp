@@ -141,7 +141,7 @@
             (setf variable-length-p t))
           (incf offset length)))
       (unless variable-length-p
-        (constants `(def!constant ,(symbolicate name "-SIZE") ,offset)))
+        (constants `(defconstant ,(symbolicate name "-SIZE") ,offset)))
       #-c-headers-only
       (when alloc-trans
         (forms `(def-alloc ,alloc-trans ,offset
@@ -211,7 +211,7 @@
 (in-package "SB!C")
 
 ;;; the maximum number of SCs in any implementation
-(def!constant sc-number-limit 62)
+(defconstant sc-number-limit 62)
 
 ;;; Modular functions
 
