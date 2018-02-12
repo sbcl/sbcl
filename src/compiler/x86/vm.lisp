@@ -30,14 +30,11 @@
                     ;; (in the same file) depends on compile-time evaluation
                     ;; of the DEFCONSTANT. -- AL 20010224
                 (defconstant ,(symbolicate name "-OFFSET") ,offset)))
-           ;; FIXME: It looks to me as though DEFREGSET should also
-           ;; define the related *FOO-REGISTER-NAMES* variable.
            (defregset (name &rest regs)
-             `(eval-when (:compile-toplevel :load-toplevel :execute)
-                (defparameter ,name
+             `(defglobal ,name
                   (list ,@(mapcar (lambda (name)
                                     (symbolicate name "-OFFSET"))
-                                  regs))))))
+                                  regs)))))
 
   ;; byte registers
   ;;
@@ -318,18 +315,14 @@
 
 (macrolet ((def-misc-reg-tns (sc-name &rest reg-names)
              (collect ((forms))
-                      (dolist (reg-name reg-names)
-                        (let ((tn-name (symbolicate reg-name "-TN"))
-                              (offset-name (symbolicate reg-name "-OFFSET")))
-                          ;; FIXME: It'd be good to have the special
-                          ;; variables here be named with the *FOO*
-                          ;; convention.
-                          (forms `(defparameter ,tn-name
-                                    (make-random-tn :kind :normal
-                                                    :sc (sc-or-lose ',sc-name)
-                                                    :offset
-                                                    ,offset-name)))))
-                      `(progn ,@(forms)))))
+               (dolist (reg-name reg-names `(progn ,@(forms)))
+                 (let ((tn-name (symbolicate reg-name "-TN"))
+                       (offset-name (symbolicate reg-name "-OFFSET")))
+                   (forms `(defconstant-eqx ,tn-name
+                             (make-random-tn :kind :normal
+                                             :sc (sc-or-lose ',sc-name)
+                                             :offset ,offset-name)
+                             (constantly t))))))))
 
   (def-misc-reg-tns unsigned-reg eax ebx ecx edx ebp esp edi esi)
   (def-misc-reg-tns word-reg ax bx cx dx bp sp di si)

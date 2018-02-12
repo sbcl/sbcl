@@ -37,14 +37,13 @@
                     ;; (in the same file) depends on compile-time evaluation
                     ;; of the DEFCONSTANT. -- AL 20010224
                 (defconstant ,(symbolicate name "-OFFSET") ,offset)))
-           ;; FIXME: It looks to me as though DEFREGSET should also
-           ;; define the related *FOO-REGISTER-NAMES* variable.
            (defregset (name &rest regs)
-             `(eval-when (:compile-toplevel :load-toplevel :execute)
-                (defparameter ,name
+             ;; FIXME: this would be DEFCONSTANT-EQX were it not
+             ;; for all the style-warnings about earmuffs on a constant.
+             `(defglobal ,name
                   (list ,@(mapcar (lambda (name)
                                     (symbolicate name "-OFFSET"))
-                                  regs))))))
+                                  regs)))))
 
   ;; byte registers
   ;;
@@ -421,18 +420,14 @@
 
 (macrolet ((def-misc-reg-tns (sc-name &rest reg-names)
              (collect ((forms))
-                      (dolist (reg-name reg-names)
-                        (let ((tn-name (symbolicate reg-name "-TN"))
-                              (offset-name (symbolicate reg-name "-OFFSET")))
-                          ;; FIXME: It'd be good to have the special
-                          ;; variables here be named with the *FOO*
-                          ;; convention.
-                          (forms `(defglobal ,tn-name
-                                    (make-random-tn :kind :normal
-                                                    :sc (sc-or-lose ',sc-name)
-                                                    :offset
-                                                    ,offset-name)))))
-                      `(progn ,@(forms)))))
+               (dolist (reg-name reg-names `(progn ,@(forms)))
+                 (let ((tn-name (symbolicate reg-name "-TN"))
+                       (offset-name (symbolicate reg-name "-OFFSET")))
+                   (forms `(defconstant-eqx ,tn-name
+                             (make-random-tn :kind :normal
+                                             :sc (sc-or-lose ',sc-name)
+                                             :offset ,offset-name)
+                             (constantly t))))))))
 
   (def-misc-reg-tns unsigned-reg rax rbx rcx rdx rbp rsp rdi rsi
                     r8 r9 r10 r11 r12 r13 r14 r15)
@@ -466,17 +461,26 @@
 ;; A register that's never used by the code generator, and can therefore
 ;; be used as an assembly temporary in cases where a VOP :TEMPORARY can't
 ;; be used.
-(defglobal temp-reg-tn r11-tn)
+;; (DEFCONSTANT-EQX TEMP-REG-TN R11-TN ...) causes a self-inflicted problem
+;; due to the magic in the cross-compiler's version of DEFCONSTANT-EQX.
+;; Since the value assigned is constant, we turn that form into
+;; (DEFCONSTANT TEMP-REG-TN '#<SB-C:TN {addr}>)
+;; But this rendering needs a MAKE-LOAD-FORM method on TN.
+;; Hiding the constant-ness from the macro dumbs it down enough to work.
+(defconstant-eqx temp-reg-tn (symbol-value 'r11-tn) (constantly t))
 
 ;;; TNs for registers used to pass arguments
-(defparameter *register-arg-tns*
+;;; This can't be a DEFCONSTANT-EQX, for a similar reason to above, but worse.
+;;; Among the problems, RECEIVE-UNKNOWN-VALUES uses (FIRST *REGISTER-ARG-TNS*)
+;;; and so the compiler knows that the object is constant and wants to dump it
+;;; as such; it has no name, so it's not even reasonable to expect it to
+;;; use the corresponding object in RDX-TN.
+(defglobal *register-arg-tns*
   (mapcar (lambda (register-arg-name)
             (symbol-value (symbolicate register-arg-name "-TN")))
           *register-arg-names*))
 
-(defglobal thread-base-tn
-  (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg)
-                  :offset r12-offset))
+(defconstant-eqx thread-base-tn (symbol-value 'r12-tn) (constantly t))
 
 ;;; If value can be represented as an immediate constant, then return
 ;;; the appropriate SC number, otherwise return NIL.
