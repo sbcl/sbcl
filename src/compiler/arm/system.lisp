@@ -192,7 +192,6 @@
     (inst sub ndescr ndescr (- other-pointer-lowtag fun-pointer-lowtag))
     (inst add func code ndescr)))
 ;;;
-#!+symbol-info-vops
 (define-vop (symbol-info-vector)
   (:policy :fast-safe)
   (:translate symbol-info-vector)
@@ -206,7 +205,6 @@
     (inst cmp temp list-pointer-lowtag)
     (loadw res res cons-cdr-slot list-pointer-lowtag :eq)))
 
-#!+symbol-info-vops
 (define-vop (symbol-plist)
   (:policy :fast-safe)
   (:translate symbol-plist)

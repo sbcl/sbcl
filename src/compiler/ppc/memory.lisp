@@ -82,7 +82,6 @@
 (define-indexer signed-byte-index-ref nil lbz lbzx 2 t)
 (define-indexer byte-index-set t stb stbx 2)
 
-#!+compare-and-swap-vops
 (define-vop (word-index-cas)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg zero immediate))

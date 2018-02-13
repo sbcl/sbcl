@@ -459,7 +459,6 @@
   (def fast-ash-left/signed=>signed signed-reg signed-num signed-reg 3)
   (def fast-ash-left/unsigned=>unsigned unsigned-reg unsigned-num unsigned-reg 3))
 
-#!+ash-right-vops
 (define-vop (fast-%ash/right/unsigned)
   (:translate %ash/right)
   (:policy :fast-safe)
@@ -471,7 +470,6 @@
   (:generator 4
      (inst lsr result number amount)))
 
-#!+ash-right-vops
 (define-vop (fast-%ash/right/signed)
   (:translate %ash/right)
   (:policy :fast-safe)
@@ -483,7 +481,6 @@
   (:generator 4
     (inst asr result number amount)))
 
-#!+ash-right-vops
 (define-vop (fast-%ash/right/fixnum)
   (:translate %ash/right)
   (:policy :fast-safe)
@@ -1103,7 +1100,6 @@
     (inst umulh hi x y)
     (inst mul lo x y)))
 
-#!+multiply-high-vops
 (define-vop (mulhi)
   (:translate %multiply-high)
   (:policy :fast-safe)
@@ -1115,7 +1111,6 @@
   (:generator 20
     (inst umulh hi x y)))
 
-#!+multiply-high-vops
 (define-vop (mulhi/fx)
   (:translate %multiply-high)
   (:policy :fast-safe)

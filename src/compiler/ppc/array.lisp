@@ -139,7 +139,6 @@
   (def-data-vector-frobs simple-array-signed-byte-32 word-index
     signed-num signed-reg))
 
-#!+compare-and-swap-vops
 (define-vop (%compare-and-swap-svref word-index-cas)
   (:note "inline array compare-and-swap")
   (:policy :fast-safe)

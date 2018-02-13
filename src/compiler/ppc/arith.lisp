@@ -1125,7 +1125,6 @@
     (inst mullw lo x y)
     (inst mulhwu hi x y)))
 
-#!+multiply-high-vops
 (define-vop (mulhi)
   (:translate %multiply-high)
   (:policy :fast-safe)
@@ -1137,7 +1136,6 @@
   (:generator 20
     (inst mulhwu hi x y)))
 
-#!+multiply-high-vops
 (define-vop (mulhi/fx)
   (:translate %multiply-high)
   (:policy :fast-safe)

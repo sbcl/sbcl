@@ -184,9 +184,6 @@
 
 ;;;; symbol frobbing
 
-;; only define if the feature is enabled to test building without it
-#!+symbol-info-vops
-(progn
 (define-vop (symbol-info-vector)
   (:policy :fast-safe)
   (:translate symbol-info-vector)
@@ -217,7 +214,7 @@
     (loadw res res cons-car-slot list-pointer-lowtag)
     (inst mov temp nil-value)
     (emit-optimized-test-inst res fixnum-tag-mask)
-    (inst cmov :e res temp))))
+    (inst cmov :e res temp)))
 
 ;;;; other miscellaneous VOPs
 
@@ -338,32 +335,27 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
 
 ;;;; Memory barrier support
 
-#!+memory-barrier-vops
 (define-vop (%compiler-barrier)
   (:policy :fast-safe)
   (:translate %compiler-barrier)
   (:generator 3))
 
-#!+memory-barrier-vops
 (define-vop (%memory-barrier)
   (:policy :fast-safe)
   (:translate %memory-barrier)
   (:generator 3
     (inst add (make-ea :dword :base esp-tn) 0 :lock)))
 
-#!+memory-barrier-vops
 (define-vop (%read-barrier)
   (:policy :fast-safe)
   (:translate %read-barrier)
   (:generator 3))
 
-#!+memory-barrier-vops
 (define-vop (%write-barrier)
   (:policy :fast-safe)
   (:translate %write-barrier)
   (:generator 3))
 
-#!+memory-barrier-vops
 (define-vop (%data-dependency-barrier)
   (:policy :fast-safe)
   (:translate %data-dependency-barrier)

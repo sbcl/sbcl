@@ -938,7 +938,6 @@ constant shift greater than word length")))
 
     DONE))
 
-#!+ash-right-vops
 (define-vop (fast-%ash/right/unsigned)
   (:translate %ash/right)
   (:policy :fast-safe)
@@ -953,7 +952,6 @@ constant shift greater than word length")))
     (move rcx amount)
     (inst shr result :cl)))
 
-#!+ash-right-vops
 (define-vop (fast-%ash/right/signed)
   (:translate %ash/right)
   (:policy :fast-safe)
@@ -968,7 +966,6 @@ constant shift greater than word length")))
     (move rcx amount)
     (inst sar result :cl)))
 
-#!+ash-right-vops
 (define-vop (fast-%ash/right/fixnum)
   (:translate %ash/right)
   (:policy :fast-safe)
@@ -1748,7 +1745,6 @@ constant shift greater than word length")))
     (move hi edx)
     (move lo eax)))
 
-#!+multiply-high-vops
 (define-vop (mulhi)
   (:translate %multiply-high)
   (:policy :fast-safe)
@@ -1766,7 +1762,6 @@ constant shift greater than word length")))
     (inst mul eax y)
     (move hi edx)))
 
-#!+multiply-high-vops
 (define-vop (mulhi/fx)
   (:translate %multiply-high)
   (:policy :fast-safe)

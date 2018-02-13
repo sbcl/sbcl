@@ -35,7 +35,6 @@
   (:info name dx-p offset lowtag)
   (:ignore name dx-p))
 
-#!+compare-and-swap-vops
 (define-vop (compare-and-swap-slot)
   (:args (object :scs (descriptor-reg))
          (old :scs (descriptor-reg any-reg))
@@ -59,7 +58,6 @@
 
 ;;;; Symbol hacking VOPs:
 
-#!+compare-and-swap-vops
 (define-vop (%compare-and-swap-symbol-value)
   (:translate %compare-and-swap-symbol-value)
   (:args (symbol :scs (descriptor-reg))
@@ -488,7 +486,6 @@
   (:variant instance-slots-offset instance-pointer-lowtag)
   (:arg-types instance positive-fixnum *))
 
-#!+compare-and-swap-vops
 (define-vop (%instance-cas word-index-cas)
   (:policy :fast-safe)
   (:translate %instance-cas)
