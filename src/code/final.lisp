@@ -225,14 +225,13 @@ Examples:
   (let ((hashtable (finalizer-id-map **finalizer-store**)))
     (loop
      (let ((cell (hash-table-culled-values hashtable)))
-       ;; Remove an item from the pending list
-       (unless cell (return))
        ;; This is like atomic-pop, but its obtains the first cons cell
        ;; in the list, not the car of the first cons.
-       (loop (let ((actual (cas (hash-table-culled-values hashtable)
+       (loop (unless cell (return-from scan-finalizers))
+             (let ((actual (cas (hash-table-culled-values hashtable)
                                 cell (cdr cell))))
                (if (eq actual cell) (return) (setq cell actual))))
-       (let* ((id (car cell))
+       (let* ((id (the index (car cell)))
               ;; No other thread can modify **FINALIZER-STORE** at index ID
               ;; because the table no longer contains an object mapping to
               ;; that element; however the vector could be grown at any point,
@@ -242,6 +241,14 @@ Examples:
               ;; on (CAR CELL) and STORE. (Alpha with threads, anyone?)
               (finalizers (svref store id))) ; [1] load
          (setf (svref store id) 0)           ; [2] store
+         ;; The ID can be reused right away. Link it into the recycle list,
+         ;; which has an extra NIL at the head so that we can use RPLACD,
+         ;; making this operation agnostic of whether the vector was switched.
+         (let* ((list (svref store 0))
+                (old (cdr list)))
+           (loop (let ((actual (cas (cdr list) old (rplacd cell old))))
+                   (if (eq actual old) (return) (setq old actual)))))
+         ;; Now call the function(s)
          (flet ((call (finalizer)
                   (let ((fun (if (consp finalizer) (car finalizer) finalizer)))
                     (handler-case (funcall fun)
@@ -267,12 +274,7 @@ Examples:
          ;; removing dangling references, but if it's just a function,
          ;; there's nothing to smash.
          (cond ((simple-vector-p finalizers) (fill finalizers 0))
-               ((consp finalizers) (rplaca finalizers 0)))
-         ;; Recycle the ID by linking CELL into the recycle bin.
-         (let* ((list (svref store 0))
-                (old (cdr list)))
-           (loop (let ((actual (cas (cdr list) old (rplacd cell old))))
-                   (if (eq actual old) (return) (setq old actual))))))))))
+               ((consp finalizers) (rplaca finalizers 0))))))))
 
 #!+sb-thread
 (progn

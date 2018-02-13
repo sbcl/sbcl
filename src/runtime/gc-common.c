@@ -1364,7 +1364,7 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table, lispobj *prev,
             kv_vector[2 * index] = empty_symbol;
             if (save_culled_values) {
                 lispobj val = kv_vector[2 * index + 1];
-                gc_assert(is_lisp_immediate(val));
+                gc_assert(!is_lisp_pointer(val));
                 struct cons *cons = (struct cons*)
                   gc_general_alloc(sizeof(struct cons), BOXED_PAGE_FLAG, ALLOC_QUICK);
                 // Lisp code which manipulates the culled_values slot must use
