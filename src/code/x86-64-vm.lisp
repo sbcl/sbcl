@@ -62,7 +62,7 @@
   (return-from fixup-code-object
     (case flavor
       ((:named-call :layout :immobile-object ; -> fixedobj subspace
-        :assembly-routine :static-call)      ; -> varyobj subspace
+        :assembly-routine :assembly-routine* :static-call) ; -> varyobj subspace
        (if (eq kind :absolute) :absolute))
       (:foreign
        ;; linkage-table calls using the "CALL rel32" format need to be saved,

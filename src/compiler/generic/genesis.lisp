@@ -1843,7 +1843,8 @@ core and return a descriptor to it."
           (unless leave-fn-raw
             (write-wordindexed fdefn sb!vm:fdefn-fun-slot *nil-descriptor*)
             (let ((tramp
-                   (or (lookup-assembler-reference 'sb!vm::undefined-tramp core-file-name)
+                   (or (lookup-assembler-reference 'sb!vm::undefined-tramp
+                                                   :direct core-file-name)
                        ;; Our preload for the tramps doesn't happen during host-1,
                        ;; so substitute a usable value.
                        0)))
@@ -2048,13 +2049,20 @@ core and return a descriptor to it."
 (defvar *cold-assembler-routines*)
 (defvar *cold-static-call-fixups*)
 
-(defun lookup-assembler-reference (symbol &optional (errorp t))
-  (let ((code-component (car *cold-assembler-obj*))
-        (offset (or (cdr (assoc symbol *cold-assembler-routines*))
-                    (and errorp (error "Assembler routine ~S not defined." symbol)))))
+(defun lookup-assembler-reference (symbol &optional (mode :direct) (errorp t))
+  (let* ((code-component *cold-assembler-obj*)
+         (list *cold-assembler-routines*)
+         (offset (or (cdr (assq symbol list))
+                     (and errorp (error "Assembler routine ~S not defined." symbol)))))
     (when offset
       (+ (logandc2 (descriptor-bits code-component) sb!vm:lowtag-mask)
-         (calc-offset code-component offset)))))
+         (ecase mode
+           (:direct
+            (calc-offset code-component offset))
+           (:indirect
+            (ash (+ (round-up sb!vm:code-constants-offset 2)
+                    (count-if (lambda (x) (< (cdr x) offset)) list))
+                 sb!vm:word-shift)))))))
 
 ;;; Unlike in the target, FOP-KNOWN-FUN sometimes has to backpatch.
 (defvar *deferred-known-fun-refs*)
@@ -2176,6 +2184,14 @@ core and return a descriptor to it."
                         *cold-foreign-symbol-table*
                         (hash-table-count *cold-foreign-symbol-table*)))))
 
+;;; Leave space for this many assembly routine addresses so that we can create
+;;; a vector of entrypoints in the code component header, allowing for
+;;; memory-indirect call on x86 where would otherwise a register would be needed
+;;; due to lack of an absolute call instruction.
+(defconstant asm-routine-table-size ; must be a multiple of 2
+  (+ #!+x86    40
+     #!+x86-64 64))
+
 ;;; *COLD-FOREIGN-SYMBOL-TABLE* becomes *!INITIAL-FOREIGN-SYMBOLS* in
 ;;; the core. When the core is loaded, !LOADER-COLD-INIT uses this to
 ;;; create *STATIC-FOREIGN-SYMBOLS*, which the code in
@@ -2198,9 +2214,20 @@ core and return a descriptor to it."
                                                     (if (listp key) (car key) key)))))
                (if (listp key) (cold-list sym) sym))
              'sb!vm::+required-foreign-symbols+)
-    (cold-set (cold-intern '*assembler-routines*) (car *cold-assembler-obj*))
-    (to-core (setq *cold-assembler-routines*
-                   (sort (copy-list *cold-assembler-routines*) #'< :key 'cdr))
+    (cold-set (cold-intern '*assembler-routines*) *cold-assembler-obj*)
+    (setq *cold-assembler-routines*
+          (sort *cold-assembler-routines* #'< :key #'cdr))
+    (when (plusp asm-routine-table-size)
+      ;; The number of routines must be strictly less than the table size
+      ;; so that there's room for a 0 word marking the end of the list.
+      (unless (< (length *cold-assembler-routines*) asm-routine-table-size)
+        (bug "Please increase ASM-ROUTINE-TABLE-SIZE for this platform"))
+      (let ((index (round-up sb!vm:code-constants-offset 2)))
+        (dolist (item *cold-assembler-routines*)
+          (write-wordindexed/raw *cold-assembler-obj* index
+                                 (lookup-assembler-reference (car item)))
+          (incf index))))
+    (to-core *cold-assembler-routines*
              (lambda (rtn)
                (cold-cons (cold-intern (first rtn)) (make-fixnum-descriptor (cdr rtn))))
              '*!initial-assembler-routines*)))
@@ -2775,47 +2802,46 @@ core and return a descriptor to it."
 
 (define-cold-fop (fop-assembler-code)
   (let* ((length (read-word-arg (fasl-input-stream)))
-         (aligned-length (round-up length (* 2 sb!vm:n-word-bytes)))
+         (rounded-length (round-up length (* 2 sb!vm:n-word-bytes)))
          (header-n-words
           ;; Note: we round the number of constants up to ensure that
           ;; the code vector will be properly aligned.
           (round-up sb!vm:code-constants-offset 2))
          (asm-code *cold-assembler-obj*)
-         (des (car asm-code))
-         (cur-length 0)
+         ;; OFFSET is the byte offset into CODE-INSTRUCTIONS
+         ;; at which this newly loaded set of routines will begin.
+         (offset (ash asm-routine-table-size sb!vm:word-shift))
          (space (or #!+immobile-space *immobile-varyobj* *read-only*)))
-    (cond (des
-           (setq cur-length
-                 (descriptor-fixnum (read-wordindexed des sb!vm:code-code-size-slot)))
+    (cond (asm-code
+           (setq offset
+                 (descriptor-fixnum (read-wordindexed asm-code
+                                                      sb!vm:code-code-size-slot)))
            (aver (= (gspace-free-word-index space)
-                    (+ (/ cur-length sb!vm:n-word-bytes) header-n-words)))
-           (incf (gspace-free-word-index space) (/ aligned-length sb!vm:n-word-bytes)))
+                    (+ (/ offset sb!vm:n-word-bytes) header-n-words)))
+           (incf (gspace-free-word-index space) (/ rounded-length sb!vm:n-word-bytes)))
           (t
-           (setq des (allocate-cold-descriptor
-                      space
-                      (+ (ash header-n-words sb!vm:word-shift) length)
-                      sb!vm:other-pointer-lowtag))
-           (setf asm-code (list des) *cold-assembler-obj* asm-code)
-           (write-header-word des header-n-words sb!vm:code-header-widetag)))
-    (write-wordindexed  des sb!vm:code-code-size-slot
-                        (make-fixnum-descriptor (+ cur-length aligned-length)))
-    (push aligned-length (cdr asm-code))
-    (let ((start (+ (descriptor-byte-offset des)
+           (setq asm-code
+                 (allocate-cold-descriptor
+                  space
+                  (+ (ash header-n-words sb!vm:word-shift) offset length)
+                  sb!vm:other-pointer-lowtag))
+           (setf *cold-assembler-obj* asm-code)
+           (write-header-word asm-code header-n-words sb!vm:code-header-widetag)))
+    (write-wordindexed asm-code sb!vm:code-code-size-slot
+                       (make-fixnum-descriptor (+ offset rounded-length)))
+    (let ((start (+ (descriptor-byte-offset asm-code)
                     (ash header-n-words sb!vm:word-shift)
-                    cur-length)))
-      (read-bigvec-as-sequence-or-die (descriptor-mem des)
+                    offset)))
+      (read-bigvec-as-sequence-or-die (descriptor-mem asm-code)
                                       (fasl-input-stream)
                                       :start start
                                       :end (+ start length)))
-    ;; Extra offset is the amount by which this assembly code component moves
-    ;; to stick it on to the end of the previous batch of assembly routines.
-    (let ((extra-offset (apply #'+ (cddr asm-code))))
-      ;; Update the name -> address table.
-      (dotimes (i (descriptor-fixnum (pop-stack)))
-        (let ((offset (+ (descriptor-fixnum (pop-stack)) extra-offset))
-              (name (pop-stack)))
-          (push (cons name offset) *cold-assembler-routines*)))
-      (apply-fixups (%fasl-input-stack (fasl-input)) des extra-offset))))
+    ;; Update the name -> address table.
+    (dotimes (i (descriptor-fixnum (pop-stack)))
+      (let ((offset (+ offset (descriptor-fixnum (pop-stack))))
+            (name (pop-stack)))
+        (push (cons name offset) *cold-assembler-routines*)))
+    (apply-fixups (%fasl-input-stack (fasl-input)) asm-code offset)))
 
 ;;; Target variant of this is defined in 'target-load'
 (defun apply-fixups (fop-stack code-obj extra-offset)
@@ -2830,6 +2856,7 @@ core and return a descriptor to it."
            code-obj offset
            (ecase flavor
              (:assembly-routine (lookup-assembler-reference sym))
+             (:assembly-routine* (lookup-assembler-reference sym :indirect))
              (:foreign
               (let ((sym (base-string-from-core sym)))
                 #!+sb-dynamic-core (dyncore-note-symbol sym nil)

@@ -256,9 +256,15 @@
 ;;; how we learn about assembler routines at startup
 (defvar *!initial-assembler-routines*)
 
-(defun get-asm-routine (name &aux (code *assembler-routines*))
+(defun get-asm-routine (name &optional indirect &aux (code *assembler-routines*))
   (awhen (gethash (the symbol name) (car (%code-debug-info code)))
-    (sap-int (sap+ (code-instructions code) (car it)))))
+    (if indirect
+        ;; Return the address containing the routine address
+        (+ (get-lisp-obj-address code)
+           (ash (+ (code-header-words code) (cddr it)) sb!vm:word-shift)
+           (- sb!vm:other-pointer-lowtag))
+        ;; Return the routine address itself
+        (sap-int (sap+ (code-instructions code) (car it))))))
 
 (defun !loader-cold-init ()
   (let* ((code *assembler-routines*)
@@ -278,8 +284,8 @@
       (destructuring-bind (name . offset) (svref vector i)
         (let ((next-offset (if (< (1+ i) count) (cdr (svref vector (1+ i))) size)))
           (aver (> next-offset offset))
-          ;; store inclusive bounds on PC offset range
-          (setf (gethash name ht) (cons offset (1- next-offset))))))))
+          ;; store inclusive bounds on PC offset range and the function index
+          (setf (gethash name ht) (list* offset (1- next-offset) i)))))))
 
 (defun !warm-load (file)
   (restart-case (let ((sb!c::*source-namestring*

@@ -494,7 +494,7 @@
                              #'< :key #'car))
           ;; byte range is inclusive bound on both ends
           (scan-function (+ origin (car range))
-                         (+ origin (cdr range) 1)
+                         (+ origin (cadr range) 1)
                          (lambda (addr)
                            (and (not (<= origin addr end))
                                 (immobile-space-addr-p addr)))))

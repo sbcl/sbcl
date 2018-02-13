@@ -10,15 +10,16 @@
 (in-package "SB!VM")
 
 (defun invoke-asm-routine (inst routine vop temp-reg)
-  (declare (ignorable vop))
-  (cond #!+immobile-code
-        ((sb!c::code-immobile-p (sb!c::vop-node vop))
-         (setq temp-reg (make-fixup routine :assembly-routine)))
-        (t
-         (inst mov temp-reg (make-fixup routine :assembly-routine))))
-  (ecase inst
-   (jmp  (inst jmp temp-reg))
-   (call (inst call temp-reg))))
+  (declare (ignorable vop temp-reg))
+  (let ((fixup
+         (cond #!+immobile-code
+               ((sb!c::code-immobile-p (sb!c::vop-node vop))
+                (make-fixup routine :assembly-routine))
+               (t
+                (make-ea :qword :disp (make-fixup routine :assembly-routine*))))))
+    (ecase inst
+      (jmp  (inst jmp fixup))
+      (call (inst call fixup)))))
 
 (defun generate-call-sequence (name style vop options)
   ;; It will be nice if we can eliminate the global assumption that

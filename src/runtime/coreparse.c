@@ -597,6 +597,14 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
 #endif
 }
 
+static inline struct code* get_asm_routine_code_component() {
+#ifdef LISP_FEATURE_IMMOBILE_CODE
+    return (struct code*)VARYOBJ_SPACE_START;
+#else
+    return (struct code*)READ_ONLY_SPACE_START;
+#endif
+}
+
 static void relocate_heap(struct heap_adjust* adj)
 {
     if (!lisp_startup_options.noinform || SHOW_SPACE_RELOCATION) {
@@ -622,9 +630,15 @@ static void relocate_heap(struct heap_adjust* adj)
 #endif
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
+    // Assembler routines move with varyobj space.
+    // (They're in readonly space if no immobile space)
+    struct code* code = get_asm_routine_code_component();
+    lispobj* jump_table = (lispobj*)code + code_header_words(code->header);
+    for ( ; *jump_table ; ++jump_table )
+        adjust_word_at(jump_table, adj);
+#if ELFCORE
     // Pointers within varyobj space to varyobj space do not need adjustment
     // so remove any delta before performing the relocation pass on this space.
-#if ELFCORE
     if (&__lisp_code_start)
         adj->range[2].delta = 0;
 #endif
@@ -1019,11 +1033,7 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
 #include "genesis/cons.h"
 os_vm_address_t get_asm_routine_by_name(const char* name)
 {
-#ifdef LISP_FEATURE_IMMOBILE_CODE
-    struct code* code = (struct code*)VARYOBJ_SPACE_START;
-#else
-    struct code* code = (struct code*)READ_ONLY_SPACE_START;
-#endif
+    struct code* code = get_asm_routine_code_component();
     if (listp(code->debug_info)) {
         struct hash_table* ht =
             (struct hash_table*)native_pointer(CONS(code->debug_info)->car);
@@ -1034,7 +1044,7 @@ os_vm_address_t get_asm_routine_by_name(const char* name)
             if (lowtag_of(sym = table->data[i]) == OTHER_POINTER_LOWTAG
                 && widetag_of(SYMBOL(sym)->header) == SYMBOL_WIDETAG
                 && !strcmp(name, (char*)(VECTOR(SYMBOL(sym)->name)->data)))
-                return ALIGN_UP(offsetof(struct code,constants), 2*N_WORD_BYTES)
+                return code_header_words(code->header)*N_WORD_BYTES
                     + fixnum_value(CONS(table->data[i+1])->car) + (os_vm_address_t)code;
         // Something is wrong if we have a hashtable but find nothing.
         fprintf(stderr, "WARNING: get_asm_routine_by_name(%s) failed\n",

@@ -89,8 +89,9 @@
          (sb!vm:fixup-code-object
           code-obj offset
           (ecase flavor
-            (:assembly-routine (or (get-asm-routine sym)
-                                   (error "undefined assembler routine: ~S" sym)))
+            ((:assembly-routine :assembly-routine*)
+             (or (get-asm-routine sym (eq flavor :assembly-routine*))
+                 (error "undefined assembler routine: ~S" sym)))
             (:foreign (foreign-symbol-address sym))
             (:foreign-dataref (foreign-symbol-address sym t))
             (:code-object (get-lisp-obj-address code-obj))

@@ -1013,7 +1013,7 @@
   (assert (<= (length +fixup-kinds+) 8))) ; fixup-kind fits in 3 bits
 
 (defconstant-eqx +fixup-flavors+
-  #(:assembly-routine :symbol-tls-index
+  #(:assembly-routine :assembly-routine* :symbol-tls-index
     :foreign :foreign-dataref :code-object
     :layout :immobile-object :named-call :static-call)
   #'equalp)
@@ -1051,7 +1051,8 @@
                                    flavor))
            (operand
             (ecase flavor
-              ((:assembly-routine :symbol-tls-index) (the symbol name))
+              ((:assembly-routine :assembly-routine* :symbol-tls-index)
+               (the symbol name))
               ((:foreign #!+linkage-table :foreign-dataref) (the string name))
               (:code-object (the null name))
               #!+immobile-space (:layout (classoid-name (layout-classoid name)))

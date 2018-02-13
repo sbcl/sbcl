@@ -1925,14 +1925,21 @@
            (values found 0))
           (t
            (let* ((code sb!fasl::*assembler-routines*)
+                  (hashtable (car (%code-debug-info code)))
                   (start (sap-int (code-instructions code)))
                   (end (+ start (1- (%code-code-size code)))))
              (when (<= start address end) ; it has to be an asm routine
-               (let ((me (- address start)))
-                 (dohash ((name locs) (car (%code-debug-info code)))
-                   (when (<= (car locs) me (cdr locs))
+               (let* ((offset (- address start))
+                      (index (unless (logtest address (1- sb!vm:n-word-bytes))
+                               (floor offset sb!vm:n-word-bytes))))
+                 (dohash ((name locs) hashtable)
+                   (when (<= (car locs) offset (cadr locs))
                      (return-from find-assembler-routine
-                      (values name (- address (+ start (car locs))))))))))
+                      (values name (- address (+ start (car locs))))))
+                   #!+(or x86 x86-64)
+                   (when (eql index (cddr locs))
+                     (return-from find-assembler-routine
+                      (values name 0)))))))
            (values nil nil)))))
 
 ;;;; some handy function for machine-dependent code to use...

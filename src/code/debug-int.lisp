@@ -1118,7 +1118,7 @@ register."
     (cond
       ((consp info)
        (let ((routine (dohash ((name pc-range) (car info))
-                        (when (<= (car pc-range) pc (cdr pc-range))
+                        (when (<= (car pc-range) pc (cadr pc-range))
                           (return name)))))
          (make-bogus-debug-fun (cond ((not routine)
                                       "no debug information for frame")
