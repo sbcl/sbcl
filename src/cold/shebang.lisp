@@ -37,6 +37,16 @@
 (defun backend-asm-package-name ()
   (concatenate 'string "SB!" (string-upcase (target-platform-name)) "-ASM"))
 
+(defun any-vop-named-p (vop-name)
+  (gethash vop-name (symbol-value (find-symbol "*BACKEND-PARSED-VOPS*" "SB!C"))))
+
+(defun any-vop-translates-p (fun-name)
+  (let ((f (intern "INFO" "SB!INT")))
+    (let ((info (and (fboundp f) (funcall f :function :info fun-name))))
+    (and info
+         (let ((f (intern "FUN-INFO-TEMPLATES" "SB!C")))
+           (and (fboundp f) (not (null (funcall f info)))))))))
+
 (defun feature-in-list-p (feature list)
   (labels ((sane-expr-p (x)
              (typecase x
@@ -44,7 +54,7 @@
                ;; This allows you to write #!+(host-feature sbcl) <stuff>
                ;; to muffle conditions, bypassing the "probable XC bug" check.
                ;; Using the escape hatch is assumed never to be a mistake.
-               ((cons (eql :host-feature)) t)
+               ((cons (member :host-feature :vop-named :vop-translates)) t)
                (cons (every #'sane-expr-p (cdr x))))))
     (unless (sane-expr-p feature)
       (error "Target feature expression ~S looks screwy" feature)))
@@ -55,14 +65,17 @@
             (ecase (first feature)
               (:or  (some  #'subfeature-in-list-p (rest feature)))
               (:and (every #'subfeature-in-list-p (rest feature)))
-              ((:host-feature :not)
+              ((:host-feature :not :vop-named :vop-translates)
                (destructuring-bind (subexpr) (cdr feature)
-                 (cond ((eq (first feature) :host-feature)
+                 (case (first feature)
+                   (:host-feature
                         ;; (:HOST-FEATURE :sym) looks in *FEATURES* for :SYM
-                        (check-type subexpr symbol)
-                        (member subexpr *features* :test #'eq))
-                       (t
-                        (not (subfeature-in-list-p subexpr)))))))))))
+                    (check-type subexpr symbol)
+                    (member subexpr *features* :test #'eq))
+                   (:vop-named (any-vop-named-p subexpr))
+                   (:vop-translates (any-vop-translates-p subexpr))
+                   (t
+                    (not (subfeature-in-list-p subexpr)))))))))))
 (compile 'feature-in-list-p)
 
 (defun shebang-reader (stream sub-character infix-parameter)

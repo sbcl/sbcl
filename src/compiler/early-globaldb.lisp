@@ -92,7 +92,9 @@
 ;;
 #-sb-xc-host
 (progn
- #!-symbol-info-vops (declaim (inline symbol-info-vector))
+ ;; Don't inline this if a vop translates it. Inlining occurs first,
+ ;; causing the vop not to be used.
+ #!-(vop-translates symbol-info-vector) (declaim (inline symbol-info-vector))
  (defun symbol-info-vector (symbol)
   (let ((info-holder (symbol-info symbol)))
     (truly-the (or null simple-vector)
@@ -101,6 +103,7 @@
 ;;; SYMBOL-INFO is a primitive object accessor defined in 'objdef.lisp'
 ;;; But in the host Lisp, there is no such thing as a symbol-info slot.
 ;;; Instead, symbol-info is kept in the host symbol's plist.
+;;; This must be a SETFable place.
 #+sb-xc-host
 (defmacro symbol-info-vector (symbol) `(get ,symbol :sb-xc-globaldb-info))
 

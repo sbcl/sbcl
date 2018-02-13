@@ -803,14 +803,11 @@
               (reference-tn-list (remove-if-not #'tn-p (flatten-list arg-tns)) nil))
              (result-operands
               (reference-tn-list (remove-if-not #'tn-p result-tns) t)))
-        (cond #.(if (gethash 'call-out-named *backend-parsed-vops*)
-                    '((and (constant-lvar-p function)
-                           (stringp (lvar-value function)))
-                      (vop* call-out-named call block
-                       (arg-operands) (result-operands)
-                       (lvar-value function)
-                       (sb!alien::alien-fun-type-varargs type)))
-                    (values))
+        (cond #!+(vop-named sb!vm::call-out-named)
+              ((and (constant-lvar-p function) (stringp (lvar-value function)))
+               (vop* call-out-named call block (arg-operands) (result-operands)
+                     (lvar-value function)
+                     (sb!alien::alien-fun-type-varargs type)))
               (t
                (vop* call-out call block
                      ((lvar-tn call block function) arg-operands)

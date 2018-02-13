@@ -14,26 +14,19 @@
 
 ;;;; Interpreter stubs for the various barrier functions
 
-#!-memory-barrier-vops
+#!-(vop-named sb!vm:%memory-barrier)
 (declaim (inline sb!vm:%compiler-barrier sb!vm:%memory-barrier
                  sb!vm:%read-barrier sb!vm:%write-barrier
                  sb!vm:%data-dependency-barrier))
-(defun sb!vm:%compiler-barrier ()
-  #!+memory-barrier-vops (sb!vm:%compiler-barrier)
-  (values))
-(defun sb!vm:%memory-barrier ()
-  #!+memory-barrier-vops (sb!vm:%memory-barrier)
-  (values))
-(defun sb!vm:%read-barrier ()
-  #!+memory-barrier-vops (sb!vm:%read-barrier)
-  (values))
-(defun sb!vm:%write-barrier ()
-  #!+memory-barrier-vops (sb!vm:%write-barrier)
-  (values))
-(defun sb!vm:%data-dependency-barrier ()
-  #!+memory-barrier-vops (sb!vm:%data-dependency-barrier)
-  (values))
-
+(macrolet ((def (name)
+             `(defun ,name ()
+                #!+(vop-named sb!vm:%memory-barrier) (,name)
+                (values))))
+  (def sb!vm:%compiler-barrier)
+  (def sb!vm:%memory-barrier)
+  (def sb!vm:%read-barrier)
+  (def sb!vm:%write-barrier)
+  (def sb!vm:%data-dependency-barrier))
 
 ;;;; The actual barrier macro and support
 (defmacro barrier ((kind) &body forms)
