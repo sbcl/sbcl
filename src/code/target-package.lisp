@@ -202,10 +202,8 @@ of :INHERITED :EXTERNAL :INTERNAL."
           (package-hashtable-free table) (package-hashtable-free temp-table)
           (package-hashtable-deleted table) 0)))
 
-;;;; package locking operations, built conditionally on :sb-package-locks
+;;;; package locking operations, built unconditionally now
 
-#!+sb-package-locks
-(progn
 (defun package-locked-p (package)
   "Returns T when PACKAGE is locked, NIL otherwise. Signals an error
 if PACKAGE doesn't designate a valid package."
@@ -336,8 +334,6 @@ error if any of PACKAGES is not a valid package designator."
                 list)
               sb!c::*disabled-package-locks*)))
 
-) ; progn
-
 ;;;; more package-locking these are NOPs unless :sb-package-locks is
 ;;;; in target features. Cross-compiler NOPs for these are in cross-misc.
 
@@ -348,9 +344,6 @@ error if any of PACKAGES is not a valid package designator."
 ;;; WITH-SINGLE-PACKAGE-LOCKED-ERROR
 (defun assert-package-unlocked (package &optional format-control
                                 &rest format-arguments)
-  #!-sb-package-locks
-  (declare (ignore format-control format-arguments))
-  #!+sb-package-locks
   (when (package-lock-violation-p package)
     (package-lock-violation package
                             :format-control format-control
@@ -365,9 +358,6 @@ error if any of PACKAGES is not a valid package designator."
 ;;; this.
 (defun assert-symbol-home-package-unlocked (name &optional format-control
                                             &rest format-arguments)
-  #!-sb-package-locks
-  (declare (ignore format-control format-arguments))
-  #!+sb-package-locks
   (let* ((symbol (etypecase name
                    (symbol name)
                    ;; Istm that the right way to declare that you want to allow
@@ -995,7 +985,6 @@ implementation it is ~S." *!default-package-use-list*)
                      (mapcar #'package-name use-list))
                     (dolist (p use-list)
                       (unuse-package package p))))
-                #!+sb-package-locks
                 (dolist (p (package-implements-list package))
                   (remove-implementation-package package p))
                 (with-package-graph ()
@@ -1705,7 +1694,6 @@ PACKAGE."
               (info-gethash (package-%name pkg) names) pkg)
         (dolist (nick (package-%nicknames pkg))
           (setf (info-gethash nick names) (list pkg)))
-        #!+sb-package-locks
         (setf (package-lock pkg) nil
               (package-%implementation-packages pkg) nil))))
 
@@ -1803,9 +1791,6 @@ PACKAGE."
               (scan))))))
 
 (defun program-assert-symbol-home-package-unlocked (context symbol control)
-  #!-sb-package-locks
-  (declare (ignore context symbol control))
-  #!+sb-package-locks
   (handler-bind ((package-lock-violation
                   (lambda (condition)
                     (ecase context

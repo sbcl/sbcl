@@ -7,7 +7,4 @@ unintentional modifications of packages. The full documentation for
 package locks is only built if package locks are enabled in the image
 the documentation was built from,
 
-Package locking support is currently not built by default. To build
-SBCL with package locking enabled add @code{:sb-package-locks} to
-target @code{*features*} as per instructions in the file
-@file{INSTALL}.
+Package locking support is currently built by default.

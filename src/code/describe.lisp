@@ -349,7 +349,6 @@
       (let ((exports nil))
         (do-external-symbols (ext object)
           (push ext exports))
-        #+sb-package-locks
         (let ((implemented (humanize (package-implemented-by-list object)))
               (implements (humanize (package-implements-list object)))
               (this (list (package-name object))))

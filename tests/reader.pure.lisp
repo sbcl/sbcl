@@ -336,7 +336,6 @@
                  (read-from-string "sb-c::(a sb-kernel::(x y) b)")))
   (assert (equal '(cl-user::yes-this-is-sbcl)
                  (read-from-string "cl-user::(#+sbcl yes-this-is-sbcl)")))
-  #+sb-package-locks
   (assert (eq :violated!
               (handler-case
                   (read-from-string "cl::'foo")
@@ -408,8 +407,7 @@
 
 ;;; The WITH-FAST-READ-BYTE macro accidentally left the package lock
 ;;; of FAST-READ-BYTE disabled during its body.
-(with-test (:name :fast-read-byte-package-lock
-            :skipped-on (not :sb-package-locks))
+(with-test (:name :fast-read-byte-package-lock)
   (let ((fun
          ;; Suppress the compiler output to avoid noise when running the
          ;; test. (There are a warning and an error about the package

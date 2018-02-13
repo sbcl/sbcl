@@ -85,9 +85,7 @@
   ;; documentation string for this package
   (doc-string nil :type (or simple-string null))
   ;; package locking
-  #!+sb-package-locks
   (lock nil :type boolean)
-  #!+sb-package-locks
   (%implementation-packages nil :type list)
   ;; Definition source location
   (source-location nil :type (or null sb!c:definition-source-location))

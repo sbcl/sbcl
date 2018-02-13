@@ -29,13 +29,13 @@
     (:shadow "{symbol-name}*")
     (:shadowing-import-from "<package-name> {symbol-name}*")
     (:local-nicknames "{local-nickname actual-package-name}*")
-    #+sb-package-locks (:lock "boolean")
-    #+sb-package-locks (:implement "{package-name}*")
+    (:lock "boolean")
+    (:implement "{package-name}*")
     (:documentation "doc-string")
     (:intern "{symbol-name}*")
     (:size "<integer>")
     (:nicknames "{package-name}*"))
-  '(:size #+sb-package-locks :lock)))
+  '(:size :lock)))
   (let ((nicknames nil)
         (local-nicknames nil)
         (size nil)
@@ -59,7 +59,7 @@
         (%program-error "bogus DEFPACKAGE option: ~S" option))
       (setq optname (car option) optval (cdr option))
       (case optname
-        ((:documentation :size #+sb-package-locks :lock)
+        ((:documentation :size :lock)
          (when (memq optname seen)
            (%program-error "can't specify ~S more than once." optname))
          (unless (typep optval '(cons t null))
@@ -107,11 +107,9 @@
          (setf interns (append interns (stringify-string-designators optval))))
         (:export
          (setf exports (append exports (stringify-string-designators optval))))
-        #+sb-package-locks
         (:implement
          (setf implement (append implement (stringify-package-designators optval))
                implement-p t))
-        #+sb-package-locks
         (:lock
          (setf lock (coerce optval 'boolean)))
         (:documentation
@@ -204,7 +202,6 @@
                        imports interns
                        exports implement local-nicknames
                        lock doc-string)
-  (declare #-sb-package-locks (ignore implement lock))
   (%enter-new-nicknames package nicknames)
   ;; 1. :shadow and :shadowing-import-from
   ;;
@@ -235,13 +232,11 @@
   (when source-location
     (setf (package-source-location package) source-location))
   (setf (package-doc-string package) doc-string)
-  #+sb-package-locks
-  (progn
-    ;; Handle packages this is an implementation package of
-    (dolist (p implement)
+  ;; Handle packages this is an implementation package of
+  (dolist (p implement)
       (add-implementation-package package p))
-    ;; Handle lock
-    (setf (package-lock package) lock))
+  ;; Handle lock
+  (setf (package-lock package) lock)
   package)
 
 (declaim (type list *on-package-variance*))
@@ -340,7 +335,6 @@ specifies to signal a warning if SWANK package is in variance, and an error othe
            (unexport no-longer-exported package))
          (keep-them ()
            :report "Keep exporting them.")))))
-  #+sb-package-locks
   (let ((old-implements
           (set-difference (package-implements-list package)
                           (mapcar #'find-undeleted-package-or-lose implement))))

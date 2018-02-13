@@ -13,7 +13,6 @@
   (:import-from #:sb-gray #:fundamental-stream)
   (:import-from #:sb-impl
                 #:in-stream-from-designator #:out-stream-from-designator)
-  #+sb-package-locks
   ;; FIXME: Using deffoo! or equivalent might be nicer.
   (:implement #:common-lisp #:sb-kernel #:sb-int)
   (:export ;; Stream classes

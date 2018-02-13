@@ -932,9 +932,6 @@
   ()
   (:default-initargs :references '((:ansi-cl :section (2 4 8 13)))))
 
-#!+sb-package-locks
-(progn
-
 (define-condition package-lock-violation (package-error
                                           reference-condition
                                           simple-condition)
@@ -971,8 +968,6 @@ signalled when an operation on a package violates a package lock."))
 signalled when an operation on a symbol violates a package lock. The
 symbol that caused the violation is accessed by the function
 SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
-
-) ; progn
 
 (define-condition undefined-alien-error (cell-error) ()
   (:report

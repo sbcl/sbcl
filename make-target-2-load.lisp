@@ -242,7 +242,6 @@
 (setq sb-c::*name-context-file-path-selector* 'truename)
 
 ;;; Lock internal packages
-#+sb-package-locks
 (dolist (p (list-all-packages))
   (unless (member p (mapcar #'find-package '("KEYWORD" "CL-USER")))
     (sb-ext:lock-package p)))

@@ -30,11 +30,11 @@
 ;;; backend-subfeatures
 (setf sb-cold:*shebang-backend-subfeatures* sb-c:*backend-subfeatures*)
 
-(handler-bind (#+sb-package-locks (sb-ext:package-locked-error #'continue))
+(handler-bind ((sb-ext:package-locked-error #'continue))
   ;; The nickname SB!XC now refers to the CL package.
   (rename-package "COMMON-LISP" "COMMON-LISP"
                   (cons "SB!XC" (package-nicknames "CL")))
-  #+sb-package-locks (sb-ext:unlock-package "CL")
+  (sb-ext:unlock-package "CL")
 
   ;; Any other name SB!FOO refers to the package now called SB-FOO.
   (dolist (package (list-all-packages))
@@ -48,7 +48,7 @@
         (let* ((stem (subseq name (length cold-name-prefix)))
                (cold-name (concatenate 'simple-string cold-name-prefix stem)))
           (rename-package package name (cons cold-name nicknames)))
-        #+sb-package-locks (sb-ext:unlock-package package)))))
+        (sb-ext:unlock-package package)))))
 
 ;; Reinstate the pre-cold-init variable-defining macros.
 (let ((*package* (find-package "SB-INT")))
