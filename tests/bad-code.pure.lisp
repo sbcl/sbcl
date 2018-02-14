@@ -267,3 +267,21 @@
                           (declare (type integer x))
                           z))
                       :allow-warnings t))))
+
+(with-test (:name :recursive-delete-lambda)
+  (assert (nth-value 1
+                     (checked-compile
+                      '(lambda ()
+                        (flet ((%f ()
+                                 (lambda ())))
+                          (%f :a)
+                          (%f :b)))
+                      :allow-warnings t)))
+  (assert (nth-value 1
+                     (checked-compile
+                      '(lambda ()
+                        (flet ((%f ()
+                                 (lambda (&optional m) m)))
+                          (%f :a)
+                          (%f :b)))
+                      :allow-warnings t))))

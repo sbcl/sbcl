@@ -1316,7 +1316,7 @@
 ;;; that the lambda is unreachable, so that its body may be
 ;;; deleted. We set FUNCTIONAL-KIND to :DELETED and rely on
 ;;; IR1-OPTIMIZE to delete its blocks.
-(defun delete-lambda (clambda)
+(defun delete-lambda (clambda &optional (delete-children t))
   (declare (type clambda clambda))
   (let ((original-kind (functional-kind clambda))
         (bind (lambda-bind clambda)))
@@ -1326,21 +1326,23 @@
     (setf (functional-kind clambda) :deleted)
     (setf (lambda-bind clambda) nil)
 
-    (labels ((delete-children (lambda)
-               (dolist (child (lambda-children lambda))
-                 (cond ((eq (functional-kind child) :deleted)
-                        (delete-children child))
-                       ;; Can happen when all optional entries produce
-                       ;; errors, making the main entry unreachable,
-                       ;; but the XEP should not be deleted, as it can
-                       ;; still be reachable.
-                       ((and (eq (functional-kind child) :external)
-                             (eq (main-entry (functional-entry-fun child)) clambda)))
-                       (t
-                        (delete-lambda child))))
-               (setf (lambda-children lambda) nil)
-               (setf (lambda-parent lambda) nil)))
-      (delete-children clambda))
+    (when delete-children
+      (labels ((delete-children (lambda)
+                 (dolist (child (lambda-children lambda))
+                   (cond ((eq (functional-kind child) :deleted)
+                          (delete-children child))
+                         ;; Can happen when all optional entries produce
+                         ;; errors, making the main entry unreachable,
+                         ;; but the XEP should not be deleted, as it can
+                         ;; still be reachable.
+                         ((and (eq (functional-kind child) :external)
+                               (eq (main-entry (functional-entry-fun child)) clambda)))
+                         (t
+                          (delete-lambda child nil)
+                          (delete-children child))))
+                 (setf (lambda-children lambda) nil)
+                 (setf (lambda-parent lambda) nil)))
+        (delete-children clambda)))
 
     ;; (The IF test is (FUNCTIONAL-SOMEWHAT-LETLIKE-P CLAMBDA), except
     ;; that we're using the old value of the KIND slot, not the
