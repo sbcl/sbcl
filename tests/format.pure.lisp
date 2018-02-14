@@ -79,4 +79,14 @@
     (checked-compile-and-assert
         ()
         `(lambda () (format nil ,control))
-      (() "A" :test #'equal))))
+      (() "A" :test #'equal))
+    (checked-compile-and-assert
+        ()
+        `(lambda () (cerror ,control ,control))
+      (() (condition 'simple-error)))
+    (checked-compile-and-assert
+        ()
+        `(lambda () (error ,control))
+      (() (condition 'simple-error)))))
+
+

@@ -1248,8 +1248,8 @@
 ;;; inspired by that of Gerd Moellmann, and comes decorated with
 ;;; FIXMEs:
 (defun %compiler-walk-format-string (string args)
-  (declare (type simple-string string))
-  (let ((*default-format-error-control-string* string))
+  (let* ((string (coerce string 'simple-string))
+         (*default-format-error-control-string* string))
     (macrolet ((incf-both (&optional (increment 1))
                  `(progn
                    (incf min ,increment)

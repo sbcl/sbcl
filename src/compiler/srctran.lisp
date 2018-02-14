@@ -4524,8 +4524,6 @@
 ;;; list type, a warning could be signalled.
 (defun check-format-args (string args fun)
   (declare (type string string))
-  (unless (typep string 'simple-string)
-    (setq string (coerce string 'simple-string)))
   (multiple-value-bind (min max)
       (handler-case (sb!format:%compiler-walk-format-string string args)
         (sb!format:format-error (c)
