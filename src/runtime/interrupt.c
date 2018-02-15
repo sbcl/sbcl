@@ -1715,6 +1715,7 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
 
     if(addr >= CONTROL_STACK_HARD_GUARD_PAGE(th) &&
        addr < CONTROL_STACK_HARD_GUARD_PAGE(th) + os_vm_page_size) {
+        fake_foreign_function_call(context);
         lose("Control stack exhausted, fault: %p, PC: %p",
              addr, *os_context_pc_addr(context));
     }
@@ -1724,6 +1725,11 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
          * protection so the error handler has some headroom, protect the
          * previous page so that we can catch returns from the guard page
          * and restore it. */
+        if (lose_on_corruption_p || gc_active_p) {
+            fake_foreign_function_call(context);
+            lose("Control stack exhausted, fault: %p, PC: %p",
+                 addr, *os_context_pc_addr(context));
+        }
         if (th->control_stack_guard_page_protected == NIL)
             lose("control_stack_guard_page_protected NIL");
         lower_thread_control_stack_guard_page(th);
@@ -1755,6 +1761,12 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
             addr < BINDING_STACK_GUARD_PAGE(th) + os_vm_page_size) {
         protect_binding_stack_guard_page(0, NULL);
         protect_binding_stack_return_guard_page(1, NULL);
+
+        if (lose_on_corruption_p) {
+            fake_foreign_function_call(context);
+            lose("Binding stack exhausted");
+        }
+
         fprintf(stderr, "INFO: Binding stack guard page unprotected\n");
 
         /* For the unfortunate case, when the binding stack is
