@@ -1745,7 +1745,7 @@ extended <package-name>::<form-in-package> syntax."
 (defun make-float-aux (number divisor float-format stream)
   (handler-case
       (coerce (/ number divisor) float-format)
-    (type-error (c)
+    (arithmetic-error (c)
       (error 'reader-impossible-number-error
              :error c :stream stream
              :format-control "failed to build float from ~a"

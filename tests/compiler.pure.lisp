@@ -6302,6 +6302,13 @@
       `(lambda (x) (* #C(4.457268f31 0.0) 4 x -46253801283659))
     ((5.0f-9) #C(-4.123312f37 -0.0))))
 
+(with-test (:name :reducing-constants.2
+                  ;; x86 delays FPE signalling
+                  :fails-on :x86)
+  (checked-compile-and-assert (:allow-style-warnings t)
+      `(lambda () (*  1.0 2 (expt 2 127)))
+    (() (condition 'floating-point-overflow))))
+
 (with-test (:name (logbitp :past fixnum))
   (checked-compile-and-assert ()
       `(lambda (x) (logbitp sb-vm:n-fixnum-bits (the fixnum x)))

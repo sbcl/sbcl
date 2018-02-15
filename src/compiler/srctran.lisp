@@ -437,10 +437,10 @@
                       (float-infinity-p y))
                  nil
                  (set-bound y (and strict (consp x))))))
-         ;; Some numerical operations will signal SIMPLE-TYPE-ERROR, e.g.
-         ;; in the course of converting a bignum to a float.  Default to
+         ;; Some numerical operations will signal an ERROR, e.g. in
+         ;; the course of converting a bignum to a float. Default to
          ;; NIL in that case.
-         (simple-type-error ()))))
+         (arithmetic-error ()))))
 
 (defun safe-double-coercion-p (x)
   (or (typep x 'double-float)

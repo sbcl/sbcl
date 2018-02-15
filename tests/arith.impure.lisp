@@ -66,7 +66,8 @@
 (assert (null (ignore-errors (compiled-logxor #c(2 3)))))
 (assert (= (compiled-logxor -6) -6))
 
-(assert-error (coerce (expt 10 1000) 'single-float) type-error)
+(with-test (:name (coerce :overflow))
+  (assert-error (coerce (expt 10 1000) 'single-float) floating-point-overflow))
 
 (defun are-we-getting-ash-right (x y)
   (declare (optimize speed)
