@@ -1964,31 +1964,34 @@
   ;; need.
   (let ((lo (interval-low quot))
         (hi (interval-high quot)))
-    ;; Take the floor of the lower bound. The result is always a
-    ;; closed lower bound.
-    (when lo
-      (setf lo (- (floor (type-bound-number lo))
-                  ;; FLOOR on floats depends on the divisor,
-                  ;; make it conservative
-                  (if (floatp (type-bound-number lo))
-                      1
-                      0))))
-    ;; For the upper bound, we need to be careful.
-    (setf hi
-          (cond ((consp hi)
+    (make-interval
+     ;; Take the floor of the lower bound. The result is always a
+     ;; closed lower bound.
+     :low
+     (and lo
+          (- (floor (type-bound-number lo))
+             ;; FLOOR on floats depends on the divisor,
+             ;; make it conservative
+             (if (floatp (type-bound-number lo))
+                 1
+                 0)))
+     :high
+     (and hi
+          (+ (if (consp hi)
                  ;; An open bound. We need to be careful here because
                  ;; the floor of '(10.0) is 9, but the floor of
                  ;; 10.0 is 10.
                  (multiple-value-bind (q r) (floor (first hi))
                    (if (zerop r)
                        (1- q)
-                       q)))
-                (hi
+                       q))
                  ;; A closed bound, so the answer is obvious.
                  (floor hi))
-                (t
-                 hi)))
-    (make-interval :low lo :high hi)))
+             ;; Be conservative
+             (if (floatp (type-bound-number hi))
+                 1
+                 0))))))
+
 (defun floor-rem-bound (div)
   ;; The remainder depends only on the divisor. Try to get the
   ;; correct sign for the remainder if we can.
@@ -2060,31 +2063,33 @@
   ;; need.
   (let ((lo (interval-low quot))
         (hi (interval-high quot)))
-    ;; Take the ceiling of the upper bound. The result is always a
-    ;; closed upper bound.
-    (when hi
-      (setf hi (+ (floor (type-bound-number hi))
-                  ;; CEILING on floats depends on the divisor,
-                  ;; make it conservative
-                  (if (ceiling (type-bound-number hi))
-                      1
-                      0))))
-    ;; For the lower bound, we need to be careful.
-    (setf lo
-          (cond ((consp lo)
+    (make-interval
+     :low
+     (and lo
+          (- (if (consp lo)
                  ;; An open bound. We need to be careful here because
                  ;; the ceiling of '(10.0) is 11, but the ceiling of
                  ;; 10.0 is 10.
                  (multiple-value-bind (q r) (ceiling (first lo))
                    (if (zerop r)
                        (1+ q)
-                       q)))
-                (lo
+                       q))
                  ;; A closed bound, so the answer is obvious.
                  (ceiling lo))
-                (t
-                 lo)))
-    (make-interval :low lo :high hi)))
+             ;; CEILING on floats depends on the divisor,
+             ;; make it conservative
+             (if (floatp (type-bound-number lo))
+                 1
+                 0)))
+     :high
+     ;; Take the ceiling of the upper bound. The result is always a
+     ;; closed upper bound.
+     (and hi
+          (+ (ceiling (type-bound-number hi))
+             ;; Be conservative
+             (if (floatp (type-bound-number hi))
+                 1
+                 0))))))
 (defun ceiling-rem-bound (div)
   ;; The remainder depends only on the divisor. Try to get the
   ;; correct sign for the remainder if we can.
