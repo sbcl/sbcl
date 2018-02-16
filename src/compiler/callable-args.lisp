@@ -290,7 +290,7 @@
                    (let* ((arg (nth nth-arg deps))
                           (key-nth (getf options :key))
                           (key (and key-nth (nth key-nth deps)))
-                          (key-return-type (and key
+                          (key-return-type (and (lvar-p key)
                                                 (multiple-value-bind (type name) (lvar-fun-type key)
                                                   (cond ((eq name 'identity)
                                                          nil)

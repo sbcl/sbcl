@@ -1144,3 +1144,12 @@
          (setf (schar (the (satisfies eval) s) 0) v)
          s)
     (((copy-seq "abc") #\m) "mbc" :test #'equal)))
+
+(with-test (:name :check-function-designator-cast-key-lambda-var)
+  (checked-compile-and-assert
+      (:optimize '(:speed 3 :space 0))
+      `(lambda (p1 p4)
+         (declare (vector p1)
+                  ((member ,#'car "x" cdr) p4))
+         (stable-sort p1 #'<= :key p4))
+    (((vector '(2) '(3) '(1)) #'car) #((1) (2) (3)) :test #'equalp)))
