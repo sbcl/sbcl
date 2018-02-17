@@ -321,8 +321,7 @@
                    (forms `(defglobal ,tn-name
                              (make-random-tn :kind :normal
                                              :sc (sc-or-lose ',sc-name)
-                                             :offset ,offset-name)
-                             (constantly t))))))))
+                                             :offset ,offset-name))))))))
 
   (def-misc-reg-tns unsigned-reg eax ebx ecx edx ebp esp edi esi)
   (def-misc-reg-tns word-reg ax bx cx dx bp sp di si)
