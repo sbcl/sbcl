@@ -594,7 +594,7 @@
   (checked-compile-and-assert (:optimize :safe)
    `(lambda ()
       (floor -302254842 50510.5))
-    (() (values -5984 0.0)))
+    (() (eval '(floor -302254842 50510.5))))
   (checked-compile-and-assert (:optimize :safe)
    `(lambda ()
       (ceiling 114658225103614 84619.58))
