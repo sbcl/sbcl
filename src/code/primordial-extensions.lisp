@@ -341,19 +341,3 @@
            (sb!c::%defconstant ',symbol
              ,(if constp `',(constant-form-value expr) expr)
              (sb!c:source-location) ,@(when doc (list doc))))))))
-
-;;; For defining things that we'd really like to be DEFCONSTANT,
-;;; but don't care too much if they aren't.
-;;; Depending on the compilation host, it might think you need
-;;; a MAKE-LOAD-FORM for the value of the constant, so work around that
-;;; for known problematic hosts.
-;;; Always evaluate at compile-time-too, because at least that much
-;;; of DEFCONSTANT's behavior is required.
-#+sb-xc-host
-(defmacro !possibly-defconstant-eqx (symbol value comparator)
-  (declare (ignorable comparator))
-  #+ccl `(defglobal ,symbol ,value)
-  #-ccl `(defconstant-eqx ,symbol ,value ,comparator))
-#-sb-xc-host
-(defmacro !possibly-defconstant-eqx (&rest args)
-  `(defconstant-eqx ,@args))

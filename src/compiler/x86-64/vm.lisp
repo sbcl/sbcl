@@ -423,11 +423,10 @@
                (dolist (reg-name reg-names `(progn ,@(forms)))
                  (let ((tn-name (symbolicate reg-name "-TN"))
                        (offset-name (symbolicate reg-name "-OFFSET")))
-                   (forms `(!possibly-defconstant-eqx ,tn-name
-                             (make-random-tn :kind :normal
-                                             :sc (sc-or-lose ',sc-name)
-                                             :offset ,offset-name)
-                             (constantly t))))))))
+                   (forms `(defglobal ,tn-name
+                               (make-random-tn :kind :normal
+                                               :sc (sc-or-lose ',sc-name)
+                                               :offset ,offset-name))))))))
 
   (def-misc-reg-tns unsigned-reg rax rbx rcx rdx rbp rsp rdi rsi
                     r8 r9 r10 r11 r12 r13 r14 r15)
@@ -461,13 +460,7 @@
 ;; A register that's never used by the code generator, and can therefore
 ;; be used as an assembly temporary in cases where a VOP :TEMPORARY can't
 ;; be used.
-;; (DEFCONSTANT-EQX TEMP-REG-TN R11-TN ...) causes a self-inflicted problem
-;; due to the magic in the cross-compiler's version of DEFCONSTANT-EQX.
-;; Since the value assigned is constant, we turn that form into
-;; (DEFCONSTANT TEMP-REG-TN '#<SB-C:TN {addr}>)
-;; But this rendering needs a MAKE-LOAD-FORM method on TN.
-;; Hiding the constant-ness from the macro dumbs it down enough to work.
-(!possibly-defconstant-eqx temp-reg-tn (symbol-value 'r11-tn) (constantly t))
+(defglobal temp-reg-tn r11-tn)
 
 ;;; TNs for registers used to pass arguments
 ;;; This can't be a DEFCONSTANT-EQX, for a similar reason to above, but worse.
@@ -480,7 +473,7 @@
             (symbol-value (symbolicate register-arg-name "-TN")))
           *register-arg-names*))
 
-(!possibly-defconstant-eqx thread-base-tn (symbol-value 'r12-tn) (constantly t))
+(defglobal thread-base-tn r12-tn)
 
 ;;; If value can be represented as an immediate constant, then return
 ;;; the appropriate SC number, otherwise return NIL.

@@ -318,7 +318,7 @@
                (dolist (reg-name reg-names `(progn ,@(forms)))
                  (let ((tn-name (symbolicate reg-name "-TN"))
                        (offset-name (symbolicate reg-name "-OFFSET")))
-                   (forms `(!possibly-defconstant-eqx ,tn-name
+                   (forms `(defglobal ,tn-name
                              (make-random-tn :kind :normal
                                              :sc (sc-or-lose ',sc-name)
                                              :offset ,offset-name)
