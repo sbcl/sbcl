@@ -152,7 +152,7 @@
 ;; Signal a type error for non-sequences.
 ;; This is for dispatching within sequence functions that have
 ;; the EXPLICIT-CHECK attribute on at least their sequence arg(s).
-(eval-when (:compile-toplevel)
+(eval-when-compile-toplevel
 (sb!xc:defmacro seq-dispatch-checking
     (sequence list-form vector-form &optional (other-form nil other-form-p))
   `(cond ((listp ,sequence)
@@ -718,7 +718,7 @@
                          (funcall getter vector2 index2))))))))
   vector1)
 
-(eval-when (:compile-toplevel :execute)
+(eval-when-compile-toplevel
 
 ;;; If we are copying around in the same vector, be careful not to copy the
 ;;; same elements over repeatedly. We do this by copying backwards.
@@ -1402,7 +1402,7 @@ many elements are copied."
 
 ;;;; REDUCE
 
-(eval-when (:compile-toplevel :execute)
+(eval-when-compile-toplevel
 
 (sb!xc:defmacro mumble-reduce (function
                                sequence
@@ -1503,7 +1503,7 @@ many elements are copied."
 
 ;;;; DELETE
 
-(eval-when (:compile-toplevel :execute)
+(eval-when-compile-toplevel
 
 (sb!xc:defmacro mumble-delete (pred)
   `(do ((index start (1+ index))
@@ -1630,7 +1630,7 @@ many elements are copied."
           (normal-mumble-delete)))
     (apply #'sb!sequence:delete item sequence args)))
 
-(eval-when (:compile-toplevel :execute)
+(eval-when-compile-toplevel
 
 (sb!xc:defmacro if-mumble-delete ()
   `(mumble-delete
@@ -1670,7 +1670,7 @@ many elements are copied."
           (if-mumble-delete)))
     (apply #'sb!sequence:delete-if predicate sequence args)))
 
-(eval-when (:compile-toplevel :execute)
+(eval-when-compile-toplevel
 
 (sb!xc:defmacro if-not-mumble-delete ()
   `(mumble-delete
@@ -1712,7 +1712,7 @@ many elements are copied."
 
 ;;;; REMOVE
 
-(eval-when (:compile-toplevel :execute)
+(eval-when-compile-toplevel
 
 ;;; MUMBLE-REMOVE-MACRO does not include (removes) each element that
 ;;; satisfies the predicate.
@@ -2229,7 +2229,7 @@ many elements are copied."
       (incf index incrementer))
     result))
 
-(eval-when (:compile-toplevel :execute)
+(eval-when-compile-toplevel
 
 (sb!xc:defmacro subst-dispatch (pred)
   `(seq-dispatch-checking=>seq sequence
@@ -2642,7 +2642,7 @@ many elements are copied."
 
 ;;;; COUNT-IF, COUNT-IF-NOT, and COUNT
 
-(eval-when (:compile-toplevel :execute)
+(eval-when-compile-toplevel
 
 (sb!xc:defmacro vector-count-if (notp from-end-p predicate sequence
                                  &key two-arg-predicate)
@@ -2755,7 +2755,7 @@ many elements are copied."
 
 ;;;; MISMATCH
 
-(eval-when (:compile-toplevel :execute)
+(eval-when-compile-toplevel
 
 (sb!xc:defmacro match-vars (&rest body)
   `(let ((inc (if from-end -1 1))
@@ -2777,7 +2777,7 @@ many elements are copied."
 
 ) ; EVAL-WHEN
 
-(eval-when (:compile-toplevel :execute)
+(eval-when-compile-toplevel
 
 (sb!xc:defmacro if-mismatch (elt1 elt2)
   `(cond ((= (the fixnum index1) (the fixnum end1))
@@ -2884,7 +2884,7 @@ many elements are copied."
 
 ;;; search comparison functions
 
-(eval-when (:compile-toplevel :execute)
+(eval-when-compile-toplevel
 
 ;;; Compare two elements and return if they don't match.
 (sb!xc:defmacro compare-elements (elt1 elt2)
@@ -2941,7 +2941,7 @@ many elements are copied."
 
 ;;;; SEARCH
 
-(eval-when (:compile-toplevel :execute)
+(eval-when-compile-toplevel
 
 (sb!xc:defmacro list-search (main sub)
   `(do ((main (nthcdr start2 ,main) (cdr main))

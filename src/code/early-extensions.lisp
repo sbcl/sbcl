@@ -1755,3 +1755,7 @@ to :INTERPRET, an interpreter will be used.")
     (symbol (or (eq x t) (eq (symbol-package x) *keyword-package*)))
     (cons nil)
     (t t)))
+
+(defmacro eval-when-compile-toplevel (&body body)
+  `(eval-when (:compile-toplevel :execute #!+sb-devel :load-toplevel)
+     ,@body))
