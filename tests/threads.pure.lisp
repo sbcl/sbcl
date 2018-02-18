@@ -191,7 +191,8 @@
       (assert (eq :from-child (symbol-value 'this-is-new))))))
 
 (with-test (:name :symbol-value-in-thread.3
-            :skipped-on (not :sb-thread))
+            :skipped-on (not :sb-thread)
+            :broken-on :sb-safepoint)
   (let* ((parent *current-thread*)
          (semaphore (make-semaphore))
          (running t)
