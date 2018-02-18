@@ -1166,3 +1166,11 @@
       '(lambda (x)
         (replace x x :start1 2))
     (((vector 1 2)) #(1 2) :test #'equalp)))
+
+(with-test (:name :error-in-xep)
+  (checked-compile-and-assert
+      (:optimize :safe)
+      '(lambda (x)
+        (declare (type (satisfies error) x))
+        x)
+    (("") (condition 'error))))

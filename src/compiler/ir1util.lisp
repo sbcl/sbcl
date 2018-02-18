@@ -1528,7 +1528,6 @@
              (clambda
               (ecase (functional-kind leaf)
                 ((nil :let :mv-let :assignment :escape :cleanup)
-                 (aver (null (functional-entry-fun leaf)))
                  (delete-lambda leaf))
                 (:external
                  (unless (functional-has-external-references-p leaf)
