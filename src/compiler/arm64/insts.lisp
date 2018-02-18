@@ -1489,7 +1489,7 @@
                       (fp-reg-type rt1)))))
     (when fp
       (setf size (+ opc 2)))
-    (assert (not (ldb-test (byte size 0) offset)))
+    (aver (not (ldb-test (byte size 0) offset)))
     (emit-ldr-str-pair segment opc v
                        (ecase mode
                          (:post-index #b01)
@@ -1613,13 +1613,13 @@
          (t
           (emit-back-patch segment 4
                            (cond (label
-                                  (assert (label-p label))
+                                  (aver (label-p label))
                                   (lambda (segment posn)
                                     (emit-cond-branch segment
                                                       (ash (- (label-position label) posn) -2)
                                                       (conditional-opcode cond-or-label))))
                                  (t
-                                  (assert (label-p cond-or-label))
+                                  (aver (label-p cond-or-label))
                                   (lambda (segment posn)
                                     (emit-uncond-branch segment
                                                         0
@@ -1691,7 +1691,7 @@
 (define-instruction cbz (segment rt label)
   (:printer compare-branch-imm ((op 0)))
   (:emitter
-   (assert (label-p label))
+   (aver (label-p label))
    (emit-back-patch segment 4
                     (lambda (segment posn)
                       (emit-compare-branch-imm segment
@@ -1703,7 +1703,7 @@
 (define-instruction cbnz (segment rt label)
   (:printer compare-branch-imm ((op 1)))
   (:emitter
-   (assert (label-p label))
+   (aver (label-p label))
    (emit-back-patch segment 4
                     (lambda (segment posn)
                       (emit-compare-branch-imm segment
@@ -1731,7 +1731,7 @@
 (define-instruction tbz (segment rt bit label)
   (:printer test-branch-imm ((op 0)))
   (:emitter
-   (assert (label-p label))
+   (aver (label-p label))
    (check-type bit (integer 0 63))
    (emit-back-patch segment 4
                     (lambda (segment posn)
@@ -1745,7 +1745,7 @@
 (define-instruction tbnz (segment rt bit label)
   (:printer test-branch-imm ((op 1)))
   (:emitter
-   (assert (label-p label))
+   (aver (label-p label))
    (check-type bit (integer 0 63))
    (emit-back-patch segment 4
                     (lambda (segment posn)
@@ -1798,8 +1798,8 @@
   (rd :field (byte 5 0) :type 'x-reg))
 
 (defun emit-pc-relative-inst (op segment rd label &optional (offset 0))
-  (assert (label-p label))
-  (assert (register-p rd))
+  (aver (label-p label))
+  (aver (register-p rd))
   (emit-back-patch segment 4
                    (lambda (segment posn)
                      (let ((offset (+ (- (label-position label) posn)

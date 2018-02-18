@@ -823,7 +823,7 @@ IF-NOT-OWNER is :FORCE)."
   #!+sb-thread
   (let ((me *current-thread*))
     (barrier (:read))
-    (assert (eq me (mutex-%owner mutex)))
+    (aver (eq me (mutex-%owner mutex)))
     (let ((status :interrupted))
       ;; Need to disable interrupts so that we don't miss grabbing
       ;; the mutex on our way out.
@@ -1393,7 +1393,7 @@ session."
   (first (interactive-threads session)))
 
 (defun make-listener-thread (tty-name)
-  (assert (probe-file tty-name))
+  (aver (probe-file tty-name))
   (let* ((in (sb!unix:unix-open (namestring tty-name) sb!unix:o_rdwr #o666))
          (out (sb!unix:unix-dup in))
          (err (sb!unix:unix-dup in)))

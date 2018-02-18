@@ -239,7 +239,7 @@
 ;;; already be one.
 (defun dfo-scavenge-dependency-graph (clambda component)
   (declare (type clambda clambda) (type component component))
-  (assert (not (eql (lambda-kind clambda) :deleted)))
+  (aver (not (eql (lambda-kind clambda) :deleted)))
   (let* ((bind-block (node-block (lambda-bind clambda)))
          (old-lambda-component (block-component bind-block))
          (return (lambda-return clambda)))

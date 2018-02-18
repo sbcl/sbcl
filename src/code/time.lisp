@@ -234,15 +234,14 @@ format."
     (if time-zone
         (setf encoded-time (+ second (* (+ minute (* (+ hours time-zone) 60)) 60)))
         (let* ((secwest-guess
-                (sb!unix::get-timezone
-                 (truncate-to-unix-range (* hours 60 60))))
+                 (sb!unix::get-timezone
+                  (truncate-to-unix-range (* hours 60 60))))
                (guess (+ second (* 60 (+ minute (* hours 60)))
                          secwest-guess))
                (secwest
-                (sb!unix::get-timezone
-                 (truncate-to-unix-range guess))))
+                 (sb!unix::get-timezone
+                  (truncate-to-unix-range guess))))
           (setf encoded-time (+ guess (- secwest secwest-guess)))))
-    (assert (typep encoded-time '(integer 0)))
     encoded-time))
 
 ;;;; TIME

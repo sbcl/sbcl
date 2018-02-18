@@ -1329,8 +1329,8 @@ or they must be declared locally notinline at each call site.~@:>"
 (defun mutable-layout-p (old-layout new-layout)
   (let ((old-bitmap (layout-bitmap old-layout))
         (new-bitmap (layout-bitmap new-layout)))
-    (assert (= old-bitmap (dd-bitmap (layout-info old-layout))))
-    (assert (= new-bitmap (dd-bitmap (layout-info new-layout))))
+    (aver (= old-bitmap (dd-bitmap (layout-info old-layout))))
+    (aver (= new-bitmap (dd-bitmap (layout-info new-layout))))
     (dotimes (i (dd-length (layout-info old-layout)) t)
       (when (and (logbitp i new-bitmap) ; a tagged (i.e. scavenged) slot
                  (not (logbitp i old-bitmap))) ; that was opaque bits

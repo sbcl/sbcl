@@ -182,7 +182,7 @@
                                                    key-length
                                                    :element-type '(unsigned-byte 32)))
                                              (codepoints nil))
-                                        (assert (and (/= cp-length 0) (/= key-length 0)))
+                                        (aver (and (/= cp-length 0) (/= key-length 0)))
                                         (loop repeat cp-length do
                                               (push (dpb 0 (byte 10 22) (aref info index))
                                                     codepoints)

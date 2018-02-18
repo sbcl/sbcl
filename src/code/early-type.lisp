@@ -123,7 +123,7 @@
 
 ;;; Evil macro.
 (defmacro maybe-reparse-specifier! (type)
-  (assert (symbolp type))
+  (aver (symbolp type))
   (with-unique-names (new-type)
     `(let ((,new-type (maybe-reparse-specifier ,type)))
        (when ,new-type

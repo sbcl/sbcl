@@ -589,7 +589,7 @@
          (name (if (consp name)
                    (case (car name)
                      ((xep tl-xep)
-                      (assert (eq kind :external))
+                      (aver (eq kind :external))
                       (second name))
                      (&optional-processor
                       (setf kind :optional)

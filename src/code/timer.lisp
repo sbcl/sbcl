@@ -363,7 +363,7 @@ triggers."
   (defvar *timer-thread* nil)
 
   (defun get-waitable-timer ()
-    (assert (under-scheduler-lock-p))
+    (aver (under-scheduler-lock-p))
     (or *waitable-timer-handle*
         (prog1
             (setf *waitable-timer-handle* (os-create-wtimer))
@@ -418,8 +418,8 @@ triggers."
     (sb!unix:unix-setitimer :real 0 0 0 0)))
 
 (defun set-system-timer ()
-  (assert (under-scheduler-lock-p))
-  (assert (not *interrupts-enabled*))
+  (aver (under-scheduler-lock-p))
+  (aver (not *interrupts-enabled*))
   (let ((next-timer (peek-schedule)))
     (if next-timer
         (let ((delta (- (%timer-expire-time next-timer)
@@ -463,7 +463,7 @@ triggers."
                    (set-system-timer)
                    (return-from run-expired-timers nil)
                 else
-                do (assert (eq timer (priority-queue-extract-maximum *schedule*)))
+                do (aver (eq timer (priority-queue-extract-maximum *schedule*)))
                    (push timer timers)))
         (run-timers)))))
 

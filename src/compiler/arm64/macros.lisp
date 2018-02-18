@@ -90,7 +90,7 @@
   "Jump to the lisp lip LIP."
   `(let ((function ,function)
          (lip ,lip))
-     (assert (sc-is lip interior-reg))
+     (aver (sc-is lip interior-reg))
      (inst add lip function
            (- (ash simple-fun-code-offset word-shift)
               fun-pointer-lowtag))
@@ -103,7 +103,7 @@
      ;; Indicate a single-valued return by clearing all of the status
      ;; flags, or a multiple-valued return by setting all of the status
      ;; flags.
-     (assert (sc-is lip interior-reg))
+     (aver (sc-is lip interior-reg))
      ,@(ecase return-style
          (:single-value '((inst msr :nzcv zr-tn)))
          (:multiple-values '((inst orr tmp-tn zr-tn #xf0000000)
