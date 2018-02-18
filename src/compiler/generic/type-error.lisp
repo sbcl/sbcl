@@ -131,7 +131,10 @@
     sb!c::%odd-key-args-error nil)
   (def unknown-key-arg-error unknown-key-arg-error
     sb!c::%unknown-key-arg-error t key)
-  (def nil-fun-returned-error nil-fun-returned-error nil nil fun))
+  (def nil-fun-returned-error nil-fun-returned-error nil nil fun)
+  (def failed-aver sb!kernel::failed-aver-error
+    sb!impl::%failed-aver
+    nil form))
 
 (defun encode-internal-error-args (values)
   (with-adjustable-vector (vector)

@@ -23,7 +23,7 @@
                               ,(make-array n :initial-element 0))))))
   (def-it))
 
-(eval-when (:compile-toplevel :execute)
+(eval-when-compile-toplevel
 (sb!xc:defmacro deferr (name args &rest body)
   (multiple-value-bind (llks required optional rest) (parse-lambda-list args)
     (declare (ignore llks))
@@ -357,6 +357,9 @@
   ;; recursive error.
   (%primitive print "Thread local storage exhausted.")
   (sb!impl::%halt))
+
+(deferr failed-aver-error (form)
+  (bug "~@<failed AVER: ~2I~_~S~:>" form))
 
 ;;;; INTERNAL-ERROR signal handler
 

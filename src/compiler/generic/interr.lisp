@@ -107,7 +107,8 @@
    ("A function with declared result type NIL returned." nil-fun-returned 1)
    ("An array with element-type NIL was accessed." nil-array-accessed 1)
    ("Object layout is invalid. (indicates obsolete instance)" layout-invalid 2)
-   ("Thread local storage exhausted." tls-exhausted 0))
+   ("Thread local storage exhausted." tls-exhausted 0)
+   ("Failed aver" failed-aver 1))
 
   ;; (II) All the type specifiers X for which there is a unique internal
   ;;      error code corresponding to a primitive object-not-X-error.
