@@ -963,9 +963,9 @@
                       ;; SEQ2 must be distinct arrays.
                       ,(eql sequence-type1 sequence-type2)
                       (eq seq1 seq2) (> start1 start2))
-                     (do ((i (truly-the index (+ start1 replace-len -1))
+                     (do ((i (truly-the (or (eql -1) index) (+ start1 replace-len -1))
                              (1- i))
-                          (j (truly-the index (+ start2 replace-len -1))
+                          (j (truly-the (or (eql -1) index) (+ start2 replace-len -1))
                              (1- j)))
                          ((< i start1))
                        (declare (optimize (insert-array-bounds-checks 0)))

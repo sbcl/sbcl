@@ -689,8 +689,7 @@
 
 ;;;; REPLACE
 (defun vector-replace (vector1 vector2 start1 start2 end1 diff)
-  (declare (index start1 start2)
-           ((or (eql -1) index) end1)
+  (declare ((or (eql -1) index) start1 start2 end1)
            (optimize (sb!c::insert-array-bounds-checks 0))
            ((integer -1 1) diff))
   (let ((tag1 (%other-pointer-widetag vector1))
@@ -725,18 +724,21 @@
 (sb!xc:defmacro vector-replace-from-vector ()
   `(let ((nelts (min (- target-end target-start)
                      (- source-end source-start))))
-     (with-array-data ((data1 target-sequence) (start1 target-start) (end1 target-end))
-       (with-array-data ((data2 source-sequence) (start2 source-start) (end2 source-end))
+     (with-array-data ((data1 target-sequence) (start1 target-start) (end1))
+       (declare (ignore end1))
+       (let ((end1 (the fixnum (+ start1 nelts))))
          (if (and (eq target-sequence source-sequence)
-                  (> start1 start2))
-             (let ((nelts (min (- end1 start1)
-                               (- end2 start2))))
-               (vector-replace data1 data2
-                               (the fixnum (+ start1 (the fixnum nelts) -1))
-                               (the fixnum (+ start2 (the fixnum nelts) -1))
-                               (1- target-start)
+                  (> target-start source-start))
+             (let ((end (the fixnum (1- end1))))
+               (vector-replace data1 data1
+                               end
+                               (the fixnum (- end
+                                              (- target-start source-start)))
+                               (1- start1)
                                -1))
-             (vector-replace data1 data2 start1 start2 (the fixnum (+ start1 nelts)) 1))))
+             (with-array-data ((data2 source-sequence) (start2 source-start) (end2))
+               (declare (ignore end2))
+               (vector-replace data1 data2 start1 start2 end1 1)))))
      target-sequence))
 
 (sb!xc:defmacro list-replace-from-list ()

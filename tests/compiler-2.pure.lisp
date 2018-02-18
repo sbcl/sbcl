@@ -1153,3 +1153,16 @@
                   ((member ,#'car "x" cdr) p4))
          (stable-sort p1 #'<= :key p4))
     (((vector '(2) '(3) '(1)) #'car) #((1) (2) (3)) :test #'equalp)))
+
+(with-test (:name :replace-zero-elements)
+  (checked-compile-and-assert
+      ()
+      '(lambda (x)
+        (declare ((simple-vector 2) x))
+        (replace x x :start1 2))
+    (((vector 1 2)) #(1 2) :test #'equalp))
+  (checked-compile-and-assert
+      ()
+      '(lambda (x)
+        (replace x x :start1 2))
+    (((vector 1 2)) #(1 2) :test #'equalp)))
