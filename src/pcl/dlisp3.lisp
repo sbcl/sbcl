@@ -23,53 +23,50 @@
 
 (in-package "SB-PCL")
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-(defparameter *checking-or-caching-list*
-  '((t nil (class) nil)
-    (t nil (class class) nil)
-    (t nil (class class class) nil)
-    (t nil (class class t) nil)
-    (t nil (class class t t) nil)
-    (t nil (class class t t t) nil)
-    (t nil (class t) nil)
-    (t nil (class t t) nil)
-    (t nil (class t t t) nil)
-    (t nil (class t t t t) nil)
-    (t nil (class t t t t t) nil)
-    (t nil (class t t t t t t) nil)
-    (t nil (t class) nil)
-    (t nil (t class t) nil)
-    (t nil (t t class) nil)
-    (t nil (class) t)
-    (t nil (class class) t)
-    (t nil (class t) t)
-    (t nil (class t t) t)
-    (t nil (class t t t) t)
-    (t nil (t class) t)
-    (t t (class) nil)
-    (t t (class class) nil)
-    (t t (class class class) nil)
-    (nil nil (class) nil)
-    (nil nil (class class) nil)
-    (nil nil (class class t) nil)
-    (nil nil (class class t t) nil)
-    (nil nil (class t) nil)
-    (nil nil (t class t) nil)
-    (nil nil (class) t)
-    (nil nil (class class) t)))
-) ; EVAL-WHEN
-
 ;;; Rather than compiling the constructors here, just tickle the range
 ;;; of shapes defined above, leaving the generation of the
 ;;; constructors to precompile-dfun-constructors.
-(dolist (key *checking-or-caching-list*)
-  (destructuring-bind (cached-emf-p return-value-p metatypes applyp) key
-    (multiple-value-bind (args generator)
-        (if cached-emf-p
-            (if return-value-p
-                (values (list metatypes) 'emit-constant-value)
-                (values (list metatypes applyp) 'emit-caching))
-            (if return-value-p
-                (values (list metatypes) 'emit-in-checking-p)
-                (values (list metatypes applyp) 'emit-checking)))
-      (apply #'get-dfun-constructor generator args))))
+(let ((checking-or-caching-list
+        '((t nil (class) nil)
+          (t nil (class class) nil)
+          (t nil (class class class) nil)
+          (t nil (class class t) nil)
+          (t nil (class class t t) nil)
+          (t nil (class class t t t) nil)
+          (t nil (class t) nil)
+          (t nil (class t t) nil)
+          (t nil (class t t t) nil)
+          (t nil (class t t t t) nil)
+          (t nil (class t t t t t) nil)
+          (t nil (class t t t t t t) nil)
+          (t nil (t class) nil)
+          (t nil (t class t) nil)
+          (t nil (t t class) nil)
+          (t nil (class) t)
+          (t nil (class class) t)
+          (t nil (class t) t)
+          (t nil (class t t) t)
+          (t nil (class t t t) t)
+          (t nil (t class) t)
+          (t t (class) nil)
+          (t t (class class) nil)
+          (t t (class class class) nil)
+          (nil nil (class) nil)
+          (nil nil (class class) nil)
+          (nil nil (class class t) nil)
+          (nil nil (class class t t) nil)
+          (nil nil (class t) nil)
+          (nil nil (t class t) nil)
+          (nil nil (class) t)
+          (nil nil (class class) t))))
+ (dolist (key checking-or-caching-list)
+   (destructuring-bind (cached-emf-p return-value-p metatypes applyp) key
+     (multiple-value-bind (args generator)
+         (if cached-emf-p
+             (if return-value-p
+                 (values (list metatypes) 'emit-constant-value)
+                 (values (list metatypes applyp) 'emit-caching))
+             (if return-value-p
+                 (values (list metatypes) 'emit-in-checking-p)
+                 (values (list metatypes applyp) 'emit-checking)))
+       (apply #'get-dfun-constructor generator args)))))
