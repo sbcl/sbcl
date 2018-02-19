@@ -737,7 +737,6 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
 ;;; Note that within the states that cache, there are dfun updates
 ;;; which simply select a new cache or cache field. Those are not
 ;;; considered as state transitions.
-(defvar *lazy-dfun-compute-p* t)
 (defvar *early-p* nil)
 
 (defun make-initial-dfun (gf)
@@ -1740,15 +1739,15 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
             ;; still enabled...
             (sb-thread::call-with-recursive-system-lock #'update lock))))))
 
-(defvar *dfun-count* nil)
-(defvar *dfun-list* nil)
-(defvar *minimum-cache-size-to-list*)
-
 ;;; These functions aren't used in SBCL, or documented anywhere that
 ;;; I'm aware of, but they look like they might be useful for
 ;;; debugging or performance tweaking or something, so I've just
 ;;; commented them out instead of deleting them. -- WHN 2001-03-28
 #||
+(defvar *dfun-count* nil)
+(defvar *dfun-list* nil)
+(defvar *minimum-cache-size-to-list*)
+
 (defun list-dfun (gf)
   (let* ((sym (type-of (gf-dfun-info gf)))
          (a (assq sym *dfun-list*)))

@@ -14,8 +14,6 @@ Examples:
  (make-instance 'sb-bsd-sockets:inet-socket :type :datagram :protocol :udp)
 ")))
 
-(defparameter *inet-address-any* (vector 0 0 0 0))
-
 (defun address-numbers/v4 (address)
   (coerce address 'list))
 

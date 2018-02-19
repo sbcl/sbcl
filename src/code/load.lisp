@@ -389,7 +389,7 @@
 ;; executed.
 #!+sb-show
 (defvar *show-fops-p* nil)
-(defvar *fasl-source-info*)
+
 ;;;
 ;;; a helper function for LOAD-AS-FASL
 ;;;
@@ -408,7 +408,6 @@
   ;;
   (declare (ignorable print))
   (let ((stream (%fasl-input-stream fasl-input))
-        *fasl-source-info*
         (trace #!+sb-show *show-fops-p*))
     (unless (check-fasl-header stream)
       (return-from load-fasl-group))

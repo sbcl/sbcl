@@ -1397,7 +1397,7 @@ of specialized arrays is supported."
                      ,(if (or (eq (sb!vm:saetp-specifier saetp) 'character)
                               #!+sb-unicode
                               (eq (sb!vm:saetp-specifier saetp) 'base-char))
-                          *default-init-char-form*
+                          '(code-char 0)
                           (sb!vm:saetp-initial-element-default saetp))))
                  (remove-if-not
                   #'sb!vm:saetp-specifier

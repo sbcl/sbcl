@@ -1284,7 +1284,6 @@ possibly temporarily, because it might be used internally."
                "CONSTANT-ARG"
 
                ;; various internal defaults
-               "*DEFAULT-INIT-CHAR-FORM*"
                "*LOAD-SOURCE-DEFAULT-TYPE*" "BASE-CHAR-CODE-LIMIT"
 
                ;; hash caches

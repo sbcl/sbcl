@@ -370,8 +370,7 @@
 ;;; Just convert it into a MAKE-ARRAY.
 (deftransform make-string ((length &key
                                    (element-type 'character)
-                                   (initial-element
-                                    #.*default-init-char-form*)))
+                                   (initial-element (code-char 0))))
   `(the simple-string (make-array (the index length)
                        :element-type element-type
                        ,@(when initial-element

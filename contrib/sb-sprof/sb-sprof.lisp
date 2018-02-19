@@ -757,9 +757,6 @@ The following keyword args are recognized:
 
 (defvar *timer* nil)
 
-(defvar *old-alloc-interval* nil)
-(defvar *old-sample-interval* nil)
-
 #-win32
 (defun start-profiling (&key (max-samples *max-samples*)
                         (mode *sampling-mode*)

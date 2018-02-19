@@ -427,8 +427,6 @@
       (map-dependents gf (lambda (dependent)
                            (apply #'update-dependent gf dependent args))))))
 
-(declaim (special *lazy-dfun-compute-p*))
-
 (defun set-methods (gf methods)
   (setf (generic-function-methods gf) nil)
   (loop (when (null methods) (return gf))

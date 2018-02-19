@@ -14,8 +14,6 @@ Examples:
  (make-instance 'sb-bsd-sockets:inet6-socket :type :datagram :protocol :udp)
 ")))
 
-(defparameter *inet6-address-any* (vector 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0))
-
 (defun address-numbers/v6 (address)
   (loop for i from 0 below 16 by 2 collect
        (+ (* 256 (elt address i)) (elt address (1+ i)))))

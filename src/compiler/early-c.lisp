@@ -106,6 +106,7 @@
 (defvar *current-path*)
 (defvar *current-component*)
 (defvar *delayed-ir1-transforms*)
+#!+sb-dyncount
 (defvar *dynamic-counts-tn*)
 (defvar *elsewhere*)
 (defvar *elsewhere-label*)
