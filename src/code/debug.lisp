@@ -66,11 +66,8 @@ provide bindings for printer control variables.")
 ;;; It actually works as long as the condition is not a subtype of WARNING
 ;;; or ERROR. (Any other direct descendant of CONDITION should be fine)
 (!defvar *stack-top-hint* nil)
-
-(defvar *real-stack-top* nil)
-(defvar *stack-top* nil)
-
 (defvar *current-frame* nil)
+(declaim (always-bound *stack-top-hint* *current-frame*))
 
 ;;; Beginner-oriented help messages are important because you end up
 ;;; in the debugger whenever something bad happens, or if you try to
@@ -1169,10 +1166,8 @@ and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
 
 (defun debug-loop-fun ()
   (let* ((*debug-command-level* (1+ *debug-command-level*))
-         (*real-stack-top* (sb!di:top-frame))
-         (*stack-top* (or *stack-top-hint* *real-stack-top*))
-         (*stack-top-hint* nil)
-         (*current-frame* *stack-top*))
+         (*current-frame* (or *stack-top-hint* (sb!di:top-frame)))
+         (*stack-top-hint* nil))
     (handler-bind ((sb!di:debug-condition
                     (lambda (condition)
                       (princ condition *debug-io*)
