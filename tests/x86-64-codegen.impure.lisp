@@ -107,9 +107,8 @@
                            :stream s)))
            #\newline))
          (index
-          (position "; error trap" lines :test 'search)))
-    (assert (search "OBJECT-NOT-TYPE-ERROR" (nth (1+ index) lines)))
-    (assert (search "; #<SB-KERNEL:LAYOUT for SB-ASSEM:LABEL" (nth (+ index 3) lines)))))
+          (position "OBJECT-NOT-TYPE-ERROR" lines :test 'search)))
+    (assert (search "; #<SB-KERNEL:LAYOUT for SB-ASSEM:LABEL" (nth (+ index 2) lines)))))
 
 #+immobile-code
 (with-test (:name :reference-assembly-tramp)

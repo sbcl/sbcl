@@ -305,10 +305,7 @@
     ;; Use the magic officially-undefined instruction that Linux
     ;; treats as generating SIGTRAP.
     (inst debug-trap)
-    ;; The rest of this is "just" the encoded error details.
-    (inst byte kind)
-    (inst byte code)
-    (encode-internal-error-args values)
+    (emit-internal-error kind code values)
     (emit-alignment word-shift)))
 
 (defun generate-error-code (vop error-code &rest values)

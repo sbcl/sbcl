@@ -115,14 +115,10 @@
 ;;; arguments from the instruction stream.
 (defun internal-error-args (context)
   (declare (type (alien (* os-context-t)) context))
-  (/show0 "entering INTERNAL-ERROR-ARGS, CONTEXT=..")
-  (/hexstr context)
   (let* ((pc (context-pc context))
-         (error-number (sap-ref-8 pc 1)))
+         (trap-number (sap-ref-8 pc 0)))
     (declare (type system-area-pointer pc))
-    (/show0 "got PC")
-    (values error-number
-            (sb!kernel::decode-internal-error-args (sap+ pc 2) error-number))))
+    (sb!kernel::decode-internal-error-args (sap+ pc 1) trap-number)))
 
 ;;; This is used in error.lisp to insure that floating-point exceptions
 ;;; are properly trapped. The compiler translates this to a VOP.

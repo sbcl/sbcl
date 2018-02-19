@@ -136,6 +136,28 @@
     sb!impl::%failed-aver
     nil form))
 
+
+(defun emit-internal-error (kind code values &key trap-emitter
+                                                  (compact-error-trap t))
+  (let ((trap-number (if (and (eq kind error-trap)
+                              compact-error-trap)
+                         (+ kind code)
+                         kind)))
+    (if trap-emitter
+        (funcall trap-emitter trap-number)
+        (inst byte trap-number)))
+  (unless (and (eq kind error-trap)
+               compact-error-trap)
+    (inst byte code))
+  (encode-internal-error-args
+   (mapcar (lambda (tn)
+             (cond ((and (tn-p tn) (sc-is tn immediate))
+                    (aver (typep (tn-value tn) '(or symbol layout)))
+                    (make-sc-offset constant-sc-number (tn-offset tn)))
+                   (t
+                    tn)))
+           values)))
+
 (defun encode-internal-error-args (values)
   (with-adjustable-vector (vector)
     (dolist (where values)

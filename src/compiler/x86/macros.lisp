@@ -187,9 +187,7 @@
     ;; The return PC points here; note the location for the debugger.
     (when vop
       (note-this-location vop :internal-error))
-    (inst byte kind)                    ; e.g. trap_xyyy
-    (inst byte code)
-    (encode-internal-error-args values)))
+    (emit-internal-error kind code values)))
 
 (defun generate-error-code (vop error-code &rest values)
   "Generate-Error-Code Error-code Value*

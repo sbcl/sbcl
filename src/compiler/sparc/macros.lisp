@@ -288,9 +288,9 @@
   (assemble ()
     (when vop
       (note-this-location vop :internal-error))
-    (inst unimp kind)
-    (inst byte code)
-    (encode-internal-error-args values)
+    (emit-internal-error kind code values
+                         :trap-emitter (lambda (tramp-number)
+                                         (inst unimp tramp-number)))
     (emit-alignment word-shift)))
 
 (defun generate-error-code (vop error-code &rest values)

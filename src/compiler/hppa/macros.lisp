@@ -192,9 +192,10 @@ initializes the object."
   (assemble ()
     (when vop
       (note-this-location vop :internal-error))
-    (inst break kind)
-    (inst byte code)
-    (encode-internal-error-args values)
+    (emit-internal-error kind code values
+                         :trap-emitter (lambda (trap-number)
+                                         (inst break trap-number))
+                         :compact-error-trap nil)
     (emit-alignment word-shift)))
 
 (defun generate-error-code (vop error-code &rest values)

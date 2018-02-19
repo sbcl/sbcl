@@ -2256,6 +2256,9 @@ unhandled_trap_error(os_context_t *context)
 void
 handle_trap(os_context_t *context, int trap)
 {
+    if (trap >= trap_Error) {
+        trap = trap_Error;
+    }
     switch(trap) {
 #if !(defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD))
     case trap_PendingInterrupt:

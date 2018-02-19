@@ -199,12 +199,10 @@
 ;;; know its value at compile time:
 (defconstant nil-value (+ static-space-start #xb))
 
-;;;; other miscellaneous constants
 
 (defenum (:start 8)
   halt-trap
   pending-interrupt-trap
-  error-trap
   cerror-trap
   breakpoint-trap
   fun-end-breakpoint-trap
@@ -212,7 +210,8 @@
   single-step-before-trap
   memory-fault-emulation-trap
   #!+sb-safepoint global-safepoint-trap
-  #!+sb-safepoint csp-safepoint-trap)
+  #!+sb-safepoint csp-safepoint-trap
+  error-trap)
 
 ;;;; static symbols
 

@@ -215,9 +215,9 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
   (assemble ()
     (when vop
       (note-this-location vop :internal-error))
-    (inst break 0 kind)
-    (inst byte code)
-    (encode-internal-error-args values)
+    (emit-internal-error kind code values
+                         :trap-emitter (lambda (tramp-number)
+                                         (inst break 0 tramp-number)))
     (emit-alignment word-shift)))
 
 (defun generate-error-code (vop error-code &rest values)

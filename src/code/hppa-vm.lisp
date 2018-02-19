@@ -71,8 +71,8 @@
 (defun internal-error-args (context)
   (declare (type (alien (* os-context-t)) context))
   (let* ((pc (context-pc context))
-         (error-number (sap-ref-8 pc 4)))
+         (trap-number (logand (sap-ref-8 pc 3) #x1f)))
     (declare (type system-area-pointer pc))
-    (values error-number
-            (sb!kernel::decode-internal-error-args (sap+ pc 5) error-number))))
+    (sb!kernel::decode-internal-error-args (sap+ pc 5) trap-number
+                                           (sap-ref-8 pc 4))))
 ) ; end PROGN

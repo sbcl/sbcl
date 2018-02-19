@@ -326,7 +326,7 @@ static void sigill_handler(int signal, siginfo_t *siginfo,
         unsigned int* pc = (unsigned int*) siginfo->si_addr;
 
         inst = *pc;
-        trap = inst & 0x1f;
+        trap = inst & 0xff;
         handle_trap(context,trap);
     }
     else if ((siginfo->si_code) == ILL_ILLTRP

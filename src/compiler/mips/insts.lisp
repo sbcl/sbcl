@@ -42,7 +42,7 @@
     (error "~S isn't a floating-point register." tn))
   (tn-offset tn))
 
-;;;(sb!disassem:set-disassem-params :instruction-alignment 32)
+(defconstant +disassem-inst-alignment-bytes+ 4)
 
 (defvar *disassem-use-lisp-reg-names* t)
 
@@ -1055,27 +1055,27 @@
   (declare (ignore inst))
   (flet ((nt (x) (if stream (note x dstate))))
     (when (= (break-code chunk dstate) 0)
-      (case (break-subcode chunk dstate)
-        (#.halt-trap
-         (nt "Halt trap"))
-        (#.pending-interrupt-trap
-         (nt "Pending interrupt trap"))
-        (#.error-trap
-         (nt "Error trap")
-         (handle-break-args #'snarf-error-junk stream dstate))
-        (#.cerror-trap
-         (nt "Cerror trap")
-         (handle-break-args #'snarf-error-junk stream dstate))
-        (#.breakpoint-trap
-         (nt "Breakpoint trap"))
-        (#.fun-end-breakpoint-trap
-         (nt "Function end breakpoint trap"))
-        (#.after-breakpoint-trap
-         (nt "After breakpoint trap"))
-        (#.single-step-around-trap
-         (nt "Single step around trap"))
-        (#.single-step-before-trap
-         (nt "Single step before trap"))))))
+      (let ((trap (break-subcode chunk dstate)))
+       (case trap
+         (#.halt-trap
+          (nt "Halt trap"))
+         (#.pending-interrupt-trap
+          (nt "Pending interrupt trap"))
+         (#.breakpoint-trap
+          (nt "Breakpoint trap"))
+         (#.fun-end-breakpoint-trap
+          (nt "Function end breakpoint trap"))
+         (#.after-breakpoint-trap
+          (nt "After breakpoint trap"))
+         (#.single-step-around-trap
+          (nt "Single step around trap"))
+         (#.single-step-before-trap
+          (nt "Single step before trap"))
+         (#.cerror-trap
+          (nt "Cerror trap")
+          (handle-break-args #'snarf-error-junk trap stream dstate))
+         (t
+          (handle-break-args #'snarf-error-junk trap stream dstate)))))))
 
 (define-instruction break (segment code &optional (subcode 0))
   (:declare (type (unsigned-byte 10) code subcode))

@@ -208,14 +208,20 @@ describe_internal_error(os_context_t *context)
     char count;
     int position, sc_offset, sc_number, offset, ch;
     void * pc = (void*)*os_context_pc_addr(context);
+    unsigned char code;
 
 #ifdef LISP_FEATURE_ARM64
     u32 trap_instruction = *(u32 *)ptr;
-    unsigned char code = trap_instruction >> 13 & 0xFF;
+    code = trap_instruction >> 13 & 0xFF;
     ptr += 4;
 #else
-    unsigned char code = *ptr;
-    ptr++;
+    unsigned char trap = *(ptr-1);
+    if (trap >= trap_Error) {
+        code = trap - trap_Error;
+    } else {
+        code = *ptr;
+        ptr++;
+    }
 #endif
 
     if (code > sizeof(internal_error_nargs)) {

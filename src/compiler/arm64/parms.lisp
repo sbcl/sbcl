@@ -99,13 +99,13 @@
 (defenum (:start 8)
   halt-trap
   pending-interrupt-trap
-  error-trap
   cerror-trap
   breakpoint-trap
   fun-end-breakpoint-trap
   single-step-around-trap
   single-step-before-trap
-  invalid-arg-count-trap)
+  invalid-arg-count-trap
+  error-trap)
 
 ;;;; Static symbols.
 

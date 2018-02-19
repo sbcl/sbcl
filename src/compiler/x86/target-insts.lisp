@@ -227,19 +227,19 @@
 (defun break-control (chunk inst stream dstate)
   (declare (ignore inst))
   (flet ((nt (x) (if stream (note x dstate))))
-    (case #!-ud2-breakpoints (byte-imm-code chunk dstate)
-          #!+ud2-breakpoints (word-imm-code chunk dstate)
-      (#.error-trap
-       (nt "error trap")
-       (handle-break-args #'snarf-error-junk stream dstate))
-      (#.cerror-trap
-       (nt "cerror trap")
-       (handle-break-args #'snarf-error-junk stream dstate))
-      (#.breakpoint-trap
-       (nt "breakpoint trap"))
-      (#.pending-interrupt-trap
-       (nt "pending interrupt trap"))
-      (#.halt-trap
-       (nt "halt trap"))
-      (#.fun-end-breakpoint-trap
-       (nt "function end breakpoint trap")))))
+    (let ((trap #!-ud2-breakpoints (byte-imm-code chunk dstate)
+                #!+ud2-breakpoints (word-imm-code chunk dstate)))
+     (case trap
+       (#.cerror-trap
+        (nt "cerror trap")
+        (handle-break-args #'snarf-error-junk trap stream dstate))
+       (#.breakpoint-trap
+        (nt "breakpoint trap"))
+       (#.pending-interrupt-trap
+        (nt "pending interrupt trap"))
+       (#.halt-trap
+        (nt "halt trap"))
+       (#.fun-end-breakpoint-trap
+        (nt "function end breakpoint trap"))
+       (t
+        (handle-break-args #'snarf-error-junk trap stream dstate))))))

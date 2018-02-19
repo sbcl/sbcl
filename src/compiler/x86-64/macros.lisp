@@ -151,19 +151,9 @@
     ;; The return PC points here; note the location for the debugger.
     (when vop
       (note-this-location vop :internal-error))
-    (inst byte kind)                       ; eg trap_Xyyy
-    (case kind
-      (#.invalid-arg-count-trap) ; there is no "payload" in this trap kind
-      (t
-       (inst byte code)
-       (encode-internal-error-args
-        (mapcar (lambda (tn)
-                  (cond ((and (tn-p tn) (sc-is tn immediate))
-                         (aver (typep (tn-value tn) '(or symbol layout)))
-                         (make-sc-offset constant-sc-number (tn-offset tn)))
-                        (t
-                         tn)))
-                values))))))
+    (if (= kind invalid-arg-count-trap) ; there is no "payload" in this trap kind
+        (inst byte kind)
+        (emit-internal-error kind code values))))
 
 (defun generate-error-code (vop error-code &rest values)
   (apply #'generate-error-code+ nil vop error-code values))

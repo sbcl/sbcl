@@ -143,19 +143,17 @@
 (defconstant linkage-table-entry-size 16)
 
 
-;;;; other random constants.
-
 (defenum (:start 8)
   halt-trap
   pending-interrupt-trap
-  error-trap
   cerror-trap
   breakpoint-trap
   fun-end-breakpoint-trap
   after-breakpoint-trap
   single-step-around-trap
   single-step-before-trap
-  #!+gencgc allocation-trap)
+  #!+gencgc allocation-trap
+  error-trap)
 
 ;;;; static symbols.
 

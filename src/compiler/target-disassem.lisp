@@ -2170,14 +2170,15 @@
 ;;;   3) a list of SC-OFFSETs of the locations of the error parameters
 ;;;   4) a list of the length (as read from the SAP), in bytes, of each
 ;;;      of the return values.
-(defun handle-break-args (error-parse-fun stream dstate)
+(defun handle-break-args (error-parse-fun trap-number stream dstate)
   (declare (type function error-parse-fun)
            (type (or null stream) stream)
            (type disassem-state dstate))
-  (multiple-value-bind (errnum adjust sc-offsets lengths)
+  (multiple-value-bind (errnum adjust sc-offsets lengths error-byte)
       (funcall error-parse-fun
                (dstate-segment-sap dstate)
                (dstate-next-offs dstate)
+               trap-number
                (null stream))
     (when stream
       (setf (dstate-cur-offs dstate)
@@ -2192,9 +2193,8 @@
              (emit-note (note)
                (when note
                  (note note dstate))))
-        ;; ARM64 encodes the error number in BRK instruction itself
-        #!-arm64
-        (emit-err-arg)
+        (when error-byte
+          (emit-err-arg))
         (emit-note (symbol-name (get-internal-error-name errnum)))
         (dolist (sc-offs sc-offsets)
           (emit-err-arg)
@@ -2210,27 +2210,36 @@
 ;;; so can't easily share this code.
 ;;; But probably we should just add the conditionalization in here.
 #!-arm64
-(defun snarf-error-junk (sap offset &optional length-only)
-  (let* ((error-number (sap-ref-8 sap offset))
-         (length (sb!kernel::error-length error-number))
-         (index (1+ offset)))
+(defun snarf-error-junk (sap offset trap-number &optional length-only (compact-error-trap t))
+  (let* ((index offset)
+         (error-byte t)
+         (error-number (cond ((and compact-error-trap
+                                   (>= trap-number sb!vm:error-trap))
+                              (setf error-byte nil)
+                              (- trap-number sb!vm:error-trap))
+                             (t
+                              (incf index)
+                              (sap-ref-8 sap offset))))
+         (length (sb!kernel::error-length error-number)))
     (declare (type system-area-pointer sap)
              (type (unsigned-byte 8) length))
     (cond (length-only
            (loop repeat length do (sb!c:sap-read-var-integerf sap index))
-           (values 0 (- index offset) nil nil))
+           (values 0 (- index offset) nil nil error-byte))
           (t
            (collect ((sc-offsets)
                      (lengths))
-             (lengths 1) ;; error-number
+             (when error-byte
+               (lengths 1)) ;; error-number
              (loop repeat length do
-                  (let ((old-index index))
-                    (sc-offsets (sb!c:sap-read-var-integerf sap index))
-                    (lengths (- index old-index))))
+                   (let ((old-index index))
+                     (sc-offsets (sb!c:sap-read-var-integerf sap index))
+                     (lengths (- index old-index))))
              (values error-number
                      (- index offset)
                      (sc-offsets)
-                     (lengths)))))))
+                     (lengths)
+                     error-byte))))))
 
 ;; A prefilter set is a list of vectors specifying bytes to extract
 ;; and a function to call on the extracted value(s).

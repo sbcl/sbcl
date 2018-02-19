@@ -109,12 +109,9 @@
 (defconstant linkage-table-entry-size 16)
 
 
-;;;; other miscellaneous constants
-
 (defenum (:start 8)
   halt-trap
   pending-interrupt-trap
-  error-trap
   cerror-trap
   breakpoint-trap
   fun-end-breakpoint-trap
@@ -123,7 +120,8 @@
   invalid-arg-count-trap
   memory-fault-emulation-trap
   #!+sb-safepoint global-safepoint-trap
-  #!+sb-safepoint csp-safepoint-trap)
+  #!+sb-safepoint csp-safepoint-trap
+  error-trap)
 
 ;;;; static symbols
 

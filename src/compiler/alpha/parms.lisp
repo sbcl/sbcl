@@ -139,7 +139,6 @@
 (defenum (:start 8)
   halt-trap
   pending-interrupt-trap
-  error-trap
   cerror-trap
   breakpoint-trap
   fun-end-breakpoint-trap
@@ -148,7 +147,8 @@
   ;; are still needed to avoid undefined variable warnings during sbcl
   ;; build.
   single-step-around-trap
-  single-step-before-trap)
+  single-step-before-trap
+  error-trap)
 
 ;;;; static symbols
 

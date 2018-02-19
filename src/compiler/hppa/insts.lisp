@@ -433,23 +433,27 @@
 (defun break-control (chunk inst stream dstate)
   (declare (ignore inst))
   (flet ((nt (x) (if stream (note x dstate))))
-    (case (break-im5 chunk dstate)
-      (#.error-trap
-       (nt "Error trap")
-       (handle-break-args #'snarf-error-junk stream dstate))
-      (#.cerror-trap
-       (nt "Cerror trap")
-       (handle-break-args #'snarf-error-junk stream dstate))
-      (#.breakpoint-trap
-       (nt "Breakpoint trap"))
-      (#.pending-interrupt-trap
-       (nt "Pending interrupt trap"))
-      (#.halt-trap
-       (nt "Halt trap"))
-      (#.fun-end-breakpoint-trap
-       (nt "Function end breakpoint trap"))
-      (#.single-step-around-trap
-       (nt "Single step around trap")))))
+    (let ((trap (break-im5 chunk dstate)))
+     (case trap
+       (#.cerror-trap
+        (nt "Cerror trap")
+        (handle-break-args #'snarf-error-junk trap stream dstate))
+       (#.breakpoint-trap
+        (nt "Breakpoint trap"))
+       (#.pending-interrupt-trap
+        (nt "Pending interrupt trap"))
+       (#.halt-trap
+        (nt "Halt trap"))
+       (#.fun-end-breakpoint-trap
+        (nt "Function end breakpoint trap"))
+       (#.single-step-around-trap
+        (nt "Single step around trap"))
+       (#.error-trap
+        (nt "Error trap")
+        (handle-break-args (lambda (sap offset trap &optional length-only)
+                             (snarf-error-junk sap offset trap length-only nil))
+                           trap
+                           stream dstate))))))
 
 (define-instruction-format (system-inst 32)
   (op1 :field (byte 6 26) :value 0)

@@ -318,7 +318,8 @@
                         dstate))))
 
 ;;;; special magic to support decoding internal-error and related traps
-(defun snarf-error-junk (sap offset &optional length-only)
+(defun snarf-error-junk (sap offset trap-number &optional length-only)
+  (declare (ignore trap-number))
   (let* ((inst (sap-ref-32 sap (- offset 4)))
          (error-number (ldb (byte 8 13) inst))
          (length (sb!kernel::error-length error-number))
@@ -351,10 +352,10 @@
          (nt "Pending interrupt trap"))
         (#.error-trap
          (nt "Error trap")
-         (handle-break-args #'snarf-error-junk stream dstate))
+         (handle-break-args #'snarf-error-junk code stream dstate))
         (#.cerror-trap
          (nt "Cerror trap")
-         (handle-break-args #'snarf-error-junk stream dstate))
+         (handle-break-args #'snarf-error-junk code stream dstate))
         (#.breakpoint-trap
          (nt "Breakpoint trap"))
         (#.fun-end-breakpoint-trap

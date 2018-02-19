@@ -144,20 +144,13 @@
 ;;; arguments from the instruction stream.
 (defun internal-error-args (context)
   (declare (type (alien (* os-context-t)) context))
-  (/show0 "entering INTERNAL-ERROR-ARGS, CONTEXT=..")
-  (/hexstr context)
   (let* ((pc (context-pc context))
          (trap-number (sap-ref-8 pc 0)))
     (declare (type system-area-pointer pc))
-    (/show0 "got PC")
-    ;; using INT3 the pc is .. INT3 <here> code length bytes...
     (if (= trap-number invalid-arg-count-trap)
         (values #.(error-number-or-lose 'invalid-arg-count-error)
                 '(#.arg-count-sc))
-        (let ((error-number (sap-ref-8 pc 1)))
-          (values error-number
-                  (sb!kernel::decode-internal-error-args (sap+ pc 2) error-number)
-                  trap-number)))))
+        (sb!kernel::decode-internal-error-args (sap+ pc 1) trap-number))))
 
 
 #!+immobile-code

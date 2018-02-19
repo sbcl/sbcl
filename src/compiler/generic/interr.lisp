@@ -226,8 +226,18 @@
       0))
 
 #-sb-xc-host ; no SB!C:SAP-READ-VAR-INTEGERF
-(defun decode-internal-error-args (sap error-number)
-  (let ((length (sb!kernel::error-length error-number)))
-    (declare (type (unsigned-byte 8) length))
-    (loop repeat length with index = 0
-       collect (sb!c:sap-read-var-integerf sap index))))
+(defun decode-internal-error-args (sap trap-number &optional error-number)
+  (let ((error-number (cond (error-number)
+                            ((>= trap-number sb!vm:error-trap)
+                             (prog1
+                                 (- trap-number sb!vm:error-trap)
+                               (setf trap-number sb!vm:error-trap)))
+                            (t
+                             (prog1 (sap-ref-8 sap 0)
+                               (setf sap (sap+ sap 1)))))))
+    (let ((length (sb!kernel::error-length error-number)))
+      (declare (type (unsigned-byte 8) length))
+      (values error-number
+              (loop repeat length with index = 0
+                    collect (sb!c:sap-read-var-integerf sap index))
+              trap-number))))
