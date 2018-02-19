@@ -207,7 +207,7 @@ backtraces. Possible values are :MINIMAL, :NORMAL, and :FULL.
    In the this case arguments may include values internal to SBCL's method
    dispatch machinery.")
 
-(define-deprecated-variable :early "1.1.4.9" *show-entry-point-details*
+(define-deprecated-variable :late "1.1.4.9" *show-entry-point-details*
   :value nil)
 
 (define-deprecated-function :early "1.2.15" backtrace (print-backtrace)

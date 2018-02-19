@@ -54,8 +54,8 @@
                               (simple-condition-format-control w)) 0)))))
 
 ;; Ensure that FOPCOMPILE warns about deprecated variables.
-#+nil ; FIXME
-(with-test (:name :fopcompiler-deprecated-var-warning)
+(with-test (:name :fopcompiler-deprecated-var-warning
+            :fails-on :sbcl)
   (assert (typep (assert-fopcompilable-and-compile-it
                   '(defvar *frob* (if *SHOW-ENTRY-POINT-DETAILS* 'yes 'no)))
                  'sb-ext:deprecation-condition)))
