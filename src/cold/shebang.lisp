@@ -42,10 +42,12 @@
 
 (defun any-vop-translates-p (fun-name)
   (let ((f (intern "INFO" "SB!INT")))
-    (let ((info (and (fboundp f) (funcall f :function :info fun-name))))
-    (and info
-         (let ((f (intern "FUN-INFO-TEMPLATES" "SB!C")))
-           (and (fboundp f) (not (null (funcall f info)))))))))
+    (when (fboundp f)
+      (let ((info (funcall f :function :info fun-name)))
+        (if info
+            (let ((f (intern "FUN-INFO-TEMPLATES" "SB!C")))
+              (and (fboundp f) (not (null (funcall f info)))))
+            (error "vop-translates: ~s is not a known function." fun-name))))))
 
 (defun feature-in-list-p (feature list)
   (labels ((sane-expr-p (x)

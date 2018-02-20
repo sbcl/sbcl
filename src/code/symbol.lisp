@@ -198,8 +198,9 @@ distinct from the global value. Can also be SETF."
 
 (defun symbol-plist (symbol)
   "Return SYMBOL's property list."
-  #!+(vop-translates symbol-plist) (symbol-plist symbol)
-  #!-(vop-translates symbol-plist)
+  #!+(vop-translates cl:symbol-plist)
+  (symbol-plist symbol)
+  #!-(vop-translates cl:symbol-plist)
   (let ((list (car (truly-the list (symbol-info symbol))))) ; a white lie
     ;; Just ensure the result is not a fixnum, and we're done.
     (if (fixnump list) nil list)))
