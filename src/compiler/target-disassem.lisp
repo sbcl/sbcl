@@ -2174,37 +2174,39 @@
   (declare (type function error-parse-fun)
            (type (or null stream) stream)
            (type disassem-state dstate))
-  (multiple-value-bind (errnum adjust sc-offsets lengths error-byte)
-      (funcall error-parse-fun
-               (dstate-segment-sap dstate)
-               (dstate-next-offs dstate)
-               trap-number
-               (null stream))
-    (when stream
-      (setf (dstate-cur-offs dstate)
-            (dstate-next-offs dstate))
-      (flet ((emit-err-arg ()
-               (let ((num (pop lengths)))
-                 (print-notes-and-newline stream dstate)
-                 (print-current-address stream dstate)
-                 (print-inst num stream dstate)
-                 (print-bytes num stream dstate)
-                 (incf (dstate-cur-offs dstate) num)))
-             (emit-note (note)
-               (when note
-                 (note note dstate))))
-        (when error-byte
-          (emit-err-arg))
-        (emit-note (symbol-name (get-internal-error-name errnum)))
-        (dolist (sc-offs sc-offsets)
-          (emit-err-arg)
-          (if (= (sb!c:sc-offset-scn sc-offs)
-                 sb!vm:constant-sc-number)
-              (note-code-constant (* (1- (sb!c:sc-offset-offset sc-offs))
-                                     sb!vm:n-word-bytes)
-                                  dstate)
-              (emit-note (get-random-tn-name sc-offs))))))
-    (incf (dstate-next-offs dstate) adjust)))
+  (when (or (= trap-number sb!vm:cerror-trap)
+            (> trap-number sb!vm:error-trap))
+   (multiple-value-bind (errnum adjust sc-offsets lengths error-byte)
+       (funcall error-parse-fun
+                (dstate-segment-sap dstate)
+                (dstate-next-offs dstate)
+                trap-number
+                (null stream))
+     (when stream
+       (setf (dstate-cur-offs dstate)
+             (dstate-next-offs dstate))
+       (flet ((emit-err-arg ()
+                (let ((num (pop lengths)))
+                  (print-notes-and-newline stream dstate)
+                  (print-current-address stream dstate)
+                  (print-inst num stream dstate)
+                  (print-bytes num stream dstate)
+                  (incf (dstate-cur-offs dstate) num)))
+              (emit-note (note)
+                (when note
+                  (note note dstate))))
+         (when error-byte
+           (emit-err-arg))
+         (emit-note (symbol-name (get-internal-error-name errnum)))
+         (dolist (sc-offs sc-offsets)
+           (emit-err-arg)
+           (if (= (sb!c:sc-offset-scn sc-offs)
+                  sb!vm:constant-sc-number)
+               (note-code-constant (* (1- (sb!c:sc-offset-offset sc-offs))
+                                      sb!vm:n-word-bytes)
+                                   dstate)
+               (emit-note (get-random-tn-name sc-offs))))))
+     (incf (dstate-next-offs dstate) adjust))))
 
 ;;; arm64 stores an error-number in the instruction bytes,
 ;;; so can't easily share this code.
