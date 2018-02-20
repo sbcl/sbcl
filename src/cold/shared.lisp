@@ -587,7 +587,9 @@
            (lambda ()
              (progv (list (intern "*SOURCE-NAMESTRING*" "SB!C"))
                     (list (lpnify-stem stem))
-               (compile-stem stem flags :target-compile)))))
+               (loop
+                (with-simple-restart (recompile "Recompile")
+                  (return (compile-stem stem flags :target-compile))))))))
 (compile 'target-compile-stem)
 
 ;;; (This function is not used by the build process, but is intended
