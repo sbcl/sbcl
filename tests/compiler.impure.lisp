@@ -2852,3 +2852,15 @@
 (defun blah (x) (- x))
 (with-test (:name :foldable-wild-args-fun)
   (assert (eql (funcall (checked-compile '(lambda () (blah (+ 1 2))))) -3)))
+
+
+(declaim (ftype (function * (values cons &optional)) safety-zero-return-checking)
+         (inline safety-zero-return-checking))
+(defun safety-zero-return-checking (x)
+  x)
+
+(with-test (:name :safety-zero-return-checking)
+  (assert (nth-value 1 (checked-compile `(lambda ()
+                                           (declare (optimize (safety 0)))
+                                           (safety-zero-return-checking 1))
+                                        :allow-warnings t))))

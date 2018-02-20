@@ -847,7 +847,6 @@ and no value was provided for it." name))))))))))
            ;; an automatic check.
            (let ((policy (lexenv-policy (functional-lexenv functional))))
              (when (and return
-                        (policy policy (> type-check 0))
                         (or (eq really-assert t)
                             (not (member :result (cdr really-assert)))))
                (assert-lvar-type (return-result return) type-returns
