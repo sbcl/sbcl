@@ -979,27 +979,26 @@
 ;;;      lvar LOC.
 ;;;   -- We don't know what it is.
 (defun fun-lvar-tn (node block lvar)
-  (declare (ignore node block))
   (declare (type lvar lvar))
   (let ((2lvar (lvar-info lvar)))
-    (if (eq (ir2-lvar-kind 2lvar) :delayed)
-        (let ((name (lvar-fun-name lvar t)))
-          (aver name)
-          (values (cond ((sb!vm::static-fdefn-offset name)
-                         name)
-                        (t
-                         ;; Named call to an immobile fdefn from an immobile component
-                         ;; uses the FUN-TN only to preserve liveness of the fdefn.
-                         ;; The name becomes an info arg.
-                         (make-load-time-constant-tn :fdefinition name)))
-                   name))
-        (let* ((locs (ir2-lvar-locs 2lvar))
-               (loc (first locs))
-               (function-ptype (primitive-type-or-lose 'function)))
-          (aver (and (eq (ir2-lvar-kind 2lvar) :fixed)
-                     (= (length locs) 1)))
-          (aver (eq (tn-primitive-type loc) function-ptype))
-          (values loc nil)))))
+    (cond ((neq (ir2-lvar-kind 2lvar) :delayed)
+           (let* ((locs (ir2-lvar-locs 2lvar))
+                  (loc (first locs)))
+             (aver (and (eq (ir2-lvar-kind 2lvar) :fixed)
+                        (= (length locs) 1)))
+             (values loc nil)))
+          ((lvar-fun-name lvar t)
+           (let ((name (lvar-fun-name lvar t)))
+             (values (cond ((sb!vm::static-fdefn-offset name)
+                            name)
+                           (t
+                            ;; Named call to an immobile fdefn from an immobile component
+                            ;; uses the FUN-TN only to preserve liveness of the fdefn.
+                            ;; The name becomes an info arg.
+                            (make-load-time-constant-tn :fdefinition name)))
+                     name)))
+          (t
+           (values (lvar-tn node block lvar) nil)))))
 
 ;;; Set up the args to NODE in the current frame, and return a TN-REF
 ;;; list for the passing locations.
@@ -1033,9 +1032,11 @@
         (fun-lvar-tn node block (basic-combination-fun node))
       (cond ((not named)
              (vop* tail-call node block
-                  (fun-tn old-fp return-pc pass-refs)
-                  (nil)
-                  nargs (emit-step-p node)))
+                   (fun-tn old-fp return-pc pass-refs)
+                   (nil)
+                   nargs (emit-step-p node)
+                   #!+call-symbol
+                   (eq (tn-primitive-type fun-tn) *backend-t-primitive-type*)))
             #!-immobile-code
             ((eq fun-tn named)
              (vop* static-tail-call-named node block
@@ -1094,7 +1095,9 @@
           (fun-lvar-tn node block (basic-combination-fun node))
         (cond ((not named)
                (vop* call node block (fp fun-tn args) (loc-refs)
-                     arg-locs nargs nvals (emit-step-p node)))
+                     arg-locs nargs nvals (emit-step-p node)
+                     #!+call-symbol
+                     (eq (tn-primitive-type fun-tn) *backend-t-primitive-type*)))
               #!-immobile-code
               ((eq fun-tn named)
                (vop* static-call-named node block
@@ -1123,7 +1126,9 @@
           (fun-lvar-tn node block (basic-combination-fun node))
         (cond ((not named)
                (vop* multiple-call node block (fp fun-tn args) (loc-refs)
-                  arg-locs nargs (emit-step-p node)))
+                     arg-locs nargs (emit-step-p node)
+                     #!+call-symbol
+                     (eq (tn-primitive-type fun-tn) *backend-t-primitive-type*)))
               #!-immobile-code
               ((eq fun-tn named)
                (vop* static-multiple-call-named node block
@@ -1236,6 +1241,16 @@
     (when (consp fname)
       (aver (legal-fun-name-p fname))))) ;; FIXME: needless check?
 
+#!+call-symbol
+(defun remove-%coerce-callable-for-call (call)
+  (let* ((fun (basic-combination-fun call))
+         (use (lvar-uses fun)))
+    (when (and (combination-p use)
+               (eq (lvar-fun-name (combination-fun use) t)
+                   '%coerce-callable-for-call))
+      (let ((callable (car (combination-args use))))
+        (setf (basic-combination-fun call) callable)))))
+
 ;;; If the call is in a tail recursive position and the return
 ;;; convention is standard, then do a tail full call. If one or fewer
 ;;; values are desired, then use a single-value call, otherwise use a
@@ -1243,6 +1258,8 @@
 (defun ir2-convert-full-call (node block)
   (declare (type combination node) (type ir2-block block))
   (ponder-full-call node)
+  #!+call-symbol
+  (remove-%coerce-callable-for-call node)
   (cond ((node-tail-p node)
          (ir2-convert-tail-full-call node block))
         ((let ((lvar (node-lvar node)))
@@ -1559,17 +1576,23 @@
         (let ((env (physenv-info (node-physenv node))))
           (vop tail-call-variable node block start fun
                (ir2-physenv-old-fp env)
-               (ir2-physenv-return-pc env))))
+               (ir2-physenv-return-pc env)
+               #!+call-symbol
+               (eq (tn-primitive-type fun) *backend-t-primitive-type*))))
        ((and 2lvar
              (eq (ir2-lvar-kind 2lvar) :unknown))
         (vop* multiple-call-variable node block (start fun nil)
               ((reference-tn-list (ir2-lvar-locs 2lvar) t))
-              (emit-step-p node)))
+              (emit-step-p node)
+              #!+call-symbol
+              (eq (tn-primitive-type fun) *backend-t-primitive-type*)))
        (t
         (let ((locs (standard-result-tns lvar)))
           (vop* call-variable node block (start fun nil)
                 ((reference-tn-list locs t)) (length locs)
-                (emit-step-p node))
+                (emit-step-p node)
+                #!+call-symbol
+                (eq (tn-primitive-type fun) *backend-t-primitive-type*))
           (move-lvar-result node block locs lvar)))))))
 
 ;;; Reset the stack pointer to the start of the specified
@@ -1693,6 +1716,18 @@ not stack-allocated LVAR ~S." source-lvar)))))
                 (lvar-tn node block count)
                 nil)
                ((reference-tn-list locs t))))))))
+
+;;; If ir2-convert-full-call gets to it first REMOVE-%COERCE-CALLABLE-FOR-CALL does the job.
+#!+call-symbol
+(defoptimizer (%coerce-callable-for-call ir2-convert) ((fun) node block)
+  (let ((dest (node-dest node)))
+    (if (and (basic-combination-p dest)
+             (eq (basic-combination-kind dest) :full)
+             (let ((dest-fun (basic-combination-fun dest)))
+               (or (eq dest-fun fun) ;; already removed
+                   (eq (lvar-uses dest-fun) node))))
+        (setf (basic-combination-fun dest) fun)
+        (ir2-convert-full-call node block))))
 
 ;;;; special binding
 

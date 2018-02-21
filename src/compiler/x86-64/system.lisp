@@ -263,6 +263,17 @@
                             (* simple-fun-code-offset n-word-bytes))))))
 
 ;;;; symbol frobbing
+(defun load-symbol-info-vector (result symbol temp)
+  (loadw result symbol symbol-info-slot other-pointer-lowtag)
+  ;; If RES has list-pointer-lowtag, take its CDR. If not, use it as-is.
+  ;; This CMOV safely reads from memory when it does not move, because if
+  ;; there is an info-vector in the slot, it has at least one element.
+  ;; This would compile to almost the same code without a VOP,
+  ;; but using a jmp around a mov instead.
+  (inst lea temp (make-ea :dword :base result :disp (- list-pointer-lowtag)))
+  (inst test (reg-in-size temp :byte) lowtag-mask)
+  (inst cmov :e result
+        (make-ea-for-object-slot result cons-cdr-slot list-pointer-lowtag)))
 
 (define-vop (symbol-info-vector)
   (:policy :fast-safe)
@@ -271,16 +282,8 @@
   (:results (res :scs (descriptor-reg)))
   (:temporary (:sc unsigned-reg :offset rax-offset) rax)
   (:generator 1
-    (loadw res x symbol-info-slot other-pointer-lowtag)
-    ;; If RES has list-pointer-lowtag, take its CDR. If not, use it as-is.
-    ;; This CMOV safely reads from memory when it does not move, because if
-    ;; there is an info-vector in the slot, it has at least one element.
-    ;; This would compile to almost the same code without a VOP,
-    ;; but using a jmp around a mov instead.
-    (inst lea rax (make-ea :dword :base res :disp (- list-pointer-lowtag)))
-    (inst test (reg-in-size rax :byte) lowtag-mask)
-    (inst cmov :e res
-          (make-ea-for-object-slot res cons-cdr-slot list-pointer-lowtag))))
+    (load-symbol-info-vector res x rax)))
+
 (define-vop (symbol-plist)
   (:policy :fast-safe)
   (:translate symbol-plist)

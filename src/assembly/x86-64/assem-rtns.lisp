@@ -131,8 +131,8 @@
 ;;;; TAIL-CALL-VARIABLE
 
 ;;; For tail-call-variable, we have to copy the arguments from the end
-;;; of our stack frame (were args are produced) to the start of our
-;;; stack frame (were args are expected).
+;;; of our stack frame (where args are produced) to the start of our
+;;; stack frame (where args are expected).
 ;;;
 ;;; We take the function to call in EAX and a pointer to the arguments in
 ;;; ESI. EBP says the same over the jump, and the old frame pointer is
@@ -140,9 +140,100 @@
 ;;; the second stack slot, so we have to push it to make it look like
 ;;; we actually called. We also have to compute ECX from the difference
 ;;; between ESI and the stack top.
+(defun !prepare-for-tail-call-variable (eax ebx ecx edx edi esi
+                                        &optional jump-to-the-end)
+  (assemble ()
+    ;; Calculate NARGS (as a fixnum)
+    (move ecx esi)
+    (inst sub ecx rsp-tn)
+    #!-#.(cl:if (cl:= sb!vm:word-shift sb!vm:n-fixnum-tag-bits) '(and) '(or))
+    (inst shr ecx (- word-shift n-fixnum-tag-bits))
+
+    ;; Check for all the args fitting the registers.
+    (inst cmp ecx (fixnumize register-arg-count))
+    (inst jmp :le REGISTER-ARGS)
+
+    ;; Save the OLD-FP and RETURN-PC because the blit is going to trash
+    ;; those stack locations. Save the ECX, because the loop is going to
+    ;; trash it.
+    (pushw rbp-tn (frame-word-offset ocfp-save-offset))
+    (loadw ebx rbp-tn (frame-word-offset return-pc-save-offset))
+    (inst push ecx)
+
+    ;; Do the blit. Because we are coping from smaller addresses to
+    ;; larger addresses, we have to start at the largest pair and work
+    ;; our way down.
+    (inst shr ecx n-fixnum-tag-bits)
+    (inst std)                          ; count down
+    (inst lea edi (make-ea :qword :base rbp-tn :disp (frame-byte-offset 0)))
+    (inst sub esi n-word-bytes)
+    (inst rep)
+    (inst movs :qword)
+    (inst cld)
+
+    ;; Load the register arguments carefully.
+    (loadw edx rbp-tn (frame-word-offset ocfp-save-offset))
+
+    ;; Restore OLD-FP and ECX.
+    (inst pop ecx)
+    ;; Overwrites a1
+    (popw rbp-tn (frame-word-offset ocfp-save-offset))
+
+    ;; Blow off the stack above the arguments.
+    (inst lea rsp-tn (make-ea :qword :base edi :disp n-word-bytes))
+
+    ;; remaining register args
+    (inst mov edi edx)
+    (loadw edx rbp-tn (frame-word-offset 0))
+    (loadw esi rbp-tn (frame-word-offset 2))
+
+    ;; Push the (saved) return-pc so it looks like we just called.
+    (inst push ebx)
+
+    ;; And jump into the function.
+    (if jump-to-the-end
+        (inst jmp end)
+        (inst jmp
+              (make-ea :byte :base eax
+                             :disp (- (* closure-fun-slot n-word-bytes)
+                                      fun-pointer-lowtag))))
+
+    ;; All the arguments fit in registers, so load them.
+    REGISTER-ARGS
+    (loadw edx esi -1)
+    (loadw edi esi -2)
+    (loadw esi esi -3)
+
+    ;; Clear most of the stack.
+    (inst lea rsp-tn
+          (make-ea :qword :base rbp-tn :disp (* (- sp->fp-offset 3) n-word-bytes)))
+
+    ;; Push the return-pc so it looks like we just called.
+    (pushw rbp-tn (frame-word-offset return-pc-save-offset))
+    END))
+
 #+sb-assembling ;; No vop for this one either.
 (define-assembly-routine
     (tail-call-variable
+     (:return-style :none))
+    ((:temp eax unsigned-reg rax-offset)
+     (:temp ebx unsigned-reg rbx-offset)
+     (:temp ecx unsigned-reg rcx-offset)
+     (:temp edx unsigned-reg rdx-offset)
+     (:temp edi unsigned-reg rdi-offset)
+     (:temp esi unsigned-reg rsi-offset)
+     (:temp fun (any-reg descriptor-reg) rax-offset)
+     (:temp length (any-reg descriptor-reg) rax-offset)
+     (:temp vector (any-reg descriptor-reg) rbx-offset))
+  (!prepare-for-tail-call-variable eax ebx ecx edx edi esi)
+
+  (inst jmp (make-ea :byte :base eax
+                     :disp (- (* closure-fun-slot n-word-bytes)
+                              fun-pointer-lowtag))))
+
+#+sb-assembling
+(define-assembly-routine
+    (tail-call-callable-variable
      (:return-style :none))
 
     ((:temp eax unsigned-reg rax-offset)
@@ -150,78 +241,79 @@
      (:temp ecx unsigned-reg rcx-offset)
      (:temp edx unsigned-reg rdx-offset)
      (:temp edi unsigned-reg rdi-offset)
-     (:temp esi unsigned-reg rsi-offset))
+     (:temp esi unsigned-reg rsi-offset)
+     (:temp fun (any-reg descriptor-reg) rax-offset)
+     (:temp length (any-reg descriptor-reg) rax-offset)
+     (:temp vector (any-reg descriptor-reg) rbx-offset))
+  (!prepare-for-tail-call-variable eax ebx ecx edx edi esi t)
 
-  ;; Calculate NARGS (as a fixnum)
-  (move ecx esi)
-  (inst sub ecx rsp-tn)
-  #!-#.(cl:if (cl:= sb!vm:word-shift sb!vm:n-fixnum-tag-bits) '(and) '(or))
-  (inst shr ecx (- word-shift n-fixnum-tag-bits))
-
-  ;; Check for all the args fitting the registers.
-  (inst cmp ecx (fixnumize register-arg-count))
-  (inst jmp :le REGISTER-ARGS)
-
-  ;; Save the OLD-FP and RETURN-PC because the blit is going to trash
-  ;; those stack locations. Save the ECX, because the loop is going to
-  ;; trash it.
-  (pushw rbp-tn (frame-word-offset ocfp-save-offset))
-  (loadw ebx rbp-tn (frame-word-offset return-pc-save-offset))
-  (inst push ecx)
-
-  ;; Do the blit. Because we are coping from smaller addresses to
-  ;; larger addresses, we have to start at the largest pair and work
-  ;; our way down.
-  (inst shr ecx n-fixnum-tag-bits)
-  (inst std)                            ; count down
-  (inst lea edi (make-ea :qword :base rbp-tn :disp (frame-byte-offset 0)))
-  (inst sub esi n-word-bytes)
-  (inst rep)
-  (inst movs :qword)
-  (inst cld)
-
-  ;; Load the register arguments carefully.
-  (loadw edx rbp-tn (frame-word-offset ocfp-save-offset))
-
-  ;; Restore OLD-FP and ECX.
-  (inst pop ecx)
-  ;; Overwrites a1
-  (popw rbp-tn (frame-word-offset ocfp-save-offset))
-
-  ;; Blow off the stack above the arguments.
-  (inst lea rsp-tn (make-ea :qword :base edi :disp n-word-bytes))
-
-  ;; remaining register args
-  (inst mov edi edx)
-  (loadw edx rbp-tn (frame-word-offset 0))
-  (loadw esi rbp-tn (frame-word-offset 2))
-
-  ;; Push the (saved) return-pc so it looks like we just called.
-  (inst push ebx)
-
-  ;; And jump into the function.
-  (inst jmp
-        (make-ea :byte :base eax
-                 :disp (- (* closure-fun-slot n-word-bytes)
-                          fun-pointer-lowtag)))
-
-  ;; All the arguments fit in registers, so load them.
-  REGISTER-ARGS
-  (loadw edx esi -1)
-  (loadw edi esi -2)
-  (loadw esi esi -3)
-
-  ;; Clear most of the stack.
-  (inst lea rsp-tn
-        (make-ea :qword :base rbp-tn :disp (* (- sp->fp-offset 3) n-word-bytes)))
-
-  ;; Push the return-pc so it looks like we just called.
-  (pushw rbp-tn (frame-word-offset return-pc-save-offset))
-
-  ;; And away we go.
+  (%lea-for-lowtag-test ebx-tn fun fun-pointer-lowtag)
+  (inst test bl-tn lowtag-mask)
+  (inst jmp :nz not-fun)
   (inst jmp (make-ea :byte :base eax
-                     :disp (- (* closure-fun-slot n-word-bytes)
-                              fun-pointer-lowtag))))
+                           :disp (- (* closure-fun-slot n-word-bytes)
+                                    fun-pointer-lowtag)))
+  not-fun
+  (inst jmp (make-fixup 'tail-call-symbol :assembly-routine)))
+
+#+sb-assembling
+(define-assembly-routine (call-symbol
+                          (:return-style :none)
+                          (:export tail-call-symbol))
+    ((:temp fun (any-reg descriptor-reg) rax-offset)
+     (:temp length (any-reg descriptor-reg) rax-offset)
+     (:temp vector (any-reg descriptor-reg) rbx-offset))
+  ;; Jump over CALL QWORD PTR [RAX-3] in the caller
+  (inst add (make-ea :qword :base rsp-tn) 3)
+  (emit-alignment n-lowtag-bits :long-nop)
+
+  TAIL-CALL-SYMBOL
+  (%lea-for-lowtag-test vector fun other-pointer-lowtag)
+  (inst test (reg-in-size vector :byte) lowtag-mask)
+  (inst jmp :nz not-callable)
+  (inst cmp (make-ea :byte :base fun :disp (- other-pointer-lowtag))
+        symbol-widetag)
+  (inst jmp :ne not-callable)
+  (load-symbol-info-vector vector fun r11-tn)
+  ;; info-vector-fdefn
+  (inst cmp vector nil-value)
+  (inst jmp :e undefined)
+
+  (inst mov r10d-tn (make-ea :dword :base vector
+                                    :disp (- (* 2 n-word-bytes) other-pointer-lowtag)))
+  (inst and r10d-tn (fixnumize (1- (ash 1 (* info-number-bits 2)))))
+  (inst cmp r10d-tn (fixnumize (1+ (ash +fdefn-info-num+ info-number-bits))))
+  (inst jmp :b undefined)
+
+  (loadw length vector 1 other-pointer-lowtag)
+  (inst mov fun (make-ea :qword :base vector
+                                :index length
+                                :scale 4
+                                :disp
+                                (- 8 other-pointer-lowtag)))
+
+  (inst lea vector (make-ea :qword :base fun
+                                   :disp (- (* fdefn-raw-addr-slot
+                                               n-word-bytes)
+                                            other-pointer-lowtag)))
+  (inst jmp vector)
+
+  UNDEFINED
+  (inst pop (make-ea :qword :base rbp-tn :disp n-word-bytes))
+  (emit-error-break nil cerror-trap (error-number-or-lose 'undefined-fun-error) (list fun))
+  (inst push (make-ea :qword :base rbp-tn :disp n-word-bytes))
+
+  (inst jmp (make-ea :qword :base fun
+                            :disp (- (* closure-fun-slot n-word-bytes)
+                                     fun-pointer-lowtag)))
+  NOT-CALLABLE
+  (inst cmp fun nil-value) ;; NIL doesn't have SYMBOL-WIDETAG
+  (inst jmp :e undefined)
+
+  (inst pop (make-ea :qword :base rbp-tn :disp n-word-bytes))
+  (emit-error-break nil error-trap (error-number-or-lose 'sb!kernel::object-not-callable-error)
+                    (list fun)))
+
 
 (define-assembly-routine (throw
                           (:return-style :raw))

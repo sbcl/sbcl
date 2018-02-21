@@ -1810,7 +1810,9 @@
   (values (simple-array * (*)) index index index)
   (foldable flushable))
 (defknown %set-symbol-package (symbol t) t ())
-(defknown %coerce-callable-to-fun (function-designator) function (flushable))
+(defknown (%coerce-callable-to-fun %coerce-callable-for-call)
+    (function-designator)
+    function (flushable))
 (defknown array-bounding-indices-bad-error (t t t) nil)
 (defknown sequence-bounding-indices-bad-error (t t t) nil)
 (defknown %find-position

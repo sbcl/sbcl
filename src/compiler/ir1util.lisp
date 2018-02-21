@@ -2380,6 +2380,9 @@ is :ANY, the function name is not checked."
   (declare (type basic-combination call))
   (let ((kind (basic-combination-kind call)))
     (or (eq kind :full)
+        ;; It has an ir2-converter, but needs to behave like a full call.
+        (eq (lvar-fun-name (basic-combination-fun call) t)
+            '%coerce-callable-for-call)
         (and (eq kind :known)
              (let ((info (basic-combination-fun-info call)))
                (and
