@@ -292,12 +292,17 @@
                                 :disp
                                 (- 8 other-pointer-lowtag)))
 
-  (inst lea vector (make-ea :qword :base fun
-                                   :disp (- (* fdefn-raw-addr-slot
-                                               n-word-bytes)
-                                            other-pointer-lowtag)))
-  (inst jmp vector)
-
+  (let ((fdefn-raw-addr
+          (make-ea :qword :base fun
+                          :disp (- (* fdefn-raw-addr-slot
+                                      n-word-bytes)
+                                   other-pointer-lowtag))))
+    #!+immobile-code
+    (progn
+      (inst lea vector fdefn-raw-addr)
+      (inst jmp vector))
+    #!-immobile-code
+    (inst jmp fdefn-raw-addr))
   UNDEFINED
   (inst pop (make-ea :qword :base rbp-tn :disp n-word-bytes))
   (emit-error-break nil cerror-trap (error-number-or-lose 'undefined-fun-error) (list fun))
