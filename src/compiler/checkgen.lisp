@@ -348,8 +348,11 @@
             #.(map 'vector
                    (lambda (entry)
                      (cons (type-specifier (specifier-type (car entry)))
-                           (cdr entry)))
-                   (remove-if #'stringp sb!c:+backend-internal-errors+
+                           (cadr entry)))
+                   (remove-if (lambda (spec)
+                                (or (stringp spec)
+                                    (typep spec '(cons (eql or)))))
+                              sb!c:+backend-internal-errors+
                               :key #'car)))
            ;; This is effectively a compact read-only binned hashtable.
            (hashtable (make-array (logior (length entries) 1)
@@ -360,11 +363,52 @@
                       (bucket (mod (sxhash canon-type) (length hashtable))))
                  (push entry (svref hashtable bucket))))
              entries)
-        hashtable))
+      hashtable))
+
+(defglobal **type-spec-unions-interr-symbols**
+    #.(map 'vector
+           (lambda (entry)
+             (cons (type-specifier (specifier-type (car entry)))
+                   (cadr entry)))
+           (remove-if-not (lambda (spec)
+                            (typep spec '(cons (eql or))))
+                          sb!c:+backend-internal-errors+
+                          :key #'car)))
+(declaim (simple-vector **type-spec-unions-interr-symbols**))
+
+;;; Different order of elements in (OR ...) specs make the hash-table
+;;; approach inssuficient.
+(defun %interr-symbol-for-union-type-spec (spec)
+  (let* ((spec (cdr spec))
+         (length (length spec))
+         (bit-map (if (> length sb!vm:n-fixnum-bits)
+                      (return-from %interr-symbol-for-union-type-spec)
+                      (1- (ash 1 (truly-the (integer 1 #.sb!vm:n-fixnum-bits)
+                                            length))))))
+    (declare (list spec))
+    (loop for entry across **type-spec-unions-interr-symbols**
+          when
+          (let ((current-map bit-map))
+            ;; Check that each element is present and mark it in the bit map,
+            ;; at the end if the map is zero the specs match.
+            (declare (type fixnum current-map))
+            (loop for element in (cdar entry)
+                  for position = (position element spec :test #'equal)
+                  always position
+                  do
+                  (setf (ldb (byte 1 (truly-the (integer 0 (#.sb!vm:n-fixnum-bits))
+                                                position))
+                             current-map)
+                        0))
+            (zerop current-map))
+          return (cdr entry))))
+
 (defun %interr-symbol-for-type-spec (spec)
   (let ((table **type-spec-interr-symbols**))
-    (cadr (assoc spec (svref table (rem (sxhash spec) (length table)))
-                :test #'equal))))
+    (if (typep spec '(cons (eql or)))
+        (%interr-symbol-for-union-type-spec spec)
+        (cdr (assoc spec (svref table (rem (sxhash spec) (length table)))
+                    :test #'equal)))))
 #+nil ; some meta-analysis to decide what types should be in "generic/interr"
 (progn
   (defvar *checkgen-used-types* (make-hash-table :test 'equal))

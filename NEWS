@@ -11,6 +11,7 @@ changes relative to sbcl-1.4.4:
     work as soon it returns from GC and invokes any post-GC hooks.
     As such, it is more important than before to avoid assumptions about
     special variable bindings in finalizers, even in single-threaded code.
+  * optimization: faster (funcall (or function symbol)) on x86-64.
 
 changes in sbcl-1.4.4 relative to sbcl-1.4.3:
   * bug fix: pathname accessors such as PATHNAME-DIRECTORY work on
