@@ -310,7 +310,7 @@ void
 arch_handle_single_step_trap(os_context_t *context, int trap)
 {
     unsigned int code = *((u32 *) (*os_context_pc_addr(context)));
-    int register_offset = code >> 5 & 0x1f;
+    int register_offset = code >> 8 & 0x1f;
     handle_single_step_trap(context, trap, register_offset);
     arch_skip_instruction(context);
 }

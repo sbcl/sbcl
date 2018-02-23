@@ -1054,28 +1054,27 @@
 (defun break-control (chunk inst stream dstate)
   (declare (ignore inst))
   (flet ((nt (x) (if stream (note x dstate))))
-    (when (= (break-code chunk dstate) 0)
-      (let ((trap (break-subcode chunk dstate)))
-       (case trap
-         (#.halt-trap
-          (nt "Halt trap"))
-         (#.pending-interrupt-trap
-          (nt "Pending interrupt trap"))
-         (#.breakpoint-trap
-          (nt "Breakpoint trap"))
-         (#.fun-end-breakpoint-trap
-          (nt "Function end breakpoint trap"))
-         (#.after-breakpoint-trap
-          (nt "After breakpoint trap"))
-         (#.single-step-around-trap
-          (nt "Single step around trap"))
-         (#.single-step-before-trap
-          (nt "Single step before trap"))
-         (#.cerror-trap
-          (nt "Cerror trap")
-          (handle-break-args #'snarf-error-junk trap stream dstate))
-         (t
-          (handle-break-args #'snarf-error-junk trap stream dstate)))))))
+    (let ((trap (break-subcode chunk dstate)))
+      (case trap
+        (#.halt-trap
+         (nt "Halt trap"))
+        (#.pending-interrupt-trap
+         (nt "Pending interrupt trap"))
+        (#.breakpoint-trap
+         (nt "Breakpoint trap"))
+        (#.fun-end-breakpoint-trap
+         (nt "Function end breakpoint trap"))
+        (#.after-breakpoint-trap
+         (nt "After breakpoint trap"))
+        (#.single-step-around-trap
+         (nt "Single step around trap"))
+        (#.single-step-before-trap
+         (nt "Single step before trap"))
+        (#.cerror-trap
+         (nt "Cerror trap")
+         (handle-break-args #'snarf-error-junk trap stream dstate))
+        (t
+         (handle-break-args #'snarf-error-junk trap stream dstate))))))
 
 (define-instruction break (segment code &optional (subcode 0))
   (:declare (type (unsigned-byte 10) code subcode))

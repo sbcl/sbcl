@@ -738,7 +738,7 @@ default-value-8
                     ;; the register number of CALLABLE-TN.
                     (inst unimp (logior single-step-around-trap
                                         (ash (reg-tn-encoding callable-tn)
-                                             5)))
+                                             8)))
                     (emit-label step-done-label))))
            (declare (ignorable #'insert-step-instrumenting))
            ,@(case named

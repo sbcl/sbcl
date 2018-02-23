@@ -768,12 +768,8 @@ default-value-8
                     ;; CONTEXT-PC will be pointing here when the
                     ;; interrupt is handled, not after the BREAK.
                     (note-this-location vop :step-before-vop)
-                    ;; Construct a trap code with the low bits from
-                    ;; SINGLE-STEP-AROUND-TRAP and the high bits from
-                    ;; the register number of CALLABLE-TN.
-                    (inst break 0 (logior single-step-around-trap
-                                          (ash (reg-tn-encoding callable-tn)
-                                               5)))
+                    (inst break (reg-tn-encoding callable-tn)
+                          single-step-around-trap)
                     (emit-label step-done-label))))
            (declare (ignorable #'insert-step-instrumenting))
            ,@(case named
