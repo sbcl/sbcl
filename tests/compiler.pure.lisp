@@ -6307,7 +6307,8 @@
                   :fails-on :x86)
   (checked-compile-and-assert (:allow-style-warnings t)
       `(lambda () (*  1.0 2 (expt 2 127)))
-    (() (condition 'floating-point-overflow))))
+    (() #-(or arm64 arm) (condition 'floating-point-overflow)
+        #+(or arm64 arm) sb-ext:single-float-positive-infinity)))
 
 (with-test (:name (logbitp :past fixnum))
   (checked-compile-and-assert ()
