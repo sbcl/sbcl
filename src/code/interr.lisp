@@ -372,99 +372,104 @@
 (defun internal-error (context continuable)
   (declare (type system-area-pointer context))
   (declare (ignore continuable))
-  (/show0 "entering INTERNAL-ERROR, CONTEXT=..")
-  (/hexstr context)
   (let (#!+unwind-to-frame-and-call-vop
         (*interr-current-bsp*
           ;; Needs to be done before anything is bound
           (%primitive sb!c:current-binding-pointer)))
-   (infinite-error-protect
-    (/show0 "about to bind ALIEN-CONTEXT")
-    (let* ((alien-context (sap-alien context (* os-context-t)))
-           #!+c-stack-is-control-stack
-           (fp-and-pc (make-array 2 :element-type 'word)))
-      #!+c-stack-is-control-stack
-      (declare (truly-dynamic-extent fp-and-pc))
-      #!+c-stack-is-control-stack
-      (setf (aref fp-and-pc 0) (sb!vm:context-register alien-context sb!vm::cfp-offset)
-            (aref fp-and-pc 1) (sb!sys:sap-int (sb!vm:context-pc alien-context)))
-      (let (#!+c-stack-is-control-stack
-            (*saved-fp-and-pcs* (cons fp-and-pc *saved-fp-and-pcs*)))
+    (macrolet ((with-pinned-code-object (context &body body)
+                 (declare (ignorable context))
+                 #!+(or x86 x86-64)
+                 `(progn ,@body)
+                 #!-(or x86 x86-64)
+                 `(with-pinned-objects ((without-gcing
+                                          (sb-di::code-object-from-context ,context)))
+                    ,@body)))
+     (infinite-error-protect
+      (let* ((alien-context (sap-alien context (* os-context-t)))
+             #!+c-stack-is-control-stack
+             (fp-and-pc (make-array 2 :element-type 'word)))
         #!+c-stack-is-control-stack
-        (declare (truly-dynamic-extent *saved-fp-and-pcs*))
-       (/show0 "about to bind ERROR-NUMBER and ARGUMENTS"))
-      (multiple-value-bind (error-number arguments
-                            *current-internal-trap-number*)
-          (sb!vm:internal-error-args alien-context)
-        (with-interrupt-bindings
-          (let ((sb!debug:*stack-top-hint* (find-interrupted-frame))
-                (*current-internal-error* error-number)
-                (*current-internal-error-args* arguments)
-                (*current-internal-error-context* alien-context)
-                (fp (int-sap (sb!vm:context-register alien-context
-                                                     sb!vm::cfp-offset))))
-            (if (and (>= error-number (length **internal-error-handlers**))
-                     (< error-number (length sb!c:+backend-internal-errors+)))
-                (let ((context (sb!di:error-context)))
-                  (if (typep context '(cons (eql :struct-read)))
-                      ;; This was shoehorned into being a "type error"
-                      ;; which isn't the best way to explain it to the user.
-                      ;; However, from an API stance, it makes some sense to signal
-                      ;; a TYPE-ERROR since there may be existing code that catches
-                      ;; unbound slots errors as type-errors. Our tests certainly do,
-                      ;; but perhaps only as an artifact of the implementation.
-                      (destructuring-bind (struct-name . slot-name) (cdr context)
-                        ;; Infer the slot type, but fail safely. The message is enough,
-                        ;; and the required type is pretty much irrelevant.
-                        (let* ((dd (find-defstruct-description struct-name))
-                               (dsd (and dd (find slot-name (dd-slots dd) :key #'dsd-name))))
-                          (error 'simple-type-error
-                                 :format-control "Accessed uninitialized slot ~S of structure ~S"
-                                 :format-arguments (list slot-name struct-name)
-                                 :datum (make-unbound-marker)
-                                 :expected-type (if dsd (dsd-type dsd) 't))))
-                      (error 'type-error
-                             :datum (sb!di::sub-access-debug-var-slot
-                                     fp (first arguments) alien-context)
-                             :expected-type
-                             (car (svref sb!c:+backend-internal-errors+
-                                         error-number))
-                             :context context)))
-                (let ((handler
-                        (and (typep error-number
-                                    '#.`(mod ,(length **internal-error-handlers**)))
-                             (svref **internal-error-handlers** error-number))))
-                  (cond
-                    ((functionp handler)
-                     ;; INTERNAL-ERROR-ARGS supplies the right amount of arguments
-                     (macrolet ((arg (n)
-                                  `(sb!di::sub-access-debug-var-slot
-                                    fp (nth ,n arguments) alien-context)))
-                       (ecase (length arguments)
-                         (0 (funcall handler))
-                         (1 (funcall handler (arg 0)))
-                         (2 (funcall handler (arg 0) (arg 1)))
-                         (3 (funcall handler (arg 0) (arg 1) (arg 2))))))
-                    ((eql handler 0) ; if (DEFERR x) was inadvertently omitted
-                     (error 'simple-error
-                            :format-control
-                            "unknown internal error, ~D, args=~S"
-                            :format-arguments
-                            (list error-number
-                                  (mapcar (lambda (sc-offset)
-                                            (sb!di::sub-access-debug-var-slot
-                                             fp sc-offset alien-context))
-                                          arguments))))
-                    (t                  ; wtf?
-                     (error 'simple-error
-                            :format-control "internal error ~D: ~A; args=~S"
-                            :format-arguments
-                            (list error-number
-                                  handler
-                                  (mapcar (lambda (sc-offset)
-                                            (sb!di::sub-access-debug-var-slot
-                                             fp sc-offset alien-context))
-                                          arguments))))))))))))))
+        (declare (truly-dynamic-extent fp-and-pc))
+        #!+c-stack-is-control-stack
+        (setf (aref fp-and-pc 0) (sb!vm:context-register alien-context sb!vm::cfp-offset)
+              (aref fp-and-pc 1) (sb!sys:sap-int (sb!vm:context-pc alien-context)))
+        (let (#!+c-stack-is-control-stack
+              (*saved-fp-and-pcs* (cons fp-and-pc *saved-fp-and-pcs*)))
+          #!+c-stack-is-control-stack
+          (declare (truly-dynamic-extent *saved-fp-and-pcs*)))
+        (with-pinned-code-object alien-context
+          (multiple-value-bind (error-number arguments
+                                *current-internal-trap-number*)
+              (sb!vm:internal-error-args alien-context)
+            (with-interrupt-bindings
+              (let ((sb!debug:*stack-top-hint* (find-interrupted-frame))
+                    (*current-internal-error* error-number)
+                    (*current-internal-error-args* arguments)
+                    (*current-internal-error-context* alien-context)
+                    (fp (int-sap (sb!vm:context-register alien-context
+                                                         sb!vm::cfp-offset))))
+                (if (and (>= error-number (length **internal-error-handlers**))
+                         (< error-number (length sb!c:+backend-internal-errors+)))
+                    (let ((context (sb!di:error-context)))
+                      (if (typep context '(cons (eql :struct-read)))
+                          ;; This was shoehorned into being a "type error"
+                          ;; which isn't the best way to explain it to the user.
+                          ;; However, from an API stance, it makes some sense to signal
+                          ;; a TYPE-ERROR since there may be existing code that catches
+                          ;; unbound slots errors as type-errors. Our tests certainly do,
+                          ;; but perhaps only as an artifact of the implementation.
+                          (destructuring-bind (struct-name . slot-name) (cdr context)
+                            ;; Infer the slot type, but fail safely. The message is enough,
+                            ;; and the required type is pretty much irrelevant.
+                            (let* ((dd (find-defstruct-description struct-name))
+                                   (dsd (and dd (find slot-name (dd-slots dd) :key #'dsd-name))))
+                              (error 'simple-type-error
+                                     :format-control "Accessed uninitialized slot ~S of structure ~S"
+                                     :format-arguments (list slot-name struct-name)
+                                     :datum (make-unbound-marker)
+                                     :expected-type (if dsd (dsd-type dsd) 't))))
+                          (error 'type-error
+                                 :datum (sb!di::sub-access-debug-var-slot
+                                         fp (first arguments) alien-context)
+                                 :expected-type
+                                 (car (svref sb!c:+backend-internal-errors+
+                                             error-number))
+                                 :context context)))
+                    (let ((handler
+                            (and (typep error-number
+                                        '#.`(mod ,(length **internal-error-handlers**)))
+                                 (svref **internal-error-handlers** error-number))))
+                      (cond
+                        ((functionp handler)
+                         ;; INTERNAL-ERROR-ARGS supplies the right amount of arguments
+                         (macrolet ((arg (n)
+                                      `(sb!di::sub-access-debug-var-slot
+                                        fp (nth ,n arguments) alien-context)))
+                           (ecase (length arguments)
+                             (0 (funcall handler))
+                             (1 (funcall handler (arg 0)))
+                             (2 (funcall handler (arg 0) (arg 1)))
+                             (3 (funcall handler (arg 0) (arg 1) (arg 2))))))
+                        ((eql handler 0) ; if (DEFERR x) was inadvertently omitted
+                         (error 'simple-error
+                                :format-control
+                                "unknown internal error, ~D, args=~S"
+                                :format-arguments
+                                (list error-number
+                                      (mapcar (lambda (sc-offset)
+                                                (sb!di::sub-access-debug-var-slot
+                                                 fp sc-offset alien-context))
+                                              arguments))))
+                        (t              ; wtf?
+                         (error 'simple-error
+                                :format-control "internal error ~D: ~A; args=~S"
+                                :format-arguments
+                                (list error-number
+                                      handler
+                                      (mapcar (lambda (sc-offset)
+                                                (sb!di::sub-access-debug-var-slot
+                                                 fp sc-offset alien-context))
+                                              arguments))))))))))))))))
 
 (defun control-stack-exhausted-error ()
   (let ((sb!debug:*stack-top-hint* nil))
