@@ -382,7 +382,7 @@
                  `(progn ,@body)
                  #!-(or x86 x86-64)
                  `(with-pinned-objects ((without-gcing
-                                          (sb-di::code-object-from-context ,context)))
+                                          (sb!di::code-object-from-context ,context)))
                     ,@body)))
      (infinite-error-protect
       (let* ((alien-context (sap-alien context (* os-context-t)))
