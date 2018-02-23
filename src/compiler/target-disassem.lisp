@@ -2175,7 +2175,7 @@
            (type (or null stream) stream)
            (type disassem-state dstate))
   (when (or (= trap-number sb!vm:cerror-trap)
-            (> trap-number sb!vm:error-trap))
+            (>= trap-number sb!vm:error-trap))
    (multiple-value-bind (errnum adjust sc-offsets lengths error-byte)
        (funcall error-parse-fun
                 (dstate-segment-sap dstate)

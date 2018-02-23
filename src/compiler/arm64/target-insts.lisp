@@ -351,7 +351,6 @@
         (#.pending-interrupt-trap
          (nt "Pending interrupt trap"))
         (#.error-trap
-         (nt "Error trap")
          (handle-break-args #'snarf-error-junk code stream dstate))
         (#.cerror-trap
          (nt "Cerror trap")
