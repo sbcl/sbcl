@@ -12,6 +12,16 @@
 
 (defvar *current-internal-error-context*)
 
+(eval-when-compile-toplevel
+  (defmacro with-pinned-context-code-object ((&optional (context '*current-internal-error-context*) ) &body body)
+    (declare (ignorable context))
+    #!+(or x86 x86-64)
+    `(progn ,@body)
+    #!-(or x86 x86-64)
+    `(with-pinned-objects ((without-gcing
+                             (sb!di::code-object-from-context ,context)))
+       ,@body)))
+
 ;;;; OS-CONTEXT-T
 
 ;;; a POSIX signal context, i.e. the type passed as the third
@@ -65,17 +75,19 @@
 (declaim (inline incf-context-pc))
 (defun incf-context-pc (context offset)
   (declare (type (alien (* os-context-t)) context))
-  (let ((addr (context-pc-addr context)))
-    (declare (type (alien (* unsigned)) addr))
-    (setf (deref addr kludge-big-endian-short-pointer-offset)
-          (+ (deref addr kludge-big-endian-short-pointer-offset) offset))))
+  (with-pinned-context-code-object (context)
+    (let ((addr (context-pc-addr context)))
+      (declare (type (alien (* unsigned)) addr))
+      (setf (deref addr kludge-big-endian-short-pointer-offset)
+            (+ (deref addr kludge-big-endian-short-pointer-offset) offset)))))
 
 (declaim (inline set-context-pc))
 (defun set-context-pc (context new)
   (declare (type (alien (* os-context-t)) context))
-  (let ((addr (context-pc-addr context)))
-    (declare (type (alien (* unsigned)) addr))
-    (setf (deref addr kludge-big-endian-short-pointer-offset) new)))
+  (with-pinned-context-code-object (context)
+    (let ((addr (context-pc-addr context)))
+      (declare (type (alien (* unsigned)) addr))
+      (setf (deref addr kludge-big-endian-short-pointer-offset) new))))
 
 (declaim (inline context-register-addr))
 (define-alien-routine ("os_context_register_addr" context-register-addr)
