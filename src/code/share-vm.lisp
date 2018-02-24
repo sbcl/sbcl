@@ -13,7 +13,9 @@
 (defvar *current-internal-error-context*)
 
 (eval-when-compile-toplevel
-  (defmacro with-pinned-context-code-object ((&optional (context '*current-internal-error-context*) ) &body body)
+  (sb!xc:defmacro with-pinned-context-code-object
+      ((&optional (context '*current-internal-error-context*))
+       &body body)
     (declare (ignorable context))
     #!+(or x86 x86-64)
     `(progn ,@body)
