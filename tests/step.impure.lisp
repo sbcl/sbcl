@@ -308,3 +308,13 @@
 (with-test (:name :step-out/2)
   (handler-bind ((step-condition #'sb-impl::invoke-stepper))
     (test-step-out/2)))
+
+(with-test (:name :static-fun-step)
+  (handler-bind ((step-form-condition
+                   (lambda (c)
+                     c
+                     (invoke-restart 'step-into))))
+    (assert (= (step (funcall (checked-compile
+                               `(lambda (x) (declare (optimize debug)) (/ 1 x)))
+                              2))
+               1/2))))

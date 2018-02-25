@@ -792,10 +792,13 @@
                           (storew rbp-tn new-fp
                                   (frame-word-offset ocfp-save-offset))
 
-                          (move rbp-tn new-fp) ; NB - now on new stack frame.
-                          )))
+                          (move rbp-tn new-fp))))  ; NB - now on new stack frame.
 
-               (when step-instrumenting
+               (when (and step-instrumenting
+                          ,@(and (eq named :direct)
+                                 `((not (and #!+immobile-code
+                                             ;; handle-single-step-around-trap can't handle it
+                                             (static-fdefn-offset fun))))))
                  (emit-single-step-test)
                  (inst jmp :eq DONE)
                  (inst break single-step-around-trap))

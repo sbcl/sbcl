@@ -3433,16 +3433,18 @@ register."
   ;; Fetch the function / fdefn we're about to call from the
   ;; appropriate register.
   (let* ((callee
-          (cond #!+immobile-space
-                ((eql (sap-ref-8 (context-pc context) 0) #xB8) ; MOV EAX,imm
-                 ;; FIXME: this ought to go in {target}-vm.lisp as
-                 ;; something like GET-FDEFN-FOR-SINGLE-STEP
-                 (let ((jmp-target (sap-ref-32 (context-pc context) 1)))
-                   (make-lisp-obj
-                    (+ jmp-target (- (ash word-shift fdefn-raw-addr-slot))
-                       other-pointer-lowtag))))
-                (t (make-lisp-obj
-                    (context-register context callee-register-offset)))))
+           ;; FIXME: this could handle static calls, but needs some
+           ;; help from the backends
+           (cond #!+immobile-space
+                 ((eql (sap-ref-8 (context-pc context) 0) #xB8) ; MOV EAX,imm
+                  ;; FIXME: this ought to go in {target}-vm.lisp as
+                  ;; something like GET-FDEFN-FOR-SINGLE-STEP
+                  (let ((jmp-target (sap-ref-32 (context-pc context) 1)))
+                    (make-lisp-obj
+                     (+ jmp-target (- (ash word-shift fdefn-raw-addr-slot))
+                        other-pointer-lowtag))))
+                 (t (make-lisp-obj
+                     (context-register context callee-register-offset)))))
          (step-info (single-step-info-from-context context)))
     ;; If there was not enough debug information available, there's no
     ;; sense in signaling the condition.

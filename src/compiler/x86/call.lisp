@@ -756,7 +756,8 @@
 
                (:ignore
                ,@(unless (or variable (eq return :tail)) '(arg-locs))
-               ,@(unless variable '(args)))
+               ,@(unless variable '(args))
+               ,@(when (eq named :direct) '(step-instrumenting)))
 
                ;; We pass either the fdefn object (for named call) or
                ;; the actual function object (for unnamed call) in
@@ -861,8 +862,7 @@
                           ;; For tail call, we have to push the
                           ;; return-pc so that it looks like we CALLed
                           ;; despite the fact that we are going to JMP.
-                          (inst push return-pc)
-                          ))
+                          (inst push return-pc)))
                        (t
                         ;; For non-tail call, we have to save our
                         ;; frame pointer and install the new frame
@@ -890,11 +890,11 @@
                                   (frame-word-offset ocfp-save-offset))
 
                           (move ebp-tn new-fp))))  ; NB - now on new stack frame.
-
-               (when step-instrumenting
-                 (emit-single-step-test)
-                 (inst jmp :eq DONE)
-                 (inst break single-step-around-trap))
+               ,@(unless (eq named :direct)  ;; handle-single-step-around-trap can't handle it
+                   `((when step-instrumenting
+                       (emit-single-step-test)
+                       (inst jmp :eq DONE)
+                       (inst break single-step-around-trap))))
                DONE
 
                (note-this-location vop :call-site)
