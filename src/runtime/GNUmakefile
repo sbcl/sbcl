@@ -102,9 +102,9 @@ shrinkwrap-sbcl.s shrinkwrap-sbcl-core.o: ../../output/sbcl.core \
 	../../run-sbcl.sh --script ../../tools-for-build/editcore.lisp split \
 		../../output/sbcl.core shrinkwrap-sbcl.s
 shrinkwrap-sbcl: shrinkwrap-sbcl.s shrinkwrap-sbcl-core.o $(LIBSBCL)
-	$(CC) -Wl,-export-dynamic $(CFLAGS) -o $@ $^ $(LIBS)
+	$(CC) $(LINKFLAGS) $(CFLAGS) -o $@ $^ $(LIBS)
 semiwrap-sbcl: shrinkwrap-sbcl.s $(LIBSBCL)
-	$(CC) -Wl,-export-dynamic $(CFLAGS) -o $@ $^ $(LIBS)
+	$(CC) $(LINKFLAGS) $(CFLAGS) -o $@ $^ $(LIBS)
 
 sbcl.mk:
 	( echo 'CC=$(CC)' ; \

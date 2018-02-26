@@ -28,7 +28,7 @@
                 #:alien-value-sap #:alien-value-type)
   (:import-from "SB-C" #:+backend-page-bytes+)
   (:import-from "SB-VM" #:map-objects-in-range #:reconstitute-object
-                #:%closure-callee)
+                #:%closure-callee #:code-component-size)
   (:import-from "SB-DISASSEM" #:get-inst-space #:find-inst
                 #:make-dstate #:%make-segment
                 #:seg-virtual-location #:seg-length #:seg-sap-maker
@@ -226,21 +226,23 @@
         ((stringp x) x)
         (t "?"))))))
 
-(defstruct (core-state
-            (:conc-name "CS-")
-            (:predicate nil)
-            (:copier nil)
-            (:constructor make-core-state
-                (code-space-start code-space-end
-                 fixedobj-space-start fixedobj-space-end
-                 &aux (inst-space (get-inst-space))
-                      (call-inst (find-inst #b11101000 inst-space))
-                      (jmp-inst (find-inst #b11101001 inst-space))
-                      (pop-inst (find-inst #x5d inst-space)))))
-  (code-space-start 0 :type fixnum :read-only t)
-  (code-space-end 0 :type fixnum :read-only t)
-  (fixedobj-space-start 0 :type fixnum :read-only t)
-  (fixedobj-space-end 0 :type fixnum :read-only t)
+(defstruct (bounds (:constructor make-bounds (low high)))
+  (low 0 :type word) (high 0 :type word))
+(defun space-bounds (id spaces)
+  (let ((space (get-space id spaces)))
+    (make-bounds (space-addr space) (space-end space))))
+(defun in-bounds-p (addr bounds)
+  (and (>= addr (bounds-low bounds)) (< addr (bounds-high bounds))))
+
+(defstruct (core (:predicate nil)
+                 (:copier nil)
+                 (:constructor %make-core))
+  (code-bounds nil :type bounds :read-only t)
+  (fixedobj-bounds nil :type bounds :read-only t)
+  (linkage-bounds nil :type bounds :read-only t)
+  (linkage-symbols nil)
+  (linkage-symbol-usedp nil)
+  (linkage-entry-size nil)
   (dstate (make-dstate nil) :read-only t)
   (seg (%make-segment :sap-maker (lambda () (error "Bad sap maker"))
                       :virtual-location 0) :read-only t)
@@ -249,8 +251,86 @@
   (jmp-inst nil :read-only t)
   (pop-inst nil :read-only t))
 
-;;; Emit .byte or .quad directives dumping memory from SAP for COUNT bytes
-;;; to STREAM.  SIZE specifies which direcive to emit.
+(defun target-hash-table-alist (table spaces)
+  (let ((table (truly-the hash-table (translate table spaces))))
+    (let ((cells (the simple-vector (translate (hash-table-table table) spaces))))
+      (collect ((pairs))
+        (do ((count (hash-table-number-entries table) (1- count))
+             (i 2 (+ i 2)))
+            ((zerop count)
+             (pairs))
+          (pairs (cons (svref cells i) (svref cells (1+ i)))))))))
+
+;;; Return either the physical or logical address of the specified symbol.
+(defun find-target-symbol (package-name symbol-name spaces
+                           &optional (address-mode :physical))
+  (dolist (id `(,immobile-fixedobj-core-space-id ,static-core-space-id))
+    (let* ((space (find id (cdr spaces) :key #'space-id))
+           (start (translate-ptr (space-addr space) spaces))
+           (end (+ start (space-size space)))
+           (physaddr start))
+     (loop
+      (when (>= physaddr end) (return))
+      (multiple-value-bind (obj tag size)
+          (reconstitute-object (ash physaddr (- n-fixnum-tag-bits)))
+        (when (and (= tag symbol-widetag)
+                   (string= symbol-name (translate (symbol-name obj) spaces))
+                   (%instancep (symbol-package obj))
+                   (string= package-name
+                            (translate
+                             (package-%name
+                              (truly-the package (translate (symbol-package obj) spaces)))
+                             spaces)))
+          (return-from find-target-symbol
+            (%make-lisp-obj
+                   (logior (ecase address-mode
+                             (:physical physaddr)
+                             (:logical (+ (space-addr space) (- physaddr start))))
+                           other-pointer-lowtag))))
+        (incf physaddr size)))))
+  (bug "Can't find symbol ~A::~A" package-name symbol-name))
+
+(defun compute-linkage-symbols (spaces entry-size)
+  (let* ((hashtable (symbol-global-value
+                     (find-target-symbol "SB-SYS" "*LINKAGE-INFO*" spaces
+                                         :physical)))
+         (pairs (target-hash-table-alist hashtable spaces))
+         (min (reduce #'min pairs :key #'cdr))
+         (max (reduce #'max pairs :key #'cdr))
+         (n (1+ (/ (- max min) entry-size)))
+         (vector (make-array n)))
+    (dolist (entry pairs vector)
+      (let ((key (car entry))
+            (entry-index (/ (- (cdr entry) min) entry-size)))
+        (setf (aref vector entry-index)
+              (translate (if (consp key) (car (translate key spaces)) key)
+                         spaces))))))
+
+(defun make-core (spaces code-bounds fixedobj-bounds)
+  (let* ((linkage-bounds
+          (make-bounds
+           (symbol-global-value
+            (find-target-symbol "SB-VM" "LINKAGE-TABLE-SPACE-START" spaces :physical))
+           (symbol-global-value
+            (find-target-symbol "SB-VM" "LINKAGE-TABLE-SPACE-END" spaces :physical))))
+         (linkage-entry-size
+          (symbol-global-value
+           (find-target-symbol "SB-VM" "LINKAGE-TABLE-ENTRY-SIZE"
+                               spaces :physical)))
+         (linkage-symbols (compute-linkage-symbols spaces linkage-entry-size))
+         (inst-space (get-inst-space)))
+  (%make-core :code-bounds code-bounds
+              :fixedobj-bounds fixedobj-bounds
+              :linkage-bounds linkage-bounds
+              :linkage-entry-size linkage-entry-size
+              :linkage-symbols linkage-symbols
+              :linkage-symbol-usedp (make-array (length linkage-symbols) :element-type 'bit)
+              :call-inst (find-inst #b11101000 inst-space)
+              :jmp-inst (find-inst #b11101001 inst-space)
+              :pop-inst (find-inst #x5d inst-space))))
+
+;;; Emit .byte or .quad directives dumping memory from SAP for COUNT units
+;;; (bytes or qwords) to STREAM.  SIZE specifies which direcive to emit.
 ;;; EXCEPTIONS specify offsets at which a specific string should be
 ;;; written to the file in lieu of memory contents, useful for emitting
 ;;; expressions involving the assembler '.' symbol (the current PC).
@@ -306,35 +386,15 @@
            (setq per-line 0))))))
   (terpri stream))
 
-(defun emit-lisp-asm-routines (spaces code-component output emit-sizes vector count)
-  (emit-asm-directives :qword
-                       (sap+ (code-instructions code-component)
-                             (- (* sb-vm:code-constants-offset sb-vm:n-word-bytes)))
-                       sb-vm:code-constants-offset
-                       output #())
-  (let ((list (loop for i from 2 by 2 repeat count
-                    collect
-                    (let* ((location (translate (svref vector (1+ i)) spaces))
-                           (offset (car location))
-                           (nbytes (- (1+ (cdr location)) offset))
-                           (name (translate
-                                  (symbol-name (translate (svref vector i) spaces))
-                                  spaces)))
-                      (list* offset name nbytes)))))
-    (loop for (offset name . nbytes) in (sort list #'< :key #'car)
-          do (format output " .set ~a, .~%~@[ .size ~:*~a, ~d~%~]"
-                     (format nil "~(\"~a\"~)" name) (if emit-sizes nbytes))
-             (emit-asm-directives
-              :qword
-              (sap+ (code-instructions code-component) offset)
-              (ceiling nbytes sb-vm:n-word-bytes)
-              output #()))))
-
 (defun code-fixup-locs (code spaces)
-  (let ((locs (sb-vm::%code-fixups code)))
-    (unless (eql locs 0)
-      (sb-c::unpack-code-fixup-locs
-       (if (fixnump locs) locs (translate locs spaces))))))
+  (let ((fixups (sb-vm::%code-fixups code)))
+    (unless (eql fixups 0)
+      ;; If fixups is a cons, it separately records absolute and relative fixups.
+      ;; We only need the absolute fixups.
+      (let ((locs (if (consp fixups) (car (translate fixups spaces)) fixups)))
+        ;; Now if we have a bignum, translate it
+        (sb-c::unpack-code-fixup-locs
+         (if (fixnump locs) locs (translate locs spaces)))))))
 
 ;;; Disassemble the function pointed to by SAP for LENGTH bytes, returning
 ;;; all instructions that should be emitted using assembly language
@@ -343,14 +403,14 @@
 ;;; - jmp/call instructions that transfer control to the fixedoj space
 ;;;    delimited by bounds in STATE.
 ;;; At execution time the function will have virtual address LOAD-ADDR.
-(defun list-annotated-instructions (sap length state load-addr emit-cfi)
-  (let ((dstate (cs-dstate state))
-        (seg (cs-seg state))
-        (call-inst (cs-call-inst state))
-        (jmp-inst (cs-jmp-inst state))
-        (pop-inst (cs-pop-inst state))
+(defun list-annotated-instructions (sap length core load-addr emit-cfi)
+  (let ((dstate (core-dstate core))
+        (seg (core-seg core))
+        (call-inst (core-call-inst core))
+        (jmp-inst (core-jmp-inst core))
+        (pop-inst (core-pop-inst core))
         (next-fixup-addr
-         (or (car (cs-fixup-addrs state)) most-positive-word))
+         (or (car (core-fixup-addrs core)) most-positive-word))
         (list))
     (setf (seg-virtual-location seg) load-addr
           (seg-length seg) length
@@ -363,17 +423,16 @@
        (cond
          ((< next-fixup-addr (dstate-next-addr dstate))
           (let ((operand (sap-ref-32 sap (- next-fixup-addr load-addr))))
-            (when (<= (cs-code-space-start state) operand (cs-code-space-end state))
+            (when (in-bounds-p operand (core-code-bounds core))
               (aver (eql (sap-ref-8 sap (- next-fixup-addr load-addr 1)) #xB8)) ; mov rax, imm32
               (push (list* (dstate-cur-offs dstate) 5 "mov" operand) list)))
-          (pop (cs-fixup-addrs state))
-          (setq next-fixup-addr (or (car (cs-fixup-addrs state)) most-positive-word)))
+          (pop (core-fixup-addrs core))
+          (setq next-fixup-addr (or (car (core-fixup-addrs core)) most-positive-word)))
          ((or (eq inst jmp-inst) (eq inst call-inst))
           (let ((target-addr (+ (near-jump-displacement dchunk dstate)
                                 (dstate-next-addr dstate))))
-            (when (<= (cs-fixedobj-space-start state)
-                      target-addr
-                      (cs-fixedobj-space-end state))
+            (when (or (in-bounds-p target-addr (core-fixedobj-bounds core))
+                      (in-bounds-p target-addr (core-linkage-bounds core)))
               (push (list* (dstate-cur-offs dstate)
                            5 ; length
                            (if (eq inst call-inst) "call" "jmp")
@@ -417,14 +476,14 @@
 ;;; This is tricky to fix because while we can relativize the CFA to the
 ;;; known frame size, we can't do that based only on a disassembly.
 
-(defun emit-lisp-function (paddr vaddr count stream emit-cfi core-state)
+(defun emit-lisp-function (paddr vaddr count stream emit-cfi core)
   (when emit-cfi
     (format stream " .cfi_startproc~%"))
   ;; Any byte offset that appears as a key in the INSTRUCTIONS causes the indicated
   ;; bytes to be written as an assembly language instruction rather than opaquely,
   ;; thereby affecting the ELF data (cfi or relocs) produced.
   (let ((instructions
-         (list-annotated-instructions (int-sap paddr) count core-state vaddr emit-cfi))
+         (list-annotated-instructions (int-sap paddr) count core vaddr emit-cfi))
         (ptr paddr))
     (symbol-macrolet ((cur-offset (- ptr paddr)))
       (loop
@@ -454,7 +513,14 @@
           (aver (= cur-offset until))
           (destructuring-bind (length opcode . operand) (cdr (pop instructions))
             (when (cond ((member opcode '("jmp" "call") :test #'string=)
-                         (format stream " ~A 0x~X~%" opcode operand))
+                         (when (in-bounds-p operand (core-linkage-bounds core))
+                           (let ((entry-index
+                                  (/ (- operand (bounds-low (core-linkage-bounds core)))
+                                     (core-linkage-entry-size core))))
+                             (setf (bit (core-linkage-symbol-usedp core) entry-index) 1
+                                   operand (aref (core-linkage-symbols core) entry-index))))
+                         (format stream " ~A ~:[0x~X~;~a~]~%"
+                                 opcode (stringp operand) operand))
                         ((string= opcode "pop")
                          (format stream " ~A ~A~%" opcode operand)
                          (cond ((string= operand "8(%rbp)")
@@ -465,7 +531,7 @@
                                (t)))
                         ((string= opcode "mov")
                          (format stream " mov $(__lisp_code_start+0x~x),%eax~%"
-                                 (- operand (cs-code-space-start core-state))))
+                                 (- operand (bounds-low (core-code-bounds core)))))
                         (t))
               (bug "Random annotated opcode ~S" opcode))
             (incf ptr length))
@@ -477,16 +543,12 @@
 ;;; TODO: relocate fdefns and instances of standard-generic-function
 ;;; into the space that is dumped into an ELF section.
 (defun write-assembler-text
-    (spaces fixedobj-range output
+    (spaces output
      &optional emit-sizes (emit-cfi t)
-     &aux (code-space (get-space immobile-varyobj-core-space-id spaces))
-          (code-space-start (space-addr code-space)) ; target virtual address
-          (code-space-end (+ code-space-start (space-size code-space)))
-          (code-addr code-space-start)
-          (core-state
-           (make-core-state code-space-start code-space-end
-                            (car fixedobj-range)
-                            (+ (car fixedobj-range) (cdr fixedobj-range))))
+     &aux (code-bounds (space-bounds immobile-varyobj-core-space-id spaces))
+          (fixedobj-bounds (space-bounds immobile-fixedobj-core-space-id spaces))
+          (core (make-core spaces code-bounds fixedobj-bounds))
+          (code-addr (bounds-low code-bounds))
           (total-code-size 0)
           (pp-state (cons (make-hash-table :test 'equal)
                           ;; copy no entries for macros/special-operators (flet, etc)
@@ -511,7 +573,7 @@
                  (unless (and (< i (length exceptions)) (svref exceptions i))
                    (let ((word (sap-ref-word sap (* i n-word-bytes))))
                      (when (and (= (logand word 3) 3) ; is a pointer
-                                (<= code-space-start word (1- code-space-end))) ; to code space
+                                (in-bounds-p word code-bounds)) ; to code space
                        #+nil
                        (format t "~&~(~x: ~x~)~%" (+ logical-addr  (* i n-word-bytes))
                                word)
@@ -520,43 +582,54 @@
                                                       :initial-element nil)
                              (svref exceptions i)
                              (format nil "__lisp_code_start+0x~x"
-                                     (- word code-space-start)))))))
+                                     (- word (bounds-low code-bounds))))))))
                (emit-asm-directives :qword sap count stream exceptions)))
            (make-code-obj (addr)
              (let ((translation (translate-ptr addr spaces)))
                (aver (= (%widetag-of (sap-ref-word (int-sap translation) 0))
                         code-header-widetag))
                (%make-lisp-obj (logior translation other-pointer-lowtag))))
-           (calc-obj-size (code)
-             ;; No need to pin - it's not managed by GC
-             (nth-value 2
-              (reconstitute-object
-               (ash (logandc2 (get-lisp-obj-address code) lowtag-mask)
-                    (- n-fixnum-tag-bits)))))
            (%widetag-of (word)
              (logand word widetag-mask)))
     (format output " .text~% .file \"sbcl.core\"
  .globl __lisp_code_start, __lisp_code_end~% .balign 4096~%__lisp_code_start:~%")
 
     ;; Scan the assembly routines.
-    (let* ((code-component (make-code-obj code-addr))
-           (size (calc-obj-size code-component))
-           (hashtable
-            (truly-the hash-table
-                       (translate (car (translate (%code-debug-info code-component)
-                                                  spaces))
-                                  spaces)))
-           (cells (translate (hash-table-table hashtable) spaces))
-           (count (hash-table-number-entries hashtable)))
-      (incf code-addr size)
-      (setf total-code-size size)
-      (emit-lisp-asm-routines spaces code-component output emit-sizes cells count))
-
+    (let ((code-component (make-code-obj code-addr)))
+      ;; Write the code component header
+      (emit-asm-directives :qword
+                           (int-sap (- (get-lisp-obj-address code-component)
+                                       sb-vm:other-pointer-lowtag))
+                           (code-header-words code-component)
+                           output #())
+      (let ((name->addr
+             ;; the CDR of each alist item is a target cons (needing translation)
+             (mapcar (lambda (entry &aux (cdr (translate (cdr entry) spaces)))
+                       (list* (translate (symbol-name (translate (car entry) spaces))
+                                         spaces)
+                              (car cdr) (cdr cdr)))
+                     (target-hash-table-alist
+                      (car (translate (%code-debug-info code-component) spaces))
+                      spaces))))
+        ;; Loop over the embedded routines
+        (dolist (entry (sort name->addr #'< :key #'cadr))
+          (destructuring-bind (name start-offs . end-offs) entry
+            (let ((nbytes (- (1+ end-offs) start-offs)))
+              (format output " .set ~a, .~%~@[ .size ~:*~a, ~d~%~]"
+                      (format nil "~(\"~a\"~)" name) (if emit-sizes nbytes))
+              (emit-lisp-function (+ (sap-int (code-instructions code-component))
+                                     start-offs)
+                                  (+ code-addr
+                                     (ash (code-header-words code-component) sb-vm:word-shift)
+                                     start-offs)
+                                  nbytes output nil core)))))
+      (let ((size (code-component-size code-component))) ; No need to pin
+        (incf code-addr size)
+        (setf total-code-size size)))
     (loop
-      (when (>= code-addr code-space-end) (return))
-      ;(format t "~&vaddr ~x paddr ~x~%" code-addr (get-lisp-obj-address (make-code-obj code-addr)))
+      (when (>= code-addr (bounds-high code-bounds)) (return))
       (let* ((code (make-code-obj code-addr))
-             (objsize (calc-obj-size code)))
+             (objsize (code-component-size code)))
         (setq end-loc (+ code-addr objsize))
         (incf total-code-size objsize)
         (cond
@@ -594,7 +667,7 @@
              (when (> first-fun boxed-end)
                (dumpwords boxed-end (floor (- first-fun boxed-end) n-word-bytes)
                           output)))
-           (setf (cs-fixup-addrs core-state)
+           (setf (core-fixup-addrs core)
                  (mapcar (lambda (x)
                            (+ code-addr (ash (code-header-words code) word-shift) x))
                          (code-fixup-locs code spaces)))
@@ -639,10 +712,10 @@
                                    (+ code-addr (- entrypoint
                                                    (logandc2 (get-lisp-obj-address code)
                                                              lowtag-mask)))
-                                   size output emit-cfi core-state)))
+                                   size output emit-cfi core)))
            (terpri output)
            ;; All fixups should have been consumed by writing the code out
-           (aver (null (cs-fixup-addrs core-state))))
+           (aver (null (core-fixup-addrs core))))
           (t
            (error "Strange code component: ~S" code)))
         (incf code-addr objsize))))
@@ -666,95 +739,7 @@
         (when (plusp nwords)
           (format output " .fill ~d~%" (* nwords n-word-bytes))))))
   ; (format t "~&linker-relocs=~D~%" n-linker-relocs)
-  (values total-code-size n-linker-relocs))
-
-;;; Return either the physical or logical address of the specified symbol.
-(defun find-target-symbol (package-name symbol-name spaces
-                           &optional (address-mode :physical))
-  (let* ((space (find immobile-fixedobj-core-space-id (cdr spaces) :key #'space-id))
-         (start (translate-ptr (space-addr space) spaces))
-         (end (+ start (space-size space)))
-         (physaddr start))
-    (loop
-      (when (>= physaddr end) (bug "Can't find symbol"))
-      (multiple-value-bind (obj tag size)
-          (reconstitute-object (ash physaddr (- n-fixnum-tag-bits)))
-        (when (and (= tag symbol-widetag)
-                   (string= symbol-name (translate (symbol-name obj) spaces))
-                   (%instancep (symbol-package obj))
-                   (string= package-name
-                            (translate
-                             (package-%name
-                              (truly-the package (translate (symbol-package obj) spaces)))
-                             spaces)))
-          (return (%make-lisp-obj
-                   (logior (ecase address-mode
-                             (:physical physaddr)
-                             (:logical (+ (space-addr space) (- physaddr start))))
-                           other-pointer-lowtag))))
-        (incf physaddr size)))))
-
-(defun extract-required-c-symbols (spaces asm-file &optional (verbose nil))
-  (flet ((symbol-fdefn-fun (symbol)
-           (let ((vector (translate (symbol-info-vector symbol) spaces)))
-             ;; TODO: allow for (plist . info-vector) in the info slot
-             (aver (simple-vector-p vector))
-             (translate (fdefn-fun (translate (info-vector-fdefn vector) spaces))
-                        spaces))))
-    (let ((linkage-info
-           (translate (symbol-global-value
-                       (find-target-symbol "SB-SYS" "*LINKAGE-INFO*" spaces))
-                      spaces))
-          (dyn-syminfo
-           (symbol-fdefn-fun
-            (find-target-symbol "SB-SYS"
-                                "ENSURE-DYNAMIC-FOREIGN-SYMBOL-ADDRESS"
-                                spaces))))
-      (aver (= (get-closure-length dyn-syminfo) 3))
-      (let* ((ht1 (translate (%closure-index-ref dyn-syminfo 1) spaces))
-             (ht2 (translate (%closure-index-ref dyn-syminfo 0) spaces))
-             (table0 (translate (hash-table-table (truly-the hash-table linkage-info))
-                                spaces))
-             (table1 (translate (hash-table-table (truly-the hash-table ht1)) spaces))
-             (table2 (translate (hash-table-table (truly-the hash-table ht2)) spaces))
-             (linkage)
-             (foreign))
-        (declare (simple-vector table0 table1 table2))
-        (flet ((show (x)
-                 (push x foreign)
-                 (when verbose
-                   (format t "~A~%" x)))
-               (scan-table (table name fun &aux (n 0) (end (length table)))
-                 (when verbose
-                   (format t "~&~A:~%~A~%"
-                           name (make-string (1+ (length name)) :initial-element #\-)))
-                 (do ((i 2 (+ i 2)))
-                     ((= i end))
-                   (let ((val (svref table i)))
-                     (unless (unbound-marker-p val)
-                       (funcall fun (translate val spaces))
-                       (incf n))))
-                 (when verbose
-                   (format t "TOTAL: ~D entries~2%" n))))
-          (scan-table table0 "linkage info"
-                      (lambda (x &aux (type #\T))
-                        (when (consp x)
-                          (setq x (translate (car x) spaces) type #\D))
-                        (format asm-file " .long ~A~%" x)
-                        (when verbose
-                          (format t "~A ~A~%" type x))
-                        (push x linkage)))
-          (scan-table table1 "defined" #'show)
-          (scan-table table2 "undefined" #'show)
-          (let ((diff1 ; linkage not in foreign
-                 (remove-if (lambda (x) (member x foreign :test #'string=)) linkage))
-                (diff2 ; foreign not in linkage
-                 (remove-if (lambda (x) (member x linkage :test #'string=)) foreign)))
-            (when verbose
-              (format t "~&Linkage not in foreign:~%~S~%" diff1)
-              (format t "~&Foreign not in linkage:~%~S~%" diff2))
-            )))))
-  (terpri asm-file))
+  (values core total-code-size n-linker-relocs))
 
 ;;;; ELF file I/O
 
@@ -952,28 +937,18 @@
       (write-byte 0 output))
     (aver (eq (file-position output) core-start))))
 
-;;; Return a list of fixups (FIXUP-WHERE KIND ADDEND) to peform in a foreign core
-;;; whose code space is subject to link-time relocation.
 (defconstant R_X86_64_64    1) ; /* Direct 64 bit  */
 (defconstant R_X86_64_PC32  2) ; /* PC relative 32 bit signed */
 (defconstant R_X86_64_32   10) ; /* Direct 32 bit zero extended */
-;;;
+(defconstant R_X86_64_32S  11) ; /* Direct 32 bit sign extended */
+
+;;; Return a list of fixups (FIXUP-WHERE ADDEND . KIND) to peform in a foreign core
+;;; whose code space is subject to link-time relocation.
 (defun collect-relocations (spaces fixups &aux (print nil))
-  (binding* (((static-start static-end)
-              (let ((space (get-space static-core-space-id spaces)))
-                (values (space-addr space) (space-end space))))
-             ((code-start code-end)
-              (let ((space (get-space immobile-varyobj-core-space-id spaces)))
-                (values (space-addr space) (space-end space))))
-             ;; the distance between fixedobj space address (i.e following the pages of
-             ;; dynamic space) in the ELF section which has a presumptive address of 0
-             ;; due to being non-loaded, to where it will be later mapped by coreparse
-             (fixedobj-space-displacement
-              (let ((space (get-space immobile-fixedobj-core-space-id spaces)))
-                (- (* (1+ (space-data-page space)) +backend-page-bytes+) ; 1+ = core header
-                   (space-addr space))))
-             (n-abs 0)
-             (n-rel 0))
+  (let* ((code-bounds (space-bounds immobile-varyobj-core-space-id spaces))
+         (code-start (bounds-low code-bounds))
+         (n-abs 0)
+         (n-rel 0))
     (labels
         ((abs-fixup (core-offs referent)
            (incf n-abs)
@@ -991,16 +966,16 @@
            (vector-push-extend `(,(+ core-header-size core-offs)
                                  ,(- referent code-start) . ,R_X86_64_32)
                                fixups))
-         (rel-fixup (core-offs referent)
+         (rel-fixup (core-offs referent addend)
            (incf n-rel)
            (when print
              (format t "~x = 0x~(~x~): (r)~%" core-offs (core-to-logical core-offs) #+nil referent))
            (setf (sap-ref-32 (car spaces) core-offs) 0)
            (vector-push-extend `(,(+ core-header-size core-offs)
-                                 ,(- referent code-start) . ,R_X86_64_PC32)
+                                 ;; Emitted as signed absolute plus addend,
+                                 ;; since the originating PC is known.
+                                 ,(+ (- referent code-start) addend) . ,R_X86_64_32S)
                                fixups))
-         (in-code-space-p (ptr)
-           (and (<= code-start ptr) (< ptr code-end)))
          ;; Given a address which is an offset into the data pages of the target core,
          ;; compute the logical address which that offset would be mapped to.
          ;; For example core address 0 is the virtual address of static space.
@@ -1025,7 +1000,7 @@
                  (i wordindex-min (1+ i)))
                 ((> i wordindex-max) n-fixups)
              (let ((ptr (sap-ref-word sap (ash i word-shift))))
-               (when (and (= (logand ptr 3) 3) (in-code-space-p ptr))
+               (when (and (= (logand ptr 3) 3) (in-bounds-p ptr code-bounds))
                  (abs-fixup (+ core-offs (ash i word-shift)) ptr)
                  (incf n-fixups)))))
          (scanptr (obj wordindex)
@@ -1070,21 +1045,18 @@
                      ;; what the fdefn's logical PC will be
                      (fdefn-logical-pc (+ vaddr (ash fdefn-raw-addr-slot word-shift)))
                      (rel32off (signed-sap-ref-32 fdefn-pc-sap 1))
-                     (target (+ fdefn-logical-pc 1 rel32off))
-                     (space-displacement
-                      (if (<= static-start vaddr static-end)
-                          (+ (- sb-vm:static-space-start) +backend-page-bytes+)
-                          fixedobj-space-displacement)))
-                (when (in-code-space-p target)
+                     (next-pc (+ fdefn-logical-pc 5))
+                     (target (+ next-pc rel32off)))
+                (when (in-bounds-p target code-bounds)
                   ;; This addend needs to account for the fact that the location
                   ;; where fixup occurs is not where the fdefn will actually exist.
                   (rel-fixup (+ core-offs (ash 3 word-shift) 1)
-                             (+ target space-displacement))))
+                             target (- next-pc))))
               (return-from scan-obj))
              ((#.closure-widetag #.funcallable-instance-widetag)
               (let ((word (sap-ref-word (int-sap (get-lisp-obj-address obj))
                                         (- n-word-bytes fun-pointer-lowtag))))
-                (when (in-code-space-p word)
+                (when (in-bounds-p word code-bounds)
                   (abs-fixup (+ core-offs (ash 1 word-shift)) word)))
               (when (eq widetag funcallable-instance-widetag)
                 (let ((layout (truly-the layout
@@ -1100,7 +1072,7 @@
              (#.code-header-widetag
               (dolist (loc (code-fixup-locs obj spaces))
                 (let ((val (sap-ref-32 (code-instructions obj) loc)))
-                  (when (in-code-space-p val)
+                  (when (in-bounds-p val code-bounds)
                     (abs32-fixup (sap- (sap+ (code-instructions obj) loc) (car spaces))
                                  val))))
               (dotimes (i (code-n-entries obj))
@@ -1346,13 +1318,19 @@
               (format t "Copying ~d bytes (#x~x) from ptes = ~d PTEs~%"
                       pte-nbytes pte-nbytes (floor pte-nbytes 10)))
             (copy-bytes input output pte-nbytes)) ; Copy PTEs from input
-
-          ;; There's no relation between emit-sizes and which section to put
-          ;; C symbol references in, however it's a safe bet that if sizes
-          ;; are supported then so is the .rodata directive.
-          (format asm-file (if emit-sizes " .rodata~%" " .data~%"))
-          (extract-required-c-symbols map asm-file)
-          (write-assembler-text map fixedobj-range asm-file emit-sizes)))
+          (format asm-file "#ifdef MEMORY_SANITIZER
+#define malloc malloc_unpoisoned
+#endif~%")
+          (let ((core (write-assembler-text map asm-file emit-sizes)))
+            ;; There's no relation between emit-sizes and which section to put
+            ;; C symbol references in, however it's a safe bet that if sizes
+            ;; are supported then so is the .rodata directive.
+            (terpri asm-file)
+            (format asm-file (if emit-sizes " .rodata~%" " .data~%"))
+            (loop for s across (core-linkage-symbols core)
+                  for bit across (core-linkage-symbol-usedp core)
+                  unless (eql bit 1)
+                  do (format asm-file " .long ~a~%" s)))))
 
       (format asm-file "~% ~A~%" +noexec-stack-note+))))
 
