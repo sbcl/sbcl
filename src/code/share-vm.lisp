@@ -12,8 +12,7 @@
 
 (defvar *current-internal-error-context*)
 
-(eval-when-compile-toplevel
-  (sb!xc:defmacro with-pinned-context-code-object
+(defmacro with-pinned-context-code-object
       ((&optional (context '*current-internal-error-context*))
        &body body)
     (declare (ignorable context))
@@ -22,7 +21,7 @@
     #!-(or x86 x86-64)
     `(with-pinned-objects ((without-gcing
                              (sb!di::code-object-from-context ,context)))
-       ,@body)))
+       ,@body))
 
 ;;;; OS-CONTEXT-T
 

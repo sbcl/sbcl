@@ -23,8 +23,7 @@
                               ,(make-array n :initial-element 0))))))
   (def-it))
 
-(eval-when-compile-toplevel
-(sb!xc:defmacro deferr (name args &rest body)
+(defmacro deferr (name args &rest body)
   (multiple-value-bind (llks required optional rest) (parse-lambda-list args)
     (declare (ignore llks))
     (aver (not rest))
@@ -34,7 +33,7 @@
   `(setf (svref **internal-error-handlers** ,(error-number-or-lose name))
          (named-lambda ,(string name) (,@args)
            (declare (optimize (sb!c::verify-arg-count 0)))
-           ,@body)))) ; EVAL-WHEN
+           ,@body)))
 
 ;;; Backtrace code may want to know the error that caused
 ;;; interruption, but there are other means to get code interrupted
