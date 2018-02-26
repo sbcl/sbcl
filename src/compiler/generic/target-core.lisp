@@ -100,31 +100,42 @@
             #!+immobile-code (:named-call (sb!vm::fdefn-entry-address sym))
             #!+immobile-code (:static-call (sb!vm::function-raw-address sym)))
           kind flavor))
-       (finish-fixups (code-obj preserved-fixups)
-         (declare (ignorable code-obj preserved-fixups))
+       (finish-fixups (code-obj abs-fixups rel-fixups)
+         (declare (ignorable code-obj abs-fixups rel-fixups))
          #!+(or immobile-space x86)
-         (when preserved-fixups
-           (setf (sb!vm::%code-fixups code-obj)
-                 (sb!c::pack-code-fixup-locs preserved-fixups)))
+         (when (or abs-fixups rel-fixups)
+           (let ((abs (sb!c::pack-code-fixup-locs abs-fixups))
+                 (rel (sb!c::pack-code-fixup-locs rel-fixups)))
+             ;; Store a cons of both only if there are any relative fixups,
+             ;; otherwise just the absolute [sic] fixups (the more common kind),
+             ;; some of which are actually relative fixups on x86. The C code
+             ;; deciphers (usually correctly) which are which. (See lp#1749369)
+             (setf (sb!vm::%code-fixups code-obj)
+                   (if rel-fixups (cons abs rel) abs))))
          #!-(or x86 x86-64)
          (sb!vm:sanctify-for-execution code-obj)))
 
   (defun apply-fasl-fixups (fop-stack code-obj &aux (top (svref fop-stack 0))
-                                                    (preserved-fixups nil))
+                                                    (preserved-fixups nil)
+                                                    (preserved-rel-fixups nil))
     (macrolet ((pop-fop-stack () `(prog1 (svref fop-stack top) (decf top))))
       (dotimes (i (pop-fop-stack) (setf (svref fop-stack 0) top))
         (multiple-value-bind (offset kind flavor)
             (sb!fasl::!unpack-fixup-info (pop-fop-stack))
-          (when (fixup code-obj offset (pop-fop-stack) kind flavor #'find-layout)
-            (push offset preserved-fixups)))))
-    (finish-fixups code-obj preserved-fixups))
+         (let ((savep
+                (fixup code-obj offset (pop-fop-stack) kind flavor #'find-layout)))
+           (cond ((eq savep :relative) (push offset preserved-rel-fixups))
+                 (savep (push offset preserved-fixups)))))))
+    (finish-fixups code-obj preserved-fixups preserved-rel-fixups))
 
-  (defun apply-core-fixups (fixup-notes code-obj &aux (preserved-fixups nil))
+  (defun apply-core-fixups (fixup-notes code-obj &aux (preserved-fixups nil)
+                                                      (preserved-rel-fixups nil))
     (declare (list fixup-notes))
     (dolist (note fixup-notes)
-      (let ((fixup (fixup-note-fixup note))
-            (offset (fixup-note-position note)))
-        (when (fixup code-obj offset
+      (let* ((fixup (fixup-note-fixup note))
+             (offset (fixup-note-position note))
+             (savep
+              (fixup code-obj offset
                      (fixup-name fixup)
                      (fixup-note-kind note)
                      (fixup-flavor fixup)
@@ -132,9 +143,10 @@
                ;; an instance of LAYOUT, not a symbol. Those probably should be
                ;; :IMMOBILE-OBJECT fixups. But since they're not, inform the
                ;; fixupper not to call find-layout on them.
-                     #'identity)
-          (push offset preserved-fixups))))
-      (finish-fixups code-obj preserved-fixups)))
+                     #'identity)))
+        (cond ((eq savep :relative) (push offset preserved-rel-fixups))
+              (savep (push offset preserved-fixups)))))
+    (finish-fixups code-obj preserved-fixups preserved-rel-fixups)))
 
 ;;; Note the existence of FUNCTION.
 (defun note-fun (info function object)

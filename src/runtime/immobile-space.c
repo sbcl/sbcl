@@ -49,6 +49,7 @@
 #include "gc-internal.h"
 #include "gc-private.h"
 #include "genesis/gc-tables.h"
+#include "genesis/cons.h"
 #include "genesis/vector.h"
 #include "forwarding-ptr.h"
 #include "pseudo-atomic.h"
@@ -1725,8 +1726,7 @@ static void fixup_space(lispobj* where, size_t n_words)
               f->self = adjust_fun_entrypoint(f->self);
               adjust_words(SIMPLE_FUN_SCAV_START(f), SIMPLE_FUN_SCAV_NWORDS(f), 0);
           });
-          if (code->fixups)
-              fixup_immobile_refs(follow_fp, code->fixups, code);
+          fixup_immobile_refs(follow_fp, code->fixups, code);
           break;
         case CLOSURE_WIDETAG:
           where[1] = adjust_fun_entrypoint(where[1]);
@@ -2230,6 +2230,10 @@ void verify_immobile_page_protection(int keep_gen, int new_gen)
 void fixup_immobile_refs(lispobj (*fixup_lispobj)(lispobj),
                          lispobj fixups, struct code* code)
 {
+    if (listp(fixups))
+        fixups = CONS(fixups)->car;
+    if (!fixups) // if no fixups, or only relative fixups
+        return;
     struct varint_unpacker unpacker;
     varint_unpacker_init(&unpacker, fixups);
     char* instructions = (char*)((lispobj*)code + code_header_words(code->header));

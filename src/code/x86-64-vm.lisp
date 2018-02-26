@@ -18,7 +18,9 @@
 
 ;;; This gets called by LOAD to resolve newly positioned objects
 ;;; with things (like code instructions) that have to refer to them.
-;;; Return T if and only if the fixup needs to be recorded in %CODE-FIXUPS
+;;; Return :ABSOLUTE if an absolute fixup needs to be recorded in %CODE-FIXUPS,
+;;; and return :RELATIVE if a relative fixup needs to be recorded.
+;;; The code object we're fixing up is pinned whenever this is called.
 (defun fixup-code-object (code offset fixup kind flavor)
   (declare (type index offset) (ignorable flavor))
   (let* ((sap (code-instructions code))
@@ -52,18 +54,22 @@
                      (the (unsigned-byte 64) (+ (sap-int sap) offset 4)))))))))
   ;; An absolute fixup is stored in the code header's %FIXUPS slot if it
   ;; references an immobile-space (but not static-space) object.
-  ;; This needn't be inside WITHOUT-GCING, because code fixups will point
-  ;; only to objects that don't move except during save-lisp-and-die.
-  ;; So there is no race with GC here.
   ;; Note that:
   ;;  (1) Call fixups occur in both :RELATIVE and :ABSOLUTE kinds.
-  ;;      We can ignore the :RELATIVE kind.
+  ;;      We can ignore the :RELATIVE kind, except for foreign call.
   ;;  (2) :STATIC-CALL fixups point to immobile space, not static space.
   #!+immobile-space
   (return-from fixup-code-object
-        (and (eq kind :absolute)
-             (member flavor '(:named-call :layout :immobile-object ; -> fixedobj subspace
-                              :assembly-routine :static-call)))) ; -> varyobj subspace
+    (case flavor
+      ((:named-call :layout :immobile-object ; -> fixedobj subspace
+        :assembly-routine :static-call)      ; -> varyobj subspace
+       (if (eq kind :absolute) :absolute))
+      (:foreign
+       ;; linkage-table calls using the "CALL rel32" format need to be saved,
+       ;; because the linkage table resides at a fixed address.
+       ;; Space defragmentation can handle the fixup automatically,
+       ;; but core relocation can't - it can't find all the call sites.
+       (if (eq kind :relative) :relative))))
   nil) ; non-immobile-space builds never record code fixups
 
 #!+(or darwin linux win32)

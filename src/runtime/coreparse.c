@@ -277,6 +277,7 @@ struct heap_adjust {
 #define relocate_heap(ignore)
 #else
 #include "genesis/gc-tables.h"
+#include "genesis/cons.h"
 #include "genesis/hash-table.h"
 #include "genesis/layout.h"
 #include "genesis/vector.h"
@@ -298,6 +299,18 @@ static inline sword_t calc_adjustment(struct heap_adjust* adj, lispobj x)
 // like a pointer. But do test whether it points to a relocatable space.
 static inline lispobj adjust_word(struct heap_adjust* adj, lispobj word) {
     return word + calc_adjustment(adj, word);
+}
+
+// Given a post-relocation object 'x', compute the address at which
+// it was originally expected to have been placed as per the core file.
+static inline lispobj inverse_adjust(struct heap_adjust* adj, lispobj x)
+{
+    int j;
+    for (j=0; j<3; ++j)
+        if (adj->range[j].start + adj->range[j].delta <= x &&
+            x < adj->range[j].end + adj->range[j].delta)
+            return x - adj->range[j].delta;
+    return x;
 }
 
 #define SHOW_SPACE_RELOCATION 0
@@ -344,11 +357,21 @@ static void adjust_pointers(lispobj *where, sword_t n_words, struct heap_adjust*
 #include "var-io.h"
 #include "unaligned.h"
 static void __attribute__((unused))
-adjust_code_refs(struct heap_adjust* adj, lispobj fixups, struct code* code)
+adjust_code_refs(struct heap_adjust* adj, struct code* code, lispobj original_vaddr)
 {
-    struct varint_unpacker unpacker;
-    varint_unpacker_init(&unpacker, fixups);
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    // Dynamic space is a always relocated before immobile space,
+    // and dynamic space code does not use fixups (except on 32-bit x86).
+    // So if we're here, it must be to relocate an immobile object.
+    // Therefore these CAR and CDR operations are correct,
+    // because what they point to has already been relocated.
+    lispobj fixups    = code->fixups;
+    lispobj absfixups = listp(fixups) ? CONS(fixups)->car : fixups;
+    lispobj relfixups = listp(fixups) ? CONS(fixups)->cdr : 0;
     char* instructions = (char*)((lispobj*)code + code_header_words(code->header));
+    struct varint_unpacker unpacker;
+
+    varint_unpacker_init(&unpacker, absfixups);
     int prev_loc = 0, loc;
     while (varint_unpack(&unpacker, &loc) && loc != 0) {
         // For extra compactness, each loc is relative to the prior,
@@ -361,6 +384,20 @@ adjust_code_refs(struct heap_adjust* adj, lispobj fixups, struct code* code)
         if (adjusted != ptr)
             FIXUP32(UNALIGNED_STORE32(fixup_where, adjusted), fixup_where);
     }
+    sword_t displacement = (lispobj)code - original_vaddr;
+    if (!displacement) // if this code didn't move, do nothing
+        return;
+    varint_unpacker_init(&unpacker, relfixups);
+    prev_loc = 0;
+    while (varint_unpack(&unpacker, &loc) && loc != 0) {
+        loc += prev_loc;
+        prev_loc = loc;
+        void* fixup_where = instructions + loc;
+        lispobj rel32operand = UNALIGNED_LOAD32(fixup_where);
+        lispobj adjusted = rel32operand - displacement;
+        FIXUP_rel(UNALIGNED_STORE32(fixup_where, adjusted), fixup_where);
+    }
+#endif
 }
 
 static inline void fix_fun_header_layout(lispobj* fun, struct heap_adjust* adj)
@@ -461,18 +498,15 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
                 adjust_pointers(&f->self, (lispobj*)f->code - &f->self, adj);
 #endif
             });
-            // Compute the address where the code "was" as the first argument
-            // by negating the adjustment for 'where'.
-            // Can't call calc_adjustment to get the negative of the adjustment!
-            gencgc_apply_code_fixups((struct code*)((char*)where -
-                                                    adj->range[DYNAMIC_SPACE_ADJ_INDEX].delta),
-                                     code);
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-            // Now that the packed integer comprising the list of fixup locations
-            // has been fixed-up (if necessary), apply them to the code.
-            if (code->fixups != 0)
-                adjust_code_refs(adj, code->fixups, code);
-#endif
+            {
+              // Now that the packed integer comprising the list of fixup locations
+              // has been fixed-up (if necessary), apply them to the code.
+              lispobj original_vaddr = inverse_adjust(adj, (lispobj)code);
+              // code->fixups, if a bignum pointer, was fixed up as part of
+              // the constant pool.
+              gencgc_apply_code_fixups((struct code*)original_vaddr, code);
+              adjust_code_refs(adj, code, original_vaddr);
+            }
             continue;
         case CLOSURE_WIDETAG:
             fix_fun_header_layout(where, adj);

@@ -2105,9 +2105,13 @@ core and return a descriptor to it."
       (assert (= obj-start-addr
                  (+ gspace-base (descriptor-byte-offset code-object))))
 
+      ;; FIXME: every other backend has the code factored out nicely into
+      ;; {target}-vm.lisp, but x86 doesn't. Is it really so impossible?
       ;; See FIXUP-CODE-OBJECT in x86-vm.lisp and x86-64-vm.lisp.
       ;; Except for the use of saps, this is basically identical.
-      (when (ecase kind
+      (let
+          ((savep
+            (ecase kind
              (:absolute
               (setf (bvref-32 gspace-data gspace-byte-offset)
                     (the (unsigned-byte 32) addr))
@@ -2135,9 +2139,11 @@ core and return a descriptor to it."
               ;; and we don't record those fixups.
               #!+x86 (and in-dynamic-space
                           (not (< obj-start-addr addr code-end-addr)))
-              #!+x86-64 nil))
-        (push after-header (gethash (descriptor-bits code-object)
-                                    *code-fixup-notes*)))))
+              #!+x86-64 (if (eq flavor :foreign) :relative)))))
+        (when savep
+          (push (cons (if (eq savep :relative) :relative :absolute) after-header)
+                (gethash (descriptor-bits code-object)
+                         *code-fixup-notes*))))))
   code-object)
 
 (defun resolve-static-call-fixups ()
@@ -2147,6 +2153,19 @@ core and return a descriptor to it."
                   (cold-fun-entry-addr
                    (cold-fdefn-fun (cold-fdefinition-object name)))
                   kind :static-call))))
+
+;;; Save a cons of both kinds of fixups if there are both, otherwise just the
+;;; not-explicitly-relative kind (which include both kinds for 32-bit x86)
+;;; (cf. FINISH-FIXUPS in generic/target-core.)
+(defun repack-fixups (list)
+  (collect ((relative) (absolute))
+    (dolist (item list)
+      (if (eq (car item) :relative)
+          (relative (cdr item))
+          (absolute (cdr item))))
+    (let ((packed-rel (number-to-core (sb!c::pack-code-fixup-locs (relative))))
+          (packed-abs (number-to-core (sb!c::pack-code-fixup-locs (absolute)))))
+      (if (relative) (cold-cons packed-abs packed-rel) packed-abs))))
 
 #!+sb-dynamic-core
 (defun dyncore-note-symbol (symbol-name datap)
@@ -3723,8 +3742,7 @@ III. initially undefined function references (alphabetically):
       #!+(or x86 immobile-space)
       (dolist (pair (sort (%hash-table-alist *code-fixup-notes*) #'< :key #'car))
         (write-wordindexed (make-random-descriptor (car pair))
-                           sb!vm::code-fixups-slot
-                           (number-to-core (sb!c::pack-code-fixup-locs (cdr pair)))))
+                           sb!vm::code-fixups-slot (repack-fixups (cdr pair))))
       (when core-file-name
         (finish-symbols))
       (finalize-load-time-value-noise)
