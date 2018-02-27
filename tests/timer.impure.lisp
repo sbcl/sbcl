@@ -333,7 +333,8 @@
                                                 do (sb-ext:schedule-timer (make-timer #'one :thread thread) 0.001))))))
           (dolist (thread threads)
             (sched thread)))
-        (mapcar #'sb-thread:join-thread threads)))))
+        (loop for thread in threads
+              do (sb-thread:join-thread thread :timeout 20))))))
 
 ;; SB-THREAD:MAKE-THREAD used to lock SB-THREAD:*MAKE-THREAD-LOCK*
 ;; before entering WITHOUT-INTERRUPTS. When a thread which was
