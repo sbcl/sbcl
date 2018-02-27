@@ -1278,6 +1278,7 @@ on this semaphore, then N of them is woken up."
             (lambda (c h)
               (sb!debug::debugger-disabled-hook c h :quit nil)
               (abort-thread :allow-exit t)))
+      (sb!impl::finalizer-thread-stop)
       (dolist (thread (list-all-threads))
         (cond ((eq thread current))
               ((main-thread-p thread)

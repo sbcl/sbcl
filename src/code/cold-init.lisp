@@ -356,7 +356,6 @@ process to continue normally."
   (if (or abort *exit-in-process*)
       (os-exit (or code 1) :abort t)
       (let ((code (or code 0)))
-        #!+sb-thread (finalizer-thread-stop)
         (with-deadline (:seconds nil :override t)
           (sb!thread:grab-mutex *exit-lock*))
         (setf *exit-in-process* code
