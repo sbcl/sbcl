@@ -2587,6 +2587,7 @@ core and return a descriptor to it."
             (t (call fun :sb-cold-funcall-handler/for-effect args)))))))
 
 ;;; Needed for certain L-T-V lambdas that use the -NO-SKIP variant of funcall.
+#-c-headers-only
 (setf (svref **fop-funs** (get 'fop-funcall-no-skip 'opcode))
       (svref **fop-funs** (get 'fop-funcall 'opcode)))
 

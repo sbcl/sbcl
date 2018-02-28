@@ -6,6 +6,7 @@
 time $SBCL_XC_HOST <<EOF
 (load "src/cold/shared.lisp")
 (load "src/cold/set-up-cold-packages.lisp")
+(load "tools-for-build/corefile.lisp")
 (in-package "SB-COLD")
 (in-host-compilation-mode
  (lambda (&aux (*features* (cons :c-headers-only *features*)))
