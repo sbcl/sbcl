@@ -2092,7 +2092,10 @@ void defrag_immobile_space(int* components, boolean verbose)
                 inst_byte_num = 1; // where the displacement operand starts
             switch (*inst_addr) { // opcode
             case 0xE8: case 0xE9: break; // JMP or CALL
-            case 0x8D: inst_len = 6; inst_byte_num = 2; break; // LEA
+            case 0x8D: // LEA
+            case 0x0F: // Jcc
+              inst_len = 6; inst_byte_num = 2;
+              break;
             default: lose("Can't fixup opcode %02x", *inst_addr);
             }
             unsigned int target_addr =

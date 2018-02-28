@@ -445,6 +445,7 @@
         ;; Look for these three instruction formats.
         (lea-inst (find-inst #x8D (get-inst-space)))
         (jmp-inst (find-inst #b11101001 (get-inst-space)))
+        (cond-jmp-inst (find-inst #x800f (get-inst-space)))
         (call-inst (find-inst #b11101000 (get-inst-space)))
         (seg (sb!disassem::%make-segment
               :sap-maker (lambda () (error "Bad sap maker")) :virtual-location 0))
@@ -456,10 +457,14 @@
                    (let ((sap (int-sap fun-entry-addr))) (lambda () sap)))
              (map-segment-instructions
               (lambda (dchunk inst)
-                (cond ((and (or (eq inst jmp-inst) (eq inst call-inst))
-                            (funcall predicate
-                                     (+ (near-jump-displacement dchunk dstate)
-                                        (dstate-next-addr dstate))))
+                (cond ((or (and (or (eq inst jmp-inst) (eq inst call-inst))
+                                (funcall predicate
+                                         (+ (near-jump-displacement dchunk dstate)
+                                            (dstate-next-addr dstate))))
+                           (and (eq inst cond-jmp-inst)
+                                (funcall predicate
+                                         (+ (near-cond-jump-displacement dchunk dstate)
+                                            (dstate-next-addr dstate)))))
                        (vector-push-extend (dstate-cur-addr dstate) relocs))
                       ((eq inst lea-inst)
                        (let ((sap (funcall (seg-sap-maker seg))))
