@@ -866,17 +866,25 @@
   (define-full-call multiple-call-variable nil :unknown t))
 
 (defun tail-call-unnamed (fun callable vop)
+  (declare (ignorable vop))
   (cond (callable
          (assemble ()
            (%lea-for-lowtag-test ebx-tn fun fun-pointer-lowtag)
            (inst test bl-tn lowtag-mask)
-           (inst jmp :nz not-fun)
-           (inst jmp (make-ea :qword :base fun
-                                     :disp (- (* closure-fun-slot n-word-bytes)
-                                              fun-pointer-lowtag)))
-           not-fun
-           (invoke-asm-routine 'jmp 'tail-call-symbol
-                               vop rbx-tn)))
+           (let ((routine (make-fixup 'tail-call-symbol :assembly-routine))
+                 (relative-call (or #!+immobile-code
+                                    (sb!c::code-immobile-p (sb!c::vop-node vop)))))
+             (assemble ()
+               (inst jmp :nz (if relative-call
+                                 routine
+                                 not-fun))
+               (inst jmp (make-ea :qword :base fun
+                                         :disp (- (* closure-fun-slot n-word-bytes)
+                                                  fun-pointer-lowtag)))
+               not-fun
+               (unless relative-call
+                 (inst mov rbx-tn routine)
+                 (inst jmp rbx-tn))))))
         (t
          (inst jmp
                (make-ea :qword :base fun
