@@ -482,13 +482,17 @@
       ;; Assembler routines contain jumps to immobile code.
       (let* ((code sb!fasl:*assembler-routines*)
              (origin (sap-int (code-instructions code)))
+             (end (+ origin (%code-code-size code)))
              (relocs-index (fill-pointer relocs)))
         (dolist (range (sort (loop for range being each hash-value
                                    of (car (%code-debug-info code)) collect range)
                              #'< :key #'car))
           ;; byte range is inclusive bound on both ends
           (scan-function (+ origin (car range))
-                         (+ origin (cdr range) 1) #'immobile-space-addr-p))
+                         (+ origin (cdr range) 1)
+                         (lambda (addr)
+                           (and (not (<= origin addr end))
+                                (immobile-space-addr-p addr)))))
         (finish-component code relocs-index))
 
       ;; Immobile space - code components can jump to immobile space,
@@ -509,7 +513,7 @@
                       (- (get-lisp-obj-address (%code-entry-point code (1+ i)))
                          fun-pointer-lowtag)
                       text-end)
-                ;; Exclude transfers within this code component
+                  ;; Exclude transfers within this code component
                   (lambda (jmp-targ-addr)
                     (not (<= text-origin jmp-targ-addr text-end)))))))))
        :immobile))
