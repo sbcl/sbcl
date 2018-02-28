@@ -674,7 +674,7 @@
 
 #!-sb-fluid (declaim (inline ansi-stream-fresh-line))
 (defun ansi-stream-fresh-line (stream)
-  (when (/= (or (charpos stream) 1) 0)
+  (unless (eql (charpos stream) 0)
     (funcall (ansi-stream-out stream) stream #\newline)
     t))
 
