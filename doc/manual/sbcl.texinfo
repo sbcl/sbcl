@@ -111,7 +111,7 @@ provided with absolutely no warranty. See the @file{COPYING} and
 @include ffi.texinfo
 @include pathnames.texinfo
 @include streams.texinfo
-@include package-locks.texi-temp
+@include package-locks.texinfo
 @include threading.texinfo
 @include timers.texinfo
 @include sb-bsd-sockets/sb-bsd-sockets.texinfo

@@ -97,14 +97,6 @@
           (declare (ignore key))
           (pushnew (sb-impl::ef-names val) result :test #'equal))
         (table (sort result #'string< :key #'car))))))
-
-(defun select-package-locks-texinfo (&optional (output-file "package-locks.texi-temp"))
-  (format t "/creating ~A~%" output-file)
-  (let ((variant (if (and #1=(find-symbol "PACKAGE-LOCKED-P" :sb-ext)
-                          (fboundp #1#))
-                     "package-locks-extended.texinfo"
-                     "package-locks-basic.texinfo")))
-    (uiop:copy-file variant output-file)))
 
 ;;;; Entry point
 
@@ -114,5 +106,4 @@
    runtime :docstring-directory docstring-directory)
 
   (expand-variables)
-  (generate-external-format-texinfo)
-  (select-package-locks-texinfo))
+  (generate-external-format-texinfo))
