@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-1.4.4:
+changes in sbcl-1.4.5 relative to sbcl-1.4.4:
   * minor incompatible change: building with/without the :sb-package-locks
     feature is no longer an option. Package locks are always compiled in,
     and removing :sb-package-locks from *features* will have no effect.
