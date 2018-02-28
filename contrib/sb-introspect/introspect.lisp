@@ -170,33 +170,27 @@ constant pool."
   ;; is.
   (description nil :type list))
 
-(defun vop-sources-from-fun-templates (name)
+(defun vops-translating-fun (name)
   (let ((fun-info (sb-int:info :function :info name)))
     (when fun-info
-      (loop for vop in (sb-c::fun-info-templates fun-info)
-            for source = (find-definition-source
-                          (sb-c::vop-info-generator-function vop))
-            do (setf (definition-source-description source)
-                     (if (sb-c::template-note vop)
-                         (list (sb-c::template-name vop)
-                               (sb-c::template-note vop))
-                         (list (sb-c::template-name vop))))
-            collect source))))
+      (sb-c::fun-info-templates fun-info))))
 
 (defun find-vop-source (name)
-  (let* ((templates (vop-sources-from-fun-templates name))
-         (vop (gethash name sb-c::*backend-template-names*))
-         (generator (when vop
-                      (sb-c::vop-info-generator-function vop)))
-         (source (when generator
-                   (find-definition-source generator))))
-    (cond
-      (source
-       (setf (definition-source-description source)
-             (list name))
-       (cons source templates))
-      (t
-       templates))))
+  (let* ((vop (gethash name sb-c::*backend-template-names*))
+         (translating (vops-translating-fun name))
+         (vops (if vop
+                   (cons vop (remove vop translating))
+                   translating)))
+    (loop for vop in vops
+          for name = (sb-c::vop-info-name vop)
+          for loc = (sb-int:info :source-location :vop name)
+          when loc
+          collect (let ((source (translate-source-location loc)))
+                    (setf (definition-source-description source)
+                          (if (sb-c::vop-info-note vop)
+                              (list name (sb-c::vop-info-note vop))
+                              (list name)))
+                    source))))
 
 (defun find-definition-sources-by-name (name type)
   "Returns a list of DEFINITION-SOURCEs for the objects of type TYPE
@@ -374,12 +368,7 @@ If an unsupported TYPE is requested, the function will return NIL.
                             (list name))
                       source))))))
        (:vop
-        (let ((loc (sb-int:info :source-location type name))
-              (translated (find-vop-source name)))
-          (if loc
-              (cons (translate-source-location loc)
-                    translated)
-              translated)))
+        (find-vop-source name))
        (:alien-type
         (let ((loc (sb-int:info :source-location type name)))
           (and loc
