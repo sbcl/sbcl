@@ -595,7 +595,6 @@ that provides the REPL for the system. Assumes that *STANDARD-INPUT* and
   (loop
    (unwind-protect
         (progn
-          ;; (See comment preceding the definition of SCRUB-CONTROL-STACK.)
           (scrub-control-stack)
           (sb!thread::get-foreground)
           (unless noprint
