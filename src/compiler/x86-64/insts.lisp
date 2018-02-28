@@ -828,7 +828,7 @@
                                      :default-printer '(:name width)))
 
 (define-instruction-format (short-cond-jump 16)
-  (op    :field (byte 4 4))
+  (op    :field (byte 4 4) :value #b0111)
   (cc    :field (byte 4 0) :type 'condition-code)
   (label :field (byte 8 8) :type 'displacement))
 
@@ -840,7 +840,7 @@
 (define-instruction-format (near-cond-jump 48)
   (op    :fields (list (byte 8 0) (byte 4 12)) :value '(#b00001111 #b1000))
   (cc    :field (byte 4 8) :type 'condition-code)
-  (label :field (byte 32 16) :type 'displacement))
+  (label :field (byte 32 16) :type 'displacement :reader near-cond-jump-displacement))
 
 (define-instruction-format (near-jump 40 :default-printer '(:name :tab label))
   (op    :field (byte 8 0))
@@ -2307,7 +2307,7 @@
 
 (define-instruction jmp (segment cond &optional where)
   ;; conditional jumps
-  (:printer short-cond-jump ((op #b0111)) '('j cc :tab label))
+  (:printer short-cond-jump () '('j cc :tab label))
   (:printer near-cond-jump () '('j cc :tab label))
   ;; unconditional jumps
   (:printer short-jump ((op #b1011)))
@@ -2316,26 +2316,34 @@
                                    (reg/mem nil :printer #'print-jmp-ea)))
   (:emitter
    (cond (where
-          (emit-chooser
-           segment 6 2
-           (lambda (segment posn delta-if-after)
-             (let ((disp (- (label-position where posn delta-if-after)
-                            (+ posn 2))))
-               (when (<= -128 disp 127)
+          (cond ((fixup-p where)
+                 (emit-byte segment #b00001111)
                  (emit-byte segment
                             (dpb (conditional-opcode cond)
                                  (byte 4 0)
-                                 #b01110000))
-                 (emit-byte-displacement-backpatch segment where)
-                 t)))
-           (lambda (segment posn)
-             (let ((disp (- (label-position where) (+ posn 6))))
-               (emit-byte segment #b00001111)
-               (emit-byte segment
-                          (dpb (conditional-opcode cond)
-                               (byte 4 0)
-                               #b10000000))
-               (emit-signed-dword segment disp)))))
+                                 #b10000000))
+                 (emit-relative-fixup segment where))
+                (t
+                 (emit-chooser
+                  segment 6 2
+                  (lambda (segment posn delta-if-after)
+                    (let ((disp (- (label-position where posn delta-if-after)
+                                   (+ posn 2))))
+                      (when (<= -128 disp 127)
+                        (emit-byte segment
+                                   (dpb (conditional-opcode cond)
+                                        (byte 4 0)
+                                        #b01110000))
+                        (emit-byte-displacement-backpatch segment where)
+                        t)))
+                  (lambda (segment posn)
+                    (let ((disp (- (label-position where) (+ posn 6))))
+                      (emit-byte segment #b00001111)
+                      (emit-byte segment
+                                 (dpb (conditional-opcode cond)
+                                      (byte 4 0)
+                                      #b10000000))
+                      (emit-signed-dword segment disp)))))))
          ((label-p (setq where cond))
           (emit-chooser
            segment 5 0
