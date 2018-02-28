@@ -254,7 +254,6 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                "CALLEE-NFP-TN" "CALLEE-RETURN-PC-TN"
                "CASE-BODY" "CATCH-BLOCK" "UNWIND-BLOCK"
                "CLOSURE-INIT" "CLOSURE-REF" "CLOSURE-INIT-FROM-FP"
-               "*CODE-COVERAGE-INFO*"
                "COMPARE-AND-SWAP-SLOT"
                "COMPILE-IN-LEXENV"
                "%COMPILER-DEFUN" "COMPILER-ERROR" "FATAL-COMPILER-ERROR"
@@ -430,6 +429,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                ;; for SB-COVER
                "*CODE-COVERAGE-INFO*" "CODE-COVERAGE-RECORD-MARKED"
                "CLEAR-CODE-COVERAGE" "RESET-CODE-COVERAGE"
+               "+CODE-COVERAGE-UNMARKED+"
                ;; for SB-INTROSPECT
                "MAP-PACKED-XREF-DATA" "MAP-SIMPLE-FUNS"
                ))
