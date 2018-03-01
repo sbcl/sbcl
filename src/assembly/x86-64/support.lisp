@@ -9,7 +9,7 @@
 
 (in-package "SB!VM")
 
-(defun invoke-asm-routine (inst routine vop temp-reg)
+(defun invoke-asm-routine (inst routine vop &optional temp-reg)
   (declare (ignorable vop temp-reg))
   (let ((fixup
          (cond ((sb!c::code-immobile-p vop)

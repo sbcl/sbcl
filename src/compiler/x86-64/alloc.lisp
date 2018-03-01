@@ -31,7 +31,7 @@
   (inst lea alloc-tn (make-ea :byte :base rsp-tn :disp lowtag))
   (values))
 
-(defun allocation-tramp (result-tn size lowtag)
+(defun allocation-tramp (node result-tn size lowtag)
   (cond ((typep size '(and integer (not (signed-byte 32))))
          ;; MOV accepts large immediate operands, PUSH does not
          (inst mov result-tn size)
@@ -42,14 +42,8 @@
   ;; rather than specializing on R11, which just happens to be the temp reg.
   ;; But the assembly routine is hand-written, not generated, and it has to match,
   ;; so there's not much that can be done to generalize it.
-  (let* ((to-r11 (location= result-tn r11-tn))
-         (fixup (make-fixup (if to-r11
-                                'alloc-tramp-r11
-                                'alloc-tramp) :assembly-routine)))
-    (inst call (cond #!+immobile-code
-                     (sb!c::*code-is-immobile* fixup)
-                     (t (inst mov result-tn fixup)
-                        result-tn)))
+  (let ((to-r11 (location= result-tn r11-tn)))
+    (invoke-asm-routine 'call (if to-r11 'alloc-tramp-r11 'alloc-tramp) node)
     (unless to-r11
       (inst pop result-tn)))
 
@@ -63,7 +57,6 @@
 ;;; This function should only be used inside a pseudo-atomic section,
 ;;; which to the degree needed should also cover subsequent initialization.
 (defun allocation (alloc-tn size node &optional dynamic-extent lowtag)
-  (declare (ignore node))
   (when dynamic-extent
     (allocation-dynamic-extent alloc-tn size lowtag)
     (return-from allocation (values)))
@@ -77,7 +70,7 @@
   ;; to the register allocator when not using it as the thread base.
   ;; Could push/pop any random register on the stack and own it temporarily,
   ;; but seeing as nobody cared about this, just punt.
-  (allocation-tramp alloc-tn size lowtag)
+  (allocation-tramp node alloc-tn size lowtag)
 
   #!-(and (not sb-thread) sb-dynamic-core)
   ;; Otherwise do the normal inline allocation thing
@@ -103,7 +96,7 @@
                ;; large objects will never be made in a per-thread region
                (and (integerp size)
                     (>= size large-object-size)))
-           (allocation-tramp alloc-tn size lowtag))
+           (allocation-tramp node alloc-tn size lowtag))
           (t
            (inst mov temp-reg-tn free-pointer)
            (cond ((integerp size)
@@ -123,9 +116,9 @@
              (emit-label NOT-INLINE)
              (cond ((and (tn-p size) (location= size alloc-tn)) ; recover SIZE
                     (inst sub alloc-tn free-pointer)
-                    (allocation-tramp temp-reg-tn alloc-tn nil))
+                    (allocation-tramp node temp-reg-tn alloc-tn nil))
                    (t ; SIZE is intact
-                    (allocation-tramp temp-reg-tn size nil)))
+                    (allocation-tramp node temp-reg-tn size nil)))
              (inst jmp DONE))))
     (values)))
 
@@ -492,13 +485,12 @@
 (define-vop (make-funcallable-instance-tramp)
   (:args)
   (:results (result :scs (any-reg)))
+  (:vop-var vop)
   (:generator 1
     (let ((tramp (make-fixup 'funcallable-instance-tramp :assembly-routine)))
-      (cond #!+immobile-code
-            (sb!c::*code-is-immobile*
-             (inst lea result tramp))
-            (t
-             (inst mov result tramp))))))
+      (if (sb!c::code-immobile-p vop)
+          (inst lea result tramp)
+          (inst mov result tramp)))))
 
 (define-vop (fixed-alloc)
   (:args)
