@@ -135,12 +135,6 @@ os_sem_destroy(os_sem_t *sem)
 
 #endif
 
-#if defined(LISP_FEATURE_OS_PROVIDES_DLOPEN) && !defined(LISP_FEATURE_WIN32)
-void* os_dlopen(char* name, int flags) {
-    return dlopen(name,flags);
-}
-#endif
-
 /* When :SB-DYNAMIC-CORE is enabled, the special category of /static/ foreign
  * symbols disappears. Foreign fixups are resolved to linkage table locations
  * during genesis, and for each of them a record is added to
