@@ -1184,3 +1184,10 @@
         (declare (ignore b))
         (values a c)))
    ((#'values) (values 1 3))))
+
+(with-test (:name :constraints-not-enough-args)
+  (checked-compile-and-assert
+   ()
+   `(lambda (list)
+      (delete-if #'> (the list list)))
+   (((list 1)) nil)))

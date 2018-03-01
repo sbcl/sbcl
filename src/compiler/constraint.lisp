@@ -716,14 +716,15 @@
                                                 nil constraints
                                                 consequent-constraints)))))
                  ((< >)
-                  (let* ((arg1 (first args))
-                         (var1 (ok-lvar-lambda-var arg1 constraints))
-                         (arg2 (second args))
-                         (var2 (ok-lvar-lambda-var arg2 constraints)))
-                    (when var1
-                      (add name var1 (lvar-type arg2) nil))
-                    (when var2
-                      (add (if (eq name '<) '> '<) var2 (lvar-type arg1) nil))))
+                  (when (= (length args) 2)
+                    (let* ((arg1 (first args))
+                           (var1 (ok-lvar-lambda-var arg1 constraints))
+                           (arg2 (second args))
+                           (var2 (ok-lvar-lambda-var arg2 constraints)))
+                      (when var1
+                        (add name var1 (lvar-type arg2) nil))
+                      (when var2
+                        (add (if (eq name '<) '> '<) var2 (lvar-type arg1) nil)))))
                  (t
                   (add-combination-test-constraints use constraints
                                                     consequent-constraints
