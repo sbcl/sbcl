@@ -763,12 +763,6 @@
              (cached-block-physenv (ir2-block-block block))))))))
   (values))
 
-;;; FIXME: The next 3 macros aren't needed in the target runtime.
-;;; Figure out some way to make them only at build time. (Just
-;;; (EVAL-WHEN (:COMPILE-TOPLEVEL :EXECUTE) (DEFMACRO ..)) isn't good enough,
-;;; since we need CL:DEFMACRO at build-the-cross-compiler time and
-;;; SB!XC:DEFMACRO at run-the-cross-compiler time.)
-
 ;;; This is used in SCAN-VOP-REFS to simultaneously do something to
 ;;; all of the TNs referenced by a big more arg. We have to treat
 ;;; these TNs specially, since when we set or clear the bit in the
@@ -782,12 +776,14 @@
      (let ((prev ref))
        (do ((mref (tn-ref-next-ref ref) (tn-ref-next-ref mref)))
            ((null mref))
-         (let ((mtn (tn-ref-tn mref)))
-           (unless (eql (tn-local-number mtn) num)
-             (return))
-           ,action)
-         (setq prev mref))
-       (setq ref prev))))
+         (let* ((mtn (tn-ref-tn mref))
+                (tn-number (tn-local-number mtn)))
+           (when tn-number
+             (unless (eql tn-number num)
+               (return))
+             ,action
+             (setq prev mref)
+             (setq ref prev)))))))
 
 ;;; Handle the part of CONFLICT-ANALYZE-1-BLOCK that scans the REFs
 ;;; for the current VOP. This macro shamelessly references free

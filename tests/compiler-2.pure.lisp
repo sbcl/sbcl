@@ -1174,3 +1174,13 @@
         (declare (type (satisfies error) x))
         x)
     (("") (condition 'error))))
+
+(with-test (:name :lifetime-analyze-tn-overflow-unused-tns)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (multiple-value-bind (a b c)
+          (funcall x 1 2 3 ,@(make-list 58))
+        (declare (ignore b))
+        (values a c)))
+   ((#'values) (values 1 3))))
