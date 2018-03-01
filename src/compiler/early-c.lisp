@@ -312,6 +312,11 @@ the stack without triggering overflow protection.")
 (defvar *compile-time-eval* nil)
 (declaim (always-bound *compile-time-eval*))
 
+#!-immobile-code
+(defmacro code-immobile-p (thing)
+  (declare (ignore thing))
+  nil)
+
 (in-package "SB!ALIEN")
 
 ;;; Information describing a heap-allocated alien.

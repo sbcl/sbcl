@@ -872,8 +872,7 @@
            (%lea-for-lowtag-test ebx-tn fun fun-pointer-lowtag)
            (inst test bl-tn lowtag-mask)
            (let ((routine (make-fixup 'tail-call-symbol :assembly-routine))
-                 (relative-call (or #!+immobile-code
-                                    (sb!c::code-immobile-p (sb!c::vop-node vop)))))
+                 (relative-call (sb!c::code-immobile-p vop)))
              (assemble ()
                (inst jmp :nz (if relative-call
                                  routine

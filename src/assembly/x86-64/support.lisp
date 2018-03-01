@@ -12,8 +12,7 @@
 (defun invoke-asm-routine (inst routine vop temp-reg)
   (declare (ignorable vop temp-reg))
   (let ((fixup
-         (cond #!+immobile-code
-               ((sb!c::code-immobile-p (sb!c::vop-node vop))
+         (cond ((sb!c::code-immobile-p vop)
                 (make-fixup routine :assembly-routine))
                (t
                 (make-ea :qword :disp (make-fixup routine :assembly-routine*))))))

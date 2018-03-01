@@ -1124,8 +1124,7 @@
               (fasl-output-source-info fasl-output))
         (dump-object info fasl-output))
 
-      (dump-object (or #!+immobile-code (sb!c::code-immobile-p component))
-                   fasl-output)
+      (dump-object (sb!c::code-immobile-p component) fasl-output)
       (dump-fop 'fop-code fasl-output code-length
                 (- header-length sb!vm:code-constants-offset)
                 (length entry-offsets))

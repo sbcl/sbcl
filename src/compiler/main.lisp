@@ -563,12 +563,13 @@ necessary, since type inference may take arbitrarily long to converge.")
   ;; The real default is set to :DYNAMIC in make-target-2-load.lisp
   (defvar *compile-to-memory-space* :immobile) ; BUILD-TIME default
   (defvar *compile-file-to-memory-space* :immobile) ; BUILD-TIME default
-  (defun code-immobile-p (node-or-component)
+  (defun code-immobile-p (thing)
     (if (fasl-output-p *compile-object*)
         (and (eq *compile-file-to-memory-space* :immobile)
-             (neq (component-kind (if (node-p node-or-component)
-                                      (node-component node-or-component)
-                                      node-or-component))
+             (neq (component-kind (typecase thing
+                                    (vop  (node-component (vop-node thing)))
+                                    (node (node-component thing))
+                                    (t    thing)))
                   :toplevel))
         (eq *compile-to-memory-space* :immobile))))
 

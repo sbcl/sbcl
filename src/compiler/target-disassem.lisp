@@ -1932,6 +1932,7 @@
                (let* ((offset (- address start))
                       (index (unless (logtest address (1- sb!vm:n-word-bytes))
                                (floor offset sb!vm:n-word-bytes))))
+                 (declare (ignorable index))
                  (dohash ((name locs) hashtable)
                    (when (<= (car locs) offset (cadr locs))
                      (return-from find-assembler-routine

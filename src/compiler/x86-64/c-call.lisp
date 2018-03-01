@@ -329,9 +329,7 @@
   ;; one jump in a statically linked executable.
 
   (inst call (cond ((tn-p fun) fun)
-                   #!+immobile-code
-                   ((sb!c::code-immobile-p (sb!c::vop-node vop))
-                    (make-fixup fun :foreign))
+                   ((sb!c::code-immobile-p vop) (make-fixup fun :foreign))
                    (t (make-ea :qword :disp (make-fixup fun :foreign 8)))))
   ;; For the undefined alien error
   (note-this-location vop :internal-error)
