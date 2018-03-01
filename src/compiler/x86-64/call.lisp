@@ -865,49 +865,58 @@
   (define-full-call call-variable nil :fixed t)
   (define-full-call multiple-call-variable nil :unknown t))
 
-(defun tail-call-unnamed (fun callable vop)
-  (declare (ignorable vop))
-  (cond (callable
-         (assemble ()
-           (%lea-for-lowtag-test ebx-tn fun fun-pointer-lowtag)
-           (inst test bl-tn lowtag-mask)
-           (let ((routine (make-fixup 'tail-call-symbol :assembly-routine))
-                 (relative-call (sb!c::code-immobile-p vop)))
-             (assemble ()
-               (inst jmp :nz (if relative-call
-                                 routine
-                                 not-fun))
-               (inst jmp (make-ea :qword :base fun
-                                         :disp (- (* closure-fun-slot n-word-bytes)
-                                                  fun-pointer-lowtag)))
-               not-fun
-               (unless relative-call
-                 (inst mov rbx-tn routine)
-                 (inst jmp rbx-tn))))))
-        (t
-         (inst jmp
-               (make-ea :qword :base fun
-                               :disp (- (* closure-fun-slot n-word-bytes)
-                                        fun-pointer-lowtag))))))
+;;; Invoke the function-designator FUN. If DESIGNATOR-P is true, FUN might be
+;;; a symbol; if DESIGNATOR-P is false, FUN is definitely a function.
+;;;
+;;; Note: DESIGNATOR-P used to be named CALLABLE. They're both imperfect.
+;;; While it's true that the noun CALLABLE is synonymous with function-designator,
+;;; the former had a strange connotation of (NOT CALLABLE) counterintuitively
+;;; implying that the FUN *is* directly callable, being strictly a function,
+;;; with "callable" parsed in its adjectival sense.
+;;; Also problematic would be NOT-FUNCTIONP since FUN might satisfy FUNCTIONP.
+;;; A pedantically correct change would be to invert the boolean as supplied,
+;;; and name it DEFINITELY-FUNCTIONP, or name it just FUNCTIONP with the
+;;; notion that T means T and NIL means possibly.
+;;; However, we might really want three values: yes, no, and maybe.
+;;; Because as things are, the definitely-NOT-function case goes through
+;;; the "maybe" path even though it _must_ coerce to a function:
+;;;
+;;; * (disassemble '(lambda (f) (funcall (the symbol f) 42)))
+;;;  3F:       8D58F5           LEA EBX, [RAX-11]
+;;;  42:       F6C30F           TEST BL, 15
+;;;  45:       7503             JNE L1
+;;;  47:       FF60FD           JMP QWORD PTR [RAX-3]
+;;;  4A: L1:   FF242570000020   JMP QWORD PTR [#x20000070]       ; TAIL-CALL-SYMBOL
 
-(defun call-unnamed (fun callable vop)
-  (cond (callable
-         (assemble ()
-           (%lea-for-lowtag-test ebx-tn fun fun-pointer-lowtag)
-           (inst test bl-tn lowtag-mask)
-           (inst jmp :z call)
-           (invoke-asm-routine 'call 'call-symbol
-                               vop rbx-tn)
-           call
-           (inst call (make-ea :qword :base fun
-                                      :disp (- (* closure-fun-slot n-word-bytes)
-                                               fun-pointer-lowtag)))))
-        (t
-         (inst call
-               (make-ea :qword :base fun
-                               :disp (- (* closure-fun-slot n-word-bytes)
-                                        fun-pointer-lowtag))))))
+(defun tail-call-unnamed (fun designator-p vop)
+  (let ((relative-call (sb!c::code-immobile-p vop))
+        (fun-ea (make-ea :qword :base fun
+                         :disp (- (* closure-fun-slot n-word-bytes)
+                                  fun-pointer-lowtag))))
+    (if designator-p
+        (assemble ()
+          (%lea-for-lowtag-test ebx-tn fun fun-pointer-lowtag)
+          (inst test bl-tn lowtag-mask)
+          (inst jmp :nz (if relative-call
+                            (make-fixup 'tail-call-symbol :assembly-routine)
+                            not-fun))
+          (inst jmp fun-ea)
+          not-fun
+          (unless relative-call
+            (invoke-asm-routine 'jmp 'tail-call-symbol vop)))
+        (inst jmp fun-ea))))
 
+(defun call-unnamed (fun designator-p vop)
+  (assemble ()
+    (when designator-p
+      (%lea-for-lowtag-test ebx-tn fun fun-pointer-lowtag)
+      (inst test bl-tn lowtag-mask)
+      (inst jmp :z call)
+      (invoke-asm-routine 'call 'call-symbol vop))
+    call
+    (inst call (make-ea :qword :base fun
+                        :disp (- (* closure-fun-slot n-word-bytes)
+                                 fun-pointer-lowtag)))))
 
 ;;; This is defined separately, since it needs special code that BLT's
 ;;; the arguments down. All the real work is done in the assembly
