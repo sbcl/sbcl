@@ -828,7 +828,7 @@
                                    (:start index)
                                    (:end sequence-end))
   sequence
-  ()
+  (recursive)
   :derive-type #'result-type-first-arg)
 
 ;;;; from the "Manipulating List Structure" chapter:
