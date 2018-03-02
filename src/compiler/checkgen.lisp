@@ -453,13 +453,20 @@
 (defun make-type-check-form (types &optional context)
   (let ((temps (make-gensym-list (length types))))
     `(multiple-value-bind ,temps 'dummy
-       ,@(mapcar (lambda (temp type)
-                   (let* ((spec
-                            (let ((*unparse-fun-type-simplify* t))
-                              (type-specifier (second type))))
-                          (test (if (first type) `(not ,spec) spec)))
-                     `(unless (typep ,temp ',test)
-                        ,(internal-type-error-call temp (third type) context))))
+       ,@(mapcar (lambda (temp %type)
+                   (destructuring-bind (not type-to-check
+                                        type-to-report) %type
+                    (let* ((spec
+                             (let ((*unparse-fun-type-simplify* t))
+                               (type-specifier type-to-check)))
+                           (test (if not `(not ,spec) spec)))
+                      `(unless (typep ,temp ',test)
+                         ,(internal-type-error-call temp
+                                                    (if (fun-designator-type-p type-to-report)
+                                                        ;; Simplify
+                                                        (specifier-type 'callable)
+                                                        type-to-report)
+                                                    context)))))
                  temps
                  types)
        (values ,@temps))))
