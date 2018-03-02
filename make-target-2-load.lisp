@@ -122,7 +122,7 @@
 
   ;; Unintern no-longer-needed stuff before the possible PURIFY in
   ;; SAVE-LISP-AND-DIE.
-  #-sb-fluid (!unintern-init-only-stuff)
+  #-(or sb-fluid sb-devel) (!unintern-init-only-stuff)
 
   ;; Mark interned immobile symbols so that COMPILE-FILE knows
   ;; which symbols will always be physically in immobile space.
