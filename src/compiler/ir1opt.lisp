@@ -2246,8 +2246,12 @@
         (value (cast-value cast)))
     (cond ((not (may-delete-cast cast))
            nil)
-          ((values-subtypep (lvar-derived-type value)
-                            (cast-asserted-type cast))
+          ((or
+            ;; If it's a call (decided by may-delete-cast), it'll do
+            ;; all the aproriate checking
+            (function-designator-cast-p cast)
+            (values-subtypep (lvar-derived-type value)
+                             (cast-asserted-type cast)))
            (delete-cast cast)
            t)
           ((and (listp (lvar-uses value))
