@@ -4134,21 +4134,25 @@
           ((= nargs 1) `(progn (the ,type ,@args) t))
           ((= nargs 2)
            `(if (,predicate ,(first args) ,(second args)) nil t))
-          ((not (policy *lexenv*
+          ((or (> (length args) 50)
+               (not (policy *lexenv*
                         (and (>= speed space)
-                             (>= speed compilation-speed))))
+                             (>= speed compilation-speed)))))
            (values nil t))
           (t
            (let ((vars (make-gensym-list nargs)))
-             (do ((var vars next)
-                  (next (cdr vars) (cdr next))
-                  (result t))
-                 ((null next)
-                  `((lambda ,vars (declare (type ,type ,@vars)) ,result)
-                    ,@args))
-               (let ((v1 (first var)))
-                 (dolist (v2 next)
-                   (setq result `(if (,predicate ,v1 ,v2) nil ,result))))))))))
+             `((lambda ,vars
+                 (declare (type ,type ,@vars))
+                 (block nil
+                   (tagbody
+                      ,@(loop for (var . rest) on vars
+                              nconc (loop for var2 in rest
+                                          collect `(if (,predicate ,var ,var2)
+                                                       (go return-nil))))
+                      (return-from nil t)
+                    return-nil
+                      (return-from nil nil))))
+               ,@args))))))
 
 (define-source-transform /= (&rest args)
   (multi-not-equal '= args 'number))
