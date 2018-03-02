@@ -3292,18 +3292,21 @@ used for a COMPLEX component.~:@>"
   ;; implemented in terms of subtypep.
   ;;
   ;; Ouch. - CSR, 2002-04-10
-  (multiple-value-bind (sub-value sub-certain?)
-      (type= type1
-             (apply #'type-union
-                    (mapcar (lambda (x) (type-intersection type1 x))
-                            (union-type-types type2))))
-    (if sub-certain?
-        (values sub-value sub-certain?)
-        ;; The ANY/TYPE expression above is a sufficient condition for
-        ;; subsetness, but not a necessary one, so we might get a more
-        ;; certain answer by this CALL-NEXT-METHOD-ish step when the
-        ;; ANY/TYPE expression is uncertain.
-        (invoke-complex-subtypep-arg1-method type1 type2))))
+  (cond ((fun-designator-type-p type1)
+         (type= type2 (specifier-type 'callable)))
+        (t
+         (multiple-value-bind (sub-value sub-certain?)
+             (type= type1
+                    (apply #'type-union
+                           (mapcar (lambda (x) (type-intersection type1 x))
+                                   (union-type-types type2))))
+           (if sub-certain?
+               (values sub-value sub-certain?)
+               ;; The ANY/TYPE expression above is a sufficient condition for
+               ;; subsetness, but not a necessary one, so we might get a more
+               ;; certain answer by this CALL-NEXT-METHOD-ish step when the
+               ;; ANY/TYPE expression is uncertain.
+               (invoke-complex-subtypep-arg1-method type1 type2))))))
 
 (!define-type-method (union :complex-subtypep-arg2) (type1 type2)
   (union-complex-subtypep-arg2 type1 type2))
