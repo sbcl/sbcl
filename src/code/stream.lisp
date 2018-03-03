@@ -789,6 +789,8 @@
      (force-output stream))
     (:finish-output
      (finish-output stream))
+    (:clear-output
+     (clear-output stream))
     (:element-type
      (stream-element-type stream))
     (:element-mode
