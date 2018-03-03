@@ -342,14 +342,19 @@
 the child process in the parent. Forking while multiple threads are running is
 not supported."
     (tagbody
-       (sb-thread::with-all-threads-lock
-         (when (cdr sb-thread::*all-threads*)
-           (go :error))
-         (let ((pid (posix-fork)))
-           #+darwin
-           (when (= pid 0)
-             (darwin-reinit))
-           (return-from fork pid)))
+       (let ()
+         #+sb-thread
+         (sb-impl::finalizer-thread-stop)
+         (sb-thread::with-all-threads-lock
+           (when (cdr sb-thread::*all-threads*)
+             (go :error))
+           (let ((pid (posix-fork)))
+             #+darwin
+             (when (= pid 0)
+               (darwin-reinit))
+             #+sb-thread
+             (setf sb-impl::*finalizer-thread* t)
+             (return-from fork pid))))
      :error
        (error "Cannot fork with multiple threads running.")))
   (export 'fork :sb-posix)
