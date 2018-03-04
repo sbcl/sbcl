@@ -39,13 +39,13 @@
 
 #ifdef POSITION_INDEPENDENT_ASM
 #define PIC_CALL(x) x@PLT
-#define PIC_VAR(x,dest) mov GNAME(x)@GOTPCREL(%rip), dest ; mov (dest), dest
+#define LOAD_PIC_VAR(x,dest) mov GNAME(x)@GOTPCREL(%rip), dest ; mov (dest), dest
 #else
 #define PIC_CALL(x) x
 #ifdef LISP_FEATURE_DARWIN
-#define PIC_VAR(x,dest) mov GNAME(x)(%rip), dest
+#define LOAD_PIC_VAR(x,dest) mov GNAME(x)(%rip), dest
 #else
-#define PIC_VAR(x,dest) mov GNAME(x), dest
+#define LOAD_PIC_VAR(x,dest) mov GNAME(x), dest
 #endif
 #endif
 
@@ -94,6 +94,7 @@
 #define TRAP int3
 #endif
 
+#define THREAD_BASE_REG %r12
         
 	.text	
 	.globl  GNAME(call_into_lisp_first_time)
@@ -112,7 +113,7 @@ GNAME(call_into_lisp_first_time):
         movq	__msan_param_tls@GOTTPOFF(%rip), %rax
         movq	%rax, (SYMBOL_VALUE_OFFSET+MSAN_PARAM_TLS)
 #endif
-	PIC_VAR	(all_threads, %rax)
+	LOAD_PIC_VAR(all_threads, %rax)
 	mov     THREAD_CONTROL_STACK_END_OFFSET(%rax) ,%rsp
 	jmp     Lstack
 
@@ -156,17 +157,17 @@ Lstack:
 	push	%rdx	#
 #ifdef LISP_FEATURE_SB_THREAD
 #ifdef LISP_FEATURE_GCC_TLS
-	movq	GNAME(current_thread)@GOTTPOFF(%rip), %r12
-	movq	%fs:(%r12), %r12
+	movq	GNAME(current_thread)@GOTTPOFF(%rip), THREAD_BASE_REG
+	movq	%fs:(THREAD_BASE_REG), THREAD_BASE_REG
 #else
-	PIC_VAR (specials, %rdi)
+	LOAD_PIC_VAR(specials, %rdi)
 	call    PIC_CALL(GNAME(pthread_getspecific))
-	mov	%rax,%r12
+	mov	%rax, THREAD_BASE_REG
 #endif
 #elif defined(LISP_FEATURE_SB_SAFEPOINT)
         /* We need this to find the CSP trap page.  This does no harm,
-	 * as the compiler doesn't use R12 on non-threaded builds. */
-        PIC_VAR	(all_threads,%r12)
+	 * as the compiler doesn't use THREAD_BASE_REG on non-threaded builds. */
+        LOAD_PIC_VAR(all_threads, THREAD_BASE_REG)
 #endif
 	pop	%rcx	# num args
 	pop	%rbx	# arg vector
@@ -251,7 +252,7 @@ GNAME(funcall_alien_callback):
 	push	%r14    #
 	push	%r15    #
 
-        mov     %rcx,%r12
+        mov     %rcx, THREAD_BASE_REG
         mov     $(3 << N_FIXNUM_TAG_BITS),%rcx
 
 	/* Alloc new frame. */
@@ -396,7 +397,7 @@ GNAME(arch_scrub_control_stack):
 	 * guard page upper bound in R8, and our hard guard
 	 * page upper bound in R9. */
 	lea	-8(%rsp), %rax
-	PIC_VAR(os_vm_page_size, %r9)
+	LOAD_PIC_VAR(os_vm_page_size, %r9)
 	lea	(%rsi,%r9), %r8
 	lea	(%rdx,%r9), %r9
 
