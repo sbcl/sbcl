@@ -38,7 +38,7 @@
 
 ;;; the different policies we can use to determine the coding strategy
 (deftype ltn-policy ()
-  '(member :safe :small :fast :fast-safe))
+  '(member :safe :small :small-safe :fast :fast-safe))
 
 ;;;; PRIMITIVE-TYPEs
 

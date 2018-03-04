@@ -1526,7 +1526,7 @@
 ;;;     This option causes the VOP template to be entered as an IR2
 ;;;     translation for the named functions.
 ;;;
-;;; :POLICY {:SMALL | :FAST | :SAFE | :FAST-SAFE}
+;;; :POLICY {:SMALL | :SMALL-SAFE | :FAST | :SAFE | :FAST-SAFE}
 ;;;     Specifies the policy under which this VOP is the best translation.
 ;;;
 ;;; :GUARD Form
