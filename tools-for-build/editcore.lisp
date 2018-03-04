@@ -292,19 +292,20 @@
 
 (defun compute-linkage-symbols (spaces entry-size)
   (let* ((hashtable (symbol-global-value
-                     (find-target-symbol "SB-SYS" "*LINKAGE-INFO*" spaces
-                                         :physical)))
+                     (find-target-symbol "SB-SYS" "*LINKAGE-INFO*"
+                                         spaces :physical)))
          (pairs (target-hash-table-alist hashtable spaces))
          (min (reduce #'min pairs :key #'cdr))
          (max (reduce #'max pairs :key #'cdr))
          (n (1+ (/ (- max min) entry-size)))
          (vector (make-array n)))
     (dolist (entry pairs vector)
-      (let ((key (car entry))
-            (entry-index (/ (- (cdr entry) min) entry-size)))
+      (let* ((key (car entry))
+             (entry-index (/ (- (cdr entry) min) entry-size))
+             (string (translate (if (consp key) (car (translate key spaces)) key)
+                                spaces)))
         (setf (aref vector entry-index)
-              (translate (if (consp key) (car (translate key spaces)) key)
-                         spaces))))))
+              (if (consp key) (list string) string))))))
 
 (defun make-core (spaces code-bounds fixedobj-bounds)
   (let* ((linkage-bounds
@@ -595,24 +596,38 @@
  .globl __lisp_code_start, __lisp_code_end~% .balign 4096~%__lisp_code_start:~%")
 
     ;; Scan the assembly routines.
-    (let ((code-component (make-code-obj code-addr)))
+    (let* ((code-component (make-code-obj code-addr))
+           (header-len (code-header-words code-component)))
       ;; Write the code component header
       (emit-asm-directives :qword
                            (int-sap (- (get-lisp-obj-address code-component)
                                        sb-vm:other-pointer-lowtag))
-                           (code-header-words code-component)
-                           output #())
+                           header-len output #())
       (let ((name->addr
              ;; the CDR of each alist item is a target cons (needing translation)
-             (mapcar (lambda (entry &aux (cdr (translate (cdr entry) spaces)))
-                       (list* (translate (symbol-name (translate (car entry) spaces))
-                                         spaces)
-                              (car cdr) (cdr cdr)))
-                     (target-hash-table-alist
-                      (car (translate (%code-debug-info code-component) spaces))
-                      spaces))))
+             (sort
+              (mapcar (lambda (entry &aux (name (translate (car entry) spaces)) ; symbol
+                                          ;; VAL is (start end . index)
+                                          (val (translate (cdr entry) spaces))
+                                          (start (car val))
+                                          (end (car (translate (cdr val) spaces))))
+                        (list* (translate (symbol-name name) spaces) start end))
+                      (target-hash-table-alist
+                       (car (translate (%code-debug-info code-component) spaces))
+                       spaces))
+              #'< :key #'cadr)))
+        (let* ((n-entrypoints (length name->addr))
+               (min-entry-offs (cadar name->addr))
+               (n-words (/ min-entry-offs sb-vm:n-word-bytes)))
+          ;; Write a table of N-WORDS in length containing the entrypoints
+          ;; Not all words in the jump table will necessarily be used.
+          (dotimes (i n-words)
+            (format output " .quad ~:[0~;__lisp_code_start+0x~:*~x~]~%"
+                    (when (< i n-entrypoints)
+                      (+ (ash header-len sb-vm:word-shift)
+                         (cadr (nth i name->addr)))))))
         ;; Loop over the embedded routines
-        (dolist (entry (sort name->addr #'< :key #'cadr))
+        (dolist (entry name->addr)
           (destructuring-bind (name start-offs . end-offs) entry
             (let ((nbytes (- (1+ end-offs) start-offs)))
               (format output " .set ~a, .~%~@[ .size ~:*~a, ~d~%~]"
@@ -1321,16 +1336,24 @@
           (format asm-file "#ifdef MEMORY_SANITIZER
 #define malloc malloc_unpoisoned
 #endif~%")
-          (let ((core (write-assembler-text map asm-file emit-sizes)))
+          (let ((core (write-assembler-text map asm-file emit-sizes))
+                (emit-all-c-symbols t))
             ;; There's no relation between emit-sizes and which section to put
             ;; C symbol references in, however it's a safe bet that if sizes
             ;; are supported then so is the .rodata directive.
-            (terpri asm-file)
-            (format asm-file (if emit-sizes " .rodata~%" " .data~%"))
+            (format asm-file (if emit-sizes "~% .rodata~%" "~% .data~%"))
+            (format asm-file " .globl ~A~%~:*~A:
+ .quad ~d # ct~%"
+                    "__lisp_linkage_values"
+                    (length (core-linkage-symbols core)))
+            ;; -1 (not a plausible function address) signifies that word
+            ;; following it is a data, not text, reference.
             (loop for s across (core-linkage-symbols core)
                   for bit across (core-linkage-symbol-usedp core)
-                  unless (eql bit 1)
-                  do (format asm-file " .long ~a~%" s)))))
+                  when (or emit-all-c-symbols (eql bit 0))
+                  do (format asm-file " .quad ~:[~;-1, ~]~a~%"
+                             (consp s)
+                             (if (consp s) (car s) s))))))
 
       (format asm-file "~% ~A~%" +noexec-stack-note+))))
 
