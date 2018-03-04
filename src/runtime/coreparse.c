@@ -82,8 +82,10 @@ open_binary(char *filename, int mode)
 #if defined(LISP_FEATURE_LINUX) && defined(LISP_FEATURE_IMMOBILE_CODE)
 #define ELFCORE 1
 extern __attribute__((weak)) lispobj __lisp_code_start, __lisp_code_end;
+static inline boolean code_in_elf() { return &__lisp_code_start != 0; }
 #else
 #define ELFCORE 0
+static inline boolean code_in_elf() { return 0; }
 #endif
 
 /* Search 'filename' for an embedded core.  An SBCL core has, at the
@@ -636,12 +638,10 @@ static void relocate_heap(struct heap_adjust* adj)
     lispobj* jump_table = (lispobj*)code + code_header_words(code->header);
     for ( ; *jump_table ; ++jump_table )
         adjust_word_at(jump_table, adj);
-#if ELFCORE
     // Pointers within varyobj space to varyobj space do not need adjustment
     // so remove any delta before performing the relocation pass on this space.
-    if (&__lisp_code_start)
-        adj->range[2].delta = 0;
-#endif
+    if (code_in_elf())
+        adj->range[2].delta = 0; // FIXME: isn't this this already the case?
     relocate_space(VARYOBJ_SPACE_START, varyobj_free_pointer, adj);
 #endif
 }
@@ -878,8 +878,12 @@ process_directory(int count, struct ndir_entry *entry,
                    spaces[DYNAMIC_CORE_SPACE_ID].base, // expected
                    spaces[DYNAMIC_CORE_SPACE_ID].len);
 #  endif // LISP_FEATURE_GENCGC
-    if (adj->range[0].delta | adj->range[1].delta | adj->range[2].delta)
+    if (adj->range[0].delta | adj->range[1].delta | adj->range[2].delta) {
+        if (adj->range[1].delta && code_in_elf())
+            lose("Relocation of fixedobj space not supported with ELF core.\n\
+Please report this as a bug");
         relocate_heap(adj);
+    }
 #endif
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE

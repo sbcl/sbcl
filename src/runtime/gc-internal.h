@@ -212,6 +212,9 @@ extern lispobj fdefn_callee_lispobj(struct fdefn *fdefn);
 
 static inline lispobj fdefn_callee_lispobj(struct fdefn *fdefn) {
     extern unsigned int asm_routines_end;
+    // FIXME: This test is completely bogus.
+    // The low byte of raw_addr is the jump opcode 0xE9,
+    // and the rest of the bytes are not an absolute address.
     return (lispobj)fdefn->raw_addr -
       ((uword_t)fdefn->raw_addr < (uword_t)asm_routines_end ? 0 : FUN_RAW_ADDR_OFFSET);
 }
