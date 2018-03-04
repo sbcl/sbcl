@@ -1753,7 +1753,22 @@
               (fun-code-header code-component)
               code-component))
          (dstate (make-dstate))
-         (segments (get-code-segments code-component)))
+         (segments
+          (if (eq code-component sb!fasl::*assembler-routines*)
+              (collect ((segs))
+                (dohash ((name locs) (car (%code-debug-info code-component)))
+                  (destructuring-bind (start end . index) locs
+                    (declare (ignore index))
+                    (let ((seg (make-code-segment
+                                code-component start (- (1+ end) start))))
+                      (push (make-offs-hook :offset 0
+                                            :fun (lambda (stream dstate)
+                                                   (declare (ignore stream))
+                                                   (note (string name) dstate)))
+                            (seg-hooks seg))
+                      (segs seg))))
+                (sort (segs) #'< :key #'seg-virtual-location))
+              (get-code-segments code-component))))
     (when use-labels
       (label-segments segments dstate))
     (disassemble-segments segments stream dstate)))
