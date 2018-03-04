@@ -909,41 +909,6 @@
       (setf *disassem-inst-space* ispace))
     ispace))
 
-;;;; Add global hooks.
-
-(defun add-offs-hook (segment addr hook)
-  (let ((entry (cons addr hook)))
-    (if (null (seg-hooks segment))
-        (setf (seg-hooks segment) (list entry))
-        (push entry (cdr (last (seg-hooks segment)))))))
-
-(defun add-offs-note-hook (segment addr note)
-  (add-offs-hook segment
-                 addr
-                 (lambda (stream dstate)
-                   (declare (type (or null stream) stream)
-                            (type disassem-state dstate))
-                   (when stream
-                     (note note dstate)))))
-
-(defun add-offs-comment-hook (segment addr comment)
-  (add-offs-hook segment
-                 addr
-                 (lambda (stream dstate)
-                   (declare (type (or null stream) stream)
-                            (ignore dstate))
-                   (when stream
-                     (write-string ";;; " stream)
-                     (etypecase comment
-                       (string
-                        (write-string comment stream))
-                       (function
-                        (funcall comment stream)))
-                     (terpri stream)))))
-
-(defun add-fun-hook (dstate function)
-  (push function (dstate-fun-hooks dstate)))
-
 (defun set-location-printing-range (dstate from length)
   (setf (dstate-addr-print-len dstate) ; in characters
         ;; 4 bits per hex digit
