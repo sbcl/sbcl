@@ -830,14 +830,7 @@ core and return a descriptor to it."
     (dotimes (index size result)
       (write-wordindexed result (+ index sb!vm:vector-data-offset)
                          (pop objects)))))
-#!+x86
-(defun ub32-vector-in-core (objects)
-  (let* ((size (length objects))
-         (result (allocate-vector-object *dynamic* sb!vm:n-word-bits size
-                                         sb!vm:simple-array-unsigned-byte-32-widetag)))
-    (dotimes (index size result)
-      (write-wordindexed/raw result (+ index sb!vm:vector-data-offset)
-                             (pop objects)))))
+
 (defun cold-svset (vector index value)
   (let ((i (if (integerp index) index (descriptor-fixnum index))))
     (write-wordindexed vector (+ i sb!vm:vector-data-offset) value)))
