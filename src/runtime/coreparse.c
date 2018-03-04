@@ -272,6 +272,14 @@ struct heap_adjust {
     int n_relocs_rel; // relative
 };
 
+static inline struct code* get_asm_routine_code_component() {
+#ifdef LISP_FEATURE_IMMOBILE_CODE
+    return (struct code*)VARYOBJ_SPACE_START;
+#else
+    return (struct code*)READ_ONLY_SPACE_START;
+#endif
+}
+
 #ifndef LISP_FEATURE_RELOCATABLE_HEAP
 #define adjust_word(ignore,thing) thing
 #define relocate_heap(ignore)
@@ -594,14 +602,6 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
 #if SHOW_SPACE_RELOCATION
     fprintf(stderr, "space @ %p: fixed %d absolute + %d relative pointers\n",
             (lispobj*)start, adj->n_relocs_abs, adj->n_relocs_rel);
-#endif
-}
-
-static inline struct code* get_asm_routine_code_component() {
-#ifdef LISP_FEATURE_IMMOBILE_CODE
-    return (struct code*)VARYOBJ_SPACE_START;
-#else
-    return (struct code*)READ_ONLY_SPACE_START;
 #endif
 }
 
