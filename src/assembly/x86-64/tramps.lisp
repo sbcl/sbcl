@@ -45,8 +45,8 @@
             (map-floats push)
             (map-registers push)
             (inst mov rdi-tn (make-ea :qword :base rbp-tn :disp 16))
-            (inst mov rax-tn (make-fixup "alloc" :foreign))
-            (inst call rax-tn)
+            ;; asm routines can always call foreign code with a relative operand
+            (inst call (make-fixup "alloc" :foreign))
             ,@move-result
             (map-registers pop)
             (map-floats pop)
