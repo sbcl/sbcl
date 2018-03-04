@@ -285,3 +285,10 @@
                           (%f :a)
                           (%f :b)))
                       :allow-warnings t))))
+
+(with-test (:name :complex-number)
+  (checked-compile-and-assert
+   ()
+   '(lambda (x)
+     (typep 1 x))
+   (('(complex number)) (condition 'error))))

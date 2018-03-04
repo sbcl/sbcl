@@ -2051,7 +2051,7 @@
                (complex1 (component-type)
                  (unless (numeric-type-p component-type)
                    (not-numeric))
-                 (when (eq (numeric-type-complexp component-type) :complex)
+                 (unless (eq (numeric-type-complexp component-type) :real)
                    (not-real))
                  (if (csubtypep component-type (specifier-type '(eql 0)))
                      *empty-type*
