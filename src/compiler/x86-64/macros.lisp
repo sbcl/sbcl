@@ -89,13 +89,18 @@
                      (ash symbol-value-slot word-shift)
                      (- other-pointer-lowtag))))
 
+(defun thread-tls-ea (index &optional (size :qword))
+  (if (tn-p index)
+      (make-ea size :base thread-base-tn :index index)
+      (make-ea size :base thread-base-tn :disp index)))
+
 #!+sb-thread
 (progn
   ;; Return an EA for the TLS of SYMBOL, or die.
   (defun symbol-known-tls-cell (symbol)
     (let ((index (info :variable :wired-tls symbol)))
       (aver (integerp index))
-      (make-ea :qword :base thread-base-tn :disp index)))
+      (thread-tls-ea index)))
 
   ;; LOAD/STORE-TL-SYMBOL-VALUE macros are ad-hoc (ugly) emulations
   ;; of (INFO :VARIABLE :WIRED-TLS) = :ALWAYS-THREAD-LOCAL
@@ -192,9 +197,7 @@
 ;;; pa section.
 #!+sb-thread
 (defmacro %clear-pseudo-atomic ()
-  '(inst mov (make-ea :qword :base thread-base-tn
-              :disp (* n-word-bytes thread-pseudo-atomic-bits-slot))
-    0))
+  '(inst mov (thread-tls-ea (* n-word-bytes thread-pseudo-atomic-bits-slot)) 0))
 
 #!+sb-safepoint
 (defun emit-safepoint ()
@@ -210,9 +213,7 @@
     `(let ((,label (gen-label))
            (,pa-bits-ea
             #!+sb-thread
-            (make-ea :qword
-                     :base thread-base-tn
-                     :disp (* n-word-bytes thread-pseudo-atomic-bits-slot))
+            (thread-tls-ea (* n-word-bytes thread-pseudo-atomic-bits-slot))
             #!-sb-thread
             (make-ea :qword
                      :disp (+ nil-value

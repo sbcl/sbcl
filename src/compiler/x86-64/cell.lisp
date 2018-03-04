@@ -127,10 +127,7 @@
                       no-tls-value-marker-widetag)
                 (inst cmov :e cell symbol))) ; now possibly get the symbol
            (access-wired-tls-val (sym) ; SYM is a symbol
-             `(make-ea :qword :disp (load-time-tls-offset ,sym)
-                       :base thread-base-tn))
-           (access-tls-val (index size)
-             `(make-ea ,size :base thread-base-tn :index ,index :scale 1))
+             `(thread-tls-ea (load-time-tls-offset ,sym)))
            (access-value-slot (sym &optional (size :qword)) ; SYM is a TN
              (ecase size
                (:dword `(make-ea-for-object-slot-half
@@ -230,17 +227,17 @@
                      ;; slot index 1/2 is the high half of the header word.
                      (symbol-slot-ea known-symbol 1/2 :dword))
                ;; read the TLS value using that index
-               (inst mov value (access-tls-val value :qword)))
+               (inst mov value (thread-tls-ea value :qword)))
                (constant
 
                ;; These reads are inextricably data-dependent
                (inst mov symbol-reg symbol) ; = MOV REG, [RIP-N]
                (inst mov (reg-in-size value :dword) (tls-index-of symbol-reg))
-               (inst mov value (access-tls-val value :qword)))))
+               (inst mov value (thread-tls-ea value :qword)))))
 
             (t ; SYMBOL-VALUE of a random symbol
              (inst mov (reg-in-size symbol-reg :dword) (tls-index-of symbol))
-             (inst mov value (access-tls-val symbol-reg :qword))
+             (inst mov value (thread-tls-ea symbol-reg :qword))
              (setq symbol-reg symbol)))
 
           ;; Load the global value if the TLS value didn't exist
@@ -305,7 +302,7 @@
       (:temporary (:sc dword-reg) temp)
       (:generator 9
         (inst mov temp (tls-index-of object))
-        (inst mov temp (access-tls-val temp :dword))
+        (inst mov temp (thread-tls-ea temp :dword))
         (inst cmp temp no-tls-value-marker-widetag)
         (inst cmov :e temp (access-value-slot object :dword))
         (inst cmp temp unbound-marker-widetag))))
@@ -437,10 +434,10 @@
     (inst mov tls-index symbol)
     (invoke-asm-routine 'call 'alloc-tls-index vop tmp)
     TLS-INDEX-VALID
-    (inst mov tmp (make-ea :qword :base thread-base-tn :index tls-index))
+    (inst mov tmp (thread-tls-ea tls-index))
     (storew tmp bsp (- binding-value-slot binding-size))
     (storew tls-index bsp (- binding-symbol-slot binding-size))
-    (inst mov (make-ea :qword :base thread-base-tn :index tls-index) val)))
+    (inst mov (thread-tls-ea tls-index) val)))
 
 (define-vop (bind) ; bind a known symbol
   (:args (val :scs (any-reg descriptor-reg)))
@@ -449,11 +446,10 @@
   (:generator 10
     (inst mov bsp (* binding-size n-word-bytes))
     (inst xadd
-          (make-ea :qword :base thread-base-tn
-                   :disp (ash thread-binding-stack-pointer-slot word-shift))
+          (thread-tls-ea (ash thread-binding-stack-pointer-slot word-shift))
           bsp)
     (let* ((tls-index (load-time-tls-offset symbol))
-           (tls-cell (make-ea :qword :base thread-base-tn :disp tls-index)))
+           (tls-cell (thread-tls-ea tls-index)))
       ;; Too bad we can't use "XCHG [r12+disp], val" to write the new value
       ;; and read the old value in one step. It will violate the constraints
       ;; prescribed in the internal documentation on special binding.
@@ -489,7 +485,7 @@
     (inst xorpd zero zero)
     (loop for symbol in symbols
           for tls-index = (load-time-tls-offset symbol)
-          for tls-cell = (make-ea :qword :base thread-base-tn :disp tls-index)
+          for tls-cell = (thread-tls-ea tls-index)
           do
           (inst sub bsp (* binding-size n-word-bytes))
 
@@ -540,8 +536,7 @@
     #!-sb-thread
     (storew value symbol symbol-value-slot other-pointer-lowtag)
     #!+sb-thread
-    (inst mov (make-ea :qword :base thread-base-tn :index symbol)
-          value)
+    (inst mov (thread-tls-ea symbol) value)
 
     SKIP
     (inst movapd (make-ea :qword :base bsp) zero)

@@ -460,7 +460,7 @@
 ;; A register that's never used by the code generator, and can therefore
 ;; be used as an assembly temporary in cases where a VOP :TEMPORARY can't
 ;; be used.
-(defglobal temp-reg-tn r11-tn)
+(define-symbol-macro temp-reg-tn r11-tn)
 
 ;;; TNs for registers used to pass arguments
 ;;; This can't be a DEFCONSTANT-EQX, for a similar reason to above, but worse.
@@ -473,7 +473,7 @@
             (symbol-value (symbolicate register-arg-name "-TN")))
           *register-arg-names*))
 
-(defglobal thread-base-tn r12-tn)
+(define-symbol-macro thread-base-tn r12-tn)
 
 ;;; If value can be represented as an immediate constant, then return
 ;;; the appropriate SC number, otherwise return NIL.

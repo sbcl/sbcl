@@ -325,7 +325,7 @@
   (:arg-types (:constant unsigned-byte))
   (:policy :fast-safe)
   (:generator 1
-    (inst mov sap (make-ea :qword :base thread-base-tn :disp (ash n 3)))))
+    (inst mov sap (thread-tls-ea (ash n 3)))))
 (define-vop (current-thread-offset-sap)
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)

@@ -1432,10 +1432,7 @@
   ;; register on -SB-THREAD. While this isn't critical for x86-64,
   ;; it's more serious for x86.
   #!+sb-thread
-  (inst cmp (make-ea :qword
-                     :base thread-base-tn
-                     :disp (* thread-stepping-slot n-word-bytes))
-        0)
+  (inst cmp (thread-tls-ea (* thread-stepping-slot n-word-bytes)) 0)
   #!-sb-thread
   (inst cmp (make-ea :byte
                      :disp (+ nil-value (static-symbol-offset
