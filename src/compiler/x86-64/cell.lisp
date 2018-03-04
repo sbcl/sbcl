@@ -450,7 +450,7 @@
           bsp)
     (let* ((tls-index (load-time-tls-offset symbol))
            (tls-cell (thread-tls-ea tls-index)))
-      ;; Too bad we can't use "XCHG [r12+disp], val" to write the new value
+      ;; Too bad we can't use "XCHG [thread + disp], val" to write new value
       ;; and read the old value in one step. It will violate the constraints
       ;; prescribed in the internal documentation on special binding.
       (inst mov tmp tls-cell)

@@ -61,15 +61,15 @@
 
 (with-test (:name :symeval-known-tls-index :skipped-on :immobile-symbols)
   ;; When symbol SC is IMMEDIATE:
-  ;;    498B942478210000   MOV RDX, [R12+8568]       ; tls: *PRINT-BASE*
+  ;;    498B9578210000     MOV RDX, [R13+disp]       ; tls: *PRINT-BASE*
   ;;    83FA61             CMP EDX, 97
   ;;    480F44142538F94B20 CMOVEQ RDX, [#x204BF938]  ; *PRINT-BASE*
   ;; (TODO: could use "CMOVEQ RDX, [RIP-n]" in immobile code)
   (assert (= (length (disasm 0 '*print-base*)) 3))
 
   ;; When symbol SC is CONSTANT:
-  ;;    498B942478290000   MOV RDX, [R12+10616]        ; tls: FOO
-  ;;    488B05A4FFFFFF     MOV RAX, [RIP-92]           ; 'FOO
+  ;;    498B9578290000     MOV RDX, [R13+disp]       ; tls: FOO
+  ;;    488B059EFFFFFF     MOV RAX, [RIP-98]         ; 'FOO
   ;;    83FA61             CMP EDX, 97
   ;;    480F4450F9         CMOVEQ RDX, [RAX-7]
   (assert (= (length (disasm 0 'foo)) 4)))
@@ -82,7 +82,7 @@
 (with-test (:name :symeval-unknown-tls-index :skipped-on :immobile-symbols)
   ;; When symbol SC is immediate:
   ;;    8B142514A24C20     MOV EDX, [#x204CA214]    ; tls_index: *BLUB*
-  ;;    498B1414           MOV RDX, [R12+RDX]
+  ;;    4A8B142A           MOV RDX, [RDX+R13]
   ;;    83FA61             CMP EDX, 97
   ;;    480F44142518A24C20 CMOVEQ RDX, [#x204CA218] ; *BLUB*
   ;; (TODO: could use "CMOVEQ RDX, [RIP-n]" in immobile code)
@@ -91,7 +91,7 @@
   ;; When symbol SC is constant:
   ;;    488B05B3FFFFFF     MOV RAX, [RIP-77]          ; 'BLUB"
   ;;    8B50F5             MOV EDX, [RAX-11]
-  ;;    498B1414           MOV RDX, [R12+RDX]
+  ;;    4A8B142A           MOV RDX, [RDX+R13]
   ;;    83FA61             CMP EDX, 97
   ;;    480F4450F9         CMOVEQ RDX, [RAX-7]
   (assert (= (length (disasm 0 'blub)) 5)))

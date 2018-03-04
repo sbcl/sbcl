@@ -65,9 +65,6 @@
 
   #!+(and (not sb-thread) sb-dynamic-core)
   ;; We'd need a spare reg in which to load boxed_region from the linkage table.
-  ;; Probably could use r12 since it's reserved for the thread base,
-  ;; but that seems like the wrong answer, because r12 should be available
-  ;; to the register allocator when not using it as the thread base.
   ;; Could push/pop any random register on the stack and own it temporarily,
   ;; but seeing as nobody cared about this, just punt.
   (allocation-tramp node alloc-tn size lowtag)

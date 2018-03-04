@@ -72,7 +72,7 @@
   (defreg r15b 30 :byte)
   (defregset *byte-regs*
       al cl dl bl sil dil r8b r9b r10b
-      #+nil r11b #+nil r12b r13b r14b r15b)
+      #+nil r11b r12b #+nil r13b r14b r15b)
 
   ;; word registers
   (defreg ax 0 :word)
@@ -92,7 +92,7 @@
   (defreg r14w 28 :word)
   (defreg r15w 30 :word)
   (defregset *word-regs* ax cx dx bx si di r8w r9w r10w
-             #+nil r11w #+nil r12w r13w r14w r15w)
+             #+nil r11w r12w #+nil r13w r14w r15w)
 
   ;; double word registers
   (defreg eax 0 :dword)
@@ -112,7 +112,7 @@
   (defreg r14d 28 :dword)
   (defreg r15d 30 :dword)
   (defregset *dword-regs* eax ecx edx ebx esi edi r8d r9d r10d
-             #+nil r11d #+nil r12w r13d r14d r15d)
+             #+nil r11d r12w #+nil r13d r14d r15d)
 
   ;; quadword registers
   (defreg rax 0 :qword)
@@ -131,17 +131,8 @@
   (defreg r13 26 :qword)
   (defreg r14 28 :qword)
   (defreg r15 30 :qword)
-  ;; for no good reason at the time, r12 and r13 were missed from the
-  ;; list of qword registers.  However
-  ;; <jsnell> r13 is already used as temporary [#lisp irc 2005/01/30]
-  ;; and we're now going to use r12 for the struct thread*
-  ;;
-  ;; Except that now we use r11 instead of r13 as the temporary,
-  ;; since it's got a more compact encoding than r13, and experimentally
-  ;; the temporary gets used more than the other registers that are never
-  ;; wired. -- JES, 2005-11-02
   (defregset *qword-regs* rax rcx rdx rbx rsi rdi
-             r8 r9 r10 #+nil r11 #+nil r12 r13  r14 r15)
+             r8 r9 r10 #+nil r11 r12 #+nil r13 r14 r15)
 
   ;; floating point registers
   (defreg float0 0 :float)
@@ -473,7 +464,9 @@
             (symbol-value (symbolicate register-arg-name "-TN")))
           *register-arg-names*))
 
-(define-symbol-macro thread-base-tn r12-tn)
+;; r13 is preferable to r12 because 12 is an alias of 4 in ModRegRM, which
+;; implies use of a SIB byte with no index register for fixed displacement.
+(define-symbol-macro thread-base-tn r13-tn)
 
 ;;; If value can be represented as an immediate constant, then return
 ;;; the appropriate SC number, otherwise return NIL.

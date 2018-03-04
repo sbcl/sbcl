@@ -91,7 +91,12 @@
 
 (defun thread-tls-ea (index &optional (size :qword))
   (if (tn-p index)
-      (make-ea size :base thread-base-tn :index index)
+      ;; Due to an encoding peculiarity, flipping the base and index is better.
+      ;; Base of r13 is reg=5 in ModRegRM, so if mod were 0, it would imply
+      ;; RIP-relative addressing. (And attempting to encode an index is illegal)
+      ;; So the 'mod' bits must be nonzero, which mandates encoding of an
+      ;; explicit displacement of 0.  Using INDEX as base avoids the extra byte.
+      (make-ea size :base index :index thread-base-tn)
       (make-ea size :base thread-base-tn :disp index)))
 
 #!+sb-thread

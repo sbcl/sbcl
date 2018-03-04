@@ -94,7 +94,7 @@
 #define TRAP int3
 #endif
 
-#define THREAD_BASE_REG %r12
+#define THREAD_BASE_REG %r13
         
 	.text	
 	.globl  GNAME(call_into_lisp_first_time)
