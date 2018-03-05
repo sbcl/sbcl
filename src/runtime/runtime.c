@@ -674,7 +674,10 @@ main(int argc, char *argv[], char *envp[])
         core = search_for_core();
     }
 
-    if (!lisp_startup_options.noinform && embedded_core_offset == 0) {
+    if (embedded_core_offset)
+        lisp_startup_options.noinform = 1;
+
+    if (!lisp_startup_options.noinform) {
         print_banner();
         fflush(stdout);
     }
