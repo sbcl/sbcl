@@ -474,26 +474,19 @@ arch_install_interrupt_handlers()
 }
 
 #ifdef LISP_FEATURE_LINKAGE_TABLE
-/* FIXME: It might be cleaner to generate these from the lisp side of
- * things.
- */
-
 void
-arch_write_linkage_table_jmp(char *reloc_addr, void *target_addr)
+arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap)
 {
+    if (datap) {
+        *(uword_t *)reloc_addr = (uword_t)target_addr;
+        return;
+    }
     reloc_addr[0] = 0xFF; /* Opcode for near jump to absolute reg/mem64. */
     reloc_addr[1] = 0x25; /* ModRM #b00 100 101, i.e. RIP-relative. */
     UNALIGNED_STORE32((reloc_addr+2), 2); /* 32-bit displacement field = 2 */
     reloc_addr[6] = 0x66; reloc_addr[7] = 0x90; /* 2-byte NOP */
     *(void**)(reloc_addr+8) = target_addr;
 }
-
-void
-arch_write_linkage_table_ref(void *reloc_addr, void *target_addr)
-{
-    *(uword_t *)reloc_addr = (uword_t)target_addr;
-}
-
 #endif
 
 /* These setup and check *both* the sse2 and x87 FPUs. While lisp code

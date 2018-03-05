@@ -64,7 +64,6 @@ extern void arch_handle_after_breakpoint(os_context_t *context);
 extern void arch_handle_single_step_trap(os_context_t *context, int trap);
 #endif
 
-extern void arch_write_linkage_table_jmp(char *reloc_addr, void *target_addr);
-extern void arch_write_linkage_table_ref(void *reloc_addr, void *target_addr);
+extern void arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap);
 
 #endif /* __ARCH_H__ */

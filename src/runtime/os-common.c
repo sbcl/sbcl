@@ -207,10 +207,7 @@ void os_link_runtime()
 #endif
         }
         if (result) {
-            if (datap)
-                arch_write_linkage_table_ref(link_target,result);
-            else
-                arch_write_linkage_table_jmp(link_target,result);
+            arch_write_linkage_table_entry(link_target, result, datap);
         } else {
             m++;
         }

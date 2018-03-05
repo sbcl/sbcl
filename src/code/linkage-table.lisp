@@ -19,24 +19,11 @@
 
 (in-package "SB!IMPL")
 
-(define-alien-routine arch-write-linkage-table-jmp void
-  (table-address system-area-pointer)
-  (real-address system-area-pointer))
-
-(define-alien-routine arch-write-linkage-table-ref void
-  (table-address system-area-pointer)
-  (real-address system-area-pointer))
+(define-alien-routine arch-write-linkage-table-entry void
+  (table-address unsigned) (real-address unsigned) (datap int))
 
 (define-load-time-global *linkage-info*
     (make-hash-table :test 'equal :synchronized t))
-
-(defun write-linkage-table-entry (table-address real-address datap)
-  (/show0 "write-linkage-table-entry")
-  (let ((reloc (int-sap table-address))
-        (target (int-sap real-address)))
-    (if datap
-        (arch-write-linkage-table-ref reloc target)
-        (arch-write-linkage-table-jmp reloc target))))
 
 ;;; Add a foreign linkage entry if none exists, return the address
 ;;; in the linkage table.
@@ -53,7 +40,8 @@
                          table-base)))
                 (aver real-address)
                 (when (< table-address sb!vm:linkage-table-space-end)
-                  (write-linkage-table-entry table-address real-address datap)
+                  (arch-write-linkage-table-entry
+                   table-address real-address (if datap 1 0))
                   (let ((str (logically-readonlyize name)))
                     (setf (gethash (if datap (list str) str) ht)
                           table-address))))))
@@ -75,4 +63,5 @@
       (unless (or #!+sb-dynamic-core (member name '("malloc" "free") :test 'string=))
         (let ((real-address (ensure-dynamic-foreign-symbol-address name datap)))
           (aver (and table-address real-address))
-          (write-linkage-table-entry table-address real-address datap))))))
+          (arch-write-linkage-table-entry
+           table-address real-address (if datap 1 0)))))))

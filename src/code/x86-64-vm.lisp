@@ -176,7 +176,7 @@
       ;; We could use the #xA1 opcode to save a byte, but that would
       ;; be another headache do deal with when relocating this code.
       ;; There's precedent for this style of hand-assembly,
-      ;; in arch_write_linkage_table_jmp() and arch_do_displaced_inst().
+      ;; in arch_write_linkage_table_entry() and arch_do_displaced_inst().
       (setf (sap-ref-32 sap 0) #x058B48 ; REX MOV [RIP-n]
             (signed-sap-ref-32 sap 3) (- ea (+ (sap-int sap) 7))) ; disp
       (let ((i (if (/= (fun-subtype fun) funcallable-instance-widetag)

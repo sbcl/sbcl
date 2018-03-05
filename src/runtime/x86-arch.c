@@ -628,13 +628,13 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
 }
 
 #ifdef LISP_FEATURE_LINKAGE_TABLE
-/* FIXME: It might be cleaner to generate these from the lisp side of
- * things.
- */
-
 void
-arch_write_linkage_table_jmp(char *reloc_addr, void *target_addr)
+arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap)
 {
+    if (datap) {
+        *(unsigned long *)reloc_addr = (unsigned long)target_addr;
+        return;
+    }
     /* Make JMP to function entry. JMP offset is calculated from next
      * instruction.
      */
@@ -650,11 +650,4 @@ arch_write_linkage_table_jmp(char *reloc_addr, void *target_addr)
     /* write a nop for good measure. */
     *reloc_addr = 0x90;
 }
-
-void
-arch_write_linkage_table_ref(void *reloc_addr, void *target_addr)
-{
-    *(unsigned long *)reloc_addr = (unsigned long)target_addr;
-}
-
 #endif

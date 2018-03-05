@@ -43,7 +43,7 @@ fashioned way: linkage-table is only used for symbols resolved with
 On system startup @code{FOREIGN-REINIT} iterates through the
 @code{*LINKAGE-INFO*}, which is a hash-table mapping dynamic foreign
 names to @code{LINKAGE-INFO} structures, and calls
-@code{arch_write_linkage_table_jmp}@code{/ref} to write the
+@code{arch_write_linkage_table_entry} to write the
 appropriate entries to the linkage-table.
 
 When a foreign symbol is referred to, it is first looked for in the
@@ -86,7 +86,7 @@ examples.
 
 @subsubsection Porting to new architectures
 
-Write @code{arch_write_linkage_table_jmp} and  @code{arch_write_linkage_table_ref}.
+Write @code{arch_write_linkage_table_entry}.
 
 Write @code{FOREIGN-SYMBOL-DATAREF} VOP.
 

@@ -447,8 +447,12 @@ arch_install_interrupt_handlers(void)
 
 /* Insert the necessary jump instructions at the given address. */
 void
-arch_write_linkage_table_jmp(char *reloc_addr, void *target_addr)
+arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap)
 {
+  if (datap) {
+    *(unsigned int *)reloc_addr = (unsigned int)target_addr;
+    return;
+  }
   /* Make JMP to function entry. The instruction sequence is:
        lui    $25, 0, %hi(addr)
        addiu  $25, $25, %lo(addr)
@@ -467,11 +471,4 @@ arch_write_linkage_table_jmp(char *reloc_addr, void *target_addr)
 
   os_flush_icache((os_vm_address_t)reloc_addr, LINKAGE_TABLE_ENTRY_SIZE);
 }
-
-void
-arch_write_linkage_table_ref(void *reloc_addr, void *target_addr)
-{
-    *(unsigned int *)reloc_addr = (unsigned int)target_addr;
-}
-
 #endif
