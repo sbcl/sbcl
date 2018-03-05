@@ -428,6 +428,7 @@ static void print_environment(int argc, char *argv[])
     }
 }
 
+extern void write_protect_immobile_space();
 struct lisp_startup_options lisp_startup_options;
 int
 main(int argc, char *argv[], char *envp[])
@@ -718,6 +719,12 @@ main(int argc, char *argv[], char *envp[])
         enable_lossage_handler();
 
     os_link_runtime();
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    /* Delayed until after dynamic space has been mapped, fixups made,
+     * and/or immobile-space linkage entries written,
+     * since it was too soon earlier to handle write faults. */
+    write_protect_immobile_space();
+#endif
 #ifdef LISP_FEATURE_HPUX
     /* -1 = CLOSURE_FUN_OFFSET, 23 = SIMPLE_FUN_CODE_OFFSET, we are
      * not in LANGUAGE_ASSEMBLY so we cant reach them. */

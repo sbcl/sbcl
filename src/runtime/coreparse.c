@@ -81,7 +81,8 @@ open_binary(char *filename, int mode)
 
 #if defined(LISP_FEATURE_LINUX) && defined(LISP_FEATURE_IMMOBILE_CODE)
 #define ELFCORE 1
-extern __attribute__((weak)) lispobj __lisp_code_start, __lisp_code_end;
+extern __attribute__((weak)) lispobj
+ __lisp_code_start, __lisp_code_end, __lisp_linkage_values;
 static inline boolean code_in_elf() { return &__lisp_code_start != 0; }
 #else
 #define ELFCORE 0
@@ -706,6 +707,30 @@ process_directory(int count, struct ndir_entry *entry,
         printf("Lisp code present in executable @ %lx:%lx (freeptr=%p)\n",
                (uword_t)&__lisp_code_start, aligned_end, varyobj_free_pointer);
 #endif
+        // Prefill the Lisp linkage table so that we can (pending some additional work)
+        // remove "-ldl" from the linker options when making a shrinkwrapped executable.
+        // All data references are potentially needed because aliencomp doesn't emit
+        // SAP-REF-n in a way that admits elision of the linkage entry. e.g.
+        //     MOV RAX, [#x20200AA0] ; some_c_symbol
+        //     MOV RAX, [RAX]
+        // might be rendered as
+        //     MOV RAX, some_c_symbol(%rip)
+        // but that's more of a change to the asm instructions than I'm comfortable making;
+        // whereas "CALL linkage_entry_for_f" -> "CALL f" is quite straightforward.
+        // (Rarely would a jmp indirection be used; maybe for newly compiled code?)
+        lispobj* ptr = &__lisp_linkage_values;
+        gc_assert(ptr);
+        char *link_target = (char*)(intptr_t)LINKAGE_TABLE_SPACE_START;
+        int count;
+        extern int lisp_linkage_table_n_prelinked;
+        count = lisp_linkage_table_n_prelinked = *ptr++;
+        for ( ; count-- ; link_target += LINKAGE_TABLE_ENTRY_SIZE ) {
+            boolean datap = *ptr == (lispobj)-1; // -1 can't be a function address
+            if (datap)
+                ++ptr;
+            arch_write_linkage_table_entry(link_target, (void*)*ptr++, datap);
+        }
+
         // unprotect the pages
         os_protect((void*)VARYOBJ_SPACE_START, varyobj_space_size, OS_VM_PROT_ALL);
     } else

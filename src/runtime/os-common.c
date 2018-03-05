@@ -162,7 +162,7 @@ os_dlsym_default(char *name)
  * we need to unpoison all malloc() results,
  * otherwise the memory can't be read by sanitized code.
  */
-static void* malloc_unpoisoned(size_t size)
+void* malloc_unpoisoned(size_t size)
 {
     void* result = malloc(size);
     if (result)
@@ -171,10 +171,9 @@ static void* malloc_unpoisoned(size_t size)
 }
 #endif
 
+int lisp_linkage_table_n_prelinked;
 void os_link_runtime()
 {
-    extern void write_protect_immobile_space();
-
 #ifdef LISP_FEATURE_SB_DYNAMIC_CORE
     char *link_target = (char*)(intptr_t)LINKAGE_TABLE_SPACE_START;
     void *validated_end = link_target;
@@ -184,8 +183,11 @@ void os_link_runtime()
     void* result;
     int n = 0, m = 0, j;
 
+    if (lisp_linkage_table_n_prelinked)
+        return; // Linkage was already performed by coreparse
+
     struct vector* symbols = VECTOR(SymbolValue(REQUIRED_FOREIGN_SYMBOLS,0));
-    n = fixnum_value(symbols->length);
+    n = lisp_linkage_table_n_prelinked = fixnum_value(symbols->length);
     for (j = 0 ; j < n ; ++j)
     {
         lispobj item = symbols->data[j];
@@ -217,13 +219,6 @@ void os_link_runtime()
     odxprint(runtime_link, "%d total symbols linked, %d undefined",
              n, m);
 #endif /* LISP_FEATURE_SB_DYNAMIC_CORE */
-
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-    /* Delayed until after dynamic space has been mapped, fixups made,
-     * and/or immobile-space linkage entries written,
-     * since it was too soon earlier to handle write faults. */
-    write_protect_immobile_space();
-#endif
 }
 
 #ifndef LISP_FEATURE_WIN32

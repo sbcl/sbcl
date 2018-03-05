@@ -55,13 +55,18 @@
 ;;; FIXME: Should figure out how to write only those entries that need
 ;;; updating.
 (defun update-linkage-table ()
-  (dohash ((key table-address) *linkage-info* :locked t)
-    (let* ((datap (listp key))
-           (name (if datap (car key) key)))
-      ;; Absent a fix for the issue noted above at "Should figure out ...",
-      ;; never ever re-touch malloc or free if already linked.
-      (unless (or #!+sb-dynamic-core (member name '("malloc" "free") :test 'string=))
-        (let ((real-address (ensure-dynamic-foreign-symbol-address name datap)))
-          (aver (and table-address real-address))
-          (arch-write-linkage-table-entry
-           table-address real-address (if datap 1 0)))))))
+  ;; This symbol is of course itself a prelinked symbol.
+  (let ((n-prelinked (extern-alien "lisp_linkage_table_n_prelinked" int)))
+    (dohash ((key table-address) *linkage-info* :locked t)
+      (let* ((datap (listp key))
+             (name (if datap (car key) key))
+             (index (floor (- table-address sb!vm:linkage-table-space-start)
+                           sb!vm:linkage-table-entry-size)))
+        ;; Partial fix to the above: Symbols required for Lisp startup
+        ;; will not be re-pointed to a different address ever.
+        ;; Nor will those referenced by ELF core.
+        (when (>= index n-prelinked)
+          (let ((real-address (ensure-dynamic-foreign-symbol-address name datap)))
+            (aver (and table-address real-address))
+            (arch-write-linkage-table-entry table-address real-address
+                                            (if datap 1 0))))))))
