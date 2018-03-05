@@ -140,6 +140,7 @@
 ;;; the second stack slot, so we have to push it to make it look like
 ;;; we actually called. We also have to compute ECX from the difference
 ;;; between ESI and the stack top.
+#-sb-assembling ; avoid "Redefinition" warning (this file is processed twice)
 (defun !prepare-for-tail-call-variable (eax ebx ecx edx edi esi
                                         &optional jump-to-the-end)
   (assemble ()
