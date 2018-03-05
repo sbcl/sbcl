@@ -2298,7 +2298,8 @@
             ;; run-time and %CHECK-BOUND ir2-converter will signal at
             ;; compile-time if it survives further stages of ir1
             ;; optimization.
-            ((bound-cast-p cast))
+            ((and (bound-cast-p cast)
+                  (bound-cast-check cast)))
             (t
              (let ((context (node-source-form cast))
                    (detail (lvar-all-sources (cast-value cast))))

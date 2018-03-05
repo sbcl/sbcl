@@ -294,8 +294,10 @@
    (('(complex number)) (condition 'error))))
 
 (with-test (:name :aref-type-mismatch)
-  (checked-compile
-   `(lambda (x)
-      (svref x *break-on-signals*))))
+  (assert (nth-value 1
+                     (checked-compile
+                      `(lambda (x)
+                         (svref x *break-on-signals*))
+                      :allow-warnings t))))
 
 
