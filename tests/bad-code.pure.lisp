@@ -292,3 +292,10 @@
    '(lambda (x)
      (typep 1 x))
    (('(complex number)) (condition 'error))))
+
+(with-test (:name :aref-type-mismatch)
+  (checked-compile
+   `(lambda (x)
+      (svref x *break-on-signals*))))
+
+

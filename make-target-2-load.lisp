@@ -124,6 +124,24 @@
   ;; SAVE-LISP-AND-DIE.
   #-(or sb-fluid sb-devel) (!unintern-init-only-stuff)
 
+  ;; Fix unknown types in globaldb
+  (let ((l nil))
+    (do-all-symbols (s)
+      (flet ((fixup (kind)
+               (multiple-value-bind (type present)
+                   (sb-int:info kind :type s)
+                 (when (and present
+                            (sb-kernel:contains-unknown-type-p type))
+                   (setf (sb-int:info kind :type s)
+                         (sb-kernel:specifier-type (sb-kernel:type-specifier type)))
+                   (push s l)))))
+        (fixup :function)
+        (fixup :variable)))
+    (unless (sb-impl::!c-runtime-noinform-p)
+      (let ((*print-pretty* nil)
+            (*print-length* nil))
+        (format t "~&; Fixed ftypes: ~S~%" (sort l #'string<)))))
+
   ;; Mark interned immobile symbols so that COMPILE-FILE knows
   ;; which symbols will always be physically in immobile space.
   ;; Due to the possibility of interning a symbol that was allocated in dynamic
