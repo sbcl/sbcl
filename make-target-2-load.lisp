@@ -137,7 +137,7 @@
                    (push s l)))))
         (fixup :function)
         (fixup :variable)))
-    (unless (sb-impl::!c-runtime-noinform-p)
+    (when (= (extern-alien "lisp_startup_options" char) 0)
       (let ((*print-pretty* nil)
             (*print-length* nil))
         (format t "~&; Fixed ftypes: ~S~%" (sort l #'string<)))))
