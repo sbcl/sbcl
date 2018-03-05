@@ -3,7 +3,7 @@
 ;;; so it does not have an "!" in it.
 ;;; It it needed by genesis and SB-EDITCORE
 (defpackage "SB-COREFILE"
-  (::use "CL")
+  (:use "CL")
   (:export #:core-magic
            #:build-id-core-entry-type-code
            #:directory-core-entry-type-code
