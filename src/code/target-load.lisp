@@ -258,13 +258,12 @@
 
 (defun get-asm-routine (name &optional indirect &aux (code *assembler-routines*))
   (awhen (gethash (the symbol name) (car (%code-debug-info code)))
-    (if indirect
-        ;; Return the address containing the routine address
-        (+ (get-lisp-obj-address code)
-           (ash (+ (code-header-words code) (cddr it)) sb!vm:word-shift)
-           (- sb!vm:other-pointer-lowtag))
-        ;; Return the routine address itself
-        (sap-int (sap+ (code-instructions code) (car it))))))
+    (sap-int (sap+ (code-instructions code)
+                   (if indirect
+                       ;; Return the address containing the routine address
+                       (ash (cddr it) sb!vm:word-shift)
+                       ;; Return the routine address itself
+                       (car it))))))
 
 (defun !loader-cold-init ()
   (let* ((code *assembler-routines*)
