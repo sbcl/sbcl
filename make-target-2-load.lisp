@@ -232,6 +232,8 @@
            ;; overapproximate what we need for contribs and tests
            (member symbol '(sb-vm::map-referencing-objects
                             sb-vm::map-stack-references
+                            ;; Naughty outside-world code uses this.
+                            sb-vm::thread-control-stack-start-slot
                             sb-vm::primitive-object-size))
            (search "-OFFSET" (string symbol))
            (search "-TN" (string symbol))))
