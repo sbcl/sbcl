@@ -222,10 +222,7 @@
      (:temp ecx unsigned-reg rcx-offset)
      (:temp edx unsigned-reg rdx-offset)
      (:temp edi unsigned-reg rdi-offset)
-     (:temp esi unsigned-reg rsi-offset)
-     (:temp fun (any-reg descriptor-reg) rax-offset)
-     (:temp length (any-reg descriptor-reg) rax-offset)
-     (:temp vector (any-reg descriptor-reg) rbx-offset))
+     (:temp esi unsigned-reg rsi-offset))
   (!prepare-for-tail-call-variable eax ebx ecx edx edi esi)
 
   (inst jmp (make-ea :byte :base eax
@@ -250,12 +247,10 @@
 
   (%lea-for-lowtag-test ebx-tn fun fun-pointer-lowtag)
   (inst test bl-tn lowtag-mask)
-  (inst jmp :nz not-fun)
+  (inst jmp :nz (make-fixup 'tail-call-symbol :assembly-routine))
   (inst jmp (make-ea :byte :base eax
                            :disp (- (* closure-fun-slot n-word-bytes)
-                                    fun-pointer-lowtag)))
-  not-fun
-  (inst jmp (make-fixup 'tail-call-symbol :assembly-routine)))
+                                    fun-pointer-lowtag))))
 
 #+sb-assembling
 (define-assembly-routine (call-symbol
