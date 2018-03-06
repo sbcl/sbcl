@@ -184,6 +184,18 @@
                    (defconstant ,constant-name ,sc-number))))))
       `(progn ,@(mapcan #'process-class classes)))))
 
+;;;; some general constant definitions
+
+;;; The maximum number of storage classes and offsets within a given
+;;; storage class. Applies to all backends.
+(defconstant sc-number-limit 62)
+(defconstant sc-number-bits (integer-length (1- sc-number-limit)))
+(deftype sb!c::sc-number () `(integer 0 (,sc-number-limit)))
+
+(defconstant sc-offset-limit (ash 1 21))
+(defconstant sc-offset-bits (integer-length (1- sc-offset-limit)))
+(deftype sc-offset () `(integer 0 (,sc-offset-limit)))
+
 ;;;; stuff for defining reffers and setters
 
 (in-package "SB!C")
@@ -203,15 +215,6 @@
 ;;; references to structure slot setters because ANSI in its wisdom
 ;;; allows the xc host CL to implement structure slot setters as SETF
 ;;; expanders instead of SETF functions. -- WHN 2002-02-09
-
-;;;; some general constant definitions
-
-;;; FIXME: SC-NUMBER-LIMIT should probably be exported from SB!C
-;;; or SB!VM so that we don't need to do this extra IN-PACKAGE.
-(in-package "SB!C")
-
-;;; the maximum number of SCs in any implementation
-(defconstant sc-number-limit 62)
 
 ;;; Modular functions
 

@@ -121,9 +121,9 @@
 (defun standard-arg-location-sc (n)
   (declare (type unsigned-byte n))
   (if (< n register-arg-count)
-      (make-sc-offset descriptor-reg-sc-number
+      (make-sc+offset descriptor-reg-sc-number
                       (nth n *register-arg-offsets*))
-      (make-sc-offset control-stack-sc-number n)))
+      (make-sc+offset control-stack-sc-number n)))
 
 ;;; Make a TN to hold the number-stack frame pointer.  This is allocated
 ;;; once per component, and is component-live.

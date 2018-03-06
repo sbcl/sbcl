@@ -391,7 +391,7 @@
                              ((eq (tn-kind arg) :constant)
                               (tn-value arg))
                              (t
-                              (make-sc-offset (sc-number (tn-sc arg))
+                              (make-sc+offset (sc-number (tn-sc arg))
                                               (or (tn-offset arg) 0))))))))
     (note-this-location vop :internal-error)))
 

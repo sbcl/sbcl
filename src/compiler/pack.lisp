@@ -1541,11 +1541,11 @@
     ;; on the stack in their standard save locations.
     #!+fp-and-pc-standard-save
     (when (and (not (and
-                     (= (sc-number sc) #.(sc-offset-scn old-fp-passing-offset))
-                     (= offset #.(sc-offset-offset old-fp-passing-offset))))
+                     (= (sc-number sc) #.(sc+offset-scn old-fp-passing-offset))
+                     (= offset #.(sc+offset-offset old-fp-passing-offset))))
                (not (and
-                     (= (sc-number sc) #.(sc-offset-scn return-pc-passing-offset))
-                     (= offset #.(sc-offset-offset return-pc-passing-offset))))
+                     (= (sc-number sc) #.(sc+offset-scn return-pc-passing-offset))
+                     (= offset #.(sc+offset-offset return-pc-passing-offset))))
                (conflicts-in-sc original sc offset))
       (error "~S is wired to location ~D in SC ~A of kind ~S that it conflicts with."
              tn offset sc (tn-kind tn)))

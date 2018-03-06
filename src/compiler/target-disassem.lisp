@@ -1311,15 +1311,15 @@
            (let ((debug-var (aref debug-vars debug-var-offset)))
              #+nil
              (format t ";;; At offset ~W: ~S~%" debug-var-offset debug-var)
-             (let* ((sc-offset
-                     (sb!di::compiled-debug-var-sc-offset debug-var))
+             (let* ((sc+offset
+                     (sb!di::compiled-debug-var-sc+offset debug-var))
                     (sb-name
                      (sb!c:sb-name
                       (sb!c:sc-sb (aref sc-vec
-                                        (sb!c:sc-offset-scn sc-offset))))))
+                                        (sb!c:sc+offset-scn sc+offset))))))
                #+nil
                (format t ";;; SET: ~S[~W]~%"
-                       sb-name (sb!c:sc-offset-offset sc-offset))
+                       sb-name (sb!c:sc+offset-offset sc+offset))
                (unless (null sb-name)
                  (let ((group (cdr (assoc sb-name groups))))
                    (when (null group)
@@ -1327,7 +1327,7 @@
                      (push `(,sb-name . ,group) groups))
                    (let* ((locations (location-group-locations group))
                           (length (length locations))
-                          (offset (sb!c:sc-offset-offset sc-offset)))
+                          (offset (sb!c:sc+offset-offset sc+offset)))
                      (when (>= offset length)
                        (setf locations (adjust-array locations
                                                      (max (* 2 length) (1+ offset)))
@@ -2137,12 +2137,12 @@
 (defun get-internal-error-name (errnum)
   (cadr (svref sb!c:+backend-internal-errors+ errnum)))
 
-(defun get-random-tn-name (sc-offs)
+(defun get-random-tn-name (sc+offset)
   (sb!c:location-print-name
    (sb!c:make-random-tn :kind :normal
                         :sc (svref sb!c:*backend-sc-numbers*
-                                   (sb!c:sc-offset-scn sc-offs))
-                        :offset (sb!c:sc-offset-offset sc-offs))))
+                                   (sb!c:sc+offset-scn sc+offset))
+                        :offset (sb!c:sc+offset-offset sc+offset))))
 
 ;;; When called from an error break instruction's :DISASSEM-CONTROL (or
 ;;; :DISASSEM-PRINTER) function, will correctly deal with printing the
@@ -2164,7 +2164,7 @@
            (type disassem-state dstate))
   (when (or (= trap-number sb!vm:cerror-trap)
             (>= trap-number sb!vm:error-trap))
-   (multiple-value-bind (errnum adjust sc-offsets lengths error-byte)
+   (multiple-value-bind (errnum adjust sc+offsets lengths error-byte)
        (funcall error-parse-fun
                 (dstate-segment-sap dstate)
                 (dstate-next-offs dstate)
@@ -2186,14 +2186,14 @@
          (when error-byte
            (emit-err-arg))
          (emit-note (symbol-name (get-internal-error-name errnum)))
-         (dolist (sc-offs sc-offsets)
+         (dolist (sc+offset sc+offsets)
            (emit-err-arg)
-           (if (= (sb!c:sc-offset-scn sc-offs)
+           (if (= (sb!c:sc+offset-scn sc+offset)
                   sb!vm:constant-sc-number)
-               (note-code-constant (* (1- (sb!c:sc-offset-offset sc-offs))
+               (note-code-constant (* (1- (sb!c:sc+offset-offset sc+offset))
                                       sb!vm:n-word-bytes)
                                    dstate)
-               (emit-note (get-random-tn-name sc-offs))))))
+               (emit-note (get-random-tn-name sc+offset))))))
      (incf (dstate-next-offs dstate) adjust))))
 
 ;;; arm64 stores an error-number in the instruction bytes,
@@ -2217,17 +2217,17 @@
            (loop repeat length do (sb!c:sap-read-var-integerf sap index))
            (values 0 (- index offset) nil nil error-byte))
           (t
-           (collect ((sc-offsets)
+           (collect ((sc+offsets)
                      (lengths))
              (when error-byte
                (lengths 1)) ;; error-number
              (loop repeat length do
                    (let ((old-index index))
-                     (sc-offsets (sb!c:sap-read-var-integerf sap index))
+                     (sc+offsets (sb!c:sap-read-var-integerf sap index))
                      (lengths (- index old-index))))
              (values error-number
                      (- index offset)
-                     (sc-offsets)
+                     (sc+offsets)
                      (lengths)
                      error-byte))))))
 

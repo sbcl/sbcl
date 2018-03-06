@@ -506,7 +506,7 @@
             (aver sc)
             (setf (aref results index)
                   (if offset
-                      (+ (ash offset (1+ sc-bits))
+                      (+ (ash offset (1+ sb!vm:sc-number-bits))
                          (ash (sc-number-or-lose sc) 1)
                          1)
                       (ash (sc-number-or-lose sc) 1))))
@@ -1026,8 +1026,8 @@
 (defun compute-loading-costs (op load-p)
   (declare (type operand-parse op))
   (let ((scs (operand-parse-scs op))
-        (costs (make-array sc-number-limit :initial-element nil))
-        (load-scs (make-array sc-number-limit :initial-element nil)))
+        (costs (make-array sb!vm:sc-number-limit :initial-element nil))
+        (load-scs (make-array sb!vm:sc-number-limit :initial-element nil)))
     (dolist (sc-name (reverse scs))
       (let* ((load-sc (sc-or-lose sc-name))
              (load-scn (sc-number load-sc)))
@@ -1053,7 +1053,7 @@
               (unless (eq op-load t)
                 (pushnew load-scn (svref load-scs op-scn))))))
 
-        (dotimes (i sc-number-limit)
+        (dotimes (i sb!vm:sc-number-limit)
           (unless (svref costs i)
             (let ((op-sc (svref *backend-sc-numbers* i)))
               (when op-sc
@@ -1066,10 +1066,10 @@
     (values costs load-scs)))
 
 (defparameter *no-costs*
-  (make-array sc-number-limit :initial-element 0))
+  (make-array sb!vm:sc-number-limit :initial-element 0))
 
 (defparameter *no-loads*
-  (make-array sc-number-limit :initial-element t))
+  (make-array sb!vm:sc-number-limit :initial-element t))
 
 ;;; Pick off the case of operands with no restrictions.
 (defun compute-loading-costs-if-any (op load-p)

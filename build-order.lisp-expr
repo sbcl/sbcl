@@ -236,12 +236,6 @@
  #!+linux ("src/code/linux-os" :not-host)
  #!+win32 ("src/code/win32-os" :not-host)
 
- ;; sparc-vm and ppc-vm need sc-offset defined to get at internal
- ;; error args. This file contains stuff previously in
- ;; debug-info.lisp.  Should it therefore be :not-host?  -- CSR,
- ;; 2002-02-05
- ("src/code/sc-offset" :c-headers)
-
  ("src/code/share-vm" :not-host)
 
  ("src/code/thread" :not-host) ; provides *CURRENT-THREAD* for target-signal
@@ -295,6 +289,11 @@
  ;; needed by "compiler/vop"
  ("src/compiler/sset" :c-headers)
  ("src/code/early-type" :c-headers)
+ ;; sparc-vm and ppc-vm need sc+offset defined to get at internal
+ ;; error args. This file contains stuff previously in
+ ;; debug-info.lisp.  Should it therefore be :not-host?  -- CSR,
+ ;; 2002-02-05
+ ("src/code/sc-offset" :c-headers)
 
  ;; for e.g. BLOCK-ANNOTATION, needed by "compiler/vop"
  ("src/compiler/node" :c-headers)

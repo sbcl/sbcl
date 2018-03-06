@@ -199,15 +199,15 @@
             (:include debug-var)
             (:constructor make-compiled-debug-var
                 (symbol id alive-p
-                 sc-offset save-sc-offset indirect-sc-offset info))
+                 sc+offset save-sc+offset indirect-sc+offset info))
             (:copier nil))
   ;; storage class and offset (unexported)
-  (sc-offset nil :type sb!c:sc-offset :read-only t)
+  (sc+offset nil :type sb!c:sc+offset :read-only t)
   ;; storage class and offset when saved somewhere
-  (save-sc-offset nil :type (or sb!c:sc-offset null) :read-only t)
+  (save-sc+offset nil :type (or sb!c:sc+offset null) :read-only t)
   ;; For indirect closures the fp of the parent frame is stored in the
-  ;; normal sc-offsets above, and this has the offset into the frame
-  (indirect-sc-offset nil :type (or sb!c:sc-offset null) :read-only t)
+  ;; normal SC+OFFSETs above, and this has the offset into the frame
+  (indirect-sc+offset nil :type (or sb!c:sc+offset null) :read-only t)
   (info nil :read-only t))
 
 ;;;; DEBUG-FUNs
@@ -683,7 +683,7 @@
     (bogus-debug-fun
      ;; No handy backend (or compiler) defined constant for this one,
      ;; so construct it here and now.
-     (sb!c:make-sc-offset control-stack-sc-number lra-save-offset))))
+     (sb!c:make-sc+offset control-stack-sc-number lra-save-offset))))
 
 (defun old-fp-offset-for-location (debug-fun location)
   (declare (ignorable debug-fun location))
@@ -700,7 +700,7 @@
     (bogus-debug-fun
      ;; No handy backend (or compiler) defined constant for this one,
      ;; so construct it here and now.
-     (sb!c:make-sc-offset control-stack-sc-number ocfp-save-offset))))
+     (sb!c:make-sc+offset control-stack-sc-number ocfp-save-offset))))
 
 (defun frame-saved-cfp (frame debug-fun)
   (sub-access-debug-var-slot
@@ -1771,13 +1771,13 @@ register."
                                ((logtest sb!c::compiled-debug-var-same-name-p flags)
                                 prev-name)
                                (t (geti))))
-                 (sc-offset (if deleted 0
+                 (sc+offset (if deleted 0
                                 #!-64-bit (geti)
                                 #!+64-bit (ldb (byte 27 8) flags)))
-                 (save-sc-offset (and save
+                 (save-sc+offset (and save
                                       #!-64-bit (geti)
                                       #!+64-bit (ldb (byte 27 35) flags)))
-                 (indirect-sc-offset (and indirect-p
+                 (indirect-sc+offset (and indirect-p
                                           (geti))))
             (aver (not (and args-minimal (not minimal))))
             (cond ((and prev-name (string= prev-name symbol))
@@ -1789,9 +1789,9 @@ register."
                                  (if (stringp symbol) (make-symbol symbol) symbol)
                                  id
                                  live
-                                 sc-offset
-                                 save-sc-offset
-                                 indirect-sc-offset
+                                 sc+offset
+                                 save-sc+offset
+                                 indirect-sc+offset
                                  (cond (more-context-p :more-context)
                                        (more-count-p :more-count)))
                                 buffer)))))))
@@ -2113,30 +2113,30 @@ register."
 ;;; cell if the variable is both closed over and set.
 (defun access-compiled-debug-var-slot (debug-var frame)
   (let ((escaped (compiled-frame-escaped frame)))
-    (cond ((compiled-debug-var-indirect-sc-offset debug-var)
+    (cond ((compiled-debug-var-indirect-sc+offset debug-var)
            (sub-access-debug-var-slot
             ;; Indirect are accessed through a frame pointer of the parent.
             (descriptor-sap
              (sub-access-debug-var-slot
               (frame-pointer frame)
               (if escaped
-                  (compiled-debug-var-sc-offset debug-var)
+                  (compiled-debug-var-sc+offset debug-var)
                   (or
-                   (compiled-debug-var-save-sc-offset debug-var)
-                   (compiled-debug-var-sc-offset debug-var)))
+                   (compiled-debug-var-save-sc+offset debug-var)
+                   (compiled-debug-var-sc+offset debug-var)))
               escaped))
-            (compiled-debug-var-indirect-sc-offset debug-var)
+            (compiled-debug-var-indirect-sc+offset debug-var)
             escaped))
           (escaped
            (sub-access-debug-var-slot
             (frame-pointer frame)
-            (compiled-debug-var-sc-offset debug-var)
+            (compiled-debug-var-sc+offset debug-var)
             escaped))
           (t
            (sub-access-debug-var-slot
             (frame-pointer frame)
-            (or (compiled-debug-var-save-sc-offset debug-var)
-                (compiled-debug-var-sc-offset debug-var)))))))
+            (or (compiled-debug-var-save-sc+offset debug-var)
+                (compiled-debug-var-sc+offset debug-var)))))))
 
 ;;; a helper function for working with possibly-invalid values:
 ;;; Do (%MAKE-LISP-OBJ VAL) only if the value looks valid.
@@ -2177,7 +2177,7 @@ register."
           (values (make-unprintable-object (format nil "invalid object #x~X" val))
                   nil))))
 
-(defun sub-access-debug-var-slot (fp sc-offset &optional escaped)
+(defun sub-access-debug-var-slot (fp sc+offset &optional escaped)
   ;; NOTE: The long-float support in here is obviously decayed.  When
   ;; the x86oid and non-x86oid versions of this function were unified,
   ;; the behavior of long-floats was preserved, which only served to
@@ -2186,20 +2186,20 @@ register."
                `(if escaped
                     (let ((,var (sb!vm:context-register
                                  escaped
-                                 (sb!c:sc-offset-offset sc-offset))))
+                                 (sb!c:sc+offset-offset sc+offset))))
                       ,@forms)
                     :invalid-value-for-unescaped-register-storage))
              (escaped-boxed-value ()
                `(if escaped
                     (boxed-context-register
                      escaped
-                     (sb!c:sc-offset-offset sc-offset))
+                     (sb!c:sc+offset-offset sc+offset))
                     :invalid-value-for-unescaped-register-storage))
              (escaped-float-value (format)
                `(if escaped
                     (sb!vm:context-float-register
                      escaped
-                     (sb!c:sc-offset-offset sc-offset) ',format)
+                     (sb!c:sc+offset-offset sc+offset) ',format)
                     :invalid-value-for-unescaped-register-storage))
              (with-nfp ((var) &body body)
                ;; x86oids have no separate number stack, so dummy it
@@ -2222,12 +2222,12 @@ register."
                   ,@body))
              (number-stack-offset (&optional (offset 0))
                #!+(or x86 x86-64)
-               `(+ (sb!vm::frame-byte-offset (sb!c:sc-offset-offset sc-offset))
+               `(+ (sb!vm::frame-byte-offset (sb!c:sc+offset-offset sc+offset))
                    ,offset)
                #!-(or x86 x86-64)
-               `(+ (* (sb!c:sc-offset-offset sc-offset) sb!vm:n-word-bytes)
+               `(+ (* (sb!c:sc+offset-offset sc+offset) sb!vm:n-word-bytes)
                    ,offset)))
-    (ecase (sb!c:sc-offset-scn sc-offset)
+    (ecase (sb!c:sc+offset-scn sc+offset)
       ((#.sb!vm:any-reg-sc-number
         #.sb!vm:descriptor-reg-sc-number)
        (escaped-boxed-value))
@@ -2294,7 +2294,7 @@ register."
                         (number-stack-offset #!+sparc 4
                                              #!+(or x86 x86-64) 3)))))
       (#.sb!vm:control-stack-sc-number
-       (stack-ref fp (sb!c:sc-offset-offset sc-offset)))
+       (stack-ref fp (sb!c:sc+offset-offset sc+offset)))
       (#.sb!vm:character-stack-sc-number
        (with-nfp (nfp)
          (code-char (sap-ref-word nfp (number-stack-offset)))))
@@ -2311,7 +2311,7 @@ register."
        (if escaped
            (code-header-ref
             (code-header-from-pc (sb!vm:context-pc escaped))
-            (sb!c:sc-offset-offset sc-offset))
+            (sb!c:sc+offset-offset sc+offset))
            :invalid-value-for-unescaped-register-storage)))))
 
 ;;; This stores value as the value of DEBUG-VAR in FRAME. In the
@@ -2334,15 +2334,15 @@ register."
   (let ((escaped (compiled-frame-escaped frame)))
     (if escaped
         (sub-set-debug-var-slot (frame-pointer frame)
-                                (compiled-debug-var-sc-offset debug-var)
+                                (compiled-debug-var-sc+offset debug-var)
                                 value escaped)
         (sub-set-debug-var-slot
          (frame-pointer frame)
-         (or (compiled-debug-var-save-sc-offset debug-var)
-             (compiled-debug-var-sc-offset debug-var))
+         (or (compiled-debug-var-save-sc+offset debug-var)
+             (compiled-debug-var-sc+offset debug-var))
          value))))
 
-(defun sub-set-debug-var-slot (fp sc-offset value &optional escaped)
+(defun sub-set-debug-var-slot (fp sc+offset value &optional escaped)
   ;; Like sub-access-debug-var-slot, this is the unification of two
   ;; divergent copy-pasted functions.  The astute reviewer will notice
   ;; that long-floats are messed up here as well, that x86oids
@@ -2362,21 +2362,21 @@ register."
                `(if escaped
                     (setf (sb!vm:context-register
                            escaped
-                           (sb!c:sc-offset-offset sc-offset))
+                           (sb!c:sc+offset-offset sc+offset))
                           ,val)
                     value))
              (set-escaped-boxed-value (val)
                `(if escaped
                     (setf (boxed-context-register
                            escaped
-                           (sb!c:sc-offset-offset sc-offset))
+                           (sb!c:sc+offset-offset sc+offset))
                           ,val)
                     value))
              (set-escaped-float-value (format val)
                `(if escaped
                     (setf (sb!vm:context-float-register
                            escaped
-                           (sb!c:sc-offset-offset sc-offset)
+                           (sb!c:sc+offset-offset sc+offset)
                            ',format)
                           ,val)
                     value))
@@ -2403,12 +2403,12 @@ register."
                   ,@body))
              (number-stack-offset (&optional (offset 0))
                #!+(or x86 x86-64)
-               `(+ (sb!vm::frame-byte-offset (sb!c:sc-offset-offset sc-offset))
+               `(+ (sb!vm::frame-byte-offset (sb!c:sc+offset-offset sc+offset))
                    ,offset)
                #!-(or x86 x86-64)
-               `(+ (* (sb!c:sc-offset-offset sc-offset) sb!vm:n-word-bytes)
+               `(+ (* (sb!c:sc+offset-offset sc+offset) sb!vm:n-word-bytes)
                    ,offset)))
-    (ecase (sb!c:sc-offset-scn sc-offset)
+    (ecase (sb!c:sc+offset-scn sc+offset)
       ((#.sb!vm:any-reg-sc-number
         #.sb!vm:descriptor-reg-sc-number)
        (set-escaped-boxed-value value))
@@ -2495,7 +2495,7 @@ register."
                #!-(or x86 x86-64)
                (the long-float (realpart value)))))
       (#.sb!vm:control-stack-sc-number
-       (setf (stack-ref fp (sb!c:sc-offset-offset sc-offset)) value))
+       (setf (stack-ref fp (sb!c:sc+offset-offset sc+offset)) value))
       (#.sb!vm:character-stack-sc-number
        (with-nfp (nfp)
          (setf (sap-ref-word nfp (number-stack-offset 0))

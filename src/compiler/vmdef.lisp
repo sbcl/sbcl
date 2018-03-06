@@ -93,8 +93,6 @@
   ;; See also the description of VOP-INFO-TARGETS. -- APD, 2002-01-30
   (defconstant max-vop-tn-refs 256))
 
-(defconstant sc-bits (integer-length (1- sc-number-limit)))
-
 ;;; Emit a VOP for TEMPLATE. Arguments:
 ;;; NODE Node for source context.
 ;;; BLOCK IR2-BLOCK that we place the VOP in.
@@ -141,9 +139,10 @@
         (dotimes (i (length temps))
           (let* ((temp (aref temps i))
                  (tn (if (logbitp 0 temp)
-                         (make-wired-tn nil
-                                        (ldb (byte sc-bits 1) temp)
-                                        (ash temp (- (1+ sc-bits))))
+                         (make-wired-tn
+                          nil
+                          (ldb (byte sb!vm:sc-number-bits 1) temp)
+                          (ash temp (- (1+ sb!vm:sc-number-bits))))
                          (make-restricted-tn nil (ash temp -1))))
                  (write-ref (reference-tn tn t)))
                      ;; KLUDGE: These formulas must be consistent with

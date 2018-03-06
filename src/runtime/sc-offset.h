@@ -12,7 +12,7 @@
 #ifndef _SC_OFFSET_H_
 #define _SC_OFFSET_H_
 
-extern int sc_offset_sc_number(int sc_offset);
-extern int sc_offset_offset(int sc_offset);
+extern int sc_and_offset_sc_number(int sc_and_offset);
+extern int sc_and_offset_offset(int sc_and_offset);
 
 #endif

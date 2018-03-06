@@ -11,8 +11,8 @@
 
 (in-package "SB!VM")
 
-(defconstant arg-count-sc (make-sc-offset immediate-arg-scn nargs-offset))
-(defconstant closure-sc (make-sc-offset descriptor-reg-sc-number lexenv-offset))
+(defconstant arg-count-sc (make-sc+offset immediate-arg-scn nargs-offset))
+(defconstant closure-sc (make-sc+offset descriptor-reg-sc-number lexenv-offset))
 
 ;;; Make a passing location TN for a local call return PC. If standard
 ;;; is true, then use the standard (full call) location, otherwise use
@@ -32,7 +32,7 @@
   (make-wired-tn *fixnum-primitive-type* immediate-arg-scn ocfp-offset))
 
 (defconstant old-fp-passing-offset
-  (make-sc-offset descriptor-reg-sc-number ocfp-offset))
+  (make-sc+offset descriptor-reg-sc-number ocfp-offset))
 
 ;;; These functions make the TNs used to hold Old-FP and Return-PC
 ;;; within the current function. We treat these specially so that the

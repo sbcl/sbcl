@@ -80,7 +80,7 @@
 (defun listify-restrictions (restr)
   (declare (type sc-vector restr))
   (collect ((res))
-    (dotimes (i sc-number-limit)
+    (dotimes (i sb!vm:sc-number-limit)
       (when (eq (svref restr i) t)
         (res (svref *backend-sc-numbers* i))))
     (res)))
@@ -132,7 +132,7 @@
       (collect ((load-lose)
                 (no-move-scs)
                 (move-lose))
-        (dotimes (i sc-number-limit)
+        (dotimes (i sb!vm:sc-number-limit)
           (let ((i-sc (svref *backend-sc-numbers* i)))
             (when (eq (svref load-scs i) t)
               (cond ((not (sc-allowed-by-primitive-type i-sc ptype))
@@ -187,7 +187,7 @@
 
 ;;; FIXME: should probably be conditional on #!+SB-SHOW
 (defun check-move-fun-consistency ()
-  (dotimes (i sc-number-limit)
+  (dotimes (i sb!vm:sc-number-limit)
     (let ((sc (svref *backend-sc-numbers* i)))
       (when sc
         (let ((moves (sc-move-funs sc)))
@@ -468,14 +468,14 @@
                                             before))))
                    t)))))
       ;; Search the non-stack load SCs first.
-      (dotimes (scn sc-number-limit)
+      (dotimes (scn sb!vm:sc-number-limit)
         (let ((sc (svref *backend-sc-numbers* scn)))
           (when (and (eq (svref scs scn) t)
                      (not (eq (sb-kind (sc-sb sc)) :unbounded))
                      (check-sc scn sc))
             (return-from emit-coerce-vop))))
       ;; Search the stack SCs if the above failed.
-      (dotimes (scn sc-number-limit (bad-coerce-error op))
+      (dotimes (scn sb!vm:sc-number-limit (bad-coerce-error op))
         (let ((sc (svref *backend-sc-numbers* scn)))
           (when (and (eq (svref scs scn) t)
                      (eq (sb-kind (sc-sb sc)) :unbounded)
@@ -635,7 +635,7 @@
 ;;; allocated. This must be done last, since references in new
 ;;; environments may be introduced by MOVE-ARG insertion.
 (defun select-representations (component)
-  (let ((costs (make-array sc-number-limit))
+  (let ((costs (make-array sb!vm:sc-number-limit))
         (2comp (component-info component)))
     (labels ((assign-constant-offset (tn)
                (when (sc-is tn constant)

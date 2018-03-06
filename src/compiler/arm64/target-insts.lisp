@@ -330,15 +330,15 @@
            (loop repeat length do (sb!c::sap-read-var-integerf sap index))
            (values 0 (- index offset) nil nil))
           (t
-           (collect ((sc-offsets)
+           (collect ((sc+offsets)
                      (lengths))
              (loop repeat length do
                   (let ((old-index index))
-                    (sc-offsets (sb!c::sap-read-var-integerf sap index))
+                    (sc+offsets (sb!c::sap-read-var-integerf sap index))
                     (lengths (- index old-index))))
              (values error-number
                      (- index offset)
-                     (sc-offsets)
+                     (sc+offsets)
                      (lengths)))))))
 
 (defun brk-control (chunk inst stream dstate)

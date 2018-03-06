@@ -134,7 +134,7 @@
 (defun decode-restart-location (x)
   (declare (fixnum x))
   (let ((registers-size #.(integer-length (sb-size (sb-or-lose 'sb!vm::registers)))))
-    (values (make-sc-offset sb!vm:descriptor-reg-sc-number
+    (values (make-sc+offset sb!vm:descriptor-reg-sc-number
                             (ldb (byte registers-size 0) x))
             (ash x (- registers-size)))))
 
@@ -343,10 +343,10 @@
 
 ;;;; variables
 
-;;; Return a SC-OFFSET describing TN's location.
-(defun tn-sc-offset (tn)
+;;; Return a SC+OFFSET describing TN's location.
+(defun tn-sc+offset (tn)
   (declare (type tn tn))
-  (make-sc-offset (sc-number (tn-sc tn))
+  (make-sc+offset (sc-number (tn-sc tn))
                   (tn-offset tn)))
 
 (defun lambda-ancestor-p (maybe-ancestor maybe-descendant)
@@ -411,15 +411,15 @@
     #!+64-bit ; FIXME: fails if SB-VM:N-FIXNUM-TAG-BITS is 3
               ; which early-vm.lisp claims to work
     (cond (indirect
-           (setf (ldb (byte 27 8) flags) (tn-sc-offset tn))
+           (setf (ldb (byte 27 8) flags) (tn-sc+offset tn))
            (when save-tn
-             (setf (ldb (byte 27 35) flags) (tn-sc-offset save-tn))))
+             (setf (ldb (byte 27 35) flags) (tn-sc+offset save-tn))))
           (t
            (if (and tn (tn-offset tn))
-               (setf (ldb (byte 27 8) flags) (tn-sc-offset tn))
+               (setf (ldb (byte 27 8) flags) (tn-sc+offset tn))
                (aver minimal))
            (when save-tn
-             (setf (ldb (byte 27 35) flags) (tn-sc-offset save-tn)))))
+             (setf (ldb (byte 27 35) flags) (tn-sc+offset save-tn)))))
     (vector-push-extend flags buffer)
     (unless (or minimal
                 same-name-p
@@ -438,18 +438,18 @@
            ;; The first one/two sc-offsets are for the frame pointer,
            ;; the third is for the stack offset.
            #!-64-bit
-           (vector-push-extend (tn-sc-offset tn) buffer)
+           (vector-push-extend (tn-sc+offset tn) buffer)
            #!-64-bit
            (when save-tn
-             (vector-push-extend (tn-sc-offset save-tn) buffer))
-           (vector-push-extend (tn-sc-offset (leaf-info var)) buffer))
+             (vector-push-extend (tn-sc+offset save-tn) buffer))
+           (vector-push-extend (tn-sc+offset (leaf-info var)) buffer))
           #!-64-bit
           (t
            (if (and tn (tn-offset tn))
-               (vector-push-extend (tn-sc-offset tn) buffer)
+               (vector-push-extend (tn-sc+offset tn) buffer)
                (aver minimal))
            (when save-tn
-             (vector-push-extend (tn-sc-offset save-tn) buffer)))))
+             (vector-push-extend (tn-sc+offset save-tn) buffer)))))
   (values))
 
 ;;; Return a vector suitable for use as the DEBUG-FUN-VARS
@@ -572,7 +572,7 @@
 ;;; (Must be known values return...)
 (defun compute-debug-returns (fun)
   (coerce-to-smallest-eltype
-   (mapcar #'tn-sc-offset
+   (mapcar #'tn-sc+offset
            (return-info-locations (tail-set-info (lambda-tail-set fun))))))
 
 ;;;; debug functions
@@ -603,20 +603,20 @@
     (funcall (compiled-debug-fun-ctor kind)
              :name name
              #!-fp-and-pc-standard-save :return-pc
-             #!-fp-and-pc-standard-save (tn-sc-offset (ir2-physenv-return-pc 2env))
+             #!-fp-and-pc-standard-save (tn-sc+offset (ir2-physenv-return-pc 2env))
              #!-fp-and-pc-standard-save :return-pc-pass
-             #!-fp-and-pc-standard-save (tn-sc-offset (ir2-physenv-return-pc-pass 2env))
+             #!-fp-and-pc-standard-save (tn-sc+offset (ir2-physenv-return-pc-pass 2env))
              #!-fp-and-pc-standard-save :old-fp
-             #!-fp-and-pc-standard-save (tn-sc-offset (ir2-physenv-old-fp 2env))
+             #!-fp-and-pc-standard-save (tn-sc+offset (ir2-physenv-old-fp 2env))
              :encoded-locs
              (cdf-encode-locs
               (label-position (ir2-physenv-environment-start 2env))
               (label-position (ir2-physenv-elsewhere-start 2env))
               (when (ir2-physenv-closure-save-tn 2env)
-                (tn-sc-offset (ir2-physenv-closure-save-tn 2env)))
+                (tn-sc+offset (ir2-physenv-closure-save-tn 2env)))
               #!+unwind-to-frame-and-call-vop
               (when (ir2-physenv-bsp-save-tn 2env)
-                (tn-sc-offset (ir2-physenv-bsp-save-tn 2env)))
+                (tn-sc+offset (ir2-physenv-bsp-save-tn 2env)))
               #!-fp-and-pc-standard-save
               (label-position (ir2-physenv-lra-saved-pc 2env))
               #!-fp-and-pc-standard-save

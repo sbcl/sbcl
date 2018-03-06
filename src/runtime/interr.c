@@ -206,7 +206,7 @@ describe_internal_error(os_context_t *context)
 {
     unsigned char *ptr = arch_internal_error_arguments(context);
     char count;
-    int position, sc_offset, sc_number, offset, ch;
+    int position, sc_and_offset, sc_number, offset, ch;
     void * pc = (void*)*os_context_pc_addr(context);
     unsigned char code;
 
@@ -232,9 +232,9 @@ describe_internal_error(os_context_t *context)
     for (count = internal_error_nargs[code], position = 0;
          count > 0;
          --count) {
-        sc_offset = read_var_integer(ptr, &position);
-        sc_number = sc_offset_sc_number(sc_offset);
-        offset = sc_offset_offset(sc_offset);
+        sc_and_offset = read_var_integer(ptr, &position);
+        sc_number = sc_and_offset_sc_number(sc_and_offset);
+        offset = sc_and_offset_offset(sc_and_offset);
 
         printf("    SC: %d, Offset: %d", sc_number, offset);
         switch (sc_number) {

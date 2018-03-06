@@ -153,7 +153,7 @@
    (mapcar (lambda (tn)
              (cond ((and (tn-p tn) (sc-is tn immediate))
                     (aver (typep (tn-value tn) '(or symbol layout)))
-                    (make-sc-offset constant-sc-number (tn-offset tn)))
+                    (make-sc+offset constant-sc-number (tn-offset tn)))
                    (t
                     tn)))
            values)))
@@ -164,7 +164,7 @@
       (write-var-integer
        ;; WHERE can be either a TN or a packed SC number + offset
        (if (tn-p where)
-           (make-sc-offset (sc-number (tn-sc where)) (or (tn-offset where) 0))
+           (make-sc+offset (sc-number (tn-sc where)) (or (tn-offset where) 0))
            where)
        vector))
     (loop for octet across vector do (inst byte octet))))

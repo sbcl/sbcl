@@ -447,9 +447,9 @@
                              "unknown internal error, ~D, args=~S"
                              :format-arguments
                              (list error-number
-                                   (mapcar (lambda (sc-offset)
+                                   (mapcar (lambda (sc+offset)
                                              (sb!di::sub-access-debug-var-slot
-                                              fp sc-offset alien-context))
+                                              fp sc+offset alien-context))
                                            arguments))))
                      (t                 ; wtf?
                       (error 'simple-error
@@ -457,9 +457,9 @@
                              :format-arguments
                              (list error-number
                                    handler
-                                   (mapcar (lambda (sc-offset)
+                                   (mapcar (lambda (sc+offset)
                                              (sb!di::sub-access-debug-var-slot
-                                              fp sc-offset alien-context))
+                                              fp sc+offset alien-context))
                                            arguments))))))))))))))
 
 (defun control-stack-exhausted-error ()

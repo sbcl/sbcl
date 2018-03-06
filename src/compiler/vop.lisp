@@ -21,19 +21,16 @@
 (deftype local-tn-vector () `(simple-vector ,local-tn-limit))
 (deftype local-tn-bit-vector () `(simple-bit-vector ,local-tn-limit))
 
-;;; type of an SC number
-(deftype sc-number () `(integer 0 (,sc-number-limit)))
-
-;;; types for vectors indexed by SC numbers
-(deftype sc-vector () `(simple-vector ,sc-number-limit))
-(deftype sc-bit-vector () `(simple-bit-vector ,sc-number-limit))
+;;; vectors indexed by SC numbers
+(deftype sc-vector () `(simple-vector ,sb!vm:sc-number-limit))
+(deftype sc-bit-vector () `(simple-bit-vector ,sb!vm:sc-number-limit))
 
 (deftype sc-locations ()
-  '(simple-array sc-offset 1))
+  '(simple-array sb!vm:sc-offset 1))
 (declaim (inline make-sc-locations))
 (defun make-sc-locations (locations)
   (make-array (length locations)
-              :element-type 'sc-offset
+              :element-type 'sb!vm:sc-offset
               :initial-contents locations))
 
 ;;; the different policies we can use to determine the coding strategy
@@ -817,9 +814,9 @@
   ;; of the corresponding move functions. If loading is impossible,
   ;; then the entries are NIL. LOAD-COSTS is initialized to have a 0
   ;; for this SC.
-  (move-funs (make-array sc-number-limit :initial-element nil)
+  (move-funs (make-array sb!vm:sc-number-limit :initial-element nil)
              :type sc-vector)
-  (load-costs (make-array sc-number-limit :initial-element nil)
+  (load-costs (make-array sb!vm:sc-number-limit :initial-element nil)
               :type sc-vector)
   ;; a vector mapping from SC numbers to possibly
   ;; representation-specific move and coerce VOPs. Each entry is a
@@ -839,18 +836,18 @@
   ;; TNs wired in the standard argument registers, since there may
   ;; already be live TNs wired in those locations holding the values
   ;; that we are setting up for unknown-values return.
-  (move-vops (make-array sc-number-limit :initial-element nil)
+  (move-vops (make-array sb!vm:sc-number-limit :initial-element nil)
              :type sc-vector)
   ;; the costs corresponding to the MOVE-VOPS. Separate because this
   ;; info is needed at meta-compile time, while the MOVE-VOPs don't
   ;; exist till load time. If no move is defined, then the entry is
   ;; NIL.
-  (move-costs (make-array sc-number-limit :initial-element nil)
+  (move-costs (make-array sb!vm:sc-number-limit :initial-element nil)
               :type sc-vector)
   ;; similar to Move-VOPs, except that we only ever use the entries
   ;; for this SC and its alternates, since we never combine complex
   ;; representation conversion with argument passing.
-  (move-arg-vops (make-array sc-number-limit :initial-element nil)
+  (move-arg-vops (make-array sb!vm:sc-number-limit :initial-element nil)
                  :type sc-vector)
   ;; true if this SC or one of its alternates in in the NUMBER-STACK SB.
   (number-stack-p nil :type boolean)

@@ -38,7 +38,7 @@
 ;;; translation from SC numbers to SC info structures. SC numbers are always
 ;;; used instead of names at run time, so changing this vector changes all the
 ;;; references.
-(defglobal *backend-sc-numbers* (make-array sc-number-limit :initial-element nil))
+(defglobal *backend-sc-numbers* (make-array sb!vm:sc-number-limit :initial-element nil))
 (declaim (type sc-vector *backend-sc-numbers*))
 
 ;;; a vector of all the SBs defined, so that we can easily iterate over them

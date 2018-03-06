@@ -339,7 +339,7 @@
 ;; trivial enough to have an internal error number assigned to them that can be
 ;; used in lieu of OBJECT-NOT-TYPE-ERROR. On x86-64 this saves 16 bytes: 1 word
 ;; for the symbol in the function's constant area, a MOV instruction to load it,
-;; and an sc-offset in the error trap.
+;; and an SC+OFFSET in the error trap.
 (defglobal **type-spec-interr-symbols**
     (let* ((entries
             ;; read-time-eval so that during cold-init we can recreate the

@@ -181,11 +181,11 @@
   (returns :fixed :type (or (simple-array * (*)) (member :standard :fixed)))
   ;; SC-OFFSETs describing where the return PC and return FP are kept.
   #!-fp-and-pc-standard-save
-  (return-pc (missing-arg) :type sc-offset)
+  (return-pc (missing-arg) :type sc+offset)
   #!-fp-and-pc-standard-save
-  (return-pc-pass (missing-arg) :type sc-offset)
+  (return-pc-pass (missing-arg) :type sc+offset)
   #!-fp-and-pc-standard-save
-  (old-fp (missing-arg) :type sc-offset)
+  (old-fp (missing-arg) :type sc+offset)
   ;; An integer which contains between 2 and 4 varint-encoded fields:
   ;; START-PC -
   ;; The earliest PC in this function at which the environment is properly
@@ -325,11 +325,11 @@
 ;;;     If variables are dumped (level 1), then the variables are all
 ;;;     arguments (in order) with the minimal-arg bit set.
 ;;;    [If returns is specified, then the number of return values]
-;;;    [...sequence of var-length ints holding sc-offsets of the return
+;;;    [...sequence of var-length ints holding SC+OFFSETs of the return
 ;;;     value locations, if fixed return values are specified.]
-;;;    return-pc location sc-offset (as var-length int)
-;;;    old-fp location sc-offset (as var-length int)
-;;;    [nfp location sc-offset (as var-length int), if nfp flag]
+;;;    return-pc location SC+OFFSET (as var-length int)
+;;;    old-fp location SC+OFFSET (as var-length int)
+;;;    [nfp location SC+OFFSET (as var-length int), if nfp flag]
 ;;;    code-start-pc (as a var-length int)
 ;;;     This field implicitly encodes start of this function's code in the
 ;;;     function map, as a delta from the previous function's code start.

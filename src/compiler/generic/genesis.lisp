@@ -3311,21 +3311,21 @@ core and return a descriptor to it."
                     (sb!vm:pad-data-block sb!vm:symbol-size))
                  (* index (sb!vm:pad-data-block sb!vm:fdefn-size)))))))
 
-(defun write-sc-offset-coding (stream)
+(defun write-sc+offset-coding (stream)
   (flet ((write-array (name bytes)
-           (format stream "static struct sc_offset_byte ~A[] = {~@
+           (format stream "static struct sc_and_offset_byte ~A[] = {~@
                       ~{    {~{ ~2D, ~2D ~}}~^,~%~}~@
                       };~2%"
                    name
                    (mapcar (lambda (byte)
                              (list (byte-size byte) (byte-position byte)))
                            bytes))))
-    (format stream "struct sc_offset_byte {
+    (format stream "struct sc_and_offset_byte {
     int size;
     int position;
 };~2%")
-    (write-array "sc_offset_sc_number_bytes" sb!c::+sc-offset-scn-bytes+)
-    (write-array "sc_offset_offset_bytes"    sb!c::+sc-offset-offset-bytes+)))
+    (write-array "sc_and_offset_sc_number_bytes" sb!c::+sc+offset-scn-bytes+)
+    (write-array "sc_and_offset_offset_bytes"    sb!c::+sc+offset-offset-bytes+)))
 
 ;;;; writing map file
 
@@ -3813,7 +3813,7 @@ III. initially undefined function references (alphabetically):
           (write-boilerplate stream) ; no inclusion guard, it's not a ".h" file
           (write-thread-init stream))
         (out-to "static-symbols" (write-static-symbols stream))
-        (out-to "sc-offset" (write-sc-offset-coding stream))))))
+        (out-to "sc-offset" (write-sc+offset-coding stream))))))
 
 ;;; Invert the action of HOST-CONSTANT-TO-CORE. If STRICTP is given as NIL,
 ;;; then we can produce a host object even if it is not a faithful rendition.
