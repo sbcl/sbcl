@@ -334,6 +334,7 @@
                  (note (lambda (stream) (format stream "tls_index: ~S" symbol))
                        dstate))))
             ((and (eql base-reg #.(ash (tn-offset sb!vm::thread-base-tn) -1))
+                  (not (dstate-getprop dstate +fs-segment+)) ; not system TLS
                   (not index-reg) ; no index
                   (typep disp '(integer 0 *))) ; positive displacement
              (let* ((tls-index (ash disp (- n-fixnum-tag-bits)))
