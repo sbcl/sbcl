@@ -58,8 +58,8 @@
   ;; list of potential locations in the TN's preferred SB for the
   ;; vertex, taking into account reserve locations and preallocated
   ;; TNs.
-  (initial-domain nil :type list)
-  (initial-domain-size 0 :type index)
+  (initial-domain 0 :type sc-locations)
+  (initial-domain-size 0 :type #.`(integer 0 ,sb!vm:finite-sc-offset-limit))
   ;; TN this is a vertex for.
   (tn           nil :type tn                                  :read-only t)
   (element-size nil :type fixnum                              :read-only t)
@@ -229,16 +229,18 @@
 
 ;; Supposing that TN is restricted to its preferred SC, what locations
 ;; are available?
+(declaim (ftype (sfunction (tn) sc-locations) restricted-tn-locations))
 (defun restricted-tn-locations (tn)
   (declare (type tn tn))
   (let* ((sc (tn-sc tn))
-         (reserve (sc-reserve-locations sc)))
-    (collect ((locations))
-      (do-sc-locations (location (sc-locations sc) (locations))
-        (unless (or (and reserve ; common case: no reserve
-                         (sc-locations-member location reserve))
-                    (conflicts-in-sc tn sc location))
-          (locations location))))))
+         (reserve (sc-reserve-locations sc))
+         (locations 0))
+    (declare (type sc-locations locations))
+    (do-sc-locations (location (sc-locations sc) locations)
+      (unless (or (and reserve ; common case: no reserve
+                       (sc-locations-member location reserve))
+                  (conflicts-in-sc tn sc location))
+        (setf (ldb (byte 1 location) locations) 1)))))
 
 ;; walk over vertices, precomputing as much information as possible,
 ;; and partitioning according to their kind.
@@ -253,12 +255,13 @@
           do (let* ((tn (vertex-tn vertex))
                     (offset (tn-offset tn))
                     (locs (if offset
-                              (list offset)
+                              (sc-offset-to-sc-locations offset)
                               (restricted-tn-locations tn))))
                (aver (not (unbounded-tn-p tn)))
                (setf (vertex-number vertex) i
                      (vertex-initial-domain vertex) locs
-                     (vertex-initial-domain-size vertex) (length locs)
+                     (vertex-initial-domain-size vertex)
+                     (sc-locations-count locs)
                      (vertex-color vertex) offset
                      (vertex-spill-cost vertex) (tn-cost tn)
                      (gethash tn tn-vertex) vertex)
@@ -349,18 +352,20 @@
   (and (or (and (neq (vertex-pack-type vertex) :wired)
                 (not (tn-offset (vertex-tn vertex))))
            (= color (the fixnum (vertex-color vertex))))
-       (member color (vertex-initial-domain vertex))
+       (sc-locations-member color (vertex-initial-domain vertex))
        (color-no-conflicts-p color vertex)))
 
 ;; Sorted list of all possible locations for vertex in its preferred
 ;; SC: more heavily loaded (i.e that should be tried first) locations
 ;; first.  vertex-initial-domain is already sorted, only have to
 ;; remove offsets that aren't currently available.
+(declaim (ftype (sfunction (vertex) sc-locations) vertex-domain))
 (defun vertex-domain (vertex)
-  (declare (type vertex vertex))
-  (remove-if-not (lambda (color)
-                   (vertex-color-possible-p vertex color))
-                 (vertex-initial-domain vertex)))
+  (let ((result 0))
+    (declare (type sc-locations result))
+    (do-sc-locations (color (vertex-initial-domain vertex) result)
+      (when (vertex-color-possible-p vertex color)
+        (setf (ldb (byte 1 color) result) 1)))))
 
 ;; Return a list of vertices that we might want VERTEX to share its
 ;; location with.
@@ -368,19 +373,22 @@
   (declare (type vertex vertex) (type function tn-offset))
   (let ((sb (sc-sb (vertex-sc vertex)))
         (neighbors (vertex-full-incidence vertex))
-        vertices)
+        (vertices '()))
     (do-target-tns (current (vertex-tn vertex) :limit 20)
       (multiple-value-bind (offset target)
           (funcall tn-offset current)
         (when (and offset
                    (eq sb (sc-sb (tn-sc current)))
                    (not (oset-member neighbors target)))
-          (pushnew target vertices))))
+          (pushnew target vertices :test #'eq))))
     (nreverse vertices)))
 
 ;;; Choose the "best" color for these vertices: a color is good if as
 ;;; many of these vertices simultaneously take that color, and those
 ;;; that can't have a low spill cost.
+(declaim (ftype (sfunction (list sc-locations)
+                           (values sb!vm:finite-sc-offset list))
+                vertices-best-color/single-color))
 (defun vertices-best-color/single-color (vertices color)
   (let ((compatible '()))
     (dolist (vertex vertices)
@@ -392,14 +400,18 @@
         (push vertex compatible)))
     (values color compatible)))
 
+(declaim (ftype (sfunction (vertex sc-locations)
+                           (values sb!vm:finite-sc-offset list))
+                vertices-best-color/single-vertex))
 (defun vertices-best-color/single-vertex (vertex colors)
-  (dolist (color colors)
+  (do-sc-locations (color colors)
     (when (vertex-color-possible-p vertex color)
       (return-from vertices-best-color/single-vertex
         (values color (list vertex)))))
-  (values (first colors) '()))
+  (values (1- (integer-length colors)) '()))
 
-(declaim (ftype (function (cons cons) (values fixnum list &optional))
+(declaim (ftype (sfunction (cons sc-locations)
+                           (values sb!vm:finite-sc-offset list))
                 vertices-best-color/general))
 (defun vertices-best-color/general (vertices colors)
   (let* ((best-color      nil)
@@ -410,7 +422,7 @@
     ;; maximal 1-colorable subgraph here, ie. a maximum independent
     ;; set :\ Still, a heuristic like first attempting to pack in
     ;; max-cost vertices may be useful
-    (dolist (color colors)
+    (do-sc-locations (color colors)
       (let ((compatible '())
             (cost 0))
         (dolist (vertex vertices)
@@ -430,13 +442,14 @@
 
 (declaim (inline vertices-best-color))
 (defun vertices-best-color (vertices colors)
+  (declare (type sc-locations colors))
   (cond
     ((null vertices)
-     (values (first colors) '()))
+     (values (1- (integer-length colors)) '()))
     ((null (rest vertices))
      (vertices-best-color/single-vertex (first vertices) colors))
-    ((null (rest colors))
-     (vertices-best-color/single-color vertices (first colors)))
+    ((= 1 (sc-locations-count colors))
+     (vertices-best-color/single-color vertices (1- (integer-length colors))))
     (t
      (vertices-best-color/general vertices colors))))
 
@@ -445,47 +458,44 @@
 ;; Greedily choose the color for this vertex, also moving around any
 ;; :target vertex to the same color if possible.
 (defun find-vertex-color (vertex tn-vertex-mapping)
-  (awhen (vertex-domain vertex)
-    (let* ((targets (vertex-target-vertices vertex tn-vertex-mapping))
-           (sc (vertex-sc vertex))
-           (sb (sc-sb sc)))
-      (multiple-value-bind (color recolor-vertices)
-          (vertices-best-color targets it)
-        (aver color)
-        (dolist (target recolor-vertices)
-          (aver (vertex-color target))
-          (unless (eql color (vertex-color target))
-            (aver (eq sb (sc-sb (vertex-sc target))))
-            (aver (not (tn-offset (vertex-tn target))))
-            #+nil ; this check is slow
-            (aver (vertex-color-possible-p target color))
-            (setf (vertex-color target) color)))
-        color))))
+  (let ((domain (vertex-domain vertex)))
+    (unless (zerop domain)
+      (let* ((targets (vertex-target-vertices vertex tn-vertex-mapping))
+             (sc (vertex-sc vertex))
+             (sb (sc-sb sc)))
+        (multiple-value-bind (color recolor-vertices)
+            (vertices-best-color targets domain)
+          (dolist (target recolor-vertices)
+            (aver (vertex-color target))
+            (unless (eql color (vertex-color target))
+              (aver (eq sb (sc-sb (vertex-sc target))))
+              (aver (not (tn-offset (vertex-tn target))))
+              #+nil ; this check is slow
+              (aver (vertex-color-possible-p target color))
+              (setf (vertex-color target) color)))
+          color)))))
 
 ;; Partition vertices into those that are likely to be colored and
 ;; those that are likely to be spilled.  Assumes that the interference
 ;; graph's vertices are sorted with the least spill cost first, so
 ;; that the stacks end up with the greatest spill cost vertices first.
 (defun partition-and-order-vertices (interference-graph)
-  (flet ((domain-size (vertex)
-           (vertex-initial-domain-size vertex))
-         (degree (vertex)
-           (vertex-incidence-count vertex)))
-    (let* ((precoloring-stack '())
-           (prespilling-stack '())
-           (vertices (ig-vertices interference-graph)))
-      ;; walk the vertices from least important to most important TN wrt
-      ;; spill cost.  That way the TNs we really don't want to spill are
-      ;; at the head of the colouring lists.
-      (loop for vertex in vertices do
-        (aver (not (vertex-color vertex))) ; we already took those out above
-        ;; FIXME: some interference will be with vertices that don't
-        ;;  take the same number of slots. Find a smarter heuristic.
-        (cond ((< (degree vertex) (domain-size vertex))
-               (push vertex precoloring-stack))
-              (t
-               (push vertex prespilling-stack))))
-      (values precoloring-stack prespilling-stack))))
+  (let* ((precoloring-stack '())
+         (prespilling-stack '())
+         (vertices (ig-vertices interference-graph)))
+    ;; walk the vertices from least important to most important TN wrt
+    ;; spill cost.  That way the TNs we really don't want to spill are
+    ;; at the head of the colouring lists.
+    (loop for vertex in vertices do
+         (aver (not (vertex-color vertex))) ; we already took those out above
+       ;; FIXME: some interference will be with vertices that don't
+       ;;  take the same number of slots. Find a smarter heuristic.
+         (cond ((< (vertex-incidence-count vertex)
+                   (vertex-initial-domain-size vertex))
+                (push vertex precoloring-stack))
+               (t
+                (push vertex prespilling-stack))))
+    (values precoloring-stack prespilling-stack)))
 
 (defun color-vertex (vertex color)
   (declare (type vertex vertex))
