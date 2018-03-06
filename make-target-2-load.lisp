@@ -120,10 +120,6 @@
          (setf (sb-c::debug-source-form obj) nil))))
    :all)
 
-  ;; Unintern no-longer-needed stuff before the possible PURIFY in
-  ;; SAVE-LISP-AND-DIE.
-  #-(or sb-fluid sb-devel) (!unintern-init-only-stuff)
-
   ;; Fix unknown types in globaldb
   (let ((l nil))
     (do-all-symbols (s)
@@ -137,10 +133,14 @@
                    (push s l)))))
         (fixup :function)
         (fixup :variable)))
-    (when (= (extern-alien "lisp_startup_options" char) 0)
+    (unless (sb-impl::!c-runtime-noinform-p)
       (let ((*print-pretty* nil)
             (*print-length* nil))
-        (format t "~&; Fixed ftypes: ~S~%" (sort l #'string<)))))
+        (format t "~&; Fixed types: ~S~%" (sort l #'string<)))))
+  
+  ;; Unintern no-longer-needed stuff before the possible PURIFY in
+  ;; SAVE-LISP-AND-DIE.
+  #-(or sb-fluid sb-devel) (!unintern-init-only-stuff)
 
   ;; Mark interned immobile symbols so that COMPILE-FILE knows
   ;; which symbols will always be physically in immobile space.
