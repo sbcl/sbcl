@@ -137,7 +137,7 @@
       (let ((*print-pretty* nil)
             (*print-length* nil))
         (format t "~&; Fixed types: ~S~%" (sort l #'string<)))))
-  
+
   ;; Unintern no-longer-needed stuff before the possible PURIFY in
   ;; SAVE-LISP-AND-DIE.
   #-(or sb-fluid sb-devel) (!unintern-init-only-stuff)

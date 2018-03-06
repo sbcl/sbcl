@@ -1299,10 +1299,8 @@ uninterned."
     (let* ((package (find-undeleted-package-or-lose package))
            (name (symbol-name symbol))
            (shadowing-symbols (package-%shadowing-symbols package)))
-      (declare (list shadowing-symbols))
-
       (with-single-package-locked-error ()
-        (when (find-symbol name package)
+        (when (nth-value 1 (find-symbol name package))
           (assert-package-unlocked package "uninterning ~A" name))
 
         ;; If a name conflict is revealed, give us a chance to

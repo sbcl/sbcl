@@ -32,6 +32,7 @@
 (defpackage :test
   (:use :test-used)
   (:shadow #:shadowed)
+  (:import-from :cl nil)
   (:export
    #:*special*
    #:*unbound-special*
@@ -57,8 +58,7 @@
    #:numfun
    #:shadowed
    #:symbol-macro
-   #:unused
-   ))
+   #:unused))
 
 (defvar *uninterned* "UNINTERNED")
 (defvar *interned* "INTERNED")
@@ -666,3 +666,7 @@
   (checked-compile '(lambda (test:bound-non-special)
                      (declare (fixnum test:bound-non-special))
                      test:bound-non-special)))
+
+(with-test (:name :unintern-nil)
+  (assert-error (unintern nil 'test)
+                package-locked-error))
