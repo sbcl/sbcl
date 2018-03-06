@@ -25,13 +25,39 @@
 (deftype sc-vector () `(simple-vector ,sb!vm:sc-number-limit))
 (deftype sc-bit-vector () `(simple-bit-vector ,sb!vm:sc-number-limit))
 
-(deftype sc-locations ()
-  '(simple-array sb!vm:sc-offset 1))
-(declaim (inline make-sc-locations))
+;;; Bitset representation of a set of locations in a finite SC.
+(def!type sc-locations ()
+  `(unsigned-byte ,sb!vm:finite-sc-offset-limit))
+
 (defun make-sc-locations (locations)
-  (make-array (length locations)
-              :element-type 'sb!vm:sc-offset
-              :initial-contents locations))
+  (reduce (lambda (value location)
+            (check-type location sb!vm:finite-sc-offset)
+            (dpb 1 (byte 1 location) value))
+          locations :initial-value 0))
+
+(declaim (inline sc-offset-to-sc-locations)
+         (ftype (sfunction (sb!vm:finite-sc-offset) sc-locations)
+                sc-offset-to-sc-locations))
+(defun sc-offset-to-sc-locations (offset)
+  (dpb 1 (byte 1 offset) 0))
+
+(declaim (inline sc-locations-count)
+         (ftype (sfunction (sc-locations) (integer 0 #.sb!vm:finite-sc-offset-limit))
+                sc-locations-count))
+(defun sc-locations-count (locations)
+  (logcount locations))
+
+(declaim (inline sc-locations-member)
+         (ftype (sfunction (sb!vm:finite-sc-offset sc-locations) boolean)
+                sc-locations-member))
+(defun sc-locations-member (location locations)
+  (logbitp location locations))
+
+(defmacro do-sc-locations ((location locations &optional result) &body body)
+  (once-only ((locations locations))
+    `(dotimes (,location sb!vm:finite-sc-offset-limit ,result)
+       (when (logbitp ,location ,locations)
+         ,@body))))
 
 ;;; the different policies we can use to determine the coding strategy
 (deftype ltn-policy ()

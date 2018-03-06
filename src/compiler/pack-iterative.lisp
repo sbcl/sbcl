@@ -233,11 +233,12 @@
   (declare (type tn tn))
   (let* ((sc (tn-sc tn))
          (reserve (sc-reserve-locations sc)))
-    (loop
-      for loc across (sc-locations sc)
-      unless (or (and reserve (find loc reserve)) ; common case: no reserve
-                 (conflicts-in-sc tn sc loc))
-        collect loc)))
+    (collect ((locations))
+      (do-sc-locations (location (sc-locations sc) (locations))
+        (unless (or (and reserve ; common case: no reserve
+                         (sc-locations-member location reserve))
+                    (conflicts-in-sc tn sc location))
+          (locations location))))))
 
 ;; walk over vertices, precomputing as much information as possible,
 ;; and partitioning according to their kind.

@@ -43,7 +43,7 @@
            (error "A size specification is meaningless in a ~S SB." kind)))
         ((:finite :unbounded)
          (unless size (error "Size is not specified in a ~S SB." kind))
-         (aver (typep size 'unsigned-byte))
+         (aver (<= size sb!vm:finite-sc-offset-limit))
          (aver (= 1 (logcount size-alignment)))
          (aver (not (logtest size (1- size-alignment))))
          (aver (not (logtest size-increment (1- size-alignment))))))

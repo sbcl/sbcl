@@ -377,7 +377,7 @@
       (let* ((sb (sc-sb sc))
              (confs (finite-sb-live-tns sb)))
         (aver (eq (sb-kind sb) :finite))
-        (dovector (el (sc-locations sc))
+        (do-sc-locations (el (sc-locations sc))
           (let ((conf (load-tn-conflicts-in-sc op sc el t)))
             (if conf
                 (used (describe-tn-use el conf op))
@@ -1073,7 +1073,8 @@
       (let* ((tn (tn-ref-tn target))
              (loc (tn-offset tn)))
         (if (and (eq (tn-sc tn) sc)
-                 (find (the index loc) (sc-locations sc))
+                 (sc-locations-member (the sb!vm:finite-sc-offset loc)
+                                      (sc-locations sc))
                  (not (load-tn-conflicts-in-sc op sc loc nil)))
             loc
             nil)))))
@@ -1090,11 +1091,12 @@
       (let* ((tn (tn-ref-tn target))
              (loc (tn-offset tn)))
         (when (and (eq (sc-sb sc) (sc-sb (tn-sc tn)))
-                   (find (the index loc) (sc-locations sc))
+                   (sc-locations-member (the sb!vm:finite-sc-offset loc)
+                                        (sc-locations sc))
                    (not (load-tn-conflicts-in-sc op sc loc nil)))
               (return-from select-load-tn-location loc)))))
 
-  (dovector (loc (sc-locations sc) nil)
+  (do-sc-locations (loc (sc-locations sc) nil)
     (unless (load-tn-conflicts-in-sc op sc loc nil)
       (return loc))))
 
@@ -1148,8 +1150,7 @@
                (event unpack-tn node)
                (unpack-tn victim))
              (throw 'unpacked-tn nil)))
-      (dovector (loc (sc-locations sc))
-        (declare (type index loc))
+      (do-sc-locations (loc (sc-locations sc))
         (block SKIP
           (collect ((victims nil adjoin))
             (do ((i loc (1+ i))
@@ -1308,7 +1309,7 @@
     ;; -- TN doesn't conflict with target's location.
     (if (and (eq target-sb (sc-sb sc))
              (or (eq (sb-kind target-sb) :unbounded)
-                 (find loc (sc-locations sc)))
+                 (sc-locations-member loc (sc-locations sc)))
              (= (sc-element-size target-sc) (sc-element-size sc))
              (not (conflicts-in-sc tn sc loc))
              (zerop (mod loc (sc-alignment sc))))
@@ -1391,31 +1392,43 @@
          (alignment (sc-alignment sc))
          (align-mask (1- alignment))
          (size (finite-sb-current-size sb)))
-    (flet ((attempt-location (start-offset)
+    (flet ((available-locations ()
+             (if use-reserved-locs
+                 (sc-locations sc)
+                 (logand (sc-locations sc)
+                         (lognot (sc-reserve-locations sc)))))
+           (location-cost (location-offset)
+             (let ((always-live-count (finite-sb-always-live-count sb)))
+               (loop for offset from location-offset
+                  repeat element-size
+                  maximize (svref always-live-count offset))))
+           (attempt-location (start-offset)
              (let ((conflict (conflicts-in-sc tn sc start-offset)))
                (if conflict
                    (logandc2 (+ conflict align-mask 1)
                              align-mask)
                    (return-from select-location start-offset)))))
-      (if (eq (sb-kind sb) :unbounded)
-          (loop with offset = 0
-                until (> (+ offset element-size) size) do
-                (setf offset (attempt-location offset)))
-          (let ((locations (sc-locations sc)))
-            (when optimize
-              (setf locations
-                    (schwartzian-stable-sort-vector
-                     locations '>
-                     :key (lambda (location-offset)
-                            (loop for offset from location-offset
-                                  repeat element-size
-                                  maximize (svref
-                                            (finite-sb-always-live-count sb)
-                                            offset))))))
-            (dovector (offset locations)
-              (when (or use-reserved-locs
-                        (not (find offset (sc-reserve-locations sc))))
-                (attempt-location offset))))))))
+      (cond
+        ((eq (sb-kind sb) :unbounded)
+         (loop with offset = 0
+            until (> (+ offset element-size) size) do
+              (setf offset (attempt-location offset))))
+        (optimize ; finite SB, optimizing
+         ;; Sort locations available in the SC by LOCATION-COST
+         (let* ((locations (available-locations))
+                (locations+costs (make-array (sc-locations-count locations))))
+           (declare (dynamic-extent locations+costs))
+           (let ((i 0))
+             (do-sc-locations (location locations)
+               (setf (aref locations+costs i)
+                     (cons location (location-cost location)))
+               (incf i)))
+           (sort locations+costs #'> :key #'cdr)
+           (dovector (location-and-cost locations+costs)
+             (attempt-location (car location-and-cost)))))
+        (t ; finite SB, not optimizing
+         (do-sc-locations (location (available-locations))
+           (attempt-location location)))))))
 
 ;;; If a save TN, return the saved TN, otherwise return TN. This is
 ;;; useful for getting the conflicts of a TN that might be a save TN.

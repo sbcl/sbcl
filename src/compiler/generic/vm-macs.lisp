@@ -195,6 +195,13 @@
 (defconstant sc-offset-limit (ash 1 21))
 (defconstant sc-offset-bits (integer-length (1- sc-offset-limit)))
 (deftype sc-offset () `(integer 0 (,sc-offset-limit)))
+
+(defconstant finite-sc-offset-limit
+  #!-(or sparc alpha hppa) 32
+  #!+(or sparc alpha hppa) 64)
+(defconstant finite-sc-offset-bits
+  (integer-length (1- finite-sc-offset-limit)))
+(deftype finite-sc-offset () `(integer 0 (,finite-sc-offset-limit)))
 
 ;;;; stuff for defining reffers and setters
 
