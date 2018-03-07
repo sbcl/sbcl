@@ -107,7 +107,7 @@
                             (remove-keywords options '(:rest-p :length))))
           (let ((offset-sym (symbolicate name "-" slot-name
                                          (if rest-p "-OFFSET" "-SLOT"))))
-            (constants `(def!constant ,offset-sym ,offset))
+            (constants `(defconstant ,offset-sym ,offset))
             (when special
               (specials `(defvar ,special))))
           #-c-headers-only

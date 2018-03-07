@@ -97,7 +97,6 @@
  ("src/code/uncross" :c-headers)
 
  ("src/code/defbangtype" :c-headers)
- ("src/code/defbangconstant" :c-headers)
  ("src/code/early-constants" :c-headers) ; needs DEF!CONSTANT
 
  ("src/compiler/deftype" :c-headers)     ; on host for SB!XC:DEFTYPE
@@ -213,7 +212,6 @@
  ("src/code/seq"    :not-host) ; "code/seq" should come after "code/list".
  ("src/code/coerce" :not-host)
 
- ("src/code/char" :c-headers)
  ("src/code/huffman")
  ("src/code/target-char"    :not-host)
  ("src/code/target-unicode" :not-host)
@@ -313,7 +311,6 @@
  ;; for e.g. MAX-VOP-TN-REFS, needed by "meta-vmdef"
  ("src/compiler/vmdef" :c-headers)
 
- ("src/code/force-delayed-defbangconstants")
  ("src/code/defmacro" :c-headers)
  ("src/code/destructuring-bind" :c-headers)
 

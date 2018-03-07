@@ -53,34 +53,13 @@
 (sb!xc:deftype pathname-version ()
   '(or integer (member nil :newest :wild :unspecific)))
 
-;;; Internal time format.
-;;; 61 bits should give
-;;; seventy-three million one hundred seventeen thousand eight hundred two years of runtime
-;;; It's dangerous to run SBCL for that long without updating.
-;;; And it'll be a fixnum on 64-bit targets.
-;;; The result from querying get-internal-run-time with multiple cores
-;;; running full tilt will exhaust this faster, but it's still plenty enough.
-(def!constant internal-time-bits 61)
 (sb!xc:deftype internal-time () `(unsigned-byte ,internal-time-bits))
 
-(def!constant internal-seconds-limit
+(defconstant internal-seconds-limit
     (floor (ash 1 internal-time-bits) sb!xc:internal-time-units-per-second))
 (sb!xc:deftype internal-seconds () `(integer 0 ,internal-seconds-limit))
-(def!constant safe-internal-seconds-limit
-    ;; Dropping one bit to ensure that
-    ;;
-    ;;  (let ((seconds (the (integer 0 #.safe-internal-seconds-limit) ...)))
-    ;;    (truncate (* 1000 (float seconds 1.0f0))))
-    ;;
-    ;; doesn't go beyond the INTERNAL-TIME range due to rounding
-    ;; errors.
-    (floor (ash 1 (1- internal-time-bits)) sb!xc:internal-time-units-per-second))
 
 (sb!xc:deftype bignum-element-type () 'sb!vm:word)
-(def!constant maximum-bignum-length
-  ;; Compute number of bits in the maximum length's representation
-  ;; leaving one bit for a GC mark bit.
-  (ldb (byte (- sb!vm:n-word-bits sb!vm:n-widetag-bits 1) 0) -1))
 (sb!xc:deftype bignum-index () `(mod ,maximum-bignum-length))
 (sb!xc:deftype bignum-length () `(mod ,(1+ maximum-bignum-length)))
 

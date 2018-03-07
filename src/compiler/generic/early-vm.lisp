@@ -72,6 +72,28 @@
 (defconstant most-positive-word (1- (expt 2 n-word-bits))
   "The most positive integer that is of type SB-EXT:WORD.")
 
+(defconstant maximum-bignum-length
+  ;; Compute number of bits in the maximum length's representation
+  ;; leaving one bit for a GC mark bit.
+  (ldb (byte (- n-word-bits n-widetag-bits 1) 0) -1))
+
+(defconstant sb!xc:char-code-limit #!-sb-unicode 256 #!+sb-unicode #x110000
+  "the upper exclusive bound on values produced by CHAR-CODE")
+
+(defconstant base-char-code-limit #!-sb-unicode 256 #!+sb-unicode 128)
+
+;;; the size of the chunks returned by RANDOM-CHUNK
+(defconstant n-random-chunk-bits 32)
+
+;;; Internal time format.
+;;; 61 bits should give
+;;; seventy-three million one hundred seventeen thousand eight hundred two years of runtime
+;;; It's dangerous to run SBCL for that long without updating.
+;;; And it'll be a fixnum on 64-bit targets.
+;;; The result from querying get-internal-run-time with multiple cores
+;;; running full tilt will exhaust this faster, but it's still plenty enough.
+(defconstant sb!kernel::internal-time-bits 61)
+
 (defconstant most-positive-exactly-single-float-fixnum
   (min (expt 2 single-float-digits) sb!xc:most-positive-fixnum))
 (defconstant most-negative-exactly-single-float-fixnum

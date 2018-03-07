@@ -9,9 +9,6 @@
 
 (in-package "SB!KERNEL")
 
-;;; the size of the chunks returned by RANDOM-CHUNK
-(def!constant n-random-chunk-bits 32)
-
 (sb!xc:defstruct (random-state (:constructor %make-random-state
                                    (state))
                                ;; Needed for reading #S(random-state)

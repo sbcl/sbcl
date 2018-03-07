@@ -34,6 +34,18 @@
   (the internal-time
        (values (truncate (* seconds sb!xc:internal-time-units-per-second)))))
 
+(eval-when (:compile-toplevel :load-toplevel :execute) ; for "#."
+(defconstant safe-internal-seconds-limit
+    ;; Dropping one bit to ensure that
+    ;;
+    ;;  (let ((seconds (the (integer 0 #.safe-internal-seconds-limit) ...)))
+    ;;    (truncate (* 1000 (float seconds 1.0f0))))
+    ;;
+    ;; doesn't go beyond the INTERNAL-TIME range due to rounding
+    ;; errors.
+    (floor (ash 1 (1- sb!kernel::internal-time-bits))
+           sb!xc:internal-time-units-per-second)))
+
 (declaim (inline seconds-to-maybe-internal-time))
 (defun seconds-to-maybe-internal-time (seconds)
   (declare (optimize (speed 3)))

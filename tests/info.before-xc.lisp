@@ -17,11 +17,9 @@
 
 (/show "beginning tests/info.before-xc.lisp")
 
-(assert (eq (sb!int:info :variable :kind 'sb!vm:vector-data-offset)
-            :constant))
 ;;; It's possible in general for a constant to have the value NIL, but
 ;;; not for vector-data-offset, which must be a number:
-(assert (boundp 'sb!vm:vector-data-offset))
+(assert (constantp 'sb!vm:vector-data-offset))
 (assert (integerp (symbol-value 'sb!vm:vector-data-offset)))
 
 (in-package "SB!IMPL")

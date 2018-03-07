@@ -86,7 +86,7 @@
   ;; threads imply gencgc. use the per-thread alloc region pointer
   #!+sb-thread
   (ash (sap-int (sb!vm::current-thread-offset-sap
-                 sb!vm::thread-alloc-region-slot))
+                 #.sb!vm::thread-alloc-region-slot))
        (- (1+ sb!vm:word-shift))))
 
 ;; Return some bits that are dependent on the next address that will be
