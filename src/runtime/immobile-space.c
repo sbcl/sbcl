@@ -793,6 +793,7 @@ range_points_to_younger_p(lispobj* obj, lispobj* end,
                 if (to_gen == PSEUDO_STATIC_GENERATION+1) // scratch gen
                     to_gen = new_gen; // is actually this
             } else if (immobile_space_p(thing)) {
+                // FIXME: there is no CODE-ENTRY-POINTS slot. Is this code right?
                 // Processing the code-entry-points slot of a code component
                 // requires the general variant of immobile_obj_gen_bits
                 // because the pointed-to object is a simple-fun.

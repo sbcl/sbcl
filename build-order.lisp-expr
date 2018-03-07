@@ -641,6 +641,7 @@
  ("src/code/win32-pathname"    :not-host)
  ("src/code/filesys"           :not-host) ; needs HOST from "code/pathname"
 
+ ("src/code/simple-fun"        :not-host) ; function slot accessors
  ("src/code/target-misc"       :not-host) ; dribble-stream, used by "save"
  ("src/code/sharpm"            :not-host) ; uses stuff from "code/reader"
 
