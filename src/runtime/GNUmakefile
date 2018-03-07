@@ -101,8 +101,10 @@ shrinkwrap-sbcl.s shrinkwrap-sbcl-core.o: ../../output/sbcl.core \
  ../../tools-for-build/editcore.lisp
 	../../run-sbcl.sh --script ../../tools-for-build/editcore.lisp split \
 		../../output/sbcl.core shrinkwrap-sbcl.s
+comma := , # "Commas ... cannot appear in the text of an argument as written"
 shrinkwrap-sbcl: shrinkwrap-sbcl.s shrinkwrap-sbcl-core.o $(LIBSBCL)
-	$(CC) $(LINKFLAGS) $(CFLAGS) -o $@ $^ $(LIBS)
+	$(CC) $(filter-out -Wl$(comma)--export-dynamic, $(LINKFLAGS)) \
+ $(CFLAGS) -o $@ $(filter-out ldso-stubs.o, $^) $(LIBS)
 semiwrap-sbcl: shrinkwrap-sbcl.s $(LIBSBCL)
 	$(CC) $(LINKFLAGS) $(CFLAGS) -o $@ $^ $(LIBS)
 
