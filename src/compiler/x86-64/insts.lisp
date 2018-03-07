@@ -2523,6 +2523,11 @@
   (:emitter
    (emit-byte segment #b10011011)))
 
+(define-instruction syscall (segment)
+  (:printer two-bytes ((op '(#x0f #x05))))
+  (:emitter
+   (emit-word segment #x050F)))
+
 
 ;;;; miscellaneous hackery
 
