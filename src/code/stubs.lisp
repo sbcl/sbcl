@@ -18,6 +18,7 @@
                 (,@(if (listp name) `(funcall #',name) `(,name)) ,@args)))
            (def* (&rest defs)
              `(progn ,@(mapcar (lambda (x) `(def ,@x)) defs))))
+  (def %byte-blt (src src-start dst dst-start dst-end))
   (def get-header-data)
   (def set-header-data (x val))
   (def get-closure-length)

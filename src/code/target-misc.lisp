@@ -117,9 +117,6 @@ the file system."
            (apply #'install-streams (pop *previous-dribble-streams*)))))
   (values))
 
-(defun %byte-blt (src src-start dst dst-start dst-end)
-  (%byte-blt src src-start dst dst-start dst-end))
-
 ;;;; some *LOAD-FOO* variables
 
 (defvar *load-print* nil
