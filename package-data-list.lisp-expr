@@ -1129,7 +1129,7 @@ possibly temporarily, because it might be used internally."
                ;; bootstrapping magic, to make things happen both in
                ;; the cross-compilation host compiler's environment and
                ;; in the cross-compiler's environment
-               "DEF!CONSTANT" "DEF!STRUCT" "DEF!TYPE"
+               "DEF!STRUCT" "DEF!TYPE"
                ;; bootstrapping magic of a different kind, wherein things happen
                ;; as they ordinarily do, plus during second genesis.
                "!DEFGLOBAL" "!DEFPARAMETER" "!DEFVAR"
@@ -1472,8 +1472,7 @@ integration' (said CMU CL architecture.tex) and that probably was and
 is a good idea, but see SB-SYS re. blurring of boundaries."
       :use ("CL" "SB!ALIEN" "SB!ALIEN-INTERNALS" "SB!BIGNUM"
                  "SB!EXT" "SB!FASL" "SB!INT" "SB!SYS" "SB!GRAY")
-      :reexport ("DEF!STRUCT"
-                 #!+sb-simd-pack("SIMD-PACK"
+      :reexport (#!+sb-simd-pack("SIMD-PACK"
                                  "SIMD-PACK-P"
                                  "%MAKE-SIMD-PACK-UB32"
                                  "%MAKE-SIMD-PACK-UB64"

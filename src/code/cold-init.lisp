@@ -445,13 +445,9 @@ process to continue normally."
     (%cold-print x 0))
   (values))
 
-    ;; For some reason uninterning these:
-    ;;    DEF!TYPE DEF!CONSTANT DEF!STRUCT
-    ;; does not work, they stick around as uninterned symbols.
-    ;; Some other macros must expand into them. Ugh.
 (push
   '("SB-INT"
-    defenum defun-cached with-globaldb-name
+    defenum defun-cached with-globaldb-name def!type def!struct
     .
     #!+sb-show ()
     #!-sb-show (/hexstr /nohexstr /noshow /noshow0 /noxhow

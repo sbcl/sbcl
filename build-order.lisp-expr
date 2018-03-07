@@ -97,7 +97,7 @@
  ("src/code/uncross" :c-headers)
 
  ("src/code/defbangtype" :c-headers)
- ("src/code/early-constants" :c-headers) ; needs DEF!CONSTANT
+ ("src/code/early-constants" :c-headers)
 
  ("src/compiler/deftype" :c-headers)     ; on host for SB!XC:DEFTYPE
  ("src/compiler/early-lexenv" :c-headers)

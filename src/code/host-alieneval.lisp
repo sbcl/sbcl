@@ -1152,4 +1152,7 @@
                `(%heap-alien-addr ',(info :variable :alien-info form))))))
         (error "~S is not a valid L-value." form))))
 
+(push '("SB-ALIEN" define-alien-type-class define-alien-type-method)
+      sb!impl::*!removable-symbols*)
+
 (/show0 "host-alieneval.lisp end of file")
