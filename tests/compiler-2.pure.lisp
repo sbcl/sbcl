@@ -1191,3 +1191,14 @@
    `(lambda (list)
       (delete-if #'> (the list list)))
    (((list 1)) nil)))
+
+(with-test (:name :%coerce-callable-for-call-removal-order-mv-call)
+  (checked-compile-and-assert
+      ()
+      `(lambda (fun args)
+         (loop
+          (let ((result (apply fun args)))
+            (when result
+              (return result))
+            (setf args result))))
+    (('list '(1)) '(1) :test #'equal)))
