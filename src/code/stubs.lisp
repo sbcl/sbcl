@@ -45,6 +45,7 @@
   (def code-header-ref (code-obj index))
   (def code-header-set (code-obj index new))
   (def %vector-raw-bits (object offset))
+  (def %set-vector-raw-bits (object offset value))
   (def single-float-bits)
   (def double-float-high-bits)
   (def double-float-low-bits)

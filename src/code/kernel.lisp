@@ -85,9 +85,6 @@
       (push elt values))
     values)) ; no need to reverse - this has no promised iteration order
 
-(defun %set-vector-raw-bits (object offset value)
-  (setf (%vector-raw-bits object offset) value))
-
 ;;; A unique GC id. This is supplied for code that needs to detect
 ;;; whether a GC has happened since some earlier point in time. For
 ;;; example:
