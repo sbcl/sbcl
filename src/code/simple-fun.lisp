@@ -374,3 +374,28 @@
     #!-immobile-code
     (setf (fdefn-fun fdefn) closure)))
 
+;;;; Iterating over closure values
+
+(defmacro do-closure-values ((value closure) &body body)
+  (with-unique-names (i nclosure)
+    `(let ((,nclosure ,closure))
+       (declare (closure ,nclosure))
+       (dotimes (,i (- (1+ (get-closure-length ,nclosure)) sb!vm:closure-info-offset))
+         (let ((,value (%closure-index-ref ,nclosure ,i)))
+           ,@body)))))
+
+(defun %closure-values (closure)
+  (declare (closure closure))
+  (let (values)
+    (do-closure-values (elt closure)
+      (push elt values))
+    values)) ; no need to reverse - this has no promised iteration order
+
+;;; This is like FIND-IF, except that we do it on a compiled closure's
+;;; environment.
+(defun find-if-in-closure (test closure)
+  (declare (closure closure))
+  (do-closure-values (value closure)
+    (when (funcall test value)
+      (return value))))
+

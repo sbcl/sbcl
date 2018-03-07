@@ -1710,6 +1710,9 @@ variable: an unreadable object representing the error is printed instead.")
 
 ;;;; catch-all for unknown things
 
+(declaim (inline lowtag-of))
+(defun lowtag-of (x) (logand (get-lisp-obj-address x) sb!vm:lowtag-mask))
+
 (defmethod print-object ((object t) stream)
   (flet ((output-it (stream)
           (when (eq object sb!pcl:+slot-unbound+)

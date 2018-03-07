@@ -14,6 +14,14 @@
 
 (in-package "SB!IMPL")
 
+;;; Unlike most other "Stub functions" that never called called except
+;;; by the interpreter, these two do get called, by MAKE-UNPORTABLE-FLOAT
+;;; due to the NOTINLINE declaration.
+#-sb-xc-host
+(progn
+  (defun make-single-float (x) (make-single-float x))
+  (defun make-double-float (hi lo) (make-double-float hi lo)))
+
 (defun make-unportable-float (name)
   (flet ((opaque-identity (x) x))
     ;; KLUDGE: "DO NOT CONSTANT FOLD, EVIL COMPILER!"

@@ -246,14 +246,6 @@
               (apply function (encapsulation-info-definition info)
                      args))))))
 
-;;; This is like FIND-IF, except that we do it on a compiled closure's
-;;; environment.
-(defun find-if-in-closure (test closure)
-  (declare (closure closure))
-  (do-closure-values (value closure)
-    (when (funcall test value)
-      (return value))))
-
 ;;; Find the encapsulation info that has been closed over.
 (defun encapsulation-info (fun)
   (when (closurep fun)

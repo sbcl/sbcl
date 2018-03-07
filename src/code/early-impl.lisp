@@ -50,3 +50,18 @@
 #!+c-stack-is-control-stack
 (setf (info :variable :always-bound 'sb!c:*alien-stack-pointer*) :always-bound)
 
+;;; A unique GC id. This is supplied for code that needs to detect
+;;; whether a GC has happened since some earlier point in time. For
+;;; example:
+;;;
+;;;   (let ((epoch *gc-epoch*))
+;;;      ...
+;;;      (unless (eql epoch *gc-epoch)
+;;;        ....))
+;;;
+;;; This isn't just a fixnum counter since then we'd have theoretical
+;;; problems when exactly 2^29 GCs happen between epoch
+;;; comparisons. Unlikely, but the cost of using a cons instead is too
+;;; small to measure. -- JES, 2007-09-30
+(declaim (type cons sb!kernel::*gc-epoch*))
+(!defglobal sb!kernel::*gc-epoch* '(nil . nil))
