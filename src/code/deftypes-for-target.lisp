@@ -123,6 +123,10 @@
   '(and function
         #!+sb-fasteval (not sb!interpreter:interpreted-function)
         #!+sb-eval (not sb!eval:interpreted-function)))
+
+(sb!xc:deftype simple-fun () '(satisfies simple-fun-p))
+
+(sb!xc:deftype closure () '(satisfies closurep))
 
 ;;;; some private types that we use in defining the standard functions,
 ;;;; or implementing declarations in standard compiler transforms

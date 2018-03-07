@@ -13,9 +13,6 @@
 
 ;;;; SIMPLE-FUN and accessors
 
-(deftype simple-fun ()
-  '(satisfies simple-fun-p))
-
 (declaim (inline code-header-words))
 (defun code-header-words (code)
   (logand (get-header-data code) sb!vm:short-header-max-words))
@@ -71,9 +68,6 @@
         (return (%code-entry-point code-obj (1+ i)))))))
 
 ;;;; CLOSURE type and accessors
-
-(deftype closure ()
-  '(satisfies closurep))
 
 ;;; FIXME: this should probably exclude the closure name slot, if named
 (defmacro do-closure-values ((value closure) &body body)
