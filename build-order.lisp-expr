@@ -464,6 +464,7 @@
  ("src/compiler/dump")
 
  ("src/compiler/ir1report") ; for COMPILER-ERROR-CONTEXT
+ ("src/code/target-pathname" :not-host) ; needs "code/pathname"
  ("src/compiler/main") ; needs DEFSTRUCT FASL-OUTPUT from dump.lisp
  ("src/compiler/xref")
  ("src/compiler/target-main" :not-host)
@@ -634,7 +635,6 @@
  ("src/code/print" :not-host)
  ("src/code/reader"            :not-host) ; needs "code/readtable"
  ("src/code/target-stream"     :not-host) ; needs WHITESPACEP from "code/reader"
- ("src/code/target-pathname"   :not-host) ; needs "code/pathname"
  #!-win32
  ("src/code/unix-pathname"     :not-host)
  #!+win32

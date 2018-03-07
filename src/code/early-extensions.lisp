@@ -1199,14 +1199,6 @@ NOTE: This interface is experimental and subject to change."
     (+ digits (floor (1- digits) comma-interval))))
 
 
-;;;; etc.
-
-;;; Given a pathname, return a corresponding physical pathname.
-(defun physicalize-pathname (possibly-logical-pathname)
-  (if (typep possibly-logical-pathname 'logical-pathname)
-      (translate-logical-pathname possibly-logical-pathname)
-      possibly-logical-pathname))
-
 ;;;; Deprecating stuff
 
 (deftype deprecation-state ()
