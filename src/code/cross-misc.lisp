@@ -229,3 +229,13 @@
         (unless (<= 0 code 127)
           (setf code (sb!xc:char-code #\?)))
         (setf (aref a i) code)))))
+
+;;;; Stubs for host
+(defun sb!c:compile-in-lexenv (lambda lexenv &rest rest)
+  (declare (ignore lexenv))
+  (assert (null rest))
+  (compile nil lambda))
+
+(defun eval-tlf (form index &optional lexenv)
+  (declare (ignore index lexenv))
+  (eval form))

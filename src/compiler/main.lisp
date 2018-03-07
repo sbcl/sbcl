@@ -2112,16 +2112,3 @@ SPEED and COMPILATION-SPEED optimization values, and the
                  (setf (cdr circular-ref)
                        (append (cdr circular-ref) (cdr info)))))))
          nil)))))
-
-
-;;;; Host compile time definitions
-#+sb-xc-host
-(defun compile-in-lexenv (lambda lexenv &rest rest)
-  (declare (ignore lexenv))
-  (aver (null rest))
-  (compile nil lambda))
-
-#+sb-xc-host
-(defun eval-tlf (form index &optional lexenv)
-  (declare (ignore index lexenv))
-  (eval form))
