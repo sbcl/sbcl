@@ -42,7 +42,7 @@
                   (*block-compile* nil)
                   (*allow-instrumenting* nil)
                   (*compiler-coverage-metadata* nil)
-                  (*msan-compatible-stack-unpoison*
+                  (*msan-unpoison*
                    (and (member :msan *features*)
                         (find-dynamic-foreign-symbol-address "__msan_unpoison")))
                   (*current-path* nil)

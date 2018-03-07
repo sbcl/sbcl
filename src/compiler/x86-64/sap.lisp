@@ -154,6 +154,26 @@
 
 ;;;; mumble-SYSTEM-REF and mumble-SYSTEM-SET
 
+;; from 'llvm/projects/compiler-rt/lib/msan/msan.h':
+;;  "#define MEM_TO_SHADOW(mem) (((uptr)(mem)) ^ 0x500000000000ULL)"
+#!+linux ; shadow space differs by OS
+(defconstant msan-mem-to-shadow-xor-const #x500000000000)
+
+(defun emit-sap-set (size sap ea-index ea-disp value result)
+  (when sb!c::*msan-unpoison*
+    (let ((offset (or ea-index ea-disp)))
+      (unless (eql offset 0)
+        (inst add sap offset))
+      (inst mov temp-reg-tn msan-mem-to-shadow-xor-const)
+      (inst xor temp-reg-tn sap)
+      (inst mov (make-ea size :base temp-reg-tn) 0)
+      (unless (eql offset 0) ; restore SAP as if nothing happened
+        (inst sub sap offset))))
+  (inst mov
+        (make-ea size :base sap :index ea-index :disp ea-disp)
+        (reg-in-size value size))
+  (move result value))
+
 (macrolet ((def-system-ref-and-set (ref-name
                                     set-name
                                     ref-insn
@@ -195,10 +215,7 @@
                     (:arg-types system-area-pointer signed-num ,type)
                     (:results (result :scs (,sc)))
                     (:result-types ,type)
-                    (:generator 5
-                      (inst mov (make-ea ,size :base sap :index offset)
-                            (reg-in-size value ,size))
-                      (move result value)))
+                    (:generator 5 (emit-sap-set ,size sap offset 0 value result)))
                   (define-vop (,set-name-c)
                     (:translate ,set-name)
                     (:policy :fast-safe)
@@ -209,10 +226,7 @@
                     (:info offset)
                     (:results (result :scs (,sc)))
                     (:result-types ,type)
-                    (:generator 4
-                      (inst mov (make-ea ,size :base sap :disp offset)
-                            (reg-in-size value ,size))
-                      (move result value)))))))
+                    (:generator 4 (emit-sap-set ,size sap nil offset value result)))))))
 
   (def-system-ref-and-set sap-ref-8 %set-sap-ref-8 movzx
     unsigned-reg positive-fixnum :byte)

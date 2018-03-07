@@ -210,11 +210,6 @@
                      :disp (- (* slot n-word-bytes) lowtag))
             word)))
 
-;; from 'llvm/projects/compiler-rt/lib/msan/msan.h':
-;;  "#define MEM_TO_SHADOW(mem) (((uptr)(mem)) ^ 0x500000000000ULL)"
-#!+linux ; shadow space differs by OS
-(defconstant msan-mem-to-shadow-xor-const #x500000000000)
-
 ;;; ALLOCATE-VECTOR
 (macrolet ((calc-size-in-bytes (n-words result-tn)
              `(cond ((sc-is ,n-words immediate)
@@ -276,7 +271,7 @@
         ;; It would also be good to skip zero-fill of specialized vectors
         ;; perhaps in a policy-dependent way. At worst you'd see random
         ;; bits, and CLHS says consequences are undefined.
-        (when sb!c::*msan-compatible-stack-unpoison*
+        (when sb!c::*msan-unpoison*
           ;; Unpoison all DX vectors regardless of widetag.
           ;; Mark the header and length as valid, not just the payload.
           #!+linux ; unimplemented for others

@@ -300,14 +300,13 @@
     (inst lea (reg-in-size rax :immobile-code-pc) (make-fixup nil :code-object label))
     (emit-label label)
     (move-dword-if-immobile-code pc-save rax))
-  (when sb!c::*msan-compatible-stack-unpoison*
-    (inst mov rax (static-symbol-value-ea 'msan-param-tls))
+  (when sb!c::*msan-unpoison*
+    (inst mov rax (thread-tls-ea (ash thread-msan-param-tls-slot word-shift)))
     ;; Unpoison parameters
     (do ((n 0 (+ n n-word-bytes))
          (arg args (tn-ref-across arg)))
         ((null arg))
       ;; KLUDGE: assume all parameters are 8 bytes or less
-      (inst fs)
       (inst mov (make-ea :qword :base rax :disp n) 0)))
   #!-win32
   ;; ABI: AL contains amount of arguments passed in XMM registers

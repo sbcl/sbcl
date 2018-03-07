@@ -1333,9 +1333,6 @@
               (format t "Copying ~d bytes (#x~x) from ptes = ~d PTEs~%"
                       pte-nbytes pte-nbytes (floor pte-nbytes 10)))
             (copy-bytes input output pte-nbytes)) ; Copy PTEs from input
-          (format asm-file "#ifdef MEMORY_SANITIZER
-#define malloc malloc_unpoisoned
-#endif~%")
           (let ((core (write-assembler-text map asm-file emit-sizes))
                 (emit-all-c-symbols t))
             ;; There's no relation between emit-sizes and which section to put

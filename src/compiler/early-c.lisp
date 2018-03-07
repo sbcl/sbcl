@@ -134,7 +134,7 @@
 (defvar *warnings-p*)
 (defvar *lambda-conversions*)
 (defvar *compile-object* nil)
-(defvar *msan-compatible-stack-unpoison* nil)
+(defvar *msan-unpoison* nil)
 
 (defvar *stack-allocate-dynamic-extent* t
   "If true (the default), the compiler respects DYNAMIC-EXTENT declarations
@@ -328,3 +328,8 @@ the stack without triggering overflow protection.")
   ;; Data or code?
   (datap (missing-arg) :type boolean))
 (!set-load-form-method heap-alien-info (:xc :target))
+
+;; from 'llvm/projects/compiler-rt/lib/msan/msan.h':
+;;  "#define MEM_TO_SHADOW(mem) (((uptr)(mem)) ^ 0x500000000000ULL)"
+#!+linux ; shadow space differs by OS
+(defconstant sb!vm::msan-mem-to-shadow-xor-const #x500000000000)
