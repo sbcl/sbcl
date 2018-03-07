@@ -109,9 +109,12 @@
 GNAME(call_into_lisp_first_time):
 	push	%rbp		# Save old frame pointer.
 	mov	%rsp,%rbp	# Establish new frame.
-#ifdef MEMORY_SANITIZER
-        movq	__msan_param_tls@GOTTPOFF(%rip), %rax
-        movq	%rax, (SYMBOL_VALUE_OFFSET+MSAN_PARAM_TLS)
+#ifdef MEMORY_SANITIZER // Presumes GCC_TLS and SB_THREAD
+	movq	GNAME(current_thread)@GOTTPOFF(%rip), %r8 // Clobberable
+	movq	%fs:(%r8), %r8
+	movq	%fs:0, %rax
+	leaq	__msan_param_tls@TPOFF(%rax), %rax
+	movq	%rax, THREAD_MSAN_PARAM_TLS_OFFSET(%r8)
 #endif
 	LOAD_PIC_VAR(all_threads, %rax)
 	mov     THREAD_CONTROL_STACK_END_OFFSET(%rax) ,%rsp

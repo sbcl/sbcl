@@ -468,4 +468,6 @@
   #!+win32 (synchronous-io-handle-and-flag :c-type "HANDLE" :length 1)
   #!+(and sb-safepoint-strictly (not win32))
   (sprof-alloc-region :c-type "struct alloc_region" :length 5)
+  ;; The following slot's existence must NOT be conditional on #+msan
+  #!+x86-64 (msan-param-tls) ; = &__msan_param_tls
   (interrupt-contexts :c-type "os_context_t *" :rest-p t :pointer t))

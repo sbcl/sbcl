@@ -469,6 +469,10 @@ void* new_thread_trampoline(void* arg)
 
     lispobj function = th->no_tls_value_marker;
     th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
+#ifdef MEMORY_SANITIZER
+    asm("movq %%fs:0, %0\n\tleaq __msan_param_tls@TPOFF(%0), %0"
+        : "=r" (th->msan_param_tls));
+#endif
     init_new_thread(th, &scribble, 1);
     result = funcall0(function);
     undo_init_new_thread(th, &scribble);

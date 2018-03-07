@@ -206,8 +206,6 @@
     ;; Keep in sync with 'compiler/early-backend.lisp':
     ;;  "only PPC uses a separate symbol for the TLS index lock"
     #!+(and sb-thread ppc) *tls-index-lock*
-    ;; memory sanitizer argument-passing shadow bytes
-    msan-param-tls
 
     ;; dynamic runtime linking support
     #!+sb-dynamic-core +required-foreign-symbols+
