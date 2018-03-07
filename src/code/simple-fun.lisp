@@ -337,3 +337,40 @@
                                             (- sb!vm:fun-pointer-lowtag))))))
                (and (< from to) (- to from))))
         0)))
+
+;;; Set (SYMBOL-FUNCTION SYMBOL) to a closure that signals an error,
+;;; preventing funcall/apply of macros and special operators.
+(defun sb!c::install-guard-function (symbol fun-name docstring)
+  (when docstring
+    (setf (random-documentation symbol 'function) docstring))
+  ;; (SETF SYMBOL-FUNCTION) goes out of its way to disallow this closure,
+  ;; but we can trivially replicate its low-level effect.
+  (let ((fdefn (find-or-create-fdefn symbol))
+        (closure
+         (set-closure-name
+          (lambda (&rest args)
+           (declare (ignore args))
+           ;; ANSI specification of FUNCALL says that this should be
+           ;; an error of type UNDEFINED-FUNCTION, not just SIMPLE-ERROR.
+           ;; SPECIAL-FORM-FUNCTION is a subtype of UNDEFINED-FUNCTION.
+           (error (if (eq (info :function :kind symbol) :special-form)
+                      'special-form-function
+                      'undefined-function)
+                  :name symbol))
+          t
+          fun-name)))
+    ;; For immobile-code, do something slightly different: fmakunbound,
+    ;; then assign the fdefn-fun slot to avoid consing a new closure trampoline.
+    #!+immobile-code
+    (progn (fdefn-makunbound fdefn)
+           ;; There is no :SET-TRANS for the primitive object's fdefn-fun slot,
+           ;; nor do we desire the full effect of %SET-FDEFN-FUN.
+           (setf (sap-ref-lispobj (int-sap (get-lisp-obj-address fdefn))
+                                  (- (ash sb!vm:fdefn-fun-slot sb!vm:word-shift)
+                                     sb!vm:other-pointer-lowtag))
+                 closure))
+    ;; The above would work, but there's no overhead when installing a closure
+    ;; the regular way, so just do that.
+    #!-immobile-code
+    (setf (fdefn-fun fdefn) closure)))
+

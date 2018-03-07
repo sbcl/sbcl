@@ -130,3 +130,31 @@ the file system."
   ;; implementation-dependent. We choose NIL on the theory that it's
   ;; a nicer default behavior for Unix programs.
   "the default for the :VERBOSE argument to LOAD")
+
+(in-package "SB!C")
+
+(defun real-function-name (name)
+  ;; Resolve the actual name of the function named by NAME
+  ;; e.g. (setf (name-function 'x) #'car)
+  ;; (real-function-name 'x) => CAR
+  (cond ((not (fboundp name))
+         nil)
+        ((and (symbolp name)
+              (macro-function name))
+         (let ((name (%fun-name (macro-function name))))
+           (and (consp name)
+                (eq (car name) 'macro-function)
+                (cadr name))))
+        (t
+         (%fun-name (fdefinition name)))))
+
+(defun random-documentation (name type)
+  (cdr (assoc type (info :random-documentation :stuff name))))
+
+(defun (setf random-documentation) (new-value name type)
+  (let ((pair (assoc type (info :random-documentation :stuff name))))
+    (if pair
+        (setf (cdr pair) new-value)
+        (push (cons type new-value)
+              (info :random-documentation :stuff name))))
+  new-value)
