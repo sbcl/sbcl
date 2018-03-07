@@ -160,6 +160,7 @@
 (defconstant msan-mem-to-shadow-xor-const #x500000000000)
 
 (defun emit-sap-set (size sap ea-index ea-disp value result)
+  #!+linux
   (when sb!c::*msan-unpoison*
     (let ((offset (or ea-index ea-disp)))
       (unless (eql offset 0)
