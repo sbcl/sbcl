@@ -335,8 +335,7 @@
 
 ;;; Convert PATHNAME-DESIGNATOR (a pathname, or string, or
 ;;; stream), into a pathname in PATHNAME.
-(eval-when (:compile-toplevel :execute)
-(sb!xc:defmacro with-pathname ((pathname pathname-designator) &body body)
+(defmacro with-pathname ((pathname pathname-designator) &body body)
   (once-only ((pathname-designator pathname-designator))
     `(let ((,pathname (etypecase ,pathname-designator
                         (pathname ,pathname-designator)
@@ -345,7 +344,7 @@
                          (stream-file-name-or-lose ,pathname-designator)))))
        ,@body)))
 
-(sb!xc:defmacro with-native-pathname ((pathname pathname-designator) &body body)
+(defmacro with-native-pathname ((pathname pathname-designator) &body body)
   (once-only ((pathname-designator pathname-designator))
     `(let ((,pathname (etypecase ,pathname-designator
                         (pathname ,pathname-designator)
@@ -355,7 +354,7 @@
                         (file-stream (file-name ,pathname-designator)))))
        ,@body)))
 
-(sb!xc:defmacro with-host ((host host-designator) &body body)
+(defmacro with-host ((host host-designator) &body body)
   ;; Generally, redundant specification of information in software,
   ;; whether in code or in comments, is bad. However, the ANSI spec
   ;; for this is messy enough that it's hard to hold in short-term
@@ -410,7 +409,6 @@
                             ,host-designator))
                     (host ,host-designator))))
        ,@body)))
-) ; EVAL-WHEN
 
 (defun find-host (host-designator &optional (errorp t))
   (with-host (host host-designator)
