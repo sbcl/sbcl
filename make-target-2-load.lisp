@@ -240,11 +240,15 @@
       ((#.(find-package "SB-C")
         #.(find-package "SB-ASSEM")
         #.(find-package "SB-DISASSEM")
-        #.(find-package "SB-FASL")
         #.(find-package "SB-IMPL")
         #.(find-package "SB-KERNEL"))
        ;; Assume all and only external symbols must be retained
        (eq accessibility :external))
+      (#.(find-package "SB-FASL")
+       ;; Retain +BACKEND-FASL-FILE-IMPLEMENTATION+ and +FASL-FILE-VERSION+
+       ;; (and anything else otherwise reachable)
+       (and (eq accessibility :external)
+            (constantp symbol)))
       (#.(find-package "SB-BIGNUM")
        ;; There are 2 important external symbols for sb-gmp.
        ;; Other externals can disappear.

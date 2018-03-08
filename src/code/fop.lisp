@@ -127,25 +127,6 @@
 
 ;;;; miscellaneous fops
 
-;;; Setting this variable causes execution of a FOP-NOP4 to produce
-;;; output to *DEBUG-IO*. This can be handy when trying to follow the
-;;; progress of FASL loading.
-#!+sb-show
-(defvar *show-fop-nop4-p* nil)
-
-;;; CMU CL had a single no-op fop, FOP-NOP, with fop code 0. Since 0
-;;; occurs disproportionately often in fasl files for other reasons,
-;;; FOP-NOP is less than ideal for writing human-readable patterns
-;;; into fasl files for debugging purposes. There's no shortage of
-;;; unused fop codes, so we add this second NOP, which reads 4
-;;; arbitrary bytes and discards them.
-(!define-fop 137 (fop-nop4 () nil)
-  (let ((arg (read-arg 4 (fasl-input-stream))))
-    (declare (ignorable arg))
-    #!+sb-show
-    (when *show-fop-nop4-p*
-      (format *debug-io* "~&/FOP-NOP4 ARG=~W=#X~X~%" arg arg))))
-
 (!define-fop 0 (fop-nop () nil))
 (!define-fop 1 (fop-pop (x) nil) (push-fop-table x (fasl-input)))
 (!define-fop 2 (fop-empty-list) nil)
