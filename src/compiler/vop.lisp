@@ -47,6 +47,12 @@
 (defun sc-locations-count (locations)
   (logcount locations))
 
+(declaim (inline sc-locations-first)
+         (ftype (sfunction (sc-locations) sb!vm:finite-sc-offset)
+                sc-locations-first))
+(defun sc-locations-first (locations)
+  (1- (integer-length (logxor locations (1- locations)))))
+
 (declaim (inline sc-locations-member)
          (ftype (sfunction (sb!vm:finite-sc-offset sc-locations) boolean)
                 sc-locations-member))

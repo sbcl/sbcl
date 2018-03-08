@@ -408,7 +408,7 @@
     (when (vertex-color-possible-p vertex color)
       (return-from vertices-best-color/single-vertex
         (values color (list vertex)))))
-  (values (1- (integer-length colors)) '()))
+  (values (sc-locations-first colors) '()))
 
 (declaim (ftype (sfunction (cons sc-locations)
                            (values sb!vm:finite-sc-offset list))
@@ -445,11 +445,11 @@
   (declare (type sc-locations colors))
   (cond
     ((null vertices)
-     (values (1- (integer-length colors)) '()))
+     (values (sc-locations-first colors) '()))
     ((null (rest vertices))
      (vertices-best-color/single-vertex (first vertices) colors))
     ((= 1 (sc-locations-count colors))
-     (vertices-best-color/single-color vertices (1- (integer-length colors))))
+     (vertices-best-color/single-color vertices (sc-locations-first colors)))
     (t
      (vertices-best-color/general vertices colors))))
 
