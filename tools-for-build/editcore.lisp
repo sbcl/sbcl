@@ -114,6 +114,9 @@
                           (recons x (recurse (car x)) (recurse (cdr x))))
                          (t x))))
 
+  (when (typep lispname '(string 0))
+    (setq lispname "anonymous"))
+
   ;; Shorten obnoxiously long printed representations of methods
   ;; by changing FAST-METHOD to METHOD (because who cares?)
   ;; and shorten
