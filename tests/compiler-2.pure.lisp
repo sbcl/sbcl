@@ -1202,3 +1202,13 @@
               (return result))
             (setf args result))))
     (('list '(1)) '(1) :test #'equal)))
+
+(with-test (:name :constrant-loop)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+         (check-type a list)
+         (when a
+           (mapcar #'identity a)
+           (loop for c from 0 do (loop for d in b do
+                                       (loop for e in a)))))))

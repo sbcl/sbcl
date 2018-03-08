@@ -1210,7 +1210,11 @@
   (init-var-constraints component)
   ;; Previous results can confuse propagation and may loop forever
   (do-blocks (block component)
-    (setf (block-out block) nil))
+    (setf (block-out block) nil)
+    (let ((last (block-last block)))
+      (when (if-p last)
+        (setf (if-alternative-constraints last) nil)
+        (setf (if-consequent-constraints last) nil))))
   (setf (block-out (component-head component)) (make-conset))
   (dolist (block (find-and-propagate-constraints component))
     (unless (block-delete-p block)
