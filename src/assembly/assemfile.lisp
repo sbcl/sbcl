@@ -132,7 +132,9 @@
          ,@code
          ,@(generate-return-sequence
             (or (cadr (assoc :return-style options)) :raw))
-         (emit-alignment sb!vm:n-lowtag-bits))
+         (emit-alignment sb!vm:n-lowtag-bits
+                         ;; EMIT-LONG-NOP does not exist for (not x86-64)
+                         #!+x86-64 :long-nop))
        (when *compile-print*
          (format *error-output* "~S assembled~%" ',name)))))
 
