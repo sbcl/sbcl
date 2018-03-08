@@ -1014,3 +1014,7 @@
        (give-up-ir1-transform
         "~@<open coding coercion to ~S not implemented.~:@>"
         tval)))))
+
+(deftransform #!+64-bit unsigned-byte-64-p #!-64-bit unsigned-byte-32-p
+  ((value) (fixnum))
+  `(>= value 0))
