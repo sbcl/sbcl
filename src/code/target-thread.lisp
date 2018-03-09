@@ -1823,8 +1823,6 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
                    (values value :ok))))
           (values nil :thread-dead))))
 
-  (define-alien-variable tls-index-start unsigned-int)
-
   ;; Get values from the TLS area of the current thread.
   (defun %thread-local-references ()
     ;; TLS-INDEX-START is a word number relative to thread base.

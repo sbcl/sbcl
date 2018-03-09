@@ -623,12 +623,6 @@ free_thread_struct(struct thread *th)
 #endif
 }
 
-#ifdef LISP_FEATURE_SB_THREAD
-/* FIXME: should be MAX_INTERRUPTS -1 ? */
-const unsigned int tls_index_start =
-  MAX_INTERRUPTS + sizeof(struct thread)/sizeof(lispobj);
-#endif
-
 /* this is called from any other thread to create the new one, and
  * initialize all parts of it that can be initialized from another
  * thread

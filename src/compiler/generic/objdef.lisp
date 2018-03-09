@@ -471,3 +471,17 @@
   ;; The following slot's existence must NOT be conditional on #+msan
   #!+x86-64 (msan-param-tls) ; = &__msan_param_tls
   (interrupt-contexts :c-type "os_context_t *" :rest-p t :pointer t))
+
+;;; Compute the smallest TLS index that will be assigned to a special variable
+;;; that does not map onto a thread slot.
+(defconstant sb!thread::tls-index-start
+  (+ (sb!vm::primitive-object-length
+      (find 'sb!vm::thread sb!vm::*primitive-objects*
+            :key 'sb!vm::primitive-object-name))
+     ;; The sizeof operator in C counts the variable-length interrupt_contexts[]
+     ;; field as occupying 1 word, but PRIMITIVE-OBJECT-LENGTH does not count it.
+     ;; i.e. There's likely a fencepost bug here, but in the non-fatal way.
+     ;; (We could do without +1, but it makes this calculation in agreement
+     ;; with what it replaced in C code)
+     1
+     sb!vm:max-interrupts))
