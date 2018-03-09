@@ -139,24 +139,25 @@
 ;;; use an address width that is narrower than 64 bits.
 ;;; This function is private because of the wacky representation.
 (defun %space-bounds (space)
-  (ecase space
-    (:static
-     (values (%make-lisp-obj static-space-start)
-             (%make-lisp-obj (sap-int *static-space-free-pointer*))))
-    (:read-only
-     (values (%make-lisp-obj read-only-space-start)
-             (%make-lisp-obj (sap-int *read-only-space-free-pointer*))))
-    #+immobile-space
-    (:fixed
-     (values (%make-lisp-obj fixedobj-space-start)
-             (%make-lisp-obj (sap-int *fixedobj-space-free-pointer*))))
-    #+immobile-space
-    (:variable
-     (values (%make-lisp-obj varyobj-space-start)
-             (%make-lisp-obj (sap-int *varyobj-space-free-pointer*))))
-    (:dynamic
-     (values (%make-lisp-obj (current-dynamic-space-start))
-             (%make-lisp-obj (sap-int (dynamic-space-free-pointer)))))))
+  (macrolet ((bounds (a b) `(values (%make-lisp-obj ,a) (%make-lisp-obj ,b))))
+    (ecase space
+      (:static
+       (bounds static-space-start
+               (sap-int *static-space-free-pointer*)))
+      (:read-only
+       (bounds read-only-space-start
+               (sap-int *read-only-space-free-pointer*)))
+      #+immobile-space
+      (:fixed
+       (bounds fixedobj-space-start
+               (sap-int *fixedobj-space-free-pointer*)))
+      #+immobile-space
+      (:variable
+       (bounds varyobj-space-start
+               (sap-int *varyobj-space-free-pointer*)))
+      (:dynamic
+       (bounds (current-dynamic-space-start)
+               (sap-int (dynamic-space-free-pointer)))))))
 
 ;;; Return the total number of bytes used in SPACE.
 (defun space-bytes (space)
