@@ -780,8 +780,7 @@ Experimental: interface subject to change."
   ;; scanning threads for negative answers? Similarly, STACK-ALLOCATED-P for
   ;; checking if an object has been stack-allocated by a given thread for
   ;; testing purposes might not come amiss.
-  (if (typep object '(or fixnum character
-                      #.(if (= sb-vm:n-word-bits 64) 'single-float (values))))
+  (if (not (sb-vm:is-lisp-pointer (get-lisp-obj-address object)))
       (values :immediate nil)
       (let ((plist
              (sb-sys:with-pinned-objects (object)
@@ -878,14 +877,11 @@ conservative roots from the thread registers and interrupt contexts.
 Experimental: interface subject to change."
   (let ((fun (coerce function 'function))
         (seen (sb-int:alloc-xset)))
-    (labels ((call (part)
-               (when (and (is-lisp-pointer part)
-                          (not (sb-int:xset-member-p part seen)))
+    (flet ((call (part)
+             (when (and (sb-vm:is-lisp-pointer (get-lisp-obj-address part))
+                        (not (sb-int:xset-member-p part seen)))
                  (sb-int:add-to-xset part seen)
-                 (funcall fun part)))
-             (is-lisp-pointer (obj)
-               #+64-bit (= (logand (sb-kernel:get-lisp-obj-address obj) 3) 3)
-               #-64-bit (oddp (sb-kernel:get-lisp-obj-address obj))))
+                 (funcall fun part))))
       (when ext
         (let ((table sb-pcl::*eql-specializer-table*))
           (call (sb-int:with-locked-system-table (table)

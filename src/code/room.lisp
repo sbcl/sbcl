@@ -200,8 +200,7 @@
 
 (defun primitive-object-size (object)
   "Return number of bytes of heap or stack directly consumed by OBJECT"
-  (if #+64-bit (= (logand (get-lisp-obj-address object) 3) 3)
-      #-64-bit (oddp (get-lisp-obj-address object))
+  (if (is-lisp-pointer (get-lisp-obj-address object))
       (let ((words
               (typecase object
                 (cons 2)
