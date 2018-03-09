@@ -71,6 +71,10 @@ int arch_os_thread_init(struct thread *thread) {
         lose("Cannot sigaltstack: %s\n",strerror(errno));
     }
 #endif
+#ifdef MEMORY_SANITIZER
+    asm("movq %%fs:0, %0\n\tleaq __msan_param_tls@TPOFF(%0), %0"
+        : "=r" (thread->msan_param_tls));
+#endif
     return 1;
 }
 
