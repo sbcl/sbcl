@@ -59,11 +59,35 @@
 (defun sc-locations-member (location locations)
   (logbitp location locations))
 
-(defmacro do-sc-locations ((location locations &optional result) &body body)
-  (once-only ((locations locations))
-    `(dotimes (,location sb!vm:finite-sc-offset-limit ,result)
-       (when (logbitp ,location ,locations)
-         ,@body))))
+(defmacro do-sc-locations ((location locations
+                            &optional result increment (limit nil limitp))
+                           &body body)
+  (let* ((limit (cond
+                  ((not limitp)
+                   sb!vm:finite-sc-offset-limit)
+                  ((not (constantp limit))
+                   limit)
+                  ((eval limit))
+                  (t
+                   sb!vm:finite-sc-offset-limit)))
+         (mid   (floor sb!vm:finite-sc-offset-limit 2)))
+    (once-only ((locations locations)
+                (increment `(the sb!vm:finite-sc-offset ,(or increment 1))))
+      (labels ((make-block (start end)
+                 `(loop named #:noname
+                        for ,location of-type (integer 0 ,sb!vm:finite-sc-offset-limit)
+                        from ,start below ,end by ,increment
+                        when (logbitp ,location ,locations)
+                          do ,@body))
+               (make-guarded-block (start end)
+                 (unless (and (numberp limit) (<= limit start))
+                   (let ((mask (dpb -1 (byte mid start) 0)))
+                     `((when (logtest ,mask ,locations)
+                         ,(make-block start end )))))))
+        `(block nil
+           ,@(make-guarded-block 0   mid)
+           ,@(make-guarded-block mid limit)
+           ,result)))))
 
 ;;; the different policies we can use to determine the coding strategy
 (deftype ltn-policy ()

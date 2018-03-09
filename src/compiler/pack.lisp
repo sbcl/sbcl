@@ -377,7 +377,7 @@
       (let* ((sb (sc-sb sc))
              (confs (finite-sb-live-tns sb)))
         (aver (eq (sb-kind sb) :finite))
-        (do-sc-locations (el (sc-locations sc))
+        (do-sc-locations (el (sc-locations sc) nil (sc-element-size sc))
           (let ((conf (load-tn-conflicts-in-sc op sc el t)))
             (if conf
                 (used (describe-tn-use el conf op))
@@ -1096,7 +1096,7 @@
                    (not (load-tn-conflicts-in-sc op sc loc nil)))
               (return-from select-load-tn-location loc)))))
 
-  (do-sc-locations (loc (sc-locations sc) nil)
+  (do-sc-locations (loc (sc-locations sc) nil (sc-element-size sc))
     (unless (load-tn-conflicts-in-sc op sc loc nil)
       (return loc))))
 
@@ -1150,7 +1150,7 @@
                (event unpack-tn node)
                (unpack-tn victim))
              (throw 'unpacked-tn nil)))
-      (do-sc-locations (loc (sc-locations sc))
+      (do-sc-locations (loc (sc-locations sc) nil (sc-element-size sc))
         (block SKIP
           (collect ((victims nil adjoin))
             (do ((i loc (1+ i))
@@ -1419,7 +1419,7 @@
                 (locations+costs (make-array (sc-locations-count locations))))
            (declare (dynamic-extent locations+costs))
            (let ((i 0))
-             (do-sc-locations (location locations)
+             (do-sc-locations (location locations nil (sc-element-size sc))
                (setf (aref locations+costs i)
                      (cons location (location-cost location)))
                (incf i)))
@@ -1427,7 +1427,8 @@
            (dovector (location-and-cost locations+costs)
              (attempt-location (car location-and-cost)))))
         (t ; finite SB, not optimizing
-         (do-sc-locations (location (available-locations))
+         (do-sc-locations (location (available-locations) nil
+                                    (sc-element-size sc))
            (attempt-location location)))))))
 
 ;;; If a save TN, return the saved TN, otherwise return TN. This is

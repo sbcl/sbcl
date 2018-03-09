@@ -234,12 +234,13 @@
   (declare (type tn tn))
   (let* ((sc (tn-sc tn))
          (reserve (sc-reserve-locations sc))
+         (available-locations (logand (sc-locations sc)
+                                      (lognot reserve)))
          (locations 0))
     (declare (type sc-locations locations))
-    (do-sc-locations (location (sc-locations sc) locations)
-      (unless (or (and reserve ; common case: no reserve
-                       (sc-locations-member location reserve))
-                  (conflicts-in-sc tn sc location))
+    (do-sc-locations (location available-locations locations
+                               (sc-element-size sc))
+      (unless (conflicts-in-sc tn sc location)
         (setf (ldb (byte 1 location) locations) 1)))))
 
 ;; walk over vertices, precomputing as much information as possible,
@@ -363,7 +364,8 @@
 (defun vertex-domain (vertex)
   (let ((result 0))
     (declare (type sc-locations result))
-    (do-sc-locations (color (vertex-initial-domain vertex) result)
+    (do-sc-locations (color (vertex-initial-domain vertex) result
+                            (vertex-element-size vertex))
       (when (vertex-color-possible-p vertex color)
         (setf (ldb (byte 1 color) result) 1)))))
 
@@ -404,7 +406,7 @@
                            (values sb!vm:finite-sc-offset list))
                 vertices-best-color/single-vertex))
 (defun vertices-best-color/single-vertex (vertex colors)
-  (do-sc-locations (color colors)
+  (do-sc-locations (color colors nil (vertex-element-size vertex))
     (when (vertex-color-possible-p vertex color)
       (return-from vertices-best-color/single-vertex
         (values color (list vertex)))))
@@ -422,7 +424,7 @@
     ;; maximal 1-colorable subgraph here, ie. a maximum independent
     ;; set :\ Still, a heuristic like first attempting to pack in
     ;; max-cost vertices may be useful
-    (do-sc-locations (color colors)
+    (do-sc-locations (color colors nil (vertex-element-size (first vertices)))
       (let ((compatible '())
             (cost 0))
         (dolist (vertex vertices)
