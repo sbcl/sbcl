@@ -1824,26 +1824,27 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
           (values nil :thread-dead))))
 
   ;; Get values from the TLS area of the current thread.
+  ;; Disregard duplicates and immediate objects.
   (defun %thread-local-references ()
     ;; TLS-INDEX-START is a word number relative to thread base.
     ;; *FREE-TLS-INDEX* - which is only manipulated by machine code  - is an
     ;; offset from thread base to the next usable TLS cell as a raw word
     ;; manifesting in Lisp as a fixnum. Convert it from byte number to word
     ;; number before using it as the upper bound for the sequential scan.
-    (loop for index from tls-index-start
-          ;; On x86-64, mask off the sign bit. It is used as a semaphore.
-          below (ash (logand #!+x86-64 most-positive-fixnum
-                             sb!vm::*free-tls-index*)
-                     (+ (- sb!vm:word-shift) sb!vm:n-fixnum-tag-bits))
-          for obj = (sb!kernel:%make-lisp-obj
-                     (sb!sys:sap-int (sb!vm::current-thread-offset-sap index)))
-          unless (or (member (widetag-of obj)
-                             `(,sb!vm:no-tls-value-marker-widetag
-                               ,sb!vm:unbound-marker-widetag))
-                     (typep obj '(or fixnum character))
-                     (memq obj seen))
-          collect obj into seen
-          finally (return seen))))
+    (do ((index (ash tls-index-start sb!vm:word-shift) (+ index sb!vm:n-word-bytes))
+         ;; The sign bit of sb!vm::*free-tls-index* is a semaphore,
+         ;; except on PPC where it isn't, but masking is fine in any case.
+         (limit (ash (logand sb!vm::*free-tls-index* most-positive-fixnum)
+                     (- sb!vm:word-shift sb!vm:n-fixnum-tag-bits)))
+         ;; (There's no reason this couldn't work on any thread now.)
+         (sap (int-sap (thread-primitive-thread *current-thread*)))
+         (list))
+        ((>= index limit) list)
+      (let ((obj (sap-ref-lispobj sap index)))
+        (when (and obj ; don't bother returning NIL
+                   (sb!vm:is-lisp-pointer (get-lisp-obj-address obj))
+                   (not (memq obj list)))
+          (push obj list))))))
 
 (defun symbol-value-in-thread (symbol thread &optional (errorp t))
   "Return the local value of SYMBOL in THREAD, and a secondary value of T
