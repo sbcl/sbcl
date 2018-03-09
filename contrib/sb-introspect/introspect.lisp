@@ -27,7 +27,7 @@
 ;;; 4) FIXMEs
 
 (defpackage :sb-introspect
-  (:use "CL")
+  (:use "CL" "SB-KERNEL")
   (:export "ALLOCATION-INFORMATION"
            "FUNCTION-ARGLIST"
            "FUNCTION-LAMBDA-LIST"
@@ -80,9 +80,9 @@ include the pathname of the file and the position of the definition."
 
 (declaim (ftype (sb-int:sfunction (function) debug-info) function-debug-info))
 (defun function-debug-info (function)
-  (let* ((function-object (sb-kernel::%fun-fun function))
-         (function-header (sb-kernel:fun-code-header function-object)))
-    (sb-kernel:%code-debug-info function-header)))
+  (let* ((function-object (%fun-fun function))
+         (function-header (fun-code-header function-object)))
+    (%code-debug-info function-header)))
 
 (declaim (ftype (sb-int:sfunction (function) debug-source) function-debug-source))
 (defun function-debug-source (function)
@@ -107,10 +107,9 @@ FBOUNDP."
 (declaim (inline map-code-constants))
 (defun map-code-constants (code fn)
   "Call FN for each constant in CODE's constant pool."
-  (check-type code sb-kernel:code-component)
-  (loop for i from sb-vm:code-constants-offset below
-       (sb-kernel:code-header-words code)
-     do (funcall fn (sb-kernel:code-header-ref code i))))
+  (check-type code code-component)
+  (loop for i from sb-vm:code-constants-offset below (code-header-words code)
+     do (funcall fn (code-header-ref code i))))
 
 (declaim (inline map-allocated-code-components))
 (defun map-allocated-code-components (spaces fn)
@@ -135,9 +134,8 @@ constant pool."
        (map-code-constants
         obj
         (lambda (constant)
-          (when (and (sb-kernel:fdefn-p constant)
-                     (eq (sb-kernel:fdefn-fun constant)
-                         function))
+          (when (and (fdefn-p constant)
+                     (eq (fdefn-fun constant) function))
             (funcall fn obj))))))))
 
 ;;;; Finding definitions
@@ -336,7 +334,7 @@ If an unsupported TYPE is requested, the function will return NIL.
               (loop for xform in (sb-c::fun-info-transforms fun-info)
                     for source = (find-definition-source
                                   (sb-c::transform-function xform))
-                    for typespec = (sb-kernel:type-specifier
+                    for typespec = (type-specifier
                                     (sb-c::transform-type xform))
                     for note = (sb-c::transform-note xform)
                     do (setf (definition-source-description source)
@@ -508,7 +506,7 @@ function designator."
         ((typep function 'generic-function)
          (sb-pcl::generic-function-pretty-arglist function))
         (t
-         (sb-kernel:%fun-lambda-list function))))
+         (%fun-lambda-list function))))
 
 (defun deftype-lambda-list (typespec-operator)
   "Returns the lambda list of TYPESPEC-OPERATOR as first return
@@ -520,13 +518,13 @@ value."
                  (sb-int:info :type :expander typespec-operator)))
          (f (if (listp f) (car f) f)))
     (if (functionp f)
-        (values (sb-kernel:%fun-lambda-list f) t)
+        (values (%fun-lambda-list f) t)
         (values nil nil))))
 
 (defun function-type (function-designator)
   "Returns the ftype of FUNCTION-DESIGNATOR, or NIL."
   (flet ((ftype-of (function-designator)
-           (sb-kernel:type-specifier
+           (type-specifier
             (sb-int:proclaimed-ftype function-designator))))
     (etypecase function-designator
       (symbol
@@ -544,8 +542,7 @@ value."
        ;; Give declared type in globaldb priority over derived type
        ;; because it contains more accurate information e.g. for
        ;; struct-accessors.
-       (let ((type (function-type (sb-kernel:%fun-name
-                                   (sb-impl::%fun-fun function-designator)))))
+       (let ((type (function-type (%fun-name (%fun-fun function-designator)))))
          (if type
              type
              (sb-impl::%fun-type function-designator)))))))
@@ -566,14 +563,13 @@ value."
 
 (defun find-function-callees (function)
   "Return functions called by FUNCTION."
-  (declare (sb-kernel:simple-fun function))
+  (declare (simple-fun function))
   (let ((callees '()))
     (map-code-constants
-     (sb-kernel:fun-code-header function)
+     (fun-code-header function)
      (lambda (obj)
-       (when (sb-kernel:fdefn-p obj)
-         (push (sb-kernel:fdefn-fun obj)
-               callees))))
+       (when (fdefn-p obj)
+         (push (fdefn-fun obj) callees))))
     callees))
 
 (defun find-function-callers (function &optional (spaces '(:read-only :static
@@ -584,8 +580,8 @@ value."
      function
      spaces
      (lambda (code)
-       (dotimes (i (sb-kernel:code-n-entries code))
-         (pushnew (sb-kernel:%code-entry-point code i) referrers))))
+       (dotimes (i (code-n-entries code))
+         (pushnew (%code-entry-point code i) referrers))))
     referrers))
 
 ;;; XREF facility
@@ -594,7 +590,7 @@ value."
   (let ((result '()))
     (sb-c:map-simple-funs
      (lambda (name fun)
-       (sb-int:binding* ((xrefs (sb-kernel:%simple-fun-xrefs fun) :exit-if-null))
+       (sb-int:binding* ((xrefs (%simple-fun-xrefs fun) :exit-if-null))
          (sb-c:map-packed-xref-data
           (lambda (xref-kind xref-name xref-form-number)
             (when (and (eq xref-kind wanted-kind)
@@ -789,13 +785,13 @@ Experimental: interface subject to change."
       (values :immediate nil)
       (let ((plist
              (sb-sys:with-pinned-objects (object)
-               (let* ((addr (sb-kernel:get-lisp-obj-address object))
+               (let* ((addr (get-lisp-obj-address object))
                       (space
-                       (cond ((< (sb-kernel:current-dynamic-space-start) addr
-                                 (sb-sys:sap-int (sb-kernel:dynamic-space-free-pointer)))
+                       (cond ((< (current-dynamic-space-start) addr
+                                 (sb-sys:sap-int (dynamic-space-free-pointer)))
                               :dynamic)
                              #+immobile-space
-                             ((sb-kernel:immobile-space-addr-p addr)
+                             ((immobile-space-addr-p addr)
                               :immobile)
                              ((< sb-vm:read-only-space-start addr
                                  (sb-sys:sap-int sb-vm:*read-only-space-free-pointer*))
@@ -839,7 +835,7 @@ Experimental: interface subject to change."
         (cond (plist
                (values :heap plist))
               (t
-               (let ((sap (sb-sys:int-sap (sb-kernel:get-lisp-obj-address object))))
+               (let ((sap (sb-sys:int-sap (get-lisp-obj-address object))))
                  ;; FIXME: Check other stacks as well.
                  #+sb-thread
                  (dolist (thread (sb-thread:list-all-threads))
@@ -910,9 +906,9 @@ Experimental: interface subject to change."
          (call (realpart object))
          (call (realpart object)))
         (sb-vm::instance
-         (call (sb-kernel:%instance-layout object))
-         (sb-kernel:do-instance-tagged-slot (i object)
-           (call (sb-kernel:%instance-ref object i)))
+         (call (%instance-layout object))
+         (do-instance-tagged-slot (i object)
+           (call (%instance-ref object i)))
          #+sb-thread
          (when (typep object 'sb-thread:thread)
            (cond ((eq object sb-thread:*current-thread*)
@@ -940,37 +936,37 @@ Experimental: interface subject to change."
          (if (simple-vector-p object)
              (dotimes (i (length object))
                (call (aref object i)))
-             (when (sb-kernel:array-header-p object)
-               (call (sb-kernel:%array-data object))
-               (call (sb-kernel::%array-displaced-p object))
+             (when (array-header-p object)
+               (call (%array-data object))
+               (call (%array-displaced-p object))
                (unless simple
-                 (call (sb-kernel::%array-displaced-from object))))))
-        (sb-kernel:code-component
-         (call (sb-kernel:%code-debug-info object))
-         (loop for i from sb-vm:code-constants-offset
-               below (sb-kernel:code-header-words object)
-               do (call (sb-kernel:code-header-ref object i)))
-         (loop for i below (sb-kernel:code-n-entries object)
-               do (call (sb-kernel:%code-entry-point object i))))
-        (sb-kernel:fdefn
-         (call (sb-kernel:fdefn-name object))
-         (call (sb-kernel:fdefn-fun object)))
-        (sb-kernel:simple-fun
-         (call (sb-kernel:fun-code-header object))
-         (call (sb-kernel:%simple-fun-name object))
-         (call (sb-kernel:%simple-fun-arglist object))
-         (call (sb-kernel:%simple-fun-type object))
-         (call (sb-kernel:%simple-fun-info object)))
-        (sb-kernel:closure
-         (call (sb-kernel:%closure-fun object))
-         (sb-kernel:do-closure-values (x object)
+                 (call (%array-displaced-from object))))))
+        (code-component
+         (call (%code-debug-info object))
+         (loop for i from sb-vm:code-constants-offset below (code-header-words object)
+               do (call (code-header-ref object i)))
+         (loop for i below (code-n-entries object)
+               do (call (%code-entry-point object i))))
+        (fdefn
+         (call (fdefn-name object))
+         (call (fdefn-fun object)))
+        (simple-fun
+         (call (fun-code-header object))
+         (call (%simple-fun-name object))
+         (call (%simple-fun-arglist object))
+         (call (%simple-fun-type object))
+         (call (%simple-fun-info object)))
+        (closure
+         (call (%closure-fun object))
+         (do-closure-values (x object)
            (call x)))
-        (sb-kernel:funcallable-instance
-         (call (sb-kernel:%funcallable-instance-function object))
+        (funcallable-instance
+         ;; FIXME: layout ?
+         (call (%funcallable-instance-function object))
          (loop for i from sb-vm:instance-data-start
-               below (- (1+ (sb-kernel:get-closure-length object))
+               below (- (1+ (get-closure-length object))
                         sb-vm:funcallable-instance-info-offset)
-               do (call (sb-kernel:%funcallable-instance-info object i))))
+               do (call (%funcallable-instance-info object i))))
         (symbol
          (when ext
            (dolist (thread (sb-thread:list-all-threads))
@@ -994,12 +990,12 @@ Experimental: interface subject to change."
          (unless simple
            (call (symbol-package object))))
         (sb-kernel::random-class
-         (case (sb-kernel:widetag-of object)
+         (case (widetag-of object)
            (#.sb-vm:value-cell-widetag
-            (call (sb-kernel:value-cell-ref object)))
+            (call (value-cell-ref object)))
            (t
             (warn "~&MAP-ROOT: Unknown widetag ~S: ~S~%"
-                  (sb-kernel:widetag-of object) object)))))))
+                  (widetag-of object) object)))))))
   object)
 
 (defun object-size (object)
