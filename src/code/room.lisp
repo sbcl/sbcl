@@ -896,23 +896,30 @@ We could try a few things to mitigate this:
 
 ;;; Calls FUNCTION with all objects that have (possibly conservative)
 ;;; references to them on current stack.
+;;; This is for use by SB-INTROSPECT. (Other consumers, at your own risk)
+;;; Note that we do not call MAKE-LISP-OBJ in the errorp=nil mode, as it
+;;; potentially uses FORMAT and MAKE-UNPRINTABLE-OBJECT with each invocation.
+;;; And see the cautionary remarks above that function regarding its dangerous
+;;; nature (more so on precise GC).  On conservative GC we should be OK here
+;;; because we know that there's a stack reference.
 (defun map-stack-references (function)
-  (let ((end
-         (descriptor-sap
-          #+stack-grows-downward-not-upward *control-stack-end*
-          #-stack-grows-downward-not-upward *control-stack-start*))
-        (sp (current-sp))
-        (seen nil))
-    (loop until #+stack-grows-downward-not-upward (sap> sp end)
-                #-stack-grows-downward-not-upward (sap< sp end)
-          do (multiple-value-bind (obj ok) (make-lisp-obj (sap-ref-word sp 0) nil)
-               (when (and ok (typep obj '(not (or fixnum character))))
-                 (unless (member obj seen :test #'eq)
-                   (funcall function obj)
-                   (push obj seen))))
-             (setf sp
-                   #+stack-grows-downward-not-upward (sap+ sp n-word-bytes)
-                   #-stack-grows-downward-not-upward (sap+ sp (- n-word-bytes))))))
+  (declare (type function function))
+  (macrolet ((iter (step limit test)
+               `(do ((sp (current-sp) (sap+ sp (,step n-word-bytes)))
+                     (limit (sb-di::descriptor-sap ,limit))
+                     (seen nil))
+                    ((,test sp limit))
+                  (let ((word (sap-ref-word sp 0)))
+                    ;; Explicitly skip non-pointer words. The callable that
+                    ;; SB-INTROSPECT provides ignores immediate values anyway.
+                    (when (and (is-lisp-pointer word)
+                               (not (zerop (sb-di::valid-lisp-pointer-p (int-sap word)))))
+                      (let ((obj (%make-lisp-obj word)))
+                        (unless (memq obj seen)
+                          (push obj seen)
+                          (funcall function obj))))))))
+    #+stack-grows-downward-not-upward (iter + *control-stack-end* sap>)
+    #-stack-grows-downward-not-upward (iter - *control-stack-start* sap<)))
 
 ;;; This interface allows one either to be agnostic of the referencing space,
 ;;; or specify exactly one space, but not specify a list of spaces.
