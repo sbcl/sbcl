@@ -927,6 +927,12 @@ Experimental: interface subject to change."
                              (sb-thread:signal-semaphore sem)))
                           (sb-thread:wait-on-semaphore sem))
                       (sb-thread:interrupt-thread-error ()))
+                    ;; This is whacky - the other thread signals our condition var,
+                    ;; *then* we call the funarg on objects that may no longer
+                    ;; satisfy VALID-LISP-POINTER-P.
+                    ;; And incidentally, we miss any references from TLS indices
+                    ;; that map onto the 'struct thread', which is just as well
+                    ;; since they're either fixnums or dynamic-extent objects.
                     (mapc #'call refs))))))
         (array
          (if (simple-vector-p object)
