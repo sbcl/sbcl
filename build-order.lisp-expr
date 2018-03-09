@@ -643,11 +643,11 @@
 
  ("src/code/early-step")                  ; target-thread needs *STEP-OUT*
 
+ ("src/code/gc"     :not-host)
  ("src/code/target-thread"     :not-host)
  ("src/code/timer" :not-host)
 
  ;; defines SB!DI:DO-DEBUG-FUN-BLOCKS, needed by target-disassem.lisp
- ("src/code/gc"     :not-host)
  ("src/code/alloc"  :not-host) ; needs foo-SPACE-START
  ("src/code/debug-int" :not-host)
  ("src/code/interr" :not-host)
