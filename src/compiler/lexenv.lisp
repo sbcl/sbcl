@@ -67,7 +67,9 @@
                 (typecase what
                   (cons
                    (push name shadowed-funs)
-                   (push (cons name (function-lambda-expression (cdr what))) macros))
+                   (let ((expression (function-lambda-expression (cdr what))))
+                     (aver expression)
+                     (push (cons name expression) macros)))
                   ;; FIXME: Is there a good reason for this not to be
                   ;; DEFINED-FUN (which :INCLUDEs GLOBAL-VAR, in case
                   ;; you're wondering how this ever worked :-)? Maybe

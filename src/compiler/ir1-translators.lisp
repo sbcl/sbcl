@@ -327,8 +327,17 @@ Evaluate the FORMS in the specified SITUATIONS (any of :COMPILE-TOPLEVEL,
             (fail "The local macro argument list ~S is not a list."
                   arglist))
           `(,name macro .
-                  ,(compile-in-lexenv (make-macro-lambda nil arglist body 'macrolet name)
-                                      lexenv)))))))
+                  ,(compile-in-lexenv
+                    (let (#-sb-xc-host
+                          (*macro-policy*
+                            ;; Make sure to save the sources if an
+                            ;; inlined functions closes over this
+                            ;; macro.
+                            (process-optimize-decl
+                             '(optimize (eval-store-source-form 3))
+                             *macro-policy*)))
+                      (make-macro-lambda nil arglist body 'macrolet name))
+                    lexenv)))))))
 
 (defun funcall-in-macrolet-lexenv (definitions fun context)
   (%funcall-in-foomacrolet-lexenv

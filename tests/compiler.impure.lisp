@@ -2864,3 +2864,13 @@
                                            (declare (optimize (safety 0)))
                                            (safety-zero-return-checking 1))
                                         :allow-warnings t))))
+
+(with-test (:name :inline-macrolet-debug-0)
+  (let* ((fun (gensym "FUN"))
+         (fun (eval
+               `(locally (declare (optimize (debug 0)))
+                  (macrolet ((macro () 10))
+                    (proclaim '(inline ,fun))
+                    (defun ,fun () (macro)))
+                  (lambda () (,fun))))))
+    (assert (= (funcall fun) 10))))
