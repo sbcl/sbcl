@@ -488,7 +488,7 @@ attach_os_thread(init_thread_data *scribble)
     os_thread_t os = pthread_self();
     odxprint(misc, "attach_os_thread: attaching to %p", os);
 
-    struct thread *th = create_thread_struct(NIL);
+    struct thread *th = create_thread_struct(NO_TLS_VALUE_MARKER_WIDETAG);
     block_deferrable_signals(&scribble->oldset);
 
 #ifndef LISP_FEATURE_SB_SAFEPOINT
@@ -498,7 +498,6 @@ attach_os_thread(init_thread_data *scribble)
     unblock_gc_signals(0, 0);
 #endif
 
-    th->no_tls_value_marker = NO_TLS_VALUE_MARKER_WIDETAG;
     /* We don't actually want a pthread_attr here, but rather than add
      * `if's to the post-mostem, let's just keep that code happy by
      * keeping it initialized: */
