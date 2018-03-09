@@ -249,7 +249,7 @@
                                          (cell-error-name e)
                                          (sb-thread::symbol-value-in-thread-error-info e))))))))
     (signal-semaphore semaphore)
-    (assert (equal (list *current-thread* 'this-is-new (list :read :unbound-in-thread))
+    (assert (equal (list *current-thread* 'this-is-new (list :read :no-tls-value))
                    (join-thread child)))))
 
 (with-test (:name :symbol-value-in-thread.6 :skipped-on (not :sb-thread))

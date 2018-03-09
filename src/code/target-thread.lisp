@@ -1795,21 +1795,17 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
   #!+ppc ; only PPC uses a separate symbol for the TLS index lock
   (!defglobal sb!vm::*tls-index-lock* 0)
 
-(defun %symbol-value-in-thread (symbol thread)
+  (defun %symbol-value-in-thread (symbol thread)
     ;; Prevent the thread from dying completely while we look for the TLS
     ;; area...
     (with-all-threads-lock
       (if (thread-alive-p thread)
-          (let* ((offset (get-lisp-obj-address (symbol-tls-index symbol)))
-                 (obj (sap-ref-lispobj (int-sap (thread-primitive-thread thread)) offset))
-                 (tl-val (get-lisp-obj-address obj)))
-            (cond ((zerop offset)
-                   (values nil :no-tls-value))
-                  ((or (eql tl-val sb!vm:no-tls-value-marker-widetag)
-                       (eql tl-val sb!vm:unbound-marker-widetag))
-                   (values nil :unbound-in-thread))
-                  (t
-                   (values obj :ok))))
+          (let ((val (sap-ref-lispobj (int-sap (thread-primitive-thread thread))
+                                      (get-lisp-obj-address (symbol-tls-index symbol)))))
+            (case (get-lisp-obj-address val)
+              (#.sb!vm:no-tls-value-marker-widetag (values nil :no-tls-value))
+              (#.sb!vm:unbound-marker-widetag (values nil :unbound-in-thread))
+              (t (values val :ok))))
           (values nil :thread-dead))))
 
   (defun %set-symbol-value-in-thread (symbol thread value)
