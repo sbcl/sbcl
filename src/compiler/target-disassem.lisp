@@ -1659,7 +1659,9 @@
 (defun valid-extended-function-designators-for-disassemble-p (thing)
   (typecase thing
     ((satisfies legal-fun-name-p)
-     (compiled-funs-or-lose (fdefinition thing) thing))
+     (compiled-funs-or-lose (or (and (symbolp thing) (macro-function thing))
+                                (fdefinition thing))
+                            thing))
     (sb!pcl::%method-function
          ;; in a %METHOD-FUNCTION, the user code is in the fast function, so
          ;; we to disassemble both.
