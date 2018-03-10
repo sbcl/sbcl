@@ -90,7 +90,7 @@
                     (endp actual))
                    ((or (eq '? (car want)) (equal (car want) (car actual)))
                     (args-equal (cdr want) (cdr actual)))
-                   ((typep (car want) 'sb-impl::unprintable-object)
+                   ((typep (car want) 'sb-debug::unprintable-object)
                     (equalp (car want) (car actual)))
                    (t
                     nil)))
