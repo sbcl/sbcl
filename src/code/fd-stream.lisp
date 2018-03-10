@@ -48,7 +48,7 @@
   (tail 0 :type index))
 (declaim (freeze-type buffer))
 
-(defglobal *available-buffers* ()
+(define-load-time-global *available-buffers* ()
   "List of available buffers.")
 
 (defconstant +bytes-per-buffer+ (* 4 1024)
@@ -438,7 +438,7 @@
 
 ;;;; output routines and related noise
 
-(defglobal *output-routines* ()
+(define-load-time-global *output-routines* ()
   "List of all available output routines. Each element is a list of the
   element-type output, the kind of buffering, the function name, and the number
   of bytes per element.")

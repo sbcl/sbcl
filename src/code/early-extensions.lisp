@@ -20,7 +20,7 @@
   "The absolute pathname of the running SBCL runtime.")
 
 ;;; something not EQ to anything we might legitimately READ
-(defglobal *eof-object* (make-symbol "EOF-OBJECT"))
+(define-load-time-global *eof-object* (make-symbol "EOF-OBJECT"))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant max-hash sb!xc:most-positive-fixnum))
@@ -756,7 +756,7 @@ NOTE: This interface is experimental and subject to change."
                  (values ,@result-temps))))))
     `(progn
        (pushnew ',var-name *cache-vector-symbols*)
-       (defglobal ,var-name nil)
+       (define-load-time-global ,var-name nil)
        ,@(when *profile-hash-cache*
            `((declaim (type (simple-array fixnum (3)) ,statistics-name))
              (defvar ,statistics-name)))

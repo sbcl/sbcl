@@ -12,11 +12,11 @@
 (in-package "SB!UNICODE")
 
 (declaim (type simple-vector **special-numerics**))
-(sb!impl::defglobal **special-numerics**
+(sb!ext:define-load-time-global **special-numerics**
   #.(sb-cold:read-from-file "output/numerics.lisp-expr"))
 
 (declaim (type (simple-array (unsigned-byte 32) (*)) **block-ranges**))
-(sb!impl::defglobal **block-ranges**
+(sb!ext:define-load-time-global **block-ranges**
   #.(!coerce-to-specialized
      (sb-cold:read-from-file "output/blocks.lisp-expr")
      '(unsigned-byte 32)))
@@ -29,9 +29,12 @@
                    (bidi-mirroring-list
                     (sb-cold:read-from-file "output/bidi-mirrors.lisp-expr")))
                `(progn
-                  (sb!impl::defglobal **proplist-properties** ',proplist-dump)
-                  (sb!impl::defglobal **confusables** ',confusable-sets)
-                  (sb!impl::defglobal **bidi-mirroring-glyphs** ',bidi-mirroring-list)
+                  (sb!ext:define-load-time-global **proplist-properties**
+                    ',proplist-dump)
+                  (sb!ext:define-load-time-global **confusables**
+                    ',confusable-sets)
+                  (sb!ext:define-load-time-global **bidi-mirroring-glyphs**
+                    ',bidi-mirroring-list)
                   (defun !unicode-properties-cold-init ()
                     (let ((hash (make-hash-table)) (list ',proplist-dump))
                       (do ((k (car list) (car list)) (v (cadr list) (cadr list)))
@@ -118,19 +121,19 @@ with underscores replaced by dashes."
 ;; WARNING: These have to be manually kept in sync with the values in ucd.lisp
 (declaim (type simple-vector *general-categories* *bidi-classes* *east-asian-widths*
                *scripts* *line-break-classes* *blocks*))
-(sb!impl::defglobal *general-categories*
+(sb!ext:define-load-time-global *general-categories*
   #(:Lu :Ll :Lt :Lm :Lo :Cc :Cf :Co :Cs :Cn :Mc :Me :Mn :Nd
     :Nl :No :Pc :Pd :Pe :Pf :Pi :Po :Ps :Sc :Sk :Sm :So :Zl
     :Zp :Zs))
 
-(sb!impl::defglobal *bidi-classes*
+(sb!ext:define-load-time-global *bidi-classes*
   #(:BN :AL :AN :B :CS :EN :ES :ET :L :LRE :LRO :NSM :ON
     :PDF :R :RLE :RLO :S :WS :LRI :RLI :FSI :PDI))
 
-(sb!impl::defglobal *east-asian-widths*
+(sb!ext:define-load-time-global *east-asian-widths*
   #(:N :A :H :W :F :Na))
 
-(sb!impl::defglobal *scripts*
+(sb!ext:define-load-time-global *scripts*
   #(:Unknown :Common :Latin :Greek :Cyrillic :Armenian :Hebrew :Arabic :Syriac
     :Thaana :Devanagari :Bengali :Gurmukhi :Gujarati :Oriya :Tamil :Telugu
     :Kannada :Malayalam :Sinhala :Thai :Lao :Tibetan :Myanmar :Georgian :Hangul
@@ -150,12 +153,12 @@ with underscores replaced by dashes."
     :Psalter-Pahlavi :Grantha :Mro :Siddham :Khojki :Nabataean :Tirhuta
     :Khudawadi :Old-North-Arabian :Warang-Citi :Linear-A :Old-Permic))
 
-(sb!impl::defglobal *line-break-classes*
+(sb!ext:define-load-time-global *line-break-classes*
     #(:XX :AI :AL :B2 :BA :BB :BK :CB :CJ :CL :CM :CP :CR :EX :GL
       :HL :HY :ID :IN :IS :LF :NL :NS :NU :OP :PO :PR :QU :RI :SA
       :SG :SP :SY :WJ :ZW))
 
-(sb!impl::defglobal *blocks*
+(sb!ext:define-load-time-global *blocks*
   #(:Basic-Latin :Latin-1-Supplement :Latin-Extended-A :Latin-Extended-B
     :IPA-Extensions :Spacing-Modifier-Letters :Combining-Diacritical-Marks
     :Greek-and-Coptic :Cyrillic :Cyrillic-Supplement :Armenian :Hebrew :Arabic
@@ -704,10 +707,10 @@ only characters for which it returns T are collected."
 
 ;;; Unicode case algorithms
 ;; FIXME: Make these parts less redundant (macro?)
-(sb!ext:defglobal **special-titlecases**
+(sb!ext:define-load-time-global **special-titlecases**
   '#.(sb-cold:read-from-file "output/titlecases.lisp-expr"))
 
-(sb!ext:defglobal **special-casefolds**
+(sb!ext:define-load-time-global **special-casefolds**
   '#.(sb-cold:read-from-file "output/foldcases.lisp-expr"))
 
 (defun has-case-p (char)

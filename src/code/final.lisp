@@ -283,7 +283,7 @@ Examples:
   ;; Saving a core sets the flag to NIL so that finalizers which execute
   ;; between stopping the thread and writing to disk will be synchronous.
   ;; Restarting a saved core resets the flag to T.
-  (defglobal *finalizer-thread* t)
+  (define-load-time-global *finalizer-thread* t)
   (declaim (type (or sb!thread:thread boolean) *finalizer-thread*))
   (define-load-time-global *finalizer-queue-lock*
       (sb!thread:make-mutex :name "finalizer"))

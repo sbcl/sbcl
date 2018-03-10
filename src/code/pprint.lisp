@@ -703,8 +703,8 @@ line break."
 
 ;;;; pprint-dispatch tables
 
-(defglobal *standard-pprint-dispatch-table* nil)
-(defglobal *initial-pprint-dispatch-table* nil)
+(define-load-time-global *standard-pprint-dispatch-table* nil)
+(define-load-time-global *initial-pprint-dispatch-table* nil)
 
 (defstruct (pprint-dispatch-entry
             (:constructor make-pprint-dispatch-entry (type priority fun test-fn))

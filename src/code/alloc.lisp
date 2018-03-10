@@ -44,7 +44,8 @@
 #!+immobile-space
 (progn
 
-(defglobal *immobile-space-mutex* (sb!thread:make-mutex :name "Immobile space"))
+(define-load-time-global *immobile-space-mutex*
+    (sb!thread:make-mutex :name "Immobile space"))
 
 (eval-when (:compile-toplevel)
   (assert (eql code-code-size-slot 1))

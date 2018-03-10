@@ -186,7 +186,7 @@
 
 
 ;;; To be initialized in unix/win32-pathname.lisp
-(defglobal *physical-host* nil)
+(define-load-time-global *physical-host* nil)
 
 ;;; Return a value suitable, e.g., for preinitializing
 ;;; *DEFAULT-PATHNAME-DEFAULTS* before *DEFAULT-PATHNAME-DEFAULTS* is
@@ -431,7 +431,7 @@
 ;;; A two-level lookup is used- it works better than mixing all
 ;;; pathname components into a hash key.
 (define-load-time-global *pathnames* (make-array 211 :initial-element nil))
-(defglobal *pathnames-lock* (sb!thread:make-mutex :name "Pathnames"))
+(define-load-time-global *pathnames-lock* (sb!thread:make-mutex :name "Pathnames"))
 
 (defun %make-pathname (host device directory name type version)
   (if (or device (neq host *physical-host*))

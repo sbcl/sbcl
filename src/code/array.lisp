@@ -329,7 +329,8 @@
                    #.sb!vm:complex-vector-widetag))))
     (make-case)))
 
-(defglobal %%simple-array-n-bits-shifts%% (make-array (1+ sb!vm:widetag-mask)))
+(define-load-time-global %%simple-array-n-bits-shifts%%
+    (make-array (1+ sb!vm:widetag-mask)))
 #.(loop for info across sb!vm:*specialized-array-element-type-properties*
         collect `(setf (aref %%simple-array-n-bits-shifts%% ,(sb!vm:saetp-typecode info))
                        ,(sb!vm:saetp-n-bits-shift info)) into forms
@@ -625,7 +626,8 @@ of specialized arrays is supported."
 ;;; vectors or not simple.
 (macrolet ((def (name table-name)
              `(progn
-                (defglobal ,table-name (make-array ,(1+ sb!vm:widetag-mask)))
+                (define-load-time-global ,table-name
+                    (make-array ,(1+ sb!vm:widetag-mask)))
                 (declaim (type (simple-array function (,(1+ sb!vm:widetag-mask)))
                                ,table-name))
                 (defmacro ,name (array-var)

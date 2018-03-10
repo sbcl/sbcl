@@ -17,7 +17,7 @@
   (typep warning *muffled-warnings*))
 
 ;; Host lisp does not need a value for this, so start it out as NIL.
-(defglobal **initial-handler-clusters** nil)
+(define-load-time-global **initial-handler-clusters** nil)
 
 ;;; Each cluster is an alist of the form
 ;;;

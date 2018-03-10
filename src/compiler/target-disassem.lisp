@@ -139,7 +139,7 @@
 
 ;;; now that we've defined the structure, we can declaim the type of
 ;;; the variable:
-(defglobal *disassem-inst-space* nil)
+(define-load-time-global *disassem-inst-space* nil)
 (declaim (type (or null inst-space) *disassem-inst-space*))
 
 (defstruct (inst-space-choice (:conc-name ischoice-)
@@ -1872,7 +1872,7 @@
                (t
                 (values nil nil))))))
 
-(defglobal *assembler-routines-by-addr* nil)
+(define-load-time-global *assembler-routines-by-addr* nil)
 
 ;;; Return the name of the primitive Lisp assembler routine that contains
 ;;; ADDRESS, or foreign symbol located at ADDRESS, or NIL if there isn't one.

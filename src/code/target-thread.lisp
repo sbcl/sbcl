@@ -461,7 +461,7 @@ HOLDING-MUTEX-P."
   ;; Make sure to get the current value.
   (sb!ext:compare-and-swap (mutex-%owner mutex) nil nil))
 
-(sb!ext:defglobal **deadlock-lock** nil)
+(sb!ext:define-load-time-global **deadlock-lock** nil)
 
 #!+(or (not sb-thread) sb-futex)
 (defstruct (waitqueue (:copier nil) (:constructor make-waitqueue (&key name)))
@@ -1896,7 +1896,7 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
 #!+sb-thread
 (progn
 
-  (sb!ext:defglobal sb!vm::*free-tls-index* 0)
+  (sb!ext:define-load-time-global sb!vm::*free-tls-index* 0)
   ;; Keep in sync with 'compiler/generic/parms.lisp'
   #!+ppc ; only PPC uses a separate symbol for the TLS index lock
   (!defglobal sb!vm::*tls-index-lock* 0)

@@ -627,7 +627,8 @@
 ;;; The only way to detect the current set of references is to find uses of the
 ;;; current jump address, which means we need to fix them *all* before anyone
 ;;; else gets an opportunity to change the fdefn-fun of this same fdefn again.
-(defglobal *static-linker-lock* (sb!thread:make-mutex :name "static linker"))
+(define-load-time-global *static-linker-lock*
+    (sb!thread:make-mutex :name "static linker"))
 (defun sb!vm::remove-static-links (fdefn)
   ; (warn "undoing static linkage of ~S" (fdefn-name fdefn))
   (sb!thread::with-system-mutex (*static-linker-lock* :without-gcing t)

@@ -87,7 +87,7 @@
 ;;; ever allocated by adding this to the number of bytes currently
 ;;; allocated and never freed.)
 (declaim (type unsigned-byte *n-bytes-freed-or-purified*))
-(defglobal *n-bytes-freed-or-purified* 0)
+(define-load-time-global *n-bytes-freed-or-purified* 0)
 (defun gc-reinit ()
   (setq *gc-inhibit* nil)
   (gc)

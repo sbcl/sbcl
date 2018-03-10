@@ -193,7 +193,7 @@ format."
           (truncate years 100))
        (truncate (+ years 300) 400))))
 
-(defglobal **days-before-month**
+(define-load-time-global **days-before-month**
   #.(let ((reversed-result nil)
           (sum 0))
       (push nil reversed-result)

@@ -21,7 +21,7 @@
 (deftype char-code ()
   `(integer 0 (,sb!xc:char-code-limit)))
 
-(defglobal **unicode-character-name-huffman-tree** ())
+(define-load-time-global **unicode-character-name-huffman-tree** ())
 
 (declaim (inline pack-3-codepoints))
 (defun pack-3-codepoints (first &optional (second 0) (third 0))
@@ -45,7 +45,7 @@
                           array)))
                     (init-global (name type &optional length)
                       `(progn
-                         (defglobal ,name
+                         (define-load-time-global ,name
                              ,(if (eql type 'hash-table)
                                   `(make-hash-table)
                                   `(make-array ,length :element-type ',type)))
@@ -282,7 +282,7 @@
   (frob))
 #+sb-xc-host (!character-name-database-cold-init)
 
-(defglobal *base-char-name-alist*
+(define-load-time-global *base-char-name-alist*
   ;; Note: The *** markers here indicate character names which are
   ;; required by the ANSI specification of #'CHAR-NAME. For the others,
   ;; we prefer the ASCII standard name.

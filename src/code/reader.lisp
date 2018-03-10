@@ -31,7 +31,7 @@
 ;;; WITH-STANDARD-IO-SYNTAX), and should not normally be user-visible.
 ;;; If the initial value is changed from NIL to something more interesting,
 ;;; be sure to update the duplicated definition in "src/code/print.lisp"
-(defglobal *standard-readtable* nil)
+(define-load-time-global *standard-readtable* nil)
 
 ;;; In case we get an error trying to parse a symbol, we want to rebind the
 ;;; above stuff so it's cool.

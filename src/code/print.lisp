@@ -57,7 +57,7 @@
 variable: an unreadable object representing the error is printed instead.")
 
 ;; duplicate defglobal because this file is compiled before "reader"
-(defglobal *standard-readtable* nil)
+(define-load-time-global *standard-readtable* nil)
 
 (defun %with-standard-io-syntax (function)
   (declare (type function function))
@@ -1010,7 +1010,7 @@ variable: an unreadable object representing the error is printed instead.")
 ;;;
 ;;; It doesn't need a lock, but if you work on SCRUB-POWER-CACHE or
 ;;; POWERS-FOR-BASE, see that you don't break the assumptions!
-(defglobal *power-cache* (make-array 37 :initial-element nil))
+(define-load-time-global *power-cache* (make-array 37 :initial-element nil))
 (declaim (type (simple-vector 37) *power-cache*))
 
 (defconstant +power-cache-integer-length-limit+ 2048)

@@ -27,7 +27,7 @@
 (in-package "SB!PCL")
 
 (declaim (type (member nil early braid complete) **boot-state**))
-(defglobal **boot-state** nil)
+(define-load-time-global **boot-state** nil)
 
 
 ;;; The PCL package is internal and is used by code in potential

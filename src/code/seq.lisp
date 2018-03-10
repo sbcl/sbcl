@@ -581,7 +581,7 @@
                 do (setf pointer (cdr (rplaca pointer item)))))))
   sequence)
 
-(defglobal %%fill-bashers%% (make-array (1+ sb!vm:widetag-mask)))
+(define-load-time-global %%fill-bashers%% (make-array (1+ sb!vm:widetag-mask)))
 #.`(progn
    ,@(loop for saetp across sb!vm:*specialized-array-element-type-properties*
            for et = (sb!vm:saetp-specifier saetp)
