@@ -77,7 +77,7 @@
  ;; of CL special binding when the variable is undeclared.
  ("src/code/globals" :not-host)
 
- ("src/code/cmacros" :not-host :slam-forcibly)
+ ("src/code/cmacros" :not-host)
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; cross-compiler-only replacements for stuff which in target Lisp would be
@@ -120,7 +120,7 @@
  ("src/code/barrier" :not-host)
  ("src/code/parse-body" :c-headers)       ; on host for PARSE-BODY
  ("src/code/unportable-float")
- ("src/compiler/policy" :c-headers :slam-forcibly)
+ ("src/compiler/policy" :c-headers)
  #!+sb-fasteval ("src/interpreter/basic-env")
  ;; PARSE-{UNKNOWN,DEPRECATED}-TYPE and other things should be known
  ;; condition subtypes as soon as possible
@@ -154,7 +154,7 @@
 
  ("src/code/funutils" :not-host)
 
- ("src/code/maphash" :not-host :slam-forcibly)
+ ("src/code/maphash" :not-host)
  ("src/code/xset" :c-headers) ; for representation of MEMBER type
  ;; This needs DEF!STRUCT, and is itself needed early so that structure
  ;; accessors and inline functions defined here can be compiled inline

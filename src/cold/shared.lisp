@@ -303,11 +303,6 @@
     ;; SBCL. ("not target code" -- but still presumably host code,
     ;; used to support the cross-compilation process)
     :not-target
-    ;; meaning: This file must always be compiled by 'slam.lisp' even if
-    ;; the object is not out of date with respect to its source.
-    ;; Necessary if there are compile-time-too effects that are not
-    ;; reflected into make-host-2 by load-time actions of make-host-1.
-    :slam-forcibly
     ;; meaning: The #'COMPILE-STEM argument :TRACE-FILE should be T.
     ;; When the compiler is SBCL's COMPILE-FILE or something like it,
     ;; compiling "foo.lisp" will generate "foo.trace" which contains lots

@@ -42,8 +42,7 @@
   (unless (position :not-target flags)
     (let ((srcname (stem-source-path stem))
           (objname (stem-object-path stem flags :target-compile)))
-      (when (or (member :slam-forcibly flags)
-                (not (output-up-to-date-wrt-input-p objname srcname))
+      (when (or (not (output-up-to-date-wrt-input-p objname srcname))
                 ;; Back to our "new-trace-file" case, also build if
                 ;; a trace file is desired but is out-of-date.
                 (and (position :trace-file flags)
