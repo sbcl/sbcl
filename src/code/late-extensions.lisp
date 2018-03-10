@@ -39,24 +39,6 @@
 ;;;      ;; -- WHN 2002-10-19
 ;;;      (error "can't calculate length of cyclic list")))
 
-;;; Used internally, but it would be nice to provide something
-;;; like this for users as well.
-(defmacro define-structure-slot-addressor (name &key structure slot)
-  (let* ((dd (find-defstruct-description structure t))
-         (slotd (or (and dd (find slot (dd-slots dd) :key #'dsd-name))
-                    (error "Slot ~S not found in ~S." slot structure)))
-         (index (dsd-index slotd)))
-    `(progn
-       (declaim (inline ,name))
-       (defun ,name (instance)
-         (declare (type ,structure instance) (optimize speed))
-         (truly-the
-          word
-          (+ (get-lisp-obj-address instance)
-             ,(+ (- sb!vm:instance-pointer-lowtag)
-                 (* (+ sb!vm:instance-slots-offset index)
-                    sb!vm:n-word-bytes))))))))
-
 (defun spin-loop-hint ()
   "Hints the processor that the current thread is spin-looping."
   (spin-loop-hint))

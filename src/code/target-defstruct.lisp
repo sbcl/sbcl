@@ -263,5 +263,24 @@
 
 (defmethod print-object ((x structure-object) stream)
   (default-structure-print x stream *current-level-in-print*))
+
+;;; Used internally, but it would be nice to provide something
+;;; like this for users as well.
+(defmacro define-structure-slot-addressor (name &key structure slot)
+  (let* ((dd (find-defstruct-description structure t))
+         (slotd (or (and dd (find slot (dd-slots dd) :key #'dsd-name))
+                    (error "Slot ~S not found in ~S." slot structure)))
+         (index (dsd-index slotd)))
+    `(progn
+       (declaim (inline ,name))
+       (defun ,name (instance)
+         (declare (type ,structure instance) (optimize speed))
+         (truly-the
+          word
+          (+ (get-lisp-obj-address instance)
+             ,(+ (- sb!vm:instance-pointer-lowtag)
+                 (* (+ sb!vm:instance-slots-offset index)
+                    sb!vm:n-word-bytes))))))))
+
 
 (/show0 "target-defstruct.lisp end of file")
