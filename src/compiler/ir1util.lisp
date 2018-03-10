@@ -1126,12 +1126,59 @@
            (frob if-alternative)
            (when (eq (if-consequent last)
                      (if-alternative last))
-             (reoptimize-component (block-component block) :maybe)))))
+             (reoptimize-component (block-component block) t)))))
       (t
        (unless (memq new (block-succ block))
          (link-blocks block new)))))
 
   (values))
+
+;;; Utility: return T if both argument cblocks are equivalent.  For now,
+;;; detect only blocks that read the same leaf into the same lvar, and
+;;; continue to the same block.
+(defun blocks-equivalent-p (x y)
+  (declare (type cblock x y))
+  (let ((ref-x (single-ref-block-p x))
+        (ref-y (single-ref-block-p y)))
+    (and ref-x
+         ref-y
+         (equal (block-succ x) (block-succ y))
+         (eq (ref-lvar ref-x) (ref-lvar ref-y))
+         (eq (ref-leaf ref-x) (ref-leaf ref-y))
+         (eq (node-enclosing-cleanup ref-x)
+             (node-enclosing-cleanup ref-y)))))
+
+(defun single-ref-block-p (block)
+  (let ((start (block-start block)))
+    (when start
+      (let ((node (ctran-next start)))
+        (and (ref-p node)
+             (eq (block-last block) node)
+             node)))))
+
+;;; If a block consisting of a single ref is equivalent to another
+;;; block with the same ref and the have the same successor it can be
+;;; removed.
+;;; 
+;;; Removing more is tricky, debugging will suffer, and code relying
+;;; on constraint propagation will break, e.g.
+;;; (if (simple-vector-p x) (aref x 0) (aref x 0)))
+;;; 344d4d778 contains some code that handles combinations and casts.
+(defun remove-equivalent-blocks (block)
+  (let ((pred (block-pred block)))
+    (when (cdr pred)
+      (loop for (block1 . rest) on pred
+            when (and (not (block-delete-p block1))
+                      (single-ref-block-p block1))
+            do
+            (loop for block2 in rest
+                  when (and (not (block-delete-p block1))
+                            (blocks-equivalent-p block1 block2))
+                  do
+                  (loop for pred in (block-pred block2)
+                        do
+                        (change-block-successor pred block2 block1))
+                  (delete-block block2 t))))))
 
 ;;; Unlink a block from the next/prev chain. We also null out the
 ;;; COMPONENT.

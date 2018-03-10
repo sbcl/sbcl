@@ -378,7 +378,7 @@
 
                  (unless (join-successor-if-possible block)
                    (return)))
-
+              (remove-equivalent-blocks block)
               (when (and (not fastp) (block-reoptimize block) (block-component block))
                 (aver (not (block-delete-p block)))
                 (ir1-optimize-block block))
@@ -653,21 +653,6 @@
 
 ;;;; IF optimization
 
-;;; Utility: return T if both argument cblocks are equivalent.  For now,
-;;; detect only blocks that read the same leaf into the same lvar, and
-;;; continue to the same block.
-(defun cblocks-equivalent-p (x y)
-  (declare (type cblock x y))
-  (and (ref-p (block-start-node x))
-       (eq (block-last x) (block-start-node x))
-
-       (ref-p (block-start-node y))
-       (eq (block-last y) (block-start-node y))
-
-       (equal (block-succ x) (block-succ y))
-       (eql (ref-lvar (block-start-node x)) (ref-lvar (block-start-node y)))
-       (eql (ref-leaf (block-start-node x)) (ref-leaf (block-start-node y)))))
-
 ;;; Check whether the predicate is known to be true or false,
 ;;; deleting the IF node in favor of the appropriate branch when this
 ;;; is the case.
@@ -689,8 +674,8 @@
                     alternative)
                    ((type= type (specifier-type 'null))
                     consequent)
-                   ((or (eq consequent alternative) ; Can this happen?
-                        (cblocks-equivalent-p alternative consequent))
+                   ((or (eq consequent alternative)
+                        (blocks-equivalent-p alternative consequent))
                     ;; Even if the references are the same they can have
                     ;; different derived types based on the TEST
                     ;; Don't lose the second type when killing it.
