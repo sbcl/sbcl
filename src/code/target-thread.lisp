@@ -1828,18 +1828,18 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
   (defun %thread-local-references ()
     ;; TLS-INDEX-START is a word number relative to thread base.
     ;; *FREE-TLS-INDEX* - which is only manipulated by machine code  - is an
-    ;; offset from thread base to the next usable TLS cell as a raw word
-    ;; manifesting in Lisp as a fixnum. Convert it from byte number to word
-    ;; number before using it as the upper bound for the sequential scan.
-    (do ((index (ash tls-index-start sb!vm:word-shift) (+ index sb!vm:n-word-bytes))
-         ;; The sign bit of sb!vm::*free-tls-index* is a semaphore,
-         ;; except on PPC where it isn't, but masking is fine in any case.
-         (limit (ash (logand sb!vm::*free-tls-index* most-positive-fixnum)
-                     (- sb!vm:word-shift sb!vm:n-fixnum-tag-bits)))
+    ;; offset from thread base to the next usable TLS cell as a byte offset
+    ;; (raw value) manifesting in Lisp as a fixnum.
+    ;; The sign bit of sb!vm::*free-tls-index* is a semaphore,
+    ;; except on PPC where it isn't, but masking is fine in any case.
+    (do ((index (- (ash (logand sb!vm::*free-tls-index* most-positive-fixnum)
+                        sb!vm:n-fixnum-tag-bits)
+                   sb!vm:n-word-bytes)
+                (- index sb!vm:n-word-bytes))
          ;; (There's no reason this couldn't work on any thread now.)
          (sap (int-sap (thread-primitive-thread *current-thread*)))
          (list))
-        ((>= index limit) list)
+        ((< index (ash tls-index-start sb!vm:word-shift)) list)
       (let ((obj (sap-ref-lispobj sap index)))
         (when (and obj ; don't bother returning NIL
                    (sb!vm:is-lisp-pointer (get-lisp-obj-address obj))
