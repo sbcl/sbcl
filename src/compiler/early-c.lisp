@@ -174,8 +174,9 @@ the stack without triggering overflow protection.")
 ;;; Rather than registering listeners, they can detect changes by comparing
 ;;; their stored nonce to the current nonce. Additionally the observers
 ;;; can detect whether function definitions have occurred.
-(declaim (fixnum *type-cache-nonce*))
-(!defglobal *type-cache-nonce* 0)
+#-sb-xc-host
+(progn (declaim (fixnum *type-cache-nonce*))
+       (!define-load-time-global *type-cache-nonce* 0))
 
 (def!struct (undefined-warning
             #-no-ansi-print-object

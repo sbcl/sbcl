@@ -1132,7 +1132,8 @@ possibly temporarily, because it might be used internally."
                "DEF!STRUCT" "DEF!TYPE"
                ;; bootstrapping magic of a different kind, wherein things happen
                ;; as they ordinarily do, plus during second genesis.
-               "!DEFGLOBAL" "!DEFPARAMETER" "!DEFVAR"
+               "!DEFINE-LOAD-TIME-GLOBAL"
+               "!DEFPARAMETER" "!DEFVAR"
                "!DEFINE-THREAD-LOCAL"
 
                ;; bootstrapping macro whose effect is to delay until warm load.

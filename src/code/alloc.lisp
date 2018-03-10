@@ -64,7 +64,7 @@
 ;;; A better structure would be just a sorted array of sizes
 ;;; with each entry pointing to the holes which are threaded through
 ;;; some bytes in the storage itself rather than through cons cells.
-(!defglobal *immobile-freelist* nil)
+(!define-load-time-global *immobile-freelist* nil)
 
 ;;; Return the zero-based index within the varyobj subspace of immobile space.
 (defun varyobj-page-index (address)

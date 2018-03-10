@@ -50,7 +50,7 @@
                (makunbound '*!cold-init-forms*)))
   #-sb-xc (declare (ignore name)))
 
-;;; !DEFGLOBAL, !DEFPARAMETER and !DEFVAR are named by analogy
+;;; !DEFINE-LOAD-TIME-GLOBAL, !DEFPARAMETER and !DEFVAR are named by analogy
 ;;; with !COLD-INIT-FORMS and (not DEF!FOO) because they are
 ;;; basically additional cold-init-helpers to avoid the tedious sequence:
 ;;;    (!begin-collecting-cold-init-forms)
@@ -65,7 +65,7 @@
              `(defmacro ,wrapper (sym value &optional (doc nil doc-p))
                 `(progn (,',real-name ,sym ,value ,@(if doc-p (list doc)))
                         #-sb-xc-host (sb!fasl::setq-no-questions-asked ,sym ,value)))))
-  (def !defglobal defglobal)
+  (def !define-load-time-global define-load-time-global)
   (def !defparameter defparameter)
   (def !defvar defvar))
 

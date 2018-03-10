@@ -18,8 +18,9 @@
              (let ((n (1+ (position-if 'stringp sb!c:+backend-internal-errors+
                                        :key #'car :from-end t))))
                `(progn
+                  (defconstant n-internal-error-handlers ,n)
                   (declaim ((simple-vector ,n) **internal-error-handlers**))
-                  (!defglobal **internal-error-handlers**
+                  (!define-load-time-global **internal-error-handlers**
                               ,(make-array n :initial-element 0))))))
   (def-it))
 
@@ -427,8 +428,7 @@
                                           error-number))
                               :context context)))
                  (let ((handler
-                         (and (typep error-number
-                                     '#.`(mod ,(length **internal-error-handlers**)))
+                         (and (typep error-number `(mod ,n-internal-error-handlers))
                               (svref **internal-error-handlers** error-number))))
                    (cond
                      ((functionp handler)

@@ -165,7 +165,7 @@
        *specialized-array-element-type-properties*))
 
 #-sb-xc-host
-(!defglobal sb!kernel::*specialized-array-element-types*
+(!define-load-time-global sb!kernel::*specialized-array-element-types*
             '#.sb!kernel::*specialized-array-element-types*)
 
 (define-load-time-global *vector-without-complex-typecode-infos*

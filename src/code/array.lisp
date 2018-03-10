@@ -1756,7 +1756,7 @@ function to be removed without further warning."
            (error 'type-error
                   :datum (first args)
                   :expected-type '(simple-array * (*)))))
-       (!defglobal ,table-name ,(make-array (1+ sb!vm:widetag-mask)))
+       (!define-load-time-global ,table-name ,(make-array (1+ sb!vm:widetag-mask)))
 
        ;; This SUBSTITUTE call happens ** after ** all the SETFs below it.
        ;; DEFGLOBAL's initial value is dumped by genesis as a vector filled

@@ -16,7 +16,7 @@
 
 ;; This variable properly belongs in 'target-hash-table',
 ;; but it's compiled after this file is.
-(!defglobal *user-hash-table-tests* nil)
+(!define-load-time-global *user-hash-table-tests* nil)
 
 
 ;;;; fdefinition (fdefn) objects

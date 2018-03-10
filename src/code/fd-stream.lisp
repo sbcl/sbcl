@@ -2708,7 +2708,7 @@
     (t ; call next method
      (fd-stream-misc-routine stream operation arg1 arg2))))
 
-(!defglobal *!cold-stderr-buf* " ")
+(!define-load-time-global *!cold-stderr-buf* " ")
 
 (defun !make-cold-stderr-stream ()
   (let ((stderr

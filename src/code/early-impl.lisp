@@ -64,4 +64,4 @@
 ;;; comparisons. Unlikely, but the cost of using a cons instead is too
 ;;; small to measure. -- JES, 2007-09-30
 (declaim (type cons sb!kernel::*gc-epoch*))
-(!defglobal sb!kernel::*gc-epoch* '(nil . nil))
+(!define-load-time-global sb!kernel::*gc-epoch* '(nil . nil))

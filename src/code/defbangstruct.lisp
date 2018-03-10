@@ -17,7 +17,7 @@
 
 ;;; Has the type system been properly initialized? (I.e. is it OK to
 ;;; use it?)
-(!defglobal *type-system-initialized* nil)
+(!define-load-time-global *type-system-initialized* nil)
 
 ;;; machinery used in the implementation of DEF!STRUCT
 #+sb-xc-host
