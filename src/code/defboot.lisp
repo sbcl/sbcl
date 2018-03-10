@@ -263,6 +263,17 @@ evaluated as a PROGN."
                     ,@(and docp
                            `(',doc)))))
 
+(defun %compiler-defglobal (name always-boundp value assign-it-p)
+  (sb!xc:proclaim `(global ,name))
+  (when assign-it-p
+    (set-symbol-global-value name value))
+  (sb!c::process-variable-declaration
+   name 'always-bound
+   ;; don't "weaken" the proclamation if it's in fact always bound now
+   (if (eq (info :variable :always-bound name) :always-bound)
+       :always-bound
+       always-boundp)))
+
 (defun %compiler-defvar (var)
   (sb!xc:proclaim `(special ,var)))
 

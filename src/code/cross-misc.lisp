@@ -37,6 +37,10 @@
 
 (defmacro define-load-time-global (&rest args) `(defvar ,@args))
 
+;;; Necessary only to placate the host compiler in %COMPILER-DEFGLOBAL.
+(defun set-symbol-global-value (sym val)
+  (error "Can't set symbol-global-value: ~S ~S" sym val))
+
 ;;; The GENESIS function works with fasl code which would, in the
 ;;; target SBCL, work on ANSI-STREAMs (streams which aren't extended
 ;;; Gray streams). In ANSI Common Lisp, an ANSI-STREAM is just a

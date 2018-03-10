@@ -841,7 +841,15 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
 ;;; For OAOO reasons we give a name to this value and then use #. readmacro
 ;;; to splice it in as a constant. Anyone who actually wants a random value
 ;;; is free to :USE (PACKAGE-USE-LIST :CL-USER) or whatever.
-(defglobal *!default-package-use-list* nil)
+;;;
+;;; This must not use DEFGLOBAL, which calls SET-SYMBOL-GLOBAL-VALUE at
+;;; compile-time. The xc stub for that is defined to error out on purpose,
+;;; since there is no such thing as a global variable in portable CL.
+;;; Anyway this is a trivial compile-time constant that disappears after
+;;; self-build, so efficiency of reads (one of the concerns of DEFGLOBAL,
+;;; the other being documentation of intent) doesn't matter in the least.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defvar *!default-package-use-list* nil))
 
 (defun make-package (name &key
                           (use '#.*!default-package-use-list*)
