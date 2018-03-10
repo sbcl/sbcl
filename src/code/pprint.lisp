@@ -1230,7 +1230,7 @@ line break."
 ;;;        puts a newline in between INTO and COUNT.
 ;;;        It would be awesome to have code in common with the macro
 ;;;        the properly represents each clauses.
-(defglobal *loop-separating-clauses*
+(defconstant-eqx +loop-separating-clauses+
   '(:and
     :with :for
     :initially :finally
@@ -1244,7 +1244,8 @@ line break."
     :minimize :minimizing
     :if :when :unless :end
     :for :while :until :repeat :always :never :thereis
-    ))
+    )
+  #'equal)
 
 (defun pprint-extended-loop (stream list)
   (pprint-logical-block (stream list :prefix "(" :suffix ")")
@@ -1257,7 +1258,7 @@ line break."
     (write-char #\space stream)
     (loop for thing = (pprint-pop)
           when (and (symbolp thing)
-                    (member thing  *loop-separating-clauses* :test #'string=))
+                    (member thing +loop-separating-clauses+ :test #'string=))
           do (pprint-newline :mandatory stream)
           do (output-object thing stream)
           do (pprint-exit-if-list-exhausted)

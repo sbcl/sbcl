@@ -11,8 +11,7 @@
 
 (in-package "SB!C")
 
-(declaim (simple-vector **policy-primary-qualities**))
-(!defglobal **policy-primary-qualities**
+(defconstant-eqx +policy-primary-qualities+
         #(;; ANSI standard qualities
           compilation-speed
           debug
@@ -27,10 +26,11 @@
           ;; optimization-related notes, which is already mostly the
           ;; behavior, and should probably become the exact behavior.
           ;; Perhaps INHIBIT-NOTES?
-          inhibit-warnings))
+          inhibit-warnings)
+    #'equalp)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant n-policy-primary-qualities (length **policy-primary-qualities**))
+  (defconstant n-policy-primary-qualities (length +policy-primary-qualities+))
   ;; 1 bit per quality is stored to indicate whether it was explicitly given
   ;; a value in a lexical policy. In addition to the 5 ANSI-standard qualities,
   ;; SBCL defines one more "primary" quality and 16 dependent qualities.

@@ -16,7 +16,7 @@
   (let ((policy (process-optimize-decl (cons 'optimize spec) *policy*)))
     (fresh-line)
     (format t "  Basic qualities:~%")
-    (dovector (quality **policy-primary-qualities**)
+    (dovector (quality +policy-primary-qualities+)
       (format t "~S = ~D~%" quality (policy-quality policy quality)))
     (format t "  Dependent qualities:~%")
     (loop for info across **policy-dependent-qualities**
