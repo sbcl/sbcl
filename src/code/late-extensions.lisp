@@ -39,16 +39,6 @@
 ;;;      ;; -- WHN 2002-10-19
 ;;;      (error "can't calculate length of cyclic list")))
 
-;;; This is used in constructing arg lists for debugger printing,
-;;; and when needing to print unbound slots in PCL.
-(defstruct (unprintable-object
-            (:constructor make-unprintable-object (string))
-            (:print-object (lambda (x s)
-                             (print-unreadable-object (x s)
-                               (write-string (unprintable-object-string x) s))))
-            (:copier nil))
-  (string nil :read-only t))
-
 ;;; Used internally, but it would be nice to provide something
 ;;; like this for users as well.
 (defmacro define-structure-slot-addressor (name &key structure slot)

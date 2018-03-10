@@ -439,6 +439,16 @@ information."
                         :replace-dynamic-extent-objects t)
     (values (cons name args) info)))
 
+;;; This is used in constructing arg lists for debugger printing,
+;;; and when needing to print unbound slots in PCL.
+(defstruct (unprintable-object
+            (:constructor make-unprintable-object (string))
+            (:print-object (lambda (x s)
+                             (print-unreadable-object (x s)
+                               (write-string (unprintable-object-string x) s))))
+            (:copier nil))
+  (string nil :read-only t))
+
 (defun replace-dynamic-extent-object (obj)
   (if (stack-allocated-p obj)
       (make-unprintable-object
@@ -609,7 +619,7 @@ thread, NIL otherwise."
                 (real-args (the list (cddr args)))) ; strip .PV. and .N-M-CALL.
             (if (and (eq style :minimal)
                      (fboundp gf-name)
-                     (notany #'sb!impl::unprintable-object-p real-args)
+                     (notany #'unprintable-object-p real-args)
                      (singleton-p (compute-applicable-methods
                                    (fdefinition gf-name) real-args)))
                 (values gf-name real-args)
