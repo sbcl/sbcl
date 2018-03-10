@@ -609,7 +609,7 @@ lowercase eszet (U+DF)."
     (let ((code (aref cases (1+ index))))
       (if (zerop code)
           char
-          (code-char code)))))
+          (code-char (truly-the char-code code))))))
 
 (defun char-downcase (char)
   "Return CHAR converted to lower-case if that is possible."
@@ -618,7 +618,7 @@ lowercase eszet (U+DF)."
     (let ((code (aref cases index)))
       (if (zerop code)
           char
-          (code-char code)))))
+          (code-char (truly-the char-code code))))))
 
 (defun alphanumericp (char)
   "Given a character-object argument, ALPHANUMERICP returns T if the argument
