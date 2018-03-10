@@ -128,6 +128,52 @@ the file system."
   ;; a nicer default behavior for Unix programs.
   "the default for the :VERBOSE argument to LOAD")
 
+;;; DEFmumble helpers
+
+(defun %defglobal (name value boundp doc docp source-location)
+  (%compiler-defglobal name :always-bound value (not boundp))
+  (when docp
+    (setf (fdocumentation name 'variable) doc))
+  (when source-location
+    (setf (info :source-location :variable name) source-location))
+  name)
+
+(defun %defparameter (var val source-location &optional (doc nil docp))
+  (%compiler-defvar var)
+  (set var val)
+  (when docp
+    (setf (fdocumentation var 'variable) doc))
+  (when source-location
+    (setf (info :source-location :variable var) source-location))
+  var)
+
+(defun %defvar (var source-location &optional (val nil valp) (doc nil docp))
+  (%compiler-defvar var)
+  (when (and valp
+             (not (boundp var)))
+    (set var val))
+  (when docp
+    (setf (fdocumentation var 'variable) doc))
+  (when source-location
+    (setf (info :source-location :variable var) source-location))
+  var)
+
+(defun %defun (name def &optional inline-lambda)
+  (declare (type function def))
+  ;; should've been checked by DEFMACRO DEFUN
+  (aver (legal-fun-name-p name))
+  (sb!c:%compiler-defun name inline-lambda nil)
+  (when (fboundp name)
+    (warn 'redefinition-with-defun :name name :new-function def))
+  (setf (fdefinition name) def)
+  ;; %COMPILER-DEFUN doesn't do this except at compile-time, when it
+  ;; also checks package locks. By doing this here we let (SETF
+  ;; FDEFINITION) do the load-time package lock checking before
+  ;; we frob any existing inline expansions.
+  (sb!c::%set-inline-expansion name nil inline-lambda)
+  (sb!c::note-name-defined name :function)
+  name)
+
 (in-package "SB!C")
 
 (defun real-function-name (name)

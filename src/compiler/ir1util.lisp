@@ -1159,7 +1159,7 @@
 ;;; If a block consisting of a single ref is equivalent to another
 ;;; block with the same ref and the have the same successor it can be
 ;;; removed.
-;;; 
+;;;
 ;;; Removing more is tricky, debugging will suffer, and code relying
 ;;; on constraint propagation will break, e.g.
 ;;; (if (simple-vector-p x) (aref x 0) (aref x 0)))

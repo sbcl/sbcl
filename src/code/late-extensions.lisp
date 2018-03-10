@@ -109,14 +109,6 @@ See also DEFGLOBAL which assigns the VALUE at compile-time too."
        :always-bound
        always-boundp)))
 
-(defun %defglobal (name value boundp doc docp source-location)
-  (%compiler-defglobal name :always-bound value (not boundp))
-  (when docp
-    (setf (fdocumentation name 'variable) doc))
-  (when source-location
-    (setf (info :source-location :variable name) source-location))
-  name)
-
 (defun split-version-string (string)
   (loop with subversion and start = 0
         with end = (length string)
