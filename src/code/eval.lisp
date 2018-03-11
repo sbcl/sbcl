@@ -64,6 +64,10 @@
 ;;; Handle PROGN and implicit PROGN.
 #!-sb-fasteval
 (progn
+(defun list-with-length-p (x)
+  ;; Is X a list for which LENGTH is meaningful, i.e. a list which is
+  ;; not improper and which is not circular?
+  (values (ignore-errors (list-length x))))
 (defun simple-eval-progn-body (progn-body lexenv)
   (unless (list-with-length-p progn-body)
     (let ((*print-circle* t))

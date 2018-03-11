@@ -47,6 +47,15 @@ Unused by SBCL itself: reserved for user and applications.
 Using (SB-EXT:EXIT :ABORT T), or calling exit(3) directly circumvents
 these hooks.")
 
+(defun call-hooks (kind hooks &key (on-error :error))
+  (dolist (hook hooks)
+    (handler-case
+        (funcall hook)
+      (serious-condition (c)
+        (if (eq :warn on-error)
+            (warn "Problem running ~A hook ~S:~%  ~A" kind hook c)
+            (with-simple-restart (continue "Skip this ~A hook." kind)
+              (error "Problem running ~A hook ~S:~%  ~A" kind hook c)))))))
 
 ;;; Binary search for simple vectors
 (defun binary-search* (value seq key)

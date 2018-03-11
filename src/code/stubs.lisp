@@ -67,3 +67,7 @@
         (%simd-pack-low)
         (%simd-pack-high))
   )
+
+(defun spin-loop-hint ()
+  "Hints the processor that the current thread is spin-looping."
+  (spin-loop-hint))

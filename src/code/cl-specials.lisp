@@ -142,3 +142,45 @@
                        cl:*load-truename*
                        cl:*compile-file-pathname*
                        cl:*compile-file-truename*))
+
+;;;; DEFGLOBAL and DEFINE-LOAD-TIME-GLOBAL
+;;;; These have alternate definitions (in cross-misc) which rely on
+;;;; the underlying host DEFVAR when building the cross-compiler.
+
+(in-package "SB!IMPL")
+
+(defmacro defglobal (name value &optional (doc nil docp))
+  "Defines NAME as a global variable that is always bound. VALUE is evaluated
+and assigned to NAME both at compile- and load-time, but only if NAME is not
+already bound.
+
+Global variables share their values between all threads, and cannot be
+locally bound, declared special, defined as constants, and neither bound
+nor defined as symbol macros.
+
+See also the declarations SB-EXT:GLOBAL and SB-EXT:ALWAYS-BOUND."
+  (let ((boundp (make-symbol "BOUNDP")))
+    `(progn
+       (eval-when (:compile-toplevel)
+         (let ((,boundp (boundp ',name)))
+           (%compiler-defglobal ',name :always-bound
+                                (unless ,boundp ,value) (not ,boundp))))
+       (let ((,boundp (boundp ',name)))
+         (%defglobal ',name (unless ,boundp ,value) ,boundp ',doc ,docp
+                     (sb!c:source-location))))))
+
+(defmacro define-load-time-global (name value &optional (doc nil docp))
+  "Defines NAME as a global variable that is always bound. VALUE is evaluated
+and assigned to NAME at load-time, but only if NAME is not already bound.
+
+Attempts to read NAME at compile-time will signal an UNBOUND-VARIABLE error
+unless it has otherwise been assigned a value.
+
+See also DEFGLOBAL which assigns the VALUE at compile-time too."
+  (let ((boundp (make-symbol "BOUNDP")))
+    `(progn
+       (eval-when (:compile-toplevel)
+         (%compiler-defglobal ',name :eventually nil nil))
+       (let ((,boundp (boundp ',name)))
+         (%defglobal ',name (unless ,boundp ,value) ,boundp ',doc ,docp
+                     (sb!c:source-location))))))

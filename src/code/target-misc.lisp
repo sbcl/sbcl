@@ -201,3 +201,43 @@ the file system."
         (push (cons type new-value)
               (info :random-documentation :stuff name))))
   new-value)
+
+(defun split-version-string (string)
+  (loop with subversion and start = 0
+        with end = (length string)
+        when (setf (values subversion start)
+                   (parse-integer string :start start :junk-allowed t))
+        collect it
+        while (and subversion
+                   (< start end)
+                   (char= (char string start) #\.))
+        do (incf start)))
+
+(defun version>= (x y)
+  (unless (or x y)
+    (return-from version>= t))
+  (let ((head-x (or (first x) 0))
+        (head-y (or (first y) 0)))
+    (or (> head-x head-y)
+        (and (= head-x head-y)
+             (version>= (rest x) (rest y))))))
+
+(defun assert-version->= (&rest subversions)
+  "Asserts that the current SBCL is of version equal to or greater than
+the version specified in the arguments.  A continuable error is signaled
+otherwise.
+
+The arguments specify a sequence of subversion numbers in big endian order.
+They are compared lexicographically with the runtime version, and versions
+are treated as though trailed by an unbounded number of 0s.
+
+For example, (assert-version->= 1 1 4) asserts that the current SBCL is
+version 1.1.4[.0.0...] or greater, and (assert-version->= 1) that it is
+version 1[.0.0...] or greater."
+  (let ((version (split-version-string (lisp-implementation-version))))
+    (unless (version>= version subversions)
+      (cerror "Disregard this version requirement."
+              "SBCL ~A is too old for this program (version ~{~A~^.~} ~
+               or later is required)."
+              (lisp-implementation-version)
+              subversions))))
