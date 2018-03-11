@@ -82,7 +82,9 @@
   (let ((count 0))
     (macrolet ((clear-it (place)
                  `(when ,place
-                    (setf ,place nil)
+                    ,(if (typep place '(cons (eql sb-int:info)))
+                         `(sb-int:clear-info ,@(cdr place))
+                         `(setf ,place nil))
                     (incf count))))
       ;; 1. Functions, macros, special operators
       (sb-vm::map-allocated-objects
