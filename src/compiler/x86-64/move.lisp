@@ -284,7 +284,7 @@
             (inst imul y x #.(ash 1 n-fixnum-tag-bits))
             (inst jmp :no DONE)
             (inst mov y x)))
-     (invoke-asm-routine 'call #.(bignum-from-reg 'y "SIGNED") vop temp-reg-tn)
+     (invoke-asm-routine 'call #.(bignum-from-reg 'y "SIGNED") vop)
      DONE))
 (define-move-vop move-from-signed :move
   (signed-reg) (descriptor-reg))
@@ -316,7 +316,7 @@
                               :scale (ash 1 n-fixnum-tag-bits))))
      (inst jmp :z done)
      (inst mov y x)
-     (invoke-asm-routine 'call #.(bignum-from-reg 'y "UNSIGNED") vop temp-reg-tn)
+     (invoke-asm-routine 'call #.(bignum-from-reg 'y "UNSIGNED") vop)
      DONE))
 (define-move-vop move-from-unsigned :move
   (unsigned-reg) (descriptor-reg))

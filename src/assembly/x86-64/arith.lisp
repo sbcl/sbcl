@@ -181,8 +181,7 @@
                                         (:policy :safe)
                                         (:save-p t)
                                         (:conditional ,test)
-                                        (:cost 10)
-                                        (:call-temps rcx))
+                                        (:cost 10))
                   ((:arg x (descriptor-reg any-reg) rdx-offset)
                    (:arg y (descriptor-reg any-reg) rdi-offset)
 
@@ -210,8 +209,7 @@
                           (:policy :safe)
                           (:save-p t)
                           (:conditional :e)
-                          (:cost 10)
-                          (:call-temps rcx))
+                          (:cost 10))
                          ((:arg x (descriptor-reg any-reg) rdx-offset)
                           (:arg y (descriptor-reg any-reg) rdi-offset)
 
@@ -233,8 +231,7 @@
                           (:policy :safe)
                           (:save-p t)
                           (:conditional :e)
-                          (:cost 10)
-                          (:call-temps rcx))
+                          (:cost 10))
                          ((:arg x (descriptor-reg any-reg) rdx-offset)
                           (:arg y (descriptor-reg any-reg) rdi-offset)
 
@@ -370,7 +367,7 @@
            (inst jmp done)
          slow
            (move rdx arg)
-           (invoke-asm-routine 'call 'logcount vop rcx)
+           (invoke-asm-routine 'call 'logcount vop)
            (move result rdx)
          done))))
   (def-it unsigned-byte-64-count 14 unsigned-reg unsigned-num)
@@ -397,8 +394,7 @@
                           ;; if the args are not integer, which this doesn't.
                           (:policy :fast-safe)
                           (:conditional :e)
-                          (:cost 10)
-                          (:call-temps rcx))
+                          (:cost 10))
                          ((:arg x (descriptor-reg any-reg) rdx-offset)
                           (:arg y (descriptor-reg any-reg) rdi-offset)
                           (:temp rcx unsigned-reg rcx-offset)

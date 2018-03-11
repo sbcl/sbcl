@@ -9,8 +9,8 @@
 
 (in-package "SB!VM")
 
-(defun invoke-asm-routine (inst routine vop &optional temp-reg)
-  (declare (ignorable vop temp-reg))
+(defun invoke-asm-routine (inst routine vop)
+  (declare (ignorable vop))
   (let ((fixup
          (cond ((sb!c::code-immobile-p vop)
                 (make-fixup routine :assembly-routine))
@@ -21,26 +21,24 @@
       (call (inst call fixup)))))
 
 (defun generate-call-sequence (name style vop options)
-  ;; It will be nice if we can eliminate the global assumption that
-  ;; a certain register (TEMP-REG-TN - currently R11) is always available.
-  (let ((call-tn (or (second (assoc :call-temps options)) 'temp-reg-tn)))
-    (ecase style
+  (declare (ignore options))
+  (ecase style
       (:raw
        (values
         `((note-this-location ,vop :call-site)
-          (invoke-asm-routine 'call ',name ,vop ,call-tn)
+          (invoke-asm-routine 'call ',name ,vop)
           (note-this-location ,vop :single-value-return))
         nil))
       (:full-call
        (values
         `((note-this-location ,vop :call-site)
-          (invoke-asm-routine 'call ',name ,vop ,call-tn)
+          (invoke-asm-routine 'call ',name ,vop)
           (note-this-location ,vop :single-value-return))
         '((:save-p :compute-only))))
       (:none
        (values
-        `((invoke-asm-routine 'jmp ',name ,vop ,call-tn))
-        nil)))))
+        `((invoke-asm-routine 'jmp ',name ,vop))
+        nil))))
 
 (defun generate-return-sequence (style)
   (ecase style

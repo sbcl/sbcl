@@ -258,7 +258,7 @@
     (storew temp-reg-tn block unwind-block-entry-pc-slot)
 
     ;; Run any required UWPs.
-    (invoke-asm-routine 'jmp 'unwind vop temp-reg-tn)
+    (invoke-asm-routine 'jmp 'unwind vop)
     ENTRY-LABEL
 
     ;; Move our saved function to where we want it now.

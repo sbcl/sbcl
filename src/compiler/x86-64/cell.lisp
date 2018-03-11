@@ -432,7 +432,7 @@
     (inst test (reg-in-size tls-index :dword) (reg-in-size tls-index :dword))
     (inst jmp :ne TLS-INDEX-VALID)
     (inst mov tls-index symbol)
-    (invoke-asm-routine 'call 'alloc-tls-index vop tmp)
+    (invoke-asm-routine 'call 'alloc-tls-index vop)
     TLS-INDEX-VALID
     (inst mov tmp (thread-tls-ea tls-index))
     (storew tmp bsp (- binding-value-slot binding-size))

@@ -929,7 +929,6 @@
   (:info callable)
   (:temporary (:sc unsigned-reg :offset rsi-offset :from (:argument 0)) rsi)
   (:temporary (:sc unsigned-reg :offset rax-offset :from (:argument 1)) rax)
-  (:temporary (:sc unsigned-reg) call-target)
   (:vop-var vop)
   (:generator 75
     (check-ocfp-and-return-pc old-fp return-pc)
@@ -940,7 +939,7 @@
     (invoke-asm-routine 'jmp (if callable
                                  'tail-call-callable-variable
                                  'tail-call-variable)
-                        vop call-target)))
+                        vop)))
 
 ;;;; unknown values return
 
@@ -1056,7 +1055,6 @@
          (nvals :scs (any-reg) :target rcx))
   (:temporary (:sc unsigned-reg :offset rsi-offset :from (:argument 2)) rsi)
   (:temporary (:sc unsigned-reg :offset rcx-offset :from (:argument 3)) rcx)
-  (:temporary (:sc unsigned-reg) return-asm)
   (:temporary (:sc descriptor-reg :offset (first *register-arg-offsets*)
                    :from (:eval 0)) a0)
   (:node-var node)
@@ -1081,7 +1079,7 @@
         (emit-label not-single)))
     (move rsi vals)
     (move rcx nvals)
-    (invoke-asm-routine 'jmp 'return-multiple vop return-asm)))
+    (invoke-asm-routine 'jmp 'return-multiple vop)))
 
 ;;;; XEP hackery
 
