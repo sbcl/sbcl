@@ -547,13 +547,13 @@
      (storew header result 0 lowtag))))
 
 #!+immobile-space
-(define-vop (alloc-fixedobj)
+(progn
+(define-vop (alloc-immobile-fixedobj)
   (:info lowtag size word0 word1)
-  (:temporary (:sc unsigned-reg :to :eval
-               :offset #.(first *c-call-register-arg-offsets*)) c-arg1)
-  (:temporary (:sc unsigned-reg :to :eval
-               :offset #.(second *c-call-register-arg-offsets*)) c-arg2)
-  (:temporary (:sc unsigned-reg :from :eval :to (:result 0) :offset rax-offset) c-result)
+  (:temporary (:sc unsigned-reg :to :eval :offset rdi-offset) c-arg1)
+  (:temporary (:sc unsigned-reg :to :eval :offset rsi-offset) c-arg2)
+  (:temporary (:sc unsigned-reg :from :eval :to (:result 0) :offset rax-offset)
+              c-result)
   (:results (result :scs (descriptor-reg)))
   (:generator 50
    (inst mov c-arg1 size)
@@ -561,41 +561,27 @@
    ;; RSP needn't be restored because the allocators all return immediately
    ;; which has that effect
    (inst and rsp-tn -16)
-   (inst mov temp-reg-tn (make-fixup "alloc_fixedobj" :foreign))
    (pseudo-atomic
-     (inst call temp-reg-tn)
+     (inst call (make-fixup "alloc_fixedobj" :foreign))
      (inst lea result (make-ea :qword :base c-result :disp lowtag))
      ;; If code, the next word must be set within the P-A
      ;; otherwise the GC would compute the wrong object size.
      (when word1
        (inst mov (make-ea :qword :base result :disp (- n-word-bytes lowtag)) word1)))))
-
-#!+immobile-space
-(macrolet ((def (lisp-name c-name arg-scs &body stuff
-                           &aux (argc (length arg-scs)))
-             `(define-vop (,lisp-name)
-                (:args ,@(if (>= argc 1) `((arg1 :scs ,(first arg-scs) :target c-arg1)))
-                       ,@(if (>= argc 2) `((arg2 :scs ,(second arg-scs) :target c-arg2))))
-                ,@(if (>= argc 1)
-                      `((:temporary (:sc unsigned-reg :from (:argument 0)
-                                     :to :eval :offset ,(first *c-call-register-arg-offsets*))
-                                    c-arg1)))
-                ,@(if (>= argc 2)
-                      `((:temporary (:sc unsigned-reg :from (:argument 1)
-                                     :to :eval :offset ,(second *c-call-register-arg-offsets*))
-                                    c-arg2)))
-                (:temporary (:sc unsigned-reg :from :eval :to (:result 0)
-                             :offset rax-offset) c-result)
-                (:results (result :scs (descriptor-reg)))
-                (:generator 50
-                 (pseudo-atomic
-                  ,@(if (>= argc 1) '((move c-arg1 arg1)))
-                  ,@(if (>= argc 2) '((move c-arg2 arg2)))
-                  (inst and rsp-tn -16)
-                  (inst mov temp-reg-tn (make-fixup ,c-name :foreign))
-                  (inst call temp-reg-tn)
-                  ,@stuff
-                  (move result c-result))))))
-  (def alloc-immobile-layout "alloc_layout" ; MAKE-LAYOUT
-       ((descriptor-reg))))
+(define-vop (alloc-immobile-layout)
+  (:args (slots :scs (descriptor-reg) :target c-arg1))
+  (:temporary (:sc unsigned-reg :from (:argument 0) :to :eval :offset rdi-offset)
+              c-arg1)
+  (:temporary (:sc unsigned-reg :from :eval :to (:result 0) :offset rax-offset)
+              c-result)
+  (:results (result :scs (descriptor-reg)))
+  (:generator 50
+   (move c-arg1 slots)
+   ;; RSP needn't be restored because the allocators all return immediately
+   ;; which has that effect
+   (inst and rsp-tn -16)
+   (pseudo-atomic
+     (inst call (make-fixup "alloc_layout" :foreign)))
+     (move result c-result)))
+) ; end PROGN
 

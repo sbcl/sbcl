@@ -1500,7 +1500,7 @@ lispobj* find_preceding_object(lispobj* obj)
   }
 }
 
-lispobj* alloc_fixedobj(int nwords, uword_t header)
+lispobj* AMD64_SYSV_ABI alloc_fixedobj(int nwords, uword_t header)
 {
     return alloc_immobile_obj(MAKE_ATTR(ALIGN_UP(nwords,2), // spacing
                                         ALIGN_UP(nwords,2), // size
@@ -1510,7 +1510,7 @@ lispobj* alloc_fixedobj(int nwords, uword_t header)
 
 #include "genesis/vector.h"
 #include "genesis/instance.h"
-lispobj alloc_layout(lispobj slots)
+lispobj AMD64_SYSV_ABI alloc_layout(lispobj slots)
 {
     struct vector* v = VECTOR(slots);
     // If INSTANCE_DATA_START is 0, subtract 1 word for the header.

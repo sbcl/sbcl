@@ -367,7 +367,7 @@
     code))
 
 (defun alloc-immobile-symbol ()
-  (values (%primitive alloc-fixedobj other-pointer-lowtag symbol-size
+  (values (%primitive alloc-immobile-fixedobj other-pointer-lowtag symbol-size
                       (logior (ash (1- symbol-size) n-widetag-bits) symbol-widetag)
                       nil)))
 (defun make-immobile-symbol (name)
@@ -383,12 +383,12 @@
     symbol))
 
 (defun alloc-immobile-fdefn ()
-  (values (%primitive alloc-fixedobj other-pointer-lowtag fdefn-size
+  (values (%primitive alloc-immobile-fixedobj other-pointer-lowtag fdefn-size
                       (logior (ash (1- fdefn-size) n-widetag-bits) fdefn-widetag)
                       nil)))
 
 (defun alloc-immobile-gf ()
-  (values (%primitive alloc-fixedobj fun-pointer-lowtag 6 ; kludge
+  (values (%primitive alloc-immobile-fixedobj fun-pointer-lowtag 6 ; kludge
                       (logior (ash 5 n-widetag-bits) funcallable-instance-widetag)
                       nil)))
 (defun make-immobile-gf (layout slot-vector)
@@ -405,7 +405,7 @@
     gf))
 
 (defun alloc-immobile-trampoline ()
-  (values (%primitive alloc-fixedobj other-pointer-lowtag 6
+  (values (%primitive alloc-immobile-fixedobj other-pointer-lowtag 6
                       (logior (ash 4 n-widetag-bits) code-header-widetag)
                       (ash (* 2 n-word-bytes) n-fixnum-tag-bits))))
 
