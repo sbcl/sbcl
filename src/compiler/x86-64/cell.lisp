@@ -640,7 +640,7 @@
   instance-pointer-lowtag (any-reg descriptor-reg) * %instance-ref)
 
 (define-full-setter instance-index-set * instance-slots-offset
-  instance-pointer-lowtag (any-reg descriptor-reg) * %instance-set)
+  instance-pointer-lowtag (any-reg descriptor-reg immediate) * %instance-set)
 
 (define-full-compare-and-swap %instance-cas instance
   instance-slots-offset instance-pointer-lowtag

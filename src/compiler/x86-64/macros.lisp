@@ -353,11 +353,11 @@
        (:results (result :scs ,scs))
        (:result-types ,el-type)
        (:generator 4                    ; was 5
-         (inst mov (make-ea :qword :base object :index index
+         (gen-cell-set
+                   (make-ea :qword :base object :index index
                             :scale (ash 1 (- word-shift n-fixnum-tag-bits))
                             :disp (- (* ,offset n-word-bytes) ,lowtag))
-               value)
-         (move result value)))
+                   value result)))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate
            `((:translate ,translate)))
@@ -372,11 +372,11 @@
        (:results (result :scs ,scs))
        (:result-types ,el-type)
        (:generator 3                    ; was 5
-         (inst mov (make-ea :qword :base object
+         (gen-cell-set
+                   (make-ea :qword :base object
                             :disp (- (* (+ ,offset index) n-word-bytes)
                                      ,lowtag))
-               value)
-         (move result value)))))
+                   value result)))))
 
 (defmacro define-full-setter+offset (name type offset lowtag scs el-type &optional translate)
   `(progn
@@ -396,11 +396,11 @@
        (:results (result :scs ,scs))
        (:result-types ,el-type)
        (:generator 4                    ; was 5
-         (inst mov (make-ea :qword :base object :index index
+         (gen-cell-set
+                   (make-ea :qword :base object :index index
                             :scale (ash 1 (- word-shift n-fixnum-tag-bits))
                             :disp (- (* (+ ,offset offset) n-word-bytes) ,lowtag))
-               value)
-         (move result value)))
+                   value result)))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate
            `((:translate ,translate)))
@@ -418,11 +418,11 @@
        (:results (result :scs ,scs))
        (:result-types ,el-type)
        (:generator 3                    ; was 5
-         (inst mov (make-ea :qword :base object
+         (gen-cell-set
+                   (make-ea :qword :base object
                             :disp (- (* (+ ,offset index offset) n-word-bytes)
                                      ,lowtag))
-               value)
-         (move result value)))))
+                   value result)))))
 
 ;;; Emit the most compact form of the test immediate instruction
 ;;; by using the smallest operand size that is the large enough to hold

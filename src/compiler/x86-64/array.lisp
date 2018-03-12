@@ -191,7 +191,7 @@
                   ,type vector-data-offset other-pointer-lowtag ,scs
                   ,element-type data-vector-set-with-offset)))
            )
-  (def-full-data-vector-frobs simple-vector * descriptor-reg any-reg)
+  (def-full-data-vector-frobs simple-vector * descriptor-reg any-reg immediate)
   (def-full-data-vector-frobs simple-array-unsigned-byte-64 unsigned-num
     unsigned-reg)
   (def-full-data-vector-frobs simple-array-fixnum tagged-num any-reg)
