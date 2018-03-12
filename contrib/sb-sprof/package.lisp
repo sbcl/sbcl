@@ -8,6 +8,7 @@
   (:export
    ;; Recording
    #:start-sampling #:stop-sampling #:with-sampling
+   #:map-traces #:map-trace-samples #:map-all-samples
 
    ;; Call counting
    #:profile-call-counts #:unprofile-call-counts

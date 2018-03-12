@@ -3,6 +3,8 @@
 changes relative to sbcl-1.4.5:
   * enhancement: DISASSEMBLE on a symbol naming a macro will disassemble
     the expander, not the code that traps attempted FUNCALL of the macro.
+  * enhancement: The sb-sprof contrib now provides an experimental interface
+    for accessing collected profiler data.
 
 changes in sbcl-1.4.5 relative to sbcl-1.4.4:
   * minor incompatible change: building with/without the :sb-package-locks

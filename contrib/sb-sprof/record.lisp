@@ -81,7 +81,67 @@
     (setf (aref vector index) info
           (aref vector (1+ index)) pc-or-offset)
     (setf (samples-index samples) (+ index 2))))
+
+;;; Trace and sample and access functions
 
+(defun map-traces (function samples)
+  "Call FUNCTION on each trace in SAMPLES
+
+The lambda list of FUNCTION has to be compatible to
+
+  (trace)
+
+. FUNCTION is called once for each trace such that TRACE is an opaque
+object whose only purpose is being used as the second argument to
+MAP-CALLS.
+
+EXPERIMENTAL: Interface subject to change."
+  (let ((function (sb-kernel:%coerce-callable-to-fun function))
+        (vector (samples-vector samples))
+        (index (samples-index samples)))
+    (sb-int:aver (eq (aref vector 0) 'trace-start))
+    (loop for start = 0 then end
+          while (< start index)
+          for end = (or (position 'trace-start vector :start (+ start 1))
+                        index)
+          do (let ((trace (list vector start end)))
+               (funcall function trace)))))
+
+(defun map-trace-samples (function trace)
+  "Call FUNCTION on each sample in TRACE.
+
+The lambda list of FUNCTION has to be compatible to
+
+  (info pc-or-offset)
+
+.
+
+TRACE is an object as received by a function passed to MAP-TRACES.
+
+EXPERIMENTAL: Interface subject to change."
+  (let ((function (sb-kernel:%coerce-callable-to-fun function)))
+    (destructuring-bind (samples start end) trace
+      (loop for i from (- end 2) downto (+ start 2) by 2
+            for info = (aref samples i)
+            for pc-or-offset = (aref samples (1+ i))
+            do (funcall function info pc-or-offset)))))
+
+(declaim (special *samples*))
+(defun map-all-samples (function &optional (samples *samples*))
+  "Call FUNCTION on each sample in SAMPLES.
+
+The lambda list of FUNCTION has to be compatible to
+
+  (info pc-or-offset)
+
+.
+
+SAMPLES is usually the value of *SAMPLES* after a profiling run.
+
+EXPERIMENTAL: Interface subject to change."
+  (sb-int:dx-flet ((do-trace (trace)
+                     (map-trace-samples function trace)))
+    (map-traces #'do-trace samples)))
 
 ;;; Sampling
 
