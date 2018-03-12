@@ -1,0 +1,65 @@
+Statistical profiler.
+
+Overview:
+
+This profiler arranges for SIGPROF interrupts to interrupt a running
+program at regular intervals.  Each time a SIGPROF occurs, the current
+program counter and return address is recorded in a vector, until a
+configurable maximum number of samples have been taken.
+
+A profiling report is generated from the samples array by determining
+the Lisp functions corresponding to the recorded addresses.  Each
+program counter/return address pair forms one edge in a call graph.
+
+Problems:
+
+The code being generated on x86 makes determining callers reliably
+something between extremely difficult and impossible.  Example:
+
+10979F00:       .entry eval::eval-stack-args(arg-count)
+      18:       pop     dword ptr [ebp-8]
+      1B:       lea     esp, [ebp-32]
+      1E:       mov     edi, edx
+
+      20:       cmp     ecx, 4
+      23:       jne     L4
+      29:       mov     [ebp-12], edi
+      2C:       mov     dword ptr [ebp-16], #x28F0000B ; nil
+                                             ; No-arg-parsing entry point
+      33:       mov     dword ptr [ebp-20], 0
+      3A:       jmp     L3
+      3C: L0:   mov     edx, esp
+      3E:       sub     esp, 12
+      41:       mov     eax, [#x10979EF8]    ; #<FDEFINITION object for eval::eval-stack-pop>
+      47:       xor     ecx, ecx
+      49:       mov     [edx-4], ebp
+      4C:       mov     ebp, edx
+      4E:       call    dword ptr [eax+5]
+      51:       mov     esp, ebx
+
+Suppose this function is interrupted by SIGPROF at 4E.  At that point,
+the frame pointer EBP has been modified so that the original return
+address of the caller of eval-stack-args is no longer where it can be
+found by x86-call-context, and the new return address, for the call to
+eval-stack-pop, is not yet on the stack.  The effect is that
+x86-call-context returns something bogus, which leads to wrong edges
+in the call graph.
+
+One thing that one might try is filtering cases where the program is
+interrupted at a call instruction.  But since the above example of an
+interrupt at a call instruction isn't the only case where the stack is
+something x86-call-context can't really cope with, this is not a
+general solution.
+
+Random ideas for implementation:
+
+* Space profiler.  Sample when new pages are allocated instead of
+  at SIGPROF.
+
+* Record a configurable number of callers up the stack.  That could
+  give a more complete graph when there are many small functions.
+
+* Print help strings for reports, include hints to the problem
+  explained above.
+
+* Make flat report the default since call-graph isn't that reliable?
