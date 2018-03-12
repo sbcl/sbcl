@@ -75,8 +75,10 @@
 (defun record-trace-start (samples)
   ;; Mark the start of the trace.
   (multiple-value-bind (vector index) (ensure-samples-vector samples)
-    (setf (aref vector index) 'trace-start)
-    (setf (samples-index samples) (+ index 2))))
+    (setf (aref vector index) 'trace-start
+          (aref vector (+ index 1)) sb-thread:*current-thread*
+          (aref vector (+ index 2)) (get-internal-real-time))
+    (setf (samples-index samples) (+ index 3))))
 
 (declaim (inline record-sample))
 (defun record-sample (samples info pc-or-offset)
@@ -94,23 +96,29 @@
 
 The lambda list of FUNCTION has to be compatible to
 
-  (trace)
+  (thread time trace)
 
-. FUNCTION is called once for each trace such that TRACE is an opaque
-object whose only purpose is being used as the second argument to
-MAP-CALLS.
+. FUNCTION is called once for each trace such that THREAD is the
+SB-THREAD:TREAD instance that was sampled to produce TRACE, TIME is
+the internal real time at which TRACE was produced and TRACE is an
+opaque object whose only purpose is being used as the second argument
+to MAP-TRACE-SAMPLES.
 
 EXPERIMENTAL: Interface subject to change."
   (let ((function (sb-kernel:%coerce-callable-to-fun function))
         (vector (samples-vector samples))
-        (index (samples-index samples)))
+        (index (samples-index samples))
+        (start-time (samples-start-time samples)))
     (sb-int:aver (eq (aref vector 0) 'trace-start))
     (loop for start = 0 then end
           while (< start index)
-          for end = (or (position 'trace-start vector :start (+ start 1))
+          for thread = (aref vector (+ start 1))
+          for time = (/ (- (aref vector (+ start 2)) start-time)
+                        internal-time-units-per-second)
+          for end = (or (position 'trace-start vector :start (+ start 3))
                         index)
           do (let ((trace (list vector start end)))
-               (funcall function trace)))))
+               (funcall function thread time trace)))))
 
 (defun map-trace-samples (function trace)
   "Call FUNCTION on each sample in TRACE.
@@ -144,7 +152,8 @@ The lambda list of FUNCTION has to be compatible to
 SAMPLES is usually the value of *SAMPLES* after a profiling run.
 
 EXPERIMENTAL: Interface subject to change."
-  (sb-int:dx-flet ((do-trace (trace)
+  (sb-int:dx-flet ((do-trace (thread time trace)
+                     (declare (ignore thread time))
                      (map-trace-samples function trace)))
     (map-traces #'do-trace samples)))
 

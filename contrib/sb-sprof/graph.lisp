@@ -304,7 +304,8 @@
   (let ((elsewhere-count 0))
     (with-lookup-tables ()
       (map-traces
-       (lambda (trace)
+       (lambda (thread time trace)
+         (declare (ignore thread time))
          (let ((visited-nodes '())
                (depth 0)
                (caller nil))
