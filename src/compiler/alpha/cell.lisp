@@ -252,7 +252,7 @@
 
 (define-vop (closure-init)
   (:args (object :scs (descriptor-reg))
-         (value :scs (descriptor-reg any-reg null zero)))
+         (value :scs (descriptor-reg any-reg)))
   (:info offset)
   (:generator 4
     (storew value object (+ closure-info-offset offset) fun-pointer-lowtag)))

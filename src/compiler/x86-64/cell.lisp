@@ -570,12 +570,10 @@
 
 (define-vop (closure-init)
   (:args (object :scs (descriptor-reg))
-         (value :scs (descriptor-reg any-reg immediate)))
-  (:temporary (:sc unsigned-reg) temp)
+         (value :scs (descriptor-reg any-reg)))
   (:info offset)
   (:generator 4
-     (generate-set-slot object value temp
-                        (+ closure-info-offset offset) fun-pointer-lowtag)))
+    (storew value object (+ closure-info-offset offset) fun-pointer-lowtag)))
 
 (define-vop (closure-init-from-fp)
   (:args (object :scs (descriptor-reg)))
