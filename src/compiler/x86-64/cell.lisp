@@ -24,39 +24,34 @@
 (define-vop (set-slot)
   (:args (object :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg immediate)))
-  (:temporary (:sc descriptor-reg) temp)
   (:info name offset lowtag)
  ;(:ignore name)
   (:results)
   (:generator 1
     (progn name) ; ignore it
-    (generate-set-slot object value temp offset lowtag)))
-
-(defun generate-set-slot (object value temp offset lowtag &optional zeroed)
-    (if (sc-is value immediate)
-        (move-immediate (make-ea :qword
-                                 :base object
-                                 :disp (- (* offset n-word-bytes)
-                                          lowtag))
-                        (encode-value-if-immediate value)
-                        temp zeroed)
-        ;; Else, value not immediate.
-        (storew value object offset lowtag)))
+    (gen-cell-set (make-ea-for-object-slot object offset lowtag) value nil)))
 
 ;; INIT-SLOT has to know about the :COMPACT-INSTANCE-HEADER feature.
 (define-vop (init-slot set-slot)
   (:info name dx-p offset lowtag)
   (:generator 1
     (progn name dx-p)
-    (if (or #!+compact-instance-header
-            (and (eq name '%make-structure-instance) (eql offset :layout)))
+    (cond #!+compact-instance-header
+          ((and (eq name '%make-structure-instance) (eql offset :layout))
         ;; The layout is in the upper half of the header word.
-        (inst mov
+           (inst mov
               (make-ea :dword :base object :disp (- 4 instance-pointer-lowtag))
               (if (sc-is value immediate)
                   (make-fixup (tn-value value) :layout)
-                  (reg-in-size value :dword)))
-        (generate-set-slot object value temp offset lowtag (not dx-p)))))
+                  (reg-in-size value :dword))))
+          ((sc-is value immediate)
+           (move-immediate (make-ea :qword
+                                    :base object
+                                    :disp (- (* offset n-word-bytes) lowtag))
+                           (encode-value-if-immediate value)
+                           temp-reg-tn (not dx-p)))
+          (t
+           (storew value object offset lowtag))))) ; Else, value not immediate.
 
 (define-vop (compare-and-swap-slot)
   (:args (object :scs (descriptor-reg) :to :eval)
@@ -188,18 +183,14 @@
     ;; TODO: SET could be shorter for any known wired-tls symbol.
     (define-vop (set)
       (:args (symbol :scs (descriptor-reg))
-             (value :scs (descriptor-reg any-reg)
-                    :load-if (or (not (sc-is value immediate))
-                                 (not (typep (encode-value-if-immediate value)
-                                             '(or (signed-byte 32) fixup))))))
+             (value :scs (descriptor-reg any-reg immediate)))
       (:temporary (:sc descriptor-reg) cell)
       (:generator 4
         ;; Compute the address into which to store. CMOV can only move into
         ;; a register, so we can't conditionally move into the TLS and
         ;; conditionally move in the opposite flag sense to the symbol.
         (compute-virtual-symbol)
-        (inst mov (access-value-slot cell)
-              (encode-value-if-immediate value))))
+        (gen-cell-set (access-value-slot cell) value nil)))
 
     ;; This code is tested by 'codegen.impure.lisp'
     (defun emit-symeval (value symbol symbol-reg check-boundp vop)
