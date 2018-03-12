@@ -337,9 +337,8 @@ on the depth of the call stack.")
   (sampled-threads nil :type list))
 
 (defmethod print-object ((samples samples) stream)
-  (print-unreadable-object (samples stream :type t :identity t)
-    (let ((*print-array* nil))
-      (call-next-method))))
+  (let ((*print-array* nil))
+    (call-next-method)))
 
 (defmethod print-object ((call-graph call-graph) stream)
   (print-unreadable-object (call-graph stream :type t :identity t)
