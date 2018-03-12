@@ -457,15 +457,30 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
 (defknown %vector-cas-pair (simple-array index t t t t) (values t t))
 (defknown %instance-cas-pair (instance index t t t t) (values t t))
 
-;; 32-bit register names here are not an accident - it's a deliberate attempt
-;; to keep this exactly in sync with 32-bit code in the hope that somebody
-;; will invent a way to share things in common.
+(defun generate-dblcas (memory-operand old-lo old-hi new-lo new-hi
+                        rax rbx rcx rdx result-lo result-hi)
+  (move rax old-lo)
+  (move rdx old-hi)
+  (move rbx new-lo)
+  (move rcx new-hi)
+  (inst cmpxchg16b memory-operand :lock)
+  ;; RDX:RAX  hold the actual old contents of memory.
+  ;; Manually analyze result lifetimes to avoid clobbering.
+  (cond ((and (location= result-lo rdx) (location= result-hi rax))
+         (inst xchg rax rdx)) ; unlikely, but possible
+        ((location= result-lo rdx) ; result-hi is not rax
+         (move result-hi rdx) ; move high part first
+         (move result-lo rax))
+        (t                    ; result-lo is not rdx
+         (move result-lo rax) ; move low part first
+         (move result-hi rdx))))
+
 (macrolet
     ((define-cmpxchg-vop (name memory-operand more-stuff &optional index-arg)
        `(define-vop (,name)
-          (:policy :fast)
+          (:policy :fast-safe)
           ,@more-stuff
-          (:args (data :scs (descriptor-reg) :to :eval)
+          (:args (object :scs (descriptor-reg) :to :eval)
                  ,@index-arg
                  (expected-old-lo :scs (descriptor-reg any-reg) :target eax)
                  (expected-old-hi :scs (descriptor-reg any-reg) :target edx)
@@ -482,26 +497,14 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
           (:temporary (:sc unsigned-reg :offset ecx-offset
                        :from (:argument 5) :to (:result 0)) ecx)
           (:generator 7
-           (move eax expected-old-lo)
-           (move edx expected-old-hi)
-           (move ebx new-lo)
-           (move ecx new-hi)
-           (inst cmpxchg16b ,memory-operand :lock)
-           ;; EDX:EAX  hold the actual old contents of memory.
-           ;; Manually analyze result lifetimes to avoid clobbering.
-           (cond ((and (location= result-lo edx) (location= result-hi eax))
-                  (inst xchg eax edx)) ; unlikely, but possible
-                 ((location= result-lo edx) ; result-hi is not eax
-                  (move result-hi edx) ; move high part first
-                  (move result-lo eax))
-                 (t                    ; result-lo is not edx
-                  (move result-lo eax) ; move low part first
-                  (move result-hi edx)))))))
+           (generate-dblcas ,memory-operand
+                            expected-old-lo expected-old-hi new-lo new-hi
+                            eax ebx ecx edx result-lo result-hi)))))
   (define-cmpxchg-vop compare-and-exchange-pair
-      (make-ea :dword :base data :disp (- list-pointer-lowtag))
+      (make-ea :dword :base object :disp (- list-pointer-lowtag))
       ((:translate %cons-cas-pair)))
   (define-cmpxchg-vop compare-and-exchange-pair-indexed
-      (make-ea :dword :base data :disp offset :index index
+      (make-ea :dword :base object :disp offset :index index
                       :scale (ash n-word-bytes (- n-fixnum-tag-bits)))
       ((:variant-vars offset))
       ((index :scs (descriptor-reg any-reg) :to :eval))))

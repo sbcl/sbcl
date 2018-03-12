@@ -34,13 +34,10 @@
 
 (progn
   (defun test-a-cons (acons oldcar oldcdr newcar newcdr)
-    (declare (optimize (safety 0)))
     (%cons-cas-pair acons oldcar oldcdr newcar newcdr))
   (defun test-a-vect (avect ind old1 old2 new1 new2)
-    (declare (optimize (safety 0)))
     (%vector-cas-pair avect ind old1 old2 new1 new2))
   (defun test-a-struct (inst ind old1 old2 new1 new2)
-    (declare (optimize (safety 0)))
     (%instance-cas-pair inst ind old1 old2 new1 new2))
 
   (defun test-wide-cmpxchg ()
