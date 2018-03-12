@@ -127,13 +127,14 @@
   (:translate get-closure-length)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg)))
-  (:results (res :scs (unsigned-reg)))
+  (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
   (:generator 6
     (let ((res (reg-in-size res :dword)))
-      (inst mov res (make-ea-for-object-slot-half x 0 fun-pointer-lowtag))
-      (inst shr res n-widetag-bits)
-      (inst and res short-header-max-words))))
+      (inst movzx res
+            (make-ea :word :base x :disp (1+ (- fun-pointer-lowtag))))
+      (inst btr res 15) ; Clear the NAMEDP header bit
+      (inst shl res n-fixnum-tag-bits))))
 
 (define-vop (set-header-data)
   (:translate set-header-data)

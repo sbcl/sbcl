@@ -597,13 +597,15 @@
   (:policy :fast-safe)
   (:translate %instance-length)
   (:args (struct :scs (descriptor-reg)))
-  (:results (res :scs (unsigned-reg)))
+  ;; Explicitly fixnumizing admits a 32-bit left-shift which might encode
+  ;; in 1 less byte. (Other backends return an UNSIGNED-REG here.)
+  (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
   (:generator 4
-    (inst mov (reg-in-size res :word)
-              (make-ea :word :base struct
-                       :disp (1+ (- instance-pointer-lowtag))))
-    (inst movzx (reg-in-size res :dword) (reg-in-size res :word))))
+    (let ((res (reg-in-size res :dword)))
+      (inst movzx res (make-ea :word :base struct
+                               :disp (1+ (- instance-pointer-lowtag))))
+      (inst shl res n-fixnum-tag-bits))))
 
 #!+compact-instance-header
 (progn
