@@ -11,22 +11,23 @@
 (deftype sampling-mode ()
   '(member :cpu :alloc :time))
 
+(declaim (inline make-sample-vector))
+(defun make-sample-vector (max-samples)
+  (make-array (* max-samples
+                 ;; Arbitrary guess at how many samples we'll be
+                 ;; taking for each trace. The exact amount doesn't
+                 ;; matter, this is just to decrease the amount of
+                 ;; re-allocation that will need to be done.
+                 10
+                 ;; Each sample takes two cells in the vector
+                 2)))
+
 ;;; Encapsulate all the information about a sampling run
 (defstruct (samples
              (:constructor
               make-samples (&key mode sample-interval alloc-interval
                                  max-depth max-samples
-                            &aux (vector (make-array (* max-samples
-                                                        ;; Arbitrary guess at how many
-                                                        ;; samples we'll be taking for each
-                                                        ;; trace. The exact amount doesn't
-                                                        ;; matter, this is just to decrease
-                                                        ;; the amount of re-allocation that
-                                                        ;; will need to be done.
-                                                        10
-                                                        ;; Each sample takes two cells in
-                                                        ;; the vector
-                                                        2))))))
+                            &aux (vector (make-sample-vector max-samples)))))
   ;; When this vector fills up, we allocate a new one and copy over
   ;; the old contents.
   (vector          nil                  :type simple-vector)
@@ -44,6 +45,42 @@
 (defmethod print-object ((samples samples) stream)
   (let ((*print-array* nil))
     (call-next-method)))
+
+(defun note-sample-vector-full (samples)
+  (format *trace-output* "Profiler sample vector full (~:D trace~:P / ~
+                          approximately ~:D sample~:P), doubling the ~
+                          size~%"
+          (samples-trace-count samples)
+          (truncate (samples-index samples) 2)))
+
+(declaim (inline ensure-samples-vector))
+(defun ensure-samples-vector (samples)
+  (declare (optimize (speed 3)))
+  (let ((vector (samples-vector samples))
+        (index (samples-index samples)))
+    ;; Allocate a new sample vector if the old one is full
+    (values (if (= (length vector) index)
+                (let ((new-vector (make-array (* 2 index))))
+                  (note-sample-vector-full samples)
+                  (replace new-vector vector)
+                  (setf (samples-vector samples) new-vector))
+                vector)
+            index)))
+
+(defun record-trace-start (samples)
+  ;; Mark the start of the trace.
+  (multiple-value-bind (vector index) (ensure-samples-vector samples)
+    (setf (aref vector index) 'trace-start)
+    (setf (samples-index samples) (+ index 2))))
+
+(declaim (inline record-sample))
+(defun record-sample (samples info pc-or-offset)
+  (multiple-value-bind (vector index) (ensure-samples-vector samples)
+    ;; For each sample, store the debug-info and the PC/offset into
+    ;; adjacent cells.
+    (setf (aref vector index) info
+          (aref vector (1+ index)) pc-or-offset)
+    (setf (samples-index samples) (+ index 2))))
 
 
 ;;; Sampling
@@ -131,51 +168,12 @@
                    (t
                     (values nil 0 nil))))))))
 
-(defun ensure-samples-vector (samples)
-  (let ((vector (samples-vector samples))
-        (index (samples-index samples)))
-    ;; Allocate a new sample vector if the old one is full
-    (if (= (length vector) index)
-        (let ((new-vector (make-array (* 2 index))))
-          (format *trace-output* "Profiler sample vector full (~a traces / ~a samples), doubling the size~%"
-                  (samples-trace-count samples)
-                  (truncate index 2))
-          (replace new-vector vector)
-          (setf (samples-vector samples) new-vector))
-        vector)))
-
 (declaim (inline record))
 (defun record (samples pc)
-  (declare (type system-area-pointer pc)
-           (muffle-conditions compiler-note))
-  (multiple-value-bind (info pc-or-offset foreign)
-      (debug-info pc)
-    (let ((vector (ensure-samples-vector samples))
-          (index (samples-index samples)))
-      (declare (type simple-vector vector))
-      ;; Allocate a new sample vector if the old one is full
-      (when (= (length vector) index)
-        (let ((new-vector (make-array (* 2 index))))
-          (format *trace-output* "Profiler sample vector full (~a traces / ~a samples), doubling the size~%"
-                  (samples-trace-count samples)
-                  (truncate index 2))
-          (replace new-vector vector)
-          (setf vector new-vector
-                (samples-vector samples) new-vector)))
-      ;; For each sample, store the debug-info and the PC/offset into
-      ;; adjacent cells.
-      (setf (aref vector index) info
-            (aref vector (1+ index)) pc-or-offset)))
-  (incf (samples-index samples) 2)
-  foreign)
-
-(defun record-trace-start (samples)
-  ;; Mark the start of the trace.
-  (let ((vector (ensure-samples-vector samples)))
-    (declare (type simple-vector vector))
-    (setf (aref vector (samples-index samples))
-          'trace-start))
-  (incf (samples-index samples) 2))
+  (declare (type system-area-pointer pc))
+  (multiple-value-bind (info pc-or-offset foreign) (debug-info pc)
+    (record-sample samples info pc-or-offset)
+    foreign))
 
 ;;; List of thread currently profiled, or :ALL for all threads.
 (defvar *profiled-threads* nil)
