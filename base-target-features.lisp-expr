@@ -231,10 +231,6 @@
  ;;    sorted in emission order. It could actually perform arbitrary
  ;;    modifications to the vector, e.g. to fuse constants of different
  ;;    size.
- ;; * emit-constant-segment-header: receives the vector of sorted constants
- ;;    and a flag (true iff speed > space). Expected to emit padding
- ;;    of some sort between the ELSEWHERE segment and the constants, or some
- ;;    metadata.
  ;; * emit-inline-constant: receives a constant descriptor and its associated
  ;;    label. Emits the constant.
  ;;

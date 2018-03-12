@@ -3478,10 +3478,6 @@
     (values label (make-ea size
                            :disp (make-fixup nil :code-object label)))))
 
-(defun emit-constant-segment-header (segment constants optimize)
-  (declare (ignore constants))
-  (emit-long-nop segment (if optimize 64 16)))
-
 (defun size-nbyte (size)
   (ecase size
     (:byte  1)
