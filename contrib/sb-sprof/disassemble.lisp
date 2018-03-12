@@ -21,22 +21,22 @@
 (defun add-disassembly-profile-note (chunk stream dstate)
   (declare (ignore chunk stream))
   (when *samples*
-    (let* ((location (+ (sb-disassem::seg-virtual-location
-                         (sb-disassem:dstate-segment dstate))
-                        (sb-disassem::dstate-cur-offs dstate)))
-           (samples (loop with index = (samples-index *samples*)
-                       for x from 0 below (- index 2) by 2
-                       for last-sample = nil then sample
-                       for sample = (aref (samples-vector *samples*) x)
-                       for pc-or-offset = (aref (samples-vector *samples*)
-                                                (1+ x))
-                       when (and sample (eq last-sample 'trace-start))
-                       count (= location
-                                (sample-pc-from-pc-or-offset sample
-                                                             pc-or-offset)))))
-      (unless (zerop samples)
-        (sb-disassem::note (format nil "~A/~A samples"
-                                   samples (samples-trace-count *samples*))
-                           dstate)))))
+    (let ((samples *samples*)
+          (location (+ (sb-disassem::seg-virtual-location
+                        (sb-disassem:dstate-segment dstate))
+                       (sb-disassem::dstate-cur-offs dstate)))
+          (hits 0))
+      (declare (type index hits))
+      (map-all-samples (lambda (debug-info pc-or-offset)
+                         (when (= location (sample-pc-from-pc-or-offset
+                                            debug-info pc-or-offset))
+                           (incf hits)))
+                       samples)
+      (unless (zerop hits)
+        (let* ((total-count (samples-trace-count samples))
+               (width (length (write-to-string total-count :base 10))))
+          (sb-disassem::note (format nil "~VD/~VD samples"
+                                     width hits width total-count)
+                             dstate))))))
 
 (pushnew 'add-disassembly-profile-note sb-disassem::*default-dstate-hooks*)

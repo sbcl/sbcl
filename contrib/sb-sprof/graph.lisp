@@ -301,42 +301,44 @@
 
 ;;; Value is a CALL-GRAPH for the current contents of *SAMPLES*.
 (defun make-call-graph-1 (max-depth)
-  (let ((elsewhere-count 0)
-        visited-nodes)
+  (let ((elsewhere-count 0))
     (with-lookup-tables ()
-      (loop for i below (- (samples-index *samples*) 2) by 2
-         with depth = 0
-         for debug-info = (aref (samples-vector *samples*) i)
-         for next-info = (aref (samples-vector *samples*)
-                               (+ i 2))
-         do (if (eq debug-info 'trace-start)
-                (setf depth 0)
-                (let ((callee (lookup-node debug-info))
-                      (caller (unless (eq next-info 'trace-start)
-                                (lookup-node next-info))))
-                  (when (< depth max-depth)
-                    (when (zerop depth)
-                      (setf visited-nodes nil)
-                      (cond (callee
-                             (incf (node-accrued-count callee))
-                             (incf (node-count callee)))
-                            (t
-                             (incf elsewhere-count))))
-                    (incf depth)
-                    (when callee
-                      (push callee visited-nodes))
+      (map-traces
+       (lambda (trace)
+         (let ((visited-nodes '())
+               (depth 0)
+               (caller nil))
+           (block calls
+             (map-trace-samples
+              (lambda (debug-info pc-offset)
+                (declare (ignore pc-offset))
+                (when (> depth max-depth)
+                  (return-from calls))
+                (let ((callee (lookup-node debug-info)))
+                  (when (and caller (not (member caller visited-nodes
+                                                 :test #'eq)))
+                    (incf (node-accrued-count caller))
+                    (push caller visited-nodes))
+                  (when callee
                     (when caller
-                      (unless (member caller visited-nodes)
-                        (incf (node-accrued-count caller)))
-                      (when callee
-                        (let ((call (find callee (node-edges caller)
-                                          :key #'call-vertex)))
-                          (pushnew caller (node-callers callee))
-                          (if call
-                              (unless (member caller visited-nodes)
-                                (incf (call-count call)))
-                              (push (make-call callee)
-                                    (node-edges caller))))))))))
+                      (let ((call (find callee (node-edges caller)
+                                        :key #'call-vertex)))
+                        (pushnew caller (node-callers callee))
+                        (if call
+                            (unless (member caller visited-nodes)
+                              (incf (call-count call)))
+                            (push (make-call callee)
+                                  (node-edges caller))))))
+                  (incf depth)
+                  (setf caller callee)))
+              trace))
+           (cond
+             (caller
+              (incf (node-count caller))
+              (incf (node-accrued-count caller)))
+             (t
+              (incf elsewhere-count)))))
+       *samples*)
       (let ((sorted-nodes (sort (collect-nodes) #'> :key #'node-count)))
         (loop for node in sorted-nodes and i from 1 do
              (setf (node-index node) i))
