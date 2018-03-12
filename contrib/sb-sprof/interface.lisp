@@ -185,7 +185,8 @@ The following keyword args are recognized:
             (truncate sample-interval)
           (values secs (truncate (* rest 1000000))))
       (setf *sampling* sampling
-            *samples* (make-samples :max-depth max-depth
+            *samples* (make-samples :start-time (get-internal-real-time)
+                                    :max-depth max-depth
                                     :max-samples max-samples
                                     :sample-interval sample-interval
                                     :alloc-interval alloc-interval
@@ -251,7 +252,8 @@ The following keyword args are recognized:
      (disable-call-counting)
      (setf *profiling* nil
            *sampling* nil
-           *profiled-threads* nil)))
+           *profiled-threads* nil)
+     (setf (samples-end-time *samples*) (get-internal-real-time))))
   (values))
 
 (defun reset ()

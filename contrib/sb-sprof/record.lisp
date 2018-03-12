@@ -25,7 +25,8 @@
 ;;; Encapsulate all the information about a sampling run
 (defstruct (samples
              (:constructor
-              make-samples (&key mode sample-interval alloc-interval
+              make-samples (&key start-time
+                                 mode sample-interval alloc-interval
                                  max-depth max-samples
                             &aux (vector (make-sample-vector max-samples)))))
   ;; When this vector fills up, we allocate a new one and copy over
@@ -35,6 +36,10 @@
   (trace-count     0                    :type sb-int:index)
 
   (sampled-threads nil                  :type list)
+
+  ;; Metadata
+  (start-time      (sb-int:missing-arg) :type sb-kernel:internal-time    :read-only t)
+  (end-time        nil                  :type (or null sb-kernel:internal-time))
 
   (mode            nil                  :type sampling-mode              :read-only t)
   (sample-interval (sb-int:missing-arg) :type (real (0))                 :read-only t)
