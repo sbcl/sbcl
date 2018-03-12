@@ -239,9 +239,6 @@
    code start/end locations etc."
   '(unsigned-byte #.sb-vm::n-machine-word-bits))
 
-(defconstant +unknown-address+ 0
-  "Constant representing an address that cannot be determined.")
-
 ;;; A call graph.  Vertices are NODE structures, edges are CALL
 ;;; structures.
 (defstruct (call-graph (:include graph)
