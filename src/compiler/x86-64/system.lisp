@@ -223,8 +223,10 @@
   (:results (sap :scs (sap-reg) :from (:argument 0)))
   (:result-types system-area-pointer)
   (:generator 10
-    (zeroize sap)
-    (inst mov (reg-in-size sap :word)
+    ;; Perform an unaligned 16-bit read to extract the payload length.
+    ;; There are only 15 bits of precision, but the high bit is always 0
+    ;; so it doesn't need masking.
+    (inst movzx (reg-in-size sap :dword)
               (make-ea :word :base code :disp (- 1 other-pointer-lowtag)))
     (inst lea sap (make-ea :byte :base code :index sap
                            :scale n-word-bytes
@@ -236,8 +238,7 @@
   (:arg-types * positive-fixnum)
   (:results (func :scs (descriptor-reg) :from (:argument 0)))
   (:generator 10
-    (zeroize func)
-    (inst mov (reg-in-size func :word)
+    (inst movzx (reg-in-size func :dword)
               (make-ea :word :base code :disp (- 1 other-pointer-lowtag)))
     (inst lea func
           (make-ea :byte :base offset :index func
