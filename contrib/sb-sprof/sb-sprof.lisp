@@ -245,17 +245,17 @@
                        (:constructor %make-call-graph))
   ;; the value of *SAMPLE-INTERVAL* or *ALLOC-INTERVAL* at the time
   ;; the graph was created (depending on the current allocation mode)
-  (sample-interval (sb-impl::missing-arg) :type number)
+  (sample-interval (sb-impl::missing-arg) :type (real (0)))
   ;; the sampling-mode that was used for the profiling run
-  (sampling-mode (sb-impl::missing-arg) :type (member :cpu :alloc :time))
+  (sampling-mode   (sb-impl::missing-arg) :type sampling-mode)
   ;; number of samples taken
-  (nsamples (sb-impl::missing-arg) :type sb-int:index)
+  (nsamples        (sb-impl::missing-arg) :type sb-int:index)
   ;; threads that have been sampled
-  (sampled-threads nil :type list)
+  (sampled-threads '()                    :type list)
   ;; sample count for samples not in any function
   (elsewhere-count (sb-impl::missing-arg) :type sb-int:index)
   ;; a flat list of NODEs, sorted by sample count
-  (flat-nodes () :type list))
+  (flat-nodes      '()                    :type list))
 
 ;;; A node in a call graph, representing a function that has been
 ;;; sampled.  The edges of a node are CALL structures that represent
@@ -299,11 +299,11 @@
 
 (defvar *sample-interval* 0.01
   "Default number of seconds between samples.")
-(declaim (type number *sample-interval*))
+(declaim (type (real (0)) *sample-interval*))
 
 (defvar *alloc-interval* 4
   "Default number of allocation region openings between samples.")
-(declaim (type number *alloc-interval*))
+(declaim (type (integer (0)) *alloc-interval*))
 
 (defvar *max-samples* 50000
   "Default number of traces taken. This variable is somewhat misnamed:
@@ -311,27 +311,35 @@ each trace may actually consist of an arbitrary number of samples, depending
 on the depth of the call stack.")
 (declaim (type sb-int:index *max-samples*))
 
+(deftype sampling-mode ()
+  '(member :cpu :alloc :time))
+
 ;;; Encapsulate all the information about a sampling run
 (defstruct (samples)
   ;; When this vector fills up, we allocate a new one and copy over
   ;; the old contents.
-  (vector (make-array (* *max-samples*
-                         ;; Arbitrary guess at how many samples we'll be
-                         ;; taking for each trace. The exact amount doesn't
-                         ;; matter, this is just to decrease the amount of
-                         ;; re-allocation that will need to be done.
-                         10
-                         ;; Each sample takes two cells in the vector
-                         2))
-          :type simple-vector)
-  (trace-count 0 :type sb-int:index)
-  (index 0 :type sb-int:index)
-  (mode nil :type (member :cpu :alloc :time))
-  (sample-interval (sb-int:missing-arg) :type number)
-  (alloc-interval (sb-int:missing-arg) :type number)
-  (max-depth most-positive-fixnum :type number)
-  (max-samples (sb-int:missing-arg) :type sb-int:index)
-  (sampled-threads nil :type list))
+  (vector          (make-array (* *max-samples*
+                                  ;; Arbitrary guess at how many
+                                  ;; samples we'll be taking for each
+                                  ;; trace. The exact amount doesn't
+                                  ;; matter, this is just to decrease
+                                  ;; the amount of re-allocation that
+                                  ;; will need to be done.
+                                  10
+                                  ;; Each sample takes two cells in
+                                  ;; the vector
+                                  2))
+                   :type simple-vector)
+  (trace-count     0                    :type sb-int:index)
+  (index           0                    :type sb-int:index)
+
+  (mode            nil                  :type sampling-mode              :read-only t)
+  (sample-interval (sb-int:missing-arg) :type (real (0))                 :read-only t)
+  (alloc-interval  (sb-int:missing-arg) :type (integer (0))              :read-only t)
+  (max-depth       most-positive-fixnum :type (and fixnum (integer (0))) :read-only t)
+  (max-samples     (sb-int:missing-arg) :type sb-int:index               :read-only t)
+
+  (sampled-threads nil                  :type list))
 
 (defmethod print-object ((samples samples) stream)
   (let ((*print-array* nil))
@@ -356,7 +364,7 @@ on the depth of the call stack.")
 (defvar *sampling-mode* :cpu
   "Default sampling mode. :CPU for cpu profiling, :ALLOC for allocation
 profiling, and :TIME for wallclock profiling.")
-(declaim (type (member :cpu :alloc :time) *sampling-mode*))
+(declaim (type sampling-mode *sampling-mode*))
 
 (defvar *alloc-region-size*
   #-gencgc
@@ -369,7 +377,7 @@ profiling, and :TIME for wallclock profiling.")
 (declaim (type (or null samples) *samples*))
 
 (defvar *profiling* nil)
-(declaim (type (member nil :alloc :cpu :time) *profiling*))
+(declaim (type (or (eql nil) sampling-mode) *profiling*))
 (defvar *sampling* nil)
 (declaim (type boolean *sampling*))
 
