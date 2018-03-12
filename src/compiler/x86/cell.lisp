@@ -776,3 +776,71 @@
     (let ((value-imag (complex-double-reg-imag-tn value)))
       (with-tn@fp-top (value-imag)
         (inst fstd (make-ea-for-raw-slot object index 2))))))
+
+;;;;
+
+(defknown %cons-cas-pair (cons t t t t) (values t t))
+(defknown %vector-cas-pair (simple-vector index t t t t) (values t t))
+;; %INSTANCE-CAS-PAIR only operates on tagged slots (for now)
+(defknown %instance-cas-pair (instance index t t t t) (values t t))
+
+(defun generate-dblcas (memory-operand old-lo old-hi new-lo new-hi
+                        eax ebx ecx edx result-lo result-hi)
+  (move eax old-lo)
+  (move edx old-hi)
+  (move ebx new-lo)
+  (move ecx new-hi)
+  (inst cmpxchg8b memory-operand :lock)
+  ;; EDX:EAX hold the actual old contents of memory.
+  ;; Manually analyze result lifetimes to avoid clobbering.
+  (cond ((and (location= result-lo edx) (location= result-hi eax))
+         (inst xchg eax edx)) ; unlikely, but possible
+        ((location= result-lo edx) ; result-hi is not eax
+         (move result-hi edx) ; move high part first
+         (move result-lo eax))
+        (t                    ; result-lo is not edx
+         (move result-lo eax) ; move low part first
+         (move result-hi edx))))
+
+(macrolet
+    ((define-cmpxchg-vop (name memory-operand more-stuff &optional index-arg)
+       `(define-vop (,name)
+          (:policy :fast-safe)
+          ,@more-stuff
+          (:args (data :scs (descriptor-reg) :to :eval)
+                 ,@index-arg
+                 (expected-old-lo :scs (descriptor-reg any-reg) :target eax)
+                 (expected-old-hi :scs (descriptor-reg any-reg) :target edx)
+                 (new-lo :scs (descriptor-reg any-reg) :target ebx)
+                 (new-hi :scs (descriptor-reg any-reg) :target ecx))
+          (:results (result-lo :scs (descriptor-reg any-reg))
+                    (result-hi :scs (descriptor-reg any-reg)))
+          (:temporary (:sc unsigned-reg :offset eax-offset
+                       :from (:argument 2) :to (:result 0)) eax)
+          (:temporary (:sc unsigned-reg :offset edx-offset
+                       :from (:argument 3) :to (:result 0)) edx)
+          (:temporary (:sc unsigned-reg :offset ebx-offset
+                       :from (:argument 4) :to (:result 0)) ebx)
+          (:temporary (:sc unsigned-reg :offset ecx-offset
+                       :from (:argument 5) :to (:result 0)) ecx)
+          (:generator 7
+           (generate-dblcas ,memory-operand
+                            expected-old-lo expected-old-hi new-lo new-hi
+                            eax ebx ecx edx result-lo result-hi)))))
+  (define-cmpxchg-vop compare-and-exchange-pair
+      (make-ea :dword :base data :disp (- list-pointer-lowtag))
+      ((:translate %cons-cas-pair)))
+  (define-cmpxchg-vop compare-and-exchange-pair-indexed
+      (make-ea :dword :base data :disp offset :index index
+                      :scale (ash n-word-bytes (- n-fixnum-tag-bits)))
+      ((:variant-vars offset))
+      ((index :scs (descriptor-reg any-reg) :to :eval))))
+
+(define-vop (%vector-cas-pair compare-and-exchange-pair-indexed)
+  (:translate %vector-cas-pair)
+  (:variant (- (* n-word-bytes vector-data-offset) other-pointer-lowtag)))
+
+(define-vop (%instance-cas-pair compare-and-exchange-pair-indexed)
+  (:translate %instance-cas-pair)
+  (:variant (- (* n-word-bytes instance-slots-offset) instance-pointer-lowtag)))
+

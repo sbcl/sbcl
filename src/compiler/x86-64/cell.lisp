@@ -769,3 +769,75 @@
     (:generator 4
       (inst xadd (make-ea-for-raw-slot object index) diff :lock)
       (move result diff))))
+
+;;;;
+
+(defknown %cons-cas-pair (cons t t t t) (values t t))
+(defknown %vector-cas-pair (simple-vector index t t t t) (values t t))
+;; %INSTANCE-CAS-PAIR only operates on tagged slots (for now)
+(defknown %instance-cas-pair (instance index t t t t) (values t t))
+
+(defun generate-dblcas (memory-operand old-lo old-hi new-lo new-hi
+                        rax rbx rcx rdx result-lo result-hi)
+  (move rax old-lo)
+  (move rdx old-hi)
+  (move rbx new-lo)
+  (move rcx new-hi)
+  (inst cmpxchg16b memory-operand :lock)
+  ;; RDX:RAX hold the actual old contents of memory.
+  ;; Manually analyze result lifetimes to avoid clobbering.
+  (cond ((and (location= result-lo rdx) (location= result-hi rax))
+         (inst xchg rax rdx)) ; unlikely, but possible
+        ((location= result-lo rdx) ; result-hi is not rax
+         (move result-hi rdx) ; move high part first
+         (move result-lo rax))
+        (t                    ; result-lo is not rdx
+         (move result-lo rax) ; move low part first
+         (move result-hi rdx))))
+
+(macrolet
+    ((define-cmpxchg-vop (name memory-operand more-stuff &optional index-arg)
+       `(define-vop (,name)
+          (:policy :fast-safe)
+          ,@more-stuff
+          (:args (object :scs (descriptor-reg) :to :eval)
+                 ,@index-arg
+                 (expected-old-lo :scs (descriptor-reg any-reg) :target eax)
+                 (expected-old-hi :scs (descriptor-reg any-reg) :target edx)
+                 (new-lo :scs (descriptor-reg any-reg) :target ebx)
+                 (new-hi :scs (descriptor-reg any-reg) :target ecx))
+          (:results (result-lo :scs (descriptor-reg any-reg))
+                    (result-hi :scs (descriptor-reg any-reg)))
+          (:temporary (:sc unsigned-reg :offset eax-offset
+                       :from (:argument 2) :to (:result 0)) eax)
+          (:temporary (:sc unsigned-reg :offset edx-offset
+                       :from (:argument 3) :to (:result 0)) edx)
+          (:temporary (:sc unsigned-reg :offset ebx-offset
+                       :from (:argument 4) :to (:result 0)) ebx)
+          (:temporary (:sc unsigned-reg :offset ecx-offset
+                       :from (:argument 5) :to (:result 0)) ecx)
+          (:generator 7
+           (generate-dblcas ,memory-operand
+                            expected-old-lo expected-old-hi new-lo new-hi
+                            eax ebx ecx edx result-lo result-hi)))))
+  (define-cmpxchg-vop compare-and-exchange-pair
+      (make-ea :dword :base object :disp (- list-pointer-lowtag))
+      ((:translate %cons-cas-pair)))
+  (define-cmpxchg-vop compare-and-exchange-pair-indexed
+      (make-ea :dword :base object :disp offset :index index
+                      :scale (ash n-word-bytes (- n-fixnum-tag-bits)))
+      ((:variant-vars offset))
+      ((index :scs (descriptor-reg any-reg) :to :eval))))
+
+;; The CPU requires 16-byte alignment for the memory operand.
+;; A vector's data portion starts on a 16-byte boundary,
+;; so any even numbered index is OK.
+(define-vop (%vector-cas-pair compare-and-exchange-pair-indexed)
+  (:translate %vector-cas-pair)
+  (:variant (- (* n-word-bytes vector-data-offset) other-pointer-lowtag)))
+
+;; Here you specify an odd numbered slot, otherwise get a bus error.
+;; An instance's first user-visible slot at index 1 is 16-byte-aligned.
+(define-vop (%instance-cas-pair compare-and-exchange-pair-indexed)
+  (:translate %instance-cas-pair)
+  (:variant (- (* n-word-bytes instance-slots-offset) instance-pointer-lowtag)))
