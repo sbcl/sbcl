@@ -5,6 +5,8 @@ changes relative to sbcl-1.4.5:
     the expander, not the code that traps attempted FUNCALL of the macro.
   * enhancement: The sb-sprof contrib now provides an experimental interface
     for accessing collected profiler data.
+  * enhancement: The instruction-level profiling of the sb-prof contrib
+    annotates the disassembler output more efficiently.
 
 changes in sbcl-1.4.5 relative to sbcl-1.4.4:
   * minor incompatible change: building with/without the :sb-package-locks
