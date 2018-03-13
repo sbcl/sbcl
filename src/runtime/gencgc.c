@@ -1849,10 +1849,9 @@ preserve_pointer(void *addr)
      * we are only called on valid object pointers in the first place,
      * so we just have to do a bounds-check against the heap, a
      * generation check, and the already-pinned check. */
-    if (page < 0 ||
-        (compacting_p() && (page_table[page].gen != from_space ||
+    if (compacting_p() && (page_table[page].gen != from_space ||
                             (page_single_obj_p(page) &&
-                             page_table[page].pinned))))
+                             page_table[page].pinned)))
         return;
      object_start = native_pointer((lispobj)addr);
      switch (widetag_of(*object_start)) {
@@ -1863,7 +1862,7 @@ preserve_pointer(void *addr)
          object_start = fun_code_header(object_start);
      }
 #else
-    if (page < 0 || (object_start = conservative_root_p((lispobj)addr, page)) == NULL)
+    if ((object_start = conservative_root_p((lispobj)addr, page)) == NULL)
         return;
 #endif
 
