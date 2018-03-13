@@ -408,7 +408,7 @@ EXPERIMENTAL: Interface subject to change."
                     (fp (sb-vm::context-register scp #.sb-vm::cfp-offset)))
                 (unless (eq (record samples pc-ptr) :foreign)
                   (record samples (sap-ref-sap
-                                   (int-snap fp)
+                                   (int-sap fp)
                                    (* sb-vm::lra-save-offset sb-vm::n-word-bytes))))))))))))
 
 ;;; Return the start address of CODE.
