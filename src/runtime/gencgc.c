@@ -1494,6 +1494,19 @@ search_dynamic_space(void *pointer)
 }
 
 #if !GENCGC_IS_PRECISE
+/* Return true if 'addr' has a lowtag and widetag that correspond,
+ * given that the words at 'addr' are within range for an allocated page.
+ * 'addr' could be a pointer to random data, and this check is merely
+ * a heuristic. False positives are possible. */
+static inline boolean plausible_tag_p(lispobj addr)
+{
+    if (listp(addr))
+        return is_cons_half(CONS(addr)->car)
+            && is_cons_half(CONS(addr)->cdr);
+    unsigned char widetag = widetag_of(*native_pointer(addr));
+    return other_immediate_lowtag_p(widetag)
+        && lowtag_of(addr) == lowtag_for_widetag[widetag>>2];
+}
 // Return the starting address of the object containing 'addr'
 // if and only if the object is one which would be evacuated from 'from_space'
 // were it allowed to be either discarded as garbage or moved.
@@ -1524,16 +1537,7 @@ conservative_root_p(lispobj addr, page_index_t addr_page_index)
      * definitive test which involves searching for the containing object. */
 
     if (enforce_lowtag) {
-        lispobj* obj = native_pointer(addr);
-        if (listp(addr)) {
-            if (!is_cons_half(obj[0]) || !is_cons_half(obj[1]))
-                return 0;
-        } else {
-            unsigned char widetag = widetag_of(*obj);
-            if (!other_immediate_lowtag_p(widetag) ||
-                lowtag_of(addr) != lowtag_for_widetag[widetag>>2])
-                return 0;
-        }
+        if (!plausible_tag_p(addr)) return 0;
         /* Don't gc_search_space() more than once for any object.
          * Doesn't apply to code since the base address is unknown */
         /* FIXME: for non-compacting GC, either don't do this call at all
