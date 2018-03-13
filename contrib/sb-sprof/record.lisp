@@ -156,6 +156,25 @@ EXPERIMENTAL: Interface subject to change."
                      (declare (ignore thread time))
                      (map-trace-samples function trace)))
     (map-traces #'do-trace samples)))
+
+(defun sample-pc (info pc-or-offset)
+  "Extract and return program counter from INFO and PC-OR-OFFSET.
+
+Can be applied to the arguments passed by MAP-TRACE-SAMPLES and
+MAP-ALL-SAMPLES.
+
+EXPERIMENTAL: Interface subject to change."
+  (etypecase info
+    ;; Assembly routines or foreign functions don't move around, so
+    ;; we've stored a raw PC
+    ((or null sb-kernel:code-component string)
+     pc-or-offset)
+    ;; Lisp functions might move, so we've stored a offset from the
+    ;; start of the code component.
+    (sb-di::compiled-debug-fun
+     (let* ((component (sb-di::compiled-debug-fun-component info))
+            (start-pc (code-start component)))
+       (+ start-pc pc-or-offset)))))
 
 ;;; Sampling
 

@@ -5,19 +5,6 @@
 
 (in-package #:sb-sprof)
 
-(defun sample-pc-from-pc-or-offset (sample pc-or-offset)
-  (etypecase sample
-    ;; Assembly routines or foreign functions don't move around, so we've
-    ;; stored a raw PC
-    ((or sb-kernel:code-component string)
-     pc-or-offset)
-    ;; Lisp functions might move, so we've stored a offset from the
-    ;; start of the code component.
-    (sb-di::compiled-debug-fun
-     (let* ((component (sb-di::compiled-debug-fun-component sample))
-            (start-pc (code-start component)))
-       (+ start-pc pc-or-offset)))))
-
 (defun add-disassembly-profile-note (chunk stream dstate)
   (declare (ignore chunk stream))
   (when *samples*
@@ -28,8 +15,7 @@
           (hits 0))
       (declare (type index hits))
       (map-all-samples (lambda (debug-info pc-or-offset)
-                         (when (= location (sample-pc-from-pc-or-offset
-                                            debug-info pc-or-offset))
+                         (when (= location (sample-pc debug-info pc-or-offset))
                            (incf hits)))
                        samples)
       (unless (zerop hits)
