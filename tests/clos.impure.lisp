@@ -1149,6 +1149,7 @@
     (incf y)
     (call-next-method))
   (:method ((x symbol) &optional (y 0))
+    (declare (ignore y))
     (call-next-method)))
 (with-test (:name (:cnm-assignment :bug-1734771 4))
   (assert (equal (bug-1734771-2 2) '(2 nil nil))))
@@ -2610,7 +2611,7 @@
   (handler-bind ((timeout (lambda (condition)
                             (declare (ignore condition))
                             (error "Timeout"))))
-    (sb-ext:with-timeout 1
+    (sb-ext:with-timeout 10
       (checked-compile-and-assert (:allow-warnings t)
           `(lambda ()
              (defmethod foo ((bar keyword))))
