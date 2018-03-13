@@ -4093,9 +4093,10 @@ void gc_load_corefile_ptes(core_entry_elt_t n_ptes, core_entry_elt_t total_bytes
     generations[gen].bytes_allocated = bytes_allocated;
     gc_assert((ssize_t)bytes_allocated <=
               ((char*)get_alloc_pointer() - page_address(0)));
+    // write-protecting needs the current value of last_free_page
+    last_free_page = n_ptes;
     if (ENABLE_PAGE_PROTECTION)
         write_protect_generation_pages(gen);
-    last_free_page = n_ptes;
 }
 
 /* Prepare the array of corefile_ptes for save */
