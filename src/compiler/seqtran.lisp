@@ -317,6 +317,17 @@
                        (%give-up))))))))))
 
 ;;; MAP-INTO
+(defmacro mapper-from-typecode (typecode)
+  #+sb-xc-host
+  `(svref ,(let ((a (make-array 256)))
+             (dovector (info sb!vm:*specialized-array-element-type-properties* a)
+               (setf (aref a (sb!vm:saetp-typecode info))
+                     (package-symbolicate "SB!IMPL" "VECTOR-MAP-INTO/"
+                                          (sb!vm:saetp-primitive-type-name info)))))
+          ,typecode)
+  #-sb-xc-host
+  `(%fun-name (svref sb!impl::%%vector-map-into-funs%% ,typecode)))
+
 (deftransform map-into ((result fun &rest seqs)
                         (vector * &rest *)
                         * :node node)
@@ -353,22 +364,16 @@
                   :body '(locally (declare (optimize (insert-array-bounds-checks 0)))
                           (setf (aref result index) funcall-result))))
             result))
-      (cond #-sb-xc-host
-            ;; %%vector-map-into-funs%% is not defined in xc
-            ;; if something needs to be faster in the compiler, it
-            ;; should declare the input sequences instead.
-            ((and non-complex-vector-type-p
+      (cond ((and non-complex-vector-type-p
                   (array-type-p result-type)
                   (not (eq (array-type-specialized-element-type result-type)
                            *wild-type*)))
              (let ((saetp (find-saetp-by-ctype (array-type-specialized-element-type result-type))))
                (unless saetp
                  (give-up-ir1-transform "Uknown upgraded array element type of the result"))
-               (let ((mapper (%fun-name (svref sb!impl::%%vector-map-into-funs%%
-                                               (sb!vm:saetp-typecode saetp)))))
-                 `(progn (,mapper result 0 (length result)
-                                  (%coerce-callable-to-fun fun) seqs)
-                         result))))
+               `(progn (,(mapper-from-typecode (sb!vm:saetp-typecode saetp))
+                        result 0 (length result) (%coerce-callable-to-fun fun) seqs)
+                       result)))
             (t
              (%give-up))))))
 
