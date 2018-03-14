@@ -1945,11 +1945,8 @@ update_page_write_prot(page_index_t page)
 
     if (!ENABLE_PAGE_PROTECTION) return 0;
 
-    /* Skip if it's already write-protected, pinned, or unboxed */
-    if (page_table[page].write_protected
-        /* FIXME: What's the reason for not write-protecting pinned pages? */
-        || page_table[page].pinned
-        || page_unboxed_p(page))
+    /* Skip if it's unboxed or already write-protected */
+    if (page_table[page].write_protected || page_unboxed_p(page))
         return (0);
 
     /* Scan the page for pointers to younger generations or the
