@@ -219,7 +219,7 @@ page_ends_contiguous_block_p(page_index_t page_index, generation_index_t gen)
            (/* page doesn't fill block */
             (page_bytes_used(page_index) < GENCGC_CARD_BYTES)
             /* page is last allocated page */
-            || ((page_index + 1) >= last_free_page)
+            || ((page_index + 1) >= next_free_page)
             /* next page contains no data */
             || !page_bytes_used(page_index + 1)
             /* next page is in different generation */
@@ -316,16 +316,12 @@ struct generation generations[NUM_GENERATIONS];
  * data can be avoided. */
 generation_index_t gencgc_oldest_gen_to_gc = HIGHEST_NORMAL_GENERATION;
 
-/* META: Is nobody aside from me bothered by this especially misleading
- * use of the word "last"?  It could mean either "ultimate" or "prior",
- * but in fact means neither. It is the *FIRST* page that should be grabbed
- * for more space, so it is min free page, or 1+ the max used page. */
-/* The maximum free page in the heap is maintained and used to update
+/* The maximum used page in the heap is maintained and used to update
  * ALLOCATION_POINTER which is used by the room function to limit its
  * search of the heap. XX Gencgc obviously needs to be better
  * integrated with the Lisp code. */
 
-page_index_t last_free_page;
+page_index_t next_free_page; // upper (exclusive) bound on used page range
 
 #ifdef LISP_FEATURE_SB_THREAD
 /* This lock is to prevent multiple threads from simultaneously
@@ -355,7 +351,7 @@ count_write_protect_generation_pages(generation_index_t generation)
 {
     page_index_t i, count = 0;
 
-    for (i = 0; i < last_free_page; i++)
+    for (i = 0; i < next_free_page; i++)
         if (!page_free_p(i)
             && (page_table[i].gen == generation)
             && page_table[i].write_protected)
@@ -370,7 +366,7 @@ count_generation_pages(generation_index_t generation)
     page_index_t i;
     page_index_t count = 0;
 
-    for (i = 0; i < last_free_page; i++)
+    for (i = 0; i < next_free_page; i++)
         if (!page_free_p(i) && page_table[i].gen == generation)
             count++;
     return count;
@@ -381,7 +377,7 @@ static void show_pinnedobj_count()
     page_index_t page;
     int nbytes = 0;
     int n_pinned_largeobj = 0;
-    for (page = 0; page < last_free_page; ++page) {
+    for (page = 0; page < next_free_page; ++page) {
         if (page_table[page].gen == from_space && page_table[page].pinned
                 && page_single_obj_p(page)) {
             nbytes += page_bytes_used(page);
@@ -401,7 +397,7 @@ count_generation_bytes_allocated (generation_index_t gen)
 {
     page_index_t i;
     os_vm_size_t result = 0;
-    for (i = 0; i < last_free_page; i++) {
+    for (i = 0; i < next_free_page; i++) {
         if (!page_free_p(i) && page_table[i].gen == gen)
             result += page_bytes_used(i);
     }
@@ -450,7 +446,7 @@ write_generation_stats(FILE *file)
         page_index_t pagect[4], pinned_cnt = 0, tot_pages = 0;
 
         memset(pagect, 0, sizeof pagect);
-        for (page = 0; page < last_free_page; page++)
+        for (page = 0; page < next_free_page; page++)
             if (!page_free_p(page) && page_table[page].gen == i) {
                 int k = (page_single_obj_p(page)<<1) | !page_boxed_p(page);
                 pagect[k]++;
@@ -1240,10 +1236,10 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
 
     gc_assert(most_bytes_found_to);
     // most_bytes_found_to is the upper exclusive bound on the found range.
-    // last_free_page is the high water mark of most_bytes_found_to.
-    if (most_bytes_found_to > last_free_page) {
-        last_free_page = most_bytes_found_to;
-        set_alloc_pointer((lispobj)(page_address(last_free_page)));
+    // next_free_page is the high water mark of most_bytes_found_to.
+    if (most_bytes_found_to > next_free_page) {
+        next_free_page = most_bytes_found_to;
+        set_alloc_pointer((lispobj)(page_address(next_free_page)));
     }
     *restart_page_ptr = most_bytes_found_from;
     return most_bytes_found_to-1;
@@ -2076,7 +2072,7 @@ scavenge_generations(generation_index_t from, generation_index_t to)
         page_table[i].write_protected_cleared = 0;
 #endif
 
-    for (i = 0; i < last_free_page; i++) {
+    for (i = 0; i < next_free_page; i++) {
         generation_index_t generation = page_table[i].gen;
         if (page_boxed_p(i)
             && (page_bytes_used(i) != 0)
@@ -2208,7 +2204,7 @@ static void newspace_full_scavenge(generation_index_t generation)
     FSHOW((stderr,
            "/starting one full scan of newspace generation %d\n",
            generation));
-    for (i = 0; i < last_free_page; i++) {
+    for (i = 0; i < next_free_page; i++) {
         if ((page_table[i].gen == generation) && page_boxed_p(i)
             && (page_bytes_used(i) != 0)
             && !page_table[i].write_protected) {
@@ -2363,7 +2359,7 @@ unprotect_oldspace(void)
     char *page_addr = 0;
     uword_t region_bytes = 0;
 
-    for (i = 0; i < last_free_page; i++) {
+    for (i = 0; i < next_free_page; i++) {
         if ((page_bytes_used(i) != 0)
             && (page_table[i].gen == from_space)) {
 
@@ -2409,12 +2405,12 @@ free_oldspace(void)
 
     do {
         /* Find a first page for the next region of pages. */
-        while ((first_page < last_free_page)
+        while ((first_page < next_free_page)
                && ((page_bytes_used(first_page) == 0)
                    || (page_table[first_page].gen != from_space)))
             first_page++;
 
-        if (first_page >= last_free_page)
+        if (first_page >= next_free_page)
             break;
 
         /* Find the last page of this region. */
@@ -2431,7 +2427,7 @@ free_oldspace(void)
             gc_assert(!page_table[last_page].write_protected);
             last_page++;
         }
-        while ((last_page < last_free_page)
+        while ((last_page < next_free_page)
                && page_table[last_page].gen == from_space
                && page_bytes_used(last_page));
 
@@ -2449,7 +2445,7 @@ free_oldspace(void)
                    OS_VM_PROT_NONE);
 #endif
         first_page = last_page;
-    } while (first_page < last_free_page);
+    } while (first_page < next_free_page);
 
     generations[from_space].bytes_allocated -= bytes_freed;
     bytes_allocated -= bytes_freed;
@@ -2751,7 +2747,7 @@ walk_generation(uword_t (*proc)(lispobj*,lispobj*,uword_t),
     page_index_t i;
     int genmask = generation >= 0 ? 1 << generation : ~0;
 
-    for (i = 0; i < last_free_page; i++) {
+    for (i = 0; i < next_free_page; i++) {
         if ((page_bytes_used(i) != 0) && ((1 << page_table[i].gen) & genmask)) {
             page_index_t last_page;
 
@@ -2790,7 +2786,7 @@ write_protect_generation_pages(generation_index_t generation)
 
     gc_assert(generation < SCRATCH_GENERATION);
 
-    for (start = 0; start < last_free_page; start++) {
+    for (start = 0; start < next_free_page; start++) {
         if (protect_page_p(start, generation)) {
             void *page_start;
             page_index_t last;
@@ -2798,7 +2794,7 @@ write_protect_generation_pages(generation_index_t generation)
             /* Note the page as protected in the page tables. */
             page_table[start].write_protected = 1;
 
-            for (last = start + 1; last < last_free_page; last++) {
+            for (last = start + 1; last < next_free_page; last++) {
                 if (!protect_page_p(last, generation))
                   break;
                 page_table[last].write_protected = 1;
@@ -2879,7 +2875,7 @@ move_pinned_pages_to_newspace()
      * pages.  Pinned pages are precisely those pages which must not
      * be evacuated, so move them to newspace directly. */
 
-    for (i = 0; i < last_free_page; i++) {
+    for (i = 0; i < next_free_page; i++) {
         /* 'pinned' is cleared lazily, so test the 'gen' field as well. */
         if (page_table[i].gen == from_space
             && page_table[i].pinned && page_single_obj_p(i)) {
@@ -2944,7 +2940,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
      * This will also obviate the extra test at the comment
      * "pinned is cleared lazily" in move_pinned_pages_to_newspace().
      */
-        for (i = 0; i < last_free_page; i++)
+        for (i = 0; i < next_free_page; i++)
             if(page_table[i].gen==from_space)
                 page_table[i].pinned = 0;
 
@@ -2966,7 +2962,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
 
         // Unprotect the dynamic space but leave page_table bits alone
         if (ENABLE_PAGE_PROTECTION)
-            os_protect(page_address(0), npage_bytes(last_free_page),
+            os_protect(page_address(0), npage_bytes(next_free_page),
                        OS_VM_PROT_ALL);
 
         // Allocate pages from dynamic space for the work queue.
@@ -3202,7 +3198,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
     /* If the GC is not raising the age then lower the generation back
      * to its normal generation number */
     if (!raise) {
-        for (i = 0; i < last_free_page; i++)
+        for (i = 0; i < next_free_page; i++)
             if ((page_bytes_used(i) != 0)
                 && (page_table[i].gen == SCRATCH_GENERATION))
                 page_table[i].gen = generation;
@@ -3235,11 +3231,11 @@ maybe_verify:
 }
 
 static page_index_t
-find_last_free_page(void)
+find_next_free_page(void)
 {
     page_index_t last_page = -1, i;
 
-    for (i = 0; i < last_free_page; i++)
+    for (i = 0; i < next_free_page; i++)
         if (page_bytes_used(i) != 0)
             last_page = i;
 
@@ -3317,7 +3313,7 @@ collect_garbage(generation_index_t last_gen)
     boolean gc_mark_only = 0;
     int raise, more = 0;
     int gen_to_wp;
-    /* The largest value of last_free_page seen since the time
+    /* The largest value of next_free_page seen since the time
      * remap_free_pages was called. */
     static page_index_t high_water_mark = 0;
 
@@ -3470,12 +3466,12 @@ collect_garbage(generation_index_t last_gen)
      * generation than 0 */
     gc_alloc_generation = 0;
 
-    /* Save the high-water mark before updating last_free_page */
-    if (last_free_page > high_water_mark)
-        high_water_mark = last_free_page;
+    /* Save the high-water mark before updating next_free_page */
+    if (next_free_page > high_water_mark)
+        high_water_mark = next_free_page;
 
-    last_free_page = find_last_free_page();
-    set_alloc_pointer((lispobj)(page_address(last_free_page)));
+    next_free_page = find_next_free_page();
+    set_alloc_pointer((lispobj)(page_address(next_free_page)));
 
     /* Update auto_gc_trigger. Make sure we trigger the next GC before
      * running out of heap! */
@@ -3499,8 +3495,8 @@ collect_garbage(generation_index_t last_gen)
      * back to the OS.
      */
     if (gen > small_generation_limit) {
-        if (last_free_page > high_water_mark)
-            high_water_mark = last_free_page;
+        if (next_free_page > high_water_mark)
+            high_water_mark = next_free_page;
         remap_free_pages(0, high_water_mark);
         high_water_mark = 0;
     }
@@ -3862,7 +3858,7 @@ zero_all_free_pages() /* called only by gc_and_save() */
 {
     page_index_t i;
 
-    for (i = 0; i < last_free_page; i++) {
+    for (i = 0; i < next_free_page; i++) {
         if (page_free_p(i)) {
 #ifdef READ_PROTECT_FREE_PAGES
             os_protect(page_address(i), GENCGC_CARD_BYTES, OS_VM_PROT_ALL);
@@ -3890,7 +3886,7 @@ prepare_for_final_gc ()
     extern void prepare_immobile_space_for_final_gc();
     prepare_immobile_space_for_final_gc ();
 #endif
-    for (i = 0; i < last_free_page; i++) {
+    for (i = 0; i < next_free_page; i++) {
         page_table[i].type &= ~SINGLE_OBJECT_FLAG;
         if (page_table[i].gen == PSEUDO_STATIC_GENERATION) {
             int used = page_bytes_used(i);
@@ -3959,15 +3955,15 @@ gc_and_save(char *filename, boolean prepend_runtime,
      *
      * Penultimate GC: (moves all objects higher in memory)
      *   | ... from_space ... |
-     *                        ^--  gencgc_alloc_start_page = last_free_page
+     *                        ^--  gencgc_alloc_start_page = next_free_page
      *                        | ... to_space ... |
-     *                                           ^ new last_free_page
+     *                                           ^ new next_free_page
      *
      * Utimate GC: (moves all objects lower in memory)
      *   | ... to_space ...   | ... from_space ...| ... |
-     *                                                  ^ new last_free_page ?
+     *                                                  ^ new next_free_page ?
      * Question:
-     *  In the ultimate GC, can last_free_page actually increase past
+     *  In the ultimate GC, can next_free_page actually increase past
      *  its ending value from the penultimate GC?
      * Answer:
      *  Yes- Suppose the sequence of copying is so adversarial to the allocator
@@ -3981,7 +3977,7 @@ gc_and_save(char *filename, boolean prepend_runtime,
      *  as empty pages, because we can't represent discontiguous ranges.
      */
     prepare_for_final_gc();
-    gencgc_alloc_start_page = last_free_page;
+    gencgc_alloc_start_page = next_free_page;
     collect_garbage(HIGHEST_NORMAL_GENERATION+1);
 
     // We always coalesce copyable numbers. Addional coalescing is done
@@ -4014,9 +4010,9 @@ gc_and_save(char *filename, boolean prepend_runtime,
     ASSERT_REGIONS_CLOSED();
 
     /* The number of dynamic space pages saved is based on the allocation
-     * pointer, while the number of PTEs is based on last_free_page.
+     * pointer, while the number of PTEs is based on next_free_page.
      * Make sure they agree */
-    gc_assert((char*)get_alloc_pointer() == page_address(last_free_page));
+    gc_assert((char*)get_alloc_pointer() == page_address(next_free_page));
 
     save_to_filehandle(file, filename, lisp_init_function,
                        prepend_runtime, save_runtime_options,
@@ -4072,8 +4068,8 @@ void gc_load_corefile_ptes(core_entry_elt_t n_ptes, core_entry_elt_t total_bytes
     generations[gen].bytes_allocated = bytes_allocated;
     gc_assert((ssize_t)bytes_allocated <=
               ((char*)get_alloc_pointer() - page_address(0)));
-    // write-protecting needs the current value of last_free_page
-    last_free_page = n_ptes;
+    // write-protecting needs the current value of next_free_page
+    next_free_page = n_ptes;
     if (ENABLE_PAGE_PROTECTION)
         write_protect_generation_pages(gen);
 }
@@ -4082,7 +4078,7 @@ void gc_load_corefile_ptes(core_entry_elt_t n_ptes, core_entry_elt_t total_bytes
 void gc_store_corefile_ptes(struct corefile_pte *ptes)
 {
     page_index_t i;
-    for (i = 0; i < last_free_page; i++) {
+    for (i = 0; i < next_free_page; i++) {
         /* Thanks to alignment requirements, the two low bits
          * are always zero, so we can use them to store the
          * allocation type -- region is always closed, so only

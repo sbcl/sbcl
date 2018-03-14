@@ -60,12 +60,12 @@ struct unbounded_queue {
 static page_index_t free_page;
 
 /* The whole-page allocator works backwards from the end of dynamic space.
- * If it collides with 'last_free_page', then you lose.
+ * If it collides with 'next_free_page', then you lose.
  * TOOD: It would be reasonably simple to have this request more memory from
  * the OS instead of failing on overflow */
 static void* get_free_page() {
     --free_page;
-    if (free_page < last_free_page)
+    if (free_page < next_free_page)
         lose("Needed more space to GC\n");
     page_table[free_page].type = UNBOXED_PAGE_FLAG;
     char* mem = page_address(free_page);
@@ -542,7 +542,7 @@ void execute_full_sweep_phase()
 #endif
 
     page_index_t first_page, last_page;
-    for (first_page = 0; first_page < last_free_page; ++first_page)
+    for (first_page = 0; first_page < next_free_page; ++first_page)
         if (page_table[first_page].write_protected) {
             last_page = first_page;
             while (page_table[last_page+1].write_protected)

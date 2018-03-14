@@ -374,7 +374,7 @@
   (declaim (inline find-page-index))
   (define-alien-routine ("ext_find_page_index" find-page-index)
     long (index unsigned))
-  (define-alien-variable "last_free_page" sb-kernel::page-index-t)
+  (define-alien-variable "next_free_page" sb-kernel::page-index-t)
   (define-alien-variable "page_table" (* (struct page))))
 
 #+immobile-space
@@ -389,14 +389,14 @@
 
 #|
 MAP-ALLOCATED-OBJECTS is fundamentally unsafe to use if the user-supplied
-function allocates anything. Consider what can happens when LAST-FREE-PAGE [sic]
+function allocates anything. Consider what can happens when NEXT-FREE-PAGE
 points to a partially filled page, and one more object is created extending
 an allocation region that began on the formerly "last" page:
 
    0x10027cfff0: 0x00000000000000d9     <-- this was Lisp's view of
    0x10027cfff8: 0x0000000000000006         the last page (page 1273)
    ---- page boundary ----
-   0x10027d0000: 0x0000001000005ecf     <-- last_free_page moves here (page 1274)
+   0x10027d0000: 0x0000001000005ecf     <-- next_free_page moves here (page 1274)
    0x10027d0008: 0x00000000000000ba
    0x10027d0010: 0x0000000000000040
    0x10027d0018: 0x0000000000000000
@@ -409,16 +409,16 @@ However the object, a vector, that started on page 1273 ends on page 1274,
 causing MAP-OBJECTS-IN-RANGE to assert that it overran 0x10027d0000.
 
 We could try a few things to mitigate this:
-* Try to "chase" the value of last-free-page.  This is literally impossible -
+* Try to "chase" the value of next-free-page.  This is literally impossible -
   it's a moving target, and it's extremely likely to exhaust memory doing so,
   especially if the supplied lambda is an interpreted function.
   (Each object scanned causes consing of more bytes, and we never
-  "catch up" to the moving last-free-page)
+  "catch up" to the moving next-free-page)
 
 * If the page that we're looking at is full but the FINALLY clause is hit,
   don't stop looking for more pages in that one case. Instead keep looking
   for the end of the contiguous block, but stop as soon any potential
-  stopping point is found; don't chase last-free-page.  This is tricky
+  stopping point is found; don't chase next-free-page.  This is tricky
   as well and just about as infeasible.
 
 * Pass a flag to MAP-OBJECTS-IN-RANGE specifying that it's OK to
@@ -492,9 +492,9 @@ We could try a few things to mitigate this:
        ;; Our procedure is to scan forward through the page table,
        ;; maintaining an "end pointer" until we reach a page where
        ;; BYTES-USED is not GENCGC-CARD-BYTES or we reach
-       ;; LAST-FREE-PAGE.  We then MAP-OBJECTS-IN-RANGE if the range
+       ;; NEXT-FREE-PAGE.  We then MAP-OBJECTS-IN-RANGE if the range
        ;; is not empty, and proceed to the next page (unless we've hit
-       ;; LAST-FREE-PAGE).  We happily take advantage of the fact that
+       ;; NEXT-FREE-PAGE).  We happily take advantage of the fact that
        ;; MAP-OBJECTS-IN-RANGE will simply return if passed two
        ;; coincident pointers for the range.
 
@@ -515,7 +515,7 @@ We could try a few things to mitigate this:
           ;; but it does its job of producing efficient code.
           for page-index
           of-type (integer -1 (#.(/ (ash 1 n-machine-word-bits) gencgc-card-bytes)))
-          from 0 below last-free-page
+          from 0 below next-free-page
           for next-page-addr from (+ start page-size) by page-size
           for page-bytes-used
               ;; The low bits of bytes-used is the need-to-zero flag.
@@ -1075,7 +1075,7 @@ We could try a few things to mitigate this:
 #+nil ; for debugging
 (defun dump-dynamic-space-code (&optional (stream *standard-output*)
                                 &aux (n-code-bytes 0)
-                                     (total-pages last-free-page)
+                                     (total-pages next-free-page)
                                      (pages
                                       (make-array total-pages :element-type 'bit)))
   (flet ((dump-page (page-num)

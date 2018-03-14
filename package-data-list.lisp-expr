@@ -3242,7 +3242,7 @@ structure representations"
                #!+gencgc("MAX-DYNAMIC-SPACE-END"
                          "PAGE-TABLE"
                          "FIND-PAGE-INDEX"
-                         "LAST-FREE-PAGE")
+                         "NEXT-FREE-PAGE")
                #!-gencgc("DYNAMIC-0-SPACE-START"
                          "DYNAMIC-0-SPACE-END")
                #!+immobile-space("IMMOBILE-CARD-BYTES"

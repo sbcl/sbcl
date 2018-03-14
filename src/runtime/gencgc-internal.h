@@ -285,7 +285,7 @@ extern struct fixedobj_page *fixedobj_pages;
 #define fixedobj_page_obj_size(i) fixedobj_pages[i].attr.parts.obj_size
 #endif
 
-extern page_index_t last_free_page;
+extern page_index_t next_free_page;
 
 extern uword_t
 walk_generation(uword_t (*proc)(lispobj*,lispobj*,uword_t),

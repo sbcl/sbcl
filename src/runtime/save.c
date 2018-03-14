@@ -332,7 +332,7 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
 #ifdef LISP_FEATURE_GENCGC
     {
         extern void gc_store_corefile_ptes(struct corefile_pte*);
-        size_t true_size = last_free_page * sizeof(struct corefile_pte);
+        size_t true_size = next_free_page * sizeof(struct corefile_pte);
         size_t aligned_size = ALIGN_UP(true_size, N_WORD_BYTES);
         char* data = successful_malloc(aligned_size);
         // Zeroize the final few bytes of data that get written out
@@ -341,7 +341,7 @@ save_to_filehandle(FILE *file, char *filename, lispobj init_function,
         gc_store_corefile_ptes((struct corefile_pte*)data);
         write_lispobj(PAGE_TABLE_CORE_ENTRY_TYPE_CODE, file);
         write_lispobj(5, file); // 5 = # of words in this core header entry
-        write_lispobj(last_free_page, file);
+        write_lispobj(next_free_page, file);
         write_lispobj(aligned_size, file);
         sword_t offset = write_bytes(file, data, aligned_size, core_start_pos,
                                      COMPRESSION_LEVEL_NONE);
