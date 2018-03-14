@@ -171,12 +171,6 @@ static inline boolean page_boxed_no_region_p(page_index_t page) {
     return (page_table[page].type & 9) == BOXED_PAGE_FLAG;
 }
 
-/// Return true if page MUST NOT hold boxed objects (including code).
-static inline boolean page_unboxed_p(page_index_t page) {
-    /* Both flags set == code-component page */
-    return (page_table[page].type & 7) == UNBOXED_PAGE_FLAG;
-}
-
 static inline boolean protect_page_p(page_index_t page, generation_index_t generation) {
     return (page_boxed_no_region_p(page)
             && (page_bytes_used(page) != 0)
@@ -1942,7 +1936,7 @@ update_page_write_prot(page_index_t page)
     if (!ENABLE_PAGE_PROTECTION) return 0;
 
     /* Skip if it's unboxed or already write-protected */
-    if (page_table[page].write_protected || page_unboxed_p(page))
+    if (page_table[page].write_protected || !page_boxed_p(page))
         return (0);
 
     /* Scan the page for pointers to younger generations or the
