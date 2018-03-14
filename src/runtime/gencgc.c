@@ -2201,8 +2201,7 @@ extern void
 /* Do one full scan of the new space generation. This is not enough to
  * complete the job as new objects may be added to the generation in
  * the process which are not scavenged. */
-static void
-scavenge_newspace_generation_one_scan(generation_index_t generation)
+static void newspace_full_scavenge(generation_index_t generation)
 {
     page_index_t i;
 
@@ -2210,47 +2209,27 @@ scavenge_newspace_generation_one_scan(generation_index_t generation)
            "/starting one full scan of newspace generation %d\n",
            generation));
     for (i = 0; i < last_free_page; i++) {
-        /* Note that this skips over open regions when it encounters them. */
-        if (page_boxed_p(i)
+        if ((page_table[i].gen == generation) && page_boxed_p(i)
             && (page_bytes_used(i) != 0)
-            && (page_table[i].gen == generation)
-            && (!page_table[i].write_protected
-                /* (This may be redundant as write_protected is now
-                 * cleared before promotion.) */
-                || page_table[i].pinned)) {
+            && !page_table[i].write_protected) {
             page_index_t last_page;
-            int all_wp=1;
 
             /* The scavenge will start at the scan_start_offset of
              * page i.
              *
              * We need to find the full extent of this contiguous
-             * block in case objects span pages.
-             *
-             * Now work forward until the end of this contiguous area
-             * is found. A small area is preferred as there is a
-             * better chance of its pages being write-protected. */
+             * block in case objects span pages. */
             for (last_page = i; ;last_page++) {
-                /* If all pages are write-protected and movable,
-                 * then no need to scavenge */
-                all_wp=all_wp && page_table[last_page].write_protected &&
-                    !page_table[last_page].pinned;
-
                 /* Check whether this is the last page in this
                  * contiguous block */
                 if (page_ends_contiguous_block_p(last_page, generation))
                     break;
             }
 
-            // FIXME: I cannot see how any page of newspace could be write-protected.
-            // This really deserves an explanation.
-            /* Do a limited check for write-protected pages.  */
-            if (!all_wp) {
-                record_new_regions_below = 1 + last_page;
-                heap_scavenge(page_scan_start(i),
-                              (lispobj*)(page_address(last_page)
-                                         + page_bytes_used(last_page)));
-            }
+            record_new_regions_below = 1 + last_page;
+            heap_scavenge(page_scan_start(i),
+                          (lispobj*)(page_address(last_page)
+                                     + page_bytes_used(last_page)));
             i = last_page;
         }
     }
@@ -2280,7 +2259,7 @@ scavenge_newspace_generation(generation_index_t generation)
     new_areas = new_areas_1;
 
     /* Start with a full scavenge. */
-    scavenge_newspace_generation_one_scan(generation);
+    newspace_full_scavenge(generation);
 
     /* Flush the current regions updating the page table. */
     gc_close_all_regions();
@@ -2325,7 +2304,7 @@ scavenge_newspace_generation(generation_index_t generation)
                 SHOW("new_areas overflow, doing full scavenge");
             }
 
-            scavenge_newspace_generation_one_scan(generation);
+            newspace_full_scavenge(generation);
 
         } else {
 
