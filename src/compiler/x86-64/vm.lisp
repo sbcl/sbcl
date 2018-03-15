@@ -13,23 +13,6 @@
 
 ;;;; register specs
 
-(defconstant-eqx +byte-register-names+
-    #("AL"  "CL"  "DL"   "BL"   "SPL"  "BPL"  "SIL"  "DIL"
-      "R8B" "R9B" "R10B" "R11B" "R12B" "R13B" "R14B" "R15B")
-  #'equalp)
-(defconstant-eqx +word-register-names+
-    #("AX"  "CX"  "DX"   "BX"   "SP"   "BP"   "SI"   "DI"
-      "R8W" "R9W" "R10W" "R11W" "R12W" "R13W" "R14W" "R15W")
-  #'equalp)
-(defconstant-eqx +dword-register-names+
-    #("EAX" "ECX" "EDX"  "EBX"  "ESP"  "EBP"  "ESI"  "EDI"
-      "R8D" "R9D" "R10D" "R11D" "R12D" "R13D" "R14D" "R15D")
-  #'equalp)
-(defconstant-eqx +qword-register-names+
-    #("RAX" "RCX" "RDX" "RBX" "RSP" "RBP" "RSI" "RDI"
-      "R8"  "R9"  "R10" "R11" "R12" "R13" "R14" "R15")
-  #'equalp)
-
 (macrolet ((defreg (name offset size)
              (declare (ignore size))
              `(eval-when (:compile-toplevel :load-toplevel :execute)
@@ -43,8 +26,41 @@
              `(defglobal ,name
                   (list ,@(mapcar (lambda (name)
                                     (symbolicate name "-OFFSET"))
-                                  regs)))))
+                                  regs))))
+           ;; Define general-purpose regs in a more concise way, as we seem
+           ;; to (redundantly) want each register's offset for dword and qword
+           ;; even though the value of the constant is the same.
+           ;; We don't need constants for the byte- or word-sized offsets.
+           (define-gprs (want-offsets offsets-list names array)
+             `(progn
+                (defconstant-eqx ,names ,array #'equalp)
+                ;; We need the constants evaluable because of the DEFGLOBAL
+                ;; which is needed because of forms such as #.*qword-regs*
+                (eval-when (:compile-toplevel :load-toplevel :execute)
+                  ,@(when want-offsets
+                      (let ((i 0))
+                        (map 'list
+                             (lambda (x)
+                               `(defconstant ,(symbolicate x "-OFFSET")
+                                  ,(prog1 (* i 2) (incf i))))
+                             array))))
+                (defglobal ,offsets-list
+                    (remove-if (lambda (x)
+                                 (member x `(,r11-offset ; temp reg
+                                             ,r13-offset ; thread base
+                                             ,rsp-offset
+                                             ,rbp-offset)))
+                               (loop for i below 16 collect (* i 2)))))))
 
+  (define-gprs t *qword-regs* +qword-register-names+
+    #("RAX" "RCX" "RDX" "RBX" "RSP" "RBP" "RSI" "RDI"
+      "R8"  "R9"  "R10" "R11" "R12" "R13" "R14" "R15"))
+  (define-gprs t *dword-regs* +dword-register-names+
+    #("EAX" "ECX" "EDX"  "EBX"  "ESP"  "EBP"  "ESI"  "EDI"
+      "R8D" "R9D" "R10D" "R11D" "R12D" "R13D" "R14D" "R15D"))
+  (define-gprs nil *word-regs* +word-register-names+
+    #("AX"  "CX"  "DX"   "BX"   "SP"   "BP"   "SI"   "DI"
+      "R8W" "R9W" "R10W" "R11W" "R12W" "R13W" "R14W" "R15W"))
   ;; byte registers
   ;;
   ;; Note: the encoding here is different than that used by the chip.
@@ -56,83 +72,9 @@
   ;; add special cases into the code generation. The overlap doesn't
   ;; therefore exist anymore, but the numbering hasn't been changed
   ;; to reflect this.
-  (defreg al    0 :byte)
-  (defreg cl    2 :byte)
-  (defreg dl    4 :byte)
-  (defreg bl    6 :byte)
-  (defreg sil  12 :byte)
-  (defreg dil  14 :byte)
-  (defreg r8b  16 :byte)
-  (defreg r9b  18 :byte)
-  (defreg r10b 20 :byte)
-  (defreg r11b 22 :byte)
-  (defreg r12b 24 :byte)
-  (defreg r13b 26 :byte)
-  (defreg r14b 28 :byte)
-  (defreg r15b 30 :byte)
-  (defregset *byte-regs*
-      al cl dl bl sil dil r8b r9b r10b
-      #+nil r11b r12b #+nil r13b r14b r15b)
-
-  ;; word registers
-  (defreg ax 0 :word)
-  (defreg cx 2 :word)
-  (defreg dx 4 :word)
-  (defreg bx 6 :word)
-  (defreg sp 8 :word)
-  (defreg bp 10 :word)
-  (defreg si 12 :word)
-  (defreg di 14 :word)
-  (defreg r8w  16 :word)
-  (defreg r9w  18 :word)
-  (defreg r10w 20 :word)
-  (defreg r11w 22 :word)
-  (defreg r12w 24 :word)
-  (defreg r13w 26 :word)
-  (defreg r14w 28 :word)
-  (defreg r15w 30 :word)
-  (defregset *word-regs* ax cx dx bx si di r8w r9w r10w
-             #+nil r11w r12w #+nil r13w r14w r15w)
-
-  ;; double word registers
-  (defreg eax 0 :dword)
-  (defreg ecx 2 :dword)
-  (defreg edx 4 :dword)
-  (defreg ebx 6 :dword)
-  (defreg esp 8 :dword)
-  (defreg ebp 10 :dword)
-  (defreg esi 12 :dword)
-  (defreg edi 14 :dword)
-  (defreg r8d  16 :dword)
-  (defreg r9d  18 :dword)
-  (defreg r10d 20 :dword)
-  (defreg r11d 22 :dword)
-  (defreg r12d 24 :dword)
-  (defreg r13d 26 :dword)
-  (defreg r14d 28 :dword)
-  (defreg r15d 30 :dword)
-  (defregset *dword-regs* eax ecx edx ebx esi edi r8d r9d r10d
-             #+nil r11d r12w #+nil r13d r14d r15d)
-
-  ;; quadword registers
-  (defreg rax 0 :qword)
-  (defreg rcx 2 :qword)
-  (defreg rdx 4 :qword)
-  (defreg rbx 6 :qword)
-  (defreg rsp 8 :qword)
-  (defreg rbp 10 :qword)
-  (defreg rsi 12 :qword)
-  (defreg rdi 14 :qword)
-  (defreg r8  16 :qword)
-  (defreg r9  18 :qword)
-  (defreg r10 20 :qword)
-  (defreg r11 22 :qword)
-  (defreg r12 24 :qword)
-  (defreg r13 26 :qword)
-  (defreg r14 28 :qword)
-  (defreg r15 30 :qword)
-  (defregset *qword-regs* rax rcx rdx rbx rsi rdi
-             r8 r9 r10 #+nil r11 r12 #+nil r13 r14 r15)
+  (define-gprs nil *byte-regs* +byte-register-names+
+    #("AL"  "CL"  "DL"   "BL"   "SPL"  "BPL"  "SIL"  "DIL"
+      "R8B" "R9B" "R10B" "R11B" "R12B" "R13B" "R14B" "R15B"))
 
   ;; floating point registers
   (defreg float0 0 :float)
@@ -409,25 +351,29 @@
 
 ;;;; miscellaneous TNs for the various registers
 
-(macrolet ((def-misc-reg-tns (sc-name &rest reg-names)
+(macrolet ((def-gpr-tns (sc-name name-array &aux (i 0))
+             `(progn
+                ,@(map 'list
+                       (lambda (reg-name)
+                         `(define-load-time-global ,(symbolicate reg-name "-TN")
+                              (make-random-tn :kind :normal
+                                              :sc (sc-or-lose ',sc-name)
+                                              :offset ,(prog1 (* i 2) (incf i)))))
+                       (symbol-value name-array))))
+           (def-fpr-tns (sc-name &rest reg-names)
              (collect ((forms))
                (dolist (reg-name reg-names `(progn ,@(forms)))
                  (let ((tn-name (symbolicate reg-name "-TN"))
                        (offset-name (symbolicate reg-name "-OFFSET")))
-                   (forms `(defglobal ,tn-name
+                   (forms `(define-load-time-global ,tn-name
                                (make-random-tn :kind :normal
                                                :sc (sc-or-lose ',sc-name)
                                                :offset ,offset-name))))))))
-
-  (def-misc-reg-tns unsigned-reg rax rbx rcx rdx rbp rsp rdi rsi
-                    r8 r9 r10 r11 r12 r13 r14 r15)
-  (def-misc-reg-tns dword-reg eax ebx ecx edx ebp esp edi esi
-                    r8d r9d r10d r11d r12d r13d r14d r15d)
-  (def-misc-reg-tns word-reg ax bx cx dx bp sp di si
-                    r8w r9w r10w r11w r12w r13w r14w r15w)
-  (def-misc-reg-tns byte-reg al cl dl bl sil dil r8b r9b r10b
-                    r11b r12b r13b r14b r15b)
-  (def-misc-reg-tns single-reg
+  (def-gpr-tns unsigned-reg +qword-register-names+)
+  (def-gpr-tns dword-reg +dword-register-names+)
+  (def-gpr-tns word-reg +word-register-names+)
+  (def-gpr-tns byte-reg +byte-register-names+)
+  (def-fpr-tns single-reg
       float0 float1 float2 float3 float4 float5 float6 float7
       float8 float9 float10 float11 float12 float13 float14 float15))
 
@@ -459,7 +405,7 @@
 ;;; and so the compiler knows that the object is constant and wants to dump it
 ;;; as such; it has no name, so it's not even reasonable to expect it to
 ;;; use the corresponding object in RDX-TN.
-(defglobal *register-arg-tns*
+(define-load-time-global *register-arg-tns*
   (mapcar (lambda (register-arg-name)
             (symbol-value (symbolicate register-arg-name "-TN")))
           *register-arg-names*))
