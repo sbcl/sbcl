@@ -1902,23 +1902,19 @@ preserve_pointer(void *addr)
  * Note that because of the existence of some words which have fixnum lowtag
  * but are actually pointers, you might think it would be possible for this
  * function to go wrong, protecting a page that contains old->young pointers.
- * Well, it seems fine mostly. Why: two of the guilty parties are CLOSURE-FUN
- * and FDEFN-RAW-ADDR.  Closure-fun is a fixnum (on x86) which when treated
+ * Indeed the edge cases are rare enough not to have manifested ever,
+ * as far anyone knows.
+ *
+ * Suspect A is CLOSURE-FUN, which is a fixnum (on x86) which when treated
  * as a pointer indicates the entry point to call. Its function can never
  * be an object younger than itself. (An invariant of any immutable object)
- * fdefn-raw-address is more subtle. In set-fdefn-fun we first store 'fun'
- * and then 'raw-addr', where a stop-for-GC could occur in between.
- * So if the fdefn was, before the first store:
- *     fun -> younger object
- *     raw-addr -> younger object
- * and then after the first store:
- *     fun -> older object | <- interrupt occurred after this store
- *     raw-addr -> younger object
- * then we have a page that may look like it has no traceable pointers
- * to younger objects (the raw-addr is untraceable by the algorithm below).
- * But because the fdefn is in a register, it is pinned, therefore it is live,
- * therefore all its slots will be traced on this GC.
- * In fact update_page_write_prot() won't even be called on the fdefn's page.
+ *
+ * Suspect B is FDEFN-RAW-ADDRESS. This is a problem, but only under worst-case
+ * assumptions. Previous remarks here mentioned pinning and/or absence of calls
+ * to update_page_write_prot(). That explanation was flawed, as is almost
+ * anything in GC comments mentioning the obsolete pinning code.
+ * See 'doc/internals-notes/fdefn-gc-safety' for execution schedules
+ * that lead to invariant loss.
  */
 static int
 update_page_write_prot(page_index_t page)

@@ -1,0 +1,127 @@
+Problem: setting the two function slots of an FDEFN can, 
+ under extremely contrived circumstances, cause GC invariant loss.
+
+Consider two thought experiments regarding whether it is safe
+to assign the slots first in one order, then the opposite.
+
+Assumptions for both experiments:
+ - FUN1 is in generation 1
+ - FUN2 is in generation 2
+ - FDEFN is on a GC page with no other objects of interest
+   (suppose, without loss of generality, that there are simple-vectors
+   holding fixnums and nothing else, sharing its page. This page is
+   therefore not involved in any object graph but for FDEFN and FUNs)
+ - FDEFN is in generation 2
+ - thread A updates FDEFN
+ - thread B is aggressively allocating and causing GC
+ - scheduling is extremely biased against thread A (for unknown reasons)
+
+Scenario 1: store fdefn-fun then fdefn-raw-addr (status quo)
+===========
+initial state:
+  - FDEFN fun      : FUN1 (tagged ptr)
+          raw-addr : FUN1 (raw ptr)
+  - GC page with fdefn is not WPed
+  - thread A has registers pointing to FDEFN and FUN2
+
+timeline:
+  [first store]: thread A stores FUN2 into tagged ptr
+  <interupt>
+  GC of gen 0:
+     * None of FDEFN, FUN1, or FUN2 are pinned, because they are in
+       generations _older_ than the condemned generation.
+       That is, we do not need to immobilize those objects, because
+       they aren't candidates to move. Further, suppose their pages were
+       never pinned (i.e. that the lazily-cleared "pinned" flag is 0)
+       and so they are not pinned by accident.
+     * this GC cycle will write-protect the page with FDEFN on it
+       because FUN1 raw-addr is invisible to update_page_page_write_prot().
+       [so: FDEFN fun -> FUN2, raw-addr -> FUN1.
+      --> GC invariant violation
+  ... more work
+  <interrupt>
+  GC of gen 0 and 1:
+    FUN1 is transported. The page with FDEFN is ignored because it is WP'ed.
+    FDEFN-raw-addr is now invalid. The page it pointed to is available for
+    new allocations.
+  ...
+  thread B attempts to call via fdefn-raw-addr, crashing.
+  ...
+  [second store]: thread A stores FUN2 into raw addr (trips write barrier)
+  --> Heap corruption of FDEFN is now permanent.
+
+Scenario 2: store fdefn-raw-addr fun then fdefn-fun
+===========
+initial state:
+ - FDEFN fun      : FUN2 (tagged ptr)
+         raw-addr : FUN2 (raw ptr)
+  - GC page with fdefn is WPed
+  - thread A has registers pointing to FDEFN and FUN1
+
+timeline:
+  [first store]: thread A stores FUN1 into raw ptr, tripping write barrier
+      [so: FDEFN fun -> FUN2, raw-addr -> FUN1]
+  <interupt>
+  GC of gen 0: this GC will write-protect the page with FDEFN on it
+      --> invariant violation.
+  ... more work
+  GC of gen 0 and 1:
+    if conservative GC: GC can not move FUN1
+    if precise GC: GC can move FUN1 and fail to update the FDEFN
+  ..
+  thread B attempts to call via fdefn-raw-addr. CPU fetches garbage
+  ...
+  [second store]: thread A stores FUN1 into raw addr (trips write barrier)
+  WP invariant is restored.
+  Corruption was temporary for conservative GC,
+  and permanent for precise GC.
+
+-- End of though experiments --
+
+Both contrived examples required 2 GC cycles to go really wrong.
+Scenario 2 has a "self-healing" aspect, but it's the opposite of status quo.
+We must consider, aside from GC, the impact on calling through the fdefn.
+Which of these transitions are threadsafe? And on which backends?
+ change simple-fun -> {different simple-fun, FIN, closure}
+ change FIN -> {different FIN, simple-fun, closure}
+ change closure -> {different closure, simple-fun, FIN}
+
+And in any case it would be nice to avoid relying on progress in thread A
+as the sole means of avoiding heap corruption.
+
+Possible soutions for GC, in approximately increasing order of difficulty:
+ * Use double-wide atomic ops in SET-FDEFN-FUN
+   (pretty simple for x86)
+ * Failing that, put pseudo-atomic in SET-FDEFN-FUN
+   (pretty simple for everybody else)
+ * When setting fdefn-fun, read the old values from the 2 slots,
+   and invoke WITH-PINNED-OBJECTS on 4 objects: both old slot values
+   and both new, ensuring that nothing the FDEFN pointed to or will point
+   to can move. This removes a pain point from Scenario 1, but still requires
+   that thread A not suffer sudden death to preserve a heap invariant.
+   It similarly removes a pain point from Scenario 2 under precise GC.
+ * Always do some pin-like thing on FDEFNs (i.e. notice a stack reference)
+   regardless of generation, and do not WP a page that contains
+   an FDEFN that is pointed to by a register, so that the page can be
+   WPd only after there are no pointers to the FDEFN.
+ * Record whether a GC page contains any FDEFNs and be more careful
+   in update_page_write_prot only if it does. (i.e. we know the
+   representation of FDEFNs and take advantage of that)
+   Problem: 4 words can, worst-case, occupy 2 pages.
+   Possible fix: ensure 4-word alignment
+ * Always be more careful in update_page_write_prot by looking
+   for words that have FDEFN_WIDETAG. Know that the word at header+3
+   is a fixnum that acts like a pointer. Less change to data structures,
+   more cost in time. (And same snag: a preceding page contains the
+   FDEFN header but current page contains the raw-fun slot)
+ * Refactor scavenge_generations() and heap_scavenge() so that
+   scavenging a page informs the caller whether old->young
+   pointers exist in each scavenged page. This is potentially
+   better than the current naive scan which assumes that any word
+   with pointer nature is a pointer, and anything without is not.
+
+Note also that immobile-space fdefns do NOT have this problem.
+The immobile-space GC tracks exactly object boundaries when checking
+whether a page can be protected, and is aware of object representation.
+This is both good and bad: the WP-enabling test is much slower than
+the similar logic for dynamic space.
