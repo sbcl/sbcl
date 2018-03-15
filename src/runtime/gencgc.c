@@ -2582,15 +2582,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                      * This MUST NOT use properly_tagged_descriptor_p() which
                      * assumes a known good object base address, and would
                      * "dangerously" scan a code component for embedded funs. */
-                    int lowtag = lowtag_of(thing);
-                    if (lowtag == LIST_POINTER_LOWTAG)
-                        valid = is_cons_half(CONS(thing)->car)
-                             && is_cons_half(CONS(thing)->cdr);
-                    else {
-                        lispobj word = *native_pointer(thing);
-                        valid = other_immediate_lowtag_p(word) &&
-                            lowtag_for_widetag[widetag_of(word)>>2] == lowtag;
-                    }
+                    valid = plausible_tag_p(thing);
                 }
                 /* If 'thing' points to a stack, we can only hope that the frame
                  * not clobbered, or the object at 'where' is unreachable. */
@@ -2608,11 +2600,17 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
             count = sizetab[widetag](where);
         } else switch(widetag) {
                     /* boxed or partially boxed objects */
-            // FIXME: x86-64 can have partially unboxed FINs. The raw words
-            // are at the moment valid fixnums by blind luck.
             case INSTANCE_WIDETAG:
+            // Two reasons for including funcallable instance here:
+            //  (1) the layout may be in the header, and we need to verify it
+            //  (2) there may be unboxed words in the object
+            case FUNCALLABLE_INSTANCE_WIDETAG:
                 if (instance_layout(where)) {
-                    struct layout *layout = LAYOUT(instance_layout(where));
+                    lispobj layout_word = instance_layout(where);
+                    state->vaddr = where;
+                    verify_range(&layout_word, 1, state);
+                    state->vaddr = 0;
+                    struct layout *layout = LAYOUT(layout_word);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
                     if (instance_layout(layout) != LAYOUT_OF_LAYOUT)
                         lose("Implausible layout. obj=%p layout=%p",
