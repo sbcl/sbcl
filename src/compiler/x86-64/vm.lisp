@@ -215,8 +215,8 @@
                             #!+sb-unicode #.*qword-regs*
                  #!+sb-unicode #!+sb-unicode
                  :element-size 2
-                 #!-sb-unicode #!-sb-unicode
-                 :reserve-locations (#.al-offset)
+;                 #!-sb-unicode #!-sb-unicode
+;                 :reserve-locations (#.eax-offset)
                  :constant-scs (immediate)
                  :save-p t
                  :alternate-scs (character-stack))
@@ -248,15 +248,12 @@
   ;; temporaries.
   (word-reg registers
             :locations #.*word-regs*
-            :element-size 2
-            )
+            :element-size 2)
   (dword-reg registers
             :locations #.*dword-regs*
-            :element-size 2
-            )
+            :element-size 2)
   (byte-reg registers
-            :locations #.*byte-regs*
-            )
+            :locations #.*byte-regs*)
 
   ;; that can go in the floating point registers
 
