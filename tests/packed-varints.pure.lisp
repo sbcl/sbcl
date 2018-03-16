@@ -11,10 +11,9 @@
 
 (cl:in-package :cl-user)
 
-#-(and x86-64 (not interpreter)) (sb-ext:exit :code 104) ; can't run these tests
-
 (load "compiler-test-util.lisp")
 
+#+(and x86-64 sb-unicode (not interpreter)) ; missing symbols otherwise
 (with-test (:name :bignum-unpacker-no-consing)
   (flet ((try ()
            (let ((result 0)
