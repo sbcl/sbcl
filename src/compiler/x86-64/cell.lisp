@@ -21,6 +21,8 @@
   (:generator 1
    (loadw result object offset lowtag)))
 
+;; This vop is selected by name from vm-ir2tran for converting any
+;; setter or setf'er that is defined by 'objdef'
 (define-vop (set-slot)
   (:args (object :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg immediate)))
@@ -72,13 +74,28 @@
 
 ;;;; symbol hacking VOPs
 
-(define-vop (%set-symbol-global-value cell-set)
-  (:variant symbol-value-slot other-pointer-lowtag))
+(define-vop (%set-symbol-global-value)
+  (:args (object :scs (descriptor-reg immediate))
+         (value :scs (descriptor-reg any-reg immediate)))
+  (:policy :fast-safe)
+  (:generator 4
+    (gen-cell-set (cond ((sc-is object immediate)
+                         (symbol-slot-ea (tn-value object) symbol-value-slot))
+                        (t
+                         (make-ea-for-object-slot object symbol-value-slot
+                                                  other-pointer-lowtag)))
+                  value nil)))
 
-(define-vop (fast-symbol-global-value cell-ref)
-  (:variant symbol-value-slot other-pointer-lowtag)
+(define-vop (fast-symbol-global-value)
+  (:args (object :scs (descriptor-reg immediate)))
+  (:results (value :scs (descriptor-reg any-reg)))
   (:policy :fast)
-  (:translate sym-global-val))
+  (:translate sym-global-val)
+  (:generator 4
+    (cond ((sc-is object immediate)
+           (inst mov value (symbol-slot-ea (tn-value object) symbol-value-slot)))
+          (t
+           (loadw value object symbol-value-slot other-pointer-lowtag)))))
 
 (define-vop (symbol-global-value)
   (:policy :fast-safe)

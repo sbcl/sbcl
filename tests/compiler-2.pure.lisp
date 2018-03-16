@@ -222,19 +222,6 @@
         (incf count)))
     (assert (= count 2))))
 
-(with-test (:name :set-symbol-value-imm :skipped-on (not :x86-64))
-  (let (success)
-    (dolist (line (split-string
-                   (with-output-to-string (s)
-                     (let ((sb-disassem:*disassem-location-column-width* 0))
-                       (disassemble '(lambda () (setq *print-base* 8)) :stream s)))
-                   #\newline))
-      (when (and #+sb-thread (search "MOV QWORD PTR [R" line)
-                 #-sb-thread (search "MOV QWORD PTR [" line)
-                 (search (format nil ", ~D" (ash 8 sb-vm:n-fixnum-tag-bits)) line))
-        (setq success t)))
-    (assert success)))
-
 (with-test (:name :linkage-table-bogosity :skipped-on (not :sb-dynamic-core))
   (let ((strings (map 'list (lambda (x) (if (consp x) (car x) x))
                       #+sb-dynamic-core sb-vm::+required-foreign-symbols+

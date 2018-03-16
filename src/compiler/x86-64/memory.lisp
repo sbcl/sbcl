@@ -24,7 +24,11 @@
     (let ((bits (encode-value-if-immediate value)))
       (cond ((not result)
              ;; Try to move imm-to-mem if BITS fits
-             (acond ((immediate32-p bits)
+             (acond ((or (and (fixup-p bits)
+                              ;; immobile-object fixups must fit in 32 bits
+                              (eq (fixup-flavor bits) :immobile-object)
+                              bits)
+                         (immediate32-p bits))
                      (inst mov ea it))
                     (t
                      (inst mov temp-reg-tn bits)
@@ -54,38 +58,22 @@
 ;;; CELL-REF and CELL-SET are used to define VOPs like CAR, where the
 ;;; offset to be read or written is a property of the VOP used.
 (define-vop (cell-ref)
-  (:args (object :scs (descriptor-reg)
-                 :load-if (not (and (sc-is object immediate)
-                                    (symbolp (tn-value object))))))
+  (:args (object :scs (descriptor-reg)))
   (:results (value :scs (descriptor-reg any-reg)))
   (:variant-vars offset lowtag)
   (:policy :fast-safe)
   (:generator 4
-    (cond ((sc-is object immediate)
-           ;; Hack so that FAST-SYMBOL-GLOBAL-VALUE can inherit CELL-REF.
-           ;; (Not sure it's the prettiest way)
-           ;; this sanity-check is meta-compile-time statically assertable
-           (aver (eq offset symbol-value-slot))
-           (inst mov value (symbol-slot-ea (tn-value object) offset)))
-          (t
-           (loadw value object offset lowtag)))))
+    (loadw value object offset lowtag)))
+;; This vop's sole purpose is to be an ancestor for other vops, to assign
+;; default operands, policy, and generator.
 (define-vop (cell-set)
-  (:args (object :scs (descriptor-reg)
-                 :load-if (not (and (sc-is object immediate)
-                                    (symbolp (tn-value object)))))
+  (:args (object :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg immediate)))
   (:variant-vars offset lowtag)
   (:policy :fast-safe)
   (:generator 4
-    (gen-cell-set
-      (cond ((sc-is object immediate)
-             ;; Hack so that %SET-SYMBOL-GLOBAL-VALUE can inherit CELL-SET.
-             ;; this sanity-check is meta-compile-time statically assertable
-             (aver (eq offset symbol-value-slot))
-             (symbol-slot-ea (tn-value object) offset))
-            (t
-             (make-ea-for-object-slot object offset lowtag)))
-      value nil)))
+    (gen-cell-set (make-ea-for-object-slot object offset lowtag)
+                  value nil)))
 
 ;;; X86 special
 (define-vop (cell-xadd)

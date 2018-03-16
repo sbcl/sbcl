@@ -171,3 +171,31 @@
     ;; Depending on #+immobile-code it's either direct or memory indirect.
     #+immobile-code (assert (search "CALL #x" c-call))
     #-immobile-code (assert (search "CALL [#x" c-call))))
+
+(with-test (:name :set-symbol-value-imm)
+  (let (success)
+    (dolist (line (split-string
+                   (with-output-to-string (s)
+                     (let ((sb-disassem:*disassem-location-column-width* 0))
+                       (disassemble '(lambda () (setq *print-base* 8)) :stream s)))
+                   #\newline))
+      (when (and #+sb-thread (search "MOV QWORD PTR [R" line)
+                 #-sb-thread (search "MOV QWORD PTR [" line)
+                 (search (format nil ", ~D" (ash 8 sb-vm:n-fixnum-tag-bits)) line))
+        (setq success t)))
+    (assert success)))
+
+(defglobal *avar* nil)
+(with-test (:name :set-symbol-value-imm-2)
+  (let (success)
+    (dolist (line (split-string
+                   (with-output-to-string (s)
+                     (let ((sb-disassem:*disassem-location-column-width* 0))
+                       (disassemble '(lambda () (setq *avar* :downcase)) :stream s)))
+                   #\newline))
+      ;; Should have an absolute mem ref and an immediate operand:
+      ;;   48C7042568904B207F723A20 MOV QWORD PTR [#x204B9068], #x203A727F
+      (when (and (search "MOV QWORD PTR [#x" line)
+                 (search "], #x" line))
+        (setq success t)))
+    (assert success)))
