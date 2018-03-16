@@ -543,20 +543,11 @@ void fast_bzero(void*, size_t); /* in <arch>-assem.S */
 #define fast_bzero(addr, count) memset(addr, 0, count)
 #endif
 
-/* Zero the pages from START to END (inclusive), but use mmap/munmap instead
- * if zeroing it ourselves, i.e. in practice give the memory back to the
+/* Zero the memory at ADDR for LENGTH bytes, but use mmap/munmap instead
+ * of zeroing it ourselves, i.e. in practice give the memory back to the
  * OS. Generally done after a large GC.
  */
-void zero_pages_with_mmap(page_index_t start, page_index_t end) {
-    void *addr = page_address(start), *new_addr;
-    os_vm_size_t length = npage_bytes(1+end-start);
-
-    if (start > end)
-      return;
-
-    gc_assert(length >= gencgc_release_granularity);
-    gc_assert((length % gencgc_release_granularity) == 0);
-
+static void zero_range_with_mmap(os_vm_address_t addr, os_vm_size_t length) {
 #ifdef LISP_FEATURE_LINUX
     // We use MADV_DONTNEED only on Linux due to differing semantics from BSD.
     // Linux treats it as a demand that the memory be 0-filled, or refreshed
@@ -574,11 +565,12 @@ void zero_pages_with_mmap(page_index_t start, page_index_t end) {
     } else
 #endif
     {
+        void *new_addr;
         os_invalidate(addr, length);
         new_addr = os_validate(NOT_MOVABLE, addr, length);
         if (new_addr == NULL || new_addr != addr) {
-            lose("remap_free_pages: page moved, 0x%08x ==> 0x%08x",
-                 start, new_addr);
+            lose("remap_free_pages: page moved, %p ==> %p",
+                 addr, new_addr);
         }
     }
 }
@@ -591,7 +583,6 @@ static inline void zero_pages(page_index_t start, page_index_t end) {
         fast_bzero(page_address(start), npage_bytes(1+end-start));
 }
 /* Zero the address range from START up to but not including END */
-__attribute__((unused))
 static inline void zero_range(char* start, char* end) {
     if (start < end)
         fast_bzero(start, end-start);
@@ -3238,6 +3229,22 @@ find_next_free_page(void)
     return last_page + 1;
 }
 
+/*
+ * Supposing the OS can only operate on ranges of a certain granularity
+ * (which we call 'gencgc_release_granularity'), then given any page rage,
+ * align the lower bound up and the upper down to match the granularity.
+ *
+ *     |-->| OS page | OS page |<--|
+ *
+ * If the interior of the aligned range is nonempty,
+ * perform three operations: unmap/remap, fill before, fill after.
+ * Otherwise, just one operation to fill the whole range.
+ *
+ * This will make more sense once we do a few other things:
+ *  - enable manual card marking in codegen
+ *  - disable mmap-based page protection
+ *  - enable hugepages (so the OS page is much larger than a card)
+ */
 static void
 remap_page_range (page_index_t from, page_index_t to)
 {
@@ -3248,19 +3255,17 @@ remap_page_range (page_index_t from, page_index_t to)
 #if defined(LISP_FEATURE_SUNOS)
     zero_pages(from, to);
 #else
-    const page_index_t
-            release_granularity = gencgc_release_granularity/GENCGC_CARD_BYTES,
-                   release_mask = release_granularity-1,
-                            end = to+1,
-                   aligned_from = (from+release_mask)&~release_mask,
-                    aligned_end = (end&~release_mask);
+    size_t granularity = gencgc_release_granularity;
+    // page_address "works" even if 'to' == page_table_pages-1
+    char* start = page_address(from);
+    char* end   = page_address(to+1);
+    char* aligned_start = PTR_ALIGN_UP(start, granularity);
+    char* aligned_end   = PTR_ALIGN_DOWN(end, granularity);
 
-    if (aligned_from < aligned_end) {
-        zero_pages_with_mmap(aligned_from, aligned_end-1);
-        if (aligned_from != from)
-            zero_pages(from, aligned_from-1);
-        if (aligned_end != end)
-            zero_pages(aligned_end, end-1);
+    if (aligned_start < aligned_end) {
+        zero_range_with_mmap(aligned_start, aligned_end-aligned_start);
+        zero_range(start, aligned_start);
+        zero_range(aligned_end, end);
     } else {
         zero_pages(from, to);
     }
