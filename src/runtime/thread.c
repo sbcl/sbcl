@@ -677,7 +677,7 @@ create_thread_struct(lispobj initial_function) {
     set_binding_stack_pointer(th,th->binding_stack_start);
     th->this=th;
     th->os_thread=0;
-#ifdef LAYOUT_OF_FUNCTION
+#if defined(LAYOUT_OF_FUNCTION) && defined(LISP_FEATURE_SB_THREAD)
     th->function_layout = LAYOUT_OF_FUNCTION << 32;
 #endif
 

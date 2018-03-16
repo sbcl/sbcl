@@ -78,9 +78,11 @@
                   do (setf (sap-ref-lispobj sap ofs) (%closure-index-ref closure i)))
             (setf (closure-header-word copy) ; Update the header
                   ;; Closure copy lost its high header bits, so OR them in again.
-                  (logior #!+(and immobile-space 64-bit)
+                  (logior #!+(and immobile-space 64-bit sb-thread)
                           (sap-int (sb!vm::current-thread-offset-sap
                                     sb!vm::thread-function-layout-slot))
+                          #!+(and immobile-space 64-bit (not sb-thread))
+                          (get-lisp-obj-address sb!vm:function-layout)
                           (namedp-bit)
                           (closure-header-word copy)))
             ;; We copy only if there was no padding, which means that adding 1 slot

@@ -444,7 +444,9 @@
       (storew* #!-immobile-space header ; write the widetag and size
                #!+immobile-space        ; ... plus the layout pointer
                (progn (inst mov temp header)
-                      (inst or temp (thread-tls-ea (ash thread-function-layout-slot
+                      (inst or temp #!-sb-thread (static-symbol-value-ea 'function-layout)
+                                    #!+sb-thread
+                                    (thread-tls-ea (ash thread-function-layout-slot
                                                         word-shift)))
                       temp)
                result 0 fun-pointer-lowtag (not stack-allocate-p)))
