@@ -539,6 +539,8 @@ report_heap_exhaustion(long available, long requested, struct thread *th)
 
 #if defined(LISP_FEATURE_X86)
 void fast_bzero(void*, size_t); /* in <arch>-assem.S */
+#else
+#define fast_bzero(addr, count) memset(addr, 0, count)
 #endif
 
 /* Zero the pages from START to END (inclusive), but use mmap/munmap instead
@@ -584,17 +586,15 @@ void zero_pages_with_mmap(page_index_t start, page_index_t end) {
 /* Zero the pages from START to END (inclusive). Generally done just after
  * a new region has been allocated.
  */
-static void
-zero_pages(page_index_t start, page_index_t end) {
-    if (start > end)
-      return;
-
-#if defined(LISP_FEATURE_X86)
-    fast_bzero(page_address(start), npage_bytes(1+end-start));
-#else
-    bzero(page_address(start), npage_bytes(1+end-start));
-#endif
-
+static inline void zero_pages(page_index_t start, page_index_t end) {
+    if (start <= end)
+        fast_bzero(page_address(start), npage_bytes(1+end-start));
+}
+/* Zero the address range from START up to but not including END */
+__attribute__((unused))
+static inline void zero_range(char* start, char* end) {
+    if (start < end)
+        fast_bzero(start, end-start);
 }
 
 /* Zero the pages from START to END (inclusive), except for those
