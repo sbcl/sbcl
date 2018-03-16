@@ -2041,7 +2041,7 @@ static inline boolean large_simple_vector_p(page_index_t page) {
  * pointers as the objects contain a link to the next and are written
  * if a weak pointer is scavenged. Still it's a useful check. */
 static void
-scavenge_generations(generation_index_t from, generation_index_t to)
+scavenge_root_gens(generation_index_t from, generation_index_t to)
 {
     page_index_t i;
     page_index_t num_wp = 0;
@@ -2126,13 +2126,13 @@ scavenge_generations(generation_index_t from, generation_index_t to)
         if ((page_bytes_used(i) != 0)
             && (page_table[i].gen == generation)
             && (page_table[i].write_protected_cleared != 0)) {
-            FSHOW((stderr, "/scavenge_generation() %d\n", generation));
+            FSHOW((stderr, "/scavenge_root_gens() %d\n", generation));
             FSHOW((stderr,
                    "/page bytes_used=%d scan_start_offset=%lu pin=%d\n",
                     page_bytes_used(i),
                     scan_start_offset(page_table[i]),
                     page_table[i].pinned));
-            lose("write to protected page %d in scavenge_generation()\n", i);
+            lose("write to protected page %d in scavenge_root_gens()\n", i);
         }
     }
 #endif
@@ -3149,13 +3149,12 @@ garbage_collect_generation(generation_index_t generation, int raise)
     // number reassigned to that generation if applicable.
     scavenge_immobile_roots(generation+1, SCRATCH_GENERATION);
 #endif
-    scavenge_generations(generation+1, PSEUDO_STATIC_GENERATION);
-
-    if (gc_object_watcher) scavenge(&gc_object_watcher, 1);
+    scavenge_root_gens(generation+1, PSEUDO_STATIC_GENERATION);
     scavenge_pinned_ranges();
     /* The Lisp start function is stored in the core header, not a static
      * symbol. It is passed to gc_and_save() in this C variable */
     if (lisp_init_function) scavenge(&lisp_init_function, 1);
+    if (gc_object_watcher)  scavenge(&gc_object_watcher, 1);
 
     /* Finally scavenge the new_space generation. Keep going until no
      * more objects are moved into the new generation */

@@ -114,7 +114,7 @@ Possible soutions for GC, in approximately increasing order of difficulty:
    is a fixnum that acts like a pointer. Less change to data structures,
    more cost in time. (And same snag: a preceding page contains the
    FDEFN header but current page contains the raw-fun slot)
- * Refactor scavenge_generations() and heap_scavenge() so that
+ * Refactor scavenge_root_gens() and heap_scavenge() so that
    scavenging a page informs the caller whether old->young
    pointers exist in each scavenged page. This is potentially
    better than the current naive scan which assumes that any word
