@@ -2599,14 +2599,21 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
         } else if (unboxed_obj_widetag_p(widetag)) {
             count = sizetab[widetag](where);
         } else switch(widetag) {
-                    /* boxed or partially boxed objects */
-            case INSTANCE_WIDETAG:
-            // Two reasons for including funcallable instance here:
-            //  (1) the layout may be in the header, and we need to verify it
-            //  (2) there may be unboxed words in the object
+                /* boxed or partially boxed objects */
+                lispobj layout_word;
+                // Two reasons for including funcallable instance here:
+                //  (1) the layout may be in the header, and we need to verify it
+                //  (2) there may be unboxed words in the object
             case FUNCALLABLE_INSTANCE_WIDETAG:
-                if (instance_layout(where)) {
-                    lispobj layout_word = instance_layout(where);
+#ifndef LISP_FEATURE_COMPACT_INSTANCE_HEADER
+                layout_word = funinstance_layout(where);
+                goto instance_layout;
+#endif
+            case INSTANCE_WIDETAG:
+                layout_word = instance_layout(where);
+
+            instance_layout:
+                if (layout_word) {
                     state->vaddr = where;
                     verify_range(&layout_word, 1, state);
                     state->vaddr = 0;
@@ -2656,7 +2663,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                 state->vaddr = 0;
                 count = ALIGN_UP(sizeof (struct fdefn)/sizeof(lispobj), 2);
                 break;
-        }
+            }
     }
 }
 static uword_t verify_space(lispobj start, lispobj* end, uword_t flags) {
