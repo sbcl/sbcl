@@ -122,11 +122,6 @@
 ;;; (typically a bignum, but a fixnum will do),
 ;;; and each value represents the difference from the preceding value.
 
-;;; Somebody should try changing the x86 code to use this representation
-;;; and profile that to see if it makes performance worse.
-;;; x86-64 does not care about speed here, because GC is unaffected
-;;; except when saving a core.
-
 (defun integer-from-octets (octets)
   (declare (type (array (unsigned-byte 8) (*)) octets))
   (let ((result 0) (shift 0))
@@ -156,6 +151,7 @@
            (,shift 0)
            (,acc 0)
            (,prev 0))
+       #-sb-xc-host (declare (notinline sb!kernel:%ldb)) ; lp#1573398
        (loop
         (let ((,byte (ldb (byte 8 ,bytepos) ,integer)))
           (incf ,bytepos 8)

@@ -1360,6 +1360,7 @@ possibly temporarily, because it might be used internally."
                "FIND-RESTART-OR-CONTROL-ERROR"
                "LOAD-AS-SOURCE"
                "DESCRIPTOR-SAP"
+               "DO-PACKED-VARINTS"
 
                ;; These could be moved back into SB!EXT if someone has
                ;; compelling reasons, but hopefully we can get by
