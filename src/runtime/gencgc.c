@@ -2498,6 +2498,13 @@ struct verify_state {
 /* VERIFYING_foo indicates internal state, not a caller's option */
 #define VERIFYING_HEAP_OBJECTS 8
 
+// Generalize over INSTANCEish things. (Not general like SB-KERNEL:LAYOUT-OF)
+static inline lispobj layout_of(lispobj* instance) { // native ptr
+    // Smart C compilers eliminate the ternary operator if exprs are the same
+    return widetag_of(*instance) == FUNCALLABLE_INSTANCE_WIDETAG
+      ? funinstance_layout(instance) : instance_layout(instance);
+}
+
 // NOTE: This function can produces false failure indications,
 // usually related to dynamic space pointing to the stack of a
 // dead thread, but there may be other reasons as well.
@@ -2596,14 +2603,8 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                 //  (1) the layout may be in the header, and we need to verify it
                 //  (2) there may be unboxed words in the object
             case FUNCALLABLE_INSTANCE_WIDETAG:
-#ifndef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-                layout_word = funinstance_layout(where);
-                goto instance_layout;
-#endif
             case INSTANCE_WIDETAG:
-                layout_word = instance_layout(where);
-
-            instance_layout:
+                layout_word = layout_of(where);
                 if (layout_word) {
                     state->vaddr = where;
                     verify_range(&layout_word, 1, state);
