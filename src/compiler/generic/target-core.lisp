@@ -108,7 +108,7 @@
                  (savep (push offset (elt preserved-lists 1))))))
 
        (finish-fixups (code-obj preserved-lists)
-         (declare (ignorable preserved-lists))
+         (declare (ignorable code-obj preserved-lists))
          #!+(or immobile-space x86)
          (let ((rel-fixups (elt preserved-lists 0))
                (abs-fixups (elt preserved-lists 1)))
