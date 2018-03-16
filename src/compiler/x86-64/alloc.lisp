@@ -437,25 +437,30 @@
   (:node-var node)
   (:generator 10
    (maybe-pseudo-atomic stack-allocate-p
-    (let* ((size (+ length closure-info-offset))
-           (header (logior (ash (1- size) n-widetag-bits) closure-widetag)))
-      (allocation result (pad-data-block size) node stack-allocate-p
-                  fun-pointer-lowtag)
-      (storew* #!-immobile-space header ; write the widetag and size
-               #!+immobile-space        ; ... plus the layout pointer
-               (progn (inst mov temp header)
-                      (inst or temp #!-sb-thread (static-symbol-value-ea 'function-layout)
-                                    #!+sb-thread
-                                    (thread-tls-ea (ash thread-function-layout-slot
-                                                        word-shift)))
-                      temp)
-               result 0 fun-pointer-lowtag (not stack-allocate-p)))
-    ;; These two instructions are within the scope of PSEUDO-ATOMIC.
-    ;; This is due to scav_closure() assuming that it can always subtract
-    ;; FUN_RAW_ADDR_OFFSET from closure->fun to obtain a Lisp object,
-    ;; without any precheck for whether that word is currently 0.
-    (inst lea temp (make-fixup nil :closure label))
-    (storew temp result closure-fun-slot fun-pointer-lowtag))))
+     (let* ((size (+ length closure-info-offset))
+            (header (logior (ash (1- size) n-widetag-bits) closure-widetag)))
+       (allocation result (pad-data-block size) node stack-allocate-p
+                   fun-pointer-lowtag)
+       (storew* #!-immobile-space header ; write the widetag and size
+                #!+immobile-space        ; ... plus the layout pointer
+                (progn (inst mov temp header)
+                       (inst or temp #!-sb-thread (static-symbol-value-ea 'function-layout)
+                                     #!+sb-thread
+                                     (thread-tls-ea (ash thread-function-layout-slot
+                                                         word-shift)))
+                       temp)
+                result 0 fun-pointer-lowtag (not stack-allocate-p)))
+     ;; These two instructions are within the scope of PSEUDO-ATOMIC.
+     ;; This is due to scav_closure() assuming that it can always subtract
+     ;; FUN_RAW_ADDR_OFFSET from closure->fun to obtain a Lisp object,
+     ;; without any precheck for whether that word is currently 0.
+     (inst lea (reg-in-size temp :immobile-code-pc) (make-fixup nil :closure label))
+     (storew (reg-in-size temp
+                          (if stack-allocate-p
+                              ;; Need to do a full word store because the stack not zeroed
+                              :qword
+                              :immobile-code-pc))
+             result closure-fun-slot fun-pointer-lowtag))))
 
 ;;; The compiler likes to be able to directly make value cells.
 (define-vop (make-value-cell)

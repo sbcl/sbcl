@@ -49,12 +49,16 @@
   `(inst mov ,value (make-ea-for-object-slot ,ptr ,slot ,lowtag)))
 
 (defun storew (value ptr &optional (slot 0) (lowtag 0))
-  (cond ((and (integerp value)
-              (not (typep value '(signed-byte 32))))
-         (inst mov temp-reg-tn value)
-         (inst mov (make-ea-for-object-slot ptr slot lowtag) temp-reg-tn))
-        (t
-         (inst mov (make-ea-for-object-slot ptr slot lowtag) value))))
+  (let* ((size (if (tn-p value)
+                   (sc-operand-size (tn-sc value))
+                   :qword))
+         (ea (make-ea size :base ptr :disp (- (* slot n-word-bytes) lowtag))))
+    (cond ((and (integerp value)
+                (not (typep value '(signed-byte 32))))
+           (inst mov temp-reg-tn value)
+           (inst mov ea temp-reg-tn))
+          (t
+           (inst mov ea value)))))
 
 (defmacro pushw (ptr &optional (slot 0) (lowtag 0))
   `(inst push (make-ea-for-object-slot ,ptr ,slot ,lowtag)))
