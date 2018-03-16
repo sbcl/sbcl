@@ -231,4 +231,14 @@ static inline lispobj fdefn_callee_lispobj(struct fdefn *fdefn) {
 
 #endif
 
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+#include "genesis/layout.h"
+#define LAYOUT_SIZE (sizeof (struct layout)/N_WORD_BYTES)
+/// First 5 layouts: T, FUNCTION, STRUCTURE-OBJECT, LAYOUT, PACKAGE
+/// (These #defines ought to be emitted by genesis)
+#define LAYOUT_OF_FUNCTION ((FIXEDOBJ_SPACE_START+1*LAYOUT_ALIGN)|INSTANCE_POINTER_LOWTAG)
+#define LAYOUT_OF_LAYOUT   ((FIXEDOBJ_SPACE_START+3*LAYOUT_ALIGN)|INSTANCE_POINTER_LOWTAG)
+#define LAYOUT_OF_PACKAGE  ((FIXEDOBJ_SPACE_START+4*LAYOUT_ALIGN)|INSTANCE_POINTER_LOWTAG)
+#endif
+
 #endif /* _GC_INTERNAL_H_ */

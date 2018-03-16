@@ -444,7 +444,8 @@
       (storew* #!-immobile-space header ; write the widetag and size
                #!+immobile-space        ; ... plus the layout pointer
                (progn (inst mov temp header)
-                      (inst or temp (static-symbol-value-ea 'function-layout))
+                      (inst or temp (thread-tls-ea (ash thread-function-layout-slot
+                                                        word-shift)))
                       temp)
                result 0 fun-pointer-lowtag (not stack-allocate-p)))
     ;; These two instructions are within the scope of PSEUDO-ATOMIC.

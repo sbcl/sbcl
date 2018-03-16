@@ -677,6 +677,9 @@ create_thread_struct(lispobj initial_function) {
     set_binding_stack_pointer(th,th->binding_stack_start);
     th->this=th;
     th->os_thread=0;
+#ifdef LAYOUT_OF_FUNCTION
+    th->function_layout = LAYOUT_OF_FUNCTION << 32;
+#endif
 
 #ifdef LISP_FEATURE_SB_SAFEPOINT
 # ifdef LISP_FEATURE_WIN32

@@ -623,8 +623,6 @@ static void relocate_heap(struct heap_adjust* adj)
     relocate_space(STATIC_SPACE_START, static_space_free_pointer, adj);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     relocate_space(FIXEDOBJ_SPACE_START, fixedobj_free_pointer, adj);
-    SYMBOL(FUNCTION_LAYOUT)->value = \
-        adjust_word(adj, SYMBOL(FUNCTION_LAYOUT)->value >> 32) << 32;
 #endif
 #ifdef LISP_FEATURE_CHENEYGC
     relocate_space(DYNAMIC_0_SPACE_START, (lispobj*)get_alloc_pointer(), adj);

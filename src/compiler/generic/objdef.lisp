@@ -470,6 +470,9 @@
   (sprof-alloc-region :c-type "struct alloc_region" :length 5)
   ;; The following slot's existence must NOT be conditional on #+msan
   #!+x86-64 (msan-param-tls) ; = &__msan_param_tls
+  ;; function-layout is needed for closure creation. it's constant,
+  ;; but we need somewhere to read it from.
+  #!+x86-64 (function-layout)
   (interrupt-contexts :c-type "os_context_t *" :rest-p t :pointer t))
 
 ;;; Compute the smallest TLS index that will be assigned to a special variable

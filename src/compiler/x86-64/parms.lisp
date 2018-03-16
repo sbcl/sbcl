@@ -140,7 +140,6 @@
 
 (defconstant-eqx +static-symbols+
  `#(,@+common-static-symbols+
-    #!+immobile-space function-layout
     #!-sb-thread *alien-stack-pointer*    ; a thread slot if #!+sb-thread
      ;; interrupt handling
     #!-sb-thread *pseudo-atomic-bits*     ; ditto
