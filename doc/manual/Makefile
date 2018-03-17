@@ -13,7 +13,6 @@ HTMLFILES=sbcl.html asdf.html
 # Lisp's `pathname' function).
 DOCSTRINGDIR="docstrings/"
 CONTRIB_SRC_DIR="../../contrib/"
-CONTRIB_OBJ_DIR="../../obj/asdf-cache/"
 I_FLAGS=-I $(DOCSTRINGDIR) -I $(CONTRIB_SRC_DIR)
 
 # SBCL_SYSTEM is an optional argument to this make program. If this
@@ -88,11 +87,7 @@ info: $(INFOFILES)
 	$(MAKEINFO) $(I_FLAGS) $<
 
 # Texinfo docstring snippets
-# Note: assumes contrib module names are the same as the names of
-# directories containing the modules, and that these directories
-# are in $(CONTRIB_OBJ_DIR).
-CONTRIB_FASLS=$(shell find $(shell echo $(MODULES) | sed "s|:|$(CONTRIB_OBJ_DIR)|g") -name '*.fasl')
-docstrings: $(CONTRIB_FASLS) tempfiles-stamp
+docstrings: tempfiles-stamp
 	sh make-tempfiles.sh "$(SBCL_SYSTEM)" "$(DOCSTRINGDIR)" && touch $(DOCSTRINGDIR)
 
 tempfiles-stamp:
