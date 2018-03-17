@@ -240,9 +240,7 @@
      (:temp edx unsigned-reg rdx-offset)
      (:temp edi unsigned-reg rdi-offset)
      (:temp esi unsigned-reg rsi-offset)
-     (:temp fun (any-reg descriptor-reg) rax-offset)
-     (:temp length (any-reg descriptor-reg) rax-offset)
-     (:temp vector (any-reg descriptor-reg) rbx-offset))
+     (:temp fun (any-reg descriptor-reg) rax-offset))
   (!prepare-for-tail-call-variable eax ebx ecx edx edi esi t)
 
   (%lea-for-lowtag-test ebx-tn fun fun-pointer-lowtag)
