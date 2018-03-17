@@ -1049,8 +1049,11 @@
                       ((= i len)
                        (when needs-rehash
                          (setf (svref obj 1) 1)))
+                    ;; A weak or EQ-based hash table any of whose keys is a function
+                    ;; or code-component might need the 'rehash' flag set.
+                    ;; In practice, it is likely already set, because any object that
+                    ;; could move in the final GC probably did move.
                     (when (scanptr obj (+ vector-data-offset i))
-                      (format t "~&SET REHASH: vector=~X~%" (get-lisp-obj-address obj))
                       (setq needs-rehash t))
                     (scanptr obj (+ vector-data-offset i 1)))
                   (return-from scan-obj))
