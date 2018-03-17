@@ -527,27 +527,8 @@
 ;;;       83.3      1140800       7130        TN
 ;;;       16.7       228160       7130        SIMPLE-BIT-VECTOR
 
-;;; The report can optionally be collapsed to show no detail,
-;;;
-;;; which gives a 100% complete picture down to individual conses.
-;;; * (sb-aprof::aprof-show :detail nil :top-n 1000) ; or anything
-;;;        %    Sum %        Bytes    Allocations   Function
-;;;  -------  -------  -----------    -----------   --------
-;;;    6.6        6.6      1980160          50752   INIT-SB-VECTORS
-;;;    4.6       11.1      1368960          14260   MAKE-TN
-;;;    4.0       15.1      1204160           5060   MAKE-HASH-TABLE
-;;;    3.8       19.0      1154384          28727   CONSTRAIN-REF-TYPE
-;;;    3.8       22.8      1152160          13084   COPY-CONSET
-;;;    3.6       26.5      1094240          13678   MAKE-TN-REF
-;;; ... many more lines ...
-;;;   00.0      100.0           16              1   %ENTER-NEW-NICKNAMES
-;;;   00.0      100.0           16              1   UNIX-LSTAT
-;;;                    ===========
-;;;                       30054816
-
-;;; The report can be made even more detailed by not combining
-;;; lines that report the same object type within functions,
-;;; so that each program counter location that allocates is visible:
+;;; The report can be made more detailed by not combining lines
+;;; for the same object type within a function:
 ;;;
 ;;; * (aprof-show :detail  t :collapse nil)
 ;;;
@@ -567,3 +548,20 @@
 ;;;       37.1       447168       1644      21B29F50        (SIMPLE-ARRAY (UNSIGNED-BYTE 64) (*))
 ;;;       21.8       263040       1644      21B29FA8        (SIMPLE-ARRAY (UNSIGNED-BYTE 64) (*))
 ;;;        1.7        20480        128      21B2A098        (SIMPLE-ARRAY (UNSIGNED-BYTE 64) (*))
+
+;;; Or less detailed by combining all lines within a function:
+;;;
+;;; * (sb-aprof::aprof-show :detail nil :top-n 1000) ; or anything
+;;;        %    Sum %        Bytes    Allocations   Function
+;;;  -------  -------  -----------    -----------   --------
+;;;    6.6        6.6      1980160          50752   INIT-SB-VECTORS
+;;;    4.6       11.1      1368960          14260   MAKE-TN
+;;;    4.0       15.1      1204160           5060   MAKE-HASH-TABLE
+;;;    3.8       19.0      1154384          28727   CONSTRAIN-REF-TYPE
+;;;    3.8       22.8      1152160          13084   COPY-CONSET
+;;;    3.6       26.5      1094240          13678   MAKE-TN-REF
+;;; ... many more lines ...
+;;;   00.0      100.0           16              1   %ENTER-NEW-NICKNAMES
+;;;   00.0      100.0           16              1   UNIX-LSTAT
+;;;                    ===========
+;;;                       30054816

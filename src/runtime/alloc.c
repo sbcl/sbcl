@@ -23,6 +23,7 @@
 // Only supported on x86-64, but the variables are always referenced
 // to reduce preprocessor conditionalization.
 os_vm_address_t alloc_profile_buffer; // array of counters
+static size_t profile_buffer_size;
 lispobj alloc_profile_data;           // SIMPLE-VECTOR of <code-component,PC>
 boolean alloc_profiling;              // enabled flag
 
@@ -91,34 +92,38 @@ void allocation_profiler_start()
 {
     int __attribute__((unused)) ret = thread_mutex_lock(&alloc_profiler_lock);
     gc_assert(ret == 0);
-    if (alloc_profiling) {
-        fprintf(stderr, "allocation profiler already started\n");
-        goto done;
+    if (!alloc_profiling && simple_vector_p(alloc_profile_data)) {
+        max_alloc_point_counters =
+            fixnum_value(VECTOR(alloc_profile_data)->length)/2;
+        size_t size = N_WORD_BYTES * max_alloc_point_counters;
+        os_vm_address_t old_buffer = 0;
+        if (size != profile_buffer_size) {
+            profile_buffer_size = size;
+            old_buffer = alloc_profile_buffer;
+            alloc_profile_buffer = os_allocate(size);
+            printf("using %d cells (%ld bytes) for profile buffer @ %p\n",
+                   max_alloc_point_counters, size, alloc_profile_buffer);
+        }
+        alloc_profiling = 1;
+        int n = 0;
+        struct thread* th;
+        for_each_thread(th) {
+            th->profile_data = (uword_t*)alloc_profile_buffer;
+            ++n;
+        }
+        printf("allocation profiler: %d thread%s\n", n, n>1?"s":"");
+        if (old_buffer) {
+            // Thread-safely switching buffers would entail lazy reclamation
+            // of the old one. Just don't use the interface functions
+            // when any thread might be looking at the old buffer.
+            printf("WARNING: Unsafely changed alloc profile buffer\n");
+            os_deallocate(alloc_profile_buffer, profile_buffer_size);
+        }
+    } else {
+        fprintf(stderr, alloc_profiling ?
+                "allocation profiler already started\n" :
+                "profile metadata not created\n");
     }
-    if (!alloc_profile_data
-        || lowtag_of(alloc_profile_data) != OTHER_POINTER_LOWTAG
-        || widetag_of(VECTOR(alloc_profile_data)->header)
-        != SIMPLE_VECTOR_WIDETAG) {
-        fprintf(stderr, "profile metadata not created\n");
-        goto done;
-    }
-    max_alloc_point_counters =
-        fixnum_value(VECTOR(alloc_profile_data)->length)/2;
-    size_t size = N_WORD_BYTES * max_alloc_point_counters;
-    // FIXME: discard old buffer when no thread points to it
-    alloc_profile_buffer = os_allocate(size);
-    printf("using %d cells (%ld bytes) for profile buffer @ %p\n",
-           max_alloc_point_counters, size, alloc_profile_buffer);
-    int n = 0;
-    struct thread* th;
-    for_each_thread(th) {
-        th->profile_data = (uword_t*)alloc_profile_buffer;
-        ++n;
-    }
-    printf("allocation profiler: %d threads\n", n);
-    alloc_profiling = 1;
-  done:
-    ;
     ret = thread_mutex_unlock(&alloc_profiler_lock);
     gc_assert(ret == 0);
 }
@@ -128,17 +133,15 @@ void allocation_profiler_stop()
 {
     int __attribute__((unused)) ret = thread_mutex_lock(&alloc_profiler_lock);
     gc_assert(ret == 0);
-    if (!alloc_profiling) {
+    if (alloc_profiling) {
+        alloc_profiling = 0;
+        struct thread* th;
+        for_each_thread(th) {
+            th->profile_data = 0;
+        }
+    } else {
         fprintf(stderr, "allocation profiler not started\n");
-        goto done;
     }
-    struct thread* th;
-    for_each_thread(th) {
-        th->profile_data = 0;
-    }
-    alloc_profiling = 0;
-  done:
-    ;
     ret = thread_mutex_unlock(&alloc_profiler_lock);
     gc_assert(ret == 0);
 #if 0

@@ -284,6 +284,10 @@ static inline int instancep(lispobj obj) {
 static inline int functionp(lispobj obj) {
     return lowtag_of(obj) == FUN_POINTER_LOWTAG;
 }
+static inline int simple_vector_p(lispobj obj) {
+    return lowtag_of(obj) == OTHER_POINTER_LOWTAG &&
+           widetag_of(*(lispobj*)(obj-OTHER_POINTER_LOWTAG)) == SIMPLE_VECTOR_WIDETAG;
+}
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 #define HEADER_VALUE_MASKED(x) (HeaderValue(x) & SHORT_HEADER_MAX_WORDS)
