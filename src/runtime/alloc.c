@@ -78,8 +78,9 @@ lispobj alloc_code_object (unsigned boxed, unsigned unboxed)
 #include <stdio.h>
 #include "genesis/vector.h"
 
+#ifdef LISP_FEATURE_SB_THREAD
 pthread_mutex_t alloc_profiler_lock = PTHREAD_MUTEX_INITIALIZER;
-
+#endif
 // Counters 0 and 1 are reserve for variable-size allocations
 // (hit count and total size) that overflow the maximum counter index.
 // Counter 2 is reserved for fixed-size allocations.
@@ -90,8 +91,10 @@ unsigned int max_alloc_point_counters;
 
 void allocation_profiler_start()
 {
+#ifdef LISP_FEATURE_SB_THREAD
     int __attribute__((unused)) ret = thread_mutex_lock(&alloc_profiler_lock);
     gc_assert(ret == 0);
+#endif
     if (alloc_profiling) {
         fprintf(stderr, "allocation profiler already started\n");
         goto done;
@@ -99,7 +102,7 @@ void allocation_profiler_start()
     if (!alloc_profile_data
         || lowtag_of(alloc_profile_data) != OTHER_POINTER_LOWTAG
         || widetag_of(VECTOR(alloc_profile_data)->header)
-            != SIMPLE_VECTOR_WIDETAG) {
+        != SIMPLE_VECTOR_WIDETAG) {
         fprintf(stderr, "profile metadata not created\n");
         goto done;
     }
@@ -113,38 +116,46 @@ void allocation_profiler_start()
     int n = 0;
     struct thread* th;
     for_each_thread(th) {
-      th->profile_data = (uword_t*)alloc_profile_buffer;
+        th->profile_data = (uword_t*)alloc_profile_buffer;
         ++n;
     }
     printf("allocation profiler: %d threads\n", n);
     alloc_profiling = 1;
- done:
+  done:
+    ;
+#ifdef LISP_FEATURE_SB_THREAD
     ret = thread_mutex_unlock(&alloc_profiler_lock);
     gc_assert(ret == 0);
+#endif
 }
 
 // This is not exactly threadsafe. Don't try anything fancy.
 void allocation_profiler_stop()
 {
+#ifdef LISP_FEATURE_SB_THREAD
     int __attribute__((unused)) ret = thread_mutex_lock(&alloc_profiler_lock);
     gc_assert(ret == 0);
+#endif
     if (!alloc_profiling) {
         fprintf(stderr, "allocation profiler not started\n");
         goto done;
     }
     struct thread* th;
     for_each_thread(th) {
-      th->profile_data = 0;
+        th->profile_data = 0;
     }
     alloc_profiling = 0;
- done:
+  done:
+    ;
+#ifdef LISP_FEATURE_SB_THREAD
     ret = thread_mutex_unlock(&alloc_profiler_lock);
     gc_assert(ret == 0);
+#endif
 #if 0
     if (warning_issued) {
-       fprintf(stderr, "allocation profile needed %d counters\n",
-               alloc_profile_n_counters);
-       warning_issued = 0;
+        fprintf(stderr, "allocation profile needed %d counters\n",
+                alloc_profile_n_counters);
+        warning_issued = 0;
     }
 #endif
 }
