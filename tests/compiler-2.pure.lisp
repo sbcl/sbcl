@@ -23,8 +23,6 @@
 
 (cl:in-package :cl-user)
 
-(load "compiler-test-util.lisp")
-
 (defun compiles-with-warning (lambda)
   (assert (nth-value 2 (checked-compile lambda :allow-warnings t))))
 

@@ -13,8 +13,6 @@
 
 (cl:in-package :cl-user)
 
-(load "compiler-test-util.lisp")
-
 (with-test (:name (:infinities :comparison))
   (dolist (ifnis (list (cons single-float-positive-infinity
                              single-float-negative-infinity)

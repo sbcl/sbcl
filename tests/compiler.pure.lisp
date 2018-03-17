@@ -13,8 +13,6 @@
 
 (cl:in-package :cl-user)
 
-(load "compiler-test-util.lisp")
-
 ;; The tests in this file do not work under the legacy interpreter.
 (when (and (eq sb-ext:*evaluator-mode* :interpret)
            (not (member :sb-fasteval *features*)))

@@ -13,8 +13,6 @@
 
 (in-package "CL-USER")
 
-(load "compiler-test-util.lisp")
-
 (assert (equal (symbol-name '#:|fd\sA|) "fdsA"))
 
 ;;; Prior to sbcl-0.7.2.10, SBCL disobeyed the ANSI requirements on

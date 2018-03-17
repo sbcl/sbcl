@@ -13,8 +13,6 @@
 
 (in-package :cl-user)
 
-(load "test-util.lisp")
-(load "compiler-test-util.lisp")
 (use-package :test-util)
 
 ;;;; properties of symbols, e.g. presence of doc strings for public symbols

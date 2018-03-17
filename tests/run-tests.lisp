@@ -1,9 +1,9 @@
 (load "test-util.lisp")
+(load "assertoid.lisp")
+(load "compiler-test-util.lisp")
 
 (defpackage :run-tests
-    (:use :cl :test-util :sb-ext))
-
-(load "assertoid.lisp")
+  (:use :cl :test-util :sb-ext))
 
 (in-package run-tests)
 

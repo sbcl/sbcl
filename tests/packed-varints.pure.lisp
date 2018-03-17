@@ -11,8 +11,6 @@
 
 (cl:in-package :cl-user)
 
-(load "compiler-test-util.lisp")
-
 #+(and x86-64 immobile-space sb-unicode (not interpreter)) ; missing symbols otherwise
 (with-test (:name :bignum-unpacker-no-consing)
   (flet ((try ()

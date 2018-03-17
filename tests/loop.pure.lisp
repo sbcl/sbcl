@@ -13,8 +13,6 @@
 
 (in-package "CL-USER")
 
-(load "compiler-test-util.lisp")
-
 ;;; The bug reported by Alexei Dejneka on sbcl-devel 2001-09-03
 ;;; is fixed now.
 (assert (equal (let ((hash (make-hash-table)))

@@ -13,8 +13,6 @@
 
 (in-package :cl-user)
 
-(load "compiler-test-util.lisp")
-
 ;;; As reported by Paul Dietz from his ansi-test suite for gcl, REMOVE
 ;;; malfunctioned when given :START, :END and :FROM-END arguments.
 ;;; Make sure it doesn't happen again.

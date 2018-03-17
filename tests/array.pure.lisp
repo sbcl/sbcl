@@ -11,8 +11,6 @@
 
 (in-package :cl-user)
 
-(load "compiler-test-util.lisp")
-
 ;;; Array initialization has complicated defaulting for :ELEMENT-TYPE,
 ;;; and both compile-time and run-time logic takes a whack at it.
 (with-test (:name (make-array :element-type :bug-126))
