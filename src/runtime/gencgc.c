@@ -1474,7 +1474,6 @@ search_dynamic_space(void *pointer)
     return gc_search_space(start, pointer);
 }
 
-#if !GENCGC_IS_PRECISE
 /* Return true if 'addr' has a lowtag and widetag that correspond,
  * given that the words at 'addr' are within range for an allocated page.
  * 'addr' could be a pointer to random data, and this check is merely
@@ -1488,6 +1487,8 @@ static inline boolean plausible_tag_p(lispobj addr)
     return other_immediate_lowtag_p(widetag)
         && lowtag_of(addr) == lowtag_for_widetag[widetag>>2];
 }
+
+#if !GENCGC_IS_PRECISE
 // Return the starting address of the object containing 'addr'
 // if and only if the object is one which would be evacuated from 'from_space'
 // were it allowed to be either discarded as garbage or moved.
