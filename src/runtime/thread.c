@@ -680,6 +680,9 @@ create_thread_struct(lispobj initial_function) {
 #if defined(LAYOUT_OF_FUNCTION) && defined(LISP_FEATURE_SB_THREAD)
     th->function_layout = LAYOUT_OF_FUNCTION << 32;
 #endif
+    // Once allocated, the allocation profiling buffer sticks around.
+    // If present and enabled, assign into the new thread.
+    th->profile_data = (uword_t*)(alloc_profiling ? alloc_profile_buffer : 0);
 
 #ifdef LISP_FEATURE_SB_SAFEPOINT
 # ifdef LISP_FEATURE_WIN32

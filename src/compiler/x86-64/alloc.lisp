@@ -73,6 +73,7 @@
   ;; Otherwise do the normal inline allocation thing
   (let ((NOT-INLINE (gen-label))
         (DONE (gen-label))
+        (SKIP-INSTRUMENTATION (gen-label))
         ;; Yuck.
         (in-elsewhere (eq *elsewhere* sb!assem::**current-segment**))
         ;; thread->alloc_region.free_pointer
@@ -87,6 +88,44 @@
          (thread-tls-ea (* n-word-bytes (1+ thread-alloc-region-slot)))
          #!-sb-thread
          (make-ea :qword :disp (make-fixup "gc_alloc_region" :foreign 8))))
+
+    ;; Insert allocation profiler instrumentation
+    ;; FIXME: for now, change this to '>=' to perform self-build
+    ;;        where the resulting executable has instrumentation
+    ;;        because I can't get policies to work.
+    ;; FIXME: and does this work for assembly routines?
+    (when (policy node (> sb!c::instrument-consing 1))
+      (inst mov temp-reg-tn
+            (make-ea :qword :base thread-base-tn
+                     :disp (* n-word-bytes thread-profile-data-slot)))
+      (inst test temp-reg-tn temp-reg-tn)
+      ;; This instruction is modified to "JMP :z" when profiling is
+      ;; partially enabled. After the buffer is assigned, it becomes
+      ;; fully enabled. The unconditional jmp gives minimal performance
+      ;; loss if the profiler is statically disabled. (one memory
+      ;; read and a test whose result is never used, which the CPU
+      ;; is good at ignoring as far as instruction prefetch goes)
+      (inst jmp skip-instrumentation)
+      (emit-alignment 3 :long-nop)
+      (let ((helper (if (integerp size)
+                        'enable-alloc-counter
+                        'enable-sized-alloc-counter)))
+        (cond ((or (not node) ; assembly routine
+                   (sb!c::code-immobile-p node))
+               (inst call (make-fixup helper :assembly-routine)) ; 5 bytes
+               (emit-long-nop sb!assem::**current-segment** 3)) ; align
+              (t
+               (inst call ; 7 bytes
+                     (make-ea :qword :disp
+                              (make-fixup helper :assembly-routine*)))
+               (inst nop))) ; align
+        (unless (integerp size)
+          ;; This TEST instruction is never executed- it informs the profiler
+          ;; which register holds SIZE.
+          (inst test size size) ; 3 bytes
+          (emit-long-nop sb!assem::**current-segment** 5))) ; align
+      (emit-label skip-instrumentation))
+
     (cond ((or in-elsewhere
                ;; large objects will never be made in a per-thread region
                (and (integerp size)

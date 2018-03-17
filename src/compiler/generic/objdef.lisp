@@ -396,6 +396,9 @@
   ;; Doing so reduces code size for allocation sequences and special variable
   ;; manipulations by fixing their TLS offsets to be < 2^7, the largest
   ;; aligned displacement fitting in a signed byte.
+  ;;
+  ;; Information for constructing deterministic consing profile.
+  (profile-data :c-type "uword_t *" :pointer t)
   #!+gencgc (alloc-region :c-type "struct alloc_region" :length 4)
   #!+sb-thread (pseudo-atomic-bits #!+(or x86 x86-64) :special #!+(or x86 x86-64) *pseudo-atomic-bits*)
   ;; next two not used in C, but this wires the TLS offsets to small values

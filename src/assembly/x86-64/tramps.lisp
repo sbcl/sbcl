@@ -6,8 +6,9 @@
 (in-package "SB!VM")
 
 (macrolet
-    ((def ((name &key do-not-preserve (stack-delta 0))
-           &body move-result)
+    ((def ((name c-name &key do-not-preserve (stack-delta 0))
+           move-arg
+           move-result)
        `(define-assembly-routine
             (,name (:return-style :none))
             ()
@@ -44,20 +45,35 @@
             (inst sub rsp-tn (* 16 16))
             (map-floats push)
             (map-registers push)
-            (inst mov rdi-tn (make-ea :qword :base rbp-tn :disp 16))
+            ,@move-arg
             ;; asm routines can always call foreign code with a relative operand
-            (inst call (make-fixup "alloc" :foreign))
+            (inst call (make-fixup ,c-name :foreign))
             ,@move-result
             (map-registers pop)
             (map-floats pop)
             (inst mov rsp-tn rbp-tn)
             (inst pop rbp-tn)
             (inst ret ,stack-delta)))))
-  (def (alloc-tramp)
-    (inst mov (make-ea :qword :base rbp-tn :disp 16) rax-tn))
-  (def (alloc-tramp-r11 :do-not-preserve (r11-tn)
+
+  (def (alloc-tramp "alloc")
+    ((inst mov rdi-tn (make-ea :qword :base rbp-tn :disp 16))) ; arg
+    ((inst mov (make-ea :qword :base rbp-tn :disp 16) rax-tn))) ; result
+
+  (def (alloc-tramp-r11 "alloc"
+                        :do-not-preserve (r11-tn)
                         :stack-delta 8) ;; remove the size parameter
-    (inst mov r11-tn rax-tn)))
+    ((inst mov rdi-tn (make-ea :qword :base rbp-tn :disp 16))) ; arg
+    ((inst mov r11-tn rax-tn))) ; result
+
+  ;; These routines are for the deterministic allocation profiler.
+  ;; The C support routine's argument is the return PC
+  (def (enable-alloc-counter "allocation_tracker_counted")
+    ((inst lea rdi-tn (make-ea :qword :base rbp-tn :disp 8))) ; arg
+    ()) ; result
+
+  (def (enable-sized-alloc-counter "allocation_tracker_sized")
+    ((inst lea rdi-tn (make-ea :qword :base rbp-tn :disp 8))) ; arg
+    ())) ; result
 
 (define-assembly-routine
     (undefined-tramp (:return-style :none))

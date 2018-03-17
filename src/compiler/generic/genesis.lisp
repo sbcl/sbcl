@@ -2054,6 +2054,7 @@ core and return a descriptor to it."
 ;;; In case we need to store code fixups in code objects.
 ;;; At present only the x86 backends use this
 (defvar *code-fixup-notes*)
+(defvar *allocation-point-fixup-notes*)
 
 ;;; Given a pointer to a code object and a byte offset relative to the
 ;;; tail of the code object's header, return a byte offset relative to the
@@ -2866,7 +2867,13 @@ core and return a descriptor to it."
               (+ (descriptor-bits (cold-fdefinition-object sym))
                  (ash sb!vm:fdefn-raw-addr-slot sb!vm:word-shift)
                  (- sb!vm:other-pointer-lowtag))))
-           kind flavor)))))
+           kind flavor))
+      (when (and (member sym '(sb!vm::enable-alloc-counter
+                               sb!vm::enable-sized-alloc-counter))
+                 ;; Ignore symbol fixups naming these assembly routines!
+                 (member flavor '(:assembly-routine :assembly-routine*)))
+        (push (cold-cons code-obj (make-fixnum-descriptor offset))
+              *allocation-point-fixup-notes*)))))
 
 ;;;; sanity checking space layouts
 
@@ -3668,6 +3675,7 @@ III. initially undefined function references (alphabetically):
            *cold-assembler-routines*
            *cold-assembler-obj*
            (*code-fixup-notes* (make-hash-table))
+           (*allocation-point-fixup-notes* nil)
            (*deferred-known-fun-refs* nil))
 
       (setf *nil-descriptor* (make-nil-descriptor)
@@ -3755,6 +3763,8 @@ III. initially undefined function references (alphabetically):
       (dolist (pair (sort (%hash-table-alist *code-fixup-notes*) #'< :key #'car))
         (write-wordindexed (make-random-descriptor (car pair))
                            sb!vm::code-fixups-slot (repack-fixups (cdr pair))))
+      (cold-set 'sb!c::*!cold-allocation-point-fixups*
+                (vector-in-core *allocation-point-fixup-notes*))
       (when core-file-name
         (finish-symbols))
       (finalize-load-time-value-noise)

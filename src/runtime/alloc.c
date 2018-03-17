@@ -19,6 +19,13 @@
 #include "pseudo-atomic.h"
 #include "genesis/code.h"
 
+// Work space for the deterministic allocation profiler.
+// Only supported on x86-64, but the variables are always referenced
+// to reduce preprocessor conditionalization.
+os_vm_address_t alloc_profile_buffer; // array of counters
+lispobj alloc_profile_data;           // SIMPLE-VECTOR of <code-component,PC>
+boolean alloc_profiling;              // enabled flag
+
 #ifdef LISP_FEATURE_GENCGC
 #ifdef LISP_FEATURE_SB_THREAD
 /* This lock is used to protect non-thread-local allocation. */
@@ -67,3 +74,77 @@ lispobj alloc_code_object (unsigned boxed, unsigned unboxed)
     return make_lispobj(code, OTHER_POINTER_LOWTAG);
 }
 #endif
+
+#include <stdio.h>
+#include "genesis/vector.h"
+
+pthread_mutex_t alloc_profiler_lock = PTHREAD_MUTEX_INITIALIZER;
+
+// Counters 0 and 1 are reserve for variable-size allocations
+// (hit count and total size) that overflow the maximum counter index.
+// Counter 2 is reserved for fixed-size allocations.
+// Constant-size allocations consume 1 entry (hit count)
+// Variable-size consume 2 (hit count and total size).
+unsigned int alloc_profile_n_counters = 3;
+unsigned int max_alloc_point_counters;
+
+void allocation_profiler_start()
+{
+    int __attribute__((unused)) ret = thread_mutex_lock(&alloc_profiler_lock);
+    gc_assert(ret == 0);
+    if (alloc_profiling) {
+        fprintf(stderr, "allocation profiler already started\n");
+        goto done;
+    }
+    if (!alloc_profile_data
+        || lowtag_of(alloc_profile_data) != OTHER_POINTER_LOWTAG
+        || widetag_of(VECTOR(alloc_profile_data)->header)
+            != SIMPLE_VECTOR_WIDETAG) {
+        fprintf(stderr, "profile metadata not created\n");
+        goto done;
+    }
+    max_alloc_point_counters =
+        fixnum_value(VECTOR(alloc_profile_data)->length)/2;
+    size_t size = N_WORD_BYTES * max_alloc_point_counters;
+    // FIXME: discard old buffer when no thread points to it
+    alloc_profile_buffer = os_allocate(size);
+    printf("using %d cells (%ld bytes) for profile buffer @ %p\n",
+           max_alloc_point_counters, size, alloc_profile_buffer);
+    int n = 0;
+    struct thread* th;
+    for_each_thread(th) {
+      th->profile_data = (uword_t*)alloc_profile_buffer;
+        ++n;
+    }
+    printf("allocation profiler: %d threads\n", n);
+    alloc_profiling = 1;
+ done:
+    ret = thread_mutex_unlock(&alloc_profiler_lock);
+    gc_assert(ret == 0);
+}
+
+// This is not exactly threadsafe. Don't try anything fancy.
+void allocation_profiler_stop()
+{
+    int __attribute__((unused)) ret = thread_mutex_lock(&alloc_profiler_lock);
+    gc_assert(ret == 0);
+    if (!alloc_profiling) {
+        fprintf(stderr, "allocation profiler not started\n");
+        goto done;
+    }
+    struct thread* th;
+    for_each_thread(th) {
+      th->profile_data = 0;
+    }
+    alloc_profiling = 0;
+ done:
+    ret = thread_mutex_unlock(&alloc_profiler_lock);
+    gc_assert(ret == 0);
+#if 0
+    if (warning_issued) {
+       fprintf(stderr, "allocation profile needed %d counters\n",
+               alloc_profile_n_counters);
+       warning_issued = 0;
+    }
+#endif
+}

@@ -62,7 +62,6 @@
 
 (defstruct (machine-ea (:include sb!disassem::filtered-arg)
                        (:copier nil)
-                       (:predicate nil)
                        (:constructor %make-machine-ea))
   base disp index scale)
 
@@ -662,3 +661,18 @@
          seg dstate)))
     (setf (sb!vm::fdefn-has-static-callers fdefn) 0))) ; Clear static link flag
 ) ; end PROGN
+
+
+(defun sb!c::convert-alloc-point-fixups (code locs)
+  ;; Find the instruction which jumps over the profiling code,
+  ;; and record the offset, and not the instruction that makes the call
+  ;; to enable the counter. The instructions preceding the call comprise
+  ;; a test, jmp, and long nop. Luckily a long nop encoding never
+  ;; has the byte #xEB in it, so just scan backwards looking for that.
+  (pack-code-fixup-locs
+   (mapcar (lambda (loc)
+             (loop (cond ((zerop (decf loc))
+                          (bug "Failed to find allocation point"))
+                         ((eql (sap-ref-8 (code-instructions code) loc) #xEB)
+                          (return loc)))))
+           locs)))

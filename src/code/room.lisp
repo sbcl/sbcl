@@ -1128,3 +1128,15 @@ We could try a few things to mitigate this:
            (when (simple-fun-p object)
              (setq addr (get-lisp-obj-address (fun-code-header object))))
            (logand #xF (sap-ref-8 (int-sap (logandc2 addr lowtag-mask)) 3))))))
+
+(in-package "SB-C")
+;;; As soon as practical in warm build it makes sense to add
+;;; cold-allocation-point-fixups into the weak hash-table.
+(defvar *!cold-allocation-point-fixups*)
+(let ((hash-table (make-hash-table :test 'eq)))
+  ;; Group by code component
+  (loop for (code . offset) across *!cold-allocation-point-fixups*
+        do (push offset (gethash code hash-table)))
+  (dohash ((code list) hash-table)
+    (setf (gethash code *allocation-point-fixups*)
+          (convert-alloc-point-fixups code list))))

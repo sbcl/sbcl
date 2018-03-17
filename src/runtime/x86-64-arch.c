@@ -573,3 +573,152 @@ lispobj fdefn_callee_lispobj(struct fdefn* fdefn) {
     lose("Can't decode fdefn raw addr @ %p: %p\n", fdefn, fdefn->raw_addr);
 }
 #endif
+
+#include "genesis/vector.h"
+#define LOCK_PREFIX 0xF0
+#undef SHOW_PC_RECORDING
+
+extern unsigned int alloc_profile_n_counters;
+extern unsigned int max_alloc_point_counters;
+extern pthread_mutex_t alloc_profiler_lock;
+
+static unsigned int claim_index(int qty)
+{
+    static boolean warning_issued;
+    unsigned int index = alloc_profile_n_counters;
+    alloc_profile_n_counters += qty;
+    if (alloc_profile_n_counters <= max_alloc_point_counters)
+       return index;
+    if (!warning_issued) {
+       fprintf(stderr, "allocation profile buffer overflowed\n");
+       warning_issued = 1;
+    }
+    return 0; // use the overflow bin(s)
+}
+
+static boolean instrumentp(uword_t* sp, uword_t** pc, uword_t* old_word)
+{
+    int __attribute__((unused)) ret = thread_mutex_lock(&alloc_profiler_lock);
+    gc_assert(ret == 0);
+    uword_t next_pc = *sp;
+    // The instrumentation site was 8-byte aligned
+    uword_t return_pc = ALIGN_DOWN(next_pc, 8);
+#if 0
+    if (!(return_pc >= instrument_from && return_pc < instrument_to))
+        return 0;
+#endif
+    uword_t word = *(uword_t*)return_pc;
+    unsigned char opcode = word & 0xFF;
+    // Adjust the return PC to where the call instruction was,
+    // not the instruction after it.
+    *sp = return_pc;
+    // If > 1 thread called this routine at the same time,
+    // one of them would already have patched the call site.
+    if (opcode == LOCK_PREFIX)
+        return 0;
+    *pc = (uword_t*)return_pc;
+    *old_word = word;
+    return 1;
+}
+
+// logical index 'index' in the metadata array stores the code component
+// and pc-offset relative to the component base address
+static void record_pc(uword_t* pc, unsigned int index, boolean sizedp)
+{
+    lispobj *code = component_ptr_from_pc(pc);
+    if (!code) {
+        fprintf(stderr, "can't identify code @ %p\n", pc);
+    } else {
+#ifdef SHOW_PC_RECORDING
+        fprintf(stderr, "%#lx (%#lx) -> %d%s\n",
+                (uword_t)pc, make_lispobj(code, OTHER_POINTER_LOWTAG),
+                index, sizedp?" (sized)":"");
+#endif
+    }
+#if 0
+    if (!code) {
+        int ret = thread_mutex_lock(&free_pages_lock);
+        gc_assert(ret == 0);
+        ensure_region_closed(code_region);
+        int ret = thread_mutex_unlock(&free_pages_lock);
+        gc_assert(ret == 0);
+        code = component_ptr_from_pc((lispobj*)pc);
+    }
+#endif
+    struct vector* v = VECTOR(alloc_profile_data);
+    index <<= 1;
+    if (sizedp) {
+       v->data[index] = v->data[index+1] = NIL;
+       index += 2;
+    }
+    if (code) {
+        v->data[index] = make_lispobj(code, OTHER_POINTER_LOWTAG);
+        v->data[index+1] = make_fixnum((lispobj)pc - (lispobj)code);
+    } else {
+        gc_assert(!((uword_t)pc & LOWTAG_MASK));
+        v->data[index] = make_fixnum(-1); // no code component found
+        v->data[index+1] = (lispobj)pc;
+    }
+}
+
+void AMD64_SYSV_ABI
+allocation_tracker_counted(uword_t* sp)
+{
+    uword_t *pc, word_at_pc;
+    if (instrumentp(sp, &pc, &word_at_pc)) {
+        unsigned int index = claim_index(1);
+        if (index == 0)
+            index = 2; // reserved overflow counter for fixed-size alloc
+        // rewrite call into: LOCK INC QWORD PTR, [R11+n] ; opcode = 0xFF / 0
+        uword_t new_inst =
+          0xF0 | (0x49 << 8) | (0xFF << 16) | (0x83L << 24) | ((index*8L) << 32);
+        // Ensure atomicity of the write. A plain store would probably do,
+        // but since this is self-modifying code, the most stringent memory
+        // order is prudent.
+        if (!__sync_bool_compare_and_swap(pc, word_at_pc, new_inst))
+            lose("alloc profiler failed to rewrite instruction @ %lx", pc);
+        if (index != 2)
+            record_pc(pc, index, 0);
+    }
+    int __attribute__((unused)) ret = thread_mutex_unlock(&alloc_profiler_lock);
+    gc_assert(ret == 0);
+}
+
+void AMD64_SYSV_ABI
+allocation_tracker_sized(uword_t* sp)
+{
+    uword_t *pc, word_at_pc;
+    if (instrumentp(sp, &pc, &word_at_pc)) {
+        int index = claim_index(2);
+        uword_t word_after_pc = pc[1];
+        unsigned char prefix = word_after_pc & 0xFF;
+        unsigned char opcode = (word_after_pc >>  8) & 0xFF;
+        unsigned char modrm  = (word_after_pc >> 16) & 0xFF;
+        if ((prefix == 0x48 || prefix == 0x4D) && /* REX w=1 or w=r=b=1 */
+            (opcode == 0x85) && /* TEST */
+            (modrm & 0xC0) == 0xC0 && /* register-direct mode */
+            ((modrm >> 3) & 0x7) == (modrm & 0x7)) { /* same register */
+        } else {
+            lose("Can't decode instruction @ pc %p\n", pc);
+        }
+        // rewrite call into:
+        //  LOCK INC QWORD PTR, [R11+n] ; opcode = 0xFF / 0
+        uword_t new_inst1 =
+          0xF0 | (0x49 << 8) | (0xFF << 16) | (0x83L << 24) | ((index * 8L) << 32);
+        //  LOCK ADD [R11+n], Rxx ; opcode = 0x01
+        prefix = 0x49 | ((prefix & 1) << 2); // 'b' bit becomes 'r' bit
+        modrm  = 0x83 | (modrm & (7<<3)); // copy 'reg' into new modrm byte
+        uword_t new_inst2 =
+          0xF0 | (prefix << 8) | (0x01 << 16) | ((long)modrm << 24)
+            | (((1 + index) * 8L) << 32);
+        // Overwrite the second instruction first, because as soon as the CALL
+        // opcode is changed, fallthrough to the next instruction occurs.
+        if (!__sync_bool_compare_and_swap(pc+1, word_after_pc, new_inst2) ||
+            !__sync_bool_compare_and_swap(pc,   word_at_pc,    new_inst1))
+            lose("alloc profiler failed to rewrite instructions @ %lx", pc);
+        if (index != 0) // can't record a PC for the overflow counts
+            record_pc(pc, index, 1);
+    }
+    int __attribute__((unused)) ret = thread_mutex_unlock(&alloc_profiler_lock);
+    gc_assert(ret == 0);
+}

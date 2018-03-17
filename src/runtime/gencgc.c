@@ -3155,6 +3155,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
      * symbol. It is passed to gc_and_save() in this C variable */
     if (lisp_init_function) scavenge(&lisp_init_function, 1);
     if (gc_object_watcher)  scavenge(&gc_object_watcher, 1);
+    if (alloc_profile_data) scavenge(&alloc_profile_data, 1);
 
     /* Finally scavenge the new_space generation. Keep going until no
      * more objects are moved into the new generation */

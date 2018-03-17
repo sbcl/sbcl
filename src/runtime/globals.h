@@ -49,6 +49,10 @@ extern unsigned int immobile_range_1_max_offset, immobile_range_2_min_offset;
 extern unsigned int varyobj_space_size;
 #endif
 
+extern boolean alloc_profiling;
+extern os_vm_address_t alloc_profile_buffer;
+extern lispobj alloc_profile_data; // Lisp SIMPLE-VECTOR
+
 #ifdef LISP_FEATURE_WIN32
 #define ENVIRON _environ
 #else

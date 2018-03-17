@@ -144,6 +144,10 @@ debugger.")
     0
   ("no" "no" "yes" "yes"))
 
+(define-optimization-quality instrument-consing
+    1
+  ("no" "no" "no" "yes"))
+
 #!+sb-safepoint
 (define-optimization-quality inhibit-safepoints
     0

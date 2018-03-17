@@ -805,6 +805,7 @@
   "src/code/describe-policy"
   "src/code/inspect"
   "src/code/profile"
+  #+x86-64 "src/code/aprof" ; precise allocation profiler
   "src/code/ntrace"
   "src/code/step"
   "src/code/warm-lib"

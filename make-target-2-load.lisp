@@ -234,6 +234,8 @@
            ;; overapproximate what we need for contribs and tests
            (member symbol '(sb-vm::map-referencing-objects
                             sb-vm::map-stack-references
+                            sb-vm::thread-profile-data-slot
+                            sb-vm::thread-alloc-region-slot
                             ;; Naughty outside-world code uses this.
                             sb-vm::thread-control-stack-start-slot
                             sb-vm::primitive-object-size))

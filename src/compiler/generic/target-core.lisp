@@ -82,6 +82,15 @@
               #!-(or x86 x86-64)
               (setf (%simple-fun-self fun) fun))))))
 
+;;; Map of code-component -> list of PC offsets at which allocations occur.
+;;; This table is needed in order to enable allocation profiling.
+(define-load-time-global *allocation-point-fixups*
+  (make-hash-table :test 'eq :weakness :key :synchronized t))
+
+#!-x86-64
+(defun convert-alloc-point-fixups (dummy1 dummy2)
+  (declare (ignore dummy1 dummy2)))
+
 (flet ((fixup (code-obj offset sym kind flavor layout-finder preserved-lists)
          ;; PRESERVED-LISTS is a vector of lists of locations (by kind)
          ;; at which fixup must be re-applied after code movement.
@@ -104,6 +113,10 @@
                    #!+immobile-code (:named-call (sb!vm::fdefn-entry-address sym))
                    #!+immobile-code (:static-call (sb!vm::function-raw-address sym)))
                  kind flavor)))
+           ;; These won't exist except for x86-64, but it doesn't matter.
+           (when (member sym '(sb!vm::enable-alloc-counter
+                               sb!vm::enable-sized-alloc-counter))
+             (push offset (elt preserved-lists 2)))
            (cond ((eq savep :relative) (push offset (elt preserved-lists 0)))
                  (savep (push offset (elt preserved-lists 1))))))
 
@@ -121,11 +134,14 @@
                    (rel (sb!c::pack-code-fixup-locs rel-fixups)))
                (setf (sb!vm::%code-fixups code-obj)
                      (if rel-fixups (cons abs rel) abs)))))
+         (awhen (elt preserved-lists 2)
+           (setf (gethash code-obj *allocation-point-fixups*)
+                 (convert-alloc-point-fixups code-obj it)))
          #!-(or x86 x86-64)
          (sb!vm:sanctify-for-execution code-obj)))
 
   (defun apply-fasl-fixups (fop-stack code-obj &aux (top (svref fop-stack 0)))
-    (dx-let ((preserved (vector nil nil)))
+    (dx-let ((preserved (make-array 3 :initial-element nil)))
       (macrolet ((pop-fop-stack () `(prog1 (svref fop-stack top) (decf top))))
         (dotimes (i (pop-fop-stack) (setf (svref fop-stack 0) top))
           (multiple-value-bind (offset kind flavor)
@@ -136,7 +152,7 @@
 
   (defun apply-core-fixups (fixup-notes code-obj)
     (declare (list fixup-notes))
-    (dx-let ((preserved (vector nil nil)))
+    (dx-let ((preserved (make-array 3 :initial-element nil)))
       (dolist (note fixup-notes)
         (let ((fixup (fixup-note-fixup note))
               (offset (fixup-note-position note)))
