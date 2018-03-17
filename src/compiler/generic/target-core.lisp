@@ -141,7 +141,7 @@
          (sb!vm:sanctify-for-execution code-obj)))
 
   (defun apply-fasl-fixups (fop-stack code-obj &aux (top (svref fop-stack 0)))
-    (dx-let ((preserved (make-array 3 :initial-element nil)))
+    (dx-let ((preserved (vector nil nil nil)))
       (macrolet ((pop-fop-stack () `(prog1 (svref fop-stack top) (decf top))))
         (dotimes (i (pop-fop-stack) (setf (svref fop-stack 0) top))
           (multiple-value-bind (offset kind flavor)
@@ -152,7 +152,7 @@
 
   (defun apply-core-fixups (fixup-notes code-obj)
     (declare (list fixup-notes))
-    (dx-let ((preserved (make-array 3 :initial-element nil)))
+    (dx-let ((preserved (vector nil nil nil)))
       (dolist (note fixup-notes)
         (let ((fixup (fixup-note-fixup note))
               (offset (fixup-note-position note)))
