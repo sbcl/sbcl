@@ -55,13 +55,8 @@ arguments to fit Lisp style more closely."))
 ;;; gethostbyname/gethostbyaddr are generally not thread safe. POSIX
 ;;; 1003.1-2003 defines an alternative API, which is specified in the
 ;;; RFC to be thread-safe. If it seems to be available, use it.
-;;;
-;;; Unfortunately the manual page claims that these functions are not
-;;; thread-safe on OS X, but they probably can't be any worse than
-;;; gethostbyname and gethostbyaddr.
-;;;
-;;; CLH: getaddrinfo seems to be broken on x86-64/darwin
-#-(or win32 (and x86-64 darwin))
+
+#-win32
 (let ((addr (sb-alien::find-dynamic-foreign-symbol-address "getaddrinfo")))
   (when addr
     (pushnew :sb-bsd-sockets-addrinfo *features*)))

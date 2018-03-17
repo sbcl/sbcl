@@ -290,7 +290,9 @@ GET-NAME-SERVICE-ERRNO")
              (sb-alien:extern-alien "WSAGetLastError" (function integer))))))
 
 (defun get-name-service-error-message (errno error-code)
+  (declare (ignorable errno error-code))
   #-win32
   (if errno
       (sockint::h-strerror errno)
+      #+sb-bsd-sockets-addrinfo
       (sockint::gai-strerror error-code)))
