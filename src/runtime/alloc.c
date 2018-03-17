@@ -30,6 +30,7 @@ boolean alloc_profiling;              // enabled flag
 #ifdef LISP_FEATURE_SB_THREAD
 /* This lock is used to protect non-thread-local allocation. */
 static pthread_mutex_t allocation_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t alloc_profiler_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
 lispobj alloc_code_object (unsigned boxed, unsigned unboxed)
 {
@@ -78,9 +79,6 @@ lispobj alloc_code_object (unsigned boxed, unsigned unboxed)
 #include <stdio.h>
 #include "genesis/vector.h"
 
-#ifdef LISP_FEATURE_SB_THREAD
-pthread_mutex_t alloc_profiler_lock = PTHREAD_MUTEX_INITIALIZER;
-#endif
 // Counters 0 and 1 are reserve for variable-size allocations
 // (hit count and total size) that overflow the maximum counter index.
 // Counter 2 is reserved for fixed-size allocations.
@@ -91,10 +89,8 @@ unsigned int max_alloc_point_counters;
 
 void allocation_profiler_start()
 {
-#ifdef LISP_FEATURE_SB_THREAD
     int __attribute__((unused)) ret = thread_mutex_lock(&alloc_profiler_lock);
     gc_assert(ret == 0);
-#endif
     if (alloc_profiling) {
         fprintf(stderr, "allocation profiler already started\n");
         goto done;
@@ -123,19 +119,15 @@ void allocation_profiler_start()
     alloc_profiling = 1;
   done:
     ;
-#ifdef LISP_FEATURE_SB_THREAD
     ret = thread_mutex_unlock(&alloc_profiler_lock);
     gc_assert(ret == 0);
-#endif
 }
 
 // This is not exactly threadsafe. Don't try anything fancy.
 void allocation_profiler_stop()
 {
-#ifdef LISP_FEATURE_SB_THREAD
     int __attribute__((unused)) ret = thread_mutex_lock(&alloc_profiler_lock);
     gc_assert(ret == 0);
-#endif
     if (!alloc_profiling) {
         fprintf(stderr, "allocation profiler not started\n");
         goto done;
@@ -147,10 +139,8 @@ void allocation_profiler_stop()
     alloc_profiling = 0;
   done:
     ;
-#ifdef LISP_FEATURE_SB_THREAD
     ret = thread_mutex_unlock(&alloc_profiler_lock);
     gc_assert(ret == 0);
-#endif
 #if 0
     if (warning_issued) {
         fprintf(stderr, "allocation profile needed %d counters\n",
