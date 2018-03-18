@@ -1025,13 +1025,7 @@
                 (handle-loadtime-error c dest)))))))
    :allow-notes nil))
 
-(declaim (inline foovector barvector))
-(defun foovector (x y z)
-  (let ((v (make-array 3)))
-    (setf (aref v 0) x
-          (aref v 1) y
-          (aref v 2) z)
-    v))
+(declaim (inline barvector))
 (defun barvector (x y z)
   (make-array 3 :initial-contents (list x y z)))
 (with-test (:name :dx-compiler-notes
@@ -1052,11 +1046,6 @@
                                     (true x)
                                     (true (- x)))))
                          (declare (dynamic-extent y))
-                         (print y)
-                         nil)))
-    (assert-notes 1 `(lambda (x)
-                       (let ((y (foovector x x x)))
-                         (declare (sb-int:truly-dynamic-extent y))
                          (print y)
                          nil)))
     ;; These ones should not complain.
@@ -1356,7 +1345,6 @@
     (assert (sb-sys:sap= start end))
     (assert result)))
 
-
 (with-test (:name :unused-paremeters-of-an-inlined-function)
   (let ((name (gensym "fun")))
     (proclaim `(inline ,name))
@@ -1375,3 +1363,15 @@
                            (equal (multiple-value-list
                                    (funcall (first values) 2 3))
                                   expected))))))
+
+(with-test (:name :nested-multiple-use-vars)
+  (let ((fun (checked-compile
+              `(lambda ()
+                 (sb-int:dx-let ((x (let ((x (make-array 3)))
+                                      (setf (aref x 0) 22)
+                                      x)))
+                   (opaque-identity x)
+                   10)))))
+    (assert-no-consing (funcall fun))))
+
+

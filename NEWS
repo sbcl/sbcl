@@ -7,6 +7,7 @@ changes relative to sbcl-1.4.5:
     for accessing collected profiler data.
   * enhancement: The instruction-level profiling of the sb-prof contrib
     annotates the disassembler output more efficiently.
+  * optimization: improved dynamic-extent handling of nested variables. 
 
 changes in sbcl-1.4.5 relative to sbcl-1.4.4:
   * minor incompatible change: building with/without the :sb-package-locks

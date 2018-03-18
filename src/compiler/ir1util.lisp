@@ -294,18 +294,48 @@
            (%delete-lvar-use node)
            (add-lvar-use node new))
          (reoptimize-lvar new)
-         (awhen (and propagate-dx (lvar-dynamic-extent old))
-           (setf (lvar-dynamic-extent old) nil)
-           (unless (lvar-dynamic-extent new)
-             (setf (lvar-dynamic-extent new) it)
-             (setf (cleanup-info it) (subst new old (cleanup-info it)))))
-         (when (lvar-dynamic-extent new)
-           (do-uses (node new)
-             (unless (node-to-be-deleted-p node)
-               (node-ends-block node)))))
+         (propagate-lvar-dx new old propagate-dx))
         (t (flush-dest old)))
 
   (values))
+
+(defun propagate-lvar-dx (new old propagate-dx)
+  (awhen (and propagate-dx (lvar-dynamic-extent old))
+    (setf (lvar-dynamic-extent old) nil)
+    (unless (lvar-dynamic-extent new)
+      (setf (lvar-dynamic-extent new) it)
+      (setf (cleanup-info it) (subst new old (cleanup-info it)))))
+  (when (lvar-dynamic-extent new)
+    (do-uses (node new)
+      (unless (node-to-be-deleted-p node)
+        (node-ends-block node)))))
+
+(defun lexenv-contains-lambda (lambda parent-lexenv)
+  (loop for lexenv = (lambda-call-lexenv lambda)
+        then (let ((lambda (lexenv-lambda lexenv)))
+               (and (lambda-call-lexenv lambda)))
+        while lexenv
+        thereis
+        (loop for parent = lexenv then (lexenv-parent parent)
+              while parent
+              thereis (and (eq parent parent-lexenv)))))
+
+;;; Handle
+;;; (dx-let ((x (let ((m (make-array)))
+;;;               (fill m)
+;;;               m))))
+(defun propagate-ref-dx (new-ref old-lvar old-lambda-var)
+  (let ((dx (lvar-dynamic-extent old-lvar))
+        (new-lambda-var (ref-leaf new-ref)))
+    (when (and dx
+               (lambda-var-p new-lambda-var)
+               ;; Make sure the let inside the dx let
+               (lexenv-contains-lambda (lambda-var-home new-lambda-var)
+                                       (lambda-lexenv (lambda-var-home old-lambda-var))))
+      (let ((new-lvar (lambda-var-ref-lvar new-ref)))
+        (when new-lvar
+          (propagate-lvar-dx new-lvar old-lvar t)
+          t)))))
 
 ;;;; block starting/creation
 
