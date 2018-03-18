@@ -91,7 +91,7 @@ void arch_init(void)
   }
 }
 
-#define FILL_VECTOR_T "FILL-VECTOR/T"
+#define VECTOR_FILL_T "VECTOR-FILL/T"
 
 // Poke in a byte that changes an opcode to enable faster vector fill.
 // Using fixed offsets and bytes is no worse than what we do elsewhere.
@@ -104,7 +104,7 @@ void tune_asm_routines_for_microarch(void)
     if (eax >= 7) {
         cpuid(7, 0, &eax, &ebx, &ecx, &edx);
         if (ebx & (1<<9)) // Enhanced Repeat Movs/Stos
-          asm_routine_poke(FILL_VECTOR_T, 0x12, 0x7C); // Change JMP to JL
+          asm_routine_poke(VECTOR_FILL_T, 0x12, 0x7C); // Change JMP to JL
     }
 #endif
 }
@@ -115,7 +115,7 @@ void tune_asm_routines_for_microarch(void)
    instructions that don't exist on some cpu family members */
 void untune_asm_routines_for_microarch(void)
 {
-    asm_routine_poke(FILL_VECTOR_T, 0x12, 0xEB); // Change JL to JMP
+    asm_routine_poke(VECTOR_FILL_T, 0x12, 0xEB); // Change JL to JMP
 }
 
 #ifndef _WIN64

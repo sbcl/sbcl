@@ -2032,7 +2032,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "VECTOR-COMPLEX-DOUBLE-FLOAT-P" "VECTOR-T-P"
 
                "VECTOR-NIL-P"
-               "VECTOR-FILL*"
+               "VECTOR-FILL*" "VECTOR-FILL/T"
                "VECTOR-SUBSEQ*"
                "VECTOR-TO-VECTOR*"
                "VECTOR-OF-CHECKED-LENGTH-GIVEN-LENGTH" "WITH-ARRAY-DATA"

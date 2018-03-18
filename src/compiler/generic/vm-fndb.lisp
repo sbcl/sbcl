@@ -111,7 +111,7 @@
   (always-translatable flushable)
   :result-arg 0)
 
-(defknown vector-fill* (t t t t) vector
+(defknown (vector-fill* vector-fill/t) (t t t t) vector
   ()
   :result-arg 0)
 

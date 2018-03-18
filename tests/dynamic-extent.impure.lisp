@@ -1374,4 +1374,11 @@
                    10)))))
     (assert-no-consing (funcall fun))))
 
-
+(with-test (:name :nested-multiple-use-vars-vector-fill)
+  (let ((fun (checked-compile
+              `(lambda ()
+                 (declare (optimize speed))
+                 (sb-int:dx-let ((x (make-array 3 :initial-element 123)))
+                   (opaque-identity x)
+                   10)))))
+    (assert-no-consing (funcall fun))))

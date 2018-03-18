@@ -762,8 +762,7 @@
                                   (insert-array-bounds-checks 0)))
                ,(cond #!+x86-64
                       ((type= element-ctype *universal-type*)
-                       '(%primitive sb!vm::fill-vector/t
-                         data item start end))
+                       '(vector-fill/t data item start end))
                       (t
                        `(do ((i start (1+ i)))
                             ((= i end))
