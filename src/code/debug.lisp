@@ -461,10 +461,9 @@ information."
 (defun stack-allocated-p (obj)
   "Returns T if OBJ is allocated on the stack of the current
 thread, NIL otherwise."
-  (with-pinned-objects (obj)
-    (let ((sap (int-sap (get-lisp-obj-address obj))))
-      (when (sb!vm:control-stack-pointer-valid-p sap nil)
-        t))))
+  (let ((sap (int-sap (get-lisp-obj-address obj))))
+    (when (sb!vm:control-stack-pointer-valid-p sap nil)
+      t)))
 
 ;;;; frame printing
 
