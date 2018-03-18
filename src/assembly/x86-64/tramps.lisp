@@ -76,7 +76,11 @@
     ())) ; result
 
 (define-assembly-routine
-    (undefined-tramp (:return-style :none))
+    (#!+immobile-code undefined-tramp-fdefn
+     #!-immobile-code undefined-tramp
+     (:return-style :none)
+     #!+immobile-code
+     (:export undefined-tramp))
     ((:temp rax descriptor-reg rax-offset))
   #!+immobile-code
   (progn
@@ -85,6 +89,8 @@
           ;; Subtract the length of the JMP instruction plus offset to the
           ;; raw-addr-slot, and add back the lowtag. Voila, a tagged descriptor.
           (+ 5 (ash fdefn-raw-addr-slot word-shift) (- other-pointer-lowtag))))
+  #!+immobile-code
+  UNDEFINED-TRAMP
   (inst pop (make-ea :qword :base rbp-tn :disp n-word-bytes))
   (emit-error-break nil cerror-trap (error-number-or-lose 'undefined-fun-error) (list rax))
   (inst push (make-ea :qword :base rbp-tn :disp n-word-bytes))

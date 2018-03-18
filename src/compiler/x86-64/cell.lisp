@@ -397,7 +397,7 @@
   #!+immobile-code (:temporary (:sc unsigned-reg) temp)
   (:generator 38
     #!+immobile-code
-    (let ((tramp (make-fixup 'undefined-tramp :assembly-routine)))
+    (let ((tramp (make-fixup 'undefined-tramp-fdefn :assembly-routine)))
      (if (sb!c::code-immobile-p vop)
          (inst lea temp (make-ea :qword :base rip-tn :disp tramp))
          (inst mov temp tramp))

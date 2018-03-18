@@ -298,13 +298,7 @@
     #!-immobile-code
     (inst jmp fdefn-raw-addr))
   UNDEFINED
-  (inst pop (make-ea :qword :base rbp-tn :disp n-word-bytes))
-  (emit-error-break nil cerror-trap (error-number-or-lose 'undefined-fun-error) (list fun))
-  (inst push (make-ea :qword :base rbp-tn :disp n-word-bytes))
-
-  (inst jmp (make-ea :qword :base fun
-                            :disp (- (* closure-fun-slot n-word-bytes)
-                                     fun-pointer-lowtag)))
+  (inst jmp (make-fixup 'undefined-tramp :assembly-routine))
   NOT-CALLABLE
   (inst cmp fun nil-value) ;; NIL doesn't have SYMBOL-WIDETAG
   (inst jmp :e undefined)
