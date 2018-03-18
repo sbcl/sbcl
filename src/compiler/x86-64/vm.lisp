@@ -370,6 +370,12 @@
   (def-gpr-tns dword-reg +dword-register-names+)
   (def-gpr-tns word-reg +word-register-names+)
   (def-gpr-tns byte-reg +byte-register-names+)
+  ;; RIP is not an addressable register, but this global var acts as
+  ;; a moniker for it in an effective address so that the EA structure
+  ;; does not need to accept a symbol (such as :RIP) for the base reg.
+  ;; Because there is no :OFFSET, unanticipated use will be caught.
+  (define-load-time-global rip-tn
+      (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg)))
   (def-fpr-tns single-reg
       float0 float1 float2 float3 float4 float5 float6 float7
       float8 float9 float10 float11 float12 float13 float14 float15))

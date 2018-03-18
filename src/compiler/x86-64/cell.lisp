@@ -393,12 +393,13 @@
   (:translate fdefn-makunbound)
   (:args (fdefn :scs (descriptor-reg) :target result))
   (:results (result :scs (descriptor-reg)))
+  (:vop-var vop)
   #!+immobile-code (:temporary (:sc unsigned-reg) temp)
   (:generator 38
     #!+immobile-code
     (let ((tramp (make-fixup 'undefined-tramp :assembly-routine)))
-     (if sb!c::*code-is-immobile*
-         (inst lea temp tramp)
+     (if (sb!c::code-immobile-p vop)
+         (inst lea temp (make-ea :qword :base rip-tn :disp tramp))
          (inst mov temp tramp))
      ;; Compute displacement from the call site
      (inst sub (reg-in-size temp :dword) (reg-in-size fdefn :dword))

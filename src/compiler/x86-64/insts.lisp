@@ -19,7 +19,7 @@
             ea-p sized-ea ea-base ea-index
             make-ea ea-disp) "SB!VM")
   ;; Imports from SB-VM into this package
-  (import '(sb!vm::frame-byte-offset
+  (import '(sb!vm::frame-byte-offset sb!vm::rip-tn
             sb!vm::registers sb!vm::float-registers sb!vm::stack))) ; SB names
 
 (defconstant +disassem-inst-alignment-bytes+ 1)
@@ -1295,7 +1295,9 @@
                            (or operand-size (operand-size thing))
                            reg
                            (and ea-p (ea-index thing))
-                           (cond (ea-p (ea-base thing))
+                           (cond (ea-p
+                                  (let ((base (ea-base thing)))
+                                    (unless (eq base rip-tn) base)))
                                  ((and (tn-p thing)
                                        (member (sb-name (sc-sb (tn-sc thing)))
                                                '(float-registers registers)))
@@ -1703,12 +1705,9 @@
    (maybe-emit-rex-for-ea segment src dst
                           :operand-size (if (dword-reg-p dst) :dword :qword))
    (emit-byte segment #b10001101)
-   (cond ((and (fixup-p src)
-               (eq (fixup-flavor src) :assembly-routine)
-               #!+immobile-code
-               sb!c::*code-is-immobile*)
+   (cond ((and (ea-p src) (eq (ea-base src) rip-tn) (fixup-p (ea-disp src)))
           (emit-mod-reg-r/m-byte segment #b00 (reg-tn-encoding dst) #b101)
-          (emit-relative-fixup segment src))
+          (emit-relative-fixup segment (ea-disp src)))
          (t
           (emit-ea segment src (reg-tn-encoding dst))))))
 

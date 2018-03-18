@@ -526,7 +526,7 @@
   (:generator 1
     (let ((tramp (make-fixup 'funcallable-instance-tramp :assembly-routine)))
       (if (sb!c::code-immobile-p vop)
-          (inst lea result tramp)
+          (inst lea result (make-ea :qword :base rip-tn :disp tramp))
           (inst mov result tramp)))))
 
 (define-vop (fixed-alloc)
