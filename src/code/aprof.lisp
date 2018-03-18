@@ -67,8 +67,9 @@
         #:sb-kernel)
   (:export #:aprof-run #:aprof-show)
   (:import-from #:sb-di #:valid-lisp-pointer-p)
+  (:import-from #:sb-disassem #:dstate-inst-properties)
   (:import-from #:sb-x86-64-asm
-                #:lock #:x66 #:rex
+                #:lock #:x66 #:rex #:+rex-r+
                 #:inst-operand-size
                 #:machine-ea-p
                 #:machine-ea-base
@@ -78,7 +79,8 @@
                 #:regrm-inst-r/m
                 #:reg-imm-data
                 #:reg/mem-imm-data
-                #:add #:inc #:mov #:lea #:cmp #:jmp))
+                #:add #:inc #:mov #:lea #:cmp #:jmp
+                #:|push| #:|pop| #:|or| #:|call|))
 
 (in-package #:sb-aprof)
 
@@ -138,6 +140,9 @@
 ;(defconstant +state-moved-result+    8)
 (defconstant +state-descriptorized+  9)
 (defconstant +state-widetagged+     10)
+(defconstant +state-trampoline-arg+ 11)
+(defconstant +state-called+         12)
+(defconstant +state-result-popped+  13)
 
 (defglobal *tag-to-type*
   (map 'vector
@@ -179,7 +184,8 @@
           (let ((sap (int-sap pc))) (lambda () sap)))
     (macrolet ((fail ()
                 `(progn
-                   (break "fail ~x ~s" pc component)
+                   (break "fail ~x: ~x '~s' ~s"
+                          pc (logand dchunk #xFF) opcode component)
                    (return-from fail)))
                (advance (newstate)
 ;                 `(format t "~&advance to ~d~%" (setq allocator-state ,newstate))
@@ -191,6 +197,7 @@
        (sb-disassem::map-segment-instructions
         (lambda (dchunk inst)
           (let* ((opcode (sb-disassem::inst-name inst))
+                 (opcode-byte (logand dchunk #xFF))
                  (ea (case opcode
                       ;; 64-bit mode 'inc' has reg/mem format,
                       ;; never the single-byte format
@@ -225,6 +232,10 @@
                        (null (machine-ea-index ea))
                        (eq (machine-ea-disp ea)
                            (+ profiler-index sb-vm:n-word-bytes))))
+                 ((eq opcode '|push|)
+                  ;; Known huge allocation goes straight to C call
+                  (setq size (ldb (byte 32 8) dchunk))
+                  (advance +state-trampoline-arg+))
                  (t
                   (advance-if (and (eq opcode 'mov) free-ptr-p)
                               +state-loaded-free-ptr+)
@@ -332,6 +343,27 @@
                   (return-from infer-type
                    (values (layout-name (reg/mem-imm-data 0 dstate))
                            size))))
+               (#.+state-trampoline-arg+
+                (advance-if (eq opcode '|call|) +state-called+))
+               (#.+state-called+
+                (cond ((and (eq opcode '|pop|) (<= #x58 opcode-byte #x5F))
+                       (setq target-reg
+                             (+ (if (logtest +rex-r+ (dstate-inst-properties dstate))
+                                    8 0)
+                                (- opcode-byte #x58)))
+                       (advance +state-result-popped+))
+                      (t
+                       (fail))))
+               (#.+state-result-popped+
+                (cond ((eq opcode '|or|)
+                       (if (eql opcode-byte #x0C)
+                           ;; OR AL, $byte (2 byte encoding)
+                           (setq target-lowtag (ldb (byte 8 8) dchunk))
+                           ;; OR other-reg, $byte ; (3 byte encoding)
+                           (setq target-lowtag (ldb (byte 8 16) dchunk)))
+                       (advance +state-descriptorized+))
+                      (t
+                       (fail))))
                ))))
        seg dstate))))
   (values nil nil))
