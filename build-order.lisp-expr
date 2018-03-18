@@ -500,12 +500,6 @@
 
  ("src/assembly/assemfile" :not-target)
 
- ;; Compiling this file requires the macros SB!ASSEM:EMIT-LABEL and
- ;; SB!ASSEM:EMIT-POST-IT, defined in assem.lisp, and also possibly
- ;; the definition of the LOCATION-INFO structure (if structures in
- ;; the host lisp have setf expanders rather than setf functions).
- ("src/compiler/late-vmdef")
-
  ("src/compiler/target-dstate" :not-host)
  ("src/compiler/target/insts")
  ("src/compiler/target/macros")

@@ -134,6 +134,7 @@
 (defvar *warnings-p*)
 (defvar *lambda-conversions*)
 (defvar *compile-object* nil)
+(defvar *location-context* nil)
 (defvar *msan-unpoison* nil)
 
 (defvar *stack-allocate-dynamic-extent* t

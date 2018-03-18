@@ -58,6 +58,27 @@
                  (list location)))
     location))
 
+(defun note-this-location (vop kind)
+  "NOTE-THIS-LOCATION VOP Kind
+  Note that the current code location is an interesting (to the debugger)
+  location of the specified Kind. VOP is the VOP responsible for this code.
+  This VOP must specify some non-null :SAVE-P value (perhaps :COMPUTE-ONLY) so
+  that the live set is computed."
+  (let ((lab (gen-label)))
+    (emit-label lab)
+    (note-debug-location vop lab kind *location-context*)))
+
+(defun note-next-instruction (vop kind)
+  "NOTE-NEXT-INSTRUCTION VOP Kind
+   Similar to NOTE-THIS-LOCATION, except the use the location of the next
+   instruction for the code location, wherever the scheduler decided to put
+   it."
+  (let ((loc (note-debug-location vop nil kind)))
+    (emit-postit (lambda (segment posn)
+                   (declare (ignore segment))
+                   (setf (location-info-label loc) posn))))
+  (values))
+
 #!-sb-fluid (declaim (inline ir2-block-physenv))
 (defun ir2-block-physenv (2block)
   (declare (type ir2-block 2block))
