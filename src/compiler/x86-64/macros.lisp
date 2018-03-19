@@ -428,39 +428,6 @@
                                      ,lowtag))
                    value result)))))
 
-;;; Emit the most compact form of the test immediate instruction
-;;; by using the smallest operand size that is the large enough to hold
-;;; the immediate value Y. The operand size makes no difference since the result
-;;; of the implied AND is not written back to a register. However, if the msb
-;;; (the sign bit) of the immediate at a smaller size is 1 but at its true size
-;;; (always a :QWORD) is 0, the S flag value could come out 1 instead of 0.
-;;; SIGN-BIT-MATTERS specifies that a shorter operand size must not be selected
-;;; if doing so could affect whether the sign flag comes out the same.
-;;; e.g. if EDX is #xff, "TEST EDX, #x80" indicates a non-negative result
-;;; whereas "TEST DL, #x80" indicates a negative result.
-(defun emit-optimized-test-inst (x y sign-bit-matters)
-  (let* ((size-override
-          (cond ((or (typep y '(unsigned-byte 7))
-                     (and (typep y '(unsigned-byte 8)) (not sign-bit-matters)))
-                 :byte)
-                ((or (typep y '(unsigned-byte 15))
-                     (and (typep y '(unsigned-byte 16)) (not sign-bit-matters)))
-                 :word)
-                ((or (typep y '(unsigned-byte 31))
-                     (and (typep y '(unsigned-byte 32)) (not sign-bit-matters)))
-                 :dword)))
-         (offset (tn-offset x))
-         (modified-x
-          (when size-override
-            (cond ((sc-is x control-stack)
-                   ;; TODO: a 7- or 8-bit pattern that does not span bytes
-                   ;; should be testable as a :BYTE by suitably altering :DISP.
-                   (make-ea size-override :base rbp-tn :disp (frame-byte-offset offset)))
-                  ((sc-is x any-reg descriptor-reg signed-reg unsigned-reg)
-                   (reg-in-size x size-override))))))
-    (inst test (or modified-x x) y)))
-
-
 (defun move-dword-if-immobile-code (dest src)
   (flet ((downsize (tn)
            (cond #!+immobile-code

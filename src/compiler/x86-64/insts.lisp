@@ -71,6 +71,8 @@
 (defconstant +rex-b+           #b0001)
 
 (defun width-bits (width)
+  ;; We call this "SIZE" in an EA, so really WIDTH-BITS
+  ;; should be SIZE-BITS. Oh well.
   (ecase width
     (:byte 8)
     (:word 16)

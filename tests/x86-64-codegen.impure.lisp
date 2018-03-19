@@ -199,3 +199,46 @@
                  (search "], #x" line))
         (setq success t)))
     (assert success)))
+
+(with-test (:name :test-high-byte-reg)
+  ;; Assert two things:
+  ;; - that LOGBITP can use a high byte register (sometimes)
+  ;; - that the fixnum #x80 (representation #x100) is a single byte test
+  (let (success)
+    (dolist (line
+             (split-string
+              (with-output-to-string (s)
+               (let ((sb-disassem:*disassem-location-column-width* 0))
+                 (disassemble '(lambda (x) (logtest (the fixnum x) #x80))
+                              :stream s)))
+              #\newline))
+      (when (search (format nil "TEST DH, ~D"
+                            (ash (ash #x80 sb-vm:n-fixnum-tag-bits) -8))
+                    line)
+        (setq success t)))
+    (assert success)))
+
+(with-test (:name :test-byte-stack-imm)
+  ;; Assert that LOGBITP can accept memory + immediate as the operands
+  (let (success)
+    (dolist (line
+             (split-string
+              (with-output-to-string (s)
+               (let ((sb-disassem:*disassem-location-column-width* 0))
+                 (disassemble '(lambda (a b)
+                                 (declare (fixnum b))
+                                 (print 1) ; force spilling args to stack
+                                 ;; Use an expression that doesn't select CMOV
+                                 ;; as the implementation.
+                                 ;; CMOV thinks it needs all args loaded,
+                                 ;; defeating the purpose of this test.
+                                 (values a (if (logtest b #x80) 'baz (print 2))))
+                              :stream s)))
+              #\newline))
+      (when (and (search "TEST BYTE PTR [RBP-" line)
+                 (search (format nil
+                          ", ~d"
+                          (ash (ash #x80 sb-vm:n-fixnum-tag-bits) -8))
+                         line))
+        (setq success t)))
+    (assert success)))
