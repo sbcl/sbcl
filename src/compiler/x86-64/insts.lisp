@@ -15,7 +15,7 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; Imports from this package into SB-VM
   (import '(conditional-opcode
-            register-p xmm-register-p ; FIXME: rename REGISTER-P to GPR-P
+            register-p gpr-p xmm-register-p
             ea-p sized-ea ea-base ea-index
             make-ea ea-disp) "SB!VM")
   ;; Imports from SB-VM into this package
@@ -1190,12 +1190,12 @@
        (eq (sb!c:sc-operand-size (tn-sc thing)) :qword)))
 
 ;;; Return true if THING is a general-purpose register TN.
-(defun register-p (thing)
+(defun gpr-p (thing)
   (and (tn-p thing)
        (eq (sb-name (sc-sb (tn-sc thing))) 'registers)))
 
 (defun accumulator-p (thing)
-  (and (register-p thing)
+  (and (gpr-p thing)
        (= (tn-offset thing) 0)))
 
 ;;; Return true if THING is an XMM register TN.
@@ -1203,6 +1203,8 @@
   (and (tn-p thing)
        (eq (sb-name (sc-sb (tn-sc thing))) 'float-registers)))
 
+(defun register-p (thing)
+  (or (gpr-p thing) (xmm-register-p thing)))
 
 ;;;; utilities
 
@@ -1409,7 +1411,7 @@
   (:emitter
    (let ((size (matching-operand-size dst src)))
      (maybe-emit-operand-size-prefix segment size)
-     (cond ((register-p dst)
+     (cond ((gpr-p dst)
             (cond ((integerp src)
                    ;; We want to encode the immediate using the fewest bytes possible.
                    (let ((immediate-size
@@ -1461,7 +1463,7 @@
             (emit-byte segment (if (eq size :byte) #xC6 #xC7))
             (emit-ea segment dst #b000)
             (emit-sized-immediate segment size src))
-           ((register-p src) ; reg to mem
+           ((gpr-p src) ; reg to mem
             (maybe-emit-rex-for-ea segment dst src)
             (emit-byte segment (if (eq size :byte) #x88 #x89))
             (emit-ea segment dst (reg-tn-encoding src)))
@@ -1505,7 +1507,7 @@
             `(:name :tab ,(swap-if 'dir 'accum ", " '("[" imm "]"))))
   (:emitter
    (multiple-value-bind (reg ea dir-bit)
-       (if (register-p dst) (values dst src 0) (values src dst 2))
+       (if (gpr-p dst) (values dst src 0) (values src dst 2))
      (aver (and (accumulator-p reg) (typep ea 'word)))
      (let ((size (operand-size reg)))
        (maybe-emit-operand-size-prefix segment size)
@@ -1521,7 +1523,7 @@
 ;;; to 64 bits this has the same effect as a MOVZX with 64-bit
 ;;; destination but often needs no REX prefix.
 (defun emit-move-with-extension (segment dst src signed-p)
-  (aver (register-p dst))
+  (aver (gpr-p dst))
   (let ((dst-size (operand-size dst))
         (src-size (operand-size src))
         (opcode (if signed-p #b10111110 #b10110110)))
@@ -1613,7 +1615,7 @@
             (aver (or (eq size :qword) (eq size :word)))
             (maybe-emit-operand-size-prefix segment size)
             (maybe-emit-rex-for-ea segment src nil :operand-size :do-not-set)
-            (cond ((register-p src)
+            (cond ((gpr-p src)
                    (emit-byte+reg segment #x50 src))
                   (t
                    (emit-byte segment #b11111111)
@@ -1627,7 +1629,7 @@
      (aver (or (eq size :qword) (eq size :word)))
      (maybe-emit-operand-size-prefix segment size)
      (maybe-emit-rex-for-ea segment dst nil :operand-size :do-not-set)
-     (cond ((register-p dst)
+     (cond ((gpr-p dst)
             (emit-byte+reg segment #x58 dst))
            (t
             (emit-byte segment #b10001111)
@@ -1672,7 +1674,7 @@
      (maybe-emit-operand-size-prefix segment size)
      (labels ((xchg-acc-with-something (acc something)
                 (if (and (not (eq size :byte))
-                         (register-p something)
+                         (gpr-p something)
                          ;; Don't use the short encoding for XCHG EAX, EAX:
                          (not (and (= (tn-offset something) sb!vm::eax-offset)
                                    (eq size :dword))))
@@ -1688,9 +1690,9 @@
               (xchg-acc-with-something operand1 operand2))
              ((accumulator-p operand2)
               (xchg-acc-with-something operand2 operand1))
-             ((register-p operand1)
+             ((gpr-p operand1)
               (xchg-reg-with-something operand1 operand2))
-             ((register-p operand2)
+             ((gpr-p operand2)
               (xchg-reg-with-something operand2 operand1))
              (t
               (error "bogus args to XCHG: ~S ~S" operand1 operand2)))))))
@@ -1715,7 +1717,7 @@
   ;; Register/Memory with Register.
   (:printer ext-reg-reg/mem ((op #b1011000)) '(:name :tab reg/mem ", " reg))
   (:emitter
-   (aver (register-p src))
+   (aver (gpr-p src))
    (emit-prefix segment prefix)
    (let ((size (matching-operand-size src dst)))
      (maybe-emit-operand-size-prefix segment size)
@@ -1728,7 +1730,7 @@
   (:printer ext-reg/mem-no-width
             ((op '(#xC7 1))))
   (:emitter
-   (aver (not (register-p mem)))
+   (aver (not (gpr-p mem)))
    (emit-prefix segment prefix)
    (maybe-emit-rex-for-ea segment mem nil :operand-size :qword)
    (emit-byte segment #x0F)
@@ -1739,7 +1741,7 @@
   (:printer ext-reg/mem-no-width
             ((op '(#xC7 6))))
   (:emitter
-   (aver (register-p dst))
+   (aver (gpr-p dst))
    (maybe-emit-operand-size-prefix segment (operand-size dst))
    (maybe-emit-rex-for-ea segment dst nil)
    (emit-byte segment #x0F)
@@ -1841,7 +1843,7 @@
       (if (fixup-p src)
           (emit-absolute-fixup segment src)
           (emit-sized-immediate segment size src)))
-     ((register-p src)
+     ((gpr-p src)
       (maybe-emit-rex-for-ea segment dst src)
       (emit-byte segment
                  (dpb opcode
@@ -1849,7 +1851,7 @@
                       (if (eq size :byte) #b00000000 #b00000001)))
       (emit-ea segment dst (reg-tn-encoding src)
                :allow-constants allow-constants))
-     ((register-p dst)
+     ((gpr-p dst)
       (maybe-emit-rex-for-ea segment src dst)
       (emit-byte segment
                  (dpb opcode
@@ -2040,7 +2042,7 @@
   ;; Register/Memory with Register.
   (:printer ext-reg-reg/mem ((op #b1100000)) '(:name :tab reg/mem ", " reg))
   (:emitter
-   (aver (register-p src))
+   (aver (gpr-p src))
    (emit-prefix segment prefix)
    (let ((size (matching-operand-size src dst)))
      (maybe-emit-operand-size-prefix segment size)
@@ -2140,9 +2142,9 @@
               (test-immed-and-something that this))
              ((integerp this)
               (test-immed-and-something this that))
-             ((register-p this)
+             ((gpr-p this)
               (test-reg-and-something this that))
-             ((register-p that)
+             ((gpr-p that)
               (test-reg-and-something that this))
              (t
               (error "bogus operands for TEST: ~S and ~S" this that)))))))
@@ -2408,7 +2410,7 @@
 (define-instruction cmov (segment cond dst src)
   (:printer cond-move ())
   (:emitter
-   (aver (register-p dst))
+   (aver (gpr-p dst))
    (let ((size (matching-operand-size dst src)))
      (aver (or (eq size :word) (eq size :dword) (eq size :qword)))
      (maybe-emit-operand-size-prefix segment size))
@@ -2903,15 +2905,13 @@
                      (cond ,@(when opcode-from
                                `(((xmm-register-p dst)
                                   ,(when force-to-mem
-                                     `(aver (not (or (register-p src)
-                                                     (xmm-register-p src)))))
+                                     `(aver (not (register-p src))))
                                   (emit-regular-sse-inst
                                    segment dst src ,prefix ,opcode-from))))
                            (t
                             (aver (xmm-register-p src))
                             ,(when force-to-mem
-                               `(aver (not (or (register-p dst)
-                                               (xmm-register-p dst)))))
+                               `(aver (not (register-p dst))))
                             (emit-regular-sse-inst segment src dst
                                                    ,prefix ,opcode-to))))))))
   ;; direction bit?
@@ -3041,7 +3041,7 @@
 (define-instruction pextrw (segment dst src imm)
   (:emitter
    (aver (xmm-register-p src))
-   (if (not (register-p dst))
+   (if (not (gpr-p dst))
        (emit-sse-inst-2byte segment dst src #x66 #x3a #x15
                             :operand-size :do-not-set :remaining-bytes 1)
        (emit-sse-inst segment dst src #x66 #xc5
@@ -3061,8 +3061,7 @@
                 (:emitter
                  (aver (xmm-register-p dst))
                  ,(when mem-only
-                    `(aver (not (or (register-p src)
-                                    (xmm-register-p src)))))
+                    `(aver (not (register-p src))))
                  (let ((src-size (operand-size src)))
                    (aver (or (eq src-size :qword) (eq src-size :dword))))
                  (emit-sse-inst segment dst src ,prefix ,opcode)))))
@@ -3081,7 +3080,7 @@
              `(define-instruction ,name (segment dst src)
                 ,@(sse-inst-printer-list 'reg-xmm/mem prefix opcode)
                 (:emitter
-                 (aver (register-p dst))
+                 (aver (gpr-p dst))
                  ,(when reg-only
                     `(aver (xmm-register-p src)))
                  (let ((dst-size (operand-size dst)))
@@ -3217,9 +3216,8 @@
 (define-instruction movnti (segment dst src)
   (:printer ext-reg-reg/mem-no-width ((op #xc3)) '(:name :tab reg/mem ", " reg))
   (:emitter
-   (aver (not (or (register-p dst)
-                  (xmm-register-p dst))))
-   (aver (register-p src))
+   (aver (not (register-p dst)))
+   (aver (gpr-p src))
    (maybe-emit-rex-for-ea segment dst src)
    (emit-byte segment #x0f)
    (emit-byte segment #xc3)
@@ -3235,8 +3233,7 @@
   (:printer ext-reg/mem-no-width ((op '(#x18 3)))
             '("PREFETCHT2" :tab reg/mem))
   (:emitter
-   (aver (not (or (register-p src)
-                  (xmm-register-p src))))
+   (aver (not (register-p src)))
    (aver (eq (operand-size src) :byte))
    (let ((type (position type #(:nta :t0 :t1 :t2))))
      (aver type)
@@ -3248,8 +3245,7 @@
 (define-instruction clflush (segment src)
   (:printer ext-reg/mem-no-width ((op '(#xae 7))))
   (:emitter
-   (aver (not (or (register-p src)
-                  (xmm-register-p src))))
+   (aver (not (register-p src)))
    (aver (eq (operand-size src) :byte))
    (maybe-emit-rex-for-ea segment src nil)
    (emit-byte segment #x0f)
@@ -3276,8 +3272,7 @@
 (define-instruction ldmxcsr (segment src)
   (:printer ext-reg/mem-no-width ((op '(#xae 2))))
   (:emitter
-   (aver (not (or (register-p src)
-                  (xmm-register-p src))))
+   (aver (not (register-p src)))
    (aver (eq (operand-size src) :dword))
    (maybe-emit-rex-for-ea segment src nil)
    (emit-byte segment #x0f)
@@ -3287,8 +3282,7 @@
 (define-instruction stmxcsr (segment dst)
   (:printer ext-reg/mem-no-width ((op '(#xae 3))))
   (:emitter
-   (aver (not (or (register-p dst)
-                  (xmm-register-p dst))))
+   (aver (not (register-p dst)))
    (aver (eq (operand-size dst) :dword))
    (maybe-emit-rex-for-ea segment dst nil)
    (emit-byte segment #x0f)
@@ -3299,8 +3293,8 @@
   (:printer f3-escape-reg-reg/mem ((op #xB8)))
   (:printer rex-f3-escape-reg-reg/mem ((op #xB8)))
   (:emitter
-   (aver (register-p dst))
-   (aver (and (register-p dst) (not (eq (operand-size dst) :byte))))
+   (aver (gpr-p dst))
+   (aver (and (gpr-p dst) (not (eq (operand-size dst) :byte))))
    (aver (not (eq (operand-size src) :byte)))
    (emit-sse-inst segment dst src #xf3 #xb8)))
 
@@ -3323,7 +3317,7 @@
      ;; The following operand size combinations are possible:
      ;;   dst = r32, src = r/m{8, 16, 32}
      ;;   dst = r64, src = r/m{8, 64}
-     (aver (and (register-p dst)
+     (aver (and (gpr-p dst)
                 (memq src-size (case dst-size
                                  (:dword '(:byte :word :dword))
                                  (:qword '(:byte :qword))))))
