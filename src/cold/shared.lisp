@@ -23,8 +23,6 @@
 
 (in-package "SB-COLD")
 
-cl-user::(setf (extern-alien "verify_gens" char) 0)
-
 (defun parse-make-host-parallelism (str)
   (multiple-value-bind (value1 end) (parse-integer str :junk-allowed t)
     (when value1
