@@ -15,8 +15,6 @@
 ;;;; However, this seems a good a way as any of ensuring that we have
 ;;;; no regressions.
 
-(load "test-util.lisp")
-
 (defpackage "MOP-TEST"
   (:use "CL" "SB-MOP" "ASSERTOID" "TEST-UTIL"))
 

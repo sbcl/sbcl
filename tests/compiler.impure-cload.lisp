@@ -1,8 +1,5 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (load "assertoid.lisp")
-  (load "compiler-test-util.lisp")
-  (load "test-util.lisp")
-  (use-package "ASSERTOID"))
+  (load "compiler-test-util.lisp"))
 
 ;;; bug 254: compiler falure
 (defpackage :bug254 (:use :cl))
@@ -532,7 +529,7 @@
 (defun load-time-value-type-derivation-test-2 ()
   (ctu:compiler-derived-type (load-time-value (+ (or *print-length* 0) 10))))
 
-(test-util:with-test (:name (load-time-value :type-smartness/cload))
+(with-test (:name (load-time-value :type-smartness/cload))
   (assert (eq 'cons (load-time-value-type-derivation-test-1)))
   (assert (equal '(integer 10) (load-time-value-type-derivation-test-2))))
 
@@ -540,7 +537,7 @@
   (logior (1+ most-positive-fixnum)
           (load-time-value (the fixnum (eval 1)) t)))
 
-(test-util:with-test (:name :regression-1.0.29.54)
+(with-test (:name :regression-1.0.29.54)
   (assert (= (+ most-positive-fixnum 2) (regression-1.0.29.54)))
   (assert (eq 42
               (funcall (compile nil
@@ -556,7 +553,7 @@
   (multiple-value-call #'mv-call-regression-1.0.43.57-foo
     (mv-call-regression-1.0.43.57-bar sxx sxy sxy syy)
     a))
-(test-util:with-test (:name :mv-call-regression-1.0.43.57)
+(with-test (:name :mv-call-regression-1.0.43.57)
   ;; This used to signal a bogus argument-count error.
   (mv-call-regression-1.0.43.57-quux 1s0 10s0 1s0 10s0))
 
@@ -570,7 +567,7 @@
   (defun ecase-failure-test (x)
     (ecase x ((a b c) 1) ((b c d) 2) ((e d f) 3) ((c g h i) 4))))
 
-(test-util:with-test (:name :case-failures)
+(with-test (:name :case-failures)
   (assert (equal (handler-case (etypecase-failure-test 'hi)
                    (sb-kernel:case-failure (c)
                      (sb-kernel::case-failure-possibilities c)))
@@ -587,5 +584,5 @@
 
 (sb-int:defconstant-eqx foo-vector #(a b c d "hi") #'equalp)
 (defun f (&optional (v foo-vector)) (list v))
-(test-util:with-test (:name :optional-default-hairy-defconstant)
+(with-test (:name :optional-default-hairy-defconstant)
   (assert (eq (first (f)) foo-vector)))

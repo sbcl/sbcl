@@ -11,10 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package :cl-user)
-
-(load "test-util.lisp")
-
 (defpackage :mop-test-30
   (:use :sb-pcl :sb-ext :cl :test-util))
 

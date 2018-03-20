@@ -18,8 +18,6 @@
 ;;; effective slot definitions to be available during class
 ;;; finalization)
 
-(load "assertoid.lisp")
-
 (defpackage "MOP-29"
   (:use "CL" "SB-MOP"))
 

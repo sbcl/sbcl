@@ -13,14 +13,6 @@
 
 #+interpreter (sb-ext:exit :code 104)
 
-(cl:in-package :cl-user)
-
-(load "test-util.lisp")
-(load "assertoid.lisp")
-(use-package "TEST-UTIL")
-(use-package "ASSERTOID")
-
-
 ;;; Prior to sbcl-0.7.1.38, doing something like (RECURSE), even in
 ;;; safe code, would crash the entire Lisp process. Then the soft
 ;;; stack checking was introduced, which checked (in safe code) for

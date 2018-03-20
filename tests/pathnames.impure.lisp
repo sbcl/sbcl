@@ -14,12 +14,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(load "assertoid.lisp")
-(use-package "ASSERTOID")
-
-(load "test-util.lisp")
-(use-package "TEST-UTIL")
-
 ;;;; Pathname accessors
 
 (with-test (:name (pathname :accessors :stream-not-associated-to-file type-error))

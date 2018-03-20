@@ -9,11 +9,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package :cl-user)
-
-(use-package :test-util)
-(use-package :assertoid)
-
 (defstruct foo)
 (defstruct bar x y)
 

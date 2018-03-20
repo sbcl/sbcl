@@ -18,9 +18,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package :cl-user)
-
-(test-util:with-test (:name :no-meta-info)
+(with-test (:name :no-meta-info)
  (assert-signal (compile nil '(lambda (x) (sb-int:info :type :nokind x)))
                 style-warning))
 

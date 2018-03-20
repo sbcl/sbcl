@@ -9,10 +9,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(load "assertoid.lisp")
-(use-package "ASSERTOID")
-(use-package "TEST-UTIL")
-
 (defmacro assert-nil-nil (expr)
   `(assert (equal '(nil nil) (multiple-value-list ,expr))))
 (defmacro assert-nil-t (expr)

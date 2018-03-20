@@ -16,11 +16,6 @@
 ;;;; why this idiom (a sequence of top-level forms) works as a test of
 ;;;; EVAL.
 
-(cl:in-package :cl-user)
-
-(load "assertoid.lisp")
-(use-package "ASSERTOID")
-
 ;;; Until sbcl-0.7.9.x, EVAL was not correctly treating LOCALLY,
 ;;; MACROLET and SYMBOL-MACROLET, which should preserve top-levelness
 ;;; of their body forms:

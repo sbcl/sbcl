@@ -10,7 +10,6 @@
 ;;;; more information.
 
 (load "compiler-test-util.lisp")
-(use-package "ASSERTOID")
 
 ;;;; examples from, or close to, the Common Lisp DEFSTRUCT spec
 

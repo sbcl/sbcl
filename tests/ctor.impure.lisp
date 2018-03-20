@@ -11,7 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(load "test-util.lisp")
 (load "compiler-test-util.lisp")
 
 (defpackage "CTOR-TEST"

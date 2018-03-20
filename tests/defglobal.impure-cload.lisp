@@ -25,7 +25,7 @@
   (eval-when (:compile-toplevel)
     (assert (eq :win (handler-case (test-use-ltg) (error () :win))))))
 
-(test-util:with-test (:name :load-time-global-1)
+(with-test (:name :load-time-global-1)
   (assert (equal *breadcrumbs* '(ltg-initform global-initform)))
 
   ;; Can not legally make **a-load-time-global** unbound
@@ -47,5 +47,5 @@
   ;; Assert that the second of those two forms did basically nothing.
   (assert (eq (sb-int:info :variable :always-bound '**anotherone**)
               :always-bound)))
-(test-util:with-test (:name :load-time-global-2)
+(with-test (:name :load-time-global-2)
   (assert (eql **anotherone** 3)))

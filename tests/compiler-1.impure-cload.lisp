@@ -12,12 +12,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(cl:in-package :cl-user)
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (load "assertoid")
-  (use-package "ASSERTOID"))
-
 (declaim (optimize (debug 3) (speed 2) (space 1)))
 
 ;;; Until version 0.6.9 or so, SBCL's version of Python couldn't do

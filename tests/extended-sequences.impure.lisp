@@ -14,9 +14,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(load "test-util.lisp")
-(load "assertoid.lisp")
-
 (with-test (:name (sb-kernel:extended-sequence subtypep :relations))
   (flet ((test-case (type1 type2)
            (assert (equal '(nil t)

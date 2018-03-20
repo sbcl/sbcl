@@ -11,9 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package :cl-user)
-
-(use-package :test-util)
 
 ;;;; properties of symbols, e.g. presence of doc strings for public symbols
 

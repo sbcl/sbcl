@@ -20,8 +20,6 @@
 ;;; instead of slot-names, and so on -- and :allocation :dynamic for
 ;;; dynamic slots.
 
-(untrace)
-
 (defpackage "TEST" (:use "CL" "SB-MOP"))
 (in-package "TEST")
 

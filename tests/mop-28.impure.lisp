@@ -16,8 +16,6 @@
 ;;; strategy implicit in the second return value of
 ;;; compute-applicable-methods-using-classes.
 
-(load "assertoid.lisp")
-
 (defpackage "OR-SPECIALIZER-TEST"
   (:use "CL" "SB-MOP" "ASSERTOID"))
 

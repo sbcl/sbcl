@@ -17,8 +17,6 @@
 (shadowing-import 'assertoid:assert-error)
 (use-package :sb-thread)
 (use-package :sb-sys)
-(use-package '#:test-util)
-(use-package '#:assertoid)
 
 (setf sb-unix::*on-dangerous-wait* :error)
 
@@ -1357,11 +1355,6 @@
   (terpri))
 
 ;;;; BLACK BOX TESTS
-
-(in-package :cl-user)
-(use-package :test-util)
-(use-package "ASSERTOID")
-
 
 (with-test (:name (:parallel defclass))
   (write-line "WARNING, WILL HANG ON FAILURE!")

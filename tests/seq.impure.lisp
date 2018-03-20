@@ -13,13 +13,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(load "test-util.lisp")
-(load "assertoid.lisp")
-
-(defpackage :seq-test
-  (:use :cl :assertoid :test-util))
-
-(in-package :seq-test)
+(shadow 'reset)
 
 ;;; user-defined mock sequence class for testing generic versions of
 ;;; sequence functions.

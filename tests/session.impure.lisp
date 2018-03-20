@@ -11,11 +11,6 @@
 ;;;; absoluely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(cl:in-package #:cl-user)
-
-(cl:use-package '#:test-util)
-(cl:use-package '#:assertoid)
-
 #-sb-thread (sb-ext:exit :code 104)
 
 (setf sb-unix::*on-dangerous-wait* :error)

@@ -11,10 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(load "test-util.lisp")
-(load "assertoid.lisp")
-(use-package "ASSERTOID")
-
 ;;; tests of MAP
 (with-test (:name (map :smoke))
   (assertoid (map 'vector #'+ '(1 2 3) '(30 20))

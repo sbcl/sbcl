@@ -1,7 +1,3 @@
-(in-package :cl-user)
-
-(use-package :test-util)
-
 (defmacro assert-timeout ((expected-message) form)
   (let ((ok (gensym "OK")))
     `(let ((,ok ',ok))

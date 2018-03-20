@@ -11,10 +11,6 @@
 
 #+interpreter (sb-ext:exit :code 104)
 
-(in-package "CL-USER")
-
-(use-package :test-util)
-
 (with-test (:name :heap)
   (let* ((size 1000)
          (heap (make-array size :adjustable t :fill-pointer 0))

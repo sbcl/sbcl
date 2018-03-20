@@ -11,11 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(load "assertoid.lisp")
-(load "test-util.lisp")
-(use-package "ASSERTOID")
-(use-package "TEST-UTIL")
-
 (defmacro assert-non-empty-output (&body forms)
   `(assert (plusp (length (with-output-to-string (*standard-output*)
                             ,@forms)))))

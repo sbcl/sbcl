@@ -11,11 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(load "assertoid.lisp")
-(load "test-util.lisp")
-(use-package "ASSERTOID")
-(use-package "TEST-UTIL")
-
 (defun test-inspect (object control)
   (let* ((control (if (listp control)
                       (format nil "~{~A~%~}" control)

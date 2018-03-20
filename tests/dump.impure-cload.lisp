@@ -11,8 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(cl:in-package :cl-user)
-
 (declaim (optimize (debug 3) (speed 2) (space 1)))
 
 ;;; this would fail an AVER in NOTE-POTENTIAL-CIRCULARITY
@@ -254,11 +252,11 @@
 ;; a tangled forest of structures,
 (defparameter *metadata* '#.(compute-tangled-stuff))
 
-(test-util:with-test (:name :make-load-form-huge-vector)
+(with-test (:name :make-load-form-huge-vector)
   (assert (equalp (compute-airports (length (the vector *airport-vector*)))
                   *airport-vector*)))
 
-(test-util:with-test (:name :make-load-form-circular-hair)
+(with-test (:name :make-load-form-circular-hair)
   (let ((testcase (compute-tangled-stuff)))
     (declare (optimize (speed 1)))
     ;; MAKE-LOAD-FORM discards the value of the CDF slot of one structure.

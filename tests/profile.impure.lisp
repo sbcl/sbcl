@@ -11,9 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(load "assertoid.lisp")
-(load "test-util.lisp")
-
 (defpackage :profile-test
   (:use :cl :sb-thread))
 

@@ -11,9 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(load "assertoid.lisp")
-(use-package "ASSERTOID")
-
 ;;; We should be able to output X readably (at least when *READ-EVAL*).
 (defun assert-readable-output (x)
   (assert (eql x

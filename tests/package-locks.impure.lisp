@@ -11,11 +11,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package :cl-user)
-
-(load "assertoid.lisp")
 (load "compiler-test-util.lisp")
-(use-package "ASSERTOID")
 
 ;;;; Our little labrats and a few utilities
 

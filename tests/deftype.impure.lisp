@@ -9,9 +9,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(load "assertoid.lisp")
-(use-package "ASSERTOID")
-
 ;;; Check for correct defaulting of unsupplied parameters to *
 (deftype opt (&optional arg)
   `(integer 0 ,arg))

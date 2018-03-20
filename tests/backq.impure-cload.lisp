@@ -29,7 +29,7 @@
 (defun vector-backq-expr () `#(foo ,char-code-limit)) ; no xform, but folded
 (defun obviously-constant-vector () #(foo #.char-code-limit))
 
-(test-util:with-test (:name :backquote-ir1-simplifier)
+(with-test (:name :backquote-ir1-simplifier)
   ;; The pre-tests show that the backquoted expression did not compress
   ;; (,char-code-limit x) into a constant, nor for the vector.
   ;; Thus the IR1 optimization must do it in order for this test to pass.

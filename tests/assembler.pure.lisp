@@ -13,7 +13,6 @@
 
 (in-package sb-vm)
 
-(load "test-util.lisp")
 (use-package :test-util)
 
 ;; this is architecture-agnostic
