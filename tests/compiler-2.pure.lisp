@@ -1200,7 +1200,17 @@
 
 (with-test (:name :primitive-type-fun-designator)
   (checked-compile-and-assert
-      () 
+      ()
       `(lambda  (fun)
          (map 'vector fun '(1 2 3)))
     (('1+) #(2 3 4) :test #'equalp)))
+
+(with-test (:name :mv-call-lambda-type-derivation)
+  (assert
+   (equal (sb-kernel:%simple-fun-type
+           (checked-compile
+            '(lambda (x)
+              (multiple-value-call
+                  (lambda () 133)
+                (funcall x)))))
+          '(function (t) (values (integer 133 133) &optional)))))

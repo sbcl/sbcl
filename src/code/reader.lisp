@@ -740,24 +740,22 @@ standard Lisp readtable when NIL."
 ;;; for functions that want comments to return so that they can look
 ;;; past them. CHAR must not be whitespace.
 (defun read-maybe-nothing (stream char)
-  (truly-the
-   (values bit t) ; avoid a type-check. M-V-CALL is lame
-   (multiple-value-call
-       (lambda (stream start-pos &optional (result nil supplied-p) &rest junk)
-         (declare (ignore junk)) ; is this ANSI-specified?
-         (when (and supplied-p start-pos)
-           (funcall (form-tracking-stream-observer stream)
-                    start-pos
-                    (form-tracking-stream-input-char-pos stream) result))
-         (values (if supplied-p 1 0) result))
-     ;; KLUDGE: not capturing anything in the lambda avoids closure consing
-     stream
-     (and (form-tracking-stream-p stream)
-          ;; Subtract 1 because the position points _after_ CHAR.
-          (1- (form-tracking-stream-input-char-pos stream)))
-     (funcall (!cmt-entry-to-function
-               (get-raw-cmt-entry char *readtable*) #'read-token)
-              stream char))))
+  (multiple-value-call
+      (lambda (stream start-pos &optional (result nil supplied-p) &rest junk)
+        (declare (ignore junk))         ; is this ANSI-specified?
+        (when (and supplied-p start-pos)
+          (funcall (form-tracking-stream-observer stream)
+                   start-pos
+                   (form-tracking-stream-input-char-pos stream) result))
+        (values (if supplied-p 1 0) result))
+    ;; KLUDGE: not capturing anything in the lambda avoids closure consing
+    stream
+    (and (form-tracking-stream-p stream)
+         ;; Subtract 1 because the position points _after_ CHAR.
+         (1- (form-tracking-stream-input-char-pos stream)))
+    (funcall (!cmt-entry-to-function
+              (get-raw-cmt-entry char *readtable*) #'read-token)
+             stream char)))
 
 (defun read (&optional (stream *standard-input*)
                        (eof-error-p t)
