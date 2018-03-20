@@ -399,6 +399,8 @@
             (part-of list))
            (t
             (any))))
+        (fun-designator-type
+         (any))
         (fun-type
          (exactly function))
         (classoid

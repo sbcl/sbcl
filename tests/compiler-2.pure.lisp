@@ -1188,7 +1188,7 @@
             (setf args result))))
     (('list '(1)) '(1) :test #'equal)))
 
-(with-test (:name :constrant-loop)
+(with-test (:name :constraint-loop)
   (checked-compile-and-assert
       ()
       `(lambda (a b)
@@ -1197,3 +1197,10 @@
            (mapcar #'identity a)
            (loop for c from 0 do (loop for d in b do
                                        (loop for e in a)))))))
+
+(with-test (:name :primitive-type-fun-designator)
+  (checked-compile-and-assert
+      () 
+      `(lambda  (fun)
+         (map 'vector fun '(1 2 3)))
+    (('1+) #(2 3 4) :test #'equalp)))
