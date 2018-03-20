@@ -17,14 +17,7 @@
 #include "sbcl.h"
 
 #ifndef LISP_FEATURE_WIN32
-#ifdef LISP_FEATURE_LINUX
-/* For madvise */
-#define _BSD_SOURCE
 #include <sys/mman.h>
-#undef _BSD_SOURCE
-#else
-#include <sys/mman.h>
-#endif
 #endif
 
 #include <stdio.h>
