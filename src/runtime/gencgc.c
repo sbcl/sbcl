@@ -2525,6 +2525,9 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
         if (where > state->object_end && (state->flags & VERIFYING_HEAP_OBJECTS)) {
             state->object_start = where;
             state->object_end = where + OBJECT_SIZE(*where, where) - 1;
+            // Should not see filler after sweeping all gens
+            /* if (!conservative_stack && widetag_of(*where) == FILLER_WIDETAG)
+                 fprintf(stderr, "Note: filler object @ %p\n", where); */
         }
         count = 1;
         lispobj thing = *where;
@@ -2696,13 +2699,13 @@ void verify_gc(uword_t flags)
     if (&check_varyobj_pages) check_varyobj_pages();
 #  endif
     if (verbose)
-        printf("Verifying immobile space\n");
+        fprintf(stderr, "Verifying immobile space\n");
     verify_space(FIXEDOBJ_SPACE_START, fixedobj_free_pointer, flags);
     verify_space(VARYOBJ_SPACE_START, varyobj_free_pointer, flags);
 #endif
     struct thread *th;
     if (verbose)
-        printf("Verifying binding stacks\n");
+        fprintf(stderr, "Verifying binding stacks\n");
     for_each_thread(th) {
         verify_space((lispobj)th->binding_stack_start,
                      (lispobj*)get_binding_stack_pointer(th),
@@ -2715,13 +2718,13 @@ void verify_gc(uword_t flags)
 #endif
     }
     if (verbose)
-        printf("Verifying RO space\n");
+        fprintf(stderr, "Verifying RO space\n");
     verify_space(READ_ONLY_SPACE_START, read_only_space_free_pointer, flags);
     if (verbose)
-        printf("Verifying static space\n");
+        fprintf(stderr, "Verifying static space\n");
     verify_space(STATIC_SPACE_START, static_space_free_pointer, flags);
     if (verbose)
-        printf("Verifying dynamic space\n");
+        fprintf(stderr, "Verifying dynamic space\n");
     verify_generation(-1, flags);
 }
 
