@@ -49,6 +49,8 @@
 (with-test (:name :symeval-known-thread-local)
   ;; It should take 1 instruction to read a known thread-local var
   (assert (= (length (disasm 1 'sb-thread:*current-thread*)) 1))
+  (assert (= (length (disasm 1 'sb-sys:*interrupt-pending*)) 1))
+  (assert (= (length (disasm 1 'sb-kernel:*gc-inhibit*)) 1))
   (assert (= (length (disasm 1 'sb-kernel:*restart-clusters*)) 1))
   (assert (= (length (disasm 1 'sb-kernel:*handler-clusters*)) 1)))
 

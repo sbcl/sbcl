@@ -36,3 +36,16 @@
 
 #!-sb-source-locations
 (defun source-location () nil)
+
+#-sb-xc-host
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (dolist (entry '#.sb!vm::!per-thread-c-interface-symbols)
+    (let ((symbol (if (consp entry) (car entry) entry)))
+      (declare (notinline info (setf info)))
+      ;; CURRENT-{CATCH/UWP}-BLOCK are thread slots,
+      ;; so the TLS indices were already assigned.
+      ;; There may be other symbols too.
+      (unless (info :variable :wired-tls symbol)
+        (setf (info :variable :wired-tls symbol) :always-thread-local))
+      (unless (info :variable :always-bound symbol)
+        (setf (info :variable :always-bound symbol) :always-bound)))))
