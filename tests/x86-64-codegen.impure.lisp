@@ -200,6 +200,21 @@
         (setq success t)))
     (assert success)))
 
+(defun test-arith-op-codegen (fun imm)
+  (split-string
+   (with-output-to-string (s)
+    (let ((sb-disassem:*disassem-location-column-width* 0))
+      (disassemble `(lambda (a b)
+                      (declare (fixnum b))
+                      (print 1) ; force spilling args to stack
+                      ;; Use an expression that doesn't select CMOV
+                      ;; as the implementation.
+                      ;; CMOV thinks it needs all args loaded,
+                      ;; defeating the purpose of this test.
+                      (values a (if (,fun b ,imm) 'baz (print 2))))
+                   :stream s)))
+   #\newline))
+
 (with-test (:name :test-high-byte-reg)
   ;; Assert two things:
   ;; - that LOGBITP can use a high byte register (sometimes)
@@ -221,24 +236,22 @@
 (with-test (:name :test-byte-stack-imm)
   ;; Assert that LOGBITP can accept memory + immediate as the operands
   (let (success)
-    (dolist (line
-             (split-string
-              (with-output-to-string (s)
-               (let ((sb-disassem:*disassem-location-column-width* 0))
-                 (disassemble '(lambda (a b)
-                                 (declare (fixnum b))
-                                 (print 1) ; force spilling args to stack
-                                 ;; Use an expression that doesn't select CMOV
-                                 ;; as the implementation.
-                                 ;; CMOV thinks it needs all args loaded,
-                                 ;; defeating the purpose of this test.
-                                 (values a (if (logtest b #x80) 'baz (print 2))))
-                              :stream s)))
-              #\newline))
+    (dolist (line (test-arith-op-codegen 'logtest #x80))
       (when (and (search "TEST BYTE PTR [RBP-" line)
                  (search (format nil
                           ", ~d"
                           (ash (ash #x80 sb-vm:n-fixnum-tag-bits) -8))
+                         line))
+        (setq success t)))
+    (assert success)))
+
+(with-test (:name :fixnum-cmp-stack-imm)
+  ;; Assert that < can accept memory + immediate as the operands
+  (let (success)
+    (dolist (line (test-arith-op-codegen '< -5))
+      (when (and (search "CMP QWORD PTR [RBP-" line)
+                 (search (format nil
+                          ", ~d" (ash -5 sb-vm:n-fixnum-tag-bits))
                          line))
         (setq success t)))
     (assert success)))

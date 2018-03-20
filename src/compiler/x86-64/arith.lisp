@@ -1376,27 +1376,38 @@ constant shift greater than word length")))
   (:generator 5
     (inst bt x y)))
 
+(defun emit-optimized-cmp (x y)
+  (if (and (gpr-p x) (eql y 0))
+      ;; Amazingly (to me), use of TEST in lieu of CMP produces all the correct
+      ;; flag bits for inequality comparison as well as EQL comparison.
+      ;; You'd think that the Jxx instruction should examine _only_ the S flag,
+      ;; but in fact the other flags are right too. Nonetheless this is
+      ;; quite confusing, and I would prefer that we alter the branch test
+      ;; when emitting TEST in place of CMP.
+      (inst test x x) ; smaller instruction
+      (progn (multiple-value-setq (x y) (ensure-not-mem+mem x y))
+             (inst cmp x y))))
+
 (macrolet ((define-conditional-vop (tran cond unsigned not-cond not-unsigned)
              (declare (ignore not-cond not-unsigned))
              `(progn
                 ,@(mapcar
                    (lambda (suffix cost signed)
+                     (let ((scs (case (let ((s (string suffix)))
+                                        (intern (subseq s (1+ (position #\/ s)))))
+                                  (fixnum '(any-reg control-stack))
+                                  (signed '(signed-reg signed-stack))
+                                  (unsigned '(unsigned-reg unsigned-stack)))))
                      `(define-vop (,(symbolicate "FAST-IF-" tran suffix)
                                    ,(symbolicate "FAST-CONDITIONAL"  suffix))
+                        (:args (x :scs ,scs :load-if nil)
+                               ,@(unless (search "-C/" (string suffix))
+                                   `((y :scs ,scs :load-if nil))))
                         (:translate ,tran)
                         (:conditional ,(if signed cond unsigned))
                         (:generator ,cost
-                          (cond ((and (sc-is x any-reg signed-reg unsigned-reg)
-                                      (eql y 0))
-                                 (inst test x x))
-                                (t
-                                 (inst cmp x
-                                       ,(case suffix
-                                          (-c/fixnum
-                                           `(constantize (fixnumize y)))
-                                          ((-c/signed -c/unsigned)
-                                           `(constantize y))
-                                          (t 'y))))))))
+                          (emit-optimized-cmp
+                           x ,(if (eq suffix '-c/fixnum) `(fixnumize y) 'y))))))
                    '(/fixnum -c/fixnum /signed -c/signed /unsigned -c/unsigned)
 ;                  '(/fixnum  /signed  /unsigned)
                    '(4 3 6 5 6 5)
