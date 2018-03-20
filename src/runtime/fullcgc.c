@@ -533,8 +533,9 @@ void execute_full_sweep_phase()
 
     memset(words_zeroed, 0, sizeof words_zeroed);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
+    if (sweeplog) fprintf(sweeplog, "-- fixedobj space --\n");
     sweep_fixedobj_pages(words_zeroed);
-    if (sweeplog) fprintf(sweeplog, "-- varyobj pages --\n");
+    if (sweeplog) fprintf(sweeplog, "-- varyobj space --\n");
     sweep((lispobj*)VARYOBJ_SPACE_START, varyobj_free_pointer,
           (uword_t)words_zeroed);
 #endif

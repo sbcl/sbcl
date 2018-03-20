@@ -3906,6 +3906,14 @@ prepare_for_final_gc ()
         write_TLS(PINNED_OBJECTS, NIL, th);
     }
 #endif
+#ifdef LISP_FEATURE_SB_THREAD
+    // Avoid tenuring of otherwise-dead objects referenced by
+    // dynamic bindings which disappear on image restart.
+    struct thread *thread = arch_os_get_current_thread();
+    char *start = (char*)&thread->interrupt_contexts;
+    char *end = (char*)thread + dynamic_values_bytes;
+    memset(start, 0, end-start);
+#endif
 }
 
 /* Set this switch to 1 for coalescing of strings dumped to fasl,
