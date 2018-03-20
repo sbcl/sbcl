@@ -115,7 +115,8 @@ FBOUNDP."
 (defun map-allocated-code-components (spaces fn)
   "Call FN for each allocated code component in one of SPACES.  FN
 receives the object and its size as arguments.  SPACES should be a
-list of the symbols :dynamic, :static, or :read-only."
+list of the symbols :dynamic, :static, :read-only, or :immobile on
+#+immobile-space"
   (apply #'sb-vm::map-allocated-objects
      (lambda (obj header size)
        (when (= sb-vm:code-header-widetag header)
@@ -573,7 +574,8 @@ value."
     callees))
 
 (defun find-function-callers (function &optional (spaces '(:read-only :static
-                                                           :dynamic)))
+                                                           :dynamic
+                                                           #+immobile-code :immobile)))
   "Return functions which call FUNCTION, by searching SPACES for code objects"
   (let ((referrers '()))
     (map-caller-code-components
