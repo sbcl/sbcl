@@ -1214,3 +1214,10 @@
                   (lambda () 133)
                 (funcall x)))))
           '(function (t) (values (integer 133 133) &optional)))))
+
+(with-test (:name :constant-folding-and-hairy-types)
+  (checked-compile-and-assert
+      ()
+      '(lambda ()
+        (> 0 (the (satisfies eval) (- 1))))
+      (() t)))

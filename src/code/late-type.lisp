@@ -2988,6 +2988,14 @@ used for a COMPLEX component.~:@>"
   (or (find type '(ratio keyword compiled-function) :key #'specifier-type :test #'type=)
       `(and ,@(mapcar #'type-specifier (intersection-type-types type)))))
 
+(!define-type-method (intersection :singleton-p) (type)
+  (loop for constituent in (intersection-type-types type)
+        do
+        (multiple-value-bind (single value) (type-singleton-p constituent)
+          (when single
+            (return (values single value))))
+        finally (return (values nil nil))))
+
 ;;; shared machinery for type equality: true if every type in the set
 ;;; TYPES1 matches a type in the set TYPES2 and vice versa
 (defun type=-set (types1 types2)
