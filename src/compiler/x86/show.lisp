@@ -12,8 +12,6 @@
 
 (in-package "SB!VM")
 
-;;; FIXME: should probably become conditional on #!+SB-SHOW
-;;; FIXME: should be called DEBUG-PRINT or COLD-PRINT
 (define-vop (print)
   (:args (object :scs (descriptor-reg any-reg)))
   (:temporary (:sc unsigned-reg

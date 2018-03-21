@@ -12,8 +12,6 @@
 
 (in-package "SB!VM")
 
-;;; FIXME: should probably become conditional on #!+SB-SHOW
-;;; FIXME: should be called DEBUG-PRINT or COLD-PRINT
 (define-vop (print)
   (:args (object :scs (descriptor-reg any-reg)
                  :target rdi))
@@ -27,15 +25,16 @@
                :from :eval
                :to (:result 0))
               rax)
-  (:temporary (:sc unsigned-reg :offset r13-offset) r13)
   (:temporary (:sc unsigned-reg) call-target)
   (:results (result :scs (descriptor-reg)))
   (:save-p t)
   (:generator 100
     (move rdi object)
-    (inst mov r13 rsp-tn)
-    (inst and rsp-tn -16)
+    (inst mov call-target rsp-tn) ; save RSP temporarily elsewhere
+    (inst and rsp-tn -16) ; align as required for ABI
+    (inst push call-target) ; push twice to preserve alignment
+    (inst push call-target)
     (inst mov call-target (make-fixup "debug_print" :foreign))
     (inst call call-target)
-    (inst mov rsp-tn r13)
+    (inst pop rsp-tn) ; restore the original RSP
     (move result rax)))
