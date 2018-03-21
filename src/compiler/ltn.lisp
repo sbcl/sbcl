@@ -170,14 +170,13 @@
   (declare (type basic-combination call))
   (let ((tails (and (node-tail-p call)
                     (lambda-tail-set (node-home-lambda call)))))
-    (cond ((not tails)
-           nil)
+    (cond ((not tails))
           ((eq (return-info-kind (tail-set-info tails)) :unknown)
            (ir2-change-node-successor call
-                                      (component-tail (block-component (node-block call))))
-           t)
+                                      (component-tail (block-component (node-block call)))))
           (t
-           (setf (node-tail-p call) nil)))))
+           (setf (node-tail-p call) nil))))
+  (values))
 
 ;;; We set the kind to :FULL or :FUNNY, depending on whether there is
 ;;; an IR2-CONVERT method. If a funny function, then we inhibit tail
@@ -372,9 +371,9 @@
           (t
            (setf (basic-combination-info call) :full)
            (annotate-fun-lvar (basic-combination-fun call) nil)
-           (let ((tail-p (flush-full-call-tail-transfer call)))
-             (dolist (arg (reverse args))
-               (annotate-unknown-values-lvar arg tail-p))))))
+           (dolist (arg (reverse args))
+             (annotate-unknown-values-lvar arg t))
+           (flush-full-call-tail-transfer call))))
 
   (values))
 
