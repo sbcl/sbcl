@@ -170,13 +170,14 @@
   (declare (type basic-combination call))
   (let ((tails (and (node-tail-p call)
                     (lambda-tail-set (node-home-lambda call)))))
-    (cond ((not tails))
+    (cond ((not tails)
+           nil)
           ((eq (return-info-kind (tail-set-info tails)) :unknown)
            (ir2-change-node-successor call
-                                      (component-tail (block-component (node-block call)))))
+                                      (component-tail (block-component (node-block call))))
+           t)
           (t
-           (setf (node-tail-p call) nil))))
-  (values))
+           (setf (node-tail-p call) nil)))))
 
 ;;; We set the kind to :FULL or :FUNNY, depending on whether there is
 ;;; an IR2-CONVERT method. If a funny function, then we inhibit tail
@@ -221,13 +222,12 @@
 ;;; of LVAR's DEST, and called in the order that the lvarss are
 ;;; received. Otherwise the IR2-BLOCK-POPPED and
 ;;; IR2-COMPONENT-VALUES-FOO would get all messed up.
-(defun annotate-unknown-values-lvar (lvar)
+(defun annotate-unknown-values-lvar (lvar &optional unused-count)
   (declare (type lvar lvar))
-
   (aver (not (lvar-dynamic-extent lvar)))
   (let ((2lvar (make-ir2-lvar nil)))
     (setf (ir2-lvar-kind 2lvar) :unknown)
-    (setf (ir2-lvar-locs 2lvar) (make-unknown-values-locations))
+    (setf (ir2-lvar-locs 2lvar) (make-unknown-values-locations unused-count))
     (setf (lvar-info lvar) 2lvar))
 
   ;; The CAST chain with corresponding lvars constitute the same
@@ -372,9 +372,9 @@
           (t
            (setf (basic-combination-info call) :full)
            (annotate-fun-lvar (basic-combination-fun call) nil)
-           (dolist (arg (reverse args))
-             (annotate-unknown-values-lvar arg))
-           (flush-full-call-tail-transfer call))))
+           (let ((tail-p (flush-full-call-tail-transfer call)))
+             (dolist (arg (reverse args))
+               (annotate-unknown-values-lvar arg tail-p))))))
 
   (values))
 

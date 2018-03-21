@@ -153,9 +153,14 @@
 
 ;;; Return a list of TNs that can be used to represent an unknown-values
 ;;; continuation within a function.
-(defun make-unknown-values-locations ()
+(defun make-unknown-values-locations (&optional unused-count)
+  (declare (ignorable unused-count))
   (list (make-stack-pointer-tn)
-        (make-normal-tn *fixnum-primitive-type*)))
+        (cond #!+x86-64 ;; needs support from receive-unknown-values
+              (unused-count
+               (sb!c::make-unused-tn))
+              (t
+               (make-normal-tn *fixnum-primitive-type*)))))
 
 ;;; This function is called by the ENTRY-ANALYZE phase, allowing
 ;;; VM-dependent initialization of the IR2-COMPONENT structure. We

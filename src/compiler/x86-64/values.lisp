@@ -64,7 +64,8 @@
         ((null val))
       (inst push (tn-ref-tn val)))
     (move start temp)
-    (inst mov count (fixnumize nvals))))
+    (unless (eq (tn-kind count) :unused)
+      (inst mov count (fixnumize nvals)))))
 
 ;;; Push a list of values on the stack, returning Start and Count as used in
 ;;; unknown values continuations.
@@ -92,10 +93,11 @@
     (cerror-call vop 'bogus-arg-to-values-list-error list)
 
     DONE
-    (inst mov count start)              ; start is high address
-    (inst sub count rsp-tn)             ; stackp is low address
-    #!-#.(cl:if (cl:= sb!vm:word-shift sb!vm:n-fixnum-tag-bits) '(and) '(or))
-    (inst shr count (- word-shift n-fixnum-tag-bits))))
+    (unless (eq (tn-kind count) :unused)
+      (inst mov count start)            ; start is high address
+      (inst sub count rsp-tn)           ; stackp is low address
+      #!-#.(cl:if (cl:= sb!vm:word-shift sb!vm:n-fixnum-tag-bits) '(and) '(or))
+      (inst shr count (- word-shift n-fixnum-tag-bits)))))
 
 ;;; Copy the more arg block to the top of the stack so we can use them
 ;;; as function arguments.
@@ -108,11 +110,11 @@
 (define-vop (%more-arg-values)
   (:args (context :scs (descriptor-reg any-reg) :target src)
          (skip :scs (any-reg immediate))
-         (num :scs (any-reg) :target count))
+         (num :scs (any-reg) :target loop-index))
   (:arg-types * positive-fixnum positive-fixnum)
   (:temporary (:sc any-reg :offset rsi-offset :from (:argument 0)) src)
   (:temporary (:sc descriptor-reg :offset rax-offset) temp)
-  (:temporary (:sc unsigned-reg :offset rcx-offset) loop-index)
+  (:temporary (:sc unsigned-reg :offset rcx-offset :from (:argument 2)) loop-index)
   (:results (start :scs (any-reg))
             (count :scs (any-reg)))
   (:generator 20
@@ -136,10 +138,13 @@
                     (make-ea :qword :base context :index skip
                              :scale (ash 1 (- word-shift n-fixnum-tag-bits))))
               (inst neg skip)))))
-    (move count num)
 
-    (inst lea loop-index (make-ea :byte :index count
-                                  :scale (ash 1 (- word-shift n-fixnum-tag-bits))))
+    (unless (eq (tn-kind count) :unused)
+      (move count num))
+    (if (location= loop-index num)
+        (inst shl num (- word-shift n-fixnum-tag-bits))
+        (inst lea loop-index (make-ea :byte :index num
+                                            :scale (ash 1 (- word-shift n-fixnum-tag-bits)))))
     (inst mov start rsp-tn)
     (inst jrcxz DONE)  ; check for 0 count?
 

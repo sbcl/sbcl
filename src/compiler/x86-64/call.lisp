@@ -379,7 +379,8 @@
   (let ((type (sb!c::basic-combination-derived-type node))
         (variable-values (gen-label))
         (stack-values (gen-label))
-        (done (gen-label)))
+        (done (gen-label))
+        (unused-count-p (eq (tn-kind count) :unused)))
     (when (sb!kernel:values-type-may-be-single-value-p type)
       (inst jmp :c variable-values)
       (cond ((location= start (first *register-arg-tns*))
@@ -387,7 +388,8 @@
              (inst lea start (make-ea :qword :base rsp-tn :disp n-word-bytes)))
             (t (inst mov start rsp-tn)
                (inst push (first *register-arg-tns*))))
-      (inst mov count (fixnumize 1))
+      (unless (eq (tn-kind count) :unused)
+        (inst mov count (fixnumize 1)))
       (inst jmp done)
       (emit-label variable-values))
     ;; The stack frame is burnt and RETurned from if there are no
@@ -404,7 +406,8 @@
         ;; doesn't do subtraction.
         (inst shl nargs (- word-shift n-fixnum-tag-bits))
         (inst sub rsp-tn nargs)
-        (inst shr nargs (- word-shift n-fixnum-tag-bits)))
+        (unless unused-count-p
+          (inst shr nargs (- word-shift n-fixnum-tag-bits))))
       (emit-label stack-values))
     ;; dtc: this writes the registers onto the stack even if they are
     ;; not needed, only the number specified in rcx are used and have
@@ -415,7 +418,8 @@
       for j below (sb!kernel:values-type-max-value-count type)
       do (storew arg args i))
     (move start args)
-    (move count nargs)
+    (unless unused-count-p
+      (move count nargs))
 
     (emit-label done))
   (values))

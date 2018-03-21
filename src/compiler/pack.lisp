@@ -1234,32 +1234,36 @@
   (do ((scs scs (cdr scs))
        (op ops (tn-ref-across op)))
       ((null scs))
-      (let ((target (tn-ref-target op)))
-        (when target
-           (let* ((load-tn (tn-ref-load-tn op))
-                  (load-scs (svref (car scs)
-                                   (sc-number
-                                    (tn-sc (or load-tn (tn-ref-tn op)))))))
-             (if load-tn
-                 (aver (eq load-scs t))
-               (unless (eq load-scs t)
-                       (setf (tn-ref-load-tn op)
-                             (pack-load-tn (car scs) op))))))))
+    (let ((target (tn-ref-target op))
+          (tn (tn-ref-tn op)))
+      (when (and target
+                 (not (eq (tn-kind tn) :unused)))
+        (let* ((load-tn (tn-ref-load-tn op))
+               (load-scs (svref (car scs)
+                                (sc-number
+                                 (tn-sc (or load-tn (tn-ref-tn op)))))))
+          (if load-tn
+              (aver (eq load-scs t))
+              (unless (eq load-scs t)
+                (setf (tn-ref-load-tn op)
+                      (pack-load-tn (car scs) op))))))))
 
   (do ((scs scs (cdr scs))
        (op ops (tn-ref-across op)))
       ((null scs))
-      (let ((target (tn-ref-target op)))
-        (unless target
-           (let* ((load-tn (tn-ref-load-tn op))
-                  (load-scs (svref (car scs)
-                                   (sc-number
-                                    (tn-sc (or load-tn (tn-ref-tn op)))))))
-             (if load-tn
-                 (aver (eq load-scs t))
-               (unless (eq load-scs t)
-                       (setf (tn-ref-load-tn op)
-                             (pack-load-tn (car scs) op))))))))
+    (let ((target (tn-ref-target op))
+          (tn (tn-ref-tn op)))
+      (unless (or target
+                  (eq (tn-kind tn) :unused))
+        (let* ((load-tn (tn-ref-load-tn op))
+               (load-scs (svref (car scs)
+                                (sc-number
+                                 (tn-sc (or load-tn tn))))))
+          (if load-tn
+              (aver (eq load-scs t))
+              (unless (eq load-scs t)
+                (setf (tn-ref-load-tn op)
+                      (pack-load-tn (car scs) op))))))))
 
   (values))
 
@@ -1291,8 +1295,10 @@
   ;; the write and vice versa.
   (aver (eq (tn-ref-write-p read)
             (not (tn-ref-write-p write))))
-  (setf (tn-ref-target read) write)
-  (setf (tn-ref-target write) read))
+  (unless (or (eq (tn-kind (tn-ref-tn write)) :unused)
+              (eq (tn-kind (tn-ref-tn read)) :unused))
+    (setf (tn-ref-target read) write)
+    (setf (tn-ref-target write) read)))
 
 ;;; If TN can be packed into SC so as to honor a preference to TARGET,
 ;;; then return the offset to pack at, otherwise return NIL. TARGET

@@ -140,6 +140,7 @@
           ((null vop))
         (labels ((register-p (tn)
                    (and (tn-p tn)
+                        (not (eq (tn-kind tn) :unused))
                         (eq (sc-sb (tn-sc tn)) register-sb)))
                  (constant-eql-p (a b)
                    (or (eq a b)

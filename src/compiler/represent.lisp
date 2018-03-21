@@ -493,9 +493,11 @@
   (do ((op ops (tn-ref-across op))
        (scs load-scs (cdr scs)))
       ((null scs))
-    (unless (svref (car scs)
-                   (sc-number (tn-sc (tn-ref-tn op))))
-      (emit-coerce-vop op dest-tn (car scs) before)))
+    (let ((tn (tn-ref-tn op)))
+      (unless (or (eq (tn-kind tn) :unused)
+                  (svref (car scs)
+                         (sc-number (tn-sc tn))))
+        (emit-coerce-vop op dest-tn (car scs) before))))
   (values))
 
 ;;; Emit coerce VOPs for the args and results, as needed.

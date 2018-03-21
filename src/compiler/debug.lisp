@@ -856,12 +856,14 @@ One of :WARN, :ERROR or :NONE.")
            (do ((scs scs (cdr scs))
                 (op ops (tn-ref-across op)))
                ((null scs))
-             (let ((load-tn (tn-ref-load-tn op)))
-               (unless (eq (svref (car scs)
-                                  (sc-number
-                                   (tn-sc
-                                    (or load-tn (tn-ref-tn op)))))
-                           t)
+             (let ((tn (tn-ref-tn op))
+                   (load-tn (tn-ref-load-tn op)))
+               (unless (or (eq (tn-kind tn) :unused)
+                           (eq (svref (car scs)
+                                      (sc-number
+                                       (tn-sc
+                                        (or load-tn tn))))
+                               t))
                  (barf "operand restriction not satisfied: ~S" op))))))
     (do-ir2-blocks (block component)
       (do ((vop (ir2-block-last-vop block) (vop-prev vop)))
