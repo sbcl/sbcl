@@ -1205,6 +1205,16 @@
                   when (and (not (block-delete-p block1))
                             (blocks-equivalent-p block1 block2))
                   do
+                  (let* ((ref1 (block-start-node block1))
+                         (ref2 (block-start-node block2))
+                         (type1 (node-derived-type ref1))
+                         (type2 (node-derived-type ref2)))
+                    ;; Constraint propagation may have given the
+                    ;; references different types. Join them back.
+                    (unless (eq type1 type2)
+                      (derive-node-type ref1
+                                        (values-type-union type1 type2)
+                                        :from-scratch t)))
                   (loop for pred in (block-pred block2)
                         do
                         (change-block-successor pred block2 block1))

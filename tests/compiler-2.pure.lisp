@@ -1221,3 +1221,14 @@
       '(lambda ()
         (> 0 (the (satisfies eval) (- 1))))
       (() t)))
+
+(with-test (:name :remove-equivalent-blocks-constraints)
+  (checked-compile-and-assert
+      ()
+      `(lambda (c)
+         (declare (integer c))
+         (= (case c
+              ((-10) (abs c))
+              (t c))
+            -1))
+    ((-1) t)))
