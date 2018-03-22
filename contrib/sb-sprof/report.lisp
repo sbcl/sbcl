@@ -14,6 +14,12 @@
 (deftype report-type ()
   '(member nil :flat :graph))
 
+(deftype report-sort-key ()
+  '(member :samples :cumulative-samples))
+
+(deftype report-sort-order ()
+  '(member :descending :ascending))
+
 
 ;;;; Reporting
 
@@ -54,11 +60,11 @@
                 ncycles
                 (call-graph-sampled-threads call-graph)))))
 
-(declaim (type (member :samples :cumulative-samples) *report-sort-by*))
+(declaim (type report-sort-key *report-sort-by*))
 (defvar *report-sort-by* :samples
   "Method for sorting the flat report: either by :SAMPLES or by :CUMULATIVE-SAMPLES.")
 
-(declaim (type (member :descending :ascending) *report-sort-order*))
+(declaim (type report-sort-order  *report-sort-order*))
 (defvar *report-sort-order* :descending
   "Order for sorting the flat report: either :DESCENDING or :ASCENDING.")
 
@@ -83,11 +89,11 @@
                     (find y (node-all-callers x))))))))))
 
 (defun print-flat (call-graph &key (stream *standard-output*) max
-                                min-percent (print-header t)
-                                (sort-by *report-sort-by*)
-                                (sort-order *report-sort-order*))
-  (declare (type (member :descending :ascending) sort-order)
-           (type (member :samples :cumulative-samples) sort-by))
+                                   min-percent (print-header t)
+                                   (sort-by *report-sort-by*)
+                                   (sort-order *report-sort-order*))
+  (declare (type report-sort-order sort-order)
+           (type report-sort-key sort-by))
   (let ((*standard-output* stream)
         (*print-pretty* nil)
         (total-count 0)
