@@ -3900,12 +3900,7 @@ prepare_for_final_gc ()
             generations[HIGHEST_NORMAL_GENERATION].bytes_allocated += used;
         }
     }
-#ifdef PINNED_OBJECTS
-    struct thread *th;
-    for_each_thread(th) {
-        write_TLS(PINNED_OBJECTS, NIL, th);
-    }
-#endif
+
 #ifdef LISP_FEATURE_SB_THREAD
     // Avoid tenuring of otherwise-dead objects referenced by
     // dynamic bindings which disappear on image restart.
@@ -3913,6 +3908,14 @@ prepare_for_final_gc ()
     char *start = (char*)&thread->interrupt_contexts;
     char *end = (char*)thread + dynamic_values_bytes;
     memset(start, 0, end-start);
+#endif
+    // Make sure that it's done after zeroing above, the GC needs to
+    // see a list there
+#ifdef PINNED_OBJECTS
+    struct thread *th;
+    for_each_thread(th) {
+        write_TLS(PINNED_OBJECTS, NIL, th);
+    }
 #endif
 }
 
