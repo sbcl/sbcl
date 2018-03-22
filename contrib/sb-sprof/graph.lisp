@@ -316,10 +316,6 @@
                 (when (> depth max-depth)
                   (return-from calls))
                 (let ((callee (lookup-node debug-info)))
-                  (when (and caller (not (member caller visited-nodes
-                                                 :test #'eq)))
-                    (incf (node-accrued-count caller))
-                    (push caller visited-nodes))
                   (when callee
                     (when caller
                       (let ((call (find callee (node-edges caller)
@@ -330,6 +326,10 @@
                               (incf (call-count call)))
                             (push (make-call callee)
                                   (node-edges caller))))))
+                  (when (and caller (not (member caller visited-nodes
+                                                 :test #'eq)))
+                    (incf (node-accrued-count caller))
+                    (push caller visited-nodes))
                   (incf depth)
                   (setf caller callee)))
               trace))
