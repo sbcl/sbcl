@@ -190,6 +190,15 @@
   ;; if call counting wasn't enabled for this function)
   (call-count nil :type (or null integer)))
 
+(defun node-all-callers (node)
+  (labels ((rec (seen current)
+             (if (or (eq current node)
+                     (find current seen :test #'eq))
+                 seen
+                 (reduce #'rec (node-callers current)
+                         :initial-value (list* current seen)))))
+    (reduce #'rec (node-callers node) :initial-value '())))
+
 (defmethod print-object ((node node) stream)
   (print-unreadable-object (node stream :type t :identity t)
     (format stream "~s [~d]" (node-name node) (node-index node))))

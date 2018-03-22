@@ -78,7 +78,9 @@
               (funcall cmp px py)
               (let ((sx (the fixnum (funcall secondary x)))
                     (sy (the fixnum (funcall secondary y))))
-                (funcall cmp sx sy))))))))
+                (if (/= sx sy)
+                    (funcall cmp sx sy)
+                    (find y (node-all-callers x))))))))))
 
 (defun print-flat (call-graph &key (stream *standard-output*) max
                                 min-percent (print-header t)
