@@ -26,8 +26,12 @@
 (defun scc-p (vertex)
   (not (null (vertex-scc-vertices vertex))))
 
-(defmacro do-vertices ((vertex graph) &body body)
-  `(dolist (,vertex (graph-vertices ,graph))
+(defmacro do-vertices ((vertex graph &optional predicate)
+                       &body body)
+  `(dolist (,vertex ,(if predicate
+                         `(stable-sort (copy-list (graph-vertices ,graph))
+                                       ,predicate)
+                         `(graph-vertices ,graph)))
      ,@body))
 
 (defmacro do-edges ((edge edge-to vertex) &body body)
@@ -151,9 +155,7 @@
   ;; threads that have been sampled
   (sampled-threads '()                    :type list)
   ;; sample count for samples not in any function
-  (elsewhere-count (sb-impl::missing-arg) :type sb-int:index)
-  ;; a flat list of NODEs, sorted by sample count
-  (flat-nodes      '()                    :type list))
+  (elsewhere-count (sb-impl::missing-arg) :type sb-int:index))
 
 (defmethod print-object ((call-graph call-graph) stream)
   (print-unreadable-object (call-graph stream :type t :identity t)
@@ -388,8 +390,6 @@
   (stop-profiling)
   (show-progress "~&Computing call graph ")
   (let ((call-graph (without-gcing (make-call-graph-1 max-depth))))
-    (setf (call-graph-flat-nodes call-graph)
-          (copy-list (graph-vertices call-graph)))
     (show-progress "~&Finding cycles")
     #+nil
     (reduce-call-graph call-graph)

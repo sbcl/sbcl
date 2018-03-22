@@ -165,7 +165,8 @@
       (format t "~&                               Callers~%")
       (format t "~&                 Total.     Function~%")
       (format t "~& Count     %  Count     %      Callees~%")
-      (do-vertices (node call-graph)
+      (do-vertices (node call-graph (make-node-comparator
+                                     :samples :descending))
         (print-separator)
         ;;
         ;; Print caller information.
