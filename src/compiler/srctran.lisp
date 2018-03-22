@@ -599,9 +599,14 @@
   (let ((types (prepare-arg-for-derive-type type))
         (result nil))
     (dolist (type types)
-      (let ((type (if (member-type-p type)
-                      (convert-member-type type)
-                      type)))
+      (let ((type (typecase type
+                    (member-type type
+                     (convert-member-type type))
+                    (intersection-type
+                     (find-if #'numeric-type-p
+                              (intersection-type-types type)))
+                    (t
+                     type))))
         (unless (numeric-type-p type)
           (return-from type-approximate-interval nil))
         (let ((interval (numeric-type->interval type)))

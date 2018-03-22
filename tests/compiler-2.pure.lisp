@@ -1220,7 +1220,15 @@
       ()
       '(lambda ()
         (> 0 (the (satisfies eval) (- 1))))
-      (() t)))
+    (() t)))
+
+(with-test (:name :type-approximate-interval-and-hairy-types)
+  (checked-compile-and-assert
+      ()
+      '(lambda (x)
+        (declare (fixnum x))
+        (<= (the (satisfies eval) 65) x))
+    ((66) t)))
 
 (with-test (:name :remove-equivalent-blocks-constraints)
   (checked-compile-and-assert
