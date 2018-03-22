@@ -201,7 +201,10 @@
 
 (defmethod print-object ((node node) stream)
   (print-unreadable-object (node stream :type t :identity t)
-    (format stream "~s [~d]" (node-name node) (node-index node))))
+    (format stream "~s [~d] ~:D sample~:P"
+            (node-name node)
+            (node-index node)
+            (node-count node))))
 
 ;;; A cycle in a call graph.  The functions forming the cycle are
 ;;; found in the SCC-VERTICES slot of the VERTEX structure.
