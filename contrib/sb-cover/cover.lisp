@@ -93,6 +93,7 @@ result to RESTORE-COVERAGE."
                            :defaults pathname)))))
 
 (defun report (directory &key ((:form-mode *source-path-mode*) :whole)
+               (if-matches 'identity)
                (external-format :default))
   "Print a code coverage report of all instrumented files into DIRECTORY.
 If DIRECTORY does not exist, it will be created. The main report will be
@@ -103,27 +104,34 @@ If the keyword argument FORM-MODE has the value :CAR, the annotations in
 the coverage report will be placed on the CARs of any cons-forms, while if
 it has the value :WHOLE the whole form will be annotated (the default).
 The former mode shows explicitly which forms were instrumented, while the
-latter mode is generally easier to read."
+latter mode is generally easier to read.
+
+The keyword argument IF-MATCHES should be a designator for a function
+of one argument, called for the namestring of each file with code
+coverage info. If it returns true, the file's info is included in the
+report, otherwise ignored. The default value is CL:IDENTITY.
+"
   (let* ((paths)
          (directory (pathname-as-directory directory))
          (*default-pathname-defaults* (translate-logical-pathname directory)))
     (ensure-directories-exist *default-pathname-defaults*)
     (maphash (lambda (k v)
                (declare (ignore v))
-               (let* ((pk (translate-logical-pathname k))
-                      (n (format nil "~(~{~2,'0X~}~)"
-                                (coerce (sb-md5:md5sum-string
-                                         (sb-ext:native-namestring pk))
-                                        'list)))
-                      (path (make-pathname :name n :type "html" :defaults directory)))
-                 (when (probe-file k)
-                   (ensure-directories-exist pk)
-                   (with-open-file (stream path
-                                           :direction :output
-                                           :if-exists :supersede
-                                           :if-does-not-exist :create)
-                     (push (list* k n (report-file k stream external-format))
-                           paths)))))
+               (when (funcall if-matches k)
+                 (let* ((pk (translate-logical-pathname k))
+                        (n (format nil "~(~{~2,'0X~}~)"
+                                   (coerce (sb-md5:md5sum-string
+                                            (sb-ext:native-namestring pk))
+                                           'list)))
+                        (path (make-pathname :name n :type "html" :defaults directory)))
+                   (when (probe-file k)
+                     (ensure-directories-exist pk)
+                     (with-open-file (stream path
+                                             :direction :output
+                                             :if-exists :supersede
+                                             :if-does-not-exist :create)
+                       (push (list* k n (report-file k stream external-format))
+                             paths))))))
              *code-coverage-info*)
     (let ((report-file (make-pathname :name "cover-index" :type "html" :defaults directory)))
       (with-open-file (stream report-file
