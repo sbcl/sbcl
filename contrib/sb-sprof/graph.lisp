@@ -161,6 +161,10 @@
   (print-unreadable-object (call-graph stream :type t :identity t)
     (format stream "~d samples" (call-graph-nsamples call-graph))))
 
+;;; Used by SLIME
+(defun call-graph-flat-nodes (graph)
+  (graph-vertices graph))
+
 ;;; A node in a call graph, representing a function that has been
 ;;; sampled.  The edges of a node are CALL structures that represent
 ;;; functions called from a given node.
