@@ -186,10 +186,13 @@
                               (:declared
                                (global-var-type leaf))
                               ((:defined :defined-here)
-                               (if (and (defined-fun-p leaf)
-                                        (eq (defined-fun-inlinep leaf) :notinline))
-                                   lvar-type
-                                   (proclaimed-ftype (global-var-%source-name leaf))))
+                               (cond ((and (defined-fun-p leaf)
+                                           (eq (defined-fun-inlinep leaf) :notinline))
+                                      lvar-type)
+                                     ((fun-lexically-notinline-p (global-var-%source-name leaf))
+                                      lvar-type)
+                                     (t
+                                      (proclaimed-ftype (global-var-%source-name leaf)))))
                               (t
                                (global-var-defined-type leaf)))))
          (lvar-type (if (and defined-type
@@ -218,7 +221,9 @@
          (type (cond ((fun-type-p lvar-type)
                       lvar-type)
                      ((symbolp fun-name)
-                      (proclaimed-ftype fun-name))
+                      (if (fun-lexically-notinline-p fun-name)
+                          lvar-type
+                          (proclaimed-ftype fun-name)))
                      ((functional-p leaf)
                       (let ((info (functional-info leaf)))
                         (if info
