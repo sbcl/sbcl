@@ -168,7 +168,7 @@
                   (when lvar
                     (call lvar annotation)))))))))
 
-(defun lvar-fun-type (lvar)
+(defun lvar-fun-type (lvar &optional defined-here)
   ;; Handle #'function,  'function and (lambda (x y))
   (let* ((use (principal-lvar-use lvar))
          (lvar-type (lvar-type lvar))
@@ -182,17 +182,18 @@
                                (t
                                 '.anonymous.))))))
          (defined-type (and (global-var-p leaf)
-                            (case (global-var-where-from leaf)
+                            (case (leaf-where-from leaf)
                               (:declared
-                               (global-var-type leaf))
+                               (leaf-type leaf))
                               ((:defined :defined-here)
-                               (cond ((and (defined-fun-p leaf)
-                                           (eq (defined-fun-inlinep leaf) :notinline))
-                                      lvar-type)
-                                     ((fun-lexically-notinline-p (global-var-%source-name leaf))
-                                      lvar-type)
-                                     (t
-                                      (proclaimed-ftype (global-var-%source-name leaf)))))
+                               (if (or (and (defined-fun-p leaf)
+                                            (eq (defined-fun-inlinep leaf) :notinline))
+                                       (and defined-here
+                                            (eq (leaf-where-from leaf) :defined))
+                                       (fun-lexically-notinline-p (leaf-%source-name leaf)
+                                                                  (node-lexenv (lvar-dest lvar))))
+                                   lvar-type
+                                   (proclaimed-ftype (leaf-%source-name leaf))))
                               (t
                                (global-var-defined-type leaf)))))
          (lvar-type (if (and defined-type
@@ -221,7 +222,8 @@
          (type (cond ((fun-type-p lvar-type)
                       lvar-type)
                      ((symbolp fun-name)
-                      (if (fun-lexically-notinline-p fun-name)
+                      (if (fun-lexically-notinline-p fun-name
+                                                     (node-lexenv (lvar-dest lvar)))
                           lvar-type
                           (proclaimed-ftype fun-name)))
                      ((functional-p leaf)
