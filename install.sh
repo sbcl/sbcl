@@ -3,6 +3,8 @@ set -e
 
 # Install SBCL files into the usual places.
 
+umask 022
+
 ensure_dirs ()
 {
     for j in "$@"; do
