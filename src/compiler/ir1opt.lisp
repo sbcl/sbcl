@@ -1822,7 +1822,7 @@
                                          (leaf-type var)))
                      (propagate-to-refs var type)
                      (unless (preserve-single-use-debug-var-p call var)
-                       (update-dependent-casts leaf arg)
+                       (update-lvar-dependencies leaf arg)
                        (propagate-ref-dx use arg var)
                        (let ((use-component (node-component use)))
                          (substitute-leaf-if

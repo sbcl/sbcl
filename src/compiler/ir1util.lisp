@@ -250,7 +250,15 @@
 
 ;;;; lvar substitution
 
-(defun update-dependent-casts (new old)
+(defun update-lvar-dependencies (new old)
+  (when (lvar-p new)
+    (do-uses (node old)
+      (when (exit-p node)
+        ;; Inlined functions will try to use the lvar in the lexenv
+        (loop for block in (lexenv-blocks (node-lexenv node))
+              for block-lvar = (fourth block)
+              when (eq old block-lvar)
+              do (setf (fourth block) new)))))
   (loop for cast in (lvar-dependent-casts old)
         do (nsubst new old (dependent-cast-deps cast))
         when (lvar-p new)
@@ -262,7 +270,7 @@
 (defun substitute-lvar (new old)
   (declare (type lvar old new))
   (aver (not (lvar-dest new)))
-  (update-dependent-casts new old)
+  (update-lvar-dependencies new old)
   (let ((dest (lvar-dest old)))
     (etypecase dest
       ((or ref bind))
@@ -289,7 +297,7 @@
            (type (or lvar null) new)
            (type boolean propagate-dx))
   (cond (new
-         (update-dependent-casts new old)
+         (update-lvar-dependencies new old)
          (do-uses (node old)
            (%delete-lvar-use node)
            (add-lvar-use node new))

@@ -1269,3 +1269,18 @@
                      #'change))
             (> l v))))
     ((1) t)))
+
+(with-test (:name :inlining-and-substituted-block-lvars)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (let ((z (block nil
+                    (labels ((f (x)
+                               (return x)))
+                      (declare (inline f))
+                      (funcall (the function #'f) t)
+                      (funcall (the function #'f) t)))))
+           (and z
+                1)))
+    (() 1)))
+
