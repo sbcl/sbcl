@@ -654,7 +654,7 @@
                         (let ((functional (defined-fun-functional leaf)))
                           (when (and functional (not (functional-kind functional)))
                             (maybe-reanalyze-functional functional))))
-                   (when (and (lambda-p leaf)
+                   (when (and (functional-p leaf)
                               (memq (functional-kind leaf)
                                     '(nil :optional)))
                      (maybe-reanalyze-functional leaf))

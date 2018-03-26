@@ -1284,3 +1284,16 @@
                 1)))
     (() 1)))
 
+(with-test (:name :inlining-reanlyzing-optionals)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (labels ((w (x)
+                    x
+                    #'s)
+                  (fun2 (f x)
+                    (funcall f x))
+                  (s (&optional x)
+                    (fun2 #'w x)))
+           (declare (inline w))
+           (s)))))
