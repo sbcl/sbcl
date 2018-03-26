@@ -1240,3 +1240,10 @@
               (t c))
             -1))
     ((-1) t)))
+
+(with-test (:name :typep-singleton-intersect-types)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (keywordp t))
+    (() nil)))

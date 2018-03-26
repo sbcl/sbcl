@@ -96,7 +96,8 @@
             nil)
            (t
             (let ((intersect (type-intersection2 type otype)))
-              (unless intersect
+              (when (or (not intersect)
+                        (intersection-type-p intersect))
                 (tricky))
               (multiple-value-bind (constantp value)
                   (type-singleton-p intersect)
@@ -781,9 +782,10 @@
   (let ((ctype (careful-specifier-type type)))
     (if ctype
         (or
-         (multiple-value-bind (constantp value) (type-singleton-p ctype)
-           (and constantp
-                `(eql ,object ',value)))
+         (and (not (intersection-type-p type))
+              (multiple-value-bind (constantp value) (type-singleton-p ctype)
+                (and constantp
+                     `(eql ,object ',value))))
          (let ((pred (cdr (assoc ctype *backend-type-predicates*
                                  :test #'type=))))
            (when pred `(,pred ,object)))
