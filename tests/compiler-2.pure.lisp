@@ -1297,3 +1297,12 @@
                     (fun2 #'w x)))
            (declare (inline w))
            (s)))))
+
+(with-test (:name :vector-fill/t-fast-safe)
+  (let ((sb-c::*policy-min* sb-c::*policy-min*))
+    (sb-ext:restrict-compiler-policy 'safety 1)
+    (checked-compile-and-assert
+     ()
+     '(lambda ()
+       (make-array 2 :initial-element 10))
+     (() #(10 10) :test #'equalp))))

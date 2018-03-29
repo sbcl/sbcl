@@ -17,7 +17,8 @@
 ;;; Alternatively, if the CPU has the enhanced MOVSB feature, use REP STOS
 ;;; depending on the number of elements to be written.
 (define-assembly-routine (vector-fill/t
-                          (:translate vector-fill/t))
+                          (:translate vector-fill/t)
+                          (:policy :fast-safe))
                          ((:arg  vector (descriptor-reg) rdx-offset)
                           (:arg  item   (any-reg descriptor-reg) rax-offset)
                           (:arg  start  (any-reg descriptor-reg) rdi-offset)
