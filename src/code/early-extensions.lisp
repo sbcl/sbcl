@@ -1085,6 +1085,8 @@ NOTE: This interface is experimental and subject to change."
 (defun defprinter-print-space (stream)
   (write-char #\space stream))
 
+(defvar *print-ir-nodes-pretty* nil)
+
 ;;; Define some kind of reasonable PRINT-OBJECT method for a
 ;;; STRUCTURE-OBJECT class.
 ;;;
@@ -1108,27 +1110,30 @@ NOTE: This interface is experimental and subject to change."
 ;;;
 ;;; The structure being printed is bound to STRUCTURE and the stream
 ;;; is bound to STREAM.
+;;;
+;;; If PRETTY-IR-PRINTER is supplied, the form is invoked when
+;;; *PRINT-IR-NODES-PRETTY* is true.
 (defmacro defprinter ((name
                        &key
                        (conc-name (concatenate 'simple-string
                                                (symbol-name name)
                                                "-"))
-                       identity)
+                       identity
+                       pretty-ir-printer)
                       &rest slot-descs)
   (let ((first? t)
         maybe-print-space
-        (reversed-prints nil)
-        (stream (sb!xc:gensym "STREAM")))
+        (reversed-prints nil))
     (flet ((sref (slot-name)
              `(,(symbolicate conc-name slot-name) structure)))
       (dolist (slot-desc slot-descs)
         (if first?
             (setf maybe-print-space nil
                   first? nil)
-            (setf maybe-print-space `(defprinter-print-space ,stream)))
+            (setf maybe-print-space `(defprinter-print-space stream)))
         (cond ((atom slot-desc)
                (push maybe-print-space reversed-prints)
-               (push `(defprinter-prin1 ',slot-desc ,(sref slot-desc) ,stream)
+               (push `(defprinter-prin1 ',slot-desc ,(sref slot-desc) stream)
                      reversed-prints))
               (t
                (let ((sname (first slot-desc))
@@ -1141,25 +1146,31 @@ NOTE: This interface is experimental and subject to change."
                                    ,maybe-print-space
                                    ,@(or (stuff)
                                          `((defprinter-prin1
-                                             ',sname ,sname ,stream)))))
+                                             ',sname ,sname stream)))))
                               reversed-prints))
                      (case (first option)
                        (:prin1
                         (stuff `(defprinter-prin1
-                                  ',sname ,(second option) ,stream)))
+                                  ',sname ,(second option) stream)))
                        (:princ
                         (stuff `(defprinter-princ
-                                  ',sname ,(second option) ,stream)))
+                                  ',sname ,(second option) stream)))
                        (:test (setq test (second option)))
                        (t
                         (error "bad option: ~S" (first option)))))))))))
-    `(defmethod print-object ((structure ,name) ,stream)
-       (pprint-logical-block (,stream nil)
-         (print-unreadable-object (structure
-                                   ,stream
-                                   :type t
-                                   :identity ,identity)
-           ,@(nreverse reversed-prints))))))
+    (let ((normal-printer `(pprint-logical-block (stream nil)
+                             (print-unreadable-object (structure
+                                                       stream
+                                                       :type t
+                                                       :identity ,identity)
+                               ,@(nreverse reversed-prints))) ))
+      `(defmethod print-object ((structure ,name) stream)
+         ,(cond (pretty-ir-printer
+                 `(if *print-ir-nodes-pretty*
+                      ,pretty-ir-printer
+                      ,normal-printer))
+                (t
+                 normal-printer))))))
 
 (defun print-symbol-with-prefix (stream symbol &optional colon at)
   "For use with ~/: Write SYMBOL to STREAM as if it is not accessible from

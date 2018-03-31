@@ -763,7 +763,17 @@
   ;; kind of variable described
   (kind (missing-arg)
         :type (member :special :global-function :global :unknown)))
-(defprinter (global-var :identity t)
+
+(defun pretty-print-global-var (var stream)
+  (let ((name (leaf-source-name var)))
+    (princ (if (eq (global-var-kind var) :global-function)
+               `(function ,name)
+               name)
+           stream)))
+
+(defprinter (global-var :identity t
+             :pretty-ir-printer
+             (pretty-print-global-var structure stream))
   %source-name
   #!+sb-show id
   (type :test (not (eq type *universal-type*)))
@@ -799,7 +809,8 @@
   ;; RECOGNIZE-KNOWN-CALL) - we need separate functionals for each policy in
   ;; which the function is used.
   (functionals nil :type list))
-(defprinter (defined-fun :identity t)
+(defprinter (defined-fun :identity t
+             :pretty-ir-printer (pretty-print-global-var structure stream))
   %source-name
   #!+sb-show id
   inlinep
@@ -960,7 +971,17 @@
   ;; True if this functional was created from an inline expansion. This
   ;; is either T, or the GLOBAL-VAR for which it is an expansion.
   (inline-expanded nil))
-(defprinter (functional :identity t)
+
+(defun pretty-print-functional (functional stream)
+  (let ((name (functional-debug-name functional)))
+    (princ `(function
+             ,(if (typep name '(cons (member xep tl-xep)))
+                  (cadr name)
+                  name))
+           stream)))
+
+(defprinter (functional :identity t
+             :pretty-ir-printer (pretty-print-functional structure stream))
   %source-name
   %debug-name
   #!+sb-show id)
@@ -1080,7 +1101,8 @@
   ;; the lambda itself is not, and the bindings introduced by it are considered
   ;; transparent by the nested DX analysis.
   (system-lambda-p nil :type boolean))
-(defprinter (clambda :conc-name lambda- :identity t)
+(defprinter (clambda :conc-name lambda- :identity t
+             :pretty-ir-printer (pretty-print-functional structure stream))
   %source-name
   %debug-name
   #!+sb-show id
@@ -1161,7 +1183,8 @@
   ;; be used by callers that supply at least MAX-ARGS arguments and
   ;; know what they are doing.
   (main-entry nil :type (or clambda null)))
-(defprinter (optional-dispatch :identity t)
+(defprinter (optional-dispatch :identity t
+             :pretty-ir-printer (pretty-print-functional structure stream))
   %source-name
   %debug-name
   #!+sb-show id
