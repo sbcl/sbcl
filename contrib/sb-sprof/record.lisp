@@ -371,7 +371,6 @@ EXPERIMENTAL: Interface subject to change."
                   ;; pointer in ebp/rbp, so make sure it looks
                   ;; reasonable before walking the stack
                   (unless (sb-di::control-stack-pointer-valid-p (sb-sys:int-sap fp))
-                    (record samples pc-ptr)
                     (return-from sigprof-handler nil))
                   (incf (samples-trace-count samples))
                   (pushnew self (samples-sampled-threads samples))
