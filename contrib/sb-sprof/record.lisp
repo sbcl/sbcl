@@ -63,8 +63,11 @@
   (declare (optimize (speed 3)))
   (let ((vector (samples-vector samples))
         (index (samples-index samples)))
-    ;; Allocate a new sample vector if the old one is full
-    (values (if (= (length vector) index)
+    ;; Allocate a new sample vector if the current one is too small to
+    ;; accommodate the largest chunk of elements that we could
+    ;; potentially store in one go (currently 3 elements, stored by
+    ;; RECORD-TRACE-START).
+    (values (if (< (length vector) (+ index 3))
                 (let ((new-vector (make-array (* 2 index))))
                   (note-sample-vector-full samples)
                   (replace new-vector vector)
