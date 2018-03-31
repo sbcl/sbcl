@@ -11,6 +11,16 @@
 (deftype sampling-mode ()
   '(member :cpu :alloc :time))
 
+;;; 0 code-component-ish
+;;; 1 an offset relative to the start of the code-component or an
+;;;   absolute address
+(defconstant +elements-per-sample+ 2)
+
+;;; 0 the symbol TRACE-START
+;;; 1 the current thread, an SB-THREAD:THREAD instance
+;;; 2 the current internal real time
+(defconstant +elements-per-trace-start+ 3)
+
 (declaim (inline make-sample-vector))
 (defun make-sample-vector (max-samples)
   (make-array (* max-samples
@@ -20,7 +30,7 @@
                  ;; re-allocation that will need to be done.
                  10
                  ;; Each sample takes two cells in the vector
-                 2)))
+                 +elements-per-sample+)))
 
 ;;; Encapsulate all the information about a sampling run
 (defstruct (samples
@@ -56,7 +66,7 @@
                           approximately ~:D sample~:P), doubling the ~
                           size~%"
           (samples-trace-count samples)
-          (truncate (samples-index samples) 2)))
+          (truncate (samples-index samples) +elements-per-sample+)))
 
 (declaim (inline ensure-samples-vector))
 (defun ensure-samples-vector (samples)
@@ -67,7 +77,8 @@
     ;; accommodate the largest chunk of elements that we could
     ;; potentially store in one go (currently 3 elements, stored by
     ;; RECORD-TRACE-START).
-    (values (if (< (length vector) (+ index 3))
+    (values (if (< (length vector) (+ index (max +elements-per-sample+
+                                                 +elements-per-trace-start+)))
                 (let ((new-vector (make-array (* 2 index))))
                   (note-sample-vector-full samples)
                   (replace new-vector vector)
@@ -81,7 +92,7 @@
     (setf (aref vector index) 'trace-start
           (aref vector (+ index 1)) sb-thread:*current-thread*
           (aref vector (+ index 2)) (get-internal-real-time))
-    (setf (samples-index samples) (+ index 3))))
+    (setf (samples-index samples) (+ index +elements-per-trace-start+))))
 
 (declaim (inline record-sample))
 (defun record-sample (samples info pc-or-offset)
@@ -90,7 +101,7 @@
     ;; adjacent cells.
     (setf (aref vector index) info
           (aref vector (1+ index)) pc-or-offset)
-    (setf (samples-index samples) (+ index 2))))
+    (setf (samples-index samples) (+ index +elements-per-sample+))))
 
 ;;; Trace and sample and access functions
 
@@ -118,7 +129,8 @@ EXPERIMENTAL: Interface subject to change."
           for thread = (aref vector (+ start 1))
           for time = (/ (- (aref vector (+ start 2)) start-time)
                         internal-time-units-per-second)
-          for end = (or (position 'trace-start vector :start (+ start 3))
+          for end = (or (position 'trace-start vector
+                                  :start (+ start +elements-per-trace-start+))
                         index)
           do (let ((trace (list vector start end)))
                (funcall function thread time trace)))))
@@ -137,7 +149,9 @@ TRACE is an object as received by a function passed to MAP-TRACES.
 EXPERIMENTAL: Interface subject to change."
   (let ((function (sb-kernel:%coerce-callable-to-fun function)))
     (destructuring-bind (samples start end) trace
-      (loop for i from (- end 2) downto (+ start 2) by 2
+      (loop for i from (- end +elements-per-sample+)
+            downto (+ start +elements-per-trace-start+ -1)
+            by +elements-per-sample+
             for info = (aref samples i)
             for pc-or-offset = (aref samples (1+ i))
             do (funcall function info pc-or-offset)))))
