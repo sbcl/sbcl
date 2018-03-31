@@ -106,7 +106,8 @@
 
 ;; Check for presence of constant coalescing bugs
 (compile-load "test-data-3")
-(test-2)
+(let ((*standard-output* (make-broadcast-stream)))
+  (test-2))
 
 ;;; Another file, with some branches
 (compile-load "test-data-branching-forms")
