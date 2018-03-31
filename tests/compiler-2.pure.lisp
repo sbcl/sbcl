@@ -1306,3 +1306,14 @@
      '(lambda ()
        (make-array 2 :initial-element 10))
      (() #(10 10) :test #'equalp))))
+
+(with-test (:name :deleted-tail-sets)
+  (checked-compile-and-assert
+   ()
+   '(lambda ()
+     (labels ((f (&optional (a (catch t 6))
+                            (b (error ""))
+                            (c (unwind-protect 1)))
+                (+ a b c)))
+       (unwind-protect (f 4))))
+   (() (condition 'error))))

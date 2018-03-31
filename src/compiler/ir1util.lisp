@@ -479,6 +479,7 @@
                 (when (return-p (lvar-dest lvar))
                   (do-uses (use value)
                     (when (and (basic-combination-p use)
+                               (not (node-to-be-deleted-p use))
                                (eq (basic-combination-kind use) :local))
                       (merges use))))
                 (substitute-lvar-uses lvar value
