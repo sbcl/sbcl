@@ -942,9 +942,7 @@ Experimental: interface subject to change."
                                             :host (pathname-host pathspec)
                                             :name nil
                                             :type nil
-                                            :version nil))
-             (starting-point (or (%query-file-system starting-point :truename nil)
-                                 starting-point)))
+                                            :version nil)))
     (case mode
       (:wild-inferiors
        (map-wild-inferiors function directory-rest starting-point))
