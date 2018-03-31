@@ -1317,3 +1317,9 @@
                 (+ a b c)))
        (unwind-protect (f 4))))
    (() (condition 'error))))
+
+;;; The SLEEP source transform barfed on float positive infinity
+;;; values.
+(with-test (:name (compile sleep float :infinity :lp-1754081))
+  (checked-compile '(lambda () (sleep single-float-positive-infinity)))
+  (checked-compile '(lambda () (sleep double-float-positive-infinity))))

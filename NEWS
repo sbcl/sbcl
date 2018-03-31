@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-1.4.6:
+  * bug fix: Compiling a SLEEP call with a float positive infinity argument no
+    longer causes an internal error (lp#1754081)
+
 changes in sbcl-1.4.6 relative to sbcl-1.4.5:
   * enhancement: DISASSEMBLE on a symbol naming a macro will disassemble
     the expander, not the code that traps attempted FUNCALL of the macro.
@@ -7,7 +11,7 @@ changes in sbcl-1.4.6 relative to sbcl-1.4.5:
     for accessing collected profiler data.
   * enhancement: The instruction-level profiling of the sb-prof contrib
     annotates the disassembler output more efficiently.
-  * optimization: improved dynamic-extent handling of nested variables. 
+  * optimization: improved dynamic-extent handling of nested variables.
 
 changes in sbcl-1.4.5 relative to sbcl-1.4.4:
   * minor incompatible change: building with/without the :sb-package-locks
