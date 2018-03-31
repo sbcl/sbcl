@@ -38,21 +38,62 @@
             (:copier nil))
   ;; a list of the stringified CARs of the enclosing non-original source forms
   ;; exceeding the *enclosing-source-cutoff*
-  (enclosing-source nil :type list)
+  (%enclosing-source nil :type list)
   ;; a list of stringified enclosing non-original source forms
-  (source nil :type list)
-  ;; the stringified form in the original source that expanded into SOURCE
-  (original-source (missing-arg) :type simple-string)
+  (%source nil :type list)
+  (original-form (missing-arg))
+  (original-form-string nil)
   ;; a list of prefixes of "interesting" forms that enclose original-source
   (context nil :type list)
   ;; the FILE-INFO-NAME for the relevant FILE-INFO
   (file-name (missing-arg) :type (or pathname (member :lisp :stream)))
   ;; the file position at which the top level form starts, if applicable
   (file-position nil :type (or index null))
+  path
+  format-args
+  initialized
   ;; the original source part of the source path
   (original-source-path nil :type list)
   ;; the lexenv active at the time
   (lexenv nil :type (or null lexenv)))
+
+;;; Delay computing some source information, since it may not actually be ever used
+(defun compiler-error-context-original-source (context)
+  (let ((source (compiler-error-context-original-form-string context)))
+    (if (stringp source)
+        source
+        (setf (compiler-error-context-original-form-string context)
+              (stringify-form (compiler-error-context-original-form context))))))
+
+(defun compiler-error-context-source (context)
+  (setup-compiler-error-context context)
+  (compiler-error-context-%source context))
+
+(defun compiler-error-context-enclosing-source (context)
+  (setup-compiler-error-context context)
+  (compiler-error-context-%enclosing-source context))
+
+(defun setup-compiler-error-context (context)
+  (unless (compiler-error-context-initialized context)
+    (setf (compiler-error-context-initialized context) t)
+    (let ((path (compiler-error-context-path context))
+          (args (compiler-error-context-format-args context)))
+      (collect ((full nil cons)
+                (short nil cons))
+        (let ((forms (source-path-forms path))
+              (n 0))
+          (dolist (src (if (member (first forms) args)
+                           (rest forms)
+                           forms))
+            (if (>= n *enclosing-source-cutoff*)
+                (short (stringify-form (if (consp src)
+                                           (car src)
+                                           src)
+                                       nil))
+                (full (stringify-form src)))
+            (incf n))
+          (setf (compiler-error-context-%enclosing-source context) (short)
+                (compiler-error-context-%source context) (full)))))))
 
 ;;; If true, this is the node which is used as context in compiler warning
 ;;; messages.
@@ -206,38 +247,23 @@
           (if old
               (values old t)
               (when (and *source-info* path)
-                (multiple-value-bind (form src-context) (find-original-source path)
-                  (collect ((full nil cons)
-                            (short nil cons))
-                    (let ((forms (source-path-forms path))
-                          (n 0))
-                      (dolist (src (if (member (first forms) args)
-                                       (rest forms)
-                                       forms))
-                        (if (>= n *enclosing-source-cutoff*)
-                            (short (stringify-form (if (consp src)
-                                                       (car src)
-                                                       src)
-                                                   nil))
-                            (full (stringify-form src)))
-                        (incf n)))
-
-                    (let* ((tlf (source-path-tlf-number path))
-                           (file-info (source-info-file-info *source-info*)))
-                      (values
-                       (make-compiler-error-context
-                        :enclosing-source (short)
-                        :source (full)
-                        :original-source (stringify-form form)
-                        :context src-context
-                        :file-name (file-info-name file-info)
-                        :file-position
-                        (nth-value 1 (find-source-root tlf *source-info*))
-                        :original-source-path (source-path-original-source path)
-                        :lexenv (if context
-                                    (node-lexenv context)
-                                    (if (boundp '*lexenv*) *lexenv* nil)))
-                       nil))))))))))
+                (let ((tlf (source-path-tlf-number path))
+                      (file-info (source-info-file-info *source-info*)))
+                  (multiple-value-bind (form src-context) (find-original-source path)
+                    (values
+                     (make-compiler-error-context
+                      :original-form form
+                      :format-args args
+                      :context src-context
+                      :file-name (file-info-name file-info)
+                      :file-position
+                      (nth-value 1 (find-source-root tlf *source-info*))
+                      :path path
+                      :original-source-path (source-path-original-source path)
+                      :lexenv (if context
+                                  (node-lexenv context)
+                                  (if (boundp '*lexenv*) *lexenv* nil)))
+                     nil)))))))))
 
 ;;;; printing error messages
 

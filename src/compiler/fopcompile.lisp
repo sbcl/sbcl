@@ -448,8 +448,9 @@
                                   (file-info (source-info-file-info *source-info*))
                                   (*compiler-error-context*
                                     (make-compiler-error-context
-                                     :original-source (stringify-form form)
+                                     :original-form form
                                      :file-name (file-info-name file-info)
+                                     :initialized t
                                      :file-position
                                      (nth-value 1 (find-source-root tlf *source-info*))
                                      :original-source-path (source-path-original-source path)
