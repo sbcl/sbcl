@@ -397,6 +397,14 @@ EXPERIMENTAL: Interface subject to change."
                       (setf (values ok pc-ptr fp)
                             (sb-di::x86-call-context fp))
                       (unless ok
+                        ;; If we fail to walk the stack beyond the
+                        ;; initial frame, there is likely something
+                        ;; wrong. Undo the trace start marker and the
+                        ;; one sample we already recorded.
+                        (when (zerop i)
+                          (decf (samples-index samples)
+                                (+ +elements-per-trace-start+
+                                   (* +elements-per-sample+ (1+ i)))))
                         (return))))))
               ;; Reset thread-local allocation counter before interrupts
               ;; are enabled.
