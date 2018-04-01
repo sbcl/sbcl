@@ -2936,18 +2936,16 @@ core and return a descriptor to it."
   (c-name (symbol-name symbol) strip))
 
 (defun write-makefile-features (*standard-output*)
-  ;; propagating *SHEBANG-FEATURES* into the Makefiles
-  (dolist (shebang-feature-name (sort (mapcar #'c-symbol-name
-                                              sb-cold:*shebang-features*)
-                                      #'string<))
-    (format t "LISP_FEATURE_~A=1~%" shebang-feature-name)))
+  ;; propagating SB!XC:*FEATURES* into the Makefiles
+  (dolist (target-feature-name (sort (mapcar #'c-symbol-name sb!xc:*features*)
+                                     #'string<))
+    (format t "LISP_FEATURE_~A=1~%" target-feature-name)))
 
 (defun write-config-h (*standard-output*)
-  ;; propagating *SHEBANG-FEATURES* into C-level #define's
-  (dolist (shebang-feature-name (sort (mapcar #'c-symbol-name
-                                              sb-cold:*shebang-features*)
-                                      #'string<))
-    (format t "#define LISP_FEATURE_~A~%" shebang-feature-name))
+  ;; propagating SB!XC:*FEATURES* into C-level #define's
+  (dolist (target-feature-name (sort (mapcar #'c-symbol-name sb!xc:*features*)
+                                     #'string<))
+    (format t "#define LISP_FEATURE_~A~%" target-feature-name))
   (terpri)
   ;; and miscellaneous constants
   (format t "#define SBCL_VERSION_STRING ~S~%"
@@ -3531,7 +3529,7 @@ III. initially undefined function references (alphabetically):
       (binding* ((build-id (concatenate
                             'string
                             (with-open-file (s "output/build-id.inc") (read s))
-                            (if (member :msan sb-cold::*shebang-features*) "-msan" "")))
+                            (if (member :msan sb!xc:*features*) "-msan" "")))
                  ((nwords padding) (ceiling (length build-id) sb!vm:n-word-bytes)))
         (declare (type simple-string build-id))
         ;; Write BUILD-ID-CORE-ENTRY-TYPE-CODE, the length of the header,

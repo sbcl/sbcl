@@ -14,8 +14,7 @@
 
 ;;; various environment inquiries
 
-(defvar *features*
-  '#.(sort (copy-list sb-cold:*shebang-features*) #'string<)
+(!defvar *features* '#.(sort (copy-list sb!xc:*features*) #'string<)
   "a list of symbols that describe features provided by the
    implementation")
 

@@ -332,7 +332,7 @@
                          :direction :output :if-exists :supersede)
       (let* ((target-features
               (if (find-package "SB-COLD")
-                  (symbol-value (find-symbol "*SHEBANG-FEATURES*" "SB-COLD"))
+                  (symbol-value (find-symbol "*FEATURES*" "SB!XC"))
                   *features*))
              (feature-bits
               (+ (if (= n-word-bits 64) 1 0)

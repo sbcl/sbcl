@@ -133,7 +133,7 @@ Sample output
 ;;; time to run it. The resulting core isn't used in the normal build,
 ;;; but can be handy for experimenting with the system. (See slam.sh
 ;;; for an example.)
-(when (position :sb-after-xc-core *shebang-features*)
+(when (position :sb-after-xc-core sb!xc:*features*)
   #+cmu (ext:save-lisp "output/after-xc.core" :load-init-file nil)
   #+sbcl (sb-ext:save-lisp-and-die "output/after-xc.core")
   #+openmcl (ccl::save-application "output/after-xc.core")

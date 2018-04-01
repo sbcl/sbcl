@@ -30,7 +30,7 @@
          . muffle-warning)))
 
 (defun proclaim-target-optimization ()
-  (let ((debug (if (position :sb-show *shebang-features*) 2 1)))
+  (let ((debug (if (position :sb-show sb!xc:*features*) 2 1)))
     (sb!xc:proclaim
      `(optimize
        (compilation-speed 1) (debug ,debug)

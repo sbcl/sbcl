@@ -58,7 +58,6 @@
 ;; and its one name should be SBCL, but changing it to that
 ;; would entail touching about 900 lines.
 (let ((package-name "SB!XC"))
-  (make-package package-name :use nil :nicknames nil)
   (dolist (name '(;; the constants (except for T and NIL which have
                   ;; a specially hacked correspondence between
                   ;; cross-compilation host Lisp and target Lisp)

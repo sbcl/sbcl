@@ -10,12 +10,12 @@
   (load "tools-for-build/ldso-stubs.lisp")
   (let ((*print-pretty* nil)
         (*print-length* nil))
-    (dolist (thing '("*SHEBANG-FEATURES*" "*SHEBANG-BACKEND-SUBFEATURES*"))
-      (let ((val (symbol-value (intern thing "SB-COLD"))))
+    (dolist (thing '(("SB!XC" "*FEATURES*")
+                     ("SB-COLD" "*SHEBANG-BACKEND-SUBFEATURES*")))
+      (let* ((sym (intern (cadr thing) (car thing)))
+             (val (symbol-value sym)))
         (when val
-          (format t "~&target *~A* = ~S~%"
-                  (subseq thing (length "*SHEBANG-") (1- (length thing)))
-                  val))))))
+          (format t "~&target ~S = ~S~%" sym  val))))))
 (in-package "SB-COLD")
 (progn
   (setf *host-obj-prefix* "obj/from-host/")

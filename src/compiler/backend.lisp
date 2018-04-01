@@ -153,8 +153,7 @@ Until SBCL-0.7pre57, this is translated as
   (:GUARD #!+(OR :SPARC-V8 (AND :SPARC-V9 (NOT :SPARC-64))) T
           #!-(OR :SPARC-V8 (AND :SPARC-V9 (NOT :SPARC-64))) NIL)
 which means that whether this VOP will ever be used is determined at
-compiler compile-time depending on the contents of
-*SHEBANG-FEATURES*?.
+compiler compile-time depending on the contents of SB!XC:*FEATURES*.
 
 As of SBCL-0.7pre57, a new special variable,
 SB-C:*BACKEND-SUBFEATURES*?, is introduced. As of that version, only

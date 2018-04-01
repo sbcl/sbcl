@@ -186,9 +186,9 @@
 ;;; When cross-compiling, the *FEATURES* set for the target Lisp is
 ;;; not in general the same as the *FEATURES* set for the host Lisp.
 ;;; In order to refer to target features specifically, we refer to
-;;; *SHEBANG-FEATURES* instead of *FEATURES*, and use the #!+ and #!-
+;;; SB!XC:*FEATURES* instead of CL:*FEATURES*, and use the #!+ and #!-
 ;;; readmacros instead of the ordinary #+ and #- readmacros.
-(setf *shebang-features*
+(setf sb!xc:*features*
       (let* ((default-features
                (funcall (compile
                          nil
@@ -215,7 +215,7 @@
 
 ;;; You can get all the way through make-host-1 without either one of these
 ;;; features, but then 'bit-bash' will fail to cross-compile.
-(unless (intersection '(:big-endian :little-endian) *shebang-features*)
+(unless (intersection '(:big-endian :little-endian) sb!xc:*features*)
   (warn "You'll have bad time without either endian-ness defined"))
 
 ;;; Some feature combinations simply don't work, and sometimes don't
@@ -266,7 +266,7 @@
           ":SB-THREAD not supported on selected architecture")))
       (failed-test-descriptions nil))
   (dolist (test feature-compatibility-tests)
-    (let ((*features* *shebang-features*))
+    (let ((cl:*features* sb!xc:*features*))
       (when (read-from-string (concatenate 'string "#+" (first test) "T NIL"))
         (push (second test) failed-test-descriptions))))
   (when failed-test-descriptions

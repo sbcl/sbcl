@@ -22,10 +22,6 @@
 ;;; We need the #! readtable modifications.
 (load (merge-pathnames "shebang.lisp" *load-truename*))
 
-;;; #!+ and #!- now refer to *FEATURES* values (as opposed to the way
-;;; that they referred to special target-only *SHEBANG-FEATURES* values
-;;; during cold init).
-(setf sb-cold:*shebang-features* *features*)
 ;;; Just in case we want to play with the initial value of
 ;;; backend-subfeatures
 (setf sb-cold:*shebang-backend-subfeatures* sb-c:*backend-subfeatures*)
