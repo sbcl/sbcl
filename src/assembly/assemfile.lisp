@@ -46,8 +46,6 @@
         (let ((*features* (cons :sb-assembling *features*)))
           (init-assembler)
           (load (merge-pathnames name (make-pathname :type "lisp")))
-          (sb!assem:append-segment *code-segment* *elsewhere*)
-          (setf *elsewhere* nil)
           #!+inline-constants
           (emit-inline-constants)
           (let ((length (sb!assem:finalize-segment *code-segment*)))
@@ -132,6 +130,12 @@
          ,@code
          ,@(generate-return-sequence
             (or (cadr (assoc :return-style options)) :raw))
+         (sb!assem:append-segment *code-segment* *elsewhere*)
+         (setf *elsewhere*
+               (make-segment :type :elsewhere
+                             :run-scheduler (default-segment-run-scheduler)
+                             :inst-hook (default-segment-inst-hook)
+                             :alignment 0))
          (emit-alignment sb!vm:n-lowtag-bits
                          ;; EMIT-LONG-NOP does not exist for (not x86-64)
                          #!+x86-64 :long-nop))
