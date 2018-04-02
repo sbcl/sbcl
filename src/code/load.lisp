@@ -355,11 +355,14 @@
                  (read-string-as-bytes stream result)
                  result)))
         ;; Read and validate implementation and version.
-        (let ((implementation (keywordicate (string-from-stream)))
+        (let ((implementation (string-from-stream))
               (expected-implementation +backend-fasl-file-implementation+))
           (unless (string= expected-implementation implementation)
             (error 'invalid-fasl-implementation
                    :stream stream
+                   ;; This slot used to hold a symbol. Now it's a string.
+                   ;; I don't think anyone should care, but if they do,
+                   ;; then this needs a call to KEYWORDICATE.
                    :implementation implementation
                    :expected expected-implementation)))
         (let* ((fasl-version (read-word-arg stream))
