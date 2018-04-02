@@ -77,7 +77,7 @@
 (defun module-provide-contrib (name)
   "Stringify and downcase NAME, then attempt to load the file
    $SBCL_HOME/name/name"
-  (let* ((filesys-name (string-downcase (string name)))
+  (let* ((filesys-name (string-downcase name))
          (unadorned-path
           (merge-pathnames
            (make-pathname :directory (list :relative "contrib")
