@@ -524,6 +524,8 @@
 
 ;; maximum number of spill iterations
 (defvar *pack-iterations* 500)
+(declaim (fixnum *pack-iterations*)
+         (always-bound *pack-iterations*))
 
 ;; Find the least-spill-cost neighbor in each color.
 ;; FIXME: this is too slow and isn't the right interface anymore.
@@ -549,36 +551,36 @@
 
 ;; Try to color the graph. If some TNs are left uncolored, find a
 ;; spill candidate, force it on the stack, and try again.
-(defun iterate-color (vertices component
-                      &optional (iterations *pack-iterations*))
-  (let* ((spill-list '())
+(defun iterate-color (vertices component)
+  (let* ((spilled 0)
          ;; presorting edges helps; later sorts are stable, so this
          ;; ends up sorting by (sum of) loop depth for TNs with equal
          ;; costs.
-         (vertices (stable-sort (copy-list vertices) #'>
+         (vertices (stable-sort vertices #'>
                                 :key (lambda (vertex)
                                        (tn-loop-depth
                                         (vertex-tn vertex)))))
          (graph (make-interference-graph vertices component)))
+    (declare (index spilled))
     (labels ((spill-candidates-p (vertex)
                (unless (vertex-color vertex)
-                 (aver (eql :normal (vertex-pack-type vertex)))
+                 (aver (eq (vertex-pack-type vertex) :normal))
                  t))
              (try-color ()
                (color-interference-graph graph)
                (find-if #'spill-candidates-p (ig-vertices graph)))
              (spill (vertex)
                (setf (vertex-color vertex) nil)
-               (push vertex spill-list)
+               (incf spilled)
                (setf graph (reset-interference-graph-without-vertex
                             graph vertex))))
-      (loop repeat iterations
+      (loop repeat *pack-iterations*
             for uncolored = (try-color)
             while uncolored
             do (spill uncolored)))
     (let ((colored (ig-vertices graph)))
       (aver (= (length vertices)
-               (+ (length spill-list) (length colored)
+               (+ spilled (length colored)
                   (length (ig-precolored-vertices graph)))))
       colored)))
 
