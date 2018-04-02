@@ -262,8 +262,14 @@
 
 (defun oset-delete (oset element)
   (when (sset-delete element oset)
-    (setf (oset-members oset)
-          (delete element (oset-members oset)))
+    ;; Delete one element and stop
+    (loop for prev = nil then cdr
+          for cdr = (oset-members oset) then (truly-the cons (cdr cdr))
+          when (eq (car cdr) element)
+          do (if prev
+                 (setf (cdr prev) (cdr cdr))
+                 (setf (oset-members oset) (truly-the list (cdr cdr))))
+             (return))
     t))
 
 (declaim (inline oset-member))
