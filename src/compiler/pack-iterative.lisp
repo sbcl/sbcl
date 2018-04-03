@@ -366,7 +366,7 @@
           (let ((offset (vertex-color target)))
             (when (and offset
                        (eq sb (sc-sb (tn-sc current)))
-                       (not (sset-member neighbors target)))
+                       (not (sset-member target neighbors)))
               (pushnew target vertices :test #'eq))))))
     (nreverse vertices)))
 
