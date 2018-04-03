@@ -91,11 +91,7 @@
   ;; vertices: vertices with lower spill cost come first.
   (vertices nil :type list)
   ;; unsorted set of precolored vertices.
-  (precolored-vertices nil :type list :read-only t)
-  ;; A function that maps TNs to vertices, and then to the vertex's
-  ;; assigned offset, if any.  The offset (or NIL) is returned first,
-  ;; then the vertex as a second value.
-  (tn-vertex-mapping (missing-arg) :type function :read-only t))
+  (precolored-vertices nil :type list :read-only t))
 
 ;;; Interference graph construction
 ;;;
@@ -125,9 +121,8 @@
 
 ;; Partition the global TNs that appear in that IR2 block, between
 ;; those that are LIVE throughout the block and the rest.
-(defun block-gtns (block tn-vertex)
-  (declare (type ir2-block block)
-           (type hash-table tn-vertex))
+(defun block-gtns (block)
+  (declare (type ir2-block block))
   (collect ((live-gtns)
             (gtns))
     (do ((conflict (ir2-block-global-tns block)
@@ -138,7 +133,7 @@
       (let ((tn (global-conflicts-tn conflict)))
         (awhen (and (not (tn-offset tn))
                     (not (eql :component (tn-kind tn)))
-                    (gethash tn tn-vertex))
+                    (tn-vertex tn))
           (if (eql (global-conflicts-kind conflict) :live)
               (live-gtns it)
               (gtns (cons it conflict))))))))
@@ -148,11 +143,11 @@
 ;; with everything but are absent from conflict bitvectors.
 (defun insert-block-local-conflicts-for (vertex number conflicts
                                          local-tns ltn-count
-                                         gtn-p live-gtns tn-vertex)
+                                         gtn-p live-gtns)
   (declare (type vertex vertex) (type local-tn-number number)
            (type local-tn-bit-vector conflicts)
            (type local-tn-vector local-tns) (type local-tn-count ltn-count)
-           (type list live-gtns) (type hash-table tn-vertex))
+           (type list live-gtns))
   ;; conflict with all live gtns
   (dolist (b live-gtns)
     (insert-one-edge vertex b gtn-p))
@@ -166,18 +161,17 @@
              (aver (or gtn-p
                        (tn-global-conflicts b)
                        (eq local (tn-local b))))
-             (awhen (gethash b tn-vertex)
+             (awhen (tn-vertex b)
                (insert-one-edge vertex it (and gtn-p
                                                (tn-global-conflicts b))))))))
 
 ;; Compute all conflicts in a single IR2 block
-(defun insert-block-local-conflicts (block tn-vertex)
-  (declare (type ir2-block block)
-           (type hash-table tn-vertex))
+(defun insert-block-local-conflicts (block)
+  (declare (type ir2-block block))
   (let* ((local-tns (ir2-block-local-tns block))
          (n (ir2-block-local-tn-count block)))
     (multiple-value-bind (live-gtns gtns)
-        (block-gtns block tn-vertex)
+        (block-gtns block)
       ;; all live gtns conflict with one another
       (loop for (a . rest) on live-gtns do
         (dolist (b rest)
@@ -188,30 +182,27 @@
               (conflicts (global-conflicts-conflicts conflict)))
           (insert-block-local-conflicts-for a number conflicts
                                             local-tns n
-                                            t live-gtns tn-vertex)))
+                                            t live-gtns)))
       ;; local-* interference
       (dotimes (i n)
         (binding* ((a (aref local-tns i))
-                   (vertex (gethash a tn-vertex) :exit-if-null)
+                   (vertex (and (tn-p a)
+                                (tn-vertex a)) :exit-if-null)
                    (conflicts (tn-local-conflicts a)))
           (unless (or (tn-offset a)
                       (tn-global-conflicts a))
             (insert-block-local-conflicts-for vertex i conflicts
                                               local-tns n
-                                              nil live-gtns tn-vertex)))))))
+                                              nil live-gtns)))))))
 
 ;; Compute all conflict edges for component
 ;; COMPONENT-VERTICES is a list of vertices for :component TNs,
 ;; GLOBAL-VERTICES a list of vertices for TNs with global conflicts,
 ;; and LOCAL-VERTICES a list of vertices for local TNs.
-;;
-;; TN-VERTEX is a hash table from TN -> VERTEX, for all vertices that
-;; must be colored.
 (defun insert-conflict-edges (component
                               component-vertices global-vertices
-                              local-vertices tn-vertex)
-  (declare (type list component-vertices global-vertices local-vertices)
-           (type hash-table tn-vertex))
+                              local-vertices)
+  (declare (type list component-vertices global-vertices local-vertices))
   ;; COMPONENT vertices conflict with everything
   (loop for (a . rest) on component-vertices
         do (dolist (b rest)
@@ -222,7 +213,7 @@
              (insert-one-edge a b)))
   ;; Find the other edges by enumerating IR2 blocks
   (do-ir2-blocks (block component)
-    (insert-block-local-conflicts block tn-vertex)))
+    (insert-block-local-conflicts block)))
 
 ;;; Interference graph construction, the rest: annotating vertex
 ;;; structures, and bundling up the conflict graph.
@@ -248,12 +239,11 @@
 
 ;; walk over vertices, precomputing as much information as possible,
 ;; and partitioning according to their kind.
-;; Return the partition, and a hash table to map tns to vertices.
+;; Return the partition
 (defun prepare-vertices (vertices)
   (let (component-vertices
         global-vertices
-        local-vertices
-        (tn-vertex (make-hash-table :test #'eq)))
+        local-vertices)
     (loop for i upfrom 0
           for vertex in vertices
           do (let* ((tn (vertex-tn vertex))
@@ -268,7 +258,7 @@
                      (sc-locations-count locs)
                      (vertex-color vertex) offset
                      (vertex-spill-cost vertex) (tn-cost tn)
-                     (gethash tn tn-vertex) vertex)
+                     (tn-vertex tn) vertex)
                (cond (offset) ; precolored -> no need to track conflict
                      ((eql :component (tn-kind tn))
                       (push vertex component-vertices))
@@ -277,19 +267,16 @@
                      (t
                       (aver (tn-local tn))
                       (push vertex local-vertices)))))
-    (values component-vertices global-vertices local-vertices
-            tn-vertex)))
+    (values component-vertices global-vertices local-vertices)))
 
 ;; Construct the interference graph for these vertices in the component.
 ;; All TNs types are included in the graph, both with offset and without,
 ;; but only those requiring coloring appear in the VERTICES slot.
 (defun make-interference-graph (vertices component)
-  (multiple-value-bind (component-vertices global-vertices local-vertices
-                        tn-vertex)
+  (multiple-value-bind (component-vertices global-vertices local-vertices)
       (prepare-vertices vertices)
     (insert-conflict-edges component
-                           component-vertices global-vertices local-vertices
-                           tn-vertex)
+                           component-vertices global-vertices local-vertices)
     ;; Normalize adjacency list ordering, and collect all uncolored
     ;; vertices in the graph.
     (collect ((colored)
@@ -306,10 +293,7 @@
       ;; Later passes like having this list sorted; do it in advance.
       (%make-interference-graph
        :vertices (stable-sort (uncolored) #'< :key #'vertex-spill-cost)
-       :precolored-vertices (colored)
-       :tn-vertex-mapping (lambda (tn)
-                            (awhen (gethash tn tn-vertex)
-                              (values (vertex-color it) it)))))))
+       :precolored-vertices (colored)))))
 
 ;;; Coloring information is removed from all remaining vertices.
 (defun reset-interference-graph-without-vertex (graph vertex)
@@ -371,18 +355,19 @@
 
 ;; Return a list of vertices that we might want VERTEX to share its
 ;; location with.
-(defun vertex-target-vertices (vertex tn-offset)
-  (declare (type vertex vertex) (type function tn-offset))
+(defun vertex-target-vertices (vertex)
+  (declare (type vertex vertex))
   (let ((sb (sc-sb (vertex-sc vertex)))
         (neighbors (vertex-full-incidence vertex))
         (vertices '()))
     (do-target-tns (current (vertex-tn vertex) :limit 20)
-      (multiple-value-bind (offset target)
-          (funcall tn-offset current)
-        (when (and offset
-                   (eq sb (sc-sb (tn-sc current)))
-                   (not (sset-member target neighbors)))
-          (pushnew target vertices :test #'eq))))
+      (let ((target (tn-vertex current)))
+        (when target
+          (let ((offset (vertex-color target)))
+            (when (and offset
+                       (eq sb (sc-sb (tn-sc current)))
+                       (not (sset-member neighbors target)))
+              (pushnew target vertices :test #'eq))))))
     (nreverse vertices)))
 
 ;;; Choose the "best" color for these vertices: a color is good if as
@@ -459,10 +444,10 @@
 
 ;; Greedily choose the color for this vertex, also moving around any
 ;; :target vertex to the same color if possible.
-(defun find-vertex-color (vertex tn-vertex-mapping)
+(defun find-vertex-color (vertex)
   (let ((domain (vertex-domain vertex)))
     (unless (zerop domain)
-      (let* ((targets (vertex-target-vertices vertex tn-vertex-mapping))
+      (let* ((targets (vertex-target-vertices vertex))
              (sc (vertex-sc vertex))
              (sb (sc-sb sc)))
         (multiple-value-bind (color recolor-vertices)
@@ -508,16 +493,15 @@
 
 ;; Try and color the interference graph once.
 (defun color-interference-graph (interference-graph)
-  (let ((tn-vertex (ig-tn-vertex-mapping interference-graph)))
-    (flet ((color-vertices (vertices)
-             (dolist (vertex vertices)
-               (awhen (find-vertex-color vertex tn-vertex)
-                 (color-vertex vertex it)))))
-      (multiple-value-bind (probably-colored probably-spilled)
-          (partition-and-order-vertices interference-graph)
-        (color-vertices probably-colored)
-        ;; These might benefit from further ordering... LexBFS?
-        (color-vertices probably-spilled))))
+  (flet ((color-vertices (vertices)
+           (dolist (vertex vertices)
+             (awhen (find-vertex-color vertex)
+               (color-vertex vertex it)))))
+    (multiple-value-bind (probably-colored probably-spilled)
+        (partition-and-order-vertices interference-graph)
+      (color-vertices probably-colored)
+      ;; These might benefit from further ordering... LexBFS?
+      (color-vertices probably-spilled)))
   interference-graph)
 
 ;;; Iterative spilling logic.

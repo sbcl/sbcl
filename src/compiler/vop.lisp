@@ -1045,7 +1045,10 @@
   ;; physical environment that the TN is live throughout.
   (physenv nil :type (or physenv null))
   ;; The depth of the deepest loop that this TN is used in.
-  (loop-depth 0 :type fixnum))
+  (loop-depth 0 :type fixnum)
+  ;; Used by pack-iterative
+  vertex)
+
 (declaim (freeze-type tn))
 (defmethod print-object ((tn tn) stream)
   (cond ((not (boundp 'sb!c::*compiler-ir-obj-map*))
