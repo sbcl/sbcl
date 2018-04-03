@@ -1323,3 +1323,9 @@
 (with-test (:name (compile sleep float :infinity :lp-1754081))
   (checked-compile '(lambda () (sleep single-float-positive-infinity)))
   (checked-compile '(lambda () (sleep double-float-positive-infinity))))
+
+(with-test (:name :atanh-type-derivation)
+  (checked-compile-and-assert
+   ()
+   '(lambda (x)
+     (atanh (coerce x '(double-float * (0.0d0)))))))

@@ -745,15 +745,21 @@
     ;; Check that the ARG bounds are correctly canonicalized.
     (when (and arg-lo (floatp arg-lo-val) (zerop arg-lo-val) (consp arg-lo)
                (minusp (float-sign arg-lo-val)))
-      (compiler-notify "float zero bound ~S not correctly canonicalized?" arg-lo)
-      (setq arg-lo 0e0 arg-lo-val arg-lo))
+      (setf arg-lo
+            (typecase arg-lo-val
+              (single-float 0f0)
+              (double-float 0d0)
+              #!+long-float
+              (long-float 0l0))
+            arg-lo-val arg-lo))
     (when (and arg-hi (zerop arg-hi-val) (floatp arg-hi-val) (consp arg-hi)
                (plusp (float-sign arg-hi-val)))
-      (compiler-notify "float zero bound ~S not correctly canonicalized?" arg-hi)
-      (setq arg-hi (ecase *read-default-float-format*
-                     (double-float (load-time-value (make-unportable-float :double-float-negative-zero)))
-                     #!+long-float
-                     (long-float (load-time-value (make-unportable-float :long-float-negative-zero))))
+      (setf arg-hi
+            (typecase arg-lo-val
+              (single-float (load-time-value (make-unportable-float :single-float-negative-zero)))
+              (double-float (load-time-value (make-unportable-float :double-float-negative-zero)))
+              #!+long-float
+              (long-float (load-time-value (make-unportable-float :long-float-negative-zero))))
             arg-hi-val arg-hi))
     (flet ((fp-neg-zero-p (f)           ; Is F -0.0?
              (and (floatp f) (zerop f) (minusp (float-sign f))))
