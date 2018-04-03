@@ -19,6 +19,9 @@
   (:use "CL"))
 (in-package "SB-COLD")
 
+(sb-ext:unlock-package "CL")
+(rename-package "COMMON-LISP" "COMMON-LISP"
+                (cons "SB!XC" (package-nicknames "CL")))
 ;;; We need the #! readtable modifications.
 (load (merge-pathnames "shebang.lisp" *load-truename*))
 
@@ -27,11 +30,6 @@
 (setf sb-cold:*shebang-backend-subfeatures* sb-c:*backend-subfeatures*)
 
 (handler-bind ((sb-ext:package-locked-error #'continue))
-  ;; The nickname SB!XC now refers to the CL package.
-  (rename-package "COMMON-LISP" "COMMON-LISP"
-                  (cons "SB!XC" (package-nicknames "CL")))
-  (sb-ext:unlock-package "CL")
-
   ;; Any other name SB!FOO refers to the package now called SB-FOO.
   (dolist (package (list-all-packages))
     (let ((name (package-name package))
