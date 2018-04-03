@@ -51,10 +51,13 @@
              (:include sset-element)
              (:copier nil)
              (:constructor %make-vertex (tn element-size pack-type)))
-  ;; incidence set, as an ordered list (for reproducibility)
-  (full-incidence  (make-oset) :type oset :read-only t)
-  (incidence       #()                :type simple-vector)
-  (incidence-count 0                  :type index)
+  ;; full incidence set. has to support iteration and efficient
+  ;; membership test.
+  (full-incidence  (make-sset) :type sset :read-only t)
+  ;; subset of currently considered neighbors. does not have to
+  ;; support efficient membership test, only iteration.
+  (incidence       #()         :type simple-vector)
+  (incidence-count 0           :type index)
   ;; list of potential locations in the TN's preferred SB for the
   ;; vertex, taking into account reserve locations and preallocated
   ;; TNs.
@@ -115,9 +118,9 @@
   (unless (or (neq (sc-sb (vertex-sc a)) (sc-sb (vertex-sc b)))
               (tn-offset (vertex-tn a))
               (tn-offset (vertex-tn b)))
-    (aver (or (oset-adjoin (vertex-full-incidence a) b)
+    (aver (or (sset-adjoin b (vertex-full-incidence a))
               perhaps-redundant))
-    (aver (or (oset-adjoin (vertex-full-incidence b) a)
+    (aver (or (sset-adjoin a (vertex-full-incidence b))
               perhaps-redundant))))
 
 ;; Partition the global TNs that appear in that IR2 block, between
@@ -292,11 +295,8 @@
     (collect ((colored)
               (uncolored))
       (dolist (v vertices)
-        (let ((full-incidence (vertex-full-incidence v)))
-          (setf (oset-members full-incidence)
-                ;; this really doesn't matter, but minimises variability
-                (sort (oset-members full-incidence) #'< :key #'vertex-number)
-                (vertex-incidence v) (make-array (oset-count full-incidence))))
+        (setf (vertex-incidence v)
+              (make-array (sset-count (vertex-full-incidence v))))
         (cond ((vertex-color v)
                (aver (tn-offset (vertex-tn v)))
                (colored v))
@@ -321,8 +321,8 @@
                                    (vertex-incidence-count v) 0)
                           and collect v)))
     (setf (ig-vertices graph) vertices)
-    (do-oset-elements (neighbor (vertex-full-incidence vertex) graph)
-      (oset-delete (vertex-full-incidence neighbor) vertex))))
+    (do-sset-elements (neighbor (vertex-full-incidence vertex) graph)
+      (sset-delete vertex (vertex-full-incidence neighbor)))))
 
 ;;; Support code
 
@@ -381,7 +381,7 @@
           (funcall tn-offset current)
         (when (and offset
                    (eq sb (sc-sb (tn-sc current)))
-                   (not (oset-member neighbors target)))
+                   (not (sset-member target neighbors)))
           (pushnew target vertices :test #'eq))))
     (nreverse vertices)))
 
@@ -395,8 +395,8 @@
   (let ((compatible '()))
     (dolist (vertex vertices)
       (when (and (notany (lambda (existing)
-                           (oset-member (vertex-full-incidence existing)
-                                        vertex))
+                           (sset-member vertex
+                                        (vertex-full-incidence existing)))
                          compatible)
                  (vertex-color-possible-p vertex color))
         (push vertex compatible)))
@@ -429,8 +429,8 @@
             (cost 0))
         (dolist (vertex vertices)
           (when (and (notany (lambda (existing)
-                               (oset-member (vertex-full-incidence existing)
-                                            vertex))
+                               (sset-member vertex
+                                            (vertex-full-incidence existing)))
                              compatible)
                      (vertex-color-possible-p vertex color))
             (incf cost (max 1 (vertex-spill-cost vertex)))
@@ -502,7 +502,7 @@
 (defun color-vertex (vertex color)
   (declare (type vertex vertex))
   (setf (vertex-color vertex) color)
-  (do-oset-elements (neighbor (vertex-full-incidence vertex) vertex)
+  (do-sset-elements (neighbor (vertex-full-incidence vertex) vertex)
     (let ((new-count (incf (vertex-incidence-count neighbor))))
       (setf (aref (vertex-incidence neighbor) (1- new-count)) vertex))))
 
