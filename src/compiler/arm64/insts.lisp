@@ -1965,7 +1965,7 @@
   `(define-instruction ,name (segment rn rm)
      (:printer fp-compare ((op ,op)))
      (:printer fp-compare ((op ,op) (z 1) (type 0))
-               '(:name :tab rn ", " 0s0))
+               '(:name :tab rn ", " 0f0))
      (:printer fp-compare ((op ,op) (z 1) (type 1))
                '(:name :tab rn ", " 0d0))
      (:emitter
