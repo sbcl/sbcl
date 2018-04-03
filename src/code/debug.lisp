@@ -627,13 +627,12 @@ thread, NIL otherwise."
 
 (defun clean-frame-call (frame name method-frame-style info)
   (let ((args (frame-args-as-list frame)))
-    (cond ((memq :external info)
+    (cond ((typep name '(cons (eql sb!pcl::fast-method)))
+           (clean-fast-method name args method-frame-style info))
+          ((memq :external info)
            (clean-xep frame name args info))
           ((memq :more info)
            (clean-&more-processor name args info))
-          ((and (consp name)
-                (eq (car name) 'sb!pcl::fast-method))
-           (clean-fast-method name args method-frame-style info))
           (t
            (values name args info)))))
 

@@ -175,6 +175,10 @@
   (error 'undefined-alien-function-error))
 
 (deferr invalid-arg-count-error (nargs)
+  (let* ((frame (find-interrupted-frame))
+         (name (sb!di:debug-fun-name (sb!di:frame-debug-fun frame))))
+    (when (typep name '(cons (eql sb!pcl::fast-method)))
+      (decf nargs 2)))
   (restart-case
       (%program-error "invalid number of arguments: ~S" nargs)
     #!+(or x86-64 arm64)
