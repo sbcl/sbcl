@@ -1016,9 +1016,6 @@ possibly temporarily, because it might be used internally."
                "SSET" "SSET-ELEMENT"
                "SSET-ADJOIN" "SSET-DELETE" "SSET-EMPTY" "SSET-COUNT"
                "SSET-MEMBER"
-               "OSET" "MAKE-OSET" "OSET-MEMBERS" "OSET-COUNT"
-               "OSET-ADJOIN" "OSET-DELETE" "OSET-MEMBER"
-               "DO-OSET-ELEMENTS"
 
                ;; communication between the runtime and Lisp
                "*CORE-STRING*"
