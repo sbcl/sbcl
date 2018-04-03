@@ -18,6 +18,28 @@
 ;;; a list of (NAME LABEL OFFSET) for every entry point
 (defvar *entry-points* nil)
 
+;;; The scheduling assembler backends don't like it when ELSEWHERE is
+;;; appended to CODE-SEGMENT after each asm routine. The failure is an AVER
+;;; in finalize-positions.  I'm not surprised, but I don't terribly care.
+;;; Interestingly, some non-scheduling backends also fail which is strange
+;;; considering that the x86 backends are fine, but have have at least as
+;;; many uses of EMIT-CHOOSER as any other backend - choosers being the only
+;;; way that alignment notes have to do any "interesting" computation about
+;;; how much space to leave. (The AVER is that alignment needs to emit either
+;;; negative space or more than was reserved as the maximum padding)
+;;;
+;;; To fix this in general, we should not begin to generate machine code
+;;; until all assembly code is buffered up - and appended or not as many
+;;; times as is necessary.  Then with the full logical representation of all
+;;; assembly source available, we start to translate to machine code.
+;;;
+;;; Doing things that way would also give an opportunity to perform
+;;; peephole optimizations on the assembly source.
+;;; Since we're not there yet, but I really don't like seeing the
+;;; elsewhere code so far away from its point of use, do the right thing
+;;; (eagerly append) only when it is known to work properly.
+(defmacro eagerly-append-elsewhere-segment () #!+(or x86 x86-64) t)
+
 ;;; Note: You might think from the name that this would act like
 ;;; COMPILE-FILE, but in fact it's arguably more like LOAD, even down
 ;;; to the return convention. It LOADs a file, then writes out any
@@ -46,6 +68,9 @@
         (let ((*features* (cons :sb-assembling *features*)))
           (init-assembler)
           (load (merge-pathnames name (make-pathname :type "lisp")))
+          (unless (eagerly-append-elsewhere-segment)
+            (sb!assem:append-segment *code-segment* *elsewhere*)
+            (setf *elsewhere* nil))
           #!+inline-constants
           (emit-inline-constants)
           (let ((length (sb!assem:finalize-segment *code-segment*)))
@@ -130,12 +155,13 @@
          ,@code
          ,@(generate-return-sequence
             (or (cadr (assoc :return-style options)) :raw))
-         (sb!assem:append-segment *code-segment* *elsewhere*)
-         (setf *elsewhere*
-               (make-segment :type :elsewhere
-                             :run-scheduler (default-segment-run-scheduler)
-                             :inst-hook (default-segment-inst-hook)
-                             :alignment 0))
+         (when (eagerly-append-elsewhere-segment)
+           (sb!assem:append-segment *code-segment* *elsewhere*)
+           (setf *elsewhere*
+                 (make-segment :type :elsewhere
+                               :run-scheduler (default-segment-run-scheduler)
+                               :inst-hook (default-segment-inst-hook)
+                               :alignment 0)))
          (emit-alignment sb!vm:n-lowtag-bits
                          ;; EMIT-LONG-NOP does not exist for (not x86-64)
                          #!+x86-64 :long-nop))
