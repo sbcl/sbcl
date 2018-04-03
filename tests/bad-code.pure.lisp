@@ -300,4 +300,17 @@
                          (svref x *break-on-signals*))
                       :allow-warnings t))))
 
+(with-test (:name :unknown-keys-propagation-error-checking.1)
+  (assert (nth-value 1
+                     (checked-compile
+                      `(lambda (x)
+                         (let ((a :tests))
+                           (find 1 x a #'eql)))
+                      :allow-warnings t))))
 
+(with-test (:name :unknown-keys-propagation-error-checking.2)
+  (assert (nth-value 1
+                     (checked-compile
+                      `(lambda ()
+                         (apply 'find '(3 (1 2 3) :bad t)))
+                      :allow-warnings t))))

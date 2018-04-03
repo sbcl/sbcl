@@ -922,7 +922,7 @@
       (combination
        (ecase (basic-combination-kind node)
          (:local (ltn-analyze-local-call node))
-         ((:full :error) (ltn-default-call node))
+         ((:full :error :unknown-keys) (ltn-default-call node))
          (:known
           (ltn-analyze-known-call node))))
       (cif (ltn-analyze-if node))

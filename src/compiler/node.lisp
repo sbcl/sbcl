@@ -1394,7 +1394,8 @@
   ;; NOTINLINE. :ERROR is like :FULL, but means that we have
   ;; discovered that the call contains an error, and should not be
   ;; reconsidered for optimization.
-  (kind :full :type (member :local :full :error :known))
+  (kind :full :type (member :local :full :error :known
+                            :unknown-keys))
   ;; if a call to a known global function, contains the FUN-INFO.
   (fun-info nil :type (or fun-info null))
   ;; Untrusted type we have asserted for this combination.

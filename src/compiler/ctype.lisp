@@ -112,7 +112,8 @@
   (let* ((*lossage-detected* nil)
          (*unwinnage-detected* nil)
          (*compiler-error-context* call)
-         (args (combination-args call)))
+         (args (combination-args call))
+         unknown-keys)
     (if (fun-type-p type)
         (let* ((nargs (length args))
                (required (fun-type-required type))
@@ -147,8 +148,9 @@
               "The function has an odd number of arguments in the keyword portion."))
             (t
              (check-fixed-and-rest args (append required optional) rest)
-             (when keyp
-               (check-key-args args max-args type))))
+             (when (and keyp
+                        (check-key-args args max-args type))
+               (setf unknown-keys t))))
 
           (when result-test
             (let* ((dtype (node-derived-type call))
@@ -180,9 +182,9 @@
         (when (typep type 'defstruct-description)
           (awhen (assq it (dd-constructors type))
             (check-structure-constructor-call call type (cdr it))))))
-    (cond (*lossage-detected* (values nil t))
-          (*unwinnage-detected* (values nil nil))
-          (t (values t t)))))
+    (cond (*lossage-detected* (values nil t unknown-keys))
+          (*unwinnage-detected* (values nil nil unknown-keys))
+          (t (values t t unknown-keys)))))
 
 ;;;
 
@@ -308,9 +310,10 @@ and no value was provided for it." name))))))))))
 ;;; be known and the corresponding argument should be of the correct
 ;;; type. If the key isn't a constant, then we can't tell, so we can
 ;;; complain about absence of manifest winnage.
-(declaim (ftype (function (list fixnum fun-type) (values)) check-key-args))
+(declaim (ftype (function (list fixnum fun-type) boolean) check-key-args))
 (defun check-key-args (args pre-key type)
-  (let (lossages allow-other-keys)
+  (let (lossages allow-other-keys
+        unknown-keys)
     (do ((key (nthcdr pre-key args) (cddr key))
          (n (1+ pre-key) (+ n 2)))
         ((null key))
@@ -320,9 +323,7 @@ and no value was provided for it." name))))))))))
         (cond
           ((not (check-arg-type k (specifier-type 'symbol) n)))
           ((not (constant-lvar-p k))
-           (note-unwinnage "~@<The ~:R argument (in keyword position) is not ~
-                            a constant, weakening keyword argument ~
-                            checking.~:@>" n)
+           (setf unknown-keys t)
            ;; An unknown key may turn out to be :ALLOW-OTHER-KEYS at runtime,
            ;; so we cannot signal full warnings for keys that look bad.
            (unless allow-other-keys
@@ -351,8 +352,8 @@ and no value was provided for it." name))))))))))
                         (butlast lossages)
                         (car (last lossages)))
           (note-lossage "~S is not a known argument keyword."
-                        (car lossages)))))
-  (values))
+                        (car lossages))))
+    unknown-keys))
 
 ;;; Construct a function type from a definition.
 ;;;

@@ -2223,7 +2223,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
            (ecase kind
              (:local
               (ir2-convert-local-call node 2block))
-             (:full
+             ((:full :unknown-keys)
               (ir2-convert-full-call node 2block))
              (:known
               (let* ((info (basic-combination-fun-info node))

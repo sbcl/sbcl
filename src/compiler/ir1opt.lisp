@@ -846,7 +846,8 @@
       (return-from ir1-optimize-combination))
     (maybe-terminate-block node nil))
   (let ((args (basic-combination-args node))
-        (info (basic-combination-fun-info node)))
+        (info (basic-combination-fun-info node))
+        (kind (basic-combination-kind node)))
     (flet ((clear-reoptimize-args ()
              (dolist (arg args)
                (when arg
@@ -859,7 +860,7 @@
                    (when res
                      (derive-node-type node (coerce-to-values res))
                      (maybe-terminate-block node nil)))))))
-      (ecase (basic-combination-kind node)
+      (ecase kind
         (:local
          (let ((fun (combination-lambda node)))
            (if (eq (functional-kind fun) :let)
@@ -867,7 +868,7 @@
                (propagate-local-call-args node fun))))
         (:error
          (clear-reoptimize-args))
-        (:full
+        ((:full :unknown-keys)
          (clear-reoptimize-args)
          (cond (info
                 ;; This is a known function marked NOTINLINE
@@ -881,7 +882,9 @@
                       (if (global-var-p leaf)
                           (values (leaf-type leaf) (leaf-defined-type leaf))
                           (values nil nil))
-                    (when (and (not (fun-type-p type)) (fun-type-p defined-type))
+                    (when (or (eq kind :unknown-keys)
+                              (and (fun-type-p defined-type)
+                                   (not (fun-type-p type))))
                       (validate-call-type node type leaf)))))))
         (:known
          (aver info)
@@ -1005,7 +1008,8 @@
 ;;;
 ;;; We return the leaf referenced (NIL if not a leaf) and the
 ;;; FUN-INFO assigned.
-(defun recognize-known-call (call ir1-converting-not-optimizing-p)
+(defun recognize-known-call (call ir1-converting-not-optimizing-p
+                             &optional unknown-keys)
   (declare (type combination call))
   (let* ((ref (lvar-uses (basic-combination-fun call)))
          (leaf (when (ref-p ref) (ref-leaf ref)))
@@ -1013,61 +1017,64 @@
                       (defined-fun-inlinep leaf)
                       :no-chance)))
     (cond
-     ((eq inlinep :notinline)
-      (let ((info (info :function :info (leaf-source-name leaf))))
-        (when info
-          (setf (basic-combination-fun-info call) info))
-        (values nil nil)))
-     ((not (and (global-var-p leaf)
-                (eq (global-var-kind leaf) :global-function)))
-      (values leaf nil))
-     ((and (ecase inlinep
-             (:inline t)
-             (:no-chance nil)
-             ((nil :maybe-inline) (policy call (zerop space))))
-           (defined-fun-p leaf)
-           (defined-fun-inline-expansion leaf)
-           (inline-expansion-ok call))
-      ;; Inline: if the function has already been converted at another call
-      ;; site in this component, we point this REF to the functional. If not,
-      ;; we convert the expansion.
-      ;;
-      ;; For :INLINE case local call analysis will copy the expansion later,
-      ;; but for :MAYBE-INLINE and NIL cases we only get one copy of the
-      ;; expansion per component.
-      ;;
-      ;; FIXME: We also convert in :INLINE & FUNCTIONAL-KIND case below. What
-      ;; is it for?
-      (with-ir1-environment-from-node call
-        (let ((fun (defined-fun-functional leaf)))
-          (if (or (not fun)
-                  (and (eq inlinep :inline) (functional-kind fun)))
-              ;; Convert.
-              (let* ((name (leaf-source-name leaf))
-                     (res (ir1-convert-inline-expansion
-                           name
-                           (defined-fun-inline-expansion leaf)
-                           leaf
-                           inlinep
-                           (info :function :info name))))
-                ;; Allow backward references to this function from following
-                ;; forms. (Reused only if policy matches.)
-                (push res (defined-fun-functionals leaf))
-                (change-ref-leaf ref res)
-                (unless ir1-converting-not-optimizing-p
-                  (locall-analyze-component *current-component*)))
-              ;; If we've already converted, change ref to the converted
-              ;; functional.
-              (change-ref-leaf ref fun))))
-      (values (ref-leaf ref) nil))
-     (t
-      (let ((info (info :function :info (leaf-source-name leaf))))
-        (if info
-            (values leaf
-                    (progn
-                      (setf (basic-combination-kind call) :known)
-                      (setf (basic-combination-fun-info call) info)))
-            (values leaf nil)))))))
+      (unknown-keys
+       (setf (basic-combination-kind call) :unknown-keys)
+       (values leaf nil))
+      ((eq inlinep :notinline)
+       (let ((info (info :function :info (leaf-source-name leaf))))
+         (when info
+           (setf (basic-combination-fun-info call) info))
+         (values nil nil)))
+      ((not (and (global-var-p leaf)
+                 (eq (global-var-kind leaf) :global-function)))
+       (values leaf nil))
+      ((and (ecase inlinep
+              (:inline t)
+              (:no-chance nil)
+              ((nil :maybe-inline) (policy call (zerop space))))
+            (defined-fun-p leaf)
+            (defined-fun-inline-expansion leaf)
+            (inline-expansion-ok call))
+       ;; Inline: if the function has already been converted at another call
+       ;; site in this component, we point this REF to the functional. If not,
+       ;; we convert the expansion.
+       ;;
+       ;; For :INLINE case local call analysis will copy the expansion later,
+       ;; but for :MAYBE-INLINE and NIL cases we only get one copy of the
+       ;; expansion per component.
+       ;;
+       ;; FIXME: We also convert in :INLINE & FUNCTIONAL-KIND case below. What
+       ;; is it for?
+       (with-ir1-environment-from-node call
+         (let ((fun (defined-fun-functional leaf)))
+           (if (or (not fun)
+                   (and (eq inlinep :inline) (functional-kind fun)))
+               ;; Convert.
+               (let* ((name (leaf-source-name leaf))
+                      (res (ir1-convert-inline-expansion
+                            name
+                            (defined-fun-inline-expansion leaf)
+                            leaf
+                            inlinep
+                            (info :function :info name))))
+                 ;; Allow backward references to this function from following
+                 ;; forms. (Reused only if policy matches.)
+                 (push res (defined-fun-functionals leaf))
+                 (change-ref-leaf ref res)
+                 (unless ir1-converting-not-optimizing-p
+                   (locall-analyze-component *current-component*)))
+               ;; If we've already converted, change ref to the converted
+               ;; functional.
+               (change-ref-leaf ref fun))))
+       (values (ref-leaf ref) nil))
+      (t
+       (let ((info (info :function :info (leaf-source-name leaf))))
+         (if info
+             (values leaf
+                     (progn
+                       (setf (basic-combination-kind call) :known)
+                       (setf (basic-combination-fun-info call) info)))
+             (values leaf nil)))))))
 
 ;;; Check whether CALL satisfies TYPE. If so, apply the type to the
 ;;; call, and do MAYBE-TERMINATE-BLOCK and return the values of
@@ -1102,17 +1109,22 @@
                    (assert-call-type call defined-type nil)
                    (maybe-terminate-block call ir1-converting-not-optimizing-p)))))
            (recognize-known-call call ir1-converting-not-optimizing-p))
-          ((valid-fun-use call type
-                          :argument-test #'always-subtypep
-                          :result-test nil
-                          :lossage-fun #'compiler-warn
-                          :unwinnage-fun #'compiler-notify)
-           (assert-call-type call type)
-           (maybe-terminate-block call ir1-converting-not-optimizing-p)
-           (recognize-known-call call ir1-converting-not-optimizing-p))
           (t
-           (setf (combination-kind call) :error)
-           (values nil nil)))))
+           (multiple-value-bind (valid unwinnage unknown-keys)
+               (valid-fun-use call type
+                              :argument-test #'always-subtypep
+                              :result-test nil
+                              :lossage-fun #'compiler-warn
+                              :unwinnage-fun #'compiler-notify)
+             (declare (ignore unwinnage))
+             (cond (valid
+                    (assert-call-type call type)
+                    (maybe-terminate-block call ir1-converting-not-optimizing-p)
+                    (setf (combination-kind call) :full)
+                    (recognize-known-call call ir1-converting-not-optimizing-p unknown-keys))
+                   (t
+                    (setf (combination-kind call) :error)
+                    (values nil nil))))))))
 
 ;;; This is called by IR1-OPTIMIZE when the function for a call has
 ;;; changed. If the call is local, we try to LET-convert it, and
