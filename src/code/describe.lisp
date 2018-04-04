@@ -540,23 +540,31 @@
     (format stream "~@:_Argument precedence order: ~:A" argument-list)))
 
 (defun describe-function-source (function stream)
-  (if (compiled-function-p (the function function))
-      (let* ((code (fun-code-header (%fun-fun function)))
-             (info (sb-kernel:%code-debug-info code)))
-        (when info
-          (let ((source (sb-c::debug-info-source info)))
-            (when source
-              (let ((namestring (sb-c::debug-source-namestring source)))
-                ;; This used to also report the times the source was created
-                ;; and compiled, but that seems more like noise than useful
-                ;; information -- but FWIW that are to be had as
-                ;; SB-C::DEBUG-SOUCE-CREATED/COMPILED.
-                (cond (namestring
-                       (format stream "~@:_Source file: ~A" namestring))
-                      ((sb-di:debug-source-form source)
-                       (format stream "~@:_Source form:~@:_  ~S"
-                               (sb-di:debug-source-form source)))))))))
-      (let ((source
+  (declare (function function))
+  (typecase function
+    (generic-function
+     (let ((source (sb-pcl::definition-source function)))
+       (when source
+         (format stream "~@:_Source file: ~A"
+                 (sb-c:definition-source-location-namestring source)))))
+    (compiled-function
+     (let* ((code (fun-code-header (%fun-fun function)))
+            (info (sb-kernel:%code-debug-info code)))
+       (when info
+         (let ((source (sb-c::debug-info-source info)))
+           (when source
+             (let ((namestring (sb-c::debug-source-namestring source)))
+               ;; This used to also report the times the source was created
+               ;; and compiled, but that seems more like noise than useful
+               ;; information -- but FWIW that are to be had as
+               ;; SB-C::DEBUG-SOUCE-CREATED/COMPILED.
+               (cond (namestring
+                      (format stream "~@:_Source file: ~A" namestring))
+                     ((sb-di:debug-source-form source)
+                      (format stream "~@:_Source form:~@:_  ~S"
+                              (sb-di:debug-source-form source))))))))))
+    (t
+     (let ((source
              (typecase function
                #+sb-eval
                (sb-eval:interpreted-function
@@ -564,10 +572,10 @@
                #+sb-fasteval
                (sb-interpreter:interpreted-function
                 (sb-interpreter:fun-source-location function)))))
-        (when source
-          (let ((namestring (sb-c:definition-source-location-namestring source)))
-            (when namestring
-              (format stream "~@:_Source file: ~A" namestring)))))))
+       (when source
+         (let ((namestring (sb-c:definition-source-location-namestring source)))
+           (when namestring
+             (format stream "~@:_Source file: ~A" namestring))))))))
 
 (defun describe-function (name function stream)
   (let ((name (if function (%fun-name function) name)))
