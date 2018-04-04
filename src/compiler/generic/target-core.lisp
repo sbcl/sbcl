@@ -210,6 +210,7 @@
                       (or #!+immobile-code (eq *compile-to-memory-space* :immobile))
                       box-num length)))
       (declare (type index box-num length))
+      (aver (<= box-num sb!vm:short-header-max-words))
 
       ;; The following operations need the code pinned:
       ;; 1. copying into code-instructions (a SAP)
