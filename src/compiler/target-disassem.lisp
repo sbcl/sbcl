@@ -316,16 +316,15 @@
 
 ;;; the offset of FUNCTION from the start of its code-component's
 ;;; instruction area
-(defun fun-insts-offset (function) ; FUNCTION *must* be pinned
-  (declare (type compiled-function function))
-  (let ((simple-fun (%fun-fun function)))
-    (- (get-lisp-obj-address simple-fun)
-       sb!vm:fun-pointer-lowtag
-       (sap-int (code-instructions (fun-code-header simple-fun))))))
+(defun fun-insts-offset (simple-fun) ; FUNCTION *must* be pinned
+  (declare (type simple-fun simple-fun))
+  (- (get-lisp-obj-address simple-fun)
+     sb!vm:fun-pointer-lowtag
+     (sap-int (code-instructions (fun-code-header simple-fun)))))
 
 ;;; the offset of FUNCTION from the start of its code-component
 (defun fun-offset (function)
-  (declare (type compiled-function function))
+  (declare (type simple-fun function))
   ;; FIXME: closure-length has fewer bits than the number of bits
   ;; specifying the offset from a function back to its code.
   ;; FUN_HEADER_NWORDS_MASK is 24 bits, closure-length is <= 15 bits
