@@ -402,11 +402,6 @@
   ;; are in sorted order, to allow binary search. We omit the first
   ;; and last PC, since their values are 0 and the length of the code
   ;; vector.
-  ;;
-  ;; KLUDGE: PC's can't always be represented by FIXNUMs, unless we're
-  ;; always careful to put our code in low memory. Is that how it
-  ;; works? Would this break if we used a more general memory map? --
-  ;; WHN 20000120
   (fun-map (missing-arg) :type simple-vector :read-only t)
   ;; Location contexts
   ;; Either a simple-vector or a context if there's only one context.
