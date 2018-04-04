@@ -625,26 +625,21 @@ evaluated as a PROGN."
     (flet ((const-cons (test handler)
              ;; If possible, render HANDLER as a load-time constant so that
              ;; consing the test and handler is also load-time constant.
-             (let ((name (when (typep handler
-                                      '(cons (member function quote)
-                                        (cons symbol null)))
-                           (cadr handler))))
-               (cond ((or (not name)
-                          (assq name (local-functions))
-                          (and (eq (car handler) 'function)
+             (let ((quote (car handler))
+                   (name (cadr handler)))
+               (cond ((and (eq quote 'function)
+                           (or (assq name (local-functions))
                                (sb!c::fun-locally-defined-p name env)))
                       `(cons ,(case (car test)
                                 ((named-lambda function) test)
                                 (t `(load-time-value ,test t)))
-                             ,(locally
-                                  ;; Regardless of lexical policy, never allow
-                                  ;; a non-callable into handler-clusters.
-                                  (declare (optimize (safety 3)))
-                                `(the (function-designator (condition)) ,handler))))
+                             (the (function-designator (condition)) ,handler)))
                      ((info :function :info name) ; known
                       ;; This takes care of CONTINUE,ABORT,MUFFLE-WARNING.
                       ;; #' will be evaluated in the null environment.
-                      `(load-time-value (cons ,test (the (function-designator (condition)) #',name)) t))
+                      `(load-time-value
+                        (cons ,test (the (function-designator (condition)) #',name))
+                        t))
                      (t
                       ;; For each handler specified as #'F we must verify
                       ;; that F is fboundp upon entering the binding scope.
@@ -659,7 +654,8 @@ evaluated as a PROGN."
                                         (find-or-create-fdefn ',name) t))))
                       ;; Resolve to an fdefn at load-time.
                       `(load-time-value
-                        (cons ,test (find-or-create-fdefn (the (function-designator (condition)) ',name)))
+                        (cons ,test (find-or-create-fdefn
+                                     (the (function-designator (condition)) ',name)))
                         t)))))
 
            (const-list (items)
@@ -718,19 +714,31 @@ evaluated as a PROGN."
                        `(named-lambda (%handler-bind ,type) (c)
                           (declare (optimize (sb!c::verify-arg-count 0)))
                           (typep c ',type))))
-                ;; Compute the handler expression
-                (let ((lexpr (typecase handler
-                               ((cons (eql lambda)) handler)
-                               ((cons (eql function)
-                                      (cons (cons (eql lambda)) null))
-                                (cadr handler)))))
-                  (if lexpr
-                      (let ((name (let ((sb!xc:*gensym-counter*
-                                         (length (cluster-entries))))
-                                    (sb!xc:gensym "H"))))
-                        (local-functions `(,name ,@(rest lexpr)))
-                        `#',name)
-                      handler))))))))
+                ;; Compute the handler expression.
+                ;; Unless the expression is ({FUNCTION|QUOTE} <sym>), then create a
+                ;; new local function. If the supplied handler is spelled
+                ;; (LAMBDA ...) or #'(LAMBDA ...), then the local function is the
+                ;; lambda but named. If not spelled as such, the function funcalls
+                ;; the user's sexpr so that the compiler enforces callable-ness.
+                (if (typep handler '(cons (member function quote) (cons symbol null)))
+                    handler
+                    (let ((lexpr
+                           (typecase handler
+                             ;; These two are merely expansion prettifiers,
+                             ;; and not strictly necessary.
+                             ((cons (eql function) (cons (cons (eql lambda)) null))
+                              (cadr handler))
+                             ((cons (eql lambda))
+                              handler)
+                             (t
+                              ;; Should be (THE (FUNCTION-DESIGNATOR (CONDITION)))
+                              ;; but the cast kills DX allocation.
+                              `(lambda (c) (funcall ,handler c)))))
+                          (name (let ((sb!xc:*gensym-counter*
+                                       (length (cluster-entries))))
+                                  (sb!xc:gensym "H"))))
+                      (local-functions `(,name ,@(rest lexpr)))
+                      `#',name))))))))
 
       `(dx-flet ,(local-functions)
          ,@(dummy-forms)

@@ -664,13 +664,16 @@
 ;;; handler-case and handler-bind should use DX internally
 
 (defun dx-handler-bind (x)
-  (handler-bind ((error
-                  #'(lambda (c)
-                      (break "OOPS: ~S caused ~S" x c)))
-                 ((and serious-condition (not error))
-                  #'(lambda (c)
-                      (break "OOPS2: ~S did ~S" x c))))
-    (/ 2 x)))
+  (let ((y 3))
+    (macrolet ((fool () `(lambda (c) (print (list c (incf y))))))
+      (handler-bind ((error
+                      #'(lambda (c)
+                          (break "OOPS: ~S caused ~S" x c)))
+                     (warning (fool))
+                     ((and serious-condition (not error))
+                      #'(lambda (c)
+                          (break "OOPS2: ~S did ~S" x c))))
+        (/ 2 x)))))
 
 (defun dx-handler-case (x)
   (assert (zerop (handler-case (/ 2 x)

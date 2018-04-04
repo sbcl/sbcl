@@ -478,11 +478,6 @@
       (let ((fn (cdaar sb-kernel:*handler-clusters*)))
         (assert (functionp fn)))))
 
-  (handler-bind ((warning (eval ''muffle-warning)))
-    (let ((fn (cdaar sb-kernel:*handler-clusters*)))
-      ;; the function is stored as a symbol
-      (assert (eq fn 'muffle-warning))))
-
   (handler-bind ((warning 'some-silly-handler))
     (let ((fn (cdaar sb-kernel:*handler-clusters*)))
       ;; the function is stored as an fdefn
