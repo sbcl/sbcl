@@ -236,6 +236,10 @@
             (setf (%simple-fun-name fun) (entry-info-name entry-info))
             (setf (%simple-fun-arglist fun) (entry-info-arguments entry-info))
             (setf (%simple-fun-type fun) (entry-info-type entry-info))
+            ;; We can't make a decision to record the source here
+            ;; because the policy is not available in a simple way.
+            ;; (It would demand groveling through the component to find
+            ;; the lambda-bind corresponding to this entry)
             (setf (%simple-fun-info fun) (entry-info-info entry-info))
             (note-fun entry-info fun object))))
 
@@ -265,11 +269,10 @@
 ;;; Backpatch all the DEBUG-INFOs dumped so far with the specified
 ;;; SOURCE-INFO list. We also check that there are no outstanding
 ;;; forward references to functions.
-(defun fix-core-source-info (info object &optional function)
-  (declare (type core-object object)
-           (type (or null function) function))
+(defun fix-core-source-info (info object)
+  (declare (type core-object object))
   (aver (zerop (hash-table-count (core-object-patch-table object))))
-  (let ((source (debug-source-for-info info :function function)))
+  (let ((source (debug-source-for-info info)))
     (dolist (info (core-object-debug-info object))
       (setf (debug-info-source info) source)))
   (setf (core-object-debug-info object) nil)

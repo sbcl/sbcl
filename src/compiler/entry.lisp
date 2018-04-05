@@ -31,6 +31,26 @@
   (select-component-format component)
   (values))
 
+;;; An "effectively" null environment captures at most
+;;; a compilation policy, nothing more.
+;;; This is to make the 2nd value of FUNCTION-LAMBDA-EXPRESSION
+;;; accurate; but is it really important to do that? Nah.
+#+nil
+(defun effectively-null-lexenv-p (lexenv)
+  (or (null-lexenv-p lexenv)
+      (and (not (or (lexenv-funs lexenv)
+                    (lexenv-vars lexenv)
+                    (lexenv-blocks lexenv)
+                    (lexenv-tags lexenv)
+                    (lexenv-type-restrictions lexenv)
+                    (lexenv-lambda lexenv)
+                    (lexenv-cleanup lexenv)
+                    (lexenv-handled-conditions lexenv)
+                    (lexenv-disabled-package-locks lexenv)
+                    (lexenv-user-data lexenv)))
+           (or (not (lexenv-parent lexenv))
+               (null-lexenv-p (lexenv-parent lexenv))))))
+
 ;;; Initialize INFO structure to correspond to the XEP LAMBDA FUN.
 (defun compute-entry-info (fun info)
   (declare (type clambda fun) (type entry-info info))
@@ -43,6 +63,12 @@
     (setf (entry-info-offset info) (gen-label))
     (setf (entry-info-name info)
           (leaf-debug-name internal-fun))
+    ;; Though compiling to core may store the source expr into %SIMPLE-FUN-INFO,
+    ;; compilation to file does not, so we don't put it in ENTRY-INFO-INFO
+    ;; because that would be picked up by FASL-DUMP-COMPONENT.
+    ;; (All manner of un-dumpable objects could be present in the form)
+    (setf (entry-info-lexpr info)
+          (functional-inline-expansion internal-fun))
     (let ((doc (functional-documentation internal-fun))
           (xrefs (pack-xref-data (functional-xref internal-fun))))
       (setf (entry-info-info info) (if (and doc xrefs)

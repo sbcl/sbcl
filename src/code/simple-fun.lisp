@@ -211,38 +211,83 @@
     (sb!interpreter:interpreted-function (sb!interpreter:%fun-type function))
     (t (%simple-fun-type (%fun-fun function)))))
 
-;;; Extract halves of SIMPLE-FUN-INFO, which is a string if it holds
-;;; documentation, a SIMPLE-VECTOR if XREFS,
-;;; or (CONS STRING SIMPLE-VECTOR) for both, or NIL if neither.
-(macrolet ((def (name info-part if-simple-vector if-string)
+;;; A FUN-SRC structure appears in %SIMPLE-FUN-INFO of any function for
+;;; which a source form is retained via COMPILE or LOAD and for which it was
+;;; required to store all three of these pieces of data.
+(defstruct (fun-src (:constructor make-fun-src (form doc xrefs))
+                    (:predicate nil)
+                    (:copier nil))
+  form
+  doc
+  xrefs)
+;;; Assign %SIMPLE-FUN-INFO given the three possible things that
+;;; we stash there.
+(defun set-simple-fun-info (fun form doc xrefs)
+  (setf (%simple-fun-info fun)
+        (if form
+            ;; If form starts with a string, we can't store it by itself
+            ;; because it's confusable with (CONS STRING *)
+            ;; Lambda expressions start with LAMBDA, obviously,
+            ;; so this really shouldn't happen. Just being defensive here.
+            (if (or doc xrefs (typep form '(cons string)))
+                (make-fun-src form doc xrefs)
+                form)
+            (if (and doc xrefs)
+                (cons doc xrefs)
+                (or doc xrefs)))))
+
+;;; Define readers for parts of SIMPLE-FUN-INFO, which holds:
+;;;  - a string if documentation only,
+;;;  - a SIMPLE-VECTOR if xrefs only
+;;;  - a (CONS STRING SIMPLE-VECTOR) if both
+;;;  - a CONS headed by LAMBDA or an integer if a source form only
+;;;  - a FUN-SRC if other combinations of the above
+;;;  - or NIL
+(macrolet ((def (name info-part if-simple-vector if-string if-struct)
              `(defun ,name (simple-fun)
                 (declare (simple-fun simple-fun))
                 (let ((info (%simple-fun-info simple-fun)))
                   (typecase info
-                    (list (,info-part info))
+                    ;; (CONS (NOT STRING)) implies neither doc nor xref present
+                    (list (if (stringp (car info)) (,info-part info)))
                     (simple-vector ,if-simple-vector)
                     (string ,if-string)
+                    (fun-src ,if-struct)
                     (t (bug "bogus INFO for ~S: ~S" simple-fun info)))))))
-  (def %simple-fun-doc   car nil info)
-  (def %simple-fun-xrefs cdr info nil))
+  (def %simple-fun-doc   car nil info (fun-src-doc info))
+  (def %simple-fun-xrefs cdr info nil (fun-src-xrefs info)))
+
+;;; Return two values - the lambda expression for SIMPLE-FUN if compiled
+;;; to memory (and retained), and secondarily the index of the toplevel
+;;; function that contained this function, the latter serving to extract
+;;; forms by traversal of stored source path indices.
+(defun %simple-fun-lexpr (simple-fun)
+  (declare (simple-fun simple-fun))
+  (let* ((info (%simple-fun-info simple-fun))
+         (expr (typecase info
+                 (fun-src (fun-src-form info))
+                 ((cons (not string)) info))))
+    ;; An integer is the index to the entry into SIMPLE-FUN's code component
+    ;; that contains the toplevel form containing SIMPLE-FUN.
+    (if (integerp (car expr))
+        (values (cdr expr) (car expr))
+        (values expr 0))))
 
 (defun (setf %simple-fun-doc) (doc simple-fun)
   (declare (type (or null string) doc)
            (simple-fun simple-fun))
   (let ((info (%simple-fun-info simple-fun)))
     (setf (%simple-fun-info simple-fun)
-          (cond ((typep info '(or null string))
-                 doc)
-                ((simple-vector-p info)
-                 (if doc
-                     (cons doc info)
-                     info))
-                ((consp info)
-                 (if doc
-                     (cons doc (cdr info))
-                     (cdr info)))
-                (t
-                 (bug "bogus INFO for ~S: ~S" simple-fun info))))))
+          (typecase info
+            ((or null string) doc)
+            (simple-vector
+             (if doc (cons doc info) info))
+            ((cons string)
+             (if doc (cons doc (cdr info)) (cdr info)))
+            (fun-src
+             (setf (fun-src-doc info) doc))
+            (t
+             (bug "bogus INFO for ~S: ~S" simple-fun info))))))
 
 (defun %fun-doc (function)
   (typecase function

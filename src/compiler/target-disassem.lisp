@@ -1222,7 +1222,7 @@
                (awhen (sfcache-last-location-retrieved cache)
                  (sb!di:code-location= loc it))))
       (values nil nil)
-      (let ((form (sb!debug::code-location-source-form loc context nil)))
+      (let ((form (sb!debug::code-location-source-form nil loc context nil)))
         (when cache
           (setf (sfcache-debug-source cache)
                 (sb!di:code-location-debug-source loc))

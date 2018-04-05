@@ -113,13 +113,22 @@
       (format t "~&Removed ~D doc string~:P" count)))
 
   ;; Remove source forms of compiled-to-memory lambda expressions.
-  ;; The disassembler is the major culprit for retention of these.
+  ;; The disassembler is the major culprit for retention of these,
+  ;; but there are others and I don't feel like figuring out where from.
+  ;; Globally declaiming EVAL-STORE-SOURCE-FORM 0 would work too,
+  ;; but isn't it nice to know that the logic for storing the forms
+  ;; actually works? (Yes)
   (sb-vm::map-allocated-objects
    (lambda (obj type size)
-     (declare (ignore type size))
-     (when (typep obj 'sb-c::debug-source)
-       (unless (sb-c::debug-source-namestring obj)
-         (setf (sb-c::debug-source-form obj) nil))))
+     (declare (ignore size))
+     (when (= type sb-vm:code-header-widetag)
+       (dotimes (i (sb-kernel:code-n-entries obj))
+         (let ((fun (sb-kernel:%code-entry-point obj i)))
+           (when (sb-impl::%simple-fun-lexpr fun)
+             (sb-impl::set-simple-fun-info
+              fun nil
+              (sb-kernel:%simple-fun-doc fun)
+              (sb-kernel:%simple-fun-xrefs fun)))))))
    :all)
 
   ;; Fix unknown types in globaldb

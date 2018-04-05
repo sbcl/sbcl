@@ -82,6 +82,22 @@
 
       ;; fle-eval should still be an interpreted function.
       (assert (interpreted-function-p (symbol-function 'fle-eval))))))
+
+(with-test (:name :nested-function-lambda-expression)
+  (let* ((lexpr
+          '(lambda ()
+            (labels ((f1 (z &rest r &key (b (eval 'foo)) (a 3) w)
+                       (- a w (length r) (f2 (/  z b))))
+                     (f2 (w) (* w .3)))
+              (values #'f1 #'f2))))
+         (f (compile nil lexpr)))
+    (assert (equal (function-lambda-expression f) lexpr))
+    (assert (equal (function-lambda-expression (funcall f))
+                   '(lambda (z &rest r &key (b (eval 'foo)) (a 3) w)
+                     (block f1 (- a w (length r) (f2 (/ z b)))))))
+    (assert (equal (function-lambda-expression
+                    (nth-value 1 (funcall f)))
+                   '(lambda (w) (block f2 (* w 0.3)))))))
 
 ;;; Tests of documentation on types and classes
 

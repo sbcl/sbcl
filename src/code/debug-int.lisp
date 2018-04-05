@@ -2663,12 +2663,26 @@ register."
 
 ;;; Given a code location, return the associated form-number
 ;;; translations and the actual top level form.
-(defun get-toplevel-form (location)
+;;; Note that functions compiled to memory (via COMPILE or implicitly
+;;; via LOAD if *EVALUATOR-MODE* = :COMPILE) do not save their source form
+;;; in the DEBUG-SOURCE corresponding to their code-component. Instead the
+;;; form hangs off the %SIMPLE-FUN-INFO slot, so that we can get an accurate
+;;; depiction of the source form for any lambda no matter where from.
+(defun get-toplevel-form (frame location)
   (let ((d-source (code-location-debug-source location)))
     (let* ((offset (code-location-toplevel-form-offset location))
            (res
-             (cond ((debug-source-form d-source)
-                    (debug-source-form d-source))
+             (cond ((let ((fun (debug-fun-fun (frame-debug-fun frame))))
+                      (and (simple-fun-p fun)
+                           ;; %SIMPLE-FUN-LEXPR's primary value is the right answer
+                           ;; provided that its secondary value is 0. But the general
+                           ;; case handles the special case just fine, so always call
+                           ;; it twice - once to extract the toplevel function index
+                           ;; and then again to extract that function's source form.
+                           (sb!impl::%simple-fun-lexpr
+                            (%code-entry-point (fun-code-header fun)
+                                               (nth-value 1 (sb!impl::%simple-fun-lexpr
+                                                             fun)))))))
                    ((debug-source-namestring d-source)
                     (get-file-toplevel-form location))
                    (t (bug "Don't know how to use a DEBUG-SOURCE without ~

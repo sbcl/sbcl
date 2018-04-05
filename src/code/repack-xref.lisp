@@ -141,12 +141,13 @@
       (when (>= verbose 1)
         (format t "; Repacking xref information~%"))
       (loop for (fun . unpacked) in all-unpacked do
-           (let ((info (%simple-fun-info fun))
-                 (new-xrefs (pack-xref-data unpacked)))
+           (let ((new-xrefs (pack-xref-data unpacked)))
              (incf new-size (xref-size new-xrefs))
-             (setf (%simple-fun-info fun) (if (consp info)
-                                              (cons (car info) new-xrefs)
-                                              new-xrefs)))))
+             (sb-impl::set-simple-fun-info
+              fun
+              (sb-impl::%simple-fun-lexpr fun)
+              (%simple-fun-doc fun)
+              new-xrefs))))
 
     (when (>= verbose 1)
       (format t ";   Old xref size ~11:D byte~:P~@
