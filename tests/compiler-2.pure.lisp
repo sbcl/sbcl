@@ -1329,3 +1329,12 @@
    ()
    '(lambda (x)
      (atanh (coerce x '(double-float * (0.0d0)))))))
+
+(with-test (:name :ir1-optimize-combination-unknown-keys)
+  (checked-compile-and-assert
+      ()
+      '(lambda (p x y)
+        (let ((f (when p #'string-equal)))
+          (when f
+            (funcall f "a" "b" x y))))
+    ((t :start1 0) nil)))
