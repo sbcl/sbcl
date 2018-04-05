@@ -222,9 +222,6 @@
   (multiple-value-bind (nreq applyp)
       (get-generic-fun-info gf)
     (let ((ll (make-fast-method-call-lambda-list nreq applyp))
-          (check-applicable-keywords
-           (when (and applyp (gf-requires-emf-keyword-checks gf))
-             '((check-applicable-keywords))))
           (error-p (or (eq (first effective-method) '%no-primary-method)
                        (eq (first effective-method) '%invalid-qualifiers)))
           (mc-args-p
@@ -258,12 +255,10 @@
               (declare (ignore .pv. .next-method-call.))
               (let ((.gf-args. ,gf-args))
                 (declare (ignorable .gf-args.))
-                ,@check-applicable-keywords
                 ,effective-method))))
         (t
          `(named-lambda ,name ,ll
             (declare (ignore ,@(if error-p ll '(.pv. .next-method-call.))))
-            ,@check-applicable-keywords
             ,effective-method))))))
 
 (defun expand-emf-call-method (gf form metatypes applyp env)
@@ -329,7 +324,7 @@
                                          .valid-keys.
                                          .dfun-more-context.
                                          .dfun-more-count.)
-             '(.keyargs-start. .valid-keys.)))
+             '()))
     (t
      (default-code-converter form))))
 
@@ -346,11 +341,10 @@
                             generic-function form))
                          (cdr form)))))
     (check-applicable-keywords
-     '(.keyargs-start. .valid-keys.))
+     '())
     (t
      (default-constant-converter form))))
 
-(defvar *applicable-methods*)
 (defun make-effective-method-function-internal
     (generic-function effective-method method-alist-p wrappers-p)
   (multiple-value-bind (nreq applyp metatypes nkeys arg-info)
@@ -376,29 +370,23 @@
                     (lambda (form)
                       (memf-constant-converter form generic-function)))
         (lambda (method-alist wrappers)
-          (multiple-value-bind (valid-keys keyargs-start)
-              (when (memq '.valid-keys. constants)
-                (compute-applicable-keywords
-                 generic-function *applicable-methods*))
-            (flet ((compute-constant (constant)
-                     (if (consp constant)
-                         (case (car constant)
-                           (.meth.
-                            (funcall (cdr constant) method-alist wrappers))
-                           (.meth-list.
-                            (mapcar (lambda (fn)
-                                      (funcall fn method-alist wrappers))
-                                    (cdr constant)))
-                           (t constant))
-                         (case constant
-                           (.keyargs-start. keyargs-start)
-                           (.valid-keys. valid-keys)
-                           (t constant)))))
-              (let ((fun (apply cfunction
-                                (mapcar #'compute-constant constants))))
-                (set-fun-name fun `(combined-method ,name))
-                (make-fast-method-call :function fun
-                                       :arg-info arg-info)))))))))
+          (flet ((compute-constant (constant)
+                   (if (consp constant)
+                       (case (car constant)
+                         (.meth.
+                          (funcall (cdr constant) method-alist wrappers))
+                         (.meth-list.
+                          (mapcar (lambda (fn)
+                                    (funcall fn method-alist wrappers))
+                                  (cdr constant)))
+                         (t constant))
+                       (case constant
+                         (t constant)))))
+            (let ((fun (apply cfunction
+                              (mapcar #'compute-constant constants))))
+              (set-fun-name fun `(combined-method ,name))
+              (make-fast-method-call :function fun
+                                     :arg-info arg-info))))))))
 
 (defmacro call-method-list (&rest calls)
   `(progn ,@calls))
@@ -448,8 +436,12 @@
            (let ((call-method
                   `(call-method ,(first (primary)) ,(rest (primary)))))
              (if (gf-requires-emf-keyword-checks generic-function)
-                 ;; the PROGN inhibits the above optimization
-                 `(progn ,call-method)
+                 (multiple-value-bind (valid-keys keyargs-start)
+                     (compute-applicable-keywords generic-function applicable-methods)
+                   `(let ((.valid-keys. ',valid-keys)
+                          (.keyargs-start. ',keyargs-start))
+                      (check-applicable-keywords)
+                      ,call-method))
                  call-method)))
           (t
            (let ((main-effective-method

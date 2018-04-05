@@ -3,6 +3,9 @@
 changes relative to sbcl-1.4.6:
   * bug fix: Compiling a SLEEP call with a float positive infinity argument no
     longer causes an internal error (lp#1754081)
+  * bug fix: Keyword arguments provided to a generic function with
+    EQL-specialized methods are checked more correctly (reported by Syll,
+    lp#1760987)
 
 changes in sbcl-1.4.6 relative to sbcl-1.4.5:
   * enhancement: DISASSEMBLE on a symbol naming a macro will disassemble
