@@ -159,7 +159,7 @@
            values)))
 
 (defun encode-internal-error-args (values)
-  (with-adjustable-vector (vector)
+  (sb!c::with-adjustable-vector (vector)
     (dolist (where values)
       (write-var-integer
        ;; WHERE can be either a TN or a packed SC number + offset

@@ -402,3 +402,28 @@
     (when (funcall test value)
       (return value))))
 
+(in-package "SB!C")
+
+;;; This is target-only code, so doesn't belong in 'debug-info.lisp'
+(flet ((unpack-tlf-num+offset (integer &aux (bytepos 0))
+         (flet ((unpack-1 ()
+                  (let ((shift 0) (acc 0))
+                    (declare (notinline sb!kernel:%ldb)) ; lp#1573398
+                    (loop
+                     (let ((byte (ldb (byte 8 bytepos) integer)))
+                       (incf bytepos 8)
+                       (setf acc (logior acc (ash (logand byte #x7f) shift)))
+                       (if (logtest byte #x80)
+                           (incf shift 7)
+                           (return acc)))))))
+           (let ((v1 (unpack-1))
+                 (v2 (unpack-1)))
+             (values (if (eql v1 0) nil (1- v1))
+                     (if (eql v2 0) nil (1- v2)))))))
+  (defun compiled-debug-info-tlf-number (cdi)
+    (nth-value 0 (unpack-tlf-num+offset
+                  (compiled-debug-info-tlf-num+offset cdi))))
+
+  (defun compiled-debug-info-char-offset (cdi)
+    (nth-value 1 (unpack-tlf-num+offset
+                  (compiled-debug-info-tlf-num+offset cdi)))))

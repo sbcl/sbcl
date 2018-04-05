@@ -738,12 +738,12 @@
                         (sb!c::entry-info-name (car entries)))
                    (component-name component)))
        :fun-map fun-map
-       :tlf-number component-tlf-num
-       :char-offset
-       (and component-tlf-num
-            (aref (file-info-positions
-                   (source-info-file-info *source-info*))
-                  component-tlf-num))
+       :tlf-num+offset (pack-tlf-num+offset
+                        component-tlf-num
+                        (and component-tlf-num
+                             (aref (file-info-positions
+                                    (source-info-file-info *source-info*))
+                                   component-tlf-num)))
        :contexts (compact-vector *contexts*)))))
 
 ;;; Write BITS out to BYTE-BUFFER in backend byte order. The length of

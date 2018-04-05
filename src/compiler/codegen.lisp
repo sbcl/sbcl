@@ -213,7 +213,6 @@
   (let ((prev-env nil)
         (*prev-segment* nil)
         (*prev-vop* nil)
-        (sb!vm::*adjustable-vectors* nil)
         (*fixup-notes* nil))
     (let ((label (sb!assem:gen-label)))
       (setf *elsewhere-label* label)

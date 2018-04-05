@@ -577,6 +577,7 @@ necessary, since type inference may take arbitrarily long to converge.")
   (let ((*code-segment* nil)
         (*elsewhere* nil)
         (*elsewhere-label* nil)
+        (*adjustable-vectors* nil) ; Needed both by codegen and fasl writer
         #!+inline-constants (*unboxed-constants* nil))
     (maybe-mumble "GTN ")
     (gtn-analyze component)
