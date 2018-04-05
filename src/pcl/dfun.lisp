@@ -434,7 +434,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
      dfun-info)))
 
 (defun make-checking-dfun (generic-function function &optional cache)
-  (unless cache
+  (unless (or cache (use-default-method-only-dfun-p generic-function))
     (when (use-caching-dfun-p generic-function)
       (return-from make-checking-dfun (make-caching-dfun generic-function)))
     (when (use-dispatch-dfun-p generic-function)
@@ -445,8 +445,11 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
     (if (every (lambda (mt) (eq mt t)) metatypes)
         (let ((dfun-info (default-method-only-dfun-info)))
           (values
-           (funcall (get-dfun-constructor 'emit-default-only metatypes applyp)
-                    function)
+           (let* ((constructor (get-dfun-constructor 'emit-default-only metatypes applyp))
+                  (fun (funcall constructor function))
+                  (name (generic-function-name generic-function)))
+             (set-fun-name fun `(default-only ,name))
+             fun)
            nil
            dfun-info))
         (let* ((cache (or cache (make-cache :key-count nkeys :value nil :size 2)))

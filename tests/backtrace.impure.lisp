@@ -535,7 +535,7 @@
                         ((lambda (a b &rest rest) :in ,*p*) 10 11 0)))))
 
 (defgeneric gf-dispatch-test/gf (x y)
-  (:method (x y)
+  (:method ((x integer) (y integer))
     (+ x y)))
 (defun gf-dispatch-test/f (z)
   (declare (muffle-conditions style-warning))
@@ -546,6 +546,16 @@
   ;; Wrong argument count
   (assert-backtrace (lambda () (gf-dispatch-test/f 42))
                     '(((sb-pcl::gf-dispatch gf-dispatch-test/gf) 42))))
+
+(defgeneric gf-default-only-test/gf (x y)
+  (:method (x y) (+ x y)))
+(defun gf-default-only-test/f (z)
+  (declare (muffle-conditions style-warning))
+  (gf-default-only-test/gf z))
+(with-test (:name (:backtrace :default-only))
+  (gf-default-only-test/gf 1 1)
+  (assert-backtrace (lambda () (gf-default-only-test/f 42))
+                    '(((sb-pcl::default-only gf-default-only-test/gf) 42))))
 
 (with-test (:name (:backtrace :local-tail-call))
   (assert-backtrace
