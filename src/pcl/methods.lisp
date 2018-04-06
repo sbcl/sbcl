@@ -765,7 +765,7 @@
         (compute-applicable-methods-using-types gf types)
       (let ((generator (get-secondary-dispatch-function1
                         gf methods types nil t all-applicable-and-sorted-p)))
-        (make-callable gf methods generator
+        (make-callable generator
                        nil (mapcar #'class-wrapper classes))))))
 
 (defun value-for-caching (gf classes)

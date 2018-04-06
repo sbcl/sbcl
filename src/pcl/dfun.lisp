@@ -666,8 +666,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
            0))))
 
 (declaim (inline make-callable))
-(defun make-callable (gf methods generator method-alist wrappers)
-  (declare (ignore gf))
+(defun make-callable (generator method-alist wrappers)
   (function-funcall generator method-alist wrappers))
 
 (defun make-dispatch-dfun (gf)
@@ -677,7 +676,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
   (let* ((methods (generic-function-methods gf))
          (generator (get-secondary-dispatch-function1
                      gf methods nil nil nil nil nil t)))
-    (make-callable gf methods generator nil nil)))
+    (make-callable generator nil nil)))
 
 (defun make-final-dispatch-dfun (gf)
   (make-dispatch-dfun gf))
@@ -1073,8 +1072,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
                          (get-secondary-dispatch-function1
                           gf methods types nil (and for-cache-p wrappers)
                           all-applicable-and-sorted-p)))
-                    (make-callable gf methods generator
-                                   nil (and for-cache-p wrappers)))
+                    (make-callable generator nil (and for-cache-p wrappers)))
                   (default-secondary-dispatch-function gf))))
     (multiple-value-bind (index accessor-type)
         (and for-accessor-p all-applicable-and-sorted-p methods
@@ -1625,7 +1623,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
          (get-secondary-dispatch-function1
           gf methods types (not (null method-alist)) (not (null wrappers))
           (not (methods-contain-eql-specializer-p methods)))))
-    (make-callable gf methods generator method-alist wrappers)))
+    (make-callable generator method-alist wrappers)))
 
 (defun get-secondary-dispatch-function1 (gf methods types method-alist-p
                                             wrappers-p
@@ -1690,7 +1688,7 @@ Except see also BREAK-VICIOUS-METACIRCLE.  -- CSR, 2003-05-28
   (let ((generator
          (get-secondary-dispatch-function1
           gf methods nil (not (null method-alist)) (not (null wrappers)) t)))
-    (make-callable gf methods generator method-alist wrappers)))
+    (make-callable generator method-alist wrappers)))
 
 (defun get-effective-method-function1 (gf methods &optional (sorted-p t))
   (get-secondary-dispatch-function1 gf methods nil nil nil t sorted-p))
