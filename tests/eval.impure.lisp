@@ -278,7 +278,7 @@
     (assert (eq :fun (empty-let-is-not-toplevel-fun)))))
 
 (with-test (:name (eval function-lambda-expression))
-  (assert (equal `(sb-int:named-lambda eval-fle-1 (x)
+  (assert (equal `(lambda (x)
                     (block eval-fle-1
                       (+ x 1)))
                  (function-lambda-expression
