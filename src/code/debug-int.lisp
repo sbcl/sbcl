@@ -2668,21 +2668,12 @@ register."
 ;;; in the DEBUG-SOURCE corresponding to their code-component. Instead the
 ;;; form hangs off the %SIMPLE-FUN-INFO slot, so that we can get an accurate
 ;;; depiction of the source form for any lambda no matter where from.
-(defun get-toplevel-form (frame location)
+(defun get-toplevel-form (location)
   (let ((d-source (code-location-debug-source location)))
     (let* ((offset (code-location-toplevel-form-offset location))
            (res
-             (cond ((let ((fun (debug-fun-fun (frame-debug-fun frame))))
-                      (and (simple-fun-p fun)
-                           ;; %SIMPLE-FUN-LEXPR's primary value is the right answer
-                           ;; provided that its secondary value is 0. But the general
-                           ;; case handles the special case just fine, so always call
-                           ;; it twice - once to extract the toplevel function index
-                           ;; and then again to extract that function's source form.
-                           (sb!impl::%simple-fun-lexpr
-                            (%code-entry-point (fun-code-header fun)
-                                               (nth-value 1 (sb!impl::%simple-fun-lexpr
-                                                             fun)))))))
+             (cond ((and (typep d-source 'sb!c::core-debug-source)
+                         (sb!c::core-debug-source-form d-source)))
                    ((debug-source-namestring d-source)
                     (get-file-toplevel-form location))
                    (t (bug "Don't know how to use a DEBUG-SOURCE without ~

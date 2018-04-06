@@ -257,21 +257,15 @@
   (def %simple-fun-doc   car nil info (fun-src-doc info))
   (def %simple-fun-xrefs cdr info nil (fun-src-xrefs info)))
 
-;;; Return two values - the lambda expression for SIMPLE-FUN if compiled
-;;; to memory (and retained), and secondarily the index of the toplevel
-;;; function that contained this function, the latter serving to extract
-;;; forms by traversal of stored source path indices.
+;;; Return the lambda expression for SIMPLE-FUN if compiled to memory
+;;; and rentention of forms was enabled via the EVAL-STORE-SOURCE-FORM policy
+;;; (as is the default).
 (defun %simple-fun-lexpr (simple-fun)
   (declare (simple-fun simple-fun))
-  (let* ((info (%simple-fun-info simple-fun))
-         (expr (typecase info
-                 (fun-src (fun-src-form info))
-                 ((cons (not string)) info))))
-    ;; An integer is the index to the entry into SIMPLE-FUN's code component
-    ;; that contains the toplevel form containing SIMPLE-FUN.
-    (if (integerp (car expr))
-        (values (cdr expr) (car expr))
-        (values expr 0))))
+  (let ((info (%simple-fun-info simple-fun)))
+    (typecase info
+      (fun-src (fun-src-form info))
+      ((cons (not string)) info))))
 
 (defun (setf %simple-fun-doc) (doc simple-fun)
   (declare (type (or null string) doc)

@@ -285,10 +285,11 @@
 
 ;;; Return DEBUG-SOURCE structure containing information derived from
 ;;; INFO.
-(defun debug-source-for-info (info)
+(defun debug-source-for-info (info &key function)
   (declare (type source-info info))
   (let ((file-info (get-toplevelish-file-info info)))
-    (make-debug-source
+    (multiple-value-call
+        (if function #'sb!c::make-core-debug-source #'make-debug-source)
      :compiled (source-info-start-time info)
      :namestring (or *source-namestring*
                      (make-file-info-namestring
@@ -298,7 +299,13 @@
                                (truename (file-info-name file-info)))))
                         (if (pathnamep pathname) pathname))
                       file-info))
-     :created (file-info-write-date file-info))))
+     :created (file-info-write-date file-info)
+     (if function
+         (values :form (let ((direct-file-info (source-info-file-info info)))
+                         (when (eq :lisp (file-info-name direct-file-info))
+                           (elt (file-info-forms direct-file-info) 0)))
+                 :function function)
+         (values)))))
 
 (defun smallest-element-type (integer negative)
   (let ((bits (max (+ (integer-length integer)

@@ -1246,49 +1246,28 @@ necessary, since type inference may take arbitrarily long to converge.")
             (when (core-object-p object)
               #+sb-xc-host (error "Can't compile to core")
               #-sb-xc-host
-              (progn
-                (fix-core-source-info *source-info* object)
+              (let ((store-source
+                     (policy (lambda-bind fun)
+                             (> eval-store-source-form 0))))
+                (fix-core-source-info *source-info* object
+                                      (and store-source result))
                 ;; FIXME: here on down the logic probably belongs in
                 ;; MAKE-CORE-COMPONENT, but to do that we'd want to pass in
                 ;; the EVAL-STORE-SOURCE policy
-                (when (policy (lambda-bind fun)
-                              (> eval-store-source-form 0))
-                  (let* ((direct-file-info (source-info-file-info *source-info*))
-                         (code (fun-code-header result))
-                         ;; Find RESULT's index in the list of CODE entrypoints
-                         (toplevel-fun-index
-                          (dotimes (i (code-n-entries code))
-                            (when (eq result (%code-entry-point code i))
-                              (return i)))))
-                    (aver toplevel-fun-index)
-                    ;; Store each simple-fun's lambda expression
-                    (dohash ((entry simple-fun) entry-table)
-                      (let ((info (entry-info-info entry)))
-                        (sb!impl::set-simple-fun-info
+                (when store-source
+                  ;; Store each simple-fun's lambda expression
+                  (dohash ((entry simple-fun) entry-table)
+                    (let ((info (entry-info-info entry)))
+                      (sb!impl::set-simple-fun-info
                          simple-fun
-                         (if (and (eq simple-fun result)
-                                  (eq :lisp (file-info-name direct-file-info)))
-                             ;; The stored source form is a little different for the toplevel
-                             ;; to be debugger-compatible. All source form paths are
-                             ;; expressed in terms of a directed walk from the top of the
-                             ;; outermost form. See FORM-NUMBER-TRANSLATIONS, e.g.
-                             (elt (file-info-forms direct-file-info) 0)
-                             ;; Otherwise, store the LEXPR as given, and a backreference
-                             ;; to the index of the toplevel-est functional.
-                             ;; If the backreference is to entry index 0, it's not
-                             ;; necessary to store the index number.
-                             (let ((lexpr (entry-info-lexpr entry)))
-                               (if (eql toplevel-fun-index 0) ; almost always true
-                                   lexpr
-                                   ;; otherwise, remember the nonzero index
-                                   (cons toplevel-fun-index lexpr))))
+                         (entry-info-lexpr entry)
                          ;; SET-SIMPLE-FUN-INFO expects all 3 thingies that we might
                          ;; save (any can be NIL) so extract the existing docstring
                          (cond ((listp info) (car info))
                                ((stringp info) info))
                          ;; ... and the existing xrefs
                          (cond ((listp info) (cdr info))
-                               ((simple-vector-p info) info)))))))))
+                               ((simple-vector-p info) info))))))))
 
             (mapc #'clear-ir1-info components-from-dfo)
             result))))))

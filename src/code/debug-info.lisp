@@ -367,6 +367,14 @@
   (compiled (missing-arg) :type unsigned-byte)
   ;; Additional information from (WITH-COMPILATION-UNIT (:SOURCE-PLIST ...))
   (plist *source-plist* :read-only t))
+(def!struct (core-debug-source #-sb-xc-host (:pure t)
+                               (:copier nil)
+                               (:include debug-source))
+  ;; Compilation to memory stores each toplevel form given to %COMPILE.
+  ;; That form can generate multiple functions, and those functions can
+  ;; be in one or more code components. They all point at the same form.
+  form
+  function)
 
 ;;;; DEBUG-INFO structures
 

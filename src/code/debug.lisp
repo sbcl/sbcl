@@ -743,7 +743,7 @@ the current thread are replaced with dummy objects which can safely escape."
                 (not (eql (search "SYS:SRC;" path) 0)))
         (handler-case
             (let ((source (handler-case
-                              (code-location-source-form frame loc 0)
+                              (code-location-source-form loc 0)
                             (error (c)
                               (format stream "~&   error finding frame source: ~A" c)))))
               (format stream "~%   source: ~S" source))
@@ -1679,18 +1679,17 @@ forms that explicitly control this kind of evaluation.")
 (!def-debug-command-alias "L" "LIST-LOCALS")
 
 (!def-debug-command "SOURCE" ()
-  (print (code-location-source-form *current-frame*
-                                    (sb!di:frame-code-location *current-frame*)
+  (print (code-location-source-form (sb!di:frame-code-location *current-frame*)
                                     (read-if-available 0))
          *debug-io*))
 
 ;;;; source location printing
 
-(defun code-location-source-form (frame location context &optional (errorp t))
+(defun code-location-source-form (location context &optional (errorp t))
   (let* ((start-location (maybe-block-start-location location))
          (form-num (sb!di:code-location-form-number start-location)))
     (multiple-value-bind (translations form)
-        (sb!di:get-toplevel-form frame start-location)
+        (sb!di:get-toplevel-form start-location)
       (declare (notinline warn))
       (cond ((< form-num (length translations))
              (sb!di:source-path-context form
