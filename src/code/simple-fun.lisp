@@ -240,7 +240,7 @@
 ;;;  - a string if documentation only,
 ;;;  - a SIMPLE-VECTOR if xrefs only
 ;;;  - a (CONS STRING SIMPLE-VECTOR) if both
-;;;  - a CONS headed by LAMBDA or an integer if a source form only
+;;;  - a CONS headed by LAMBDA if a source form only
 ;;;  - a FUN-SRC if other combinations of the above
 ;;;  - or NIL
 (macrolet ((def (name info-part if-simple-vector if-string if-struct)
@@ -277,13 +277,15 @@
             (simple-vector
              (if doc (cons doc info) info))
             ((cons string)
-             (if doc (cons doc (cdr info)) (cdr info)))
+             (if doc (rplaca info doc) (cdr info)))
             (fun-src
-             (setf (fun-src-doc info) doc))
+             (setf (fun-src-doc info) doc)
+             info)
             ((cons (not string))
-             (make-fun-src info doc nil))
+             (if doc (make-fun-src info doc nil) info))
             (t
-             (bug "bogus INFO for ~S: ~S" simple-fun info))))))
+             (bug "bogus INFO for ~S: ~S" simple-fun info)))))
+  doc)
 
 (defun %fun-doc (function)
   (typecase function
