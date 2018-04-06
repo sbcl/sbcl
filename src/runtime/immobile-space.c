@@ -1590,13 +1590,34 @@ static lispobj* defrag_search_varyobj_subspace(lispobj addr)
     lose("Can't find jump target");
 }
 
+static inline boolean tempspace_p(char* addr)
+{
+    return (addr >= fixedobj_tempspace.start &&
+            addr < fixedobj_tempspace.start + fixedobj_tempspace.n_bytes)
+        || (addr >= varyobj_tempspace.start &&
+            addr < varyobj_tempspace.start + varyobj_tempspace.n_bytes);
+}
+static inline boolean known_space_p(lispobj ptr)
+{
+    return find_page_index((char*)ptr) >= 0
+        || tempspace_p((char*)ptr)
+        || immobile_space_p(ptr)
+        || (STATIC_SPACE_START <= ptr && ptr < STATIC_SPACE_END);
+}
+static boolean forwardable_ptr_p(lispobj ptr)
+{
+    return is_lisp_pointer(ptr) &&
+           known_space_p(ptr) &&
+           forwarding_pointer_p(native_pointer(ptr));
+}
+
 static void adjust_words(lispobj *where, sword_t n_words, uword_t arg)
 {
     int i;
     for (i=0;i<n_words;++i) {
         lispobj ptr = where[i];
-        if (is_lisp_pointer(ptr) && forwarding_pointer_p(native_pointer(ptr)))
-          where[i] = forwarding_pointer_value(native_pointer(ptr));
+        if (forwardable_ptr_p(ptr))
+            where[i] = forwarding_pointer_value(native_pointer(ptr));
     }
 }
 
@@ -1764,9 +1785,9 @@ static void fixup_space(lispobj* where, size_t n_words)
               int i;
               for (i = fixnum_value(v->length)-1 ; i>=0 ; --i) {
                   lispobj ptr = data[i];
-                  if (is_lisp_pointer(ptr) && forwarding_pointer_p(native_pointer(ptr))) {
-                    data[i] = forwarding_pointer_value(native_pointer(ptr));
-                    needs_rehash = 1;
+                  if (forwardable_ptr_p(ptr)) {
+                      data[i] = forwarding_pointer_value(native_pointer(ptr));
+                      needs_rehash = 1;
                   }
               }
               if (needs_rehash)
