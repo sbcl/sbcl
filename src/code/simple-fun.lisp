@@ -280,6 +280,8 @@
              (if doc (cons doc (cdr info)) (cdr info)))
             (fun-src
              (setf (fun-src-doc info) doc))
+            ((cons (not string))
+             (make-fun-src info doc nil))
             (t
              (bug "bogus INFO for ~S: ~S" simple-fun info))))))
 
