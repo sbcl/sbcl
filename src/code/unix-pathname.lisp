@@ -226,56 +226,7 @@
       (write-string (unparse-native-physical-file pathname) s))))
 
 (defun unparse-unix-enough (pathname defaults)
-  (declare (type pathname pathname defaults))
-  (flet ((lose ()
-           (error "~S cannot be represented relative to ~S."
-                  pathname defaults)))
-    (collect ((strings))
-      (let* ((pathname-directory (%pathname-directory pathname))
-             (defaults-directory (%pathname-directory defaults))
-             (prefix-len (length defaults-directory))
-             (result-directory
-              (cond ((null pathname-directory) '(:relative))
-                    ((eq (car pathname-directory) :relative)
-                     pathname-directory)
-                    ((and (> prefix-len 0)
-                          (>= (length pathname-directory) prefix-len)
-                          (compare-component (subseq pathname-directory
-                                                     0 prefix-len)
-                                             defaults-directory))
-                     ;; Pathname starts with a prefix of default. So
-                     ;; just use a relative directory from then on out.
-                     (cons :relative (nthcdr prefix-len pathname-directory)))
-                    ((eq (car pathname-directory) :absolute)
-                     ;; We are an absolute pathname, so we can just use it.
-                     pathname-directory)
-                    (t
-                     (bug "Bad fallthrough in ~S" 'unparse-unix-enough)))))
-        (strings (unparse-physical-directory-list result-directory #\\)))
-      (let* ((pathname-type (%pathname-type pathname))
-             (type-needed (pathname-component-present-p pathname-type))
-             (pathname-name (%pathname-name pathname))
-             (name-needed (or type-needed
-                              (and pathname-name
-                                   (not (compare-component pathname-name
-                                                           (%pathname-name
-                                                            defaults)))))))
-        (when name-needed
-          (unless pathname-name (lose))
-          (when (and (null pathname-type)
-                     (typep pathname-name 'simple-string)
-                     (position #\. pathname-name :start 1))
-            (error "too many dots in the name: ~S" pathname))
-          (strings (unparse-physical-piece pathname-name #\\)))
-        (when type-needed
-          (unless (pathname-component-present-p pathname-type)
-            (lose))
-          (when (typep pathname-type 'simple-string)
-            (when (position #\. pathname-type)
-              (error "type component can't have a #\. inside: ~S" pathname)))
-          (strings ".")
-          (strings (unparse-physical-piece pathname-type #\\))))
-      (apply #'concatenate 'simple-string (strings)))))
+  (unparse-physical-enough pathname defaults #\\))
 
 (defun simplify-unix-namestring (src)
   (declare (type simple-string src))
