@@ -150,14 +150,18 @@
           (t
            (make-pattern (pattern))))))
 
-(declaim (ftype (sfunction ((or (eql :wild) simple-string pattern) character)
+(declaim (ftype (sfunction ((or (eql :wild) simple-string pattern) character &key (:escape-dot t))
                            simple-string)
                 unparse-physical-piece))
-(defun unparse-physical-piece (thing escape-char)
+(defun unparse-physical-piece (thing escape-char &key escape-dot)
   (let ((length 0)
         (complicated nil))
     (declare (type index length))
-    (labels ((inspect-fragment (fragment)
+    (labels ((needs-escaping-p (char)
+               (or (char= char #\*) (char= char #\?)
+                   (char= char #\[) (char= char escape-char)
+                   (and escape-dot (char= char #\.))))
+             (inspect-fragment (fragment)
                (etypecase fragment
                  ((eql :wild)
                   (incf length)
@@ -166,8 +170,7 @@
                   (incf length (length fragment))
                   (Loop with complicated = nil
                         for char across (the simple-string fragment)
-                        when (or (char= char #\*) (char= char #\?)
-                                 (char= char #\[) (char= char escape-char))
+                        when (needs-escaping-p char)
                         do (setf complicated t)
                            (incf length)
                         finally (return complicated)))
@@ -183,49 +186,48 @@
                                (incf length (+ 2 (length (cdr piece))))
                                t)))
                           (pattern-pieces fragment))))))
-      (setf complicated (inspect-fragment thing)))
-    (unless complicated
-      (return-from unparse-physical-piece thing))
-    (let ((result (make-string length))
-          (index 0))
-      (declare (type (simple-array character 1) result)
-               (type index index))
-      (labels ((output-character (character)
-                 (setf (aref result index) character)
-                 (incf index))
-               (output-string (string)
-                 (declare (type (simple-array character 1) string))
-                 (setf (subseq result index) string)
-                 (incf index (length string)))
-               (unparse-fragment (fragment)
-                 (etypecase fragment
-                   ((eql :wild)
-                    (output-character #\*))
-                   (simple-string
-                    (loop for char across (the simple-string fragment)
-                          when (or (char= char #\*) (char= char #\?)
-                                   (char= char #\[) (char= char escape-char))
-                          do (output-character escape-char)
-                          do (output-character char)))
-                   (pattern
-                    (mapc (lambda (piece piece-complicated)
-                            (etypecase piece
-                              (simple-string
-                               (if piece-complicated
-                                   (unparse-fragment piece)
-                                   (output-string piece)))
-                              ((eql :multi-char-wild)
-                               (output-character #\*))
-                              ((eql :single-char-wild)
-                               (output-character #\?))
-                              ((cons (eql :character-set))
-                               (output-character #\[)
-                               (output-string (cdr piece))
-                               (output-character #\]))))
-                          (pattern-pieces fragment) complicated)))))
-        (declare (inline output-character output-string))
-        (unparse-fragment thing))
-      result)))
+      (setf complicated (inspect-fragment thing))
+      (unless complicated
+        (return-from unparse-physical-piece thing))
+      (let ((result (make-string length))
+            (index 0))
+        (declare (type (simple-array character 1) result)
+                 (type index index))
+        (labels ((output-character (character)
+                   (setf (aref result index) character)
+                   (incf index))
+                 (output-string (string)
+                   (declare (type (simple-array character 1) string))
+                   (setf (subseq result index) string)
+                   (incf index (length string)))
+                 (unparse-fragment (fragment)
+                   (etypecase fragment
+                     ((eql :wild)
+                      (output-character #\*))
+                     (simple-string
+                      (loop for char across (the simple-string fragment)
+                            when (needs-escaping-p char)
+                            do (output-character escape-char)
+                            do (output-character char)))
+                     (pattern
+                      (mapc (lambda (piece piece-complicated)
+                              (etypecase piece
+                                (simple-string
+                                 (if piece-complicated
+                                     (unparse-fragment piece)
+                                     (output-string piece)))
+                                ((eql :multi-char-wild)
+                                 (output-character #\*))
+                                ((eql :single-char-wild)
+                                 (output-character #\?))
+                                ((cons (eql :character-set))
+                                 (output-character #\[)
+                                 (output-string (cdr piece))
+                                 (output-character #\]))))
+                            (pattern-pieces fragment) complicated)))))
+          (declare (inline output-character output-string))
+          (unparse-fragment thing))
+        result))))
 
 (defun make-matcher (piece)
   (cond ((eq piece :wild)
@@ -238,22 +240,24 @@
          (lambda (other)
            (equal piece other)))))
 
-(/show0 "filesys.lisp 160")
-
 (defun extract-name-type-and-version (namestr start end escape-char)
   (declare (type simple-string namestr)
            (type index start end))
-  (let ((last-dot (position #\. namestr :start (1+ start) :end end
-                            :from-end t)))
-    (if last-dot
-        (values (maybe-make-pattern namestr start last-dot escape-char)
-                (maybe-make-pattern namestr (1+ last-dot) end escape-char)
-                :newest)
-        (values (maybe-make-pattern namestr start end escape-char)
-                nil
-                :newest))))
-
-(/show0 "filesys.lisp 200")
+  (flet ((escape-p (i)
+           (and (>= i start) (char= (aref namestr i) escape-char))))
+    (let ((last-dot
+            (loop for i from (1- end) downto (1+ start)
+                  when (and (char= (aref namestr i) #\.)
+                            (or (not (escape-p (1- i)))
+                                (escape-p (- i 2))))
+                  return i)))
+      (if last-dot
+          (values (maybe-make-pattern namestr start last-dot escape-char)
+                  (maybe-make-pattern namestr (1+ last-dot) end escape-char)
+                  :newest)
+          (values (maybe-make-pattern namestr start end escape-char)
+                  nil
+                  :newest)))))
 
 
 ;;;; Grabbing the kind of file when we have a namestring.

@@ -452,22 +452,25 @@
                    (make-pathname :name "^" :type "txt")
                    (make-pathname :name "foo*" :type "txt")
                    (make-pathname :name "foo[" :type "txt")
+                   (make-pathname :name "foo.bar" :type "txt")
+                   (make-pathname :name "foo" :type "txt.gz")
+                   (make-pathname :name "foo.bar" :type "txt.gz")
+                   (make-pathname :name "foo.bar")
                    (parse-namestring "SCRATCH:FOO.TXT.1")
                    (parse-namestring "SCRATCH:FOO.TXT.NEWEST")
                    (parse-namestring "SCRATCH:FOO.TXT")))
-    (handler-case
-        (let* ((*print-readably* t)
-               (new (read-from-string (format nil "~S" p))))
-          (unless (equal new p)
-            (let ((*print-readably* nil))
-              (error "oops: host:~S device:~S dir:~S version:~S~% ->~%~
-                             host:~S device:~S dir:~S version:~S"
-                     (pathname-host p) (pathname-device p)
-                     (pathname-directory p) (pathname-version p)
-                     (pathname-host new) (pathname-device new)
-                     (pathname-directory new) (pathname-version new)))))
-      (print-not-readable ()
-        nil))))
+    (let* ((*print-readably* t)
+           (new (read-from-string (format nil "~S" p))))
+      (unless (equal new p)
+        (let ((*print-readably* nil))
+          (error ":host ~S :device ~S :directory ~S :name ~S :type ~S :version ~S~@
+                  -> :host ~S :device ~S :directory ~S :name ~S :type ~S :version ~S"
+                 (pathname-host p) (pathname-device p)
+                 (pathname-directory p) (pathname-name p)
+                 (pathname-type p) (pathname-version p)
+                 (pathname-host new) (pathname-device new)
+                 (pathname-directory new) (pathname-name new)
+                 (pathname-type new) (pathname-version new)))))))
 
 ;;; BUG 330: "PARSE-NAMESTRING should accept namestrings as the
 ;;; default argument" ...and streams as well
@@ -530,6 +533,47 @@
             (test "*E[ab]" "*E[ab]")
             (test "*EE"    "*EE")))
 
+(with-test (:name (namestring :escape-dot))
+  (labels ((prepare (namestring)
+             #-win32 (substitute #\\ #\E namestring)
+             #+win32 (substitute #\^ #\E namestring))
+           (test (expected &rest args)
+             (let* ((expected (prepare expected))
+                    (args (loop for (key value) on args by #'cddr
+                                collect key collect (prepare value)))
+                    (pathname (pathname (apply #'make-pathname args))))
+               (assert (string= expected (namestring pathname)))
+               (assert (equal (parse-namestring expected) pathname)))))
+    (test "foo.bar"          :name "foo"     :type "bar")
+    (test ".foo.bar"         :name ".foo"    :type "bar")
+    (test "foo.baz.bar"      :name "foo.baz" :type "bar")
+    (test "fooEE.bar"        :name "fooE"    :type "bar")
+    (test "fooEEEE.bar"      :name "fooEE"   :type "bar")
+
+    (test "foo.E.bar"        :name "foo"     :type ".bar")
+    (test ".foo.E.bar"       :name ".foo"    :type ".bar")
+    (test "foo.baz.E.bar"    :name "foo.baz" :type ".bar")
+    (test "fooEE.E.bar"      :name "fooE"    :type ".bar")
+    (test "fooEEEE.E.bar"    :name "fooEE"   :type ".bar")
+
+    (test "foo.barE.fez"     :name "foo"     :type "bar.fez")
+    (test ".foo.barE.fez"    :name ".foo"    :type "bar.fez")
+    (test "foo.baz.barE.fez" :name "foo.baz" :type "bar.fez")
+    (test "fooEE.barE.fez"   :name "fooE"    :type "bar.fez")
+    (test "fooEEEE.barE.fez" :name "fooEE"   :type "bar.fez")
+
+    (test "foo.barE."        :name "foo"     :type "bar.")
+    (test ".foo.barE."       :name ".foo"    :type "bar.")
+    (test "foo.baz.barE."    :name "foo.baz" :type "bar.")
+    (test "fooEE.barE."      :name "fooE"    :type "bar.")
+    (test "fooEEEE.barE."    :name "fooEE"   :type "bar.")
+
+    (test "foo.EEbar"        :name "foo"     :type "Ebar")
+    (test ".foo.EEbar"       :name ".foo"    :type "Ebar")
+    (test "foo.baz.EEbar"    :name "foo.baz" :type "Ebar")
+    (test "fooEE.EEbar"      :name "fooE"    :type "Ebar")
+    (test "fooEEEE.EEbar"    :name "fooEE"   :type "Ebar")))
+
 ;;; Printing of pathnames; see CLHS 22.1.3.1. This section was started
 ;;; to confirm that pathnames are printed as their namestrings under
 ;;; :escape nil :readably nil.
@@ -567,10 +611,8 @@
   (flet ((test (&rest initargs)
            (let ((pathname (apply #'make-pathname initargs)))
              (assert-error (namestring pathname) file-error))))
-    (test :name "foo.")
     (test :name "")
-    (test :type "foo")
-    (test :name "foo" :type ".bar")))
+    (test :type "foo")))
 
 ;;; reported by James Y Knight on sbcl-devel 2006-05-17
 (with-test (:name :merge-back)

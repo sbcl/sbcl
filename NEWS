@@ -2,9 +2,12 @@
 
 changes relative to sbcl-1.4.6:
   * enhancement: better handling of unknown keyword arguments (lp#1750466)
-  * bug fix: Compiling a SLEEP call with a float positive infinity argument no
+  * enhancement: namestrings can now be computed for certain pathnames that
+    previously did not have namestrings because of #\. characters in their
+    name and/or type components.
+  * bug fix: compiling a SLEEP call with a float positive infinity argument no
     longer causes an internal error (lp#1754081)
-  * bug fix: Keyword arguments provided to a generic function with
+  * bug fix: keyword arguments provided to a generic function with
     EQL-specialized methods are checked more correctly (reported by Syll,
     lp#1760987)
 

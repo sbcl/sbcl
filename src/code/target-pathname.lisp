@@ -137,29 +137,20 @@
       ;; translating logical pathnames to a filesystem without
       ;; versions (like Unix and Win32).
       (when name
-        (when (and (null type)
-                   (typep name 'string)
-                   (> (length name) 0)
-                   (position #\. name :start 1))
-          (no-namestring-error
-           pathname
-           "there are too many dots in the ~S component ~S." :name name))
         (when (and (typep name 'string)
                    (string= name ""))
           (no-namestring-error
            pathname "the ~S component ~S is of length 0" :name name))
-        (fragments (unparse-physical-piece name escape-char)))
+        (fragments (unparse-physical-piece name escape-char
+                                           :escape-dot (null type))))
       (when (pathname-component-present-p type)
         (unless name
           (no-namestring-error
            pathname
            "there is a ~S component but no ~S component" :type :name))
-        (when (typep type 'simple-string)
-          (when (position #\. type)
-            (no-namestring-error
-             pathname "the ~S component contains a ~S" :type #\.)))
         (fragments ".")
-        (fragments (unparse-physical-piece type escape-char)))
+        (fragments (unparse-physical-piece
+                    type escape-char :escape-dot t)))
       (apply #'concatenate 'simple-string (fragments)))))
 
 (defun unparse-native-physical-file (pathname)
@@ -221,19 +212,14 @@
                                                             defaults)))))))
         (when name-needed
           (unless pathname-name (lose))
-          (when (and (null pathname-type)
-                     (typep pathname-name 'simple-string)
-                     (position #\. pathname-name :start 1))
-            (error "too many dots in the name: ~S" pathname))
-          (strings (unparse-physical-piece pathname-name escape-char)))
+          (strings (unparse-physical-piece pathname-name escape-char
+                                           :escape-dot (not pathname-type))))
         (when type-needed
           (unless (pathname-component-present-p pathname-type)
             (lose))
-          (when (typep pathname-type 'simple-string)
-            (when (position #\. pathname-type)
-              (error "type component can't have a #\. inside: ~S" pathname)))
           (strings ".")
-          (strings (unparse-physical-piece pathname-type escape-char))))
+          (strings (unparse-physical-piece pathname-type
+                                           escape-char :escape-dot t))))
       (apply #'concatenate 'simple-string (strings)))))
 
 
