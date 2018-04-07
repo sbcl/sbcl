@@ -1007,9 +1007,7 @@ static boolean is_some_thread_local_addr(os_vm_address_t addr);
 boolean
 gc_managed_addr_p(lispobj addr)
 {
-    if(in_range_p(addr, READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE) ||
-       in_range_p(addr, STATIC_SPACE_START   , STATIC_SPACE_SIZE) ||
-       in_range_p(addr, DYNAMIC_SPACE_START  , dynamic_space_size) ||
+    if(gc_managed_heap_space_p(addr) ||
        is_some_thread_local_addr((os_vm_address_t)addr))
         return 1;
     return 0;

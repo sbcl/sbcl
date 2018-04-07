@@ -124,6 +124,8 @@ extern void os_protect(os_vm_address_t addr,
 /* Return true for an address (with or without lowtag bits) within
  * any range of memory understood by the garbage collector. */
 extern boolean gc_managed_addr_p(lispobj test);
+/* As for above, but consider only the heap spaces, not stacks */
+extern boolean gc_managed_heap_space_p(lispobj test);
 
 /* Given a signal context, return the address for storage of the
  * register, of the specified offset, for that context. The offset is

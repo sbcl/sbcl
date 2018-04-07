@@ -198,6 +198,26 @@ void os_link_runtime()
 #endif /* LISP_FEATURE_SB_DYNAMIC_CORE */
 }
 
+boolean
+gc_managed_heap_space_p(lispobj addr)
+{
+    if ((READ_ONLY_SPACE_START <= addr && addr < READ_ONLY_SPACE_END)
+        || (STATIC_SPACE_START <= addr && addr < STATIC_SPACE_END)
+#if defined LISP_FEATURE_GENCGC
+        || (DYNAMIC_SPACE_START <= addr &&
+            addr < (DYNAMIC_SPACE_START + dynamic_space_size))
+        || immobile_space_p(addr)
+#else
+        || (DYNAMIC_0_SPACE_START <= addr &&
+            addr < DYNAMIC_0_SPACE_START + dynamic_space_size)
+        || (DYNAMIC_1_SPACE_START <= addr &&
+            addr < DYNAMIC_1_SPACE_START + dynamic_space_size)
+#endif
+        )
+        return 1;
+    return 0;
+}
+
 #ifndef LISP_FEATURE_WIN32
 
 /* Remap a part of an already existing mapping to a file */
@@ -214,30 +234,18 @@ void os_map(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
 }
 
 boolean
-gc_managed_addr_p(lispobj ad)
+gc_managed_addr_p(lispobj addr)
 {
     struct thread *th;
 
-    if ((READ_ONLY_SPACE_START <= ad && ad < READ_ONLY_SPACE_END)
-        || (STATIC_SPACE_START <= ad && ad < STATIC_SPACE_END)
-#if defined LISP_FEATURE_GENCGC
-        || (DYNAMIC_SPACE_START <= ad &&
-            ad < (DYNAMIC_SPACE_START + dynamic_space_size))
-        || immobile_space_p(ad)
-#else
-        || (DYNAMIC_0_SPACE_START <= ad &&
-            ad < DYNAMIC_0_SPACE_START + dynamic_space_size)
-        || (DYNAMIC_1_SPACE_START <= ad &&
-            ad < DYNAMIC_1_SPACE_START + dynamic_space_size)
-#endif
-        )
+    if (gc_managed_heap_space_p(addr))
         return 1;
     for_each_thread(th) {
-        if(th->control_stack_start <= (lispobj*)ad
-           && (lispobj*)ad < th->control_stack_end)
+        if(th->control_stack_start <= (lispobj*)addr
+           && (lispobj*)addr < th->control_stack_end)
             return 1;
-        if(th->binding_stack_start <= (lispobj*)ad
-           && (lispobj*)ad < th->binding_stack_start + BINDING_STACK_SIZE)
+        if(th->binding_stack_start <= (lispobj*)addr
+           && (lispobj*)addr < th->binding_stack_start + BINDING_STACK_SIZE)
             return 1;
     }
     return 0;
