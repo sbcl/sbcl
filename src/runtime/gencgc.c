@@ -3965,8 +3965,6 @@ gc_and_save(char *filename, boolean prepend_runtime,
     if (file == NULL)
        return;
 
-    conservative_stack = 0;
-
     /* The filename might come from Lisp, and be moved by the now
      * non-conservative GC. */
     filename = strdup(filename);
@@ -4015,6 +4013,7 @@ gc_and_save(char *filename, boolean prepend_runtime,
      *  Then the entire (zeroed) from_space will be present in the saved core
      *  as empty pages, because we can't represent discontiguous ranges.
      */
+    conservative_stack = 0;
     prepare_for_final_gc();
     gencgc_alloc_start_page = next_free_page;
     collect_garbage(HIGHEST_NORMAL_GENERATION+1);
@@ -4037,10 +4036,6 @@ gc_and_save(char *filename, boolean prepend_runtime,
     gencgc_alloc_start_page = 0;
     collect_garbage(HIGHEST_NORMAL_GENERATION+1);
 
-    if (prepend_runtime)
-        save_runtime_to_filehandle(file, runtime_bytes, runtime_size,
-                                   application_type);
-
     /* The dumper doesn't know that pages need to be zeroed before use. */
     zero_all_free_pages();
     do_destructive_cleanup_before_save(lisp_init_function);
@@ -4052,6 +4047,10 @@ gc_and_save(char *filename, boolean prepend_runtime,
      * pointer, while the number of PTEs is based on next_free_page.
      * Make sure they agree */
     gc_assert((char*)get_alloc_pointer() == page_address(next_free_page));
+
+    if (prepend_runtime)
+        save_runtime_to_filehandle(file, runtime_bytes, runtime_size,
+                                   application_type);
 
     save_to_filehandle(file, filename, lisp_init_function,
                        prepend_runtime, save_runtime_options,
