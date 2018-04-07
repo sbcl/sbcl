@@ -1568,9 +1568,10 @@
          (setf (gethash ',name *backend-parsed-vops*)
                ',parse))
 
-       (let ((,n-res ,(set-up-vop-info inherited-parse parse)))
-         (store-vop-info ,n-res)
-         ,@(set-up-fun-translation parse n-res))
+       ,@(unless (eq (vop-parse-body parse) :unspecified)
+           `((let ((,n-res ,(set-up-vop-info inherited-parse parse)))
+               (store-vop-info ,n-res)
+               ,@(set-up-fun-translation parse n-res))))
        (let ((source-location (source-location)))
          (when source-location
            (setf (info :source-location :vop ',name) source-location)))
