@@ -184,35 +184,6 @@ static int find_ref(lispobj* source, lispobj target)
 enum ref_kind { HEAP, CONTROL_STACK, BINDING_STACK, TLS };
 char *ref_kind_name[4] = {"heap","C stack","bindings","TLS"};
 
-/// This unfortunately entails a heap scan,
-/// but it's quite fast if the symbol is found in immobile space.
-#ifdef LISP_FEATURE_SB_THREAD
-static lispobj* find_sym_by_tls_index(lispobj tls_index)
-{
-    lispobj* where = 0;
-    lispobj* end = 0;
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-    where = (lispobj*)FIXEDOBJ_SPACE_START;
-    end = fixedobj_free_pointer;
-#endif
-    while (1) {
-        while (where < end) {
-            lispobj header = *where;
-            int widetag = widetag_of(header);
-            if (widetag == SYMBOL_WIDETAG &&
-                tls_index_of(((struct symbol*)where)) == tls_index)
-                return where;
-            where += OBJECT_SIZE(header, where);
-        }
-        if (where >= (lispobj*)DYNAMIC_SPACE_START)
-            break;
-        where = (lispobj*)DYNAMIC_SPACE_START;
-        end = (lispobj*)get_alloc_pointer();
-    }
-    return 0;
-}
-#endif
-
 static inline int interestingp(lispobj ptr, struct hopscotch_table* targets)
 {
     return is_lisp_pointer(ptr) && hopscotch_containsp(targets, ptr);
@@ -601,7 +572,8 @@ static void trace1(lispobj object,
         fprintf(file, ":%s:", ref_kind_name[root_kind]);
         if (root_kind==BINDING_STACK || root_kind==TLS) {
 #ifdef LISP_FEATURE_SB_THREAD
-            lispobj* symbol = find_sym_by_tls_index(tls_index);
+            lispobj* symbol = (lispobj*)
+              lisp_symbol_from_tls_index(tls_index);
 #else
             lispobj* symbol = native_pointer(tls_index);
 #endif

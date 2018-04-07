@@ -13,6 +13,7 @@
 #define _SEARCH_H_
 
 extern lispobj* find_symbol(char*, char*, unsigned int*); // Find via package
+extern struct symbol* lisp_symbol_from_tls_index(lispobj tls_index);
 // Find via heap scan
 extern boolean search_for_type(int type, lispobj **start, int *count);
 extern lispobj* search_for_symbol(char *name, lispobj start, lispobj end);

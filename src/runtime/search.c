@@ -20,6 +20,7 @@
 #include "genesis/primitive-objects.h"
 #include "genesis/hash-table.h"
 #include "genesis/package.h"
+#include "pseudo-atomic.h" // for get_alloc_pointer()
 
 lispobj *
 search_read_only_space(void *pointer)
@@ -102,6 +103,35 @@ lispobj* search_for_symbol(char *name, lispobj start, lispobj end)
     }
     return 0;
 }
+
+/// This unfortunately entails a heap scan,
+/// but it's quite fast if the symbol is found in immobile space.
+#ifdef LISP_FEATURE_SB_THREAD
+struct symbol* lisp_symbol_from_tls_index(lispobj tls_index)
+{
+    lispobj* where = 0;
+    lispobj* end = 0;
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    where = (lispobj*)FIXEDOBJ_SPACE_START;
+    end = fixedobj_free_pointer;
+#endif
+    while (1) {
+        while (where < end) {
+            lispobj header = *where;
+            int widetag = widetag_of(header);
+            if (widetag == SYMBOL_WIDETAG &&
+                tls_index_of(((struct symbol*)where)) == tls_index)
+                return (struct symbol*)where;
+            where += OBJECT_SIZE(header, where);
+        }
+        if (where >= (lispobj*)DYNAMIC_SPACE_START)
+            break;
+        where = (lispobj*)DYNAMIC_SPACE_START;
+        end = (lispobj*)get_alloc_pointer();
+    }
+    return 0;
+}
+#endif
 
 static boolean sym_stringeq(lispobj sym, const char *string, int len)
 {
