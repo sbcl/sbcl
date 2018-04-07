@@ -2485,19 +2485,27 @@ is_in_stack_space(lispobj ptr)
 }
 
 struct verify_state {
-    lispobj *object_start, *object_end;
     lispobj *vaddr;
+    lispobj *object_start, *object_end;
+    lispobj tagged_object_start;
     uword_t flags;
     int errors;
     generation_index_t object_gen;
 };
 
 #define VERIFY_VERBOSE    1
-/* AGGRESSIVE = always call valid_lisp_pointer_p() on pointers.
- * Otherwise, do only a quick check that widetag/lowtag correspond */
+/* AGGRESSIVE = always call valid_lisp_pointer_p() on pointers. */
 #define VERIFY_AGGRESSIVE 2
+/* QUICK = skip most tests. This is intended for use when GC is believed
+ * to be correct per se (i.e. not for debugging GC), and so the verify
+ * pass executes more quickly */
+#define VERIFY_QUICK      4
+/* FINAL = warn about pointers from heap space to non-heap space.
+ * Such pointers would normally be ignored and do not be flagged as failure.
+ * This can be used in conjunction with QUICK, AGGRESSIVE, or neither. */
+#define VERIFY_FINAL      8
 /* VERIFYING_foo indicates internal state, not a caller's option */
-#define VERIFYING_HEAP_OBJECTS 8
+#define VERIFYING_HEAP_OBJECTS 16
 
 // Generalize over INSTANCEish things. (Not general like SB-KERNEL:LAYOUT-OF)
 static inline lispobj layout_of(lispobj* instance) { // native ptr
@@ -2516,14 +2524,22 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
     boolean is_in_readonly_space =
         (READ_ONLY_SPACE_START <= (uword_t)where &&
          where < read_only_space_free_pointer);
-    boolean is_in_immobile_space = immobile_space_p((lispobj)where);
+
+    /* Strict containment: no pointer from a heap space may point
+     * to anything outside of a heap space. */
+    boolean strict_containment = state->flags & VERIFY_FINAL;
 
     lispobj *end = where + nwords;
     size_t count;
     for ( ; where < end ; where += count) {
-        // Keep track of object boundaries, unless verifying a non-heap space.
-        if (where > state->object_end && (state->flags & VERIFYING_HEAP_OBJECTS)) {
+        /* Track object boundaries unless verifying non-heap space. A 1-word
+         * range resulting from unpacking a quasi-descriptor (compact instance
+         * header, fdefn raw addr) passed in as a local var of this function,
+         * and identifiable with vaddr != 0, can't start a new object. */
+        if (!state->vaddr && where > state->object_end &&
+            (state->flags & VERIFYING_HEAP_OBJECTS)) {
             state->object_start = where;
+            state->tagged_object_start = compute_lispobj(where);
             state->object_end = where + OBJECT_SIZE(*where, where) - 1;
             // Should not see filler after sweeping all gens
             /* if (!conservative_stack && widetag_of(*where) == FILLER_WIDETAG)
@@ -2533,17 +2549,25 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
         lispobj thing = *where;
         lispobj callee;
 
+#define GC_WARN(str) \
+        fprintf(stderr, "Ptr %p @ %"OBJ_FMTX" (lispobj %"OBJ_FMTX") sees %s\n", \
+                 (void*)(uintptr_t)thing, \
+                 (lispobj)(state->vaddr ? state->vaddr : where), \
+                 state->tagged_object_start, str);
+
         if (is_lisp_pointer(thing)) {
+            /* DONTFAIL mode skips most tests, performing only the strict
+             * containinment check */
+            if (strict_containment && !gc_managed_heap_space_p(thing))
+                GC_WARN("non-Lisp memory");
+            if (state->flags & VERIFY_QUICK)
+                continue;
+
             page_index_t page_index = find_page_index((void*)thing);
             boolean to_immobile_space = immobile_space_p(thing);
 
-    /* unlike lose(), fprintf detects format mismatch, hence the casts */
 #define FAIL_IF(what, why) if (what) { \
-    if (++state->errors > 25) lose("Too many errors"); \
-    else fprintf(stderr, "Ptr %p @ %"OBJ_FMTX" sees %s\n", \
-                 (void*)(uintptr_t)thing, \
-                 (lispobj)(state->vaddr ? state->vaddr : where), \
-                 why); }
+    if (++state->errors > 25) lose("Too many errors"); else GC_WARN(why); }
 
             /* Does it point to the dynamic space? */
             if (page_index != -1) {
@@ -2576,8 +2600,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                 int valid;
                 /* If aggressive, or to/from immobile space, do a full search
                  * (as entailed by valid_lisp_pointer_p) */
-                if ((state->flags & VERIFY_AGGRESSIVE)
-                    || (is_in_immobile_space || to_immobile_space))
+                if (state->flags & VERIFY_AGGRESSIVE)
                     valid = valid_lisp_pointer_p(thing);
                 else {
                     /* Efficiently decide whether 'thing' is plausible.
@@ -2586,8 +2609,8 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                      * "dangerously" scan a code component for embedded funs. */
                     valid = plausible_tag_p(thing);
                 }
-                /* If 'thing' points to a stack, we can only hope that the frame
-                 * not clobbered, or the object at 'where' is unreachable. */
+                /* If 'thing' points to a stack, we can only hope that the stack
+                 * frame is ok, or the object at 'where' is unreachable. */
                 FAIL_IF(!valid && !is_in_stack_space(thing), "junk");
             }
             continue;
