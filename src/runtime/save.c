@@ -211,11 +211,6 @@ static void
 smash_enclosing_state(boolean verbose) {
     struct thread *th = all_threads;
 
-    // Since SB-IMPL::DEINIT already checked for exactly 1 thread,
-    // losing here probably can't happen.
-    if (th->next)
-        lose("Can't save image with more than one executing thread");
-
 #ifdef LISP_FEATURE_X86_64
     untune_asm_routines_for_microarch();
 #endif
@@ -498,6 +493,13 @@ prepare_to_save(char *filename, boolean prepend_runtime, void **runtime_bytes,
     FILE *file;
     char *runtime_path;
     extern char *saved_runtime_path; // path computed from argv[0]
+
+    // SB-IMPL::DEINIT already checked for exactly 1 thread,
+    // so this really shouldn't happen.
+    if (all_threads->next) {
+        fprintf(stderr, "Can't save image with more than one executing thread");
+        return NULL;
+    }
 
     if (prepend_runtime) {
         runtime_path = os_get_runtime_executable_path(0);
