@@ -123,17 +123,18 @@ EXPERIMENTAL: Interface subject to change."
         (vector (samples-vector samples))
         (index (samples-index samples))
         (start-time (samples-start-time samples)))
-    (sb-int:aver (eq (aref vector 0) 'trace-start))
-    (loop for start = 0 then end
-          while (< start index)
-          for thread = (aref vector (+ start 1))
-          for time = (/ (- (aref vector (+ start 2)) start-time)
-                        internal-time-units-per-second)
-          for end = (or (position 'trace-start vector
-                                  :start (+ start +elements-per-trace-start+))
-                        index)
-          do (let ((trace (list vector start end)))
-               (funcall function thread time trace)))))
+    (when (plusp index)
+      (sb-int:aver (eq (aref vector 0) 'trace-start))
+      (loop for start = 0 then end
+            while (< start index)
+            for thread = (aref vector (+ start 1))
+            for time = (/ (- (aref vector (+ start 2)) start-time)
+                          internal-time-units-per-second)
+            for end = (or (position 'trace-start vector
+                                    :start (+ start +elements-per-trace-start+))
+                          index)
+            do (let ((trace (list vector start end)))
+                 (funcall function thread time trace))))))
 
 (defun map-trace-samples (function trace)
   "Call FUNCTION on each sample in TRACE.
