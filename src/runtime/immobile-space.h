@@ -16,8 +16,9 @@
 #include <limits.h>
 #include "core.h"
 
-void prepare_immobile_space_for_save(lispobj init_function, boolean verbose);
-
+extern void prepare_immobile_space_for_final_gc();
+extern void prepare_immobile_space_for_save(lispobj init_function,
+                                            boolean verbose);
 typedef int low_page_index_t;
 
 static inline void *
@@ -71,6 +72,8 @@ static inline boolean immobile_space_p(lispobj obj)
 #else
 
 static inline boolean immobile_space_p(lispobj obj) { return 0; }
+#define prepare_immobile_space_for_final_gc()
+#define prepare_immobile_space_for_save(dummy1,dummy2)
 
 #endif
 

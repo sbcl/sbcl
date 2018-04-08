@@ -3910,10 +3910,7 @@ prepare_for_final_gc ()
 {
     page_index_t i;
 
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-    extern void prepare_immobile_space_for_final_gc();
     prepare_immobile_space_for_final_gc ();
-#endif
     for (i = 0; i < next_free_page; i++) {
         page_table[i].type &= ~SINGLE_OBJECT_FLAG;
         if (page_table[i].gen == PSEUDO_STATIC_GENERATION) {
@@ -4014,7 +4011,10 @@ gc_and_save(char *filename, boolean prepend_runtime,
      *  as empty pages, because we can't represent discontiguous ranges.
      */
     conservative_stack = 0;
+    // From here on until exit, there is no chance of continuing
+    // in Lisp if something goes wrong during GC.
     prepare_for_final_gc();
+    unwind_binding_stack();
     gencgc_alloc_start_page = next_free_page;
     collect_garbage(HIGHEST_NORMAL_GENERATION+1);
 
@@ -4032,16 +4032,26 @@ gc_and_save(char *filename, boolean prepend_runtime,
 
     /* FIXME: now that relocate_heap() works, can we just memmove() everything
      * down and perform a relocation instead of a collection? */
+    if (verbose) { printf("[performing final GC.. "); fflush(stdout); }
     prepare_for_final_gc();
     gencgc_alloc_start_page = 0;
     collect_garbage(HIGHEST_NORMAL_GENERATION+1);
+    // Enforce (rather, warn for lack of) self-containedness of the heap
+    verify_gc(VERIFY_FINAL | VERIFY_QUICK);
+    if (verbose)
+        printf(" done]\n");
+
+    // Defragment and set all objects' generations to pseudo-static
+    prepare_immobile_space_for_save(lisp_init_function, verbose);
 
     /* The dumper doesn't know that pages need to be zeroed before use. */
     zero_all_free_pages();
-    do_destructive_cleanup_before_save(lisp_init_function);
-
     /* All global allocation regions should be empty */
     ASSERT_REGIONS_CLOSED();
+
+#ifdef LISP_FEATURE_X86_64
+    untune_asm_routines_for_microarch();
+#endif
 
     /* The number of dynamic space pages saved is based on the allocation
      * pointer, while the number of PTEs is based on next_free_page.

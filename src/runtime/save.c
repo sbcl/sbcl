@@ -207,13 +207,10 @@ open_core_for_saving(char *filename)
     return fopen(filename, "wb");
 }
 
-static void
-smash_enclosing_state(boolean verbose) {
+void unwind_binding_stack()
+{
+    boolean verbose = !lisp_startup_options.noinform;
     struct thread *th = all_threads;
-
-#ifdef LISP_FEATURE_X86_64
-    untune_asm_routines_for_microarch();
-#endif
 
     /* Smash the enclosing state. (Once we do this, there's no good
      * way to go back, which is a sufficient reason that this ends up
@@ -226,17 +223,6 @@ smash_enclosing_state(boolean verbose) {
     write_TLS(CURRENT_CATCH_BLOCK, 0, th); // If set to 0 on start, why here too?
     write_TLS(CURRENT_UNWIND_PROTECT_BLOCK, 0, th);
     if (verbose) printf("done]\n");
-}
-
-void
-do_destructive_cleanup_before_save(lispobj init_function)
-{
-    boolean verbose = !lisp_startup_options.noinform;
-    // Preparing to save.
-    smash_enclosing_state(verbose);
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-    prepare_immobile_space_for_save(init_function, verbose);
-#endif
 }
 
 boolean
@@ -547,7 +533,11 @@ save(char *filename, lispobj init_function, boolean prepend_runtime,
     if (prepend_runtime)
         save_runtime_to_filehandle(file, runtime_bytes, runtime_size, application_type);
 
-    do_destructive_cleanup_before_save(init_function);
+    /* This unwinding is necessary for proper restoration of the
+     * symbol-value slots to their toplevel values, but it occurs
+     * too late to remove old references from the binding stack.
+     * There's probably no safe way to do that from Lisp */
+    unwind_binding_stack();
     return save_to_filehandle(file, filename, init_function, prepend_runtime,
                               save_runtime_options,
                               compressed ? compressed : COMPRESSION_LEVEL_NONE);
