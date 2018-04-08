@@ -1816,12 +1816,6 @@ pin_object(lispobj* base_addr)
  * It is also assumed that the current gc_alloc() region has been
  * flushed and the tables updated. */
 
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-extern void immobile_space_preserve_pointer(void*);
-#else
-#define immobile_space_preserve_pointer(x) /* nothing */
-#endif
-
 static void NO_SANITIZE_MEMORY
 preserve_pointer(void *addr)
 {
@@ -2164,18 +2158,6 @@ scavenge_root_gens(generation_index_t from, generation_index_t to)
 static struct new_area new_areas_1[NUM_NEW_AREAS];
 static struct new_area new_areas_2[NUM_NEW_AREAS];
 
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-extern unsigned int immobile_scav_queue_count;
-extern void
-  update_immobile_nursery_bits(),
-  scavenge_immobile_roots(generation_index_t,generation_index_t),
-  scavenge_immobile_newspace(),
-  sweep_immobile_space(int raise),
-  write_protect_immobile_space();
-#else
-#define immobile_scav_queue_count 0
-#endif
-
 /* Do one full scan of the new space generation. This is not enough to
  * complete the job as new objects may be added to the generation in
  * the process which are not scavenged. */
@@ -2269,9 +2251,7 @@ scavenge_newspace_generation(generation_index_t generation)
         new_areas = (new_areas == new_areas_1) ? new_areas_2 : new_areas_1;
         new_areas_index = 0;
 
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
         scavenge_immobile_newspace();
-#endif
         /* Check whether previous_new_areas had overflowed. */
         if (previous_new_areas_index >= NUM_NEW_AREAS) {
 
@@ -3170,12 +3150,12 @@ garbage_collect_generation(generation_index_t generation, int raise)
     /* All generations but the generation being GCed need to be
      * scavenged. The new_space generation needs special handling as
      * objects may be moved in - it is handled separately below. */
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
+
     // SCRATCH_GENERATION is scavenged in immobile space
     // because pinned objects will already have had their generation
     // number reassigned to that generation if applicable.
     scavenge_immobile_roots(generation+1, SCRATCH_GENERATION);
-#endif
+
     scavenge_root_gens(generation+1, PSEUDO_STATIC_GENERATION);
     scavenge_pinned_ranges();
     /* The Lisp start function is stored in the core header, not a static
@@ -3194,12 +3174,10 @@ garbage_collect_generation(generation_index_t generation, int raise)
     ensure_region_closed(&boxed_region, BOXED_PAGE_FLAG);
     scan_weak_pointers();
     wipe_nonpinned_words();
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
     // Do this last, because until wipe_nonpinned_words() happens,
     // not all page table entries have the 'gen' value updated,
     // which we need to correctly find all old->young pointers.
     sweep_immobile_space(raise);
-#endif
 
     ASSERT_REGIONS_CLOSED();
 #ifdef PIN_GRANULARITY_LISPOBJ
@@ -3393,11 +3371,9 @@ collect_garbage(generation_index_t last_gen)
     if (gencgc_verbose > 1)
         print_generation_stats();
 
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
     /* Immobile space generation bits are lazily updated for gen0
        (not touched on every object allocation) so do it now */
     update_immobile_nursery_bits();
-#endif
 
     if (gc_mark_only) {
         garbage_collect_generation(PSEUDO_STATIC_GENERATION, 0);
@@ -3531,9 +3507,7 @@ collect_garbage(generation_index_t last_gen)
 
     large_allocation = 0;
  finish:
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
     write_protect_immobile_space();
-#endif
     gc_active_p = 0;
 
     if (gc_object_watcher) {
@@ -4032,7 +4006,7 @@ gc_and_save(char *filename, boolean prepend_runtime,
 
     /* FIXME: now that relocate_heap() works, can we just memmove() everything
      * down and perform a relocation instead of a collection? */
-    if (verbose) { printf("[performing final GC.. "); fflush(stdout); }
+    if (verbose) { printf("[performing final GC..."); fflush(stdout); }
     prepare_for_final_gc();
     gencgc_alloc_start_page = 0;
     collect_garbage(HIGHEST_NORMAL_GENERATION+1);
