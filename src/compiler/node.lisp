@@ -740,8 +740,6 @@
       extent)))
 
 ;;; LEAF name operations
-;;;
-;;; KLUDGE: wants CLOS..
 (defun leaf-has-source-name-p (leaf)
   (not (eq (leaf-%source-name leaf)
            '.anonymous.)))
