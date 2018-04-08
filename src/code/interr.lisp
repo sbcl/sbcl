@@ -282,7 +282,7 @@
     (when (listp tag)
       (binding* ((frame (find-interrupted-frame))
                  (name (sb!di:debug-fun-name (sb!di:frame-debug-fun frame)))
-                 (down (and (eq name 'sb!c::unwind) ; is this tautological ?
+                 (down (and (eq name 'throw) ; is this tautological ?
                             (sb!di:frame-down frame)) :exit-if-null))
         (case (sb!di:debug-fun-name (sb!di:frame-debug-fun down))
          ((return-from)
