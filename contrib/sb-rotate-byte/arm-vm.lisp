@@ -41,7 +41,7 @@
                (:translate %unsigned-32-rotate-byte)
                (:note "inline 32-bit rotation")
                (:args (count :scs (sb-vm::signed-reg) :target res)
-                      (integer :scs (sb-vm::unsigned-reg)))
+                      (integer :scs (sb-vm::unsigned-reg) :to :save))
                (:arg-types sb-vm::tagged-num ,arg-type)
                (:results (res :scs (sb-vm::unsigned-reg)))
                (:result-types sb-vm::unsigned-byte-32)
