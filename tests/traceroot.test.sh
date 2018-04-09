@@ -26,26 +26,22 @@ run_sbcl <<EOF >$tmpfilename
 (setq sb-ext:*evaluator-mode* :compile)
 (defvar *fred*)
 (defstruct foo a)
-;; CLEARSTUFF zeroes out a bunch of words below the stack pointer,
-;; in case OBJ was spilled to a stack slot that randomly is left untouched
-;; afterward, thereby making the test spuriously fail.
-(defun clearstuff () (sb-int:dx-let ((b (make-array 20))) (eval b)))
 (defun test1 (wp obj root)
   (let ((*fred* (list (make-foo :a (list (vector #xfeefa (list obj)))))))
     (setq obj nil) ; so OBJ is not found as a stack reference
     (ecase root
       (:tls
-       (clearstuff)
+       (sb-sys:scrub-control-stack)
        (sb-ext::gc-and-search-roots wp))
       (:bindings ; bind *FRED* again so the old value is on the binding stack
        (let ((*fred* 1))
-         (clearstuff)
+         (sb-sys:scrub-control-stack)
          (sb-ext::gc-and-search-roots wp)))
       (:stack
        ; put the OBJ back on the control stack
        ; and also ensure that *FRED* is not a root.
        (setq obj *fred* *fred* nil)
-       (clearstuff)
+       (sb-sys:scrub-control-stack)
        (sb-ext::gc-and-search-roots wp)))))
 
 (let ((wp (make-weak-pointer (list 1 2 3 4))))
