@@ -157,10 +157,12 @@
   (let ((length 0)
         (complicated nil))
     (declare (type index length))
-    (labels ((needs-escaping-p (char)
+    (labels ((needs-escaping-p (char index)
                (or (char= char #\*) (char= char #\?)
                    (char= char #\[) (char= char escape-char)
-                   (and escape-dot (char= char #\.))))
+                   (case escape-dot
+                     (:unless-at-start (and (plusp index) (char= char #\.)))
+                     ((t) (char= char #\.)))))
              (inspect-fragment (fragment)
                (etypecase fragment
                  ((eql :wild)
@@ -170,7 +172,8 @@
                   (incf length (length fragment))
                   (Loop with complicated = nil
                         for char across (the simple-string fragment)
-                        when (needs-escaping-p char)
+                        for i from 0
+                        when (needs-escaping-p char i)
                         do (setf complicated t)
                            (incf length)
                         finally (return complicated)))
@@ -206,7 +209,8 @@
                       (output-character #\*))
                      (simple-string
                       (loop for char across (the simple-string fragment)
-                            when (needs-escaping-p char)
+                            for i from 0
+                            when (needs-escaping-p char i)
                             do (output-character escape-char)
                             do (output-character char)))
                      (pattern

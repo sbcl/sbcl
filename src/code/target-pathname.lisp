@@ -141,8 +141,9 @@
                    (string= name ""))
           (no-namestring-error
            pathname "the ~S component ~S is of length 0" :name name))
-        (fragments (unparse-physical-piece name escape-char
-                                           :escape-dot (null type))))
+        (fragments (unparse-physical-piece
+                    name escape-char
+                    :escape-dot (when (null type) :unless-at-start))))
       (when (pathname-component-present-p type)
         (unless name
           (no-namestring-error
@@ -212,8 +213,9 @@
                                                             defaults)))))))
         (when name-needed
           (unless pathname-name (lose))
-          (strings (unparse-physical-piece pathname-name escape-char
-                                           :escape-dot (not pathname-type))))
+          (strings (unparse-physical-piece
+                    pathname-name escape-char
+                    :escape-dot (when (not pathname-type) :unless-at-start))))
         (when type-needed
           (unless (pathname-component-present-p pathname-type)
             (lose))
