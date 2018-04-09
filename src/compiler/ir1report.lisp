@@ -653,7 +653,7 @@ has written, having proved that it is unreachable."))
     (let ((warning-count (emitted-full-call-count name)))
       (when (and warning-count
                  ;; Warn only if the the compiler did not have the expansion.
-                 (not (info :function :inline-expansion-designator name))
+                 (not (fun-name-inline-expansion name))
                  ;; and if nothing was previously known about inline status
                  ;; so that repeated proclamations don't warn. NIL is a valid
                  ;; value for :inlinep in the globaldb so use the 2nd result.
@@ -696,7 +696,7 @@ and defining the function before its first potential use.~@:>"
   ;; Do nothing if the inline expansion is known - it wasn't used
   ;; because of the expansion limit, which is a different problem.
   (unless (or (logtest 2 (car count-cell)) ; warn at most once per name
-              (info :function :inline-expansion-designator name))
+              (fun-name-inline-expansion name))
     ;; This function is only called by PONDER-FULL-CALL when NAME
     ;; is not lexically NOTINLINE, so therefore if it is globally INLINE,
     ;; there was no local declaration to the contrary.

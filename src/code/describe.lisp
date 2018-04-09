@@ -633,8 +633,7 @@
                                  declared-type
                                  (cons
                                   (info :function :inlinep name)
-                                  (info :function :inline-expansion-designator
-                                        name)))))))
+                                  (fun-name-inline-expansion name)))))))
           (describe-block (stream (unless function "~A names ~A:") name what)
             (describe-deprecation 'function name stream)
             (describe-lambda-list lambda-list stream)

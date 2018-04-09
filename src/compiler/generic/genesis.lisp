@@ -1848,7 +1848,7 @@ core and return a descriptor to it."
      (ash sb!vm:simple-fun-code-offset sb!vm:word-shift)))
 
 ;;; Handle a DEFUN in cold-load.
-(defun cold-fset (name defn &optional inline-expansion)
+(defun cold-fset (name defn &optional inline-expansion dxable-args)
   (binding* (((cold-name warm-name)
               ;; (SETF f) was descriptorized when dumped, symbols were not.
                      (if (symbolp name)
@@ -1860,7 +1860,7 @@ core and return a descriptor to it."
     ;; There can't be any closures or funcallable instances.
     (aver (= (logand (descriptor-bits (read-memory defn)) sb!vm:widetag-mask)
              sb!vm:simple-fun-widetag))
-    (push (cold-cons cold-name inline-expansion) *!cold-defuns*)
+    (push (cold-list cold-name inline-expansion dxable-args) *!cold-defuns*)
     (write-wordindexed fdefn sb!vm:fdefn-fun-slot defn)
     (let ((fun-entry-addr
             (+ (logandc2 (descriptor-bits defn) sb!vm:lowtag-mask)

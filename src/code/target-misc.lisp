@@ -157,11 +157,11 @@ the file system."
     (setf (info :source-location :variable var) source-location))
   var)
 
-(defun %defun (name def &optional inline-lambda)
+(defun %defun (name def &optional inline-lambda dxable-args)
   (declare (type function def))
   ;; should've been checked by DEFMACRO DEFUN
   (aver (legal-fun-name-p name))
-  (sb!c:%compiler-defun name inline-lambda nil)
+  (sb!c:%compiler-defun name inline-lambda dxable-args nil)
   (when (fboundp name)
     (warn 'redefinition-with-defun :name name :new-function def))
   (setf (fdefinition name) def)
@@ -169,7 +169,7 @@ the file system."
   ;; also checks package locks. By doing this here we let (SETF
   ;; FDEFINITION) do the load-time package lock checking before
   ;; we frob any existing inline expansions.
-  (sb!c::%set-inline-expansion name nil inline-lambda)
+  (sb!c::%set-inline-expansion name nil inline-lambda dxable-args)
   (sb!c::note-name-defined name :function)
   name)
 

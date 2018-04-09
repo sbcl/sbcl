@@ -128,7 +128,7 @@
             :inlinep
             :kind
             :macro-function
-            :inline-expansion-designator
+            :inlining-data
             :source-transform
             :assumed-type)))
   (values))
@@ -142,19 +142,25 @@
     (if (info :function :assumed-type name)
         (clear-info :function :assumed-type name))))
 
-;;; Trivially wrap (INFO :FUNCTION :INLINE-EXPANSION-DESIGNATOR FUN-NAME)
-(declaim (ftype (function ((or symbol cons)) list) fun-name-inline-expansion))
+;;; Trivially wrap (INFO :FUNCTION :INLINING-DATA FUN-NAME)
+;;; to extract an inlineable lambda.
+;;; Secondary value is T only if an explicit expansion was stored, and NOT
+;;; an implicit expansion of a auto-defined product of DEFSTRUCT.
+(declaim (ftype (function ((or symbol cons)) (values list boolean))
+                fun-name-inline-expansion))
 (defun fun-name-inline-expansion (fun-name)
-  (multiple-value-bind (answer winp)
-      (info :function :inline-expansion-designator fun-name)
+  (multiple-value-bind (answer winp) (info :function :inlining-data fun-name)
+    (typecase answer
+      ;; an INLINING-DATA is a DXABLE-ARGS, so test it first
+      (inlining-data (setq answer (inlining-data-expansion answer)))
+      (dxable-args   (setq answer nil winp nil)))
     (when (and (not winp) (symbolp fun-name))
       (let ((info (info :function :type fun-name)))
         (when (typep info 'defstruct-description)
           (let ((spec (assq fun-name (dd-constructors info))))
             (aver spec)
             (setq answer `(lambda ,@(structure-ctor-lambda-parts
-                                     info (cdr spec)))
-                  winp t)))))
+                                     info (cdr spec))))))))
     (values answer winp)))
 
 ;;;; ANSI Common Lisp functions which are defined in terms of the info

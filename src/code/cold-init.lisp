@@ -174,8 +174,8 @@
       (when docstring (setf (fdocumentation name 'variable) docstring))))
   (!with-init-wrappers
    (dolist (x *!cold-defuns*)
-     (destructuring-bind (name . inline-expansion) x
-       (%defun name (fdefinition name) inline-expansion))))
+     (destructuring-bind (name inline-expansion dxable-args) x
+       (%defun name (fdefinition name) inline-expansion dxable-args))))
 
   ;; KLUDGE: Why are fixups mixed up with toplevel forms? Couldn't
   ;; fixups be done separately? Wouldn't that be clearer and better?

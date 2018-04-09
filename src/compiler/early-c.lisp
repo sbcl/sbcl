@@ -69,6 +69,16 @@
     (maybe-inline . :maybe-inline))
   #'equal)
 
+(defstruct (dxable-args (:constructor make-dxable-args (list))
+                        (:predicate nil)
+                        (:copier nil))
+  (list nil :read-only t))
+(defstruct (inlining-data (:include dxable-args)
+                          (:constructor make-inlining-data (expansion list))
+                          (:predicate nil)
+                          (:copier nil))
+  (expansion nil :read-only t))
+
 ;;; *FREE-VARS* translates from the names of variables referenced
 ;;; globally to the LEAF structures for them. *FREE-FUNS* is like
 ;;; *FREE-VARS*, only it deals with function names.

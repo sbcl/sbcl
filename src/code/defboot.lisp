@@ -170,7 +170,7 @@ evaluated as a PROGN."
 ;;;; DEFUN
 
 ;;; Should we save the inline expansion of the function named NAME?
-(defun inline-fun-name-p (name)
+(defun save-inline-expansion-p (name)
   (or
    ;; the normal reason for saving the inline expansion
    (let ((inlinep (info :function :inlinep name)))
@@ -187,7 +187,45 @@ evaluated as a PROGN."
    ;; what should we do with the old inline expansion when we see the
    ;; new DEFUN? Overwriting it with the new definition seems like
    ;; the only unsurprising choice.
-   (info :function :inline-expansion-designator name)))
+   (nth-value 1 (fun-name-inline-expansion name))))
+
+(defun extract-dx-args (lambda-list decl-forms)
+  (let (dx-decls)
+    (dolist (form decl-forms)
+      (dolist (expr (cdr form))
+        (when (eq (car expr) 'dynamic-extent)
+          (setf dx-decls (union dx-decls (cdr expr))))))
+    (unless dx-decls
+      (return-from extract-dx-args nil))
+    ;; TODO: in addition to ":SILENT T" supressing warnings, PARSE-LAMBDA-LIST
+    ;; needs to allow :CONDITION-CLASS = NIL to ask that no errors be signaled.
+    ;; An indicator can be returned so that at worst the code below does nothing.
+    (multiple-value-bind (llks required optional rest key aux)
+        (parse-lambda-list lambda-list :silent t)
+      (declare (ignore llks rest))
+      ;; We enforce uniqueness of the symbols in the union of REQUIRED,
+      ;; OPTIONAL, REST, KEY (including any supplied-p variables),
+      ;; but there may be an AUX binding shadowing a lambda binding.
+      ;; This affects something like:
+      ;;  (LAMBDA (X &AUX (X (MAKE-FOO X))) (DECLARE (DYNAMIC-EXTENT X))
+      ;; in which the decl does not pertain to argument X.
+      (let ((arg-index 0) caller-dxable)
+        (labels ((examine (sym dx-note)
+                   (when (and (member sym dx-decls) (not (shadowed-p sym)))
+                     (push dx-note caller-dxable))
+                   (incf arg-index))
+                 (shadowed-p (sym)
+                   (dolist (binding aux)
+                     (when (eq (if (listp binding) (car binding) binding) sym)
+                       (return t)))))
+          (dolist (spec required)
+            (examine spec arg-index))
+          (dolist (spec optional)
+            (examine (if (listp spec) (car spec) spec) arg-index))
+          (dolist (spec key)
+            (multiple-value-bind (keyword var) (parse-key-arg-spec spec)
+              (examine var keyword))))
+        (nreverse caller-dxable)))))
 
 (sb!xc:defmacro defun (&environment env name lambda-list &body body)
   "Define a function at top level."
@@ -202,9 +240,10 @@ evaluated as a PROGN."
            (lambda `(lambda ,lambda-list ,@lambda-guts))
            (named-lambda `(named-lambda ,name ,lambda-list
                             ,@(when doc (list doc)) ,@lambda-guts))
+           (dxable-args (extract-dx-args lambda-list decls))
            (inline-thing
             (or (sb!kernel::defstruct-generated-defn-p name lambda-list body)
-                (when (inline-fun-name-p name)
+                (when (save-inline-expansion-p name)
                   ;; we want to attempt to inline, so complain if we can't
                   (acond ((sb!c:maybe-inline-syntactic-closure lambda env)
                           (list 'quote it))
@@ -216,8 +255,10 @@ evaluated as a PROGN."
                           nil))))))
       `(progn
          (eval-when (:compile-toplevel)
-           (sb!c:%compiler-defun ',name ,inline-thing t))
-         (%defun ',name ,named-lambda ,@(and inline-thing (list inline-thing)))
+           (sb!c:%compiler-defun ',name ,inline-thing ,dxable-args t))
+         (%defun ',name ,named-lambda
+                 ,@(when (or inline-thing dxable-args) (list inline-thing))
+                 ,@(when dxable-args `(',dxable-args)))
          ;; This warning, if produced, comes after the DEFUN happens.
          ;; When compiling, there's no real difference, but when interpreting,
          ;; if there is a handler for style-warning that nonlocally exits,

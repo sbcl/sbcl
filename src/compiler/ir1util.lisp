@@ -691,8 +691,20 @@
              (and flush (combination-p use) (flushable-combination-p use))
              ;; Don't report those with homes in :OPTIONAL -- we'd get doubled
              ;; reports that way.
+             ;; Also don't report if the home is :EXTERNAL. This allows declaring
+             ;; funargs as dynamic-extent which can inform compilation of callers
+             ;; to this lambda that they can DXify the arg.
              (and (ref-p use) (lambda-var-p (ref-leaf use))
-                  (eq :optional (lambda-kind (lambda-var-home (ref-leaf use))))))
+                  (member (lambda-kind (lambda-var-home (ref-leaf use)))
+                          '(:optional :external)))
+             ;; Don't complain if the referent is #'SOMEFUN, avoiding a note for
+             ;;  (DEFUN FOO (X &KEY (TEST #'IDENTITY)) ...)
+             ;; where TEST is declared DX, and one possible use of this LVAR is
+             ;; to the supplied arg, and other is essentially constant-like.
+             (and (ref-p use)
+                  (let ((var (ref-leaf use)))
+                    (and (global-var-p var)
+                         (eq (global-var-kind var) :global-function)))))
       ;; FIXME: For the first leg (lambda-bind (lambda-var-home ...))
       ;; would be a far better description, but since we use
       ;; *COMPILER-ERROR-CONTEXT* for muffling we can't -- as that node

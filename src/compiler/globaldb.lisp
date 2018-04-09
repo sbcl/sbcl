@@ -321,13 +321,17 @@
   #+sb-xc-host :assumed
   #-sb-xc-host (lambda (name) (if (fboundp name) :defined :assumed)))
 
-;;; something which can be decoded into the inline expansion of the
-;;; function, or NIL if there is none
-;;;
-;;; To inline a function, we want a lambda expression, e.g.
-;;; '(LAMBDA (X) (+ X 1)).
-(define-info-type (:function :inline-expansion-designator)
-  :type-spec list)
+;;; Two kinds of hints for compiling calls as efficiently as possible:
+;;; (A) Inline expansion: To inline a function, we want a lambda
+;;; expression, e.g. '(LAMBDA (X) (+ X 1)) or a lambda-with-lexenv.
+;;; (B) List of arguments which could be dynamic-extent closures, and which
+;;; we could, under suitable compilation policy, DXify in the caller
+;;; especially when compiling a NOTINLINE call to this function.
+;;; If only (A) is stored, then this value is a list (the lambda expression).
+;;; If only (B) is stored, then this is a DXABLE-ARGS.
+;;; If both, this is an INLINING-DATA.
+(define-info-type (:function :inlining-data)
+    :type-spec (or list sb!c::dxable-args sb!c::inlining-data))
 
 ;;; This specifies whether this function may be expanded inline. If
 ;;; null, we don't care.
@@ -572,5 +576,5 @@
                  (if (not type) type-num)
                  (if type
                      (list (meta-info-category type) (meta-info-kind type))))
-         (write val :level 1)))
+         (write val :level 2)))
      sym)))

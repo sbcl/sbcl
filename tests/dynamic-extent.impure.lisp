@@ -514,7 +514,7 @@
 ;; even though the MAKE- function was not expressly INLINE when its DEFSTRUCT
 ;; was compiled.
 (dolist (s '(make-foo1 make-foo2 make-foo3))
-  (assert (null (sb-int:info :function :inline-expansion-designator s))))
+  (assert (null (sb-int:info :function :inlining-data s))))
 
 (defstruct foo1 x)
 
@@ -1385,3 +1385,23 @@
                    (opaque-identity x)
                    10)))))
     (assert-no-consing (funcall fun))))
+
+(defun fun-name-dx-args (fun-name)
+  (let ((answer (sb-int:info :function :inlining-data fun-name)))
+    (when (typep answer 'sb-c::dxable-args)
+      (sb-c::dxable-args-list answer))))
+(defun trythisfun (test arg &key key)
+  (declare (dynamic-extent test key))
+  (funcall test (funcall key arg)))
+(declaim (maybe-inline sortasort))
+(defun sortasort (seq pred)
+  (declare (dynamic-extent pred))
+  (funcall pred (elt seq 0) (elt seq 1))
+  seq)
+(with-test (:name :store-dx-arglist)
+  ;; Positional argument 0 and keyword argument :KEY
+  (assert (equal (fun-name-dx-args 'trythisfun) '(0 :key)))
+  ;; Positional argument 1
+  (assert (equal (fun-name-dx-args 'sortasort) '(1)))
+  ;; And also an inline expansion
+  (assert (sb-c::fun-name-inline-expansion 'sortasort)))
