@@ -1556,6 +1556,7 @@ Does not affect the cases that are already controlled by *PRINT-LENGTH*")
 
 (defun call-with-sane-io-syntax (function)
   (declare (type function function))
+  #-sb-xc-host (declare (dynamic-extent function)) ; "unable"
   (macrolet ((true (sym)
                `(and (boundp ',sym) ,sym)))
     (let ((*print-readably* nil)

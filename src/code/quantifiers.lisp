@@ -68,6 +68,7 @@
                   #-sb-xc-host ; don't redefine CL builtins!
                   (defun ,name (pred first-seq &rest more-seqs)
                     ,doc
+                    (declare (dynamic-extent pred))
                     (flet ((map-me (&rest rest)
                              (let ((value (apply pred rest)))
                                (,found-test value

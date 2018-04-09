@@ -255,7 +255,7 @@ evaluated as a PROGN."
                           nil))))))
       `(progn
          (eval-when (:compile-toplevel)
-           (sb!c:%compiler-defun ',name ,inline-thing ,dxable-args t))
+           (sb!c:%compiler-defun ',name ,inline-thing ',dxable-args t))
          (%defun ',name ,named-lambda
                  ,@(when (or inline-thing dxable-args) (list inline-thing))
                  ,@(when dxable-args `(',dxable-args)))

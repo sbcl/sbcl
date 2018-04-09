@@ -756,6 +756,7 @@
                 (key #'identity)
                 (test #'eql))
   (declare (type function next key test))
+  ;; #-sb-xc-host (declare (dynamic-extent next key test)) ; emits "unable" note
   (do ((current list (funcall next current)))
       ((null current) nil)
     (when (funcall test (funcall key current) element)
@@ -771,6 +772,7 @@
                     (key #'identity)
                     (test #'eql))
   (declare (type function next key test))
+  ;; #-sb-xc-host (declare (dynamic-extent next key test)) ; emits "unable" note
   (do ((current list (funcall next current))
        (i 0 (1+ i)))
       ((null current) nil)

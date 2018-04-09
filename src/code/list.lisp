@@ -155,6 +155,7 @@
 (defun tree-equal (x y &key (test nil testp) (test-not nil notp))
   "Return T if X and Y are isomorphic trees with identical leaves."
   (declare (explicit-check))
+  (declare (dynamic-extent test test-not))
   (cond (notp
          (when testp
            (error ":TEST and :TEST-NOT were both supplied."))
@@ -654,6 +655,7 @@
 
 (defun subst (new old tree &key key (test #'eql testp) (test-not #'eql notp))
   "Substitutes new for subtrees matching old."
+  (declare (dynamic-extent key test test-not))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (let ((key (and key (%coerce-callable-to-fun key)))
@@ -673,6 +675,7 @@
 
 (defun subst-if (new test tree &key key)
   "Substitutes new for subtrees for which test is true."
+  (declare (dynamic-extent test key))
   (let ((test (%coerce-callable-to-fun test))
         (key (and key (%coerce-callable-to-fun key))))
     (labels ((s (subtree)
@@ -688,6 +691,7 @@
 
 (defun subst-if-not (new test tree &key key)
   "Substitutes new for subtrees for which test is false."
+  (declare (dynamic-extent test key))
   (let ((test (%coerce-callable-to-fun test))
         (key (and key (%coerce-callable-to-fun key))))
     (labels ((s (subtree)
@@ -703,6 +707,7 @@
 
 (defun nsubst (new old tree &key key (test #'eql testp) (test-not #'eql notp))
   "Substitute NEW for subtrees matching OLD."
+  (declare (dynamic-extent key test test-not))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (let ((key (and key (%coerce-callable-to-fun key)))
@@ -725,6 +730,7 @@
 
 (defun nsubst-if (new test tree &key key)
   "Substitute NEW for subtrees of TREE for which TEST is true."
+  (declare (dynamic-extent test key))
   (let ((test (%coerce-callable-to-fun test))
         (key (and key (%coerce-callable-to-fun key))))
     (labels ((s (subtree)
@@ -743,6 +749,7 @@
 
 (defun nsubst-if-not (new test tree &key key)
   "Substitute NEW for subtrees of TREE for which TEST is false."
+  (declare (dynamic-extent test key))
   (let ((test (%coerce-callable-to-fun test))
         (key (and key (%coerce-callable-to-fun key))))
     (labels ((s (subtree)
@@ -761,6 +768,7 @@
 
 (defun sublis (alist tree &key key (test #'eql testp) (test-not #'eql notp))
   "Substitute from ALIST into TREE nondestructively."
+  (declare (dynamic-extent key test test-not))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (let ((key (and key (%coerce-callable-to-fun key)))
@@ -794,6 +802,7 @@
 
 (defun nsublis (alist tree &key key (test #'eql testp) (test-not #'eql notp))
   "Substitute from ALIST into TREE destructively."
+  (declare (dynamic-extent key test test-not))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (let ((key (and key (%coerce-callable-to-fun key)))
@@ -823,6 +832,7 @@
   "Return the tail of LIST beginning with first element satisfying EQLity,
    :TEST, or :TEST-NOT with the given ITEM."
   (declare (explicit-check))
+  (declare (dynamic-extent key test test-not))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (let ((key (and key (%coerce-callable-to-fun key)))
@@ -844,6 +854,7 @@
 (defun member-if (test list &key key)
   "Return tail of LIST beginning with first element satisfying TEST."
   (declare (explicit-check))
+  (declare (dynamic-extent test key))
   (let ((test (%coerce-callable-to-fun test))
         (key (and key (%coerce-callable-to-fun key))))
     (if key
@@ -853,6 +864,7 @@
 (defun member-if-not (test list &key key)
   "Return tail of LIST beginning with first element not satisfying TEST."
   (declare (explicit-check))
+  (declare (dynamic-extent test key))
   (let ((test (%coerce-callable-to-fun test))
         (key (and key (%coerce-callable-to-fun key))))
     (if key
@@ -870,6 +882,7 @@
 (defun adjoin (item list &key key (test #'eql testp) (test-not nil notp))
   "Add ITEM to LIST unless it is already a member"
   (declare (explicit-check))
+  (declare (dynamic-extent key test test-not))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (let ((key (and key (%coerce-callable-to-fun key)))
@@ -940,6 +953,7 @@
 (defun union (list1 list2 &key key (test nil testp) (test-not nil notp))
   "Return the union of LIST1 and LIST2."
   (declare (explicit-check))
+  (declare (dynamic-extent key test test-not))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   ;; We have two possibilities here: for shortish lists we pick up the
@@ -979,6 +993,7 @@
 (defun nunion (list1 list2 &key key (test nil testp) (test-not nil notp))
   "Destructively return the union of LIST1 and LIST2."
   (declare (explicit-check))
+  (declare (dynamic-extent key test test-not))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   ;; We have two possibilities here: for shortish lists we pick up the
@@ -1025,6 +1040,7 @@
                      &key key (test nil testp) (test-not nil notp))
   "Return the intersection of LIST1 and LIST2."
   (declare (explicit-check))
+  (declare (dynamic-extent key test test-not))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (when (and list1 list2)
@@ -1039,6 +1055,7 @@
                       &key key (test nil testp) (test-not nil notp))
   "Destructively return the intersection of LIST1 and LIST2."
   (declare (explicit-check))
+  (declare (dynamic-extent key test test-not))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (when (and list1 list2)
@@ -1055,6 +1072,7 @@
                        &key key (test nil testp) (test-not nil notp))
   "Return the elements of LIST1 which are not in LIST2."
   (declare (explicit-check))
+  (declare (dynamic-extent key test test-not))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (if list2
@@ -1070,6 +1088,7 @@
                         &key key (test nil testp) (test-not nil notp))
   "Destructively return the elements of LIST1 which are not in LIST2."
   (declare (explicit-check))
+  (declare (dynamic-extent key test test-not))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (if list2
@@ -1087,6 +1106,7 @@
                          &key key (test nil testp) (test-not nil notp))
   "Return new list of elements appearing exactly once in LIST1 and LIST2."
   (declare (explicit-check))
+  (declare (dynamic-extent key test test-not))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (let ((result nil))
@@ -1105,6 +1125,7 @@
   "Destructively return a list with elements which appear but once in LIST1
    and LIST2."
   (declare (explicit-check))
+  (declare (dynamic-extent key test test-not))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (let ((key (and key (%coerce-callable-to-fun key)))
@@ -1163,6 +1184,7 @@
 (defun subsetp (list1 list2 &key key (test #'eql testp) (test-not nil notp))
   "Return T if every element in LIST1 is also in LIST2."
   (declare (explicit-check))
+  (declare (dynamic-extent key test test-not))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (with-member-test (member-test)
@@ -1190,6 +1212,7 @@
   "Return the cons in ALIST whose car is equal (by a given test or EQL) to
    the ITEM."
   (declare (explicit-check))
+  (declare (dynamic-extent key test test-not))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (let ((key (and key (%coerce-callable-to-fun key)))
@@ -1212,6 +1235,7 @@
   "Return the first cons in ALIST whose CAR satisfies PREDICATE. If
    KEY is supplied, apply it to the CAR of each cons before testing."
   (declare (explicit-check))
+  (declare (dynamic-extent predicate key))
   (let ((predicate (%coerce-callable-to-fun predicate))
         (key (and key (%coerce-callable-to-fun key))))
     (if key
@@ -1222,6 +1246,7 @@
   "Return the first cons in ALIST whose CAR does not satisfy PREDICATE.
   If KEY is supplied, apply it to the CAR of each cons before testing."
   (declare (explicit-check))
+  (declare (dynamic-extent predicate key))
   (let ((predicate (%coerce-callable-to-fun predicate))
         (key (and key (%coerce-callable-to-fun key))))
     (if key
@@ -1232,6 +1257,7 @@
   "Return the cons in ALIST whose CDR is equal (by a given test or EQL) to
    the ITEM."
   (declare (explicit-check))
+  (declare (dynamic-extent key test test-not))
   (when (and testp notp)
     (error ":TEST and :TEST-NOT were both supplied."))
   (let ((key (and key (%coerce-callable-to-fun key)))
@@ -1254,6 +1280,7 @@
   "Return the first cons in ALIST whose CDR satisfies PREDICATE. If KEY
   is supplied, apply it to the CDR of each cons before testing."
   (declare (explicit-check))
+  (declare (dynamic-extent predicate key))
   (let ((predicate (%coerce-callable-to-fun predicate))
         (key (and key (%coerce-callable-to-fun key))))
     (if key
@@ -1264,6 +1291,7 @@
   "Return the first cons in ALIST whose CDR does not satisfy PREDICATE.
   If KEY is supplied, apply it to the CDR of each cons before testing."
   (declare (explicit-check))
+  (declare (dynamic-extent predicate key))
   (let ((predicate (%coerce-callable-to-fun predicate))
         (key (and key (%coerce-callable-to-fun key))))
     (if key
@@ -1280,6 +1308,7 @@
 ;;; CDRs down the arglists calling the function and accumulating
 ;;; results as desired.
 (defun map1 (fun-designator arglists accumulate take-car)
+  (declare (dynamic-extent fun-designator))
   (do* ((fun (%coerce-callable-to-fun fun-designator))
         (non-acc-result (car arglists))
         (ret-list (list nil))
@@ -1321,6 +1350,7 @@
                `(defun ,name (function list &rest more-lists)
                   ,documentation
                   (declare (explicit-check))
+                  (declare (dynamic-extent function))
                   (dx-let ((lists (list* list more-lists)))
                     (map1 function lists ,accumulate ,take-car))))))
   (define-list-map mapc    nil    t   "LIST")
@@ -1392,8 +1422,10 @@
                   `(defun ,(intern (format nil "%~A~{-~A~}~@[-~A~]" name funs variant))
                        (x list ,@funs)
                      (declare (optimize speed (sb!c::verify-arg-count 0)))
-                     ,@(when funs `((declare (function ,@funs))))
-                     ,@(unless (member name '(member assoc adjoin rassoc)) `((declare (function x))))
+                     ,@(when funs `((declare (function ,@funs)
+                                             (dynamic-extent ,@funs))))
+                     ,@(unless (member name '(member assoc adjoin rassoc))
+                         `((declare (function x) (dynamic-extent x))))
                      (declare (explicit-check))
                      ,body))))
          `(progn

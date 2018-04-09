@@ -86,12 +86,17 @@
   (multiple-value-bind (body declarations docstring) (parse-body body t)
     (collect ((new-args)
               (new-declarations)
+              ;; Things which are functions
+              (funargs)
               ;; Things which are definitely used in any code path.
               (rebindings/eager)
               ;; Things which may be used/are only used in certain
               ;; code paths (e.g. length).
               (rebindings/lazy))
       (dolist (arg args)
+        (let ((sym (if (listp arg) (car arg) arg)))
+          (when (member sym '(function predicate key test test-not))
+            (funargs sym)))
         (case arg
           ;; FIXME: make this robust.  And clean.
           ((sequence sequence1 sequence2)
@@ -120,6 +125,8 @@
       `(defun ,name ,(new-args)
          ,@(when docstring (list docstring))
          ,@declarations
+         ;; All sequence traversers' funargs are downward funargs
+         (declare (dynamic-extent ,@(funargs)))
          (symbol-macrolet (,@(rebindings/lazy))
            (let* (,@(rebindings/eager))
              (declare ,@(new-declarations))
@@ -1146,6 +1153,7 @@ many elements are copied."
 ;;; helper functions to handle arity-1 subcases of MAP
 (defun %map-to-list-arity-1 (fun sequence)
   (declare (explicit-check))
+  (declare (dynamic-extent fun))
   (let ((reversed-result nil)
         (really-fun (%coerce-callable-to-fun fun)))
     (sb!sequence:dosequence (element sequence)
@@ -1154,6 +1162,7 @@ many elements are copied."
     (nreverse reversed-result)))
 (defun %map-to-simple-vector-arity-1 (fun sequence)
   (declare (explicit-check))
+  (declare (dynamic-extent fun))
   (let ((result (make-array (length sequence)))
         (index 0)
         (really-fun (%coerce-callable-to-fun fun)))
@@ -1165,6 +1174,7 @@ many elements are copied."
     result))
 (defun %map-for-effect-arity-1 (fun sequence)
   (declare (explicit-check))
+  (declare (dynamic-extent fun))
   (let ((really-fun (%coerce-callable-to-fun fun)))
     (sb!sequence:dosequence (element sequence)
       (funcall really-fun element)))
@@ -1173,6 +1183,7 @@ many elements are copied."
 (declaim (maybe-inline %map-for-effect))
 (defun %map-for-effect (fun sequences)
   (declare (type function fun) (type list sequences))
+  (declare (dynamic-extent fun))
   (let ((%sequences sequences)
         (%iters (mapcar (lambda (s)
                           (seq-dispatch s
@@ -1222,6 +1233,7 @@ many elements are copied."
 (defun %map-to-list (fun sequences)
   (declare (type function fun)
            (type list sequences))
+  (declare (dynamic-extent fun))
   (let ((result nil))
     (flet ((f (&rest args)
              (declare (truly-dynamic-extent args))
@@ -1232,6 +1244,7 @@ many elements are copied."
 (defun %map-to-vector (output-type-spec fun sequences)
   (declare (type function fun)
            (type list sequences))
+  (declare (dynamic-extent fun))
   (let ((min-len 0))
     (flet ((f (&rest args)
              (declare (truly-dynamic-extent args))
@@ -1255,7 +1268,7 @@ many elements are copied."
 ;;; in RESULT-TYPE.
 (defun %map (result-type function &rest sequences)
   (declare (explicit-check))
-  (declare (dynamic-extent sequences))
+  (declare (dynamic-extent function sequences))
   ;; Everything that we end up calling uses %COERCE-TO-CALLABLE
   ;; on FUNCTION so we don't need to declare it of type CALLABLE here.
   ;; Additionally all the arity-1 mappers use SEQ-DISPATCH which asserts
@@ -1306,6 +1319,7 @@ many elements are copied."
 
 (defun map (result-type function first-sequence &rest more-sequences)
   (declare (explicit-check))
+  (declare (dynamic-extent function))
   (let ((result
          (apply #'%map result-type function first-sequence more-sequences)))
     (if (or (eq result-type 'nil) (typep result result-type))
@@ -1333,6 +1347,7 @@ many elements are copied."
            (type function fun)
            (type list sequences))
   (declare (explicit-check))
+  (declare (dynamic-extent fun))
   (let ((index start))
     (declare (type index index))
     (block mapping
@@ -1359,6 +1374,7 @@ many elements are copied."
 ;;; sequences.
 (defun map-into (result-sequence function &rest sequences)
   (declare (optimize (sb!c::check-tag-existence 0)))
+  (declare (dynamic-extent function))
   (let ((really-fun (%coerce-callable-to-fun function)))
     (etypecase result-sequence
       (vector
@@ -2377,6 +2393,7 @@ many elements are copied."
   (declare (type fixnum start end count)
            (type (or null function) key)
            (type function test)) ; coercion is done by caller
+  (declare (dynamic-extent test key))
   (do ((list (nthcdr start sequence) (cdr list))
        (index start (1+ index)))
       ((or (= index end) (null list) (= count 0)) sequence)
@@ -2391,6 +2408,7 @@ many elements are copied."
            (type (integer -1 1) incrementer)
            (type (or null function) key)
            (type function test)) ; coercion is done by caller
+  (declare (dynamic-extent test key))
   (let* ((tag (%other-pointer-widetag sequence))
          (getter (the function (svref %%data-vector-reffers%% tag)))
          (setter (the function (svref %%data-vector-setters%% tag))))
@@ -2431,6 +2449,7 @@ many elements are copied."
   (declare (type fixnum start end count)
            (type (or null function) key)
            (type function test))        ; coercion is done by caller
+  (declare (dynamic-extent test key))
   (do ((list (nthcdr start sequence) (cdr list))
        (index start (1+ index)))
       ((or (= index end) (null list) (= count 0)) sequence)
@@ -2445,6 +2464,7 @@ many elements are copied."
            (type (integer -1 1) incrementer)
            (type (or null function) key)
            (type function test))        ; coercion is done by caller
+  (declare (dynamic-extent test key))
   (let* ((tag (%other-pointer-widetag sequence))
          (getter (the function (svref %%data-vector-reffers%% tag)))
          (setter (the function (svref %%data-vector-setters%% tag))))
@@ -2502,6 +2522,7 @@ many elements are copied."
                )))
   (defun %find-position (item sequence-arg from-end start end key test)
     (declare (explicit-check sequence-arg))
+    (declare (dynamic-extent test key))
     (macrolet ((frob (sequence from-end)
                  `(%find-position item ,sequence
                                   ,from-end start end key test))
@@ -2511,6 +2532,7 @@ many elements are copied."
       (frobs t)))
   (defun %find-position-if (predicate sequence-arg from-end start end key)
     (declare (explicit-check sequence-arg))
+    (declare (dynamic-extent predicate key))
     (macrolet ((frob (sequence from-end)
                  `(%find-position-if predicate ,sequence
                                      ,from-end start end key))
@@ -2520,6 +2542,7 @@ many elements are copied."
       (frobs)))
   (defun %find-position-if-not (predicate sequence-arg from-end start end key)
     (declare (explicit-check sequence-arg))
+    (declare (dynamic-extent predicate key))
     (macrolet ((frob (sequence from-end)
                  `(%find-position-if-not predicate ,sequence
                                          ,from-end start end key))
@@ -2531,6 +2554,7 @@ many elements are copied."
 (defun find
     (item sequence &rest args &key from-end (start 0) end key test test-not)
   (declare (truly-dynamic-extent args))
+  (declare (dynamic-extent key test test-not))
   (declare (explicit-check sequence))
   (seq-dispatch-checking sequence
     (nth-value 0 (%find-position
@@ -2545,6 +2569,7 @@ many elements are copied."
 (defun position
     (item sequence &rest args &key from-end (start 0) end key test test-not)
   (declare (truly-dynamic-extent args))
+  (declare (dynamic-extent key test test-not))
   (declare (explicit-check sequence))
   (seq-dispatch-checking sequence
     (nth-value 1 (%find-position
@@ -2560,6 +2585,7 @@ many elements are copied."
 (defun find-if (predicate sequence &rest args &key from-end (start 0) end key)
   (declare (truly-dynamic-extent args))
   (declare (explicit-check sequence))
+  (declare (dynamic-extent predicate key))
   (seq-dispatch-checking sequence
     (nth-value 0 (%find-position-if
                   (%coerce-callable-to-fun predicate)
@@ -2574,6 +2600,7 @@ many elements are copied."
     (predicate sequence &rest args &key from-end (start 0) end key)
   (declare (truly-dynamic-extent args))
   (declare (explicit-check sequence))
+  (declare (dynamic-extent predicate key))
   (seq-dispatch-checking sequence
     (nth-value 1 (%find-position-if
                   (%coerce-callable-to-fun predicate)
@@ -2589,6 +2616,7 @@ many elements are copied."
     (predicate sequence &rest args &key from-end (start 0) end key)
   (declare (truly-dynamic-extent args))
   (declare (explicit-check sequence))
+  (declare (dynamic-extent predicate key))
   (seq-dispatch-checking sequence
     (nth-value 0 (%find-position-if-not
                   (%coerce-callable-to-fun predicate)
@@ -2603,6 +2631,7 @@ many elements are copied."
     (predicate sequence &rest args &key from-end (start 0) end key)
   (declare (truly-dynamic-extent args))
   (declare (explicit-check sequence))
+  (declare (dynamic-extent predicate key))
   (seq-dispatch-checking sequence
     (nth-value 1 (%find-position-if-not
                   (%coerce-callable-to-fun predicate)

@@ -540,6 +540,7 @@
            (type segment segment)
            (type disassem-state dstate)
            (type (or null stream) stream))
+  (declare (dynamic-extent function))
 
   (let ((ispace (get-inst-space))
         (prefix-p nil) ; just processed a prefix inst

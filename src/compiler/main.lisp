@@ -191,6 +191,7 @@ Examples:
 
 (defun %with-compilation-unit (fn &key override policy source-plist source-namestring)
   (declare (type function fn))
+  (declare (dynamic-extent fn))
   (flet ((with-it ()
            (let ((succeeded-p nil)
                  (*source-plist* (append source-plist *source-plist*))
@@ -903,6 +904,7 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;; a subtype of not-so-aptly-named INPUT-ERROR-IN-COMPILE-FILE.
 (defun %do-forms-from-info (function info condition-name)
   (declare (function function))
+  #-sb-xc-host (declare (dynamic-extent function)) ; avoid "unable" note
   (let* ((file-info (source-info-file-info info))
          (stream (get-source-stream info))
          (pos (file-position stream))

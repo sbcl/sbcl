@@ -39,6 +39,7 @@
 
 (defun map-xset (function xset)
   (declare (function function))
+  #-sb-xc-host (declare (dynamic-extent function)) ; Avoid "unable" in host
   (let ((data (xset-data xset)))
     (if (listp data)
         (dolist (elt data)

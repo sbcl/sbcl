@@ -150,3 +150,45 @@
                                  (length pattern))
                               (1+ i))))
               (return))))))))
+
+
+;;; Scan all functions that take funargs, looking to see whether the funarg
+;;; is declared as downward (dynamic-extent) or assumed possibly upward.
+;;; Print the names of functions for which the number of funargs differs
+;;; from the number of DX args. (This is a way to scan for missing decls)
+;;; In an ideal world, the compiler would infer that a funarg can be allocated
+;;; with dynamic-extent based on it only appearing as the first argument
+;;; to FUNCALL/APPLY, and not being closed over.
+;;; But we don't need ideal, we just need good enough.
+(flet ((fun-funargs-count (type)
+         (flet ((funlike-type-p (x)
+                  (or (csubtypep x (specifier-type 'function))
+                      (type= x (specifier-type '(or function null)))
+                      (type= x (specifier-type '(or function symbol))))))
+           (+ (count-if #'funlike-type-p (fun-type-required type))
+              (count-if #'funlike-type-p (fun-type-optional type))
+              (count-if (lambda (x) (funlike-type-p (key-info-type x)))
+                        (fun-type-keywords type))))))
+  (dotimes (pass 2)
+    (format t "~[CL symbols~;other symbols~]:~%" pass)
+    (let (result)
+      (do-all-symbols (s)
+        (when (if (= pass 0)
+                  (eq (symbol-package s) (find-package "CL"))
+                  (neq (symbol-package s) (find-package "CL")))
+          (let ((type (info :function :type s)))
+            (when (and s
+                       (not (eq type (find-classoid 'function)))
+                       (not (typep type 'defstruct-description))
+                       (not (eq type :generic-function)))
+              (let ((n-funargs (fun-funargs-count type)))
+                (when (plusp n-funargs)
+                  (let ((dxable-args
+                         (let ((info (info :function :inlining-data s)))
+                           (when (typep info 'dxable-args)
+                             (dxable-args-list info)))))
+                    (unless (= n-funargs (length dxable-args))
+                      (push (list (length dxable-args) n-funargs s)
+                            result)))))))))
+      (dolist (x (sort result #'string< :key 'third))
+        (format t "~{ ~d ~d ~a~}~%" x)))))

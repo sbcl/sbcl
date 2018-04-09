@@ -423,6 +423,7 @@ returns values returned by FUNCTION.
       NIL.)
 
 EXPERIMENTAL: Interface subject to change."
+  (declare (dynamic-extent timer function))
   (let (old-run-utime
         new-run-utime
         old-run-stime

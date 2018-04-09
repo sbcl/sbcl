@@ -165,6 +165,7 @@ held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
              `(defun ,(if variant (symbolicate name "/" variant) name)
                   (function mutex)
                 (declare (function function))
+                (declare (dynamic-extent function))
                 (flet ((%call-with-system-mutex ()
                          (dx-let (got-it)
                            (unwind-protect
@@ -217,6 +218,7 @@ held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
 (progn
   (defun call-with-mutex (function mutex value waitp timeout)
     (declare (function function))
+    (declare (dynamic-extent function))
     (unless (or (null value) (eq *current-thread* value))
       (error "~S called with non-nil :VALUE that isn't the current thread."
              'with-mutex))
@@ -232,6 +234,7 @@ held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
 
   (defun call-with-recursive-lock (function mutex waitp timeout)
     (declare (function function))
+    (declare (dynamic-extent function))
     (dx-let ((inner-lock-p (eq (mutex-%owner mutex) *current-thread*))
              (got-it nil))
       (without-interrupts
@@ -247,6 +250,7 @@ held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
                `(defun ,(if variant (symbolicate name "/" variant) name)
                     (function lock)
                   (declare (function function))
+                  (declare (dynamic-extent function))
                   (flet ((%call-with-recursive-system-lock ()
                            (dx-let ((inner-lock-p
                                      (eq *current-thread* (mutex-owner lock)))

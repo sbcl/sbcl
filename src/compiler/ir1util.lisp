@@ -687,6 +687,12 @@
     (unless (or
              ;; Don't complain about not being able to stack allocate constants.
              (and (ref-p use) (constant-p (ref-leaf use)))
+             ;; Don't complain if the object is "essentially" a constant
+             ;; in the form of a global function reference.
+             (and (ref-p use)
+                  (let ((var (ref-leaf use)))
+                    (and (global-var-p var)
+                         (eq (global-var-kind var) :global-function))))
              ;; If we're flushing, don't complain if we can flush the combination.
              (and flush (combination-p use) (flushable-combination-p use))
              ;; Don't report those with homes in :OPTIONAL -- we'd get doubled
@@ -2175,6 +2181,7 @@ is :ANY, the function name is not checked."
 ;;; whether to substitute
 (defun substitute-leaf-if (test new-leaf old-leaf)
   (declare (type leaf new-leaf old-leaf) (type function test))
+  #-sb-xc-host (declare (dynamic-extent test)) ; "unable"
   (dolist (ref (leaf-refs old-leaf))
     (when (funcall test ref)
       (change-ref-leaf ref new-leaf)))

@@ -554,6 +554,7 @@ HOLDING-MUTEX-P."
 
 (defun %%wait-for (test stop-sec stop-usec)
   (declare (function test))
+  (declare (dynamic-extent test))
   (labels ((try ()
              (declare (optimize (safety 0)))
              (awhen (funcall test)
@@ -611,6 +612,7 @@ HOLDING-MUTEX-P."
 
 (defun %wait-for (test timeout)
   (declare (function test))
+  (declare (dynamic-extent test))
   (tagbody
    :restart
      (multiple-value-bind (to-sec to-usec stop-sec stop-usec deadlinep)

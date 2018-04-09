@@ -1405,3 +1405,9 @@
   (assert (equal (fun-name-dx-args 'sortasort) '(1)))
   ;; And also an inline expansion
   (assert (sb-c::fun-name-inline-expansion 'sortasort)))
+(with-test (:name :store-dx-arglist-std-functions)
+  ;; You might think this would go in the SB-C::FUN-INFO,
+  ;; but we want user-defined functions to have this bit of info
+  ;; as well, potentially.
+  (assert (equal (fun-name-dx-args 'remove) '(:test :test-not :key)))
+  (assert (equal (fun-name-dx-args 'remove-if) '(0 :key))))

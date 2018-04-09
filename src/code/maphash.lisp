@@ -65,6 +65,7 @@ current key. The applies to all threads, not just the current one --
 even for synchronized hash-tables. If the table may be mutated by
 another thread during iteration, use eg. SB-EXT:WITH-LOCKED-HASH-TABLE
 to protect the MAPHASH call."
+  (declare (dynamic-extent function-designator))
   (maphash function-designator hash-table)) ; via compiler-macro
 
 (defmacro with-hash-table-iterator ((name hash-table) &body body)

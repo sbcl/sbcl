@@ -547,6 +547,7 @@ that provides the REPL for the system. Assumes that *STANDARD-INPUT* and
 
 (defun %with-rebound-io-syntax (function)
   (declare (type function function))
+  (declare (dynamic-extent function))
   (let ((*package* *package*)
         (*print-array* *print-array*)
         (*print-base* *print-base*)

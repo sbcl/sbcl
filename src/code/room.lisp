@@ -314,6 +314,7 @@
 ;;; as FIXNUMs (unlike SAPs or tagged addresses, these will not cons).
 (defun map-objects-in-range (fun start end &optional (strict-bound t))
   (declare (type function fun))
+  (declare (dynamic-extent fun))
   (named-let iter ((start start))
   (cond
     ((< (get-lisp-obj-address start) (get-lisp-obj-address end))
@@ -383,6 +384,7 @@
 (declaim (ftype (sfunction (function &rest immobile-subspaces) null)
                 map-immobile-objects))
 (defun map-immobile-objects (function &rest subspaces) ; Perform no filtering
+  (declare (dynamic-extent function))
   (do-rest-arg ((subspace) subspaces)
     (multiple-value-bind (start end) (%space-bounds subspace)
       (map-objects-in-range function start end)))))
@@ -434,6 +436,7 @@ We could try a few things to mitigate this:
   (declare (type function fun)
            ;; KLUDGE: rest-arg and self calls do not play nice and it'll get consed
            (optimize (sb-c::recognize-self-calls 0)))
+  (declare (dynamic-extent fun))
   (when (and (= (length spaces) 1) (eq (first spaces) :all))
     (return-from map-allocated-objects
      (map-allocated-objects fun
@@ -879,6 +882,7 @@ We could try a few things to mitigate this:
   (declare (type spaces space)
            (type (or index null) larger smaller type count)
            (type (or function null) test))
+  (declare (dynamic-extent test))
   (unless *ignore-after*
     (setq *ignore-after* (cons 1 2)))
   (collect ((counted 0 1+))
@@ -905,6 +909,7 @@ We could try a few things to mitigate this:
 ;;; because we know that there's a stack reference.
 (defun map-stack-references (function)
   (declare (type function function))
+  (declare (dynamic-extent function))
   (macrolet ((iter (step limit test)
                `(do ((sp (current-sp) (sap+ sp (,step n-word-bytes)))
                      (limit (sb-di::descriptor-sap ,limit))

@@ -183,6 +183,7 @@
 
 (defun %with-ir1-environment-from-node (node fun)
   (declare (type node node) (type function fun))
+  #-sb-xc-host (declare (dynamic-extent fun)) ; "unable"
   (let ((*current-component* (node-component node))
         (*lexenv* (node-lexenv node))
         (*current-path* (node-source-path node)))

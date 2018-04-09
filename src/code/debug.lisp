@@ -272,6 +272,7 @@ is :DEBUGGER-FRAME.
     specifies the currently debugged frame when inside the debugger, and
     behaves as :INTERRUPTED-FRAME outside the debugger.
 "
+  (declare (dynamic-extent function))
   (loop with result = nil
         for index upfrom 0
         for frame = (backtrace-start-frame from)
