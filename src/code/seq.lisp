@@ -2658,47 +2658,48 @@ many elements are copied."
                 (setq count (1+ count))))))))
 
 (define-sequence-traverser count-if
-    (pred sequence &rest args &key from-end start end key)
+    (predicate sequence &rest args &key from-end start end key)
   "Return the number of elements in SEQUENCE satisfying PRED(el)."
   (declare (type fixnum start)
            (truly-dynamic-extent args))
   (declare (explicit-check sequence))
-  (let ((pred (%coerce-callable-to-fun pred)))
-    (seq-dispatch-checking sequence
+  (seq-dispatch-checking sequence
       (let ((end (or end length)))
         (declare (type index end))
         (if from-end
-            (list-count-if nil t pred sequence)
-            (list-count-if nil nil pred sequence)))
+            (list-count-if nil t predicate sequence)
+            (list-count-if nil nil predicate sequence)))
       (let ((end (or end length)))
         (declare (type index end))
         (if from-end
-            (vector-count-if nil t pred sequence)
-            (vector-count-if nil nil pred sequence)))
-      (apply #'sb!sequence:count-if pred sequence args))))
+            (vector-count-if nil t predicate sequence)
+            (vector-count-if nil nil predicate sequence)))
+      (apply #'sb!sequence:count-if predicate sequence args)))
 
 (define-sequence-traverser count-if-not
-    (pred sequence &rest args &key from-end start end key)
+    (predicate sequence &rest args &key from-end start end key)
   "Return the number of elements in SEQUENCE not satisfying TEST(el)."
   (declare (type fixnum start)
            (truly-dynamic-extent args))
   (declare (explicit-check sequence))
-  (let ((pred (%coerce-callable-to-fun pred)))
-    (seq-dispatch-checking sequence
+  (seq-dispatch-checking sequence
       (let ((end (or end length)))
         (declare (type index end))
         (if from-end
-            (list-count-if t t pred sequence)
-            (list-count-if t nil pred sequence)))
+            (list-count-if t t predicate sequence)
+            (list-count-if t nil predicate sequence)))
       (let ((end (or end length)))
         (declare (type index end))
         (if from-end
-            (vector-count-if t t pred sequence)
-            (vector-count-if t nil pred sequence)))
-      (apply #'sb!sequence:count-if-not pred sequence args))))
+            (vector-count-if t t predicate sequence)
+            (vector-count-if t nil predicate sequence)))
+      (apply #'sb!sequence:count-if-not predicate sequence args)))
 
 (define-sequence-traverser count
     (item sequence &rest args &key from-end start end
+          ;; FIXME: TEST and TEST-NOT are not eagerly coerced to functions
+          ;; because DEFINE-SEQUENCE-TRAVERSER does not see the arg name-
+          ;; it expects only symbols as args.
           key (test #'eql test-p) (test-not nil test-not-p))
   "Return the number of elements in SEQUENCE satisfying a test with ITEM,
    which defaults to EQL."
