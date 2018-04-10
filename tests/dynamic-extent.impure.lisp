@@ -1438,3 +1438,16 @@
                   :skipped-on (not :stack-allocatable-closures))
   (assert-no-consing (autodxclosure1 42))
   (assert-no-consing (autodxclosure2)))
+
+#+gencgc
+(with-test (:name (:no-consing :auto-dx-closures)
+                  :skipped-on (not :stack-allocatable-closures))
+  (assert-no-consing
+   (let ((ct 0))
+     (sb-vm::map-allocated-objects
+      (lambda (obj type size)
+        (declare (ignore obj type size))
+        (incf ct))
+      :static)
+     ;; Static-space has some small number of objects
+     (assert (<= 1 ct 100)))))
