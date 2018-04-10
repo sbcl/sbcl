@@ -1338,3 +1338,11 @@
           (when f
             (funcall f "a" "b" x y))))
     ((t :start1 0) nil)))
+
+(with-test (:name :member-transform)
+  (let ((list '(2 1 3)))
+    (checked-compile-and-assert
+     ()
+     '(lambda (list &key key)
+       (member 1 list :key key))
+     ((list) (cdr list)))))

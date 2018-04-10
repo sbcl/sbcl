@@ -448,7 +448,7 @@
               (null-type (specifier-type 'null)))
           (cond ((csubtypep key-type null-type)
                  (values nil nil))
-                ((csubtypep null-type key-type)
+                ((types-equal-or-intersect null-type key-type)
                  (values key '(if key
                                (%coerce-callable-to-fun key)
                                #'identity)))
@@ -517,7 +517,7 @@
               (null-type (specifier-type 'null)))
           (cond ((csubtypep key-type null-type)
                  (values nil nil))
-                ((csubtypep null-type key-type)
+                ((types-equal-or-intersect null-type key-type)
                  (values key '(if key
                                (%coerce-callable-to-fun key)
                                #'identity)))
