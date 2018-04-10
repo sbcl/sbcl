@@ -162,6 +162,10 @@
             (setq answer `(lambda ,@(structure-ctor-lambda-parts
                                      info (cdr spec))))))))
     (values answer winp)))
+(defun fun-name-dx-args (fun-name)
+  (let ((answer (info :function :inlining-data fun-name)))
+    (when (typep answer 'dxable-args)
+      (dxable-args-list answer))))
 
 ;;;; ANSI Common Lisp functions which are defined in terms of the info
 ;;;; database

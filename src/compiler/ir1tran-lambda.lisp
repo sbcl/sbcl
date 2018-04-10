@@ -1284,6 +1284,19 @@
              ;; - and one because the source-transform is erased.
              (warn "redefinition of ~S clobbers structure ~:[accessor~;predicate~]"
                    name (eq (cdr info) :predicate))))))
+  ;; says CLHS: "Only an implementation that was willing to be responsible
+  ;; for recompiling f if the definition of g changed incompatibly could
+  ;; legitimately stack allocate the list argument to g in f."
+  ;; Yeah, well, we're not going be responsible for bupkis.
+  ;; If you want to do something dangerous, then do it.
+  ;; Of course it would be nice NOT to warn when we haven't actually baked-in
+  ;; any assumptions about callees, but I don't feel like adding more metadata
+  ;; to track when we assumed something.
+  (let ((old (fun-name-dx-args name)))
+    (when (and old (not (subsetp old dxable-args)))
+      (warn "redefinition of ~S with differing DYNAMIC-EXTENT declarations ~
+is potentially harmful to any already-compiled callers using (SAFETY 0)."
+            name)))
   (if (or inline-lambda dxable-args)
       (setf (info :function :inlining-data name)
             (if dxable-args

@@ -837,6 +837,112 @@
        "The return value of ~A should not be discarded."
        (lvar-fun-name (basic-combination-fun node) t)))))
 
+(defglobal *debug-auto-dx* nil)
+;;; Generalized transform: For each downward funarg, unless it is
+;;; a global var (like #'EQL), or the user already DXified,
+;;; or this transform already ran, then try to wrap in DX-FLET.
+;;; Change the call only if at least one DXable arg is known
+;;; to be a fuction. If no eligible arg is, then do nothing.
+;;; For now this only works on globally named functions.
+(defun dxify-downward-funargs (node dxable-args fun-name)
+  (when *debug-auto-dx*
+    (format t "~&DXifying funargs to ~S~%" fun-name))
+  (let* ((dx-flets)
+         (received-args)
+         (passed-args))
+    ;; Experience shows that users place incorrect DYNAMIC-EXTENT declarations
+    ;; without due consideration and care. Since the declaration was ignored
+    ;; in more contexts than not, it was relatively harmless.
+    ;; In light of that, only make this transform if willing to generate
+    ;; wrong code, or if the declaration can be trusted.
+    ;; [It's seems to be true that users who want this are OK with lack of
+    ;; tail-callability and/or potential stack exhaustion due to the assumption
+    ;; that callers should always use more stack space. You should really
+    ;; only do that if you don't also need an arbitrarily long call chain.
+    ;; MAP and friends are good examples where this pertains]
+    (when (or (policy node (= safety 0))
+              (or #+sb-xc-host t ; always trust our own code
+                  (let ((pkg
+                         (symbol-package (fun-name-block-name fun-name))))
+                    (or (eq pkg *cl-package*)
+                        ;; a poor heuristic. shoud use a bit in the package
+                        ;; to indicate that it's a system package
+                        (eql (mismatch "SB-" (package-name pkg)) 3)))))
+      (dolist (arg-spec dxable-args)
+        (when (symbolp arg-spec)
+          ;; If there are keywords, we had better have a FUN-TYPE
+          (let ((fun-type (lvar-type (combination-fun node))))
+            ;; Can't do anything unless we can ascertain where
+            ;; the keyword arguments start.
+            (when (fun-type-p fun-type)
+              (let* ((keys-index
+                      (+ (length (fun-type-required fun-type))
+                         (length (fun-type-optional fun-type))))
+                     (keywords-supplied
+                      (nthcdr keys-index (combination-args node))))
+                ;; Everything in a keyword position needs to be
+                ;; constant, or else no transform occurs.
+                (loop
+                   (unless (cdr keywords-supplied) (return))
+                   (let ((keyword (car keywords-supplied)))
+                     (unless (constant-lvar-p keyword)
+                       (return))
+                     (when (eq (lvar-value keyword) arg-spec)
+                       ;; Map it to a positional arg
+                       (setq arg-spec (1+ keys-index))
+                       (return))
+                     (setq keywords-supplied (cddr keywords-supplied))
+                     (incf keys-index 2)))))))
+        (when (integerp arg-spec)
+          ;; OK, turn the Nth argument into a dx-flet
+          (let* ((arg (nth arg-spec (combination-args node)))
+                 (use (principal-lvar-use arg)))
+            (when (and (ref-p use)
+                       (lambda-p (ref-leaf use))
+                       (neq (leaf-extent (lambda-parent (ref-leaf use)))
+                            :always-dynamic))
+              (unless received-args
+                (setq received-args
+                      (make-gensym-list (length (combination-args node))))
+                (setq passed-args (copy-list received-args)))
+              (let ((tempname (let ((*gensym-counter* (length dx-flets)))
+                                (gensym "LAMBDA")))
+                    (original-lambda
+                     (functional-inline-expansion
+                      (lambda-entry-fun (ref-leaf use)))))
+                (aver (typep original-lambda '(cons (eql lambda))))
+                (let ((original-lambda-list (second original-lambda)))
+                  ;; KISS - the closure that you're passing can have 0 or more
+                  ;; mandatory args and nothing else.
+                  (unless (intersection original-lambda-list lambda-list-keywords)
+                    (push `(,tempname ,original-lambda-list
+                             (%funcall ,(nth arg-spec received-args)
+                                       ,@original-lambda-list))
+                          dx-flets)
+                    (setf (nth arg-spec passed-args) `#',tempname)))))))))
+    (when dx-flets
+      (let ((new
+             `(lambda ,received-args
+                (dx-flet ,(nreverse dx-flets)
+                  (,@(if (symbolp fun-name) `(,fun-name) `(funcall #',fun-name))
+                   ,@passed-args)))))
+        (when *debug-auto-dx*
+          (format t "->~%~S~%" new))
+        new))))
+
+;;; This does not work. The intent was to prepend this transform to the list
+;;; of (FUN-INFO-TRANSFORMS INFO) when applicable, in the known fun case.
+;;; But the reason it doesn't work isn't that the transform doesn't transform
+;;; the code - it does; but compiler doesn't appear to respect the DX-FLET.
+(defglobal *dxify-args-transform*
+  (make-transform :type (specifier-type 'function)
+                  :function (lambda (node)
+                              (or (let ((name (combination-fun-source-name node)))
+                                    (dxify-downward-funargs
+                                     node (fun-name-dx-args name) name))
+                                  (give-up-ir1-transform)))
+                  :note "auto-DX"))
+
 ;;; Do IR1 optimizations on a COMBINATION node.
 (declaim (ftype (function (combination) (values)) ir1-optimize-combination))
 (defun ir1-optimize-combination (node)
@@ -889,7 +995,13 @@
                                    (fun-type-p type))
                               (and (fun-type-p defined-type)
                                    (not (fun-type-p type))))
-                      (validate-call-type node type leaf)))))))
+                      (validate-call-type node type leaf))))
+                (binding* ((name (combination-fun-source-name node nil)
+                                 :exit-if-null)
+                           (dxable-args (fun-name-dx-args name) :exit-if-null))
+                  (unless (fun-lexically-notinline-p name (node-lexenv node))
+                    (awhen (dxify-downward-funargs node dxable-args name)
+                      (transform-call node it name)))))))
         (:known
          (aver info)
          (clear-reoptimize-args)
@@ -904,8 +1016,9 @@
                       (not (constant-lvar-p (second args))))
              (setf (basic-combination-args node) (nreverse args))))
 
-         (let ((fun (fun-info-optimizer info)))
-           (unless (and fun (funcall fun node))
+         (let ((fun-source-name (combination-fun-source-name node))
+               (optimizer (fun-info-optimizer info)))
+           (unless (and optimizer (funcall optimizer node))
              ;; First give the VM a peek at the call
              (multiple-value-bind (style transform)
                  (combination-implementation-style node)
@@ -916,9 +1029,14 @@
                  (:transform
                   ;; The VM mostly knows how to handle this.  We need
                   ;; to massage the call slightly, though.
-                  (transform-call node transform (combination-fun-source-name node)))
+                  (transform-call node transform fun-source-name))
                  ((:default :maybe)
                   ;; Let transforms have a crack at it.
+                  ;; We should always try with the dxify-args transform,
+                  ;; but ironically it *does* *not* *work* for any function
+                  ;; that has FUNCTION-DESIGNATOR in its arg signature
+                  ;; (pretty much any CL: function). This is just sad.
+                  ;; Are type checks getting in the way?
                   (dolist (x (fun-info-transforms info))
                     #!+sb-show
                     (when *show-transforms-p*

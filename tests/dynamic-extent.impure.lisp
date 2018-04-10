@@ -1386,10 +1386,6 @@
                    10)))))
     (assert-no-consing (funcall fun))))
 
-(defun fun-name-dx-args (fun-name)
-  (let ((answer (sb-int:info :function :inlining-data fun-name)))
-    (when (typep answer 'sb-c::dxable-args)
-      (sb-c::dxable-args-list answer))))
 (defun trythisfun (test arg &key key)
   (declare (dynamic-extent test key))
   (funcall test (funcall key arg)))
@@ -1398,6 +1394,8 @@
   (declare (dynamic-extent pred))
   (funcall pred (elt seq 0) (elt seq 1))
   seq)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (import 'sb-c::fun-name-dx-args))
 (with-test (:name :store-dx-arglist)
   ;; Positional argument 0 and keyword argument :KEY
   (assert (equal (fun-name-dx-args 'trythisfun) '(0 :key)))
@@ -1411,3 +1409,32 @@
   ;; as well, potentially.
   (assert (equal (fun-name-dx-args 'remove) '(:test :test-not :key)))
   (assert (equal (fun-name-dx-args 'remove-if) '(0 :key))))
+
+(defun trivial-hof (fun arg)
+  (declare (dynamic-extent fun))
+  (funcall fun 3 arg))
+
+(declaim (ftype (function (function t &key (:key function)) *)
+                fancy-hof))
+(defun fancy-hof (pred arg &key key)
+  (declare (dynamic-extent pred key))
+  (funcall pred (funcall key arg)))
+
+(defun autodxclosure1 (&optional (x 4))
+  ;; Calling a higher-order function will only implicitly DXify a funarg
+  ;; if the callee is trusted (a CL: function) or the caller is unsafe.
+  (declare (optimize speed (safety 0) (debug 0)))
+  (trivial-hof (lambda (a b) (+ a b x)) 92))
+
+(defun autodxclosure2 (&aux (i 0) (j 0))
+  (declare (optimize speed (safety 0) (debug 0)))
+  (assert (eq (fancy-hof (lambda (x) (incf i) (symbolp x))
+                         '(a b)
+                         :key (lambda (x) (incf j) (car x)))
+              t))
+  (assert (and (= i 1) (= j 1))))
+
+(with-test (:name (:no-consing :auto-dx-closures)
+                  :skipped-on (not :stack-allocatable-closures))
+  (assert-no-consing (autodxclosure1 42))
+  (assert-no-consing (autodxclosure2)))
