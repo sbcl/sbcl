@@ -270,7 +270,6 @@
 (defun substitute-lvar (new old)
   (declare (type lvar old new))
   (aver (not (lvar-dest new)))
-  (update-lvar-dependencies new old)
   (let ((dest (lvar-dest old)))
     (etypecase dest
       ((or ref bind))

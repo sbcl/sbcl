@@ -2872,3 +2872,23 @@
                     (defun ,fun () (macro)))
                   (lambda () (,fun))))))
     (assert (= (funcall fun) 10))))
+
+(with-test (:name :substitute-lvar-updating-lvar-dependenceis)
+  (let ((name (gensym)))
+    (proclaim `(ftype (function * (values number &optional))
+                      ,name))
+    (checked-compile-and-assert
+     ()
+     `(sb-int:named-lambda ,name (x fun)
+        (block nil
+          (labels
+              ((snoop ()
+                 (return
+                   (funcall fun))))
+            (declare (inline snoop))
+            (when (plusp x)
+              (snoop))
+            (when (plusp x)
+              (snoop))
+            33)))
+     ((10 (constantly 131)) 131))))
