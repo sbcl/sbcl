@@ -28,6 +28,34 @@
                                     :immobile v)
     (assert (member 'satisfies referers))))
 
+;; Assert something about *CURRENT-THREAD* seeing objects that it just consed.
+(with-test (:name :m-a-o-threadlocally-precise
+                  :skipped-on (:or (:not (:and :gencgc :sb-thread))
+                                   :interpreter))
+  (let ((before (make-array 4))
+        (after  (make-array 4 :initial-element 0)))
+    (flet ((countit (obj type size)
+             (declare (ignore type size))
+             (symbol-macrolet ((n-conses     (aref after 1))
+                               (n-bitvectors (aref after 2))
+                               (n-symbols    (aref after 3))
+                               (n-other      (aref after 0)))
+               (typecase obj
+                 (list       (incf n-conses))
+                 (bit-vector (incf n-bitvectors))
+                 (symbol     (incf n-symbols))
+                 (t          (incf n-other))))))
+      (sb-vm::map-allocated-objects #'countit :dynamic)
+      (replace before after)
+      (fill after 0)
+      ;; expect to see 1 cons, 1 bit-vector, 1 symbol, and nothing else
+      (let ((foo (cons (make-array 5 :element-type 'bit)
+                       (make-symbol "WAT"))))
+        (sb-vm::map-allocated-objects #'countit :dynamic)
+        (dotimes (i 4 foo)
+          (assert (= (- (aref after i) (aref before i))
+                     (if (= i 0) 0 1))))))))
+
 (defparameter *x* ())
 
 (defun cons-madly ()

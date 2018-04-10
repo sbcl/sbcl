@@ -9,6 +9,8 @@
 
 /* Abstract out the data for an allocation region allowing a single
  * routine to be used for allocation and closing. */
+/* Caution: if you change this, you may have to change
+ * all the backend's allocators and/or 'room.lisp' */
 struct alloc_region {
 
     /* These two are needed for quick allocation. */

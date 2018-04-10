@@ -127,6 +127,7 @@ code_n_funs(struct code* code) { return fixnum_value((code)->n_entries) & 0x3FFF
  * struct page in gencgc-internal.h. These constants are used in gc-common,
  * so they can't easily be made gencgc-only */
 #define FREE_PAGE_FLAG        0
+/* Note: MAP-ALLOCATED-OBJECTS expects this value to be 1 */
 #define BOXED_PAGE_FLAG       1
 #define UNBOXED_PAGE_FLAG     2
 #define OPEN_REGION_PAGE_FLAG 8
