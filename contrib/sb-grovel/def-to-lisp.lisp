@@ -181,9 +181,31 @@ code:
     (as-c "return 0;")
     (as-c "}")))
 
-(defun c-constants-extract  (filename output-file package)
-  (with-open-file (f output-file :direction :output :if-exists :supersede)
-    (with-open-file (i filename :direction :input)
+;;; Extract constants as specified from INPUT, creating file OUTPUT.
+;;; Very important: This OUTPUT formal parameter should ** literally ** be
+;;; be named OUTPUT, and not OUTPUT-FILE.  WAT ???
+;;; Well, OUTPUT-FILE is the name of a class exported from ASDF and we might do
+;;; (USE-PACKAGE "ASDF") *after* having loaded our 'defpackage' without ASDF.
+;;; A subsequent USE-PACKAGE would cause a symbol conflict. How can there ever
+;;; be a subsequent USE-PACKAGE?  Because some _other_ system decides that it
+;;; wants to do the following actions:
+;;;  - load system "A" using a non-ASDF system loading tool
+;;;    that wants to use SB-GROVEL
+;;;  - load ASDF, which pushes :ASDF on *FEATURES*
+;;;  - use ASDF to load system "B" which claims to need ASDF to use SB-GROVEL
+;;;  - which re-loads SB-GROVEL, which loads our DEFPACKAGE
+;;;  - which causes the aforementioned failure.
+;;; Now you might think that pushing "SB-GROVEL" on to *MODULES* the first time
+;;; would fix things, but it doesn't - because we actually _do_ have to reload
+;;; this file, in order to pull in the CLOS stuff.  This problem can't be
+;;; fixed until the outside worlds' systems either all use ASDF or not.
+;;; Which translates to: this won't be fixed correctly, ever.
+;;;
+;;; TLDR: this stupid restriction on a variable's name makes
+;;; something work that didn't used to work. And victory is ours!
+(defun c-constants-extract  (input output package)
+  (with-open-file (f output :direction :output :if-exists :supersede)
+    (with-open-file (i input :direction :input)
       (let* ((headers (read i))
              (definitions (read i)))
         (print-c-source  f headers definitions package)))))
