@@ -85,9 +85,7 @@ int arch_os_thread_init(struct thread *thread) {
 #endif
 #ifdef LISP_FEATURE_MACH_EXCEPTION_HANDLER
     mach_lisp_thread_init(thread);
-#endif
-
-#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+#elif defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
     stack_t sigstack;
 
     /* Signal handlers are run on the control stack, so if it is exhausted
