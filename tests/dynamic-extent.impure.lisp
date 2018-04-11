@@ -1440,7 +1440,7 @@
   (assert-no-consing (autodxclosure2)))
 
 #+gencgc
-(with-test (:name (:no-consing :auto-dx-closures)
+(with-test (:name (:no-consing :more-auto-dx-closures)
                   :skipped-on (not :stack-allocatable-closures))
   (assert-no-consing
    (let ((ct 0))
