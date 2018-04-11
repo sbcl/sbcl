@@ -230,6 +230,10 @@
 ;;; that mechanism into the target for every potential compile-time option
 ;;; once build is complete.
 (setq *features* (delete :sb-after-xc-core *features*))
+;;; :CONS-PROFILING is not intended to persist after build.
+;;; It was merely a way to pass in a default OPTIMIZE quality.
+;;; Use (DESCRIBE-COMPILER-POLICY) to see the policy at startup.
+(setq *features* (delete :cons-profiling *features*))
 
 (progn
   (load "src/code/shaketree")
@@ -277,7 +281,7 @@
        ;; By default, retain any symbol with any attachments
        (or (sb-kernel:symbol-info symbol)
            (and (boundp symbol) (not (keywordp symbol)))))))
-   :verbose t :print nil)
+   :verbose nil :print nil)
   (unintern 'sb-impl::shake-packages 'sb-impl))
 
 ;;; Use historical (stupid) behavior for storing pathname namestrings

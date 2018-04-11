@@ -167,8 +167,17 @@ See also :POLICY option in WITH-COMPILATION-UNIT."
 ;;; OPTIMIZE forms have messed with it.
 (defun !policy-cold-init-or-resanify ()
   (setq **baseline-policy**
-        (make-policy (loop for i below n-policy-primary-qualities
-                           sum (ash #b01 (* i 2))))
+        (let ((policy
+               (make-policy (loop for i below n-policy-primary-qualities
+                                  sum (ash #b01 (* i 2))))))
+          ;; If :CONS-PROFILING was requested, then add it to the baseline policy.
+          (when (member :cons-profiling sb!xc:*features*)
+            (alter-policy policy
+                          #-sb-xc (policy-quality-name-p 'instrument-consing)
+                          #+sb-xc #.(policy-quality-name-p 'instrument-consing)
+                          2))
+          policy)
+
         **zero-typecheck-policy**
         (alter-policy (copy-policy **baseline-policy**)
                       #-sb-xc (policy-quality-name-p 'type-check)
