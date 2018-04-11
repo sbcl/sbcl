@@ -199,7 +199,7 @@
                              (compile nil
                                       (read-from-file customizer-file-name))
                              #'identity)))
-        (funcall customizer default-features)))
+        (sort (funcall customizer default-features) #'string<)))
 
 (defvar *shebang-backend-subfeatures*
   (let* ((default-subfeatures nil)

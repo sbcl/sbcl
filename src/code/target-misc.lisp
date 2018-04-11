@@ -14,7 +14,7 @@
 
 ;;; various environment inquiries
 
-(!defvar *features* '#.(sort (copy-list sb!xc:*features*) #'string<)
+(!defvar *features* '#.sb!xc:*features*
   "a list of symbols that describe features provided by the
    implementation")
 

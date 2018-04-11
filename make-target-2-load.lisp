@@ -225,6 +225,12 @@
 #+sb-xref-for-internals (sb-c::repack-xref :verbose 1)
 (fmakunbound 'sb-c::repack-xref)
 
+;;; The "--with" command-line mechanism (or equivalent 'customize-' file)
+;;; is convenient for passing boolean flags, but we shouldn't reflect
+;;; that mechanism into the target for every potential compile-time option
+;;; once build is complete.
+(setq *features* (delete :sb-after-xc-core *features*))
+
 (progn
   (load "src/code/shaketree")
   (sb-impl::shake-packages
