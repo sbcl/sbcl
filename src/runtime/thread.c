@@ -626,6 +626,54 @@ free_thread_struct(struct thread *th)
 /* this is called from any other thread to create the new one, and
  * initialize all parts of it that can be initialized from another
  * thread
+ *
+ * The allocated memory will be laid out as depicted below.
+ * Left-to-right is in order of lowest to highest address:
+ *
+ *      ______ spaces as obtained from OS
+ *     /   ___ aligned_spaces
+ *    /   /
+ *  (0) (1)       (2)       (3)       (4)    (5)          (6)
+ *   |   | CONTROL | BINDING |  ALIEN  |  CSP | per_thread |          |
+ *   |   |  STACK  |  STACK  |  STACK  | PAGE | structure  | altstack |
+ *   |...|------------------------------------------------------------|
+ *          2MiB       1MiB     1MiB               (*)         (**)
+ *
+ *
+ *  |       (*) per_thread detail       |    (**) altstack detail   |
+ *  |-----------------------------------|---------------------------|
+ *  |           Lisp TLS area           |            |              |
+ *  |-----------------------------------|            |              |
+ *  | struct   | interrupt |            | nonpointer |              |
+ *  | thread   | contexts  |            |    data    |   sigstack   |
+ *  |----------+-----------+------------|------------+--------------|
+ *  | 30 words | 1K words  |  remainder | ~200 bytes |              |
+ *  |                                   |                           |
+ *  |  <--  4K words in total   -->     | <--  32*SIGSTKSIZE -->    |
+ *          (32KB for x86-64)
+ *
+ *   (1) = control stack start. default size shown
+ *   (2) = binding stack start. size = BINDING_STACK_SIZE
+ *   (3) = alien stack start.   size = ALIEN_STACK_SIZE
+ *   (4) = C safepoint page.    size = BACKEND_PAGE_BYTES or 0
+ *   (5) = per_thread_data.     size = dynamic_values_bytes
+ *   (6) = nonpointer_thread_data and signal stack.
+ *
+ *   (0) and (1) may coincide; (4) and (5) may coincide
+ *
+ *   - Lisp TLS overlaps 'struct thread' so that the first N (~30) words
+ *     have preassigned TLS indices.
+ *     Others are assigned on demand, skipping over interrupt_contexts[]
+ *
+ *   - nonpointer data are not in 'struct thread' because placing them there
+ *     makes it tough to calculate addresses in 'struct thread' from Lisp.
+ *     (Every 'struct thread' slot has a known size)
+ *
+ *   - nonpointer_thread_data overlaps the signal stack. This is technically
+ *     wrong, but probably OK. It runs the theoretical risk of stomping on our
+ *     data, but we've asked for more than the default size so ... who cares?
+ *     And even if the OS knows not to deliver a signal exhausting the altstack,
+ *     we could step on our own toes in the handler.
  */
 
 static struct thread *

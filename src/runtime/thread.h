@@ -52,7 +52,8 @@ extern int kill_safely(os_thread_t os_thread, int signal);
 
 union per_thread_data {
     struct thread thread;
-    lispobj dynamic_values[1];  /* actually more like 4000 or so */
+    /* actual number of elements is TLS_SIZE (4096) */
+    lispobj dynamic_values[1];
 };
 
 /* The thread struct is generated from lisp during genesis and it
