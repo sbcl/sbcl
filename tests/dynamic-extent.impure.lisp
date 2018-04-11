@@ -1451,3 +1451,12 @@
       :static)
      ;; Static-space has some small number of objects
      (assert (<= 1 ct 100)))))
+
+(with-test (:name :cast-dx-funarg-no-spurious-warn)
+  (checked-compile
+   '(lambda (&key (test #'eql) key)
+     (declare (function test key))
+     (declare (dynamic-extent test key))
+     test key
+     1)
+   :allow-notes nil))
