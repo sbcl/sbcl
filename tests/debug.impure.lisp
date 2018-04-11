@@ -86,7 +86,8 @@
             ,@body)
        (ignore-errors (untrace ,name)))))
 
-(defun trace-this ()
+(defun trace-this (&optional arg)
+  (declare (ignore arg))
   'ok)
 
 (defun trace-fact (n)
@@ -98,6 +99,14 @@
   (let ((output (with-traced-function (trace-this)
                   (assert (eq 'ok (trace-this))))))
     (assert (search "TRACE-THIS" output))
+    (assert (search "returned OK" output))))
+
+(with-test (:name (trace :print-readably))
+  (let ((output (with-traced-function (trace-this)
+                  (let ((*print-readably* t))
+                    (assert (eq 'ok (trace-this (sb-int:make-unprintable-object "foo"))))))))
+    (assert (search "TRACE-THIS" output))
+    (assert (search "foo" output))
     (assert (search "returned OK" output))))
 
 ;;; bug 379
