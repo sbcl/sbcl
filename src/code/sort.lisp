@@ -12,6 +12,7 @@
 (in-package "SB!IMPL")
 
 (defun sort-vector (vector start end predicate-fun key-fun-or-nil)
+  (declare (dynamic-extent predicate-fun key-fun-or-nil))
   (sort-vector vector start end predicate-fun key-fun-or-nil))
 
 ;;; This is MAYBE-INLINE because it's not too hard to have an
@@ -23,6 +24,7 @@
   "Destructively sort SEQUENCE. PREDICATE should return non-NIL if
    ARG1 is to precede ARG2."
   (declare (truly-dynamic-extent args))
+  (declare  (dynamic-extent predicate key))
   (let ((predicate-fun (%coerce-callable-to-fun predicate)))
     (seq-dispatch sequence
       (stable-sort-list sequence
@@ -42,6 +44,7 @@
   "Destructively sort SEQUENCE. PREDICATE should return non-NIL if
    ARG1 is to precede ARG2."
   (declare (truly-dynamic-extent args))
+  (declare (dynamic-extent predicate key))
   (let ((predicate-fun (%coerce-callable-to-fun predicate)))
     (seq-dispatch sequence
       (stable-sort-list sequence
@@ -79,6 +82,7 @@
   (declare (type cons head list1 list2)
            (type function test key)
            (optimize speed))
+  (declare (dynamic-extent test key))
   (let ((key1 (funcall key (car list1)))
         (key2 (funcall key (car list2))))
     (macrolet ((merge-one (l1 k1 l2)
@@ -162,6 +166,7 @@
            (type function test key)
            (dynamic-extent head))
   (declare (explicit-check))
+  (declare (dynamic-extent test key))
   (labels ((merge* (size list1 tail1 list2 tail2 rest)
              (declare (optimize speed)
                       (type (and fixnum unsigned-byte) size)
@@ -319,12 +324,14 @@
            (type function pred)
            (type (or null function) key))
   (declare (explicit-check))
+  (declare (dynamic-extent pred key))
   (vector-merge-sort vector pred key svref))
 
 (defun stable-sort-vector (vector pred key)
   (declare (type function pred)
            (type (or null function) key))
   (declare (explicit-check))
+  (declare (dynamic-extent pred key))
   (vector-merge-sort vector pred key aref))
 
 ;;;; merging
@@ -379,6 +386,7 @@
   ;; full calls to SPECIFIER-TYPE at runtime; copying input vectors
   ;; to lists before doing MERGE-LISTS -- WHN 2003-01-05
   (declare (explicit-check))
+  (declare (dynamic-extent predicate key))
   (let ((type (specifier-type result-type))
         (pred-fun (%coerce-callable-to-fun predicate))
         ;; Avoid coercing NIL to a function since 2 out of 3 branches of the
