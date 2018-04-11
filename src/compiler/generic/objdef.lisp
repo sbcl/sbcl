@@ -470,7 +470,7 @@
   #!+sb-safepoint (csp-around-foreign-call :c-type "lispobj *")
   #!+win32 (synchronous-io-handle-and-flag :c-type "HANDLE" :length 1)
   #!+(and sb-safepoint-strictly (not win32))
-  (sprof-alloc-region :c-type "struct alloc_region" :length 5)
+  (sprof-alloc-region :c-type "struct alloc_region" :length 4)
   ;; The following slot's existence must NOT be conditional on #+msan
   #!+x86-64 (msan-param-tls) ; = &__msan_param_tls
   ;; function-layout is needed for closure creation. it's constant,
