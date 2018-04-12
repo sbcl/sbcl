@@ -63,8 +63,6 @@
   (once-only ((n-target target)
               (n-source source)
               (n-offset offset))
-    ;; FIXME: although I don't understand entirely, I'm going to do
-    ;; what whn does in x86/macros.lisp -- Christophe
     (ecase *backend-byte-order*
       (:little-endian
        `(inst ldub ,n-target ,n-source ,n-offset))

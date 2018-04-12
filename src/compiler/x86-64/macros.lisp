@@ -137,17 +137,7 @@
 (defmacro load-type (target source &optional (offset 0))
   "Loads the type bits of a pointer into target independent of
    byte-ordering issues."
-  (once-only ((n-target target)
-              (n-source source)
-              (n-offset offset))
-    (ecase *backend-byte-order*
-      (:little-endian
-       `(inst movzx ,n-target
-              (make-ea :byte :base ,n-source :disp ,n-offset)))
-      (:big-endian
-       `(inst movzx ,n-target
-              (make-ea :byte :base ,n-source
-                             :disp (+ ,n-offset (1- n-word-bytes))))))))
+  `(inst movzx ,target (make-ea :byte :base ,source :disp ,offset)))
 
 ;;;; error code
 (defun emit-error-break (vop kind code values)
