@@ -48,9 +48,9 @@ int arch_os_thread_init(struct thread *thread) {
      * swapped stacks, require that the control stack contain only
      * boxed data, and expands upwards while the C stack expands
      * downwards. */
-    sigstack.ss_sp=((void *) thread)+dynamic_values_bytes;
-    sigstack.ss_flags=0;
-    sigstack.ss_size = 32*SIGSTKSZ;
+    sigstack.ss_sp    = calc_altstack_base(thread);
+    sigstack.ss_flags = 0;
+    sigstack.ss_size  = calc_altstack_size(thread);
     if(sigaltstack(&sigstack,0)<0)
         lose("Cannot sigaltstack: %s\n",strerror(errno));
 

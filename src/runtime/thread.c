@@ -640,16 +640,16 @@ free_thread_struct(struct thread *th)
  *          2MiB       1MiB     1MiB               (*)         (**)
  *
  *
- *  |       (*) per_thread detail       |    (**) altstack detail   |
- *  |-----------------------------------|---------------------------|
- *  |           Lisp TLS area           |            |              |
- *  |-----------------------------------|            |              |
- *  | struct   | interrupt |            | nonpointer |              |
- *  | thread   | contexts  |            |    data    |   sigstack   |
- *  |----------+-----------+------------|------------+--------------|
- *  | 30 words | 1K words  |  remainder | ~200 bytes |              |
- *  |                                   |                           |
- *  |  <--  4K words in total   -->     | <--  32*SIGSTKSIZE -->    |
+ *  |       (*) per_thread detail       |    (**) altstack detail    |
+ *  |-----------------------------------|----------------------------|
+ *  |           Lisp TLS area           |            |               |
+ *  |-----------------------------------|            |               |
+ *  | struct   | interrupt |            | nonpointer |               |
+ *  | thread   | contexts  |            |    data    |   sigstack    |
+ *  |----------+-----------+------------|------------+---------------|
+ *  | 30 words | 1K words  |  remainder | ~200 bytes | 32*SIGSTKSIZE |
+ *  |                                   |
+ *  |  <--  4K words in total   -->     |
  *          (32KB for x86-64)
  *
  *   (1) = control stack start. default size shown
@@ -669,11 +669,6 @@ free_thread_struct(struct thread *th)
  *     makes it tough to calculate addresses in 'struct thread' from Lisp.
  *     (Every 'struct thread' slot has a known size)
  *
- *   - nonpointer_thread_data overlaps the signal stack. This is technically
- *     wrong, but probably OK. It runs the theoretical risk of stomping on our
- *     data, but we've asked for more than the default size so ... who cares?
- *     And even if the OS knows not to deliver a signal exhausting the altstack,
- *     we could step on our own toes in the handler.
  */
 
 static struct thread *
