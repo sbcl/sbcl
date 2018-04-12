@@ -200,7 +200,7 @@ static char* NO_SANITIZE_MEMORY deduce_thread_pc(struct thread* th, void** addr)
 
     if (th != arch_os_get_current_thread()) {
         int i = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
-        os_context_t *c = th->interrupt_contexts[i-1];
+        os_context_t *c = nth_interrupt_context(i-1, th);
         fp = (uword_t*)*os_context_register_addr(c,reg_FP);
     }
     while (1) {
@@ -238,7 +238,7 @@ deduce_thread(void (*context_scanner)(), uword_t pointer, char** pc)
             void **esp1;
             free = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
             for(i=free-1;i>=0;i--) {
-                os_context_t *c=th->interrupt_contexts[i];
+                os_context_t *c = nth_interrupt_context(i, th);
                 esp1 = (void **) *os_context_register_addr(c,reg_SP);
                 if (esp1>=(void **)th->control_stack_start && esp1<(void **)th->control_stack_end) {
                     if(esp1<esp) esp=esp1;

@@ -369,8 +369,7 @@ previous_info(struct call_info *info)
         /* We were interrupted. Find the correct signal context. */
         free_ici = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,thread));
         while (free_ici-- > 0) {
-            os_context_t *context =
-                thread->interrupt_contexts[free_ici];
+            os_context_t *context = nth_interrupt_context(free_ici, thread);
             if ((struct call_frame *)(uword_t)
                 (*os_context_register_addr(context, reg_CFP))
                 == info->frame) {
@@ -601,7 +600,7 @@ lisp_backtrace(int nframes)
     int free_ici = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,thread));
 
     if (free_ici) {
-        os_context_t *context = thread->interrupt_contexts[free_ici - 1];
+        os_context_t *context = nth_interrupt_context(free_ici - 1, thread);
         backtrace_from_context(context, nframes);
     } else {
         void *fp;

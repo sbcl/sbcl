@@ -810,7 +810,7 @@ fake_foreign_function_call(os_context_t *context)
     bind_variable(FREE_INTERRUPT_CONTEXT_INDEX,
                   make_fixnum(context_index + 1),thread);
 
-    thread->interrupt_contexts[context_index] = context;
+    nth_interrupt_context(context_index, thread) = context;
 
 #if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
     /* x86oid targets don't maintain the foreign function call flag at

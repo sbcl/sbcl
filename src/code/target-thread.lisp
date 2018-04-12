@@ -257,13 +257,13 @@ created and old ones may exit at any time."
 #!-(or sb-fluid sb-thread) (declaim (inline sb!vm::current-thread-offset-sap))
 #!-sb-thread
 (defun sb!vm::current-thread-offset-sap (n)
-  (declare (type (unsigned-byte 27) n))
+  (declare (type (signed-byte 28) n))
   (sap-ref-sap (alien-sap (extern-alien "all_threads" (* t)))
                (* n sb!vm:n-word-bytes)))
 
 #!+sb-thread
 (defun sb!vm::current-thread-offset-sap (n)
-  (declare (type (unsigned-byte 27) n))
+  (declare (type (signed-byte 28) n))
   (sb!vm::current-thread-offset-sap n))
 
 (declaim (inline current-thread-sap))

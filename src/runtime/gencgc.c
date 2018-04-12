@@ -3012,7 +3012,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
                     read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
                 while (k > 0)
                     preserve_context_registers((void(*)(os_context_register_t))preserve_pointer,
-                                               th->interrupt_contexts[--k]);
+                                               nth_nterrupt_contexts(--k, th));
             }
 #  endif
 # elif defined(LISP_FEATURE_SB_THREAD)
@@ -3025,7 +3025,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
                 void **esp1;
                 free=fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
                 for(i=free-1;i>=0;i--) {
-                    os_context_t *c=th->interrupt_contexts[i];
+                    os_context_t *c = nth_interrupt_context(i, th);
                     esp1 = (void **) *os_context_register_addr(c,reg_SP);
                     if (esp1>=(void **)th->control_stack_start &&
                         esp1<(void **)th->control_stack_end) {
@@ -3899,7 +3899,9 @@ prepare_for_final_gc ()
     // Avoid tenuring of otherwise-dead objects referenced by
     // dynamic bindings which disappear on image restart.
     struct thread *thread = arch_os_get_current_thread();
-    char *start = (char*)&thread->interrupt_contexts;
+    // This calculation is valid for both old and new thread memory layout.
+    // Refer to the pictures above create_thread_struct().
+    char *start = (char*)(thread + 1);
     char *end = (char*)thread + dynamic_values_bytes;
     memset(start, 0, end-start);
 #endif

@@ -311,10 +311,10 @@
     (inst break pending-interrupt-trap)))
 
 #!+sb-thread
-;; 28 unsigned bits is the max before shifting left by 3 that fits in the
-;; 'displacement' of an EA. This is hugely generous. The largest offset
-;; you'd ever supply is THREAD-NONPOINTER-DATA-SLOT + interrupt depth.
-(defknown current-thread-offset-sap ((unsigned-byte 28))
+;; 29 signed bits is the max before shifting left by 3 that fits in the
+;; 'displacement' of an EA. This is hugely generous.
+;; We need negative indices to reference the interrupt contexts
+(defknown current-thread-offset-sap ((signed-byte 29))
   system-area-pointer (flushable))
 
 #!+sb-thread
@@ -324,7 +324,7 @@
   (:result-types system-area-pointer)
   (:translate current-thread-offset-sap)
   (:info n)
-  (:arg-types (:constant unsigned-byte))
+  (:arg-types (:constant signed-byte))
   (:policy :fast-safe)
   (:generator 1
     (inst mov sap (thread-tls-ea (ash n 3)))))

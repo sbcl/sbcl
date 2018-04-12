@@ -67,8 +67,6 @@ int arch_os_thread_init(struct thread *thread) {
     sigstack.ss_sp    = calc_altstack_base(thread);
     sigstack.ss_flags = 0;
     sigstack.ss_size  = calc_altstack_size(thread);
-    struct nonpointer_thread_data *nonpointer_data
-        = (void *) ((char*)thread + dynamic_values_bytes);
     if(sigaltstack(&sigstack,0)<0) {
         lose("Cannot sigaltstack: %s\n",strerror(errno));
     }

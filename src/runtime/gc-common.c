@@ -2090,7 +2090,7 @@ scavenge_interrupt_contexts(struct thread *th)
 #endif
 
     for (i = 0; i < index; i++) {
-        context = th->interrupt_contexts[i];
+        context = nth_interrupt_context(i, th);
         scavenge_interrupt_context(context);
     }
 }

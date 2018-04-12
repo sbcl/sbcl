@@ -287,7 +287,7 @@ lispobj parse_lispobj(char **ptr)
                 throw_to_monitor();
             }
 
-            context = thread->interrupt_contexts[free_ici - 1];
+            context = nth_interrupt_context(free_ici - 1, thread);
 
             regnum = parse_regnum(token);
             if (regnum < 0) {

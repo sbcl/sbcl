@@ -475,19 +475,24 @@
   #!+x86-64 (msan-param-tls) ; = &__msan_param_tls
   ;; function-layout is needed for closure creation. it's constant,
   ;; but we need somewhere to read it from.
-  #!+(and immobile-space 64-bit sb-thread) (function-layout)
-  (interrupt-contexts :c-type "os_context_t *" :rest-p t :pointer t))
+  #!+(and immobile-space 64-bit sb-thread) (function-layout))
+
+(defconstant primitive-thread-object-length
+  (sb!vm::primitive-object-length
+   (find 'sb!vm::thread sb!vm::*primitive-objects*
+         :key 'sb!vm::primitive-object-name)))
 
 ;;; Compute the smallest TLS index that will be assigned to a special variable
 ;;; that does not map onto a thread slot.
+;;; Given N thread slots, the tls indices are 0..N-1 scaled by word-shift.
+;;; This constant is the index prior to scaling.
 (defconstant sb!thread::tls-index-start
-  (+ (sb!vm::primitive-object-length
-      (find 'sb!vm::thread sb!vm::*primitive-objects*
-            :key 'sb!vm::primitive-object-name))
-     ;; The sizeof operator in C counts the variable-length interrupt_contexts[]
-     ;; field as occupying 1 word, but PRIMITIVE-OBJECT-LENGTH does not count it.
-     ;; i.e. There's likely a fencepost bug here, but in the non-fatal way.
-     ;; (We could do without +1, but it makes this calculation in agreement
-     ;; with what it replaced in C code)
-     1
-     sb!vm:max-interrupts))
+  (+ primitive-thread-object-length
+     ;; x86-64 interrupt contexts precede 'struct thread' so that TLS indices
+     ;; continue without a gap from the offset of the last primitive thread slot
+     ;; up until the TLS-SIZE'th slot (at which point exhaustion occurs).
+     ;;
+     ;; Other backends that haven't been converted over to use that thread memory
+     ;; layout have the interrupt contexts array intruding into the TLS area.
+     ;; That array must be skipped over when computing the next available index.
+     #!-x86-64 (1+ sb!vm:max-interrupts)))
