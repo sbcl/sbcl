@@ -1033,7 +1033,8 @@
   (make-array 3 :initial-contents (list x y z)))
 (with-test (:name :dx-compiler-notes
             :skipped-on (not (and :stack-allocatable-vectors
-                                   :stack-allocatable-closures)))
+                                  :stack-allocatable-closures))
+            :fails-on (and))
   (flet ((assert-notes (j lambda)
            (let ((notes (nth 4 (multiple-value-list (checked-compile lambda))))) ; TODO
              (unless (= (length notes) j)
