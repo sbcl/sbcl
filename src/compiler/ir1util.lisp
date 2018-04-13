@@ -683,40 +683,41 @@
 
 (defun note-no-stack-allocation (lvar &key flush)
   (do-uses (use (principal-lvar lvar))
-    (when (cast-p use)
-      (setq use (principal-lvar-use (cast-value use))))
-    (unless (or
-             ;; Don't complain about not being able to stack allocate constants.
-             (and (ref-p use) (constant-p (ref-leaf use)))
-             ;; If we're flushing, don't complain if we can flush the combination.
-             (and flush (combination-p use) (flushable-combination-p use))
-             ;; Don't report those with homes in :OPTIONAL -- we'd get doubled
-             ;; reports that way.
-             ;; Also don't report if the home is :EXTERNAL. This allows declaring
-             ;; funargs as dynamic-extent which can inform compilation of callers
-             ;; to this lambda that they can DXify the arg.
-             (and (ref-p use) (lambda-var-p (ref-leaf use))
-                  (member (lambda-kind (lambda-var-home (ref-leaf use)))
-                          '(:optional :external)))
-             ;; Don't complain if the referent is #'SOMEFUN, avoiding a note for
-             ;;  (DEFUN FOO (X &KEY (TEST #'IDENTITY)) ...)
-             ;; where TEST is declared DX, and one possible use of this LVAR is
-             ;; to the supplied arg, and other is essentially constant-like.
-             (and (ref-p use)
-                  (let ((var (ref-leaf use)))
-                    (and (global-var-p var)
-                         (eq (global-var-kind var) :global-function)))))
-      ;; FIXME: For the first leg (lambda-bind (lambda-var-home ...))
-      ;; would be a far better description, but since we use
-      ;; *COMPILER-ERROR-CONTEXT* for muffling we can't -- as that node
-      ;; can have different handled conditions.
-      (let ((*compiler-error-context* use))
-        (if (and (ref-p use) (lambda-var-p (ref-leaf use)))
-            (compiler-notify "~@<could~2:I not stack allocate ~S in: ~S~:@>"
-                             (lambda-var-original-name (ref-leaf use))
-                             (find-original-source (node-source-path use)))
-            (compiler-notify "~@<could~2:I not stack allocate: ~S~:@>"
-                             (find-original-source (node-source-path use))))))))
+    (dolist (use (ensure-list (if (cast-p use)
+                                  (principal-lvar-use (cast-value use))
+                                  use)))
+      (unless (or
+               ;; Don't complain about not being able to stack allocate constants.
+               (and (ref-p use) (constant-p (ref-leaf use)))
+               ;; If we're flushing, don't complain if we can flush the combination.
+               (and flush (combination-p use) (flushable-combination-p use))
+               ;; Don't report those with homes in :OPTIONAL -- we'd get doubled
+               ;; reports that way.
+               ;; Also don't report if the home is :EXTERNAL. This allows declaring
+               ;; funargs as dynamic-extent which can inform compilation of callers
+               ;; to this lambda that they can DXify the arg.
+               (and (ref-p use) (lambda-var-p (ref-leaf use))
+                    (member (lambda-kind (lambda-var-home (ref-leaf use)))
+                            '(:optional :external)))
+               ;; Don't complain if the referent is #'SOMEFUN, avoiding a note for
+               ;;  (DEFUN FOO (X &KEY (TEST #'IDENTITY)) ...)
+               ;; where TEST is declared DX, and one possible use of this LVAR is
+               ;; to the supplied arg, and other is essentially constant-like.
+               (and (ref-p use)
+                    (let ((var (ref-leaf use)))
+                      (and (global-var-p var)
+                           (eq (global-var-kind var) :global-function)))))
+        ;; FIXME: For the first leg (lambda-bind (lambda-var-home ...))
+        ;; would be a far better description, but since we use
+        ;; *COMPILER-ERROR-CONTEXT* for muffling we can't -- as that node
+        ;; can have different handled conditions.
+        (let ((*compiler-error-context* use))
+          (if (and (ref-p use) (lambda-var-p (ref-leaf use)))
+              (compiler-notify "~@<could~2:I not stack allocate ~S in: ~S~:@>"
+                               (lambda-var-original-name (ref-leaf use))
+                               (find-original-source (node-source-path use)))
+              (compiler-notify "~@<could~2:I not stack allocate: ~S~:@>"
+                               (find-original-source (node-source-path use)))))))))
 
 (defun use-good-for-dx-p (use dx &optional component)
   ;; FIXME: Can casts point to LVARs in other components?

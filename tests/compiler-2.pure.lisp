@@ -1346,3 +1346,11 @@
      '(lambda (list &key key)
        (member 1 list :key key))
      ((list) (cdr list)))))
+
+(with-test (:name :note-no-stack-allocation-casts)
+  (checked-compile-and-assert
+   ()
+   `(lambda ()
+     (let ((*s* (the integer (catch 'ct1 0))))
+       (declare (dynamic-extent *s*)
+                (special *s*))))))
