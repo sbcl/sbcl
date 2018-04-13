@@ -506,25 +506,8 @@ We could try a few things to mitigate this:
        ;; prove to be an issue with concurrent systems, or with
        ;; spectacularly poor timing for closing an allocation region
        ;; in a single-threaded system.
-
-       ;; Start with a Lisp rendition of ensure_region_closed() on the active
-       ;; thread's region, since users are often surprised to learn that a
-       ;; just-consed object can't necessarily be seen by MAP-ALLOCATED-OBJECTS.
-       ;; Since we're in WITHOUT-GCING, there can be no interrupts.
-       ;; This is probably better than calling MAP-OBJECTS-IN-RANGE on the
-       ;; thread's region, because then we might visit some page twice
-       ;; by doing that.
-       ;; (And seeing small consing by other threads is hopeless either way)
        #+sb-thread
-       (unless (eql (sap-int (current-thread-offset-sap
-                              (+ thread-alloc-region-slot 3)))
-                    0) ; start_addr
-         (alien-funcall
-          (extern-alien "gc_close_region" (function void unsigned int))
-          (truly-the word
-           (+ (sb-thread::thread-primitive-thread sb-thread:*current-thread*)
-              (ash thread-alloc-region-slot word-shift)))
-          1))
+       (close-current-gc-region)
        (loop
           with page-size = (ash gencgc-card-bytes (- n-fixnum-tag-bits))
           ;; This magic dance gets us an unboxed aligned pointer as a
@@ -555,6 +538,26 @@ We could try a few things to mitigate this:
     (if (eq space :dynamic)
         (without-gcing (do-1-space space))
         (do-1-space space)))))
+
+#+(and sb-thread gencgc)
+;; Start with a Lisp rendition of ensure_region_closed() on the active
+;; thread's region, since users are often surprised to learn that a
+;; just-consed object can't necessarily be seen by MAP-ALLOCATED-OBJECTS.
+;; Since we're in WITHOUT-GCING, there can be no interrupts.
+;; This is probably better than calling MAP-OBJECTS-IN-RANGE on the
+;; thread's region, because then we might visit some page twice
+;; by doing that.
+;; (And seeing small consing by other threads is hopeless either way)
+(defun close-current-gc-region ()
+  (unless (eql (sap-int (current-thread-offset-sap
+                         (+ thread-alloc-region-slot 3)))
+               0)                       ; start_addr
+    (alien-funcall
+     (extern-alien "gc_close_region" (function void unsigned int))
+     (truly-the word
+                (+ (sb-thread::thread-primitive-thread sb-thread:*current-thread*)
+                   (ash thread-alloc-region-slot word-shift)))
+     1)))
 
 ;;;; MEMORY-USAGE
 

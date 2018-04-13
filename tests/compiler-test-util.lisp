@@ -65,6 +65,8 @@
 (defun collect-consing-stats (thunk times)
   (declare (type function thunk))
   (declare (type fixnum times))
+  #+(and sb-thread gencgc)
+  (sb-vm::close-current-gc-region)
   (let ((before (sb-ext:get-bytes-consed)))
     (dotimes (i times)
       (funcall thunk))
