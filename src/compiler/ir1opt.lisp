@@ -831,8 +831,10 @@
 
 (defun check-important-result (node info)
   (when (and (null (node-lvar node))
-             (ir1-attributep (fun-info-attributes info) important-result))
+             (ir1-attributep (fun-info-attributes info) important-result)
+             (neq (combination-info node) :important-result-discarded))
     (let ((*compiler-error-context* node))
+      (setf (combination-info node) :important-result-discarded)
       (compiler-style-warn
        "The return value of ~A should not be discarded."
        (lvar-fun-name (basic-combination-fun node) t)))))

@@ -1400,6 +1400,7 @@
   ;; Untrusted type we have asserted for this combination.
   (type-validated-for-leaf nil)
   ;; some kind of information attached to this node by the back end
+  ;; or by CHECK-IMPORTANT-RESULT
   (info nil)
   (step-info))
 
