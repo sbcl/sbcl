@@ -871,7 +871,10 @@
   (declare (muffle-conditions t))
   (declare (type (unsigned-byte 32) n)
            (optimize (speed 3) (safety 0)))
-  (sb!alien:sap-alien #!+x86-64 (sb!vm::current-thread-offset-sap (- -1 n))
+  (sb!alien:sap-alien #!+x86-64 (sb!vm::current-thread-offset-sap (- -1 n
+                                                                     #!+sb-safepoint
+                                                                     ;; the C safepoint page
+                                                                     sb!c:+backend-page-bytes+))
                       #!-x86-64
                       (sb!vm::current-thread-offset-sap
                        (+ sb!vm::primitive-thread-object-length

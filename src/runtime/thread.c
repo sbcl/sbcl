@@ -677,6 +677,7 @@ free_thread_struct(struct thread *th)
  *  +-----------+-----------------------|------------+--------------|
  *  | 1K words  |   <-- 4K words --->   | ~200 bytes |              |
  *              ^ thread base
+ * On sb-safepoint builds one page before the thread base is used for the foreign calls safepoint.
  */
 
 static struct thread *
@@ -707,8 +708,8 @@ create_thread_struct(lispobj initial_function) {
 
     // Refer to the ASCII art in the block comment above
 #if THREAD_MEMORY_LAYOUT_NEW
-    os_context_t **contexts = (void*)(csp_page + THREAD_CSP_PAGE_SIZE);
-    struct thread *th = (void*)(contexts + MAX_INTERRUPTS);
+    os_context_t **contexts = (void*)(csp_page);
+    struct thread *th = (void*)(contexts + MAX_INTERRUPTS + THREAD_CSP_PAGE_SIZE);
 #else
     struct thread *th = (void*)(csp_page + THREAD_CSP_PAGE_SIZE);
 #endif
