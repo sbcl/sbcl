@@ -67,6 +67,7 @@
   (declare (type fixnum times))
   #+(and sb-thread gencgc)
   (sb-vm::close-current-gc-region)
+  (setf sb-int:*n-bytes-freed-or-purified* 0)
   (let ((before (sb-ext:get-bytes-consed)))
     (dotimes (i times)
       (funcall thunk))
