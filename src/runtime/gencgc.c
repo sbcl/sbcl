@@ -3012,7 +3012,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
                     read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
                 while (k > 0)
                     preserve_context_registers((void(*)(os_context_register_t))preserve_pointer,
-                                               th->interrupt_contexts[--k]);
+                                               nth_interrupt_context(--k, th));
             }
 #  endif
 # elif defined(LISP_FEATURE_SB_THREAD)
