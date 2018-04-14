@@ -704,15 +704,11 @@ create_thread_struct(lispobj initial_function) {
         (aligned_spaces+
          thread_control_stack_size+
          BINDING_STACK_SIZE+
-         ALIEN_STACK_SIZE);
+         ALIEN_STACK_SIZE +
+         INTERRUPT_CONTEXTS_SIZE);
 
     // Refer to the ASCII art in the block comment above
-#if THREAD_MEMORY_LAYOUT_NEW
-    os_context_t **contexts = (void*)(csp_page);
-    struct thread *th = (void*)(contexts + MAX_INTERRUPTS + THREAD_CSP_PAGE_SIZE);
-#else
     struct thread *th = (void*)(csp_page + THREAD_CSP_PAGE_SIZE);
-#endif
 
 #ifdef LISP_FEATURE_SB_THREAD
     lispobj* tls = (lispobj*)th;

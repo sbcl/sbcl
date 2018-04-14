@@ -871,16 +871,18 @@
   (declare (muffle-conditions t))
   (declare (type (unsigned-byte 32) n)
            (optimize (speed 3) (safety 0)))
-  (sb!alien:sap-alien #!+x86-64 (sb!vm::current-thread-offset-sap (- -1 n
-                                                                     #!+sb-safepoint
-                                                                     ;; the C safepoint page
-                                                                     sb!c:+backend-page-bytes+))
-                      #!-x86-64
-                      (sb!vm::current-thread-offset-sap
-                       (+ sb!vm::primitive-thread-object-length
-                          #!-alpha n
-                          #!+alpha (* 2 n)))
-                      (* os-context-t)))
+  (sb!alien:sap-alien
+   (sb!vm::current-thread-offset-sap
+    #!+x86-64
+    (- -1 n
+       #!+sb-safepoint
+       ;; the C safepoint page
+       (/ sb!c:+backend-page-bytes+ n-word-bytes))
+    #!-x86-64
+    (+ sb!vm::primitive-thread-object-length
+       #!-alpha n
+       #!+alpha (* 2 n)))
+   (* os-context-t)))
 
 ;;; On SB-DYNAMIC-CORE symbols which come from the runtime go through
 ;;; an indirection table, but the debugger needs to know the actual

@@ -216,7 +216,7 @@ extern __thread struct thread *current_thread;
   /* context 0 is the word immediately before the thread struct, and so on.
    * Pointer subtraction is well-defined in C, but negative indexing is not,
    * despite the equivalence of *(a+j) and a[j], or so I'm led to believe. */
-  #define nth_interrupt_context(n,thread) *((os_context_t**)thread - 1 - (n) - THREAD_CSP_PAGE_SIZE)
+  #define nth_interrupt_context(n,thread) *((os_context_t**)thread - 1 - THREAD_CSP_PAGE_SIZE / N_WORD_BYTES - (n))
 #else
   #define THREAD_MEMORY_LAYOUT_NEW 0
   #define INTERRUPT_CONTEXTS_SIZE 0
