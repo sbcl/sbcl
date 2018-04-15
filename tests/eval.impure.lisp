@@ -278,16 +278,21 @@
     (assert (eq :fun (empty-let-is-not-toplevel-fun)))))
 
 (with-test (:name (eval function-lambda-expression))
-  (assert (equal `(lambda (x)
-                    (block eval-fle-1
-                      (+ x 1)))
-                 (function-lambda-expression
+  (assert (equal (function-lambda-expression
                   (eval `(progn
                            (defun eval-fle-1 (x) (+ x 1))
-                           #'eval-fle-1)))))
-  (assert (equal `(lambda (x y z) (+ x 1 y z))
-                 (function-lambda-expression
-                  (eval `(lambda (x y z) (+ x 1 y z)))))))
+                           #'eval-fle-1)))
+                 #+interpreter
+                 `(sb-int:named-lambda eval-fle-1 (x)
+                    (block eval-fle-1
+                      (+ x 1)))
+                 #-interpreter
+                 `(lambda (x)
+                    (block eval-fle-1
+                      (+ x 1)))))
+  (assert (equal (function-lambda-expression
+                  (eval `(lambda (x y z) (+ x 1 y z))))
+                 `(lambda (x y z) (+ x 1 y z)))))
 
 (with-test (:name (:bug-573747 eval :compile))
   (let ((*out* (make-string-output-stream))
