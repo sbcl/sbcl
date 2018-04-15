@@ -147,7 +147,9 @@
        #!+sb-fasteval
        (sb!interpreter:interpreted-function
         (return-from %fun-name
-          (sb!interpreter:proto-fn-name (sb!interpreter:fun-proto-fn function)))))))
+          (let ((name (sb!interpreter:proto-fn-name (sb!interpreter:fun-proto-fn function))))
+            (unless (eql name 0)
+              name)))))))
   (%simple-fun-name (%fun-fun function)))
 
 (defun (setf %fun-name) (new-value function)
