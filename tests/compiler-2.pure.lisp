@@ -1354,3 +1354,8 @@
      (let ((*s* (the integer (catch 'ct1 0))))
        (declare (dynamic-extent *s*)
                 (special *s*))))))
+
+(with-test (:name :dxify-downward-funargs-variable-name)
+  (checked-compile-and-assert
+      ()
+      '(lambda () ((lambda (map) (funcall map)) #'list))))
