@@ -45,14 +45,13 @@
                  (bit-vector (incf n-bitvectors))
                  (symbol     (incf n-symbols))
                  (t          (incf n-other))))))
-      ;; all symbols are in immobile space if #+immobile-symbols
-      (sb-vm::map-allocated-objects #'countit :dynamic #+immobile-space :immobile)
+      (sb-vm::map-allocated-objects #'countit :all)
       (replace before after)
       (fill after 0)
       ;; expect to see 1 cons, 1 bit-vector, 1 symbol, and nothing else
       (let ((* (cons (make-array 5 :element-type 'bit)
                      (make-symbol "WAT"))))
-        (sb-vm::map-allocated-objects #'countit :dynamic #+immobile-space :immobile)
+        (sb-vm::map-allocated-objects #'countit :all)
         (assert (equal (map 'list #'- after before) '(0 1 1 1)))))))
 
 (defparameter *x* ())
