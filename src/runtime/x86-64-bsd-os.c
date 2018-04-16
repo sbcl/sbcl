@@ -143,7 +143,6 @@ os_flush_icache(os_vm_address_t address, os_vm_size_t length)
 }
 
 int arch_os_thread_init(struct thread *thread) {
-    stack_t sigstack;
 #ifdef LISP_FEATURE_SB_THREAD
 #ifdef LISP_FEATURE_GCC_TLS
     current_thread = thread;
@@ -158,6 +157,7 @@ int arch_os_thread_init(struct thread *thread) {
     /* Signal handlers are run on the control stack, so if it is exhausted
      * we had better use an alternate stack for whatever signal tells us
      * we've exhausted it */
+    stack_t sigstack;
     sigstack.ss_sp    = calc_altstack_base(thread);
     sigstack.ss_flags = 0;
     sigstack.ss_size  = calc_altstack_size(thread);
