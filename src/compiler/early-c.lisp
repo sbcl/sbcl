@@ -189,7 +189,7 @@ the stack without triggering overflow protection.")
 (progn (declaim (fixnum *type-cache-nonce*))
        (!define-load-time-global *type-cache-nonce* 0))
 
-(def!struct (undefined-warning
+(defstruct (undefined-warning
             #-no-ansi-print-object
             (:print-object (lambda (x s)
                              (print-unreadable-object (x s :type t)
