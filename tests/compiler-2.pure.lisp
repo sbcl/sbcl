@@ -1359,3 +1359,9 @@
   (checked-compile-and-assert
       ()
       '(lambda () ((lambda (map) (funcall map)) #'list))))
+
+(with-test (:name :array-call-type-deriver-non-fun-type)
+  (checked-compile-and-assert
+      ()
+      '(lambda (x) (funcall (the compiled-function #'aref) x))
+    ((#0A123) 123)))
