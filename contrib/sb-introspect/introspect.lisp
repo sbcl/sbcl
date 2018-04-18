@@ -313,15 +313,10 @@ If an unsupported TYPE is requested, the function will return NIL.
                       (not (eq type :condition)))
               (find-definition-source class)))))
        ((:method-combination)
-        (let ((combination-fun
-                (find-method #'sb-mop:find-method-combination
-                             nil
-                             (list (find-class 'generic-function)
-                                   (list 'eql name)
-                                   t)
-                             nil)))
-          (when combination-fun
-            (find-definition-source combination-fun))))
+        (let ((info (gethash name sb-pcl::**method-combinations**)))
+          (when info
+            (translate-source-location
+             (sb-pcl::method-combination-info-source-location info)))))
        ((:package)
         (when (symbolp name)
           (let ((package (find-package name)))

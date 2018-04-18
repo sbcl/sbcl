@@ -36,22 +36,26 @@
                (listp (caddr form)))
           (expand-long-defcombin form)
           (expand-short-defcombin form))))
+
+(defstruct method-combination-info
+  (constructor (error "missing arg") :type function)
+  (cache nil :type list)
+  (source-location nil :type (or null sb-c:definition-source-location)))
+(defglobal **method-combinations** (make-hash-table :test 'eql))
+
+(defmethod find-method-combination ((generic-function generic-function)
+                                    name options)
+  (let ((info (gethash name **method-combinations**)))
+    (when info
+      (or (cdr (assoc options (method-combination-info-cache info) :test #'equal))
+          (cdar (push (cons options (funcall (method-combination-info-constructor info) options))
+                      (method-combination-info-cache info)))))))
 
 ;;;; standard method combination
-
-;;; The STANDARD method combination type is implemented directly by
-;;; the class STANDARD-METHOD-COMBINATION. The method on
-;;; COMPUTE-EFFECTIVE-METHOD does standard method combination directly
-;;; and is defined by hand in the file combin.lisp. The method for
-;;; FIND-METHOD-COMBINATION must appear in this file for bootstrapping
-;;; reasons.
-(defmethod find-method-combination ((generic-function generic-function)
-                                    (type-name (eql 'standard))
-                                    options)
-  (when options
-    (method-combination-error
-      "STANDARD method combination accepts no options."))
-  *standard-method-combination*)
+(setf (gethash 'standard **method-combinations**)
+      (make-method-combination-info
+       :constructor (lambda (options) (when options (method-combination-error "STANDARD method combination accepts no options.")) *standard-method-combination*)
+       :cache (list (cons nil *standard-method-combination*))))
 
 ;;;; short method combinations
 ;;;;
@@ -73,35 +77,15 @@
       (sb-c:source-location))))
 
 (defun load-short-defcombin (type-name operator ioa doc source-location)
-  (let* ((specializers
-           (list (find-class 'generic-function)
-                 (intern-eql-specializer type-name)
-                 *the-class-t*))
-         (old-method
-           (get-method #'find-method-combination () specializers nil))
-         (new-method nil))
-    (setq new-method
-          (make-instance 'standard-method
-            :qualifiers ()
-            :specializers specializers
-            :lambda-list '(generic-function type-name options)
-            :function (lambda (args nms &rest cm-args)
-                        (declare (ignore nms cm-args))
-                        (apply
-                         (lambda (gf type-name options)
-                           (declare (ignore gf))
-                           (short-combine-methods
-                            type-name options operator ioa new-method doc))
-                         args))
-            'source source-location))
-    (when old-method
-      (remove-method #'find-method-combination old-method))
-    (add-method #'find-method-combination new-method)
-    (when doc
-      (setf (random-documentation type-name 'method-combination) doc))
-    type-name))
+  (let ((info (make-method-combination-info
+               :source-location source-location
+               :constructor (lambda (options)
+                              (short-combine-methods type-name options operator ioa source-location doc)))))
+    (setf (gethash type-name **method-combinations**) info))
+  (setf (random-documentation type-name 'method-combination) doc)
+  type-name)
 
-(defun short-combine-methods (type-name options operator ioa method doc)
+(defun short-combine-methods (type-name options operator ioa source-location doc)
   (cond ((null options) (setq options '(:most-specific-first)))
         ((equal options '(:most-specific-first)))
         ((equal options '(:most-specific-last)))
@@ -116,7 +100,7 @@
                  :options options
                  :operator operator
                  :identity-with-one-argument ioa
-                 'source method
+                 'source source-location
                  :documentation doc))
 
 (defmethod invalid-qualifiers ((gf generic-function)
@@ -165,36 +149,20 @@
 
 (define-load-time-global *long-method-combination-functions* (make-hash-table :test 'eq))
 
-(defun load-long-defcombin
-    (type-name doc function args-lambda-list source-location)
-  (let* ((specializers
-           (list (find-class 'generic-function)
-                 (intern-eql-specializer type-name)
-                 *the-class-t*))
-         (old-method
-           (get-method #'find-method-combination () specializers nil))
-         (new-method
-           (make-instance 'standard-method
-             :qualifiers ()
-             :specializers specializers
-             :lambda-list '(generic-function type-name options)
-             :function (lambda (args nms &rest cm-args)
-                         (declare (ignore nms cm-args))
-                         (apply
-                          (lambda (generic-function type-name options)
-                            (declare (ignore generic-function))
-                            (make-instance 'long-method-combination
-                                           :type-name type-name
-                                           :options options
-                                           :args-lambda-list args-lambda-list
-                                           :documentation doc))
-                          args))
-             'source source-location)))
-    (setf (gethash type-name *long-method-combination-functions*) function)
-    (when old-method (remove-method #'find-method-combination old-method))
-    (add-method #'find-method-combination new-method)
-    (setf (random-documentation type-name 'method-combination) doc)
-    type-name))
+(defun load-long-defcombin (type-name doc function args-lambda-list source-location)
+  (let ((info (make-method-combination-info
+               :constructor (lambda (options)
+                              (make-instance 'long-method-combination
+                                             :type-name type-name
+                                             :options options
+                                             :args-lambda-list args-lambda-list
+                                             'source source-location
+                                             :documentation doc))
+               :source-location source-location)))
+    (setf (gethash type-name **method-combinations**) info))
+  (setf (gethash type-name *long-method-combination-functions*) function)
+  (setf (random-documentation type-name 'method-combination) doc)
+  type-name)
 
 (defmethod compute-effective-method ((generic-function generic-function)
                                      (combin long-method-combination)

@@ -34,5 +34,11 @@
 (define-method-combination min    :identity-with-one-argument t)
 (define-method-combination nconc  :identity-with-one-argument t)
 (define-method-combination or     :identity-with-one-argument t)
+;;; we made OR (:MOST-SPECIFIC-FIRST) earlier in the build; hook it in
+(let ((info (gethash 'or **method-combinations**)))
+  (aver info)
+  (aver (null (method-combination-info-cache info)))
+  (setf (method-combination-info-cache info)
+        (list (cons '(:most-specific-first) *or-method-combination*))))
 (define-method-combination progn  :identity-with-one-argument t)
 
