@@ -484,4 +484,8 @@
   ;; if the current compilation is recursive (e.g., due to EVAL-WHEN
   ;; processing at compile-time), the invoking compilation's
   ;; source-info.
-  (parent nil :type (or source-info null) :read-only t))
+  ;; KLUDGE: expressing this as (OR NULL SOURCE-INFO) rather than
+  ;; the reverse avoids a warning from PARSE-1-DSD.
+  ;; The compiler really needs to be made more aware of
+  ;; some issues involving recursive structures.
+  (parent nil :type (or null source-info) :read-only t))

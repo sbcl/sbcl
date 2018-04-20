@@ -883,19 +883,18 @@ unless :NAMED is also specified.")))
 ;;; stored in a raw slot?  Return the index of the matching RAW-SLOT-DATA
 ;;; if TYPE should be stored in a raw slot, or NIL if not.
 (defun structure-raw-slot-data-index (type)
-  (multiple-value-bind (fixnum? fixnum-certain?)
-      (sb!xc:subtypep type 'fixnum)
-    ;; (The extra test for FIXNUM-CERTAIN? here is intended for
-    ;; bootstrapping the system. In particular, in sbcl-0.6.2, we set up
-    ;; LAYOUT before FIXNUM is defined, and so could bogusly end up
-    ;; putting INDEX-typed values into raw slots if we didn't test
-    ;; FIXNUM-CERTAIN?.)
-    (if (or fixnum? (not fixnum-certain?))
-        nil
-        (dotimes (i (length *raw-slot-data*))
-          (let ((data (svref *raw-slot-data* i)))
-            (when (sb!xc:subtypep type (raw-slot-data-raw-type data))
-              (return i)))))))
+  ;; If TYPE isn't a subtype of NUMBER, it can't go in a raw slot.
+  ;; In the negative case (which is most often), doing 1 SUBTYPEP test
+  ;; beats doing 5 or 6. Even before testing that, check if the slot
+  ;; can store NIL, because TYPEP is easier to test than SUBTYPEP.
+  (when (and (not (sb!xc:typep nil type))
+             (sb!xc:subtypep type 'number)
+             ;; FIXNUMs and smaller go in tagged slots, not raw slots
+             (not (sb!xc:subtypep type 'fixnum)))
+    (dotimes (i (length *raw-slot-data*))
+      (let ((data (svref *raw-slot-data* i)))
+        (when (sb!xc:subtypep type (raw-slot-data-raw-type data))
+          (return i))))))
 
 (defun typed-structure-info-or-lose (name)
   (or (info :typed-structure :info name)

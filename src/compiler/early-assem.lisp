@@ -51,14 +51,14 @@
   `(integer 0 ,max-alignment))
 
 ;;; common supertype for all the different kinds of annotations
-(defstruct (annotation (:constructor nil)
+(def!struct (annotation (:constructor nil)
                         (:copier nil))
   ;; Where in the raw output stream was this annotation emitted?
   (index 0 :type index)
   ;; What position does that correspond to?
   (posn nil :type (or index null)))
 
-(defstruct (label (:include annotation)
+(def!struct (label (:include annotation)
                    (:constructor gen-label ())
                    (:copier nil))
   ;; (doesn't need any additional information beyond what is in the

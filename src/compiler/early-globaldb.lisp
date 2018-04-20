@@ -256,7 +256,7 @@
 ;;;; operations, we represent the attributes as bits in a fixnum.
 
 (in-package "SB!C")
-(deftype attributes () 'fixnum)
+(def!type attributes () 'fixnum)
 
 ;;; Given a list of attribute names and an alist that translates them
 ;;; to masks, return the OR of the masks.

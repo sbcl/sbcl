@@ -190,9 +190,20 @@
 (assert (null (type-intersection2 (specifier-type 'symbol)
                                   (specifier-type '(satisfies foo)))))
 (assert (intersection-type-p (specifier-type '(and symbol (satisfies foo)))))
-(assert (ctypep :x86 (specifier-type '(satisfies keywordp))))
-(assert (type= (specifier-type '(member :x86))
-               (specifier-type '(and (member :x86) (satisfies keywordp)))))
+;; the target compiler returns NIL for this CTYPEP call involving KEYWORDP.
+;; therefore the cross-compiler should too.
+(assert (not (ctypep :x86 (specifier-type '(satisfies keywordp)))))
+(let* ((info (sb!int:info :function :info 'keywordp))
+       (attributes (sb!c::fun-info-attributes info)))
+  (unwind-protect
+       (progn
+         (setf (sb!c::fun-info-attributes info)
+               (logior attributes (sb!c::ir1-attributes sb!c::foldable)))
+         (assert (ctypep :x86 (specifier-type '(satisfies keywordp)))))
+    (setf (sb!c::fun-info-attributes info) attributes)))
+(assert (not (type= (specifier-type '(member :x86))
+                    (specifier-type '(and (member :x86) (satisfies keywordp))))))
+#+nil
 (let* ((type1 (specifier-type '(member :x86)))
        (type2 (specifier-type '(or keyword null)))
        (isect (type-intersection type1 type2)))
@@ -301,7 +312,8 @@
   (assert win))
 ;; Used to run out of stack.
 (multiple-value-bind (yes win)
-    (subtypep 'null '(or unk0 unk1))
+    (handler-bind ((sb!kernel::cross-type-giving-up #'muffle-warning))
+      (subtypep 'null '(or unk0 unk1)))
   (assert (not yes))
   (assert (not win)))
 

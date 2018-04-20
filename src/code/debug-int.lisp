@@ -297,12 +297,14 @@
 (defstruct (frame (:constructor nil)
                   (:copier nil))
   ;; the next frame up, or NIL when top frame
-  (up nil :type (or frame null))
+  ;; KLUDGE - (OR NULL FRAME), and not (OR FRAME NULL), because PARSE-1-DSD
+  ;; warns; we're so bad at understanding recursive structure.
+  (up nil :type (or null frame))
   ;; the previous frame down, or NIL when the bottom frame. Before
   ;; computing the next frame down, this slot holds the frame pointer
   ;; to the control stack for the given frame. This lets us get the
   ;; next frame down and the return-pc for that frame.
-  (%down :unparsed :type (or frame (member nil :unparsed)))
+  (%down :unparsed :type (or (member nil :unparsed) frame))
   ;; the DEBUG-FUN for the function whose call this frame represents
   (debug-fun nil :type debug-fun :read-only t)
   ;; the CODE-LOCATION where the frame's DEBUG-FUN will continue

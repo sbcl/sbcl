@@ -190,7 +190,7 @@
 ;;; storage class. Applies to all backends.
 (defconstant sc-number-limit 62)
 (defconstant sc-number-bits (integer-length (1- sc-number-limit)))
-(deftype sb!c::sc-number () `(integer 0 (,sc-number-limit)))
+(def!type sb!c::sc-number () `(integer 0 (,sc-number-limit)))
 
 (defconstant sc-offset-limit (ash 1 21))
 (defconstant sc-offset-bits (integer-length (1- sc-offset-limit)))

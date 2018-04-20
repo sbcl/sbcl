@@ -61,7 +61,7 @@
 ;;;             by APD on #lisp 2005-11-26: "MAYBE-INLINE lambda is
 ;;;             instantiated once per component, INLINE - for all
 ;;;             references (even under #'without FUNCALL)."
-(deftype inlinep ()
+(def!type inlinep ()
   '(member :inline :maybe-inline :notinline nil))
 (defconstant-eqx +inlinep-translations+
   '((inline . :inline)

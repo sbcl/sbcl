@@ -16,13 +16,13 @@
 ;;; in any block
 (defconstant local-tn-limit 64)
 
-(deftype local-tn-number () `(integer 0 (,local-tn-limit)))
+(def!type local-tn-number () `(integer 0 (,local-tn-limit)))
 (deftype local-tn-count () `(integer 0 ,local-tn-limit))
 (deftype local-tn-vector () `(simple-vector ,local-tn-limit))
-(deftype local-tn-bit-vector () `(simple-bit-vector ,local-tn-limit))
+(def!type local-tn-bit-vector () `(simple-bit-vector ,local-tn-limit))
 
 ;;; vectors indexed by SC numbers
-(deftype sc-vector () `(simple-vector ,sb!vm:sc-number-limit))
+(def!type sc-vector () `(simple-vector ,sb!vm:sc-number-limit))
 (deftype sc-bit-vector () `(simple-bit-vector ,sb!vm:sc-number-limit))
 
 ;;; Bitset representation of a set of locations in a finite SC.
@@ -90,7 +90,7 @@
            ,result)))))
 
 ;;; the different policies we can use to determine the coding strategy
-(deftype ltn-policy ()
+(def!type ltn-policy ()
   '(member :safe :small :small-safe :fast :fast-safe))
 
 ;;;; PRIMITIVE-TYPEs
@@ -100,7 +100,7 @@
 ;;; done on the basis of the primitive types of the operands, and the
 ;;; primitive type of a value is used to constrain the possible
 ;;; representations of that value.
-(defstruct (primitive-type (:copier nil))
+(def!struct (primitive-type (:copier nil))
   ;; the name of this PRIMITIVE-TYPE
   (name nil :type symbol :read-only t)
   ;; a list of the SC numbers for all the SCs that a TN of this type
@@ -763,7 +763,7 @@
 
 ;;; The SB structure represents the global information associated with
 ;;; a storage base.
-(defstruct (storage-base (:copier nil) (:conc-name sb-))
+(def!struct (storage-base (:copier nil) (:conc-name sb-))
   ;; name, for printing and reference
   (name nil :type symbol :read-only t)
   ;; the kind of storage base (which determines the packing
