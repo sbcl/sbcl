@@ -249,7 +249,7 @@
 ;;; An OPERAND-PARSE object contains stuff we need to know about an
 ;;; operand or temporary at meta-compile time. Besides the obvious
 ;;; stuff, we also store the names of per-operand temporaries here.
-(def!struct (operand-parse
+(defstruct (operand-parse
              (:copier nil)
              #-sb-xc-host (:pure t))
   ;; name of the operand (which we bind to the TN)
@@ -279,14 +279,24 @@
   (scs nil :type (or symbol list))
   ;; If non-null, we are a temp wired to this offset in SC.
   (offset nil :type (or unsigned-byte null)))
-(!set-load-form-method operand-parse (:host :xc :target))
 
 (defun operand-parse-sc (parse) ; Enforce a single symbol
   (the (and symbol (not null)) (operand-parse-scs parse)))
 
 ;;; A VOP-PARSE object holds everything we need to know about a VOP at
 ;;; meta-compile time.
-(def!struct (vop-parse #-sb-xc-host (:pure t))
+;;; This list of slots MUST match the slots in the DEFSTRUCT, in order,
+(defglobal vop-parse-slot-names ; but not including the OPERANDS slot.
+    '(source-location name inherits args results temps more-args more-results
+      ignores conditional-p arg-types result-types guard cost body variant
+      variant-vars vop-var node-var info-args note translate ltn-policy
+      save-p move-args))
+(declaim (inline !new-vop-parse))
+(declaim (inline !make-vop-parse))
+(defstruct (vop-parse #-sb-xc-host (:pure t)
+                (:constructor !make-vop-parse #.vop-parse-slot-names)
+                (:constructor !new-vop-parse)) ; all slots default
+  (source-location)
   ;; the name of this VOP
   (name nil :type symbol)
   ;; If true, then the name of the VOP we inherit from.
@@ -341,7 +351,6 @@
   ;; info about how to emit MOVE-ARG VOPs for the &MORE operand in
   ;; call/return VOPs
   (move-args nil :type (member nil :local-call :full-call :known-return)))
-(!set-load-form-method vop-parse (:host :xc :target))
 (defprinter (vop-parse)
   name
   (inherits :test inherits)
@@ -365,6 +374,15 @@
   (save-p :test save-p)
   (move-args :test move-args))
 
+;; A sanity-check enabled only when performing a self-hosted build
+#!+(and (host-feature sbcl) (host-feature sb-xc-host))
+(assert (equal (remove 'operands
+                       (mapcar 'sb-kernel:dsd-name
+                               (sb-kernel:dd-slots
+                                (sb-kernel:find-defstruct-description
+                                 'vop-parse))))
+               vop-parse-slot-names))
+
 (defprinter (operand-parse)
   name
   kind
@@ -373,7 +391,6 @@
   dies
   (scs :test scs)
   (load :test load)
-  (sc :test sc)
   (offset :test offset))
 
 ;;; Make NAME be the VOP used to move values in the specified FROM-SCs
@@ -1239,11 +1256,8 @@
 
   (values))
 
-;;; Compute stuff that can only be computed after we are done parsing
-;;; everying. We set the VOP-PARSE-OPERANDS, and do various error checks.
-(defun grovel-vop-operands (parse)
+(defun set-vop-parse-operands (parse)
   (declare (type vop-parse parse))
-
   (setf (vop-parse-operands parse)
         (append (vop-parse-args parse)
                 (if (vop-parse-more-args parse)
@@ -1251,21 +1265,7 @@
                 (vop-parse-results parse)
                 (if (vop-parse-more-results parse)
                     (list (vop-parse-more-results parse)))
-                (vop-parse-temps parse)))
-
-  (check-operand-types parse
-                       (vop-parse-args parse)
-                       (vop-parse-more-args parse)
-                       (vop-parse-arg-types parse)
-                       t)
-
-  (check-operand-types parse
-                       (vop-parse-results parse)
-                       (vop-parse-more-results parse)
-                       (vop-parse-result-types parse)
-                       nil)
-
-  (values))
+                (vop-parse-temps parse))))
 
 ;;;; function translation stuff
 
@@ -1560,27 +1560,95 @@
                             (vop-parse-or-lose inherits)))
          (parse (if inherits
                     (copy-vop-parse inherited-parse)
-                    (make-vop-parse)))
+                    (!new-vop-parse)))
          (n-res (gensym)))
     (setf (vop-parse-name parse) name)
     (setf (vop-parse-inherits parse) inherits)
 
     (parse-define-vop parse specs)
-    (grovel-vop-operands parse)
-
+    (set-vop-parse-operands parse)
+    (check-operand-types parse
+                         (vop-parse-args parse)
+                         (vop-parse-more-args parse)
+                         (vop-parse-arg-types parse)
+                         t)
+    (check-operand-types parse
+                         (vop-parse-results parse)
+                         (vop-parse-more-results parse)
+                         (vop-parse-result-types parse)
+                         nil)
     `(progn
-       (eval-when (:compile-toplevel :load-toplevel :execute)
-         (setf (gethash ',name *backend-parsed-vops*)
-               ',parse))
-
+       (eval-when (:compile-toplevel)
+         (setf (gethash ',name *backend-parsed-vops*) ',parse))
+       (register-vop-parse
+        ,@(macrolet
+              ((quotify-slots ()
+                 (collect ((forms))
+                   (dolist (x vop-parse-slot-names (cons 'list (forms)))
+                     (let ((reader (package-symbolicate (symbol-package 'vop-parse)
+                                                        "VOP-PARSE-" x)))
+                       (forms
+                        (case x
+                          (source-location ''(source-location))
+                          ((temps args results) `(quotify-list (,reader parse)))
+                          ((more-args more-results) `(quotify (,reader parse)))
+                          (t `(list 'quote (,reader parse))))))))))
+            (labels ((quotify (operand-or-nil)
+                       (when operand-or-nil
+                         (list 'quote (quotify-1 operand-or-nil))))
+                     (quotify-list (operands)
+                       (list 'quote (mapcar #'quotify-1 operands)))
+                     (quotify-1 (x) ; Return everything except the KIND, quoted
+                       `(,(operand-parse-name x)
+                         ,(operand-parse-target x) ,(operand-parse-temp x)
+                         ,(operand-parse-born x) ,(operand-parse-dies x)
+                         ,(operand-parse-load-tn x) ,(operand-parse-load x)
+                         ,(operand-parse-scs x) ,(operand-parse-offset x))))
+              (quotify-slots))))
        ,@(unless (eq (vop-parse-body parse) :unspecified)
            `((let ((,n-res ,(set-up-vop-info inherited-parse parse)))
                (store-vop-info ,n-res)
                ,@(set-up-fun-translation parse n-res))))
-       (let ((source-location (source-location)))
-         (when source-location
-           (setf (info :source-location :vop ',name) source-location)))
        ',name)))
+
+(macrolet
+   ((def ()
+     `(defun register-vop-parse ,vop-parse-slot-names
+       ;; Try to share each OPERAND-PARSE structure with a similar existing one.
+       (labels ((share-list (operand-specs accessor kind)
+                  (let ((new (mapcar (lambda (x) (share x kind)) operand-specs)))
+                    (dohash ((key parse) *backend-parsed-vops* :result new)
+                      (declare (ignore key))
+                      (when (equal (funcall accessor parse) new)
+                        (return (funcall accessor parse))))))
+                (share (operand-spec kind)
+                  ;; OPERAND-PARSE structures are immutable. Scan all vops for one
+                  ;; with an operand matching OPERAND-SPEC, and use that if found.
+                  (destructuring-bind (name targ temp born dies load-tn load scs offs)
+                      operand-spec
+                    (let ((op (make-operand-parse
+                               :name name :kind kind :target targ :temp temp
+                               :born born :dies dies :load-tn load-tn :load load
+                               :scs scs :offset offs)))
+                      (dohash ((key parse) *backend-parsed-vops* :result op)
+                        (declare (ignore key))
+                        (awhen (find op (vop-parse-operands parse) :test #'operand=)
+                          (return it))))))
+                (operand= (a b)
+                  ;; EQUALP is too weak a comparator for arbitrary sexprs,
+                  ;; since (EQUALP "foo" #(#\F #\O #\O)) is T, not that
+                  ;; we expect such weirdness in the LOAD-IF expression.
+                  (and (equal (operand-parse-load a) (operand-parse-load b))
+                       (equalp a b))))
+         (setq temps (share-list temps #'vop-parse-temps :temporary)
+               args (share-list args #'vop-parse-args :argument)
+               results (share-list results #'vop-parse-results :result))
+         (when more-args (setq more-args (share more-args :more-argument)))
+         (when more-results (setq more-results (share more-results :more-result))))
+       (let ((parse (!make-vop-parse . ,vop-parse-slot-names)))
+         (set-vop-parse-operands parse)
+         (setf (gethash name *backend-parsed-vops*) parse)))))
+  (def))
 
 (defun store-vop-info (vop-info)
   ;; This is an inefficent way to perform coalescing, but it doesn't matter.

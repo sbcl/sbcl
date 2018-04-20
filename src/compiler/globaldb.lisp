@@ -555,7 +555,6 @@
 (define-info-type (:source-location :constant) :type-spec t)
 (define-info-type (:source-location :typed-structure) :type-spec t)
 (define-info-type (:source-location :symbol-macro) :type-spec t)
-(define-info-type (:source-location :vop) :type-spec t)
 (define-info-type (:source-location :declaration) :type-spec t)
 (define-info-type (:source-location :alien-type) :type-spec t)
 
