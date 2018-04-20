@@ -1007,48 +1007,49 @@
          (aver info)
          (clear-reoptimize-args)
          (process-info)
-         (let ((attr (fun-info-attributes info)))
-           (when (constant-fold-call-p node)
-             (constant-fold-call node)
-             (return-from ir1-optimize-combination))
-           (when (and (ir1-attributep attr commutative)
-                      (= (length args) 2)
-                      (constant-lvar-p (first args))
-                      (not (constant-lvar-p (second args))))
-             (setf (basic-combination-args node) (nreverse args))))
+         (unless (eq (combination-kind node) :error) ;; casued by derive-type
+           (let ((attr (fun-info-attributes info)))
+             (when (constant-fold-call-p node)
+               (constant-fold-call node)
+               (return-from ir1-optimize-combination))
+             (when (and (ir1-attributep attr commutative)
+                        (= (length args) 2)
+                        (constant-lvar-p (first args))
+                        (not (constant-lvar-p (second args))))
+               (setf (basic-combination-args node) (nreverse args))))
 
-         (let ((fun-source-name (combination-fun-source-name node))
-               (optimizer (fun-info-optimizer info)))
-           (unless (and optimizer (funcall optimizer node))
-             ;; First give the VM a peek at the call
-             (multiple-value-bind (style transform)
-                 (combination-implementation-style node)
-               (ecase style
-                 (:direct
-                  ;; The VM knows how to handle this.
-                  )
-                 (:transform
-                  ;; The VM mostly knows how to handle this.  We need
-                  ;; to massage the call slightly, though.
-                  (transform-call node transform fun-source-name))
-                 ((:default :maybe)
-                  ;; Let transforms have a crack at it.
-                  ;; We should always try with the dxify-args transform,
-                  ;; but ironically it *does* *not* *work* for any function
-                  ;; that has FUNCTION-DESIGNATOR in its arg signature
-                  ;; (pretty much any CL: function). This is just sad.
-                  ;; Are type checks getting in the way?
-                  (dolist (x (fun-info-transforms info))
-                    #!+sb-show
-                    (when *show-transforms-p*
-                      (let* ((lvar (basic-combination-fun node))
-                             (fname (lvar-fun-name lvar t)))
-                        (/show "trying transform" x (transform-function x) "for" fname)))
-                    (unless (ir1-transform node x)
+           (let ((fun-source-name (combination-fun-source-name node))
+                 (optimizer (fun-info-optimizer info)))
+             (unless (and optimizer (funcall optimizer node))
+               ;; First give the VM a peek at the call
+               (multiple-value-bind (style transform)
+                   (combination-implementation-style node)
+                 (ecase style
+                   (:direct
+                    ;; The VM knows how to handle this.
+                    )
+                   (:transform
+                    ;; The VM mostly knows how to handle this.  We need
+                    ;; to massage the call slightly, though.
+                    (transform-call node transform fun-source-name))
+                   ((:default :maybe)
+                    ;; Let transforms have a crack at it.
+                    ;; We should always try with the dxify-args transform,
+                    ;; but ironically it *does* *not* *work* for any function
+                    ;; that has FUNCTION-DESIGNATOR in its arg signature
+                    ;; (pretty much any CL: function). This is just sad.
+                    ;; Are type checks getting in the way?
+                    (dolist (x (fun-info-transforms info))
                       #!+sb-show
                       (when *show-transforms-p*
-                        (/show "quitting because IR1-TRANSFORM result was NIL"))
-                      (return))))))))))))
+                        (let* ((lvar (basic-combination-fun node))
+                               (fname (lvar-fun-name lvar t)))
+                          (/show "trying transform" x (transform-function x) "for" fname)))
+                      (unless (ir1-transform node x)
+                        #!+sb-show
+                        (when *show-transforms-p*
+                          (/show "quitting because IR1-TRANSFORM result was NIL"))
+                        (return)))))))))))))
   (values))
 
 (defun xep-tail-combination-p (node)

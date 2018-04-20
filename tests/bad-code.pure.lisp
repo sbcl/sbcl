@@ -162,6 +162,15 @@
                   (make-array (do)))
                :allow-failure t))))
 
+(with-test (:name (make-array :dimensions :bad-propagated-value))
+  (assert
+   (nth-value 1
+              (checked-compile
+               `(lambda ()
+                  (let ((x '(("foo"))))
+                    (make-array (list x) :fill-pointer 0)))
+               :allow-warnings t))))
+
 (with-test (:name :&rest-ref-bad-n)
   (assert
    (nth-value 1
@@ -314,3 +323,5 @@
                       `(lambda ()
                          (apply 'find '(3 (1 2 3) :bad t)))
                       :allow-warnings t))))
+
+
