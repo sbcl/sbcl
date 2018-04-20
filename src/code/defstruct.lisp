@@ -887,7 +887,9 @@ unless :NAMED is also specified.")))
   ;; In the negative case (which is most often), doing 1 SUBTYPEP test
   ;; beats doing 5 or 6. Even before testing that, check if the slot
   ;; can store NIL, because TYPEP is easier to test than SUBTYPEP.
-  (when (and (not (sb!xc:typep nil type))
+  (when (and #-sb-xc-host
+             (not (contains-unknown-type-p (specifier-type type)))
+             (not (sb!xc:typep nil type))
              (sb!xc:subtypep type 'number)
              ;; FIXNUMs and smaller go in tagged slots, not raw slots
              (not (sb!xc:subtypep type 'fixnum)))
