@@ -67,7 +67,7 @@
               obj
               (compound-type-types type)))
     (fun-designator-type
-     (typep obj '(or function symbol)))
+     (values (typep obj '(or function symbol)) t))
     (fun-type
      (values (functionp obj) t))
     (unknown-type
