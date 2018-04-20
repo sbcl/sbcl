@@ -50,12 +50,6 @@ extern int kill_safely(os_thread_t os_thread, int signal);
 #define THREAD_SLOT_OFFSET_WORDS(c) \
  (offsetof(struct thread,c)/(sizeof (struct thread *)))
 
-union per_thread_data {
-    struct thread thread;
-    /* actual number of elements is TLS_SIZE (4096) */
-    lispobj dynamic_values[1];
-};
-
 /* The thread struct is generated from lisp during genesis and it
  * needs to know the sizes of all its members, but some types may have
  * arbitrary lengths, thus the pointers are stored instead. This
@@ -103,13 +97,16 @@ extern int dynamic_values_bytes;
 static inline unsigned int
 tls_index_of(struct symbol *symbol) // untagged pointer
 {
+#ifdef LISP_FEATURE_X86_64
+  return ((unsigned int*)symbol)[1];
+#else
   return symbol->header >> 32;
+#endif
 }
 #else
 #  define tls_index_of(x) (x->tls_index)
 #endif
-#define per_thread_value(sym,th) \
-  ((union per_thread_data *)th)->dynamic_values[tls_index_of(sym)>>WORD_SHIFT]
+#  define per_thread_value(sym,th) *(lispobj*)(tls_index_of(sym) + (char*)th)
 #endif
 
 static inline lispobj
@@ -141,9 +138,8 @@ SetSymbolValue(u64 tagged_symbol_pointer,lispobj val, void *thread)
  * be thread-local without saving a prior value on the binding stack. */
 # define write_TLS(sym, val, thread) write_TLS_index(sym##_tlsindex, val, thread, _ignored_)
 # define write_TLS_index(index, val, thread, sym) \
-   *(lispobj*)(index + (char*)((union per_thread_data*)thread)->dynamic_values) = val
-# define read_TLS(sym, thread) \
-   *(lispobj*)(sym##_tlsindex + (char*)((union per_thread_data*)thread)->dynamic_values)
+   *(lispobj*)(index + (char*)thread) = val
+# define read_TLS(sym, thread) *(lispobj*)(sym##_tlsindex + (char*)thread)
 #else
 # define write_TLS(sym, val, thread) SYMBOL(sym)->value = val
 # define write_TLS_index(index, val, thread, sym) sym->value = val

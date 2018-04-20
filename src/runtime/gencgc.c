@@ -2715,8 +2715,7 @@ void verify_gc(uword_t flags)
                      flags ^ VERIFYING_HEAP_OBJECTS);
 #ifdef LISP_FEATURE_SB_THREAD
         verify_space((lispobj)(th+1),
-                     (lispobj*)(SymbolValue(FREE_TLS_INDEX,0)
-                                + (char*)((union per_thread_data*)th)->dynamic_values),
+                     (lispobj*)(SymbolValue(FREE_TLS_INDEX,0) + (char*)th),
                      flags ^ VERIFYING_HEAP_OBJECTS);
 #endif
     }

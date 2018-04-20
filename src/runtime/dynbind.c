@@ -30,8 +30,7 @@
    have been assigned a thread-local storage index. See *KNOWN-TLS-SYMBOLS* in
    compiler/generic/genesis for the symbols whose indices are pre-assigned. */
 #ifdef LISP_FEATURE_SB_THREAD
-#define value_address(thing, thread) \
-  (lispobj*)(thing + (char*)((union per_thread_data *)thread)->dynamic_values)
+#define value_address(thing, thread) (lispobj*)(thing + (char*)thread)
 void bind_tls_cell(unsigned symbol, lispobj value, void *th)
 #else
 #define value_address(thing, thread) &SYMBOL(thing)->value
