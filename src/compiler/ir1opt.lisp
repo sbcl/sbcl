@@ -999,7 +999,9 @@
                               (and (fun-type-p defined-type)
                                    (not (fun-type-p type))))
                       (validate-call-type node type leaf)))
-                  (binding* ((name (lvar-fun-name fun) :exit-if-null)
+                  (binding* ((name (and leaf ;; don't want to transform CASTs
+                                        (lvar-fun-name fun))
+                                   :exit-if-null)
                              (dxable-args (fun-name-dx-args name) :exit-if-null))
                     (awhen (dxify-downward-funargs node dxable-args name)
                       (transform-call node it name)))))))

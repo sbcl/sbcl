@@ -1365,8 +1365,17 @@
       '(lambda () (sb-debug::map-backtrace))
       :allow-style-warnings t))
 
+(with-test (:name :dxify-downward-funargs-casts)
+  (checked-compile-and-assert
+   ()
+   '(lambda (f x)
+     (flet ((f (y) (funcall f y)))
+       (funcall (the (satisfies eval) #'every) #'f x)))
+   ((#'evenp '(2 2 4)) t)))
+
 (with-test (:name :array-call-type-deriver-non-fun-type)
   (checked-compile-and-assert
       ()
       '(lambda (x) (funcall (the compiled-function #'aref) x))
     ((#0A123) 123)))
+
