@@ -897,7 +897,8 @@
                      (incf keys-index 2)))))))
         (when (integerp arg-spec)
           ;; OK, turn the Nth argument into a dx-flet
-          (let* ((arg (nth arg-spec (combination-args node)))
+          (let* ((arg (or (nth arg-spec (combination-args node))
+                          (return-from dxify-downward-funargs nil)))
                  (use (principal-lvar-use arg)))
             (when (and (ref-p use)
                        (lambda-p (ref-leaf use))

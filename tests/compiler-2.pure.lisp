@@ -1360,6 +1360,11 @@
       ()
       '(lambda () ((lambda (map) (funcall map)) #'list))))
 
+(with-test (:name :dxify-downward-funargs-malformed)
+  (checked-compile
+      '(lambda () (sb-debug::map-backtrace))
+      :allow-style-warnings t))
+
 (with-test (:name :array-call-type-deriver-non-fun-type)
   (checked-compile-and-assert
       ()
