@@ -873,6 +873,22 @@
                                :complex-arg1 :complex-subtypep-arg1)))))
 
 ;;; Just parse the type specifiers and call CSUBTYPE.
+;;; Well, not "just" - Despite memoization of parsing and CSUBTYPEP,
+;;; it's nonetheless better to test EQUAL first, which is ~10x faster
+;;; in the positive case, and insigificant in the negative.
+;;; The specifiers might not be legal type specifiers,
+;;; but we're not obligated to police that:
+;;;   "This version eliminates the requirement to signal an error."
+;;; http://www.lispworks.com/documentation/HyperSpec/Issues/iss335_w.htm
+;;; (Status: Passed, as amended, Jun89 X3J13)
+;;;
+;;; Also, inferring from the version of the text that was obsoleted
+;;; - which while it has no direct impact on the final requirement,
+;;; implies something about what would have been legal -
+;;;   "SUBTYPEP must always return values T T in the case where the two
+;;;    type specifiers (or their expansions) are EQUAL."
+;;; i.e. though it is not longer technically a MUST, it suggests that EQUAL is
+;;; in fact a valid implemenation, at least where it computes T.
 (defun sb!xc:subtypep (type1 type2 &optional environment)
   "Return two values indicating the relationship between type1 and type2.
   If values are T and T, type1 definitely is a subtype of type2.
@@ -880,7 +896,9 @@
   If values are NIL and NIL, it couldn't be determined."
   (declare (type lexenv-designator environment) (ignore environment))
   (declare (explicit-check))
-  (csubtypep (specifier-type type1) (specifier-type type2)))
+  (if (equal type1 type2)
+      (values t t)
+      (csubtypep (specifier-type type1) (specifier-type type2))))
 
 ;;; If two types are definitely equivalent, return true. The second
 ;;; value indicates whether the first value is definitely correct.
