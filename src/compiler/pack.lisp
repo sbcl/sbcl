@@ -1430,7 +1430,7 @@
                (setf (aref locations+costs i)
                      (cons location (location-cost location)))
                (incf i)))
-           (sort locations+costs #'> :key #'cdr)
+           (setq locations+costs (sort locations+costs #'> :key #'cdr))
            (dovector (location-and-cost locations+costs)
              (attempt-location (car location-and-cost)))))
         (t ; finite SB, not optimizing
