@@ -635,7 +635,7 @@ exist or if is a file or a symbolic link."
     ;; Depends whether people are in the habit of using chdir within Lisp.
     (parse-native-namestring (if (and env (not (string= env "")))
                                  env
-                                 *sbcl-home*)
+                                 (or *sbcl-home* ""))
                              *physical-host*
                              *default-pathname-defaults*
                              :as-directory t)))

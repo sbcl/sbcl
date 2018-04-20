@@ -888,7 +888,7 @@
 ;;;   "SUBTYPEP must always return values T T in the case where the two
 ;;;    type specifiers (or their expansions) are EQUAL."
 ;;; i.e. though it is not longer technically a MUST, it suggests that EQUAL is
-;;; in fact a valid implemenation, at least where it computes T.
+;;; in fact a valid implementation, at least where it computes T.
 (defun sb!xc:subtypep (type1 type2 &optional environment)
   "Return two values indicating the relationship between type1 and type2.
   If values are T and T, type1 definitely is a subtype of type2.
