@@ -1679,7 +1679,8 @@ PACKAGE."
   (setf *package-graph-lock* (sb!thread:make-mutex :name "Package Graph Lock")
         *package-names*
         (make-info-hashtable
-         :comparator (lambda (a b) (and (not (eql a 0)) (string= a b)))
+         :comparator (named-lambda "PKG-NAME=" (a b)
+                       (and (not (eql a 0)) (string= a b)))
          :hash-function #'sxhash))
   (with-package-names (names)
     (dolist (spec *!initial-symbols*)
