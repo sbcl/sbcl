@@ -294,7 +294,7 @@
                   dims))
       (let ((*compiler-error-context* node))
         (setf (combination-kind node) :error)
-        (compiler-warn "Bad array dimensions: ~a" dims))))
+        (compiler-warn "Bad array dimensions: ~s" dims))))
 
 (defun derive-make-array-type (dims element-type adjustable
                                fill-pointer displaced-to
