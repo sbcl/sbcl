@@ -242,6 +242,10 @@
 ;;;; elaborate syntax and to retain the information so that it can be
 ;;;; inherited by other VOPs.
 
+;;; FIXME: all VOP-PARSE and OPERAND-PARSE slots should be readonly.
+;;; Unfortunately each kind of object acts both as mutable working storage
+;;; for the DEFINE-VOP expander, and the immutable object finally produced.
+
 ;;; An OPERAND-PARSE object contains stuff we need to know about an
 ;;; operand or temporary at meta-compile time. Besides the obvious
 ;;; stuff, we also store the names of per-operand temporaries here.
@@ -264,20 +268,21 @@
   ;; PARSE-TIME-SPEC.
   born
   dies
-  ;; a list of the names of the SCs that this operand is allowed into.
-  ;; If false, there is no restriction.
-  (scs nil :type list)
   ;; Variable that is bound to the load TN allocated for this operand, or to
   ;; NIL if no load-TN was allocated.
   (load-tn (make-operand-parse-load-tn) :type symbol)
   ;; an expression that tests whether to do automatic operand loading
   (load t)
   ;; In a wired or restricted temporary this is the SC the TN is to be
-  ;; packed in. Null otherwise.
-  (sc nil :type (or symbol null))
+  ;; packed in. Otherwise, if a non-nil list, the names of the SCs that
+  ;; this operand is allowed into. If NIL, there is no restriction.
+  (scs nil :type (or symbol list))
   ;; If non-null, we are a temp wired to this offset in SC.
   (offset nil :type (or unsigned-byte null)))
 (!set-load-form-method operand-parse (:host :xc :target))
+
+(defun operand-parse-sc (parse) ; Enforce a single symbol
+  (the (and symbol (not null)) (operand-parse-scs parse)))
 
 ;;; A VOP-PARSE object holds everything we need to know about a VOP at
 ;;; meta-compile time.
@@ -885,7 +890,7 @@
              (setf (operand-parse-target res)
                    (vop-spec-arg opt 'symbol 1 nil)))
             (:sc
-             (setf (operand-parse-sc res)
+             (setf (operand-parse-scs res)
                    (vop-spec-arg opt 'symbol 1 nil)))
             (:offset
              (let ((offset (eval (second opt))))
@@ -900,7 +905,7 @@
              (let ((scs (vop-spec-arg opt 'list 1 nil)))
                (unless (= (length scs) 1)
                  (error "must specify exactly one SC for a temporary"))
-               (setf (operand-parse-sc res) (first scs))))
+               (setf (operand-parse-scs res) (first scs))))
             (:type)
             (t
              (error "unknown temporary option: ~S" opt))))
@@ -911,7 +916,7 @@
                         (operand-parse-dies res)))
           (error "Temporary lifetime doesn't begin before it ends: ~S" spec))
 
-        (unless (operand-parse-sc res)
+        (unless (operand-parse-scs res)
           (error "must specify :SC for all temporaries: ~S" spec))
 
         (setf (vop-parse-temps parse)
