@@ -462,7 +462,6 @@
 ;;; BAR in (INTEGER FOO BAR) are INTEGERs.
 (defun sb!xc:typep (host-object target-type-spec &optional (env nil env-p))
   (declare (ignore env))
-  (declare (optimize (debug 0))) ; workaround for lp# 1498644
   (aver (null env-p)) ; 'cause we're too lazy to think about it
   (multiple-value-bind (opinion certain-p)
       (cross-typep 'typep host-object target-type-spec)
