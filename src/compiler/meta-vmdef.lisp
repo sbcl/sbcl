@@ -242,9 +242,9 @@
 ;;;; elaborate syntax and to retain the information so that it can be
 ;;;; inherited by other VOPs.
 
-;;; FIXME: all VOP-PARSE and OPERAND-PARSE slots should be readonly.
-;;; Unfortunately each kind of object acts both as mutable working storage
-;;; for the DEFINE-VOP expander, and the immutable object finally produced.
+;;; FIXME: all VOP-PARSE slots should be readonly.
+;;; Unfortunately it acts as both mutable working storage for the DEFINE-VOP
+;;; expander, and the immutable object finally produced.
 
 ;;; An OPERAND-PARSE object contains stuff we need to know about an
 ;;; operand or temporary at meta-compile time. Besides the obvious
@@ -253,32 +253,32 @@
              (:copier nil)
              #-sb-xc-host (:pure t))
   ;; name of the operand (which we bind to the TN)
-  (name nil :type symbol)
+  (name nil :type symbol :read-only t)
   ;; the way this operand is used:
-  (kind (missing-arg)
+  (kind (missing-arg) :read-only t
         :type (member :argument :result :temporary
                       :more-argument :more-result))
   ;; If true, the name of an operand that this operand is targeted to.
   ;; This is only meaningful in :ARGUMENT and :TEMPORARY operands.
-  (target nil :type (or symbol null))
+  (target nil :type (or symbol null) :read-only t)
   ;; TEMP is a temporary that holds the TN-REF for this operand.
-  (temp (make-operand-parse-temp) :type symbol)
+  (temp (make-operand-parse-temp) :type symbol :read-only t)
   ;; the time that this operand is first live and the time at which it
   ;; becomes dead again. These are TIME-SPECs, as returned by
   ;; PARSE-TIME-SPEC.
-  born
-  dies
+  (born nil :read-only t)
+  (dies nil :read-only t)
   ;; Variable that is bound to the load TN allocated for this operand, or to
   ;; NIL if no load-TN was allocated.
-  (load-tn (make-operand-parse-load-tn) :type symbol)
+  (load-tn (make-operand-parse-load-tn) :type symbol :read-only t)
   ;; an expression that tests whether to do automatic operand loading
-  (load t)
+  (load t :read-only t)
   ;; In a wired or restricted temporary this is the SC the TN is to be
   ;; packed in. Otherwise, if a non-nil list, the names of the SCs that
   ;; this operand is allowed into. If NIL, there is no restriction.
-  (scs nil :type (or symbol list))
+  (scs nil :type (or symbol list) :read-only t)
   ;; If non-null, we are a temp wired to this offset in SC.
-  (offset nil :type (or unsigned-byte null)))
+  (offset nil :type (or unsigned-byte null) :read-only t))
 
 (defun operand-parse-sc (parse) ; Enforce a single symbol
   (the (and symbol (not null)) (operand-parse-scs parse)))
@@ -807,10 +807,10 @@
                                       (list kind)
                                       nil)
                         nil))
-               (res (if old
-                        (make-operand-parse
-                         :name name
-                         :kind kind
+               (res
+                (nconc (list :kind kind)
+                       (if old
+                        (list
                          :target (operand-parse-target old)
                          :born (operand-parse-born old)
                          :dies (operand-parse-dies old)
@@ -819,50 +819,46 @@
                          :load (operand-parse-load old))
                         (ecase kind
                           (:argument
-                           (make-operand-parse
-                            :name (first spec)
-                            :kind :argument
-                            :born (parse-time-spec :load)
-                            :dies (parse-time-spec `(:argument ,(incf num)))))
+                           (list :born (parse-time-spec :load)
+                                 :dies (parse-time-spec `(:argument ,(incf num)))))
                           (:result
-                           (make-operand-parse
-                            :name (first spec)
-                            :kind :result
-                            :born (parse-time-spec `(:result ,(incf num)))
-                            :dies (parse-time-spec :save)))))))
-          (do ((key (rest spec) (cddr key)))
-              ((null key))
-            (let ((value (second key)))
-              (case (first key)
+                           (list :born (parse-time-spec `(:result ,(incf num)))
+                                 :dies (parse-time-spec :save))))))))
+          (do ((tail (rest spec) (cddr tail)))
+              ((null tail))
+            (let ((key (first tail))
+                  (value (second tail)))
+              (case key
                 (:scs
                  (aver (typep value 'list))
                  (aver (= (length value) (length (remove-duplicates value))))
-                 (setf (operand-parse-scs res) (copy-list value)))
+                 (setq value (copy-list value)))
                 (:load-tn
-                 (aver (typep value 'symbol))
-                 (setf (operand-parse-load-tn res) value))
+                 (aver (typep value 'symbol)))
                 (:load-if
-                 (setf (operand-parse-load res) value))
+                 (setq key :load))
                 (:more
                  (aver (typep value 'boolean))
-                 (setf (operand-parse-kind res)
-                       (if (eq kind :argument) :more-argument :more-result))
-                 (setf (operand-parse-load res) nil)
-                 (setq more res))
+                 (setq key :kind
+                       value (if (eq kind :argument) :more-argument :more-result))
+                 (setf (getf res :load) nil)
+                 (setq more t))
                 (:target
-                 (aver (typep value 'symbol))
-                 (setf (operand-parse-target res) value))
+                 (aver (typep value 'symbol)))
                 (:from
                  (unless (eq kind :result)
                    (error "can only specify :FROM in a result: ~S" spec))
-                 (setf (operand-parse-born res) (parse-time-spec value)))
+                 (setq key :born value (parse-time-spec value)))
                 (:to
                  (unless (eq kind :argument)
                    (error "can only specify :TO in an argument: ~S" spec))
-                 (setf (operand-parse-dies res) (parse-time-spec value)))
+                 (setq key :dies value (parse-time-spec value)))
                 (t
-                 (error "unknown keyword in operand specifier: ~S" spec)))))
+                 (error "unknown keyword in operand specifier: ~S" spec)))
+              (setf (getf res key) value)))
 
+          (setq res (apply #'make-operand-parse :name name res)
+                more (if more res nil))
           (cond ((not more)
                  (operands res))
                 ((operand-parse-target more)
@@ -889,37 +885,34 @@
       (unless (symbolp name)
         (error "bad temporary name: ~S" name))
       (incf *parse-vop-operand-count*)
-      (let ((res (make-operand-parse :name name
-                                     :kind :temporary
-                                     :born (parse-time-spec :load)
-                                     :dies (parse-time-spec :save))))
+      (let ((res (list :born (parse-time-spec :load)
+                       :dies (parse-time-spec :save))))
         (do ((opt (second spec) (cddr opt)))
             ((null opt))
+         (let ((key (first opt))
+               (value (second opt)))
           (case (first opt)
             (:target
-             (setf (operand-parse-target res)
-                   (vop-spec-arg opt 'symbol 1 nil)))
+             (setf value (vop-spec-arg opt 'symbol 1 nil)))
             (:sc
-             (setf (operand-parse-scs res)
-                   (vop-spec-arg opt 'symbol 1 nil)))
+             (setf key :scs value (vop-spec-arg opt 'symbol 1 nil)))
             (:offset
-             (let ((offset (eval (second opt))))
-               (aver (typep offset 'unsigned-byte))
-               (setf (operand-parse-offset res) offset)))
+             (aver (typep (setq value (eval value)) 'unsigned-byte)))
             (:from
-             (setf (operand-parse-born res) (parse-time-spec (second opt))))
+             (setf key :born value (parse-time-spec value)))
             (:to
-             (setf (operand-parse-dies res) (parse-time-spec (second opt))))
+             (setf key :dies value (parse-time-spec value)))
             ;; backward compatibility...
             (:scs
              (let ((scs (vop-spec-arg opt 'list 1 nil)))
                (unless (= (length scs) 1)
                  (error "must specify exactly one SC for a temporary"))
-               (setf (operand-parse-scs res) (first scs))))
-            (:type)
+               (setf value (first scs))))
             (t
-             (error "unknown temporary option: ~S" opt))))
+             (error "unknown temporary option: ~S" opt)))
+          (setf (getf res key) value)))
 
+        (setq res (apply #'make-operand-parse :name name :kind :temporary res))
         (unless (and (>= (operand-parse-dies res)
                          (operand-parse-born res))
                      (< (operand-parse-born res)
