@@ -339,37 +339,38 @@
               (inst mov words result) ; restore 'words'
               (inst lea result ; recompute the tagged pointer
                     (make-ea :byte :base rsp-tn :disp other-pointer-lowtag)))))
-        (let ((data-addr
-                (make-ea :qword :base result
-                                :disp (- (* vector-data-offset n-word-bytes)
-                                         other-pointer-lowtag))))
-          (block zero-fill
-            (cond ((sc-is words immediate)
-                   (let ((n (tn-value words)))
-                     (cond ((> n 8)
-                            (inst mov rcx (tn-value words)))
-                           ((= n 1)
-                            (inst mov data-addr 0)
-                            (return-from zero-fill))
-                           (t
-                            (multiple-value-bind (double single) (truncate n 2)
-                              (inst xorpd zero zero)
-                              (dotimes (i double)
-                                (inst movapd data-addr zero)
-                                (setf data-addr
-                                      (make-ea :qword :base (ea-base data-addr)
-                                               :disp (+ (ea-disp data-addr)
-                                                        (* n-word-bytes 2)))))
-                              (unless (zerop single)
-                                (inst movaps data-addr zero))
-                              (return-from zero-fill))))))
-                  (t
-                   (move rcx words)
-                   (inst shr rcx n-fixnum-tag-bits)))
-            (inst lea rdi data-addr)
-            (unless rax-zeroed (zeroize rax))
-            (inst rep)
-            (inst stos rax)))))))
+        (unless (sb!c::vector-initialized-p node)
+          (let ((data-addr
+                  (make-ea :qword :base result
+                                  :disp (- (* vector-data-offset n-word-bytes)
+                                           other-pointer-lowtag))))
+            (block zero-fill
+              (cond ((sc-is words immediate)
+                     (let ((n (tn-value words)))
+                       (cond ((> n 8)
+                              (inst mov rcx (tn-value words)))
+                             ((= n 1)
+                              (inst mov data-addr 0)
+                              (return-from zero-fill))
+                             (t
+                              (multiple-value-bind (double single) (truncate n 2)
+                                (inst xorpd zero zero)
+                                (dotimes (i double)
+                                  (inst movapd data-addr zero)
+                                  (setf data-addr
+                                        (make-ea :qword :base (ea-base data-addr)
+                                                        :disp (+ (ea-disp data-addr)
+                                                                 (* n-word-bytes 2)))))
+                                (unless (zerop single)
+                                  (inst movaps data-addr zero))
+                                (return-from zero-fill))))))
+                    (t
+                     (move rcx words)
+                     (inst shr rcx n-fixnum-tag-bits)))
+              (inst lea rdi data-addr)
+              (unless rax-zeroed (zeroize rax))
+              (inst rep)
+              (inst stos rax))))))))
 
 ;;; ALLOCATE-LIST
 (macrolet ((calc-size-in-bytes (length answer)

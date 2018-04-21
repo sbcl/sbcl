@@ -262,6 +262,13 @@
               (funcall setter (tnify i) tmp))))))
     (move-lvar-result node block locs lvar)))
 
+(defun vector-initialized-p (call)
+  (let ((lvar (node-lvar call)))
+    (when lvar
+      (let ((dest (principal-lvar-dest lvar)))
+        (and (basic-combination-p dest)
+             (lvar-fun-is (basic-combination-fun dest) '(initialize-vector)))))))
+
 ;;; An array header for simple non-unidimensional arrays is a fixed alloc,
 ;;; because the rank has to be known.
 ;;; (There are no compile-time optimizations for unknown rank arrays)
