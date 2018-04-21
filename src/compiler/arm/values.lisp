@@ -91,7 +91,7 @@
   (:policy :fast-safe)
   (:results (start :scs (any-reg))
             (count :scs (any-reg)))
-  (:temporary (:scs (descriptor-reg) :type list :from (:argument 0)) list)
+  (:temporary (:scs (descriptor-reg) :from (:argument 0)) list)
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:temporary (:sc any-reg) csp-temp)

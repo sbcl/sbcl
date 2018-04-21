@@ -1160,7 +1160,7 @@ default-value-8
   (:args (nargs :scs (any-reg)))
   (:arg-types positive-fixnum (:constant t) (:constant t))
   (:info min max)
-  (:temporary (:scs (unsigned-reg) :type fixnum) temp)
+  (:temporary (:scs (unsigned-reg)) temp)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 3

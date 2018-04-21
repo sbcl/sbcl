@@ -42,7 +42,7 @@
 
 (define-vop (fast-lognot/fixnum fixnum-unop)
   (:translate lognot)
-  (:temporary (:scs (any-reg) :type fixnum :to (:result 0))
+  (:temporary (:scs (any-reg) :to (:result 0))
               temp)
   (:generator 1
     (inst li (fixnumize -1) temp)

@@ -14,9 +14,9 @@
 ;;;; LIST and LIST*
 (define-vop (list-or-list*)
   (:args (things :more t))
-  (:temporary (:scs (descriptor-reg) :type list) ptr)
+  (:temporary (:scs (descriptor-reg)) ptr)
   (:temporary (:scs (descriptor-reg)) temp)
-  (:temporary (:scs (descriptor-reg) :type list :to (:result 0) :target result)
+  (:temporary (:scs (descriptor-reg) :to (:result 0) :target result)
               res)
   (:temporary (:sc non-descriptor-reg :offset nl4-offset) pa-flag)
   (:info num)
