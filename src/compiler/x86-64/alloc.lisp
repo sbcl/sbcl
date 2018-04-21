@@ -356,8 +356,10 @@
                               (inst xorpd zero zero)
                               (dotimes (i double)
                                 (inst movapd data-addr zero)
-                                (setf data-addr (copy-structure data-addr))
-                                (incf (ea-disp data-addr) (* n-word-bytes 2)))
+                                (setf data-addr
+                                      (make-ea :qword :base (ea-base data-addr)
+                                               :disp (+ (ea-disp data-addr)
+                                                        (* n-word-bytes 2)))))
                               (unless (zerop single)
                                 (inst movaps data-addr zero))
                               (return-from zero-fill))))))
