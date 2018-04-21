@@ -1,4 +1,4 @@
-;;;; testing add/remove-method thread thread safety
+;;;; testing add/remove-method thread safety
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
