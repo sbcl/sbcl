@@ -82,7 +82,7 @@
                 (and test-not (%coerce-callable-to-fun test-not))
                 (or null function)))))
 
-(sb!xc:defmacro define-sequence-traverser (name args &body body)
+(defmacro define-sequence-traverser (name args &body body)
   (multiple-value-bind (body declarations docstring) (parse-body body t)
     (collect ((new-args)
               (new-declarations)
@@ -138,8 +138,7 @@
 ;;; SIMPLE-VECTOR, and VECTOR, instead of the current LIST and VECTOR.
 ;;; It tends to make code run faster but be bigger; some benchmarking
 ;;; is needed to decide.
-(sb!xc:defmacro seq-dispatch
-    (sequence list-form array-form &optional other-form)
+(defmacro seq-dispatch (sequence list-form array-form &optional other-form)
   `(if (listp ,sequence)
        (let ((,sequence (truly-the list ,sequence)))
          (declare (ignorable ,sequence))
@@ -235,7 +234,7 @@
   (declare (optimize allow-non-returning-tail-call))
   (%program-error "~S is too hairy for sequence functions." type-spec))
 
-(sb!xc:defmacro when-extended-sequence-type
+(defmacro when-extended-sequence-type
     ((type-specifier type
       &key
       expandedp
