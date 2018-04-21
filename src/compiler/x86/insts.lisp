@@ -552,7 +552,7 @@
   (base nil :type (or tn null) :read-only t)
   (index nil :type (or tn null) :read-only t)
   (scale 1 :type (member 1 2 4 8) :read-only t)
-  (disp 0 :type (or (unsigned-byte 32) (signed-byte 32) fixup)) :read-only t)
+  (disp 0 :type (or (unsigned-byte 32) (signed-byte 32) fixup) :read-only t))
 (defmethod print-object ((ea ea) stream)
   (cond ((or *print-escape* *print-readably*)
          (print-unreadable-object (ea stream :type t)
