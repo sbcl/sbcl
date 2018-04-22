@@ -4,7 +4,7 @@
 ;;; then collect garbage, and re-intern all symbols that survived GC.
 ;;; Any symbol satisfying PREDICATE will be strongly referenced during GC
 ;;; so that it doesn't disappear, regardless of whether it appeared unused.
-(defun shake-packages (predicate &key print verbose)
+(defun shake-packages (predicate &key print verbose query)
   (declare (function predicate))
   (let (list)
     (flet ((weaken (table accessibility)
@@ -26,6 +26,8 @@
                        package)
                 list))))
     (gc :gen 7)
+    (when query
+      (sb-ext::gc-and-search-roots query :static))
     (let ((n-dropped 0))
       (flet ((reintern (symbols table package access)
                (declare (ignore package))

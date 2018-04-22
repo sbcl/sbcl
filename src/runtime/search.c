@@ -183,6 +183,8 @@ lispobj* find_symbol(char* symbol_name, char* package_name, unsigned int* hint)
     lispobj kernel_package = SYMBOL(FDEFN(SUB_GC_FDEFN)->name)->package;
     lispobj* package_names = search_package_symbols(kernel_package, "*PACKAGE-NAMES*",
                                                     &kernelpkg_hint);
+    if (!package_names)
+        return 0;
     lispobj namelen = strlen(package_name);
     struct instance* names = (struct instance*)
         native_pointer(((struct symbol*)package_names)->value);
