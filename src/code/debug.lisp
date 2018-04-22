@@ -80,7 +80,7 @@ provide bindings for printer control variables.")
   (sb!thread::get-foreground)
   (format stream
           "~%~W~:[~;[~W~]] "
-          (sb!di:frame-number *current-frame*)
+          (frame-number *current-frame*)
           (> *debug-command-level* 1)
           *debug-command-level*))
 
@@ -159,11 +159,11 @@ Other commands:
 ;;; location. Used by source printing to some information instead of
 ;;; none for the user.
 (defun maybe-block-start-location (loc)
-  (if (sb!di:code-location-unknown-p loc)
-      (let* ((block (sb!di:code-location-debug-block loc))
-             (start (sb!di:do-debug-block-locations (loc block)
+  (if (code-location-unknown-p loc)
+      (let* ((block (code-location-debug-block loc))
+             (start (do-debug-block-locations (loc block)
                       (return loc))))
-        (cond ((and (not (sb!di:debug-block-elsewhere-p block))
+        (cond ((and (not (debug-block-elsewhere-p block))
                     start)
                (format *debug-io* "~%unknown location: using block start~%")
                start)
@@ -219,12 +219,12 @@ backtraces. Possible values are :MINIMAL, :NORMAL, and :FULL.
   (list-backtrace :count count))
 
 (defun backtrace-start-frame (frame-designator)
-  (let ((here (sb!di:top-frame)))
+  (let ((here (top-frame)))
     (labels ((current-frame ()
                (let ((frame here))
                  ;; Our caller's caller.
                  (loop repeat 2
-                       do (setf frame (or (sb!di:frame-down frame) frame)))
+                       do (setf frame (or (frame-down frame) frame)))
                  frame))
              (interrupted-frame ()
                (or (find-interrupted-frame)
@@ -237,7 +237,7 @@ backtraces. Possible values are :MINIMAL, :NORMAL, and :FULL.
             (if (and *in-the-debugger* *current-frame*)
                 *current-frame*
                 (interrupted-frame)))
-           ((sb!di:frame-p frame-designator)
+           ((frame-p frame-designator)
             frame-designator)
            (t
             (error "Invalid designator for initial backtrace frame: ~S"
@@ -276,7 +276,7 @@ is :DEBUGGER-FRAME.
   (loop with result = nil
         for index upfrom 0
         for frame = (backtrace-start-frame from)
-        then (sb!di:frame-down frame)
+        then (frame-down frame)
         until (null frame)
         when (<= start index) do
         (if (minusp (decf count))
@@ -481,7 +481,7 @@ thread, NIL otherwise."
                                               more
                                               deleted)
   `(etypecase ,element
-     (sb!di:debug-var
+     (debug-var
       ,@required)
      (cons
       (ecase (car ,element)
@@ -497,7 +497,7 @@ thread, NIL otherwise."
   (let ((var (gensym)))
     `(let ((,var ,variable))
        (cond ((eq ,var :deleted) ,deleted)
-             ((eq (sb!di:debug-var-validity ,var ,location) :valid)
+             ((eq (debug-var-validity ,var ,location) :valid)
               ,valid)
              (t ,other)))))
 
@@ -505,8 +505,8 @@ thread, NIL otherwise."
 
 ;;; Extract the function argument values for a debug frame.
 (defun map-frame-args (thunk frame)
-  (let ((debug-fun (sb!di:frame-debug-fun frame)))
-    (dolist (element (sb!di:debug-fun-lambda-list debug-fun))
+  (let ((debug-fun (frame-debug-fun frame)))
+    (dolist (element (debug-fun-lambda-list debug-fun))
       (funcall thunk element))))
 
 ;;; When the frame is interrupted before any of the function code is called
@@ -542,7 +542,7 @@ thread, NIL otherwise."
     (return-from frame-args-as-list
       (early-frame-args frame)))
   (handler-case
-      (let ((location (sb!di:frame-code-location frame))
+      (let ((location (frame-code-location frame))
             (reversed-result nil))
         (block enumerating
           (map-frame-args
@@ -557,7 +557,7 @@ thread, NIL otherwise."
               :deleted ((push (frame-call-arg element location frame) reversed-result))
               :rest ((lambda-var-dispatch (second element) location
                       nil
-                      (let ((rest (sb!di:debug-var-value (second element) frame)))
+                      (let ((rest (debug-var-value (second element) frame)))
                         (if (listp rest)
                             (setf reversed-result (append (reverse rest) reversed-result))
                             (push (make-unprintable-object "unavailable &REST argument")
@@ -568,8 +568,8 @@ thread, NIL otherwise."
                             reversed-result)))
               :more ((lambda-var-dispatch (second element) location
                       nil
-                      (let ((context (sb!di:debug-var-value (second element) frame))
-                            (count (sb!di:debug-var-value (third element) frame)))
+                      (let ((context (debug-var-value (second element) frame))
+                            (count (debug-var-value (third element) frame)))
                         (setf reversed-result
                               (append (reverse
                                        (multiple-value-list
@@ -580,7 +580,7 @@ thread, NIL otherwise."
                             reversed-result)))))
            frame))
         (nreverse reversed-result))
-    (sb!di:lambda-list-unavailable ()
+    (lambda-list-unavailable ()
       (make-unprintable-object "unavailable lambda list"))))
 
 (defun clean-xep (frame name args info)
@@ -653,12 +653,12 @@ information.
 
 If REPLACE-DYNAMIC-EXTENT-OBJECTS is true, objects allocated on the stack of
 the current thread are replaced with dummy objects which can safely escape."
-  (let* ((debug-fun (sb!di:frame-debug-fun frame))
-         (kind (sb!di:debug-fun-kind debug-fun)))
+  (let* ((debug-fun (frame-debug-fun frame))
+         (kind (debug-fun-kind debug-fun)))
     (multiple-value-bind (name args info)
         (clean-frame-call frame
-                          (or (sb!di:debug-fun-closure-name debug-fun frame)
-                              (sb!di:debug-fun-name debug-fun))
+                          (or (debug-fun-closure-name debug-fun frame)
+                              (debug-fun-name debug-fun))
                           method-frame-style
                           (when kind (list kind)))
       (let ((args (if (and (consp args) replace-dynamic-extent-objects)
@@ -678,7 +678,7 @@ the current thread are replaced with dummy objects which can safely escape."
 (defun frame-call-arg (var location frame)
   (lambda-var-dispatch var location
     (make-unprintable-object "unused argument")
-    (sb!di:debug-var-value var frame)
+    (debug-var-value var frame)
     (make-unprintable-object "unavailable argument")))
 
 ;;; Prints a representation of the function call causing FRAME to
@@ -694,7 +694,7 @@ the current thread are replaced with dummy objects which can safely escape."
   (when number
     (format stream "~&~S: " (if (integerp number)
                                 number
-                                (sb!di:frame-number frame))))
+                                (frame-number frame))))
   (multiple-value-bind (name args info)
       (frame-call frame :method-frame-style method-frame-style)
     (pprint-logical-block (stream nil :prefix "(" :suffix ")")
@@ -729,13 +729,13 @@ the current thread are replaced with dummy objects which can safely escape."
     (when info
       (format stream " [~{~(~A~)~^,~}]" info)))
   (when print-frame-source
-    (let* ((loc (sb!di:frame-code-location frame))
+    (let* ((loc (frame-code-location frame))
            (path (and (sb!di::compiled-debug-fun-p
-                       (sb!di:code-location-debug-fun loc))
-                      (handler-case (sb!di:code-location-debug-source loc)
-                        (sb!di:no-debug-blocks ())
+                       (code-location-debug-fun loc))
+                      (handler-case (code-location-debug-source loc)
+                        (no-debug-blocks ())
                         (:no-error (source)
-                          (sb!di:debug-source-namestring source))))))
+                          (debug-source-namestring source))))))
       (when (or (eq print-frame-source :always)
                 ;; Avoid showing sources for internals,
                 ;; it will either fail anyway due to all the SB! and
@@ -748,7 +748,7 @@ the current thread are replaced with dummy objects which can safely escape."
                             (error (c)
                               (format stream "~&   error finding frame source: ~A" c)))))
               (format stream "~%   source: ~S" source))
-          (sb!di:debug-condition ()
+          (debug-condition ()
             ;; This is mostly noise.
             (when (eq :always print-frame-source)
               (format stream "~&   no source available for frame")))
@@ -1175,9 +1175,9 @@ and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
 
 (defun debug-loop-fun ()
   (let* ((*debug-command-level* (1+ *debug-command-level*))
-         (*current-frame* (or *stack-top-hint* (sb!di:top-frame)))
+         (*current-frame* (or *stack-top-hint* (top-frame)))
          (*stack-top-hint* nil))
-    (handler-bind ((sb!di:debug-condition
+    (handler-bind ((debug-condition
                     (lambda (condition)
                       (princ condition *debug-io*)
                       (/show0 "handling d-c by THROWing DEBUG-LOOP-CATCHER")
@@ -1234,7 +1234,7 @@ forms that explicitly control this kind of evaluation.")
   (cond ((not (and (fboundp 'compile) *auto-eval-in-frame*))
          (eval expr))
         ((frame-has-debug-vars-p *current-frame*)
-         (sb!di:eval-in-frame *current-frame* expr))
+         (eval-in-frame *current-frame* expr))
         (t
          (format *debug-io* "; No debug variables for current frame: ~
                                using EVAL instead of EVAL-IN-FRAME.~%")
@@ -1260,19 +1260,19 @@ forms that explicitly control this kind of evaluation.")
   ;; are reporeted in *elsewhere*, which is after start-pc saved in the
   ;; debug function, defeating the checks.
   (and (not (sb!di::all-args-available-p frame))
-       (eq (sb!di:debug-var-validity var location) :valid)))
+       (eq (debug-var-validity var location) :valid)))
 
 (eval-when (:execute :compile-toplevel)
 
 (sb!xc:defmacro define-var-operation (ref-or-set &optional value-var)
   `(let* ((temp (etypecase name
-                  (symbol (sb!di:debug-fun-symbol-vars
-                           (sb!di:frame-debug-fun *current-frame*)
+                  (symbol (debug-fun-symbol-vars
+                           (frame-debug-fun *current-frame*)
                            name))
-                  (simple-string (sb!di:ambiguous-debug-vars
-                                  (sb!di:frame-debug-fun *current-frame*)
+                  (simple-string (ambiguous-debug-vars
+                                  (frame-debug-fun *current-frame*)
                                   name))))
-          (location (sb!di:frame-code-location *current-frame*))
+          (location (frame-code-location *current-frame*))
           ;; Let's only deal with valid variables.
           (vars (remove-if-not (lambda (v)
                                  (var-valid-in-frame-p v location))
@@ -1283,9 +1283,9 @@ forms that explicitly control this kind of evaluation.")
            ((= (length vars) 1)
             ,(ecase ref-or-set
                (:ref
-                '(sb!di:debug-var-value (car vars) *current-frame*))
+                '(debug-var-value (car vars) *current-frame*))
                (:set
-                `(setf (sb!di:debug-var-value (car vars) *current-frame*)
+                `(setf (debug-var-value (car vars) *current-frame*)
                        ,value-var))))
            (t
             ;; Since we have more than one, first see whether we have
@@ -1296,7 +1296,7 @@ forms that explicitly control this kind of evaluation.")
                    ;; FIXME: REMOVE-IF-NOT is deprecated, use STRING/=
                    ;; instead.
                    (exact (remove-if-not (lambda (v)
-                                           (string= (sb!di:debug-var-symbol-name v)
+                                           (string= (debug-var-symbol-name v)
                                                     name))
                                          vars))
                    (vars (or exact vars)))
@@ -1307,9 +1307,9 @@ forms that explicitly control this kind of evaluation.")
                ((= (length vars) 1)
                 ,(ecase ref-or-set
                    (:ref
-                    '(sb!di:debug-var-value (car vars) *current-frame*))
+                    '(debug-var-value (car vars) *current-frame*))
                    (:set
-                    `(setf (sb!di:debug-var-value (car vars) *current-frame*)
+                    `(setf (debug-var-value (car vars) *current-frame*)
                            ,value-var))))
                ;; If there weren't any exact matches, flame about
                ;; ambiguity unless all the variables have the same
@@ -1317,33 +1317,33 @@ forms that explicitly control this kind of evaluation.")
                ((and (not exact)
                      (find-if-not
                       (lambda (v)
-                        (string= (sb!di:debug-var-symbol-name v)
-                                 (sb!di:debug-var-symbol-name (car vars))))
+                        (string= (debug-var-symbol-name v)
+                                 (debug-var-symbol-name (car vars))))
                       (cdr vars)))
                 (error "specification ambiguous:~%~{   ~A~%~}"
-                       (mapcar #'sb!di:debug-var-symbol-name
+                       (mapcar #'debug-var-symbol-name
                                (delete-duplicates
                                 vars :test #'string=
-                                :key #'sb!di:debug-var-symbol-name))))
+                                :key #'debug-var-symbol-name))))
                ;; All names are the same, so see whether the user
                ;; ID'ed one of them.
                (id-supplied
-                (let ((v (find id vars :key #'sb!di:debug-var-id)))
+                (let ((v (find id vars :key #'debug-var-id)))
                   (unless v
                     (error
                      "invalid variable ID, ~W: should have been one of ~S"
                      id
-                     (mapcar #'sb!di:debug-var-id vars)))
+                     (mapcar #'debug-var-id vars)))
                   ,(ecase ref-or-set
                      (:ref
-                      '(sb!di:debug-var-value v *current-frame*))
+                      '(debug-var-value v *current-frame*))
                      (:set
-                      `(setf (sb!di:debug-var-value v *current-frame*)
+                      `(setf (debug-var-value v *current-frame*)
                              ,value-var)))))
                (t
                 (error "Specify variable ID to disambiguate ~S. Use one of ~S."
                        name
-                       (mapcar #'sb!di:debug-var-id vars)))))))))
+                       (mapcar #'debug-var-id vars)))))))))
 
 ) ; EVAL-WHEN
 
@@ -1392,11 +1392,11 @@ forms that explicitly control this kind of evaluation.")
                          (return (values (third ele) t)))))
         :deleted ((if (zerop n) (return (values ele t))))
         :rest ((let ((var (second ele)))
-                 (lambda-var-dispatch var (sb!di:frame-code-location
+                 (lambda-var-dispatch var (frame-code-location
                                            *current-frame*)
                    (error "unused &REST argument before n'th argument")
                    (dolist (value
-                            (sb!di:debug-var-value var *current-frame*)
+                            (debug-var-value var *current-frame*)
                             (error
                              "The argument specification ~S is out of range."
                              n))
@@ -1414,14 +1414,14 @@ forms that explicitly control this kind of evaluation.")
     (return-from arg
       (early-frame-nth-arg n *current-frame*)))
   (multiple-value-bind (var lambda-var-p)
-      (nth-arg n (handler-case (sb!di:debug-fun-lambda-list
-                                (sb!di:frame-debug-fun *current-frame*))
-                   (sb!di:lambda-list-unavailable ()
+      (nth-arg n (handler-case (debug-fun-lambda-list
+                                (frame-debug-fun *current-frame*))
+                   (lambda-list-unavailable ()
                      (error "No argument values are available."))))
     (if lambda-var-p
-        (lambda-var-dispatch var (sb!di:frame-code-location *current-frame*)
+        (lambda-var-dispatch var (frame-code-location *current-frame*)
           (error "Unused arguments have no values.")
-          (sb!di:debug-var-value var *current-frame*)
+          (debug-var-value var *current-frame*)
           (error "invalid argument value"))
         var)))
 
@@ -1517,7 +1517,7 @@ forms that explicitly control this kind of evaluation.")
 ;;;; frame-changing commands
 
 (!def-debug-command "UP" ()
-  (let ((next (sb!di:frame-up *current-frame*)))
+  (let ((next (frame-up *current-frame*)))
     (cond (next
            (setf *current-frame* next)
            (print-frame-call next *debug-io*))
@@ -1525,7 +1525,7 @@ forms that explicitly control this kind of evaluation.")
            (format *debug-io* "~&Top of stack.")))))
 
 (!def-debug-command "DOWN" ()
-  (let ((next (sb!di:frame-down *current-frame*)))
+  (let ((next (frame-down *current-frame*)))
     (cond (next
            (setf *current-frame* next)
            (print-frame-call next *debug-io*))
@@ -1536,7 +1536,7 @@ forms that explicitly control this kind of evaluation.")
 
 (!def-debug-command "BOTTOM" ()
   (do ((prev *current-frame* lead)
-       (lead (sb!di:frame-down *current-frame*) (sb!di:frame-down lead)))
+       (lead (frame-down *current-frame*) (frame-down lead)))
       ((null lead)
        (setf *current-frame* prev)
        (print-frame-call prev *debug-io*))))
@@ -1547,11 +1547,11 @@ forms that explicitly control this kind of evaluation.")
                              (n (read-prompting-maybe "frame number: ")))
   (setf *current-frame*
         (multiple-value-bind (next-frame-fun limit-string)
-            (if (< n (sb!di:frame-number *current-frame*))
-                (values #'sb!di:frame-up "top")
-              (values #'sb!di:frame-down "bottom"))
+            (if (< n (frame-number *current-frame*))
+                (values #'frame-up "top")
+              (values #'frame-down "bottom"))
           (do ((frame *current-frame*))
-              ((= n (sb!di:frame-number frame))
+              ((= n (frame-number frame))
                frame)
             (let ((next-frame (funcall next-frame-fun frame)))
               (cond (next-frame
@@ -1626,23 +1626,23 @@ forms that explicitly control this kind of evaluation.")
 (!def-debug-command-alias "P" "PRINT")
 
 (!def-debug-command "LIST-LOCALS" ()
-  (let ((d-fun (sb!di:frame-debug-fun *current-frame*)))
+  (let ((d-fun (frame-debug-fun *current-frame*)))
     #!+sb-fasteval
-    (when (typep (sb!di:debug-fun-name d-fun nil)
+    (when (typep (debug-fun-name d-fun nil)
                  '(cons (eql sb!interpreter::.eval.)))
       (let ((env (arg 1)))
         (when (typep env 'sb!interpreter:basic-env)
           (return-from list-locals-debug-command
             (sb!interpreter:list-locals env)))))
-    (if (sb!di:debug-var-info-available d-fun)
+    (if (debug-var-info-available d-fun)
         (let ((*standard-output* *debug-io*)
-              (location (sb!di:frame-code-location *current-frame*))
+              (location (frame-code-location *current-frame*))
               (prefix (read-if-available nil))
               (any-p nil)
               (any-valid-p nil)
               (more-context nil)
               (more-count nil))
-          (dolist (v (sb!di:ambiguous-debug-vars
+          (dolist (v (ambiguous-debug-vars
                       d-fun
                       (if prefix (string prefix) "")))
             (setf any-p t)
@@ -1650,15 +1650,15 @@ forms that explicitly control this kind of evaluation.")
               (setf any-valid-p t)
               (case (sb!di::debug-var-info v)
                 (:more-context
-                 (setf more-context (sb!di:debug-var-value v *current-frame*)))
+                 (setf more-context (debug-var-value v *current-frame*)))
                 (:more-count
-                 (setf more-count (sb!di:debug-var-value v *current-frame*)))
+                 (setf more-count (debug-var-value v *current-frame*)))
                 (t
                  (format *debug-io* "~S~:[#~W~;~*~]  =  ~S~%"
-                         (sb!di:debug-var-symbol v)
-                         (zerop (sb!di:debug-var-id v))
-                         (sb!di:debug-var-id v)
-                         (sb!di:debug-var-value v *current-frame*))))))
+                         (debug-var-symbol v)
+                         (zerop (debug-var-id v))
+                         (debug-var-id v)
+                         (debug-var-value v *current-frame*))))))
           (when (and more-context more-count)
             (format *debug-io* "~S  =  ~S~%"
                     'more
@@ -1680,7 +1680,7 @@ forms that explicitly control this kind of evaluation.")
 (!def-debug-command-alias "L" "LIST-LOCALS")
 
 (!def-debug-command "SOURCE" ()
-  (print (code-location-source-form (sb!di:frame-code-location *current-frame*)
+  (print (code-location-source-form (frame-code-location *current-frame*)
                                     (read-if-available 0))
          *debug-io*))
 
@@ -1688,12 +1688,12 @@ forms that explicitly control this kind of evaluation.")
 
 (defun code-location-source-form (location context &optional (errorp t))
   (let* ((start-location (maybe-block-start-location location))
-         (form-num (sb!di:code-location-form-number start-location)))
+         (form-num (code-location-form-number start-location)))
     (multiple-value-bind (translations form)
-        (sb!di:get-toplevel-form start-location)
+        (get-toplevel-form start-location)
       (declare (notinline warn))
       (cond ((< form-num (length translations))
-             (sb!di:source-path-context form
+             (source-path-context form
                                         (svref translations form-num)
                                         context))
             (t
@@ -1740,9 +1740,9 @@ forms that explicitly control this kind of evaluation.")
 ;;; miscellaneous commands
 
 (!def-debug-command "DESCRIBE" ()
-  (let* ((curloc (sb!di:frame-code-location *current-frame*))
-         (debug-fun (sb!di:code-location-debug-fun curloc))
-         (function (sb!di:debug-fun-fun debug-fun)))
+  (let* ((curloc (frame-code-location *current-frame*))
+         (debug-fun (code-location-debug-fun curloc))
+         (function (debug-fun-fun debug-fun)))
     (if function
         (describe function)
         (format *debug-io* "can't figure out the function for this frame"))))
@@ -1784,15 +1784,15 @@ forms that explicitly control this kind of evaluation.")
                            (funcall thunk)))))
   #!-unwind-to-frame-and-call-vop
   (let ((tag (gensym)))
-    (sb!di:replace-frame-catch-tag frame
+    (replace-frame-catch-tag frame
                                    'sb!c:debug-catch-tag
                                    tag)
     (throw tag thunk)))
 
 #!+unwind-to-frame-and-call-vop
 (defun find-binding-stack-pointer (frame)
-  (let ((debug-fun (sb!di:frame-debug-fun frame)))
-    (if (eq (sb!di:debug-fun-kind debug-fun) :external)
+  (let ((debug-fun (frame-debug-fun frame)))
+    (if (eq (debug-fun-kind debug-fun) :external)
         ;; XEPs do not bind anything, nothing to restore.
         ;; But they may call other code through SATISFIES
         ;; declaration, check that the interrupt is actually in the XEP.
@@ -1847,9 +1847,9 @@ forms that explicitly control this kind of evaluation.")
                               (return (read-prompting-maybe
                                        "return: ")))
    (if (frame-has-debug-tag-p *current-frame*)
-       (let* ((code-location (sb!di:frame-code-location *current-frame*))
+       (let* ((code-location (frame-code-location *current-frame*))
               (values (multiple-value-list
-                       (funcall (sb!di:preprocess-for-eval return code-location)
+                       (funcall (preprocess-for-eval return code-location)
                                 *current-frame*))))
          (unwind-to-frame-and-call *current-frame* (lambda ()
                                                      (values-list values))))
@@ -1864,7 +1864,7 @@ forms that explicitly control this kind of evaluation.")
         (multiple-value-bind (fun arglist ok)
             (if (and (legal-fun-name-p fname) (fboundp fname))
                 (values (fdefinition fname) args t)
-                (values (sb!di:debug-fun-fun (sb!di:frame-debug-fun *current-frame*))
+                (values (debug-fun-fun (frame-debug-fun *current-frame*))
                         (frame-args-as-list *current-frame*)
                         nil))
           (when (and fun
@@ -1896,9 +1896,9 @@ forms that explicitly control this kind of evaluation.")
   (find 'sb!c:debug-catch-tag (sb!di::frame-catches frame) :key #'car))
 
 (defun frame-has-debug-vars-p (frame)
-  (sb!di:debug-var-info-available
-   (sb!di:code-location-debug-fun
-    (sb!di:frame-code-location frame))))
+  (debug-var-info-available
+   (code-location-debug-fun
+    (frame-code-location frame))))
 
 ;;;; debug loop command utilities
 

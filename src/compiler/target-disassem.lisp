@@ -1127,9 +1127,9 @@
 
 (defstruct (source-form-cache (:conc-name sfcache-)
                               (:copier nil))
-  (debug-source nil :type (or null sb!di:debug-source))
+  (debug-source nil :type (or null debug-source))
   (toplevel-form-index -1 :type fixnum)
-  (last-location-retrieved nil :type (or null sb!di:code-location))
+  (last-location-retrieved nil :type (or null code-location))
   (last-form-retrieved -1 :type fixnum))
 
 ;;; Return a memory segment located at the system-area-pointer returned by
@@ -1152,7 +1152,7 @@
   (declare (type (function () system-area-pointer) sap-maker)
            (type disassem-length length)
            (type (or null address) virtual-location)
-           (type (or null sb!di:debug-fun) debug-fun)
+           (type (or null debug-fun) debug-fun)
            (type (or null source-form-cache) source-form-cache))
   (let ((segment
           (%make-segment
@@ -1214,23 +1214,23 @@
 
 (defun get-different-source-form (loc context &optional cache)
   (if (and cache
-           (eq (sb!di:code-location-debug-source loc)
+           (eq (code-location-debug-source loc)
                (sfcache-debug-source cache))
-           (eq (sb!di:code-location-toplevel-form-offset loc)
+           (eq (code-location-toplevel-form-offset loc)
                (sfcache-toplevel-form-index cache))
-           (or (eql (sb!di:code-location-form-number loc)
+           (or (eql (code-location-form-number loc)
                     (sfcache-last-form-retrieved cache))
                (awhen (sfcache-last-location-retrieved cache)
-                 (sb!di:code-location= loc it))))
+                 (code-location= loc it))))
       (values nil nil)
       (let ((form (sb!debug::code-location-source-form loc context nil)))
         (when cache
           (setf (sfcache-debug-source cache)
-                (sb!di:code-location-debug-source loc))
+                (code-location-debug-source loc))
           (setf (sfcache-toplevel-form-index cache)
-                (sb!di:code-location-toplevel-form-offset loc))
+                (code-location-toplevel-form-offset loc))
           (setf (sfcache-last-form-retrieved cache)
-                (sb!di:code-location-form-number loc))
+                (code-location-form-number loc))
           (setf (sfcache-last-location-retrieved cache) loc))
         (values form t))))
 
@@ -1299,7 +1299,7 @@
 ;;; Return a STORAGE-INFO struction describing the object-to-source
 ;;; variable mappings from DEBUG-FUN.
 (defun storage-info-for-debug-fun (debug-fun)
-  (declare (type sb!di:debug-fun debug-fun))
+  (declare (type debug-fun debug-fun))
   (let ((sc-vec sb!c::*backend-sc-numbers*)
         (groups nil)
         (debug-vars (sb!di::debug-fun-debug-vars debug-fun)))
@@ -1348,10 +1348,10 @@
 
 (defun source-available-p (debug-fun)
   (handler-case
-      (sb!di:do-debug-fun-blocks (block debug-fun)
+      (do-debug-fun-blocks (block debug-fun)
         (declare (ignore block))
         (return t))
-    (sb!di:no-debug-blocks () nil)))
+    (no-debug-blocks () nil)))
 
 (defun print-block-boundary (stream dstate)
   (let ((os (dstate-output-state dstate)))
@@ -1366,7 +1366,7 @@
 ;;; structure, in which case it is used to cache forms from files.
 (defun add-source-tracking-hooks (segment debug-fun &optional sfcache)
   (declare (type segment segment)
-           (type (or null sb!di:debug-fun) debug-fun)
+           (type (or null debug-fun) debug-fun)
            (type (or null source-form-cache) sfcache))
   (let ((last-block-pc -1))
     (flet ((add-hook (pc fun &optional before-address)
@@ -1376,9 +1376,9 @@
                     :before-address before-address)
                    (seg-hooks segment))))
       (handler-case
-          (sb!di:do-debug-fun-blocks (block debug-fun)
+          (do-debug-fun-blocks (block debug-fun)
             (let ((first-location-in-block-p t))
-              (sb!di:do-debug-block-locations (loc block)
+              (do-debug-block-locations (loc block)
                 (let ((pc (sb!di::compiled-code-location-pc loc)))
 
                   ;; Put blank lines in at block boundaries
@@ -1393,7 +1393,7 @@
 
                   ;; Print out corresponding source; this information is not
                   ;; all that accurate, but it's better than nothing
-                  (unless (zerop (sb!di:code-location-form-number loc))
+                  (unless (zerop (code-location-form-number loc))
                     (multiple-value-bind (form new)
                         (get-different-source-form loc 0 sfcache)
                       (when new
@@ -1406,7 +1406,7 @@
                                 (unless at-block-begin
                                   (terpri stream))
                                 (format stream ";;; [~W] "
-                                        (sb!di:code-location-form-number
+                                        (code-location-form-number
                                          loc))
                                 (prin1-short form stream)
                                 (terpri stream)
@@ -1430,7 +1430,7 @@
                                          live-set)))
                              dstate))))
                   ))))
-        (sb!di:no-debug-blocks () nil)))))
+        (no-debug-blocks () nil)))))
 
 (defvar *disassemble-annotate* nil
   "Annotate DISASSEMBLE output with source code.")
@@ -1441,7 +1441,7 @@
           (storage-info-for-debug-fun debug-fun))
     (when *disassemble-annotate*
       (add-source-tracking-hooks segment debug-fun sfcache))
-    (let ((kind (sb!di:debug-fun-kind debug-fun)))
+    (let ((kind (debug-fun-kind debug-fun)))
       (flet ((add-new-hook (n)
                (push (make-offs-hook
                       :offset 0
@@ -2076,7 +2076,7 @@
          (find-valid-storage-location offset sc-name dstate)))
     (when storage-location
       (note (lambda (stream)
-              (princ (sb!di:debug-var-symbol
+              (princ (debug-var-symbol
                       (aref (storage-info-debug-vars
                              (seg-storage-info (dstate-segment dstate)))
                             storage-location))
@@ -2100,7 +2100,7 @@
       (note (lambda (stream)
               (format stream "~A = ~S"
                       assoc-with
-                      (sb!di:debug-var-symbol
+                      (debug-var-symbol
                        (aref (dstate-debug-vars dstate)
                              storage-location))))
             dstate)

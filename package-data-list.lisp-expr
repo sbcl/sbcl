@@ -442,7 +442,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
 basic stuff like BACKTRACE and ARG. For now, the actual supported interface
 is still mixed indiscriminately with low-level internal implementation stuff
 like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
-      :use ("CL" "SB!EXT" "SB!INT" "SB!SYS" "SB!KERNEL")
+      :use ("CL" "SB!EXT" "SB!INT" "SB!SYS" "SB!KERNEL" "SB!DI")
       :reexport ("*DEBUG-PRINT-VARIABLE-ALIST*")
       :export ("*BACKTRACE-FRAME-COUNT*"
                "*DEBUG-BEGINNER-HELP-P*"
@@ -516,7 +516,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
    #s(sb-cold:package-data
       :name "SB!DISASSEM"
       :doc "private: stuff related to the implementation of the disassembler"
-      :use ("CL" "SB!EXT" "SB!INT" "SB!SYS" "SB!KERNEL")
+      :use ("CL" "SB!EXT" "SB!INT" "SB!SYS" "SB!KERNEL" "SB!DI")
       :export ("+DISASSEM-INST-ALIGNMENT-BYTES+"
                "*DISASSEM-NOTE-COLUMN*" "*DISASSEM-OPCODE-COLUMN-WIDTH*"
                "*DISASSEM-LOCATION-COLUMN-WIDTH*"
