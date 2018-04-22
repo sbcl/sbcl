@@ -222,10 +222,10 @@
      ;; arbitrary object that changes after each GC
      sb!kernel::*gc-epoch*
      ;; Dispatch tables for generic array access
-     sb!impl::%%data-vector-reffers%%
-     sb!impl::%%data-vector-reffers/check-bounds%%
-     sb!impl::%%data-vector-setters%%
-     sb!impl::%%data-vector-setters/check-bounds%%))
+     %%data-vector-reffers%%
+     %%data-vector-reffers/check-bounds%%
+     %%data-vector-setters%%
+     %%data-vector-setters/check-bounds%%))
   #'equalp)
 
 ;;; Number of entries in the thread local storage. Limits the number

@@ -129,7 +129,7 @@
   (show-and-call !random-cold-init)
 
   ;; Must be done before any non-opencoded array references are made.
-  (show-and-call !hairy-data-vector-reffer-init)
+  (show-and-call sb!vm::!hairy-data-vector-reffer-init)
 
   (show-and-call !character-database-cold-init)
   (show-and-call !character-name-database-cold-init)
