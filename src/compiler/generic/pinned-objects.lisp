@@ -11,7 +11,7 @@
 
 (in-package "SB!VM")
 
-(sb!xc:defmacro with-pinned-objects ((&rest objects) &body body)
+(defmacro with-pinned-objects ((&rest objects) &body body)
   #.(concatenate 'string
   "Arrange with the garbage collector that the pages occupied by
 OBJECTS will not be moved in memory for the duration of BODY.

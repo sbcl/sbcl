@@ -205,6 +205,7 @@
   ;; Define at most one INTERPRETED-FUNCTION type based on target features
  #!+sb-eval ("src/code/early-full-eval" :not-host)
  #!+sb-fasteval ("src/interpreter/function" :not-host)
+ ("src/compiler/generic/pinned-objects" :not-host)
 
  ("src/code/target-sxhash" :not-host) ; needs most-fooative-foo-float constants
 
@@ -503,7 +504,6 @@
  ("src/compiler/target-dstate" :not-host)
  ("src/compiler/target/insts")
  ("src/compiler/target/macros")
- ("src/compiler/generic/pinned-objects")
  ("src/compiler/generic/early-type-vops")
 
  ("src/assembly/target/support")
