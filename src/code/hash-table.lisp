@@ -98,24 +98,6 @@
 ;; the generational garbage collector needs to know it.
 (defconstant +magic-hash-vector-value+ (ash 1 (1- sb!vm:n-word-bits)))
 
-(sb!xc:defmacro with-locked-hash-table ((hash-table) &body body)
-  "Limits concurrent accesses to HASH-TABLE for the duration of BODY.
-If HASH-TABLE is synchronized, BODY will execute with exclusive
-ownership of the table. If HASH-TABLE is not synchronized, BODY will
-execute with other WITH-LOCKED-HASH-TABLE bodies excluded -- exclusion
-of hash-table accesses not surrounded by WITH-LOCKED-HASH-TABLE is
-unspecified."
-  ;; Needless to say, this also excludes some internal bits, but
-  ;; getting there is too much detail when "unspecified" says what
-  ;; is important -- unpredictable, but harmless.
-  `(sb!thread::with-recursive-lock ((hash-table-lock ,hash-table))
-     ,@body))
-
-(sb!xc:defmacro with-locked-system-table ((hash-table) &body body)
-  `(sb!thread::with-recursive-system-lock
-       ((hash-table-lock ,hash-table))
-     ,@body))
-
 ;;; Return an association list representing the same data as HASH-TABLE.
 (defun %hash-table-alist (hash-table)
   (let ((result nil))
