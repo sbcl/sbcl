@@ -64,7 +64,16 @@ echo //checking for leftover cold-init symbols
                       (search "!" (string obj)))
              (push obj l)))
          :all)
-        (format t "Found ~D:~%~S~%" (length l) l))
+        (format t "Found ~D:~%~S~%" (length l) l)
+        (sb-int:awhen
+          (mapcan (quote apropos-list)
+           (quote ("DEFINE-INFO-TYPE" "LVAR-TYPE-USING"
+                   "COPY-LIST-MACRO" "TWO-ARG-+/-"
+                   "SUBTRACT-BIGNUM-LOOP" "BIGNUM-REPLACE" "WITH-BIGNUM-BUFFERS"
+                   "GCD-ASSERT" "MODULARLY" "BIGNUM-NEGATE-LOOP"
+                   "SHIFT-RIGHT-UNALIGNED"
+                   "STRING-LESS-GREATER-EQUAL-TESTS")))
+         (format t "~&Leftover from [disabled?] tree-shaker:~%~S~%" sb-int:it)))
     (abort ()
       :report "Abort building SBCL."
       (sb-ext:exit :code 1)))' --quit

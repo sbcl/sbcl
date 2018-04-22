@@ -40,14 +40,13 @@
 ;;; a SIMPLE-VECTOR set by GENESIS
 (defvar *!load-time-values*)
 
-(eval-when (:compile-toplevel :execute)
   ;; FIXME: Perhaps we should make SHOW-AND-CALL-AND-FMAKUNBOUND, too,
   ;; and use it for most of the cold-init functions. (Just be careful
   ;; not to use it for the COLD-INIT-OR-REINIT functions.)
-  (sb!xc:defmacro show-and-call (name)
+(defmacro show-and-call (name)
     `(progn
        (/primitive-print ,(symbol-name name))
-       (,name))))
+       (,name)))
 
 (defun !encapsulate-stuff-for-cold-init (&aux names)
   (flet ((encapsulate-1 (name handler)

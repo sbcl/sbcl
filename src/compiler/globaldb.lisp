@@ -124,15 +124,10 @@
 ;;;  :DEFAULT (CONSTANTLY #'<a-function-name>) to adhere to the convention
 ;;; that default objects satisfying FUNCTIONP will always be funcalled.
 ;;;
-(eval-when (:compile-toplevel :execute)
-;; This convoluted idiom creates a macro that disappears from the target,
-;; kind of an alternative to the "!" name convention.
-(#+sb-xc-host defmacro
- #-sb-xc-host sb!xc:defmacro
-    define-info-type ((category kind)
-                       &key (type-spec (missing-arg))
-                            (validate-function)
-                            default)
+(defmacro define-info-type ((category kind)
+                            &key (type-spec (missing-arg))
+                                 (validate-function)
+                                 default)
   (declare (type keyword category kind))
   ;; There was formerly a remark that (COPY-TREE TYPE-SPEC) ensures repeatable
   ;; fasls. That's not true now, probably never was. A compiler is permitted to
@@ -146,7 +141,9 @@
            ;; Rationale for hardcoding here is explained at INFO-VECTOR-FDEFN.
            ,(or (and (eq category :function) (eq kind :definition)
                      +fdefn-info-num+)
-                #+sb-xc (meta-info-number (meta-info category kind))))))
+                #+sb-xc (meta-info-number (meta-info category kind)))))
+;; It's an external symbol of SB-INT so wouldn't be removed automatically
+(push '("SB-INT" define-info-type) sb!impl::*!removable-symbols*)
 
 
 (macrolet ((meta-info-or-lose (category kind)

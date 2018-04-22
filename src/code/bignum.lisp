@@ -325,12 +325,10 @@
 
 ;;;; subtraction
 
-(eval-when (:compile-toplevel :execute)
-
 ;;; This subtracts b from a plugging result into res. Return-fun is the
 ;;; function to call that fixes up the result returning any useful values, such
 ;;; as the result. This macro may evaluate its arguments more than once.
-(sb!xc:defmacro subtract-bignum-loop (a len-a b len-b res len-res return-fun)
+(defmacro subtract-bignum-loop (a len-a b len-b res len-res return-fun)
   (with-unique-names (borrow a-digit a-sign b-digit b-sign i v k)
     `(let* ((,borrow 1)
             (,a-sign (%sign-digit ,a ,len-a))
@@ -346,8 +344,6 @@
              (setf (%bignum-ref ,res ,i) ,v)
              (setf ,borrow ,k))))
        (,return-fun ,res ,len-res))))
-
-) ;EVAL-WHEN
 
 (defun subtract-bignum (a b)
   (declare (type bignum a b))
@@ -455,10 +451,7 @@
 
 ;;;; BIGNUM-REPLACE and WITH-BIGNUM-BUFFERS
 
-(eval-when (:compile-toplevel :execute)
-
-(sb!xc:defmacro bignum-replace (dest
-                                src
+(defmacro bignum-replace (dest src
                                 &key
                                 (start1 '0)
                                 end1
@@ -492,7 +485,7 @@
                     (declare (type bignum-index ,i1 ,i2))
                     (%bignum-set ,n-dest ,i1 (%bignum-ref ,n-src ,i2))))))))))
 
-(sb!xc:defmacro with-bignum-buffers (specs &body body)
+(defmacro with-bignum-buffers (specs &body body)
   "WITH-BIGNUM-BUFFERS ({(var size [init])}*) Form*"
   (collect ((binds) (inits))
     (dolist (spec specs)
@@ -505,20 +498,17 @@
     `(let* ,(binds)
        ,@(inits)
        ,@body)))
-
-) ;EVAL-WHEN
 
 ;;;; GCD
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
   ;; The asserts in the GCD implementation are way too expensive to
   ;; check in normal use, and are disabled here.
-  (sb!xc:defmacro gcd-assert (&rest args)
-    (declare (ignore args))
-    #+sb-bignum-assertions `(assert ,@args))
+(defmacro gcd-assert (&rest args)
+  (declare (ignore args))
+  #+sb-bignum-assertions `(assert ,@args))
   ;; We'll be doing a lot of modular arithmetic.
-  (sb!xc:defmacro modularly (form)
-    `(logand all-ones-digit ,form)))
+(defmacro modularly (form)
+  `(logand all-ones-digit ,form))
 
 ;;; I'm not sure why I need this FTYPE declaration.  Compiled by the
 ;;; target compiler, it can deduce the return type fine, but without
@@ -881,11 +871,9 @@
 
 ;;;; negation
 
-(eval-when (:compile-toplevel :execute)
-
 ;;; This negates bignum-len digits of bignum, storing the resulting digits into
 ;;; result (possibly EQ to bignum) and returning whatever end-carry there is.
-(sb!xc:defmacro bignum-negate-loop
+(defmacro bignum-negate-loop
     (bignum bignum-len &optional (result nil resultp))
   (with-unique-names (carry end value last)
     `(let* (,@(if (not resultp) `(,last))
@@ -911,8 +899,6 @@
            (setf ,carry temp))
          (incf i))
        ,(if resultp carry `(values ,carry ,last)))))
-
-) ; EVAL-WHEN
 
 ;;; Fully-normalize is an internal optional. It cause this to always return
 ;;; a bignum, without any extraneous digits, and it never returns a fixnum.
@@ -946,8 +932,6 @@
 
 ;;;; shifting
 
-(eval-when (:compile-toplevel :execute)
-
 ;;; This macro is used by BIGNUM-ASHIFT-RIGHT, BIGNUM-BUFFER-ASHIFT-RIGHT, and
 ;;; BIGNUM-LDB-BIGNUM-RES. They supply a termination form that references
 ;;; locals established by this form. Source is the source bignum. Start-digit
@@ -960,7 +944,7 @@
 ;;; Given start-pos, 1-31 inclusively, of shift, we form the j'th resulting
 ;;; digit from high bits of the i'th source digit and the start-pos number of
 ;;; bits from the i+1'th source digit.
-(sb!xc:defmacro shift-right-unaligned (source
+(defmacro shift-right-unaligned (source
                                        start-digit
                                        start-pos
                                        res-len-form
@@ -980,8 +964,6 @@
                                                   ,start-pos)
                       (%ashl (%bignum-ref ,source (1+ i))
                              high-bits-in-first-digit))))))
-
-) ; EVAL-WHEN
 
 ;;; First compute the number of whole digits to shift, shifting them by
 ;;; skipping them when we start to pick up bits, and the number of bits to
@@ -1979,3 +1961,12 @@
                       (logxor xi
                               (ash xi -7))))))
     result))
+
+;;; NEGATE-BIGNUM-BUFFER-IN-PLACE has an inline expansion that is not expected
+;;; to be used post-build. It references the BIGNUM-NEGATE-LOOP macro,
+;;; which had been deliberately excluded from the target due to a surrounding
+;;; (EVAL-WHEN (:COMPILE-TOPLEVEL :EXECUTE) ...) form.
+(let ((s 'negate-bignum-buffer-in-place))
+  (clear-info :function :inlining-data s)
+  (clear-info :function :inlinep s)
+  (clear-info :source-location :declaration s))

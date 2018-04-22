@@ -395,9 +395,7 @@
   (declare (explicit-check))
   (1- number))
 
-(eval-when (:compile-toplevel)
-
-(sb!xc:defmacro two-arg-+/- (name op big-op)
+(defmacro two-arg-+/- (name op big-op)
   `(defun ,name (x y)
      (number-dispatch ((x number) (y number))
        (bignum-cross-fixnum ,op ,big-op)
@@ -438,8 +436,6 @@
                                 (t3 (truncate dy g2))
                                 (nd (if (eql t2 1) t3 (* t2 t3))))
                            (if (eql nd 1) nn (%make-ratio nn nd))))))))))))
-
-) ; EVAL-WHEN
 
 (two-arg-+/- two-arg-+ + add-bignums)
 (two-arg-+/- two-arg-- - subtract-bignum)

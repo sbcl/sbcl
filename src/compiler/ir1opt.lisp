@@ -62,10 +62,7 @@
 ;;; The result value is cached in the LVAR-%DERIVED-TYPE slot. If the
 ;;; slot is true, just return that value, otherwise recompute and
 ;;; stash the value there.
-(eval-when (:compile-toplevel :execute)
-  (#+sb-xc-host cl:defmacro
-   #-sb-xc-host sb!xc:defmacro
-        lvar-type-using (lvar accessor)
+(defmacro lvar-type-using (lvar accessor)
      `(let ((uses (lvar-uses ,lvar)))
         (cond ((null uses) *empty-type*)
               ((listp uses)
@@ -76,7 +73,7 @@
                    ((or (null current) (eq res *wild-type*))
                     res)))
               (t
-               (,accessor uses))))))
+               (,accessor uses)))))
 
 (defun %lvar-derived-type (lvar)
   (lvar-type-using lvar node-derived-type))

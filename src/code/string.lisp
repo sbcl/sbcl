@@ -9,8 +9,7 @@
 
 (in-package "SB!IMPL")
 
-(eval-when (:compile-toplevel)
-  (sb!xc:defmacro %string (x) `(if (stringp ,x) ,x (string ,x))))
+(defmacro %string (x) `(if (stringp ,x) ,x (string ,x)))
 
 (defun string (x)
   "Coerces X into a string. If X is a string, X is returned. If X is a
@@ -35,11 +34,10 @@
 (defun %check-vector-sequence-bounds (vector start end)
   (%check-vector-sequence-bounds vector start end))
 
-(eval-when (:compile-toplevel)
 ;;; WITH-ONE-STRING is used to set up some string hacking things. The
 ;;; keywords are parsed, and the string is hacked into a
 ;;; simple-string.
-(sb!xc:defmacro with-one-string ((string start end) &body forms)
+(defmacro with-one-string ((string start end) &body forms)
   `(let ((,string (%string ,string)))
      (with-array-data ((,string ,string)
                        (,start ,start)
@@ -48,8 +46,8 @@
        ,@forms)))
 ;;; WITH-TWO-STRINGS is used to set up string comparison operations. The
 ;;; keywords are parsed, and the strings are hacked into SIMPLE-STRINGs.
-(sb!xc:defmacro with-two-strings (string1 string2 start1 end1 cum-offset-1
-                                  start2 end2 &rest forms)
+(defmacro with-two-strings (string1 string2 start1 end1 cum-offset-1
+                            start2 end2 &rest forms)
   `(let ((,string1 (%string ,string1))
          (,string2 (%string ,string2)))
      (with-array-data ((,string1 ,string1 :offset-var ,cum-offset-1)
@@ -62,7 +60,7 @@
                          :check-fill-pointer t)
          ,@forms))))
 
-(sb!xc:defmacro with-two-arg-strings (string1 string2 start1 end1 cum-offset-1
+(defmacro with-two-arg-strings (string1 string2 start1 end1 cum-offset-1
                                       start2 end2 &rest forms)
   `(let ((,string1 (%string ,string1))
          (,string2 (%string ,string2)))
@@ -75,8 +73,6 @@
                          (,end2)
                          :check-fill-pointer t)
          ,@forms))))
-
-) ; EVAL-WHEN
 
 (defun char (string index)
   "Given a string and a non-negative integer index less than the length of
@@ -187,11 +183,9 @@
                                           string2 start2 end2)))
       (if comparison (- (the fixnum comparison) offset1)))))
 
-(eval-when (:compile-toplevel :execute)
-
 ;;; LESSP is true if the desired expansion is for STRING<* or STRING<=*.
 ;;; EQUALP is true if the desired expansion is for STRING<=* or STRING>=*.
-(sb!xc:defmacro string<>=*-body (lessp equalp)
+(defmacro string<>=*-body (lessp equalp)
   (let ((offset1 (gensym)))
     `(with-two-strings string1 string2 start1 end1 ,offset1 start2 end2
        (let ((index (%sp-string-compare string1 start1 end1
@@ -212,7 +206,6 @@
                     (- (the fixnum index) ,offset1))
                    (t nil))
              ,(if equalp `(- (the fixnum end1) ,offset1) nil))))))
-) ; EVAL-WHEN
 
 (defun string<* (string1 string2 start1 end1 start2 end2)
   (declare (fixnum start1 start2))
@@ -292,12 +285,9 @@
 (defun two-arg-string/= (string1 string2)
   (string/=* string1 string2 0 nil 0 nil))
 
-(eval-when (:compile-toplevel :execute)
-
 ;;; STRING-NOT-EQUAL-LOOP is used to generate character comparison loops for
 ;;; STRING-EQUAL and STRING-NOT-EQUAL.
-(sb!xc:defmacro string-not-equal-loop (end
-                                       end-value
+(defmacro string-not-equal-loop (end end-value
                                        &optional (abort-value nil abortp))
   (declare (fixnum end))
   (let ((end-test (if (= end 1)
@@ -318,8 +308,6 @@
                         (schar string1 index1)
                         (schar string2 index2)))
                   (return ,abort-value)))))))
-
-) ; EVAL-WHEN
 
 (defun string-equal (string1 string2 &key (start1 0) end1 (start2 0) end2)
   "Given two strings (string1 and string2), and optional integers start1,
@@ -369,7 +357,7 @@
             (t
              (string-not-equal-loop 2 (- index1 offset1)))))))
 
-(eval-when (:compile-toplevel :execute)
+(eval-when (:compile-toplevel :load-toplevel :execute)
 
 ;;; STRING-LESS-GREATER-EQUAL-TESTS returns a test on the lengths of string1
 ;;; and string2 and a test on the current characters from string1 and string2
@@ -386,8 +374,9 @@
           (values '>= `(not (char-lessp char1 char2)))
           ;; STRING-GREATERP
           (values '> `(char-greaterp char1 char2)))))
+) ; EVAL-WHEN
 
-(sb!xc:defmacro string-less-greater-equal (lessp equalp)
+(defmacro string-less-greater-equal (lessp equalp)
   (multiple-value-bind (length-test character-test)
       (string-less-greater-equal-tests lessp equalp)
     `(with-two-strings string1 string2 start1 end1 offset1 start2 end2
@@ -407,8 +396,6 @@
                (if ,character-test
                    (return (- index1 offset1))
                    (return ()))))))))
-
-) ; EVAL-WHEN
 
 (defun string-lessp* (string1 string2 start1 end1 start2 end2)
   (declare (fixnum start1 start2))

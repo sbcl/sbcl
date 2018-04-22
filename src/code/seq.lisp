@@ -552,7 +552,7 @@
     (the extended-sequence (values (sb!sequence:copy-seq sequence)))))
 
 (defun list-copy-seq* (sequence)
-  (!copy-list-macro sequence :check-proper-list t))
+  (copy-list-macro sequence :check-proper-list t))
 
 ;;;; FILL
 
