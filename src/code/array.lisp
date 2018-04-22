@@ -496,9 +496,6 @@
                  (setf (%array-fill-pointer-p array) nil
                        (%array-fill-pointer array) total-size))
              (setf (%array-available-elements array) total-size)
-             ;; Terrible name for this slot - we displace to the
-             ;; target array's header, if any, not the "ultimate"
-             ;; vector in the chain of displacements.
              (setf (%array-data array) data)
              (setf (%array-displaced-from array) nil)
              (cond (displaced-to
