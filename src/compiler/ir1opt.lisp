@@ -859,14 +859,11 @@
     ;; that callers should always use more stack space. You should really
     ;; only do that if you don't also need an arbitrarily long call chain.
     ;; MAP and friends are good examples where this pertains]
-    (when (or (policy node (= safety 0))
-              (or #+sb-xc-host t ; always trust our own code
-                  (let ((pkg
-                         (symbol-package (fun-name-block-name fun-name))))
-                    (or (eq pkg *cl-package*)
-                        ;; a poor heuristic. shoud use a bit in the package
-                        ;; to indicate that it's a system package
-                        (eql (mismatch "SB-" (package-name pkg)) 3)))))
+    (when #+sb-xc-host t ; always trust our own code
+          #-sb-xc-host
+          (or (package-locked-p ; callee "probably" won't get redefined
+               (symbol-package (fun-name-block-name fun-name)))
+              (policy node (= safety 0)))
       (dolist (arg-spec dxable-args)
         (when (symbolp arg-spec)
           ;; If there are keywords, we had better have a FUN-TYPE
