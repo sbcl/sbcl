@@ -264,6 +264,7 @@
         #.(find-package "SB-ASSEM")
         #.(find-package "SB-DISASSEM")
         #.(find-package "SB-IMPL")
+        #.(find-package "SB-PRETTY")
         #.(find-package "SB-KERNEL"))
        ;; Assume all and only external symbols must be retained
        (eq accessibility :external))

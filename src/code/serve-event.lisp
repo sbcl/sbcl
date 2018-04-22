@@ -57,7 +57,7 @@
 (!define-thread-local *descriptor-handlers* nil
   "List of all the currently active handlers for file descriptors")
 
-(sb!xc:defmacro with-descriptor-handlers (&body forms)
+(defmacro with-descriptor-handlers (&body forms)
   ;; FD-STREAM functionality can add and remove descriptors on it's
   ;; own, so getting an interrupt while modifying this and the
   ;; starting to recursively modify it could lose...
