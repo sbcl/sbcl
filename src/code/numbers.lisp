@@ -1303,8 +1303,9 @@ and the number of 0 bits if INTEGER is negative."
                        (setq temp (- u v))
                        (when (zerop temp)
                          (let ((res (ash u k)))
-                           (declare (type sb!vm:signed-word res)
-                                    (optimize (inhibit-warnings 3)))
+                           (declare (type sb!vm:signed-word res))
+                           ;; signed word to integer coercion -> return value
+                           (declare (muffle-conditions compiler-note))
                            (return res))))))
                 (declare (type (mod #.sb!vm:n-word-bits) k)
                          (type sb!vm:signed-word u v)))))

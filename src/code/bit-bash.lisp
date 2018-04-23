@@ -92,14 +92,16 @@
   (declare (type system-area-pointer sap)
            (type index offset)
            (values sb!vm:word)
-           (optimize (speed 3) (safety 0) #-sb-xc-host (inhibit-warnings 3)))
+           (muffle-conditions compiler-note) ; "unsigned word to integer coercion"
+           (optimize (speed 3) (safety 0)))
   (sap-ref-word sap (the index (ash offset sb!vm:word-shift))))
 (defun %set-word-sap-ref (sap offset value)
   (declare (type system-area-pointer sap)
            (type index offset)
            (type sb!vm:word value)
            (values sb!vm:word)
-           (optimize (speed 3) (safety 0) (inhibit-warnings 3)))
+           (muffle-conditions compiler-note) ; "unsigned word to integer coercion"
+           (optimize (speed 3) (safety 0)))
   (setf (sap-ref-word sap (the index (ash offset sb!vm:word-shift)))
         value))
 

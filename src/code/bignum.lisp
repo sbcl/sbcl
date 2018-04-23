@@ -1163,7 +1163,8 @@
 ;;; exponent and sign.
 (defun single-float-from-bits (bits exp plusp)
   (declare (fixnum exp))
-  (declare (optimize #-sb-xc-host (inhibit-warnings 3)))
+  ;; "float to pointer coercion -> return value"
+  (declare (muffle-conditions compiler-note))
   (let ((res (dpb exp
                   sb!vm:single-float-exponent-byte
                   (logandc2 (logand #xffffffff
@@ -1175,7 +1176,8 @@
          (logior res (ash -1 sb!vm:float-sign-shift))))))
 (defun double-float-from-bits (bits exp plusp)
   (declare (fixnum exp))
-  (declare (optimize #-sb-xc-host (inhibit-warnings 3)))
+  ;; "float to pointer coercion -> return value"
+  (declare (muffle-conditions compiler-note))
   (let ((hi (dpb exp
                  sb!vm:double-float-exponent-byte
                  (logandc2 (ecase sb!vm::n-word-bits
@@ -1190,7 +1192,6 @@
 #!+(and long-float x86)
 (defun long-float-from-bits (bits exp plusp)
   (declare (fixnum exp))
-  (declare (optimize #-sb-xc-host (inhibit-warnings 3)))
   (make-long-float
    (if plusp
        exp

@@ -3268,10 +3268,7 @@ register."
                    bpt)))))
 
 (defun signal-context-frame (signal-context)
-  (let* ((scp
-          (locally
-            (declare (optimize (inhibit-warnings 3)))
-            (sb!alien:sap-alien signal-context (* os-context-t))))
+  (let* ((scp (sb!alien:sap-alien signal-context (* os-context-t)))
          (cfp (int-sap (sb!vm:context-register scp sb!vm::cfp-offset))))
     (compute-calling-frame cfp
                            ;; KLUDGE: This argument is ignored on
@@ -3299,10 +3296,7 @@ register."
   ;; FIXME: This looks brittle: what if we are interrupted somewhere
   ;; here? ...or do we have interrupts disabled here?
   (delete-breakpoint-data data)
-  (let* ((scp
-          (locally
-            (declare (optimize (inhibit-warnings 3)))
-            (sb!alien:sap-alien signal-context (* os-context-t))))
+  (let* ((scp (sb!alien:sap-alien signal-context (* os-context-t)))
          (frame (signal-context-frame signal-context))
          (component (breakpoint-data-component data))
          (cookie (gethash component *fun-end-cookies*)))

@@ -387,8 +387,7 @@ null byte."
 (defun slot (alien slot)
   "Extract SLOT from the Alien STRUCT or UNION ALIEN. May be set with SETF."
   (declare (type alien-value alien)
-           (type symbol slot)
-           (optimize (inhibit-warnings 3)))
+           (type symbol slot))
   (let ((type (alien-value-type alien)))
     (etypecase type
       (alien-pointer-type
@@ -404,8 +403,7 @@ null byte."
 ;;; this when it can't figure out anything better.
 (defun %set-slot (alien slot value)
   (declare (type alien-value alien)
-           (type symbol slot)
-           (optimize (inhibit-warnings 3)))
+           (type symbol slot))
   (let ((type (alien-value-type alien)))
     (etypecase type
       (alien-pointer-type
@@ -420,8 +418,7 @@ null byte."
 ;;; Compute the address of the specified slot and return a pointer to it.
 (defun %slot-addr (alien slot)
   (declare (type alien-value alien)
-           (type symbol slot)
-           (optimize (inhibit-warnings 3)))
+           (type symbol slot))
   (let ((type (alien-value-type alien)))
     (etypecase type
       (alien-pointer-type
@@ -481,8 +478,7 @@ null byte."
    as the indices of the array element to access. If a pointer, one index can
    optionally be specified, giving the equivalent of C pointer arithmetic."
   (declare (type alien-value alien)
-           (type list indices)
-           (optimize (inhibit-warnings 3)))
+           (type list indices))
   (multiple-value-bind (target-type offset) (deref-guts alien indices)
     (%alien-value (alien-value-sap alien)
                   offset
@@ -490,8 +486,7 @@ null byte."
 
 (defun %set-deref (alien value &rest indices)
   (declare (type alien-value alien)
-           (type list indices)
-           (optimize (inhibit-warnings 3)))
+           (type list indices))
   (multiple-value-bind (target-type offset) (deref-guts alien indices)
     (setf (%alien-value (alien-value-sap alien)
                         offset
@@ -500,8 +495,7 @@ null byte."
 
 (defun %deref-addr (alien &rest indices)
   (declare (type alien-value alien)
-           (type list indices)
-           (optimize (inhibit-warnings 3)))
+           (type list indices))
   (multiple-value-bind (target-type offset) (deref-guts alien indices)
     (%sap-alien (sap+ (alien-value-sap alien) (/ offset sb!vm:n-byte-bits))
                 (make-alien-pointer-type :to target-type))))
@@ -509,23 +503,20 @@ null byte."
 ;;;; accessing heap alien variables
 
 (defun %heap-alien (info)
-  (declare (type heap-alien-info info)
-           (optimize (inhibit-warnings 3)))
+  (declare (type heap-alien-info info))
   (%alien-value (heap-alien-info-sap info)
                 0
                 (heap-alien-info-type info)))
 
 (defun %set-heap-alien (info value)
-  (declare (type heap-alien-info info)
-           (optimize (inhibit-warnings 3)))
+  (declare (type heap-alien-info info))
   (setf (%alien-value (heap-alien-info-sap info)
                       0
                       (heap-alien-info-type info))
         value))
 
 (defun %heap-alien-addr (info)
-  (declare (type heap-alien-info info)
-           (optimize (inhibit-warnings 3)))
+  (declare (type heap-alien-info info))
   (%sap-alien (heap-alien-info-sap info)
               (make-alien-pointer-type :to (heap-alien-info-type info))))
 
@@ -594,8 +585,7 @@ null byte."
 (defun %cast (alien target-type)
   (declare (type alien-value alien)
            (type alien-type target-type)
-           (optimize (safety 2))
-           (optimize (inhibit-warnings 3)))
+           (optimize (safety 2)))
   (if (or (alien-pointer-type-p target-type)
           (alien-array-type-p target-type)
           (alien-fun-type-p target-type))

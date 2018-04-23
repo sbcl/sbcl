@@ -18,7 +18,6 @@
 
 (proclaim '(optimize (compilation-speed 1)
                      (debug #+sb-show 2 #-sb-show 1)
-                     (inhibit-warnings 2)
                      (safety 2)
                      (space 1)
                      (speed 2)))
@@ -31,8 +30,6 @@
 
 
 ;;;; compiling and loading more of the system
-
-(load "src/cold/muffler.lisp")
 
 ;;; FIXME: CMU CL's pclcom.lisp had extra optional stuff wrapped around
 ;;; COMPILE-PCL, at least some of which we should probably have too:
@@ -61,9 +58,7 @@
                    (read f))))
       (sb-c::*handled-conditions* sb-c::*handled-conditions*))
  (declare (special *compile-files-p*))
- (proclaim '(sb-ext:muffle-conditions
-             (or (satisfies unable-to-optimize-note-p)
-                 (satisfies optional+key-style-warning-p))))
+ (proclaim '(sb-ext:muffle-conditions compiler-note))
  (flet ((do-srcs (list)
          (dolist (stem list)
           ;; Do like SB-COLD::LPNIFY-STEM for consistency, though parse/xlate/unparse
