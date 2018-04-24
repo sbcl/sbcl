@@ -1314,7 +1314,16 @@ is potentially harmful to any already-compiled callers using (SAFETY 0)."
 ;;; The INLINE-LAMBDA is either a symbol in {:ACCESSOR, :PREDICATE} meaning
 ;;; that the function is a structure accessor or predicate respectively,
 ;;; or a LAMBDA-WITH-LEXENV, or NIL if there is no inline expansion.
-(defun %compiler-defun (name inline-lambda dxable-args compile-toplevel)
+(defun %compiler-defun (name compile-toplevel inline-lambda
+                             &optional (dxable-args nil dxable-args-supplied-p))
+  (unless dxable-args-supplied-p
+    ; TEMPORARY KLUDGE to avoid compilation failure in hu.hu.dwim.delico
+    ; which causes a cascade of problems in quicklisp.
+    ; The call must match "(sb-c:%compiler-defun {x} nil t)"
+    (aver (and (not compile-toplevel) (eq inline-lambda t)))
+    ; It was inside (EVAL-WHEN (:compile-toplevel) ...) so now fix the
+    ; arguments to reflect that.
+    (setq compile-toplevel t inline-lambda nil))
   (let ((defined-fun nil)) ; will be set below if we're in the compiler
     (when compile-toplevel
       (with-single-package-locked-error

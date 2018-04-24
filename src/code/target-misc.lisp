@@ -161,7 +161,7 @@ the file system."
   (declare (type function def))
   ;; should've been checked by DEFMACRO DEFUN
   (aver (legal-fun-name-p name))
-  (sb!c:%compiler-defun name inline-lambda dxable-args nil)
+  (sb!c:%compiler-defun name nil inline-lambda dxable-args)
   (when (fboundp name)
     (warn 'redefinition-with-defun :name name :new-function def))
   (setf (fdefinition name) def)
