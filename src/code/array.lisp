@@ -1803,3 +1803,7 @@ function to be removed without further warning."
 ;;; Why is this needed for ARM and not x86 ???
 (defun allocate-vector (type length words)
   (allocate-vector type length words))
+
+;;; Horrible kludge for the "static-vectors" system
+;;; which uses an internal symbol in SB-IMPL.
+(import '%vector-widetag-and-n-bits-shift 'sb!impl)
