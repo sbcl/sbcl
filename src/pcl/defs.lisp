@@ -399,27 +399,18 @@
 
 (defclass standard-method-combination (definition-source-mixin
                                        method-combination)
-  ((type-name
-    :reader method-combination-type-name
-    :initarg :type-name)
-   (options
-    :reader method-combination-options
-    :initarg :options)))
+  ((type-name :reader method-combination-type-name :initarg :type-name)
+   (options :reader method-combination-options :initarg :options)
+   (%generic-functions :initform (make-hash-table :weakness :key) :reader method-combination-%generic-functions)))
 
 (defclass long-method-combination (standard-method-combination)
-  ((function
-    :initarg :function
-    :reader long-method-combination-function)
-   (args-lambda-list
-    :initarg :args-lambda-list
-    :reader long-method-combination-args-lambda-list)))
+  ((function :initarg :function :reader long-method-combination-function)
+   (args-lambda-list :initarg :args-lambda-list
+                     :reader long-method-combination-args-lambda-list)))
 
 (defclass short-method-combination (standard-method-combination)
-  ((operator
-    :reader short-combination-operator
-    :initarg :operator)
-   (identity-with-one-argument
-    :reader short-combination-identity-with-one-argument
+  ((operator :reader short-combination-operator :initarg :operator)
+   (identity-with-one-argument :reader short-combination-identity-with-one-argument
     :initarg :identity-with-one-argument)))
 
 (defclass slot-definition (metaobject definition-source-mixin)

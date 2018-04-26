@@ -158,8 +158,24 @@
                                              :args-lambda-list args-lambda-list
                                              'source source-location
                                              :documentation doc))
-               :source-location source-location)))
-    (setf (gethash type-name **method-combinations**) info))
+               :source-location source-location))
+        (old-info (gethash type-name **method-combinations**)))
+    (setf (gethash type-name **method-combinations**) info)
+    ;; for correctness' sake we should probably lock
+    ;; **METHOD-COMBINATIONS** while we're updating things, to defend
+    ;; against defining gfs in one thread while redefining the method
+    ;; combination in another thread.
+    (when old-info
+      (setf (method-combination-info-cache info) (method-combination-info-cache old-info))
+      (setf (method-combination-info-cache old-info) nil)
+      (dolist (entry (method-combination-info-cache info))
+        (let* ((mc (cdr entry))
+               (gfs (method-combination-%generic-functions mc)))
+          (flet ((flush (gf ignore)
+                   (declare (ignore ignore))
+                   (flush-effective-method-cache gf)
+                   (reinitialize-instance gf)))
+            (maphash #'flush gfs))))))
   (setf (gethash type-name *long-method-combination-functions*) function)
   (setf (random-documentation type-name 'method-combination) doc)
   type-name)
