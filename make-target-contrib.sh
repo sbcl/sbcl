@@ -112,7 +112,7 @@ done
 # Sometimes people used to see the "No tests failed." output from the last
 # DEFTEST in contrib self-tests and think that's all that is. So...
 HEADER_HAS_BEEN_PRINTED=false
-for dir in `cd contrib ; echo *`
+for dir in $contribs_to_build
 do
   if [ -d "contrib/$dir" -a -f "contrib/$dir/Makefile" -a ! -f "obj/asdf-cache/$dir/test-passed.test-report" ]; then
       if $HEADER_HAS_BEEN_PRINTED; then
