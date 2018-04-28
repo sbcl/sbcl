@@ -56,6 +56,25 @@
       (make-method-combination-info
        :constructor (lambda (options) (when options (method-combination-error "STANDARD method combination accepts no options.")) *standard-method-combination*)
        :cache (list (cons nil *standard-method-combination*))))
+
+(defun update-mcs (name new old frobmc)
+  (setf (gethash name **method-combinations**) new)
+  ;; for correctness' sake we should probably lock
+  ;; **METHOD-COMBINATIONS** while we're updating things, to defend
+  ;; against defining gfs in one thread while redefining the method
+  ;; combination in another thread.
+  (when old
+    (setf (method-combination-info-cache new) (method-combination-info-cache old))
+    (setf (method-combination-info-cache old) nil)
+    (dolist (entry (method-combination-info-cache new))
+      (let* ((mc (cdr entry))
+             (gfs (method-combination-%generic-functions mc)))
+        (funcall frobmc mc)
+        (flet ((flush (gf ignore)
+                 (declare (ignore ignore))
+                 (flush-effective-method-cache gf)
+                 (reinitialize-instance gf)))
+          (maphash #'flush gfs))))))
 
 ;;;; short method combinations
 ;;;;
@@ -80,8 +99,13 @@
   (let ((info (make-method-combination-info
                :source-location source-location
                :constructor (lambda (options)
-                              (short-combine-methods type-name options operator ioa source-location doc)))))
-    (setf (gethash type-name **method-combinations**) info))
+                              (short-combine-methods type-name options operator ioa source-location doc))))
+        (old-info (gethash type-name **method-combinations**)))
+    (flet ((frobber (mc)
+             ;; KLUDGE: assume the MC is already a short-form MC
+             (reinitialize-instance mc :operator operator :identity-with-one-argument ioa
+                                    'source source-location :documentation doc)))
+      (update-mcs type-name info old-info #'frobber)))
   (setf (random-documentation type-name 'method-combination) doc)
   type-name)
 
@@ -160,22 +184,7 @@
                                              :documentation doc))
                :source-location source-location))
         (old-info (gethash type-name **method-combinations**)))
-    (setf (gethash type-name **method-combinations**) info)
-    ;; for correctness' sake we should probably lock
-    ;; **METHOD-COMBINATIONS** while we're updating things, to defend
-    ;; against defining gfs in one thread while redefining the method
-    ;; combination in another thread.
-    (when old-info
-      (setf (method-combination-info-cache info) (method-combination-info-cache old-info))
-      (setf (method-combination-info-cache old-info) nil)
-      (dolist (entry (method-combination-info-cache info))
-        (let* ((mc (cdr entry))
-               (gfs (method-combination-%generic-functions mc)))
-          (flet ((flush (gf ignore)
-                   (declare (ignore ignore))
-                   (flush-effective-method-cache gf)
-                   (reinitialize-instance gf)))
-            (maphash #'flush gfs))))))
+    (update-mcs type-name info old-info #'identity))
   (setf (gethash type-name *long-method-combination-functions*) function)
   (setf (random-documentation type-name 'method-combination) doc)
   type-name)
