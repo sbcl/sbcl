@@ -49,3 +49,17 @@
   (assert (eql (long-or-test 3) 'fixnum))
   (assert (eql (long-or-test (1+ most-positive-fixnum)) 'integer))
   (assert (eql (long-or-test 3.2) 'number)))
+
+;;; TODO
+;;;
+;;; 1. redefinition of long-form including change to args-lambda-list
+;;;
+;;; 2. redefinition of short-form (e.g. - with/without :i-o-a)
+;;;
+;;; 3. redefinition to update documentation and source location
+;;;
+;;; 4. (possibly) move long-method-combination-function into method
+;;;    combination objects, in which case need to check that existing
+;;;    method combination objects are updated (currently the method
+;;;    combination function lives in a global hash table and that is
+;;;    updated at redefinition time).
