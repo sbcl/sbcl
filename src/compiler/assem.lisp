@@ -920,9 +920,8 @@
     (setf (segment-postits segment) nil)
     (dolist (postit postits)
       (emit-back-patch segment 0 postit)))
-  (let ((hook (segment-inst-hook segment)))
-    (when hook
-      (funcall hook segment vop :label label)))
+  (awhen (segment-inst-hook segment)
+    (funcall it segment vop :label label))
   (emit-annotation segment label))
 
 ;;; Called by the EMIT-ALIGNMENT macro to emit an alignment note. We check to
@@ -932,9 +931,8 @@
 (defun %emit-alignment (segment vop bits &optional (pattern 0))
   (when (segment-run-scheduler segment)
     (schedule-pending-instructions segment))
-  (let ((hook (segment-inst-hook segment)))
-    (when hook
-      (funcall hook segment vop :align bits)))
+  (awhen (segment-inst-hook segment)
+    (funcall it segment vop :align bits))
   (let ((alignment (segment-alignment segment))
         (offset (- (segment-current-posn segment)
                    (segment-sync-posn segment))))
@@ -1544,9 +1542,8 @@
     (setf (segment-postits segment) nil)
     (dolist (postit postits)
       (emit-back-patch segment 0 postit))
-    (let ((hook (segment-inst-hook segment)))
-      (when hook
-        (apply hook segment vop args)))))
+    (awhen (segment-inst-hook segment)
+      (apply it segment vop args))))
 
 (defmacro define-instruction-macro (name lambda-list &body body)
   `(defmacro ,(op-encoder-name name t) ,lambda-list ,@body))
