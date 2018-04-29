@@ -17,7 +17,7 @@
 ;;; from the C alloc() function by way of the alloc-tramp
 ;;; assembly routine.
 
-(defun allocation-dynamic-extent (alloc-tn size lowtag)
+(defun stack-allocation (alloc-tn size lowtag)
   (aver (not (location= alloc-tn rsp-tn)))
   (inst sub rsp-tn size)
   ;; see comment in x86/macros.lisp implementation of this
@@ -31,7 +31,7 @@
   (inst lea alloc-tn (make-ea :byte :base rsp-tn :disp lowtag))
   (values))
 
-(defun allocation-tramp (node result-tn size lowtag)
+(defun %alloc-tramp (node result-tn size lowtag)
   (cond ((typep size '(and integer (not (signed-byte 32))))
          ;; MOV accepts large immediate operands, PUSH does not
          (inst mov result-tn size)
@@ -58,7 +58,7 @@
 ;;; which to the degree needed should also cover subsequent initialization.
 (defun allocation (alloc-tn size node &optional dynamic-extent lowtag)
   (when dynamic-extent
-    (allocation-dynamic-extent alloc-tn size lowtag)
+    (stack-allocation alloc-tn size lowtag)
     (return-from allocation (values)))
   (aver (and (not (location= alloc-tn temp-reg-tn))
              (or (integerp size) (not (location= size temp-reg-tn)))))
@@ -67,7 +67,7 @@
   ;; We'd need a spare reg in which to load boxed_region from the linkage table.
   ;; Could push/pop any random register on the stack and own it temporarily,
   ;; but seeing as nobody cared about this, just punt.
-  (allocation-tramp node alloc-tn size lowtag)
+  (%alloc-tramp node alloc-tn size lowtag)
 
   #!-(and (not sb-thread) sb-dynamic-core)
   ;; Otherwise do the normal inline allocation thing
@@ -130,7 +130,7 @@
                ;; large objects will never be made in a per-thread region
                (and (integerp size)
                     (>= size large-object-size)))
-           (allocation-tramp node alloc-tn size lowtag))
+           (%alloc-tramp node alloc-tn size lowtag))
           (t
            (inst mov temp-reg-tn free-pointer)
            (cond ((integerp size)
@@ -150,9 +150,9 @@
              (emit-label NOT-INLINE)
              (cond ((and (tn-p size) (location= size alloc-tn)) ; recover SIZE
                     (inst sub alloc-tn free-pointer)
-                    (allocation-tramp node temp-reg-tn alloc-tn nil))
+                    (%alloc-tramp node temp-reg-tn alloc-tn nil))
                    (t ; SIZE is intact
-                    (allocation-tramp node temp-reg-tn size nil)))
+                    (%alloc-tramp node temp-reg-tn size nil)))
              (inst jmp DONE))))
     (values)))
 
@@ -304,7 +304,7 @@
     (:generator 100
       (let ((size (calc-size-in-bytes words result))
             (rax-zeroed))
-        (allocation result size node t other-pointer-lowtag)
+        (stack-allocation result size other-pointer-lowtag)
         (put-header result type length nil)
         ;; FIXME: It would be good to check for stack overflow here.
         ;; It would also be good to skip zero-fill of specialized vectors
@@ -404,13 +404,11 @@
     (:results (result :scs (descriptor-reg) :from :load))
     (:arg-types positive-fixnum *)
     (:policy :fast-safe)
-    (:node-var node)
     (:temporary (:sc descriptor-reg) tail next limit)
-    (:node-var node)
     (:generator 20
       (let ((size (calc-size-in-bytes length next))
             (loop (gen-label)))
-        (allocation result size node t list-pointer-lowtag)
+        (stack-allocation result size list-pointer-lowtag)
         (compute-end)
         (inst mov next result)
         (emit-label LOOP)

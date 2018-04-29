@@ -25,7 +25,7 @@
 ;;; the duration.  Now we have pseudoatomic there's no need for that
 ;;; overhead.
 
-(defun allocation-dynamic-extent (alloc-tn size lowtag)
+(defun stack-allocation (alloc-tn size lowtag)
   (aver (not (location= alloc-tn esp-tn)))
   (inst sub esp-tn size)
   ;; FIXME: SIZE _should_ be double-word aligned (suggested but
@@ -148,7 +148,7 @@
   (declare (ignorable node))
   (cond
     (dynamic-extent
-     (allocation-dynamic-extent alloc-tn size lowtag))
+     (stack-allocation alloc-tn size lowtag))
     ;; Inline allocation can't work if (and (not sb-thread) sb-dynamic-core)
     ;; because boxed_region points to the linkage table, not the alloc region.
     #!+(or sb-thread (not sb-dynamic-core))
@@ -286,7 +286,6 @@
               positive-fixnum)
   (:translate allocate-vector)
   (:policy :fast-safe)
-  (:node-var node)
   (:generator 100
     (inst lea result (make-ea :byte :base words :disp
                               (+ (1- (ash 1 n-lowtag-bits))
@@ -295,7 +294,7 @@
     ;; FIXME: It would be good to check for stack overflow here.
     (move ecx words)
     (inst shr ecx n-fixnum-tag-bits)
-    (allocation result result node t other-pointer-lowtag)
+    (stack-allocation result result other-pointer-lowtag)
     (inst cld)
     (inst lea res
           (make-ea :byte :base result :disp (- (* vector-data-offset n-word-bytes)
