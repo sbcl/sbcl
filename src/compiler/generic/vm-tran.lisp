@@ -609,6 +609,13 @@
               ((simple-unboxed-array (*)) (vector-sap thing)))))
      (declare (inline sapify))
     (with-pinned-objects (dst src)
+      ;; Prevent failure caused by memmove() hitting a write-protected page
+      ;; and the fault handler losing, since it thinks you're not in Lisp.
+      ;; This is wasteful, but better than being randomly broken (lp#1366263).
+      #!+cheneygc
+      (let ((dst (sapify dst)))
+        (setf (sap-ref-8 dst dst-start) (sap-ref-8 dst dst-start)
+              (sap-ref-8 dst (1- dst-end)) (sap-ref-8 dst (1- dst-end))))
       (memmove (sap+ (sapify dst) dst-start)
                (sap+ (sapify src) src-start)
                (- dst-end dst-start)))
