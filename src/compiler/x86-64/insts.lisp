@@ -3366,7 +3366,7 @@
        ;; emit 32-bit, signed relative offset for where
        (emit-dword-displacement-backpatch segment where)
        ;; nowhere to jump: simply jump to the next instruction
-       (emit-skip segment 4 0))))
+       (emit-dword segment 0))))
 
 (define-instruction xend (segment)
   (:printer three-bytes ((op '(#x0f #x01 #xd5))))
