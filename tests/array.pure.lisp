@@ -523,3 +523,19 @@
   (checked-compile-and-assert (:optimize :safe)
       `(lambda (x) (aref #100(a) x))
     ((#\Nul) (condition 'type-error))))
+
+(with-test (:name (make-array :erroneous-type-specifiers))
+  (dolist (atom '(signed-byte unsigned-byte))
+    (assert (handler-case (make-array 10 :element-type `(,atom "oops"))
+              (error (c) (search (format nil "bad size specified for ~A" atom)
+                                 (princ-to-string c)))
+              (:no-error (obj) obj nil)))))
+
+(declaim (notinline opaque-identity))
+(defun opaque-identity (x) x) ; once and only, uh 6 times?
+
+(with-test (:name (make-array :strange-type-specifiers))
+  (assert (stringp (make-array 10 :element-type (opaque-identity '(base-char)))))
+  (assert (stringp (make-array 10 :element-type (opaque-identity '(standard-char)))))
+  (assert (stringp (make-array 10 :element-type (opaque-identity '(extended-char)))))
+  (assert (bit-vector-p (make-array 10 :element-type (opaque-identity '(bit))))))

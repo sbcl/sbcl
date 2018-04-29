@@ -138,6 +138,8 @@
                         (when ,type-sym
                           (ill-type))))
                     ,@body)))
+             (ill-type ()
+               `(go fastidiously-parse))
              (result (widetag)
                (let ((value (symbol-value widetag)))
                  `(values ,value
@@ -145,11 +147,7 @@
                             (find value
                                   *specialized-array-element-type-properties*
                                   :key #'saetp-typecode))))))
-    (flet ((ill-type ()
-             (declare (optimize allow-non-returning-tail-call))
-             (error "Invalid type specifier: ~/sb!impl:print-type-specifier/"
-                    type))
-           (integer-interval-widetag (low high)
+    (flet ((integer-interval-widetag (low high)
              (if (minusp low)
                  (%integer-vector-widetag-and-n-bits-shift
                   t
@@ -157,11 +155,12 @@
                  (%integer-vector-widetag-and-n-bits-shift
                   nil
                   (max (integer-length low) (integer-length high))))))
-      (let* ((consp (consp type))
-             (type-name (if consp
-                            (car type)
-                            type)))
-        (case type-name
+     (tagbody
+      (binding*
+       ((consp (consp type))
+        (type-name (if consp (car type) type))
+        ((widetag n-bits-shift)
+         (case type-name
           ((t)
            (when consp
              (ill-type))
@@ -281,12 +280,15 @@
           ((nil)
            (result simple-array-nil-widetag))
           (t
-           (block nil
-             (let ((ctype (type-or-nil-if-unknown type)))
-               (unless ctype
-                 (return (result simple-vector-widetag)))
-               (typecase ctype
-                 (union-type
+           (go fastidiously-parse)))))
+        (return-from %vector-widetag-and-n-bits-shift
+          (values widetag n-bits-shift)))
+      fastidiously-parse)
+     ;; Do things the hard way after falling through the tagbody.
+     (let ((ctype (type-or-nil-if-unknown type)))
+       (typecase ctype
+         (null (result simple-vector-widetag))
+         (union-type
                   (let ((types (union-type-types ctype)))
                     (cond ((not (every #'numeric-type-p types))
                            (result simple-vector-widetag))
@@ -303,7 +305,7 @@
                            (result simple-array-long-float-widetag))
                           (t
                            (result simple-vector-widetag)))))
-                 (character-set-type
+         (character-set-type
                   #!-sb-unicode (result simple-base-string-widetag)
                   #!+sb-unicode
                   (if (loop for (start . end)
@@ -312,11 +314,11 @@
                                         (< end base-char-code-limit)))
                       (result simple-base-string-widetag)
                       (result simple-character-string-widetag)))
-                 (t
+         (t
                   (let ((expansion (type-specifier ctype)))
                     (if (equal expansion type)
                         (result simple-vector-widetag)
-                        (%vector-widetag-and-n-bits-shift expansion)))))))))))))
+                        (%vector-widetag-and-n-bits-shift expansion)))))))))
 
 (defun %complex-vector-widetag (widetag)
   (macrolet ((make-case ()
