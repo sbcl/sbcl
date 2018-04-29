@@ -558,11 +558,9 @@
                                      `((lognot ,transformed))
                                      `(,transformed))))))
          ,@(if single-op-op
-              `((handler-case
-                    (progn
-                      (inst ,single-op-op ,r ,x ,transformed))
-                  (cannot-encode-immediate-operand ()
-                    ,@(composite))))
+              `((if (encodable-immediate ,transformed)
+                    (inst ,single-op-op ,r ,x ,transformed)
+                    (progn ,@(composite))))
               (composite))))))
 
 
