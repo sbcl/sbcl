@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-1.4.6:
+changes in sbcl-1.4.7 relative to sbcl-1.4.6:
   * enhancement: better handling of unknown keyword arguments (lp#1750466)
   * enhancement: namestrings can now be computed for certain pathnames that
     previously did not have namestrings because of #\. characters in their
