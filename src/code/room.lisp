@@ -508,32 +508,49 @@ We could try a few things to mitigate this:
        ;; in a single-threaded system.
        #+sb-thread
        (close-current-gc-region)
-       (loop
-          with page-size = (ash gencgc-card-bytes (- n-fixnum-tag-bits))
-          ;; This magic dance gets us an unboxed aligned pointer as a
-          ;; FIXNUM.
-          with start = (%make-lisp-obj (current-dynamic-space-start))
-          with end = start
+       (do ((initial-next-free-page next-free-page)
+            ;; This is a "funny" fixnum - essentially the bit cast of a pointer
+            (start (the fixnum (%make-lisp-obj (current-dynamic-space-start))))
+            (page-index 0 (1+ page-index))
+            ;; SPAN is a page count, for which an unsigned fixnum is adequate.
+            (span 0))
+           ;; We can safely iterate up to and including next_free_page
+           ;; even if next_free_page is the total number of pages in the space,
+           ;; because there is one extra page table entry as a sentinel.
+           ;; The extra page always has 0 bytes used, so we'll observe the end
+           ;; of a contiguous block without needing a termination clause to
+           ;; handle a final sequence of totally full pages that exactly abut
+           ;; the heap end. [Also note that for our purposes, contiguous blocks
+           ;; can span different GC generations and page types, whereas within
+           ;; GC, a page ends a block if the next differs in those aspects]
+           ((> page-index initial-next-free-page))
+         ;; The type constraint on PAGE-INDEX is probably too generous,
+         ;; but it does its job of producing efficient code.
+         (declare (type (integer 0 (#.(/ (ash 1 n-machine-word-bits) gencgc-card-bytes)))
+                        page-index)
+                  (type (and fixnum unsigned-byte) span))
+         (let ((page-bytes-used ; The low bit of bytes-used is the need-to-zero flag.
+                (logandc1 1 (slot (deref page-table page-index) 'bytes-used))))
+           (if (= page-bytes-used gencgc-card-bytes)
+               (incf span)
+               ;; RANGE-END forces funny increment of START by the extent in bytes,
+               ;; returning a negative fixum when the word's high bit flips.
+               ;; The proper way to add "funny" fixnums is via +-MODFX which for
+               ;; reasons unknown isn't defined on all backends.
+               (macrolet
+                   ((range-end (extra)
+                      `(truly-the fixnum
+                        (%make-lisp-obj
+                         (logand most-positive-word
+                                 ;; The first and third addends are known good
+                                 ;; The second needs help to avoid an expensive ASH
+                                 (+ (get-lisp-obj-address start)
+                                    (logand (* span gencgc-card-bytes) most-positive-word)
+                                    ,extra))))))
+                 (map-objects-in-range fun start (range-end page-bytes-used)
+                                       (< page-index initial-next-free-page))
+                 (setf start (range-end gencgc-card-bytes) span 0)))))))))
 
-          ;; This is our page range. The type constraint is far too generous,
-          ;; but it does its job of producing efficient code.
-          for page-index
-          of-type (integer -1 (#.(/ (ash 1 n-machine-word-bits) gencgc-card-bytes)))
-          from 0 below next-free-page
-          for next-page-addr from (+ start page-size) by page-size
-          for page-bytes-used
-              ;; The low bits of bytes-used is the need-to-zero flag.
-              = (logandc1 1 (slot (deref page-table page-index) 'bytes-used))
-
-          when (< page-bytes-used gencgc-card-bytes)
-          do (progn
-               (incf end (ash page-bytes-used (- n-fixnum-tag-bits)))
-               (map-objects-in-range fun start end)
-               (setf start next-page-addr)
-               (setf end next-page-addr))
-          else do (incf end page-size)
-
-          finally (map-objects-in-range fun start end nil))))))
   (do-rest-arg ((space) spaces)
     (if (eq space :dynamic)
         (without-gcing (do-1-space space))
