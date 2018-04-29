@@ -782,7 +782,7 @@
   (let ((ctype (careful-specifier-type type)))
     (if ctype
         (or
-         (and (not (intersection-type-p type))
+         (and (not (intersection-type-p ctype))
               (multiple-value-bind (constantp value) (type-singleton-p ctype)
                 (and constantp
                      `(eql ,object ',value))))
