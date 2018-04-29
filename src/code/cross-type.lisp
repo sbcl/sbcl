@@ -129,7 +129,7 @@
 (dolist (symbol '(lexenv sb!c::abstract-lexenv
                   condition restart style-warning step-condition
                   class sb!pcl::condition-class error
-                  hash-table
+                  hash-table sb!thread:mutex
                   sb!pretty:pprint-dispatch-table
                   compiler-note
                   deprecation-condition
