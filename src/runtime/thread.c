@@ -694,7 +694,7 @@ create_thread_struct(lispobj initial_function) {
      * on the alignment passed from os_validate, since that might
      * assume the current (e.g. 4k) pagesize, while we calculate with
      * the biggest (e.g. 64k) pagesize allowed by the ABI. */
-    void *spaces = os_allocate(THREAD_STRUCT_SIZE);
+    void *spaces = os_validate(IS_THREAD_STRUCT, NULL, THREAD_STRUCT_SIZE);
     if(!spaces)
         return NULL;
     /* Aligning up is safe as THREAD_STRUCT_SIZE has

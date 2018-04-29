@@ -158,6 +158,14 @@ os_validate(int movable, os_vm_address_t addr, os_vm_size_t len)
         // FALLTHROUGH_INTENDED
     case NOT_MOVABLE:
         flags = MAP_FIXED;
+        break;
+    case IS_THREAD_STRUCT:
+#if defined(LISP_FEATURE_OPENBSD) && defined(MAP_STACK)
+        /* OpenBSD requires MAP_STACK for pages used as stack.
+         * Note that FreeBSD has a MAP_STACK with different behavior. */
+        flags = MAP_STACK;
+#endif
+        break;
     }
 #ifdef MAP_EXCL // not defined in OpenBSD, NetBSD, DragonFlyBSD
     if (flags & MAP_FIXED) flags |= MAP_EXCL;
