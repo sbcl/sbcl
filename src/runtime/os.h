@@ -86,11 +86,14 @@ extern void os_zero(os_vm_address_t addr, os_vm_size_t length);
 
 /* Allocate 'len' bytes at 'addr',
  * or at an OS-chosen address if 'addr' is zero.
- * If 'movable' then 'addr' is a preference, not a requirement. */
-#define NOT_MOVABLE 0
-#define MOVABLE 1
-#define MOVABLE_LOW 2
-#define IS_THREAD_STRUCT 3
+ * If 'movable' then 'addr' is a preference, not a requirement.
+ * These are discrete bits, not opaque enumerated values.
+ * i.e. the consuming code might test via either (x & bit)
+ * or (x == bit) depending on the use-case */
+#define NOT_MOVABLE      0
+#define MOVABLE          1
+#define MOVABLE_LOW      2
+#define IS_THREAD_STRUCT 4
 extern os_vm_address_t os_validate(int movable,
                                    os_vm_address_t addr,
                                    os_vm_size_t len);
