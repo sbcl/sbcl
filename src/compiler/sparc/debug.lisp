@@ -94,7 +94,7 @@
 (define-vop (get-lisp-obj-address)
   (:policy :fast-safe)
   (:translate get-lisp-obj-address)
-  (:args (thing :scs (descriptor-reg) :target result))
+  (:args (thing :scs (descriptor-reg any-reg) :target result))
   (:results (result :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 1
