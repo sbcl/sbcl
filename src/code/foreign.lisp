@@ -11,33 +11,6 @@
 
 (in-package "SB!IMPL")
 
-#!-(or elf mach-o win32)
-(error "Not an ELF, Mach-O, or Win32 platform?")
-
-(defun extern-alien-name (name)
-  (handler-case
-      (coerce name 'base-string)
-    (error ()
-      (error "invalid external alien name: ~S" name))))
-
-;;; *STATIC-FOREIGN-SYMBOLS* are static as opposed to "dynamic" (not
-;;; as opposed to C's "extern"). The table contains symbols known at
-;;; the time that the program was built, but not symbols defined in
-;;; object files which have been loaded dynamically since then.
-#!-sb-dynamic-core
-(declaim (type hash-table *static-foreign-symbols*))
-#!-sb-dynamic-core
-(defvar *static-foreign-symbols* (make-hash-table :test 'equal))
-
-(declaim
- (ftype (sfunction (string hash-table) (or integer null)) find-foreign-symbol-in-table))
-(defun find-foreign-symbol-in-table (name table)
-  (let ((extern (extern-alien-name name)))
-    (values
-     (or (gethash extern table)
-         (gethash (concatenate 'base-string "ldso_stub__" extern) table)))))
-
-#-sb-xc-host
 (defun find-foreign-symbol-address (name)
   "Returns the address of the foreign symbol NAME, or NIL. Does not enter the
 symbol in the linkage table, and never returns an address in the linkage-table."
@@ -45,7 +18,6 @@ symbol in the linkage table, and never returns an address in the linkage-table."
       (find-foreign-symbol-in-table name *static-foreign-symbols*)
       (find-dynamic-foreign-symbol-address name)))
 
-#-sb-xc-host
 (defun foreign-symbol-address (name &optional datap)
   "Returns the address of the foreign symbol NAME. DATAP must be true if the
 symbol designates a variable (used only on linkage-table platforms).
@@ -64,19 +36,14 @@ On non-linkage-table ports signals an error if the symbol isn't found."
     (if static
         (values static nil)
         #!+os-provides-dlopen
-        (progn
-          #-sb-xc-host
-          (values #!-linkage-table
-                  (ensure-dynamic-foreign-symbol-address name)
-                  #!+linkage-table
-                  (ensure-foreign-symbol-linkage name datap)
-                  t)
-          #+sb-xc-host
-          (error 'undefined-alien-error :name name))
+        (values #!-linkage-table
+                (ensure-dynamic-foreign-symbol-address name)
+                #!+linkage-table
+                (ensure-foreign-symbol-linkage name datap)
+                t)
         #!-os-provides-dlopen
         (error 'undefined-alien-error :name name))))
 
-#-sb-xc-host ; SAPs don't exist
 (defun foreign-symbol-sap (symbol &optional datap)
   "Returns a SAP corresponding to the foreign symbol. DATAP must be true if the
 symbol designates a variable (used only on linkage-table platforms). May enter
@@ -88,7 +55,6 @@ if the symbol isn't found."
   #!+linkage-table
   (multiple-value-bind (addr sharedp)
       (foreign-symbol-address symbol datap)
-    #+sb-xc-host #!-sb-dynamic-core (aver (not sharedp)) ()
     ;; If the address is from linkage-table and refers to data
     ;; we need to do a bit of juggling. It is not the address of the
     ;; variable, but the address where the real address is stored.
@@ -96,7 +62,6 @@ if the symbol isn't found."
         (int-sap (sap-ref-word (int-sap addr) 0))
         (int-sap addr))))
 
-#-sb-xc-host
 (defun foreign-reinit ()
   #!+os-provides-dlopen
   (reopen-shared-objects)
@@ -108,7 +73,6 @@ if the symbol isn't found."
     (update-linkage-table)))
 
 ;;; Cleanups before saving a core
-#-sb-xc-host
 (defun foreign-deinit ()
   #!+(and os-provides-dlopen (not linkage-table))
   (when (dynamic-foreign-symbols-p)
@@ -125,7 +89,6 @@ if the symbol isn't found."
 (declaim (maybe-inline sap-foreign-symbol))
 (defun sap-foreign-symbol (sap)
   (declare (ignorable sap))
-  #-sb-xc-host
   (let ((addr (sap-int sap)))
     (declare (ignorable addr))
     #!+linkage-table
@@ -158,7 +121,6 @@ if the symbol isn't found."
 ;;; How we learn about foreign symbols and dlhandles initially
 (defvar *!initial-foreign-symbols*)
 
-#-sb-xc-host
 (defun !foreign-cold-init ()
   #!-sb-dynamic-core
   (dovector (symbol *!initial-foreign-symbols*)

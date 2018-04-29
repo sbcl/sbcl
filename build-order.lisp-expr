@@ -449,7 +449,7 @@
  #!+os-provides-dlopen ("src/code/foreign-load" :not-host)
  #!+(and os-provides-dlopen (not win32)) ("src/code/unix-foreign-load" :not-host)
  #!+(and os-provides-dlopen win32) ("src/code/win32-foreign-load" :not-host)
- ("src/code/foreign")
+ ("src/code/foreign" :not-host)
 
  ("src/code/fop") ; needs macros from code/load.lisp
 

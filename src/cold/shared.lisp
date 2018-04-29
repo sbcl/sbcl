@@ -239,6 +239,8 @@
           ":SB-SAFEPOINT not supported on selected architecture")
          ("(and sb-safepoint-strictly (not sb-safepoint))"
           ":SB-SAFEPOINT-STRICTLY requires :SB-SAFEPOINT")
+         ("(not (or elf mach-o win32))"
+          "No execute object file format feature defined")
          ("(and sb-dynamic-core (not linkage-table))"
           ":SB-DYNAMIC-CORE requires :LINKAGE-TABLE")
          ("(and relocatable-heap win32)"

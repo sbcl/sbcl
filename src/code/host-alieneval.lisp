@@ -1155,4 +1155,28 @@
 (push '("SB-ALIEN" define-alien-type-class define-alien-type-method)
       sb!impl::*!removable-symbols*)
 
+(in-package "SB!IMPL")
+
+(defun extern-alien-name (name)
+ (handler-case (coerce name 'base-string)
+   (error ()
+     (error "invalid external alien name: ~S" name))))
+
+(declaim (ftype (sfunction (string hash-table) (or integer null))
+                find-foreign-symbol-in-table))
+(defun find-foreign-symbol-in-table (name table)
+  (let ((extern (extern-alien-name name)))
+    (values
+     (or (gethash extern table)
+         (gethash (concatenate 'base-string "ldso_stub__" extern) table)))))
+
+;;; *STATIC-FOREIGN-SYMBOLS* are static as opposed to "dynamic" (not
+;;; as opposed to C's "extern"). The table contains symbols known at
+;;; the time that the program was built, but not symbols defined in
+;;; object files which have been loaded dynamically since then.
+#!-sb-dynamic-core
+(progn
+  (declaim (type hash-table *static-foreign-symbols*))
+  (defvar *static-foreign-symbols* (make-hash-table :test 'equal)))
+
 (/show0 "host-alieneval.lisp end of file")
