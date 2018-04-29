@@ -129,15 +129,13 @@
   (alien-funcall (extern-alien "allocation_profiler_stop" (function void))))
 
 (defconstant +state-initial+         1)
-(defconstant +state-profiler+        2)
-(defconstant +state-loaded-free-ptr+ 3)
-(defconstant +state-bumped-free-ptr+ 4)
-(defconstant +state-tested-free-ptr+ 5)
-(defconstant +state-jumped+          6)
-(defconstant +state-stored-free-ptr+ 7)
-;; moved-result is a spurious instruction and I'd like to eliminate it.
-;; But this code has to recognize it meanwhile.
-;(defconstant +state-moved-result+    8)
+(defconstant +state-begin-pa+        2)
+(defconstant +state-profiler+        3)
+(defconstant +state-loaded-free-ptr+ 4)
+(defconstant +state-bumped-free-ptr+ 5)
+(defconstant +state-tested-free-ptr+ 6)
+(defconstant +state-jumped+          7)
+(defconstant +state-stored-free-ptr+ 8)
 (defconstant +state-descriptorized+  9)
 (defconstant +state-widetagged+     10)
 (defconstant +state-trampoline-arg+ 11)
@@ -237,9 +235,17 @@
                   (setq size (ldb (byte 32 8) dchunk))
                   (advance +state-trampoline-arg+))
                  (t
+                  (advance-if (and (eq opcode 'mov)
+                                   (let ((rm (regrm-inst-r/m 0 dstate)))
+                                     (eq (machine-ea-base rm) thread-base-reg)
+                                     (eq (machine-ea-disp rm)
+                                         (ash sb-vm::thread-pseudo-atomic-bits-slot
+                                              sb-vm:word-shift))))
+                              +state-begin-pa+))))
+               (#.+state-begin-pa+
                   (advance-if (and (eq opcode 'mov) free-ptr-p)
                               +state-loaded-free-ptr+)
-                  (setq orig-free-ptr-reg (regrm-inst-reg dchunk dstate)))))
+                  (setq orig-free-ptr-reg (regrm-inst-reg dchunk dstate)))
                (#.+state-loaded-free-ptr+
                 (case opcode
                  ;; Variable-size alloc can either use LEA or ADD to compute the

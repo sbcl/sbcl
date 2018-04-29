@@ -51,49 +51,9 @@
     (inst or (reg-in-size result-tn :byte) lowtag))
   (values))
 
-;;; Emit code to allocate an object with a size in bytes given by
-;;; SIZE into ALLOC-TN. The size may be an integer of a TN.
-;;; NODE may be used to make policy-based decisions.
-;;; This function should only be used inside a pseudo-atomic section,
-;;; which to the degree needed should also cover subsequent initialization.
-(defun allocation (alloc-tn size node &optional dynamic-extent lowtag)
-  (when dynamic-extent
-    (stack-allocation alloc-tn size lowtag)
-    (return-from allocation (values)))
-  (aver (and (not (location= alloc-tn temp-reg-tn))
-             (or (integerp size) (not (location= size temp-reg-tn)))))
-
-  #!+(and (not sb-thread) sb-dynamic-core)
-  ;; We'd need a spare reg in which to load boxed_region from the linkage table.
-  ;; Could push/pop any random register on the stack and own it temporarily,
-  ;; but seeing as nobody cared about this, just punt.
-  (%alloc-tramp node alloc-tn size lowtag)
-
-  #!-(and (not sb-thread) sb-dynamic-core)
-  ;; Otherwise do the normal inline allocation thing
-  (let ((NOT-INLINE (gen-label))
-        (DONE (gen-label))
-        (SKIP-INSTRUMENTATION (gen-label))
-        ;; Yuck.
-        (in-elsewhere (eq *elsewhere* sb!assem::**current-segment**))
-        ;; thread->alloc_region.free_pointer
-        (free-pointer
-         #!+sb-thread
-         (thread-tls-ea (* n-word-bytes thread-alloc-region-slot))
-         #!-sb-thread
-         (make-ea :qword :disp (make-fixup "gc_alloc_region" :foreign)))
-        ;; thread->alloc_region.end_addr
-        (end-addr
-         #!+sb-thread
-         (thread-tls-ea (* n-word-bytes (1+ thread-alloc-region-slot)))
-         #!-sb-thread
-         (make-ea :qword :disp (make-fixup "gc_alloc_region" :foreign 8))))
-
-    ;; Insert allocation profiler instrumentation
-    ;; FIXME: for now, change this to '>=' to perform self-build
-    ;;        where the resulting executable has instrumentation
-    ;;        because I can't get policies to work.
-    ;; FIXME: and does this work for assembly routines?
+;;; Insert allocation profiler instrumentation
+(defun instrument-alloc (size node)
+  (let ((SKIP-INSTRUMENTATION (gen-label)))
     (when (policy node (> sb!c::instrument-consing 1))
       (inst mov temp-reg-tn
             (make-ea :qword :base thread-base-tn
@@ -124,7 +84,44 @@
           ;; which register holds SIZE.
           (inst test size size) ; 3 bytes
           (emit-long-nop sb!assem::**current-segment** 5))) ; align
-      (emit-label skip-instrumentation))
+      (emit-label skip-instrumentation))))
+
+;;; Emit code to allocate an object with a size in bytes given by
+;;; SIZE into ALLOC-TN. The size may be an integer of a TN.
+;;; NODE may be used to make policy-based decisions.
+;;; This function should only be used inside a pseudo-atomic section,
+;;; which to the degree needed should also cover subsequent initialization.
+(defun allocation (alloc-tn size node &optional dynamic-extent lowtag)
+  (when dynamic-extent
+    (stack-allocation alloc-tn size lowtag)
+    (return-from allocation (values)))
+  (aver (and (not (location= alloc-tn temp-reg-tn))
+             (or (integerp size) (not (location= size temp-reg-tn)))))
+
+  #!+(and (not sb-thread) sb-dynamic-core)
+  ;; We'd need a spare reg in which to load boxed_region from the linkage table.
+  ;; Could push/pop any random register on the stack and own it temporarily,
+  ;; but seeing as nobody cared about this, just punt.
+  (%alloc-tramp node alloc-tn size lowtag)
+
+  #!-(and (not sb-thread) sb-dynamic-core)
+  ;; Otherwise do the normal inline allocation thing
+  (let ((NOT-INLINE (gen-label))
+        (DONE (gen-label))
+        ;; Yuck.
+        (in-elsewhere (eq *elsewhere* sb!assem::**current-segment**))
+        ;; thread->alloc_region.free_pointer
+        (free-pointer
+         #!+sb-thread
+         (thread-tls-ea (* n-word-bytes thread-alloc-region-slot))
+         #!-sb-thread
+         (make-ea :qword :disp (make-fixup "gc_alloc_region" :foreign)))
+        ;; thread->alloc_region.end_addr
+        (end-addr
+         #!+sb-thread
+         (thread-tls-ea (* n-word-bytes (1+ thread-alloc-region-slot)))
+         #!-sb-thread
+         (make-ea :qword :disp (make-fixup "gc_alloc_region" :foreign 8))))
 
     (cond ((or in-elsewhere
                ;; large objects will never be made in a per-thread region
@@ -159,10 +156,12 @@
 ;;; Allocate an other-pointer object of fixed SIZE with a single word
 ;;; header having the specified WIDETAG value. The result is placed in
 ;;; RESULT-TN.
-(defun fixed-alloc (result-tn widetag size node &optional stack-allocate-p)
+(defun fixed-alloc (result-tn widetag size node &optional stack-allocate-p
+                    &aux (bytes (pad-data-block size)))
+  (unless stack-allocate-p
+    (instrument-alloc bytes node))
   (maybe-pseudo-atomic stack-allocate-p
-      (allocation result-tn (pad-data-block size) node stack-allocate-p
-                  other-pointer-lowtag)
+      (allocation result-tn bytes node stack-allocate-p other-pointer-lowtag)
       (storew* (logior (ash (1- size) n-widetag-bits) widetag)
                result-tn 0 other-pointer-lowtag
                (not stack-allocate-p))))
@@ -193,11 +192,13 @@
                              (move temp ,tn)
                              temp))))
                      (storew reg ,list ,slot list-pointer-lowtag))))
-             (let ((cons-cells (if star (1- num) num))
-                   (stack-allocate-p (node-stack-allocate-p node)))
+             (let* ((cons-cells (if star (1- num) num))
+                    (stack-allocate-p (node-stack-allocate-p node))
+                    (size (* (pad-data-block cons-size) cons-cells)))
+               (unless stack-allocate-p
+                 (instrument-alloc size node))
                (maybe-pseudo-atomic stack-allocate-p
-                (allocation res (* (pad-data-block cons-size) cons-cells) node
-                            stack-allocate-p list-pointer-lowtag)
+                (allocation res size node stack-allocate-p list-pointer-lowtag)
                 (move ptr res)
                 (dotimes (i (1- cons-cells))
                   (store-car (tn-ref-tn things) ptr)
@@ -284,6 +285,7 @@
       ;; The LET generates instructions that needn't be pseudoatomic
       ;; so don't move it inside.
       (let ((size (calc-size-in-bytes words result)))
+        (instrument-alloc size node)
         (pseudo-atomic
          (allocation result size node nil other-pointer-lowtag)
          (put-header result type length t)))))
@@ -438,6 +440,7 @@
             (loop (gen-label))
             (no-init
              (and (sc-is element immediate) (eql (tn-value element) 0))))
+        (instrument-alloc size node)
         (pseudo-atomic
          (allocation result size node nil list-pointer-lowtag)
          (compute-end)
@@ -476,11 +479,13 @@
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
   (:generator 10
-   (maybe-pseudo-atomic stack-allocate-p
-     (let* ((size (+ length closure-info-offset))
-            (header (logior (ash (1- size) n-widetag-bits) closure-widetag)))
-       (allocation result (pad-data-block size) node stack-allocate-p
-                   fun-pointer-lowtag)
+   (let* ((words (+ length closure-info-offset)) ; including header
+          (bytes (pad-data-block words))
+          (header (logior (ash (1- words) n-widetag-bits) closure-widetag)))
+     (unless stack-allocate-p
+       (instrument-alloc bytes node))
+     (maybe-pseudo-atomic stack-allocate-p
+       (allocation result bytes node stack-allocate-p fun-pointer-lowtag)
        (storew* #!-immobile-space header ; write the widetag and size
                 #!+immobile-space        ; ... plus the layout pointer
                 (progn (inst mov temp header)
@@ -536,9 +541,12 @@
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
   (:generator 50
+   (let ((bytes (pad-data-block words)))
     (progn name) ; possibly not used
+    (unless stack-allocate-p
+      (instrument-alloc bytes node))
     (maybe-pseudo-atomic stack-allocate-p
-     (allocation result (pad-data-block words) node stack-allocate-p lowtag)
+     (allocation result bytes node stack-allocate-p lowtag)
      (when type
        (let* ((widetag (if (typep type 'layout) instance-widetag type))
               (header (logior (ash (1- words) n-widetag-bits) widetag)))
@@ -553,7 +561,7 @@
          (unless (eq type widetag) ; TYPE is actually a LAYOUT
            (inst mov (make-ea :dword :base result :disp (+ 4 (- lowtag)))
                  ;; XXX: should layout fixups use a name, not a layout object?
-                 (make-fixup type :layout))))))))
+                 (make-fixup type :layout)))))))))
 
 ;;; Allocate a non-vector variable-length object.
 ;;; Exactly 4 allocators are rendered via this vop:
@@ -590,6 +598,7 @@
           (make-ea :qword :base header
                    :disp (+ (ash -2 n-widetag-bits) type)))
     (inst and bytes (lognot lowtag-mask)))
+    (instrument-alloc bytes node)
     (pseudo-atomic
      (allocation result bytes node nil lowtag)
      (storew header result 0 lowtag))))

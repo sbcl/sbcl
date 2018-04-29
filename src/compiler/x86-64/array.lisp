@@ -40,6 +40,7 @@
     (inst shl header n-widetag-bits)
     (inst or  header type)
     (inst shr header n-fixnum-tag-bits)
+    (instrument-alloc bytes node)
     (pseudo-atomic
      (allocation result bytes node nil other-pointer-lowtag)
      (storew header result 0 other-pointer-lowtag))))
@@ -60,6 +61,7 @@
            (header (logior (ash header-size
                                 n-widetag-bits)
                            type)))
+     (instrument-alloc bytes node)
      (pseudo-atomic
       (allocation result bytes node nil other-pointer-lowtag)
       (storew header result 0 other-pointer-lowtag)))))

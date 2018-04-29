@@ -1300,6 +1300,8 @@
       (inst mov result nil-value)
       (inst jrcxz done)
       (inst lea dst (make-ea :qword :index rcx :scale (ash 2 (- word-shift n-fixnum-tag-bits))))
+      (unless stack-allocate-p
+        (instrument-alloc dst node))
       (maybe-pseudo-atomic stack-allocate-p
        ;; FIXME: if COUNT >= 8192, allocates to single-object page(s).
        ;; All we have to do is unset the '.singleton' bit,
