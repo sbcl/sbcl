@@ -580,7 +580,9 @@ lispobj fdefn_callee_lispobj(struct fdefn* fdefn) {
 
 extern unsigned int alloc_profile_n_counters;
 extern unsigned int max_alloc_point_counters;
+#ifdef LISP_FEATURE_SB_THREAD
 extern pthread_mutex_t alloc_profiler_lock;
+#endif
 
 static unsigned int claim_index(int qty)
 {
