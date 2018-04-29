@@ -152,10 +152,10 @@
   (block nil
     (flet ((give-up (&optional reason)
              (cond ((= (length subscripts) 1)
-                    (let ((arg (sb!xc:gensym)))
-                      `(lambda (array ,arg)
-                         (and (typep ,arg '(and fixnum unsigned-byte))
-                              (< ,arg (array-dimension array 0))))))
+                    (return
+                      `(lambda (array arg)
+                         (and (typep arg '(and fixnum unsigned-byte))
+                              (< arg (array-dimension array 0))))))
                    (t
                     (give-up-ir1-transform
                      (or reason
@@ -168,9 +168,6 @@
                               (lvar-conservative-type array))
                              args)
                           (give-up (car args)))))
-        ;; Might be *. (Note: currently this is never true, because the type
-        ;; derivation infers the rank from the call to ARRAY-IN-BOUNDS-P, but
-        ;; let's keep this future proof.)
         (when (eq '* dimensions)
           (give-up "array bounds unknown"))
         ;; shortcut for zero dimensions

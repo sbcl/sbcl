@@ -1385,3 +1385,12 @@
       '(lambda (&rest s) (nth 536870908 s))
     (() nil)))
 
+
+(with-test (:name :array-in-bounds-p-transform-hairy-types)
+  (checked-compile-and-assert
+      ()
+      '(lambda ()
+        (let ((a (the (satisfies eval) (make-array 4 :fill-pointer 0))))
+          (and (array-in-bounds-p a 0)
+               (array-in-bounds-p a 1))))
+    (() t)))
