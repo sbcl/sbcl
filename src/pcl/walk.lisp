@@ -27,7 +27,16 @@
 ;;;; warranty about the software, its performance or its conformity to any
 ;;;; specification.
 
-(in-package "SB!WALKER")
+(defpackage "SB-WALKER"
+  (:use "CL" "SB-INT" "SB-EXT")
+  (:documentation "internal: a code walker used by PCL")
+  (:export "DEFINE-WALKER-TEMPLATE"
+           "WALK-FORM"
+           "*WALK-FORM-EXPAND-MACROS-P*"
+           "VAR-LEXICAL-P" "VAR-SPECIAL-P"
+           "VAR-GLOBALLY-SPECIAL-P"
+           "VAR-DECLARATION"))
+(in-package "SB-WALKER")
 
 ;;;; forward references
 
@@ -100,12 +109,12 @@
 ;;; Instead this list was COERCEd to a #<FUNCTION ...>!
 ;;;
 ;;; Instead, we now use a special sort of "function"-type for that
-;;; information, because the functions slot in SB!C::LEXENV is
+;;; information, because the functions slot in SB-C::LEXENV is
 ;;; supposed to have a list of <Name MACRO . #<function> elements.
 ;;; So, now we hide our bits of interest in the walker-info slot in
 ;;; our new BOGO-FUN.
 ;;;
-;;; MACROEXPAND-1 and SB!INT:EVAL-IN-LEXENV are the only SBCL
+;;; MACROEXPAND-1 and SB-INT:EVAL-IN-LEXENV are the only SBCL
 ;;; functions that get called with the constructed environment
 ;;; argument.
 
@@ -151,8 +160,8 @@
   ;; would be wrong. But we still have to make an entry so we can tell
   ;; functions from macros -- same for telling variables apart from
   ;; symbol macros.
-  (let ((lexenv (sb!kernel:coerce-to-lexenv env)))
-    (sb!c::make-lexenv
+  (let ((lexenv (sb-kernel:coerce-to-lexenv env)))
+    (sb-c::make-lexenv
      :default lexenv
      :vars (when (eql (caar macros) *key-to-walker-environment*)
              (copy-tree (mapcar (lambda (b)
@@ -161,20 +170,20 @@
                                     (if (eq info :lexical-var)
                                         (cons name
                                               (if (var-special-p name env)
-                                                  (sb!c::make-global-var
+                                                  (sb-c::make-global-var
                                                    :kind :special
                                                    :%source-name name)
-                                                  (sb!c::make-lambda-var
+                                                  (sb-c::make-lambda-var
                                                    :%source-name name)))
                                         b)))
                                 (fourth (cadar macros)))))
      :funs (append (mapcar (lambda (f)
                              (cons (car f)
-                                   (sb!c::make-functional :lexenv lexenv)))
+                                   (sb-c::make-functional :lexenv lexenv)))
                            funs)
                    (mapcar (lambda (m)
                              (list* (car m)
-                                    'sb!c::macro
+                                    'sb-sys:macro
                                     (if (eq (car m)
                                             *key-to-walker-environment*)
                                         (walker-info-to-bogo-fun (cadr m))
@@ -183,16 +192,16 @@
 
 (defun environment-function (env fn)
   (when env
-    (let ((entry (assoc fn (sb!c::lexenv-funs env) :test #'equal)))
+    (let ((entry (assoc fn (sb-c::lexenv-funs env) :test #'equal)))
       (and entry
-           (sb!c::functional-p (cdr entry))
+           (sb-c::functional-p (cdr entry))
            (cdr entry)))))
 
 (defun environment-macro (env macro)
   (when env
-    (let ((entry (assoc macro (sb!c::lexenv-funs env) :test #'eq)))
+    (let ((entry (assoc macro (sb-c::lexenv-funs env) :test #'eq)))
       (and entry
-           (eq (cadr entry) 'sb!c::macro)
+           (eq (cadr entry) 'sb-sys:macro)
            (if (eq macro *key-to-walker-environment*)
                (values (bogo-fun-to-walker-info (cddr entry)))
                (values (function-lambda-expression (cddr entry))))))))
@@ -228,7 +237,7 @@
   #-sb-xc-host
   (let ((gensym (make-symbol name)))
     (eval-in-lexenv `(defmacro ,gensym ,llist ,@body)
-                    (sb!c::make-restricted-lexenv env))
+                    (sb-c::make-restricted-lexenv env))
     (macro-function gensym)))
 
 ;;;; the actual walker
@@ -292,24 +301,25 @@
   ;; if we're finding something in the real lexenv, we don't have a
   ;; bound declaration and so we specifically don't want to return
   ;; a special object that declarations can attach to, just the name.
-  (and env (find var (mapcar #'car (sb!c::lexenv-vars env)))))
+  (and env (find var (mapcar #'car (sb-c::lexenv-vars env)))))
 
 (defun variable-symbol-macro-p (var env)
   ;; FIXME: crufty return convention
   (let ((entry (or (member var (env-lexical-variables env) :key #'car :test #'eq)
-                   (and env (member var (sb!c::lexenv-vars env) :key #'car :test #'eq)))))
-    (when (and (consp (cdar entry)) (eq (cadar entry) 'sb!sys:macro))
+                   (and env (member var (sb-c::lexenv-vars env) :key #'car :test #'eq)))))
+    (when (and (consp (cdar entry)) (eq (cadar entry) 'sb-sys:macro))
       (return-from variable-symbol-macro-p entry))
     (unless entry
       (when (var-globally-symbol-macro-p var)
-        (list (list* var 'sb!sys:macro (info :variable :macro-expansion var)))))))
+        (list (list* var 'sb-sys:macro (info :variable :macro-expansion var)))))))
 
 (defun var-globally-symbol-macro-p (var)
   (eq (info :variable :kind var) :macro))
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
 (defun walked-var-declaration-p (declaration)
-  (member declaration '(sb!pcl::%class sb!pcl::%parameter
-                        sb!pcl::%variable-rebinding special)))
+  (member declaration '(sb-pcl::%class sb-pcl::%parameter
+                        sb-pcl::%variable-rebinding special))))
 
 (defun %var-declaration (declaration var env)
   (let ((id (or (var-lexical-p var env) var)))
@@ -329,10 +339,9 @@
       (%var-declaration declaration var env)
       (error "Not a variable declaration the walker cares about: ~S" declaration)))
 
-#-sb-xc-host
 (define-compiler-macro var-declaration (&whole form declaration var env
                                         &environment lexenv)
-  (if (sb!xc:constantp declaration lexenv)
+  (if (constantp declaration lexenv)
       (let ((decl (constant-form-value declaration lexenv)))
         (if (walked-var-declaration-p decl)
             `(%var-declaration ,declaration ,var ,env)
@@ -460,12 +469,16 @@
 
 ;;; SBCL-only special forms
 (define-walker-template truly-the (nil quote eval))
-(define-walker-template sb!kernel:the* (nil quote eval))
+(define-walker-template sb-kernel:the* (nil quote eval))
 ;;; FIXME: maybe we don't need this one any more, given that
 ;;; NAMED-LAMBDA now expands into (FUNCTION (NAMED-LAMBDA ...))?
 (define-walker-template named-lambda walk-named-lambda)
 
 (defvar *walk-form-expand-macros-p* nil)
+
+#+sb-fasteval
+(declaim (ftype (sfunction (sb-interpreter:basic-env &optional t) sb-kernel:lexenv)
+                sb-interpreter:lexenv-from-env environment))
 
 (defun walk-form (form
                   &optional environment
@@ -473,9 +486,9 @@
                              (lambda (subform context env)
                                (declare (ignore context env))
                                subform)))
-  #!+(and sb-fasteval (host-feature sb-xc))
-  (when (typep environment 'sb!interpreter:basic-env)
-    (setq environment (sb!interpreter:lexenv-from-env environment)))
+  #+sb-fasteval
+  (when (typep environment 'sb-interpreter:basic-env)
+    (setq environment (sb-interpreter:lexenv-from-env environment)))
   (walker-environment-bind (new-env environment :walk-function walk-function)
     (walk-form-internal form :eval new-env)))
 
@@ -679,7 +692,7 @@
                                      ,(or (var-lexical-p name env) name)
                                      ,.args)
                                    env)
-                 (note-declaration (sb!c::canonized-decl-spec declaration) env))
+                 (note-declaration (sb-c::canonized-decl-spec declaration) env))
              (push declaration declarations)))
          (recons body
                  form
@@ -702,7 +715,7 @@
                                          &aux arg)
   (cond ((null arglist) ())
         ((symbolp (setq arg (car arglist)))
-         (or (member arg sb!xc:lambda-list-keywords :test #'eq)
+         (or (member arg lambda-list-keywords :test #'eq)
              (note-var-binding arg env))
          (recons arglist
                  arg
@@ -710,7 +723,7 @@
                                context
                                env
                                (and destructuringp
-                                    (not (member arg sb!xc:lambda-list-keywords))))))
+                                    (not (member arg lambda-list-keywords))))))
         ((consp arg)
          (prog1 (recons arglist
                         (if destructuringp
@@ -951,7 +964,7 @@
                  :lexical-vars
                  (append (mapcar (lambda (binding)
                                    `(,(car binding)
-                                     sb!sys:macro . ,(cadr binding)))
+                                     sb-sys:macro . ,(cadr binding)))
                                  bindings)
                          (env-lexical-variables old-env)))
       (relist* form 'symbol-macrolet bindings

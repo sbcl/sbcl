@@ -694,12 +694,7 @@
  ("src/code/sxhash") ; needs SB!XC:DEFINE-MODIFY-MACRO
 
  ("src/code/late-globaldb" :not-host)
- ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
- ;; PCL-related stuff, which shouldn't need to be done earlier than
- ;; anything else in cold build because after all it used to be
- ;; postponed 'til warm init with no problems.
-
- ("src/pcl/walk"))
+ )
 
 ;;; warm build skips the list of files above even though there is no "#!" macro
 ;;; at this point. That's not specified behavior of *READ-SUPPRESS*.
@@ -713,7 +708,8 @@
   ;; We re-nickname SB-SEQUENCE as SEQUENCE now.
   ;; It could be done in genesis, but not earlier,
   ;; since the host has a package of that name.
-  "src/code/defpackage")
+  "src/code/defpackage"
+  "src/pcl/walk") ; needs DEFPACKAGE
 
  #+sb-fasteval
  ("src/interpreter/macros"
