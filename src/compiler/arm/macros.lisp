@@ -204,16 +204,14 @@
   (let ((fixup (gen-label)))
     (when (integerp size)
       (load-immediate-word alloc-tn size))
-    (emit-word sb!assem::**current-segment** (logior #xe92d0000
-                                                     (ash 1 (if (integerp size)
-                                                                (tn-offset alloc-tn)
-                                                                (tn-offset size)))
-                                                     (ash 1 (tn-offset lr-tn))))
+    (inst word (logior #xe92d0000
+                       (ash 1 (if (integerp size) (tn-offset alloc-tn) (tn-offset size)))
+                       (ash 1 (tn-offset lr-tn))))
     (inst load-from-label alloc-tn alloc-tn fixup)
     (inst blx alloc-tn)
-    (emit-word sb!assem::**current-segment** (logior #xe8bd0000
-                                                     (ash 1 (tn-offset alloc-tn))
-                                                     (ash 1 (tn-offset lr-tn))))
+    (inst word (logior #xe8bd0000
+                       (ash 1 (tn-offset alloc-tn))
+                       (ash 1 (tn-offset lr-tn))))
     (inst b back-label)
     (emit-label fixup)
     (inst word (make-fixup "alloc_tramp" :foreign))))
