@@ -482,6 +482,7 @@
  ("src/compiler/float-tran")
  ("src/compiler/saptran")
  ("src/compiler/srctran")
+ ("src/compiler/sxhash")
  ("src/code/quantifiers")
  ("src/compiler/bitops-derive-type")
  ("src/compiler/generic/vm-tran")
@@ -691,7 +692,6 @@
  ;; machinery like SB!XC:DEFMACRO exists
 
  ("src/code/late-format") ; needs SB!XC:DEFMACRO
- ("src/code/sxhash") ; needs SB!XC:DEFINE-MODIFY-MACRO
 
  ("src/code/late-globaldb" :not-host)
  )

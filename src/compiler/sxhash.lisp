@@ -89,15 +89,21 @@
 ;;; strings, and of symbols whose names are known at compile time;
 ;;; except that since SXHASH on the cross-compilation host is not in
 ;;; general compatible with SXHASH on the target SBCL, we can't so
-;;; easily do this optimization in the cross-compiler, and SBCL itself
-;;; doesn't seem to need this optimization, so we don't try.
+;;; easily do this optimization in the cross-compiler.
+;;; To play it safe, we'll assert that SBCL itself would not benefit
+;;; from this optimization.
+(macrolet ((compiler-sxhash (x)
+             #+sb-xc-host `(error "Compiler wanted to eval (SXHASH '~S)" (lvar-value ,x))
+             #-sb-xc-host `(sxhash (lvar-value ,x))))
 (deftransform sxhash ((x) (simple-string))
-  (cond #-sb-xc-host ((constant-lvar-p x) (sxhash (lvar-value x)))
+  (cond ((constant-lvar-p x) (compiler-sxhash x))
         (t '(%sxhash-simple-string x))))
 (deftransform sxhash ((x) (symbol))
-  (cond #-sb-xc-host ((constant-lvar-p x) (sxhash (lvar-value x)))
-        ((csubtypep (lvar-type x) (specifier-type 'null))
+  (cond ((csubtypep (lvar-type x) (specifier-type 'null))
+         ;; Test this before CONSTANT-LVAR-P because it does happen
+         ;; during cross-compilation, and we want to win, not lose.
          (ash sb!vm::nil-value (- sb!vm:n-fixnum-tag-bits)))
+        ((constant-lvar-p x) (compiler-sxhash x))
         ((csubtypep (lvar-type x) (specifier-type 'keyword))
          ;; All interned symbols have a precomputed hash.
          ;; There's no way to ask the type system whether a symbol is known to
@@ -116,6 +122,7 @@
             (if (= 0 result)
                 (ensure-symbol-hash x)
                 result)))))
+) ; end MACROLET
 
 (deftransform psxhash ((x &optional depthoid) (character &optional t))
   `(char-code (char-upcase x)))
