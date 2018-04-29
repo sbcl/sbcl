@@ -1255,7 +1255,7 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1)))
   (:info index)
-  (:arg-types * (:constant (signed-byte 32)))
+  (:arg-types * (:constant (signed-byte #.(- 32 word-shift))))
   (:results (value :scs (descriptor-reg any-reg)))
   (:result-types *)
   (:generator 3

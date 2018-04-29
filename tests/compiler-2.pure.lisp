@@ -1379,3 +1379,9 @@
       '(lambda (x) (funcall (the compiled-function #'aref) x))
     ((#0A123) 123)))
 
+(with-test (:name :nth-&rest-overflow)
+  (checked-compile-and-assert
+      ()
+      '(lambda (&rest s) (nth 536870908 s))
+    (() nil)))
+
