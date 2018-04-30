@@ -878,6 +878,7 @@
                  (:delay ,cost)
                  (:dependencies (writes frt) (reads fra) (reads frb) (reads frc) ,@other-dependencies)
                  (:emitter
+                  (progn frc) ; unused sometimes. Why?
                   (emit-a-form-inst segment
                    ,op
                    (fp-reg-tn-encoding frt)

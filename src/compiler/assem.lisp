@@ -1390,42 +1390,6 @@
                (:big-endian forms))
            ',name)))))
 
-;;; Return a list of forms involving VALUES that will pass the arguments from
-;;; LAMBA-LIST by way of MULTIPLE-VALUE-CALL. Secondary value is the augmented
-;;; lambda-list which has a supplied-p var for every &OPTIONAL and &KEY arg.
-(defun make-arglist-forwarder (lambda-list)
-  (multiple-value-bind (llks required optional rest keys aux)
-      (parse-lambda-list lambda-list)
-    (collect ((reconstruction))
-      (flet ((augment (spec var def sup-p var-maker arg-passing-form)
-               (multiple-value-bind (sup-p new-spec)
-                   (if sup-p
-                       (values (car sup-p) spec)
-                       (let ((sup-p (copy-symbol var)))
-                         (values sup-p `(,(funcall var-maker) ,def ,sup-p))))
-                 (reconstruction `(if ,sup-p ,arg-passing-form (values)))
-                 new-spec)))
-        (setq optional ; Ensure that each &OPTIONAL arg has a supplied-p var.
-              (mapcar (lambda (spec)
-                        (multiple-value-bind (var def sup)
-                            (parse-optional-arg-spec spec)
-                          (augment spec var def sup (lambda () var) var)))
-                      optional))
-        (unless (ll-kwds-restp llks)
-          (setq keys ; Do the same for &KEY, unless &REST is present.
-                (mapcar (lambda (spec)
-                          (multiple-value-bind (key var def sup)
-                              (parse-key-arg-spec spec)
-                            (augment spec var def sup
-                                     (lambda ()
-                                       (if (eq (keywordicate var) key)
-                                           var
-                                           `(,key ,var)))
-                                     `(values ',key ,var))))
-                        keys))))
-      (values `(,@required ,@(reconstruction) ,@(if rest `((values-list ,@rest))))
-              (make-lambda-list llks nil required optional rest keys aux)))))
-
 (defmacro define-instruction (name lambda-list &rest options)
   (binding* ((sym-name (symbol-name name))
              (defun-name (op-encoder-name sym-name t))
@@ -1438,9 +1402,7 @@
              (dependencies nil)
              (delay nil)
              (pinned nil)
-             (pdefs nil)
-             ((arg-reconstructor new-lambda-list)
-              (make-arglist-forwarder (cdr lambda-list))))
+             (pdefs nil))
     (dolist (option-spec options)
       (multiple-value-bind (option args)
           (if (consp option-spec)
@@ -1481,7 +1443,7 @@
           (t
            (error "unknown option: ~S" option)))))
     (when emitter
-      (push `(multiple-value-call #'instruction-hooks ,sym-name ,@arg-reconstructor)
+      (push `(apply #'instruction-hooks ,sym-name .operands.)
             emitter)
       (unless cost (setf cost 1))
       #!+sb-dyncount
@@ -1501,9 +1463,8 @@
                   `((when (segment-run-scheduler ,segment-name)
                       (schedule-pending-instructions ,segment-name))
                     ,@emitter))
-            (let ((flet-name
-                    (gensym (concatenate 'string "EMIT-" sym-name "-INST-")))
-                  (inst-name (gensym "INST-")))
+            (let ((flet-name (make-symbol (concatenate 'string "ENCODE-" sym-name)))
+                  (inst-name '#:inst))
               (setf emitter `((flet ((,flet-name (,segment-name)
                                        ,@emitter))
                                 (if (segment-run-scheduler ,segment-name)
@@ -1526,13 +1487,13 @@
        (setf (get ',defun-name 'sb!disassem::instruction-flavors)
              (list ,@pdefs))
        ,(when emitter
-          `(defun ,defun-name ,new-lambda-list
-             ,@(when decls
-                 `((declare ,@decls)))
-             (let* ((,segment-name **current-segment**)
-                    ,@(and vop-name
-                           `((,vop-name **current-vop**))))
-               ,@emitter)
+          `(defun ,defun-name (&rest .operands.)
+             (apply (lambda ,(cdr lambda-list)
+                      (declare ,@decls)
+                      (let ((,segment-name **current-segment**)
+                            ,@(and vop-name `((,vop-name **current-vop**))))
+                        ,@emitter))
+                    .operands.)
              (values))))))
 
 (defun instruction-hooks (&rest args)

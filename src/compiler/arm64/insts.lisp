@@ -2289,6 +2289,7 @@
 
 (define-instruction compute-code (segment code lip object-label)
   (:vop-var vop)
+  (:declare (ignore object-label))
   (:emitter
    (emit-compute segment vop code lip
                  (lambda (position &optional magic-value)
