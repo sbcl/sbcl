@@ -459,7 +459,7 @@ static void trace1(lispobj object,
     enum ref_kind root_kind;
     struct thread* root_thread;
     char* thread_pc = 0;
-    lispobj tls_index;
+    lispobj tls_index = 0;
     lispobj target;
     int i;
 
