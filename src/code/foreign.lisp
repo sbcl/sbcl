@@ -122,6 +122,7 @@ if the symbol isn't found."
 (defvar *!initial-foreign-symbols*)
 
 (defun !foreign-cold-init ()
+  (declare (special *runtime-dlhandle* *shared-objects*))
   #!-sb-dynamic-core
   (dovector (symbol *!initial-foreign-symbols*)
     (setf (gethash (car symbol) *static-foreign-symbols*) (cdr symbol)))
@@ -134,6 +135,22 @@ if the symbol isn't found."
   (setf *runtime-dlhandle* (dlopen-or-lose))
   #!+os-provides-dlopen
   (setf *shared-objects* nil))
+
+;;; Helpers for defining error-signalling NOP's for "not supported
+;;; here" operations.
+(defmacro define-unsupported-fun (name &optional
+                                  (doc "Unsupported on this platform.")
+                                  (control
+                                   "~S is unsupported on this platform ~
+                                    (OS, CPU, whatever)."
+                                   controlp)
+                                  arguments)
+  `(defun ,name (&rest args)
+     ,doc
+     (declare (ignore args))
+     (error 'unsupported-operator
+            :format-control ,control
+            :format-arguments (if ,controlp ',arguments (list ',name)))))
 
 #!-os-provides-dlopen
 (define-unsupported-fun load-shared-object)
