@@ -617,7 +617,6 @@
  ("src/code/eval"              :not-host) ; uses INFO, wants compiler macro
  ("src/code/target-sap"        :not-host) ; uses SAP-INT type
  ("src/code/target-package"    :not-host) ; needs "code/package"
- ("src/code/module"            :not-host)
  ("src/code/bignum-random"     :not-host) ; needs "code/random" and
                                           ;   "code/bignum"
  ("src/code/target-hash-table" :not-host) ; needs "code/hash-table"
@@ -806,4 +805,5 @@
   #+immobile-code "src/code/immobile-space"
   "src/code/repack-xref"
   #+cheneygc "src/code/purify"
+  "src/code/module"
   "src/code/save"))
