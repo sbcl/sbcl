@@ -182,12 +182,15 @@
            (recurse x (list x) 0)
            t))))
 
-;;; Is X a (possibly-improper) list of at least N elements?
-(declaim (ftype (function (t index)) list-of-length-at-least-p))
-(defun list-of-length-at-least-p (x n)
-  (or (zerop n) ; since anything can be considered an improper list of length 0
-      (and (consp x)
-           (list-of-length-at-least-p (cdr x) (1- n)))))
+;;; Is LIST a (possibly-improper) list of at least LENGTH elements?
+(declaim (ftype (sfunction (t index) boolean) list-of-length-at-least-p))
+(defun list-of-length-at-least-p (list length)
+  (labels ((rec (rest n)
+             (declare (type index n))
+             (or (zerop n) ; since anything can be considered an improper list of length 0
+                 (and (consp rest)
+                      (rec (cdr rest) (1- n))))))
+    (rec list length)))
 
 ;;; Is X is a positive prime integer?
 (defun positive-primep (x)
