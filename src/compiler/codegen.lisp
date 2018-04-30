@@ -225,7 +225,8 @@
     (let* ((n-entries (length (ir2-component-entries (component-info component))))
            (ptrs-per-word (/ sb!vm:n-word-bytes 4)) ; either 1 or 2
            (n-words (ceiling (1- n-entries) ptrs-per-word)))
-      (emit-skip #!-inline-constants *code-segment*
+      (sb!assem::%emit-skip
+                 #!-inline-constants *code-segment*
                  #!+inline-constants (constant-segment *unboxed-constants*)
                  ;; Preserve double-word alignment of the unboxed constants
                  (sb!vm:pad-data-block n-words)))

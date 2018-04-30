@@ -793,10 +793,10 @@
   (incf (segment-current-posn segment))
   (values))
 
-;;; interface: Output AMOUNT bytes to SEGMENT, either copies of
+;;; internal: Output AMOUNT bytes to SEGMENT, either copies of
 ;;; PATTERN (if that is an integer), or by calling EMIT-LONG-NOP
 ;;; (if PATTERN is :LONG-NOP).
-(defun emit-skip (segment amount &optional (pattern 0))
+(defun %emit-skip (segment amount &optional (pattern 0))
   (declare (type segment segment)
            (type index amount))
   (etypecase pattern
@@ -837,7 +837,7 @@
 ;;; is useful if you just want to find out where things ended up.
 (defun emit-back-patch (segment size function)
   (emit-annotation segment (make-back-patch size function))
-  (emit-skip segment size))
+  (%emit-skip segment size))
 
 ;;; Note that the instruction stream here depends on the actual
 ;;; positions of various labels, so can't be output until label
@@ -858,7 +858,7 @@
            (type function maybe-shrink worst-case-fun))
   (let ((chooser (make-chooser size alignment maybe-shrink worst-case-fun)))
     (emit-annotation segment chooser)
-    (emit-skip segment size)
+    (%emit-skip segment size)
     (adjust-alignment-after-chooser segment chooser)))
 
 ;;; This is called in EMIT-CHOOSER and COMPRESS-SEGMENT in order to
@@ -897,7 +897,7 @@
 ;;; reemitted at its original _start_ position but the joined filler
 ;;; would extend over this position and instead leave a subsequence of
 ;;; the segment up to the alignment's original _end_ position visible.
-(defun emit-filler (segment n-bytes)
+(defun %emit-filler (segment n-bytes)
   (declare (type index n-bytes))
   (let ((last (segment-last-annotation segment)))
     (cond ((and last
@@ -947,7 +947,7 @@
                                       (1- (ash 1 bits)))))
              (aver (> size 0))
              (emit-annotation segment (make-alignment bits size pattern))
-             (emit-skip segment size pattern))
+             (%emit-skip segment size pattern))
            (setf (segment-alignment segment) bits)
            (setf (segment-sync-posn segment) (segment-current-posn segment)))
           (t
@@ -956,7 +956,7 @@
            ;; assuming the last alignment was met.
            (let* ((mask (1- (ash 1 bits)))
                   (new-offset (logand (+ offset mask) (lognot mask))))
-             (emit-skip segment (- new-offset offset) pattern))
+             (%emit-skip segment (- new-offset offset) pattern))
            ;; But we emit an alignment with size=0 so we can verify
            ;; that everything works.
            (emit-annotation segment (make-alignment bits 0 pattern)))))
@@ -1016,7 +1016,7 @@
                               preserves ~W bits of alignment."
                              note additional-delta (chooser-alignment note)))
                     (incf delta additional-delta)
-                    (emit-filler segment additional-delta))
+                    (%emit-filler segment additional-delta))
                   (setf prev (segment-last-annotation segment))
                   (if prev
                       (setf (cdr prev) (cdr remaining))
@@ -1058,7 +1058,7 @@
                               and is ~W now."
                              note old-size size))
                     (when (plusp additional-delta)
-                      (emit-filler segment additional-delta)
+                      (%emit-filler segment additional-delta)
                       (incf delta additional-delta)))
                   (setf prev (segment-last-annotation segment))
                   (if prev
@@ -1101,8 +1101,8 @@
                   ;; We need to re-emit the alignment because a shorter
                   ;; multi-byte NOP pattern is most of the time not a
                   ;; prefix of a longer one.
-                  (emit-skip segment size (alignment-pattern note)))
-                (emit-filler segment additional-delta)
+                  (%emit-skip segment size (alignment-pattern note)))
+                (%emit-filler segment additional-delta)
                 (setf prev (segment-last-annotation segment))
                 (if prev
                     (setf (cdr prev) next)
