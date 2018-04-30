@@ -207,11 +207,8 @@
 ;;;
 ;;; Return true if X is a proper list whose length is between MIN and
 ;;; MAX (inclusive).
+;;; Running time is bounded by MAX for circular inputs.
 (defun proper-list-of-length-p (x min &optional (max min))
-  ;; FIXME: This implementation will hang on circular list
-  ;; structure. Since this is an error-checking utility, i.e. its
-  ;; job is to deal with screwed-up input, it'd be good style to fix
-  ;; it so that it can deal with circular list structure.
   (cond ((minusp max) nil)
         ((null x) (zerop min))
         ((consp x)
