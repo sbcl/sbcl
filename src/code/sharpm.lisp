@@ -120,7 +120,7 @@
       ;; It's not legal to have #A without the rank, use that for
       ;; #A(dimensions element-type contents) to avoid using #. when
       ;; printing specialized arrays readably.
-      ((proper-list-of-length-p contents 2)
+      ((list-of-length-at-least-p contents 2)
        (destructuring-bind (dimensions type &rest contents) contents
          (make-array dimensions :initial-contents contents
                                 :element-type type)))
