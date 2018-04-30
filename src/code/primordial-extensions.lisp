@@ -28,6 +28,14 @@
                          bindings)))
      ,@forms))
 
+;;; like Scheme's named LET
+(defmacro named-let (name binds &body body)
+  (dolist (x binds)
+    (unless (proper-list-of-length-p x 2)
+      (error "malformed NAMED-LET variable spec: ~S" x)))
+  `(labels ((,name ,(mapcar #'first binds) ,@body))
+     (,name ,@(mapcar #'second binds))))
+
 ;; Define "exchanged subtract" So that DECF on a symbol requires no LET binding:
 ;;  (DECF I (EXPR)) -> (SETQ I (XSUBTRACT (EXPR) I))
 ;; which meets the CLHS 5.1.3 requirement to eval (EXPR) prior to reading

@@ -185,12 +185,10 @@
 ;;; Is LIST a (possibly-improper) list of at least LENGTH elements?
 (declaim (ftype (sfunction (t index) boolean) list-of-length-at-least-p))
 (defun list-of-length-at-least-p (list length)
-  (labels ((rec (rest n)
-             (declare (type index n))
-             (or (zerop n) ; since anything can be considered an improper list of length 0
-                 (and (consp rest)
-                      (rec (cdr rest) (1- n))))))
-    (rec list length)))
+  (named-let rec ((rest list) (n length))
+    (declare (type index n))
+    (or (zerop n) ; since anything can be considered an improper list of length 0
+        (and (consp rest) (rec (cdr rest) (1- n))))))
 
 ;;; Is X is a positive prime integer?
 (defun positive-primep (x)
@@ -370,18 +368,6 @@
           (t list))))
 
 ;;;; miscellaneous iteration extensions
-
-;;; like Scheme's named LET
-;;;
-;;; (CMU CL called this ITERATE, and commented it as "the ultimate
-;;; iteration macro...". I (WHN) found the old name insufficiently
-;;; specific to remind me what the macro means, so I renamed it.)
-(defmacro named-let (name binds &body body)
-  (dolist (x binds)
-    (unless (proper-list-of-length-p x 2)
-      (error "malformed NAMED-LET variable spec: ~S" x)))
-  `(labels ((,name ,(mapcar #'first binds) ,@body))
-     (,name ,@(mapcar #'second binds))))
 
 (defun filter-dolist-declarations (decls)
   (mapcar (lambda (decl)
