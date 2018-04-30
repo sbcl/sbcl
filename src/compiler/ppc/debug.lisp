@@ -69,7 +69,7 @@
         (inst addi temp temp (- lowtag other-pointer-lowtag)))
       (inst sub code thing temp)
       (emit-label done)
-      (assemble (*elsewhere*)
+      (assemble (:elsewhere)
         (emit-label bogus)
         (move code null-tn)
         (inst b done)))))

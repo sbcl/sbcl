@@ -226,7 +226,7 @@
   LOOP
 
   (let ((error (gen-label)))
-    (assemble (*elsewhere*)
+    (assemble (:elsewhere)
       (emit-label error)
 
       ;; Fake up a stack frame so that backtraces come out right.

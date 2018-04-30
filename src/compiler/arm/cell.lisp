@@ -136,7 +136,7 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 38
     (let ((closure-tramp-fixup (gen-label)))
-      (assemble (*elsewhere*)
+      (assemble (:elsewhere)
         (emit-label closure-tramp-fixup)
         (inst word (make-fixup 'closure-tramp :assembly-routine)))
       (load-type type function (- fun-pointer-lowtag))
@@ -156,7 +156,7 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 38
     (let ((undefined-tramp-fixup (gen-label)))
-      (assemble (*elsewhere*)
+      (assemble (:elsewhere)
         (emit-label undefined-tramp-fixup)
         (inst word (make-fixup 'undefined-tramp :assembly-routine)))
       (storew null-tn fdefn fdefn-fun-slot other-pointer-lowtag)

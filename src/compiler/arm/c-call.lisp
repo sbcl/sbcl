@@ -174,7 +174,7 @@
   (:generator 2
     (let ((fixup-label (gen-label)))
       (inst load-from-label res lip fixup-label)
-      (assemble (*elsewhere*)
+      (assemble (:elsewhere)
         (emit-label fixup-label)
         (inst word (make-fixup foreign-symbol :foreign))))))
 
@@ -192,7 +192,7 @@
     (let ((fixup-label (gen-label)))
       (inst load-from-label res lip fixup-label)
       (inst ldr res (@ res))
-      (assemble (*elsewhere*)
+      (assemble (:elsewhere)
         (emit-label fixup-label)
         (inst word (make-fixup foreign-symbol :foreign-dataref))))))
 
@@ -211,7 +211,7 @@
   (:generator 0
     (let ((call-into-c-fixup (gen-label))
           (cur-nfp (current-nfp-tn vop)))
-      (assemble (*elsewhere*)
+      (assemble (:elsewhere)
         (emit-label call-into-c-fixup)
         (inst word (make-fixup "call_into_c" :foreign)))
       (when cur-nfp

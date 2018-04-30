@@ -216,7 +216,7 @@
         (*fixup-notes* nil))
     (let ((label (sb!assem:gen-label)))
       (setf *elsewhere-label* label)
-      (assemble (*elsewhere*)
+      (assemble (:elsewhere)
         (sb!assem:emit-label label)))
     ;; Leave space for the unboxed words containing simple-fun offsets.
     ;; Each offset is a 32-bit integer. On 64-bit platforms, 1 offset
@@ -235,7 +235,7 @@
       (let ((1block (ir2-block-block block)))
         (when (and (eq (block-info 1block) block)
                    (block-start 1block))
-          (assemble (*code-segment*)
+          (assemble (:code)
             ;; Align first emitted block of each loop: x86 and x86-64 both
             ;; like 16 byte alignment, however, since x86 aligns code objects
             ;; on 8 byte boundaries we cannot guarantee proper loop alignment
@@ -262,7 +262,7 @@
       (do ((vop (ir2-block-start-vop block) (vop-next vop)))
           ((null vop))
         (let ((gen (vop-info-generator-function (vop-info vop))))
-          (assemble (*code-segment* vop)
+          (assemble (:code vop)
             (cond ((not gen)
                    (format t
                            "missing generator for ~S~%"
@@ -284,7 +284,7 @@
             *fixup-notes*)))
 
 (defun emit-label-elsewhere (label)
-  (assemble (*elsewhere*)
+  (assemble (:elsewhere)
     (emit-label label)))
 
 (defun label-elsewhere-p (label-or-posn kind)

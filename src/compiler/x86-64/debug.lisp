@@ -86,7 +86,7 @@
             (make-ea :qword :base thing :index temp :scale n-word-bytes
                             :disp (- other-pointer-lowtag fun-pointer-lowtag)))
       (emit-label done)
-      (assemble (*elsewhere*)
+      (assemble (:elsewhere)
         (emit-label bogus)
         (inst mov code nil-value)
         (inst jmp done)))))

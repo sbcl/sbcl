@@ -22,7 +22,7 @@
                   `((inst load-from-label pc-tn lr-tn ,fixup-address))
                   `((inst load-from-label lr-tn lr-tn ,fixup-address)
                     (inst blx lr-tn)))
-            (assemble (*elsewhere* ,vop)
+            (assemble (:elsewhere ,vop)
               (emit-label ,fixup-address)
               (inst word (make-fixup ',name :assembly-routine)))))
         nil)))

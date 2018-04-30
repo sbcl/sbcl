@@ -284,7 +284,7 @@ default-value-8
 
             (let ((defaults (defaults)))
               (when defaults
-                (assemble (*elsewhere*)
+                (assemble (:elsewhere)
                   (emit-label default-stack-vals)
                   (do ((remaining defaults (cdr remaining)))
                       ((null remaining))
@@ -331,7 +331,7 @@ default-value-8
 
     (emit-label done)
 
-    (assemble (*elsewhere*)
+    (assemble (:elsewhere)
       (emit-label variable-values)
       (inst compute-code-from-lra code-tn lra-tn lra-label temp)
       (do ((arg *register-arg-tns* (rest arg))
@@ -1049,7 +1049,7 @@ default-value-8
            (inst beq DONE))
           (t
            (inst addic. count nargs-tn (- (fixnumize fixed)))
-           (inst ble (assemble (*elsewhere*)
+           (inst ble (assemble (:elsewhere)
                        FIX-CSP
                        ;; If the fixed args aren't fully supplied, the
                        ;; (INST ADD CSP-TN RESULT COUNT) below could

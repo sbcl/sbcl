@@ -273,7 +273,7 @@
       (storew temp block catch-block-entry-pc-slot)
 
       ;; Run any required UWPs.
-      (assemble (*elsewhere* vop)
+      (assemble (:elsewhere vop)
         (emit-label uwp-label)
         (inst word (make-fixup 'unwind :assembly-routine)))
       (inst load-from-label pc-tn lr-tn uwp-label)

@@ -97,7 +97,7 @@
         (inst subq temp (- other-pointer-lowtag lowtag) temp))
       (inst subq thing temp code)
       (emit-label done)
-      (assemble (*elsewhere*)
+      (assemble (:elsewhere)
         (emit-label bogus)
         (move null-tn code)
         (inst br zero-tn done)))))

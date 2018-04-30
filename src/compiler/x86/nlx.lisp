@@ -191,7 +191,7 @@
                     (inst mov tn move-temp)))))
              (let ((defaulting-done (gen-label)))
                (emit-label defaulting-done)
-               (assemble (*elsewhere*)
+               (assemble (:elsewhere)
                  (dolist (default (defaults))
                    (emit-label (car default))
                    (when (cddr default)

@@ -287,7 +287,7 @@ default-value-8
 
             (let ((defaults (defaults)))
               (aver defaults)
-              (assemble (*elsewhere*)
+              (assemble (:elsewhere)
                 (emit-label default-stack-vals)
                 (do ((remaining defaults (cdr remaining)))
                     ((null remaining))
@@ -336,7 +336,7 @@ default-value-8
 
     (emit-label done)
 
-    (assemble (*elsewhere*)
+    (assemble (:elsewhere)
       (emit-label variable-values)
       (when lra-label
         (inst compute-code-from-lra code-tn code-tn lra-label temp))

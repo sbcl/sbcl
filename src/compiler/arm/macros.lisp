@@ -268,7 +268,7 @@
               (when ,lowtag
                 (inst orr ,result-tn ,result-tn ,lowtag))
 
-              (assemble (*elsewhere*)
+              (assemble (:elsewhere)
                 (emit-label ALLOC)
                 (allocation-tramp ,result-tn ,size BACK-FROM-ALLOC)
                 (emit-label FIXUP)
@@ -309,7 +309,7 @@
 (defun generate-error-code (vop error-code &rest values)
   "Generate-Error-Code Error-code Value*
   Emit code for an error with the specified Error-Code and context Values."
-  (assemble (*elsewhere*)
+  (assemble (:elsewhere)
     (let ((start-lab (gen-label)))
       (emit-label start-lab)
       (emit-error-break vop error-trap (error-number-or-lose error-code) values)

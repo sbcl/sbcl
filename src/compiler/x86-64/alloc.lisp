@@ -143,7 +143,7 @@
            (if lowtag
                (inst lea alloc-tn (make-ea :byte :base temp-reg-tn :disp lowtag))
                (inst mov alloc-tn temp-reg-tn))
-           (assemble (*elsewhere*)
+           (assemble (:elsewhere)
              (emit-label NOT-INLINE)
              (cond ((and (tn-p size) (location= size alloc-tn)) ; recover SIZE
                     (inst sub alloc-tn free-pointer)

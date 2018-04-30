@@ -183,7 +183,7 @@
 
                (emit-label defaulting-done)
 
-               (assemble (*elsewhere*)
+               (assemble (:elsewhere)
                  (dolist (def (defaults))
                    (emit-label (car def))
                    (let ((tn (cdr def)))

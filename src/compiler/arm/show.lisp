@@ -28,7 +28,7 @@
     (let ((call-into-c-fixup (gen-label))
           (debug-print-fixup (gen-label))
           (cur-nfp (current-nfp-tn vop)))
-      (assemble (*elsewhere*)
+      (assemble (:elsewhere)
         (emit-label call-into-c-fixup)
         (inst word (make-fixup "call_into_c" :foreign))
         (emit-label debug-print-fixup)

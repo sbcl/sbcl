@@ -1013,7 +1013,7 @@
         (inst add cur-nfp cur-nfp (bytes-needed-for-non-descriptor-stack-frame))
         (move nsp-tn cur-nfp)))
     (let ((fixup-lab (gen-label)))
-      (assemble (*elsewhere*)
+      (assemble (:elsewhere)
         (emit-label fixup-lab)
         (inst word (make-fixup 'tail-call-variable :assembly-routine)))
       (inst load-from-label pc-tn lip fixup-lab))))

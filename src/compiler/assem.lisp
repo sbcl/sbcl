@@ -278,7 +278,11 @@
         (error "duplicate nested labels: ~S"
                (intersection labels inherited-labels)))
       `(let* (,@(when segment
-                  `((**current-segment** ,segment)))
+                  `((**current-segment**
+                     ,(case segment
+                        (:code 'sb!c:*code-segment*)
+                        (:elsewhere 'sb!c:*elsewhere*)
+                        (t segment)))))
               ,@(when vop
                   `((**current-vop** ,vop)))
               ,@(mapcar (lambda (name)

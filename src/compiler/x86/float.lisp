@@ -2212,7 +2212,7 @@
                     (emit-label DONE)
                     (unless (zerop (tn-offset y))
                       (inst fstd y))
-                    (assemble (*elsewhere*)
+                    (assemble (:elsewhere)
                       (emit-label REDUCE)
                       ;; Else x was out of range so reduce it; ST0 is unchanged.
                       (with-empty-tn@fp-top (fr1)
@@ -2265,7 +2265,7 @@
       (inst fnstsw)                        ; status word to ax
       (inst and ah-tn #x04)                ; C2
       (inst jmp :nz REDUCE)
-      (assemble (*elsewhere*)
+      (assemble (:elsewhere)
         (emit-label REDUCE)
         ;; Else x was out of range so reduce it; ST0 is unchanged.
         (with-empty-tn@fp-top (fr1)

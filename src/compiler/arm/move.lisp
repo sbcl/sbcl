@@ -71,7 +71,7 @@
 (define-move-fun (load-system-area-pointer 1) (vop x y)
   ((immediate) (sap-reg))
   (let ((immediate-label (gen-label)))
-    (assemble (*elsewhere*)
+    (assemble (:elsewhere)
       (emit-label immediate-label)
       (inst word (sap-int (tn-value x))))
     (inst ldr y (@ immediate-label))))

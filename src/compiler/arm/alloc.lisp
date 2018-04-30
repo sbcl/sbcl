@@ -108,7 +108,7 @@
         (storew name result fdefn-name-slot other-pointer-lowtag)
         (storew null-tn result fdefn-fun-slot other-pointer-lowtag)
         (storew temp result fdefn-raw-addr-slot other-pointer-lowtag))
-      (assemble (*elsewhere*)
+      (assemble (:elsewhere)
         (emit-label undefined-tramp-fixup)
         (inst word (make-fixup 'undefined-tramp :assembly-routine))))))
 
@@ -160,7 +160,7 @@
   (:generator 1
     (let ((fixup (gen-label)))
       (inst load-from-label result lip fixup)
-      (assemble (*elsewhere*)
+      (assemble (:elsewhere)
         (emit-label fixup)
         (inst word (make-fixup 'funcallable-instance-tramp :assembly-routine))))))
 

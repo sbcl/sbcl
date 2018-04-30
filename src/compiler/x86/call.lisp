@@ -388,7 +388,7 @@
            (move esp-tn ebx-tn)
            (let ((defaults (defaults)))
              (when defaults
-               (assemble (*elsewhere*)
+               (assemble (:elsewhere)
                  (emit-label default-stack-slots)
                  (dolist (default defaults)
                    (emit-label (car default))
