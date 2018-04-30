@@ -97,33 +97,39 @@
                "Comma inside a backquoted array (not a list or general vector.)"))
          (*backquote-depth* 0)
          (contents (read stream t nil t)))
-    (if rank
-        (collect ((dims))
-          (let ((seq contents))
-            (dotimes (axis rank
-                           (make-array (dims) :initial-contents contents))
-              (unless (typep seq 'sequence)
-                (simple-reader-error stream
-                                     "#~WA axis ~W is not a sequence:~%  ~S"
-                                     rank axis seq))
-              (let ((len (length seq)))
-                (dims len)
-                (unless (or (= axis (1- rank))
-                            ;; ANSI: "If some dimension of the array whose
-                            ;; representation is being parsed is found to be
-                            ;; 0, all dimensions to the right (i.e., the
-                            ;; higher numbered dimensions) are also
-                            ;; considered to be 0."
-                            (= len 0))
-                  (setq seq (elt seq 0)))))))
-        ;; It's not legal to have #A without the rank, use that for
-        ;; #A(dimensions element-type contents) to avoid using #. when
-        ;; printing specialized arrays readably.
-        (let ((dimensions (car contents))
-              (type (cadr contents))
-              (contents (cddr contents)))
-          (make-array dimensions :initial-contents contents
-                                 :element-type type)))))
+    (cond
+      (rank
+       (collect ((dims))
+         (let ((seq contents))
+           (dotimes (axis rank
+                          (make-array (dims) :initial-contents contents))
+             (unless (typep seq 'sequence)
+               (simple-reader-error stream
+                                    "#~WA axis ~W is not a sequence:~%  ~S"
+                                    rank axis seq))
+             (let ((len (length seq)))
+               (dims len)
+               (unless (or (= axis (1- rank))
+                           ;; ANSI: "If some dimension of the array whose
+                           ;; representation is being parsed is found to be
+                           ;; 0, all dimensions to the right (i.e., the
+                           ;; higher numbered dimensions) are also
+                           ;; considered to be 0."
+                           (= len 0))
+                 (setq seq (elt seq 0))))))))
+      ;; It's not legal to have #A without the rank, use that for
+      ;; #A(dimensions element-type contents) to avoid using #. when
+      ;; printing specialized arrays readably.
+      ((proper-list-of-length-p contents 2)
+       (destructuring-bind (dimensions type &rest contents) contents
+         (make-array dimensions :initial-contents contents
+                                :element-type type)))
+      (t
+       (simple-reader-error stream
+                            "~@<Array literal is neither of the ~
+                             standard form #<rank>A<contents> nor the ~
+                             SBCL-specific form #A(dimensions ~
+                             element-type . contents).~@:>")))))
 
 ;;;; reading structure instances: the #S readmacro
 
