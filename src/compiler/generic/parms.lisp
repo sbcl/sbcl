@@ -77,7 +77,8 @@
     (let*
         ((spaces (append `((read-only ,small-space-size)
                            #!+sb-safepoint
-                           (safepoint ,+backend-page-bytes+ gc-safepoint-page-addr)
+                           (safepoint ,(symbol-value '+backend-page-bytes+)
+                                      gc-safepoint-page-addr)
                            (static ,small-space-size))
                          #!+linkage-table
                          `((linkage-table ,small-space-size))
