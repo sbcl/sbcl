@@ -330,3 +330,10 @@
                      (checked-compile
                       '(lambda () (position 0 '(1 2 0 5 . 5)))
                       :allow-style-warnings t))))
+
+(with-test (:name :source-form-context-dotted-list)
+  (assert (nth-value 1
+                     (checked-compile
+                      '(lambda (y) `(defines ,@ (and x) . ,y))
+                      :allow-warnings t))))
+

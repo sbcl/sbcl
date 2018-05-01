@@ -153,7 +153,7 @@
 (defun source-form-context (form)
   (flet ((get-it (form)
            (cond ((atom form) nil)
-                 ((>= (length form) 2)
+                 ((list-of-length-at-least-p form 2)
                   (let* ((context-fun-default
                            (lambda (x)
                              (declare (ignore x))
