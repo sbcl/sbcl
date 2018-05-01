@@ -1208,8 +1208,17 @@
           ((#-sb-xc macro-function #+sb-xc sb!xc:macro-function sym env)
            `(,sym ,@args))
           (t
-           `(,@(if stringablep `(,sym) `(funcall (op-encoder-name ,instruction)))
-             ,@args)))))
+           `(%inst ,(if stringablep `',sym `(op-encoder-name ,instruction))
+                   ,@args)))))
+
+(defun %inst (mnemonic &rest operands)
+  ;; Pass operands to the machine instruction encoder as a list and as
+  ;; spread arguments. The list alleviates the need for emitter to listify
+  ;; operands prior to calling any instruction hooks. The spread arguments
+  ;; allow the compiler to generate normal &OPTIONAL / &KEY parsing code
+  ;; in lieu of our generating a destructuring-bind to achieve the same.
+  (apply mnemonic operands **current-segment** operands)
+  (values))
 
 (defun emit-label (label)
   "Emit LABEL at this location in the current segment."
@@ -1447,7 +1456,7 @@
           (t
            (error "unknown option: ~S" option)))))
     (when emitter
-      (push `(apply #'instruction-hooks ,sym-name .operands.)
+      (push `(instruction-hooks ,segment-name ,sym-name .operands.)
             emitter)
       (unless cost (setf cost 1))
       #!+sb-dyncount
@@ -1491,24 +1500,19 @@
        (setf (get ',defun-name 'sb!disassem::instruction-flavors)
              (list ,@pdefs))
        ,(when emitter
-          `(defun ,defun-name (&rest .operands.)
-             (apply (lambda ,(cdr lambda-list)
-                      (declare ,@decls)
-                      (let ((,segment-name **current-segment**)
-                            ,@(and vop-name `((,vop-name **current-vop**))))
-                        ,@emitter))
-                    .operands.)
-             (values))))))
+          `(defun ,defun-name (.operands. ,segment-name ,@(cdr lambda-list))
+             (declare ,@decls)
+             (let ,(and vop-name `((,vop-name **current-vop**)))
+               ,@emitter))))))
 
-(defun instruction-hooks (&rest args)
-  (let* ((segment **current-segment**)
-         (vop **current-vop**)
-         (postits (segment-postits segment)))
+(defun instruction-hooks (segment mnemonic operands)
+  (let ((vop **current-vop**)
+        (postits (segment-postits segment)))
     (setf (segment-postits segment) nil)
     (dolist (postit postits)
       (emit-back-patch segment 0 postit))
     (awhen (segment-inst-hook segment)
-      (apply it segment vop args))))
+      (apply it segment vop mnemonic operands))))
 
 (defmacro define-instruction-macro (name lambda-list &body body)
   `(defmacro ,(op-encoder-name name t) ,lambda-list ,@body))
