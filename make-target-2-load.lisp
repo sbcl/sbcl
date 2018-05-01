@@ -67,6 +67,8 @@
 |#
                 (fmakunbound symbol)
                 (unintern symbol package))))))
+  (sb-int:dohash ((k v) sb-c::*backend-parsed-vops*)
+    (setf (sb-c::vop-parse-body v) nil))
   result)
 
 (progn
