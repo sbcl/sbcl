@@ -810,3 +810,14 @@
          (ash x -64))
     (( 123)  0)
     ((-321) -1)))
+
+(with-test (:name :64-bit-logcount)
+  (checked-compile-and-assert
+      ()
+      '(lambda (x)
+        (declare (type (unsigned-byte 54) x))
+        (logcount x))
+    (((1- (ash 1 24))) 24)
+    (((1- (ash 1 32))) 32)
+    (((1- (ash 1 48))) 48)
+    (((1- (ash 1 54))) 54)))

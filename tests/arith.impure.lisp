@@ -17,7 +17,6 @@
     (defun ,name (&rest args)
      (declare (optimize safety))
      (case (length args)
-       (0 (,fun))
        (1 (,fun (car args)))
        (2 (,fun (car args) (cadr args)))
        (t (apply #',fun args))))))
@@ -64,7 +63,10 @@
 (assert (= (compiled-logxor -6) -6))
 
 (with-test (:name (coerce :overflow))
-  (assert-error (coerce (expt 10 1000) 'single-float) floating-point-overflow))
+  (checked-compile-and-assert
+      ()
+      '(lambda (n) (coerce n 'single-float))
+    (((expt 10 1000)) (condition 'floating-point-overflow))))
 
 (defun are-we-getting-ash-right (x y)
   (declare (optimize speed)
@@ -141,20 +143,11 @@
     (loop for x in neg-values do
          (test x 'nc-ash 'c-ash))))
 
-
-(defun 64-bit-logcount (x)
-  (declare (optimize speed) (type (unsigned-byte 54) x))
-  (logcount x))
-(assert (= (64-bit-logcount (1- (ash 1 24))) 24))
-(assert (= (64-bit-logcount (1- (ash 1 32))) 32))
-(assert (= (64-bit-logcount (1- (ash 1 48))) 48))
-(assert (= (64-bit-logcount (1- (ash 1 54))) 54))
 
 (declaim (inline ppc-ldb-2))
 
 (defun ppc-ldb-2 (fun value)
-  (declare (type stream socket)
-           (type (signed-byte 32) value)
+  (declare (type (signed-byte 32) value)
            (optimize (speed 3) (safety 0) (space 1) (debug 1)
                      (compilation-speed 0)))
   (funcall fun (ldb (byte 8 24) value))
@@ -171,8 +164,9 @@
      for size :across (make-array 1 :element-type 'fixnum :initial-element 3)
      do (ppc-ldb-2 fun (if param size -1))))
 
-(let ((acc '()))
-  (ppc-ldb-1 (lambda (x)
-         (push x acc)))
-  (assert (equal acc '(#xff #xff #xff #xff))))
+(with-test (:name :ppc-ldb)
+ (let ((acc '()))
+   (ppc-ldb-1 (lambda (x)
+                (push x acc)))
+   (assert (equal acc '(#xff #xff #xff #xff)))))
 
