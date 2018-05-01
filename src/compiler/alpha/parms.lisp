@@ -9,6 +9,10 @@
 
 (in-package "SB!VM")
 
+(defconstant +backend-fasl-file-implementation+ :alpha)
+
+(defconstant +backend-page-bytes+ 8192)
+
 (eval-when  (:compile-toplevel :load-toplevel :execute)
 
 ;;; number of bits per word where a word holds one lisp descriptor
