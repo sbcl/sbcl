@@ -343,3 +343,9 @@
                       '(lambda (x) (typep x (quote . z)))
                       :allow-failure t))))
 
+(with-test (:name :member-transform-dotted-list)
+  (assert (nth-value 1
+                     (checked-compile
+                      '(lambda (x) (member x '(a . b)))
+                      :allow-warnings t))))
+
