@@ -1408,4 +1408,12 @@
       '(lambda (a i)
         (declare ((or (array * (1)) (satisfies eval)) a))
         (array-row-major-index a i))
-      ((#(a b) 1) 1)))
+    ((#(a b) 1) 1)))
+
+(with-test (:name :array-type-dimensions-0-rank)
+  (checked-compile-and-assert
+      ()
+      '(lambda (p1)
+        (declare ((or (array bit 1) (array * 0)) p1))
+        (array-total-size p1))
+    ((#0a3) 1)))

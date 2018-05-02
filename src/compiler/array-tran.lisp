@@ -1138,46 +1138,55 @@
 ;;; maybe this is just too sloppy for actual type logic.  -- CSR,
 ;;; 2004-02-18
 (defun array-type-dimensions-or-give-up (type)
-  (labels ((maybe-array-type-dimensions (type)
-             (typecase type
-               (array-type
-                (array-type-dimensions type))
-               (union-type
-                (let* ((types (loop for type in (union-type-types type)
-                                    for dimensions = (maybe-array-type-dimensions type)
-                                    when (hairy-type-p type)
-                                    do (return-from maybe-array-type-dimensions nil)
-                                    when (eq dimensions '*)
-                                    do
-                                    (return-from maybe-array-type-dimensions '*)
-                                    when dimensions
-                                    collect it))
-                       (result (car types))
-                       (length (length result))
-                       (complete-match t))
-                  (dolist (other (cdr types))
-                    (when (/= length (length other))
-                      (give-up-ir1-transform
-                       "~@<dimensions of arrays in union type ~S do not match~:@>"
-                       (type-specifier type)))
-                    (unless (equal result other)
-                      (setf complete-match nil)))
-                  (if complete-match
-                      result
-                      (make-list length :initial-element '*))))
-               (intersection-type
-                (let* ((types (remove nil (mapcar #'maybe-array-type-dimensions
-                                                  (intersection-type-types type))))
-                       (result (car types)))
-                  (dolist (other (cdr types) result)
-                    (unless (equal result other)
-                      (abort-ir1-transform
-                       "~@<dimensions of arrays in intersection type ~S do not match~:@>"
-                       (type-specifier type)))))))))
-    (or (maybe-array-type-dimensions type)
-        (give-up-ir1-transform
-         "~@<don't know how to extract array dimensions from type ~S~:@>"
-         (type-specifier type)))))
+  (let ((no-dimension '#:no))
+    (labels ((maybe-array-type-dimensions (type)
+               (typecase type
+                 (array-type
+                  (array-type-dimensions type))
+                 (union-type
+                  (let* ((types (loop for type in (union-type-types type)
+                                      for dimensions = (maybe-array-type-dimensions type)
+                                      when (eq dimensions no-dimension)
+                                      do (return-from maybe-array-type-dimensions no-dimension)
+                                      when (eq dimensions '*)
+                                      do
+                                      (return-from maybe-array-type-dimensions '*)
+                                      unless (eq dimensions no-dimension)
+                                      collect dimensions))
+                         (result (car types))
+                         (length (length result))
+                         (complete-match t))
+                    (dolist (other (cdr types))
+                      (when (/= length (length other))
+                        (give-up-ir1-transform
+                         "~@<dimensions of arrays in union type ~S do not match~:@>"
+                         (type-specifier type)))
+                      (unless (equal result other)
+                        (setf complete-match nil)))
+                    (if complete-match
+                        result
+                        (make-list length :initial-element '*))))
+                 (intersection-type
+                  (let* ((types (remove no-dimension
+                                        (mapcar #'maybe-array-type-dimensions
+                                                (intersection-type-types type))))
+                         (result (car types)))
+                    (dolist (other (cdr types))
+                      (unless (equal result other)
+                        (abort-ir1-transform
+                         "~@<dimensions of arrays in intersection type ~S do not match~:@>"
+                         (type-specifier type))))
+                    (if types
+                        result
+                        no-dimension)))
+                 (t
+                  no-dimension))))
+      (let ((dim (maybe-array-type-dimensions type)))
+        (if (eq dim no-dimension)
+            (give-up-ir1-transform
+             "~@<don't know how to extract array dimensions from type ~S~:@>"
+             (type-specifier type))
+            dim)))))
 
 (defun conservative-array-type-complexp (type)
   (typecase type
