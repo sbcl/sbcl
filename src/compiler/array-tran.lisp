@@ -1145,6 +1145,8 @@
                (union-type
                 (let* ((types (loop for type in (union-type-types type)
                                     for dimensions = (maybe-array-type-dimensions type)
+                                    when (hairy-type-p type)
+                                    do (return-from maybe-array-type-dimensions nil)
                                     when (eq dimensions '*)
                                     do
                                     (return-from maybe-array-type-dimensions '*)

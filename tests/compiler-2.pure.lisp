@@ -1401,3 +1401,11 @@
       '(lambda (type)
         (make-array 3 :initial-element #\a :element-type type))
     (('(and character (satisfies eval))) "aaa" :test #'equal)))
+
+(with-test (:name :array-type-dimensions-or-give-up-hairy-types)
+  (checked-compile-and-assert
+      ()
+      '(lambda (a i)
+        (declare ((or (array * (1)) (satisfies eval)) a))
+        (array-row-major-index a i))
+      ((#(a b) 1) 1)))
