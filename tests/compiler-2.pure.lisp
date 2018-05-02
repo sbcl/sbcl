@@ -1417,3 +1417,12 @@
         (declare ((or (array bit 1) (array * 0)) p1))
         (array-total-size p1))
     ((#0a3) 1)))
+
+(with-test (:name :type-derivation-hairy-types)
+  (checked-compile-and-assert
+      ()
+      `(lambda (n s)
+         (declare (fixnum n))
+         (ash (the (satisfies eval) n)
+              (the (integer * 0) s)))
+    ((1234 -4) 77)))

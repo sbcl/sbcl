@@ -1251,30 +1251,41 @@
 ;;; we didn't do this, we wouldn't be able to tell.
 (defun two-arg-derive-type (arg1 arg2 derive-fun fun)
   (declare (type function derive-fun fun))
-  (flet ((deriver (x y same-arg)
-           (cond ((and (member-type-p x) (member-type-p y))
-                  (let* ((x (first (member-type-members x)))
-                         (y (first (member-type-members y)))
-                         (result (ignore-errors
-                                   (with-float-traps-masked
-                                       (:underflow :overflow :divide-by-zero
-                                                   :invalid)
-                                     (funcall fun x y)))))
-                    (cond ((null result) *empty-type*)
-                          ((and (floatp result) (float-nan-p result))
-                           (make-numeric-type :class 'float
-                                              :format (type-of result)
-                                              :complexp :real))
-                          (t
-                           (specifier-type `(eql ,result))))))
-                 ((and (member-type-p x) (numeric-type-p y))
-                  (funcall derive-fun (convert-member-type x) y same-arg))
-                 ((and (numeric-type-p x) (member-type-p y))
-                  (funcall derive-fun x (convert-member-type y) same-arg))
-                 ((and (numeric-type-p x) (numeric-type-p y))
-                  (funcall derive-fun x y same-arg))
-                 (t
-                  *universal-type*))))
+  (labels ((ignore-hairy-type (type)
+             (if (intersection-type-p type)
+                 (find-if-not #'hairy-type-p (intersection-type-types type))
+                 type))
+           (deriver (x y same-arg)
+             (cond ((and (member-type-p x) (member-type-p y))
+                    (let* ((x (first (member-type-members x)))
+                           (y (first (member-type-members y)))
+                           (result (ignore-errors
+                                    (with-float-traps-masked
+                                        (:underflow :overflow :divide-by-zero
+                                                    :invalid)
+                                      (funcall fun x y)))))
+                      (cond ((null result) *empty-type*)
+                            ((and (floatp result) (float-nan-p result))
+                             (make-numeric-type :class 'float
+                                                :format (type-of result)
+                                                :complexp :real))
+                            (t
+                             (specifier-type `(eql ,result))))))
+                   ((and (member-type-p x) (numeric-type-p y))
+                    (funcall derive-fun (convert-member-type x) y same-arg))
+                   ((and (numeric-type-p x) (member-type-p y))
+                    (funcall derive-fun x (convert-member-type y) same-arg))
+                   ((and (numeric-type-p x) (numeric-type-p y))
+                    (funcall derive-fun x y same-arg))
+                   ;; Ignore hairy types in intersections
+                   ((and (or (intersection-type-p x)
+                             (intersection-type-p y))
+                         (let ((x (ignore-hairy-type x))
+                               (y (ignore-hairy-type y)))
+                           (and x y
+                                (deriver x y same-arg)))))
+                   (t
+                    *universal-type*))))
     (let ((same-arg (same-leaf-ref-p arg1 arg2))
           (a1 (prepare-arg-for-derive-type (lvar-type arg1)))
           (a2 (prepare-arg-for-derive-type (lvar-type arg2))))
