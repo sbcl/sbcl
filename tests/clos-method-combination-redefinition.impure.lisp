@@ -170,8 +170,6 @@
 
 ;;; TODO
 ;;;
-;;; 3. redefinition to update documentation and source location
-;;;
 ;;; 4. (possibly) move long-method-combination-function into method
 ;;;    combination objects, in which case need to check that existing
 ;;;    method combination objects are updated (currently the method
