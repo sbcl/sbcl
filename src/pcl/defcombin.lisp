@@ -102,9 +102,9 @@
                               (short-combine-methods type-name options operator ioa source-location doc))))
         (old-info (gethash type-name **method-combinations**)))
     (flet ((frobber (mc)
-             ;; KLUDGE: assume the MC is already a short-form MC
-             (reinitialize-instance mc :operator operator :identity-with-one-argument ioa
-                                    'source source-location :documentation doc)))
+             (change-class mc 'short-method-combination
+                           :operator operator :identity-with-one-argument ioa
+                           'source source-location :documentation doc)))
       (update-mcs type-name info old-info #'frobber)))
   (setf (random-documentation type-name 'method-combination) doc)
   type-name)
@@ -185,9 +185,9 @@
                :source-location source-location))
         (old-info (gethash type-name **method-combinations**)))
     (flet ((frobber (mc)
-             (reinitialize-instance mc :type-name type-name
-                                    :args-lambda-list args-lambda-list
-                                    'source source-location :documentation doc)))
+             (change-class mc 'long-method-combination
+                           :type-name type-name :args-lambda-list args-lambda-list
+                           'source source-location :documentation doc)))
       (update-mcs type-name info old-info #'frobber)))
   (setf (gethash type-name *long-method-combination-functions*) function)
   (setf (random-documentation type-name 'method-combination) doc)

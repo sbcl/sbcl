@@ -168,13 +168,32 @@
   (assert (not (even-as (make-instance 'parse-state :string "abcbabab"))))
   (assert (even-as (make-instance 'parse-state :string "abcbabab") :start 'no)))
 
-;;; TODO
-;;;
-;;; 4. (possibly) move long-method-combination-function into method
-;;;    combination objects, in which case need to check that existing
-;;;    method combination objects are updated (currently the method
-;;;    combination function lives in a global hash table and that is
-;;;    updated at redefinition time).
-;;;
-;;; 5. redefinition between short- and long-form method combinations
+;;;; changing between short- and long-form method combination
+(define-method-combination maximum :operator max)
 
+(defgeneric maxx (x)
+  (:method-combination maximum)
+  (:method maximum ((x symbol)) 3)
+  (:method maximum ((x list)) 4)
+  (:method maximum ((x null)) 5))
+
+(with-test (:name (:method-combination :maximum))
+  (assert (= (maxx nil) 5))
+  (assert (= (maxx '(3 4)) 4))
+  (assert (= (maxx t) 3)))
+
+(define-method-combination maximum ()
+  ((maximum (maximum)))
+  `(min ,@(mapcar (lambda (m) `(call-method ,m)) maximum)))
+
+(with-test (:name (:method-combination :maximum :redefined-long))
+  (assert (= (maxx nil) 3))
+  (assert (= (maxx '(3 4)) 4))
+  (assert (= (maxx t) 3)))
+
+(define-method-combination maximum :operator -)
+
+(with-test (:name (:method-combination :maximum :redefined-short))
+  (assert (= (maxx nil) -2))
+  (assert (= (maxx '(3 4)) -4))
+  (assert (= (maxx t) -3)))
