@@ -4126,8 +4126,10 @@
   ;; This used to blow stack with a sufficiently long list.
   (let ((cycle (list t)))
     (nconc cycle cycle)
-    (checked-compile `(lambda (x)
-                        (member x ',cycle)))))
+    (assert (nth-value 1
+                       (checked-compile `(lambda (x)
+                                           (member x ',cycle))
+                                        :allow-warnings t)))))
 
 (with-test (:name (compile :bug-722734))
   (checked-compile-and-assert (:allow-warnings t :optimize :safe)

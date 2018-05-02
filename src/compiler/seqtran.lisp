@@ -490,7 +490,7 @@
         (let* ((cp (constant-lvar-p list))
                (c-list (when cp (lvar-value list))))
           (cond ((not (proper-list-p c-list))
-                 (abort-ir1-transform "~a is not a proper list." c-list))
+                 (abort-ir1-transform "Argument to ~a is not a proper list." name))
                 ((and cp c-list (member name '(assoc rassoc member))
                       (policy node (>= speed space))
                       (not (nthcdr *list-open-code-limit* c-list)))
