@@ -15,7 +15,7 @@
   (:use "COMMON-LISP" "TEST-UTIL"))
 
 (in-package "CLOS-METHOD-COMBINATION-REDEFINITION")
-
+
 ;;;; long-form method combination redefinition
 
 ;;; first, define a method combination
@@ -55,7 +55,7 @@
   (assert (eql (long-or-test 3) 'fixnum))
   (assert (eql (long-or-test (1+ most-positive-fixnum)) 'integer))
   (assert (eql (long-or-test 3.2) 'number)))
-
+
 ;;;; short-form method-combination redefiniton
 
 ;;; define a method-combination
