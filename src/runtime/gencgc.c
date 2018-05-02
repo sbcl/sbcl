@@ -1820,8 +1820,14 @@ static void NO_SANITIZE_MEMORY
 preserve_pointer(void *addr)
 {
     page_index_t page = find_page_index(addr);
-    if (page < 0)
-        return immobile_space_preserve_pointer(addr); // if such space exists
+    if (page < 0) {
+        // Though immobile_space_preserve_pointer accepts any pointer,
+        // there's a benefit to testing immobile_space_p first
+        // because it's inlined. Either is a no-op if no immobile space.
+        if (immobile_space_p((lispobj)addr))
+            return immobile_space_preserve_pointer(addr);
+        return;
+    }
     lispobj *object_start;
 
 #if GENCGC_IS_PRECISE
