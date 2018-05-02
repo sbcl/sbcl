@@ -1,5 +1,11 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-1.4.7:
+  * bug fix: redefinition of method combinations now does the expected thing;
+    generic functions using that method combination have their effective
+    methods lazily recomputed according to the new definition of the method
+    combination.  (Reported by Didier Verna at ELS 2018)
+
 changes in sbcl-1.4.7 relative to sbcl-1.4.6:
   * enhancement: better handling of unknown keyword arguments (lp#1750466)
   * enhancement: namestrings can now be computed for certain pathnames that
