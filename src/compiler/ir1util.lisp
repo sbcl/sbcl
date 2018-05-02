@@ -251,19 +251,23 @@
 ;;;; lvar substitution
 
 (defun update-lvar-dependencies (new old)
-  (when (lvar-p new)
-    (do-uses (node old)
-      (when (exit-p node)
-        ;; Inlined functions will try to use the lvar in the lexenv
-        (loop for block in (lexenv-blocks (node-lexenv node))
-              for block-lvar = (fourth block)
-              when (eq old block-lvar)
-              do (setf (fourth block) new)))))
-  (loop for cast in (lvar-dependent-casts old)
-        do (nsubst new old (dependent-cast-deps cast))
-        when (lvar-p new)
-        do
-        (push cast (lvar-dependent-casts new))))
+  (typecase old
+    (ref
+     (update-lvar-dependencies new (lambda-var-ref-lvar old)))
+    (lvar
+     (when (lvar-p new)
+       (do-uses (node old)
+         (when (exit-p node)
+           ;; Inlined functions will try to use the lvar in the lexenv
+           (loop for block in (lexenv-blocks (node-lexenv node))
+                 for block-lvar = (fourth block)
+                 when (eq old block-lvar)
+                 do (setf (fourth block) new)))))
+     (loop for cast in (lvar-dependent-casts old)
+           do (nsubst new old (dependent-cast-deps cast))
+           when (lvar-p new)
+           do
+           (push cast (lvar-dependent-casts new))))))
 
 ;;; In OLD's DEST, replace OLD with NEW. NEW's DEST must initially be
 ;;; NIL. We do not flush OLD's DEST.
@@ -863,7 +867,8 @@
                (not (lambda-var-sets var)))
       (let* ((fun (lambda-var-home var))
              (vars (lambda-vars fun))
-             (lvar (ref-lvar (car (lambda-refs fun))))
+             (lvar (and (lambda-refs fun)
+                        (ref-lvar (car (lambda-refs fun)))))
              (combination (and lvar
                                (lvar-dest lvar))))
         (when (combination-p combination)
@@ -2151,6 +2156,7 @@ is :ANY, the function name is not checked."
   (declare (type ref ref) (type leaf leaf))
   (unless (eq (ref-leaf ref) leaf)
     (push ref (leaf-refs leaf))
+    (update-lvar-dependencies leaf ref)
     (delete-ref ref)
     (setf (ref-leaf ref) leaf)
     (setf (leaf-ever-used leaf) t)
