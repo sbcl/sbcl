@@ -155,170 +155,175 @@
                  (%integer-vector-widetag-and-n-bits-shift
                   nil
                   (max (integer-length low) (integer-length high))))))
-     (tagbody
-      (binding*
-       ((consp (consp type))
-        (type-name (if consp (car type) type))
-        ((widetag n-bits-shift)
-         (case type-name
-          ((t)
-           (when consp
-             (ill-type))
-           (result simple-vector-widetag))
-          ((base-char standard-char #!-sb-unicode character)
-           (when consp
-             (ill-type))
-           (result simple-base-string-widetag))
-          #!+sb-unicode
-          ((character extended-char)
-           (when consp
-             (ill-type))
-           (result simple-character-string-widetag))
-          (bit
-           (when consp
-             (ill-type))
-           (result simple-bit-vector-widetag))
-          (fixnum
-           (when consp
-             (ill-type))
-           (result simple-array-fixnum-widetag))
-          (unsigned-byte
-           (with-parameters ((integer 1)) (high)
-             (if (eq high '*)
-                 (result simple-vector-widetag)
-                 (%integer-vector-widetag-and-n-bits-shift nil high))))
-          (signed-byte
-           (with-parameters ((integer 1)) (high)
-             (if (eq high '*)
-                 (result simple-vector-widetag)
-                 (%integer-vector-widetag-and-n-bits-shift t high))))
-          (double-float
-           (with-parameters (double-float :intervals t) (low high)
-             (if (and (not (eq low '*))
-                      (not (eq high '*))
-                      (if (or (consp low) (consp high))
-                          (>= (type-bound-number low) (type-bound-number high))
-                          (> low high)))
-                 (result simple-array-nil-widetag)
-                 (result simple-array-double-float-widetag))))
-          (single-float
-           (with-parameters (single-float :intervals t) (low high)
-             (if (and (not (eq low '*))
-                      (not (eq high '*))
-                      (if (or (consp low) (consp high))
-                          (>= (type-bound-number low) (type-bound-number high))
-                          (> low high)))
-                 (result simple-array-nil-widetag)
-                 (result simple-array-single-float-widetag))))
-          (mod
-           (if (and (consp type)
-                    (consp (cdr type))
-                    (null (cddr type))
-                    (typep (cadr type) '(integer 1)))
-               (%integer-vector-widetag-and-n-bits-shift
-                nil (integer-length (1- (cadr type))))
-               (ill-type)))
-          #!+long-float
-          (long-float
-           (with-parameters (long-float :intervals t) (low high)
-             (if (and (not (eq low '*))
-                      (not (eq high '*))
-                      (if (or (consp low) (consp high))
-                          (>= (type-bound-number low) (type-bound-number high))
-                          (> low high)))
-                 (result simple-array-nil-widetag)
-                 (result simple-array-long-float-widetag))))
-          (integer
-           (with-parameters (integer :intervals t) (low high)
-             (let ((low (if (consp low)
-                            (1+ (car low))
-                            low))
-                   (high (if (consp high)
-                             (1- (car high))
-                             high)))
-               (cond ((or (eq high '*)
-                          (eq low '*))
-                      (result simple-vector-widetag))
-                     ((> low high)
-                      (result simple-array-nil-widetag))
-                     (t
-                      (integer-interval-widetag low high))))))
-          (complex
-           (with-parameters (t) (subtype)
-             (if (eq subtype '*)
-                 (result simple-vector-widetag)
-                 (let ((ctype (specifier-type type)))
-                   (cond ((eq ctype *empty-type*)
-                          (result simple-array-nil-widetag))
-                         ((union-type-p ctype)
-                          (cond ((csubtypep ctype (specifier-type '(complex double-float)))
-                                 (result
-                                  simple-array-complex-double-float-widetag))
-                                ((csubtypep ctype (specifier-type '(complex single-float)))
-                                 (result
-                                  simple-array-complex-single-float-widetag))
-                                #!+long-float
-                                ((csubtypep ctype (specifier-type '(complex long-float)))
-                                 (result
-                                  simple-array-complex-long-float-widetag))
-                                (t
-                                 (result simple-vector-widetag))))
-                         (t
-                          (case (numeric-type-format ctype)
-                            (double-float
-                             (result
-                              simple-array-complex-double-float-widetag))
-                            (single-float
-                             (result
-                              simple-array-complex-single-float-widetag))
-                            #!+long-float
-                            (long-float
-                             (result
-                              simple-array-complex-long-float-widetag))
-                            (t
-                             (result simple-vector-widetag)))))))))
-          ((nil)
-           (result simple-array-nil-widetag))
-          (t
-           (go fastidiously-parse)))))
-        (return-from %vector-widetag-and-n-bits-shift
-          (values widetag n-bits-shift)))
-      fastidiously-parse)
-     ;; Do things the hard way after falling through the tagbody.
-     (let ((ctype (type-or-nil-if-unknown type)))
-       (typecase ctype
-         (null (result simple-vector-widetag))
-         (union-type
-                  (let ((types (union-type-types ctype)))
-                    (cond ((not (every #'numeric-type-p types))
-                           (result simple-vector-widetag))
-                          ((csubtypep ctype (specifier-type 'integer))
-                           (integer-interval-widetag
-                            (reduce #'min types :key #'numeric-type-low)
-                            (reduce #'max types :key #'numeric-type-high)))
-                          ((csubtypep ctype (specifier-type 'double-float))
-                           (result simple-array-double-float-widetag))
-                          ((csubtypep ctype (specifier-type 'single-float))
-                           (result simple-array-single-float-widetag))
-                          #!+long-float
-                          ((csubtypep ctype (specifier-type 'long-float))
-                           (result simple-array-long-float-widetag))
-                          (t
-                           (result simple-vector-widetag)))))
-         (character-set-type
-                  #!-sb-unicode (result simple-base-string-widetag)
-                  #!+sb-unicode
-                  (if (loop for (start . end)
-                            in (character-set-type-pairs ctype)
-                            always (and (< start base-char-code-limit)
-                                        (< end base-char-code-limit)))
-                      (result simple-base-string-widetag)
-                      (result simple-character-string-widetag)))
-         (t
-                  (let ((expansion (type-specifier ctype)))
-                    (if (equal expansion type)
+      (tagbody
+         (binding*
+             ((consp (consp type))
+              (type-name (if consp (car type) type))
+              ((widetag n-bits-shift)
+               (case type-name
+                 ((t)
+                  (when consp
+                    (ill-type))
+                  (result simple-vector-widetag))
+                 ((base-char standard-char #!-sb-unicode character)
+                  (when consp
+                    (ill-type))
+                  (result simple-base-string-widetag))
+                 #!+sb-unicode
+                 ((character extended-char)
+                  (when consp
+                    (ill-type))
+                  (result simple-character-string-widetag))
+                 (bit
+                  (when consp
+                    (ill-type))
+                  (result simple-bit-vector-widetag))
+                 (fixnum
+                  (when consp
+                    (ill-type))
+                  (result simple-array-fixnum-widetag))
+                 (unsigned-byte
+                  (with-parameters ((integer 1)) (high)
+                    (if (eq high '*)
                         (result simple-vector-widetag)
-                        (%vector-widetag-and-n-bits-shift expansion)))))))))
+                        (%integer-vector-widetag-and-n-bits-shift nil high))))
+                 (signed-byte
+                  (with-parameters ((integer 1)) (high)
+                    (if (eq high '*)
+                        (result simple-vector-widetag)
+                        (%integer-vector-widetag-and-n-bits-shift t high))))
+                 (double-float
+                  (with-parameters (double-float :intervals t) (low high)
+                    (if (and (not (eq low '*))
+                             (not (eq high '*))
+                             (if (or (consp low) (consp high))
+                                 (>= (type-bound-number low) (type-bound-number high))
+                                 (> low high)))
+                        (result simple-array-nil-widetag)
+                        (result simple-array-double-float-widetag))))
+                 (single-float
+                  (with-parameters (single-float :intervals t) (low high)
+                    (if (and (not (eq low '*))
+                             (not (eq high '*))
+                             (if (or (consp low) (consp high))
+                                 (>= (type-bound-number low) (type-bound-number high))
+                                 (> low high)))
+                        (result simple-array-nil-widetag)
+                        (result simple-array-single-float-widetag))))
+                 (mod
+                  (if (and (consp type)
+                           (consp (cdr type))
+                           (null (cddr type))
+                           (typep (cadr type) '(integer 1)))
+                      (%integer-vector-widetag-and-n-bits-shift
+                       nil (integer-length (1- (cadr type))))
+                      (ill-type)))
+                 #!+long-float
+                 (long-float
+                  (with-parameters (long-float :intervals t) (low high)
+                    (if (and (not (eq low '*))
+                             (not (eq high '*))
+                             (if (or (consp low) (consp high))
+                                 (>= (type-bound-number low) (type-bound-number high))
+                                 (> low high)))
+                        (result simple-array-nil-widetag)
+                        (result simple-array-long-float-widetag))))
+                 (integer
+                  (with-parameters (integer :intervals t) (low high)
+                    (let ((low (if (consp low)
+                                   (1+ (car low))
+                                   low))
+                          (high (if (consp high)
+                                    (1- (car high))
+                                    high)))
+                      (cond ((or (eq high '*)
+                                 (eq low '*))
+                             (result simple-vector-widetag))
+                            ((> low high)
+                             (result simple-array-nil-widetag))
+                            (t
+                             (integer-interval-widetag low high))))))
+                 (complex
+                  (with-parameters (t) (subtype)
+                    (if (eq subtype '*)
+                        (result simple-vector-widetag)
+                        (let ((ctype (specifier-type type)))
+                          (cond ((eq ctype *empty-type*)
+                                 (result simple-array-nil-widetag))
+                                ((union-type-p ctype)
+                                 (cond ((csubtypep ctype (specifier-type '(complex double-float)))
+                                        (result
+                                         simple-array-complex-double-float-widetag))
+                                       ((csubtypep ctype (specifier-type '(complex single-float)))
+                                        (result
+                                         simple-array-complex-single-float-widetag))
+                                       #!+long-float
+                                       ((csubtypep ctype (specifier-type '(complex long-float)))
+                                        (result
+                                         simple-array-complex-long-float-widetag))
+                                       (t
+                                        (result simple-vector-widetag))))
+                                (t
+                                 (case (numeric-type-format ctype)
+                                   (double-float
+                                    (result
+                                     simple-array-complex-double-float-widetag))
+                                   (single-float
+                                    (result
+                                     simple-array-complex-single-float-widetag))
+                                   #!+long-float
+                                   (long-float
+                                    (result
+                                     simple-array-complex-long-float-widetag))
+                                   (t
+                                    (result simple-vector-widetag)))))))))
+                 ((nil)
+                  (result simple-array-nil-widetag))
+                 (t
+                  (go fastidiously-parse)))))
+           (return-from %vector-widetag-and-n-bits-shift
+             (values widetag n-bits-shift)))
+       fastidiously-parse)
+      ;; Do things the hard way after falling through the tagbody.
+      (let ((ctype (type-or-nil-if-unknown type)))
+        (typecase ctype
+          (null (result simple-vector-widetag))
+          (union-type
+           (let ((types (union-type-types ctype)))
+             (cond ((not (every #'numeric-type-p types))
+                    (result simple-vector-widetag))
+                   ((csubtypep ctype (specifier-type 'integer))
+                    (integer-interval-widetag
+                     (reduce #'min types :key #'numeric-type-low)
+                     (reduce #'max types :key #'numeric-type-high)))
+                   ((csubtypep ctype (specifier-type 'double-float))
+                    (result simple-array-double-float-widetag))
+                   ((csubtypep ctype (specifier-type 'single-float))
+                    (result simple-array-single-float-widetag))
+                   #!+long-float
+                   ((csubtypep ctype (specifier-type 'long-float))
+                    (result simple-array-long-float-widetag))
+                   (t
+                    (result simple-vector-widetag)))))
+          (intersection-type
+           (let ((types (intersection-type-types ctype)))
+             (loop for type in types
+                   unless (hairy-type-p type)
+                   return (%vector-widetag-and-n-bits-shift (type-specifier type)))))
+          (character-set-type
+           #!-sb-unicode (result simple-base-string-widetag)
+           #!+sb-unicode
+           (if (loop for (start . end)
+                     in (character-set-type-pairs ctype)
+                     always (and (< start base-char-code-limit)
+                                 (< end base-char-code-limit)))
+               (result simple-base-string-widetag)
+               (result simple-character-string-widetag)))
+          (t
+           (let ((expansion (type-specifier ctype)))
+             (if (equal expansion type)
+                 (result simple-vector-widetag)
+                 (%vector-widetag-and-n-bits-shift expansion)))))))))
 
 (defun %complex-vector-widetag (widetag)
   (macrolet ((make-case ()
