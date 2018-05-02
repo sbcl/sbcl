@@ -841,8 +841,7 @@
   ;; source transform another chance, so it all works out OK, in a
   ;; weird roundabout way. -- WHN 2001-03-18
   (if (and (not env)
-           (consp spec)
-           (eq (car spec) 'quote))
+           (typep spec '(cons (eql quote) (cons t null))))
       (source-transform-typep object (cadr spec))
       (values nil t)))
 

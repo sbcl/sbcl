@@ -337,3 +337,9 @@
                       '(lambda (y) `(defines ,@ (and x) . ,y))
                       :allow-warnings t))))
 
+(with-test (:name :typep-transform-dotted-list)
+  (assert (nth-value 1
+                     (checked-compile
+                      '(lambda (x) (typep x (quote . z)))
+                      :allow-failure t))))
+
