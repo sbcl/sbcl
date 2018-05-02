@@ -104,9 +104,71 @@
   (assert (= (short-div 3) 4))
   (assert (= (short-div 3.0) -4)))
 
+
+;;;; modifying the need for args-lambda-list
+
+;;; define a fancy method combination.  (Happens to implement a finite state machine)
+(define-method-combination fsm (default-start)
+  ((primary *))
+  `(let ((state ',default-start))
+     (restart-bind
+         (,@(mapcar (lambda (m) `(,(first (method-qualifiers m))
+                                   (lambda ()
+                                     (setq state (call-method ,m))
+                                     (if (and (typep state '(and symbol (not null)))
+                                              (find-restart state))
+                                         (invoke-restart state)
+                                         state))))
+                    primary))
+       (invoke-restart state))))
+
+(defclass parse-state ()
+  ((string :initarg :string)
+   (index :initform 0)))
+
+;;; use the finite state machine to recognize strings with an even
+;;; number of #\a characters
+(defgeneric even-as (state &key &allow-other-keys)
+  (:method-combination fsm yes)
+  (:method yes (state &key)
+    (with-slots ((s string) (i index)) state
+      (cond ((= i (length s)) t) ((char= (char s i) #\a) (incf i) 'no) (t (incf i) 'yes))))
+  (:method no (state &key)
+    (with-slots ((s string) (i index)) state
+      (cond ((= i (length s)) nil) ((char= (char s i) #\a) (incf i) 'yes) (t (incf i) 'no)))))
+
+;;; test.  (The non-functional :START argument tests are to contrast
+;;; with what happens next)
+(with-test (:name (:method-combination :finite-state-machine))
+  (assert (even-as (make-instance 'parse-state :string "abcbab")))
+  (assert (even-as (make-instance 'parse-state :string "abcbab") :start 'no))
+  (assert (not (even-as (make-instance 'parse-state :string "abcbabab"))))
+  (assert (not (even-as (make-instance 'parse-state :string "abcbabab") :start 'no))))
+
+;;; generalize: if we allow the call site to specify the initial
+;;; state, our FSM method combination is more expressive.
+(define-method-combination fsm (default-start)
+  ((primary *))
+  (:arguments &key start)
+  `(let ((state (or ,start ',default-start)))
+     (restart-bind
+         (,@(mapcar (lambda (m) `(,(first (method-qualifiers m))
+                                   (lambda ()
+                                     (setq state (call-method ,m))
+                                     (if (and (typep state '(and symbol (not null)))
+                                              (find-restart state))
+                                         (invoke-restart state)
+                                         state))))
+                    primary))
+       (invoke-restart state))))
+
+(with-test (:name (:method-combination :finite-state-machine :redefinition :args-lambda-list))
+  (assert (even-as (make-instance 'parse-state :string "abcbab")))
+  (assert (not (even-as (make-instance 'parse-state :string "abcbab") :start 'no)))
+  (assert (not (even-as (make-instance 'parse-state :string "abcbabab"))))
+  (assert (even-as (make-instance 'parse-state :string "abcbabab") :start 'no)))
+
 ;;; TODO
-;;;
-;;; 1. redefinition of long-form including change to args-lambda-list
 ;;;
 ;;; 3. redefinition to update documentation and source location
 ;;;

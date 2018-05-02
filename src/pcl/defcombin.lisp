@@ -184,7 +184,11 @@
                                              :documentation doc))
                :source-location source-location))
         (old-info (gethash type-name **method-combinations**)))
-    (update-mcs type-name info old-info #'identity))
+    (flet ((frobber (mc)
+             (reinitialize-instance mc :type-name type-name
+                                    :args-lambda-list args-lambda-list
+                                    'source source-location :documentation doc)))
+      (update-mcs type-name info old-info #'frobber)))
   (setf (gethash type-name *long-method-combination-functions*) function)
   (setf (random-documentation type-name 'method-combination) doc)
   type-name)
