@@ -645,3 +645,6 @@
 
 (with-test (:name (typep :complex-integer))
   (assert (not (eval '(typep #c(0 1/2) '(complex integer))))))
+
+(with-test (:name :typep-satisfies-boolean)
+  (assert (eq (eval '(typep 1 '(satisfies eval))) t)))

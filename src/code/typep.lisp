@@ -190,7 +190,7 @@
          (satisfies
           (unless (proper-list-of-length-p hairy-spec 2)
             (error "invalid type specifier: ~S" hairy-spec))
-          (values (funcall (symbol-function (cadr hairy-spec)) object))))))
+          (and (funcall (symbol-function (cadr hairy-spec)) object) t)))))
     (alien-type-type
      (sb!alien-internals:alien-typep object (alien-type-type-alien-type type)))
     (fun-type
