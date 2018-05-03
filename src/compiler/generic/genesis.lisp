@@ -2734,7 +2734,8 @@ core and return a descriptor to it."
 (defun resolve-deferred-known-funs ()
   (dolist (item *deferred-known-fun-refs*)
     (let ((fun (cold-fdefn-fun (cold-fdefinition-object (car item)))))
-      (aver (not (cold-null fun)))
+      (when (cold-null fun)
+        (error "need definition of ~S at genesis time" (car item)))
       (let ((place (cdr item)))
         (write-wordindexed (car place) (cdr place) fun)))))
 
