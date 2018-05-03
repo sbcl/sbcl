@@ -17,7 +17,7 @@
 
 ;; this is architecture-agnostic
 (defun test-assemble (inst expect)
-  (let ((segment (sb-assem:make-segment :type :regular)))
+  (let ((segment (sb-assem:make-segment)))
     (sb-assem:assemble (segment 'nil)
       (apply (sb-assem::op-encoder-name (car inst)) (cdr inst) segment (cdr inst)))
     (let* ((buf (sb-assem::segment-buffer segment))
