@@ -30,7 +30,6 @@
 ;;; 2003-09-08
 #+nil
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (setf sb!assem:*assem-scheduler-p* t)
   (setf sb!assem:*assem-max-locations* 70))
 
 ;;;; Constants, types, conversion functions, some disassembler stuff.

@@ -21,7 +21,6 @@
             sb!vm::zero
             sb!vm::lip-tn sb!vm::zero-tn)))
 
-(setf *assem-scheduler-p* t)
 (setf *assem-max-locations* 68)
 
 ;;;; Constants, types, conversion functions, some disassembler stuff.

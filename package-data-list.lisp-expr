@@ -149,7 +149,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
       :export ("ASSEMBLY-UNIT"
                "ASSEMBLY-UNIT-BITS"
 
-               "*ASSEM-SCHEDULER-P*"
+               "ASSEM-SCHEDULER-P"
                "*ASSEM-MAX-LOCATIONS*"
 
                "*ASMSTREAM*" "MAKE-ASMSTREAM"

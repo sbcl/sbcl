@@ -9,6 +9,8 @@
 
 (in-package "SB!VM")
 
+(defconstant sb!assem:assem-scheduler-p nil)
+
 (defconstant +backend-fasl-file-implementation+ :alpha)
 
 (defconstant +backend-page-bytes+ 8192)

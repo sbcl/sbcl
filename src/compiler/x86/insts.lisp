@@ -179,11 +179,6 @@
           (setf (aref vec (cdr cond)) (car cond)))))
   #'equalp)
 
-;;; Set assembler parameters. (In CMU CL, this was done with
-;;; a call to a macro DEF-ASSEMBLER-PARAMS.)
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (setf sb!assem:*assem-scheduler-p* nil))
-
 (define-arg-type condition-code :printer sb!vm::+condition-name-vec+)
 
 (defun conditional-opcode (condition)

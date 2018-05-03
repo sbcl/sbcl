@@ -9,6 +9,8 @@
 
 (in-package "SB!VM")
 
+(defconstant sb!assem:assem-scheduler-p t)
+
 (defconstant +backend-fasl-file-implementation+ :sparc)
 (defconstant +backend-page-bytes+ 8192)
 

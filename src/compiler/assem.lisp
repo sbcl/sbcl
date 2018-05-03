@@ -13,9 +13,6 @@
 
 ;;;; assembly control parameters
 
-(defvar *assem-scheduler-p* nil)
-(declaim (type boolean *assem-scheduler-p*))
-
 (defvar *assem-max-locations* 0)
 (declaim (type index *assem-max-locations*))
 
@@ -359,6 +356,7 @@
        ,@body)))
 
 #!+(or hppa sparc ppc mips) ; only for platforms with scheduling assembler.
+(progn
 (defun note-read-dependency (segment inst read)
   (multiple-value-bind (loc-num size)
       (sb!c:location-number read)
@@ -396,7 +394,6 @@
         (push inst (svref (segment-readers segment) index)))))
   (values))
 
-#!+(or hppa sparc ppc mips) ; only for platforms with scheduling assembler.
 (defun note-write-dependency (segment inst write &key partially)
   (multiple-value-bind (loc-num size)
       (sb!c:location-number write)
@@ -426,6 +423,7 @@
           (setf (svref (segment-writers segment) index) nil))
         (push inst (svref (segment-writers segment) index)))))
   (values))
+) ; end PROGN
 
 ;;; This routine is called by due to uses of the INST macro when the
 ;;; scheduler is turned on. The change to the dependency graph has
@@ -1590,7 +1588,7 @@
                                       (sb!c:vop-block ,vop-name)))))
                  (incf (aref costs block-number) ,cost)))
             emitter)
-      (when *assem-scheduler-p*
+      (when assem-scheduler-p
         (if pinned
             (setf emitter
                   `((when (segment-run-scheduler ,segment-name)

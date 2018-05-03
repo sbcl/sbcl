@@ -9,6 +9,8 @@
 
 (in-package "SB!VM")
 
+(defconstant sb!assem:assem-scheduler-p t)
+
 (defconstant +backend-fasl-file-implementation+ :mips)
 
   ;; The o32 ABI specifies 4k-64k as page size. We have to pick the

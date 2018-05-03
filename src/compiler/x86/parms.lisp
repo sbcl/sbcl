@@ -13,6 +13,8 @@
 
 (in-package "SB!VM")
 
+(defconstant sb!assem:assem-scheduler-p nil)
+
 (defconstant +backend-fasl-file-implementation+ :x86)
 (defconstant-eqx +fixup-kinds+ #(:absolute :relative) #'equalp)
 

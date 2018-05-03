@@ -13,6 +13,8 @@
 
 (in-package "SB!VM")
 
+(defconstant sb!assem:assem-scheduler-p nil)
+
 (defconstant +backend-fasl-file-implementation+ :arm64)
 
   ;; Can be in the range 4K-64K

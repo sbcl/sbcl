@@ -272,11 +272,6 @@
   (define-sse-shuffle-arg-type sse-shuffle-pattern-2-2 "#b~2,'0B")
   (define-sse-shuffle-arg-type sse-shuffle-pattern-8-4 "#4r~4,4,'0R"))
 
-;;; Set assembler parameters. (In CMU CL, this was done with
-;;; a call to a macro DEF-ASSEMBLER-PARAMS.)
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (setf sb!assem:*assem-scheduler-p* nil))
-
 (define-arg-type condition-code :printer sb!vm::+condition-name-vec+)
 
 (defun conditional-opcode (condition)
