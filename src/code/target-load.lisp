@@ -271,14 +271,7 @@
          (vector (the simple-vector *!initial-assembler-routines*))
          (count (length vector))
          (ht (make-hash-table :test 'eq)))
-    ;; code-debug-info stores the name->addr hashtable, but readonly
-    ;; space can't point to dynamic space. indirect through a static cons
-    (setf (%code-debug-info code)
-          (rplaca (let ((ptr (sap-int sb!vm:*static-space-free-pointer*)))
-                    (setf sb!vm:*static-space-free-pointer*
-                          (int-sap (+ ptr (* sb!vm:n-word-bytes 2))))
-                    (%make-lisp-obj (logior ptr sb!vm:list-pointer-lowtag)))
-                  ht))
+    (rplaca (%code-debug-info code) ht)
     (dotimes (i count)
       (destructuring-bind (name . offset) (svref vector i)
         (let ((next-offset (if (< (1+ i) count) (cdr (svref vector (1+ i))) size)))

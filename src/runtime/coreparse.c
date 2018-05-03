@@ -1054,10 +1054,10 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
 os_vm_address_t get_asm_routine_by_name(const char* name)
 {
     struct code* code = get_asm_routine_code_component();
-    if (listp(code->debug_info)) {
-        struct hash_table* ht =
-            (struct hash_table*)native_pointer(CONS(code->debug_info)->car);
-        struct vector* table = VECTOR(ht->table);
+    lispobj ht = CONS(code->debug_info)->car;
+    if (ht) {
+        struct vector* table =
+            VECTOR(((struct hash_table*)native_pointer(ht))->table);
         lispobj sym;
         int i;
         for (i=2 ; i < fixnum_value(table->length) ; i += 2)

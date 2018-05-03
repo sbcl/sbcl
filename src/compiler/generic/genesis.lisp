@@ -3689,6 +3689,16 @@ III. initially undefined function references (alphabetically):
       (initialize-layouts)
       (initialize-packages)
       (initialize-static-space)
+      (when *cold-assembler-obj*
+        (write-wordindexed
+         *cold-assembler-obj* sb!vm:code-debug-info-slot
+         ;; code-debug-info stores the name->addr hashtable.
+         ;; Make sure readonly space doesn't point to dynamic space here.
+         (let ((z (make-fixnum-descriptor 0)))
+           (cold-cons z z (ecase (gspace-name
+                                  (descriptor-gspace *cold-assembler-obj*))
+                            (:read-only *static*)
+                            (:immobile-varyobj *dynamic*))))))
 
       ;; Initialize the *COLD-SYMBOLS* system with the information
       ;; from common-lisp-exports.lisp-expr.
