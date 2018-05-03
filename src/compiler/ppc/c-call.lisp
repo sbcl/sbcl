@@ -492,7 +492,7 @@
                                                 'double-reg) :offset
                                                 n)))
       (let* ((segment (make-segment)))
-        (assemble (segment)
+        (assemble (segment 'nil)
           ;; Copy args from registers or stack to new position
           ;; on stack.
           (let* (

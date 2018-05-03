@@ -387,7 +387,7 @@
                               1)))))
       (setf frame-size (logandc2 (+ frame-size +number-stack-alignment-mask+)
                                  +number-stack-alignment-mask+))
-      (assemble (segment)
+      (assemble (segment 'nil)
         (emit-word segment #xe92d4ff8) ;; stmfd sp!, {r3-r11, lr}
         (move nsp-save-tn nsp-tn)
 

@@ -73,7 +73,7 @@
         (cond ((or (not node) ; assembly routine
                    (sb!c::code-immobile-p node))
                (inst call (make-fixup helper :assembly-routine)) ; 5 bytes
-               (emit-long-nop sb!assem::**current-segment** 3)) ; align
+               (emit-alignment 3 :long-nop))
               (t
                (inst call ; 7 bytes
                      (make-ea :qword :disp
@@ -83,7 +83,7 @@
           ;; This TEST instruction is never executed- it informs the profiler
           ;; which register holds SIZE.
           (inst test size size) ; 3 bytes
-          (emit-long-nop sb!assem::**current-segment** 5))) ; align
+          (emit-alignment 3 :long-nop)))
       (emit-label skip-instrumentation))))
 
 ;;; Emit code to allocate an object with a size in bytes given by
@@ -109,7 +109,7 @@
   (let ((NOT-INLINE (gen-label))
         (DONE (gen-label))
         ;; Yuck.
-        (in-elsewhere (eq *elsewhere* sb!assem::**current-segment**))
+        (in-elsewhere (sb!assem::assembling-to-elsewhere-p))
         ;; thread->alloc_region.free_pointer
         (free-pointer
          #!+sb-thread

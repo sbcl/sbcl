@@ -50,6 +50,8 @@
 (deftype alignment ()
   `(integer 0 ,max-alignment))
 
+(defvar *asmstream*)
+
 ;;; common supertype for all the different kinds of annotations
 (def!struct (annotation (:constructor nil)
                         (:copier nil))

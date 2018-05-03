@@ -2562,16 +2562,20 @@
   (stable-sort constants #'> :key (lambda (constant)
                                     (size-nbyte (caar constant)))))
 
-(defun emit-inline-constant (constant label)
+(defun emit-inline-constant (section constant label)
   (let* ((type (car constant))
          (size (size-nbyte type)))
-    (emit-alignment (integer-length (1- size)))
-    (emit-label label)
-    (let ((val (cdr constant)))
-      (case type
-        (:fixup
-         (inst word (apply #'make-fixup val)))
-        (t
-         (loop repeat size
-               do (inst byte (ldb (byte 8 0) val))
-                  (setf val (ash val -8))))))))
+    (emit section
+          `(.align ,(integer-length (1- size)))
+          label
+          (let ((val (cdr constant)))
+            (case type
+              (:fixup
+               ;; Use the WORD emitter which knows how to emit fixups
+               `(|word| ,(apply #'make-fixup val)))
+              (t
+               ;; Could add pseudo-ops for .WORD, .INT, .QUAD, .OCTA just like gcc has.
+               ;; But it works fine to emit as a sequence of bytes
+               `(.byte ,@(loop repeat size
+                               collect (prog1 (ldb (byte 8 0) val)
+                                         (setf val (ash val -8)))))))))))

@@ -25,14 +25,12 @@
 (defstruct (segment (:copier nil))
   ;; the type of this segment (for debugging output and stuff)
   (type :regular :type (member :regular :elsewhere))
-  ;; Ordinarily this is a vector where instructions are written. If
-  ;; the segment is made invalid (e.g. by APPEND-SEGMENT) then the
-  ;; vector can be replaced by NIL. This used to be an adjustable
-  ;; array, but we now do the array size management manually for
-  ;; performance reasons (as of 2006-05-13 hairy array operations
-  ;; are rather slow compared to simple ones).
-  (buffer (load-time-value (!make-specialized-array 0 'assembly-unit))
-          :type (or null (simple-array assembly-unit 1)))
+  ;; This is a vector where instructions are written.
+  ;; It used to be an adjustable array, but we now do the array size
+  ;; management manually for performance reasons (as of 2006-05-13 hairy
+  ;; array operations are rather slow compared to simple ones).
+  (buffer (make-array 100 :element-type 'assembly-unit)
+          :type (simple-array assembly-unit 1))
   ;; whether or not to run the scheduler. Note: if the instruction
   ;; definitions were not compiled with the scheduler turned on, this
   ;; has no effect.
@@ -131,10 +129,8 @@
           ((> new-buffer-size new-value))
         ;; When we have to increase the size of the array, we want to
         ;; roughly double the vector length: that way growing the array
-        ;; to size N conses only O(N) bytes in total. But just doubling
-        ;; the length would leave a zero-length vector unchanged. Hence,
-        ;; take the MAX with 1..
-        (setf new-buffer-size (max 1 (* 2 new-buffer-size))))
+        ;; to size N conses only O(N) bytes in total.
+        (setf new-buffer-size (* 2 new-buffer-size)))
       (let ((new-buffer (make-array new-buffer-size
                                     :element-type '(unsigned-byte 8))))
         (replace new-buffer buffer)
@@ -247,16 +243,72 @@
   (setf *next-inst-id* 0))
 ;;;
 
-;;; This holds the current segment while assembling. Use ASSEMBLE to
-;;; change it.
-(defvar **current-segment**)
-;;; Just like **CURRENT-SEGMENT** except this holds the current vop.
-;;; This is used only to keep track of which vops emit which insts.
-(defvar **current-vop** nil)
+;;; Instructions are streamed into a SECTION before (optionally combining
+;;; sections and) assembling into a SEGMENT.
+;;; The SECTION representation is just a list: (LAST-VOP INDEX . BUFFERS).
+;;; Each BUFFER is a simple-vector.
+;;; Because the elsewhere section and unboxed data section often hold nothing,
+;;; we start with an empty vector to avoid waste.
+(defun make-section () (list nil 0 #()))
+(defmacro section-last-vop (section) `(car ,section))
+(defmacro section-last-buf-length (section) `(cadr ,section))
+(defmacro section-last-buf (section) `(caddr ,section))
+(defun emit (section &rest things)
+  ;; each element of THINGS can be:
+  ;; - a list (symbol . args) for a machine instruction or assembler directive
+  ;; - a label
+  ;; - a function to emit a postit
+  (let ((data (cdr section)))
+    (dolist (thing things)
+      (let ((index (car data))
+            (vector (the simple-vector (cadr data))))
+        (unless (< index (length vector))
+          ;; We double the size, but rather than copying the old data into the new,
+          ;; just grow the chain of vectors. No need to materialize a single vector.
+          (let ((new-vector (make-array (max 10 (* (length vector) 2)))))
+            (if (= (length vector) 0)
+                (rplaca (cdr data) new-vector)
+                (push new-vector (cdr data)))
+            (setq vector new-vector
+                  index 0)))
+        (setf (aref vector index) thing)
+        (setf (car data) (1+ index))))))
+(defun section-note-current-vop (section vop)
+  (unless (eq (section-last-vop section) vop)
+    (emit section `(.note-vop . ,vop))
+    (setf (section-last-vop section) vop)))
 
-(defmacro assemble ((&optional segment vop &key labels) &body body
+(defstruct asmstream
+  (data-section (make-section) :read-only t)
+  (code-section (make-section) :read-only t)
+  (elsewhere-section (make-section) :read-only t)
+  (elsewhere-label (gen-label) :read-only t)
+  ;; for collecting unique "unboxed constants" prior to placing them
+  ;; into the data section
+  (constant-table (make-hash-table :test #'equal) :read-only t)
+  (constant-vector (make-array 16 :adjustable t :fill-pointer 0) :read-only t)
+  ;; tracking where we last wrote an instruction so that TRACE-INSTUCTION
+  ;; can print "in the {x} section" whenever it changes.
+  ;; FIXME: this instruction are currently written to the trace file when
+  ;; actually encoding, not when building the assembly stream.
+  ;; Suppose for argument's sake that we want to plug in llvm as the assembler,
+  ;; we wouldn't necessarily have a per-instruction hook. The whole segment
+  ;; is disassembled after assembly so there's already a way to see
+  ;; the instruction schedule.
+  (prev-section)
+  (prev-vop))
+(declaim (freeze-type asmstream))
+
+;;; This holds either the current section (if writing symbolic assembly)
+;;; or current segment (if machine-encoding). Use ASSEMBLE to change it.
+(defvar *current-destination*)
+;;; Just like *CURRENT-DESTINATION* except this holds the current vop.
+;;; This is used only to keep track of which vops emit which insts.
+(defvar **current-vop**)
+
+(defmacro assemble ((&optional dest vop &key labels) &body body
                     &environment env)
-  "Execute BODY (as a progn) with SEGMENT as the current segment."
+  "Execute BODY (as a progn) with DEST as the current section or segment."
   (flet ((label-name-p (thing)
            (and thing (symbolp thing))))
     (let* ((visible-labels (remove-if-not #'label-name-p body))
@@ -277,12 +329,12 @@
       (when (intersection labels inherited-labels)
         (error "duplicate nested labels: ~S"
                (intersection labels inherited-labels)))
-      `(let* (,@(when segment
-                  `((**current-segment**
-                     ,(case segment
-                        (:code 'sb!c:*code-segment*)
-                        (:elsewhere 'sb!c:*elsewhere*)
-                        (t segment)))))
+      `(let* (,@(when dest
+                  `((*current-destination*
+                     ,(case dest
+                        (:code '(asmstream-code-section *asmstream*))
+                        (:elsewhere '(asmstream-elsewhere-section *asmstream*))
+                        (t dest)))))
               ,@(when vop
                   `((**current-vop** ,vop)))
               ,@(mapcar (lambda (name)
@@ -295,25 +347,24 @@
                            `(emit-label ,form)
                            form))
                      body))))))
+
+(defun assembling-to-elsewhere-p ()
+  (eq *current-destination* (asmstream-elsewhere-section *asmstream*)))
 
 ;;;; the scheduler itself
 
-(defmacro without-scheduling ((&optional (segment '**current-segment**))
-                              &body body)
+(defmacro without-scheduling (() &body body)
   "Execute BODY (as a PROGN) without scheduling any of the instructions
    generated inside it. This is not protected by UNWIND-PROTECT, so
    DO NOT use THROW or RETURN-FROM to escape from it."
-  ;; FIXME: Why not just use UNWIND-PROTECT? Or is there some other
-  ;; reason why we shouldn't use THROW or RETURN-FROM?
-  (let ((var (gensym))
-        (seg (gensym)))
-    `(let* ((,seg ,segment)
-            (,var (segment-run-scheduler ,seg)))
-       (when ,var
-         (schedule-pending-instructions ,seg)
-         (setf (segment-run-scheduler ,seg) nil))
-       ,@body
-       (setf (segment-run-scheduler ,seg) ,var))))
+  `(let ((section. *current-destination*))
+     ;; This is similar to bracketing the code with ".set noreorder"
+     ;; and ".set reorder" in the MIPS assembler, except that we could
+     ;; theoretically allow nesting (so only restore ".set reorder"
+     ;; after the outermost), except that we don't allow it.
+     (emit section. '(.begin-without-scheduling))
+     ,@body
+     (emit section. '(.end-without-scheduling))))
 
 (defmacro note-dependencies ((segment inst) &body body)
   (once-only ((segment segment) (inst inst))
@@ -1197,6 +1248,103 @@
                          (string string-designator))
                      *backend-instruction-set-package*))))
 
+;;; Join all sections into one and return only the chain of buffers,
+;;; NOT an actual section.
+(defun combine-sections (sections)
+  (let ((first-section (cdar sections))
+        (more-sections (cdr sections)))
+    ;; There shouldn't be much consing due to this REVAPPEND. We're not
+    ;; reversing the contents of the buffers, just the buffer chain itself.
+    (revappend (let ((last-buffer-len (car first-section))
+                     (more-buffers (cddr first-section)))
+                 (if (eql last-buffer-len 0)
+                     more-buffers ; Exclude empty buffer
+                     (cons (subseq (cadr first-section) 0 last-buffer-len)
+                           more-buffers)))
+               (when more-sections (combine-sections more-sections)))))
+;;; Combine INPUTS into one assembly stream and assemble into SEGMENT
+(defun assemble-sections (segment &rest inputs)
+  (let ((**current-vop** nil)
+        (sections (combine-sections inputs))
+        ;; for instruction tracing
+        (sb!c::*prev-segment* nil)
+        (sb!c::*prev-vop* nil)
+        (in-without-scheduling)
+        (was-scheduling))
+    (declare (special sb!c::*prev-segment* sb!c::*prev-vop*))
+    #!+sb-dyncount
+    (setf (segment-collect-dynamic-statistics segment) *collect-dynamic-statistics*)
+    (dolist (buffer sections segment)
+      (dovector (operation buffer)
+        (etypecase operation
+          (cons
+           (let ((mnemonic (the symbol (car operation)))
+                 (operands (cdr operation)))
+             (if (char/= (char (symbol-name mnemonic) 0) #\.) ; not a pseudo-op
+                 (apply mnemonic operands segment operands)
+                 ;; potentially a pseudo-op
+                 (case mnemonic
+                   (.align
+                    (destructuring-bind (bits &optional (pattern 0)) operands
+                      (%emit-alignment segment **current-vop** bits pattern)))
+                   (.byte ; takes >1 byte, unlike inst BYTE which takes only 1
+                    (dolist (byte operands)
+                      (emit-byte segment byte)))
+                   (.skip
+                    (destructuring-bind (n-bytes &optional (pattern 0)) operands
+                      (%emit-skip segment n-bytes pattern)))
+                   (.note-vop (setq **current-vop** operands))
+                   (.begin-without-scheduling
+                    (aver (not in-without-scheduling))
+                    (setq in-without-scheduling t
+                          was-scheduling (segment-run-scheduler segment))
+                    (when was-scheduling
+                      (schedule-pending-instructions segment)
+                      (setf (segment-run-scheduler segment) nil)))
+                   (.end-without-scheduling
+                    (aver in-without-scheduling)
+                    (setf (segment-run-scheduler segment) was-scheduling
+                          in-without-scheduling nil
+                          was-scheduling nil))
+                   (t
+                    ;; A strange instruction whose name starts with #\.
+                    ;; but which isn't recognized as a pseudo-op.
+                    (apply mnemonic operands segment operands))))))
+          (label (%emit-label segment **current-vop** operation))
+          (function (%emit-postit segment operation)))))))
+
+;;; Tack SECOND on to the end of FIRST, and reset SECOND to be empty.
+;;; Typically for appending the elsewhere section to the regular section.
+(defun join-sections (first second)
+  ;; Truncate the first sections' last buffer to its in-use length
+  (setf (section-last-buf first)
+        (subseq (section-last-buf first) 0 (section-last-buf-length first)))
+  ;; Extend FIRST's chain of buffers with those in SECOND
+  (setf (cddr first) (nconc (cddr second) (cddr first)))
+  ;; Set the in-use length of the buffer that is now the final buffer
+  ;; in FIRST's chain of buffers with the in-use length from SECOND.
+  (setf (section-last-buf-length first) (section-last-buf-length second))
+  ;; Clear out SECOND
+  (setf (cddr second) (list #()) (section-last-buf-length second) 0))
+
+;;; Produce a unified vector of the section contents.
+;;; Might be useful for something, but not at present.
+(defun section-contents (section)
+  (pop section)
+  (let* ((last-buffer-length (car section))
+         (chain (cdr section))
+         (total-length (+ last-buffer-length
+                          ;; all but the last must be completely full
+                          (reduce #'+ (cdr chain) :key #'length)))
+         (contents (make-array total-length))
+         (start total-length))
+    (decf start last-buffer-length)
+    (replace contents (car chain) :start1 start)
+    (dolist (buf (cdr chain) contents)
+      (setq last-buffer-length (length buf))
+      (decf start last-buffer-length)
+      (replace contents buf :start1 start))))
+
 (defmacro inst (&whole whole instruction &rest args &environment env)
   "Emit the specified instruction to the current segment."
   (let* ((stringablep (typep instruction '(or symbol string character)))
@@ -1211,25 +1359,49 @@
            `(%inst ,(if stringablep `',sym `(op-encoder-name ,instruction))
                    ,@args)))))
 
+;;; Place INST in the current assembly section (or sometimes SEGMENT)
+;;; based on *CURRENT-DESTINATION*. The latter occurs in two scenarios:
+;;;
+;;; (1) FINALIZE-SEGMENT invokes choosers which emit instructions.
+;;;     (see e.g. any of the EMIT-COMPUTE-INST definitions).
+;;;     Rather than forcing choosers to use a different API - perhaps
+;;;     named ENCODE-INST - they can just use the same old INST macro.
+;;; (2) ALIEN-CALLBACK-ASSEMBLER-WRAPPER uses the assembler backend
+;;;     but not its front-end. This could be changed, but it's not wrong.
+;;; As such, we must detect that we are emitting directly to machine code.
+;;;
 (defun %inst (mnemonic &rest operands)
-  ;; Pass operands to the machine instruction encoder as a list and as
-  ;; spread arguments. The list alleviates the need for emitter to listify
-  ;; operands prior to calling any instruction hooks. The spread arguments
-  ;; allow the compiler to generate normal &OPTIONAL / &KEY parsing code
-  ;; in lieu of our generating a destructuring-bind to achieve the same.
-  (apply mnemonic operands **current-segment** operands)
+  (declare (symbol mnemonic))
+  (let ((dest *current-destination*))
+    (typecase dest
+      (cons ; streaming in to the assembler
+       (section-note-current-vop dest **current-vop**)
+       (emit dest `(,mnemonic . ,operands)))
+      (segment ; streaming out of the assembler
+       ;; Pass operands to the machine instruction encoder as a list and as
+       ;; spread arguments. The list alleviates the need for emitter to listify
+       ;; operands prior to calling any instruction hooks. The spread arguments
+       ;; allow the compiler to generate normal &OPTIONAL / &KEY parsing code
+       ;; in lieu of our generating a destructuring-bind to achieve the same.
+       (apply mnemonic operands dest operands))))
   (values))
 
 (defun emit-label (label)
-  "Emit LABEL at this location in the current segment."
-  (%emit-label **current-segment** **current-vop** label))
+  "Emit LABEL at this location in the current section."
+  (let ((s *current-destination*))
+    (section-note-current-vop s **current-vop**)
+    (emit s label)))
 
 (defun emit-postit (function)
-  (%emit-postit **current-segment** function))
+  (let ((s *current-destination*))
+    (section-note-current-vop s **current-vop**)
+    (emit s (the function function))))
 
 (defun emit-alignment (bits &optional (pattern 0))
   "Emit an alignment restriction to the current segment."
-  (%emit-alignment **current-segment** **current-vop** bits pattern))
+  (let ((s *current-destination*))
+    (section-note-current-vop s **current-vop**)
+    (emit s `(.align ,bits ,pattern))))
 
 (declaim (ftype (sfunction (label &optional t index) (or null index))
                 label-position))
@@ -1240,45 +1412,6 @@
     (if (and if-after (> posn if-after))
         (- posn delta)
         posn)))
-
-(defun append-segment (segment other-segment)
-  "Append OTHER-SEGMENT to the end of SEGMENT. Don't use OTHER-SEGMENT
-   for anything after this."
-  (when (segment-run-scheduler segment)
-    (schedule-pending-instructions segment))
-  (let ((postits (segment-postits segment)))
-    (setf (segment-postits segment) (segment-postits other-segment))
-    (dolist (postit postits)
-      (emit-back-patch segment 0 postit)))
-  #!-(or x86 x86-64)
-  (%emit-alignment segment nil max-alignment)
-  #!+(or x86 x86-64)
-  (unless (eq :elsewhere (segment-type other-segment))
-    (%emit-alignment segment nil max-alignment))
-  (let ((segment-current-index-0 (segment-current-index segment))
-        (segment-current-posn-0  (segment-current-posn  segment)))
-    (incf (segment-current-index segment)
-          (segment-current-index other-segment))
-    (replace (segment-buffer segment)
-             (segment-buffer other-segment)
-             :start1 segment-current-index-0)
-    (setf (segment-buffer other-segment) nil) ; to prevent accidental reuse
-    (incf (segment-current-posn segment)
-          (segment-current-posn other-segment))
-    (let ((other-annotations (segment-annotations other-segment)))
-      (when other-annotations
-        (dolist (note other-annotations)
-          (incf (annotation-index note) segment-current-index-0)
-          (incf (annotation-posn note) segment-current-posn-0))
-        ;; This SEGMENT-LAST-ANNOTATION code is confusing. Is it really
-        ;; worth enough in efficiency to justify it? -- WHN 19990322
-        (let ((last (segment-last-annotation segment)))
-          (if last
-              (setf (cdr last) other-annotations)
-              (setf (segment-annotations segment) other-annotations)))
-        (setf (segment-last-annotation segment)
-              (segment-last-annotation other-segment)))))
-  (values))
 
 (defun finalize-segment (segment)
   "Do any final processing of SEGMENT and return the total number of bytes

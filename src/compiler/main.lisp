@@ -576,11 +576,7 @@ necessary, since type inference may take arbitrarily long to converge.")
         (eq *compile-to-memory-space* :immobile))))
 
 (defun %compile-component (component)
-  (let ((*code-segment* nil)
-        (*elsewhere* nil)
-        (*elsewhere-label* nil)
-        (*adjustable-vectors* nil) ; Needed both by codegen and fasl writer
-        #!+inline-constants (*unboxed-constants* nil))
+  (let ((*adjustable-vectors* nil)) ; Needed both by codegen and fasl writer
     (maybe-mumble "GTN ")
     (gtn-analyze component)
     (maybe-mumble "LTN ")
@@ -606,7 +602,6 @@ necessary, since type inference may take arbitrarily long to converge.")
     (unwind-protect
         (progn
           (maybe-mumble "IR2tran ")
-          (init-assembler)
           (entry-analyze component)
           (ir2-convert component)
 
@@ -651,7 +646,7 @@ necessary, since type inference may take arbitrarily long to converge.")
 
           (maybe-mumble "code ")
 
-          (multiple-value-bind (code-length fixup-notes)
+          (multiple-value-bind (segment code-length elsewhere-label fixup-notes)
               (let (#!+immobile-code
                     (*code-is-immobile* (code-immobile-p component)))
                 (generate-code component))
@@ -660,17 +655,18 @@ necessary, since type inference may take arbitrarily long to converge.")
             (when *compiler-trace-output*
               (format *compiler-trace-output*
                       "~|~%disassembly of code for ~S~2%" component)
-              (sb!disassem:disassemble-assem-segment *code-segment*
+              (sb!disassem:disassemble-assem-segment segment
                                                      *compiler-trace-output*))
 
-            (let ((object *compile-object*))
+            (let ((object *compile-object*)
+                  (*elsewhere-label* elsewhere-label)) ; KLUDGE
               (funcall (etypecase object
                         (fasl-output (maybe-mumble "fasl") #'fasl-dump-component)
                         #-sb-xc-host ; no compiling to core
                         (core-object (maybe-mumble "core") #'make-core-component)
                         (null (lambda (&rest dummies)
                                 (declare (ignore dummies)))))
-                       component *code-segment* code-length fixup-notes
+                       component segment code-length fixup-notes
                        object))))))
 
   ;; We're done, so don't bother keeping anything around.

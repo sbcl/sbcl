@@ -2531,11 +2531,14 @@
   (stable-sort constants #'> :key (lambda (constant)
                                     (size-nbyte (caar constant)))))
 
-(defun emit-inline-constant (constant label)
+(defun emit-inline-constant (section constant label)
   (let ((size (size-nbyte (car constant))))
-    (emit-alignment (integer-length (1- size)))
-    (emit-label label)
-    (let ((val (cdr constant)))
-      (loop repeat size
-            do (inst byte (ldb (byte 8 0) val))
-               (setf val (ash val -8))))))
+    (emit section
+          `(.align ,(integer-length (1- size)))
+          label
+          ;; Could add pseudo-ops for .WORD, .INT, .QUAD, .OCTA just like gcc has.
+          ;; But it works fine to emit as a sequence of bytes
+          `(.byte ,@(let ((val (cdr constant)))
+                      (loop repeat size
+                            collect (prog1 (ldb (byte 8 0) val)
+                                      (setf val (ash val -8)))))))))

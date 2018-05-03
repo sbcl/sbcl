@@ -331,7 +331,7 @@
            (frame-size (* (length argument-types) n-word-bytes)))
       (setf frame-size (logandc2 (+ frame-size +number-stack-alignment-mask+)
                                  +number-stack-alignment-mask+))
-      (assemble (segment)
+      (assemble (segment 'nil)
         (inst mov-sp nsp-save-tn nsp-tn)
         (inst str lr-tn (@ nsp-tn -16 :pre-index))
         ;; Make room on the stack for arguments.

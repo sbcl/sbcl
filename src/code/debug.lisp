@@ -1257,7 +1257,7 @@ forms that explicitly control this kind of evaluation.")
 
 (defun var-valid-in-frame-p (var location &optional (frame *current-frame*))
   ;; arg count errors are checked before anything is set up but they
-  ;; are reporeted in *elsewhere*, which is after start-pc saved in the
+  ;; are reported in the elsewhere segment, which is after start-pc saved in the
   ;; debug function, defeating the checks.
   (and (not (sb!di::all-args-available-p frame))
        (eq (debug-var-validity var location) :valid)))

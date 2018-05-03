@@ -406,7 +406,7 @@ and a pointer to the arguments."
                         (incf words-processed 2)))
                      (t
                       (bug "Unknown alien floating point type: ~S" type))))))
-        (assemble (segment)
+        (assemble (segment 'nil)
           (mapc #'save-arg argument-types n-argument-words)
           ;; funcall3 (enter-alien-callback, index, args, return-area)
           ;;

@@ -409,7 +409,7 @@
                          ;; Only 8 first XMM registers are used for
                          ;; passing arguments
                          (subseq *float-regs* 0 #!-win32 8 #!+win32 4))))
-      (assemble (segment)
+      (assemble (segment 'nil)
         ;; Make room on the stack for arguments.
         (when argument-types
           (inst sub rsp (* n-word-bytes (length argument-types))))

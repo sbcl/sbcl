@@ -412,7 +412,7 @@ pointer to the arguments."
          (esp esp-tn)
          ([ebp-8] (make-ea :dword :base ebp :disp -8))
          ([ebp-4] (make-ea :dword :base ebp :disp -4)))
-    (assemble (segment)
+    (assemble (segment 'nil)
               (inst push ebp)                       ; save old frame pointer
               (inst mov  ebp esp)                   ; establish new frame
               (inst mov  eax esp)                   ;

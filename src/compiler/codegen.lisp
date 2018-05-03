@@ -62,7 +62,7 @@
   (declare (dynamic-extent args))
   (let ((*standard-output* *compiler-trace-output*))
     (unless (eq *prev-segment* segment)
-      (format t "in the ~A segment:~%" (sb!assem:segment-type segment))
+      (format t "in the ~A segment:~%" (segment-type segment))
       (setf *prev-segment* segment))
     (unless (eq *prev-vop* vop)
       (when vop
@@ -94,39 +94,15 @@
   (and *compiler-trace-output*
        #'trace-instruction))
 
-(defun init-assembler ()
-  (setf *code-segment*
-        (sb!assem:make-segment :type :regular
-                               :run-scheduler (default-segment-run-scheduler)
-                               :inst-hook (default-segment-inst-hook)))
-  #!+sb-dyncount
-  (setf (sb!assem:segment-collect-dynamic-statistics *code-segment*)
-        *collect-dynamic-statistics*)
-  (setf *elsewhere*
-        (sb!assem:make-segment :type :elsewhere
-                               :run-scheduler (default-segment-run-scheduler)
-                               :inst-hook (default-segment-inst-hook)
-                               :alignment 0))
+;;; Return T if and only if there were any constants emitted.
+(defun emit-inline-constants ()
   #!+inline-constants
-  (setf *unboxed-constants* (make-unboxed-constants))
-  (values))
-
-#!+inline-constants
-(defun emit-inline-constants (&aux (constant-holder *unboxed-constants*)
-                                   (vector (constant-vector constant-holder)))
-  (setf *unboxed-constants* nil)
-  (unless (zerop (length vector))
-    (let ((constants (sb!vm:sort-inline-constants vector)))
-      (assemble ((constant-segment constant-holder))
-        (map nil (lambda (constant)
-                   (sb!vm:emit-inline-constant (car constant) (cdr constant)))
-             constants))))
-  ;; Always append the constant segment, because a zero-length vector
-  ;; does not imply absence of unboxed data.
-  ;; In particular the simple-fun offsets are in there.
-  (setf *code-segment* (let ((seg (constant-segment constant-holder)))
-                         (sb!assem:append-segment seg *code-segment*)
-                         seg)))
+  (let* ((asmstream *asmstream*)
+         (sorted (sb!vm:sort-inline-constants
+                  (asmstream-constant-vector asmstream)))
+         (section (asmstream-data-section asmstream)))
+    (dovector (constant sorted (plusp (length sorted)))
+      (sb!vm:emit-inline-constant section (car constant) (cdr constant)))))
 
 ;;; If a constant is already loaded into a register use that register.
 (defun optimize-constant-loads (component)
@@ -210,14 +186,14 @@
     (format *compiler-trace-output*
             "~|~%assembly code for ~S~2%"
             component))
-  (let ((prev-env nil)
-        (*prev-segment* nil)
-        (*prev-vop* nil)
-        (*fixup-notes* nil))
-    (let ((label (sb!assem:gen-label)))
-      (setf *elsewhere-label* label)
-      (assemble (:elsewhere)
-        (sb!assem:emit-label label)))
+  (let* ((prev-env nil)
+         (asmstream (make-asmstream))
+         (*asmstream* asmstream)
+         (*fixup-notes* nil))
+
+    (emit (asmstream-elsewhere-section asmstream)
+          (asmstream-elsewhere-label asmstream))
+
     ;; Leave space for the unboxed words containing simple-fun offsets.
     ;; Each offset is a 32-bit integer. On 64-bit platforms, 1 offset
     ;; is stored in the header word as a 16-bit integer.
@@ -225,17 +201,16 @@
     (let* ((n-entries (length (ir2-component-entries (component-info component))))
            (ptrs-per-word (/ sb!vm:n-word-bytes 4)) ; either 1 or 2
            (n-words (ceiling (1- n-entries) ptrs-per-word)))
-      (sb!assem::%emit-skip
-                 #!-inline-constants *code-segment*
-                 #!+inline-constants (constant-segment *unboxed-constants*)
+      (when (plusp n-words)
                  ;; Preserve double-word alignment of the unboxed constants
-                 (sb!vm:pad-data-block n-words)))
+        (emit (asmstream-data-section asmstream)
+              `(.skip ,(sb!vm:pad-data-block n-words)))))
     ;;
     (do-ir2-blocks (block component)
       (let ((1block (ir2-block-block block)))
         (when (and (eq (block-info 1block) block)
                    (block-start 1block))
-          (assemble (:code)
+          (assemble (:code 'nil) ; bind **CURRENT-VOP** to nil
             ;; Align first emitted block of each loop: x86 and x86-64 both
             ;; like 16 byte alignment, however, since x86 aligns code objects
             ;; on 8 byte boundaries we cannot guarantee proper loop alignment
@@ -257,7 +232,7 @@
               (let ((lab (gen-label)))
                 (setf (ir2-physenv-elsewhere-start (physenv-info env))
                       lab)
-                (emit-label-elsewhere lab))
+                (emit (asmstream-elsewhere-section asmstream) lab))
               (setq prev-env env)))))
       (do ((vop (ir2-block-start-vop block) (vop-next vop)))
           ((null vop))
@@ -276,16 +251,19 @@
                    (setf vop (vop-next vop)))
                   (t
                    (funcall gen vop)))))))
-    (append-segment *code-segment* *elsewhere*)
-    (setf *elsewhere* nil)
-    #!+inline-constants
     (emit-inline-constants)
-    (values (finalize-segment *code-segment*)
-            *fixup-notes*)))
-
-(defun emit-label-elsewhere (label)
-  (assemble (:elsewhere)
-    (emit-label label)))
+    (let ((segment
+           (assemble-sections
+            (make-segment :type :regular
+                          :run-scheduler (default-segment-run-scheduler)
+                          :inst-hook (default-segment-inst-hook))
+            (asmstream-data-section asmstream)
+            (asmstream-code-section asmstream)
+            (asmstream-elsewhere-section asmstream))))
+      (values segment
+              (finalize-segment segment)
+              (asmstream-elsewhere-label asmstream)
+              *fixup-notes*))))
 
 (defun label-elsewhere-p (label-or-posn kind)
   (let ((elsewhere (label-position *elsewhere-label*))
@@ -304,10 +282,12 @@
 #!+inline-constants
 (defun register-inline-constant (&rest constant-descriptor)
   (declare (dynamic-extent constant-descriptor))
-  (let ((constants *unboxed-constants*)
+  (let ((asmstream *asmstream*)
         (constant (sb!vm:canonicalize-inline-constant constant-descriptor)))
     (ensure-gethash
-     constant (constant-table constants)
+     constant
+     (asmstream-constant-table asmstream)
      (multiple-value-bind (label value) (sb!vm:inline-constant-value constant)
-       (vector-push-extend (cons constant label) (constant-vector constants))
+       (vector-push-extend (cons constant label)
+                           (asmstream-constant-vector asmstream))
        value))))
