@@ -5003,24 +5003,13 @@
   (defun /report-lvar (x message)
     (declare (ignore x message))))
 
-(deftransform encode-universal-time
-    ((second minute hour date month year &optional time-zone)
-     ((constant-arg (mod 60)) (constant-arg (mod 60))
-      (constant-arg (mod 24))
-      (constant-arg (integer 1 31))
-      (constant-arg (integer 1 12))
-      (constant-arg (integer 1899))
-      (constant-arg (rational -24 24))))
-  (let ((second (lvar-value second))
-        (minute (lvar-value minute))
-        (hour (lvar-value hour))
-        (date (lvar-value date))
-        (month (lvar-value month))
-        (year (lvar-value year))
-        (time-zone (lvar-value time-zone)))
-    (if (zerop (rem time-zone 1/3600))
-        (encode-universal-time second minute hour date month year time-zone)
-        (give-up-ir1-transform))))
+;;; Can fold only when time-zone is supplied.
+(defoptimizer (encode-universal-time optimizer)
+    (#1=(second minute hour date month year time-zone) node)
+  (declare (ignore . #1#))
+  (when (every #'constant-lvar-p (basic-combination-args node))
+    (constant-fold-call node)
+    t))
 
 #!-(and win32 (not sb-thread))
 (deftransform sleep ((seconds) ((integer 0 #.(expt 10 8))))
