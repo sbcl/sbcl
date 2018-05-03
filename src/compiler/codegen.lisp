@@ -85,11 +85,10 @@
 
 ;;; standard defaults for slots of SEGMENT objects
 (defun default-segment-run-scheduler ()
-  (and *assembly-optimize*
-        (policy (lambda-bind
-                 (block-home-lambda
-                  (block-next (component-head *component-being-compiled*))))
-                (or (> speed compilation-speed) (> space compilation-speed)))))
+  (policy (lambda-bind
+           (block-home-lambda
+            (block-next (component-head *component-being-compiled*))))
+          (or (> speed compilation-speed) (> space compilation-speed))))
 (defun default-segment-inst-hook ()
   (and *compiler-trace-output*
        #'trace-instruction))

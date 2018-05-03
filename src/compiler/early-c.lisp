@@ -301,10 +301,6 @@ the stack without triggering overflow protection.")
                 debug name." name))
         name))))
 
-;;; Set this to NIL to inhibit assembly-level optimization. (For
-;;; compiler debugging, rather than policy control.)
-(defvar *assembly-optimize* t)
-
 ;;; Bound during eval-when :compile-time evaluation.
 (defvar *compile-time-eval* nil)
 (declaim (always-bound *compile-time-eval*))

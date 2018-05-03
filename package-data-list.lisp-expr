@@ -399,7 +399,6 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                "BLOCK-NUMBER"
                "IR2-BLOCK-BLOCK"
                "VOP-BLOCK"
-               "*ASSEMBLY-OPTIMIZE*"
 
                "IMMEDIATE-CONSTANT-SC"
                "BOXED-IMMEDIATE-SC-P"
