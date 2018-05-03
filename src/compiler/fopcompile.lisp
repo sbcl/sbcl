@@ -211,7 +211,8 @@
                                   (integerp index)
                                   (eq (info :variable :kind thing) :global)
                                   (typep value '(cons (member lambda function
-                                                              named-lambda))))))
+                                                       named-lambda
+                                                       top-level-named-lambda))))))
                       (and (eq function 'setq)
                            (setq-fopcompilable-p (cdr form)))
 
@@ -252,7 +253,7 @@
 (defun lambda-form-p (form)
   (and (consp form)
        (member (car form)
-               '(lambda named-lambda lambda-with-lexenv))))
+               '(lambda named-lambda top-level-named-lambda lambda-with-lexenv))))
 
 ;;; Check that a literal form is fopcompilable. It would not be, for example,
 ;;; when the form contains structures with funny MAKE-LOAD-FORMS.

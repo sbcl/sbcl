@@ -1340,8 +1340,8 @@ necessary, since type inference may take arbitrarily long to converge.")
               (convert-and-maybe-compile
                (make-compiler-error-form condition form)
                path)
-              (throw 'process-toplevel-form-error-abort nil))))
-
+              (throw 'process-toplevel-form-error-abort nil)))
+           (*top-level-form-p* t))
       (flet ((default-processor (form)
                (let ((*top-level-form-noted* (note-top-level-form form)))
                  ;; When we're cross-compiling, consider: what should we
@@ -1403,7 +1403,8 @@ necessary, since type inference may take arbitrarily long to converge.")
                    (cond ((eq expanded form)
                           (when compile-time-too
                             (eval-compile-toplevel (list form) path))
-                          (convert-and-maybe-compile form path nil))
+                          (let (*top-level-form-p*)
+                            (convert-and-maybe-compile form path nil)))
                          (t
                           (process-toplevel-form expanded
                                                  path

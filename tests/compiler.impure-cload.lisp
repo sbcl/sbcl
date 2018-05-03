@@ -586,3 +586,16 @@
 (defun f (&optional (v foo-vector)) (list v))
 (with-test (:name :optional-default-hairy-defconstant)
   (assert (eq (first (f)) foo-vector)))
+
+(defun non-top-level-type-clobbering ()
+  99)
+
+(when nil
+  (defun non-top-level-type-clobbering ()
+    93))
+
+(defun non-top-level-type-clobbering2 ()
+  (eq (non-top-level-type-clobbering) 99))
+
+(with-test (:name :non-top-level-type-clobbering)
+  (assert (non-top-level-type-clobbering2)))

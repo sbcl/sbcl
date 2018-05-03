@@ -23,6 +23,10 @@
   (declare (ignore name))
   `#'(lambda ,args ,@body))
 
+(defmacro top-level-named-lambda (name args &body body)
+  (declare (ignore name))
+  `#'(lambda ,args ,@body))
+
 (defmacro with-locked-system-table ((table) &body body)
   (declare (ignore table))
   `(progn ,@body))

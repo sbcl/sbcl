@@ -1702,3 +1702,5 @@ to :INTERPRET, an interpreter will be used.")
     (symbol (or (eq x t) (eq (symbol-package x) *keyword-package*)))
     (cons nil)
     (t t)))
+
+(defvar *top-level-form-p* nil)

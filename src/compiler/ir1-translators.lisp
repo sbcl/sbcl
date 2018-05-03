@@ -537,7 +537,7 @@ Return VALUE without evaluating it."
 ;;;; FUNCTION and NAMED-LAMBDA
 (defun name-lambdalike (thing)
   (case (car thing)
-    ((named-lambda)
+    ((named-lambda top-level-named-lambda)
      (or (second thing)
          `(lambda ,(strip-lambda-list (third thing) :name) ,(name-context))))
     ((lambda)
@@ -552,7 +552,7 @@ Return VALUE without evaluating it."
 (defun fun-name-leaf (thing)
   (cond
     ((typep thing
-            '(cons (member lambda named-lambda lambda-with-lexenv)))
+            '(cons (member lambda named-lambda top-level-named-lambda lambda-with-lexenv)))
      (values (ir1-convert-lambdalike
               thing :debug-name (name-lambdalike thing))
              t))
@@ -616,7 +616,7 @@ be a lambda expression."
   (let ((op (when (consp source) (car source))))
     (cond ((memq op '(%coerce-callable-to-fun %coerce-callable-for-call))
            (ensure-source-fun-form (second source) :coercer coercer))
-          ((member op '(function global-function lambda named-lambda))
+          ((member op '(function global-function lambda named-lambda top-level-named-lambda))
            (values source nil))
           (t
            (let ((cname (constant-global-fun-name source)))

@@ -1020,7 +1020,7 @@
                          :maybe-add-debug-catch t
                          :source-name source-name
                          :debug-name debug-name))
-    ((named-lambda)
+    ((named-lambda top-level-named-lambda)
      (let ((name (cadr thing))
            (lambda-expression `(lambda ,@(cddr thing))))
        (if (and name (legal-fun-name-p name))
@@ -1029,6 +1029,8 @@
                                           :maybe-add-debug-catch t
                                           :source-name name))
                  (info (info :function :info name)))
+             (when (eq (car thing) 'top-level-named-lambda)
+               (setf (functional-top-level-defun-p res) t))
              (assert-global-function-definition-type name res)
              (push res (defined-fun-functionals defined-fun-res))
              (unless (or

@@ -969,7 +969,9 @@
   (xref () :type list)
   ;; True if this functional was created from an inline expansion. This
   ;; is either T, or the GLOBAL-VAR for which it is an expansion.
-  (inline-expanded nil))
+  (inline-expanded nil)
+  ;; Is it coming from TOP-LEVEL-NAMED-LAMBDA?
+  (top-level-defun-p nil))
 
 (defun pretty-print-functional (functional stream)
   (let ((name (functional-debug-name functional)))
