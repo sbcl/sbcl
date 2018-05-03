@@ -344,8 +344,13 @@
                       :allow-failure t))))
 
 (with-test (:name :member-transform-dotted-list)
+  (assert (nth-value 1
+                     (checked-compile
+                      '(lambda (x) (member x '(a . b)))
+                      :allow-warnings t))))
+
+(with-test (:name :encode-universal-time)
   (assert (nth-value 3
                      (checked-compile
                       '(lambda () (encode-universal-time 0 0 0 1 1 1900 -1))
                       :allow-style-warnings t))))
-
