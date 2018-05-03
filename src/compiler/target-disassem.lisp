@@ -1935,11 +1935,11 @@
           (and (eq byte-order #!+big-endian :big-endian #!+little-endian :little-endian)
                #!-(or arm arm64 ppc x86 x86-64) ; unaligned loads are ok for these
                (not (logtest (1- length) (sap-int (sap+ sap offset))))))
-      (funcall (case length ; native byte order and acceptable alignment
-                 (8 #'sap-ref-64)
-                 (4 #'sap-ref-32)
-                 (2 #'sap-ref-16)
-                 (t #'sap-ref-8)) sap offset)
+      (case length
+        (8 (sap-ref-64 sap offset))
+        (4 (sap-ref-32 sap offset))
+        (2 (sap-ref-16 sap offset))
+        (1 (sap-ref-8 sap offset)))
       (binding* (((offset increment)
                   (cond ((eq byte-order :big-endian) (values offset +1))
                         (t (values (+ offset (1- length)) -1))))
