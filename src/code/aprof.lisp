@@ -163,6 +163,8 @@
 ;;; So we disassemble just enough instructions at PC to deduce
 ;;; what type of object is being allocated.
 (defun infer-type (pc component)
+  (declare (ignorable pc component))
+  #+(and x86-64 sb-thread)
   (let* ((seg (sb-disassem::%make-segment
                :sap-maker (lambda () (error "Bad sap maker"))
                :virtual-location 0))
