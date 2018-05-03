@@ -55,28 +55,26 @@
 
 ;;;; noise to emit an instruction trace
 
-(defvar *prev-segment*)
-(defvar *prev-vop*)
-
-(defun trace-instruction (segment vop inst &rest args)
-  (declare (dynamic-extent args))
-  (let ((*standard-output* *compiler-trace-output*))
-    (unless (eq *prev-segment* segment)
-      (format t "in the ~A segment:~%" (segment-type segment))
-      (setf *prev-segment* segment))
-    (unless (eq *prev-vop* vop)
+(defun trace-instruction (section vop inst args state
+                          &aux (*standard-output* *compiler-trace-output*))
+  (macrolet ((prev-section () `(car state))
+             (prev-vop () `(cdr state)))
+    (unless (eq (prev-section) section)
+      (format t "in the ~A section:~%" section)
+      (setf (prev-section) section))
+    (unless (eq (prev-vop) vop)
       (when vop
         (format t "~%VOP ")
         (if (vop-p vop)
             (print-vop vop)
             (format *compiler-trace-output* "~S~%" vop)))
       (terpri)
-      (setf *prev-vop* vop))
+      (setf (prev-vop) vop))
     (case inst
       (:label
-       (format t "~A:~%" (car args)))
+       (format t "~A:~%" args))
       (:align
-       (format t "~0,8T.align~0,8T~A~%" (car args)))
+       (format t "~0,8T.align~0,8T~A~%" args))
       (t
        (format t "~0,8T~A~@[~0,8T~{~A~^, ~}~]~%" inst args))))
   (values))
@@ -253,8 +251,7 @@
     (emit-inline-constants)
     (let ((segment
            (assemble-sections
-            (make-segment :type :regular
-                          :run-scheduler (default-segment-run-scheduler)
+            (make-segment :run-scheduler (default-segment-run-scheduler)
                           :inst-hook (default-segment-inst-hook))
             (asmstream-data-section asmstream)
             (asmstream-code-section asmstream)

@@ -23,8 +23,6 @@
 
 ;;; This structure holds the state of the assembler.
 (defstruct (segment (:copier nil))
-  ;; the type of this segment (for debugging output and stuff)
-  (type :regular :type (member :regular :elsewhere))
   ;; This is a vector where instructions are written.
   ;; It used to be an adjustable array, but we now do the array size
   ;; management manually for performance reasons (as of 2006-05-13 hairy
@@ -101,8 +99,6 @@
   ;; *COLLECT-DYNAMIC-STATISTICS* but is faster to reference.
   #!+sb-dyncount
   (collect-dynamic-statistics nil))
-(sb!c::defprinter (segment)
-  type)
 
 (declaim (inline segment-current-index))
 (defun segment-current-index (segment)
@@ -273,10 +269,6 @@
                   index 0)))
         (setf (aref vector index) thing)
         (setf (car data) (1+ index))))))
-(defun section-note-current-vop (section vop)
-  (unless (eq (section-last-vop section) vop)
-    (emit section `(.note-vop . ,vop))
-    (setf (section-last-vop section) vop)))
 
 (defstruct asmstream
   (data-section (make-section) :read-only t)
@@ -287,16 +279,9 @@
   ;; into the data section
   (constant-table (make-hash-table :test #'equal) :read-only t)
   (constant-vector (make-array 16 :adjustable t :fill-pointer 0) :read-only t)
-  ;; tracking where we last wrote an instruction so that TRACE-INSTUCTION
+  ;; tracking where we last wrote an instruction so that SB-C::TRACE-INSTRUCTION
   ;; can print "in the {x} section" whenever it changes.
-  ;; FIXME: this instruction are currently written to the trace file when
-  ;; actually encoding, not when building the assembly stream.
-  ;; Suppose for argument's sake that we want to plug in llvm as the assembler,
-  ;; we wouldn't necessarily have a per-instruction hook. The whole segment
-  ;; is disassembled after assembly so there's already a way to see
-  ;; the instruction schedule.
-  (prev-section)
-  (prev-vop))
+  (tracing-state (list nil nil) :read-only t)) ; segment and vop
 (declaim (freeze-type asmstream))
 
 ;;; This holds either the current section (if writing symbolic assembly)
@@ -969,14 +954,13 @@
 ;;; EMIT-LABEL (the interface) basically just expands into this,
 ;;; supplying the SEGMENT and VOP.
 (defun %emit-label (segment vop label)
+  (declare (ignore vop))
   (when (segment-run-scheduler segment)
     (schedule-pending-instructions segment))
   (let ((postits (segment-postits segment)))
     (setf (segment-postits segment) nil)
     (dolist (postit postits)
       (emit-back-patch segment 0 postit)))
-  (awhen (segment-inst-hook segment)
-    (funcall it segment vop :label label))
   (emit-annotation segment label))
 
 ;;; Called by the EMIT-ALIGNMENT macro to emit an alignment note. We check to
@@ -984,10 +968,9 @@
 ;;; fixed number of bytes. If so, we do so. Otherwise, we create and emit an
 ;;; alignment note.
 (defun %emit-alignment (segment vop bits &optional (pattern 0))
+  (declare (ignore vop))
   (when (segment-run-scheduler segment)
     (schedule-pending-instructions segment))
-  (awhen (segment-inst-hook segment)
-    (funcall it segment vop :align bits))
   (let ((alignment (segment-alignment segment))
         (offset (- (segment-current-posn segment)
                    (segment-sync-posn segment))))
@@ -1266,12 +1249,8 @@
 (defun assemble-sections (segment &rest inputs)
   (let ((**current-vop** nil)
         (sections (combine-sections inputs))
-        ;; for instruction tracing
-        (sb!c::*prev-segment* nil)
-        (sb!c::*prev-vop* nil)
         (in-without-scheduling)
         (was-scheduling))
-    (declare (special sb!c::*prev-segment* sb!c::*prev-vop*))
     #!+sb-dyncount
     (setf (segment-collect-dynamic-statistics segment) *collect-dynamic-statistics*)
     (dolist (buffer sections segment)
@@ -1293,7 +1272,6 @@
                    (.skip
                     (destructuring-bind (n-bytes &optional (pattern 0)) operands
                       (%emit-skip segment n-bytes pattern)))
-                   (.note-vop (setq **current-vop** operands))
                    (.begin-without-scheduling
                     (aver (not in-without-scheduling))
                     (setq in-without-scheduling t
@@ -1345,6 +1323,16 @@
       (decf start last-buffer-length)
       (replace contents buf :start1 start))))
 
+(defun trace-inst (section mnemonic operands)
+  (when sb!c::*compiler-trace-output*
+    (let* ((asmstream *asmstream*)
+           (section-name
+            (if (eq section (asmstream-code-section asmstream))
+                :regular
+                :elsewhere)))
+      (sb!c::trace-instruction section-name **current-vop** mnemonic operands
+                               (asmstream-tracing-state asmstream)))))
+
 (defmacro inst (&whole whole instruction &rest args &environment env)
   "Emit the specified instruction to the current segment."
   (let* ((stringablep (typep instruction '(or symbol string character)))
@@ -1375,7 +1363,7 @@
   (let ((dest *current-destination*))
     (typecase dest
       (cons ; streaming in to the assembler
-       (section-note-current-vop dest **current-vop**)
+       (trace-inst dest mnemonic operands)
        (emit dest `(,mnemonic . ,operands)))
       (segment ; streaming out of the assembler
        ;; Pass operands to the machine instruction encoder as a list and as
@@ -1389,18 +1377,17 @@
 (defun emit-label (label)
   "Emit LABEL at this location in the current section."
   (let ((s *current-destination*))
-    (section-note-current-vop s **current-vop**)
+    (trace-inst s :label label)
     (emit s label)))
 
 (defun emit-postit (function)
   (let ((s *current-destination*))
-    (section-note-current-vop s **current-vop**)
     (emit s (the function function))))
 
 (defun emit-alignment (bits &optional (pattern 0))
   "Emit an alignment restriction to the current segment."
   (let ((s *current-destination*))
-    (section-note-current-vop s **current-vop**)
+    (trace-inst s :align bits)
     (emit s `(.align ,bits ,pattern))))
 
 (declaim (ftype (sfunction (label &optional t index) (or null index))
@@ -1639,13 +1626,11 @@
                ,@emitter))))))
 
 (defun instruction-hooks (segment mnemonic operands)
-  (let ((vop **current-vop**)
-        (postits (segment-postits segment)))
+  (declare (ignore mnemonic operands))
+  (let ((postits (segment-postits segment)))
     (setf (segment-postits segment) nil)
     (dolist (postit postits)
-      (emit-back-patch segment 0 postit))
-    (awhen (segment-inst-hook segment)
-      (apply it segment vop mnemonic operands))))
+      (emit-back-patch segment 0 postit))))
 
 (defmacro define-instruction-macro (name lambda-list &body body)
   `(defmacro ,(op-encoder-name name t) ,lambda-list ,@body))

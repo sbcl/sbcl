@@ -55,8 +55,7 @@
                   `(.align ,sb!vm:n-lowtag-bits)))
           (let ((segment
                  (assemble-sections
-                  (make-segment :type :regular
-                                :inst-hook (default-segment-inst-hook)
+                  (make-segment :inst-hook (default-segment-inst-hook)
                                 :run-scheduler nil)
                   (asmstream-data-section asmstream)
                   (asmstream-code-section asmstream)
