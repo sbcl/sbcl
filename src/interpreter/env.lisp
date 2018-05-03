@@ -671,7 +671,7 @@
 
 (defun make-proto-fn (lambda-expression &optional (silent t))
   (multiple-value-bind (name lambda-list body)
-      (if (eq (car lambda-expression) 'named-lambda)
+      (if (memq (car lambda-expression) '(named-lambda top-level-named-lambda))
           (with-subforms (name lambda-list . body) (cdr lambda-expression)
             (values name lambda-list body))
           (with-subforms (lambda-list . body) (cdr lambda-expression)
