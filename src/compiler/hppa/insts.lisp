@@ -427,31 +427,6 @@
   (q2   :field (byte 8 5) :value 0)
   (im5  :field (byte 5 0) :reader break-im5))
 
-(defun break-control (chunk inst stream dstate)
-  (declare (ignore inst))
-  (flet ((nt (x) (if stream (note x dstate))))
-    (let ((trap (break-im5 chunk dstate)))
-     (case trap
-       (#.cerror-trap
-        (nt "Cerror trap")
-        (handle-break-args #'snarf-error-junk trap stream dstate))
-       (#.breakpoint-trap
-        (nt "Breakpoint trap"))
-       (#.pending-interrupt-trap
-        (nt "Pending interrupt trap"))
-       (#.halt-trap
-        (nt "Halt trap"))
-       (#.fun-end-breakpoint-trap
-        (nt "Function end breakpoint trap"))
-       (#.single-step-around-trap
-        (nt "Single step around trap"))
-       (#.error-trap
-        (nt "Error trap")
-        (handle-break-args (lambda (sap offset trap &optional length-only)
-                             (snarf-error-junk sap offset trap length-only nil))
-                           trap
-                           stream dstate))))))
-
 (define-instruction-format (system-inst 32)
   (op1 :field (byte 6 26) :value 0)
   (r1  :field (byte 5 21) :type 'reg)
@@ -557,6 +532,7 @@
 ; or load an 11bit-unsigned value. The latter is used for
 ; example in an LDIL/LDO pair. The key :unsigned specifies this.
 (macrolet ((define-load-inst (name opcode &optional imm-bits)
+             (declare (ignore imm-bits)) ; what?
              `(define-instruction ,name (segment disp base reg &key unsigned)
                 (:declare (type tn reg base)
                           (type (member t nil) unsigned)
@@ -1012,6 +988,7 @@
   (byte 1 12) (byte 1 11) (byte 11 0))
 
 (macrolet ((define-imm-inst (name cond-kind opcode subcode &optional pinned)
+             (declare (ignorable pinned))
              `(define-instruction ,name (segment imm src dst &optional cond)
                 (:declare (type tn dst src)
                   (type (signed-byte 11) imm))

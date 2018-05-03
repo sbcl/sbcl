@@ -480,31 +480,6 @@
 (define-instruction imb (segment)
   (:emitter (emit-lword segment #x00000086)))
 
-(defun bugchk-trap-control (chunk inst stream dstate)
-  (declare (ignore inst))
-  (flet ((nt (x) (if stream (note x dstate))))
-    (let ((trap (bugchk-trap-code chunk dstate)))
-      (case trap
-        (#.halt-trap
-         (nt "Halt trap"))
-        (#.pending-interrupt-trap
-         (nt "Pending interrupt trap"))
-        (#.cerror-trap
-         (nt "Cerror trap")
-         (handle-break-args #'snarf-error-junk trap stream dstate))
-        (#.breakpoint-trap
-         (nt "Breakpoint trap"))
-        (#.fun-end-breakpoint-trap
-         (nt "Function end breakpoint trap"))
-        (#.single-step-breakpoint-trap
-         (nt "Single step breakpoint trap"))
-        (#.single-step-around-trap
-         (nt "Single step around trap"))
-        (#.single-step-before-trap
-         (nt "Single step before trap"))
-        (t
-         (handle-break-args #'snarf-error-junk trap stream dstate))))))
-
 (define-instruction gentrap (segment code)
   (:printer bugchk () :default
             :control #'bugchk-trap-control)
