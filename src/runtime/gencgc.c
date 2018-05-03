@@ -2990,8 +2990,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
     /* And if we're saving a core, there's no point in being conservative. */
     if (conservative_stack) {
         for_each_thread(th) {
-            void **ptr;
-            void **esp=(void **)-1;
+            void* esp = (void*)-1;
             if (th->state == STATE_DEAD)
                 continue;
 # if defined(LISP_FEATURE_SB_SAFEPOINT)
@@ -3002,7 +3001,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
              * at.  For threads that were running Lisp code, the pitstop
              * and edge functions maintain this value within the
              * interrupt or exception handler. */
-            esp = os_get_csp(th);
+            esp = (void*)os_get_csp(th);
             assert_on_stack(th, esp);
 
             /* And on platforms with interrupts: scavenge ctx registers. */
@@ -3021,32 +3020,34 @@ garbage_collect_generation(generation_index_t generation, int raise)
             }
 #  endif
 # elif defined(LISP_FEATURE_SB_THREAD)
-            sword_t i,free;
             if(th==arch_os_get_current_thread()) {
-                /* Somebody is going to burn in hell for this, but casting
-                 * it in two steps shuts gcc up about strict aliasing. */
-                esp = (void **)((void *)&raise);
+                esp = (void*)&raise;
             } else {
-                void **esp1;
+                sword_t i,free;
+                lispobj* esp1;
                 free=fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
                 for(i=free-1;i>=0;i--) {
                     os_context_t *c = nth_interrupt_context(i, th);
-                    esp1 = (void **) *os_context_register_addr(c,reg_SP);
-                    if (esp1>=(void **)th->control_stack_start &&
-                        esp1<(void **)th->control_stack_end) {
-                        if(esp1<esp) esp=esp1;
+                    esp1 = (lispobj*) *os_context_register_addr(c,reg_SP);
+                    if (esp1 >= th->control_stack_start && esp1 < th->control_stack_end) {
+                        if ((void*)esp1<esp) esp = esp1;
                         preserve_context_registers((void(*)(os_context_register_t))preserve_pointer,
                                                    c);
                     }
                 }
             }
 # else
-            esp = (void **)((void *)&raise);
+            esp = (void*)&raise;
 # endif
             if (!esp || esp == (void*) -1)
                 lose("garbage_collect: no SP known for thread %x (OS %x)",
                      th, th->os_thread);
-            for (ptr = ((void **)th->control_stack_end)-1; ptr >= esp;  ptr--) {
+            // This loop would be more naturally expressed as
+            //  for (ptr = esp; ptr < th->control_stack_end; ++ptr)
+            // However there is a very subtle problem with that: 'esp = &raise'
+            // is not necessarily properly aligned to be a stack pointer!
+            void **ptr;
+            for (ptr = ((void **)th->control_stack_end)-1; ptr >= (void**)esp;  ptr--) {
                 preserve_pointer(*ptr);
             }
         }
