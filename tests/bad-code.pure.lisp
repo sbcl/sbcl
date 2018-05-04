@@ -354,3 +354,8 @@
                      (checked-compile
                       '(lambda () (encode-universal-time 0 0 0 1 1 1900 -1))
                       :allow-style-warnings t))))
+
+(with-test (:name :search-transform-bad-index)
+  (checked-compile
+   '(lambda (a)
+     (search '(0 1 0 2) a :start1 4 :end1 5))))

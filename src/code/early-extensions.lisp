@@ -190,6 +190,15 @@
     (or (zerop n) ; since anything can be considered an improper list of length 0
         (and (consp rest) (rec (cdr rest) (1- n))))))
 
+(defun sequence-of-length-at-least-p (sequence length)
+  (etypecase sequence
+    (list
+     (list-of-length-at-least-p sequence length))
+    (vector
+     (>= (length sequence) length))
+    (sequence
+     (>= (length sequence) length))))
+
 ;;; Is X is a positive prime integer?
 (defun positive-primep (x)
   ;; This happens to be called only from one place in sbcl-0.7.0, and

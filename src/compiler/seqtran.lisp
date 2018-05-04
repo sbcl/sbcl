@@ -1288,7 +1288,9 @@
                                  (length pattern))
                                 (t
                                  (give-up-ir1-transform))))
-             (pattern (if (= (- pattern-end pattern-start) 1)
+             (pattern (if (and (= (- pattern-end pattern-start) 1)
+                               (sequence-of-length-at-least-p pattern
+                                                              (1+ pattern-start)))
                           (elt pattern pattern-start)
                           (give-up-ir1-transform))))
         (macrolet ((maybe-arg (arg &optional (key (keywordicate arg)))
