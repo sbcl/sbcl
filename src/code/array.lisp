@@ -285,7 +285,9 @@
              (values widetag n-bits-shift)))
        fastidiously-parse)
       ;; Do things the hard way after falling through the tagbody.
-      (let ((ctype (type-or-nil-if-unknown type)))
+      (let* ((ctype (type-or-nil-if-unknown type))
+             (ctype (and ctype
+                         (sb!kernel::replace-hairy-type ctype))))
         (typecase ctype
           (null (result simple-vector-widetag))
           (union-type
@@ -303,6 +305,10 @@
                    #!+long-float
                    ((csubtypep ctype (specifier-type 'long-float))
                     (result simple-array-long-float-widetag))
+                   ((csubtypep ctype (specifier-type 'complex-double-float))
+                    (result simple-array-complex-double-float-widetag))
+                   ((csubtypep ctype (specifier-type 'complex-single-float))
+                    (result simple-array-complex-single-float-widetag))
                    (t
                     (result simple-vector-widetag)))))
           (intersection-type

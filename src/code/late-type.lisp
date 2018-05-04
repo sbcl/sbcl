@@ -74,6 +74,27 @@
         (and (fun-type-p ctype)
              (contains-unknown-type-p (fun-type-returns ctype)))))))
 
+(defun contains-hairy-type-p (ctype)
+  (typecase ctype
+    (hairy-type t)
+    (compound-type (some #'contains-hairy-type-p (compound-type-types ctype)))
+    (negation-type (contains-hairy-type-p (negation-type-type ctype)))))
+
+(defun replace-hairy-type (type)
+  (if (contains-hairy-type-p type)
+      (typecase type
+        (hairy-type *universal-type*)
+        (intersection-type (%type-intersection
+                            (mapcar #'replace-hairy-type (intersection-type-types type))))
+        (union-type (%type-union
+                     (mapcar #'replace-hairy-type (union-type-types type))))
+        (negation-type
+         (let ((new (replace-hairy-type (negation-type-type type))))
+           (if (eq new *universal-type*)
+               new
+               (type-negation new)))))
+      type))
+
 ;; Similar to (NOT CONTAINS-UNKNOWN-TYPE-P), but report that (SATISFIES F)
 ;; is not a testable type unless F is currently bound.
 (defun testable-type-p (ctype)

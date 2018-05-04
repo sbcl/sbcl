@@ -1395,13 +1395,6 @@
                (array-in-bounds-p a 1))))
     (() t)))
 
-(with-test (:name :make-array-satisifies-element-type)
-  (checked-compile-and-assert
-      ()
-      '(lambda (type)
-        (make-array 3 :initial-element #\a :element-type type))
-    (('(and character (satisfies eval))) "aaa" :test #'equal)))
-
 (with-test (:name :array-type-dimensions-or-give-up-hairy-types)
   (checked-compile-and-assert
       ()

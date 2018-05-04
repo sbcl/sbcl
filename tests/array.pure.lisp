@@ -539,3 +539,11 @@
   (assert (stringp (make-array 10 :element-type (opaque-identity '(standard-char)))))
   (assert (stringp (make-array 10 :element-type (opaque-identity '(extended-char)))))
   (assert (bit-vector-p (make-array 10 :element-type (opaque-identity '(bit))))))
+
+(with-test (:name :make-array-satisifies-element-type)
+  (checked-compile-and-assert
+      ()
+      '(lambda (type)
+        (make-array 3 :initial-element #\a :element-type type))
+    (('(and character (satisfies eval))) "aaa" :test #'equal)
+    (('(and character (or (satisfies eval) base-char))) "aaa" :test #'equal)))
