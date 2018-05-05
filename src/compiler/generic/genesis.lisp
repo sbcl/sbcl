@@ -3374,7 +3374,12 @@ III. initially undefined function references (alphabetically):
 
      FDEFN  NAME
 ==========  ====~:{~%~10,'0X  ~S~}~%"
-              (sort undefs #'string<
+              (sort undefs
+                    (lambda (a b &aux (pkg-a (package-name (symbol-package a)))
+                                      (pkg-b (package-name (symbol-package b))))
+                      (cond ((string< pkg-a pkg-b) t)
+                            ((string> pkg-a pkg-b) nil)
+                            (t (string< a b))))
                     :key (lambda (x) (fun-name-block-name (cadr x))))))
 
     (format t "~%~|~%IV. layout names:~2%")
