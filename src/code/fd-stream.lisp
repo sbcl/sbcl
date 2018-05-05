@@ -466,6 +466,13 @@
   (error 'c-string-encoding-error
          :external-format external-format
          :code code))
+
+(macrolet ((sap-ref-octets (sap offset count)
+             `(let ((.buffer.
+                     (make-array (the fixnum ,count) :element-type '(unsigned-byte 8))))
+                (%byte-blt ,sap ,offset .buffer. 0 ,count)
+                .buffer.)))
+
 (defun c-string-decoding-error (external-format sap offset count)
   (declare (optimize allow-non-returning-tail-call))
   (error 'c-string-decoding-error
@@ -511,6 +518,7 @@
         (when (> (length string) 0)
           (setf (fd-stream-listen stream) t)))
       nil)))
+) ; end MACROLET
 
 (defun stream-encoding-error-and-handle (stream code)
   (restart-case

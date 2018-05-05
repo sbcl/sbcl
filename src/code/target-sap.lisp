@@ -64,14 +64,6 @@
            (fixnum offset))
   (sap-ref-8 sap offset))
 
-(defun sap-ref-octets (sap offset count)
-  (declare (type system-area-pointer sap)
-           (fixnum offset count))
-  (let ((buffer (make-array count :element-type '(unsigned-byte 8))))
-    (dotimes (i count)
-      (setf (aref buffer i) (sap-ref-8 sap (+ offset i))))
-    buffer))
-
 ;;; Return the 16-bit word at OFFSET bytes from SAP.
 (defun sap-ref-16 (sap offset)
   (declare (type system-area-pointer sap)
