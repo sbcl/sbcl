@@ -1709,16 +1709,6 @@ subject to change."
           :late ("SBCL" "1.2.15")
           (function destroy-thread :replacement terminate-thread)))
 
-#!+sb-thread
-(defun enter-foreign-callback (index return arguments)
-  (let ((thread (without-gcing
-                  ;; Hold off GCing until *current-thread* is set up
-                  (setf *current-thread*
-                        (make-foreign-thread :name "foreign callback")))))
-    (dx-flet ((enter ()
-                (sb!alien::enter-alien-callback index return arguments)))
-      (initial-thread-function-trampoline thread nil #'enter nil))))
-
 (defmacro with-interruptions-lock ((thread) &body body)
   `(with-system-mutex ((thread-interruptions-lock ,thread))
      ,@body))

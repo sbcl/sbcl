@@ -805,4 +805,5 @@
   "src/code/repack-xref"
   #+cheneygc "src/code/purify"
   "src/code/module"
+  "src/code/alien-callback"
   "src/code/save"))
