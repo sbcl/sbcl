@@ -901,7 +901,8 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;; a subtype of not-so-aptly-named INPUT-ERROR-IN-COMPILE-FILE.
 (defun %do-forms-from-info (function info condition-name)
   (declare (function function))
-  #-sb-xc-host (declare (dynamic-extent function)) ; avoid "unable" note
+  ; FIXME: why "could not stack-allocate" in a few call sites?
+  ; (declare (dynamic-extent function))
   (let* ((file-info (source-info-file-info info))
          (stream (get-source-stream info))
          (pos (file-position stream))
