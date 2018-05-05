@@ -1492,11 +1492,11 @@ core and return a descriptor to it."
                           value))))))))
 
 ;; Look up the target's descriptor for #'FUN where FUN is a host symbol.
-(defun target-symbol-function (symbol)
+(defun cold-symbol-function (symbol &optional (errorp t))
   (let ((f (cold-fdefn-fun (cold-fdefinition-object symbol))))
-    ;; It works only if DEFUN F was seen first.
-    (aver (not (cold-null f)))
-    f))
+    (cond ((not (cold-null f)) f)
+          (errorp (error "Expected a definition for ~S in cold load" symbol))
+          (t nil))))
 
 ;;; Return a handle on an interned symbol. If necessary allocate the
 ;;; symbol and record its home package.
@@ -1824,8 +1824,8 @@ core and return a descriptor to it."
         (let ((fdefn (allocate-header+object gspace (1- sb!vm:fdefn-size) sb!vm:fdefn-widetag)))
           (setf (gethash warm-name *cold-fdefn-objects*) fdefn)
           (write-wordindexed fdefn sb!vm:fdefn-name-slot cold-name)
+          (write-wordindexed fdefn sb!vm:fdefn-fun-slot *nil-descriptor*)
           (unless leave-fn-raw
-            (write-wordindexed fdefn sb!vm:fdefn-fun-slot *nil-descriptor*)
             (let ((tramp
                    (or (lookup-assembler-reference
                         #!+(and x86-64 immobile-code) 'sb!vm::undefined-fdefn
@@ -1839,9 +1839,6 @@ core and return a descriptor to it."
                                      (encode-fdefn-raw-addr fdefn tramp #xE8)
                                      #!-immobile-code tramp)))
           fdefn))))
-
-(defun cold-functionp (descriptor)
-  (eql (descriptor-lowtag descriptor) sb!vm:fun-pointer-lowtag))
 
 (defun cold-fun-entry-addr (fun)
   (aver (= (descriptor-lowtag fun) sb!vm:fun-pointer-lowtag))
@@ -1857,7 +1854,7 @@ core and return a descriptor to it."
                          (values (cold-intern name) name)
                          (values name (warm-fun-name name))))
                     (fdefn (cold-fdefinition-object cold-name t)))
-    (when (cold-functionp (cold-fdefn-fun fdefn))
+    (unless (cold-null (cold-fdefn-fun fdefn))
       (error "Duplicate DEFUN for ~S" warm-name))
     ;; There can't be any closures or funcallable instances.
     (aver (= (logand (descriptor-bits (read-memory defn)) sb!vm:widetag-mask)
@@ -2145,8 +2142,7 @@ core and return a descriptor to it."
   (dolist (fixup *cold-static-call-fixups*)
     (destructuring-bind (name kind code offset) fixup
       (cold-fixup code offset
-                  (cold-fun-entry-addr
-                   (cold-fdefn-fun (cold-fdefinition-object name)))
+                  (cold-fun-entry-addr (cold-symbol-function name))
                   kind :static-call))))
 
 ;;; Save a cons of both kinds of fixups if there are both, otherwise just the
@@ -2566,7 +2562,7 @@ core and return a descriptor to it."
            (fdefinition
             ;; Special form #'F fopcompiles into `(FDEFINITION ,f)
             (aver (and (singleton-p args) (symbolp (car args))))
-            (target-symbol-function (car args)))
+            (cold-symbol-function (car args)))
            (cons (cold-cons (first args) (second args)))
            (symbol-global-value (cold-symbol-value (first args)))
            (t (call fun :sb-cold-funcall-handler/for-value args)))
@@ -2654,9 +2650,9 @@ core and return a descriptor to it."
   (cold-fdefinition-object (pop-stack)))
 
 (define-cold-fop (fop-known-fun)
-  (let* ((name (pop-stack))
-         (fun (cold-fdefn-fun (cold-fdefinition-object name))))
-    (if (cold-null fun) `(:known-fun . ,name) fun)))
+  (let ((name (pop-stack)))
+    (or (cold-symbol-function name nil) ; no error if undefined
+        `(:known-fun . ,name))))
 
 ;;; Setting this variable shows what code looks like before any
 ;;; fixups (or function headers) are applied.
@@ -2735,11 +2731,9 @@ core and return a descriptor to it."
 
 (defun resolve-deferred-known-funs ()
   (dolist (item *deferred-known-fun-refs*)
-    (let ((fun (cold-fdefn-fun (cold-fdefinition-object (car item)))))
-      (when (cold-null fun)
-        (error "need definition of ~S at genesis time" (car item)))
-      (let ((place (cdr item)))
-        (write-wordindexed (car place) (cdr place) fun)))))
+    (let ((fun (cold-symbol-function (car item)))
+          (place (cdr item)))
+      (write-wordindexed (car place) (cdr place) fun))))
 
 (define-cold-fop (fop-alter-code (slot))
   (let ((value (pop-stack))
@@ -3558,12 +3552,10 @@ III. initially undefined function references (alphabetically):
       ;; Write the initial function.
       (write-word initial-fun-core-entry-type-code)
       (write-word 3)
-      (let* ((cold-name (cold-intern '!cold-init))
-             (initial-fun
-              (cold-fdefn-fun (cold-fdefinition-object cold-name))))
+      (let ((initial-fun (descriptor-bits (cold-symbol-function '!cold-init))))
         (when verbose
-          (format t "~&/INITIAL-FUN=#X~X~%" (descriptor-bits initial-fun)))
-        (write-word (descriptor-bits initial-fun)))
+          (format t "~&/INITIAL-FUN=#X~X~%" initial-fun))
+        (write-word initial-fun))
 
       ;; Write the End entry.
       (write-word end-core-entry-type-code)
