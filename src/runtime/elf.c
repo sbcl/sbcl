@@ -15,30 +15,33 @@ off_t search_for_elf_core(int fd)
         fprintf(stderr, "failed to read elf header\n");
         return 0;
     }
-    // Seek to and read the section header of the section header string table
-    Elf64_Shdr shdr;
-    off_t offset = ehdr.e_shoff + ehdr.e_shstrndx * ehdr.e_shentsize;
-    if (lseek(fd, offset, SEEK_SET) != offset ||
-        read(fd, &shdr, sizeof shdr) != sizeof shdr) {
-        fprintf(stderr, "read failed\n");
-        return 0;
-    }
-    // Scan the section header string table
     unsigned long result = 0;
+    char* shdrs = 0;
     char * shstrtab_strbuf = 0;
+
+    // Slurp in all the section headers
+    int nbytes = ehdr.e_shentsize * ehdr.e_shnum;
+    if ((shdrs = malloc(nbytes)) == NULL ||
+        lseek(fd, ehdr.e_shoff, SEEK_SET) != (Elf64_Sxword)ehdr.e_shoff ||
+        read(fd, shdrs, nbytes) != nbytes)
+        goto done;
+    Elf64_Shdr* shdr = (Elf64_Shdr*)(shdrs + ehdr.e_shentsize * ehdr.e_shstrndx);
+    // Slurp the string table
+    if ((shstrtab_strbuf = malloc(shdr->sh_size)) == NULL ||
+        lseek(fd, shdr->sh_offset, SEEK_SET) != (Elf64_Sxword)shdr->sh_offset ||
+        read(fd, shstrtab_strbuf, shdr->sh_size) != (Elf64_Sxword)shdr->sh_size)
+        goto done;
+    // Scan the section header string table
     int i;
-    if ((shstrtab_strbuf = malloc(shdr.sh_size)) == NULL ||
-        lseek(fd, shdr.sh_offset, SEEK_SET) != (Elf64_Sxword)shdr.sh_offset ||
-        read(fd, shstrtab_strbuf, shdr.sh_size) != (Elf64_Sxword)shdr.sh_size ||
-        lseek(fd, ehdr.e_shoff, SEEK_SET) != (Elf64_Sxword)ehdr.e_shoff)
-        fprintf(stderr, "read failed\n");
-    else for(i=0;i<ehdr.e_shnum;++i)
-        if (read(fd, &shdr, sizeof shdr) == sizeof shdr
-            && !strcmp(&shstrtab_strbuf[shdr.sh_name], "lisp.core")) {
-            result = shdr.sh_offset;
+    for(i=1;i<ehdr.e_shnum;++i) { // skip section 0 which is the null section
+        Elf64_Shdr* h = (Elf64_Shdr*)(shdrs + ehdr.e_shentsize * i);
+        if  (!strcmp(&shstrtab_strbuf[h->sh_name], "lisp.core")) {
+            result = h->sh_offset;
             break;
         }
-    if (shstrtab_strbuf)
-        free(shstrtab_strbuf);
+    }
+done:
+    if (shstrtab_strbuf) free(shstrtab_strbuf);
+    if (shdrs) free(shdrs);
     return result;
 }
