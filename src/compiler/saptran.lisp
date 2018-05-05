@@ -49,10 +49,11 @@
           (system-area-pointer system-area-pointer) boolean
   (movable flushable))
 
-(defknown sap+ (system-area-pointer integer) system-area-pointer
+(defknown sap+ (system-area-pointer (signed-byte #.sb!vm:n-word-bits))
+               system-area-pointer
   (movable flushable))
 (defknown sap- (system-area-pointer system-area-pointer)
-               (signed-byte #.sb!vm::n-word-bits)
+               (signed-byte #.sb!vm:n-machine-word-bits)
   (movable flushable))
 
 (defknown sap-int (system-area-pointer)
