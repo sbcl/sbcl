@@ -1827,8 +1827,10 @@ core and return a descriptor to it."
           (unless leave-fn-raw
             (write-wordindexed fdefn sb!vm:fdefn-fun-slot *nil-descriptor*)
             (let ((tramp
-                   (or (lookup-assembler-reference 'sb!vm::undefined-tramp
-                                                   :direct core-file-name)
+                   (or (lookup-assembler-reference
+                        #!+(and x86-64 immobile-code) 'sb!vm::undefined-fdefn
+                        #!-(and x86-64 immobile-code) 'sb!vm::undefined-tramp
+                        :direct core-file-name)
                        ;; Our preload for the tramps doesn't happen during host-1,
                        ;; so substitute a usable value.
                        0)))

@@ -76,7 +76,7 @@
     ())) ; result
 
 (define-assembly-routine
-    (#!+immobile-code undefined-tramp-fdefn
+    (#!+immobile-code undefined-fdefn
      #!-immobile-code undefined-tramp
      (:return-style :none)
      #!+immobile-code
@@ -108,7 +108,7 @@
   ;; supposed to return with the address from which this alien call was made
   ;; (a PC within that same function) since C convention does not arrange
   ;; for RBP to hold the new frame pointer prior to making a call.
-  ;; This wouldn't matter much because the only restart availableis to throw
+  ;; This wouldn't matter much because the only restart available is to throw
   ;; to toplevel, so a lost frame is not hugely important, but it's annoying.
   (error-call nil 'undefined-alien-fun-error rbx-tn))
 
