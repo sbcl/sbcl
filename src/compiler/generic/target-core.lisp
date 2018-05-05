@@ -217,9 +217,9 @@
       ;; 2. apply-core-fixups and sanctify-for-execution
       ;; 3. set-code-entrypointa
       (with-pinned-objects (code-obj)
-         (copy-byte-vector-to-system-area
-          (the (simple-array assembly-unit 1) (segment-contents-as-vector segment))
-          (code-instructions code-obj))
+        (let ((bytes (the (simple-array assembly-unit 1)
+                          (segment-contents-as-vector segment))))
+          (%byte-blt bytes 0 (code-instructions code-obj) 0 (length bytes)))
 
         (apply-core-fixups fixup-notes code-obj)
 

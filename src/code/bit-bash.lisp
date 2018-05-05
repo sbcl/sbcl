@@ -582,20 +582,6 @@
         ;; for the bashers.
         finally (return `(progn ,@fixers ,@bashers)))
 
-;;; a common idiom for calling COPY-TO-SYSTEM-AREA
-;;;
-;;; Copy the entire contents of the vector V to memory starting at SAP+OFFSET.
-(defun copy-byte-vector-to-system-area (bv sap &optional (offset 0))
-  ;; FIXME: There should be a type like SB!VM:BYTE so that we can write this
-  ;; type as (SIMPLE-ARRAY SB!VM:BYTE 1). Except BYTE is an external symbol of
-  ;; package CL, and shadowing it would be too ugly; so maybe SB!VM:VMBYTE?
-  ;; (And then N-BYTE-BITS would be N-VMBYTE-BITS and so forth?)
-  (declare (type (simple-array (unsigned-byte 8) 1) bv))
-  (declare (type system-area-pointer sap))
-  (declare (type fixnum offset))
-  (copy-ub8-to-system-area bv 0 sap offset (length bv)))
-
-
 ;;;; Bashing-Style search for bits
 ;;;;
 ;;;; Similar search would work well for base-strings as well.
