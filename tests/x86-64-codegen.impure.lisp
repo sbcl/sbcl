@@ -116,7 +116,7 @@
 (with-test (:name :reference-assembly-tramp)
   (dolist (testcase '(("FUNCALLABLE-INSTANCE-TRAMP"
                        sb-kernel:%make-funcallable-instance)
-                      ("UNDEFINED-TRAMP"
+                      ("UNDEFINED-FDEFN"
                        sb-kernel:make-fdefn)))
     (let ((lines
            (split-string
