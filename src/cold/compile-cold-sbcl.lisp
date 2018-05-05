@@ -97,9 +97,7 @@
             slot-makunbound
             make-load-form-saving-slots
             sb!ext:run-program
-            sb!vm::map-allocated-objects
-            sb!vm::map-objects-in-range
-            sb!kernel::choose-code-component-order)
+            sb!vm::remove-static-links)
           ;; CLOS implementation
           '(sb!mop:class-finalized-p
             sb!mop:class-prototype
