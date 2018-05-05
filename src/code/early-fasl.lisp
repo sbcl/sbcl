@@ -131,6 +131,7 @@
 ;;;     have packages and that sort of native Lisp stuff associated
 ;;;     with them. We can compare them with EQ.
 (defglobal *assembler-routines* nil)
+#-sb-xc-host (declaim (code-component *assembler-routines*))
 
 
 ;;;; the FOP database

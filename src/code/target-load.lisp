@@ -257,7 +257,7 @@
 (defvar *!initial-assembler-routines*)
 
 (defun get-asm-routine (name &optional indirect &aux (code *assembler-routines*))
-  (awhen (gethash (the symbol name) (car (%code-debug-info code)))
+  (awhen (the list (gethash (the symbol name) (car (%code-debug-info code))))
     (sap-int (sap+ (code-instructions code)
                    (if indirect
                        ;; Return the address containing the routine address
