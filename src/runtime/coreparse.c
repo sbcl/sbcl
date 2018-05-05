@@ -125,7 +125,12 @@ search_for_embedded_core(char *filename, struct memsize_options *memsize_options
             core_start = -1; // reset to invalid
     }
 #if ELFCORE
-    if (core_start < 0) {
+    // Specifying "--core" as an ELF file with a lisp.core section doesn't work.
+    // (There are bunch of reasons) So only search for a core section if this
+    // is an implicit search for a core embedded in an executable.
+    // The two cases can be distinguished based on whether the core is able
+    // to set the memsize_options. (Implicit can set them, explicit can't)
+    if (core_start < 0 && memsize_options) {
         if (!(core_start = search_for_elf_core(fd)) ||
             lseek(fd, core_start, SEEK_SET) != core_start ||
             read(fd, &header, lispobj_size) != lispobj_size || header != CORE_MAGIC)
@@ -983,7 +988,7 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
     val = *ptr++;
 
     if (val != CORE_MAGIC) {
-        lose("invalid magic number in core: 0x%lx should have been 0x%x.\n",
+        lose("invalid magic number in core: 0x%lx should have been 0x%x.",
              val,
              CORE_MAGIC);
     }
