@@ -46,10 +46,6 @@
 #define thread_mutex_unlock(l) 0
 #endif
 
-#if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD)
-void os_preinit();
-#endif
-
 void os_link_runtime();
 
 #if defined(LISP_FEATURE_SB_SAFEPOINT)

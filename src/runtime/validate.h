@@ -84,7 +84,8 @@
 #define BINDING_STACK_RETURN_GUARD_PAGE(th) \
     (BINDING_STACK_GUARD_PAGE(th) - os_vm_page_size)
 
-extern void allocate_spaces(void);
+extern void allocate_spaces(boolean);
+extern boolean allocate_hardwired_spaces(boolean);
 
 extern void
 protect_control_stack_hard_guard_page(int protect_p, struct thread *thread);

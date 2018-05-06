@@ -653,7 +653,7 @@ void* os_dlsym_default(char* name)
    started before _any_ TLS slot is allocated by libraries, and
    some C compiler vendors rely on this fact. */
 
-void os_preinit()
+int os_preinit(char *argv[], char *envp[])
 {
 #ifdef LISP_FEATURE_X86
     DWORD slots[TLS_MINIMUM_AVAILABLE];
@@ -680,6 +680,7 @@ void os_preinit()
              "(last TlsAlloc() returned %u)",key);
     }
 #endif
+    return 0;
 }
 #endif  /* LISP_FEATURE_SB_THREAD */
 

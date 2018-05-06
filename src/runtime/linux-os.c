@@ -192,29 +192,30 @@ isnptl (void)
 }
 #endif
 
-void
-os_init(char *argv[], char *envp[])
+static void getuname(int *major_version, int* minor_version, int *patch_version)
 {
     /* Conduct various version checks: do we have enough mmap(), is
      * this a sparc running 2.2, can we do threads? */
     struct utsname name;
-    int major_version;
-    int minor_version;
-    int patch_version;
     char *p;
     uname(&name);
 
     p=name.release;
-    major_version = atoi(p);
-    minor_version = patch_version = 0;
+    *major_version = atoi(p);
+    *minor_version = *patch_version = 0;
     p=strchr(p,'.');
     if (p != NULL) {
-            minor_version = atoi(++p);
+            *minor_version = atoi(++p);
             p=strchr(p,'.');
             if (p != NULL)
-                    patch_version = atoi(++p);
+                    *patch_version = atoi(++p);
     }
+}
 
+void os_init(char *argv[], char *envp[])
+{
+    int major_version, minor_version, patch_version;
+    getuname(&major_version, &minor_version, &patch_version);
     if (major_version<2) {
         lose("linux kernel version too old: major version=%d (can't run in version < 2.0.0)\n",
              major_version);
@@ -242,6 +243,39 @@ os_init(char *argv[], char *envp[])
      */
     os_vm_page_size = BACKEND_PAGE_BYTES;
 
+#ifdef LISP_FEATURE_X86
+    /* Use SSE detector.  Recent versions of Linux enable SSE support
+     * on SSE capable CPUs.  */
+    /* FIXME: Are there any old versions that does not support SSE?  */
+    fast_bzero_pointer = fast_bzero_detect;
+#endif
+}
+
+#if (defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)) \
+     && (!defined(DISABLE_ASLR) || DISABLE_ASLR)
+# define ALLOW_PERSONALITY_CHANGE 1
+#else
+# define ALLOW_PERSONALITY_CHANGE 0
+#endif
+
+int os_preinit(char *argv[], char *envp[])
+{
+#if ALLOW_PERSONALITY_CHANGE
+    if (getenv("SBCL_IS_RESTARTING")) {
+        /* We restarted due to previously enabled ASLR.  Now,
+         * reenable it for fork()'ed children. */
+        int pers = personality(0xffffffffUL);
+        personality(pers & ~ADDR_NO_RANDOMIZE);
+        unsetenv("SBCL_IS_RESTARTING");
+        return 0; // ensure_spaces() will win or not. Not much to do here.
+    }
+#endif
+    /* See if we can allocate read-only, static, and linkage table spaces
+     * at their required addresses. If we can, then there's no need to try
+     * the re-exec trick since dynamic space is relocatable. */
+    if (allocate_hardwired_spaces(0)) // soft failure mode
+        return 1; // indicate that we already allocated hardwired spaces
+
     /* KLUDGE: Disable memory randomization on new Linux kernels
      * by setting a personality flag and re-executing. (We need
      * to re-execute, since the memory maps that can conflict with
@@ -250,8 +284,10 @@ os_init(char *argv[], char *envp[])
      * Since randomization is currently implemented only on x86 kernels,
      * don't do this trick on other platforms.
      */
-#if (defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)) \
-     && (!defined(DISABLE_ASLR) || DISABLE_ASLR)
+    int major_version, minor_version, patch_version;
+    getuname(&major_version, &minor_version, &patch_version);
+
+#if ALLOW_PERSONALITY_CHANGE
     if ((major_version == 2
          /* Some old kernels will apparently lose unsupported personality flags
           * on exec() */
@@ -291,26 +327,12 @@ os_init(char *argv[], char *envp[])
                     execv(runtime, argv);
                 }
             }
-            /* Either changing the personality or execve() failed. Either
-             * way we might as well continue, and hope that the random
-             * memory maps are ok this time around.
-             */
-        } else if (getenv("SBCL_IS_RESTARTING")) {
-            /* We restarted due to previously enabled ASLR.  Now,
-             * reenable it for fork()'ed children. */
-            int pers = personality(0xffffffffUL);
-            personality(pers & ~ADDR_NO_RANDOMIZE);
-
-            unsetenv("SBCL_IS_RESTARTING");
+            /* Either changing the personality or execve() failed.
+             * Just get on with life and hope for the best. */
         }
     }
-#ifdef LISP_FEATURE_X86
-    /* Use SSE detector.  Recent versions of Linux enable SSE support
-     * on SSE capable CPUs.  */
-    /* FIXME: Are there any old versions that does not support SSE?  */
-    fast_bzero_pointer = fast_bzero_detect;
 #endif
-#endif
+    return 0;
 }
 
 

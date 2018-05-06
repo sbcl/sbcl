@@ -33,12 +33,12 @@ uword_t DYNAMIC_SPACE_START;
 #endif
 
 static void
-ensure_space(lispobj *start, uword_t size)
+ensure_space(uword_t start, uword_t size)
 {
     if (os_validate(NOT_MOVABLE, (os_vm_address_t)start, (os_vm_size_t)size)==NULL) {
         fprintf(stderr,
                 "ensure_space: failed to allocate %lu bytes at %p\n",
-                (long unsigned)size, start);
+                (long unsigned)size, (void*)start);
         fprintf(stderr,
                 "(hint: Try \"ulimit -a\"; maybe you should increase memory limits.)\n");
         exit(1);
@@ -58,40 +58,60 @@ ensure_undefined_alien(void) {
     }
 }
 
-void
-allocate_spaces(void)
+boolean allocate_hardwired_spaces(boolean hard_failp)
 {
 #ifdef PRINTNOISE
     printf("allocating memory ...");
     fflush(stdout);
 #endif
+    struct {
+        uword_t start;
+        unsigned size;
+    } preinit_spaces[] = {
+      { READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE },
+      { STATIC_SPACE_START, STATIC_SPACE_SIZE },
+#ifdef LISP_FEATURE_LINKAGE_TABLE
+      { LINKAGE_TABLE_SPACE_START, LINKAGE_TABLE_SPACE_SIZE },
+#endif
+    };
+    int i;
+    int n_spaces = sizeof preinit_spaces / sizeof preinit_spaces[0];
+    boolean success = 1;
+    for (i = 0; i< n_spaces; ++i) {
+        if (hard_failp)
+            ensure_space(preinit_spaces[i].start, preinit_spaces[i].size);
+        else if (!os_validate(NOT_MOVABLE,
+                              (os_vm_address_t)preinit_spaces[i].start,
+                              preinit_spaces[i].size)) {
+            success = 0;
+            break;
+        }
+    }
+#ifdef PRINTNOISE
+    printf(" done.\n");
+#endif
+    return success;
+}
+
+void
+allocate_spaces(boolean did_preinit)
+{
 #ifndef LISP_FEATURE_RELOCATABLE_HEAP
     // Allocate the largest space(s) first,
     // since if that fails, it's game over.
 #ifdef LISP_FEATURE_GENCGC
-    ensure_space( (lispobj *)DYNAMIC_SPACE_START  , dynamic_space_size);
+    ensure_space(DYNAMIC_SPACE_START  , dynamic_space_size);
 #else
-    ensure_space( (lispobj *)DYNAMIC_0_SPACE_START, dynamic_space_size);
-    ensure_space( (lispobj *)DYNAMIC_1_SPACE_START, dynamic_space_size);
+    ensure_space(DYNAMIC_0_SPACE_START, dynamic_space_size);
+    ensure_space(DYNAMIC_1_SPACE_START, dynamic_space_size);
 #endif
 #endif
 
-    ensure_space( (lispobj *)READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE);
-    ensure_space( (lispobj *)STATIC_SPACE_START   , STATIC_SPACE_SIZE);
-#ifdef LISP_FEATURE_LINKAGE_TABLE
-    ensure_space( (lispobj *)LINKAGE_TABLE_SPACE_START,
-                  LINKAGE_TABLE_SPACE_SIZE);
-#endif
-#if defined(LISP_FEATURE_IMMOBILE_SPACE) && !defined(LISP_FEATURE_RELOCATABLE_HEAP)
-# error "unsupported configuration: immobile-space && !relocatable-heap"
-#endif
+    if (!did_preinit)
+      allocate_hardwired_spaces(1);
 
 #ifdef LISP_FEATURE_OS_PROVIDES_DLOPEN
     ensure_undefined_alien();
-#endif
-
-#ifdef PRINTNOISE
-    printf(" done.\n");
 #endif
 }
 
