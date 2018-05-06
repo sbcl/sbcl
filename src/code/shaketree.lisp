@@ -27,7 +27,8 @@
                 list))))
     (gc :gen 7)
     (when query
-      (sb-ext::gc-and-search-roots query :static))
+      #+cheneygc (error "Can't search for GC roots")
+      #+gencgc (sb-ext::gc-and-search-roots query :static))
     (let ((n-dropped 0))
       (flet ((reintern (symbols table package access)
                (declare (ignore package))
