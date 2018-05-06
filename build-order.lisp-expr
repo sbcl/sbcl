@@ -614,7 +614,6 @@
                                                 ;   "compiler/generic/core"
 
  ("src/code/eval"              :not-host) ; uses INFO, wants compiler macro
- ("src/code/target-sap"        :not-host) ; uses SAP-INT type
  ("src/code/target-package"    :not-host) ; needs "code/package"
  ("src/code/bignum-random"     :not-host) ; needs "code/random" and
                                           ;   "code/bignum"
