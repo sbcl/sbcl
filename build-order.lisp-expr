@@ -796,6 +796,7 @@
   "src/code/ntrace"
   "src/code/step"
   "src/code/warm-lib"
+  "src/code/alien-callback"
   #+win32 "src/code/warm-mswin"
   "src/code/run-program"
   #+gencgc "src/code/traceroot"
@@ -804,5 +805,4 @@
   "src/code/repack-xref"
   #+cheneygc "src/code/purify"
   "src/code/module"
-  "src/code/alien-callback"
   "src/code/save"))
