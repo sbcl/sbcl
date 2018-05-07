@@ -1419,3 +1419,9 @@
          (ash (the (satisfies eval) n)
               (the (integer * 0) s)))
     ((1234 -4) 77)))
+
+(with-test (:name :assert-lvar-type-intersection)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x y)
+         (write-sequence nil (the standard-object x) y nil))))

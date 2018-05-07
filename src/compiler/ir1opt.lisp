@@ -311,6 +311,21 @@
           (reoptimize-lvar lvar)))))
   (values))
 
+
+(defun type-asserted-p (lvar type)
+  (or (values-subtypep (lvar-derived-type lvar) type)
+      ;; Just doing values-subtypep is not enough since it may be an
+      ;; intersection of types. Need to see if there's a cast that
+      ;; actually checks that particular type.
+      (do-uses (node lvar t)
+        (unless
+            (typecase node
+              (cast
+               (values-subtypep (coerce-to-values (cast-asserted-type node)) type))
+              (t
+               (values-subtypep (node-derived-type node) type)))
+          (return)))))
+
 ;;; This is similar to DERIVE-NODE-TYPE, but asserts that it is an
 ;;; error for LVAR's value not to be TYPEP to TYPE. We implement it
 ;;; splitting off DEST a new CAST node; old LVAR will deliver values
@@ -318,7 +333,7 @@
 ;;; guarantee that the new assertion will be checked.
 (defun assert-lvar-type (lvar type policy &optional context)
   (declare (type lvar lvar) (type ctype type))
-  (unless (values-subtypep (lvar-derived-type lvar) type)
+  (unless (type-asserted-p lvar type)
     (let ((internal-lvar (make-lvar))
           (dest (lvar-dest lvar)))
       (substitute-lvar internal-lvar lvar)
