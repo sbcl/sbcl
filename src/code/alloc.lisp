@@ -387,6 +387,8 @@
                       (logior (ash (1- fdefn-size) n-widetag-bits) fdefn-widetag)
                       nil)))
 
+#!+immobile-code
+(progn
 (defun alloc-immobile-gf ()
   (values (%primitive alloc-immobile-fixedobj fun-pointer-lowtag 6 ; kludge
                       (logior (ash 5 n-widetag-bits) funcallable-instance-widetag)
@@ -408,5 +410,5 @@
   (values (%primitive alloc-immobile-fixedobj other-pointer-lowtag 6
                       (logior (ash 4 n-widetag-bits) code-header-widetag)
                       (ash (* 2 n-word-bytes) n-fixnum-tag-bits))))
-
+) ; end PROGN
 ) ; end PROGN

@@ -305,10 +305,7 @@ the stack without triggering overflow protection.")
 (defvar *compile-time-eval* nil)
 (declaim (always-bound *compile-time-eval*))
 
-#!-immobile-code
-(defmacro code-immobile-p (thing)
-  (declare (ignore thing))
-  nil)
+#!-immobile-code (defmacro code-immobile-p (thing) `(progn ,thing nil))
 
 ;;; Various error-code generating helpers
 (defvar *adjustable-vectors*)

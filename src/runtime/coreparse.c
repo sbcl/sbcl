@@ -274,7 +274,7 @@ struct heap_adjust {
 };
 
 static inline struct code* get_asm_routine_code_component() {
-#ifdef LISP_FEATURE_IMMOBILE_CODE
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
     return (struct code*)VARYOBJ_SPACE_START;
 #else
     return (struct code*)READ_ONLY_SPACE_START;

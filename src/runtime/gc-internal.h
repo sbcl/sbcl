@@ -209,25 +209,20 @@ extern boolean positive_bignum_logbitp(int,struct bignum*);
 
 extern lispobj fdefn_callee_lispobj(struct fdefn *fdefn);
 
-#elif defined(LISP_FEATURE_IMMOBILE_SPACE)
-
-static inline lispobj fdefn_callee_lispobj(struct fdefn *fdefn) {
-    extern unsigned int asm_routines_end;
-    // FIXME: This test is completely bogus.
-    // The low byte of raw_addr is the jump opcode 0xE9,
-    // and the rest of the bytes are not an absolute address.
-    return (lispobj)fdefn->raw_addr -
-      ((uword_t)fdefn->raw_addr < (uword_t)asm_routines_end ? 0 : FUN_RAW_ADDR_OFFSET);
-}
-
 #else
 
-static inline boolean points_to_readonly_space(uword_t ptr) {
+static inline lispobj points_to_asm_routine_p(uword_t ptr) {
+# if defined(LISP_FEATURE_IMMOBILE_SPACE)
+    // Lisp assembly routines are in varyobj space, not readonly space
+    extern unsigned int asm_routines_end;
+    return ptr < (uword_t)asm_routines_end;
+# else
     return READ_ONLY_SPACE_START <= ptr && ptr < READ_ONLY_SPACE_END;
+# endif
 }
 static inline lispobj fdefn_callee_lispobj(struct fdefn *fdefn) {
     return (lispobj)fdefn->raw_addr -
-      (points_to_readonly_space((uword_t)fdefn->raw_addr) ? 0 : FUN_RAW_ADDR_OFFSET);
+      (points_to_asm_routine_p((uword_t)fdefn->raw_addr) ? 0 : FUN_RAW_ADDR_OFFSET);
 }
 
 #endif

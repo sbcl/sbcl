@@ -604,7 +604,11 @@
      (storew header result 0 lowtag))))
 
 #!+immobile-space
-(progn
+(macrolet ((c-call (name)
+             `(let ((c-fun (make-fixup ,name :foreign)))
+                (inst call (cond ((sb!c::code-immobile-p node) c-fun)
+                                 (t (progn (inst mov temp-reg-tn c-fun)
+                                           temp-reg-tn)))))))
 (define-vop (alloc-immobile-fixedobj)
   (:info lowtag size word0 word1)
   (:temporary (:sc unsigned-reg :to :eval :offset rdi-offset) c-arg1)
@@ -612,6 +616,7 @@
   (:temporary (:sc unsigned-reg :from :eval :to (:result 0) :offset rax-offset)
               c-result)
   (:results (result :scs (descriptor-reg)))
+  (:node-var node)
   (:generator 50
    (inst mov c-arg1 size)
    (inst mov c-arg2 word0)
@@ -619,7 +624,7 @@
    ;; which has that effect
    (inst and rsp-tn -16)
    (pseudo-atomic
-     (inst call (make-fixup "alloc_fixedobj" :foreign))
+     (c-call "alloc_fixedobj")
      (inst lea result (make-ea :qword :base c-result :disp lowtag))
      ;; If code, the next word must be set within the P-A
      ;; otherwise the GC would compute the wrong object size.
@@ -632,13 +637,13 @@
   (:temporary (:sc unsigned-reg :from :eval :to (:result 0) :offset rax-offset)
               c-result)
   (:results (result :scs (descriptor-reg)))
+  (:node-var node)
   (:generator 50
    (move c-arg1 slots)
    ;; RSP needn't be restored because the allocators all return immediately
    ;; which has that effect
    (inst and rsp-tn -16)
-   (pseudo-atomic
-     (inst call (make-fixup "alloc_layout" :foreign)))
-     (move result c-result)))
-) ; end PROGN
+   (pseudo-atomic (c-call "alloc_layout"))
+   (move result c-result)))
+) ; end MACROLET
 
