@@ -213,13 +213,13 @@
         (when (and offset (or firstp (not (zerop offset))))
           (unless (or firstp (minusp offset))
             (write-char #\+ stream))
-          (if firstp
-            (progn
-              (princ16 offset stream)
-              (or (minusp offset)
-                  (nth-value 1 (note-code-constant-absolute offset dstate))
-                  (maybe-note-assembler-routine offset nil dstate)))
-            (princ offset stream))))))
+          (cond (firstp
+                 (princ16 offset stream)
+                 (let ((offset (ldb (byte 32 0) offset)))
+                   (or (nth-value 1 (note-code-constant-absolute offset dstate))
+                       (maybe-note-assembler-routine offset nil dstate))))
+                (t
+                 (princ offset stream)))))))
   (write-char #\] stream))
 
 ;;;; interrupt instructions
