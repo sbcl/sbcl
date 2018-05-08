@@ -110,9 +110,9 @@ tls_index_of(struct symbol *symbol) // untagged pointer
 #endif
 
 static inline lispobj
-SymbolValue(u64 tagged_symbol_pointer, void *thread)
+SymbolValue(lispobj tagged_symbol_pointer, void *thread)
 {
-    struct symbol *sym= SYMBOL(tagged_symbol_pointer);
+    struct symbol *sym = SYMBOL(tagged_symbol_pointer);
     if(thread && tls_index_of(sym)) {
         lispobj r = per_thread_value(sym, thread);
         if(r!=NO_TLS_VALUE_MARKER_WIDETAG) return r;
@@ -121,9 +121,9 @@ SymbolValue(u64 tagged_symbol_pointer, void *thread)
 }
 
 static inline void
-SetSymbolValue(u64 tagged_symbol_pointer,lispobj val, void *thread)
+SetSymbolValue(lispobj tagged_symbol_pointer,lispobj val, void *thread)
 {
-    struct symbol *sym= SYMBOL(tagged_symbol_pointer);
+    struct symbol *sym = SYMBOL(tagged_symbol_pointer);
     if(thread && tls_index_of(sym)) {
         if (per_thread_value(sym, thread) != NO_TLS_VALUE_MARKER_WIDETAG) {
             per_thread_value(sym, thread) = val;

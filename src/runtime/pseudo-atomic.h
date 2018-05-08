@@ -16,6 +16,8 @@
 #ifndef PSEUDO_ATOMIC_H
 #define PSEUDO_ATOMIC_H
 
+#include "interr.h"
+
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 
 #define set_alloc_pointer(value) dynamic_space_free_pointer = (lispobj*)(value)
