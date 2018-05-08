@@ -419,7 +419,7 @@ We could try a few things to mitigate this:
 
 * If the page that we're looking at is full but the FINALLY clause is hit,
   don't stop looking for more pages in that one case. Instead keep looking
-  for the end of the contiguous block, but stop as soon any potential
+  for the end of the contiguous block, but stop as soon as any potential
   stopping point is found; don't chase next-free-page.  This is tricky
   as well and just about as infeasible.
 
