@@ -14,11 +14,6 @@
 #define ARCH_HAS_STACK_POINTER
 #define ALIEN_STACK_GROWS_DOWNWARD
 
-/* FIXME: Do we also want
- *   #define ARCH_HAS_FLOAT_REGISTERS
- * here? (The answer wasn't obvious to me when merging the
- * architecture-abstracting patches for CSR's SPARC port. -- WHN 2002-02-15) */
-
 #define COMPILER_BARRIER \
     do { __asm__ __volatile__ ( "" : : : "memory"); } while (0)
 

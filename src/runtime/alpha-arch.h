@@ -14,7 +14,6 @@ release_spinlock(lispobj *word)
     *word=0;
 }
 
-#define ARCH_HAS_FLOAT_REGISTERS
 #define ALIEN_STACK_GROWS_DOWNWARD
 
 #endif /* _ALPHA_ARCH_H */
