@@ -53,8 +53,8 @@
 
 ;;; Insert allocation profiler instrumentation
 (defun instrument-alloc (size node)
-  (let ((SKIP-INSTRUMENTATION (gen-label)))
-    (when (policy node (> sb!c::instrument-consing 1))
+  (when (policy node (> sb!c::instrument-consing 1))
+    (let ((skip-instrumentation (gen-label)))
       (inst mov temp-reg-tn
             (make-ea :qword :base thread-base-tn
                      :disp (* n-word-bytes thread-profile-data-slot)))
