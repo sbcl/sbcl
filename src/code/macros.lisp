@@ -306,7 +306,7 @@ invoked. In that case it will store into PLACE and start over."
                             :format-control
                             "~@<~IBad ~S clause:~:@_  ~S~:@_~S allowed as the key ~
                            designator only in the final otherwise-clause, not in a ~
-                           normal-clause. Use (~S) instead, or move the clause the ~
+                           normal-clause. Use (~S) instead, or move the clause to the ~
                            correct position.~:@>"
                             :format-arguments (list 'case case keyoid keyoid)
                             :references `((:ansi-cl :macro case))))
