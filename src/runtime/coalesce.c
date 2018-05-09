@@ -136,7 +136,7 @@ static void coalesce_obj(lispobj* where, struct hopscotch_table* ht)
  * (8) purify()
  * (9) coalesce_range()
  * plus the Lisp variant:
- * (10) map-referencing-objects
+ * (10) do-referenced-object which thank goodness is common to 2 uses
  * and if you want to count 'print.c' as another, there's that.
  */
 

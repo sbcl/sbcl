@@ -873,6 +873,9 @@ NOTE: calling MAP-ROOT with a THREAD does not currently map over
 conservative roots from the thread registers and interrupt contexts.
 
 Experimental: interface subject to change."
+  (when (typep object '(or bignum float sb-sys:system-area-pointer
+                           fixnum character))
+    (return-from map-root object))
   (let ((fun (coerce function 'function))
         (seen (sb-int:alloc-xset)))
     (flet ((call (part)
@@ -884,25 +887,13 @@ Experimental: interface subject to change."
         (let ((table sb-pcl::*eql-specializer-table*))
           (call (sb-int:with-locked-system-table (table)
                   (gethash object table)))))
-      (etypecase object
-        ((or bignum float sb-sys:system-area-pointer fixnum))
-        (sb-ext:weak-pointer
-         (call (sb-ext:weak-pointer-value object)))
+      (sb-vm:do-referenced-object (object call)
         (cons
-         (call (car object))
-         (call (cdr object))
+         :extend
          (when (and ext (ignore-errors (fboundp object)))
            (call (fdefinition object))))
-        (ratio
-         (call (numerator object))
-         (call (denominator object)))
-        (complex
-         (call (realpart object))
-         (call (realpart object)))
-        (sb-vm::instance
-         (call (%instance-layout object))
-         (do-instance-tagged-slot (i object)
-           (call (%instance-ref object i)))
+        (instance
+         :extend
          #+sb-thread
          (when (typep object 'sb-thread:thread)
            (cond ((eq object sb-thread:*current-thread*)
@@ -932,42 +923,26 @@ Experimental: interface subject to change."
                     ;; that map onto the 'struct thread', which is just as well
                     ;; since they're either fixnums or dynamic-extent objects.
                     (mapc #'call refs))))))
-        (array
-         (if (simple-vector-p object)
-             (dotimes (i (length object))
-               (call (aref object i)))
-             (when (array-header-p object)
-               (call (%array-data object))
-               (call (%array-displaced-p object))
-               (unless simple
-                 (call (%array-displaced-from object))))))
+        ((satisfies array-header-p)
+         :override
+         ;; The default implementation always scans %array-displaced-from
+         (call (%array-data object))
+         (call (%array-displaced-p object))
+         (unless simple
+           (call (%array-displaced-from object))))
         (code-component
-         (call (%code-debug-info object))
-         (loop for i from sb-vm:code-constants-offset below (code-header-words object)
-               do (call (code-header-ref object i)))
+         :extend
          (loop for i below (code-n-entries object)
                do (call (%code-entry-point object i))))
-        (fdefn
-         (call (fdefn-name object))
-         (call (fdefn-fun object)))
         (simple-fun
+         :override
          (call (fun-code-header object))
          (call (%simple-fun-name object))
          (call (%simple-fun-arglist object))
          (call (%simple-fun-type object))
          (call (%simple-fun-info object)))
-        (closure
-         (call (%closure-fun object))
-         (do-closure-values (x object)
-           (call x)))
-        (funcallable-instance
-         ;; FIXME: layout ?
-         (call (%funcallable-instance-function object))
-         (loop for i from sb-vm:instance-data-start
-               below (- (1+ (get-closure-length object))
-                        sb-vm:funcallable-instance-info-offset)
-               do (call (%funcallable-instance-info object i))))
         (symbol
+         :override
          (when ext
            (dolist (thread (sb-thread:list-all-threads))
              (call (sb-thread:symbol-value-in-thread object thread nil))))
@@ -989,7 +964,8 @@ Experimental: interface subject to change."
          (call (symbol-name object))
          (unless simple
            (call (symbol-package object))))
-        (sb-kernel::random-class
+        (t
+         :extend
          (case (widetag-of object)
            (#.sb-vm:value-cell-widetag
             (call (value-cell-ref object)))

@@ -965,86 +965,171 @@ We could try a few things to mitigate this:
     #+stack-grows-downward-not-upward (iter + *control-stack-end* sap>)
     #-stack-grows-downward-not-upward (iter - *control-stack-start* sap<)))
 
+;;; Invoke FUNCTOID (a macro or function) on OBJ and any values in MORE.
+;;; Note that neither OBJ nor items in MORE undergo ONCE-ONLY treatment.
+;;; CLAUSES are used to modify the output of this macro. See example uses
+;;; for more detail.
+;;; HIGH EXPERIMENTAL: PROCEED AT YOUR OWN RISK.
+(defmacro do-referenced-object ((obj functoid &rest more) &rest alterations
+                                &aux (n-matched-alterations 0))
+  (labels ((make-case (type &rest actions)
+             (apply #'make-case* type
+                    (mapcar (lambda (action) `(,functoid ,action ,@more))
+                            actions)))
+           (make-case* (type &rest actions)
+             (let* ((found (assoc type alterations :test 'equal))
+                    (alteration (or (cdr found) '(:extend))))
+               (when found
+                 (incf n-matched-alterations))
+               (ecase (car alteration)
+                 (:override (list `(,type ,@(cdr alteration))))
+                 (:extend   (list `(,type ,@actions ,@(cdr alteration))))
+                 (:delete))))) ; no clause
+    (prog1
+      `(typecase ,obj
+         ;; Until the compiler can learn how to efficiently compile jump tables
+         ;; by widetag, test in descending order of popularity.
+         ;; These two are in fact generally the most frequently occurring type.
+         ,.(make-case 'cons `(car ,obj) `(cdr ,obj))
+         ,.(make-case* 'instance
+            `(let ((.l. (%instance-layout ,obj)))
+               (,functoid .l. ,@more)
+               (do-instance-tagged-slot (.i. ,obj :layout .l. :pad nil)
+                 (,functoid (%instance-ref ,obj .i.) ,@more))))
+         (function
+          (typecase ,obj
+            ,.(make-case* 'closure
+               `(,functoid (%closure-fun ,obj) ,@more)
+               `(do-closure-values (.o. ,obj) (,functoid .o. ,@more)))
+            ,.(make-case* 'funcallable-instance
+               `(let ((.l. (%funcallable-instance-layout ,obj)))
+                  (,functoid .l. ,@more)
+                  (,functoid (%funcallable-instance-function ,obj) ,@more)
+                  (ecase (layout-bitmap .l.)
+                    (#.sb-kernel::+layout-all-tagged+
+                     (loop for .i. from instance-data-start ; exclude layout
+                           to (- (get-closure-length ,obj) funcallable-instance-info-offset)
+                           do (,functoid (%funcallable-instance-info ,obj .i.) ,@more)))
+                    (#b0110
+                     ;; A pedantically correct kludge which shall remain unless need arises
+                     ;; for more general partially unboxed FINs.
+                     ;;  payload word 0 is raw (but looks like a fixnum, by design)
+                     ;;  word 1 is the fin-fun which we already accounted for above
+                     ;;  word 2 (info slot 0) is the only one that hasn't been processed.
+                     ;;  words 3 and 4 are raw but looks like fixnums by accident.
+                     (,functoid (%funcallable-instance-info ,obj 0) ,@more)))))
+            .,(make-case 'function))) ; in case there was code provided for it
+         (t
+          ;; TODO: the generated code is pretty horrible. OTHER-POINTER-LOWTAG
+          ;; is known at this point, but tested N times.
+          (typecase ,obj
+            ,.(make-case* 'simple-vector
+               `(dotimes (.i. (length ,obj))
+                  (,functoid (data-vector-ref ,obj .i.) ,@more)))
+            ;; Fancy arrays aren't highly popular, but this case must precede ARRAY
+            ;; because ARRAY weeds out all other arrays, namely the ones that
+            ;; hold no pointers: simple-string, simple-bit-vector, etc.
+            ,.(make-case '(satisfies array-header-p)
+               `(%array-data ,obj)
+               `(%array-displaced-p ,obj)
+               `(%array-displaced-from ,obj))
+            ,.(make-case 'array)
+            ,.(make-case 'symbol
+               `(%primitive sb-c:fast-symbol-value ,obj)
+               `(symbol-info ,obj)
+               `(symbol-name ,obj)
+               `(symbol-package ,obj))
+            ,.(make-case 'fdefn
+               `(fdefn-name ,obj)
+               `(fdefn-fun ,obj)
+               #+immobile-code
+               `(sb-kernel:%make-lisp-obj
+                 (alien-funcall (extern-alien "fdefn_callee_lispobj" (function unsigned unsigned))
+                                (logandc2 (get-lisp-obj-address ,obj) lowtag-mask))))
+            ,.(make-case* 'code-component
+               `(,functoid (%code-debug-info ,obj) ,@more)
+               #+(or x86 immobile-code) `(,functoid (%code-fixups,obj) ,@more)
+               `(loop for .i. from code-constants-offset below (code-header-words ,obj)
+                      do (,functoid (code-header-ref ,obj .i.) ,@more))
+               ;; Caller should extend behavior for embedded objects, like:
+               ;; `(loop for .i. below (code-n-entries ,obj)
+               ;;        do (,functoid (%code-entry-point ,obj .i.) ,@more)))
+               ;; and/or visit the slots of each simple-fun but not the fun per se.
+               )
+            ,.(make-case '(or float system-area-pointer)) ; nothing to do
+            ;; FIXME: (TYPEP x 'BIGNUM) is correctly implemented as a test of
+            ;; lowtag and widetag, but (TYPEP x '(OR BIGNUM ANYTHING-ELSE))
+            ;; is "mildly incorrectly" implemented as
+            ;;   `(OR (INTEGER * ,(1- most-negative-fixnum))
+            ;;        (INTEGER (1+ most-positive-fixnum))
+            ;;        anything-else)
+            ;; And this has busted semantics for our purposes here.
+            ;; Uncanonical bignums (which would normalize to a fixnum)
+            ;; do not satisy the range test.
+            ;; So in order to avoid reaching the T case, we have to split out
+            ;; BIGNUM all by itself, which becomes a pointer test.
+            ,.(make-case 'bignum)
+            ,.(make-case 'weak-pointer `(weak-pointer-value ,obj))
+            ,.(make-case 'ratio `(%numerator ,obj) `(%denominator ,obj))
+            ;; Use the non-primitive slot readers because we don't know
+            ;; which subtype of complex number this is.
+            ,.(make-case 'complex `(realpart ,obj) `(imagpart ,obj))
+            ;; Heap scans will never encounter SIMPLE-FUN so we don't really
+            ;; need it here, but just to keep it out of the T case.
+            ,.(make-case 'simple-fun)
+            ;; Caller can do anything in the fallback case.
+            ,.(make-case 't))))
+      (when (> (length alterations) n-matched-alterations)
+        (error "DO-REFERENCED-OBJECT usage error")))))
+
+;;; Return T if and only if THIS references THAT.
+;;; code-components are considered to reference their embedded
+;;; simple-funs for this purpose; if THIS is a simple-fun, it is ignored.
+(defun references-p (this that)
+  (macrolet ((test (x) `(when (eq ,x that) (go win))))
+    (tagbody
+       (do-referenced-object (this test)
+         (simple-fun :delete) ; omit this type
+         (code-component
+          :extend
+          (dotimes (i (code-n-entries this))
+            (let ((f (%code-entry-point this i)))
+              (when (or (eq f that)
+                        (eq (%simple-fun-name f) that)
+                        (eq (%simple-fun-arglist f) that)
+                        (eq (%%simple-fun-type f) that)
+                        (eq (%simple-fun-info f) that))
+                (go win)))))
+         (t
+          :extend
+          (case (widetag-of this)
+            (#.sb-vm:value-cell-widetag
+             (test (value-cell-ref this)))
+            (#.sb-vm:filler-widetag)
+            (t
+             (bug "Unknown object type #x~x addr=~x"
+                  (widetag-of this)
+                  (get-lisp-obj-address this))))))
+       (return-from references-p nil)
+     win
+       (return-from references-p t))))
+
 ;;; This interface allows one either to be agnostic of the referencing space,
 ;;; or specify exactly one space, but not specify a list of spaces.
 ;;; An upward-compatible change would be to assume a list, and call ENSURE-LIST.
 (defun map-referencing-objects (fun space object)
   (declare (type (or (eql :all) spaces) space))
+  (declare (dynamic-extent fun))
   (unless *ignore-after*
     (setq *ignore-after* (cons 1 2)))
-  (flet ((ref-p (this widetag nwords) ; return T if 'this' references object
-           (when (listp this)
-             (return-from ref-p
-               (or (eq (car this) object) (eq (cdr this) object))))
-           (case widetag
-             ;; purely boxed objects
-             ((#.ratio-widetag #.complex-widetag #.value-cell-widetag
-               #.symbol-widetag #.weak-pointer-widetag
-               #.simple-array-widetag #.simple-vector-widetag
-               #.complex-array-widetag #.complex-vector-widetag
-               #.complex-bit-vector-widetag #.complex-vector-nil-widetag
-               #.complex-base-string-widetag
-               #+sb-unicode #.complex-character-string-widetag))
-             ;; mixed boxed/unboxed objects
-             (#.code-header-widetag
-              (dotimes (i (code-n-entries this))
-                (let ((f (%code-entry-point this i)))
-                  (when (or (eq f object)
-                            (eq (%simple-fun-name f) object)
-                            (eq (%simple-fun-arglist f) object)
-                            (eq (%simple-fun-type f) object)
-                            (eq (%simple-fun-info f) object))
-                    (return-from ref-p t))))
-              (setq nwords (code-header-words this)))
-             (#.instance-widetag
-              (return-from ref-p
-                (or (eq (%instance-layout this) object)
-                    (do-instance-tagged-slot (i this)
-                      (when (eq (%instance-ref this i) object)
-                        (return t))))))
-             (#.funcallable-instance-widetag
-              (let ((l (%funcallable-instance-layout this)))
-                (when (eq l object)
-                  (return-from ref-p t))
-                (let ((bitmap (layout-bitmap l)))
-                  (unless (eql bitmap -1)
-                    ;; tagged slots precede untagged slots,
-                    ;; so integer-length is the count of tagged slots.
-                    (setq nwords (1+ (integer-length bitmap)))))))
-             (#.closure-widetag
-              (when (eq (%closure-fun this) object)
-                (return-from ref-p t)))
-             (#.fdefn-widetag
-              #+immobile-code
-              (when (eq (make-lisp-obj
-                         (alien-funcall
-                          (extern-alien "fdefn_callee_lispobj" (function unsigned unsigned))
-                          (logandc2 (get-lisp-obj-address this) lowtag-mask)))
-                        object)
-                (return-from ref-p t))
-              ;; Without immobile-code the 'raw-addr' slot either holds the same thing
-              ;; as the 'fun' slot, or holds a trampoline address. We'll overlook the
-              ;; minor issue that due to concurrent writes, two representations of the
-              ;; allegedly same referent may diverge; thus the last slot is skipped
-              ;; even if it refers to a different simple-fun.
-              (decf nwords))
-             (t
-              (return-from ref-p nil)))
-           ;; gencgc has WITHOUT-GCING in map-allocated-objects over dynamic space,
-           ;; so we don't have to pin each object inside REF-P.
-           (#+cheneygc with-pinned-objects #+cheneygc (this)
-            #-cheneygc progn
-            (do ((sap (int-sap (logandc2 (get-lisp-obj-address this) lowtag-mask)))
-                 (i (* (1- nwords) n-word-bytes) (- i n-word-bytes)))
-                ((<= i 0) nil)
-              (when (eq (sap-ref-lispobj sap i) object)
-                (return t))))))
-    (let ((fun (%coerce-callable-to-fun fun)))
-      (dx-flet ((mapfun (obj widetag size)
-                  (when (and (ref-p obj widetag (/ size n-word-bytes))
-                             (valid-obj space obj))
-                    (funcall fun obj))))
-        (map-allocated-objects #'mapfun space)))))
+  (let ((fun (%coerce-callable-to-fun fun)))
+    (map-allocated-objects
+     (lambda (referer widetag size)
+       (declare (ignore widetag size))
+       (when (and (valid-obj space referer) ; semi-bogus!
+                  (references-p referer object))
+         (funcall fun referer)))
+     space)))
 
 (defun list-referencing-objects (space object)
   (collect ((res))
