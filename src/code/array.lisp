@@ -295,9 +295,16 @@
              (cond ((not (every #'numeric-type-p types))
                     (result simple-vector-widetag))
                    ((csubtypep ctype (specifier-type 'integer))
-                    (integer-interval-widetag
-                     (reduce #'min types :key #'numeric-type-low)
-                     (reduce #'max types :key #'numeric-type-high)))
+                    (block nil
+                      (integer-interval-widetag
+                       (dx-flet ((low (x)
+                                      (or (numeric-type-low x)
+                                          (return (result simple-vector-widetag)))))
+                         (reduce #'min types :key #'low))
+                       (dx-flet ((high (x)
+                                       (or (numeric-type-high x)
+                                           (return (result simple-vector-widetag)))))
+                         (reduce #'max types :key #'high)))))
                    ((csubtypep ctype (specifier-type 'double-float))
                     (result simple-array-double-float-widetag))
                    ((csubtypep ctype (specifier-type 'single-float))

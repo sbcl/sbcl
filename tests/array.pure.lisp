@@ -547,3 +547,10 @@
         (make-array 3 :initial-element #\a :element-type type))
     (('(and character (satisfies eval))) "aaa" :test #'equal)
     (('(and character (or (satisfies eval) base-char))) "aaa" :test #'equal)))
+
+(with-test (:name :make-array-or-unsigned-byte-type)
+  (checked-compile-and-assert
+      ()
+      '(lambda (type)
+        (make-array 1 :element-type type))
+    (('(or (eql -16) unsigned-byte)) #(0) :test #'equalp)))

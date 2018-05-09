@@ -3520,9 +3520,9 @@
                    `(lambda ()
                       (list (if (typep ,v '(simple-array ,et (*)))
                                 :good
-                                :bad)
+                                ',et)
                             (if (typep (elt ,v 0) '(simple-array ,et (*)))
-                                :bad
+                                ',et
                                 :good))))))
         (assert (equal '(:good :good) (funcall fun)))))))
 
