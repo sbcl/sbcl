@@ -194,3 +194,10 @@
   (defmethod foo ((x t)) 3)
   (assert (= (foo t) 3))
   (assert (= (foo 3) 2)))
+
+(with-test (:name :bug-309084-a-i)
+  (assert-error (eval '(define-method-combination bug-309084-a-i :documentation :operator))
+                program-error))
+(with-test (:name :bug-309084-a-ii)
+  (assert-error (eval '(define-method-combination bug-309084-a-ii :documentation nil))
+                program-error))

@@ -84,16 +84,18 @@
 ;;;; and runs the same rule.
 
 (defun expand-short-defcombin (whole)
-  (let* ((type-name (cadr whole))
-         (documentation
-           (getf (cddr whole) :documentation))
-         (identity-with-one-arg
-           (getf (cddr whole) :identity-with-one-argument nil))
+  (let* ((canary (cons nil nil))
+         (type-name (cadr whole))
+         (documentation (getf (cddr whole) :documentation canary))
+         (ioa (getf (cddr whole) :identity-with-one-argument nil))
          (operator
-           (getf (cddr whole) :operator type-name)))
+          (getf (cddr whole) :operator type-name)))
+    (unless (eql documentation canary)
+      (unless (stringp documentation)
+        (%program-error "~@<~S argument to the short form of ~S must be a string.~:>"
+                        :documentation 'define-method-combination)))
     `(load-short-defcombin
-     ',type-name ',operator ',identity-with-one-arg ',documentation
-      (sb-c:source-location))))
+     ',type-name ',operator ',ioa ',documentation (sb-c:source-location))))
 
 (defun load-short-defcombin (type-name operator ioa doc source-location)
   (let ((info (make-method-combination-info
