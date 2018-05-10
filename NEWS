@@ -5,6 +5,9 @@ changes relative to sbcl-1.4.7:
     generic functions using that method combination have their effective
     methods lazily recomputed according to the new definition of the method
     combination.  (Reported by Didier Verna at ELS 2018)
+  * bug fix: :arguments argument to the long form of DEFINE-METHOD-COMBINATION
+    is now implemented more correctly, supporting suppliedp variables and
+    &optional defaults.  (Reported by Bruno Haible, lp#309084)
 
 changes in sbcl-1.4.7 relative to sbcl-1.4.6:
   * enhancement: better handling of unknown keyword arguments (lp#1750466)
