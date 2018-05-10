@@ -389,92 +389,96 @@
 ;;; FIXME: in here we have not one but two mini-copies of a weird
 ;;; hybrid of PARSE-LAMBDA-LIST and (obsolete) PARSE-DEFMACRO-LAMBDA-LIST.
 (defun deal-with-args-option (wrapped-body args-lambda-list)
-  (let ((intercept-rebindings
-         (let (rebindings)
-           (dolist (arg args-lambda-list (nreverse rebindings))
-             (unless (member arg lambda-list-keywords :test #'eq)
-               (typecase arg
-                 (symbol (push `(,arg ',arg) rebindings))
-                 (cons
-                  (unless (symbolp (car arg))
-                    (error "invalid lambda-list specifier: ~S." arg))
-                  (push `(,(car arg) ',(car arg)) rebindings))
-                 (t (error "invalid lambda-list-specifier: ~S." arg)))))))
-        (nreq 0)
-        (nopt 0)
-        (whole nil))
-    ;; Count the number of required and optional parameters in
-    ;; ARGS-LAMBDA-LIST into NREQ and NOPT, and set WHOLE to the
-    ;; name of a &WHOLE parameter, if any.
-    (when (member '&whole (rest args-lambda-list))
-      (%program-error "~@<The value of the :ARGUMENTS option of ~
-                       DEFINE-METHOD-COMBINATION is~2I~_~S,~I~_but ~
-                       &WHOLE may only appear first in the lambda ~
-                       list.~:>"
-                      args-lambda-list))
-    (loop with state = 'required
-          for arg in args-lambda-list do
-            (if (memq arg lambda-list-keywords)
-                (setq state arg)
-                (case state
-                  (required (incf nreq))
-                  (&optional (incf nopt))
-                  (&whole (setq whole arg state 'required)))))
-    ;; This assumes that the head of WRAPPED-BODY is a let, and it
-    ;; injects let-bindings of the form (ARG 'SYM) for all variables
-    ;; of the argument-lambda-list; SYM is a gensym.
-    (aver (memq (first wrapped-body) '(let let*)))
-    (setf (second wrapped-body)
-          (append intercept-rebindings (second wrapped-body)))
-    ;; Be sure to fill out the args lambda list so that it can be too
-    ;; short if it wants to.
-    (unless (or (memq '&rest args-lambda-list)
-                (memq '&allow-other-keys args-lambda-list))
-      (let ((aux (memq '&aux args-lambda-list)))
-        (setq args-lambda-list
-              (append (ldiff args-lambda-list aux)
-                      (if (memq '&key args-lambda-list)
-                          '(&allow-other-keys)
-                          '(&rest .ignore.))
-                      aux))))
-    ;; .GENERIC-FUNCTION. is bound to the generic function in the
-    ;; method combination function, and .GF-ARGS* is bound to the
-    ;; generic function arguments in effective method functions
-    ;; created for generic functions having a method combination that
-    ;; uses :ARGUMENTS.
-    ;;
-    ;; The DESTRUCTURING-BIND binds the parameters of the
-    ;; ARGS-LAMBDA-LIST to actual generic function arguments.  Because
-    ;; ARGS-LAMBDA-LIST may be shorter or longer than the generic
-    ;; function's lambda list, which is only known at run time, this
-    ;; destructuring has to be done on a slighly modified list of
-    ;; actual arguments, from which values might be stripped or added.
-    ;;
-    ;; Using one of the variable names in the body inserts a symbol
-    ;; into the effective method, and running the effective method
-    ;; produces the value of actual argument that is bound to the
-    ;; symbol.
-    `(let ((inner-result. ,wrapped-body)
-           (gf-lambda-list (generic-function-lambda-list .generic-function.)))
-       `(destructuring-bind ,',args-lambda-list
-            (frob-combined-method-args
-             .gf-args. ',gf-lambda-list
-             ,',nreq ,',nopt)
-          ,,(when (memq '.ignore. args-lambda-list)
-              ''(declare (ignore .ignore.)))
-          ;; If there is a &WHOLE in the args-lambda-list, let
-          ;; it result in the actual arguments of the generic-function
-          ;; not the frobbed list.
-          ,,(when whole
-              ``(setq ,',whole .gf-args.))
-          ,inner-result.))))
+  (binding* (((llks required optional rest key aux env whole)
+              (parse-lambda-list
+               args-lambda-list
+               :context "a define-method-combination arguments lambda list"
+               :accept (lambda-list-keyword-mask '(&allow-other-keys &aux &key &optional &rest &whole)))))
+    (check-lambda-list-names llks required optional rest key aux env whole
+                             :context "a define-method-combination arguments lambda list"
+                             :signal-via #'%program-error)
+    (let (intercept-rebindings)
+      (when whole
+        (push `(,(car whole) ',(car whole)) intercept-rebindings))
+      (dolist (arg required)
+        (push `(,arg ',arg) intercept-rebindings))
+      (dolist (arg optional)
+        (multiple-value-bind (name default suppliedp)
+            (parse-optional-arg-spec arg)
+          (declare (ignore default))
+          (push `(,name ',name) intercept-rebindings)
+          (when suppliedp
+            (push `(,(car suppliedp) ',(car suppliedp)) intercept-rebindings))))
+      (when rest
+        (push `(,(car rest) ',(car rest)) intercept-rebindings))
+      (dolist (arg key)
+        (multiple-value-bind (keyword name default suppliedp)
+            (parse-key-arg-spec arg)
+          (declare (ignore keyword default))
+          (push `(,name ',name) intercept-rebindings)
+          (when suppliedp
+            (push `(,(car suppliedp) ',(car suppliedp)) intercept-rebindings))))
+      (dolist (arg aux)
+        (let ((sym (if (consp arg) (car arg) arg)))
+          (push `(,sym ',sym) intercept-rebindings)))
+
+      (setq intercept-rebindings (nreverse intercept-rebindings))
+      ;; This assumes that the head of WRAPPED-BODY is a let, and it
+      ;; injects let-bindings of the form (ARG 'SYM) for all variables
+      ;; of the argument-lambda-list; SYM is a gensym.
+      (aver (memq (first wrapped-body) '(let let*)))
+      (setf (second wrapped-body)
+            (append intercept-rebindings (second wrapped-body)))
+      ;; Be sure to fill out the args lambda list so that it can be too
+      ;; short if it wants to.
+      (unless (or (memq '&rest args-lambda-list)
+                  (memq '&allow-other-keys args-lambda-list))
+        (let ((aux (memq '&aux args-lambda-list)))
+          (setq args-lambda-list
+                (append (ldiff args-lambda-list aux)
+                        (if (memq '&key args-lambda-list)
+                            '(&allow-other-keys)
+                            '(&rest .ignore.))
+                        aux))))
+      ;; .GENERIC-FUNCTION. is bound to the generic function in the
+      ;; method combination function, and .GF-ARGS* is bound to the
+      ;; generic function arguments in effective method functions
+      ;; created for generic functions having a method combination that
+      ;; uses :ARGUMENTS.
+      ;;
+      ;; The DESTRUCTURING-BIND binds the parameters of the
+      ;; ARGS-LAMBDA-LIST to actual generic function arguments.  Because
+      ;; ARGS-LAMBDA-LIST may be shorter or longer than the generic
+      ;; function's lambda list, which is only known at run time, this
+      ;; destructuring has to be done on a slighly modified list of
+      ;; actual arguments, from which values might be stripped or added.
+      ;;
+      ;; Using one of the variable names in the body inserts a symbol
+      ;; into the effective method, and running the effective method
+      ;; produces the value of actual argument that is bound to the
+      ;; symbol.
+      `(let ((inner-result. ,wrapped-body)
+             (gf-lambda-list (generic-function-lambda-list .generic-function.)))
+         `(destructuring-bind ,',args-lambda-list
+              (frob-combined-method-args
+               .gf-args. ',gf-lambda-list
+               ,',(length required) ,',(length optional))
+            ,,(when (memq '.ignore. args-lambda-list)
+                ''(declare (ignore .ignore.)))
+            ;; If there is a &WHOLE in the args-lambda-list, let
+            ;; it result in the actual arguments of the generic-function
+            ;; not the frobbed list.
+            ,,(when whole
+                ``(setq ,',whole .gf-args.))
+            ,inner-result.)))))
 
 ;;; Partition VALUES into three sections: required, optional, and the
 ;;; rest, according to required, optional, and other parameters in
 ;;; LAMBDA-LIST.  Make the required and optional sections NREQ and
-;;; NOPT elements long by discarding values or adding NILs.  Value is
-;;; the concatenated list of required and optional sections, and what
-;;; is left as rest from VALUES.
+;;; NOPT elements long by discarding values or adding NILs, except
+;;; don't extend the optional section when there are no more VALUES.
+;;; Value is the concatenated list of required and optional sections,
+;;; and what is left as rest from VALUES.
 (defun frob-combined-method-args (values lambda-list nreq nopt)
   (loop with section = 'required
         for arg in lambda-list
@@ -485,14 +489,14 @@
         else if (eq section 'required)
           count t into nr
           and collect (pop values) into required
-        else if (eq section '&optional)
+        else if (and values (eq section '&optional))
           count t into no
           and collect (pop values) into optional
         finally
-          (flet ((frob (list n m)
+          (flet ((frob (list n m lengthenp)
                    (cond ((> n m) (butlast list (- n m)))
-                         ((< n m) (nconc list (make-list (- m n))))
+                         ((and (< n m) lengthenp) (nconc list (make-list (- m n))))
                          (t list))))
-            (return (nconc (frob required nr nreq)
-                           (frob optional no nopt)
+            (return (nconc (frob required nr nreq t)
+                           (frob optional no nopt values)
                            values)))))
