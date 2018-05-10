@@ -2032,6 +2032,10 @@ core and return a descriptor to it."
 (defvar *cold-assembler-routines*)
 (defvar *cold-static-call-fixups*)
 
+(defun code-header-bytes (code-object) ; Return boxed part size in bytes
+  (ash (logand (get-header-data code-object) sb!vm:short-header-max-words)
+       sb!vm:word-shift))
+
 (defun lookup-assembler-reference (symbol &optional (mode :direct) (errorp t))
   (let* ((code-component *cold-assembler-obj*)
          (list *cold-assembler-routines*)
@@ -2041,7 +2045,7 @@ core and return a descriptor to it."
       (+ (logandc2 (descriptor-bits code-component) sb!vm:lowtag-mask)
          (ecase mode
            (:direct
-            (calc-offset code-component offset))
+            (+ (code-header-bytes code-component) offset))
            (:indirect
             (ash (+ (round-up sb!vm:code-constants-offset 2)
                     (count-if (lambda (x) (< (cdr x) offset)) list))
@@ -2055,22 +2059,13 @@ core and return a descriptor to it."
 (defvar *code-fixup-notes*)
 (defvar *allocation-point-fixup-notes*)
 
-;;; Given a pointer to a code object and a byte offset relative to the
-;;; tail of the code object's header, return a byte offset relative to the
-;;; (beginning of the) code object.
-;;;
-(declaim (ftype (function (descriptor sb!vm:word)) calc-offset))
-(defun calc-offset (code-object insts-offset-bytes)
-  (+ (ash (logand (get-header-data code-object) sb!vm:short-header-max-words)
-          sb!vm:word-shift)
-     insts-offset-bytes))
-
 (declaim (ftype (sfunction (descriptor sb!vm:word sb!vm:word keyword keyword)
                            descriptor)
                 cold-fixup))
 (defun cold-fixup (code-object after-header value kind flavor)
   (declare (ignorable flavor))
-  (let* ((offset-within-code-object (calc-offset code-object after-header))
+  (let* ((offset-within-code-object
+          (+ (code-header-bytes code-object) after-header))
          (gspace-byte-offset (+ (descriptor-byte-offset code-object)
                                 offset-within-code-object)))
     #!-(or x86 x86-64)
@@ -2695,7 +2690,8 @@ core and return a descriptor to it."
                     (if (> fun-index 0)
                         (let ((bytes (descriptor-mem des))
                               (index (+ (descriptor-byte-offset des)
-                                        (calc-offset des (ash (1- fun-index) 2)))))
+                                        (code-header-bytes des)
+                                        (ash (1- fun-index) 2))))
                           (aver (eql (bvref-32 bytes index) 0))
                           (setf (bvref-32 bytes index) offset))
                         #!-64-bit
@@ -2744,14 +2740,15 @@ core and return a descriptor to it."
   (if (> fun-index 0)
       (bvref-32 (descriptor-mem code-object)
                 (+ (descriptor-byte-offset code-object)
-                   (calc-offset code-object (ash (1- fun-index) 2))))
+                   (code-header-bytes code-object)
+                   (ash (1- fun-index) 2)))
       (ldb (byte 16 16)
            #!-64-bit (read-bits-wordindexed code-object sb!vm::code-n-entries-slot)
            #!+64-bit (ldb (byte 32 32) (read-bits-wordindexed code-object 0)))))
 
 (defun compute-fun (code-object fun-index)
-  (let* ((offset-from-insns-start (fun-offset code-object fun-index))
-         (offset-from-code-start (calc-offset code-object offset-from-insns-start)))
+  (let ((offset-from-code-start (+ (code-header-bytes code-object)
+                                   (fun-offset code-object fun-index))))
     (unless (zerop (logand offset-from-code-start sb!vm:lowtag-mask))
       (error "unaligned function entry ~S ~S" code-object fun-index))
     (make-descriptor (logior (+ (logandc2 (descriptor-bits code-object) sb!vm:lowtag-mask)
