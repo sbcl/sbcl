@@ -1058,20 +1058,8 @@ We could try a few things to mitigate this:
                ;;        do (,functoid (%code-entry-point ,obj .i.) ,@more)))
                ;; and/or visit the slots of each simple-fun but not the fun per se.
                )
-            ,.(make-case '(or float #+sb-simd-pack simd-pack
+            ,.(make-case '(or float bignum #+sb-simd-pack simd-pack
                               system-area-pointer)) ; nothing to do
-            ;; FIXME: (TYPEP x 'BIGNUM) is correctly implemented as a test of
-            ;; lowtag and widetag, but (TYPEP x '(OR BIGNUM ANYTHING-ELSE))
-            ;; is "mildly incorrectly" implemented as
-            ;;   `(OR (INTEGER * ,(1- most-negative-fixnum))
-            ;;        (INTEGER (1+ most-positive-fixnum))
-            ;;        anything-else)
-            ;; And this has busted semantics for our purposes here.
-            ;; Uncanonical bignums (which would normalize to a fixnum)
-            ;; do not satisy the range test.
-            ;; So in order to avoid reaching the T case, we have to split out
-            ;; BIGNUM all by itself, which becomes a pointer test.
-            ,.(make-case 'bignum)
             ,.(make-case 'weak-pointer `(weak-pointer-value ,obj))
             ,.(make-case 'ratio `(%numerator ,obj) `(%denominator ,obj))
             ;; Use the non-primitive slot readers because we don't know

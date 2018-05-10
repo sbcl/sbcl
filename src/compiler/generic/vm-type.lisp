@@ -286,6 +286,15 @@
     (unless (and info (sb!c::fun-info-templates info))
       (return-from widetags-from-union-type (values nil types))))
   (let (widetags remainder)
+    ;; A little optimization for (OR BIGNUM other). Without this, there would
+    ;; be a two-sided GENERIC-{<,>} test plus whatever test(s) "other" entails.
+    (let ((neg-bignum (specifier-type `(integer * (,most-negative-fixnum))))
+          (pos-bignum (specifier-type `(integer (,most-positive-fixnum) *))))
+      (when (and (member neg-bignum types :test #'type=)
+                 (member pos-bignum types :test #'type=))
+        (push sb!vm:bignum-widetag widetags)
+        (setf types (remove-if (lambda (x) (or (type= x neg-bignum) (type= x pos-bignum)))
+                               types))))
     (dolist (x types)
       (let ((adjunct
              (cond

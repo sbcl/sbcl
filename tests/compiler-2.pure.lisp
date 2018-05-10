@@ -1425,3 +1425,8 @@
       ()
       `(lambda (x y)
          (write-sequence nil (the standard-object x) y nil))))
+
+(with-test (:name :or-bignum-single-float-no-warn)
+  (checked-compile
+   '(lambda (x) (declare (optimize speed)) (typep x '(or bignum single-float)))
+   :allow-notes nil))
