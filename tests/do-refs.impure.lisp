@@ -70,6 +70,7 @@
           (symbolp (first slots))
           (closurep (second slots))
           (code-component-p (third slots)))
+     #-immobile-code
      (and (= (length slots) 2)
           (symbolp (first slots))
           (closurep (second slots))))))
