@@ -43,7 +43,8 @@
 
 (define-arg-type displacement
   :sign-extend t
-  :use-label (lambda (value dstate) (+ (dstate-next-addr dstate) value))
+  :use-label (lambda (value dstate)
+               (ldb (byte 32 0) (+ (dstate-next-addr dstate) value)))
   :printer (lambda (value stream dstate)
              (maybe-note-assembler-routine value nil dstate)
              (print-label value stream dstate)))
