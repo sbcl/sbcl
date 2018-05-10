@@ -967,6 +967,8 @@ We could try a few things to mitigate this:
 
 ;;; Invoke FUNCTOID (a macro or function) on OBJ and any values in MORE.
 ;;; Note that neither OBJ nor items in MORE undergo ONCE-ONLY treatment.
+;;; The fact that FUNCTOID can be a macro allows treatment of its first argument
+;;; as a generalized place in the manner of SETF, allowing read/write access.
 ;;; CLAUSES are used to modify the output of this macro. See example uses
 ;;; for more detail.
 ;;; HIGH EXPERIMENTAL: PROCEED AT YOUR OWN RISK.
@@ -1056,7 +1058,8 @@ We could try a few things to mitigate this:
                ;;        do (,functoid (%code-entry-point ,obj .i.) ,@more)))
                ;; and/or visit the slots of each simple-fun but not the fun per se.
                )
-            ,.(make-case '(or float system-area-pointer)) ; nothing to do
+            ,.(make-case '(or float #+sb-simd-pack simd-pack
+                              system-area-pointer)) ; nothing to do
             ;; FIXME: (TYPEP x 'BIGNUM) is correctly implemented as a test of
             ;; lowtag and widetag, but (TYPEP x '(OR BIGNUM ANYTHING-ELSE))
             ;; is "mildly incorrectly" implemented as
