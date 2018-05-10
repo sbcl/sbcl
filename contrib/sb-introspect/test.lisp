@@ -66,7 +66,7 @@
 
 (define-modify-macro q (x) logand)
 
-(define-method-combination r nil)
+(define-method-combination r)
 
 (define-setf-expander s (a b)
   (format t "~a ~a~%" a b))
