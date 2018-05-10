@@ -216,3 +216,9 @@
   (assert-error (eval '(define-method-combination bug-309084-a-viii nil nil
                         (:generic-function (bar))))
                 program-error))
+(with-test (:name :bug-309084-a-ix)
+  (assert-error (eval '(define-method-combination bug-309084-a-ix nil ((3))))
+                program-error))
+(with-test (:name :bug-309084-a-x)
+  (assert-error (eval '(define-method-combination bug-309084-a-x nil ((a))))
+                program-error))

@@ -322,7 +322,9 @@
         ,@real-body))))
 
 (defun parse-method-group-specifier (method-group-specifier)
-  ;;(declare (values name tests description order required))
+  (unless (symbolp (car method-group-specifier))
+    (%program-error "~@<Method group specifiers in the long form of ~S ~
+                     must begin with a symbol.~:>" 'define-method-combination))
   (let* ((name (pop method-group-specifier))
          (patterns ())
          (tests
@@ -338,6 +340,9 @@
                        (push (parse-qualifier-pattern name pattern)
                              collect)))))
              (nreverse collect))))
+    (when (null patterns)
+      (%program-error "~@<Method group specifiers in the long form of ~S ~
+                       must have at least one qualifier pattern or predicate.~:>"))
     (values name
             tests
             (getf method-group-specifier :description
