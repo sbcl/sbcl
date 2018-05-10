@@ -201,3 +201,18 @@
 (with-test (:name :bug-309084-a-ii)
   (assert-error (eval '(define-method-combination bug-309084-a-ii :documentation nil))
                 program-error))
+(with-test (:name :bug-309084-a-iii)
+  (assert-error (eval '(define-method-combination bug-309084-a-iii nil))
+                program-error))
+(with-test (:name :bug-309084-a-vi)
+  (assert-error (eval '(define-method-combination bug-309084-a-vi nil nil
+                        (:generic-function)))
+                program-error))
+(with-test (:name :bug-309084-a-vii)
+  (assert-error (eval '(define-method-combination bug-309084-a-vii nil nil
+                        (:generic-function bar baz)))
+                program-error))
+(with-test (:name :bug-309084-a-viii)
+  (assert-error (eval '(define-method-combination bug-309084-a-viii nil nil
+                        (:generic-function (bar))))
+                program-error))

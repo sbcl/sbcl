@@ -158,13 +158,20 @@
 (defun expand-long-defcombin (form)
   (let ((type-name (cadr form))
         (lambda-list (caddr form))
+        (method-group-specifiers-presentp (cdddr form))
         (method-group-specifiers (cadddr form))
         (body (cddddr form))
         (args-option ())
         (gf-var nil))
+    (unless method-group-specifiers-presentp
+      (%program-error "~@<The long form of ~S requires a list of method group specifiers.~:>"
+                      'define-method-combination))
     (when (and (consp (car body)) (eq (caar body) :arguments))
       (setq args-option (cdr (pop body))))
     (when (and (consp (car body)) (eq (caar body) :generic-function))
+      (unless (and (cdar body) (symbolp (cadar body)) (null (cddar body)))
+        (%program-error "~@<The argument to the ~S option of ~S must be a single symbol.~:>"
+                        :generic-function 'define-method-combination))
       (setq gf-var (cadr (pop body))))
     (multiple-value-bind (documentation function)
         (make-long-method-combination-function
