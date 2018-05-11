@@ -89,13 +89,16 @@
          (documentation (getf (cddr whole) :documentation canary))
          (ioa (getf (cddr whole) :identity-with-one-argument nil))
          (operator
-          (getf (cddr whole) :operator type-name)))
-    (unless (eql documentation canary)
-      (unless (stringp documentation)
-        (%program-error "~@<~S argument to the short form of ~S must be a string.~:>"
-                        :documentation 'define-method-combination)))
+           (getf (cddr whole) :operator type-name)))
+    (unless (or (eq documentation canary)
+                (stringp documentation))
+      (%program-error "~@<~S argument to the short form of ~S must be a string.~:>"
+                      :documentation 'define-method-combination))
     `(load-short-defcombin
-     ',type-name ',operator ',ioa ',documentation (sb-c:source-location))))
+      ',type-name ',operator ',ioa
+      ',(and (neq documentation canary)
+             documentation)
+      (sb-c:source-location))))
 
 (defun load-short-defcombin (type-name operator ioa doc source-location)
   (let ((info (make-method-combination-info
