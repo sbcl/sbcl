@@ -388,9 +388,6 @@
 ;;;
 ;;; At compute-effective-method time, the symbols in the :arguments
 ;;; option are bound to the symbols in the intercept lambda list.
-;;;
-;;; FIXME: in here we have not one but two mini-copies of a weird
-;;; hybrid of PARSE-LAMBDA-LIST and (obsolete) PARSE-DEFMACRO-LAMBDA-LIST.
 (defun deal-with-args-option (wrapped-body args-lambda-list)
   (binding* (((llks required optional rest key aux env whole)
               (parse-lambda-list
@@ -401,31 +398,27 @@
                              :context "a define-method-combination arguments lambda list"
                              :signal-via #'%program-error)
     (let (intercept-rebindings)
-      (when whole
-        (push `(,(car whole) ',(car whole)) intercept-rebindings))
-      (dolist (arg required)
-        (push `(,arg ',arg) intercept-rebindings))
-      (dolist (arg optional)
-        (multiple-value-bind (name default suppliedp)
-            (parse-optional-arg-spec arg)
-          (declare (ignore default))
-          (push `(,name ',name) intercept-rebindings)
-          (when suppliedp
-            (push `(,(car suppliedp) ',(car suppliedp)) intercept-rebindings))))
-      (when rest
-        (push `(,(car rest) ',(car rest)) intercept-rebindings))
-      (dolist (arg key)
-        (multiple-value-bind (keyword name default suppliedp)
-            (parse-key-arg-spec arg)
-          (declare (ignore keyword default))
-          (push `(,name ',name) intercept-rebindings)
-          (when suppliedp
-            (push `(,(car suppliedp) ',(car suppliedp)) intercept-rebindings))))
-      (dolist (arg aux)
-        (let ((sym (if (consp arg) (car arg) arg)))
-          (push `(,sym ',sym) intercept-rebindings)))
-
-      (setq intercept-rebindings (nreverse intercept-rebindings))
+      (flet ((intercept (sym) (push `(,sym ',sym) intercept-rebindings)))
+        (when whole (intercept (car whole)))
+        (dolist (arg required)
+          (intercept arg))
+        (dolist (arg optional)
+          (multiple-value-bind (name default suppliedp)
+              (parse-optional-arg-spec arg)
+            (declare (ignore default))
+            (intercept name)
+            (when suppliedp (intercept (car suppliedp)))))
+        (when rest (intercept (car rest)))
+        (dolist (arg key)
+          (multiple-value-bind (keyword name default suppliedp)
+              (parse-key-arg-spec arg)
+            (declare (ignore keyword default))
+            (intercept name)
+            (when suppliedp (intercept (car suppliedp)))))
+        (dolist (arg aux)
+          (intercept (if (consp arg) (car arg) arg)))
+        ;; cosmetic only
+        (setq intercept-rebindings (nreverse intercept-rebindings)))
       ;; This assumes that the head of WRAPPED-BODY is a let, and it
       ;; injects let-bindings of the form (ARG 'SYM) for all variables
       ;; of the argument-lambda-list; SYM is a gensym.
@@ -463,6 +456,12 @@
       `(let ((inner-result. ,wrapped-body)
              (gf-lambda-list (generic-function-lambda-list .generic-function.)))
          `(destructuring-bind ,',args-lambda-list
+              ;; FIXME: we know enough (generic function lambda list,
+              ;; args lambda list) at generate-effective-method-time
+              ;; that we could partially evaluate this frobber, to
+              ;; inline specific argument list manipulation rather
+              ;; than the generic code currently contained in
+              ;; FROB-COMBINED-METHOD-ARGS.
               (frob-combined-method-args
                .gf-args. ',gf-lambda-list
                ,',(length required) ,',(length optional))
