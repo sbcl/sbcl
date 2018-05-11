@@ -321,14 +321,6 @@
   (- (get-lisp-obj-address simple-fun)
      sb!vm:fun-pointer-lowtag
      (sap-int (code-instructions (fun-code-header simple-fun)))))
-
-;;; the offset of FUNCTION from the start of its code-component
-(defun fun-offset (function)
-  (declare (type simple-fun function))
-  ;; FIXME: closure-length has fewer bits than the number of bits
-  ;; specifying the offset from a function back to its code.
-  ;; FUN_HEADER_NWORDS_MASK is 24 bits, closure-length is <= 15 bits
-  (words-to-bytes (get-closure-length function)))
 
 ;;;; operations on code-components (which hold the instructions for
 ;;;; one or more functions)
@@ -1071,7 +1063,7 @@
   (dotimes (i (code-n-entries (seg-code segment)))
     (let* ((fun (%code-entry-point (seg-code segment) i))
            (length (seg-length segment))
-           (offset (code-offs-to-segment-offs (fun-offset fun) segment)))
+           (offset (code-offs-to-segment-offs (%fun-code-offset fun) segment)))
       (when (<= 0 offset length)
         ;; Up to 2 words of zeros might be present to align the next
         ;; simple-fun. Limit on OFFSET is to avoid incorrect triggering
@@ -1203,9 +1195,9 @@
        do
         ;; There is function header fun-offset words from the
         ;; code header.
-      (format t "Fun-header ~S at offset ~W (words):~% ~S ~A => ~S~%"
+      (format t "Fun-header ~S at offset #x~X (bytes):~% ~S ~A => ~S~%"
               fun
-              (get-closure-length fun)
+              (%fun-code-offset fun)
               (%simple-fun-name fun)
               (%simple-fun-arglist fun)
               (%simple-fun-type fun)))))

@@ -1747,7 +1747,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "FLOAT-FORMAT-MAX" "FLOAT-INT-EXPONENT"
                "FLOATING-POINT-EXCEPTION" "FORM" "FORMAT-CONTROL"
                "*FREE-INTERRUPT-CONTEXT-INDEX*" "FUNCALLABLE-INSTANCE-P"
-               "FUN-CODE-HEADER"
+               "%FUN-CODE-OFFSET" "FUN-CODE-HEADER"
                "FUN-DESIGNATOR-TYPE" "FUN-DESIGNATOR-TYPE-P"
                "FUN-TYPE" "FUN-TYPE-ALLOWP"
                "FUN-TYPE-KEYP" "FUN-TYPE-KEYWORDS" "FUN-TYPE-NARGS"
@@ -2088,6 +2088,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "%SIMPLE-FUN-NAME"
                "%SIMPLE-FUN-NEXT" ; FIXME: remove
                "%SIMPLE-FUN-SELF" ; FIXME: don't export
+               "%SIMPLE-FUN-TEXT-LEN"
                "%SIMPLE-FUN-TYPE"
                "%SIMPLE-FUN-XREFS"
 

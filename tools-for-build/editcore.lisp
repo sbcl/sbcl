@@ -697,13 +697,10 @@
            (dotimes (j (code-n-entries code))
              (let* ((fun (%code-entry-point code j))
                     (fun-addr (logandc2 (get-lisp-obj-address fun) lowtag-mask))
-                    (end (if (< (1+ j) (code-n-entries code))
-                             (logandc2 (get-lisp-obj-address (%code-entry-point code (1+ j)))
-                                       lowtag-mask)
-                             (+ (translate-ptr code-addr spaces) objsize)))
                     (entrypoint
                      (+ fun-addr (* simple-fun-code-offset n-word-bytes)))
-                    (size (- end entrypoint))
+                    (size (logandc2 (+ (%simple-fun-text-len fun j) sb-vm:lowtag-mask)
+                                    sb-vm:lowtag-mask))
                     (lispname (fun-name-from-core fun spaces core-nil packages))
                     (quotname (ldsym-quote (c-name lispname pp-state))))
                ;; Globalize the C symbol only if the name is a legal function designator

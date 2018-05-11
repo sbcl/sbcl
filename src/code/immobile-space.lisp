@@ -33,13 +33,7 @@
                                     (- n-word-bytes other-pointer-lowtag))
                       ,addr-var))
               (setf (seg-virtual-location seg) ,addr-var
-                    (seg-length seg)
-                    (- (let ((next (%code-entry-point ,code-var (1+ fun-index))))
-                         (if next
-                             (- (get-lisp-obj-address next) fun-pointer-lowtag)
-                             (+ (sap-int (code-instructions ,code-var))
-                                (%code-code-size ,code-var))))
-                       ,addr-var))
+                    (seg-length seg) (%simple-fun-text-len ,fun-var fun-index))
               ,@body))))
       ;; Slowness here is bothersome, especially for SB-VM::REMOVE-STATIC-LINKS,
       ;; so skip right over all fixedobj pages.
@@ -121,14 +115,12 @@
                   (text-end (+ text-origin (%code-code-size code)))
                   (relocs-index (fill-pointer relocs)))
              (dotimes (i (code-n-entries code) (finish-component code relocs-index))
-               (let ((fun (%code-entry-point code i)))
+               (let* ((fun (%code-entry-point code i))
+                      (fun-text (+ (get-lisp-obj-address fun)
+                                   (- fun-pointer-lowtag)
+                                   (ash simple-fun-code-offset word-shift))))
                  (scan-function
-                  (+ (get-lisp-obj-address fun) (- fun-pointer-lowtag)
-                     (ash simple-fun-code-offset word-shift))
-                  (if (< (1+ i) (code-n-entries code))
-                      (- (get-lisp-obj-address (%code-entry-point code (1+ i)))
-                         fun-pointer-lowtag)
-                      text-end)
+                  fun-text (+ fun-text (%simple-fun-text-len fun i))
                   ;; Exclude transfers within this code component
                   (lambda (jmp-targ-addr)
                     (not (<= text-origin jmp-targ-addr text-end)))))))))

@@ -324,10 +324,21 @@
   new-value)
 
 (defun %simple-fun-next (simple-fun) ; DO NOT USE IN NEW CODE
-  (let ((code-obj (fun-code-header simple-fun)))
-    (dotimes (i (code-n-entries code-obj))
-      (when (eq simple-fun (%code-entry-point code-obj i))
-        (return (%code-entry-point code-obj (1+ i)))))))
+  (%code-entry-point (fun-code-header simple-fun)
+                     (1+ (%simple-fun-index simple-fun))))
+
+;;; Return the number of bytes to subtract from the untagged address of SIMPLE-FUN
+;;; to obtain the untagged address of its code component.
+;;; Not to be confused with SIMPLE-FUN-CODE-OFFSET which is a constant.
+;;; See also CODE-FROM-FUNCTION.
+(declaim (inline %fun-code-offset))
+(defun %fun-code-offset (simple-fun)
+  (declare (type simple-fun simple-fun))
+  (ash (ash (with-pinned-objects (simple-fun)
+              (sap-ref-32 (int-sap (get-lisp-obj-address simple-fun))
+                          (- sb!vm:fun-pointer-lowtag)))
+            (- sb!vm:n-widetag-bits))
+       sb!vm:word-shift))
 
 ;;;; CODE-COMPONENT
 
@@ -346,28 +357,76 @@
   ;; The header stores the count.
   #!+64-bit (ldb (byte 16 24) (get-header-data code-obj)))
 
+;;; Return the offset in bytes from (CODE-INSTRUCTIONS CODE-OBJ)
+;;; to its FUN-INDEXth function
+(declaim (inline %code-fun-offset))
+(defun %code-fun-offset (code-obj fun-index)
+  (declare ((unsigned-byte 16) fun-index))
+  (cond ((eql fun-index 0) ; special case for the first simple-fun
+         #!-64-bit (ldb (byte 16 14) (sb!vm::%code-n-entries code-obj))
+         #!+64-bit (ldb (byte 16 40) (get-header-data code-obj)))
+        (t
+         (let ((i (+ (- sb!vm:other-pointer-lowtag)
+                     (ash (code-header-words code-obj)
+                          sb!vm:word-shift)
+                     (ash (1- fun-index) 2))))
+           (with-pinned-objects (code-obj)
+             (sap-ref-32 (int-sap (get-lisp-obj-address code-obj))
+                         i))))))
+
 (defun %code-entry-point (code-obj fun-index)
   (declare (type (unsigned-byte 16) fun-index))
-  (if (>= fun-index (code-n-entries code-obj))
-      nil
-      (%primitive sb!c:compute-fun
-                  code-obj
-                  (cond ((zerop fun-index) ; special case for the first simple-fun
-                         #!-64-bit (ldb (byte 16 14) (sb!vm::%code-n-entries code-obj))
-                         #!+64-bit (ldb (byte 16 40) (get-header-data code-obj)))
-                        (t
-                         (let ((i (+ (- sb!vm:other-pointer-lowtag)
-                                     (ash (code-header-words code-obj)
-                                          sb!vm:word-shift)
-                                     (ash (1- fun-index) 2))))
-                           (with-pinned-objects (code-obj)
-                            (sap-ref-32 (int-sap (get-lisp-obj-address code-obj))
-                                        i))))))))
+  (when (< fun-index (code-n-entries code-obj))
+    (truly-the function
+      (values (%primitive sb!c:compute-fun code-obj
+                (truly-the (unsigned-byte 32)
+                  (%code-fun-offset code-obj fun-index)))))))
 
 (defun code-entry-points (code-obj) ; FIXME: obsolete
   (let ((a (make-array (code-n-entries code-obj))))
     (dotimes (i (length a) a)
       (setf (aref a i) (%code-entry-point code-obj i)))))
+
+;;; Return the 0-based index of SIMPLE-FUN within its code component.
+;;; Computed via binary search.
+(defun %simple-fun-index (simple-fun)
+  (let* ((code (fun-code-header simple-fun))
+         (n-entries (code-n-entries code)))
+    (if (eql n-entries 1)
+        0
+        (let* ((offset (the (unsigned-byte 24)
+                            (- (%fun-code-offset simple-fun)
+                               (ash (code-header-words code) sb!vm:word-shift))))
+               (min 0)
+               (max (1- n-entries)))
+          (declare ((unsigned-byte 16) min max))
+          (loop
+           (let* ((index (floor (+ min max) 2))
+                  (guess (%code-fun-offset code index)))
+             (cond ((< guess offset) (setq min (1+ index)))
+                   ((> guess offset) (setq max (1- index)))
+                   (t (return index)))
+             (aver (<= min max))))))))
+
+;;; Return the number of bytes of instructions in SIMPLE-FUN,
+;;; i.e. to the distance to the next simple-fun or end of code component.
+;;; If INDEX is specified, it is used to quickly find the next simple-fun.
+;;; Otherwise the code object is scanned to determine SIMPLE-FUN's index.
+(defun %simple-fun-text-len (simple-fun &optional index)
+  (let* ((code (fun-code-header simple-fun))
+         (max-index (1- (code-n-entries code))))
+    (- (cond ((eq simple-fun (%code-entry-point code max-index))
+              (if index
+                  (aver (= index max-index))
+                  (setq index max-index))
+              (%code-code-size code))
+             (t
+              (if index
+                  (aver (eq (%code-entry-point code index) simple-fun))
+                  (setq index (%simple-fun-index simple-fun)))
+              (%code-fun-offset code (1+ index))))
+       (%code-fun-offset code index)
+       (ash sb!vm:simple-fun-code-offset sb!vm:word-shift))))
 
 (defun code-n-unboxed-data-words (code-obj)
   ;; If the number of boxed words (from the header) is not the same as
@@ -376,14 +435,8 @@
   ;; and the first simple-fun.
   (let ((f (%code-entry-point code-obj 0)))
     (or (and f
-             (let ((from (code-header-words code-obj))
-                   ;; Ignore the layout pointer (if present) in the upper bits
-                   ;; of the function header.
-                   (to (ldb (byte 24 sb!vm:n-widetag-bits)
-                            (with-pinned-objects (f)
-                              (sap-ref-word (int-sap (get-lisp-obj-address f))
-                                            (- sb!vm:fun-pointer-lowtag))))))
-               (and (< from to) (- to from))))
+             (- (ash (%fun-code-offset f) (- sb!vm:word-shift))
+                (code-header-words code-obj)))
         0)))
 
 ;;; Set (SYMBOL-FUNCTION SYMBOL) to a closure that signals an error,
