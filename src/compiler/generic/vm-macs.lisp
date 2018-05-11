@@ -32,7 +32,7 @@
          (list* (car options) (cadr options)
                 (remove-keywords (cddr options) keywords)))))
 
-(def!struct (prim-object-slot
+(defstruct (prim-object-slot
              (:constructor make-slot (name rest-p offset special options))
              (:copier nil)
              (:conc-name slot-))
@@ -44,7 +44,7 @@
   ;; referenced as special variables, this slot holds the name of that variable.
   (special nil :type symbol :read-only t))
 
-(def!struct (primitive-object (:copier nil))
+(defstruct (primitive-object (:copier nil))
   (name nil :type symbol :read-only t)
   (widetag nil :type symbol :read-only t)
   (lowtag nil :type symbol :read-only t)
@@ -54,8 +54,6 @@
   (variable-length-p nil :type (member t nil) :read-only t))
 
 (declaim (freeze-type prim-object-slot primitive-object))
-(!set-load-form-method prim-object-slot (:host :xc))
-(!set-load-form-method primitive-object (:host :xc))
 
 (defvar *primitive-objects* nil)
 
@@ -104,8 +102,8 @@
               (setf length 2))
             (when (oddp offset)
               (incf offset)))
-          (slots (make-slot slot-name rest-p offset special
-                            (remove-keywords options '(:rest-p :length))))
+          (slots `(make-slot ',slot-name ,rest-p ,offset ',special
+                             ',(remove-keywords options '(:rest-p :length))))
           (let ((offset-sym (symbolicate name "-" slot-name
                                          (if rest-p "-OFFSET" "-SLOT"))))
             (constants `(defconstant ,offset-sym ,offset))
@@ -150,17 +148,16 @@
                   ,widetag
                   ,lowtag ',(inits))))
       `(progn
-         (eval-when (:compile-toplevel :load-toplevel :execute)
-           (setf (info :type :source-location ',name) (source-location))
-           (!%define-primitive-object
-            ',(make-primitive-object :name name
-                                     :widetag widetag
-                                     :lowtag lowtag
-                                     :slots (slots)
-                                     :length offset
-                                     :variable-length-p variable-length-p))
-           ,@(constants)
-           ,@(specials))
+         (setf (info :type :source-location ',name) (source-location))
+         (!%define-primitive-object
+            (make-primitive-object :name ',name
+                                   :widetag ',widetag
+                                   :lowtag ',lowtag
+                                   :slots (list ,@(slots))
+                                   :length ,offset
+                                   :variable-length-p ,variable-length-p))
+         ,@(constants)
+         ,@(specials)
          (setf *!late-primitive-object-forms*
                (append *!late-primitive-object-forms*
                        ',(forms)))))))
