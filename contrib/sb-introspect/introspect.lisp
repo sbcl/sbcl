@@ -984,3 +984,48 @@ Experimental: interface subject to change."
         (sb-vm::primitive-object-size
          (sb-pcl::standard-instance-slots object)))
        (t 0))))
+
+;;; Print a distribution of object sizes in SPACE.
+;;; There are two bins for cons-sized objects: conses and anything else,
+;;; the latter including SAPs, value cells, 0-length simple-vectors,
+;;; and a bunch of other things.
+(defun object-size-histogram (&optional
+                              (space :dynamic)
+                              (size-bins ; objects whose size in words is <= this
+                               `#(2 4 6 8 10 16 20 24 32 64 128 256 512 1024
+                                  2048 4096 8192 16384 32768 131072 524288
+                                  ,(ash 1 20) ,(ash 1 21) ,(ash 1 23))))
+  (declare (simple-vector size-bins))
+  (let* ((n-bins (+ (length size-bins) 2))
+         (counts (make-array n-bins :initial-element 0))
+         (size-totals (make-array n-bins :initial-element 0)))
+    (sb-vm::map-allocated-objects
+     (lambda (obj type size)
+       (declare (ignore type))
+       (cond ((consp obj)
+              (incf (aref counts 0)))
+             (t
+              (let* ((words (ash size (- sb-vm:word-shift)))
+                     (bin
+                      (let ((i (position words size-bins :test #'<=)))
+                        (if i (1+ i) (1- n-bins)))))
+                (incf (aref counts bin))
+                (incf (aref size-totals bin) words)))))
+     space)
+    (format t "     Freq     Tot Words~% =========    =========~%")
+    (dotimes (i n-bins)
+      (format t " ~9d  ~11d  ~a~%"
+              (aref counts i)
+              (if (eql i 0) ; cons bin
+                  (* 2 (aref counts i))
+                  (aref size-totals i))
+              (cond ((zerop i) "cons")
+                    ((eql i (1- n-bins))
+                     (format nil " > ~D" (aref size-bins (- n-bins 3))))
+                    (t
+                     (let ((this-bin-size (aref size-bins (1- i)))
+                           (prev-bin-size (when (>= i 2) (aref size-bins (- i 2)))))
+                       (format nil "~:[<=~;=~] ~D"
+                               (or (not prev-bin-size)
+                                   (= this-bin-size (+ prev-bin-size 2)))
+                               this-bin-size))))))))
