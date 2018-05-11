@@ -30,7 +30,8 @@
   (walk-slots-test (make-foo) `(,(find-layout 'foo) x y))
   )
 
-(test-util:with-test (:name :walk-slots-numbers)
+(test-util:with-test (:name :walk-slots-numbers
+                      :fails-on :interpreter)
   (let ((c #c(45d0 33d0)))
     (walk-slots-test c '(45d0 33d0)))
   (let ((r 22/7))
@@ -41,7 +42,8 @@
          (a (make-array 10 :element-type 'character :displaced-to inner)))
     (walk-slots-test a (list inner t nil))))
 
-(test-util:with-test (:name :walk-slots-symbol)
+(test-util:with-test (:name :walk-slots-symbol
+                      :fails-on :interpreter)
   (let* ((name "ZOT")
          (s (make-symbol name))
          (info '((bork 42))))
@@ -103,7 +105,8 @@
                        ,(sxhash instance)
                        :a  ay :b bee :format-arguments "wat"))))
 
-(test-util:with-test (:name :walk-slots-pcl-ctor)
+(test-util:with-test (:name :walk-slots-pcl-ctor
+                      :fails-on :interpreter)
   (let* ((slot-vals '("A" "B" "C" "D" "E" "F"))
          (f (apply (compile nil '(lambda (&rest args)
                                   (let ((ctor (apply #'sb-pcl::%make-ctor args)))
@@ -113,7 +116,8 @@
     (walk-slots-test f `(,(find-layout 'sb-pcl::ctor) ,#'error ,@slot-vals))))
 
 #+sb-fasteval
-(test-util:with-test (:name :walk-slots-interpreted-fun)
+(test-util:with-test (:name :walk-slots-interpreted-fun
+                      :fails-on :interpreter)
   (let ((f (let ((sb-ext:*evaluator-mode* :interpret))
              (eval '(lambda (x y z))))))
     (funcall f 1 2 3) ; compute the digested slots
