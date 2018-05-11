@@ -70,7 +70,8 @@
 (defvar *!late-primitive-object-forms* nil)
 
 (defmacro !define-primitive-object
-          ((name &key lowtag widetag alloc-trans (type t))
+          ((name &key lowtag widetag alloc-trans (type t)
+                      (size (symbolicate name "-SIZE")))
            &rest slot-specs)
   (collect ((slots) (specials) (constants) (forms) (inits))
     (let ((offset (if widetag 1 0))
@@ -141,7 +142,7 @@
             (setf variable-length-p t))
           (incf offset length)))
       (unless variable-length-p
-        (constants `(defconstant ,(symbolicate name "-SIZE") ,offset)))
+        (constants `(defconstant ,size ,offset)))
       #-c-headers-only
       (when alloc-trans
         (forms `(def-alloc ,alloc-trans ,offset

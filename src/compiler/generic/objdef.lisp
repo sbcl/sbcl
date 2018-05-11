@@ -377,7 +377,7 @@
 ;;; in c-land.  However, we need sight of so many parts of it from Lisp that
 ;;; it makes sense to define it here anyway, so that the GENESIS machinery
 ;;; can take care of maintaining Lisp and C versions.
-(!define-primitive-object (thread)
+(!define-primitive-object (thread :size primitive-thread-object-length)
   ;; no_tls_value_marker is borrowed very briefly at thread startup to
   ;; pass the address of initial-function into new_thread_trampoline.
   ;; tls[0] = NO_TLS_VALUE_MARKER_WIDETAG because a the tls index slot
@@ -476,11 +476,6 @@
   ;; function-layout is needed for closure creation. it's constant,
   ;; but we need somewhere to read it from.
   #!+(and immobile-space 64-bit sb-thread) (function-layout))
-
-(defconstant primitive-thread-object-length
-  (sb!vm::primitive-object-length
-   (find 'sb!vm::thread sb!vm::*primitive-objects*
-         :key 'sb!vm::primitive-object-name)))
 
 ;;; Compute the smallest TLS index that will be assigned to a special variable
 ;;; that does not map onto a thread slot.
