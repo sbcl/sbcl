@@ -29,22 +29,23 @@
 ;;; in the linkage table.
 (defun ensure-foreign-symbol-linkage (name datap)
   (let ((key (if datap (list name) name))
+        (table-base sb!vm:linkage-table-space-start)
         (ht *linkage-info*))
-    (or (with-locked-system-table (ht)
-          (or (gethash key ht)
-              (let* ((real-address
-                      (ensure-dynamic-foreign-symbol-address name datap))
-                     (table-base sb!vm:linkage-table-space-start)
-                     (table-address
-                      (+ (* (hash-table-count ht) sb!vm:linkage-table-entry-size)
-                         table-base)))
-                (aver real-address)
-                (when (< table-address sb!vm:linkage-table-space-end)
-                  (arch-write-linkage-table-entry
-                   table-address real-address (if datap 1 0))
-                  (let ((str (logically-readonlyize name)))
-                    (setf (gethash (if datap (list str) str) ht)
-                          table-address))))))
+    (or (awhen (with-locked-system-table (ht)
+                 (or (gethash key ht)
+                     (let* ((table-offset
+                             (* (hash-table-count ht) sb!vm:linkage-table-entry-size))
+                            (table-address (+ table-base table-offset)))
+                       (when (<= (+ table-address sb!vm:linkage-table-entry-size)
+                                 sb!vm:linkage-table-space-end)
+                         (let ((real-address
+                                (ensure-dynamic-foreign-symbol-address name datap)))
+                           (aver real-address)
+                           (arch-write-linkage-table-entry
+                            table-address real-address (if datap 1 0))
+                           (logically-readonlyize name)
+                           (setf (gethash key ht) table-offset))))))
+               (+ table-base it))
         (error "Linkage-table full (~D entries): cannot link ~S."
                (hash-table-count ht) name))))
 
@@ -57,8 +58,9 @@
 (defun update-linkage-table ()
   ;; This symbol is of course itself a prelinked symbol.
   (let ((n-prelinked (extern-alien "lisp_linkage_table_n_prelinked" int)))
-    (dohash ((key table-address) *linkage-info* :locked t)
+    (dohash ((key table-offset) *linkage-info* :locked t)
       (let* ((datap (listp key))
+             (table-address (+ table-offset sb!vm:linkage-table-space-start))
              (name (if datap (car key) key))
              (index (floor (- table-address sb!vm:linkage-table-space-start)
                            sb!vm:linkage-table-entry-size)))
@@ -67,6 +69,6 @@
         ;; Nor will those referenced by ELF core.
         (when (>= index n-prelinked)
           (let ((real-address (ensure-dynamic-foreign-symbol-address name datap)))
-            (aver (and table-address real-address))
+            (aver real-address)
             (arch-write-linkage-table-entry table-address real-address
                                             (if datap 1 0))))))))
