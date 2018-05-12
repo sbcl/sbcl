@@ -152,10 +152,13 @@
            (,acc 0)
            (,prev 0))
        #-sb-xc-host (declare (notinline sb!kernel:%ldb)) ; lp#1573398
+       (declare (type (mod ,sb!vm:n-word-bits) ,shift)
+                (type word ,acc ,prev))
        (loop
         (let ((,byte (ldb (byte 8 ,bytepos) ,integer)))
           (incf ,bytepos 8)
-          (setf ,acc (logior ,acc (ash (logand ,byte #x7f) ,shift)))
+          (setf ,acc (logior ,acc (logand (ash (logand ,byte #x7f) ,shift)
+                                          most-positive-word)))
           (cond ((logtest ,byte #x80) (incf ,shift 7))
                 ;; No offset can be zero, so this is the delimiter
                 ((zerop ,acc) (return))
