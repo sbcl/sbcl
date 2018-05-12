@@ -404,9 +404,7 @@ static struct simple_fun* simple_fun_from_pc(char* pc)
 {
     struct code* code = (struct code*)component_ptr_from_pc((lispobj*)pc);
     if (!code) return 0;
-    struct simple_fun* prev_fun = (struct simple_fun*)
-        ((char*)code + (code_header_words(code->header)<<WORD_SHIFT)
-         + FIRST_SIMPLE_FUN_OFFSET(code));
+    struct simple_fun* prev_fun = 0;
     for_each_simple_fun(i, fun, code, 1, {
         if (pc < (char*)fun) break;
         prev_fun = fun;

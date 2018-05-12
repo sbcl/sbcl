@@ -79,8 +79,7 @@
                                   (ash sb!vm:simple-fun-code-offset sb!vm:word-shift)
                                   (- sb!vm:fun-pointer-lowtag))))
               ;; non-x86 backends store the function itself (what else?) in 'self'
-              #!-(or x86 x86-64)
-              (setf (%simple-fun-self fun) fun))))))
+              #!-(or x86 x86-64) fun)))))
 
 ;;; Map of code-component -> list of PC offsets at which allocations occur.
 ;;; This table is needed in order to enable allocation profiling.
