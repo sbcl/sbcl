@@ -2076,8 +2076,7 @@ core and return a descriptor to it."
            (obj-start-addr (logandc2 (descriptor-bits code-object) sb!vm:lowtag-mask))
            (code-end-addr
             (+ obj-start-addr
-               (ash (logand (get-header-data code-object)
-                            sb!vm:short-header-max-words) sb!vm:word-shift)
+               (code-header-bytes code-object)
                (descriptor-fixnum
                 (read-wordindexed code-object sb!vm:code-code-size-slot))))
            (gspace-base (gspace-byte-address (descriptor-gspace code-object)))
