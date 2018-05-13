@@ -135,8 +135,7 @@
   (:temporary (:scs (any-reg) :from (:argument 0)) boxed)
   (:temporary (:scs (non-descriptor-reg)) unboxed)
   (:generator 100
-    (inst addi (fixnumize (1+ code-constants-offset)) boxed-arg boxed)
-    (inst dep 0 31 n-lowtag-bits boxed)
+    (inst addi 0 boxed-arg boxed)
     (inst srl unboxed-arg word-shift unboxed)
     (inst addi lowtag-mask unboxed unboxed)
     (inst dep 0 31 n-lowtag-bits unboxed)

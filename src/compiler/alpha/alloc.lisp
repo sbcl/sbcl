@@ -85,8 +85,7 @@
   (:temporary (:scs (non-descriptor-reg)) unboxed)
   (:generator 100
     (inst li (lognot lowtag-mask) ndescr)
-    (inst lda boxed (fixnumize (1+ code-constants-offset)) boxed-arg)
-    (inst and boxed ndescr boxed)
+    (inst lda boxed 0 boxed-arg)
     (inst srl unboxed-arg word-shift unboxed)
     (inst lda unboxed lowtag-mask unboxed)
     (inst and unboxed ndescr unboxed)

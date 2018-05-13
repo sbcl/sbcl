@@ -26,7 +26,8 @@
             (t (%make-lisp-obj
                 (alien-funcall (extern-alien "alloc_code_object"
                                              (function unsigned unsigned unsigned))
-                               boxed unboxed)))))
+                               (logandc2 (+ boxed sb!vm:code-constants-offset 1) 1)
+                               unboxed)))))
   #!-gencgc
   (%primitive allocate-code-object boxed unboxed))
 

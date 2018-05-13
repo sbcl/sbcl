@@ -133,17 +133,16 @@
       (align-csp temp))))
 
 (define-vop (allocate-code-object)
-  (:args (boxed-arg :scs (any-reg))
+  ;; BOXED is a count of words as a fixnum; it is therefore also a byte count
+  ;; as a raw value because n-fixnum-tag-bits = word-shift.
+  (:args (boxed :scs (any-reg))
          (unboxed-arg :scs (any-reg)))
   (:results (result :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
-  (:temporary (:scs (any-reg) :from (:argument 0)) boxed)
   (:temporary (:scs (non-descriptor-reg)) unboxed)
   (:temporary (:sc non-descriptor-reg :offset nl4-offset) pa-flag)
   (:generator 100
     (inst li ndescr (lognot lowtag-mask))
-    (inst addu boxed boxed-arg (fixnumize (1+ code-constants-offset)))
-    (inst and boxed ndescr)
     (inst srl unboxed unboxed-arg word-shift)
     (inst addu unboxed unboxed lowtag-mask)
     (inst and unboxed ndescr)

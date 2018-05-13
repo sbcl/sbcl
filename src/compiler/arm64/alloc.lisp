@@ -71,7 +71,7 @@
 ;;;; Special purpose inline allocators.
 #!-gencgc
 (define-vop (allocate-code-object)
-  (:args (boxed-arg :scs (any-reg))
+  (:args (boxed-arg :scs (unsigned-reg))
          (unboxed-arg :scs (any-reg)))
   (:results (result :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
@@ -81,8 +81,7 @@
   (:temporary (:sc non-descriptor-reg) pa-flag)
   (:temporary (:scs (interior-reg)) lip)
   (:generator 100
-    (inst add boxed boxed-arg (fixnumize (1+ code-constants-offset)))
-    (inst and boxed boxed (bic-mask lowtag-mask))
+    (inst lsl boxed boxed-arg word-shift)
     (inst lsr unboxed unboxed-arg word-shift)
     (inst add unboxed unboxed lowtag-mask)
     (inst and unboxed unboxed (bic-mask lowtag-mask))

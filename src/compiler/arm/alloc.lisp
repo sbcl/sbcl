@@ -70,17 +70,16 @@
 ;;;; Special purpose inline allocators.
 #!-gencgc
 (define-vop (allocate-code-object)
-  (:args (boxed-arg :scs (any-reg))
+  ;; BOXED is a count of words as a fixnum; it is therefore also a byte count
+  ;; as a raw value because n-fixnum-tag-bits = word-shift.
+  (:args (boxed :scs (any-reg))
          (unboxed-arg :scs (any-reg)))
   (:results (result :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:temporary (:scs (non-descriptor-reg)) size)
-  (:temporary (:scs (any-reg) :from (:argument 0)) boxed)
   (:temporary (:scs (non-descriptor-reg)) unboxed)
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
   (:generator 100
-    (inst add boxed boxed-arg (fixnumize (1+ code-constants-offset)))
-    (inst bic boxed boxed lowtag-mask)
     (inst mov unboxed (lsr unboxed-arg word-shift))
     (inst add unboxed unboxed lowtag-mask)
     (inst bic unboxed unboxed lowtag-mask)

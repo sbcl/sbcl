@@ -33,7 +33,7 @@ boolean alloc_profiling;              // enabled flag
 static pthread_mutex_t allocation_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t alloc_profiler_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
-lispobj alloc_code_object (unsigned boxed, unsigned unboxed)
+lispobj alloc_code_object (unsigned boxedwords, unsigned unboxed)
 {
     /* It used to be that even on gencgc builds the
      * ALLOCATE-CODE-OBJECT VOP did all this initialization within
@@ -43,9 +43,6 @@ lispobj alloc_code_object (unsigned boxed, unsigned unboxed)
 
     struct code * code;
     struct thread __attribute__((unused)) *th = arch_os_get_current_thread();
-    /* boxed is the number of constants; add other slots, align it to
-     * two words, so that the code start is aligned. */
-    int boxedwords = ALIGN_UP(offsetof(struct code, constants)/sizeof(lispobj)+boxed, 2);
 
     /* Unboxed is the size of instructions in bytes. It will be stored
      * as is in the code_size slot, but it needs to be allocated with
