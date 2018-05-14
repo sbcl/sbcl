@@ -2954,7 +2954,6 @@ bootstrapping.
       `(let ((,in ,instance))
          (declare (ignorable ,in))
          ,@(maybe-rebinding in instance 'with-slots)
-         ,in
          (symbol-macrolet
              ,(mapcar (lambda (slot-entry)
                         (with-current-source-form (slot-entry slots)
@@ -2978,7 +2977,6 @@ bootstrapping.
       `(let ((,in ,instance))
          (declare (ignorable ,in))
          ,@(maybe-rebinding in instance 'with-accessors)
-         ,in
          (symbol-macrolet
              ,(mapcar (lambda (slot-entry)
                         (with-current-source-form (slot-entry slots)
