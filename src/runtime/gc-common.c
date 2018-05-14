@@ -325,8 +325,9 @@ trans_code(struct code *code)
     /* prepare to transport the code vector */
     lispobj l_code = (lispobj) LOW_WORD(code) | OTHER_POINTER_LOWTAG;
     sword_t nheader_words = code_header_words(code->header);
-    sword_t ncode_words = code_instruction_words(code->code_size);
-    lispobj l_new_code = copy_large_object(l_code, nheader_words + ncode_words,
+    sword_t ncode_words = code_unboxed_nwords(code->code_size);
+    lispobj l_new_code = copy_large_object(l_code,
+                                           ALIGN_UP(nheader_words + ncode_words, 2),
                                            CODE_PAGE_TYPE);
 
 #ifdef LISP_FEATURE_GENCGC
@@ -388,7 +389,7 @@ scav_code_header(lispobj *where, lispobj header)
                  SIMPLE_FUN_SCAV_NWORDS(function_ptr));
     })
 
-    return n_header_words + code_instruction_words(code->code_size);
+    return ALIGN_UP(n_header_words + code_unboxed_nwords(code->code_size), 2);
 }
 
 static lispobj
@@ -401,8 +402,9 @@ trans_code_header(lispobj object)
 static sword_t
 size_code_header(lispobj *where)
 {
-    return code_header_words(((struct code *)where)->header)
-         + code_instruction_words(((struct code *)where)->code_size);
+    struct code* c = (struct code*)where;
+    return ALIGN_UP(code_header_words(c->header) + code_unboxed_nwords(c->code_size),
+                    2);
 }
 
 #ifdef RETURN_PC_WIDETAG

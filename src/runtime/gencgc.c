@@ -2655,7 +2655,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                     verify_range(SIMPLE_FUN_SCAV_START(fheaderp),
                                  SIMPLE_FUN_SCAV_NWORDS(fheaderp),
                                  state); });
-                count = nheader_words + code_instruction_words(code->code_size);
+                count = ALIGN_UP(nheader_words + code_unboxed_nwords(code->code_size), 2);
                 break;
                 }
             case FDEFN_WIDETAG:

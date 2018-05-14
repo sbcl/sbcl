@@ -368,10 +368,10 @@ code_header_words(lispobj header) // given header = code->header
 
 #include "align.h"
 static inline sword_t
-code_instruction_words(lispobj n) // given n = code->code_size
+code_unboxed_nwords(lispobj n) // given n = code->code_size
 {
-    /* Convert bytes into words, double-word aligned. */
-    return ALIGN_UP(fixnum_value(n), 2*N_WORD_BYTES) >> WORD_SHIFT;
+    // Return ceiling |N / N_WORD_BYTES|
+    return (fixnum_value(n) + (N_WORD_BYTES-1)) >> WORD_SHIFT;
 }
 #undef HEADER_VALUE_MASKED
 

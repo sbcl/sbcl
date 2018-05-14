@@ -248,8 +248,9 @@ static lispobj
 ptrans_code(lispobj thing)
 {
     struct code *code = (struct code *)native_pointer(thing);
-    long nwords = code_header_words(code->header)
-                + code_instruction_words(code->code_size);
+    long nwords =
+        ALIGN_UP(code_header_words(code->header) + code_unboxed_nwords(code->code_size),
+                 2);
 
     struct code *new = (struct code *)newspace_alloc(nwords,1); /* constant */
 
