@@ -234,7 +234,7 @@
 ;;; Load a code object. N-CONSTANTS objects are popped off the stack for
 ;;; the boxed storage section, then CODE-LENGTH bytes of code are read in.
 (defun load-code (nfuns n-constants code-length stack ptr fasl-input)
-  (declare (fixnum box-num code-length))
+  (declare (fixnum n-constants code-length))
   (declare (simple-vector stack) (type index ptr))
   (let* ((debug-info-index (+ ptr n-constants))
          (immobile-p (svref stack (1+ debug-info-index)))

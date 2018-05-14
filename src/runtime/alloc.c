@@ -33,7 +33,7 @@ boolean alloc_profiling;              // enabled flag
 static pthread_mutex_t allocation_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t alloc_profiler_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
-lispobj alloc_code_object (unsigned boxedwords, unsigned unboxed)
+lispobj alloc_code_object (unsigned boxed_nwords, unsigned unboxed_nbytes)
 {
     /* It used to be that even on gencgc builds the
      * ALLOCATE-CODE-OBJECT VOP did all this initialization within
@@ -43,11 +43,6 @@ lispobj alloc_code_object (unsigned boxedwords, unsigned unboxed)
 
     struct code * code;
     struct thread __attribute__((unused)) *th = arch_os_get_current_thread();
-
-    /* Unboxed is the size of instructions in bytes. It will be stored
-     * as is in the code_size slot, but it needs to be allocated with
-     * double-word alignment. */
-    unsigned unboxed_aligned = ALIGN_UP(unboxed, 2*N_WORD_BYTES);
 
     /* Since alloc_code_object is run under WITHOUT-GCING it doesn't
      * actaully need to be pseudo-atomic, this is just to appease the
@@ -60,15 +55,16 @@ lispobj alloc_code_object (unsigned boxedwords, unsigned unboxed)
     gc_assert(!result);
     code = (struct code *)
       lisp_alloc(&gc_alloc_region[CODE_PAGE_TYPE-1],
-                 boxedwords*N_WORD_BYTES + unboxed_aligned,
+                 ALIGN_UP(boxed_nwords*N_WORD_BYTES + unboxed_nbytes,
+                          2*N_WORD_BYTES),
                  CODE_PAGE_TYPE, arch_os_get_current_thread());
     result = thread_mutex_unlock(&allocation_lock);
     gc_assert(!result);
 
     clear_pseudo_atomic_atomic(th);
 
-    code->header = (boxedwords << N_WIDETAG_BITS) | CODE_HEADER_WIDETAG;
-    code->code_size = make_fixnum(unboxed);
+    code->header = (boxed_nwords << N_WIDETAG_BITS) | CODE_HEADER_WIDETAG;
+    code->code_size = make_fixnum(unboxed_nbytes);
     code->debug_info = NIL;
     return make_lispobj(code, OTHER_POINTER_LOWTAG);
 }
