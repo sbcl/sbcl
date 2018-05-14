@@ -2652,31 +2652,30 @@ core and return a descriptor to it."
 ;;; fixups (or function headers) are applied.
 #!+sb-show (defvar *show-pre-fixup-code-p* nil)
 
-(defun cold-load-code (fasl-input code-size nconst nfuns)
+(defun cold-load-code (fasl-input code-size n-boxed-words nfuns)
   (macrolet ((pop-stack () '(pop-fop-stack (%fasl-input-stack fasl-input))))
-     (let* ((raw-header-n-words (+ sb!vm:code-constants-offset nconst))
-            ;; Note that the number of constants is rounded up to ensure
-            ;; that the code vector will be properly aligned.
-            (header-n-words (round-up raw-header-n-words 2))
+     (let* (;; Note that the number of constants is rounded up (for now)
+            ;; to ensure that the code vector will be properly aligned.
+            (aligned-n-boxed-words (round-up n-boxed-words 2))
             (immobile-p (pop-stack))
             (debug-info (pop-stack))
             (des (allocate-cold-descriptor
                   (or #!+immobile-code (and immobile-p *immobile-varyobj*) *dynamic*)
-                  (+ (ash header-n-words sb!vm:word-shift) code-size)
+                  (+ (ash aligned-n-boxed-words sb!vm:word-shift) code-size)
                   sb!vm:other-pointer-lowtag)))
        (declare (ignorable immobile-p))
-       (write-header-word des header-n-words sb!vm:code-header-widetag)
+       (write-header-word des aligned-n-boxed-words sb!vm:code-header-widetag)
        (write-wordindexed des sb!vm:code-code-size-slot
                           (make-fixnum-descriptor code-size))
        (write-wordindexed des sb!vm:code-debug-info-slot debug-info)
-       (do ((index (1- raw-header-n-words) (1- index)))
+       (do ((index (1- n-boxed-words) (1- index)))
            ((< index sb!vm:code-constants-offset))
          (let ((obj (pop-stack)))
            (if (and (consp obj) (eq (car obj) :known-fun))
                (push (list* (cdr obj) des index) *deferred-known-fun-refs*)
                (write-wordindexed des index obj))))
        (let* ((start (+ (descriptor-byte-offset des)
-                        (ash header-n-words sb!vm:word-shift)))
+                        (ash aligned-n-boxed-words sb!vm:word-shift)))
               (end (+ start code-size)))
          (read-bigvec-as-sequence-or-die (descriptor-mem des)
                                          (%fasl-input-stream fasl-input)
@@ -2709,7 +2708,7 @@ core and return a descriptor to it."
          (when *show-pre-fixup-code-p*
            (format *trace-output*
                    "~&/raw code from code-fop ~W ~W:~%"
-                   nconst
+                   n-header-words
                    code-size)
            (do ((i start (+ i sb!vm:n-word-bytes)))
                ((>= i end))

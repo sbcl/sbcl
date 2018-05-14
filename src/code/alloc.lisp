@@ -354,13 +354,11 @@
 
 ;;; This is called when we're already inside WITHOUT-GCing
 (defun allocate-immobile-code (n-boxed-words n-unboxed-bytes)
-  (let* ((unrounded-header-n-words (+ code-constants-offset n-boxed-words))
-         (rounded-header-words (* 2 (ceiling unrounded-header-n-words 2)))
-         (total-bytes (+ (* rounded-header-words n-word-bytes)
+  (let* ((total-bytes (+ (* n-boxed-words n-word-bytes)
                          (logandc2 (+ n-unboxed-bytes lowtag-mask) lowtag-mask)))
          (code (allocate-immobile-bytes
                 total-bytes
-                (logior (ash rounded-header-words n-widetag-bits) code-header-widetag)
+                (logior (ash n-boxed-words n-widetag-bits) code-header-widetag)
                 (ash n-unboxed-bytes n-fixnum-tag-bits)
                 other-pointer-lowtag)))
     (setf (%code-debug-info code) nil)

@@ -1104,8 +1104,7 @@
 
       (dump-object (sb!c::code-immobile-p component) fasl-output)
       (dump-fop 'fop-code fasl-output code-length
-                (- header-length sb!vm:code-constants-offset)
-                (length entry-offsets))
+                header-length (length entry-offsets))
 
       (dump-segment code-segment code-length fasl-output)
       (dolist (val entry-offsets) (dump-varint val fasl-output))

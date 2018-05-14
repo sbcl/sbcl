@@ -17,8 +17,13 @@
 (in-package "SB!C")
 
 (declaim (ftype (sfunction (boolean fixnum fixnum) code-component) allocate-code-object))
+;;; Allocate a code component with BOXED words in the header
+;;; followed by UNBOXED bytes of raw data.
+;;; BOXED must be the exact count of boxed words desired. No adjustments
+;;; are made for alignment considerations or the fixed slots.
 (defun allocate-code-object (immobile-p boxed unboxed)
   (declare (ignorable immobile-p))
+  (aver (<= boxed sb!vm:short-header-max-words))
   #!+gencgc
   (without-gcing
       (cond #!+immobile-code
@@ -26,8 +31,7 @@
             (t (%make-lisp-obj
                 (alien-funcall (extern-alien "alloc_code_object"
                                              (function unsigned unsigned unsigned))
-                               (logandc2 (+ boxed sb!vm:code-constants-offset 1) 1)
-                               unboxed)))))
+                               boxed unboxed)))))
   #!-gencgc
   (%primitive allocate-code-object boxed unboxed))
 
@@ -205,12 +209,10 @@
     ;; simple-funs and setting the 'nfuns' value.
     (let* ((2comp (component-info component))
            (constants (ir2-component-constants 2comp))
-           (box-num (- (length constants) sb!vm:code-constants-offset))
+           (n-header-words (logandc2 (1+ (length constants)) 1))
            (code-obj (allocate-code-object
                       (or #!+immobile-code (eq *compile-to-memory-space* :immobile))
-                      box-num length)))
-      (declare (type index box-num length))
-      (aver (<= box-num sb!vm:short-header-max-words))
+                      n-header-words length)))
 
       ;; The following operations need the code pinned:
       ;; 1. copying into code-instructions (a SAP)

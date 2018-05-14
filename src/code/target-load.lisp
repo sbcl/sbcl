@@ -231,14 +231,17 @@
           (defaulted-fasl-truename defaulted-fasl-pathname)
           (defaulted-source-truename defaulted-source-pathname))))
 
-;;; Load a code object. BOX-NUM objects are popped off the stack for
+;;; Load a code object. N-CONSTANTS objects are popped off the stack for
 ;;; the boxed storage section, then CODE-LENGTH bytes of code are read in.
-(defun load-code (nfuns box-num code-length stack ptr fasl-input)
+(defun load-code (nfuns n-constants code-length stack ptr fasl-input)
   (declare (fixnum box-num code-length))
   (declare (simple-vector stack) (type index ptr))
-  (let* ((debug-info-index (+ ptr box-num))
+  (let* ((debug-info-index (+ ptr n-constants))
          (immobile-p (svref stack (1+ debug-info-index)))
-         (code (sb!c:allocate-code-object immobile-p box-num code-length)))
+         (n-boxed-words (+ sb!vm:code-constants-offset n-constants))
+         (aligned-n-boxed-words (logandc2 (1+ n-boxed-words) 1))
+         (code (sb!c:allocate-code-object
+                immobile-p aligned-n-boxed-words code-length)))
     (setf (%code-debug-info code) (svref stack debug-info-index))
     (loop for i of-type index from sb!vm:code-constants-offset
           for j of-type index from ptr below debug-info-index
