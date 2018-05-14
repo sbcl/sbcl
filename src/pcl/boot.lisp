@@ -2934,26 +2934,22 @@ bootstrapping.
 ;;; walker stuff was only used for implementing stuff like that; maybe
 ;;; it's not needed any more? Hunt down what it was used for and see.
 
-(defun extract-the (form &optional context)
-  (cond ((and (consp form) (eq (car form) 'the))
-         (unless (proper-list-of-length-p form 3)
-           (error "Invalid instance form ~S~@[ in ~S~@]"
-                  form context))
+(defun extract-the (form)
+  (cond ((typep form '(cons (eql the) (cons t (cons t null))))
          (third form))
         (t
          form)))
 
-(flet ((maybe-rebinding (instance-var instance-form context)
-         (with-current-source-form (instance-form)
-           (let ((instance (extract-the instance-form context)))
-             (when (symbolp instance)
-               `((declare (%variable-rebinding ,instance-var ,instance))))))))
+(flet ((maybe-rebinding (instance-var instance-form)
+         (let ((instance (extract-the instance-form)))
+           (when (symbolp instance)
+             `((declare (%variable-rebinding ,instance-var ,instance)))))))
 
   (defmacro with-slots (slots instance &body body)
     (let ((in (gensym)))
       `(let ((,in ,instance))
          (declare (ignorable ,in))
-         ,@(maybe-rebinding in instance 'with-slots)
+         ,@(maybe-rebinding in instance)
          (symbol-macrolet
              ,(mapcar (lambda (slot-entry)
                         (with-current-source-form (slot-entry slots)
@@ -2976,7 +2972,7 @@ bootstrapping.
     (let ((in (gensym)))
       `(let ((,in ,instance))
          (declare (ignorable ,in))
-         ,@(maybe-rebinding in instance 'with-accessors)
+         ,@(maybe-rebinding in instance)
          (symbol-macrolet
              ,(mapcar (lambda (slot-entry)
                         (with-current-source-form (slot-entry slots)
