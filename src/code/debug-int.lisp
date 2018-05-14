@@ -3326,10 +3326,11 @@ register."
 ;;;; MAKE-BOGUS-LRA (used for :FUN-END breakpoints)
 
 (defconstant bogus-lra-constants
-  #!-(or x86-64 x86) 1
-  #!+x86-64 2
-  ;; One more for a fixup vector
-  #!+x86 3)
+  (+ sb!vm:code-constants-offset
+     #!-(or x86-64 x86) 1
+     #!+x86-64 2
+     ;; One more for a fixup vector
+     #!+x86 3))
 
 ;;; Make a bogus LRA object that signals a breakpoint trap when
 ;;; returned to. If the breakpoint trap handler returns, REAL-LRA is
