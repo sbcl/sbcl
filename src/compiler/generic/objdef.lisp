@@ -157,12 +157,6 @@
               :ref-trans %code-debug-info
               :set-known ()
               :set-trans (setf %code-debug-info))
-  #!-64-bit
-  (n-entries :type fixnum
-             :set-known ()
-             :set-trans (setf %code-n-entries)
-             :ref-trans %code-n-entries
-             :ref-known (flushable foldable))
   #!+(or x86 immobile-space)
   (fixups :type t
           :ref-known (flushable)
