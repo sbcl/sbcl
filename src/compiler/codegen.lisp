@@ -192,17 +192,6 @@
     (emit (asmstream-elsewhere-section asmstream)
           (asmstream-elsewhere-label asmstream))
 
-    ;; Leave space for the unboxed words containing simple-fun offsets.
-    ;; Each offset is a 32-bit integer. On 64-bit platforms, 1 offset
-    ;; is stored in the header word as a 16-bit integer.
-    ;; On 32-bit platforms there is an extra boxed slot in the code oject.
-    (let* ((ptrs-per-word (/ sb!vm:n-word-bytes 4)) ; either 1 or 2
-           (n-words (ceiling (1- n-entries) ptrs-per-word)))
-      (when (plusp n-words)
-                 ;; Preserve double-word alignment of the unboxed constants
-        (emit (asmstream-data-section asmstream)
-              `(.skip ,(sb!vm:pad-data-block n-words)))))
-    ;;
     (do-ir2-blocks (block component)
       (let ((1block (ir2-block-block block)))
         (when (and (eq (block-info 1block) block)

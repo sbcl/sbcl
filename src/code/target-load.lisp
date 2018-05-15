@@ -233,7 +233,7 @@
 
 ;;; Load a code object. N-CONSTANTS objects are popped off the stack for
 ;;; the boxed storage section, then CODE-LENGTH bytes of code are read in.
-(defun load-code (nfuns n-constants code-length stack ptr fasl-input)
+(defun load-code (n-constants code-length stack ptr fasl-input)
   (declare (fixnum n-constants code-length))
   (declare (simple-vector stack) (type index ptr))
   (let* ((debug-info-index (+ ptr n-constants))
@@ -249,8 +249,7 @@
     (with-pinned-objects (code)
       (read-n-bytes (%fasl-input-stream fasl-input)
                     (code-instructions code) 0 code-length)
-      (sb!c::set-code-entrypoints
-       code (loop repeat nfuns collect (read-varint-arg fasl-input)))
+      (sb!c::set-code-entrypoints code)
       (sb!c::apply-fasl-fixups stack code))
     code))
 

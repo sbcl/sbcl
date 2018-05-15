@@ -547,11 +547,11 @@
 ;;; fasl file header.)
 
 ;; Cold-load calls COLD-LOAD-CODE instead
-(!define-fop #xE0 :not-host (fop-code ((:operands n-code-bytes n-boxed-words nfuns)))
+(!define-fop #xE0 :not-host (fop-code ((:operands n-code-bytes n-boxed-words)))
   (let ((n-constants (- n-boxed-words sb!vm:code-constants-offset)))
     ;; stack has (at least) N-CONSTANTS words plus 2 more: toplevel-p and debug-info
     (with-fop-stack ((stack (operand-stack)) ptr (+ n-constants 2))
-      (load-code nfuns n-constants n-code-bytes stack ptr (fasl-input)))))
+      (load-code n-constants n-code-bytes stack ptr (fasl-input)))))
 
 ;; this gets you an #<fdefn> object, not the result of (FDEFINITION x)
 ;; cold-loader uses COLD-FDEFINITION-OBJECT instead.

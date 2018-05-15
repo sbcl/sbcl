@@ -1053,8 +1053,7 @@
 ;;; constants.
 ;;;
 ;;; We dump trap objects in any unused slots or forward referenced slots.
-(defun dump-code-object (component code-segment code-length fixups
-                         fasl-output entry-offsets)
+(defun dump-code-object (component code-segment code-length fixups fasl-output)
   (declare (type component component)
            (type index code-length)
            (type fasl-output fasl-output))
@@ -1103,11 +1102,9 @@
         (dump-object info fasl-output))
 
       (dump-object (sb!c::code-immobile-p component) fasl-output)
-      (dump-fop 'fop-code fasl-output code-length
-                header-length (length entry-offsets))
+      (dump-fop 'fop-code fasl-output code-length header-length)
 
       (dump-segment code-segment code-length fasl-output)
-      (dolist (val entry-offsets) (dump-varint val fasl-output))
 
       (let ((handle (dump-pop fasl-output)))
         (dolist (patch (patches))
@@ -1168,12 +1165,8 @@
   (let* ((2comp (component-info component))
          (entries (sb!c::ir2-component-entries 2comp))
          (nfuns (length entries))
-         (code-handle (dump-code-object
-                       component code-segment code-length
-                       fixups file
-                       (mapcar (lambda (entry)
-                                 (label-position (sb!c::entry-info-offset entry)))
-                               entries)))
+         (code-handle
+          (dump-code-object component code-segment code-length fixups file))
          (fun-index nfuns))
 
     (dolist (entry entries)

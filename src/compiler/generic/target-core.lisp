@@ -35,56 +35,25 @@
   #!-gencgc
   (%primitive allocate-code-object boxed unboxed))
 
-;;; Assign all simple-fun offsets in CODE, then set N-ENTRIES so that GC sees
-;;; a nonzero number of functions only after their addresses are assigned.
-;;; Otherwise GC would see their offsets as all 0 and bad things would happen.
-;;; Each element of OFFSETS is a byte number beyond (CODE-INSTRUCTIONS CODE).
-(defun set-code-entrypoints (code offsets)
-  (let* ((nfuns (the (unsigned-byte 14) (length offsets)))
-         (fun-index nfuns))
-    (dolist (offset offsets)
-      (declare (type index offset))
-      (unless (zerop (logand offset sb!vm:lowtag-mask))
-        (bug "unaligned function object, offset = #X~X" offset))
-      (decf fun-index)
-      (let ((header-data (get-header-data code)))
-        (if (> fun-index 0)
-            (let* ((n-header-words (logand header-data sb!vm:short-header-max-words))
-                   (index (+ (- sb!vm:other-pointer-lowtag)
-                             (ash n-header-words sb!vm:word-shift)
-                             (ash (1- fun-index) 2))))
-              (aver (eql (sap-ref-32 (int-sap (get-lisp-obj-address code)) index) 0))
-              (setf (sap-ref-32 (int-sap (get-lisp-obj-address code)) index) offset))
-            ;; Special case for the first simple-fun:
-            ;; The value range of 'offset' and 'nfuns' is the same
-            ;; regardless of word size.
-            ;; It's as if it's a positive 32-bit fixnum (29 significant bits).
-            ;; 16 bits is enough for the offset because it only needs to
-            ;; skip over the unboxed constants.
-            #!-64-bit
-            (let ((newval (logior (ash (the (mod #x8000) offset) 14) nfuns)))
-              (aver (eql (sb!vm::%code-n-entries code) 0))
-              (setf (sb!vm::%code-n-entries code) newval))
-            #!+64-bit
-            (let ((newval (logior (ash (the (mod #x8000) offset) 16) nfuns)))
-              (aver (eql (ldb (byte 32 24) header-data) 0))
-              (set-header-data code (dpb newval (byte 32 24) header-data)))))
-      ;; COMPUTE-FUN is ok even if code-obj is not pinned (which it is)
-      (let ((fun (truly-the function (%primitive sb!c:compute-fun code offset))))
-        #!+(and compact-instance-header x86-64)
-        (setf (sap-ref-32 (int-sap (get-lisp-obj-address fun))
-                          (- 4 sb!vm:fun-pointer-lowtag))
-              (truly-the (unsigned-byte 32)
-                         (get-lisp-obj-address #.(find-layout 'function))))
-        (setf (%simple-fun-self fun)
+;;; Assign all SIMPLE-FUN-SELF slots for functions in CODE. The offset of each
+;;; function was assigned by the compiler or loader, as was N functions.
+(defun set-code-entrypoints (code)
+  (dotimes (i (code-n-entries code))
+    (let ((fun (%code-entry-point code i)))
+      #!+(and compact-instance-header x86-64)
+      (setf (sap-ref-32 (int-sap (get-lisp-obj-address fun))
+                        (- 4 sb!vm:fun-pointer-lowtag))
+            (truly-the (unsigned-byte 32)
+                       (get-lisp-obj-address #.(find-layout 'function))))
+      (setf (%simple-fun-self fun)
               ;; x86 backends store the address of the entrypoint in 'self'
-              #!+(or x86 x86-64)
-              (%make-lisp-obj
+            #!+(or x86 x86-64)
+            (%make-lisp-obj
                (truly-the word (+ (get-lisp-obj-address fun)
                                   (ash sb!vm:simple-fun-code-offset sb!vm:word-shift)
                                   (- sb!vm:fun-pointer-lowtag))))
               ;; non-x86 backends store the function itself (what else?) in 'self'
-              #!-(or x86 x86-64) fun)))))
+            #!-(or x86 x86-64) fun))))
 
 ;;; Map of code-component -> list of PC offsets at which allocations occur.
 ;;; This table is needed in order to enable allocation profiling.
@@ -221,14 +190,11 @@
       (with-pinned-objects (code-obj)
         (let ((bytes (the (simple-array assembly-unit 1)
                           (segment-contents-as-vector segment))))
+          ;; By design, until the last 4 unboxed bytes of CODE-OBJ contain a
+          ;; nonzero value, GC will not see any simple-funs therein.
           (%byte-blt bytes 0 (code-instructions code-obj) 0 (length bytes)))
-
         (apply-core-fixups fixup-notes code-obj)
-
-        (set-code-entrypoints
-         code-obj (mapcar (lambda (entry-info)
-                            (label-position (entry-info-offset entry-info)))
-                          (ir2-component-entries 2comp))))
+        (set-code-entrypoints code-obj))
 
       ;; Don't need code pinned now
       (let* ((entries (ir2-component-entries 2comp))

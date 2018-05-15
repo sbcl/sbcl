@@ -2652,7 +2652,7 @@ core and return a descriptor to it."
 ;;; fixups (or function headers) are applied.
 #!+sb-show (defvar *show-pre-fixup-code-p* nil)
 
-(defun cold-load-code (fasl-input code-size n-boxed-words nfuns)
+(defun cold-load-code (fasl-input code-size n-boxed-words)
   (macrolet ((pop-stack () '(pop-fop-stack (%fasl-input-stack fasl-input))))
      (let* (;; Note that the number of constants is rounded up (for now)
             ;; to ensure that the code vector will be properly aligned.
@@ -2681,29 +2681,6 @@ core and return a descriptor to it."
                                          (%fasl-input-stream fasl-input)
                                          :start start
                                          :end end)
-
-         ;; Emulate NEW-SIMPLE-FUN in target-core
-         (loop for fun-index from (1- nfuns) downto 0
-               do (let ((offset (read-varint-arg fasl-input)))
-                    (if (> fun-index 0)
-                        (let ((bytes (descriptor-mem des))
-                              (index (+ (descriptor-byte-offset des)
-                                        (code-header-bytes des)
-                                        (ash (1- fun-index) 2))))
-                          (aver (eql (bvref-32 bytes index) 0))
-                          (setf (bvref-32 bytes index) offset))
-                        #!-64-bit
-                        (write-wordindexed/raw
-                         des
-                         sb!vm::code-n-entries-slot
-                         (logior (ash offset 16)
-                                 (ash nfuns sb!vm:n-fixnum-tag-bits)))
-                        #!+64-bit
-                        (write-wordindexed/raw
-                         des 0
-                         (logior (ash (logior (ash offset 16) nfuns) 32)
-                                 (read-bits-wordindexed des 0))))))
-
          #!+sb-show
          (when *show-pre-fixup-code-p*
            (format *trace-output*
@@ -2733,23 +2710,19 @@ core and return a descriptor to it."
         (code (pop-stack)))
     (write-wordindexed code slot value)))
 
-(defun fun-offset (code-object fun-index)
-  (if (> fun-index 0)
-      (bvref-32 (descriptor-mem code-object)
-                (+ (descriptor-byte-offset code-object)
-                   (code-header-bytes code-object)
-                   (ash (1- fun-index) 2)))
-      (ldb (byte 16 16)
-           #!-64-bit (read-bits-wordindexed code-object sb!vm::code-n-entries-slot)
-           #!+64-bit (ldb (byte 32 32) (read-bits-wordindexed code-object 0)))))
-
 (defun compute-fun (code-object fun-index)
-  (let ((offset-from-code-start (+ (code-header-bytes code-object)
-                                   (fun-offset code-object fun-index))))
-    (unless (zerop (logand offset-from-code-start sb!vm:lowtag-mask))
+  (let ((fun-offset
+         (bvref-32 (descriptor-mem code-object)
+                   (+ (descriptor-byte-offset code-object)
+                      (code-header-bytes code-object)
+                      (descriptor-fixnum
+                       (read-wordindexed code-object sb!vm:code-code-size-slot))
+                      (* (+ fun-index 2) -4)))))
+    (unless (zerop (logand fun-offset sb!vm:lowtag-mask))
       (error "unaligned function entry ~S ~S" code-object fun-index))
     (make-descriptor (logior (+ (logandc2 (descriptor-bits code-object) sb!vm:lowtag-mask)
-                                offset-from-code-start)
+                                (code-header-bytes code-object)
+                                fun-offset)
                              sb!vm:fun-pointer-lowtag))))
 
 (defun cold-fop-fun-entry (fasl-input fun-index)
