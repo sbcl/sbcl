@@ -82,14 +82,15 @@ do {                                                                   \
 #define FUN_SELF_FIXNUM_TAGGED 0
 #endif
 
+static inline unsigned int*
+code_fun_table(struct code* code) {
+  return (unsigned int*)((char*)code
+                         + code_header_words(code->header) * N_WORD_BYTES
+                         + fixnum_value(code->code_size)
+                         - sizeof (uint32_t));
+}
 static inline unsigned short
-#ifdef LISP_FEATURE_64_BIT
-code_n_funs(struct code* code) { return ((code)->header >> 32) & 0x7FFF; }
-#define FIRST_SIMPLE_FUN_OFFSET(code) ((code)->header >> 48)
-#else
-code_n_funs(struct code* code) { return fixnum_value((code)->n_entries) & 0x3FFF; }
-#define FIRST_SIMPLE_FUN_OFFSET(code) ((code)->n_entries >> 16)
-#endif
+code_n_funs(struct code* code) { return code_fun_table(code)[0]; }
 
 #define is_vector_subtype(header, val) ((HeaderValue(header) & 3) == subtype_##val)
 
@@ -110,13 +111,13 @@ code_n_funs(struct code* code) { return fixnum_value((code)->n_entries) & 0x3FFF
       char *_insts_ = (char*)(code_var) +                                   \
         (code_header_words((code_var)->header)<<WORD_SHIFT);                \
       int index_var = 0;                                                    \
-      int _offset_ = FIRST_SIMPLE_FUN_OFFSET(code_var);                     \
+      unsigned int* _offsets_ = code_fun_table(code_var) - 1;               \
       do {                                                                  \
-       struct simple_fun* fun_var = (struct simple_fun*)(_insts_+_offset_); \
+       struct simple_fun* fun_var                                           \
+           = (struct simple_fun*)(_insts_ + _offsets_[-index_var]);         \
        if (assertp)                                                         \
          gc_assert(widetag_of(fun_var->header)==SIMPLE_FUN_WIDETAG);        \
        guts ;                                                               \
-       _offset_ = ((unsigned int*)_insts_)[index_var];                      \
       } while (++index_var < _nfuns_);                                      \
   }}
 

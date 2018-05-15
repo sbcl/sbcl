@@ -92,7 +92,7 @@
       ;; Assembler routines contain jumps to immobile code.
       (let* ((code sb-fasl:*assembler-routines*)
              (origin (sap-int (code-instructions code)))
-             (end (+ origin (%code-code-size code)))
+             (end (+ origin (%code-text-size code)))
              (relocs-index (fill-pointer relocs)))
         (dolist (range (sort (loop for range being each hash-value
                                    of (car (%code-debug-info code)) collect range)
@@ -112,7 +112,7 @@
          (declare (ignore size))
          (when (= type code-header-widetag)
            (let* ((text-origin (sap-int (code-instructions code)))
-                  (text-end (+ text-origin (%code-code-size code)))
+                  (text-end (+ text-origin (%code-text-size code)))
                   (relocs-index (fill-pointer relocs)))
              (dotimes (i (code-n-entries code) (finish-component code relocs-index))
                (let* ((fun (%code-entry-point code i))

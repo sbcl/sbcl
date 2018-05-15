@@ -1502,7 +1502,7 @@
                           (setf nil-block-seen-p t))))
                  (setf last-debug-fun
                        (sb!di::make-compiled-debug-fun fmap-entry code)))))))
-        (let ((max-offset (%code-code-size code)))
+        (let ((max-offset (%code-text-size code)))
           (when (and first-block-seen-p last-debug-fun)
             (add-seg last-offset
                      (- max-offset last-offset)
@@ -1520,7 +1520,7 @@
 (defun get-code-segments (code
                           &optional
                           (start-offset 0)
-                          (length (%code-code-size code)))
+                          (length (%code-text-size code)))
   (declare (type code-component code)
            (type offset start-offset)
            (type disassem-length length))
@@ -1558,7 +1558,7 @@
                                                          code))))))
             (when last-debug-fun
               (add-seg last-offset
-                       (- (%code-code-size code) last-offset)
+                       (- (%code-text-size code) last-offset)
                        last-debug-fun))))))
     (if (null segments)
         (list (make-code-segment code start-offset length))
@@ -1724,6 +1724,7 @@
                         (sap-int
                          (code-instructions code-component)))))
                 (when (or (< code-offs 0)
+                          ;; Allow looking past instruction bytes if you want
                           (> code-offs (%code-code-size code-component)))
                   (error "address ~X not in the code component ~S"
                          address code-component))
@@ -1901,7 +1902,7 @@
            (let* ((code sb!fasl::*assembler-routines*)
                   (hashtable (car (%code-debug-info code)))
                   (start (sap-int (code-instructions code)))
-                  (end (+ start (1- (%code-code-size code)))))
+                  (end (+ start (1- (%code-text-size code)))))
              (when (<= start address end) ; it has to be an asm routine
                (let* ((offset (- address start))
                       (index (unless (logtest address (1- sb!vm:n-word-bytes))

@@ -909,7 +909,7 @@
                           (- (get-lisp-obj-address code)
                              other-pointer-lowtag)
                           code-header-len))
-            (code-size (%code-code-size code)))
+            (code-size (%code-text-size code)))
         (values pc-offset
                 (<= 0 pc-offset code-size)
                 code-size)))))

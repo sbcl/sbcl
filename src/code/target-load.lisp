@@ -270,7 +270,7 @@
 
 (defun !loader-cold-init ()
   (let* ((code *assembler-routines*)
-         (size (%code-code-size code))
+         (size (%code-text-size code))
          (vector (the simple-vector *!initial-assembler-routines*))
          (count (length vector))
          (ht (make-hash-table :test 'eq)))

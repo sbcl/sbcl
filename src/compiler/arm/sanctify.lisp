@@ -24,5 +24,5 @@
                                            system-area-pointer
                                            unsigned-long))
                    (code-instructions component)
-                   (%code-code-size component))
+                   (%code-text-size component))
   nil)

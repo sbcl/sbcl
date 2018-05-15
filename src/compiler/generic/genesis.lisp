@@ -2708,8 +2708,7 @@ core and return a descriptor to it."
          (when *show-pre-fixup-code-p*
            (format *trace-output*
                    "~&/raw code from code-fop ~W ~W:~%"
-                   n-header-words
-                   code-size)
+                   n-boxed-words code-size)
            (do ((i start (+ i sb!vm:n-word-bytes)))
                ((>= i end))
              (format *trace-output*
@@ -3678,6 +3677,17 @@ III. initially undefined function references (alphabetically):
       (flet ((assembler-file-p (name) (tailwise-equal (namestring name) ".assem-obj")))
         (dolist (file-name (remove-if-not #'assembler-file-p object-file-names))
           (cold-load file-name verbose))
+        ;; Add 2 zero words to the end of the assembler object.  The trailing
+        ;; bytes convey the count of simple-funs (of which there are none)
+        ;; in this code component, thereby avoiding a special case in GC.
+        (let ((code *cold-assembler-obj*))
+          (when code
+            (incf (gspace-free-word-index (descriptor-gspace code)) 2)
+            (write-wordindexed code sb!vm:code-code-size-slot
+                               (make-fixnum-descriptor
+                                (+ (descriptor-fixnum
+                                    (read-wordindexed code sb!vm:code-code-size-slot))
+                                   (* 2 sb!vm:n-word-bytes))))))
         (setf object-file-names (remove-if #'assembler-file-p object-file-names)))
 
       ;; Prepare for cold load.

@@ -184,6 +184,7 @@
             "~|~%assembly code for ~S~2%"
             component))
   (let* ((prev-env nil)
+         (n-entries (length (ir2-component-entries (component-info component))))
          (asmstream (make-asmstream))
          (*asmstream* asmstream)
          (*fixup-notes* nil))
@@ -195,8 +196,7 @@
     ;; Each offset is a 32-bit integer. On 64-bit platforms, 1 offset
     ;; is stored in the header word as a 16-bit integer.
     ;; On 32-bit platforms there is an extra boxed slot in the code oject.
-    (let* ((n-entries (length (ir2-component-entries (component-info component))))
-           (ptrs-per-word (/ sb!vm:n-word-bytes 4)) ; either 1 or 2
+    (let* ((ptrs-per-word (/ sb!vm:n-word-bytes 4)) ; either 1 or 2
            (n-words (ceiling (1- n-entries) ptrs-per-word)))
       (when (plusp n-words)
                  ;; Preserve double-word alignment of the unboxed constants
@@ -249,17 +249,46 @@
                   (t
                    (funcall gen vop)))))))
     (emit-inline-constants)
-    (let ((segment
-           (assemble-sections
-            (make-segment :run-scheduler (default-segment-run-scheduler)
-                          :inst-hook (default-segment-inst-hook))
-            (asmstream-data-section asmstream)
-            (asmstream-code-section asmstream)
-            (asmstream-elsewhere-section asmstream))))
-      (values segment
-              (finalize-segment segment)
-              (asmstream-elsewhere-label asmstream)
-              *fixup-notes*))))
+    (let ((trailer (sb!assem::make-section)))
+      ;; Build the simple-fun-offset table.
+      ;; The assembler is not capable of emitting the difference between labels,
+      ;; so we'll just leave space and fill them in later
+      (emit trailer `(.align 2)) ; align for some uint32 values
+      (dotimes (i (1+ n-entries))
+        (emit trailer `(.byte #xff #xff #xff #xff)))
+      (let* ((segment
+              (assemble-sections
+               (make-segment :run-scheduler (default-segment-run-scheduler)
+                             :inst-hook (default-segment-inst-hook))
+               (asmstream-data-section asmstream)
+               (asmstream-code-section asmstream)
+               (asmstream-elsewhere-section asmstream)
+               trailer))
+             (size
+              (finalize-segment segment))
+             (buffer
+              (sb!assem::segment-buffer segment)))
+        (flet ((store-ub32 (index val)
+                 #!+little-endian
+                 (setf (aref buffer (+ index 0)) (ldb (byte 8  0) val)
+                       (aref buffer (+ index 1)) (ldb (byte 8  8) val)
+                       (aref buffer (+ index 2)) (ldb (byte 8 16) val)
+                       (aref buffer (+ index 3)) (ldb (byte 8 24) val))
+                 #!+big-endian
+                 (setf (aref buffer (+ index 3)) (ldb (byte 8  0) val)
+                       (aref buffer (+ index 2)) (ldb (byte 8  8) val)
+                       (aref buffer (+ index 1)) (ldb (byte 8 16) val)
+                       (aref buffer (+ index 0)) (ldb (byte 8 24) val))))
+          (let ((index size))
+            (store-ub32 (decf index 4) n-entries)
+            (dolist (entry (reverse (sb!c::ir2-component-entries
+                                     (component-info component))))
+              (store-ub32 (decf index 4)
+                          (label-position (entry-info-offset entry))))))
+        (values segment
+                size
+                (asmstream-elsewhere-label asmstream)
+                *fixup-notes*)))))
 
 (defun label-elsewhere-p (label-or-posn kind)
   (let ((elsewhere (label-position *elsewhere-label*))

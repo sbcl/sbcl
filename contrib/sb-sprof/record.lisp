@@ -445,5 +445,5 @@ EXPERIMENTAL: Interface subject to change."
 (defun code-bounds (code)
   (declare (type sb-kernel:code-component code))
   (let* ((start (code-start code))
-         (end (+ start (sb-kernel:%code-code-size code))))
+         (end (+ start (sb-kernel:%code-text-size code))))
     (values start end)))
