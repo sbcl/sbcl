@@ -3346,26 +3346,23 @@ register."
            (trap-loc (static-foreign-symbol-sap "fun_end_breakpoint_trap"))
            (length (sap- src-end src-start))
            (code-object
-             (sb!c:allocate-code-object nil bogus-lra-constants length))
+             (sb!c:allocate-code-object nil bogus-lra-constants (+ length 4)))
            (dst-start (code-instructions code-object)))
       (declare (type system-area-pointer
                      src-start src-end dst-start trap-loc)
                (type index length))
       (setf (%code-debug-info code-object) :bogus-lra)
-      #!-(or x86 x86-64)
-      (setf (code-header-ref code-object real-lra-slot) real-lra)
+      (system-area-ub8-copy src-start 0 dst-start 0 length)
       #!+(or x86 x86-64)
       (multiple-value-bind (offset code) (compute-lra-data-from-pc real-lra)
         (setf (code-header-ref code-object real-lra-slot) code)
-        (setf (code-header-ref code-object (1+ real-lra-slot)) offset))
-      (system-area-ub8-copy src-start 0 dst-start 0 length)
-      #!-(or x86 x86-64)
-      (sb!vm:sanctify-for-execution code-object)
-      #!+(or x86 x86-64)
-      (values dst-start code-object (sap- trap-loc src-start))
+        (setf (code-header-ref code-object (1+ real-lra-slot)) offset)
+        (values dst-start code-object (sap- trap-loc src-start)))
       #!-(or x86 x86-64)
       (let ((new-lra (make-lisp-obj (+ (sap-int dst-start)
                                        sb!vm:other-pointer-lowtag))))
+        (setf (code-header-ref code-object real-lra-slot) real-lra)
+        (sb!vm:sanctify-for-execution code-object)
         ;; We used to set the header value of the LRA here to the
         ;; offset from the enclosing component to the LRA header, but
         ;; MAKE-LISP-OBJ actually checks the value before we get a
