@@ -1613,6 +1613,7 @@ variable: an unreadable object representing the error is printed instead.")
              (write-string "broken weak pointer" stream))))))
 
 (defmethod print-object ((component code-component) stream)
+  (declare (notinline code-header-words))
   (print-unreadable-object (component stream :identity t)
     (let ((dinfo (%code-debug-info component)))
       (cond ((eq dinfo :bogus-lra)
