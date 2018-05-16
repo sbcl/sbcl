@@ -82,15 +82,27 @@ do {                                                                   \
 #define FUN_SELF_FIXNUM_TAGGED 0
 #endif
 
+/* Code component trailer words:
+ *                                                   v code size
+ *      | fun_offset | fun_offset | .... | N-entries |
+ *                                       ^
+ *                 fun_table pointer ---/
+ *
+ * The fun_table pointer is aligned at a 4-byte boundary.
+ */
 static inline unsigned int*
 code_fun_table(struct code* code) {
   return (unsigned int*)((char*)code
                          + code_header_words(code->header) * N_WORD_BYTES
-                         + fixnum_value(code->code_size)
-                         - sizeof (uint32_t));
+                         + fixnum_value(code->code_size) - sizeof (uint16_t));
 }
 static inline unsigned short
-code_n_funs(struct code* code) { return code_fun_table(code)[0]; }
+code_n_funs(struct code* code) {
+    // immobile space filler objects appear to be code but have no simple-funs.
+    // Should probably consider changing the widetag to FILLER_WIDETAG.
+    return (code_header_words(code->header) > 2)
+        ? *((unsigned short*)code_fun_table(code)) : 0;
+}
 
 #define is_vector_subtype(header, val) ((HeaderValue(header) & 3) == subtype_##val)
 
@@ -98,13 +110,6 @@ code_n_funs(struct code* code) { return code_fun_table(code)[0]; }
 // offsets are stored as the number of bytes into the instructions
 // portion of the code object at which the simple-fun object resides.
 // We use bytes, not words, because that's what the COMPUTE-FUN vop expects.
-// But the offsets could be compressed further if we chose to use words,
-// which might allow storing them as (unsigned-byte 16),
-// as long as provision is made for ultra huge simple-funs. (~ .5MB)
-//
-// Note that the second assignment to _offset_ is OK: while it technically
-// oversteps the bounds of the indices of the fun offsets, it can not
-// run off the end of the code.
 #define for_each_simple_fun(index_var,fun_var,code_var,assertp,guts)        \
   { int _nfuns_ = code_n_funs(code_var);                                    \
     if (_nfuns_ > 0) {                                                      \

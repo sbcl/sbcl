@@ -682,7 +682,7 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :undefined-fun-restarts :call-symbol' >> $ltf
     case "$sbcl_os" in
     linux | darwin | *bsd)
-        printf ' :immobile-space :compact-instance-header' >> $ltf
+        printf ' :immobile-space :immobile-code :compact-instance-header' >> $ltf
     esac
 elif [ "$sbcl_arch" = "mips" ]; then
     printf ' :cheneygc :linkage-table' >> $ltf

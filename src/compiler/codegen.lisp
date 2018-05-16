@@ -242,9 +242,9 @@
       ;; Build the simple-fun-offset table.
       ;; The assembler is not capable of emitting the difference between labels,
       ;; so we'll just leave space and fill them in later
-      (emit trailer `(.align 2)) ; align for some uint32 values
-      (dotimes (i (1+ n-entries))
-        (emit trailer `(.byte #xff #xff #xff #xff)))
+      (emit trailer `(.align 2)) ; align for uint32_t
+      (dotimes (i n-entries) (emit trailer `(.byte 0 0 0 0)))
+      (emit trailer `(.byte 0 0))
       (let* ((segment
               (assemble-sections
                (make-segment :run-scheduler (default-segment-run-scheduler)
@@ -257,19 +257,30 @@
               (finalize-segment segment))
              (buffer
               (sb!assem::segment-buffer segment)))
-        (flet ((store-ub32 (index val)
-                 #!+little-endian
-                 (setf (aref buffer (+ index 0)) (ldb (byte 8  0) val)
-                       (aref buffer (+ index 1)) (ldb (byte 8  8) val)
-                       (aref buffer (+ index 2)) (ldb (byte 8 16) val)
-                       (aref buffer (+ index 3)) (ldb (byte 8 24) val))
-                 #!+big-endian
-                 (setf (aref buffer (+ index 3)) (ldb (byte 8  0) val)
-                       (aref buffer (+ index 2)) (ldb (byte 8  8) val)
-                       (aref buffer (+ index 1)) (ldb (byte 8 16) val)
-                       (aref buffer (+ index 0)) (ldb (byte 8 24) val))))
+        (flet ((store-ub16 (index val)
+                 (multiple-value-bind (b0 b1)
+                     #!+little-endian
+                     (values (ldb (byte 8 0) val) (ldb (byte 8 8) val))
+                     #!+big-endian
+                     (values (ldb (byte 8 8) val) (ldb (byte 8 0) val))
+                   (setf (aref buffer (+ index 0)) b0
+                         (aref buffer (+ index 1)) b1)))
+               (store-ub32 (index val)
+                 (multiple-value-bind (b0 b1 b2 b3)
+                     #!+little-endian
+                     (values (ldb (byte 8  0) val) (ldb (byte 8  8) val)
+                             (ldb (byte 8 16) val) (ldb (byte 8 24) val))
+                     #!+big-endian
+                     (values (ldb (byte 8 24) val) (ldb (byte 8 16) val)
+                             (ldb (byte 8  8) val) (ldb (byte 8  0) val))
+                   (setf (aref buffer (+ index 0)) b0
+                         (aref buffer (+ index 1)) b1
+                         (aref buffer (+ index 2)) b2
+                         (aref buffer (+ index 3)) b3))))
           (let ((index size))
-            (store-ub32 (decf index 4) n-entries)
+            (store-ub16 (decf index 2) n-entries)
+            ;; Assert that we are aligned for storing uint32_t
+            (aver (not (logtest index #b11)))
             (dolist (entry (reverse (sb!c::ir2-component-entries
                                      (component-info component))))
               (store-ub32 (decf index 4)

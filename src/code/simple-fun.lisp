@@ -351,10 +351,12 @@
 
 ;;; Return the number of simple-funs in CODE-OBJ
 (defun code-n-entries (code-obj)
-  (the (unsigned-byte 16)
-       (with-pinned-objects (code-obj)
-         (sap-ref-32 (code-instructions code-obj)
-                     (+ (%code-code-size code-obj) -4)))))
+  (declare (type code-component code-obj))
+  (if (eql (code-header-words code-obj) 2) ; dummy (space filling) object
+      0
+      (with-pinned-objects (code-obj)
+        (sap-ref-16 (code-instructions code-obj)
+                    (- (%code-code-size code-obj) 2)))))
 
 ;;; Subtract from %CODE-CODE-SIZE the number of trailing data bytes which aren't
 ;;; machine instructions. It's generally ok to use either accessor if searching
@@ -363,7 +365,8 @@
 ;;; examining bytes that aren't instructions.
 (declaim (inline %code-text-size))
 (defun %code-text-size (code-obj)
-  (- (%code-code-size code-obj) (* 4 (1+ (code-n-entries code-obj)))))
+  ;; There are N-ENTRIES uint32_t integers, and a uint16_t
+  (- (%code-code-size code-obj) (+ (* 4 (code-n-entries code-obj)) 2)))
 
 ;;; Return the offset in bytes from (CODE-INSTRUCTIONS CODE-OBJ)
 ;;; to its FUN-INDEXth function.
@@ -371,19 +374,17 @@
 (declaim (inline %code-fun-offset))
 (defun %code-fun-offset (code-obj fun-index)
   (declare ((unsigned-byte 16) fun-index))
-  ;; subtract the size of two ub32s - one because %CODE-CODE-SIZE
-  ;; points to one byte past the offset table, and another because the first
-  ;; ub32 value is the number of table entries.
-  (sap-ref-32 (sap+ (code-instructions code-obj) -8)
-              (- (%code-code-size code-obj) (* fun-index 4))))
+  ;; subtracting the size of trailing uint16_t puts us one byte beyond
+  ;; the last fun-index, so subtract an extra uint32_t as well.
+  (sap-ref-32 (code-instructions code-obj)
+              (- (%code-code-size code-obj) (* 4 (1+ fun-index)) 2)))
 (defun %code-entry-point (code-obj fun-index)
   (declare (type (unsigned-byte 16) fun-index))
   (when (< fun-index (code-n-entries code-obj))
     (truly-the function
       (values (%primitive sb!c:compute-fun code-obj
-                (truly-the (unsigned-byte 32)
-                 (with-pinned-objects (code-obj)
-                  (%code-fun-offset code-obj fun-index))))))))
+                (with-pinned-objects (code-obj)
+                  (%code-fun-offset code-obj fun-index)))))))
 
 (defun code-entry-points (code-obj) ; FIXME: obsolete
   (let ((a (make-array (code-n-entries code-obj))))
@@ -417,6 +418,7 @@
 ;;; If INDEX is specified, it is used to quickly find the next simple-fun.
 ;;; Otherwise the code object is scanned to determine SIMPLE-FUN's index.
 (defun %simple-fun-text-len (simple-fun &optional index)
+  (declare (simple-fun simple-fun))
   (let* ((code (fun-code-header simple-fun))
          (max-index (1- (code-n-entries code))))
     (with-pinned-objects (code)

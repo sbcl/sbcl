@@ -1619,6 +1619,9 @@ variable: an unreadable object representing the error is printed instead.")
              (write-string "bogus code object" stream))
             ((functionp dinfo)
              (format stream "trampoline ~S" dinfo))
+            ((eql (code-header-words component) 2)
+             (format stream "filler ~dw"
+                     (+ (ash (%code-code-size component) (- sb!vm:word-shift)) 2)))
             (t
              (format stream "code object [~D]" (code-n-entries component))
              (let ((fun-name (awhen (%code-entry-point component 0)

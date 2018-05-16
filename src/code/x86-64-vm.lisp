@@ -187,6 +187,7 @@
                      (setf (sap-ref-32 sap 7) (logior (ash disp8 24) #x408B48))
                      11))))
         (setf (sap-ref-32 sap i) #xFD60FF))) ; JMP [RAX-3]
+    (aver (zerop (code-n-entries code)))
     code))
 
 ;;; Return T if FUN can't be called without loading RAX with its descriptor.

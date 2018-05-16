@@ -2717,7 +2717,8 @@ core and return a descriptor to it."
                       (code-header-bytes code-object)
                       (descriptor-fixnum
                        (read-wordindexed code-object sb!vm:code-code-size-slot))
-                      (* (+ fun-index 2) -4)))))
+                      -2 ; skip back past the trailing CODE-N-ENTRIES
+                      (* (1+ fun-index) -4))))) ; and back to the desired index
     (unless (zerop (logand fun-offset sb!vm:lowtag-mask))
       (error "unaligned function entry ~S ~S" code-object fun-index))
     (make-descriptor (logior (+ (logandc2 (descriptor-bits code-object) sb!vm:lowtag-mask)
