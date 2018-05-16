@@ -297,9 +297,9 @@
   ;; GC understands
   #!+sb-safepoint
   (let ((label (gen-label)))
-    (inst lea (reg-in-size rax :immobile-code-pc) (make-fixup nil :code-object label))
+    (inst lea rax (make-fixup nil :code-object label))
     (emit-label label)
-    (move-dword-if-immobile-code pc-save rax))
+    (move pc-save rax))
   (when sb!c::*msan-unpoison*
     (inst mov rax (thread-tls-ea (ash thread-msan-param-tls-slot word-shift)))
     ;; Unpoison parameters

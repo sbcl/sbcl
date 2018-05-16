@@ -418,15 +418,3 @@
                                      ,lowtag))
                    value result)))))
 
-(defun move-dword-if-immobile-code (dest src)
-  (flet ((downsize (tn)
-           (cond #!+immobile-code
-                 (sb!c::*code-is-immobile*
-                  (cond ((sc-is tn signed-stack unsigned-stack sap-stack)
-                         (make-ea :dword :base rbp-tn
-                                         :disp (frame-byte-offset (tn-offset tn))))
-                        (t
-                         (reg-in-size tn :dword))))
-                 (t
-                  tn))))
-    (inst mov (downsize dest) (downsize src))))

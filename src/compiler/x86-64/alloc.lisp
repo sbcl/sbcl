@@ -499,13 +499,8 @@
      ;; This is due to scav_closure() assuming that it can always subtract
      ;; FUN_RAW_ADDR_OFFSET from closure->fun to obtain a Lisp object,
      ;; without any precheck for whether that word is currently 0.
-     (inst lea (reg-in-size temp :immobile-code-pc) (make-fixup nil :closure label))
-     (storew (reg-in-size temp
-                          (if stack-allocate-p
-                              ;; Need to do a full word store because the stack not zeroed
-                              :qword
-                              :immobile-code-pc))
-             result closure-fun-slot fun-pointer-lowtag))))
+     (inst lea temp (make-fixup nil :closure label))
+     (storew temp result closure-fun-slot fun-pointer-lowtag))))
 
 ;;; The compiler likes to be able to directly make value cells.
 (define-vop (make-value-cell)
