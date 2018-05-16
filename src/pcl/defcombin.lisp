@@ -92,7 +92,7 @@
            (getf (cddr whole) :operator type-name)))
     (unless (or (eq documentation canary)
                 (stringp documentation))
-      (%program-error "~@<~S argument to the short form of ~S must be a string.~:>"
+      (%program-error "~@<~S argument to the short form of ~S must be a string.~:@>"
                       :documentation 'define-method-combination))
     `(load-short-defcombin
       ',type-name ',operator ',ioa
@@ -167,13 +167,13 @@
         (args-option ())
         (gf-var nil))
     (unless method-group-specifiers-presentp
-      (%program-error "~@<The long form of ~S requires a list of method group specifiers.~:>"
+      (%program-error "~@<The long form of ~S requires a list of method group specifiers.~:@>"
                       'define-method-combination))
     (when (and (consp (car body)) (eq (caar body) :arguments))
       (setq args-option (cdr (pop body))))
     (when (and (consp (car body)) (eq (caar body) :generic-function))
       (unless (and (cdar body) (symbolp (cadar body)) (null (cddar body)))
-        (%program-error "~@<The argument to the ~S option of ~S must be a single symbol.~:>"
+        (%program-error "~@<The argument to the ~S option of ~S must be a single symbol.~:@>"
                         :generic-function 'define-method-combination))
       (setq gf-var (cadr (pop body))))
     (multiple-value-bind (documentation function)
@@ -327,7 +327,7 @@
 (defun parse-method-group-specifier (method-group-specifier)
   (unless (symbolp (car method-group-specifier))
     (%program-error "~@<Method group specifiers in the long form of ~S ~
-                     must begin with a symbol.~:>" 'define-method-combination))
+                     must begin with a symbol.~:@>" 'define-method-combination))
   (let* ((name (pop method-group-specifier))
          (patterns ())
          (tests
@@ -345,7 +345,8 @@
              (nreverse collect))))
     (when (null patterns)
       (%program-error "~@<Method group specifiers in the long form of ~S ~
-                       must have at least one qualifier pattern or predicate.~:>"))
+                       must have at least one qualifier pattern or predicate.~@:>"
+                      'define-method-combination))
     (values name
             tests
             (getf method-group-specifier :description
