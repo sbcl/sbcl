@@ -249,7 +249,6 @@
     (with-pinned-objects (code)
       (read-n-bytes (%fasl-input-stream fasl-input)
                     (code-instructions code) 0 code-length)
-      (sb!c::set-code-entrypoints code)
       (sb!c::apply-fasl-fixups stack code))
     code))
 

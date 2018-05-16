@@ -35,26 +35,6 @@
   #!-gencgc
   (%primitive allocate-code-object boxed unboxed))
 
-;;; Assign all SIMPLE-FUN-SELF slots for functions in CODE. The offset of each
-;;; function was assigned by the compiler or loader, as was N functions.
-(defun set-code-entrypoints (code)
-  (dotimes (i (code-n-entries code))
-    (let ((fun (%code-entry-point code i)))
-      #!+(and compact-instance-header x86-64)
-      (setf (sap-ref-32 (int-sap (get-lisp-obj-address fun))
-                        (- 4 sb!vm:fun-pointer-lowtag))
-            (truly-the (unsigned-byte 32)
-                       (get-lisp-obj-address #.(find-layout 'function))))
-      (setf (%simple-fun-self fun)
-              ;; x86 backends store the address of the entrypoint in 'self'
-            #!+(or x86 x86-64)
-            (%make-lisp-obj
-               (truly-the word (+ (get-lisp-obj-address fun)
-                                  (ash sb!vm:simple-fun-code-offset sb!vm:word-shift)
-                                  (- sb!vm:fun-pointer-lowtag))))
-              ;; non-x86 backends store the function itself (what else?) in 'self'
-            #!-(or x86 x86-64) fun))))
-
 ;;; Map of code-component -> list of PC offsets at which allocations occur.
 ;;; This table is needed in order to enable allocation profiling.
 (define-load-time-global *allocation-point-fixups*
@@ -110,6 +90,25 @@
          (awhen (elt preserved-lists 2)
            (setf (gethash code-obj *allocation-point-fixups*)
                  (convert-alloc-point-fixups code-obj it)))
+         ;; Assign all SIMPLE-FUN-SELF slots
+         (dotimes (i (code-n-entries code-obj))
+           (let ((fun (%code-entry-point code-obj i)))
+             (setf (%simple-fun-self fun)
+                   ;; x86 backends store the address of the entrypoint in 'self'
+                   #!+(or x86 x86-64)
+                   (%make-lisp-obj
+                    (truly-the word (+ (get-lisp-obj-address fun)
+                                       (ash sb!vm:simple-fun-code-offset sb!vm:word-shift)
+                                       (- sb!vm:fun-pointer-lowtag))))
+                   ;; non-x86 backends store the function itself (what else?) in 'self'
+                   #!-(or x86 x86-64) fun)
+             ;; And maybe store the layout in the high half of the header
+             #!+(and compact-instance-header x86-64)
+             (setf (sap-ref-32 (int-sap (get-lisp-obj-address fun))
+                               (- 4 sb!vm:fun-pointer-lowtag))
+                   (truly-the (unsigned-byte 32)
+                     (get-lisp-obj-address #.(find-layout 'function))))))
+         ;; And finally, make the memory range executable
          #!-(or x86 x86-64)
          (sb!vm:sanctify-for-execution code-obj)))
 
@@ -186,15 +185,13 @@
       ;; The following operations need the code pinned:
       ;; 1. copying into code-instructions (a SAP)
       ;; 2. apply-core-fixups and sanctify-for-execution
-      ;; 3. set-code-entrypointa
       (with-pinned-objects (code-obj)
         (let ((bytes (the (simple-array assembly-unit 1)
                           (segment-contents-as-vector segment))))
           ;; By design, until the last 4 unboxed bytes of CODE-OBJ contain a
           ;; nonzero value, GC will not see any simple-funs therein.
           (%byte-blt bytes 0 (code-instructions code-obj) 0 (length bytes)))
-        (apply-core-fixups fixup-notes code-obj)
-        (set-code-entrypoints code-obj))
+        (apply-core-fixups fixup-notes code-obj))
 
       ;; Don't need code pinned now
       (let* ((entries (ir2-component-entries 2comp))
