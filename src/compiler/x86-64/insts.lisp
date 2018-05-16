@@ -17,7 +17,7 @@
   (import '(conditional-opcode
             register-p gpr-p xmm-register-p
             ea-p sized-ea ea-base ea-index
-            make-ea ea-disp) "SB!VM")
+            make-ea ea-disp rip-relative-ea) "SB!VM")
   ;; Imports from SB-VM into this package
   (import '(sb!vm::frame-byte-offset sb!vm::rip-tn
             sb!vm::registers sb!vm::float-registers sb!vm::stack))) ; SB names
@@ -995,6 +995,14 @@
 (defun emit-byte+reg (seg byte reg)
   (emit-byte seg (+ byte (reg-tn-encoding reg))))
 
+;;; A label can refer to things near enough it using the addend.
+(defstruct (label+addend (:constructor make-label+addend (label addend))
+                         (:predicate nil)
+                         (:copier nil)
+                         (:include label))
+  (label nil :type label)
+  (addend 0 :type (signed-byte 32)))
+
 (defstruct (ea (:constructor make-ea (size &key base index scale disp))
                (:copier nil))
   ;; note that we can represent an EA with a QWORD size, but EMIT-EA
@@ -1004,14 +1012,16 @@
   (base nil :type (or tn null) :read-only t)
   (index nil :type (or tn null) :read-only t)
   (scale 1 :type (member 1 2 4 8) :read-only t)
-  (disp 0 :type (or (unsigned-byte 32) (signed-byte 32) fixup) :read-only t))
+  (disp 0 :type (or (unsigned-byte 32) (signed-byte 32) fixup
+                    label label+addend)
+          :read-only t))
 (defmethod print-object ((ea ea) stream)
   (cond ((or *print-escape* *print-readably*)
          (print-unreadable-object (ea stream :type t)
            (format stream
                    "~S~@[ base=~S~]~@[ index=~S~]~@[ scale=~S~]~@[ disp=~S~]"
                    (ea-size ea)
-                   (ea-base ea)
+                   (let ((b (ea-base ea))) (if (eq b rip-tn) :RIP b))
                    (ea-index ea)
                    (let ((scale (ea-scale ea)))
                      (if (= scale 1) nil scale))
@@ -1033,6 +1043,12 @@
            (t
             (format stream "+~A" (ea-disp ea))))
          (write-char #\] stream))))
+
+(defun rip-relative-ea (size label &optional addend)
+  (make-ea size :base rip-tn
+                :disp (if addend
+                          (make-label+addend label addend)
+                          label)))
 
 (defun sized-ea (ea new-size)
   (make-ea new-size
@@ -1087,10 +1103,10 @@
                      (emit-signed-dword segment (- (label-position target)
                                                    (+ 4 posn n-extra))))))
 
-(defun emit-label-rip (segment fixup reg remaining-bytes)
+(defun emit-label-rip (segment label reg remaining-bytes)
   ;; RIP-relative addressing
   (emit-mod-reg-r/m-byte segment #b00 reg #b101)
-  (emit-dword-displacement-backpatch segment (fixup-offset fixup) remaining-bytes)
+  (emit-dword-displacement-backpatch segment label remaining-bytes)
   (values))
 
 (defun emit-ea (segment thing reg &key allow-constants (remaining-bytes 0))
@@ -1117,6 +1133,20 @@
            "Constant TNs can only be directly used in MOV, PUSH, and CMP."))
         (emit-constant-tn-rip segment thing reg remaining-bytes))))
     (ea
+     (when (and (eq (ea-base thing) rip-tn)
+                (typep (ea-disp thing) '(or label label+addend)))
+       (aver (null (ea-index thing)))
+       (return-from emit-ea
+         (let* ((disp (ea-disp thing))
+                (label (if (typep disp 'label+addend)
+                           (label+addend-label disp)
+                           disp))
+                (addend (if (typep disp 'label+addend)
+                            (label+addend-addend disp)
+                            0)))
+           ;; To point at ADDEND bytes beyond the label, pretend that the PC
+           ;; at which the EA occurs is _smaller_ by that amount.
+           (emit-label-rip segment label reg (- remaining-bytes addend)))))
      (let* ((base (ea-base thing))
             (index (ea-index thing))
             (scale (ea-scale thing))
@@ -1132,13 +1162,6 @@
             (r/m (cond (index #b100)
                        ((null base) #b101)
                        (t (reg-tn-encoding base)))))
-       (when (and (fixup-p disp)
-                  (label-p (fixup-offset disp)))
-         (aver (null base))
-         (aver (null index))
-         (return-from emit-ea (emit-ea segment disp reg
-                                       :allow-constants allow-constants
-                                       :remaining-bytes remaining-bytes)))
        (when (and (= mod 0) (= r/m #b101))
          ;; this is rip-relative in amd64, so we'll use a sib instead
          (setf r/m #b100 scale 1))
@@ -1161,20 +1184,9 @@
                   (emit-absolute-fixup segment disp)
                   (emit-signed-dword segment disp))))))
     (fixup
-     (typecase (fixup-offset thing)
-       (label
-        (when (eq (fixup-flavor thing) :closure)
-          ;; A closure entry label points to a simple-fun header word, and not
-          ;; the first executable instruction. To get the proper entry address,
-          ;; make 'remaining-bytes' negative so that the origin of the offset
-          ;; calculation appears as if earlier in the instruction stream by
-          ;; exactly 6 words. The computed EA will come out right.
-          (decf remaining-bytes (* n-word-bytes simple-fun-code-offset)))
-        (emit-label-rip segment thing reg remaining-bytes))
-       (t
         (emit-mod-reg-r/m-byte segment #b00 reg #b100)
         (emit-sib-byte segment 0 #b100 #b101)
-        (emit-absolute-fixup segment thing))))))
+        (emit-absolute-fixup segment thing))))
 
 (defun dword-reg-p (thing)
   (and (tn-p thing)
@@ -1705,6 +1717,9 @@
                           :operand-size (if (dword-reg-p dst) :dword :qword))
    (emit-byte segment #b10001101)
    (cond ((and (ea-p src) (eq (ea-base src) rip-tn) (fixup-p (ea-disp src)))
+          ;; This handles the fixup to 'undefined-fdefn.
+          ;; Need to see why we can't just pass it through to EMIT-EA
+          ;; and get rid of this special case. (It didn't work when I tried)
           (emit-mod-reg-r/m-byte segment #b00 (reg-tn-encoding dst) #b101)
           (emit-relative-fixup segment (ea-disp src)))
          (t
@@ -3465,8 +3480,7 @@
         (size  (ecase (car constant)
                  ((:byte :word :dword :qword) (car constant))
                  ((:oword) :qword))))
-    (values label (make-ea size
-                           :disp (make-fixup nil :code-object label)))))
+    (values label (rip-relative-ea size label))))
 
 (defun size-nbyte (size)
   (ecase size

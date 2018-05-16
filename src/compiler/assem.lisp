@@ -96,6 +96,7 @@
   ;; *COLLECT-DYNAMIC-STATISTICS* but is faster to reference.
   #!+sb-dyncount
   (collect-dynamic-statistics nil))
+(defprinter (segment :identity t))
 
 (declaim (inline segment-current-index))
 (defun segment-current-index (segment)

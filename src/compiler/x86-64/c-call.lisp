@@ -297,7 +297,7 @@
   ;; GC understands
   #!+sb-safepoint
   (let ((label (gen-label)))
-    (inst lea rax (make-fixup nil :code-object label))
+    (inst lea rax (rip-relative-ea :qword label))
     (emit-label label)
     (move pc-save rax))
   (when sb!c::*msan-unpoison*

@@ -72,7 +72,7 @@
     (load-tl-symbol-value temp *current-unwind-protect-block*)
     (storew temp block unwind-block-uwp-slot)
     (storew rbp-tn block unwind-block-cfp-slot)
-    (inst lea temp (make-fixup nil :code-object entry-label))
+    (inst lea temp (rip-relative-ea :qword entry-label))
     (storew temp block unwind-block-entry-pc-slot)))
 
 ;;; like MAKE-UNWIND-BLOCK, except that we also store in the specified
@@ -88,7 +88,7 @@
     (load-tl-symbol-value temp *current-unwind-protect-block*)
     (storew temp block catch-block-uwp-slot)
     (storew rbp-tn block catch-block-cfp-slot)
-    (inst lea temp (make-fixup nil :code-object entry-label))
+    (inst lea temp (rip-relative-ea :qword entry-label))
     (storew temp block catch-block-entry-pc-slot)
     (storew tag block catch-block-tag-slot)
     (load-tl-symbol-value temp *current-catch-block*)
@@ -255,7 +255,7 @@
     (loadw temp ofp sap-pointer-slot other-pointer-lowtag)
     (storew temp block unwind-block-cfp-slot)
 
-    (inst lea temp-reg-tn (make-fixup nil :code-object entry-label))
+    (inst lea temp-reg-tn (rip-relative-ea :qword entry-label))
     (storew temp-reg-tn block unwind-block-entry-pc-slot)
 
     ;; Run any required UWPs.
