@@ -30,10 +30,15 @@
             #\newline)))
       (sb-int:unencapsulate 'sb-disassem::add-debugging-hooks 'test)
       (setq lines (cddr lines)) ; remove "Disassembly for"
-      (when (string= (car (last lines)) "")
-        (setq lines (nbutlast lines)))
       ;; For human-readability, kill the whitespace
       (setq lines (mapcar (lambda (x) (string-left-trim " ;" x)) lines))
+      ;; Same old same old- filler in simple-funs manifests as one of two
+      ;; things dependin on whether even-or odd-length padding was needed.
+      (loop while (member (car (last lines))
+                          '("00               BYTE #X00"
+                            "0000             ADD [RAX], AL"
+                            "") :test 'string=)
+            do (setq lines (nbutlast lines)))
       ;; Remove safepoint traps
       (setq lines (remove-if (lambda (x) (search "; safepoint" x)) lines))
       ;; If the last 4 lines are of the expected form
