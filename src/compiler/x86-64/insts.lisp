@@ -1103,12 +1103,6 @@
                      (emit-signed-dword segment (- (label-position target)
                                                    (+ 4 posn n-extra))))))
 
-(defun emit-label-rip (segment label reg remaining-bytes)
-  ;; RIP-relative addressing
-  (emit-mod-reg-r/m-byte segment #b00 reg #b101)
-  (emit-dword-displacement-backpatch segment label remaining-bytes)
-  (values))
-
 (defun emit-ea (segment thing reg &key allow-constants (remaining-bytes 0))
   (etypecase thing
     (tn
@@ -1136,17 +1130,17 @@
      (when (and (eq (ea-base thing) rip-tn)
                 (typep (ea-disp thing) '(or label label+addend)))
        (aver (null (ea-index thing)))
-       (return-from emit-ea
-         (let* ((disp (ea-disp thing))
-                (label (if (typep disp 'label+addend)
-                           (label+addend-label disp)
-                           disp))
-                (addend (if (typep disp 'label+addend)
-                            (label+addend-addend disp)
-                            0)))
+       (binding* ((disp (ea-disp thing))
+                  ((label addend) (if (typep disp 'label+addend)
+                                      (values (label+addend-label disp)
+                                              (label+addend-addend disp))
+                                      (values disp 0))))
+         (emit-mod-reg-r/m-byte segment #b00 reg #b101) ; RIP-relative mode
            ;; To point at ADDEND bytes beyond the label, pretend that the PC
            ;; at which the EA occurs is _smaller_ by that amount.
-           (emit-label-rip segment label reg (- remaining-bytes addend)))))
+         (emit-dword-displacement-backpatch
+          segment label (- remaining-bytes addend)))
+       (return-from emit-ea))
      (let* ((base (ea-base thing))
             (index (ea-index thing))
             (scale (ea-scale thing))
