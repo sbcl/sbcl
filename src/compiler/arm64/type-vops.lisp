@@ -340,3 +340,11 @@
       (inst b :eq is-not-cons-label)
       (test-type value target not-p (list-pointer-lowtag) :temp temp)
       (emit-label drop-thru))))
+
+(define-vop (%other-pointer-subtype-p type-predicate)
+  (:translate %other-pointer-subtype-p)
+  (:info target not-p widetags)
+  (:arg-types * (:constant t)) ; voodoo - 'target' and 'not-p' are absent
+  (:generator 15 ; arbitrary
+    (%test-headers value target not-p nil (canonicalize-widetags widetags)
+                   :temp temp)))
