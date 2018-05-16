@@ -244,7 +244,10 @@
       ;; so we'll just leave space and fill them in later
       (emit trailer `(.align 2)) ; align for uint32_t
       (dotimes (i n-entries) (emit trailer `(.byte 0 0 0 0)))
-      (emit trailer `(.byte 0 0))
+      #!+little-endian
+      (emit trailer `(.byte ,(ldb (byte 8 0) n-entries) ,(ldb (byte 8 8) n-entries)))
+      #!+big-endian
+      (emit trailer `(.byte ,(ldb (byte 8 8) n-entries) ,(ldb (byte 8 0) n-entries)))
       (let* ((segment
               (assemble-sections
                (make-segment :run-scheduler (default-segment-run-scheduler)
@@ -257,15 +260,7 @@
               (finalize-segment segment))
              (buffer
               (sb!assem::segment-buffer segment)))
-        (flet ((store-ub16 (index val)
-                 (multiple-value-bind (b0 b1)
-                     #!+little-endian
-                     (values (ldb (byte 8 0) val) (ldb (byte 8 8) val))
-                     #!+big-endian
-                     (values (ldb (byte 8 8) val) (ldb (byte 8 0) val))
-                   (setf (aref buffer (+ index 0)) b0
-                         (aref buffer (+ index 1)) b1)))
-               (store-ub32 (index val)
+        (flet ((store-ub32 (index val)
                  (multiple-value-bind (b0 b1 b2 b3)
                      #!+little-endian
                      (values (ldb (byte 8  0) val) (ldb (byte 8  8) val)
@@ -278,7 +273,7 @@
                          (aref buffer (+ index 2)) b2
                          (aref buffer (+ index 3)) b3))))
           (let ((index size))
-            (store-ub16 (decf index 2) n-entries)
+            (decf index 2)
             ;; Assert that we are aligned for storing uint32_t
             (aver (not (logtest index #b11)))
             (dolist (entry (reverse (sb!c::ir2-component-entries
