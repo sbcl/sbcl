@@ -236,8 +236,7 @@
     (emit-label start-lab)
     ;; Skip space for the function header.
     (inst simple-fun-header-word)
-    (dotimes (i (1- simple-fun-code-offset))
-      (inst dword 0))
+    (inst .skip (* (1- simple-fun-code-offset) n-word-bytes))
     ;; The start of the actual code.
     ;; Save the return-pc.
     (popw ebp-tn (frame-word-offset return-pc-save-offset))))

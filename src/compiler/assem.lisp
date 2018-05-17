@@ -1213,6 +1213,10 @@
 
 ;;;; interface to the rest of the compiler
 (defun op-encoder-name (string-designator &optional create)
+  (cond ((string= string-designator '.skip)
+         (return-from op-encoder-name '.skip))
+        ;; other pseudo-ops?
+        )
   (let ((conflictp
          ;; This kludge avoids interning instruction encoder names in lowercase
          ;; most of the time, which was a hack to avoid overlap with Lisp macros

@@ -115,8 +115,7 @@
     (emit-label start-lab)
     ;; Allocate function header.
     (inst simple-fun-header-word)
-    (dotimes (i (1- simple-fun-code-offset))
-      (inst word 0))
+    (inst .skip (* (1- simple-fun-code-offset) n-word-bytes))
     (let ((entry-point (gen-label)))
       (emit-label entry-point)
       ;; FIXME alpha port has a ### note here saying we should "save it
