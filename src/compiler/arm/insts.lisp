@@ -318,28 +318,6 @@
 (define-bitfield-emitter emit-word 32
   (byte 32 0))
 
-;;;; fixup emitters
-#|
-(defun emit-absolute-fixup (segment fixup)
-  (note-fixup segment :absolute fixup)
-  (let ((offset (fixup-offset fixup)))
-    (if (label-p offset)
-        (emit-back-patch segment
-                         4 ; FIXME: n-word-bytes
-                         (lambda (segment posn)
-                           (declare (ignore posn))
-                           (emit-dword segment
-                                       (- (+ (component-header-length)
-                                             (or (label-position offset)
-                                                 0))
-                                          other-pointer-lowtag))))
-        (emit-dword segment (or offset 0)))))
-
-(defun emit-relative-fixup (segment fixup)
-  (note-fixup segment :relative fixup)
-  (emit-dword segment (or (fixup-offset fixup) 0)))
-|#
-
 ;;;; miscellaneous hackery
 
 (defun register-p (thing)
