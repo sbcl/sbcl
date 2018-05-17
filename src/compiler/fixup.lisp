@@ -19,14 +19,14 @@
   ;; the name and flavor of the fixup. The assembler makes no
   ;; assumptions about the contents of these fields; their semantics
   ;; are imposed by the dumper.
-  name
-  flavor
+  (name nil :read-only t)
+  (flavor nil :read-only t)
   ;; OFFSET is an optional offset from whatever external label this
   ;; fixup refers to. Or in the case of the :CODE-OBJECT flavor of
   ;; fixups on the :X86 architecture, NAME is always NIL, so this
   ;; fixup doesn't refer to an external label, and OFFSET is an offset
   ;; from the beginning of the current code block.
-  offset)
+  (offset 0 :read-only t :type (or sb!vm:signed-word #!+x86 label)))
 
 (defstruct (fixup-note
              (:constructor make-fixup-note (kind fixup position))
