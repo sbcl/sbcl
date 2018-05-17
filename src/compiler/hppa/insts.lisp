@@ -486,7 +486,7 @@
   (declare (type (or fixup (signed-byte 32) (unsigned-byte 32)) value))
   (cond ((fixup-p value)
          (note-fixup segment :hi value)
-         (aver (or (null (fixup-offset value)) (zerop (fixup-offset value))))
+         (aver (zerop (fixup-offset value)))
          0)
         (t
          (let ((hi (ldb (byte 21 11) value)))
@@ -518,7 +518,7 @@
 (defun encode-disp/fixup (segment disp imm-bits)
   (cond
     ((fixup-p disp)
-      (aver (or (null (fixup-offset disp)) (zerop (fixup-offset disp))))
+      (aver (zerop (fixup-offset disp)))
       (if imm-bits
         (note-fixup segment :load11u disp)
         (note-fixup segment :load disp))
@@ -597,7 +597,7 @@
   (declare (type (or fixup (signed-byte 5)) disp))
   (cond ((fixup-p disp)
          (note-fixup segment :load-short disp)
-         (aver (or (null (fixup-offset disp)) (zerop (fixup-offset disp))))
+         (aver (zerop (fixup-offset disp)))
          0)
         (t
          (dpb (ldb (byte 4 0) disp)
@@ -721,7 +721,7 @@
   (declare (type (or fixup (signed-byte 17)) disp))
   (cond ((fixup-p disp)
          (note-fixup segment :branch disp)
-         (aver (or (null (fixup-offset disp)) (zerop (fixup-offset disp))))
+         (aver (zerop (fixup-offset disp)))
          (values 0 0 0))
         (t
          (values (ldb (byte 5 11) disp)

@@ -968,12 +968,12 @@
                                  (emit-qword segment val)
                                  (emit-signed-dword segment val)))))
         (if quad-p
-            (emit-qword segment (or offset 0))
-            (emit-signed-dword segment (or offset 0))))))
+            (emit-qword segment offset)
+            (emit-signed-dword segment offset)))))
 
 (defun emit-relative-fixup (segment fixup)
   (note-fixup segment :relative fixup)
-  (emit-signed-dword segment (or (fixup-offset fixup) 0)))
+  (emit-signed-dword segment (fixup-offset fixup)))
 
 
 ;;;; the effective-address (ea) structure

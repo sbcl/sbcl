@@ -523,11 +523,11 @@
                                              (or (label-position offset)
                                                  0))
                                           other-pointer-lowtag))))
-        (emit-dword segment (or offset 0)))))
+        (emit-dword segment offset))))
 
 (defun emit-relative-fixup (segment fixup)
   (note-fixup segment :relative fixup)
-  (emit-dword segment (or (fixup-offset fixup) 0)))
+  (emit-dword segment (fixup-offset fixup)))
 
 ;;;; the effective-address (ea) structure
 

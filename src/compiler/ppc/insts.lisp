@@ -805,7 +805,7 @@
                     (when (typep si 'fixup)
                       (ecase ,fixup
                         ((:ha :l) (note-fixup segment ,fixup si)))
-                      (setq si (or (fixup-offset si) 0)))
+                      (setq si (fixup-offset si)))
                     (emit-d-form-inst segment ,op (reg-tn-encoding rt) (reg-tn-encoding ra) si)))))
 
            (define-d-rs-ui-instruction (name op &key (cost 1) other-dependencies)
