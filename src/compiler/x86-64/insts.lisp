@@ -70,15 +70,13 @@
 (defconstant +rex-x+           #b0010)
 (defconstant +rex-b+           #b0001)
 
-(defun width-bits (width)
-  ;; We call this "SIZE" in an EA, so really WIDTH-BITS
-  ;; should be SIZE-BITS. Oh well.
-  (ecase width
-    (:byte 8)
-    (:word 16)
-    (:dword 32)
-    (:qword 64)))
-
+(defun size-nbyte (size)
+  (ecase size
+    (:byte  1)
+    (:word  2)
+    (:dword 4)
+    (:qword 8)
+    (:oword 16)))
 
 ;;;; disassembler argument types
 
@@ -160,7 +158,7 @@
                (when (and (not (dstate-getprop dstate +allow-qword-imm+))
                           (eq width :qword))
                  (setf width :dword))
-               (read-signed-suffix (width-bits width) dstate))
+               (read-signed-suffix (* (size-nbyte width) n-byte-bits) dstate))
   :printer (lambda (value stream dstate)
              (if (maybe-note-static-symbol value dstate)
                  (princ16 value stream)
@@ -176,11 +174,11 @@
 ;;; argument is PUSH.
 (define-arg-type signed-imm-data-default-qword
   :prefilter (lambda (dstate)
-               (let ((width (width-bits
-                             (inst-operand-size-default-qword dstate))))
-                 (when (= width 64)
-                   (setf width 32))
-                 (read-signed-suffix width dstate))))
+               (let ((nbits (* (size-nbyte (inst-operand-size-default-qword dstate))
+                               n-byte-bits)))
+                 (when (= nbits 64)
+                   (setf nbits 32))
+                 (read-signed-suffix nbits dstate))))
 
 (define-arg-type signed-imm-byte
   :prefilter (lambda (dstate)
@@ -3452,14 +3450,6 @@
                  ((:byte :word :dword :qword) (car constant))
                  ((:oword) :qword))))
     (values label (rip-relative-ea size label))))
-
-(defun size-nbyte (size)
-  (ecase size
-    (:byte  1)
-    (:word  2)
-    (:dword 4)
-    (:qword 8)
-    (:oword 16)))
 
 (defun sort-inline-constants (constants)
   (stable-sort constants #'> :key (lambda (constant)
