@@ -955,21 +955,9 @@
 (defun emit-absolute-fixup (segment fixup &optional quad-p)
   (note-fixup segment (if quad-p :absolute64 :absolute) fixup)
   (let ((offset (fixup-offset fixup)))
-    (if (label-p offset)
-        (emit-back-patch segment
-                         (if quad-p 8 4)
-                         (lambda (segment posn)
-                           (declare (ignore posn))
-                           (let ((val  (- (+ (component-header-length)
-                                             (or (label-position offset)
-                                                 0))
-                                          other-pointer-lowtag)))
-                             (if quad-p
-                                 (emit-qword segment val)
-                                 (emit-signed-dword segment val)))))
-        (if quad-p
-            (emit-qword segment offset)
-            (emit-signed-dword segment offset)))))
+    (if quad-p
+        (emit-qword segment offset)
+        (emit-signed-dword segment offset))))
 
 (defun emit-relative-fixup (segment fixup)
   (note-fixup segment :relative fixup)
