@@ -1127,19 +1127,21 @@
            "Constant TNs can only be directly used in MOV, PUSH, and CMP."))
         (emit-constant-tn-rip segment thing reg remaining-bytes))))
     (ea
-     (when (and (eq (ea-base thing) rip-tn)
-                (typep (ea-disp thing) '(or label label+addend)))
+     (when (eq (ea-base thing) rip-tn)
        (aver (null (ea-index thing)))
-       (binding* ((disp (ea-disp thing))
-                  ((label addend) (if (typep disp 'label+addend)
-                                      (values (label+addend-label disp)
-                                              (label+addend-addend disp))
-                                      (values disp 0))))
+       (let ((disp (ea-disp thing)))
+         (aver (typep disp '(or label label+addend fixup)))
          (emit-mod-reg-r/m-byte segment #b00 reg #b101) ; RIP-relative mode
-           ;; To point at ADDEND bytes beyond the label, pretend that the PC
-           ;; at which the EA occurs is _smaller_ by that amount.
-         (emit-dword-displacement-backpatch
-          segment label (- remaining-bytes addend)))
+         (if (typep disp 'fixup)
+             (emit-relative-fixup segment disp)
+             (multiple-value-bind (label addend)
+                 (if (typep disp 'label+addend)
+                     (values (label+addend-label disp) (label+addend-addend disp))
+                     (values disp 0))
+               ;; To point at ADDEND bytes beyond the label, pretend that the PC
+               ;; at which the EA occurs is _smaller_ by that amount.
+               (emit-dword-displacement-backpatch
+                segment label (- remaining-bytes addend)))))
        (return-from emit-ea))
      (let* ((base (ea-base thing))
             (index (ea-index thing))
@@ -1710,14 +1712,7 @@
    (maybe-emit-rex-for-ea segment src dst
                           :operand-size (if (dword-reg-p dst) :dword :qword))
    (emit-byte segment #b10001101)
-   (cond ((and (ea-p src) (eq (ea-base src) rip-tn) (fixup-p (ea-disp src)))
-          ;; This handles the fixup to 'undefined-fdefn.
-          ;; Need to see why we can't just pass it through to EMIT-EA
-          ;; and get rid of this special case. (It didn't work when I tried)
-          (emit-mod-reg-r/m-byte segment #b00 (reg-tn-encoding dst) #b101)
-          (emit-relative-fixup segment (ea-disp src)))
-         (t
-          (emit-ea segment src (reg-tn-encoding dst))))))
+   (emit-ea segment src (reg-tn-encoding dst))))
 
 (define-instruction cmpxchg (segment dst src &optional prefix)
   ;; Register/Memory with Register.
