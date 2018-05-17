@@ -349,10 +349,16 @@
 (defun %code-entry-points (code-obj) ; DO NOT USE IN NEW CODE
   (%code-entry-point code-obj 0))
 
+(declaim (inline code-obj-is-filler-p))
+(defun code-obj-is-filler-p (code-obj)
+  ;; See also HOLE-P in the allocator (same thing but using SAPs)
+  ;; and filler_obj_p() in the C code
+  (eql (code-header-words code-obj) 0))
+
 ;;; Return the number of simple-funs in CODE-OBJ
 (defun code-n-entries (code-obj)
   (declare (type code-component code-obj))
-  (if (eql (code-header-words code-obj) 2) ; dummy (space filling) object
+  (if (code-obj-is-filler-p code-obj)
       0
       (with-pinned-objects (code-obj)
         (sap-ref-16 (code-instructions code-obj)

@@ -360,7 +360,10 @@ fixnum_value(lispobj n)
     return (sword_t)n >> N_FIXNUM_TAG_BITS;
 }
 
-static inline uword_t
+// Return signed int in case something tries to compute the number of boxed
+// words excluding the header word itself using "code_header_words(header) - 1",
+// which, for a filler needs to come out as negative, not a huge positive.
+static inline sword_t
 code_header_words(lispobj header) // given header = code->header
 {
   return HeaderValue(header) & SHORT_HEADER_MAX_WORDS;

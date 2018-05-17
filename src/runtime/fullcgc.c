@@ -489,14 +489,15 @@ static uword_t sweep(lispobj* where, lispobj* end, uword_t arg)
                 if (nwords <= 2) // could be SAP, SIMPLE-ARRAY-NIL, 1-word bignum, etc
                     goto cons;
                 struct code* code  = (struct code*)where;
-                lispobj header = 2<<N_WIDETAG_BITS | CODE_HEADER_WIDETAG;
+                // Keep in sync with the definition of filler_obj_p()
+                lispobj header = CODE_HEADER_WIDETAG;
                 if (code->header != header) {
                     page_index_t page = find_page_index(where);
                     int gen = page >= 0 ? page_table[page].gen
                       : __immobile_obj_gen_bits(where);
                     NOTE_GARBAGE(gen, where, nwords, zeroed, {
                         code->header = header;
-                        code->code_size = make_fixnum((nwords - 2) * N_WORD_BYTES);
+                        code->code_size = make_fixnum(nwords * N_WORD_BYTES);
                         memset(where+2, 0, (nwords - 2) * N_WORD_BYTES);
                     })
                 }

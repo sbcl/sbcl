@@ -81,8 +81,9 @@
 
 (declaim (inline hole-p))
 (defun hole-p (raw-address)
-  (eql (sap-ref-32 (int-sap raw-address) 0)
-       (logior (ash 2 n-widetag-bits) code-header-widetag)))
+  ;; A code header with 0 boxed words is a hole.
+  ;; See also CODE-OBJ-IS-FILLER-P
+  (eql (sap-ref-64 (int-sap raw-address) 0) code-header-widetag))
 
 (defun freed-hole-p (address)
   (and (hole-p address)
@@ -95,13 +96,16 @@
 
 (declaim (inline hole-size))
 (defun hole-size (hole-address) ; in bytes
-  (+ (sap-ref-lispobj (int-sap hole-address) (ash code-code-size-slot word-shift))
-     (ash 2 word-shift))) ; add 2 boxed words
+  (the (and fixnum unsigned-byte)
+    (sap-ref-lispobj (int-sap hole-address) (ash code-code-size-slot word-shift))))
 
 (declaim (inline (setf hole-size)))
 (defun (setf hole-size) (new-size hole) ; NEW-SIZE is in bytes
-  (setf (sap-ref-lispobj (int-sap hole) (ash code-code-size-slot word-shift))
-        (- new-size (ash 2 word-shift)))) ; account for 2 boxed words
+  ;; FIXME: (SETF SET-REF-LISPOBJ) does not accept a fixnum
+  ;; because 'any-reg' is not an allowed storage class.
+  (setf (sap-ref-word (int-sap hole) (ash code-code-size-slot word-shift))
+        ;; 0 boxed words, so %CODE-CODE-SIZE covers everything.
+        (ash new-size n-fixnum-tag-bits)))
 
 (declaim (inline hole-end-address))
 (defun hole-end-address (hole-address)
@@ -249,14 +253,13 @@
           (setf hole-end (hole-end-address successor))
           (remove-from-freelist successor)))
       ;; The hole must be an integral number of doublewords.
-      (aver (zerop (rem (- hole-end hole) 16)))
+      (aver (not (logtest (- hole-end hole) lowtag-mask)))
       (setf (hole-size hole) (- hole-end hole))))
   (add-to-freelist hole))
 
 (defun allocate-immobile-bytes (n-bytes word0 word1 lowtag)
   (declare (type (and fixnum unsigned-byte) n-bytes))
-  (setq n-bytes (logandc2 (+ n-bytes (1- (* 2 n-word-bytes)))
-                          (1- (* 2 n-word-bytes))))
+  (setq n-bytes (logandc2 (+ n-bytes lowtag-mask) lowtag-mask))
   ;; Can't allocate fewer than 4 words due to min hole size.
   (aver (>= n-bytes (* 4 n-word-bytes)))
   (sb!thread::with-system-mutex (*immobile-space-mutex* :without-gcing t)
@@ -284,7 +287,7 @@
                          (when found
                            (let* ((actual-size (hole-size found))
                                   (remaining (- actual-size n-bytes)))
-                             (aver (zerop (rem actual-size 16)))
+                             (aver (not (logtest actual-size lowtag-mask)))
                              (setf (hole-size found) remaining) ; Shorten the lower piece
                              (add-to-freelist found)
                              (+ found remaining)))))) ; Consume the upper piece

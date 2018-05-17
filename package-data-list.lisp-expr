@@ -2146,6 +2146,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "%CODE-ENTRY-POINT"
                "CODE-ENTRY-POINTS" ; new accessor - returns a vector
                "CODE-N-ENTRIES"
+               "CODE-OBJ-IS-FILLER-P"
                "%CODE-ENTRY-POINTS" ; prefer %CODE-ENTRY-POINT instead of this
                "%DENOMINATOR"
                "%OTHER-POINTER-P"

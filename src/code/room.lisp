@@ -476,7 +476,7 @@ We could try a few things to mitigate this:
          (map-immobile-objects #'filter :fixed))
        (dx-flet ((filter (obj type size)
                    (unless (and (code-component-p obj)
-                                (eql (code-header-words obj) 2))
+                                (code-obj-is-filler-p obj))
                      (funcall fun obj type size))))
          (map-immobile-objects #'filter :variable)))
 

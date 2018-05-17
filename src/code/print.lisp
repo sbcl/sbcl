@@ -1614,14 +1614,13 @@ variable: an unreadable object representing the error is printed instead.")
 
 (defmethod print-object ((component code-component) stream)
   (print-unreadable-object (component stream :identity t)
-    (let ((dinfo (%code-debug-info component)))
-      (cond ((eq dinfo :bogus-lra)
+    (let (dinfo)
+      (cond ((code-obj-is-filler-p component)
+             (format stream "filler ~db" (%code-code-size component)))
+            ((eq (setq dinfo (%code-debug-info component)) :bogus-lra)
              (write-string "bogus code object" stream))
             ((functionp dinfo)
              (format stream "trampoline ~S" dinfo))
-            ((eql (code-header-words component) 2)
-             (format stream "filler ~dw"
-                     (+ (ash (%code-code-size component) (- sb!vm:word-shift)) 2)))
             (t
              (format stream "code object [~D]" (code-n-entries component))
              (let ((fun-name (awhen (%code-entry-point component 0)

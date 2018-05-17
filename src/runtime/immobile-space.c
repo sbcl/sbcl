@@ -1136,8 +1136,8 @@ sweep_varyobj_pages(int raise)
                     lose("immobile object @ %p too small to free", obj);
                 else { // Create a filler object.
                     struct code* code  = (struct code*)obj;
-                    code->header       = 2<<N_WIDETAG_BITS | CODE_HEADER_WIDETAG;
-                    code->code_size    = make_fixnum((size - 2) * N_WORD_BYTES);
+                    code->header       = CODE_HEADER_WIDETAG; // 0 boxed words
+                    code->code_size    = make_fixnum(size * N_WORD_BYTES);
                     code->debug_info   = varyobj_holes;
                     varyobj_holes      = (lispobj)code;
                 }
