@@ -1490,12 +1490,6 @@
            (t
             (error "bogus arguments to MOV: ~S ~S" dst src))))))
 
-(define-instruction quad (segment qword)
-  (:emitter
-   (etypecase qword
-     (integer (emit-qword segment qword))
-     (fixup   (emit-absolute-fixup segment qword t)))))
-
 ;;; MOVABS is not a mnemonic according to the CPU vendors, but every (dis)assembler
 ;;; in popular use chooses this mnemonic instead of MOV with an 8-byte operand.
 ;;; (Even with Intel-compatible syntax, LLVM produces MOVABS).
