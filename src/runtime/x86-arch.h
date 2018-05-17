@@ -9,6 +9,10 @@
 #error genesis/config.h (or sbcl.h) must be included before this file
 #endif
 
+// DO NOT REMOVE THIS. DOING SO WILL CAUSE NO COMPILATION ERRORS,
+// BUT WILL CAUSE RUNTIME FAILURE.
+#include "interr.h"                     /* for declaration of lose() */
+
 #define ARCH_HAS_STACK_POINTER
 #define ALIEN_STACK_GROWS_DOWNWARD
 
