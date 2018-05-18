@@ -4119,3 +4119,15 @@ void gc_store_corefile_ptes(struct corefile_pte *ptes)
         ptes[i].bytes_used = page_bytes_used(i);
     }
 }
+
+void gc_show_pte(lispobj obj)
+{
+    page_index_t page = find_page_index((void*)obj);
+    if (page>=0)
+        printf("page %ld gen %d type %x ss %p used %x%s\n",
+               page, page_table[page].gen, page_table[page].type,
+               page_scan_start(page), page_bytes_used(page),
+               page_table[page].write_protected? " WP":"");
+    else
+        printf("not in dynamic space\n");
+}
