@@ -769,13 +769,39 @@ void write_protect_immobile_space()
 #undef varyobj_page_wp
 }
 
-// Scan range between start and end (exclusive) for old-to-young pointers.
+static inline generation_index_t
+pointee_gen(lispobj thing, int keep_gen, int new_gen)
+{
+    int to_page = find_page_index((void*)thing);
+    // the default return value should be larger than any real generation number.
+    int gen = 127; // generation_index_t is a signed char
+    if (to_page >= 0) { // points to ordinary dynamic space
+        gen = page_table[to_page].gen;
+        if (gen == PSEUDO_STATIC_GENERATION+1) // scratch gen
+            gen = new_gen; // is actually this
+    } else if (immobile_space_p(thing)) {
+        // Use the general variant of immobile_obj_gen_bits
+        // because the pointed-to object could be anything.
+        gen = immobile_obj_gen_bits(native_pointer(thing));
+        if (gen == keep_gen) // keep gen
+            gen = new_gen; // is actually this
+    }
+    return gen;
+}
+
 // 'keep_gen' is the value of the generation byte of objects that were
 // candidates to become garbage, but remain live after this gc.
 // It will necessarily have the VISITED flag on.
 // 'new_gen' is the generation number that those objects will have
 // after collection, which is either the same generation or one higher,
 // depending on the 'raise' flag for this GC cycle.
+static int
+younger_p(lispobj thing, int gen, int keep_gen, int new_gen)
+{
+    return is_lisp_pointer(thing) && pointee_gen(thing, keep_gen, new_gen) < gen;
+}
+
+// Scan range between start and end (exclusive) for old-to-young pointers.
 static int
 range_points_to_younger_p(lispobj* obj, lispobj* end,
                           int gen, int keep_gen, int new_gen)
@@ -785,26 +811,8 @@ range_points_to_younger_p(lispobj* obj, lispobj* end,
 #endif
     do {
         lispobj thing = *obj;
-        if (is_lisp_pointer(thing)) {
-            int to_page = find_page_index((void*)thing),
-                to_gen = 255;
-            if (to_page >= 0) { // points to ordinary dynamic space
-                to_gen = page_table[to_page].gen;
-                if (to_gen == PSEUDO_STATIC_GENERATION+1) // scratch gen
-                    to_gen = new_gen; // is actually this
-            } else if (immobile_space_p(thing)) {
-                // FIXME: there is no CODE-ENTRY-POINTS slot. Is this code right?
-                // Processing the code-entry-points slot of a code component
-                // requires the general variant of immobile_obj_gen_bits
-                // because the pointed-to object is a simple-fun.
-                to_gen = immobile_obj_gen_bits(native_pointer(thing));
-                if (to_gen == keep_gen) // keep gen
-                    to_gen = new_gen; // is actually this
-            }
-            if (to_gen < gen) {
-                return 1; // yes, points to younger
-            }
-        }
+        if (is_lisp_pointer(thing) && pointee_gen(thing, keep_gen, new_gen) < gen)
+            return 1; // yes, points to younger
     } while (++obj < end);
     return 0; // no, does not point to younger
 }
@@ -816,33 +824,29 @@ static inline boolean
 fixedobj_points_to_younger_p(lispobj* obj, int n_words,
                              int gen, int keep_gen, int new_gen)
 {
-  unsigned char widetag = widetag_of(*obj);
-  lispobj __attribute__((unused)) funobj[1], layout[1];
-  lispobj lbitmap;
+  lispobj layout, lbitmap;
 
-  switch (widetag) {
+  switch (widetag_of(*obj)) {
   case FDEFN_WIDETAG:
-    // the seemingly silly use of an array is because points_to_younger_p()
-    // expects to get address ranges, not individual objects
-    funobj[0] = fdefn_callee_lispobj((struct fdefn*)obj);
-    return range_points_to_younger_p(funobj, funobj+1, gen, keep_gen, new_gen)
+    return younger_p(fdefn_callee_lispobj((struct fdefn*)obj),
+                     gen, keep_gen, new_gen)
         || range_points_to_younger_p(obj+1, obj+3, gen, keep_gen, new_gen);
   case CODE_HEADER_WIDETAG:
-    funobj[0] = ((struct code*)obj)->debug_info;
-    return range_points_to_younger_p(funobj, funobj+1, gen, keep_gen, new_gen);
+    // This is a simplifying trampoline around a closure or FIN.
+    // The only pointerish slot is debug_info (the called function).
+    // The size slot is a descriptor, though a non-pointer.
+    return younger_p(((struct code*)obj)->debug_info, gen, keep_gen, new_gen);
   case INSTANCE_WIDETAG:
   case FUNCALLABLE_INSTANCE_WIDETAG:
-    layout[0] = instance_layout(obj); // same as above
-    if (range_points_to_younger_p(layout, layout+1, gen, keep_gen, new_gen))
+    layout = instance_layout(obj);
+    if (younger_p(layout, gen, keep_gen, new_gen))
         return 1;
-    lbitmap = LAYOUT(layout[0])->bitmap;
-    if (lbitmap != make_fixnum(-1)) {
+    if ((lbitmap = LAYOUT(layout)->bitmap) != make_fixnum(-1)) {
         gc_assert(fixnump(lbitmap));  // No bignums (yet)
         sword_t bitmap = fixnum_value(lbitmap);
         lispobj* where = obj + 1;
         for ( ; --n_words ; ++where, bitmap >>= 1 )
-            if ((bitmap & 1) != 0 &&
-                range_points_to_younger_p(where, where+1, gen, keep_gen, new_gen))
+            if ((bitmap & 1) != 0 && younger_p(*where, gen, keep_gen, new_gen))
                 return 1;
         return 0;
     }
