@@ -1539,6 +1539,7 @@
              (delay nil)
              (pinned nil)
              (pdefs nil))
+    (declare (ignorable pinned))
     (dolist (option-spec options)
       (multiple-value-bind (option args)
           (if (consp option-spec)
