@@ -127,6 +127,7 @@
 
 ;;; Instance types that will be forward-referenced
 (dolist (symbol '(lexenv sb!c::abstract-lexenv
+                  sb!assem:label
                   condition restart style-warning step-condition
                   class sb!pcl::condition-class error
                   hash-table sb!thread:mutex
