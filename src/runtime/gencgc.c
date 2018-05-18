@@ -1647,6 +1647,7 @@ void deposit_filler(uword_t addr, sword_t nbytes) {
     if (nbytes > 0) {
         sword_t nwords = nbytes >> WORD_SHIFT;
         visit_freed_objects((char*)addr, nbytes);
+        gc_assert((nwords - 1) <= 0x7FFFFF);
         *(lispobj*)addr = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
     }
 }

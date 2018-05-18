@@ -266,9 +266,7 @@
         ((specialized-array-element-type-properties-p info)
          (reconstitute-vector (tagged-object other-pointer-lowtag) info))
         ((= widetag sb-vm:filler-widetag)
-         (values nil
-                 sb-vm:filler-widetag
-                 (boxed-size (logand header-value short-header-max-words))))
+         (values nil sb-vm:filler-widetag (boxed-size header-value)))
         ((null info)
          (error "Unrecognized widetag #x~2,'0X in reconstitute-object"
                 widetag))
