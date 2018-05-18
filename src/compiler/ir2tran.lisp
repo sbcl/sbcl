@@ -2003,11 +2003,29 @@ not stack-allocated LVAR ~S." source-lvar)))))
                        ;; are welcome there.
                        (ir2-convert-full-call node block))
                       (t
-                       (let* ((refs (reference-tn-list
+                       (let* ((scs
+                               (operand-parse-scs
+                                (vop-parse-more-args
+                                 (gethash 'list *backend-parsed-vops*))))
+                              (allow-const
+                               ;; Make sure the backend allows both of IMMEDIATE
+                               ;; and CONSTANT since MAKE-CONSTANT-TN could produce either.
+                               (and (member 'sb!vm::constant scs)
+                                    (member 'sb!vm::immediate scs)
+                                    ;; FIXME: this is terribly wrong that in high debug
+                                    ;; settings we can't allow constants at the IR2 level.
+                                    ;; But two UNWIND-TO-FRAME-AND-CALL tests fail when
+                                    ;; constants are allowed. Somehow we're affecting
+                                    ;; semantics. It's baffling.
+                                    (policy node (< debug 3))))
+                              (refs (reference-tn-list
                                      (loop for arg in args
                                            for tn = (make-normal-tn *backend-t-primitive-type*)
                                            do
-                                           (emit-move node block (lvar-tn node block arg) tn)
+                                           (cond ((and allow-const (constant-lvar-p arg))
+                                                  (setq tn (emit-constant (lvar-value arg))))
+                                                 (t
+                                                  (emit-move node block (lvar-tn node block arg) tn)))
                                            collect tn)
                                      nil))
                               (lvar (node-lvar node))

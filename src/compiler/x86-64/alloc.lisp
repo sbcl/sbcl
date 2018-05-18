@@ -168,7 +168,7 @@
 
 ;;;; CONS, LIST and LIST*
 (define-vop (list-or-list*)
-  (:args (things :more t))
+  (:args (things :more t :scs (descriptor-reg constant immediate)))
   (:temporary (:sc unsigned-reg) ptr temp)
   (:temporary (:sc unsigned-reg :to (:result 0) :target result) res)
   (:info num)
@@ -186,11 +186,14 @@
            (macrolet
                ((store-car (tn list &optional (slot cons-car-slot))
                   `(let ((reg
+                          ;; FIXME: single-float gets placed in the boxed header
+                          ;; rather than just doing an immediate store.
                           (sc-case ,tn
-                            ((any-reg descriptor-reg) ,tn)
-                            ((control-stack)
+                            ((control-stack constant)
                              (move temp ,tn)
-                             temp))))
+                             temp)
+                            (t
+                             (encode-value-if-immediate ,tn)))))
                      (storew reg ,list ,slot list-pointer-lowtag))))
              (let* ((cons-cells (if star (1- num) num))
                     (stack-allocate-p (node-stack-allocate-p node))

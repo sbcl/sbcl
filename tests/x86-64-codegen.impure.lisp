@@ -262,3 +262,14 @@
                          line))
         (setq success t)))
     (assert success)))
+
+(with-test (:name :list-vop-immediate-to-mem)
+  (let ((lines
+         (split-string
+          (with-output-to-string (s)
+            (let ((sb-disassem:*disassem-location-column-width* 0))
+              (disassemble '(lambda () (list :key :test)) :stream s)))
+          #\newline)))
+    (assert (loop for line in lines
+                  thereis (and (search "MOV QWORD PTR [" line)
+                               (search ":KEY" line))))))
