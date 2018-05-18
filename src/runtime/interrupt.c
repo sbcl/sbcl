@@ -832,6 +832,12 @@ undo_fake_foreign_function_call(os_context_t *context)
 
     foreign_function_call_active_p(thread) = 0;
 
+#ifdef LISP_FEATURE_SB_SAFEPOINT
+    /* garbage_collect_generation may access it in parallel after
+       FREE_INTERRUPT_CONTEXT_INDEX has been updated, stuff a zero to
+       keep it from being confused. */
+    nth_interrupt_context(fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,thread)) - 1, thread) = NULL;    
+#endif
     /* Undo dynamic binding of FREE_INTERRUPT_CONTEXT_INDEX */
     unbind(thread);
 

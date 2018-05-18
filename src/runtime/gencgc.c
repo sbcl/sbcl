@@ -3015,9 +3015,12 @@ garbage_collect_generation(generation_index_t generation, int raise)
             if (th != arch_os_get_current_thread()) {
                 long k = fixnum_value(
                     read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
-                while (k > 0)
-                    preserve_context_registers((void(*)(os_context_register_t))preserve_pointer,
-                                               nth_interrupt_context(--k, th));
+                while (k > 0) {
+                    os_context_t* context = nth_interrupt_context(--k, th);
+                    if (context)
+                        preserve_context_registers((void(*)(os_context_register_t))preserve_pointer,
+                                                   context);
+                }
             }
 #  endif
 # elif defined(LISP_FEATURE_SB_THREAD)
