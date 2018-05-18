@@ -636,6 +636,8 @@ void scavenge_immobile_newspace()
               // but subsequent iterations might not.
               if (immobile_scav_queue_count <= QCAPACITY)
                   --immobile_scav_queue_count;
+              // FIXME: should not enqueue already-visited objects,
+              // but a gc_assert() that it wasn't visited fails.
               if (!(__immobile_obj_gen_bits(obj) & IMMOBILE_OBJ_VISITED_FLAG)) {
                 set_visited(obj);
                 lispobj header = *obj;
