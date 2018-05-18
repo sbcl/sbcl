@@ -294,6 +294,7 @@ static inline uword_t instance_length(lispobj header)
 {
   return HEADER_VALUE_MASKED(header);
 }
+#undef HEADER_VALUE_MASKED
 /* Define an assignable instance_layout() macro taking a native pointer */
 #ifndef LISP_FEATURE_COMPACT_INSTANCE_HEADER
 # define instance_layout(instance_ptr) (instance_ptr)[1]
@@ -366,7 +367,11 @@ fixnum_value(lispobj n)
 static inline sword_t
 code_header_words(lispobj header) // given header = code->header
 {
-  return HeaderValue(header) & SHORT_HEADER_MAX_WORDS;
+#ifdef LISP_FEATURE_64_BIT
+    return header >> 32;
+#else
+    return HeaderValue(header);
+#endif
 }
 
 #include "align.h"
@@ -376,7 +381,6 @@ code_unboxed_nwords(lispobj n) // given n = code->code_size
     // Return ceiling |N / N_WORD_BYTES|
     return (fixnum_value(n) + (N_WORD_BYTES-1)) >> WORD_SHIFT;
 }
-#undef HEADER_VALUE_MASKED
 
 #if defined(LISP_FEATURE_WIN32)
 /* KLUDGE: Avoid double definition of boolean by rpcndr.h included via

@@ -2032,9 +2032,10 @@ core and return a descriptor to it."
 (defvar *cold-assembler-routines*)
 (defvar *cold-static-call-fixups*)
 
+;;; Basically the same as the real CODE-HEADER-WORDS * n-word-bytes
 (defun code-header-bytes (code-object) ; Return boxed part size in bytes
-  (ash (logand (get-header-data code-object) sb!vm:short-header-max-words)
-       sb!vm:word-shift))
+  (* (ash (get-header-data code-object) (+ #!+64-bit -24))
+     sb!vm:n-word-bytes))
 
 (defun lookup-assembler-reference (symbol &optional (mode :direct) (errorp t))
   (let* ((code-component *cold-assembler-obj*)
@@ -2652,6 +2653,11 @@ core and return a descriptor to it."
 ;;; fixups (or function headers) are applied.
 #!+sb-show (defvar *show-pre-fixup-code-p* nil)
 
+;;; Invert GET-HEADER-DATA for a code object
+(defun make-code-header-data (boxed-nwords)
+  (ash (sb!vm::make-code-header-word boxed-nwords)
+       (- sb!vm:n-widetag-bits)))
+
 (defun cold-load-code (fasl-input code-size n-boxed-words)
   (macrolet ((pop-stack () '(pop-fop-stack (%fasl-input-stack fasl-input))))
      (let* (;; Note that the number of constants is rounded up (for now)
@@ -2664,7 +2670,9 @@ core and return a descriptor to it."
                   (+ (ash aligned-n-boxed-words sb!vm:word-shift) code-size)
                   sb!vm:other-pointer-lowtag)))
        (declare (ignorable immobile-p))
-       (write-header-word des aligned-n-boxed-words sb!vm:code-header-widetag)
+       (write-header-word des
+                          (make-code-header-data aligned-n-boxed-words)
+                          sb!vm:code-header-widetag)
        (write-wordindexed des sb!vm:code-code-size-slot
                           (make-fixnum-descriptor code-size))
        (write-wordindexed des sb!vm:code-debug-info-slot debug-info)
@@ -2776,7 +2784,9 @@ core and return a descriptor to it."
                   (+ (ash header-n-words sb!vm:word-shift) offset length)
                   sb!vm:other-pointer-lowtag))
            (setf *cold-assembler-obj* asm-code)
-           (write-header-word asm-code header-n-words sb!vm:code-header-widetag)))
+           (write-header-word asm-code
+                              (make-code-header-data header-n-words)
+                              sb!vm:code-header-widetag)))
     (write-wordindexed asm-code sb!vm:code-code-size-slot
                        (make-fixnum-descriptor (+ offset rounded-length)))
     (let ((start (+ (descriptor-byte-offset asm-code)

@@ -344,7 +344,7 @@
 
 (declaim (inline code-header-words))
 (defun code-header-words (code)
-  (logand (get-header-data code) sb!vm:short-header-max-words))
+  (ash (get-header-data code) (+ #!+64-bit -24)))
 
 (defun %code-entry-points (code-obj) ; DO NOT USE IN NEW CODE
   (%code-entry-point code-obj 0))

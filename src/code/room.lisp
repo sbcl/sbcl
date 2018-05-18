@@ -195,9 +195,7 @@
 
 (defun code-component-size (x) ; in bytes
   (declare (code-component x))
-  (round-to-dualword
-   (+ (* (logand (get-header-data x) short-header-max-words) n-word-bytes)
-      (%code-code-size x))))
+  (round-to-dualword (+ (* (code-header-words x) n-word-bytes) (%code-code-size x))))
 
 (defun primitive-object-size (object)
   "Return number of bytes of heap or stack directly consumed by OBJECT"

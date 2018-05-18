@@ -485,3 +485,7 @@
      ;; layout have the interrupt contexts array intruding into the TLS area.
      ;; That array must be skipped over when computing the next available index.
      #!-x86-64 (1+ sb!vm:max-interrupts)))
+
+(defmacro make-code-header-word (boxed-nwords)
+  `(logior (ash ,boxed-nwords #!+64-bit 32 #!-64-bit n-widetag-bits)
+           code-header-widetag))

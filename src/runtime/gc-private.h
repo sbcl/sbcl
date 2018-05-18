@@ -151,7 +151,7 @@ static inline int __immobile_obj_gen_bits(lispobj* pointer) // native pointer
 #endif /* little-endian */
 
 static inline boolean filler_obj_p(lispobj* obj) {
-  return *(int*)obj == CODE_HEADER_WIDETAG;
+  return *obj == CODE_HEADER_WIDETAG;
 }
 
 #endif /* immobile space */

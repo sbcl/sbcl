@@ -361,7 +361,7 @@
                          (logandc2 (+ n-unboxed-bytes lowtag-mask) lowtag-mask)))
          (code (allocate-immobile-bytes
                 total-bytes
-                (logior (ash n-boxed-words n-widetag-bits) code-header-widetag)
+                (make-code-header-word n-boxed-words)
                 (ash n-unboxed-bytes n-fixnum-tag-bits)
                 other-pointer-lowtag)))
     (setf (%code-debug-info code) nil)
@@ -409,7 +409,7 @@
 
 (defun alloc-immobile-trampoline ()
   (values (%primitive alloc-immobile-fixedobj other-pointer-lowtag 6
-                      (logior (ash 4 n-widetag-bits) code-header-widetag)
+                      #.(make-code-header-word 4) ; boxed word count
                       (ash (* 2 n-word-bytes) n-fixnum-tag-bits))))
 ) ; end PROGN
 ) ; end PROGN

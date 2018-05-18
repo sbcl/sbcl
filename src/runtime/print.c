@@ -733,8 +733,8 @@ static void print_otherptr(lispobj obj)
         break;
 
     case CODE_HEADER_WIDETAG:
-        count &= SHORT_HEADER_MAX_WORDS;
         // ptr was already bumped up
+        count = code_header_words(((struct code*)(ptr-1))->header);
         for_each_simple_fun(fun_index, fun, (struct code*)(ptr-1), 0, {
             sprintf(buffer, "f[%d]: ", fun_index);
             print_obj(buffer, make_lispobj(fun,FUN_POINTER_LOWTAG));

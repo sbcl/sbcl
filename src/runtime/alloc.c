@@ -63,7 +63,11 @@ lispobj alloc_code_object (unsigned boxed_nwords, unsigned unboxed_nbytes)
 
     clear_pseudo_atomic_atomic(th);
 
+#ifdef LISP_FEATURE_64_BIT
+    code->header = (uword_t)boxed_nwords << 32 | CODE_HEADER_WIDETAG;
+#else
     code->header = (boxed_nwords << N_WIDETAG_BITS) | CODE_HEADER_WIDETAG;
+#endif
     code->code_size = make_fixnum(unboxed_nbytes);
     code->debug_info = NIL;
     return make_lispobj(code, OTHER_POINTER_LOWTAG);

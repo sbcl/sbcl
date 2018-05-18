@@ -92,7 +92,7 @@ os_vm_size_t bytes_consed_between_gcs = 12*1024*1024;
 #define BOXED_NWORDS(obj) ((HeaderValue(obj) & 0x7FFFFF) | 1)
 
 /* Medium-sized payload count is expressed in 15 bits. Objects in this category
- * may reside in immobile space: CODE, CLOSURE, INSTANCE, FUNCALLABLE-INSTANCE.
+ * may reside in immobile space: CLOSURE, INSTANCE, FUNCALLABLE-INSTANCE.
  * The single data bit is used as a closure's NAMED flag.
  *
  * Header:  gen# |  data |     size |    tag
