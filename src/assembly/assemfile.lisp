@@ -37,7 +37,6 @@
          (won nil)
          (asmstream (make-asmstream))
          (*asmstream* asmstream)
-         (*fixup-notes* nil)
          (*adjustable-vectors* nil)
          #!+immobile-code (*code-is-immobile* t))
     (unwind-protect
@@ -62,7 +61,7 @@
                   (asmstream-elsewhere-section asmstream))))
             (dump-assembler-routines segment
                                      (finalize-segment segment)
-                                     *fixup-notes*
+                                     (sb!assem::segment-fixup-notes segment)
                                      *entry-points*
                                      lap-fasl-output))
           (setq won t))

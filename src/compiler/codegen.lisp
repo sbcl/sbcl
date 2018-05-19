@@ -186,8 +186,7 @@
   (let* ((prev-env nil)
          (n-entries (length (ir2-component-entries (component-info component))))
          (asmstream (make-asmstream))
-         (*asmstream* asmstream)
-         (*fixup-notes* nil))
+         (*asmstream* asmstream))
 
     (emit (asmstream-elsewhere-section asmstream)
           (asmstream-elsewhere-label asmstream))
@@ -283,7 +282,7 @@
         (values segment
                 size
                 (asmstream-elsewhere-label asmstream)
-                *fixup-notes*)))))
+                (sb!assem::segment-fixup-notes segment))))))
 
 (defun label-elsewhere-p (label-or-posn kind)
   (let ((elsewhere (label-position *elsewhere-label*))

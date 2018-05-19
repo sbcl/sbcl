@@ -34,29 +34,3 @@
   kind
   fixup
   position)
-
-(defvar *fixup-notes*)
-
-;;; Setting this variable lets you see what's going on as items are
-;;; being pushed onto *FIXUPS*.
-#!+sb-show (defvar *show-fixups-being-pushed-p* nil)
-
-;;; This function is called by assembler instruction emitters when
-;;; they find themselves trying to deal with a fixup.
-(defun note-fixup (segment kind fixup)
-  (sb!assem:emit-back-patch segment
-                            0
-                            (lambda (segment posn)
-                              (declare (ignore segment))
-                              ;; Why use EMIT-BACK-PATCH to cause this PUSH to
-                              ;; be done later, instead of just doing it now?
-                              ;; I'm not sure. Perhaps there's some concern
-                              ;; that POSN isn't known accurately now? Perhaps
-                              ;; there's a desire for all fixing up to go
-                              ;; through EMIT-BACK-PATCH whether it needs to or
-                              ;; not? -- WHN 19990905
-                              #!+sb-show
-                              (when *show-fixups-being-pushed-p*
-                                (/show "PUSHING FIXUP" kind fixup posn))
-                              (push (make-fixup-note kind fixup posn) *fixup-notes*)))
-  (values))

@@ -94,11 +94,20 @@
   (delayed nil :type list)
   ;; The emittable insts again, except this time as a list sorted by depth.
   (emittable-insts-queue nil :type list)
+  (fixup-notes)
   ;; Whether or not to collect dynamic statistics. This is just the same as
   ;; *COLLECT-DYNAMIC-STATISTICS* but is faster to reference.
   #!+sb-dyncount
   (collect-dynamic-statistics nil))
 (defprinter (segment :identity t))
+
+;;; Record a FIXUP of KIND occurring at the current position in SEGMENT
+(defun sb!c::note-fixup (segment kind fixup)
+  (emit-back-patch segment
+                   0
+                   (lambda (segment posn)
+                     (push (sb!c::make-fixup-note kind fixup posn)
+                           (segment-fixup-notes segment)))))
 
 (declaim (inline segment-current-index))
 (defun segment-current-index (segment)

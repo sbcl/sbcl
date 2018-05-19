@@ -121,7 +121,6 @@
 (defvar *event-info*)
 (defvar *event-note-threshold*)
 (defvar *failure-p*)
-(defvar *fixup-notes*)
 (defvar *source-info*)
 (defvar *source-plist*)
 (defvar *source-namestring*)
