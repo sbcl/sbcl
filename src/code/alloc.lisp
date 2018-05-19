@@ -259,7 +259,7 @@
 
 (defun allocate-immobile-bytes (n-bytes word0 word1 lowtag)
   (declare (type (and fixnum unsigned-byte) n-bytes))
-  (setq n-bytes (logandc2 (+ n-bytes lowtag-mask) lowtag-mask))
+  (setq n-bytes (align-up n-bytes (* 2 n-word-bytes)))
   ;; Can't allocate fewer than 4 words due to min hole size.
   (aver (>= n-bytes (* 4 n-word-bytes)))
   (sb!thread::with-system-mutex (*immobile-space-mutex* :without-gcing t)
@@ -357,8 +357,8 @@
 
 ;;; This is called when we're already inside WITHOUT-GCing
 (defun allocate-immobile-code (n-boxed-words n-unboxed-bytes)
-  (let* ((total-bytes (+ (* n-boxed-words n-word-bytes)
-                         (logandc2 (+ n-unboxed-bytes lowtag-mask) lowtag-mask)))
+  (let* ((total-bytes (align-up (+ (* n-boxed-words n-word-bytes) n-unboxed-bytes)
+                                (* 2 n-word-bytes)))
          (code (allocate-immobile-bytes
                 total-bytes
                 (make-code-header-word n-boxed-words)

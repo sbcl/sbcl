@@ -61,8 +61,7 @@
 (defun space-size (space) (* (space-nwords space) n-word-bytes))
 (defun space-end (space) (+  (space-addr space) (space-size space)))
 (defun space-nbytes-aligned (space)
-  (logandc2 (+ (space-size space) (1- +backend-page-bytes+))
-            (1- +backend-page-bytes+)))
+  (align-up (space-size space) +backend-page-bytes+))
 (defun space-physaddr (space spaces)
   (sap+ (car spaces) (* (space-data-page space) +backend-page-bytes+)))
 
@@ -740,7 +739,7 @@
 
   ;; Pad so that non-lisp code can't be colocated on a GC page.
   ;; (Lack of Lisp object headers in C code is the issue)
-  (let ((aligned-end (logandc2 (+ end-loc 4095) 4095)))
+  (let ((aligned-end (align-up end-loc 4096)))
     (when (> aligned-end end-loc)
       (multiple-value-bind (nwords remainder)
           (floor (- aligned-end end-loc) n-word-bytes)
@@ -861,7 +860,7 @@
          (string-table
           (string-table (append '("__lisp_code_start") (map 'list #'second sections))))
          (strings (cdr string-table))
-         (padded-strings-size (logandc2 (+ (length strings) 7) 7))
+         (padded-strings-size (align-up (length strings) 8))
          (ehdr-size #.(ceiling (alien-type-bits (parse-alien-type 'elf64-ehdr nil)) 8))
          (shdr-size #.(ceiling (alien-type-bits (parse-alien-type 'elf64-shdr nil)) 8))
          (symbols-size (* 2 sym-entry-size))
@@ -869,7 +868,7 @@
          (shdrs-end (+ shdrs-start (* (1+ (length sections)) shdr-size)))
          (relocs-size (* (length relocs) reloc-entry-size))
          (relocs-end (+ shdrs-end relocs-size))
-         (core-start (logandc2 (+ relocs-end (1- core-align)) (1- core-align)))
+         (core-start (align-up relocs-end core-align))
          (ident #.(coerce '(#x7F #x45 #x4C #x46 2 1 1 0 0 0 0 0 0 0 0 0)
                           '(array (unsigned-byte 8) 1))))
 

@@ -236,8 +236,7 @@
                       (1+ (logand (get-header-data object)
                                   (logand (get-header-data object)
                                           (room-info-mask room-info)))))))))))
-        (* (logandc2 (1+ words) 1)      ; round-to-even
-           n-word-bytes))
+        (* (align-up words 2) n-word-bytes))
       0))
 
 ;;; Given the address (untagged, aligned, and interpreted as a FIXNUM)

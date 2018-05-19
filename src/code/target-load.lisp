@@ -239,9 +239,8 @@
   (let* ((debug-info-index (+ ptr n-constants))
          (immobile-p (svref stack (1+ debug-info-index)))
          (n-boxed-words (+ sb!vm:code-constants-offset n-constants))
-         (aligned-n-boxed-words (logandc2 (1+ n-boxed-words) 1))
          (code (sb!c:allocate-code-object
-                immobile-p aligned-n-boxed-words code-length)))
+                immobile-p (align-up n-boxed-words 2) code-length)))
     (setf (%code-debug-info code) (svref stack debug-info-index))
     (loop for i of-type index from sb!vm:code-constants-offset
           for j of-type index from ptr below debug-info-index

@@ -355,7 +355,7 @@
   (:generator 0
     (aver (location= result esp-tn))
     (unless (zerop amount)
-      (let ((delta (logandc2 (+ amount 3) 3)))
+      (let ((delta (align-up amount 4)))
         (inst sub esp-tn delta)))
     (align-stack-pointer esp-tn)
     (move result esp-tn)))
@@ -369,7 +369,7 @@
   (:generator 0
     (aver (not (location= result esp-tn)))
     (unless (zerop amount)
-      (let ((delta (logandc2 (+ amount 3) 3)))
+      (let ((delta (align-up amount 4)))
         (with-tls-ea (EA :base temp
                          :disp-type :index
                          :disp (make-ea-for-symbol-tls-index *alien-stack-pointer*))
@@ -379,7 +379,7 @@
   (:generator 0
     (aver (not (location= result esp-tn)))
     (unless (zerop amount)
-      (let ((delta (logandc2 (+ amount 3) 3)))
+      (let ((delta (align-up amount 4)))
         (inst sub (make-ea-for-symbol-value *alien-stack-pointer*)
               delta)))
     (load-symbol-value result *alien-stack-pointer*)))

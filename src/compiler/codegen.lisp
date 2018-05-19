@@ -20,9 +20,8 @@
 (defun component-header-length (&optional
                                 (component *component-being-compiled*))
   (let* ((2comp (component-info component))
-         (constants (ir2-component-constants 2comp))
-         (num-consts (length constants)))
-    (ash (logandc2 (1+ num-consts) 1) sb!vm:word-shift)))
+         (constants (ir2-component-constants 2comp)))
+    (ash (align-up (length constants) 2) sb!vm:word-shift)))
 
 ;;; the size of the NAME'd SB in the currently compiled component.
 ;;; This is useful mainly for finding the size for allocating stack

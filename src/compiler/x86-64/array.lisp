@@ -55,9 +55,7 @@
   (:generator 12
     (let* ((header-size (+ rank
                            (1- array-dimensions-offset)))
-           (bytes (logandc2 (+ (* (1+ header-size) n-word-bytes)
-                               lowtag-mask)
-                            lowtag-mask))
+           (bytes (* (align-up (1+ header-size) 2) n-word-bytes))
            (header (logior (ash header-size
                                 n-widetag-bits)
                            type)))

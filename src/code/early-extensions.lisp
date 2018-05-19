@@ -94,6 +94,10 @@
                           (* max-offset sb!vm:n-word-bytes))
                        scale)))
 
+(declaim (inline align-up))
+(defun align-up (value granularity &aux (mask (1- granularity)))
+  (logandc2 (+ value mask) mask))
+
 #!+(or x86 x86-64)
 (defun displacement-bounds (lowtag element-size data-offset)
   (let* ((adjustment (- (* data-offset sb!vm:n-word-bytes) lowtag))

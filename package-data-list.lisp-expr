@@ -1181,6 +1181,7 @@ possibly temporarily, because it might be used internally."
                ;; miscellaneous non-standard but handy user-level functions..
                "ASSQ" "DELQ" "MEMQ" "POSQ" "NEQ"
                "ADJUST-LIST"
+               "ALIGN-UP"
                "%FIND-PACKAGE-OR-LOSE" "FIND-UNDELETED-PACKAGE-OR-LOSE"
                "SANE-PACKAGE"
                "COALESCE-TREE-P"

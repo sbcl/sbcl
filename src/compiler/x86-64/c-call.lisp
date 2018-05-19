@@ -345,7 +345,7 @@
   (:generator 0
     (aver (location= result rsp-tn))
     (unless (zerop amount)
-      (let ((delta (logandc2 (+ amount 7) 7)))
+      (let ((delta (align-up amount 8)))
         (inst sub rsp-tn delta)))
     ;; C stack must be 16 byte aligned
     (inst and rsp-tn -16)
@@ -361,7 +361,7 @@
     (:generator 0
       (aver (not (location= result rsp-tn)))
       (unless (zerop amount)
-        (let ((delta (logandc2 (+ amount 7) 7)))
+        (let ((delta (align-up amount 8)))
           (inst sub (alien-stack-ptr) delta)))
       (inst mov result (alien-stack-ptr)))))
 
