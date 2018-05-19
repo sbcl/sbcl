@@ -166,7 +166,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                "DEFINE-INSTRUCTION" "DEFINE-INSTRUCTION-MACRO"
                "EMIT-POSTIT"
 
-               "MAKE-SEGMENT" "SEGMENT-TYPE" "ASSEMBLE"
+               "MAKE-SEGMENT" "SEGMENT-ORIGIN" "ASSEMBLE"
                "INST" "LABEL" "LABEL-P" "GEN-LABEL"
                "EMIT-LABEL" "LABEL-POSITION"
                "FINALIZE-SEGMENT"

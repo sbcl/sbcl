@@ -1041,39 +1041,6 @@
            :base (ea-base ea) :index (ea-index ea) :scale (ea-scale ea)
            :disp (ea-disp ea)))
 
-(defun emit-constant-tn-rip (segment constant-tn reg remaining-bytes)
-  ;; AMD64 doesn't currently have a code object register to use as a
-  ;; base register for constant access. Instead we use RIP-relative
-  ;; addressing. The offset from the SIMPLE-FUN-HEADER to the instruction
-  ;; is passed to the backpatch callback. In addition we need the offset
-  ;; from the start of the function header to the slot in the CODE-HEADER
-  ;; that stores the constant. Since we don't know where the code header
-  ;; starts, instead count backwards from the function header.
-  (let* ((2comp (component-info *component-being-compiled*))
-         (constants (ir2-component-constants 2comp))
-         (len (length constants))
-         ;; Both CODE-HEADER and SIMPLE-FUN-HEADER are 16-byte aligned.
-         ;; If there are an even amount of constants, there will be
-         ;; an extra qword of padding before the function header, which
-         ;; needs to be adjusted for. XXX: This will break if new slots
-         ;; are added to the code header.
-         (offset (* (- (+ len (if (evenp len)
-                                  1
-                                  2))
-                       (tn-offset constant-tn))
-                    n-word-bytes)))
-    ;; RIP-relative addressing
-    (emit-mod-reg-r/m-byte segment #b00 reg #b101)
-    (emit-back-patch segment
-                     4
-                     (lambda (segment posn)
-                       ;; The addressing is relative to end of instruction,
-                       ;; i.e. the end of this dword. Hence the + 4.
-                       (emit-signed-dword segment
-                                          (+ 4 remaining-bytes
-                                             (- (+ offset posn)))))))
-  (values))
-
 (defun emit-byte-displacement-backpatch (segment target)
   (emit-back-patch segment 1
                    (lambda (segment posn)
@@ -1111,7 +1078,14 @@
           ;; Why?
           (error
            "Constant TNs can only be directly used in MOV, PUSH, and CMP."))
-        (emit-constant-tn-rip segment thing reg remaining-bytes))))
+        ;; To access the constant at index 5 out of 6 constants, that's simply
+        ;; word index -1 from the origin label, and so on.
+        (emit-ea segment
+                 (rip-relative-ea :qword
+                                  (segment-origin segment) ; = word index 0
+                                  (- (* (tn-offset thing) n-word-bytes)
+                                     (component-header-length)))
+                 reg :remaining-bytes remaining-bytes))))
     (ea
      (when (eq (ea-base thing) rip-tn)
        (aver (null (ea-index thing)))

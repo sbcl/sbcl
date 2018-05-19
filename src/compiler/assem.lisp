@@ -48,6 +48,8 @@
   (alignment max-alignment :type alignment)
   ;; the position the last time we synchronized
   (sync-posn 0 :type index)
+  ;; a label at position 0
+  (origin (gen-label) :read-only t)
   ;; The posn and index everything ends at. This is not maintained
   ;; while the data is being generated, but is filled in after.
   ;; Basically, we copy CURRENT-POSN and CURRENT-INDEX so that we can
@@ -1254,6 +1256,7 @@
         (sections (combine-sections inputs))
         (in-without-scheduling)
         (was-scheduling))
+    (%emit-label segment nil (segment-origin segment))
     #!+sb-dyncount
     (setf (segment-collect-dynamic-statistics segment) *collect-dynamic-statistics*)
     (dolist (buffer sections segment)
