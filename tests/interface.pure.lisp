@@ -171,10 +171,10 @@
                     (the (complex single-float) y)))
                :stream (make-broadcast-stream)))
 
-;;; Data in the high bits of a fun header caused CODE-N-UNBOXED-DATA-WORDS
+;;; Data in the high bits of a fun header caused CODE-N-UNBOXED-DATA-BYTES
 ;;; to return a ridiculously huge value.
 (with-test (:name (disassemble :unboxed-data))
-  (assert (< (sb-kernel:code-n-unboxed-data-words
+  (assert (< (sb-kernel:code-n-unboxed-data-bytes
               (sb-kernel:fun-code-header #'expt))
              100))) ; The exact value is irrelevant.
 

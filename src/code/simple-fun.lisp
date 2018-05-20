@@ -441,15 +441,15 @@
          (%code-fun-offset code index)
          (ash sb!vm:simple-fun-code-offset sb!vm:word-shift)))))
 
-(defun code-n-unboxed-data-words (code-obj)
+(defun code-n-unboxed-data-bytes (code-obj)
   ;; If the number of boxed words (from the header) is not the same as
   ;; the displacement backwards from the first simple-fun to the header,
   ;; then there are unboxed constants between the end of the boxed constants
   ;; and the first simple-fun.
   (let ((f (%code-entry-point code-obj 0)))
     (or (and f
-             (- (ash (%fun-code-offset f) (- sb!vm:word-shift))
-                (code-header-words code-obj)))
+             (- (%fun-code-offset f)
+                (ash (code-header-words code-obj) sb!vm:word-shift)))
         0)))
 
 ;;; Set (SYMBOL-FUNCTION SYMBOL) to a closure that signals an error,

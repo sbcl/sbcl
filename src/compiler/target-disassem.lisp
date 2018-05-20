@@ -1184,9 +1184,7 @@
            (type offset offset)
            (inline make-segment))
   (apply #'make-segment code
-         (if (eql offset 0)
-             (ash (code-n-unboxed-data-words code) sb!vm:word-shift)
-             0)
+         (if (eql offset 0) (code-n-unboxed-data-bytes code) 0)
          (code-sap-maker code offset) length
          :code code :initial-offset offset args))
 
