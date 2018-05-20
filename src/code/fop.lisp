@@ -556,7 +556,7 @@
              (n-boxed-words (+ sb!vm:code-constants-offset n-constants))
              (code (sb!c:allocate-code-object
                     immobile-p
-                    (align-up n-boxed-words 2)
+                    (align-up n-boxed-words sb!c::code-boxed-words-align)
                     n-code-bytes)))
         (setf (%code-debug-info code) (svref stack debug-info-index))
         (loop for i of-type index from sb!vm:code-constants-offset

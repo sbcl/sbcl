@@ -2651,7 +2651,7 @@ core and return a descriptor to it."
 
 ;;; Setting this variable shows what code looks like before any
 ;;; fixups (or function headers) are applied.
-#!+sb-show (defvar *show-pre-fixup-code-p* nil)
+(defvar *show-pre-fixup-code-p* nil)
 
 ;;; Invert GET-HEADER-DATA for a code object
 (defun make-code-header-data (boxed-nwords)
@@ -2660,9 +2660,9 @@ core and return a descriptor to it."
 
 (defun cold-load-code (fasl-input code-size n-boxed-words)
   (macrolet ((pop-stack () '(pop-fop-stack (%fasl-input-stack fasl-input))))
-     (let* (;; Note that the number of constants is rounded up (for now)
+     (let* (;; The number of constants is rounded up to even (if required)
             ;; to ensure that the code vector will be properly aligned.
-            (aligned-n-boxed-words (round-up n-boxed-words 2))
+            (aligned-n-boxed-words (align-up n-boxed-words sb!c::code-boxed-words-align))
             (immobile-p (pop-stack))
             (debug-info (pop-stack))
             (des (allocate-cold-descriptor
@@ -2689,7 +2689,6 @@ core and return a descriptor to it."
                                          (%fasl-input-stream fasl-input)
                                          :start start
                                          :end end)
-         #!+sb-show
          (when *show-pre-fixup-code-p*
            (format *trace-output*
                    "~&/raw code from code-fop ~W ~W:~%"
@@ -2727,12 +2726,12 @@ core and return a descriptor to it."
                        (read-wordindexed code-object sb!vm:code-code-size-slot))
                       -2 ; skip back past the trailing CODE-N-ENTRIES
                       (* (1+ fun-index) -4))))) ; and back to the desired index
-    (unless (zerop (logand fun-offset sb!vm:lowtag-mask))
-      (error "unaligned function entry ~S ~S" code-object fun-index))
-    (make-descriptor (logior (+ (logandc2 (descriptor-bits code-object) sb!vm:lowtag-mask)
-                                (code-header-bytes code-object)
-                                fun-offset)
-                             sb!vm:fun-pointer-lowtag))))
+    (let ((fun (+ (logandc2 (descriptor-bits code-object) sb!vm:lowtag-mask)
+                  (code-header-bytes code-object)
+                  fun-offset)))
+      (unless (zerop (logand fun sb!vm:lowtag-mask))
+        (error "unaligned function entry ~S ~S" code-object fun-index))
+      (make-descriptor (logior fun sb!vm:fun-pointer-lowtag)))))
 
 (defun cold-fop-fun-entry (fasl-input fun-index)
   (binding* (((info type arglist name code-object)

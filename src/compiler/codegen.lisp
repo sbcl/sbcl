@@ -21,7 +21,7 @@
                                 (component *component-being-compiled*))
   (let* ((2comp (component-info component))
          (constants (ir2-component-constants 2comp)))
-    (ash (align-up (length constants) 2) sb!vm:word-shift)))
+    (ash (align-up (length constants) code-boxed-words-align) sb!vm:word-shift)))
 
 ;;; the size of the NAME'd SB in the currently compiled component.
 ;;; This is useful mainly for finding the size for allocating stack
@@ -248,7 +248,13 @@
       (emit trailer `(.byte ,(ldb (byte 8 8) n-entries) ,(ldb (byte 8 0) n-entries)))
       (let* ((segment
               (assemble-sections
-               (make-segment :run-scheduler (default-segment-run-scheduler)
+               (make-segment :header-skew
+                             (if (and (= code-boxed-words-align 1)
+                                      (oddp (length (ir2-component-constants
+                                                     (component-info component)))))
+                                 sb!vm:n-word-bytes
+                                 0)
+                             :run-scheduler (default-segment-run-scheduler)
                              :inst-hook (default-segment-inst-hook))
                (asmstream-data-section asmstream)
                (asmstream-code-section asmstream)

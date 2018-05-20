@@ -329,6 +329,11 @@ the stack without triggering overflow protection.")
      (prog1 (progn ,@body)
        (push ,var *adjustable-vectors*))))
 
+
+;;; The allocation quantum for boxed code header words.
+;;; 2 implies an even length boxed header; 1 implies no restriction.
+(defvar code-boxed-words-align (+ 2 #!+(or x86-64) -1))
+
 (in-package "SB!ALIEN")
 
 ;;; Information describing a heap-allocated alien.

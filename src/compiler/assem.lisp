@@ -46,6 +46,10 @@
   (last-annotation nil :type list)
   ;; the number of bits of alignment at the last time we synchronized
   (alignment max-alignment :type alignment)
+  ;; number of bytes to subtract from all finalized positions such that
+  ;; position 0 corresponds to CODE-INSTRUCTIONS of the code component
+  ;; being assembled.
+  (header-skew 0 :type (member 0 #.sb!vm:n-word-bytes))
   ;; the position the last time we synchronized
   (sync-posn 0 :type index)
   ;; a label at position 0
@@ -103,11 +107,13 @@
 
 ;;; Record a FIXUP of KIND occurring at the current position in SEGMENT
 (defun sb!c::note-fixup (segment kind fixup)
-  (emit-back-patch segment
-                   0
-                   (lambda (segment posn)
-                     (push (sb!c::make-fixup-note kind fixup posn)
-                           (segment-fixup-notes segment)))))
+  (emit-back-patch
+   segment
+   0
+   (lambda (segment posn)
+     (push (sb!c::make-fixup-note kind fixup
+                                  (- posn (segment-header-skew segment)))
+           (segment-fixup-notes segment)))))
 
 (declaim (inline segment-current-index))
 (defun segment-current-index (segment)
@@ -1218,6 +1224,10 @@
             (setf i0 (+ i1 (filler-bytes note))))))
       (frob i0 (segment-final-index segment)))
     (aver (= index (segment-final-posn segment)))
+    (let ((skew (segment-header-skew segment)))
+      (when (plusp skew)
+        (setq new-buffer (subseq new-buffer skew)) ; inefficient, but ok
+        (decf (segment-final-posn segment) skew)))
     (setf (segment-buffer segment) new-buffer)
     (setf (segment-final-index segment) (segment-final-posn segment))))
 
@@ -1265,6 +1275,20 @@
         (sections (combine-sections inputs))
         (in-without-scheduling)
         (was-scheduling))
+    ;; HEADER-SKEW is 1 word (in bytes) if the boxed code header word count is odd.
+    ;; The purpose is to trick the assembler into performing alignment such that
+    ;; word 1 is the first doubleword-aligned word. It would not work, for example,
+    ;; to merely inform the assembler that it has less than MAX-ALIGNMENT bits
+    ;; of alignment when starting out, because then there would be no way for it
+    ;; to recover to MAX-ALIGNMENT bits as required for simple-funs. So we tell it
+    ;; that it starts out with MAX-ALIGNMENT, but it's not word index 0 that has
+    ;; that alignment. There is probably a way to do this using the SYNC-POSN slot,
+    ;; but I couldn't figure that out. A more logical solution would be to emit
+    ;; _all_ boxed words as .SKIP directives. Then it's not so much a "trick" as
+    ;; a complete, albeit wasteful, representation of the code object.
+    ;; A little thinking shows that we only need to fake at most 1 boxed word.
+    (when (plusp (segment-header-skew segment))
+      (%emit-skip segment (segment-header-skew segment)))
     (%emit-label segment nil (segment-origin segment))
     #!+sb-dyncount
     (setf (segment-collect-dynamic-statistics segment) *collect-dynamic-statistics*)
@@ -1431,6 +1455,12 @@
   (compress-output segment)
   (finalize-positions segment)
   (process-back-patches segment)
+  (let ((skew (segment-header-skew segment)))
+    (when (plusp skew)
+      (dolist (note (segment-annotations segment))
+        (when (label-p note)
+          (decf (label-index note) skew)
+          (decf (label-posn note) skew)))))
   (compact-segment-buffer segment))
 
 ;;; Return the contents of SEGMENT as a vector. We assume SEGMENT has

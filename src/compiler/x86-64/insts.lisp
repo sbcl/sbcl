@@ -2499,16 +2499,18 @@
   (:emitter
    (emit-dword segment dword)))
 
+;;; Compute the distance backward to the base address of the code component
+;;; containing this simple-fun header, measured in words.
 (defun emit-header-data (segment type)
   (emit-back-patch segment
                    n-word-bytes
                    (lambda (segment posn)
-                     (emit-qword segment
-                                 (logior type
-                                         (ash (+ posn
-                                                 (component-header-length))
-                                              (- n-widetag-bits
-                                                 word-shift)))))))
+                     (emit-qword
+                      segment
+                      (logior type
+                              (ash (+ posn (- (component-header-length)
+                                              (segment-header-skew segment)))
+                                   (- n-widetag-bits word-shift)))))))
 
 (define-instruction simple-fun-header-word (segment)
   (:emitter

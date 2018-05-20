@@ -176,10 +176,10 @@
   (let ((debug-info (debug-info-for-component component)))
     (let* ((2comp (component-info component))
            (constants (ir2-component-constants 2comp))
-           (n-header-words (logandc2 (1+ (length constants)) 1))
            (code-obj (allocate-code-object
                       (or #!+immobile-code (eq *compile-to-memory-space* :immobile))
-                      n-header-words length)))
+                      (align-up (length constants) sb!c::code-boxed-words-align)
+                      length)))
 
       ;; The following operations need the code pinned:
       ;; 1. copying into code-instructions (a SAP)
