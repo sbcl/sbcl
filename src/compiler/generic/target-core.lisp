@@ -174,8 +174,6 @@
            (list fixup-notes)
            (type core-object object))
   (let ((debug-info (debug-info-for-component component)))
-    ;; See also the remark in LOAD-CODE about the order of installing
-    ;; simple-funs and setting the 'nfuns' value.
     (let* ((2comp (component-info component))
            (constants (ir2-component-constants 2comp))
            (n-header-words (logandc2 (1+ (length constants)) 1))
@@ -189,7 +187,7 @@
       (with-pinned-objects (code-obj)
         (let ((bytes (the (simple-array assembly-unit 1)
                           (segment-contents-as-vector segment))))
-          ;; By design, until the last 4 unboxed bytes of CODE-OBJ contain a
+          ;; By design, until the last 2 unboxed bytes of CODE-OBJ contain a
           ;; nonzero value, GC will not see any simple-funs therein.
           (%byte-blt bytes 0 (code-instructions code-obj) 0 (length bytes)))
         (apply-core-fixups fixup-notes code-obj))

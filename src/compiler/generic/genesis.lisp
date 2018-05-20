@@ -2703,7 +2703,7 @@ core and return a descriptor to it."
        (apply-fixups (%fasl-input-stack fasl-input) des 0))))
 
 #-c-headers-only
-(let ((i (get 'fop-code 'opcode)))
+(let ((i (get 'fop-load-code 'opcode)))
   (fill **fop-funs** #'cold-load-code :start i :end (+ i 4))
   (values))
 

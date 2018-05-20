@@ -231,26 +231,6 @@
           (defaulted-fasl-truename defaulted-fasl-pathname)
           (defaulted-source-truename defaulted-source-pathname))))
 
-;;; Load a code object. N-CONSTANTS objects are popped off the stack for
-;;; the boxed storage section, then CODE-LENGTH bytes of code are read in.
-(defun load-code (n-constants code-length stack ptr fasl-input)
-  (declare (fixnum n-constants code-length))
-  (declare (simple-vector stack) (type index ptr))
-  (let* ((debug-info-index (+ ptr n-constants))
-         (immobile-p (svref stack (1+ debug-info-index)))
-         (n-boxed-words (+ sb!vm:code-constants-offset n-constants))
-         (code (sb!c:allocate-code-object
-                immobile-p (align-up n-boxed-words 2) code-length)))
-    (setf (%code-debug-info code) (svref stack debug-info-index))
-    (loop for i of-type index from sb!vm:code-constants-offset
-          for j of-type index from ptr below debug-info-index
-          do (setf (code-header-ref code i) (svref stack j)))
-    (with-pinned-objects (code)
-      (read-n-bytes (%fasl-input-stream fasl-input)
-                    (code-instructions code) 0 code-length)
-      (sb!c::apply-fasl-fixups stack code))
-    code))
-
 ;;;; linkage fixups
 
 ;;; how we learn about assembler routines at startup

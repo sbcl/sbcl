@@ -1102,7 +1102,7 @@
         (dump-object info fasl-output))
 
       (dump-object (sb!c::code-immobile-p component) fasl-output)
-      (dump-fop 'fop-code fasl-output code-length header-length)
+      (dump-fop 'fop-load-code fasl-output code-length header-length)
 
       (dump-segment code-segment code-length fasl-output)
 
