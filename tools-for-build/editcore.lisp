@@ -640,17 +640,20 @@
                                      (ash (code-header-words code-component) sb-vm:word-shift)
                                      start-offs)
                                   nbytes output nil core)))))
+      (format output " .quad 0, 0~%") ; trailer with SIMPLE-FUN count of 0
       (let ((size (code-component-size code-component))) ; No need to pin
         (incf code-addr size)
         (setf total-code-size size)))
     (loop
       (when (>= code-addr (bounds-high code-bounds)) (return))
       (let* ((code (make-code-obj code-addr))
-             (objsize (code-component-size code)))
+             (objsize (code-component-size code))
+             (max-fun-end 0))
         (setq end-loc (+ code-addr objsize))
         (incf total-code-size objsize)
         (cond
           ((< (code-header-words code) 4) ; filler object
+           ;; ** THIS CASE IS UNTESTED **
            ;; Shouldn't occur unless defrag was not performed
            (format output "#x~x:~% .quad 0x~X, 0x~X~% .fill ~D~%"
                    code-addr
@@ -698,10 +701,23 @@
                     (fun-addr (logandc2 (get-lisp-obj-address fun) lowtag-mask))
                     (entrypoint
                      (+ fun-addr (* simple-fun-code-offset n-word-bytes)))
-                    (size (logandc2 (+ (%simple-fun-text-len fun j) sb-vm:lowtag-mask)
-                                    sb-vm:lowtag-mask))
+                    (size (%simple-fun-text-len fun j))
                     (lispname (fun-name-from-core fun spaces core-nil packages))
                     (quotname (ldsym-quote (c-name lispname pp-state))))
+               (setq max-fun-end (+ entrypoint size))
+               (cond ((< j (1- (code-n-entries code)))
+                      ;; Size is a multiple of 2 * n-word-bytes, and filler bytes
+                      ;; are NOPs which can be disassembled without fuss
+                      (aver (not (logtest size lowtag-mask))))
+                     (t
+                      ;; remove filler. FIXME: I think this "trimming" runs the
+                      ;; risk of chopping bytes that belong to a BREAK instruction
+                      ;; if the encoding of an sc+offset works out to 0.
+                      (dotimes (i 3)
+                        (if (zerop (sap-ref-8 (int-sap entrypoint) (1- size)))
+                            (decf size)
+                            (return)))
+                      (setq max-fun-end (+ entrypoint size))))
                ;; Globalize the C symbol only if the name is a legal function designator
                ;; per the standard definition.
                ;; This is a technique to try to avoid appending a uniquifying suffix
@@ -727,9 +743,16 @@
                                                    (logandc2 (get-lisp-obj-address code)
                                                              lowtag-mask)))
                                    size output emit-cfi core)))
-           (terpri output)
            ;; All fixups should have been consumed by writing the code out
-           (aver (null (core-fixup-addrs core))))
+           (aver (null (core-fixup-addrs core)))
+           ;; Emit bytes from max-fun-end to the aligned physical end.
+           (let ((start max-fun-end)
+                 (end (+ (get-lisp-obj-address code)
+                         (- other-pointer-lowtag)
+                         objsize)))
+             (format output " .byte ~{0x~x~^,~}~%"
+                     (loop for addr from start below end
+                           collect (sap-ref-8 (int-sap addr) 0)))))
           (t
            (error "Strange code component: ~S" code)))
         (incf code-addr objsize))))
