@@ -297,6 +297,7 @@
                      (limit (+ varyobj-space-start varyobj-space-size)))
                 (when (> free-ptr limit)
                   (format t "~&Immobile space exhausted~%")
+                  (sb!debug:print-backtrace)
                   (sb!impl::%halt))
                 (set-varyobj-space-free-pointer free-ptr)
                 addr))))
