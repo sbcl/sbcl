@@ -238,10 +238,8 @@ evaluated as a PROGN."
     (let* (;; stuff shared between LAMBDA and INLINE-LAMBDA and NAMED-LAMBDA
            (lambda-guts `(,@decls (block ,(fun-name-block-name name) ,@forms)))
            (lambda `(lambda ,lambda-list ,@lambda-guts))
-           (named-lambda `(,(if *top-level-form-p*
-                                'top-level-named-lambda
-                                'named-lambda)
-                           ,name ,lambda-list
+           (named-lambda `(named-lambda ,name ,lambda-list
+                           ,@(when *top-level-form-p* '((declare (sb!c::top-level-form))))
                            ,@(when doc (list doc)) ,@lambda-guts))
            (dxable-args (extract-dx-args lambda-list decls))
            (inline-thing
@@ -892,9 +890,5 @@ specification."
   `#',whole)
 
 (sb!xc:defmacro named-lambda (&whole whole name args &body body)
-  (declare (ignore name args body))
-  `#',whole)
-
-(sb!xc:defmacro top-level-named-lambda (&whole whole name args &body body)
   (declare (ignore name args body))
   `#',whole)

@@ -1142,7 +1142,7 @@
         (%program-error "~S names a special operator." name))
     ;; again it's sad that I can't wrap code around both modes
     :immediate (env)
-    (if (and (listp name) (memq (car name) '(named-lambda top-level-named-lambda lambda)))
+    (if (and (listp name) (memq (car name) '(named-lambda lambda)))
         (progn
           (aver (not (must-freeze-p env)))
           (enclose (make-proto-fn name (not (null env)))
@@ -1152,7 +1152,7 @@
         (multiple-value-bind (definition macro-p) (get-function name env)
           (if macro-p (not-a-function name) definition)))
     :deferred (env)
-    (if (and (listp name) (memq (car name) '(named-lambda top-level-named-lambda lambda)))
+    (if (and (listp name) (memq (car name) '(named-lambda lambda)))
         (handler (if (must-freeze-p env) #'enclose-freeze #'enclose)
                  (make-proto-fn name))
         (multiple-value-bind (kind definition frame-ptr)

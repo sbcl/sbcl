@@ -23,10 +23,6 @@
   (declare (ignore name))
   `#'(lambda ,args ,@body))
 
-(defmacro top-level-named-lambda (name args &body body)
-  (declare (ignore name))
-  `#'(lambda ,args ,@body))
-
 (defmacro with-locked-system-table ((table) &body body)
   (declare (ignore table))
   `(progn ,@body))
@@ -215,6 +211,9 @@
 ;;;; Variables which have meaning only to the cross-compiler, defined here
 ;;;; in lieu of #+sb-xc-host elsewere which messes up toplevel form numbers.
 (in-package "SB!C")
+
+;;; For macro lambdas that are processed by the host
+(declaim (declaration top-level-form))
 
 ;;; Set of function names whose definition will never be seen in make-host-2,
 ;;; as they are deferred until warm load.

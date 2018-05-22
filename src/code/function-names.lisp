@@ -80,6 +80,3 @@ use as a BLOCK name in the function in question."
 
 (define-function-name-syntax defmacro (name)
   (macro-function-name name))
-
-(define-function-name-syntax macrolet (name)
-  (macro-function-name name))

@@ -1721,6 +1721,7 @@
                                       it))
                     (setq explicit-check (or (cdr spec) t)
                           allow-explicit-check nil)) ; at most one of this decl
+                   ((equal spec '(top-level-form))) ; ignore
                    (t
                     (multiple-value-bind (new-env new-qualities)
                         (process-1-decl spec lexenv vars fvars

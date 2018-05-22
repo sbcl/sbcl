@@ -1006,6 +1006,14 @@
              (progn
                ,@forms))))))))
 
+;; FIXME: really should be an aspect of the lexical environment,
+;; but LEXENVs don't know whether they are toplevel or not.
+(defun has-toplevelness-decl (lambda-expr)
+  (dolist (expr (cddr lambda-expr)) ; Skip over (LAMBDA (ARGS))
+    (cond ((equal expr '(declare (top-level-form))) (return t))
+          ((typep expr '(or (cons (eql declare)) string))) ; DECL | DOCSTRING
+          (t (return nil)))))
+
 ;;; helper for LAMBDA-like things, to massage them into a form
 ;;; suitable for IR1-CONVERT-LAMBDA.
 (defun ir1-convert-lambdalike (thing
@@ -1020,7 +1028,7 @@
                          :maybe-add-debug-catch t
                          :source-name source-name
                          :debug-name debug-name))
-    ((named-lambda top-level-named-lambda)
+    ((named-lambda)
      (let ((name (cadr thing))
            (lambda-expression `(lambda ,@(cddr thing))))
        (if (and name (legal-fun-name-p name))
@@ -1029,7 +1037,7 @@
                                           :maybe-add-debug-catch t
                                           :source-name name))
                  (info (info :function :info name)))
-             (when (eq (car thing) 'top-level-named-lambda)
+             (when (has-toplevelness-decl lambda-expression)
                (setf (functional-top-level-defun-p res) t))
              (assert-global-function-definition-type name res)
              (push res (defined-fun-functionals defined-fun-res))

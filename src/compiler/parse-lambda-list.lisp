@@ -1159,13 +1159,16 @@
           (append whole env (ds-lambda-list-variables parse nil)))
     ;; Maybe kill docstring, but only under the cross-compiler.
     #!+(and (not sb-doc) (host-feature sb-xc-host)) (setq docstring nil)
-    (values `(,@(if lambda-name
-                    `(,(if *top-level-form-p*
-                           'top-level-named-lambda
-                           'named-lambda)
-                      ,lambda-name)
-                    '(lambda))
-                  (,ll-whole ,@ll-env ,@(and ll-aux (cons '&aux ll-aux)))
+    ;; Note that we *NEVER* declare macro lambdas as a toplevel named lambda.
+    ;; Code such as:
+    ;;  `(setf (symbol-function ',myfun) ,(make-macro-lambda whatever))
+    ;; with the intent to render MYFUN as having status as a known global function
+    ;; ("known" in the sense of existing at all, and preventing an "undefined"
+    ;; warning, _not_ "known" in the sense of 'fndb' knowing about it specially),
+    ;; then that code is misguided.  Macro-like objects can not cause global
+    ;; function names to be defined. Only DEFUN can do that.
+    (values `(,@(if lambda-name `(named-lambda ,lambda-name) '(lambda))
+                (,ll-whole ,@ll-env ,@(and ll-aux (cons '&aux ll-aux)))
               ,@(when (and docstring (eq doc-string-allowed :internal))
                   (prog1 (list docstring) (setq docstring nil)))
               ;; MACROLET doesn't produce an object capable of reflection,

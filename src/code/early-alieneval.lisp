@@ -32,12 +32,15 @@
 (defvar *default-c-string-external-format* nil)
 
 (defmacro define-alien-type-translator (name lambda-list &body body)
-  (let ((defun-name (symbolicate "ALIEN-" name "-TYPE-TRANSLATOR")))
-    `(eval-when (:compile-toplevel :load-toplevel :execute)
-       (setf (symbol-function ',defun-name)
-             ,(make-macro-lambda defun-name lambda-list body
-                                 'define-alien-type-translator name))
-       (%define-alien-type-translator ',name #',defun-name))))
+  (let ((defun-name (symbolicate "ALIEN-" name "-TYPE-TRANSLATOR"))
+        (macro-lambda
+         (make-macro-lambda nil lambda-list body
+                            'define-alien-type-translator name)))
+    `(progn
+       (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
+         (defun ,defun-name ,(second macro-lambda) ,@(cddr macro-lambda)))
+       (eval-when (:compile-toplevel :load-toplevel :execute)
+         (%define-alien-type-translator ',name #',defun-name)))))
 
 ;;; Process stuff in a new scope.
 (defmacro with-auxiliary-alien-types (env &body body)
