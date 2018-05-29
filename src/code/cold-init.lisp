@@ -176,10 +176,6 @@
      (destructuring-bind (name inline-expansion dxable-args) x
        (%defun name (fdefinition name) inline-expansion dxable-args))))
 
-  ;; KLUDGE: Why are fixups mixed up with toplevel forms? Couldn't
-  ;; fixups be done separately? Wouldn't that be clearer and better?
-  ;; -- WHN 19991204
-  (/show0 "doing cold toplevel forms and fixups")
   (unless (!c-runtime-noinform-p)
     (write `("Length(TLFs)=" ,(length *!cold-toplevels*)) :escape nil)
     (terpri))
@@ -202,10 +198,10 @@
             (setf (svref *!load-time-values* (third toplevel-thing))
                   (funcall (second toplevel-thing))))
         ((cons (eql :load-time-value-fixup))
-            (setf (sap-ref-word (int-sap (get-lisp-obj-address (second toplevel-thing)))
-                                (third toplevel-thing))
-                  (get-lisp-obj-address
-                   (svref *!load-time-values* (fourth toplevel-thing)))))
+         (destructuring-bind (object index value) (cdr toplevel-thing)
+           (aver (typep object 'code-component))
+           (aver (eq (code-header-ref object index) (make-unbound-marker)))
+           (setf (code-header-ref object index) (svref *!load-time-values* value))))
         ((cons (eql defstruct))
          (apply 'sb!kernel::%defstruct (cdr toplevel-thing)))
         (t

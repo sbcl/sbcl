@@ -251,7 +251,7 @@
             (:constructor make-descriptor (bits &optional gspace word-offset))
             (:copier nil))
   ;; the GSPACE that this descriptor is allocated in, or NIL if not set yet.
-  (gspace nil :type (or gspace (eql :load-time-value) null))
+  (gspace nil :type (or gspace null))
   ;; the offset in words from the start of GSPACE, or NIL if not set yet
   (word-offset nil :type (or sb!vm:word null))
   (bits 0 :read-only t :type (unsigned-byte #.sb!vm:n-machine-word-bits)))
@@ -495,21 +495,10 @@
   "Return the value which is displaced by INDEX words from ADDRESS."
     (make-random-descriptor (read-bits))))
 
-(declaim (ftype (function (descriptor
-                           (integer #.(- sb!vm:list-pointer-lowtag)
-                                    #.sb!ext:most-positive-word)
-                           descriptor)
-                          (values))
-                note-load-time-value-reference))
-(defun note-load-time-value-reference (address offset marker)
-  (push (cold-list (cold-intern :load-time-value-fixup)
-                   address
-                   (number-to-core offset)
-                   (number-to-core (descriptor-word-offset marker)))
-        *!cold-toplevels*)
-  (values))
-
-(declaim (ftype (function (descriptor sb!vm:word (or symbol descriptor))) write-wordindexed))
+(defstruct (ltv-patch (:copier nil) (:constructor make-ltv-patch (index)))
+  (index 0 :read-only t))
+(declaim (ftype (function (descriptor sb!vm:word (or symbol descriptor ltv-patch)))
+                write-wordindexed))
 (macrolet ((write-bits (bits)
              `(setf (bvref-word (descriptor-mem address)
                                 (ash (+ index (descriptor-word-offset address))
@@ -517,16 +506,21 @@
                     ,bits)))
   (defun write-wordindexed (address index value)
     "Write VALUE displaced INDEX words from ADDRESS."
-    ;; If we're passed a symbol as a value then it needs to be interned.
-    (let ((value (cond ((symbolp value) (cold-intern value))
-                       (t value))))
-      (if (eql (descriptor-gspace value) :load-time-value)
-          (note-load-time-value-reference address
-                                          (- (ash index sb!vm:word-shift)
-                                             (logand (descriptor-bits address)
-                                                     sb!vm:lowtag-mask))
-                                          value)
-          (write-bits (descriptor-bits value)))))
+    (write-bits
+     (cond ((ltv-patch-p value)
+            (if (= (logand (read-bits-wordindexed address 0) sb!vm:widetag-mask)
+                   sb!vm:code-header-widetag)
+                (push (cold-list (cold-intern :load-time-value-fixup)
+                                 address
+                                 (number-to-core index)
+                                 (number-to-core (ltv-patch-index value)))
+                      *!cold-toplevels*)
+                (bug "Can't patch load-time-value into ~S" address))
+            sb!vm:unbound-marker-widetag)
+          (t
+           ;; If we're passed a symbol as a value then it needs to be interned.
+           (descriptor-bits (cond ((symbolp value) (cold-intern value))
+                                  (t value)))))))
 
   (defun write-wordindexed/raw (address index bits)
     (declare (type descriptor address) (type sb!vm:word index)
@@ -2559,7 +2553,7 @@ core and return a descriptor to it."
             (push (cold-list (cold-intern :load-time-value) fun
                              (number-to-core counter)) *!cold-toplevels*)
             (setf *load-time-value-counter* (1+ counter))
-            (make-descriptor 0 :load-time-value counter)))))
+            (make-ltv-patch counter)))))
 
   (define-cold-fop (fop-funcall-for-effect)
     (multiple-value-bind (fun args) (pop-args (fasl-input))
