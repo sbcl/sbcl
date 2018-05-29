@@ -208,7 +208,7 @@ F(utimes)
 #ifndef irix
 F(vfork)
 #endif
-#if !defined(osf1) && !defined(LISP_FEATURE_FREEBSD) && !defined(__OpenBSD__) && !defined(__NetBSD__) && !defined(__DragonFly__)
+#if !defined(LISP_FEATURE_FREEBSD) && !defined(__OpenBSD__) && !defined(__NetBSD__) && !defined(__DragonFly__)
 F(vhangup)
 #endif
 F(wait)

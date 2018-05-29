@@ -227,7 +227,6 @@
  #!+mach  ("src/code/mach-os"  :not-host)
  #!+sunos ("src/code/sunos-os" :not-host)
  #!+hpux  ("src/code/hpux-os"  :not-host)
- #!+osf1  ("src/code/osf1-os"  :not-host)
  #!+irix  ("src/code/irix-os"  :not-host)
  #!+bsd   ("src/code/bsd-os"   :not-host)
  #!+linux ("src/code/linux-os" :not-host)

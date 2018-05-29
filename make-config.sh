@@ -278,12 +278,6 @@ case `uname` in
     Linux)
         sbcl_os="linux"
         ;;
-    OSF1)
-        # it's changed name twice since it was called OSF/1: clearly
-        # the marketers forgot to tell the engineers about Digital Unix
-        # _or_ OSF/1 ...
-        sbcl_os="osf1"
-        ;;
     *BSD)
         case `uname` in
             FreeBSD)
@@ -500,14 +494,6 @@ case "$sbcl_os" in
         link_or_copy Config.$sbcl_arch-linux Config
         link_or_copy $sbcl_arch-linux-os.h target-arch-os.h
         link_or_copy linux-os.h target-os.h
-        ;;
-    osf1)
-        printf ' :unix' >> $ltf
-        printf ' :elf' >> $ltf
-        printf ' :osf1' >> $ltf
-        link_or_copy Config.$sbcl_arch-osf1 Config
-        link_or_copy $sbcl_arch-osf1-os.h target-arch-os.h
-        link_or_copy osf1-os.h target-os.h
         ;;
     hpux)
         printf ' :unix' >> $ltf
