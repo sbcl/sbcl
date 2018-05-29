@@ -495,11 +495,6 @@
   "Return the value which is displaced by INDEX words from ADDRESS."
     (make-random-descriptor (read-bits))))
 
-(declaim (ftype (function (descriptor) descriptor) read-memory))
-(defun read-memory (address)
-  "Return the value at ADDRESS."
-  (read-wordindexed address 0))
-
 (declaim (ftype (function (descriptor
                            (integer #.(- sb!vm:list-pointer-lowtag)
                                     #.sb!ext:most-positive-word)
@@ -688,8 +683,7 @@ core and return a descriptor to it."
     handle))
 
 (defun bignum-from-core (descriptor)
-  (let ((n-words (ash (descriptor-bits (read-memory descriptor))
-                      (- sb!vm:n-widetag-bits)))
+  (let ((n-words (get-header-data descriptor))
         (val 0))
     (dotimes (i n-words val)
       (let ((bits (read-bits-wordindexed descriptor
@@ -1857,7 +1851,7 @@ core and return a descriptor to it."
     (unless (cold-null (cold-fdefn-fun fdefn))
       (error "Duplicate DEFUN for ~S" warm-name))
     ;; There can't be any closures or funcallable instances.
-    (aver (= (logand (descriptor-bits (read-memory defn)) sb!vm:widetag-mask)
+    (aver (= (logand (read-bits-wordindexed defn 0) sb!vm:widetag-mask)
              sb!vm:simple-fun-widetag))
     (push (cold-list cold-name inline-expansion dxable-args) *!cold-defuns*)
     (write-wordindexed fdefn sb!vm:fdefn-fun-slot defn)
@@ -3833,8 +3827,7 @@ III. initially undefined function references (alphabetically):
            (let ((name (read-wordindexed x sb!vm:simple-fun-name-slot)))
              `(function ,(recurse name)))))
       (#.sb!vm:other-pointer-lowtag
-       (let ((widetag (logand (descriptor-bits (read-memory x))
-                              sb!vm:widetag-mask)))
+       (let ((widetag (logand (read-bits-wordindexed x 0) sb!vm:widetag-mask)))
          (ecase widetag
            (#.sb!vm:symbol-widetag
             (if strictp
