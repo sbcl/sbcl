@@ -76,7 +76,7 @@
 ;;; portable, because as of sbcl-0.7.4 we need somewhat more than
 ;;; 16Mbytes to represent a core, and ANSI only guarantees that
 ;;; ARRAY-DIMENSION-LIMIT is not less than 1024. -- WHN 2002-06-13
-(defstruct (bigvec (:constructor %make-bigvec))
+(defstruct (bigvec (:constructor %make-bigvec (&optional outer-vector)))
   (outer-vector (vector (make-smallvec)) :type (vector smallvec)))
 (defun make-bigvec (&optional (min-size 0))
   (expand-bigvec (%make-bigvec) min-size))
@@ -91,7 +91,7 @@
 (defun (setf bvref) (new-value bigvec index)
   (multiple-value-bind (outer-index inner-index)
       (floor index +smallvec-length+)
-    (setf (aref (the smallvec
+    (setf (aref (the (simple-array (unsigned-byte 8) (*))
                   (svref (bigvec-outer-vector bigvec) outer-index))
                 inner-index)
           new-value)))
@@ -526,11 +526,6 @@
     (declare (type descriptor address) (type sb!vm:word index)
              (type (or sb!vm:word sb!vm:signed-word) bits))
     (write-bits (logand bits sb!ext:most-positive-word))))
-
-(declaim (ftype (function (descriptor (or symbol descriptor))) write-memory))
-(defun write-memory (address value)
-  "Write VALUE (a DESCRIPTOR) at ADDRESS (also a DESCRIPTOR)."
-  (write-wordindexed address 0 value))
 
 ;;;; allocating images of primitive objects in the cold core
 
@@ -2597,7 +2592,7 @@ core and return a descriptor to it."
 (define-cold-fop (fop-rplaca)
   (let ((obj (ref-fop-table (fasl-input) (read-word-arg (fasl-input-stream))))
         (idx (read-word-arg (fasl-input-stream))))
-    (write-memory (cold-nthcdr idx obj) (pop-stack))))
+    (write-wordindexed (cold-nthcdr idx obj) 0 (pop-stack))))
 
 (define-cold-fop (fop-rplacd)
   (let ((obj (ref-fop-table (fasl-input) (read-word-arg (fasl-input-stream))))
@@ -3368,28 +3363,14 @@ III. initially undefined function references (alphabetically):
 
 ;;;; writing core file
 
-(defvar *core-file*)
-
-(declaim (ftype (function (sb!vm:word) sb!vm:word) write-word))
-(defun write-word (num)
-  (ecase sb!c:*backend-byte-order*
-    (:little-endian
-     (dotimes (i sb!vm:n-word-bytes)
-       (write-byte (ldb (byte 8 (* i 8)) num) *core-file*)))
-    (:big-endian
-     (dotimes (i sb!vm:n-word-bytes)
-       (write-byte (ldb (byte 8 (* (- (1- sb!vm:n-word-bytes) i) 8)) num)
-                   *core-file*))))
-  num)
-
-(defun output-gspace (gspace data-page verbose)
-  (force-output *core-file*)
-  (let* ((posn (file-position *core-file*))
+(defun output-gspace (gspace data-page core-file write-word verbose)
+  (force-output core-file)
+  (let* ((posn (file-position core-file))
          (bytes (* (gspace-free-word-index gspace) sb!vm:n-word-bytes))
          (pages (ceiling bytes sb!c:+backend-page-bytes+))
          (total-bytes (* pages sb!c:+backend-page-bytes+)))
 
-    (file-position *core-file* (* sb!c:+backend-page-bytes+ (1+ data-page)))
+    (file-position core-file (* sb!c:+backend-page-bytes+ (1+ data-page)))
     (when verbose
       (format t "writing ~S byte~:P [~S page~:P] from ~S~%"
               total-bytes pages gspace))
@@ -3401,11 +3382,11 @@ III. initially undefined function references (alphabetically):
     ;; where the page size is equal. (RT is 4K, PMAX is 4K, Sun 3 is
     ;; 8K).
     (write-bigvec-as-sequence (gspace-data gspace)
-                              *core-file*
+                              core-file
                               :end total-bytes
                               :pad-with-zeros t)
-    (force-output *core-file*)
-    (file-position *core-file* posn)
+    (force-output core-file)
+    (file-position core-file posn)
 
     ;; Write part of a (new) directory entry which looks like this:
     ;;   GSPACE IDENTIFIER
@@ -3413,16 +3394,16 @@ III. initially undefined function references (alphabetically):
     ;;   DATA PAGE
     ;;   ADDRESS
     ;;   PAGE COUNT
-    (write-word (gspace-identifier gspace))
-    (write-word (gspace-free-word-index gspace))
-    (write-word data-page)
-    (write-word (gspace-byte-address gspace))
-    (write-word pages)
+    (funcall write-word (gspace-identifier gspace))
+    (funcall write-word (gspace-free-word-index gspace))
+    (funcall write-word data-page)
+    (funcall write-word (gspace-byte-address gspace))
+    (funcall write-word pages)
 
     (+ data-page pages)))
 
 #!+gencgc
-(defun output-page-table (gspace data-page verbose)
+(defun output-page-table (gspace data-page core-file write-word verbose)
   (declare (ignore verbose))
   ;; Write as many PTEs as there are pages used.
   ;; A corefile PTE is { uword_t scan_start_offset; page_bytes_t bytes_used; }
@@ -3462,13 +3443,13 @@ III. initially undefined function references (alphabetically):
         (setf (bvref-word ptes pte-offset) (logior sso #b11))
         (funcall (if (eql sizeof-usage 2) #'(setf bvref-16) #'(setf bvref-32))
                  usage ptes (+ pte-offset sb!vm:n-word-bytes))))
-    (force-output *core-file*)
-    (let ((posn (file-position *core-file*)))
-      (file-position *core-file* (* sb!c:+backend-page-bytes+ (1+ data-page)))
-      (write-bigvec-as-sequence ptes *core-file* :end pte-bytes)
-      (force-output *core-file*)
-      (file-position *core-file* posn))
-    (mapc 'write-word ; 5 = number of words in this core header entry
+    (force-output core-file)
+    (let ((posn (file-position core-file)))
+      (file-position core-file (* sb!c:+backend-page-bytes+ (1+ data-page)))
+      (write-bigvec-as-sequence ptes core-file :end pte-bytes)
+      (force-output core-file)
+      (file-position core-file posn))
+    (mapc write-word ; 5 = number of words in this core header entry
           `(,page-table-core-entry-type-code 5 ,n-ptes ,pte-bytes ,data-page))))
 
 ;;; Create a core file created from the cold loaded image. (This is
@@ -3477,17 +3458,19 @@ III. initially undefined function references (alphabetically):
 ;;; added some functionality to the system.)
 (defun write-initial-core-file (filename verbose)
 
-  (let ((filenamestring (namestring filename))
-        (data-page 0))
+  (when verbose
+    (format t "[building initial core file in ~S: ~%" filename))
 
-    (when verbose
-      (format t "[building initial core file in ~S: ~%" filenamestring))
-
-    (with-open-file (*core-file* filenamestring
-                                 :direction :output
-                                 :element-type '(unsigned-byte 8)
-                                 :if-exists :rename-and-delete)
-
+  (with-open-file (core-file (namestring filename) ; why NAMESTRING? dunno
+                             :direction :output
+                             :element-type '(unsigned-byte 8)
+                             :if-exists :rename-and-delete)
+   (let ((bv (%make-bigvec (vector (make-array sb!vm:n-word-bytes
+                                               :element-type '(unsigned-byte 8)))))
+         (data-page 0))
+    (flet ((write-word (word)
+             (setf (bvref-word bv 0) (the sb!vm:word word))
+             (write-sequence (elt (bigvec-outer-vector bv) 0) core-file)))
       ;; Write the magic number.
       (write-word core-magic)
 
@@ -3504,8 +3487,8 @@ III. initially undefined function references (alphabetically):
         (write-word build-id-core-entry-type-code)
         (write-word (+ 3 nwords)) ; 3 = fixed overhead including this word
         (write-word (length build-id))
-        (dovector (char build-id) (write-byte (sb!xc:char-code char) *core-file*))
-        (dotimes (j (- padding)) (write-byte #xff *core-file*)))
+        (dovector (char build-id) (write-byte (sb!xc:char-code char) core-file))
+        (dotimes (j (- padding)) (write-byte #xff core-file)))
 
       ;; Write the Directory entry header.
       (write-word directory-core-entry-type-code)
@@ -3516,8 +3499,10 @@ III. initially undefined function references (alphabetically):
         ;; length = (5 words/space) * N spaces + 2 for header.
         (write-word (+ (* (length spaces) 5) 2))
         (dolist (space spaces)
-          (setq data-page (output-gspace space data-page verbose))))
-      #!+gencgc (output-page-table *dynamic* data-page verbose)
+          (setq data-page (output-gspace space data-page
+                                         core-file #'write-word verbose))))
+      #!+gencgc (output-page-table *dynamic* data-page
+                                   core-file #'write-word verbose)
 
       ;; Write the initial function.
       (write-word initial-fun-core-entry-type-code)
@@ -3529,7 +3514,7 @@ III. initially undefined function references (alphabetically):
 
       ;; Write the End entry.
       (write-word end-core-entry-type-code)
-      (write-word 2)))
+      (write-word 2))))
 
   (when verbose
     (format t "done]~%")
