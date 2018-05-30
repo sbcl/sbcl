@@ -214,6 +214,7 @@ extern boolean positive_bignum_logbitp(int,struct bignum*);
  * neither of which materially impact garbage collection. */
 
 extern lispobj fdefn_callee_lispobj(struct fdefn *fdefn);
+extern lispobj virtual_fdefn_callee_lispobj(struct fdefn *fdefn,uword_t);
 
 #else
 

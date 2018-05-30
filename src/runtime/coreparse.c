@@ -419,6 +419,37 @@ static inline void fix_fun_header_layout(lispobj* fun, struct heap_adjust* adj)
 #endif
 }
 
+/* About relocation of fdefns - suppose we had originally intended to load:
+ *   [ range of adjustable addresses  ]
+ *   | fixedobj space | varyobj space |
+ *          fdefn --------> callee
+ *   0x1000000        0x2000000
+ * and the subspaces were actually placed at much higher addresses
+ * that do not overlap at all with the intended addresses:
+ *                                       | fixedoboj space | varyobj space |
+ *                                       0x8000000 ...
+ * Then given an fdefn, its callee as computed from the new address appears
+ * such there would be no relocation adjustment for the addressed object.
+ * We correctly do not adjust the fdefn's callee displacement.
+ * But suppose the moved spaces overlap the expected load addresses:
+ *        [ range of adjustable addresses  ]
+ *        | fixedobj space | varyobj space |
+ *               fdefn --------> callee
+ *   0x1000000 = desired
+ *        0x1008000 = actual
+ * In that case there can be an fdefn whose callee appears to be in the
+ * adjustment range, and we'd compute an (incorrect) adjustment. In reality,
+ * both the fdefn and its intended target moved by the same amount,
+ * so the net change to the fdefn JMP instruction displacement ought to be zero.
+ * To deal with this, we have to compute the fdefn callee as if the fdefn were
+ * at its intended load address, then check whether that callee needs adjustment,
+ * and compute a net adjustment by incorporating the amount by which the fdefn
+ * itself moved.  Since both spaces move together for now, these two deltas
+ * cancel out, and the net adjustment becomes zero. The full complexity is
+ * required to handle the situation where only one of the immobile subspaces
+ * moved, which we can't actually handle yet at all.
+ * But already there was a bug when they move together by a small amount.
+ */
 static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
 {
     lispobj *where = (lispobj*)start;
@@ -485,10 +516,17 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
             // the offset from fdefns to code can change if:
             // - static space fdefn -> immobile space code and immobile space moved
             // - immobile spaces changed relative position
-            if ((delta = calc_adjustment(adj, fdefn_callee_lispobj((struct fdefn*)where)))) {
-                void* prel32 = 1 + (char*)(where+3);
-                FIXUP_rel(UNALIGNED_STORE32(prel32, UNALIGNED_LOAD32(prel32) + delta),
-                          prel32);
+            {
+                // See comment above this function concerning fdefn adjustment.
+                lispobj orig = inverse_adjust(adj, (lispobj)where);
+                lispobj callee = virtual_fdefn_callee_lispobj((struct fdefn*)where, orig);
+                sword_t callee_delta = calc_adjustment(adj, callee);
+                delta = callee_delta - ((lispobj)where - orig);
+                if (delta != 0) {
+                    void* prel32 = 1 + (char*)(where+3);
+                    FIXUP_rel(UNALIGNED_STORE32(prel32, UNALIGNED_LOAD32(prel32) + delta),
+                              prel32);
+                }
             }
 #endif
             continue;

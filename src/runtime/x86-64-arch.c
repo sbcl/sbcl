@@ -551,12 +551,15 @@ arch_set_fp_modes(unsigned int mxcsr)
 ///     it resemble a simple-fun in terms of call convention, or
 /// (3) a code-component with no simple-fun within it, that makes
 ///     closures and other funcallable-instances look like simple-funs.
-lispobj fdefn_callee_lispobj(struct fdefn* fdefn) {
+lispobj virtual_fdefn_callee_lispobj(struct fdefn* fdefn, uword_t vaddr) {
     extern unsigned asm_routines_end;
     if (((lispobj)fdefn->raw_addr & 0xFE) == 0xE8) {  // looks good
         int32_t offs = UNALIGNED_LOAD32((char*)&fdefn->raw_addr + 1);
+        // Base the callee address off where the fdefn virtually is.
+        // Compensate for the offset of the raw_addr slot,
+        // and add 5 for the length of "JMP rel32" instruction.
         unsigned int raw_fun =
-            (int)(long)&fdefn->raw_addr + 5 + offs; // 5 = length of "JMP rel32"
+            (unsigned int)vaddr + offsetof(struct fdefn,raw_addr) + 5 + offs;
         switch (((unsigned char*)&fdefn->raw_addr)[5]) {
         case 0x00: // no closure/fin trampoline
           // If the target is an assembly routine, there is no simple-fun
@@ -571,6 +574,9 @@ lispobj fdefn_callee_lispobj(struct fdefn* fdefn) {
     } else if (fdefn->raw_addr == 0)
         return 0;
     lose("Can't decode fdefn raw addr @ %p: %p\n", fdefn, fdefn->raw_addr);
+}
+lispobj fdefn_callee_lispobj(struct fdefn* fdefn) {
+  return virtual_fdefn_callee_lispobj(fdefn, (uword_t)fdefn);
 }
 #endif
 
