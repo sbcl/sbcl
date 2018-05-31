@@ -206,8 +206,7 @@
     (assert (string= string1 string2)))))
 
 (with-test (:name :disassemble-assembly-routine)
-  (sb-disassem:disassemble-code-component sb-fasl:*assembler-routines*
-     :stream (make-broadcast-stream)))
+  (disassemble sb-fasl:*assembler-routines* :stream (make-broadcast-stream)))
 
 ;;; This tests that the x86-64 disasembler does not crash
 ;;; on LEA with a rip-relative operand and no label.

@@ -1692,15 +1692,16 @@
   function, a lambda expression, or a symbol with a function definition. If
   it is not already compiled, the compiler is called to produce something to
   disassemble."
-  (declare (type (or function symbol cons) object)
-           (type (or (member t) stream) stream)
+  (declare (type (or (member t) stream) stream)
            (type (member t nil) use-labels))
-  (flet ((disassemble1 (fun)
-           (format stream "~&; disassembly for ~S" (%fun-name fun))
-           (disassemble-fun fun
-                            :stream stream
-                            :use-labels use-labels)))
-    (mapc #'disassemble1 (ensure-list (compiled-funs-or-lose object))))
+  (if (typep object 'code-component)
+      (disassemble-code-component object :stream stream :use-labels use-labels)
+      (flet ((disassemble1 (fun)
+               (format stream "~&; disassembly for ~S" (%fun-name fun))
+               (disassemble-fun fun
+                                :stream stream
+                                :use-labels use-labels)))
+        (mapc #'disassemble1 (ensure-list (compiled-funs-or-lose object)))))
   nil)
 
 ;;; Disassembles the given area of memory starting at ADDRESS and

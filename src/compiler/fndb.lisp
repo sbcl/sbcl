@@ -1638,7 +1638,7 @@
 
 ;; FIXME: consider making (OR FUNCTION-DESIGNATOR CONS) something like
 ;; EXTENDED-FUNCTION-DESIGNATOR
-(defknown disassemble ((or function-designator cons) &key
+(defknown disassemble ((or function-designator cons code-component) &key
                        (:stream stream) (:use-labels t))
   null)
 
