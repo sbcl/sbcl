@@ -875,12 +875,12 @@
            (optimize (speed 3) (safety 0)))
   (sb!alien:sap-alien
    (sb!vm::current-thread-offset-sap
-    #!+x86-64
+    #!+64-bit
     (- -1 n
        #!+sb-safepoint
        ;; the C safepoint page
        (/ sb!c:+backend-page-bytes+ n-word-bytes))
-    #!-x86-64
+    #!-64-bit
     (+ sb!vm::primitive-thread-object-length
        #!-alpha n
        #!+alpha (* 2 n)))

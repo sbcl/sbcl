@@ -202,17 +202,16 @@ extern __thread struct thread *current_thread;
 #define ALT_STACK_SIZE 32 * SIGSTKSZ
 #endif
 
-#ifdef LISP_FEATURE_X86_64
+#ifdef LISP_FEATURE_64_BIT
   #define THREAD_MEMORY_LAYOUT_NEW 1
   /* Referring to the "old" and "new" pictures in the comment at
    * create_thread_struct(), observe that in the old scheme the interrupt
    * contexts are accounted for in dynamic_values_bytes (4K words by default).
    * In the new, they aren't, so sum them separately in THREAD_STRUCT_SIZE */
   #define INTERRUPT_CONTEXTS_SIZE (MAX_INTERRUPTS*sizeof(os_context_t*))
-  /* context 0 is the word immediately before the thread struct, and so on.
-   * Pointer subtraction is well-defined in C, but negative indexing is not,
-   * despite the equivalence of *(a+j) and a[j], or so I'm led to believe. */
-  #define nth_interrupt_context(n,thread) *((os_context_t**)thread - 1 - THREAD_CSP_PAGE_SIZE / N_WORD_BYTES - (n))
+  /* context 0 is the word immediately before the thread struct, and so on. */
+  #define nth_interrupt_context(n,thread) \
+      ((os_context_t**)((char*)thread - THREAD_CSP_PAGE_SIZE))[-(n+1)]
 #else
   #define THREAD_MEMORY_LAYOUT_NEW 0
   #define INTERRUPT_CONTEXTS_SIZE 0

@@ -477,14 +477,15 @@
 ;;; This constant is the index prior to scaling.
 (defconstant sb!thread::tls-index-start
   (+ primitive-thread-object-length
-     ;; x86-64 interrupt contexts precede 'struct thread' so that TLS indices
+     ;; All 64-bit architectures have been converted to place interrupt contexts
+     ;; preceding 'struct thread' in memory so that TLS indices
      ;; continue without a gap from the offset of the last primitive thread slot
      ;; up until the TLS-SIZE'th slot (at which point exhaustion occurs).
      ;;
-     ;; Other backends that haven't been converted over to use that thread memory
-     ;; layout have the interrupt contexts array intruding into the TLS area.
+     ;; 32-bit architectures haven't been converted over to use that thread memory
+     ;; layout, and have the interrupt contexts array intruding into the TLS area.
      ;; That array must be skipped over when computing the next available index.
-     #!-x86-64 (1+ sb!vm:max-interrupts)))
+     #!-64-bit (1+ sb!vm:max-interrupts)))
 
 (defmacro make-code-header-word (boxed-nwords)
   `(logior (ash ,boxed-nwords #!+64-bit 32 #!-64-bit n-widetag-bits)

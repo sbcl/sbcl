@@ -227,7 +227,7 @@
 
 #!+sb-thread
 (progn
-  (defknown current-thread-offset-sap (word)
+  (defknown current-thread-offset-sap (signed-word)
       system-area-pointer (flushable))
 
   (defun ldr-str-word-offset-encodable (x)
@@ -247,8 +247,8 @@
     (:results (sap :scs (sap-reg)))
     (:result-types system-area-pointer)
     (:translate current-thread-offset-sap)
-    (:args (n :scs (unsigned-reg) :target sap))
-    (:arg-types unsigned-num)
+    (:args (n :scs (signed-reg) :target sap))
+    (:arg-types signed-num)
     (:policy :fast-safe)
     (:generator 2
                 (inst ldr sap (@ thread-tn (extend n :lsl word-shift))))))
