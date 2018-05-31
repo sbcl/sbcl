@@ -161,7 +161,7 @@
     (let* ((random-numbers (loop repeat (+ (random 20) 3)
                                  collect (1+ (random 4000))))
            (test-list (sort (delete-duplicates random-numbers) #'<))
-           (packed-int (sb-c::pack-code-fixup-locs test-list))
+           (packed-int (sb-c::pack-code-fixup-locs test-list nil))
            (result (make-array 1 :element-type 'sb-ext:word)))
       ;; The packer intrinsically self-checks the packing
       ;; so we don't need to assert anything about that.

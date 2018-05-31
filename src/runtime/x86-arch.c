@@ -533,32 +533,9 @@ sniff_code_object(struct code *code, os_vm_size_t displacement)
 void
 gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
 {
-    sword_t nheader_words, ncode_words, nwords;
-    os_vm_address_t __attribute__((unused)) constants_start_addr, constants_end_addr;
-    os_vm_address_t __attribute__((unused)) code_start_addr, code_end_addr;
-    os_vm_address_t code_addr = (os_vm_address_t)new_code;
-    os_vm_address_t old_addr = (os_vm_address_t)old_code;
-    os_vm_size_t displacement = code_addr - old_addr;
-
-    ncode_words = code_unboxed_nwords(new_code->code_size);
-    nheader_words = code_header_words(new_code->header);
-    nwords = ncode_words + nheader_words;
-    /* FSHOW((stderr,
-             "/compiled code object at %x: header words = %d, code words = %d\n",
-             new_code, nheader_words, ncode_words)); */
-    constants_start_addr = code_addr + 5*N_WORD_BYTES;
-    constants_end_addr = code_addr + nheader_words*N_WORD_BYTES;
-    code_start_addr = code_addr + nheader_words*N_WORD_BYTES;
-    code_end_addr = code_addr + nwords*N_WORD_BYTES;
-    /*
-    FSHOW((stderr,
-           "/const start = %x, end = %x\n",
-           constants_start_addr,constants_end_addr));
-    FSHOW((stderr,
-           "/code start = %x; end = %x\n",
-           code_start_addr,code_end_addr));
-    */
-
+    char* code_start_addr = (char*)(code_header_words(new_code->header)
+                                    + (lispobj*)new_code);
+    os_vm_size_t displacement = (char*)new_code - (char*)old_code;
     lispobj fixups = new_code->fixups;
     /* It will be a nonzero integer if valid, or 0 if there are no fixups */
     if (fixups == 0) {
@@ -582,37 +559,30 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
         fixups = forwarding_pointer_value(native_pointer(fixups));
     }
 
-    /*SHOW("got fixups");*/
-
     if (fixnump(fixups) ||
         (lowtag_of(fixups) == OTHER_POINTER_LOWTAG
          && widetag_of(*native_pointer(fixups)) == BIGNUM_WIDETAG)) {
-        /* Got the fixups for the code block. Now work through the vector,
-           and apply a fixup at each address. */
+        /* Got the fixups for the code block. Now work through them
+           in order, first the absolute ones, then the relative.
+           Locations are sorted and delta-encoded for compactness. */
         struct varint_unpacker unpacker;
         varint_unpacker_init(&unpacker, fixups);
         int prev_offset = 0, offset;
+        // Absolute fixups all refer to this object itself (the code
+        // boxed constants). Add this object's displacement to the
+        // value that currently exists at the fixup location.
         while (varint_unpack(&unpacker, &offset) && offset != 0) {
-            // For extra compactness, each offset is relative to the prior,
-            // so that the magnitudes are smaller.
             offset += prev_offset;
             prev_offset = offset;
-            /* Now check the current value of offset. */
-            os_vm_address_t old_value = *(os_vm_address_t *)(code_start_addr + offset);
-
-            /* If it's within the old_code object then it must be an
-             * absolute fixup (relative ones are not saved) */
-            if ((old_value >= old_addr)
-                && (old_value < (old_addr + nwords*N_WORD_BYTES)))
-                /* So add the dispacement. */
-                *(os_vm_address_t *)(code_start_addr + offset) =
-                    old_value + displacement;
-            else
-                /* It is outside the old code object so it must be a
-                 * relative fixup (absolute fixups are not saved). So
-                 * subtract the displacement. */
-                *(os_vm_address_t *)(code_start_addr + offset) =
-                    old_value - displacement;
+            *(char**)(code_start_addr + offset) += displacement;
+        }
+        prev_offset = 0;
+        // Relative fixups: assembly and foreign routines. Subtract this
+        // object's displacement from the value that currently exists.
+        while (varint_unpack(&unpacker, &offset) && offset != 0) {
+            offset += prev_offset;
+            prev_offset = offset;
+            *(char**)(code_start_addr + offset) -= displacement;
         }
     } else {
         /* This used to just print a note to stderr, but a bogus fixup seems to

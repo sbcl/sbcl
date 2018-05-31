@@ -2079,9 +2079,7 @@ core and return a descriptor to it."
       ;; {target}-vm.lisp, but x86 doesn't. Is it really so impossible?
       ;; See FIXUP-CODE-OBJECT in x86-vm.lisp and x86-64-vm.lisp.
       ;; Except for the use of saps, this is basically identical.
-      (let
-          ((savep
-            (ecase kind
+      (when (ecase kind
              (:absolute
               (setf (bvref-32 gspace-data gspace-byte-offset)
                     (the (unsigned-byte 32) addr))
@@ -2104,16 +2102,14 @@ core and return a descriptor to it."
               (setf (bvref-32 gspace-data gspace-byte-offset)
                     (the (signed-byte 32)
                       (- addr (+ gspace-base gspace-byte-offset 4)))) ; 4 = size of rel32off
-              ;; Relative fixups are recorded if without the object.
+              ;; Relative fixups are recorded if outside of the object.
               ;; Except that read-only space contains calls to asm routines,
               ;; and we don't record those fixups.
               #!+x86 (and in-dynamic-space
                           (not (< obj-start-addr addr code-end-addr)))
-              #!+x86-64 (if (eq flavor :foreign) :relative)))))
-        (when savep
-          (push (cons (if (eq savep :relative) :relative :absolute) after-header)
-                (gethash (descriptor-bits code-object)
-                         *code-fixup-notes*))))))
+              #!+x86-64 (eq flavor :foreign)))
+        (push (cons kind after-header)
+              (gethash (descriptor-bits code-object) *code-fixup-notes*)))))
   code-object)
 
 (defun resolve-static-call-fixups ()
@@ -2124,7 +2120,6 @@ core and return a descriptor to it."
                   kind :static-call))))
 
 ;;; Save packed lists of absolute and relative fixups.
-;;; FIXME: 32-bit x86 makes no explicit distinction.
 ;;; (cf. FINISH-FIXUPS in generic/target-core.)
 (defun repack-fixups (list)
   (collect ((relative) (absolute))

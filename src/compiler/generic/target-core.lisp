@@ -51,8 +51,7 @@
          ;; CODE-OBJ must already be pinned in order to legally call this.
          ;; One call site that reaches here is below at MAKE-CORE-COMPONENT
          ;; and the other is LOAD-CODE, both of which pin the code.
-         (let ((savep
-                (sb!vm:fixup-code-object
+         (when (sb!vm:fixup-code-object
                  code-obj offset
                  (ecase flavor
                    ((:assembly-routine :assembly-routine*)
@@ -66,22 +65,20 @@
                    (:immobile-object (get-lisp-obj-address sym))
                    #!+immobile-code (:named-call (sb!vm::fdefn-entry-address sym))
                    #!+immobile-code (:static-call (sb!vm::function-raw-address sym)))
-                 kind flavor)))
-           ;; These won't exist except for x86-64, but it doesn't matter.
-           (when (member sym '(sb!vm::enable-alloc-counter
-                               sb!vm::enable-sized-alloc-counter))
-             (push offset (elt preserved-lists 2)))
-           (cond ((eq savep :relative) (push offset (elt preserved-lists 0)))
-                 (savep (push offset (elt preserved-lists 1))))))
+                 kind flavor)
+           (ecase kind
+             (:relative (push offset (elt preserved-lists 0)))
+             (:absolute (push offset (elt preserved-lists 1)))))
+         ;; These won't exist except for x86-64, but it doesn't matter.
+         (when (member sym '(sb!vm::enable-alloc-counter
+                             sb!vm::enable-sized-alloc-counter))
+           (push offset (elt preserved-lists 2))))
 
        (finish-fixups (code-obj preserved-lists)
          (declare (ignorable code-obj preserved-lists))
          #!+(or immobile-space x86)
          (let ((rel-fixups (elt preserved-lists 0))
                (abs-fixups (elt preserved-lists 1)))
-           ;; x86-64 stores both lists of fixup locs in a packed integer.
-           ;; All fixups on x86 belong to the 'abs-fixups' list, and C code
-           ;; deciphers (usually correctly) which are which. (See lp#1749369)
            (when (or abs-fixups rel-fixups)
              (setf (sb!vm::%code-fixups code-obj)
                    (sb!c::pack-code-fixup-locs abs-fixups rel-fixups))))

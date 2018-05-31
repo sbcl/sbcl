@@ -31,7 +31,9 @@
        ;; Word at sap + offset contains a value to be replaced by
        ;; adding that value to fixup.
        (setf (sap-ref-32 sap offset) (+ fixup (sap-ref-32 sap offset)))
-       ;; Record absolute fixups that point within the code object.
+       ;; Record absolute fixups that point into CODE. An absolute fixup
+       ;; can't point to another dynamic-space object, but it could point
+       ;; to read-only or static space. Those don't need to be saved.
        (< obj-start-addr (sap-ref-32 sap offset) code-end-addr))
       (:relative
        ;; Fixup is the actual address wanted.
@@ -43,8 +45,9 @@
               (rel-val (ldb (byte 32 0) (- fixup loc-sap n-word-bytes))))
          (declare (type (unsigned-byte 32) loc-sap rel-val))
          (setf (sap-ref-32 sap offset) rel-val))
-       ;; Record relative fixups that point outside the code object.
-       (or (< fixup obj-start-addr) (> fixup code-end-addr))))))
+       ;; Relative fixups point outside of this object. Keep them all.
+       (aver (or (< fixup obj-start-addr) (> fixup code-end-addr)))
+       t))))
 
 ;;;; low-level signal context access functions
 ;;;;
