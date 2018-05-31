@@ -40,9 +40,6 @@
 #define BREAKPOINT_WIDTH 2
 #endif
 
-/* Should we check code objects for fixup errors after they are transported? */
-boolean check_code_fixups = 0;
-
 void arch_init(void)
 {}
 
@@ -348,188 +345,6 @@ arch_install_interrupt_handlers()
 }
 
 
-/* Scan a x86 compiled code object, looking for possible fixups that
- * have been missed after a move.
- *
- * Two types of fixups are needed:
- * 1. Absolute fixups to within the code object.
- * 2. Relative fixups to outside the code object.
- *
- * Currently only absolute fixups to the constant vector, or to the
- * code area are checked. */
-void
-sniff_code_object(struct code *code, os_vm_size_t displacement)
-{
-    sword_t nheader_words, ncode_words, nwords;
-    os_vm_address_t constants_start_addr = NULL, constants_end_addr, p;
-    os_vm_address_t code_start_addr, code_end_addr;
-    os_vm_address_t code_addr = (os_vm_address_t)code;
-    int fixup_found = 0;
-
-    if (!check_code_fixups)
-        return;
-
-    FSHOW((stderr, "/sniffing code: %p, %lu\n", code, displacement));
-
-    ncode_words = code_unboxed_nwords(code->code_size);
-    nheader_words = code_header_words(code->header);
-    nwords = ncode_words + nheader_words;
-
-    constants_start_addr = code_addr + offsetof(struct code, constants);
-    constants_end_addr = code_addr + nheader_words*N_WORD_BYTES;
-    code_start_addr = code_addr + nheader_words*N_WORD_BYTES;
-    code_end_addr = code_addr + nwords*N_WORD_BYTES;
-
-    /* Work through the unboxed code. */
-    for (p = code_start_addr; p < code_end_addr; p++) {
-        void *data = *(void **)p;
-        unsigned d1 = *((unsigned char *)p - 1);
-        unsigned d2 = *((unsigned char *)p - 2);
-        unsigned d3 = *((unsigned char *)p - 3);
-        unsigned d4 = *((unsigned char *)p - 4);
-#if QSHOW
-        unsigned d5 = *((unsigned char *)p - 5);
-        unsigned d6 = *((unsigned char *)p - 6);
-#endif
-
-        /* Check for code references. */
-        /* Check for a 32 bit word that looks like an absolute
-           reference to within the code adea of the code object. */
-        if ((data >= (void*)(code_start_addr-displacement))
-            && (data < (void*)(code_end_addr-displacement))) {
-            /* function header */
-            if ((d4 == 0x5e)
-                && (((unsigned)p - 4 - 4*HeaderValue(*((unsigned *)p-1))) ==
-                    (unsigned)code)) {
-                /* Skip the function header */
-                p += 6*4 - 4 - 1;
-                continue;
-            }
-            /* the case of PUSH imm32 */
-            if (d1 == 0x68) {
-                fixup_found = 1;
-                FSHOW((stderr,
-                       "/code ref @%x: %.2x %.2x %.2x %.2x %.2x %.2x (%.8x)\n",
-                       p, d6, d5, d4, d3, d2, d1, data));
-                FSHOW((stderr, "/PUSH $0x%.8x\n", data));
-            }
-            /* the case of MOV [reg-8],imm32 */
-            if ((d3 == 0xc7)
-                && (d2==0x40 || d2==0x41 || d2==0x42 || d2==0x43
-                    || d2==0x45 || d2==0x46 || d2==0x47)
-                && (d1 == 0xf8)) {
-                fixup_found = 1;
-                FSHOW((stderr,
-                       "/code ref @%x: %.2x %.2x %.2x %.2x %.2x %.2x (%.8x)\n",
-                       p, d6, d5, d4, d3, d2, d1, data));
-                FSHOW((stderr, "/MOV [reg-8],$0x%.8x\n", data));
-            }
-            /* the case of LEA reg,[disp32] */
-            if ((d2 == 0x8d) && ((d1 & 0xc7) == 5)) {
-                fixup_found = 1;
-                FSHOW((stderr,
-                       "/code ref @%x: %.2x %.2x %.2x %.2x %.2x %.2x (%.8x)\n",
-                       p, d6, d5, d4, d3, d2, d1, data));
-                FSHOW((stderr,"/LEA reg,[$0x%.8x]\n", data));
-            }
-        }
-
-        /* Check for constant references. */
-        /* Check for a 32 bit word that looks like an absolute
-           reference to within the constant vector. Constant references
-           will be aligned. */
-        if ((data >= (void*)(constants_start_addr-displacement))
-            && (data < (void*)(constants_end_addr-displacement))
-            && (((unsigned)data & 0x3) == 0)) {
-            /*  Mov eax,m32 */
-            if (d1 == 0xa1) {
-                fixup_found = 1;
-                FSHOW((stderr,
-                       "/abs const ref @%x: %.2x %.2x %.2x %.2x %.2x %.2x (%.8x)\n",
-                       p, d6, d5, d4, d3, d2, d1, data));
-                FSHOW((stderr,"/MOV eax,0x%.8x\n", data));
-            }
-
-            /*  the case of MOV m32,EAX */
-            if (d1 == 0xa3) {
-                fixup_found = 1;
-                FSHOW((stderr,
-                       "/abs const ref @%x: %.2x %.2x %.2x %.2x %.2x %.2x (%.8x)\n",
-                       p, d6, d5, d4, d3, d2, d1, data));
-                FSHOW((stderr, "/MOV 0x%.8x,eax\n", data));
-            }
-
-            /* the case of CMP m32,imm32 */
-            if ((d1 == 0x3d) && (d2 == 0x81)) {
-                fixup_found = 1;
-                FSHOW((stderr,
-                       "/abs const ref @%x: %.2x %.2x %.2x %.2x %.2x %.2x (%.8x)\n",
-                       p, d6, d5, d4, d3, d2, d1, data));
-                /* XX Check this */
-                FSHOW((stderr, "/CMP 0x%.8x,immed32\n", data));
-            }
-
-            /* Check for a mod=00, r/m=101 byte. */
-            if ((d1 & 0xc7) == 5) {
-                /* Cmp m32,reg */
-                if (d2 == 0x39) {
-                    fixup_found = 1;
-                    FSHOW((stderr,
-                           "/abs const ref @%x: %.2x %.2x %.2x %.2x %.2x %.2x (%.8x)\n",
-                           p, d6, d5, d4, d3, d2, d1, data));
-                    FSHOW((stderr,"/CMP 0x%.8x,reg\n", data));
-                }
-                /* the case of CMP reg32,m32 */
-                if (d2 == 0x3b) {
-                    fixup_found = 1;
-                    FSHOW((stderr,
-                           "/abs const ref @%x: %.2x %.2x %.2x %.2x %.2x %.2x (%.8x)\n",
-                           p, d6, d5, d4, d3, d2, d1, data));
-                    FSHOW((stderr, "/CMP reg32,0x%.8x\n", data));
-                }
-                /* the case of MOV m32,reg32 */
-                if (d2 == 0x89) {
-                    fixup_found = 1;
-                    FSHOW((stderr,
-                           "/abs const ref @%x: %.2x %.2x %.2x %.2x %.2x %.2x (%.8x)\n",
-                           p, d6, d5, d4, d3, d2, d1, data));
-                    FSHOW((stderr, "/MOV 0x%.8x,reg32\n", data));
-                }
-                /* the case of MOV reg32,m32 */
-                if (d2 == 0x8b) {
-                    fixup_found = 1;
-                    FSHOW((stderr,
-                           "/abs const ref @%x: %.2x %.2x %.2x %.2x %.2x %.2x (%.8x)\n",
-                           p, d6, d5, d4, d3, d2, d1, data));
-                    FSHOW((stderr, "/MOV reg32,0x%.8x\n", data));
-                }
-                /* the case of LEA reg32,m32 */
-                if (d2 == 0x8d) {
-                    fixup_found = 1;
-                    FSHOW((stderr,
-                           "abs const ref @%x: %.2x %.2x %.2x %.2x %.2x %.2x (%.8x)\n",
-                           p, d6, d5, d4, d3, d2, d1, data));
-                    FSHOW((stderr, "/LEA reg32,0x%.8x\n", data));
-                }
-            }
-        }
-    }
-
-    /* If anything was found, print some information on the code
-     * object. */
-    if (fixup_found) {
-        FSHOW((stderr,
-               "/compiled code object at %x: header words = %d, code words = %d\n",
-               code, nheader_words, ncode_words));
-        FSHOW((stderr,
-               "/const start = %x, end = %x\n",
-               constants_start_addr, constants_end_addr));
-        FSHOW((stderr,
-               "/code start = %x, end = %x\n",
-               code_start_addr, code_end_addr));
-    }
-}
-
 void
 gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
 {
@@ -538,13 +353,8 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
     os_vm_size_t displacement = (char*)new_code - (char*)old_code;
     lispobj fixups = new_code->fixups;
     /* It will be a nonzero integer if valid, or 0 if there are no fixups */
-    if (fixups == 0) {
-        /* Check for possible errors. */
-        if (check_code_fixups)
-            sniff_code_object(new_code, displacement);
-
+    if (fixups == 0)
         return;
-    }
 
     /* Could be pointing to a forwarding pointer. */
     /* This is extremely unlikely, because the only referent of the fixups
@@ -585,15 +395,10 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
             *(char**)(code_start_addr + offset) -= displacement;
         }
     } else {
-        /* This used to just print a note to stderr, but a bogus fixup seems to
-         * indicate real heap corruption, so a hard hailure is in order. */
+        /* This used to just print a note to stderr, but bogus fixups seem to
+         * indicate real heap corruption, so a hard failure is in order. */
         lose("fixup vector %p has a bad widetag: %d\n",
              fixups, widetag_of(*native_pointer(fixups)));
-    }
-
-    /* Check for possible errors. */
-    if (check_code_fixups) {
-        sniff_code_object(new_code,displacement);
     }
 }
 
