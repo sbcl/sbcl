@@ -15,7 +15,7 @@ NM = ./linux-nm
 ASSEM_SRC = hppa-assem.S ldso-stubs.S
 ARCH_SRC = hppa-arch.c undefineds.c
 
-OS_SRC = linux-os.c hppa-linux-os.c
+OS_SRC = linux-os.c linux-mman.c hppa-linux-os.c
 OS_LIBS = -ldl
 ifdef LISP_FEATURE_SB_CORE_COMPRESSION
   OS_LIBS += -lz

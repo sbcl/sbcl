@@ -15,7 +15,7 @@ NM = ./linux-nm
 ASSEM_SRC = arm-assem.S ldso-stubs.S
 ARCH_SRC = arm-arch.c
 
-OS_SRC = linux-os.c arm-linux-os.c
+OS_SRC = linux-os.c linux-mman.c arm-linux-os.c
 OS_LIBS = -ldl
 
 ifdef LISP_FEATURE_GENCGC

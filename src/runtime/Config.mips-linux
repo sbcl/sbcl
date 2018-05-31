@@ -15,7 +15,7 @@ NM = ./linux-nm
 ASSEM_SRC = mips-assem.S ldso-stubs.S
 ARCH_SRC = mips-arch.c
 
-OS_SRC = linux-os.c mips-linux-os.c
+OS_SRC = linux-os.c linux-mman.c mips-linux-os.c
 OS_LIBS = -ldl
 
 ifdef LISP_FEATURE_LARGEFILE

@@ -13,7 +13,7 @@ NM = ./linux-nm
 
 ASSEM_SRC = x86-assem.S ldso-stubs.S
 ARCH_SRC = x86-arch.c
-OS_SRC = linux-os.c x86-linux-os.c
+OS_SRC = linux-os.c linux-mman.c x86-linux-os.c
 
 # The "--Wl,--export-dynamic" flags are here to help people
 # experimenting with callbacks from C to SBCL, by allowing linkage to

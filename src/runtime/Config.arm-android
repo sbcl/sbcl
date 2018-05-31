@@ -17,7 +17,7 @@ NM = ${NDK_PATH}/toolchains/arm-linux-androideabi-4.8/prebuilt/linux-x86_64/arm-
 ASSEM_SRC = arm-assem.S ldso-stubs.S
 ARCH_SRC = arm-arch.c
 
-OS_SRC = linux-os.c arm-linux-os.c android-os.c arm-android-os.c
+OS_SRC = linux-os.c linux-mman.c arm-linux-os.c android-os.c arm-android-os.c
 OS_LIBS = -ldl
 
 ifdef LISP_FEATURE_GENCGC

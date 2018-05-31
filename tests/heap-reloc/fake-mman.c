@@ -1,15 +1,8 @@
-#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
-#include <dlfcn.h>
-#include <sys/mman.h>
+#include "../../src/runtime/os.h"
 
 static int verbose=1;
-
-// For LISP_FEATURE_64_BIT
-#include "../../src/runtime/genesis/config.h"
-// For DEFAULT_DYNAMIC_SPACE_SIZE
-#include "../../src/runtime/genesis/constants.h"
 
 /// "Pseudo-randomly" alter requested address for testing purposes so that
 /// we can test interesting scenarios such as:
@@ -68,47 +61,50 @@ void pick_fuzzed_addresses(unsigned long *addr1,
     fclose(f);
 }
 
-void* fuzz(void* addr, int flags)
+os_vm_address_t
+os_validate(int option, os_vm_address_t addr, os_vm_size_t len)
 {
-    static unsigned long addr1, addr2;
-    if (!addr1)
-        pick_fuzzed_addresses(&addr1, &addr2);
-#ifdef LISP_FEATURE_64_BIT
-    if (!(flags & MAP_32BIT))
-      return (void*)addr2;
+    int flags =  MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE;
+    void *fuzzed = addr;
+    os_vm_address_t actual;
+    int movable = option & (MOVABLE | MOVABLE_LOW);
+
+#ifdef MAP_32BIT
+    if (option & MOVABLE_LOW)
+        flags |= MAP_32BIT;
 #endif
-    return (void*)addr1;
+    if (addr && movable) {
+        static unsigned long addr1, addr2;
+        if (!addr1)
+            pick_fuzzed_addresses(&addr1, &addr2);
+#ifdef LISP_FEATURE_64_BIT
+        if (!(option & MOVABLE_LOW))
+            fuzzed = (void*)addr2;
+        else
+#endif
+            fuzzed = (void*)addr1;
+    }
+    actual = mmap(fuzzed, len, OS_VM_PROT_ALL, flags, -1, 0);
+    if (actual == MAP_FAILED) {
+        perror("mmap");
+        return 0;               /* caller should check this */
+    }
+    if (addr && !movable && (actual != addr)) {
+        fprintf(stderr, "mmap: wanted %lu bytes at %p, actually mapped at %p\n",
+                (unsigned long) len, addr, actual);
+        return 0;
+    }
+    if (verbose && addr != fuzzed)
+      fprintf(stderr, actual == fuzzed ?
+              "//Fuzzed %12p into %12p successfully\n":
+              "//Tried fuzzing %p into %p but actually got %p\n",
+              addr, fuzzed, actual);
+    return actual;
 }
 
-int ok_size(int size) {
-    return size >= 128*1024*1024 || size == DEFAULT_DYNAMIC_SPACE_SIZE;
-}
-
-// Fuzzer has to guess whether this was a relocatable request based on size
-// because we eschew the MAP_FIXED flag in all cases.
-#define CALL_REAL_FUN() \
-  if (addr && ((flags & MAP_32BIT) || ok_size(length))) { \
-    void *changed_addr = fuzz(addr, flags); \
-    void *got = realfun(changed_addr, length, prot, flags, fd, offset); \
-    if (verbose) \
-      fprintf(stderr, got==changed_addr ?                               \
-              "//Fuzzed %12p into %12p successfully\n":                 \
-              "//Tried fuzzing %p into %p but actually got %p\n",       \
-              addr, changed_addr, got);                                 \
-    return got; } else { return realfun(addr, length, prot, flags, fd, offset); }
-
-void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset)
+void os_invalidate(os_vm_address_t addr, os_vm_size_t len)
 {
-    if (verbose>1)
-        fprintf(stderr, "//mmap @ %p for %ld, fd=%d\n", addr, length, fd);
-    void *(*realfun)() = dlsym(RTLD_NEXT, "mmap");
-    CALL_REAL_FUN();
-}
-
-void *mmap64(void *addr, size_t length, int prot, int flags, int fd, off64_t offset)
-{
-    if (verbose>1)
-        fprintf(stderr, "//mmap64 @ %p for %ld, fd=%d\n", addr, length, fd);
-    void *(*realfun)() = dlsym(RTLD_NEXT, "mmap64");
-    CALL_REAL_FUN();
+    if (munmap(addr,len) == -1) {
+        perror("munmap");
+    }
 }
