@@ -2253,7 +2253,7 @@ void verify_immobile_page_protection(int keep_gen, int new_gen)
 }
 
 // Fixup immediate values that encode Lisp object addresses
-// in immobile space.
+// in immobile space. Process only the absolute fixups.
 // TODO: remove the fixup_lispobj function; this doesn't generalize
 // as originally thought. coreparse has its own way of doing things.
 #include "forwarding-ptr.h"
@@ -2261,14 +2261,12 @@ void verify_immobile_page_protection(int keep_gen, int new_gen)
 void fixup_immobile_refs(lispobj (*fixup_lispobj)(lispobj),
                          lispobj fixups, struct code* code)
 {
-    if (listp(fixups))
-        fixups = CONS(fixups)->car;
-    if (!fixups) // if no fixups, or only relative fixups
-        return;
     struct varint_unpacker unpacker;
     varint_unpacker_init(&unpacker, fixups);
     char* instructions = (char*)((lispobj*)code + code_header_words(code->header));
     int prev_loc = 0, loc;
+    // The unpacker will produce successive values followed by a zero. There may
+    // be a second data stream for the relative fixups which we ignore.
     while (varint_unpack(&unpacker, &loc) && loc != 0) {
         // For extra compactness, each loc is relative to the prior,
         // so that the magnitudes are smaller.

@@ -2123,18 +2123,16 @@ core and return a descriptor to it."
                   (cold-fun-entry-addr (cold-symbol-function name))
                   kind :static-call))))
 
-;;; Save a cons of both kinds of fixups if there are both, otherwise just the
-;;; not-explicitly-relative kind (which include both kinds for 32-bit x86)
+;;; Save packed lists of absolute and relative fixups.
+;;; FIXME: 32-bit x86 makes no explicit distinction.
 ;;; (cf. FINISH-FIXUPS in generic/target-core.)
 (defun repack-fixups (list)
   (collect ((relative) (absolute))
     (dolist (item list)
-      (if (eq (car item) :relative)
-          (relative (cdr item))
-          (absolute (cdr item))))
-    (let ((packed-rel (number-to-core (sb!c::pack-code-fixup-locs (relative))))
-          (packed-abs (number-to-core (sb!c::pack-code-fixup-locs (absolute)))))
-      (if (relative) (cold-cons packed-abs packed-rel) packed-abs))))
+      (ecase (car item)
+        (:relative (relative (cdr item)))
+        (:absolute (absolute (cdr item)))))
+    (number-to-core (sb!c::pack-code-fixup-locs (absolute) (relative)))))
 
 #!+sb-dynamic-core
 (defun dyncore-note-symbol (symbol-name datap)

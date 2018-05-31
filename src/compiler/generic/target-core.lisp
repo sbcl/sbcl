@@ -79,15 +79,12 @@
          #!+(or immobile-space x86)
          (let ((rel-fixups (elt preserved-lists 0))
                (abs-fixups (elt preserved-lists 1)))
-             ;; Store a cons of both only if there are any relative fixups,
-             ;; otherwise just the absolute [sic] fixups (the more common kind),
-             ;; some of which are actually relative fixups on x86. The C code
-             ;; deciphers (usually correctly) which are which. (See lp#1749369)
+           ;; x86-64 stores both lists of fixup locs in a packed integer.
+           ;; All fixups on x86 belong to the 'abs-fixups' list, and C code
+           ;; deciphers (usually correctly) which are which. (See lp#1749369)
            (when (or abs-fixups rel-fixups)
-             (let ((abs (sb!c::pack-code-fixup-locs abs-fixups))
-                   (rel (sb!c::pack-code-fixup-locs rel-fixups)))
-               (setf (sb!vm::%code-fixups code-obj)
-                     (if rel-fixups (cons abs rel) abs)))))
+             (setf (sb!vm::%code-fixups code-obj)
+                   (sb!c::pack-code-fixup-locs abs-fixups rel-fixups))))
          (awhen (elt preserved-lists 2)
            (setf (gethash code-obj *allocation-point-fixups*)
                  (convert-alloc-point-fixups code-obj it)))

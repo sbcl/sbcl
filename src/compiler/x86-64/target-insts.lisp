@@ -443,4 +443,5 @@
                           (bug "Failed to find allocation point"))
                          ((eql (sap-ref-8 (code-instructions code) loc) #xEB)
                           (return loc)))))
-           locs)))
+           locs)
+   nil))

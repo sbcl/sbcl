@@ -390,14 +390,11 @@
   (terpri stream))
 
 (defun code-fixup-locs (code spaces)
-  (let ((fixups (sb-vm::%code-fixups code)))
-    (unless (eql fixups 0)
-      ;; If fixups is a cons, it separately records absolute and relative fixups.
-      ;; We only need the absolute fixups.
-      (let ((locs (if (consp fixups) (car (translate fixups spaces)) fixups)))
-        ;; Now if we have a bignum, translate it
-        (sb-c::unpack-code-fixup-locs
-         (if (fixnump locs) locs (translate locs spaces)))))))
+  (let ((locs (sb-vm::%code-fixups code)))
+    ;; Return only the absolute fixups
+    ;; Ensure that a bignum LOCS is translated before using it.
+    (values (sb-c::unpack-code-fixup-locs
+             (if (fixnump locs) locs (translate locs spaces))))))
 
 ;;; Disassemble the function pointed to by SAP for LENGTH bytes, returning
 ;;; all instructions that should be emitted using assembly language

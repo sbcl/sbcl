@@ -372,15 +372,11 @@ adjust_code_refs(struct heap_adjust* adj, struct code* code, lispobj original_va
     // Dynamic space is a always relocated before immobile space,
     // and dynamic space code does not use fixups (except on 32-bit x86).
     // So if we're here, it must be to relocate an immobile object.
-    // Therefore these CAR and CDR operations are correct,
-    // because what they point to has already been relocated.
-    lispobj fixups    = code->fixups;
-    lispobj absfixups = listp(fixups) ? CONS(fixups)->car : fixups;
-    lispobj relfixups = listp(fixups) ? CONS(fixups)->cdr : 0;
+    // If 'code->fixups' is a bignum, the pointer itself was already fixed up.
     char* instructions = (char*)((lispobj*)code + code_header_words(code->header));
     struct varint_unpacker unpacker;
 
-    varint_unpacker_init(&unpacker, absfixups);
+    varint_unpacker_init(&unpacker, code->fixups);
     int prev_loc = 0, loc;
     while (varint_unpack(&unpacker, &loc) && loc != 0) {
         // For extra compactness, each loc is relative to the prior,
@@ -396,7 +392,6 @@ adjust_code_refs(struct heap_adjust* adj, struct code* code, lispobj original_va
     sword_t displacement = (lispobj)code - original_vaddr;
     if (!displacement) // if this code didn't move, do nothing
         return;
-    varint_unpacker_init(&unpacker, relfixups);
     prev_loc = 0;
     while (varint_unpack(&unpacker, &loc) && loc != 0) {
         loc += prev_loc;

@@ -129,25 +129,32 @@
       (setf result (logior result (ash byte shift))
             shift (+ shift 8)))))
 
-;;; XXX: Maybe rename this if we use it to pack debug-fun-ish things.
-(defun pack-code-fixup-locs (list)
-  ;; Estimate the length
-  (let ((bytes (make-array (* 2 (length list)) :fill-pointer 0 :adjustable t
-                           :element-type '(unsigned-byte 8)))
-        (prev 0))
-    (setq list (sort list #'<))
-    (dolist (x list)
-      (write-var-integer (- x prev) bytes)
-      (setq prev x))
-    ;; Pack into a single integer
+(defun pack-code-fixup-locs (abs-fixups rel-fixups)
+  (let ((bytes (make-array (* 2 (+ (length abs-fixups) ; guess at final length
+                                   (length rel-fixups)))
+                           :fill-pointer 0 :adjustable t
+                           :element-type '(unsigned-byte 8))))
+    (flet ((pack (list &aux (prev 0))
+             (dolist (x list)
+               (write-var-integer (- x prev) bytes)
+               (setq prev x))))
+      (pack (setq abs-fixups (sort abs-fixups #'<)))
+      (when rel-fixups
+        (write-var-integer 0 bytes)
+        (pack (setq rel-fixups (sort rel-fixups #'<)))))
+    ;; Stuff octets into an integer
     (let ((result (integer-from-octets bytes)))
-      (aver (equal (unpack-code-fixup-locs result) list))
+      (multiple-value-bind (abs rel) (unpack-code-fixup-locs result)
+        (aver (and (equal abs-fixups abs) (equal rel-fixups rel))))
       result)))
 
-(defmacro do-packed-varints ((loc locs) &body body)
-  (with-unique-names (integer byte bytepos shift acc prev)
+(defmacro do-packed-varints ((loc locs &optional (bytepos nil bytepos-sup-p))
+                             &body body)
+  (with-unique-names (integer byte shift acc prev)
+    (unless bytepos-sup-p
+      (setq bytepos (make-symbol "BYTEPOS")))
     `(let ((,integer ,locs)
-           (,bytepos 0)
+           ,@(unless bytepos-sup-p `((,bytepos 0)))
            (,shift 0)
            (,acc 0)
            (,prev 0))
@@ -167,9 +174,11 @@
                  (setq ,acc 0 ,shift 0))))))))
 
 (defun unpack-code-fixup-locs (packed-integer)
-  (collect ((locs))
-    (do-packed-varints (loc packed-integer) (locs loc))
-    (locs)))
+  (collect ((abs-locs) (rel-locs))
+    (let ((pos 0))
+      (do-packed-varints (loc packed-integer pos) (abs-locs loc))
+      (do-packed-varints (loc packed-integer pos) (rel-locs loc)))
+    (values (abs-locs) (rel-locs))))
 
 (define-symbol-macro lz-symbol-1 210) ; arbitrary value that isn't frequent in the input
 (define-symbol-macro lz-symbol-2 218) ; ditto
