@@ -100,8 +100,8 @@ static inline unsigned short
 code_n_funs(struct code* code) {
     // immobile space filler objects appear to be code but have no simple-funs.
     // Should probably consider changing the widetag to FILLER_WIDETAG.
-    return (code_header_words(code->header) > 2)
-        ? *((unsigned short*)code_fun_table(code)) : 0;
+    return code_header_words(code->header)
+        ? *((unsigned short*)code_fun_table(code)) >> 4 : 0;
 }
 
 #define is_vector_subtype(header, val) ((HeaderValue(header) & 3) == subtype_##val)

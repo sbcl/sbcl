@@ -588,17 +588,6 @@
 
       (setf (dstate-next-offs dstate) (dstate-cur-offs dstate))
 
-      #!+(or x86 x86-64)
-      ;; Skip alignment bytes for the entry table that is located at
-      ;; the end of the code object.
-      (when (let ((left (- (seg-length (dstate-segment dstate))
-                           (dstate-cur-offs dstate))))
-              (and (<= left 3)
-                   (loop repeat left
-                         for i from (dstate-cur-offs dstate)
-                         always (zerop (sap-ref-8 (dstate-segment-sap dstate) i)))))
-        (return))
-
       (call-offs-hooks t stream dstate)
       (unless (or prefix-p (null stream))
         (print-current-address stream dstate))

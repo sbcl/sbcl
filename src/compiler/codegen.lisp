@@ -235,17 +235,16 @@
                    (setf vop (vop-next vop)))
                   (t
                    (funcall gen vop)))))))
+
     (emit-inline-constants)
-    (let ((trailer (sb!assem::make-section)))
-      ;; Build the simple-fun-offset table.
-      ;; The assembler is not capable of emitting the difference between labels,
-      ;; so we'll just leave space and fill them in later
-      (emit trailer `(.align 2)) ; align for uint32_t
-      (dotimes (i n-entries) (emit trailer `(.byte 0 0 0 0)))
-      #!+little-endian
-      (emit trailer `(.byte ,(ldb (byte 8 0) n-entries) ,(ldb (byte 8 8) n-entries)))
-      #!+big-endian
-      (emit trailer `(.byte ,(ldb (byte 8 8) n-entries) ,(ldb (byte 8 0) n-entries)))
+    (let ((fun-table (sb!assem::make-section))
+          (end-text (gen-label))
+          (start-fun-table (gen-label)))
+      ;; Create space for the simple-fun offset table:
+      ;;  1 uint32 * N simple-funs
+      ;;  1 uint16 for the number of simple-funs
+      (emit fun-table end-text `(.align 2) start-fun-table
+            `(.skip ,(+ (* n-entries 4) 2)))
       (let* ((segment
               (assemble-sections
                (make-segment :header-skew
@@ -259,12 +258,20 @@
                (asmstream-data-section asmstream)
                (asmstream-code-section asmstream)
                (asmstream-elsewhere-section asmstream)
-               trailer))
-             (size
+               fun-table))
+             (octets
               (finalize-segment segment))
-             (buffer
-              (sb!assem::segment-buffer segment)))
-        (flet ((store-ub32 (index val)
+             (index
+              (label-position start-fun-table)))
+        (flet ((store-ub16 (index val)
+                 (multiple-value-bind (b0 b1)
+                     #!+little-endian
+                     (values (ldb (byte 8 0) val) (ldb (byte 8 8) val))
+                     #!+big-endian
+                     (values (ldb (byte 8 8) val) (ldb (byte 8 0) val))
+                   (setf (aref octets (+ index 0)) b0
+                         (aref octets (+ index 1)) b1)))
+               (store-ub32 (index val)
                  (multiple-value-bind (b0 b1 b2 b3)
                      #!+little-endian
                      (values (ldb (byte 8  0) val) (ldb (byte 8  8) val)
@@ -272,20 +279,23 @@
                      #!+big-endian
                      (values (ldb (byte 8 24) val) (ldb (byte 8 16) val)
                              (ldb (byte 8  8) val) (ldb (byte 8  0) val))
-                   (setf (aref buffer (+ index 0)) b0
-                         (aref buffer (+ index 1)) b1
-                         (aref buffer (+ index 2)) b2
-                         (aref buffer (+ index 3)) b3))))
-          (let ((index size))
-            (decf index 2)
+                   (setf (aref octets (+ index 0)) b0
+                         (aref octets (+ index 1)) b1
+                         (aref octets (+ index 2)) b2
+                         (aref octets (+ index 3)) b3))))
+          (let ((padding (- index (label-position end-text))))
+            (unless (and (typep n-entries '(unsigned-byte 12))
+                         (typep padding '(unsigned-byte 4)))
+              (bug "Oversized code component?"))
             ;; Assert that we are aligned for storing uint32_t
             (aver (not (logtest index #b11)))
-            (dolist (entry (reverse (sb!c::ir2-component-entries
-                                     (component-info component))))
-              (store-ub32 (decf index 4)
-                          (label-position (entry-info-offset entry))))))
-        (values segment
-                size
+            (dolist (entry (sb!c::ir2-component-entries
+                            (component-info component)))
+              (store-ub32 index (label-position (entry-info-offset entry)))
+              (incf index 4))
+            (store-ub16 index (logior (ash n-entries 4) padding))
+            (aver (= (+ index 2) (length octets)))))
+        (values segment (length octets)
                 (asmstream-elsewhere-label asmstream)
                 (sb!assem::segment-fixup-notes segment))))))
 

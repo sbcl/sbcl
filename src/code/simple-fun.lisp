@@ -355,24 +355,23 @@
   ;; and filler_obj_p() in the C code
   (eql (code-header-words code-obj) 0))
 
+;;; The fun-table-trailer-word is a uint16_t at the end of the unboxed bytes
+;;; containing two subfields:
+;;;  12 bits for the number of simple-funs in the code component
+;;;   4 bits for the number of pad bytes added to align the fun-offset-table
+;;;     (this is strictly more bits than needed to represent the padding)
+(declaim (inline code-fun-table-count))
+(defun code-fun-table-trailer-word (code-obj)
+  (with-pinned-objects (code-obj)
+    (sap-ref-16 (code-instructions code-obj) (- (%code-code-size code-obj) 2))))
+
 ;;; Return the number of simple-funs in CODE-OBJ
+;;; Keep in sync with C function code_n_funs()
 (defun code-n-entries (code-obj)
   (declare (type code-component code-obj))
   (if (code-obj-is-filler-p code-obj)
       0
-      (with-pinned-objects (code-obj)
-        (sap-ref-16 (code-instructions code-obj)
-                    (- (%code-code-size code-obj) 2)))))
-
-;;; Subtract from %CODE-CODE-SIZE the number of trailing data bytes which aren't
-;;; machine instructions. It's generally ok to use either accessor if searching
-;;; for a function that encloses a given program counter, since the PC won't be
-;;; in the data range. But all the same, it looks nicer in disassemblies to avoid
-;;; examining bytes that aren't instructions.
-(declaim (inline %code-text-size))
-(defun %code-text-size (code-obj)
-  ;; There are N-ENTRIES uint32_t integers, and a uint16_t
-  (- (%code-code-size code-obj) (+ (* 4 (code-n-entries code-obj)) 2)))
+      (ash (code-fun-table-trailer-word code-obj) -4)))
 
 ;;; Return the offset in bytes from (CODE-INSTRUCTIONS CODE-OBJ)
 ;;; to its FUN-INDEXth function.
@@ -384,6 +383,20 @@
   ;; the last fun-index, so subtract an extra uint32_t as well.
   (sap-ref-32 (code-instructions code-obj)
               (- (%code-code-size code-obj) (* 4 (1+ fun-index)) 2)))
+
+;;; Subtract from %CODE-CODE-SIZE the number of trailing data bytes which aren't
+;;; machine instructions. It's generally ok to use either accessor if searching
+;;; for a function that encloses a given program counter, since the PC won't be
+;;; in the data range. But all the same, it looks nicer in disassemblies to avoid
+;;; examining bytes that aren't instructions.
+(declaim (inline %code-text-size))
+(defun %code-text-size (code-obj)
+  (- (%code-code-size code-obj)
+     ;; There are N-ENTRIES uint32_t integers, and a uint16_t
+     (+ 2 (* 4 (code-n-entries code-obj)))
+     ;; Subtract between 0 and 15 bytes of padding
+     (logand (code-fun-table-trailer-word code-obj) #xf)))
+
 (defun %code-entry-point (code-obj fun-index)
   (declare (type (unsigned-byte 16) fun-index))
   (when (< fun-index (code-n-entries code-obj))

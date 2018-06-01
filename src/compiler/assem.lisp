@@ -1229,7 +1229,8 @@
         (setq new-buffer (subseq new-buffer skew)) ; inefficient, but ok
         (decf (segment-final-posn segment) skew)))
     (setf (segment-buffer segment) new-buffer)
-    (setf (segment-final-index segment) (segment-final-posn segment))))
+    (setf (segment-final-index segment) (segment-final-posn segment))
+    new-buffer))
 
 
 ;;;; interface to the rest of the compiler

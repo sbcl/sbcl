@@ -1115,7 +1115,7 @@
 
 ;;; This is only called from assemfile, which doesn't exist in the target.
 #+sb-xc-host
-(defun dump-assembler-routines (code-segment length fixups routines file)
+(defun dump-assembler-routines (code-segment octets fixups routines file)
   (dump-fixups fixups file)
 
   ;; Mapping from name to address has to be created before applying fixups
@@ -1130,7 +1130,7 @@
                   file))
   (dump-integer (length routines) file)
   (dump-fop 'fop-assembler-code file)
-  (dump-word length file)
+  (dump-word (length octets) file)
   (write-segment-contents code-segment (fasl-output-stream file))
   (dump-pop file))
 

@@ -702,19 +702,6 @@
                     (lispname (fun-name-from-core fun spaces core-nil packages))
                     (quotname (ldsym-quote (c-name lispname pp-state))))
                (setq max-fun-end (+ entrypoint size))
-               (cond ((< j (1- (code-n-entries code)))
-                      ;; Size is a multiple of 2 * n-word-bytes, and filler bytes
-                      ;; are NOPs which can be disassembled without fuss
-                      (aver (not (logtest size lowtag-mask))))
-                     (t
-                      ;; remove filler. FIXME: I think this "trimming" runs the
-                      ;; risk of chopping bytes that belong to a BREAK instruction
-                      ;; if the encoding of an sc+offset works out to 0.
-                      (dotimes (i 3)
-                        (if (zerop (sap-ref-8 (int-sap entrypoint) (1- size)))
-                            (decf size)
-                            (return)))
-                      (setq max-fun-end (+ entrypoint size))))
                ;; Globalize the C symbol only if the name is a legal function designator
                ;; per the standard definition.
                ;; This is a technique to try to avoid appending a uniquifying suffix
