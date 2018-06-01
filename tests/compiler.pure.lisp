@@ -5234,12 +5234,13 @@
              (assert (eq (and (= n-dimensions 1) (not adjustable-p))
                          (typep a '(simple-array * (*)))))))))))
 
-(with-test (:name :array-subtype-tests
-            :skipped-on (:not (:or :x86 :x86-64)))
+(with-test (:name :typep-empty-vector-or-string-simple-vector)
   (checked-compile-and-assert ()
       `(lambda ()
          (typep #() '(or simple-vector simple-string)))
-    (() t))
+    (() t)))
+(with-test (:name :array-subtype-tests
+            :skipped-on (:not (:or :x86 :x86-64)))
   (flet ((approx-lines-of-assembly-code (type-expr)
            (count #\Newline
                   (with-output-to-string (s)

@@ -173,12 +173,6 @@
 (defun fixnum-mod-p (x limit)
   (and (fixnump x)
        (<= 0 x limit)))
-
-#!+(or x86 x86-64 ppc)
-(defun %other-pointer-subtype-p (x choices)
-  (and (%other-pointer-p x)
-       (member (%other-pointer-widetag x) choices)
-       t))
 
 ;;; Return the layout for an object. This is the basic operation for
 ;;; finding out the "type" of an object, and is used for generic
