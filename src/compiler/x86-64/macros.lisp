@@ -103,6 +103,9 @@
       (make-ea size :base index :index thread-base-tn)
       (make-ea size :base thread-base-tn :disp index)))
 
+(defun thread-slot-ea (slot-index &optional (size :qword))
+  (make-ea size :base thread-base-tn :disp (ash slot-index word-shift)))
+
 #!+sb-thread
 (progn
   ;; Return an EA for the TLS of SYMBOL, or die.
@@ -196,7 +199,7 @@
 ;;; pa section.
 #!+sb-thread
 (defmacro %clear-pseudo-atomic ()
-  '(inst mov (thread-tls-ea (* n-word-bytes thread-pseudo-atomic-bits-slot)) 0))
+  '(inst mov (thread-slot-ea thread-pseudo-atomic-bits-slot) 0))
 
 #!+sb-safepoint
 (defun emit-safepoint ()
@@ -211,8 +214,7 @@
   (with-unique-names (label pa-bits-ea)
     `(let ((,label (gen-label))
            (,pa-bits-ea
-            #!+sb-thread
-            (thread-tls-ea (* n-word-bytes thread-pseudo-atomic-bits-slot))
+            #!+sb-thread (thread-slot-ea thread-pseudo-atomic-bits-slot)
             #!-sb-thread
             (make-ea :qword
                      :disp (+ nil-value

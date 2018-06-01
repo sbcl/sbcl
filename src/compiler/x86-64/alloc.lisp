@@ -112,14 +112,12 @@
         (in-elsewhere (sb!assem::assembling-to-elsewhere-p))
         ;; thread->alloc_region.free_pointer
         (free-pointer
-         #!+sb-thread
-         (thread-tls-ea (* n-word-bytes thread-alloc-region-slot))
+         #!+sb-thread (thread-slot-ea thread-alloc-region-slot)
          #!-sb-thread
          (make-ea :qword :disp (make-fixup "gc_alloc_region" :foreign)))
         ;; thread->alloc_region.end_addr
         (end-addr
-         #!+sb-thread
-         (thread-tls-ea (* n-word-bytes (1+ thread-alloc-region-slot)))
+         #!+sb-thread (thread-slot-ea (1+ thread-alloc-region-slot))
          #!-sb-thread
          (make-ea :qword :disp (make-fixup "gc_alloc_region" :foreign 8))))
 
@@ -494,8 +492,7 @@
                 (progn (inst mov temp header)
                        (inst or temp #!-sb-thread (static-symbol-value-ea 'function-layout)
                                      #!+sb-thread
-                                     (thread-tls-ea (ash thread-function-layout-slot
-                                                         word-shift)))
+                                     (thread-slot-ea thread-function-layout-slot))
                        temp)
                 result 0 fun-pointer-lowtag (not stack-allocate-p)))
      ;; These two instructions are within the scope of PSEUDO-ATOMIC.

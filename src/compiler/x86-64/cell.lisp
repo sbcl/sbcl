@@ -454,9 +454,7 @@
   (:info symbol)
   (:generator 10
     (inst mov bsp (* binding-size n-word-bytes))
-    (inst xadd
-          (thread-tls-ea (ash thread-binding-stack-pointer-slot word-shift))
-          bsp)
+    (inst xadd (thread-slot-ea thread-binding-stack-pointer-slot) bsp)
     (let* ((tls-index (load-time-tls-offset symbol))
            (tls-cell (thread-tls-ea tls-index)))
       ;; Too bad we can't use "XCHG [thread + disp], val" to write new value

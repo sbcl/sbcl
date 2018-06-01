@@ -301,7 +301,7 @@
     (emit-label label)
     (move pc-save rax))
   (when sb!c::*msan-unpoison*
-    (inst mov rax (thread-tls-ea (ash thread-msan-param-tls-slot word-shift)))
+    (inst mov rax (thread-slot-ea thread-msan-param-tls-slot))
     ;; Unpoison parameters
     (do ((n 0 (+ n n-word-bytes))
          (arg args (tn-ref-across arg)))

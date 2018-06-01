@@ -324,7 +324,7 @@
   (:arg-types (:constant signed-byte))
   (:policy :fast-safe)
   (:generator 1
-    (inst mov sap (thread-tls-ea (ash n 3)))))
+    (inst mov sap (thread-slot-ea n))))
 (define-vop (current-thread-offset-sap)
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)
