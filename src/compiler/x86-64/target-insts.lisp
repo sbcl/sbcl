@@ -233,6 +233,15 @@
             ;; from the memory just a few bytes preceding 'addr'.
          (sap-ref-word (int-sap addr) 0))))
 
+(define-load-time-global thread-slot-names
+    (let* ((slots (primitive-object-slots
+                   (find 'sb!vm::thread *primitive-objects*
+                         :key #'primitive-object-name)))
+           (a (make-array (1+ (slot-offset (car (last slots))))
+                          :initial-element nil)))
+      (dolist (slot slots a)
+        (setf (aref a (slot-offset slot)) (slot-name slot)))))
+
 ;;; Prints a memory reference to STREAM. VALUE is a list of
 ;;; (BASE-REG OFFSET INDEX-REG INDEX-SCALE), where any component may be
 ;;; missing or nil to indicate that it's not used or has the obvious
@@ -335,7 +344,14 @@
             ((and (eql base-reg #.(ash (tn-offset sb!vm::thread-base-tn) -1))
                   (not (dstate-getprop dstate +fs-segment+)) ; not system TLS
                   (not index-reg) ; no index
-                  (typep disp '(integer 0 *))) ; positive displacement
+                  (typep disp '(integer 0 *)) ; positive displacement
+                  (zerop (logand disp 7))) ; lispword-aligned
+             (let ((index (ash disp -3)))
+               (when (< index (length thread-slot-names))
+                 (awhen (aref thread-slot-names index)
+                   (return-from print-mem-ref
+                     (note (lambda (stream) (format stream "thread.~(~A~)" it))
+                           dstate)))))
              (let* ((tls-index (ash disp (- n-fixnum-tag-bits)))
                     (symbol (or (guess-symbol
                                  (lambda (s) (= (symbol-tls-index s) tls-index)))
@@ -344,19 +360,6 @@
                (when symbol
                  (return-from print-mem-ref
                    (note (lambda (stream) (format stream "tls: ~S" symbol))
-                         dstate))))
-             ;; Or maybe we're looking at the 'struct thread' itself
-             (when (< disp max-interrupts)
-               (let* ((thread-slots
-                       (load-time-value
-                        (primitive-object-slots
-                         (find 'sb!vm::thread *primitive-objects*
-                               :key #'primitive-object-name)) t))
-                      (slot (find (ash disp (- word-shift)) thread-slots
-                                  :key #'slot-offset)))
-                 (when slot
-                   (note (lambda (stream)
-                           (format stream "thread.~(~A~)" (slot-name slot)))
                          dstate)))))))))
 
 (defun lea-compute-label (value dstate)
