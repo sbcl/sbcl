@@ -1769,19 +1769,17 @@
 
 ;;;; code to disassemble assembler segments
 
-(defun assem-segment-to-disassem-segment (assem-segment)
-  (declare (type sb!assem:segment assem-segment))
-  (let ((contents (sb!assem:segment-contents-as-vector assem-segment)))
-    (make-vector-segment contents 0 (length contents) :virtual-location 0)))
-
 ;;; Disassemble the machine code instructions associated with
-;;; ASSEM-SEGMENT (of type assem:segment).
-(defun disassemble-assem-segment (assem-segment stream)
-  (declare (type sb!assem:segment assem-segment)
-           (type stream stream))
-  (let ((dstate (make-dstate))
-        (disassem-segments
-         (list (assem-segment-to-disassem-segment assem-segment))))
+;;; BYTES (a vector of assembly-unit) betwen each of RANGES.
+(defun disassemble-assem-segment (bytes ranges stream)
+  (declare (type stream stream))
+  (let* ((dstate (make-dstate))
+         (disassem-segments
+          (mapcar (lambda (range &aux (from (car range)) (to (cdr range)))
+                    (make-vector-segment bytes from (- to from)
+                                         :virtual-location
+                                         (- from (caar ranges))))
+                  ranges)))
     (label-segments disassem-segments dstate)
     (disassemble-segments disassem-segments stream dstate)))
 

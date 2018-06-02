@@ -646,27 +646,38 @@ necessary, since type inference may take arbitrarily long to converge.")
 
           (maybe-mumble "code ")
 
-          (multiple-value-bind (segment code-length elsewhere-label fixup-notes)
+          (multiple-value-bind (segment text-length fun-table
+                                elsewhere-label fixup-notes)
               (let (#!+immobile-code
                     (*code-is-immobile* (code-immobile-p component)))
                 (generate-code component))
 
-            #-sb-xc-host
-            (when *compiler-trace-output*
-              (format *compiler-trace-output*
-                      "~|~%disassembly of code for ~S~2%" component)
-              (sb!disassem:disassemble-assem-segment segment
-                                                     *compiler-trace-output*))
-
-            (let ((object *compile-object*)
+            (let ((bytes (sb!assem:segment-contents-as-vector segment))
+                  (object *compile-object*)
                   (*elsewhere-label* elsewhere-label)) ; KLUDGE
+
+              (when *compiler-trace-output*
+                (let ((ranges
+                       (maplist (lambda (list)
+                                  (cons (+ (car list)
+                                           (ash sb!vm:simple-fun-code-offset
+                                                sb!vm:word-shift))
+                                        (or (cadr list) text-length)))
+                                fun-table)))
+                  (declare (ignorable ranges))
+                  (format *compiler-trace-output*
+                          "~|~%disassembly of code for ~S~2%" component)
+                  #-sb-xc-host
+                  (sb!disassem:disassemble-assem-segment
+                   bytes ranges *compiler-trace-output*)))
+
               (funcall (etypecase object
                         (fasl-output (maybe-mumble "fasl") #'fasl-dump-component)
                         #-sb-xc-host ; no compiling to core
                         (core-object (maybe-mumble "core") #'make-core-component)
                         (null (lambda (&rest dummies)
                                 (declare (ignore dummies)))))
-                       component segment code-length fixup-notes
+                       component segment (length bytes) fixup-notes
                        object))))))
 
   ;; We're done, so don't bother keeping anything around.

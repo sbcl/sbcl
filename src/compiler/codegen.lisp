@@ -183,7 +183,6 @@
             "~|~%assembly code for ~S~2%"
             component))
   (let* ((prev-env nil)
-         (n-entries (length (ir2-component-entries (component-info component))))
          (asmstream (make-asmstream))
          (*asmstream* asmstream))
 
@@ -237,16 +236,21 @@
                    (funcall gen vop)))))))
 
     (emit-inline-constants)
-    (let ((fun-table (sb!assem::make-section))
-          (end-text (gen-label))
-          (start-fun-table (gen-label)))
-      ;; Create space for the simple-fun offset table:
-      ;;  1 uint32 * N simple-funs
-      ;;  1 uint16 for the number of simple-funs
-      (emit fun-table end-text `(.align 2) start-fun-table
-            `(.skip ,(+ (* n-entries 4) 2)))
-      (let* ((segment
-              (assemble-sections
+    (let* ((fun-table)
+           (end-text (gen-label))
+           (start-fun-table (gen-label))
+           (n-entries (length (ir2-component-entries (component-info component))))
+           (fun-table-section
+            (let ((section (sb!assem::make-section)))
+              ;; Create space for the simple-fun offset table:
+              ;;  1 uint32 * N simple-funs
+              ;;  1 uint16 for the number of simple-funs
+              (emit section
+                    end-text `(.align 2) start-fun-table
+                    `(.skip ,(+ (* n-entries 4) 2)))
+              section))
+           (segment
+            (assemble-sections
                (make-segment :header-skew
                              (if (and (= code-boxed-words-align 1)
                                       (oddp (length (ir2-component-constants
@@ -258,12 +262,12 @@
                (asmstream-data-section asmstream)
                (asmstream-code-section asmstream)
                (asmstream-elsewhere-section asmstream)
-               fun-table))
-             (octets
-              (finalize-segment segment))
-             (index
-              (label-position start-fun-table)))
-        (flet ((store-ub16 (index val)
+               fun-table-section))
+           (octets
+            (finalize-segment segment))
+           (index
+            (label-position start-fun-table)))
+      (flet ((store-ub16 (index val)
                  (multiple-value-bind (b0 b1)
                      #!+little-endian
                      (values (ldb (byte 8 0) val) (ldb (byte 8 8) val))
@@ -271,7 +275,7 @@
                      (values (ldb (byte 8 8) val) (ldb (byte 8 0) val))
                    (setf (aref octets (+ index 0)) b0
                          (aref octets (+ index 1)) b1)))
-               (store-ub32 (index val)
+             (store-ub32 (index val)
                  (multiple-value-bind (b0 b1 b2 b3)
                      #!+little-endian
                      (values (ldb (byte 8  0) val) (ldb (byte 8  8) val)
@@ -283,21 +287,23 @@
                          (aref octets (+ index 1)) b1
                          (aref octets (+ index 2)) b2
                          (aref octets (+ index 3)) b3))))
-          (let ((padding (- index (label-position end-text))))
-            (unless (and (typep n-entries '(unsigned-byte 12))
-                         (typep padding '(unsigned-byte 4)))
-              (bug "Oversized code component?"))
-            ;; Assert that we are aligned for storing uint32_t
-            (aver (not (logtest index #b11)))
-            (dolist (entry (sb!c::ir2-component-entries
-                            (component-info component)))
-              (store-ub32 index (label-position (entry-info-offset entry)))
-              (incf index 4))
-            (store-ub16 index (logior (ash n-entries 4) padding))
-            (aver (= (+ index 2) (length octets)))))
-        (values segment (length octets)
-                (asmstream-elsewhere-label asmstream)
-                (sb!assem::segment-fixup-notes segment))))))
+        (let ((padding (- index (label-position end-text))))
+          (unless (and (typep n-entries '(unsigned-byte 12))
+                       (typep padding '(unsigned-byte 4)))
+            (bug "Oversized code component?"))
+          ;; Assert that we are aligned for storing uint32_t
+          (aver (not (logtest index #b11)))
+          (dolist (entry (sb!c::ir2-component-entries
+                          (component-info component)))
+            (let ((val (label-position (entry-info-offset entry))))
+              (push val fun-table)
+              (store-ub32 index val)
+              (incf index 4)))
+          (store-ub16 index (logior (ash n-entries 4) padding)))
+        (aver (= (+ index 2) (length octets))))
+      (values segment (label-position end-text) fun-table
+              (asmstream-elsewhere-label asmstream)
+              (sb!assem::segment-fixup-notes segment)))))
 
 (defun label-elsewhere-p (label-or-posn kind)
   (let ((elsewhere (label-position *elsewhere-label*))
