@@ -1014,8 +1014,9 @@
                    (ea-disp ea))))
         (t
          (format stream "~A PTR [" (symbol-name (ea-size ea)))
-         (when (ea-base ea)
-           (write-string (sb!c:location-print-name (ea-base ea)) stream)
+         (awhen (ea-base ea)
+           (write-string (if (eq it rip-tn) "RIP" (sb!c:location-print-name it))
+                         stream)
            (when (ea-index ea)
              (write-string "+" stream)))
          (when (ea-index ea)
@@ -1023,7 +1024,6 @@
          (unless (= (ea-scale ea) 1)
            (format stream "*~A" (ea-scale ea)))
          (typecase (ea-disp ea)
-           (null)
            (integer
             (format stream "~@D" (ea-disp ea)))
            (t
