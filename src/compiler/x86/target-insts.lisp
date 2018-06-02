@@ -191,35 +191,26 @@
     (princ '| PTR | stream))
   (maybe-print-segment-override stream dstate)
   (write-char #\[ stream)
-  (let ((firstp t))
-    (macrolet ((pel ((var val) &body body)
-                 ;; Print an element of the address, maybe with
-                 ;; a leading separator.
-                 `(let ((,var ,val))
-                    (when ,var
-                      (unless firstp
-                        (write-char #\+ stream))
-                      ,@body
-                      (setq firstp nil)))))
-      (pel (base-reg (first value))
-        (print-addr-reg base-reg stream dstate))
-      (pel (index-reg (third value))
-        (print-addr-reg index-reg stream dstate)
-        (let ((index-scale (fourth value)))
-          (when (and index-scale (not (= index-scale 1)))
-            (write-char #\* stream)
-            (princ index-scale stream))))
-      (let ((offset (second value)))
-        (when (and offset (or firstp (not (zerop offset))))
-          (unless (or firstp (minusp offset))
-            (write-char #\+ stream))
-          (cond (firstp
-                 (princ16 offset stream)
-                 (let ((offset (ldb (byte 32 0) offset)))
-                   (or (nth-value 1 (note-code-constant-absolute offset dstate))
-                       (maybe-note-assembler-routine offset nil dstate))))
-                (t
-                 (princ offset stream)))))))
+  (destructuring-bind (base &optional offset index scale) value
+    (when base
+      (print-addr-reg base stream dstate))
+    (when index
+      (when base (write-char #\+ stream))
+      (print-addr-reg index stream dstate)
+      (when (and scale (/= scale 1))
+        (write-char #\* stream)
+        (princ scale stream)))
+    (when offset
+      (cond ((or base index)
+             (unless (zerop offset) ; don't show "+0"
+               (unless (minusp offset)
+                 (write-char #\+ stream))
+               (princ offset stream)))
+            (t ; memory absolute
+             (setq offset (ldb (byte 32 0) offset)) ; never show as negative
+             (princ16 offset stream)
+             (or (nth-value 1 (note-code-constant-absolute offset dstate))
+                 (maybe-note-assembler-routine offset nil dstate))))))
   (write-char #\] stream))
 
 ;;;; interrupt instructions
