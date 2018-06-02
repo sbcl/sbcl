@@ -514,15 +514,16 @@
   (note-fixup segment :absolute fixup)
   (let ((offset (fixup-offset fixup)))
     (if (label-p offset)
-        (emit-back-patch segment
-                         4 ; FIXME: n-word-bytes
-                         (lambda (segment posn)
-                           (declare (ignore posn))
-                           (emit-dword segment
-                                       (- (+ (component-header-length)
-                                             (or (label-position offset)
-                                                 0))
-                                          other-pointer-lowtag))))
+        (emit-back-patch
+         segment
+         4
+         (lambda (segment posn)
+           (declare (ignore posn))
+           (emit-dword segment
+                       (- (+ (- (component-header-length)
+                                (segment-header-skew segment))
+                             (label-position offset))
+                          other-pointer-lowtag))))
         (emit-dword segment offset))))
 
 (defun emit-relative-fixup (segment fixup)
@@ -1771,15 +1772,16 @@
    (emit-dword segment dword)))
 
 (defun emit-header-data (segment type)
-  (emit-back-patch segment
-                   4
-                   (lambda (segment posn)
-                     (emit-dword segment
-                                 (logior type
-                                         (ash (+ posn
-                                                 (component-header-length))
-                                              (- n-widetag-bits
-                                                 word-shift)))))))
+  (emit-back-patch
+   segment
+   4
+   (lambda (segment posn)
+     (emit-dword segment
+                 (logior type
+                         (ash (+ (component-header-length)
+                                 (- (segment-header-skew segment))
+                                 posn)
+                              (- n-widetag-bits word-shift)))))))
 
 (define-instruction simple-fun-header-word (segment)
   (:emitter

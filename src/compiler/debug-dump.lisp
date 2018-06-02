@@ -75,8 +75,8 @@
    it."
   (let ((loc (note-debug-location vop nil kind)))
     (emit-postit (lambda (segment posn)
-                   (declare (ignore segment))
-                   (setf (location-info-label loc) posn))))
+                   (setf (location-info-label loc)
+                         (- posn (segment-header-skew segment))))))
   (values))
 
 #!-sb-fluid (declaim (inline ir2-block-physenv))

@@ -332,7 +332,7 @@ the stack without triggering overflow protection.")
 
 ;;; The allocation quantum for boxed code header words.
 ;;; 2 implies an even length boxed header; 1 implies no restriction.
-(defvar code-boxed-words-align (+ 2 #!+(or x86-64) -1))
+(defvar code-boxed-words-align (+ 2 #!+(or x86 x86-64) -1))
 
 (in-package "SB!ALIEN")
 
