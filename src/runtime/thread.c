@@ -191,10 +191,6 @@ wait_for_thread_state_change(struct thread *thread, lispobj state)
 #endif /* sb-safepoint */
 #endif /* sb-thread */
 
-#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86_64)
-void set_thread_stack(struct thread *);
-#endif
-
 static int
 initial_thread_trampoline(struct thread *th)
 {
@@ -226,10 +222,10 @@ initial_thread_trampoline(struct thread *th)
     protect_alien_stack_guard_page(1, NULL);
 
 #if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86_64)
-    set_thread_stack(th);
+    set_thread_stack(th->control_stack_end);
 #endif
 
-    /* WIN32 has a special stack arrangment, calling
+    /* WIN32 has a special stack arrangement, calling
      * call_into_lisp_first_time will put the new stack in the middle
      * of the current stack */
 #if !defined(LISP_FEATURE_WIN32) && (defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))

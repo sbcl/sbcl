@@ -24,5 +24,6 @@ typedef register_t os_context_register_t;
 
 #define RESTORE_FP_CONTROL_FROM_CONTEXT
 void os_restore_fp_control(os_context_t *context);
+void set_thread_stack(void *);
 
 #endif /* _X86_64_DARWIN_OS_H */
