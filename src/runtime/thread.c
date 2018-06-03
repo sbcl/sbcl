@@ -191,6 +191,10 @@ wait_for_thread_state_change(struct thread *thread, lispobj state)
 #endif /* sb-safepoint */
 #endif /* sb-thread */
 
+#if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86_64)
+void set_thread_stack(struct thread *);
+#endif
+
 static int
 initial_thread_trampoline(struct thread *th)
 {
@@ -222,18 +226,7 @@ initial_thread_trampoline(struct thread *th)
     protect_alien_stack_guard_page(1, NULL);
 
 #if defined(LISP_FEATURE_DARWIN) && defined(LISP_FEATURE_X86_64)
-    /* KLUDGE: There is no interface to change the stack location of
-       the initial thread, and without that backtrace(3) returns zero
-       frames, which breaks some graphical applications on High Sierra
-    */
-    void *stackaddr = pthread_get_stackaddr_np(th->os_thread);
-    size_t stacksize = pthread_get_stacksize_np(th->os_thread);
-    if (__PTHREAD_SIZE__ >= 168 &&
-        ((void **)th->os_thread->__opaque)[160 / sizeof(void *)] == stackaddr &&
-        ((size_t *)th->os_thread->__opaque)[168 / sizeof(size_t)] == stacksize) {
-      ((void **)th->os_thread->__opaque)[160 / sizeof(void *)] = th->control_stack_end;
-      ((void **)th->os_thread->__opaque)[168 / sizeof(void *)] = (void *)thread_control_stack_size;
-    }
+    set_thread_stack(th);
 #endif
 
     /* WIN32 has a special stack arrangment, calling

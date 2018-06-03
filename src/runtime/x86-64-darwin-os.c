@@ -408,6 +408,21 @@ catch_exception_raise(mach_port_t exception_port,
 }
 #endif
 
+void set_thread_stack(struct thread *th) {
+  /* KLUDGE: There is no interface to change the stack location of
+     the initial thread, and without that backtrace(3) returns zero
+     frames, which breaks some graphical applications on High Sierra
+  */
+  void *stackaddr = pthread_get_stackaddr_np(th->os_thread);
+  size_t stacksize = pthread_get_stacksize_np(th->os_thread);
+  if (__PTHREAD_SIZE__ >= 168 &&
+      ((void **)th->os_thread->__opaque)[160 / sizeof(void *)] == stackaddr &&
+      ((size_t *)th->os_thread->__opaque)[168 / sizeof(size_t)] == stacksize) {
+    ((void **)th->os_thread->__opaque)[160 / sizeof(void *)] = th->control_stack_end;
+    ((void **)th->os_thread->__opaque)[168 / sizeof(void *)] = (void *)thread_control_stack_size;
+  }
+}
+
 void
 os_restore_fp_control(os_context_t *context)
 {
