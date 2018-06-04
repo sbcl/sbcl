@@ -338,32 +338,25 @@ os_vm_size_t gencgc_alloc_granularity = GENCGC_ALLOC_GRANULARITY;
  * miscellaneous heap functions
  */
 
-/* Count the number of pages which are write-protected within the
- * given generation. */
+/* Count the number of pages in the given generation.
+ * Additionally, if 'n_write_protected' is non-NULL, then assign
+ * into *n_write_protected the count of write-protected pages.
+ */
 static page_index_t
-count_write_protect_generation_pages(generation_index_t generation)
+count_generation_pages(generation_index_t generation,
+                       page_index_t* n_write_protected)
 {
-    page_index_t i, count = 0;
+    page_index_t i, total = 0, wp = 0;
 
     for (i = 0; i < next_free_page; i++)
-        if (!page_free_p(i)
-            && (page_table[i].gen == generation)
-            && page_table[i].write_protected)
-            count++;
-    return count;
-}
-
-/* Count the number of pages within the given generation. */
-static page_index_t __attribute__((unused))
-count_generation_pages(generation_index_t generation)
-{
-    page_index_t i;
-    page_index_t count = 0;
-
-    for (i = 0; i < next_free_page; i++)
-        if (!page_free_p(i) && page_table[i].gen == generation)
-            count++;
-    return count;
+        if (!page_free_p(i) && (page_table[i].gen == generation)) {
+            total++;
+            if (page_table[i].write_protected)
+                wp++;
+        }
+    if (n_write_protected)
+        *n_write_protected = wp;
+    return total;
 }
 
 static void show_pinnedobj_count()
@@ -460,7 +453,7 @@ write_generation_stats(FILE *file)
                 generations[i].bytes_allocated,
                 npage_bytes(tot_pages) - generations[i].bytes_allocated,
                 generations[i].gc_trigger,
-                count_write_protect_generation_pages(i),
+                count_generation_pages(i, 0),
                 generations[i].num_gc,
                 generation_average_age(i));
     }
@@ -2811,11 +2804,11 @@ write_protect_generation_pages(generation_index_t generation)
     }
 
     if (gencgc_verbose > 1) {
+        page_index_t __attribute((unused)) n_total, n_protected;
+        n_total = count_generation_pages(generation, &n_protected);
         FSHOW((stderr,
                "/write protected %d of %d pages in generation %d\n",
-               count_write_protect_generation_pages(generation),
-               count_generation_pages(generation),
-               generation));
+               n_protected, n_total, generation));
     }
 }
 
