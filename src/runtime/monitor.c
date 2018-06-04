@@ -138,6 +138,8 @@ dump_cmd(char **ptr)
         count = -count;
     }
 
+    boolean aligned = ((uword_t)addr & LOWTAG_MASK) == 0;
+
     while (count-- > 0) {
 #ifndef LISP_FEATURE_ALPHA
         printf("%p: ", (os_vm_address_t) addr);
@@ -153,7 +155,7 @@ dump_cmd(char **ptr)
             unsigned char *cptr = (unsigned char *)addr;
 
 #if N_WORD_BYTES == 8
-            printf("0x%016lx | %c%c%c%c%c%c%c%c\n",
+            printf("0x%016lx | %c%c%c%c%c%c%c%c",
                    lptr[0],
                    visible(cptr[0]), visible(cptr[1]),
                    visible(cptr[2]), visible(cptr[3]),
@@ -164,12 +166,22 @@ dump_cmd(char **ptr)
             printf("0x%08lx   0x%04x 0x%04x   "
                    "0x%02x 0x%02x 0x%02x 0x%02x    "
                    "%c%c"
-                   "%c%c\n",
+                   "%c%c",
                    lptr[0], sptr[0], sptr[1],
                    cptr[0], cptr[1], cptr[2], cptr[3],
                    visible(cptr[0]), visible(cptr[1]),
                    visible(cptr[2]), visible(cptr[3]));
 #endif
+#ifdef LISP_FEATURE_GENCGC
+            if (aligned) {
+                lispobj ptr = *(lispobj*)addr;
+                int gen;
+                if (is_lisp_pointer(ptr) && gc_managed_heap_space_p(ptr)
+                    && (gen = gc_gen_of(ptr, 99)) != 99) // say that static is 99
+                    if (gen != 99) printf(" | %d", gen);
+            }
+#endif
+            printf("\n");
         }
         else
             printf("invalid Lisp-level address\n");

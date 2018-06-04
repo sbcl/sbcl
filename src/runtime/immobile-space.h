@@ -76,6 +76,9 @@ static inline boolean immobile_space_p(lispobj obj)
     return !(immobile_range_1_max_offset <= offset
              && offset < immobile_range_2_min_offset);
 }
+
+extern boolean immobile_card_protected_p(void*);
+
 #else
 
 static inline boolean immobile_space_p(lispobj obj) { return 0; }
@@ -88,6 +91,7 @@ static inline boolean immobile_space_p(lispobj obj) { return 0; }
 #define update_immobile_nursery_bits()
 #define write_protect_immobile_space()
 #define immobile_scav_queue_count 0
+#define immobile_card_protected_p(dummy) (0)
 
 #endif
 

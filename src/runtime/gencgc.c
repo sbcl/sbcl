@@ -2494,6 +2494,30 @@ static inline lispobj layout_of(lispobj* instance) { // native ptr
       ? funinstance_layout(instance) : instance_layout(instance);
 }
 
+// Helpers for verify_range
+generation_index_t gc_gen_of(lispobj obj, int defaultval) {
+    int page = find_page_index((void*)obj);
+    if (page >= 0) return page_table[page].gen;
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    if (immobile_space_p(obj))
+        return immobile_obj_gen_bits(native_pointer(obj))
+            & IMMOBILE_OBJ_GENERATION_MASK;
+#endif
+    return defaultval;
+}
+generation_index_t gen_of(lispobj object) { return gc_gen_of(object, 8); }
+
+static boolean card_protected_p(void* addr)
+{
+    page_index_t page = find_page_index(addr);
+    if (page >= 0) return page_table[page].write_protected;
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    if (immobile_space_p((lispobj)addr))
+        return immobile_card_protected_p(addr);
+#endif
+    lose("card_protected_p(%p)", addr);
+}
+
 // NOTE: This function can produces false failure indications,
 // usually related to dynamic space pointing to the stack of a
 // dead thread, but there may be other reasons as well.
@@ -4120,11 +4144,27 @@ void gc_store_corefile_ptes(struct corefile_pte *ptes)
 void gc_show_pte(lispobj obj)
 {
     page_index_t page = find_page_index((void*)obj);
-    if (page>=0)
+    if (page>=0) {
         printf("page %"PAGE_INDEX_FMT" gen %d type %x ss %p used %x%s\n",
                page, page_table[page].gen, page_table[page].type,
                page_scan_start(page), page_bytes_used(page),
                page_table[page].write_protected? " WP":"");
-    else
-        printf("not in dynamic space\n");
+        return;
+    }
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    page = find_varyobj_page_index((void*)obj);
+    if (page>=0) {
+        extern unsigned char* varyobj_page_gens;
+        printf("page %ld (v) gens %x%s\n", page, varyobj_page_gens[page],
+               card_protected_p((void*)obj)? " WP":"");
+        return;
+    }
+    page = find_fixedobj_page_index((void*)obj);
+    if (page>=0) {
+        printf("page %ld (f) gens %x%s\n", page, fixedobj_pages[page].attr.parts.gens_,
+               card_protected_p((void*)obj)? " WP":"");
+        return;
+    }
+#endif
+    printf("no in dynamic space\n");
 }

@@ -130,6 +130,16 @@ static inline lispobj* compute_fixedobj_limit(void* base, int spacing_bytes) {
 unsigned int* varyobj_page_touched_bits;
 static int n_bitmap_elts; // length of array measured in 'int's
 
+boolean immobile_card_protected_p(void* addr)
+{
+    low_page_index_t page;
+    page = find_varyobj_page_index(addr);
+    if (page >= 0) return !((varyobj_page_touched_bits[page/32] >> (page&31)) & 1);
+    page = find_fixedobj_page_index(addr);
+    if (page >= 0) return fixedobj_page_wp(page);
+    lose("immobile_card_protected_p(%p)", addr);
+}
+
 // Array of offsets backwards in double-lispwords from the page end
 // to the lowest-addressed object touching the page. This offset can
 // point to a hole, but we prefer that it not. If the offset is zero,

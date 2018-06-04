@@ -291,4 +291,6 @@ extern uword_t
 walk_generation(uword_t (*proc)(lispobj*,lispobj*,uword_t),
                 generation_index_t generation, uword_t extra);
 
+generation_index_t gc_gen_of(lispobj obj, int defaultval);
+
 #endif /* _GENCGC_INTERNAL_H_*/
