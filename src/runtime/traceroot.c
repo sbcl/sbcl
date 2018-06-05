@@ -63,14 +63,8 @@ struct scan_state {
     struct scratchpad scratchpad;
 };
 
-static int gen_of(lispobj obj) {
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-    if (immobile_space_p(obj))
-        return immobile_obj_gen_bits(native_pointer(obj));
-#endif
-    int page = find_page_index((void*)obj);
-    if (page >= 0) return page_table[page].gen;
-    return -1;
+static int traceroot_gen_of(lispobj obj) {
+    return gc_gen_of(obj, -1);
 }
 
 static const char* classify_obj(lispobj ptr)
@@ -100,7 +94,7 @@ static void add_to_layer(lispobj* obj, int wordindex,
     // Resurrect the containing object's lowtag
     lispobj ptr = compute_lispobj(obj);
     int staticp = ptr <= STATIC_SPACE_END;
-    int gen = staticp ? -1 : gen_of(ptr);
+    int gen = staticp ? -1 : traceroot_gen_of(ptr);
     if (heap_trace_verbose>2)
       // Show the containing object, its type and generation, and pointee
         fprintf(stderr,
@@ -439,7 +433,7 @@ static boolean root_p(lispobj ptr, int criterion)
     // i.e. criterion 0 implies that that largest number of objects
     // are considered roots.
     return criterion < 2
-        && (gen_of(ptr) > (criterion ? HIGHEST_NORMAL_GENERATION
+        && (traceroot_gen_of(ptr) > (criterion ? HIGHEST_NORMAL_GENERATION
                            : gencgc_oldest_gen_to_gc));
 }
 
@@ -604,7 +598,7 @@ static void trace1(lispobj object,
         if (ptr <= STATIC_SPACE_END)
             fprintf(file, "(static,");
         else
-            fprintf(file, "(g%d,", gen_of(ptr));
+            fprintf(file, "(g%d,", traceroot_gen_of(ptr));
         fputs(classify_obj(ptr), file);
         maybe_show_object_name(ptr, file);
         fprintf(file, ")#x%"OBJ_FMTX"[%d]->", ptr, next.wordindex);

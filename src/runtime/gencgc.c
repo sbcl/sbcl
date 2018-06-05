@@ -2535,7 +2535,7 @@ generation_index_t gc_gen_of(lispobj obj, int defaultval) {
 }
 generation_index_t gen_of(lispobj object) { return gc_gen_of(object, 8); }
 
-static boolean card_protected_p(void* addr)
+static boolean __attribute__((unused)) card_protected_p(void* addr)
 {
     page_index_t page = find_page_index(addr);
     if (page >= 0) return page_table[page].write_protected;
