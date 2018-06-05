@@ -111,11 +111,16 @@ dump_cmd(char **ptr)
 
     char *addr = lastaddr;
     int count = lastcount, displacement;
-    int force = 0;
+    int force = 0, decode = 0;
 
     if (more_p(ptr)) {
+        // you can't both "force" and "decode" - only one or the other,
+        // or neither
         if (!strncmp(*ptr, "-f ", 3)) {
           force = 1;
+          *ptr += 3;
+        } else if (!strncmp(*ptr, "-d ", 3)) {
+          decode = 1;
           *ptr += 3;
         }
         addr = parse_addr(ptr, !force);
@@ -139,6 +144,11 @@ dump_cmd(char **ptr)
     }
 
     boolean aligned = ((uword_t)addr & LOWTAG_MASK) == 0;
+    if (decode && (!aligned || displacement < 0)) {
+        printf("Sorry, can only decode if aligned and stepping forward\n");
+        decode = 0;
+    }
+    lispobj* next_object = decode ? (lispobj*)addr : 0;
 
     while (count-- > 0) {
 #ifndef LISP_FEATURE_ALPHA
@@ -181,6 +191,20 @@ dump_cmd(char **ptr)
                     if (gen != 99) printf(" | %d", gen);
             }
 #endif
+            if (decode && addr == (char*)next_object) {
+                lispobj word = *addr;
+                // ensure validity of widetag because crashing with
+                // "no size function" would be worse than doing nothing
+                if (word != 0 && !is_lisp_pointer(word)
+                    && valid_widetag_p(widetag_of(word))) {
+                    printf(" %s", widetag_names[widetag_of(word)>>2]);
+                    next_object += sizetab[widetag_of(word)](next_object);
+                } else if (is_cons_half(word)) {
+                    next_object += 2;
+                } else { // disable decoder if weirdness observed
+                    decode = 0;
+                }
+            }
             printf("\n");
         }
         else

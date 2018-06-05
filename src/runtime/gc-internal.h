@@ -244,4 +244,6 @@ static inline lispobj fdefn_callee_lispobj(struct fdefn *fdefn) {
 #define LAYOUT_OF_PACKAGE  ((FIXEDOBJ_SPACE_START+4*LAYOUT_ALIGN)|INSTANCE_POINTER_LOWTAG)
 #endif
 
+boolean valid_widetag_p(unsigned char widetag);
+
 #endif /* _GC_INTERNAL_H_ */
