@@ -75,6 +75,35 @@ page_index_t  gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbyt
    and 7 is scratch space used when collecting a generation without promotion,
    wherein it is moved to generation 7 and back again.
  */
+/*
+ * SCRATCH_GENERATION as we've defined it is kinda stupid because "<"
+ * doesn't do what you want. Other choices of value do, and since this an
+ * enum, it should be possible to change. Except it isn't because .. reasons.
+ * Here are some alternatives:
+ *  A: gen 0 through 6 remain as-is and SCRATCH becomes -1
+ *
+ *  B: 1 = nursery, 2 = older, ... up through "old" 6 which becomes the new 7;
+ *     and SCRATCH becomes 0. This is like alternative (A) but avoids negatives.
+ *
+ *  C: (probably the best)
+ *  generations are stored with an implied decimal and one bit of fraction
+ *  representing a half step so that:
+ *     #b0000 = 0, #b0001 = 1/2   | #b0010 = 1, #b0011 = 1 1/2
+ *     #b0100 = 2, #b0101 = 2 1/2 | #b0110 = 3, #b0111 = 3 1/2 ...
+ *  up to 6 1/2. When GCing without promotion, we'd raise each object by half
+ *  a generation, and then demote en masse, which is good because it makes the
+ *  scratch pages older than from_space but younger than the youngest root gen.
+ *
+ * Of course, you could try to solve all this by keeping the existing numbering,
+ * but expressing comparison "a < b" as either:
+ *     "logical_gen(a) < logical_gen(b)" // re-map numerically before compare
+ *  or "gen_lessp(a,b)" // just rename the comparator
+ *
+ * I generally prefer numeric comparison to just work, though we have a further
+ * difficulty that page_table[page].gen is not always the generation of an object,
+ * as when it is non-large and pinned. So the helpers might be needed anyway.
+ */
+
 enum {
     SCRATCH_GENERATION = PSEUDO_STATIC_GENERATION+1,
     NUM_GENERATIONS
@@ -393,14 +422,13 @@ count_generation_bytes_allocated (generation_index_t gen)
 
 /* Return the average age of the memory in a generation. */
 extern double
-generation_average_age(generation_index_t gen)
+generation_average_age(generation_index_t gen_index)
 {
-    if (generations[gen].bytes_allocated == 0)
+    struct generation* gen = &generations[gen_index];
+    if (gen->bytes_allocated == 0)
         return 0.0;
 
-    return
-        ((double)generations[gen].cum_sum_bytes_allocated)
-        / ((double)generations[gen].bytes_allocated);
+    return (double)gen->cum_sum_bytes_allocated / (double)gen->bytes_allocated;
 }
 
 #ifdef LISP_FEATURE_X86
@@ -440,8 +468,8 @@ write_generation_stats(FILE *file)
                 if (page_table[page].pinned) pinned_cnt++;
             }
         tot_pages = pagect[0] + pagect[1] + pagect[2] + pagect[3];
-        gc_assert(generations[i].bytes_allocated
-                  == count_generation_bytes_allocated(i));
+        struct generation* gen = &generations[i];
+        gc_assert(gen->bytes_allocated == count_generation_bytes_allocated(i));
         fprintf(file,
                 " %d %7"PAGE_INDEX_FMT" %7"PAGE_INDEX_FMT" %7"PAGE_INDEX_FMT
                 " %7"PAGE_INDEX_FMT" %4"PAGE_INDEX_FMT
@@ -450,11 +478,11 @@ write_generation_stats(FILE *file)
                 " %11"OS_VM_SIZE_FMT
                 " %7"PAGE_INDEX_FMT" %3d %7.4f\n",
                 i, pagect[0], pagect[1], pagect[2], pagect[3], pinned_cnt,
-                generations[i].bytes_allocated,
+                gen->bytes_allocated,
                 npage_bytes(tot_pages) - generations[i].bytes_allocated,
-                generations[i].gc_trigger,
+                gen->gc_trigger,
                 count_generation_pages(i, 0),
-                generations[i].num_gc,
+                gen->num_gc,
                 generation_average_age(i));
     }
     fprintf(file,"           Total bytes allocated    = %13"OS_VM_SIZE_FMT"\n", bytes_allocated);
@@ -3216,14 +3244,14 @@ garbage_collect_generation(generation_index_t generation, int raise)
 
     /* If the GC is not raising the age then lower the generation back
      * to its normal generation number */
+    struct generation* g = &generations[generation];
     if (!raise) {
         for (i = 0; i < next_free_page; i++)
             if ((page_bytes_used(i) != 0)
                 && (page_table[i].gen == SCRATCH_GENERATION))
                 page_table[i].gen = generation;
-        gc_assert(generations[generation].bytes_allocated == 0);
-        generations[generation].bytes_allocated =
-            generations[SCRATCH_GENERATION].bytes_allocated;
+        gc_assert(g->bytes_allocated == 0);
+        g->bytes_allocated = generations[SCRATCH_GENERATION].bytes_allocated;
         generations[SCRATCH_GENERATION].bytes_allocated = 0;
     }
 
@@ -3231,14 +3259,8 @@ garbage_collect_generation(generation_index_t generation, int raise)
     RESET_ALLOC_START_PAGES();
 
     /* Set the new gc trigger for the GCed generation. */
-    generations[generation].gc_trigger =
-        generations[generation].bytes_allocated
-        + generations[generation].bytes_consed_between_gc;
-
-    if (raise)
-        generations[generation].num_gc = 0;
-    else
-        ++generations[generation].num_gc;
+    g->gc_trigger = g->bytes_allocated + g->bytes_consed_between_gc;
+    g->num_gc = raise ? 0 : (1 + g->num_gc);
 
 maybe_verify:
     if (generation >= verify_gens) {
@@ -3430,13 +3452,10 @@ collect_garbage(generation_index_t last_gen)
         }
 
         if (gencgc_verbose > 1) {
+            struct generation* __attribute__((unused)) g = &generations[gen];
             FSHOW((stderr,
                    "starting GC of generation %d with raise=%d alloc=%d trig=%d GCs=%d\n",
-                   gen,
-                   raise,
-                   generations[gen].bytes_allocated,
-                   generations[gen].gc_trigger,
-                   generations[gen].num_gc));
+                   gen, raise, g->bytes_allocated, g->gc_trigger, g->num_gc));
         }
 
         /* If an older generation is being filled, then update its
@@ -3622,15 +3641,16 @@ static void gc_allocate_ptes()
 
     /* Initialize the generations. */
     for (i = 0; i < NUM_GENERATIONS; i++) {
-        generations[i].bytes_allocated = 0;
-        generations[i].gc_trigger = 2000000;
-        generations[i].num_gc = 0;
-        generations[i].cum_sum_bytes_allocated = 0;
+        struct generation* gen = &generations[i];
+        gen->bytes_allocated = 0;
+        gen->gc_trigger = 2000000;
+        gen->num_gc = 0;
+        gen->cum_sum_bytes_allocated = 0;
         /* the tune-able parameters */
-        generations[i].bytes_consed_between_gc
+        gen->bytes_consed_between_gc
             = bytes_consed_between_gcs/(os_vm_size_t)HIGHEST_NORMAL_GENERATION;
-        generations[i].number_of_gcs_before_promotion = 1;
-        generations[i].minimum_age_before_gc = 0.75;
+        gen->number_of_gcs_before_promotion = 1;
+        gen->minimum_age_before_gc = 0.75;
     }
 
     /* Initialize gc_alloc. */
