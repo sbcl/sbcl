@@ -118,75 +118,106 @@
                                               method-alist
                                               wrappers))))
 
+;;; two differences between this and SB-DEBUG::TRACE-CALL:
+;;;
+;;; 1. different frame (but is that correct?  Probably not)
+;;; 2. hiding the first two arguments (permutation-vector and
+;;;    next-effective-method-call) from sight.  KLUDGE: not from mind;
+;;;    if users use :break t and try to execute code in the frame of
+;;;    the method, those two arguments will exist and need to be
+;;;    accounted for.
+(defun trace-method-call (info function fmf-p &rest args)
+  (multiple-value-bind (start cookie) (sb-debug::trace-start-breakpoint-fun info (if fmf-p 2 0))
+    (declare (type function start cookie))
+    (let ((frame (sb-di:top-frame)))
+      (apply #'funcall start frame nil args)
+      (let ((sb-debug::*traced-entries* sb-debug::*traced-entries*))
+        (funcall cookie frame nil)
+        (let ((vals (multiple-value-list (apply function args))))
+          (funcall (sb-debug::trace-end-breakpoint-fun info) frame nil vals nil)
+          (values-list vals))))))
+
 (defun make-emf-from-method
     (method cm-args &optional gf fmf-p method-alist wrappers)
   ;; Avoid style-warning about compiler-macro being unavailable.
   (declare (notinline make-instance))
   (multiple-value-bind (mf real-mf-p fmf pv)
       (get-method-function method method-alist wrappers)
-    (if fmf
-        (let* ((next-methods (car cm-args))
-               (next (make-effective-method-function-simple1
-                      gf (car next-methods)
-                      (list* (cdr next-methods) (cdr cm-args))
-                      fmf-p method-alist wrappers))
-               (arg-info (method-plist-value method :arg-info))
-               (default (cons nil nil))
-               (value (method-plist-value method :constant-value default)))
-          (if (eq value default)
-              (make-fast-method-call :function fmf :pv pv
-                                     :next-method-call next :arg-info arg-info)
-              (make-constant-fast-method-call
-               :function fmf :pv pv :next-method-call next
-               :arg-info arg-info :value value)))
-        (if real-mf-p
-            (flet ((frob-cm-arg (arg)
-                     (if (if (listp arg)
-                             (eq (car arg) :early-method)
-                             (method-p arg))
-                         arg
-                         (if (and (consp arg) (eq (car arg) 'make-method))
-                             (let ((emf (make-effective-method-function
-                                         gf (cadr arg) method-alist wrappers)))
-                               (etypecase emf
-                                 (method-call
-                                  (make-instance 'standard-method
-                                                 :specializers nil ; XXX
-                                                 :qualifiers nil ; XXX
-                                                 :function (method-call-function emf)))
-                                 (fast-method-call
-                                  (let* ((fmf (fast-method-call-function emf))
-                                         (fun (method-function-from-fast-method-call emf))
-                                         (mf (%make-method-function fmf)))
-                                    (set-funcallable-instance-function mf fun)
+    (flet ((maybe-trace (fun gf fmf-p)
+             (let ((info (and (boundp 'sb-debug::*traced-funs*)
+                              (gethash gf sb-debug::*traced-funs*))))
+               (if (and info (sb-debug::trace-info-methods info))
+                   (let ((minfo (copy-structure info)))
+                     (setf (sb-debug::trace-info-what minfo)
+                           `(method ,(generic-function-name gf)
+                                    ,@(method-qualifiers method)
+                                    ,(unparse-specializers gf (method-specializers method))))
+                     (lambda (&rest args)
+                       (apply #'trace-method-call minfo fun fmf-p args)))
+                   fun))))
+      (if fmf
+          (let* ((next-methods (car cm-args))
+                 (next (make-effective-method-function-simple1
+                        gf (car next-methods)
+                        (list* (cdr next-methods) (cdr cm-args))
+                        fmf-p method-alist wrappers))
+                 (arg-info (method-plist-value method :arg-info))
+                 (default (cons nil nil))
+                 (value (method-plist-value method :constant-value default)))
+            (if (eq value default)
+                (make-fast-method-call :function (maybe-trace fmf gf t) :pv pv
+                                       :next-method-call next :arg-info arg-info)
+                (make-constant-fast-method-call
+                 :function (maybe-trace fmf gf t) :pv pv :next-method-call next
+                 :arg-info arg-info :value value)))
+          (if real-mf-p
+              (flet ((frob-cm-arg (arg)
+                       (if (if (listp arg)
+                               (eq (car arg) :early-method)
+                               (method-p arg))
+                           arg
+                           (if (and (consp arg) (eq (car arg) 'make-method))
+                               (let ((emf (make-effective-method-function
+                                           gf (cadr arg) method-alist wrappers)))
+                                 (etypecase emf
+                                   (method-call
                                     (make-instance 'standard-method
                                                    :specializers nil ; XXX
-                                                   :qualifiers nil
-                                                   :function mf)))))
-                             arg))))
-              (let* ((default (cons nil nil))
-                     (value
-                      (method-plist-value method :constant-value default))
-                     ;; FIXME: this is wrong.  Very wrong.  It assumes
-                     ;; that the only place that can have make-method
-                     ;; calls is in the list structure of the second
-                     ;; argument to CALL-METHOD, but AMOP says that
-                     ;; CALL-METHOD can be more complicated if
-                     ;; COMPUTE-EFFECTIVE-METHOD (and presumably
-                     ;; MAKE-METHOD-LAMBDA) is adjusted to match.
-                     ;;
-                     ;; On the other hand, it's a start, because
-                     ;; without this calls to MAKE-METHOD in method
-                     ;; combination where one of the methods is of a
-                     ;; user-defined class don't work at all.  -- CSR,
-                     ;; 2006-08-05
-                     (args (cons (mapcar #'frob-cm-arg (car cm-args))
-                                 (cdr cm-args))))
-                (if (eq value default)
-                    (make-method-call :function mf :call-method-args args)
-                    (make-constant-method-call :function mf :value value
-                                               :call-method-args args))))
-            mf))))
+                                                   :qualifiers nil ; XXX
+                                                   :function (method-call-function emf)))
+                                   (fast-method-call
+                                    (let* ((fmf (fast-method-call-function emf))
+                                           (fun (method-function-from-fast-method-call emf))
+                                           (mf (%make-method-function fmf)))
+                                      (set-funcallable-instance-function mf fun)
+                                      (make-instance 'standard-method
+                                                     :specializers nil ; XXX
+                                                     :qualifiers nil
+                                                     :function mf)))))
+                               arg))))
+                (let* ((default (cons nil nil))
+                       (value
+                        (method-plist-value method :constant-value default))
+                       ;; FIXME: this is wrong.  Very wrong.  It assumes
+                       ;; that the only place that can have make-method
+                       ;; calls is in the list structure of the second
+                       ;; argument to CALL-METHOD, but AMOP says that
+                       ;; CALL-METHOD can be more complicated if
+                       ;; COMPUTE-EFFECTIVE-METHOD (and presumably
+                       ;; MAKE-METHOD-LAMBDA) is adjusted to match.
+                       ;;
+                       ;; On the other hand, it's a start, because
+                       ;; without this calls to MAKE-METHOD in method
+                       ;; combination where one of the methods is of a
+                       ;; user-defined class don't work at all.  -- CSR,
+                       ;; 2006-08-05
+                       (args (cons (mapcar #'frob-cm-arg (car cm-args))
+                                   (cdr cm-args))))
+                  (if (eq value default)
+                      (make-method-call :function mf :call-method-args args)
+                      (make-constant-method-call :function mf :value value
+                                                 :call-method-args args))))
+              mf)))))
 
 (defun make-effective-method-function-simple1
     (gf method cm-args fmf-p &optional method-alist wrappers)

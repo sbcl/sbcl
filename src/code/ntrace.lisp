@@ -248,7 +248,7 @@
 ;;; hook function and a closure that can be used as the FUN-END-COOKIE
 ;;; function. The first communicates the sense of the
 ;;; TRACE-INFO-CONDITION to the second via a closure variable.
-(defun trace-start-breakpoint-fun (info)
+(defun trace-start-breakpoint-fun (info &optional (cdrs 0))
   (let (conditionp)
     (values
      (lambda (frame bpt &rest args)
@@ -267,7 +267,8 @@
            (let ((*print-readably* nil)
                  (*current-level-in-print* 0)
                  (*standard-output* (make-string-output-stream))
-                 (*in-trace* t))
+                 (*in-trace* t)
+                 (args (nthcdr cdrs args)))
              (ecase (trace-info-report info)
                (trace
                 (fresh-line)
@@ -440,7 +441,7 @@
           (let ((mf (sb-mop:method-function method)))
             ;; NOTE: this direct style of tracing methods -- tracing the
             ;; pcl-internal method functions -- is only one possible
-            ;; alternative.  It fails (a) when encapulation is
+            ;; alternative.  It fails (a) when encapsulation is
             ;; requested, because the function objects themselves are
             ;; stored in the method object; (b) when the method in
             ;; question is particularly simple, when the method
