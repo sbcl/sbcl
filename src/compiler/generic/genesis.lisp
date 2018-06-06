@@ -320,6 +320,7 @@
     old-free-word-index))
 
 ;; Special case for dynamic space code/data segregation
+#!+gencgc
 (defun dynamic-space-claim-n-words (gspace n-words page-type)
   (let* ((words-per-page (/ sb!vm:gencgc-card-bytes sb!vm:n-word-bytes))
          (holder (ecase page-type
