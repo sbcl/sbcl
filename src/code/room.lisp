@@ -262,8 +262,8 @@
           ;; a non-nil, non-ROOM-INFO object as INFO.
         ((specialized-array-element-type-properties-p info)
          (reconstitute-vector (tagged-object other-pointer-lowtag) info))
-        ((= widetag sb-vm:filler-widetag)
-         (values nil sb-vm:filler-widetag (boxed-size header-value)))
+        ((= widetag filler-widetag)
+         (values nil filler-widetag (boxed-size header-value)))
         ((null info)
          (error "Unrecognized widetag #x~2,'0X in reconstitute-object"
                 widetag))
@@ -317,7 +317,7 @@
       ;; SIZE is almost surely a fixnum. Non-fixnum would mean at least
       ;; a 512MB object if 32-bit words, and is inconceivable if 64-bit.
        (aver (not (logtest (the word size) lowtag-mask)))
-       (unless (= typecode sb-vm:filler-widetag)
+       (unless (= typecode filler-widetag)
          (funcall fun obj typecode size))
              ;; This special little dance is to add a number of octets
              ;; (and it had best be a number evenly divisible by our
@@ -1040,7 +1040,7 @@ We could try a few things to mitigate this:
                `(fdefn-name ,obj)
                `(fdefn-fun ,obj)
                #+immobile-code
-               `(sb-kernel:%make-lisp-obj
+               `(%make-lisp-obj
                  (alien-funcall (extern-alien "fdefn_callee_lispobj" (function unsigned unsigned))
                                 (logandc2 (get-lisp-obj-address ,obj) lowtag-mask))))
             ,.(make-case* 'code-component
@@ -1089,9 +1089,9 @@ We could try a few things to mitigate this:
          (t
           :extend
           (case (widetag-of this)
-            (#.sb-vm:value-cell-widetag
+            (#.value-cell-widetag
              (test (value-cell-ref this)))
-            (#.sb-vm:filler-widetag)
+            (#.filler-widetag)
             (t
              (bug "Unknown object type #x~x addr=~x"
                   (widetag-of this)
