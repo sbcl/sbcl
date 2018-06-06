@@ -1206,11 +1206,12 @@
 ;;; not covered by fillers. Set FINAL-INDEX of SEGMENT to the length
 ;;; of the new vector and return this length.
 (defun compact-segment-buffer (segment)
+  (decf (segment-final-posn segment) (segment-header-skew segment))
   (let ((buffer (segment-buffer segment))
         (new-buffer (make-array (segment-final-posn segment)
                                 :element-type 'assembly-unit))
-        (i0 0)
-        (index 0))
+        (i0 (segment-header-skew segment)) ; input index
+        (index 0)) ; output index
     (declare (type (simple-array assembly-unit 1) buffer)
              (type index index))
     (flet ((frob (i0 i1)
@@ -1224,10 +1225,6 @@
             (setf i0 (+ i1 (filler-bytes note))))))
       (frob i0 (segment-final-index segment)))
     (aver (= index (segment-final-posn segment)))
-    (let ((skew (segment-header-skew segment)))
-      (when (plusp skew)
-        (setq new-buffer (subseq new-buffer skew)) ; inefficient, but ok
-        (decf (segment-final-posn segment) skew)))
     (setf (segment-buffer segment) new-buffer)
     (setf (segment-final-index segment) (segment-final-posn segment))
     new-buffer))
