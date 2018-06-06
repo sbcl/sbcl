@@ -1243,6 +1243,46 @@ We could try a few things to mitigate this:
              (setq addr (get-lisp-obj-address (fun-code-header object))))
            (logand #xF (sap-ref-8 (int-sap (logandc2 addr lowtag-mask)) 3))))))
 
+;;; Unfortunately this is a near total copy of the test in gc.impure.lisp
+(defun !ensure-genesis-code/data-separation ()
+  #+gencgc
+  (let* ((n-bits (+ next-free-page 10))
+         (code-bits (make-array n-bits :element-type 'bit))
+         (data-bits (make-array n-bits :element-type 'bit))
+         (total-code-size 0))
+    (map-allocated-objects
+     (lambda (obj type size)
+       (declare ((and fixnum (integer 1)) size))
+       ;; M-A-O disables GC, therefore GET-LISP-OBJ-ADDRESS is safe
+       (let ((obj-addr (get-lisp-obj-address obj))
+             (array (cond ((= type code-header-widetag)
+                           (incf total-code-size size)
+                           code-bits)
+                          (t
+                           data-bits)))
+             (other-array (cond ((= type code-header-widetag)
+                                 data-bits)
+                                (t
+                                 code-bits))))
+         ;; This is not the most efficient way to update the bit arrays,
+         ;; but the simplest and clearest for sure. (The loop could avoided
+         ;; if the current page is the same as the previously seen page)
+         (loop for index from (find-page-index obj-addr)
+               to (find-page-index (truly-the word
+                                              (+ (logandc2 obj-addr lowtag-mask)
+                                                 (1- size))))
+               do (cond ((= (sbit other-array index) 1)
+                         (format t "~&broken on page index ~d base ~x~%"
+                                 index
+                                 (+ dynamic-space-start (* index gencgc-card-bytes)))
+                         (alien-funcall (extern-alien "ldb_monitor" (function void))))
+                        (t
+                         (setf (sbit array index) 1))))))
+     :dynamic)))
+;;; Because pseudo-static objects can not move nor be freed,
+;;; this is a valid test that genesis separated code and data.
+(!ensure-genesis-code/data-separation)
+
 (in-package "SB-C")
 ;;; As soon as practical in warm build it makes sense to add
 ;;; cold-allocation-point-fixups into the weak hash-table.

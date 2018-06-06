@@ -189,6 +189,11 @@
 
 (defconstant max-core-space-id (+ 3 #!+immobile-space 2))
 
+(defstruct page
+  (type nil :type (member nil :code :mixed))
+  (bytes-used 0)
+  scan-start) ; byte offset from base of the space
+
 ;;; a GENESIS-time representation of a memory space (e.g. read-only
 ;;; space, dynamic space, or static space)
 (defstruct (gspace (:constructor %make-gspace)
@@ -200,7 +205,12 @@
   (word-address (missing-arg) :type unsigned-byte :read-only t)
   ;; the gspace contents as a BIGVEC
   (data (make-bigvec) :type bigvec :read-only t)
-  (objects nil)
+  (page-table nil) ; for dynamic space
+  ;; lists of holes created by the allocator to segregate code from data.
+  ;; Doesn't matter for cheneygc; does for gencgc.
+  ;; Each free-range is (START . LENGTH) in words.
+  (code-free-ranges (list nil))
+  (non-code-free-ranges (list nil))
   ;; the index of the next unwritten word (i.e. chunk of
   ;; SB!VM:N-WORD-BYTES bytes) in DATA, or equivalently the number of
   ;; words actually written in DATA. In order to convert to an actual
@@ -229,9 +239,9 @@
              byte-address target-space-alignment)))
   (%make-gspace :name name
                 :identifier identifier
-                ;; Track object boundaries if a page table will be produced.
-                :objects (if (= identifier dynamic-core-space-id)
-                             (make-array 5000 :fill-pointer 0 :adjustable t))
+                ;; Track page usage
+                :page-table (if (= identifier dynamic-core-space-id)
+                                (make-array 100 :adjustable t :initial-element nil))
                 :word-address (ash byte-address (- sb!vm:word-shift))))
 
 ;;;; representation of descriptors
@@ -296,23 +306,6 @@
   (let* ((word-index
           (gspace-claim-n-bytes gspace length page-attributes))
          (ptr (+ (gspace-word-address gspace) word-index)))
-    #!+gencgc
-    (when (gspace-objects gspace)
-      (let ((this (ash word-index sb!vm:word-shift))
-            (next (ash (gspace-free-word-index gspace) sb!vm:word-shift))
-            (objects (gspace-objects gspace)))
-        (flet ((page-index (offset) (floor offset sb!vm:gencgc-card-bytes)))
-          ;; Record this object's byte offset unless it is unimportant
-          ;; for finding page scan start offsets. Define "unimportant" as:
-          ;; starts and ends on same page, and the preceding object does too.
-          ;; This records more objects than are strictly necessary,
-          ;; but it makes life simpler.
-          (unless (and (plusp (length objects))
-                       (= (page-index (aref objects (1- (length objects))))
-                          (page-index (1- this))
-                          (page-index this)
-                          (page-index (1- next))))
-            (vector-push-extend this objects)))))
     (make-descriptor (logior (ash ptr sb!vm:word-shift) lowtag)
                      gspace
                      word-index)))
@@ -325,6 +318,92 @@
     ;; Now that GSPACE is big enough, we can meaningfully grab a chunk of it.
     (setf (gspace-free-word-index gspace) new-free-word-index)
     old-free-word-index))
+
+;; Special case for dynamic space code/data segregation
+(defun dynamic-space-claim-n-words (gspace n-words page-type)
+  (let* ((words-per-page (/ sb!vm:gencgc-card-bytes sb!vm:n-word-bytes))
+         (holder (ecase page-type
+                   (:code (gspace-code-free-ranges gspace))
+                   (:mixed (gspace-non-code-free-ranges gspace))))
+         (found (find-if (lambda (x) (>= (cdr x) n-words))
+                         (cdr holder)))) ; dummy cons cell simplifies writeback
+    (labels ((alignedp (word-index) ; T if WORD-INDEX aligns to a GC page boundary
+               (not (logtest (* word-index sb!vm:n-word-bytes)
+                             (1- sb!vm:gencgc-card-bytes))))
+             (page-index (word-index)
+               (values (floor word-index words-per-page)))
+             (pte (index) ; create on demand
+               (or (aref (gspace-page-table gspace) index)
+                   (setf (aref (gspace-page-table gspace) index) (make-page))))
+             (assign-page-types (page-type start-word-index count)
+               (let ((start-page (page-index start-word-index))
+                     (end-page (page-index (+ start-word-index (1- count)))))
+                 (unless (> (length (gspace-page-table gspace)) end-page)
+                   (adjust-array (gspace-page-table gspace) (1+ end-page)
+                                 :initial-element nil))
+                 (loop for page-index from start-page to end-page
+                       for pte = (pte page-index)
+                       do (if (null (page-type pte))
+                              (setf (page-type pte) page-type)
+                              (assert (eq (page-type pte) page-type))))))
+             (note-it (start-word-index)
+               (let* ((start-page (page-index start-word-index))
+                      (end-word-index (+ start-word-index n-words))
+                      (end-page (page-index (1- end-word-index))))
+                 ;; pages from start to end (exclusive) must be full
+                 (loop for index from start-page below end-page
+                       do (setf (page-bytes-used (pte index)) sb!vm:gencgc-card-bytes))
+                 ;; Compute the difference between the word-index at the start of
+                 ;; end-page and the end-word.
+                 (setf (page-bytes-used (pte end-page))
+                       (* sb!vm:n-word-bytes
+                          (- end-word-index (* end-page words-per-page))))
+                 ;; update the scan start of any page without it set
+                 (loop for index from start-page to end-page
+                       do (let ((pte (pte index)))
+                            (unless (page-scan-start pte)
+                              (setf (page-scan-start pte) start-word-index)))))
+               start-word-index)
+             (get-frontier-page-type ()
+               (page-type (pte (page-index (1- (gspace-free-word-index gspace)))))))
+      (when found ; Case 1: always try to backfill first if possible
+        (let ((word-index (car found)))
+          (if (zerop (decf (cdr found) n-words))
+              (rplacd holder (delete found (cdr holder) :count 1))
+              (incf (car found) n-words))
+          (return-from dynamic-space-claim-n-words (note-it word-index))))
+      (when (or (alignedp (gspace-free-word-index gspace))
+                (eq (get-frontier-page-type) page-type))
+        ;; Case 2: extend the frontier
+        (let ((word-index (gspace-claim-n-words gspace n-words)))
+          ;; could optimize this out if we don't go onto a new page
+          (assign-page-types page-type word-index n-words)
+          (return-from dynamic-space-claim-n-words (note-it word-index))))
+      ;; Align the frontier to a page, add some more pages for good measure,
+      ;; and stuff that empty space onto a free list. Then start a new new page.
+      (let* ((free-ptr (gspace-free-word-index gspace))
+             ;; avoid waste by always giving some more slack to the other
+             ;; type of page before starting a new page
+             (reserve-extra-pages 4) ; a random heuristic
+             (reserve (+ (- (align-up free-ptr words-per-page) free-ptr)
+                         (* words-per-page reserve-extra-pages)))
+             (other-type (get-frontier-page-type)) ; before extending frontier
+             (word-index (gspace-claim-n-words gspace reserve)))
+        ;; the space we got should be exactly what we thought it should be
+        (aver (= word-index free-ptr))
+        (aver (alignedp (gspace-free-word-index gspace)))
+        (aver (= (gspace-free-word-index gspace) (+ free-ptr reserve)))
+        ;; those pages all have the other type (the one we don't want)
+        (assign-page-types other-type word-index reserve)
+        ;; allocator is first-fit; space goes to the tail of the other freelist.
+        (nconc (ecase other-type
+                 (:code  (gspace-code-free-ranges gspace))
+                 (:mixed (gspace-non-code-free-ranges gspace)))
+               (list (cons word-index reserve))))
+      ;; Reduced to case 2 now
+      (let ((word-index (gspace-claim-n-words gspace n-words)))
+        (assign-page-types page-type word-index n-words)
+        (note-it word-index)))))
 
 ;; layoutp is true if we need to force objects on this page to LAYOUT-ALIGN
 ;; boundaries. This doesn't need to be generalized - everything of type
@@ -366,6 +445,10 @@
                            (delete key *immobile-space-map* :key 'car :test 'equal))
                      (setf (car found) next-word)))
                (+ page-word-index page-base-index))))
+          #!+gencgc
+          ((eq gspace *dynamic*)
+           (dynamic-space-claim-n-words
+            gspace n-words (if (eq page-attributes :code) :code :mixed)))
           (t
            (gspace-claim-n-words gspace n-words)))))
 
@@ -1002,6 +1085,7 @@ core and return a descriptor to it."
 (defun cold-dsd-raw-type (cold-dsd dsd-layout)
   (1- (ldb (byte 3 0) (descriptor-fixnum (read-slot cold-dsd dsd-layout :bits)))))
 
+(declaim (ftype function read-slot write-slots))
 (flet ((get-slots (host-layout-or-type)
          (etypecase host-layout-or-type
            (layout (dd-slots (layout-info host-layout-or-type)))
@@ -2642,9 +2726,10 @@ core and return a descriptor to it."
             (immobile-p (pop-stack))
             (debug-info (pop-stack))
             (des (allocate-cold-descriptor
-                  (or #!+immobile-code (and immobile-p *immobile-varyobj*) *dynamic*)
+                  (or #!+immobile-code (and immobile-p *immobile-varyobj*)
+                      *dynamic*)
                   (+ (ash aligned-n-boxed-words sb!vm:word-shift) code-size)
-                  sb!vm:other-pointer-lowtag)))
+                  sb!vm:other-pointer-lowtag :code)))
        (declare (ignorable immobile-p))
        (write-header-word des
                           (make-code-header-data aligned-n-boxed-words)
@@ -3406,34 +3491,22 @@ III. initially undefined function references (alphabetically):
           (if (typep sb!vm:gencgc-card-bytes '(unsigned-byte 16)) 2 4))
          (sizeof-corefile-pte (+ sb!vm:n-word-bytes sizeof-usage))
          (pte-bytes (round-up (* sizeof-corefile-pte n-ptes) sb!vm:n-word-bytes))
-         (ptes (make-bigvec))
-         (start 0))
+         (ptes (make-bigvec)))
     (expand-bigvec ptes pte-bytes)
     (dotimes (page-index n-ptes)
-      ;; compute scan-start-offset
-      (let ((sso (let* ((page-start (* page-index sb!vm:gencgc-card-bytes))
-                        (p (position page-start (gspace-objects gspace)
-                                     :test #'<= :start start)))
-                   ;; P is the position in OBJECTS of the first object whose start
-                   ;; is >= PAGE-START. If page-spanning, we want the preceding object
-                   ;; because SCAN-START must satisfy the condition that it points to
-                   ;; an object such that scanning from it will cover every byte of the
-                   ;; page. If the very last item in OBJECTS spans pages, P will be NIL,
-                   ;; because no object's start is >= PAGE-START.
-                   (cond ((not p)
-                          (setq p (1- (length (gspace-objects gspace)))))
-                         ((> (aref (gspace-objects gspace) p) page-start)
-                          (decf p)))
-                   ;; This is an optimization, not a correctness requirement:
-                   ;; the next scan-start object can't be at an index less than P.
-                   (setq start p)
-                   (- page-start (aref (gspace-objects gspace) p))))
-            (usage sb!vm:gencgc-card-bytes)
-            (pte-offset (* page-index sizeof-corefile-pte)))
-        (when (= page-index (1- n-ptes)) ; calculate last page's exact usage
-          (decf usage (- (* n-ptes sb!vm:gencgc-card-bytes) data-bytes)))
-        ;; #b11 = worst-case assumption: boxed and unboxed data on the page
-        (setf (bvref-word ptes pte-offset) (logior sso #b11))
+      (let* ((pte-offset (* page-index sizeof-corefile-pte))
+             (pte (aref (gspace-page-table gspace) page-index))
+             (usage (page-bytes-used pte))
+             (sso (if (plusp usage)
+                      (- (* page-index sb!vm:gencgc-card-bytes)
+                         (* (page-scan-start pte) sb!vm:n-word-bytes))
+                      0))
+             (type-bits (if (plusp usage)
+                            (ecase (page-type pte)
+                              (:code  #b11)
+                              (:mixed #b01))
+                            0)))
+        (setf (bvref-word ptes pte-offset) (logior sso type-bits))
         (funcall (if (eql sizeof-usage 2) #'(setf bvref-16) #'(setf bvref-32))
                  usage ptes (+ pte-offset sb!vm:n-word-bytes))))
     (force-output core-file)
