@@ -148,7 +148,6 @@ void *
 os_dlsym_default(char *name)
 {
     void *frob = dlsym(RTLD_DEFAULT, name);
-    odxprint(misc, "%p", frob);
     return frob;
 }
 #endif
@@ -163,21 +162,20 @@ void os_link_runtime()
     char *namechars;
     boolean datap;
     void* result;
-    int n = 0, m = 0, j;
+    int j;
 
     if (lisp_linkage_table_n_prelinked)
         return; // Linkage was already performed by coreparse
 
     struct vector* symbols = VECTOR(SymbolValue(REQUIRED_FOREIGN_SYMBOLS,0));
-    n = lisp_linkage_table_n_prelinked = fixnum_value(symbols->length);
-    for (j = 0 ; j < n ; ++j)
+    lisp_linkage_table_n_prelinked = fixnum_value(symbols->length);
+    for (j = 0 ; j < lisp_linkage_table_n_prelinked ; ++j)
     {
         lispobj item = symbols->data[j];
         datap = listp(item);
         symbol_name = datap ? CONS(item)->car : item;
         namechars = (void*)(intptr_t)(VECTOR(symbol_name)->data);
         result = os_dlsym_default(namechars);
-        odxprint(runtime_link, "linking %s => %p", namechars, result);
 
         if (link_target == validated_end) {
             validated_end = (char*)validated_end + os_vm_page_size;
@@ -187,14 +185,12 @@ void os_link_runtime()
         }
         if (result) {
             arch_write_linkage_table_entry(link_target, result, datap);
-        } else {
-            m++;
+        } else { // startup might or might not work. ymmv
+            printf("Missing required foreign symbol '%s'\n", namechars);
         }
 
         link_target += LINKAGE_TABLE_ENTRY_SIZE;
     }
-    odxprint(runtime_link, "%d total symbols linked, %d undefined",
-             n, m);
 #endif /* LISP_FEATURE_SB_DYNAMIC_CORE */
 }
 
