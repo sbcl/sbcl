@@ -337,6 +337,12 @@
                                            ,lowtag)))))))
 
 (defmacro define-full-setter (name type offset lowtag scs el-type &optional translate)
+  (let ((want-both-variants
+         (cond ((symbolp name) t)
+               (t
+                (aver (typep name '(cons symbol (cons (eql :no-constant-variant) null))))
+                (setq name (car name))
+                nil))))
   `(progn
      (define-vop (,name)
        ,@(when translate
@@ -354,25 +360,26 @@
                             :scale (ash 1 (- word-shift n-fixnum-tag-bits))
                             :disp (- (* ,offset n-word-bytes) ,lowtag))
                    value result)))
-     (define-vop (,(symbolicate name "-C"))
-       ,@(when translate
-           `((:translate ,translate)))
-       (:policy :fast-safe)
-       (:args (object :scs (descriptor-reg))
-              (value :scs ,scs :target result))
-       (:info index)
-       (:arg-types ,type
-                   (:constant (load/store-index ,n-word-bytes ,(eval lowtag)
-                                                ,(eval offset)))
-                   ,el-type)
-       (:results (result :scs ,scs))
-       (:result-types ,el-type)
-       (:generator 3                    ; was 5
-         (gen-cell-set
+     ,@(when want-both-variants
+         `((define-vop (,(symbolicate name "-C"))
+            ,@(when translate
+                `((:translate ,translate)))
+            (:policy :fast-safe)
+            (:args (object :scs (descriptor-reg))
+                   (value :scs ,scs :target result))
+            (:info index)
+            (:arg-types ,type
+                        (:constant (load/store-index ,n-word-bytes ,(eval lowtag)
+                                                     ,(eval offset)))
+                        ,el-type)
+            (:results (result :scs ,scs))
+            (:result-types ,el-type)
+            (:generator 3                    ; was 5
+              (gen-cell-set
                    (make-ea :qword :base object
                             :disp (- (* (+ ,offset index) n-word-bytes)
                                      ,lowtag))
-                   value result)))))
+                   value result))))))))
 
 (defmacro define-full-setter+offset (name type offset lowtag scs el-type &optional translate)
   `(progn
