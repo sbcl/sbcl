@@ -2412,36 +2412,6 @@ free_oldspace(void)
     return bytes_freed;
 }
 
-#if 0
-/* Print some information about a pointer at the given address. */
-static void
-print_ptr(lispobj *addr)
-{
-    /* If addr is in the dynamic space then out the page information. */
-    page_index_t pi1 = find_page_index((void*)addr);
-
-    if (pi1 != -1)
-        fprintf(stderr,"  %p: page %d  alloc %d  gen %d  bytes_used %d  offset %lu  pin %d\n",
-                addr,
-                pi1,
-                page_table[pi1].allocated,
-                page_table[pi1].gen,
-                page_bytes_used(pi1),
-                scan_start_offset(page_table[pi1]),
-                page_table[pi1].pinned);
-    fprintf(stderr,"  %x %x %x %x (%x) %x %x %x %x\n",
-            *(addr-4),
-            *(addr-3),
-            *(addr-2),
-            *(addr-1),
-            *(addr-0),
-            *(addr+1),
-            *(addr+2),
-            *(addr+3),
-            *(addr+4));
-}
-#endif
-
 static int
 is_in_stack_space(lispobj ptr)
 {
