@@ -236,13 +236,15 @@ static inline void* calc_altstack_base(struct thread* thread) {
     return ((char*) thread) + dynamic_values_bytes
         + ALIGN_UP(sizeof (struct nonpointer_thread_data), N_WORD_BYTES);
 }
+static inline void* calc_altstack_end(struct thread* thread) {
+    return (char*)thread->os_address + THREAD_STRUCT_SIZE;
+}
 static inline int calc_altstack_size(struct thread* thread) {
     // 'end' is calculated as exactly the end address we got from the OS.
     // The usually ends up making the stack slightly larger than ALT_STACK_SIZE
     // bytes due to the addition of THREAD_ALIGNMENT_BYTES of padding.
     // If the memory was as aligned as we'd like, the padding is ours to keep.
-    char *thread_memory_end = (char*)thread->os_address + THREAD_STRUCT_SIZE;
-    return thread_memory_end - (char*)calc_altstack_base(thread);
+    return (char*)calc_altstack_end(thread) - (char*)calc_altstack_base(thread);
 }
 #if defined(LISP_FEATURE_WIN32)
 static inline struct thread* arch_os_get_current_thread()

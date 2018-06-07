@@ -441,10 +441,10 @@ lisp_backtrace(int nframes)
 static int
 altstack_pointer_p (void *p) {
 #ifndef LISP_FEATURE_WIN32
-    void* stack_start = ((char*)arch_os_get_current_thread()) + dynamic_values_bytes;
-    void* stack_end = (char*)stack_start + 32*SIGSTKSZ;
-
-    return (p > stack_start && p <= stack_end);
+    struct thread* thread = arch_os_get_current_thread();
+    // FIXME: shouldn't this be testing '>=' start and '<' end ?
+    //        i.e. Was it only right because the calculations themselves were wrong ?
+    return (p > calc_altstack_base(thread) && p <= calc_altstack_end(thread));
 #else
     /* Win32 doesn't do altstack */
     return 0;
