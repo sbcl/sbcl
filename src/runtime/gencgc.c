@@ -2057,24 +2057,12 @@ static inline boolean large_simple_vector_p(page_index_t page) {
  * there are none the page can be write-protected.
  *
  * One complication is when the newspace is the top temp. generation.
- *
- * Enabling SC_GEN_CK scavenges the write-protected pages and checks
- * that none were written, which they shouldn't be as they should have
- * no pointers to younger generations. This breaks down for weak
- * pointers as the objects contain a link to the next and are written
- * if a weak pointer is scavenged. Still it's a useful check. */
+ */
 static void
 scavenge_root_gens(generation_index_t from, generation_index_t to)
 {
     page_index_t i;
     page_index_t num_wp = 0;
-
-#define SC_GEN_CK 0
-#if SC_GEN_CK
-    /* Clear the write_protected_cleared flags on all pages. */
-    for (i = 0; i < page_table_pages; i++)
-        page_table[i].write_protected_cleared = 0;
-#endif
 
     for (i = 0; i < next_free_page; i++) {
         generation_index_t generation = page_table[i].gen;
@@ -2141,24 +2129,6 @@ scavenge_root_gens(generation_index_t from, generation_index_t to)
             }
         }
     }
-
-#if SC_GEN_CK
-    /* Check that none of the write_protected pages in this generation
-     * have been written to. */
-    for (i = 0; i < page_table_pages; i++) {
-        if ((page_bytes_used(i) != 0)
-            && (page_table[i].gen == generation)
-            && (page_table[i].write_protected_cleared != 0)) {
-            FSHOW((stderr, "/scavenge_root_gens() %d\n", generation));
-            FSHOW((stderr,
-                   "/page bytes_used=%d scan_start_offset=%lu pin=%d\n",
-                    page_bytes_used(i),
-                    scan_start_offset(page_table[i]),
-                    page_table[i].pinned));
-            lose("write to protected page %d in scavenge_root_gens()\n", i);
-        }
-    }
-#endif
 }
 
 
