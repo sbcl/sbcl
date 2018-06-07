@@ -133,8 +133,8 @@ boolean gencgc_verbose = 0;
  * check. */
 generation_index_t verify_gens = HIGHEST_NORMAL_GENERATION + 2;
 
-/* Should we do a pre-scan verify of generation 0 before it's GCed? */
-boolean pre_verify_gen_0 = 0;
+/* Should we do a pre-scan of the heap before it's GCed? */
+boolean pre_verify_gen_0 = 0; // FIXME: should be named 'pre_verify_gc'
 
 /* Should we check that newly allocated regions are zero filled? */
 boolean gencgc_zero_check = 0;
@@ -2443,17 +2443,19 @@ struct verify_state {
 
 #define VERIFY_VERBOSE    1
 /* AGGRESSIVE = always call valid_lisp_pointer_p() on pointers. */
-#define VERIFY_AGGRESSIVE 2
+#define VERIFY_PRE_GC     2
+#define VERIFY_POST_GC    4
+#define VERIFY_AGGRESSIVE 8
 /* QUICK = skip most tests. This is intended for use when GC is believed
  * to be correct per se (i.e. not for debugging GC), and so the verify
  * pass executes more quickly */
-#define VERIFY_QUICK      4
+#define VERIFY_QUICK      16
 /* FINAL = warn about pointers from heap space to non-heap space.
  * Such pointers would normally be ignored and do not be flagged as failure.
  * This can be used in conjunction with QUICK, AGGRESSIVE, or neither. */
-#define VERIFY_FINAL      8
+#define VERIFY_FINAL      32
 /* VERIFYING_foo indicates internal state, not a caller's option */
-#define VERIFYING_HEAP_OBJECTS 16
+#define VERIFYING_HEAP_OBJECTS 64
 
 // Generalize over INSTANCEish things. (Not general like SB-KERNEL:LAYOUT-OF)
 static inline lispobj layout_of(lispobj* instance) { // native ptr
@@ -2680,11 +2682,18 @@ static void verify_generation(generation_index_t generation, uword_t flags)
     if (state.errors) lose("verify failed: %d error(s)", state.errors);
 }
 
-void verify_gc(uword_t flags)
+void verify_heap(uword_t flags)
 {
-    int verbose = flags & VERIFY_VERBOSE;
+    int verbose = gencgc_verbose | ((flags & VERIFY_VERBOSE) != 0);
 
     flags |= VERIFYING_HEAP_OBJECTS;
+
+    if (verbose)
+        fprintf(stderr,
+                flags & VERIFY_PRE_GC ? "Verify before GC" :
+                flags & VERIFY_POST_GC ? "Verify after GC(%d)" :
+                "Heap check", // if called at a random time
+                (int)(flags>>16)); // generation number
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 #  ifdef __linux__
@@ -2694,13 +2703,13 @@ void verify_gc(uword_t flags)
     if (&check_varyobj_pages) check_varyobj_pages();
 #  endif
     if (verbose)
-        fprintf(stderr, "Verifying immobile space\n");
+        fprintf(stderr, " [immobile]");
     verify_space(FIXEDOBJ_SPACE_START, fixedobj_free_pointer, flags);
     verify_space(VARYOBJ_SPACE_START, varyobj_free_pointer, flags);
 #endif
     struct thread *th;
     if (verbose)
-        fprintf(stderr, "Verifying binding stacks\n");
+        fprintf(stderr, " [threads]");
     for_each_thread(th) {
         verify_space((lispobj)th->binding_stack_start,
                      (lispobj*)get_binding_stack_pointer(th),
@@ -2712,14 +2721,16 @@ void verify_gc(uword_t flags)
 #endif
     }
     if (verbose)
-        fprintf(stderr, "Verifying RO space\n");
+        fprintf(stderr, " [RO]");
     verify_space(READ_ONLY_SPACE_START, read_only_space_free_pointer, flags);
     if (verbose)
-        fprintf(stderr, "Verifying static space\n");
+        fprintf(stderr, " [static]");
     verify_space(STATIC_SPACE_START, static_space_free_pointer, flags);
     if (verbose)
-        fprintf(stderr, "Verifying dynamic space\n");
+        fprintf(stderr, " [dynamic]");
     verify_generation(-1, flags);
+    if (verbose)
+        fprintf(stderr, " passed\n");
 }
 
 /* Call 'proc' with pairs of addresses demarcating ranges in the
@@ -3203,12 +3214,8 @@ garbage_collect_generation(generation_index_t generation, int raise)
     g->num_gc = raise ? 0 : (1 + g->num_gc);
 
 maybe_verify:
-    if (generation >= verify_gens) {
-        if (gencgc_verbose) {
-            SHOW("verifying");
-        }
-        verify_gc(0);
-    }
+    if (generation >= verify_gens)
+        verify_heap(VERIFY_POST_GC | (generation<<16));
 }
 
 static page_index_t
@@ -3352,10 +3359,8 @@ collect_garbage(generation_index_t last_gen)
     gc_close_all_regions();
 
     /* Verify the new objects created by Lisp code. */
-    if (pre_verify_gen_0) {
-        FSHOW((stderr, "pre-checking generation 0\n"));
-        verify_generation(0, 0);
-    }
+    if (pre_verify_gen_0)
+        verify_heap(VERIFY_PRE_GC);
 
     if (gencgc_verbose > 1)
         print_generation_stats();
@@ -4000,7 +4005,7 @@ gc_and_save(char *filename, boolean prepend_runtime,
     gencgc_alloc_start_page = 0;
     collect_garbage(HIGHEST_NORMAL_GENERATION+1);
     // Enforce (rather, warn for lack of) self-containedness of the heap
-    verify_gc(VERIFY_FINAL | VERIFY_QUICK);
+    verify_heap(VERIFY_FINAL | VERIFY_QUICK);
     if (verbose)
         printf(" done]\n");
 
