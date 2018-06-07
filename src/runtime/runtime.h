@@ -370,8 +370,8 @@ code_header_words(lispobj header) // given header = code->header
 #ifdef LISP_FEATURE_64_BIT
     return header >> 32;
 #else
-    /* Ignore the MARK_BIT from fullcgc */
-    return HeaderValue(header & ~(1 << 31));
+    /* Mask out bits reserved for GC */
+    return HeaderValue(header & ~((1 << 31) | (1 << 30)));
 #endif
 }
 

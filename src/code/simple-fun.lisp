@@ -344,7 +344,8 @@
 
 (declaim (inline code-header-words))
 (defun code-header-words (code)
-  (ash (get-header-data code) (+ #!+64-bit -24)))
+  #!+64-bit (ash (get-header-data code) -24)
+  #!-64-bit (ldb (byte 22 0) (get-header-data code)))
 
 (defun %code-entry-points (code-obj) ; DO NOT USE IN NEW CODE
   (%code-entry-point code-obj 0))

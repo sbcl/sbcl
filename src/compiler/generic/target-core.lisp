@@ -24,7 +24,7 @@
 (defun allocate-code-object (immobile-p boxed unboxed)
   (declare (ignorable immobile-p))
   ;; Enforce limit on boxed words dependent on how many bits it gets in header.
-  (aver (typep boxed '(unsigned-byte #!+64-bit 32 #!-64-bit 23)))
+  (aver (typep boxed '(unsigned-byte #!+64-bit 32 #!-64-bit 22)))
   #!+gencgc
   (without-gcing
       (cond #!+immobile-code
