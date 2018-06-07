@@ -198,8 +198,14 @@
              (customizer (if (probe-file customizer-file-name)
                              (compile nil
                                       (read-from-file customizer-file-name))
-                             #'identity)))
-        (sort (funcall customizer default-features) #'string<)))
+                             #'identity))
+             (target-feature-list (funcall customizer default-features))
+             (arch (target-platform-keyword target-feature-list)))
+        ;; Sort the arch name to the front and de-dup the rest in case the
+        ;; command line had a redundant --with-mumble option and/or the
+        ;; customizer decided to return dups.
+        (cons arch (sort (remove-duplicates (remove arch target-feature-list))
+                         #'string<))))
 
 (defvar *shebang-backend-subfeatures*
   (let* ((default-subfeatures nil)
@@ -211,7 +217,7 @@
     (funcall customizer default-subfeatures)))
 
 ;;; Call for effect of signaling an error if no target picked.
-(target-platform-name)
+(target-platform-keyword)
 
 ;;; You can get all the way through make-host-1 without either one of these
 ;;; features, but then 'bit-bash' will fail to cross-compile.
@@ -347,7 +353,7 @@
     (if position
       (concatenate 'string
                    (subseq stem 0 (1+ position))
-                   (target-platform-name)
+                   (string-downcase (target-platform-keyword))
                    (subseq stem (+ position 7)))
       stem)))
 (compile 'stem-remap-target)
