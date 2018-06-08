@@ -131,7 +131,7 @@ boolean gencgc_verbose = 0;
 /* We hunt for pointers to old-space, when GCing generations >= verify_gen.
  * Set verify_gens to HIGHEST_NORMAL_GENERATION + 2 to disable this kind of
  * check. */
-generation_index_t verify_gens = 0;//HIGHEST_NORMAL_GENERATION + 2;
+generation_index_t verify_gens = HIGHEST_NORMAL_GENERATION + 2;
 
 /* Should we do a pre-scan of the heap before it's GCed? */
 boolean pre_verify_gen_0 = 0; // FIXME: should be named 'pre_verify_gc'
@@ -2034,6 +2034,11 @@ static inline boolean large_simple_vector_p(page_index_t page) {
         is_vector_subtype(header, VectorNormal);
 }
 
+/* Attempt to re-protect code from first_page to last_page inclusive.
+ * The object bounds are 'start' and 'limit', the former being redundant
+ * with page_address(first_page).
+ * Immobile space is dealt with in "immobile-space.c"
+ */
 static void
 update_code_writeprotection(page_index_t first_page, page_index_t last_page,
                             lispobj* start, lispobj* limit)
@@ -2050,7 +2055,6 @@ update_code_writeprotection(page_index_t first_page, page_index_t last_page,
             break;
         }
     }
-    // printf("re-protecting %ld pages of code\n", last_page-first_page+1);
     for (i = first_page; i <= last_page; i++)
         page_table[i].write_protected = 1;
 }
@@ -2689,7 +2693,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
 #if CODE_PAGES_USE_SOFT_PROTECTION
                 generation_index_t my_gen = gen_of((lispobj)where);
                 boolean rememberedp = header_rememberedp(*where);
-                /* The remembered set invariant is that an object is marked written
+                /* The remembered set invariant is that an object is marked "written"
                  * if and only if either it points to a younger object or is pointed
                  * to by a register or stack. (The pointed-to case assumes that the
                  * very next instruction on return from GC would store an old->young
@@ -3486,12 +3490,11 @@ collect_garbage(generation_index_t last_gen)
         memset(n_scav_calls, 0, sizeof n_scav_calls);
         memset(n_scav_skipped, 0, sizeof n_scav_skipped);
         garbage_collect_generation(gen, raise);
-#if 0
-        fprintf(stderr,
-                "code scavenged: %d total, %d skipped\n",
-                n_scav_calls[CODE_HEADER_WIDETAG/4],
-                n_scav_skipped[CODE_HEADER_WIDETAG/4]);
-#endif
+        if (gencgc_verbose)
+            fprintf(stderr,
+                    "code scavenged: %d total, %d skipped\n",
+                    n_scav_calls[CODE_HEADER_WIDETAG/4],
+                    n_scav_skipped[CODE_HEADER_WIDETAG/4]);
 
         /* Reset the memory age cum_sum. */
         generations[gen].cum_sum_bytes_allocated = 0;
@@ -4273,7 +4276,7 @@ sword_t scav_code_header(lispobj *object, lispobj header)
          * pointers. If my_gen is newspace, there can be no such pointers
          * because newspace is the lowest numbered generation post-GC
          * (regardless of whether this is a promotion cycle) */
-        if (my_gen != new_space) {
+        if (CODE_PAGES_USE_SOFT_PROTECTION && my_gen != new_space) {
             lispobj *where, *end = object + n_header_words, ptr;
             for (where= object + 2; where < end; ++where)
                 if (is_lisp_pointer(ptr = *where) && obj_gen_lessp(ptr, my_gen))

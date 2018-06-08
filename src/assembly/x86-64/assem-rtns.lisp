@@ -392,16 +392,16 @@
   (inst jmp (make-ea :byte :base block
                      :disp (* unwind-block-entry-pc-slot n-word-bytes))))
 
-;;; Perform a store to code, udpating the GC page (card) protection bits.
+;;; Perform a store to code, updating the GC page (card) protection bits.
 ;;; This is not a "good" implementation of soft card marking.
 ;;; It is used *only* for pages of code. The real implementation (work in
 ;;; progress) will differ in at least these ways:
 ;;; - there will be no use of pseudo-atomic
-;;; - stores will be inlined without theo helper routine below
+;;; - stores will be inlined without the helper routine below
 ;;; - will be insensitive to the size of a page table entry
 ;;; - will avoid use of a :lock prefix by allocating 1 byte per mark
 ;;; - won't need to subtract the heap base or compare to the card count
-;;;   to compute the mark address, so use will use fewer instructions.
+;;;   to compute the mark address, so will use fewer instructions.
 ;;; It is similar in that for code objects (indeed most objects
 ;;; except simple-vectors), it marks the object header which is
 ;;; not always on the same GC card affected by the store operation
@@ -465,11 +465,12 @@
                    :lock)))
 
       STORE
-      (inst mov rdi-tn (make-ea :qword :base rsp-tn :disp 24))
-      (inst mov temp-reg-tn (make-ea :qword :base rsp-tn :disp 32))
-      (inst mov rax-tn (make-ea :qword :base rsp-tn :disp 40))
+      (inst mov rdi-tn (make-ea :qword :base rsp-tn :disp 24))      ; object
+      (inst mov temp-reg-tn (make-ea :qword :base rsp-tn :disp 32)) ; word index
+      (inst mov rax-tn (make-ea :qword :base rsp-tn :disp 40))      ; newval
       ;; set 'written' flag in the code header
-      (inst or (make-ea :byte :base rdi-tn :disp (- 3 other-pointer-lowtag)) #x40 :lock)
+      (inst or (make-ea :byte :base rdi-tn :disp (- 3 other-pointer-lowtag))
+            #x40 :lock)
       ;; store newval into object
       (inst mov (make-ea :qword :base rdi-tn
                          :index temp-reg-tn :scale (ash 1 word-shift)

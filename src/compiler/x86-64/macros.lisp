@@ -358,7 +358,10 @@
        (:generator 4                    ; was 5
          ,@(if (eq name 'code-header-set)
                '((inst push value)
-                 (inst push index) ; will be unfixnumized on the stack
+                 ;; the asm routine wants a natural machine integer as the index,
+                 ;; but this macro declares the index arg as 'any-reg', so it has a tag bit,
+                 ;; so we'll push the arg and then shift right as the next instruction.
+                 (inst push index)
                  (inst shr (make-ea :qword :base rsp-tn) n-fixnum-tag-bits)
                  (inst push object)
                  (invoke-asm-routine 'call 'code-header-set vop)

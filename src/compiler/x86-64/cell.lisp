@@ -62,8 +62,8 @@
                   (inst push object)))
            (invoke-asm-routine 'call 'code-header-set vop))
           (t
-           (let ((ea (make-ea-for-object-slot object offset lowtag)))
-             (gen-cell-set ea value nil))))))
+           (gen-cell-set (make-ea-for-object-slot object offset lowtag)
+                         value nil)))))
 
 ;; INIT-SLOT has to know about the :COMPACT-INSTANCE-HEADER feature.
 (define-vop (init-slot set-slot)
