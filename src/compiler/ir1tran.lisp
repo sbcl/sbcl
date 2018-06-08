@@ -944,18 +944,6 @@
 
 ;;;; code coverage
 
-;;; Used as the CDR of the code coverage instrumentation records
-;;; (instead of NIL) to ensure that any well-behaving user code will
-;;; not have constants EQUAL to that record. This avoids problems with
-;;; the records getting coalesced with non-record conses, which then
-;;; get mutated when the instrumentation runs. Note that it's
-;;; important for multiple records for the same location to be
-;;; coalesced. -- JES, 2008-01-02
-;;; Use of #. mandates :COMPILE-TOPLEVEL for several Lisps
-;;; even though for us it's immediately accessible to EVAL.
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant +code-coverage-unmarked+ '%code-coverage-unmarked%))
-
 ;;; Check the policy for whether we should generate code coverage
 ;;; instrumentation. If not, just return the original START
 ;;; ctran. Otherwise insert code coverage instrumentation after
@@ -1013,26 +1001,6 @@
           (when *current-path*
             (instrument-coverage start nil form))))
       start))
-
-(defun record-code-coverage (info cc)
-  (setf (gethash info *code-coverage-info*) cc))
-
-(defun clear-code-coverage ()
-  (clrhash *code-coverage-info*))
-
-(defun reset-code-coverage ()
-  (maphash (lambda (info cc)
-             (declare (ignore info))
-             (dolist (cc-entry cc)
-               (setf (cdr cc-entry) +code-coverage-unmarked+)))
-           *code-coverage-info*))
-
-(defun code-coverage-record-marked (record)
-  (aver (consp record))
-  (ecase (cdr record)
-    ((#.+code-coverage-unmarked+) nil)
-    ((t) t)))
-
 
 ;;;; converting combinations
 

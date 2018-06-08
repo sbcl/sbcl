@@ -323,3 +323,24 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
                      #'< :key 'caar))))
         (recurse path-to-find (cdaar list) (cdr list))))
     start-char))
+
+;;;;; Coverage helpers
+
+(defun record-code-coverage (info cc)
+  (setf (gethash info *code-coverage-info*) cc))
+
+(defun clear-code-coverage ()
+  (clrhash *code-coverage-info*))
+
+(defun reset-code-coverage ()
+  (maphash (lambda (info cc)
+             (declare (ignore info))
+             (dolist (cc-entry cc)
+               (setf (cdr cc-entry) +code-coverage-unmarked+)))
+           *code-coverage-info*))
+
+(defun code-coverage-record-marked (record)
+  (aver (consp record))
+  (ecase (cdr record)
+    ((#.+code-coverage-unmarked+) nil)
+    ((t) t)))

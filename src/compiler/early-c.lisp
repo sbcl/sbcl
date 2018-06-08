@@ -334,6 +334,15 @@ the stack without triggering overflow protection.")
 ;;; 2 implies an even length boxed header; 1 implies no restriction.
 (defvar code-boxed-words-align (+ 2 #!+(or x86 x86-64) -1))
 
+;;; Used as the CDR of the code coverage instrumentation records
+;;; (instead of NIL) to ensure that any well-behaving user code will
+;;; not have constants EQUAL to that record. This avoids problems with
+;;; the records getting coalesced with non-record conses, which then
+;;; get mutated when the instrumentation runs. Note that it's
+;;; important for multiple records for the same location to be
+;;; coalesced. -- JES, 2008-01-02
+(defconstant +code-coverage-unmarked+ '%code-coverage-unmarked%)
+
 (in-package "SB!ALIEN")
 
 ;;; Information describing a heap-allocated alien.
