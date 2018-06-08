@@ -177,7 +177,8 @@ void check_varyobj_pages();
 #ifdef LISP_FEATURE_LITTLE_ENDIAN
 static inline void assign_generation(lispobj* obj, generation_index_t gen)
 {
-    ((generation_index_t*)obj)[3] = gen;
+    generation_index_t* ptr = (generation_index_t*)obj + 3;
+    *ptr = (*ptr & OBJ_WRITTEN_FLAG) | gen; // preserve the 'written' flag
 }
 // Turn a grey node black.
 static inline void set_visited(lispobj* obj)
@@ -434,12 +435,6 @@ void update_immobile_nursery_bits()
       os_protect((os_vm_address_t)FIXEDOBJ_SPACE_START,
                  (lispobj)fixedobj_free_pointer - FIXEDOBJ_SPACE_START,
                  OS_VM_PROT_ALL);
-
-      // varyobj_free_ptr is typically not page-aligned
-      os_protect((os_vm_address_t)VARYOBJ_SPACE_START,
-                 ALIGN_UP((uword_t)varyobj_free_pointer,
-                          IMMOBILE_CARD_BYTES) - VARYOBJ_SPACE_START,
-                 OS_VM_PROT_ALL);
   }
 
   for (page=0; page <= max_used_fixedobj_page ; ++page) {
@@ -464,7 +459,13 @@ enliven_immobile_obj(lispobj *ptr, int rescan) // a native pointer
         ptr = fun_code_header(ptr);
     gc_assert(__immobile_obj_gen_bits(ptr) == from_space);
     int pointerish = !unboxed_obj_widetag_p(widetag_of(*ptr));
-    assign_generation(ptr, (pointerish ? 0 : IMMOBILE_OBJ_VISITED_FLAG) | new_space);
+    int bits = (pointerish ? 0 : IMMOBILE_OBJ_VISITED_FLAG);
+    // enlivening makes the object appear as if written, so that
+    // scav_code_header won't skip it, thus ensuring we transitively
+    // scavenge + enliven newspace objects.
+    if (widetag_of(*ptr) == CODE_HEADER_WIDETAG)
+        bits |= OBJ_WRITTEN_FLAG;
+    assign_generation(ptr, bits | new_space);
     low_page_index_t page_index = find_fixedobj_page_index(ptr);
     boolean varyobj = 0;
 
@@ -488,6 +489,8 @@ enliven_immobile_obj(lispobj *ptr, int rescan) // a native pointer
         }
         return; // No need to enqueue.
     }
+
+    // TODO: check that objects on protected root pages are not enqueued
 
     // Do nothing if either we don't need to look for pointers in this object,
     // or the work queue has already overflowed, causing a full scan.
@@ -724,6 +727,8 @@ scavenge_immobile_roots(generation_index_t min_gen, generation_index_t max_gen)
             int n_words, gen;
             for ( ; obj < limit ; obj += n_words ) {
                 lispobj header = *obj;
+                // scav_code_header will do nothing if the object isn't
+                // marked as written.
                 if (genmask >> (gen=__immobile_obj_gen_bits(obj)) & 1) {
                     if (gen == new_space) { set_visited(obj); }
                     n_words = scavtab[widetag_of(header)](obj, header);
@@ -764,21 +769,6 @@ void write_protect_immobile_space()
             start = end = -1;
         }
     }
-#define varyobj_page_wp(x) !varyobj_page_touched(x)
-    low_page_index_t max_used_varyobj_page = calc_max_used_varyobj_page();
-    for (i = max_used_varyobj_page ; i >= 0 ; --i) {
-        if (varyobj_page_wp(i)) {
-            if (end < 0) end = i;
-            start = i;
-        }
-        if (end >= 0 && (!varyobj_page_wp(i) || i == 0)) {
-            os_protect(varyobj_page_address(start),
-                       IMMOBILE_CARD_BYTES * (1 + end - start),
-                       OS_VM_PROT_READ|OS_VM_PROT_EXECUTE);
-            start = end = -1;
-        }
-    }
-#undef varyobj_page_wp
 }
 
 static inline generation_index_t
@@ -875,17 +865,7 @@ varyobj_points_to_younger_p(lispobj* obj, int gen, int keep_gen, int new_gen,
     lispobj *begin, *end, word = *obj;
     unsigned char widetag = widetag_of(word);
     if (widetag == CODE_HEADER_WIDETAG) { // usual case. Like scav_code_header()
-        for_each_simple_fun(i, function_ptr, (struct code*)obj, 0, {
-            begin = SIMPLE_FUN_SCAV_START(function_ptr);
-            end   = begin + SIMPLE_FUN_SCAV_NWORDS(function_ptr);
-            if (page_begin > (os_vm_address_t)begin) begin = (lispobj*)page_begin;
-            if (page_end   < (os_vm_address_t)end)   end   = (lispobj*)page_end;
-            if (end > begin
-                && range_points_to_younger_p(begin, end, gen, keep_gen, new_gen))
-                return 1;
-        })
-        begin = obj + 1; // skip the header
-        end = obj + code_header_words(word); // exclusive bound on boxed slots
+        return header_rememberedp(word);
     } else if (widetag == SIMPLE_VECTOR_WIDETAG) {
         sword_t length = fixnum_value(((struct vector *)obj)->length);
         begin = obj + 2; // skip the header and length
@@ -1047,7 +1027,8 @@ sweep_fixedobj_pages(int raise)
                   fixedobj_pages[page].free_index = (char*)obj - page_base;
                 hole = obj;
                 n_holes ++;
-            } else if ((gen = __immobile_obj_gen_bits(obj)) == discard_gen) { // trash
+            } else if ((gen = __immobile_obj_gen_bits(obj) & ~OBJ_WRITTEN_FLAG)
+                       == discard_gen) { // trash
                 for (word_idx=obj_size_words-1 ; word_idx > 0 ; --word_idx)
                     obj[word_idx] = 0;
                 goto trash_it;
@@ -1105,8 +1086,9 @@ sweep_varyobj_pages(int raise)
             // Scan for old->young pointers, and WP if there are none.
             if (ENABLE_PAGE_PROTECTION && varyobj_page_touched(page)
                 && varyobj_page_gens_augmented(page) > 1
-                && can_wp_varyobj_page(page, keep_gen, new_gen))
+                && can_wp_varyobj_page(page, keep_gen, new_gen)) {
                 varyobj_page_touched_bits[page/32] &= ~(1U<<(page & 31));
+            }
             continue;
         }
         lispobj* page_base = varyobj_page_address(page);
@@ -1147,7 +1129,8 @@ sweep_varyobj_pages(int raise)
             lispobj word = *obj;
             size = sizetab[widetag_of(word)](obj);
             if (filler_obj_p(obj)) { // do nothing
-            } else if ((gen = __immobile_obj_gen_bits(obj)) == discard_gen) {
+            } else if ((gen = __immobile_obj_gen_bits(obj) & ~OBJ_WRITTEN_FLAG)
+                       == discard_gen) {
                 if (size < 4)
                     lose("immobile object @ %p too small to free", obj);
                 else { // Create a filler object.
@@ -1427,30 +1410,18 @@ void prepare_immobile_space_for_save(lispobj init_function, boolean verbose)
 int immobile_space_handle_wp_violation(void* fault_addr)
 {
     low_page_index_t fixedobj_page_index = find_fixedobj_page_index(fault_addr);
-    low_page_index_t varyobj_page_index =
-      fixedobj_page_index < 0 ? find_varyobj_page_index(fault_addr) : -1;
-
-    if (fixedobj_page_index < 0 && varyobj_page_index < 0)
+    if (fixedobj_page_index < 0)
       return 0; // unhandled
 
     os_protect(PTR_ALIGN_DOWN(fault_addr, IMMOBILE_CARD_BYTES),
                IMMOBILE_CARD_BYTES, OS_VM_PROT_ALL);
 
-    if (varyobj_page_index >= 0) {
-        // The free pointer can move up or down. Attempting to insist that a WP
-        // fault not occur above the free pointer (plus some slack) is not
-        // threadsafe, so allow it anywhere. More strictness could be imparted
-        // by tracking the max value attained by the free pointer.
-        __sync_or_and_fetch(&varyobj_page_touched_bits[varyobj_page_index/32],
-                            1 << (varyobj_page_index & 31));
-    } else if (fixedobj_page_index >= 0) {
-        // FIXME: a single bitmap of touched bits would make more sense,
-        // and the _CLEARED flag doesn't achieve much if anything.
-        if (!(fixedobj_pages[fixedobj_page_index].attr.parts.flags
-              & (WRITE_PROTECT|WRITE_PROTECT_CLEARED)))
-            return 0;
-        SET_WP_FLAG(fixedobj_page_index, WRITE_PROTECT_CLEARED);
-    }
+    // FIXME: the _CLEARED flag doesn't achieve much if anything.
+    if (!(fixedobj_pages[fixedobj_page_index].attr.parts.flags
+          & (WRITE_PROTECT|WRITE_PROTECT_CLEARED)))
+        return 0;
+    SET_WP_FLAG(fixedobj_page_index, WRITE_PROTECT_CLEARED);
+
     return 1;
 }
 

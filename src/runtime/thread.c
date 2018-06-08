@@ -719,6 +719,15 @@ create_thread_struct(lispobj initial_function) {
     for(i = 0; i < TLS_SIZE; i++)
         tls[i] = NO_TLS_VALUE_MARKER_WIDETAG;
 #endif
+#ifdef LISP_FEATURE_X86_64
+    extern unsigned int* varyobj_page_touched_bits;
+    th->varyobj_space_addr  = VARYOBJ_SPACE_START;
+    th->varyobj_card_count  = varyobj_space_size / IMMOBILE_CARD_BYTES;
+    th->varyobj_card_marks  = (lispobj)varyobj_page_touched_bits;
+    th->dynspace_addr       = DYNAMIC_SPACE_START;
+    th->dynspace_card_count = page_table_pages;
+    th->dynspace_pte_base   = (lispobj)page_table;
+#endif
 
     th->os_address = spaces;
     th->control_stack_start = (lispobj*)aligned_spaces;

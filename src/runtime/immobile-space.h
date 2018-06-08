@@ -28,6 +28,8 @@ extern void write_protect_immobile_space(void);
 extern unsigned int immobile_scav_queue_count;
 typedef int low_page_index_t;
 
+extern unsigned int* varyobj_page_touched_bits;
+
 static inline void *
 fixedobj_page_address(low_page_index_t page_num)
 {

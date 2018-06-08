@@ -391,3 +391,89 @@
 
   (inst jmp (make-ea :byte :base block
                      :disp (* unwind-block-entry-pc-slot n-word-bytes))))
+
+;;; Perform a store to code, udpating the GC page (card) protection bits.
+;;; This is not a "good" implementation of soft card marking.
+;;; It is used *only* for pages of code. The real implementation (work in
+;;; progress) will differ in at least these ways:
+;;; - there will be no use of pseudo-atomic
+;;; - stores will be inlined without theo helper routine below
+;;; - will be insensitive to the size of a page table entry
+;;; - will avoid use of a :lock prefix by allocating 1 byte per mark
+;;; - won't need to subtract the heap base or compare to the card count
+;;;   to compute the mark address, so use will use fewer instructions.
+;;; It is similar in that for code objects (indeed most objects
+;;; except simple-vectors), it marks the object header which is
+;;; not always on the same GC card affected by the store operation
+;;;
+#+sb-assembling
+(define-assembly-routine (code-header-set (:return-style :none)) ()
+  (inst push rax-tn)
+  (inst push rdi-tn)
+  ;; stack: spill[2], ret-pc, object, index, value-to-store
+
+  #!-sb-thread
+  (progn
+    ;; Load THREAD-BASE-TN from the all_threads. Does not need to be spilled
+    ;; to stack, because we do do not give the register allocator access to it.
+    ;; And call_into_lisp saves it as per convention, not that it matters,
+    ;; because there's no way to get back into C code anyhow.
+    #!+sb-dynamic-core
+    (progn
+      (inst mov thread-base-tn
+            (make-ea :qword :disp (make-fixup "all_threads" :foreign-dataref)))
+      (inst mov thread-base-tn (make-ea :qword :base thread-base-tn)))
+    #!-sb-dynamic-core
+    (inst mov thread-base-tn
+          (make-ea :qword :disp (make-fixup "all_threads" :foreign))))
+
+  (inst mov temp-reg-tn (make-ea :qword :base rsp-tn :disp 24))
+  (inst sub temp-reg-tn (thread-slot-ea thread-varyobj-space-addr-slot))
+  (inst shr temp-reg-tn (1- (integer-length immobile-card-bytes)))
+  (pseudo-atomic
+    (assemble ()
+      (inst cmp temp-reg-tn (thread-slot-ea thread-varyobj-card-count-slot))
+      (inst jmp :ae try-dynamic-space)
+      (inst mov rdi-tn (thread-slot-ea thread-varyobj-card-marks-slot))
+      (inst bts (make-ea :qword :base rdi-tn) temp-reg-tn :lock)
+      (inst jmp store)
+
+      TRY-DYNAMIC-SPACE
+      (inst mov temp-reg-tn (make-ea :qword :base rsp-tn :disp 24)) ; reload
+      (inst sub temp-reg-tn (thread-slot-ea thread-dynspace-addr-slot))
+      (inst shr temp-reg-tn (1- (integer-length gencgc-card-bytes)))
+      (inst cmp temp-reg-tn (thread-slot-ea thread-dynspace-card-count-slot))
+      (inst jmp :ae store) ; neither dynamic nor immobile space. (weird!)
+
+      ;; sizeof (struct page) depends on GENCGC-CARD-BYTES
+      ;; It's 4+2+1+1 = 8 bytes if GENCGC-CARD-BYTES is (unsigned-byte 16),
+      ;; or   4+4+1+1 = 10 bytes (rounded to 12) if wider than (unsigned-byte 16).
+      ;; See the corresponding alien structure definition in 'room.lisp'
+      (cond ((typep gencgc-card-bytes '(unsigned-byte 16))
+             (inst shl temp-reg-tn 3) ; multiply by 8
+             (inst add temp-reg-tn (thread-slot-ea thread-dynspace-pte-base-slot))
+             ;; clear WP - bit index 5 of flags byte
+             (inst and (make-ea :byte :base temp-reg-tn :disp 6) (lognot (ash 1 5))
+                   :lock))
+            (t
+             (inst lea temp-reg-tn ; multiply by 3
+                   (make-ea :qword :base temp-reg-tn :index temp-reg-tn :scale 2))
+             (inst shl temp-reg-tn 2) ; then by 4, = 12
+             (inst add temp-reg-tn (thread-slot-ea thread-dynspace-pte-base-slot))
+             ;; clear WP
+             (inst and (make-ea :byte :base temp-reg-tn :disp 8) (lognot (ash 1 5))
+                   :lock)))
+
+      STORE
+      (inst mov rdi-tn (make-ea :qword :base rsp-tn :disp 24))
+      (inst mov temp-reg-tn (make-ea :qword :base rsp-tn :disp 32))
+      (inst mov rax-tn (make-ea :qword :base rsp-tn :disp 40))
+      ;; set 'written' flag in the code header
+      (inst or (make-ea :byte :base rdi-tn :disp (- 3 other-pointer-lowtag)) #x40 :lock)
+      ;; store newval into object
+      (inst mov (make-ea :qword :base rdi-tn
+                         :index temp-reg-tn :scale (ash 1 word-shift)
+                         :disp (- other-pointer-lowtag)) rax-tn)))
+  (inst pop rdi-tn) ; restore
+  (inst pop rax-tn)
+  (inst ret 24)) ; remove 3 stack args

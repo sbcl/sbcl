@@ -373,6 +373,7 @@ trans_code(struct code *code)
     return new_code;
 }
 
+#ifdef LISP_FEATURE_CHENEYGC
 static sword_t
 scav_code_header(lispobj *where, lispobj header)
 {
@@ -391,6 +392,9 @@ scav_code_header(lispobj *where, lispobj header)
 
     return ALIGN_UP(n_header_words + code_unboxed_nwords(code->code_size), 2);
 }
+#else
+sword_t scav_code_header(lispobj *object, lispobj header);
+#endif
 
 static lispobj
 trans_code_header(lispobj object)
