@@ -118,14 +118,29 @@
                                               method-alist
                                               wrappers))))
 
+;;; methods-tracing TODO:
+;;;
+;;; 1. tracing method calls for (COMBINED-METHOD ...) / MAKE-METHOD methods
+;;; 2. tracing method calls for non-fast-method-function calls
+;;; 3. supporting :BREAK T
+;;; 4. tracing particular methods
+;;;    - need an interface.
+;;;      * (trace (method foo :around (t)))?
+;;;      * (trace :methods '((:around (t))) foo)? [probably not, interacts
+;;;        poorly with TRACE arg handling
+;;; 5. supporting non-munged arguments as an option
+;;; 6. making SB-DEBUG:ARG (and, worse, VAR) work
+;;; N. writing tests
+
 ;;; two differences between this and SB-DEBUG::TRACE-CALL:
 ;;;
-;;; 1. different frame (but is that correct?  Probably not)
+;;; 1. different frame (but is that correct?  Probably not.)
 ;;; 2. hiding the first two arguments (permutation-vector and
 ;;;    next-effective-method-call) from sight.  KLUDGE: not from mind;
 ;;;    if users use :break t and try to execute code in the frame of
 ;;;    the method, those two arguments will exist and need to be
 ;;;    accounted for.
+;;;
 (defun trace-method-call (info function fmf-p &rest args)
   (multiple-value-bind (start cookie) (sb-debug::trace-start-breakpoint-fun info (if fmf-p 2 0))
     (declare (type function start cookie))
