@@ -409,19 +409,21 @@ catch_exception_raise(mach_port_t exception_port,
 #endif
 
 void set_thread_stack(void *address) {
-  /* KLUDGE: There is no interface to change the stack location of
-     the initial thread, and without that backtrace(3) returns zero
-     frames, which breaks some graphical applications on High Sierra
-  */
-  pthread_t thread = pthread_self();
-  void *stackaddr = pthread_get_stackaddr_np(thread);
-  size_t stacksize = pthread_get_stacksize_np(thread);
-  if (__PTHREAD_SIZE__ >= 22*8 &&
-      ((void **)thread->__opaque)[20] == stackaddr &&
-      ((size_t *)thread->__opaque)[21] == stacksize) {
-    ((void **)thread->__opaque)[20] = address;
-    ((void **)thread->__opaque)[21] = (void *)thread_control_stack_size;
-  }
+    /* KLUDGE: There is no interface to change the stack location of
+       the initial thread, and without that backtrace(3) returns zero
+       frames, which breaks some graphical applications on High Sierra
+    */
+    pthread_t thread = pthread_self();
+    void *stackaddr = pthread_get_stackaddr_np(thread);
+    size_t stacksize = pthread_get_stacksize_np(thread);
+
+    if (__PTHREAD_SIZE__ >= 22*8 &&
+        ((void **)thread->__opaque)[20] == stackaddr &&
+        ((size_t *)thread->__opaque)[21] == stacksize) {
+        ((void **)thread->__opaque)[20] = address;
+        ((size_t *)thread->__opaque)[21] = thread_control_stack_size;
+        ((size_t *)thread->__opaque)[23] = (thread_control_stack_size + vm_page_size);
+    }
 }
 
 void

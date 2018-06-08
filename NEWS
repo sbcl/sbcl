@@ -2,6 +2,8 @@
 
 changes relative to sbcl-1.4.9:
   * bug fix: fixed x86 GC bug causing heap corruption. (lp#1749369)
+  * bug fix: improved compatibility with macOS High Sierra and graphical
+    applications.
 
 changes in sbcl-1.4.8 relative to sbcl-1.4.7:
   * bug fix: redefinition of method combinations now does the expected thing;
