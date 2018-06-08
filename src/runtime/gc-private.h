@@ -262,6 +262,9 @@ static inline void protect_page(void* page_addr, page_index_t page_index)
 #ifdef LISP_FEATURE_LITTLE_ENDIAN
 #define CLEAR_WRITTEN_FLAG(obj) ((unsigned char*)obj)[3] &= ~OBJ_WRITTEN_FLAG
 #define SET_WRITTEN_FLAG(obj)   ((unsigned char*)obj)[3] |= OBJ_WRITTEN_FLAG
+#else
+#define CLEAR_WRITTEN_FLAG(obj) *obj &= ~(OBJ_WRITTEN_FLAG<<24)
+#define SET_WRITTEN_FLAG(obj)   *obj |=  (OBJ_WRITTEN_FLAG<<24)
 #endif
 static inline int header_rememberedp(lispobj header) {
   return (header & (OBJ_WRITTEN_FLAG << 24)) != 0;
