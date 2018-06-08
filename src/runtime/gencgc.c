@@ -2629,11 +2629,11 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                 {
                 struct code *code = (struct code *) where;
                 sword_t nheader_words = code_header_words(code->header);
-                /* Scavenge the boxed section of the code data block */
-                verify_range(where + 1, nheader_words - 1, state);
+                gc_assert(fixnump(where[1])); // code_size
+                /* Verify the boxed section of the code data block */
+                verify_range(where + 2, nheader_words - 2, state);
 
-                /* Scavenge the boxed section of each function
-                 * object in the code data block. */
+                /* Verify the boxed section of each simple-fun */
                 for_each_simple_fun(i, fheaderp, code, 1, {
 #if defined(LISP_FEATURE_COMPACT_INSTANCE_HEADER)
                     lispobj __attribute__((unused)) layout =
@@ -4131,5 +4131,5 @@ void gc_show_pte(lispobj obj)
         return;
     }
 #endif
-    printf("no in dynamic space\n");
+    printf("not in GC'ed space\n");
 }

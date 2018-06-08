@@ -380,7 +380,7 @@ scav_code_header(lispobj *where, lispobj header)
     sword_t n_header_words = code_header_words(header);
 
     /* Scavenge the boxed section of the code data block. */
-    scavenge(where + 1, n_header_words - 1);
+    scavenge(where + 2, n_header_words - 2);
 
     /* Scavenge the boxed section of each function object in the
      * code data block. */
