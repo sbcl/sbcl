@@ -177,6 +177,10 @@
             (t
              (remove-written-tns))))))))
 
+;; Collect "static" count of number of times each vop is employed.
+;; (as opposed to "dynamic" - how many times its code is hit at runtime)
+(defglobal *static-vop-usage-counts* nil)
+
 (defun generate-code (component)
   (when *compiler-trace-output*
     (format *compiler-trace-output*
@@ -220,6 +224,9 @@
       (do ((vop (ir2-block-start-vop block) (vop-next vop)))
           ((null vop))
         (let ((gen (vop-info-generator-function (vop-info vop))))
+          (awhen *static-vop-usage-counts*
+            (let ((name (vop-info-name (vop-info vop))))
+              (incf (gethash name it 0))))
           (assemble (:code vop)
             (cond ((not gen)
                    (format t

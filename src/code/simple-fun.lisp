@@ -361,7 +361,7 @@
 ;;;  12 bits for the number of simple-funs in the code component
 ;;;   4 bits for the number of pad bytes added to align the fun-offset-table
 ;;;     (this is strictly more bits than needed to represent the padding)
-(declaim (inline code-fun-table-count))
+(declaim (inline code-fun-table-trailer-word))
 (defun code-fun-table-trailer-word (code-obj)
   (with-pinned-objects (code-obj)
     (sap-ref-16 (code-instructions code-obj) (- (%code-code-size code-obj) 2))))
