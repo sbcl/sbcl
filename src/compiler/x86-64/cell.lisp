@@ -27,44 +27,11 @@
   (:args (object :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg immediate)))
   (:info name offset lowtag)
+ ;(:ignore name)
   (:results)
-  (:vop-var vop)
   (:generator 1
-    (cond ((and (listp name)
-                (eq (car name) 'setf)
-                (member (cadr name) '(%code-debug-info
-                                      %code-fixups
-                                      %simple-fun-name
-                                      %simple-fun-arglist
-                                      %simple-fun-type
-                                      %simple-fun-info)))
-           ;; First things first: push newval on the stack.
-           ;; Don't assume that the immediate is acceptable to 'push'
-           ;; (only MOV can take a 64-bit immediate)
-           (inst mov temp-reg-tn (encode-value-if-immediate value))
-           (inst push temp-reg-tn)
-           ;; Push the slot index into code, then code itself
-           (cond ((= lowtag fun-pointer-lowtag)
-                  ;; compute code address similarly to CODE-FROM-FUNCTION vop
-                  (inst mov (reg-in-size temp-reg-tn :dword)
-                        (make-ea-for-object-slot-half object 0 fun-pointer-lowtag))
-                  (inst shr (reg-in-size temp-reg-tn :dword) n-widetag-bits)
-                  ;; now temp-reg-tn holds the difference in words from code to fun.
-                  (inst push temp-reg-tn)
-                  (inst add (make-ea :qword :base rsp-tn) offset) ; for particular slot
-                  ;; finish computing the code address
-                  (inst neg temp-reg-tn)
-                  (inst lea temp-reg-tn
-                        (make-ea :qword :base object :index temp-reg-tn :scale n-word-bytes
-                                 :disp (- other-pointer-lowtag fun-pointer-lowtag)))
-                  (inst push temp-reg-tn))
-                 (t ; is code already
-                  (inst push offset)
-                  (inst push object)))
-           (invoke-asm-routine 'call 'code-header-set vop))
-          (t
-           (gen-cell-set (make-ea-for-object-slot object offset lowtag)
-                         value nil)))))
+    (progn name) ; ignore it
+    (gen-cell-set (make-ea-for-object-slot object offset lowtag) value nil)))
 
 ;; INIT-SLOT has to know about the :COMPACT-INSTANCE-HEADER feature.
 (define-vop (init-slot set-slot)

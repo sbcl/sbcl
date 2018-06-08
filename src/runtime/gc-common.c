@@ -373,7 +373,24 @@ trans_code(struct code *code)
     return new_code;
 }
 
-sword_t scav_code_header(lispobj *object, lispobj header);
+static sword_t
+scav_code_header(lispobj *where, lispobj header)
+{
+    struct code *code = (struct code *) where;
+    sword_t n_header_words = code_header_words(header);
+
+    /* Scavenge the boxed section of the code data block. */
+    scavenge(where + 2, n_header_words - 2);
+
+    /* Scavenge the boxed section of each function object in the
+     * code data block. */
+    for_each_simple_fun(i, function_ptr, code, 1, {
+        scavenge(SIMPLE_FUN_SCAV_START(function_ptr),
+                 SIMPLE_FUN_SCAV_NWORDS(function_ptr));
+    })
+
+    return ALIGN_UP(n_header_words + code_unboxed_nwords(code->code_size), 2);
+}
 
 static lispobj
 trans_code_header(lispobj object)
