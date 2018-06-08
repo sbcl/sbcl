@@ -133,6 +133,7 @@ code_n_funs(struct code* code) {
  * struct page in gencgc-internal.h. These constants are used in gc-common,
  * so they can't easily be made gencgc-only */
 #define FREE_PAGE_FLAG        0
+#define PAGE_TYPE_MASK        7 // mask out the 'single-object flag'
 /* Note: MAP-ALLOCATED-OBJECTS expects this value to be 1 */
 #define BOXED_PAGE_FLAG       1
 #define UNBOXED_PAGE_FLAG     2

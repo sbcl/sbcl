@@ -401,6 +401,16 @@
   (stepping)
   ;; END of slots to keep near the beginning.
 
+  ;; TODO: these slots should be accessible using (SIGNED-BYTE 8) displacement
+  ;; from the thread base. We've nearly exhausted small positive indices
+  ;; so the slots will have to precede 'struct thread' in memory.
+  (varyobj-space-addr)
+  (varyobj-card-count)
+  (varyobj-card-marks)
+  (dynspace-addr)
+  (dynspace-card-count)
+  (dynspace-pte-base)
+
   ;; These aren't accessed (much) from Lisp, so don't really care
   ;; if it takes a 4-byte displacement.
   (alien-stack-start :c-type "lispobj *" :pointer t)

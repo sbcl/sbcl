@@ -354,12 +354,23 @@
        (:arg-types ,type tagged-num ,el-type)
        (:results (result :scs ,scs))
        (:result-types ,el-type)
+       (:vop-var vop)
        (:generator 4                    ; was 5
-         (gen-cell-set
+         ,@(if (eq name 'code-header-set)
+               '((inst push value)
+                 ;; the asm routine wants a natural machine integer as the index,
+                 ;; but this macro declares the index arg as 'any-reg', so it has a tag bit,
+                 ;; so we'll push the arg and then shift right as the next instruction.
+                 (inst push index)
+                 (inst shr (make-ea :qword :base rsp-tn) n-fixnum-tag-bits)
+                 (inst push object)
+                 (invoke-asm-routine 'call 'code-header-set vop)
+                 (inst mov result value))
+               `((gen-cell-set
                    (make-ea :qword :base object :index index
                             :scale (ash 1 (- word-shift n-fixnum-tag-bits))
                             :disp (- (* ,offset n-word-bytes) ,lowtag))
-                   value result)))
+                   value result)))))
      ,@(when want-both-variants
          `((define-vop (,(symbolicate name "-C"))
             ,@(when translate

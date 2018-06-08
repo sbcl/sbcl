@@ -138,13 +138,13 @@ static inline int immobile_obj_gen_bits(lispobj* pointer) // native pointer
 {
   if (widetag_of(*pointer) == SIMPLE_FUN_WIDETAG)
     pointer = fun_code_header(pointer);
-  return ((generation_index_t*)pointer)[3];
+  return ((generation_index_t*)pointer)[3] & 0x3F;
 }
 // Faster way when we know that the object can't be a simple-fun,
 // such as when walking the immobile space.
 static inline int __immobile_obj_gen_bits(lispobj* pointer) // native pointer
 {
-  return ((generation_index_t*)pointer)[3];
+  return ((generation_index_t*)pointer)[3] & 0x3F;
 }
 #else
 #error "Need to define immobile_obj_gen_bits() for big-endian"
@@ -256,6 +256,21 @@ static inline void protect_page(void* page_addr, page_index_t page_index)
 
 #define NON_FAULTING_STORE(operation, addr) operation
 
+#endif
+
+#define OBJ_WRITTEN_FLAG 0x40
+#ifdef LISP_FEATURE_LITTLE_ENDIAN
+#define CLEAR_WRITTEN_FLAG(obj) ((unsigned char*)obj)[3] &= ~OBJ_WRITTEN_FLAG
+#define SET_WRITTEN_FLAG(obj)   ((unsigned char*)obj)[3] |= OBJ_WRITTEN_FLAG
+#endif
+static inline int header_rememberedp(lispobj header) {
+  return (header & (OBJ_WRITTEN_FLAG << 24)) != 0;
+}
+
+#ifdef LISP_FEATURE_X86_64
+# define CODE_PAGES_USE_SOFT_PROTECTION 1
+#else
+# define CODE_PAGES_USE_SOFT_PROTECTION 0
 #endif
 
 #endif /* _GC_PRIVATE_H_ */
