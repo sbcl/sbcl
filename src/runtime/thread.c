@@ -720,10 +720,16 @@ create_thread_struct(lispobj initial_function) {
         tls[i] = NO_TLS_VALUE_MARKER_WIDETAG;
 #endif
 #ifdef LISP_FEATURE_X86_64
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
     extern unsigned int* varyobj_page_touched_bits;
     th->varyobj_space_addr  = VARYOBJ_SPACE_START;
     th->varyobj_card_count  = varyobj_space_size / IMMOBILE_CARD_BYTES;
     th->varyobj_card_marks  = (lispobj)varyobj_page_touched_bits;
+#else
+    th->varyobj_space_addr  = 0;
+    th->varyobj_card_count  = 0;
+    th->varyobj_card_marks  = 0;
+#endif
     th->dynspace_addr       = DYNAMIC_SPACE_START;
     th->dynspace_card_count = page_table_pages;
     th->dynspace_pte_base   = (lispobj)page_table;

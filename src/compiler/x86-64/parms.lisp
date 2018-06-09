@@ -43,7 +43,7 @@
 ;;; This must be a multiple of the OS page size.
 (defconstant gencgc-release-granularity +backend-page-bytes+)
 ;;; The card size for immobile/low space
-#!+immobile-space (defconstant immobile-card-bytes 4096)
+(defconstant immobile-card-bytes 4096)
 
 ;;; ### Note: we simultaneously use ``word'' to mean a 32 bit quantity
 ;;; and a 16 bit quantity depending on context. This is because Intel
