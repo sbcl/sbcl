@@ -494,4 +494,35 @@
   (let ((output (with-output-to-string (*trace-output*)
                   (assert (= (traced-gf 3) 4)))))
     (assert (= (length output) 0))))
+
+(let* ((mf (lambda (args nms)
+             (* 2 (car args))))
+       (m (make-instance 'standard-method
+                         :specializers (list (find-class 'integer))
+                         :qualifiers nil
+                         :lambda-list '(x)
+                         :function mf)))
+  (add-method #'traced-gf m))
+
+(untrace traced-gf)
+(with-test (:name (trace generic-function :methods :method-function))
+  (trace :methods t traced-gf)
+  (let ((output (with-output-to-string (*trace-output*)
+                  (assert (= (traced-gf 5) 10)))))
+    (assert (> (length output) 0))
+    (assert (search "0: (TRACED-GF 5)" output))
+    (assert (search "0: TRACED-GF returned 10" output))
+    (assert (search "1: ((SB-PCL::COMBINED-METHOD TRACED-GF) 5)" output))
+    (assert (search "1: (SB-PCL::COMBINED-METHOD TRACED-GF) returned 10" output))
+    (assert (search "2: ((METHOD TRACED-GF :BEFORE (T)) 5)" output))
+    (assert (search "2: (METHOD TRACED-GF :BEFORE (T)) returned :BEFORE" output))
+    (assert (search "2: ((METHOD TRACED-GF :AFTER (INTEGER)) 5)" output))
+    (assert (search "2: (METHOD TRACED-GF :AFTER (INTEGER)) returned :AFTER" output))
+    (assert (search "2: ((METHOD TRACED-GF (INTEGER)) 5)" output))
+    (assert (search "2: (METHOD TRACED-GF (INTEGER)) returned 10" output)))
+  (untrace traced-gf)
+  (let ((output (with-output-to-string (*trace-output*)
+                  (assert (= (traced-gf 5) 10)))))
+    (assert (= (length output) 0))))
+
 ;;;; success

@@ -121,6 +121,12 @@
 ;;; methods-tracing TODO:
 ;;;
 ;;; 2. tracing method calls for non-fast-method-function calls
+;;;    - [DONE] the calls themselves
+;;;    - calls to the METHOD-FUNCTION of methods with fast functions
+;;;      (e.g. from something implementing CALL-NEXT-METHOD; handle this with
+;;;      some more smarts in %METHOD-FUNCTION objects?)
+;;;    - calls to the METHOD-FUNCTION of methods without fast functions
+;;;      (TRACE :METHODS T /could/ modify the METHOD-FUNCTION slot)
 ;;; 3. supporting :BREAK T
 ;;; 4. tracing particular methods
 ;;;    - need an interface.
@@ -134,14 +140,16 @@
 ;;; two differences between this and SB-DEBUG::TRACE-CALL:
 ;;;
 ;;; 1. different frame (but is that correct?  Probably not.)
-;;; 2. hiding the first two arguments (permutation-vector and
-;;;    next-effective-method-call) from sight.  KLUDGE: not from mind;
-;;;    if users use :break t and try to execute code in the frame of
-;;;    the method, those two arguments will exist and need to be
-;;;    accounted for.
 ;;;
+;;; 2. hiding the method calling conventions [ standard: arglist is
+;;;    first argument; method-call: first two arguments are
+;;;    permutation-vector and next-effective-method-call ] from sight.
+;;;    KLUDGE: not from mind; if users use :break t and try to execute
+;;;    code in the frame of the method, the real function arguments
+;;;    will be used instead.
 (defun trace-method-call (info function fmf-p &rest args)
-  (multiple-value-bind (start cookie) (sb-debug::trace-start-breakpoint-fun info (if fmf-p 2 0))
+  (multiple-value-bind (start cookie)
+      (sb-debug::trace-start-breakpoint-fun info (if fmf-p (lambda (x) (nthcdr 2 x)) #'car))
     (declare (type function start cookie))
     (let ((frame (sb-di:top-frame)))
       (apply #'funcall start frame nil args)
@@ -185,12 +193,13 @@
                       fmf-p method-alist wrappers))
                (arg-info (method-plist-value method :arg-info))
                (default (cons nil nil))
-               (value (method-plist-value method :constant-value default)))
+               (value (method-plist-value method :constant-value default))
+               (fun (maybe-trace-method gf method fmf t)))
           (if (eq value default)
-              (make-fast-method-call :function (maybe-trace-method gf method fmf t) :pv pv
-                                     :next-method-call next :arg-info arg-info)
+              (make-fast-method-call
+               :function fun :pv pv :next-method-call next :arg-info arg-info)
               (make-constant-fast-method-call
-               :function (maybe-trace-method gf method fmf t) :pv pv :next-method-call next
+               :function fun :pv pv :next-method-call next
                :arg-info arg-info :value value)))
         (if real-mf-p
             (flet ((frob-cm-arg (arg)
@@ -234,11 +243,12 @@
                      ;; user-defined class don't work at all.  -- CSR,
                      ;; 2006-08-05
                      (args (cons (mapcar #'frob-cm-arg (car cm-args))
-                                 (cdr cm-args))))
+                                 (cdr cm-args)))
+                     (fun (maybe-trace-method gf method mf nil)))
                 (if (eq value default)
-                    (make-method-call :function mf :call-method-args args)
-                    (make-constant-method-call :function mf :value value
-                                               :call-method-args args))))
+                    (make-method-call :function fun :call-method-args args)
+                    (make-constant-method-call
+                     :function fun :value value :call-method-args args))))
             mf))))
 
 (defun make-effective-method-function-simple1

@@ -248,7 +248,7 @@
 ;;; hook function and a closure that can be used as the FUN-END-COOKIE
 ;;; function. The first communicates the sense of the
 ;;; TRACE-INFO-CONDITION to the second via a closure variable.
-(defun trace-start-breakpoint-fun (info &optional (cdrs 0))
+(defun trace-start-breakpoint-fun (info &optional (args-transformer #'identity))
   (let (conditionp)
     (values
      (lambda (frame bpt &rest args)
@@ -268,7 +268,7 @@
                  (*current-level-in-print* 0)
                  (*standard-output* (make-string-output-stream))
                  (*in-trace* t)
-                 (args (nthcdr cdrs args)))
+                 (args (funcall args-transformer args)))
              (ecase (trace-info-report info)
                (trace
                 (fresh-line)
