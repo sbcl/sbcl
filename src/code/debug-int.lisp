@@ -874,7 +874,7 @@
   (declare (type (mod #.sb!vm::max-interrupts) n)
            (optimize (speed 3) (safety 0)))
   (let ((context-pointer
-         #!+(or x86 64-bit) ; Context pointer array precedes 'struct thread'
+         #!+(or ppc x86 64-bit) ; Context pointer array precedes 'struct thread'
          (let ((context-array-index
                 (- -1 n
                    #!+sb-safepoint
@@ -890,7 +890,7 @@
                                (ash context-array-index sb!vm:word-shift))
            ;; Otherwise, negative arg to CURRENT-THREAD-OFFSET-SAP is fine
            #!-x86 (sb!vm::current-thread-offset-sap context-array-index))
-         #!-(or x86 64-bit) ; Context pointer array follows 'struct thread'
+         #!-(or ppc x86 64-bit) ; Context pointer array follows 'struct thread'
          (sb!vm::current-thread-offset-sap
           (+ sb!vm::primitive-thread-object-length
              #!-alpha n

@@ -202,7 +202,7 @@ extern __thread struct thread *current_thread;
 #define ALT_STACK_SIZE 32 * SIGSTKSZ
 #endif
 
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_64_BIT)
+#if defined(LISP_FEATURE_PPC) || defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_64_BIT)
   #define THREAD_MEMORY_LAYOUT_NEW 1
   /* Referring to the "old" and "new" pictures in the comment at
    * create_thread_struct(), observe that in the old scheme the interrupt
