@@ -98,7 +98,7 @@ void allocation_profiler_start()
             profile_buffer_size = size;
             old_buffer = alloc_profile_buffer;
             alloc_profile_buffer = os_allocate(size);
-            printf("using %d cells (%ld bytes) for profile buffer @ %p\n",
+            printf("using %d cells (0x%"OBJ_FMTX" bytes) for profile buffer @ %p\n",
                    max_alloc_point_counters, size, alloc_profile_buffer);
         }
         alloc_profiling = 1;
