@@ -489,7 +489,7 @@
      ;; 32-bit architectures haven't been converted over to use that thread memory
      ;; layout, and have the interrupt contexts array intruding into the TLS area.
      ;; That array must be skipped over when computing the next available index.
-     #!-64-bit (1+ sb!vm:max-interrupts)))
+     #!-(or x86 64-bit) (1+ sb!vm:max-interrupts)))
 
 (defmacro make-code-header-word (boxed-nwords)
   `(logior (ash ,boxed-nwords #!+64-bit 32 #!-64-bit n-widetag-bits)

@@ -871,20 +871,31 @@
 
 (defun nth-interrupt-context (n)
   (declare (muffle-conditions t))
-  (declare (type (unsigned-byte 32) n)
+  (declare (type (mod #.sb!vm::max-interrupts) n)
            (optimize (speed 3) (safety 0)))
-  (sb!alien:sap-alien
-   (sb!vm::current-thread-offset-sap
-    #!+64-bit
-    (- -1 n
-       #!+sb-safepoint
-       ;; the C safepoint page
-       (/ sb!c:+backend-page-bytes+ n-word-bytes))
-    #!-64-bit
-    (+ sb!vm::primitive-thread-object-length
-       #!-alpha n
-       #!+alpha (* 2 n)))
-   (* os-context-t)))
+  (let ((context-pointer
+         #!+(or x86 64-bit) ; Context pointer array precedes 'struct thread'
+         (let ((context-array-index
+                (- -1 n
+                   #!+sb-safepoint
+                   ;; the C safepoint page
+                   (/ sb!c:+backend-page-bytes+ n-word-bytes))))
+           ;; Using the FS segment, memory can be accessed only at the segment
+           ;; base specified by the descriptor (as segment-relative address 0)
+           ;; up through the segment limit. Negative indices are no good.
+           ;; So load via thread->this instead of the thread-local view.
+           ;; As a further complication, CURRENT-THREAD-SAP returns 0 for #-sb-thread
+           ;; which isn't useful, so basically reimplement as if for #+sb-thread.
+           #!+x86 (sap-ref-sap (sb!vm::current-thread-offset-sap sb!vm::thread-this-slot)
+                               (ash context-array-index sb!vm:word-shift))
+           ;; Otherwise, negative arg to CURRENT-THREAD-OFFSET-SAP is fine
+           #!-x86 (sb!vm::current-thread-offset-sap context-array-index))
+         #!-(or x86 64-bit) ; Context pointer array follows 'struct thread'
+         (sb!vm::current-thread-offset-sap
+          (+ sb!vm::primitive-thread-object-length
+             #!-alpha n
+             #!+alpha (* 2 n)))))
+    (sb!alien:sap-alien context-pointer (* os-context-t))))
 
 ;;; On SB-DYNAMIC-CORE symbols which come from the runtime go through
 ;;; an indirection table, but the debugger needs to know the actual
