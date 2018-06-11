@@ -718,7 +718,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 ;;; they are ready for reading and writing. See the UNIX Programmer's
 ;;; Manual for more information.
 (defun unix-select (nfds rdfds wrfds xpfds to-secs &optional (to-usecs 0))
-  (declare (muffle-conditions t))
+  (declare (muffle-conditions compiler-note))
   (declare (type integer nfds)
            (type unsigned-byte rdfds wrfds xpfds)
            (type (or (unsigned-byte 31) null) to-secs)

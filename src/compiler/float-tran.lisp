@@ -1653,7 +1653,7 @@
 
 #-sb-xc-host
 (defun %unary-ftruncate/single (x)
-  (declare (muffle-conditions t))
+  (declare (muffle-conditions compiler-note))
   (declare (type single-float x))
   (declare (optimize speed (safety 0)))
   (let* ((bits (single-float-bits x))
@@ -1672,7 +1672,7 @@
 
 #-sb-xc-host
 (defun %unary-ftruncate/double (x)
-  (declare (muffle-conditions t))
+  (declare (muffle-conditions compiler-note))
   (declare (type double-float x))
   (declare (optimize speed (safety 0)))
   (let* ((high (double-float-high-bits x))

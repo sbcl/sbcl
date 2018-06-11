@@ -98,7 +98,7 @@ means to wait indefinitely.")
 (declaim (inline split-ratio-for-sleep))
 (defun split-ratio-for-sleep (seconds)
   (declare (ratio seconds)
-           (muffle-conditions t))
+           (muffle-conditions compiler-note))
   (multiple-value-bind (quot rem) (truncate (numerator seconds)
                                             (denominator seconds))
     (values quot
@@ -109,7 +109,7 @@ means to wait indefinitely.")
                      '(* 10 (truncate 100000000 (denominator seconds))))))))
 
 (defun split-seconds-for-sleep (seconds)
-  (declare (muffle-conditions t))
+  (declare (muffle-conditions compiler-note))
   ;; KLUDGE: This whole thing to avoid consing floats
   (flet ((split-float ()
            (let ((whole-seconds (truly-the fixnum (%unary-truncate seconds))))

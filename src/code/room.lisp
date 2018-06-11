@@ -620,7 +620,7 @@ We could try a few things to mitigate this:
 ;;; Return a list of 3-lists (bytes object type-name) for the objects
 ;;; allocated in Space.
 (defun type-breakdown (space)
-  (declare (muffle-conditions t))
+  (declare (muffle-conditions compiler-note))
   (let ((sizes (make-array 256 :initial-element 0 :element-type '(unsigned-byte #.n-word-bits)))
         (counts (make-array 256 :initial-element 0 :element-type '(unsigned-byte #.n-word-bits))))
     (map-allocated-objects
