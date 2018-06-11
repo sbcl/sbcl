@@ -403,7 +403,7 @@
 (defun vertices-best-color/general (vertices colors)
   (let* ((best-color      (sc-locations-first colors))
          (best-compatible '())
-         (best-cost       nil))
+         (best-cost       0))
     ;; TODO: sort vertices by spill cost, so that high-spill cost ones
     ;; are more likely to be compatible?  We're trying to find a
     ;; maximal 1-colorable subgraph here, ie. a maximum independent
@@ -412,6 +412,7 @@
     (do-sc-locations (color colors nil (vertex-element-size (first vertices)))
       (let ((compatible '())
             (cost 0))
+        (declare (fixnum cost))
         (dolist (vertex vertices)
           (when (and (notany (lambda (existing)
                                (sset-member vertex
@@ -420,8 +421,7 @@
                      (vertex-color-possible-p vertex color))
             (incf cost (max 1 (vertex-spill-cost vertex)))
             (push vertex compatible)))
-        (when (or (null best-cost)
-                  (> cost best-cost))
+        (when (> cost best-cost)
           (setf best-color      color
                 best-compatible compatible
                 best-cost       cost))))
