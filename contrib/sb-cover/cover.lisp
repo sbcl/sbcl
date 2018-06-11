@@ -113,8 +113,8 @@ report, otherwise ignored. The default value is CL:IDENTITY.
 "
   (let* ((paths)
          (directory (pathname-as-directory directory))
-         (*default-pathname-defaults* (translate-logical-pathname directory)))
-    (ensure-directories-exist *default-pathname-defaults*)
+         (defaults (translate-logical-pathname directory)))
+    (ensure-directories-exist defaults)
     (maphash (lambda (k v)
                (declare (ignore v))
                (when (funcall if-matches k)
@@ -122,11 +122,10 @@ report, otherwise ignored. The default value is CL:IDENTITY.
                         (n (format nil "~(~{~2,'0X~}~)"
                                    (coerce (sb-md5:md5sum-string
                                             (sb-ext:native-namestring pk))
-                                           'list)))
-                        (path (make-pathname :name n :type "html" :defaults directory)))
+                                           'list))))
                    (when (probe-file k)
-                     (ensure-directories-exist pk)
-                     (with-open-file (stream path
+                     (with-open-file (stream (make-pathname :name n :type "html"
+                                                            :defaults directory)
                                              :direction :output
                                              :if-exists :supersede
                                              :if-does-not-exist :create)
