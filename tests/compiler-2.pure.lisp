@@ -1431,3 +1431,13 @@
   (checked-compile
    '(lambda (x) (declare (optimize speed)) (typep x '(or bignum single-float)))
    :allow-notes nil))
+
+
+(with-test (:name :vertices-best-color/general-default-value)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (declare ((simple-array (complex double-float)) a))
+         (* (aref a 0)
+            (let ((z (aref a 0)))
+              (complex (realpart z) (imagpart z)))))))

@@ -401,7 +401,7 @@
                            (values sb!vm:finite-sc-offset list))
                 vertices-best-color/general))
 (defun vertices-best-color/general (vertices colors)
-  (let* ((best-color      nil)
+  (let* ((best-color      (sc-locations-first colors))
          (best-compatible '())
          (best-cost       nil))
     ;; TODO: sort vertices by spill cost, so that high-spill cost ones
