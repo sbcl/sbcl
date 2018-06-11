@@ -638,49 +638,35 @@ free_thread_struct(struct thread *th)
  *     /   ___ aligned_spaces
  *    /   /
  *  (0) (1)       (2)       (3)       (4)    (5)          (6)
- *   |   | CONTROL | BINDING |  ALIEN  |  CSP | per_thread |          |
+ *   |   | CONTROL | BINDING |  ALIEN  |  CSP | thread     |          |
  *   |   |  STACK  |  STACK  |  STACK  | PAGE | structure  | altstack |
  *   |...|------------------------------------------------------------|
  *          2MiB       1MiB     1MiB               (*)         (**)
  *
- *
- *  |       (*) per_thread detail       |    (**) altstack detail    |
- *  |-----------------------------------|----------------------------|
- *  |           Lisp TLS area           |            |               |
- *  |-----------------------------------|            |               |
- *  | struct   | interrupt |            | nonpointer |               |
- *  | thread   | contexts  |            |    data    |   sigstack    |
- *  |----------+-----------+------------|------------+---------------|
- *  | 30 words | 1K words  |  remainder | ~200 bytes | 32*SIGSTKSIZE |
- *  |                                   |
- *  |  <--  4K words in total   -->     |
- *          (32KB for x86-64)
+ *  |  (*) interrupt contexts and Lisp TLS |   (**) altstack           |
+ *  |-----------|--------------------------|------------|--------------|
+ *  | interrupt | struct + dynamically     | nonpointer |   sigstack   |
+ *  | contexts  | thread   assigned TLS    |     data   |              |
+ *  +-----------+--------------------------|------------+--------------|
+ *  | 1K words  | <--- TLS_SIZE words ---> | ~200 bytes | 32*SIGSTKSZ  |
+ *              ^ thread base
  *
  *   (1) = control stack start. default size shown
  *   (2) = binding stack start. size = BINDING_STACK_SIZE
  *   (3) = alien stack start.   size = ALIEN_STACK_SIZE
  *   (4) = C safepoint page.    size = BACKEND_PAGE_BYTES or 0
- *   (5) = per_thread_data.     size = dynamic_values_bytes
+ *   (5) = per_thread_data.     size = (MAX_INTERRUPTS + TLS_SIZE) words
  *   (6) = nonpointer_thread_data and signal stack.
  *
  *   (0) and (1) may coincide; (4) and (5) may coincide
  *
  *   - Lisp TLS overlaps 'struct thread' so that the first N (~30) words
  *     have preassigned TLS indices.
- *     Others are assigned on demand, skipping over interrupt_contexts[]
  *
  *   - nonpointer data are not in 'struct thread' because placing them there
  *     makes it tough to calculate addresses in 'struct thread' from Lisp.
  *     (Every 'struct thread' slot has a known size)
  *
- * New layout:
- *  |-----------|-----------------------|------------|--------------|
- *  |           |     Lisp TLS area     |            |              |
- *  | interrupt | struct                | nonpointer |   sigstack   |
- *  | contexts  | thread                |     data   |              |
- *  +-----------+-----------------------|------------+--------------|
- *  | 1K words  |   <-- 4K words --->   | ~200 bytes |              |
- *              ^ thread base
  * On sb-safepoint builds one page before the thread base is used for the foreign calls safepoint.
  */
 
@@ -709,7 +695,7 @@ create_thread_struct(lispobj initial_function) {
          thread_control_stack_size+
          BINDING_STACK_SIZE+
          ALIEN_STACK_SIZE +
-         INTERRUPT_CONTEXTS_SIZE);
+         (MAX_INTERRUPTS*sizeof(os_context_t*)));
 
     // Refer to the ASCII art in the block comment above
     struct thread *th = (void*)(csp_page + THREAD_CSP_PAGE_SIZE);

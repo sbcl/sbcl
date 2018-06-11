@@ -479,17 +479,7 @@
 ;;; that does not map onto a thread slot.
 ;;; Given N thread slots, the tls indices are 0..N-1 scaled by word-shift.
 ;;; This constant is the index prior to scaling.
-(defconstant sb!thread::tls-index-start
-  (+ primitive-thread-object-length
-     ;; All 64-bit architectures have been converted to place interrupt contexts
-     ;; preceding 'struct thread' in memory so that TLS indices
-     ;; continue without a gap from the offset of the last primitive thread slot
-     ;; up until the TLS-SIZE'th slot (at which point exhaustion occurs).
-     ;;
-     ;; 32-bit architectures haven't been converted over to use that thread memory
-     ;; layout, and have the interrupt contexts array intruding into the TLS area.
-     ;; That array must be skipped over when computing the next available index.
-     #!-(or x86 ppc 64-bit) (1+ sb!vm:max-interrupts)))
+(defconstant sb!thread::tls-index-start primitive-thread-object-length)
 
 (defmacro make-code-header-word (boxed-nwords)
   `(logior (ash ,boxed-nwords #!+64-bit 32 #!-64-bit n-widetag-bits)

@@ -873,13 +873,11 @@
   (declare (muffle-conditions t))
   (declare (type (mod #.sb!vm::max-interrupts) n)
            (optimize (speed 3) (safety 0)))
-  (let ((context-pointer
-         #!+(or ppc x86 64-bit) ; Context pointer array precedes 'struct thread'
-         (let ((context-array-index
-                (- -1 n
-                   #!+sb-safepoint
-                   ;; the C safepoint page
-                   (/ sb!c:+backend-page-bytes+ n-word-bytes))))
+  (let* ((n (- -1 n
+               #!+sb-safepoint
+               ;; the C safepoint page
+               (/ sb!c:+backend-page-bytes+ n-word-bytes)))
+         (context-pointer
            ;; Using the FS segment, memory can be accessed only at the segment
            ;; base specified by the descriptor (as segment-relative address 0)
            ;; up through the segment limit. Negative indices are no good.
@@ -889,12 +887,11 @@
            #!+x86 (sap-ref-sap (sb!vm::current-thread-offset-sap sb!vm::thread-this-slot)
                                (ash context-array-index sb!vm:word-shift))
            ;; Otherwise, negative arg to CURRENT-THREAD-OFFSET-SAP is fine
-           #!-x86 (sb!vm::current-thread-offset-sap context-array-index))
-         #!-(or ppc x86 64-bit) ; Context pointer array follows 'struct thread'
-         (sb!vm::current-thread-offset-sap
-          (+ sb!vm::primitive-thread-object-length
+           ;; but the Alpha code is quite possibly wrong; I have no idea.
+           #!-x86
+           (sb!vm::current-thread-offset-sap
              #!-alpha n
-             #!+alpha (* 2 n)))))
+             #!+alpha (* 2 n))))
     (sb!alien:sap-alien context-pointer (* os-context-t))))
 
 ;;; On SB-DYNAMIC-CORE symbols which come from the runtime go through
