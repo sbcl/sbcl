@@ -25,13 +25,32 @@
   (:args (object :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg immediate)))
   (:info name offset lowtag)
-  (:ignore name)
   (:results)
   (:generator 1
-     (storew (encode-value-if-immediate value) object offset lowtag)))
+    (cond ((emit-gc-barrier-store-p name)
+           (inst push (encode-value-if-immediate value))
+           (inst push offset)
+           (inst push object)
+           (when (= lowtag fun-pointer-lowtag)
+             (inst push eax-tn) ; spill eax to use as a temp
+             (loadw eax-tn object 0 fun-pointer-lowtag)
+             (inst shr eax-tn n-widetag-bits)
+             ;; increment index by number of boxed words
+             (inst add (make-ea :dword :base esp-tn :disp 8) eax-tn)
+             ;; and compute the code pointer from the fun pointer
+             (inst lea eax-tn
+                   (make-ea :dword :index eax-tn :scale n-word-bytes
+                            :disp (- fun-pointer-lowtag other-pointer-lowtag)))
+             (inst sub (make-ea :dword :base esp-tn :disp 4) eax-tn)
+             (inst pop eax-tn)) ; restore
+           (inst call (make-fixup 'code-header-set :assembly-routine)))
+          (t
+           (storew (encode-value-if-immediate value) object offset lowtag)))))
 
 (define-vop (init-slot set-slot)
   (:info name dx-p offset lowtag)
+  (:generator 1
+    (storew (encode-value-if-immediate value) object offset lowtag))
   (:ignore name dx-p))
 
 (define-vop (compare-and-swap-slot)
@@ -464,8 +483,21 @@
 (define-full-reffer code-header-ref * 0 other-pointer-lowtag
   (any-reg descriptor-reg) * code-header-ref)
 
-(define-full-setter code-header-set * 0 other-pointer-lowtag
-  (any-reg descriptor-reg) * code-header-set)
+(define-vop (code-header-set)
+  (:translate code-header-set)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg))
+         (index :scs (unsigned-reg))
+         (value :scs (any-reg descriptor-reg) :target result))
+  (:arg-types * unsigned-num *)
+  (:results (result :scs (any-reg descriptor-reg)))
+  (:result-types *)
+  (:generator 10
+    (inst push value)
+    (inst push index)
+    (inst push object)
+    (inst call (make-fixup 'code-header-set :assembly-routine))
+    (move result value)))
 
 ;;;; raw instance slot accessors
 

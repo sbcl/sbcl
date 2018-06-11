@@ -148,7 +148,8 @@
   (:result-types system-area-pointer)
   (:generator 10
     (loadw sap code 0 other-pointer-lowtag)
-    (inst shr sap n-widetag-bits)
+    (inst shl sap 2) ; shift out the two GC-reserved bits
+    (inst shr sap (+ 2 n-widetag-bits))
     (inst lea sap (make-ea :byte :base code :index sap :scale 4
                            :disp (- other-pointer-lowtag)))))
 
@@ -159,7 +160,8 @@
   (:results (func :scs (descriptor-reg) :from (:argument 0)))
   (:generator 10
     (loadw func code 0 other-pointer-lowtag)
-    (inst shr func n-widetag-bits)
+    (inst shl func 2) ; shift out the two GC-reserved bits
+    (inst shr func (+ 2 n-widetag-bits))
     (inst lea func
           (make-ea :byte :base offset :index func :scale 4
                    :disp (- fun-pointer-lowtag other-pointer-lowtag)))

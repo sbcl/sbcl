@@ -30,14 +30,7 @@
   (:results)
   (:vop-var vop)
   (:generator 1
-    (cond ((and (listp name)
-                (eq (car name) 'setf)
-                (member (cadr name) '(%code-debug-info
-                                      %code-fixups
-                                      %simple-fun-name
-                                      %simple-fun-arglist
-                                      %simple-fun-type
-                                      %simple-fun-info)))
+    (cond ((emit-gc-barrier-store-p name)
            ;; Don't assume that the immediate is acceptable to 'push'
            ;; (only MOV can take a 64-bit immediate)
            (inst mov temp-reg-tn (encode-value-if-immediate value))

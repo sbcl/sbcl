@@ -426,3 +426,14 @@
                               :key 'primitive-object-name)))
                '(fill-pointer fill-pointer-p elements data
                  displacement displaced-p displaced-from dimensions)))
+
+(defun emit-gc-barrier-store-p (fun-name)
+  (and (listp fun-name)
+       (eq (car fun-name) 'setf)
+       (member (cadr fun-name)
+               '(%code-debug-info
+                 %code-fixups
+                 %simple-fun-name
+                 %simple-fun-arglist
+                 %simple-fun-type
+                 %simple-fun-info))))

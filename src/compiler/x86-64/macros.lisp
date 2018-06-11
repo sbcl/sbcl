@@ -365,7 +365,7 @@
                  (inst shr (make-ea :qword :base rsp-tn) n-fixnum-tag-bits)
                  (inst push object)
                  (invoke-asm-routine 'call 'code-header-set vop)
-                 (inst mov result value))
+                 (move result value))
                `((gen-cell-set
                    (make-ea :qword :base object :index index
                             :scale (ash 1 (- word-shift n-fixnum-tag-bits))

@@ -705,7 +705,7 @@ create_thread_struct(lispobj initial_function) {
     for(i = 0; i < TLS_SIZE; i++)
         tls[i] = NO_TLS_VALUE_MARKER_WIDETAG;
 #endif
-#ifdef LISP_FEATURE_X86_64
+#ifdef LISP_FEATURE_GENCGC
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     extern unsigned int* varyobj_page_touched_bits;
     th->varyobj_space_addr  = VARYOBJ_SPACE_START;

@@ -270,7 +270,7 @@ static inline int header_rememberedp(lispobj header) {
   return (header & (OBJ_WRITTEN_FLAG << 24)) != 0;
 }
 
-#ifdef LISP_FEATURE_X86_64
+#if defined(LISP_FEATURE_X86_64) || defined(LISP_FEATURE_X86)
 # define CODE_PAGES_USE_SOFT_PROTECTION 1
 #else
 # define CODE_PAGES_USE_SOFT_PROTECTION 0
