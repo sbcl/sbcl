@@ -885,7 +885,7 @@
            ;; As a further complication, CURRENT-THREAD-SAP returns 0 for #-sb-thread
            ;; which isn't useful, so basically reimplement as if for #+sb-thread.
            #!+x86 (sap-ref-sap (sb!vm::current-thread-offset-sap sb!vm::thread-this-slot)
-                               (ash context-array-index sb!vm:word-shift))
+                               (ash n sb!vm:word-shift))
            ;; Otherwise, negative arg to CURRENT-THREAD-OFFSET-SAP is fine
            ;; but the Alpha code is quite possibly wrong; I have no idea.
            #!-x86
