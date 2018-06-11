@@ -870,7 +870,7 @@
                              (or escaped (and savedp off-stack)))))))
 
 (defun nth-interrupt-context (n)
-  (declare (muffle-conditions t))
+  (declare (muffle-conditions compiler-note))
   (declare (type (mod #.sb!vm::max-interrupts) n)
            (optimize (speed 3) (safety 0)))
   (let* ((n (- -1 n
@@ -890,8 +890,8 @@
            ;; but the Alpha code is quite possibly wrong; I have no idea.
            #!-x86
            (sb!vm::current-thread-offset-sap
-             #!-alpha n
-             #!+alpha (* 2 n))))
+            #!-alpha n
+            #!+alpha (* 2 n))))
     (sb!alien:sap-alien context-pointer (* os-context-t))))
 
 ;;; On SB-DYNAMIC-CORE symbols which come from the runtime go through
