@@ -489,9 +489,10 @@
                     (prefix #!+(and sb-thread (not win32)) :fs
                             #!-(and sb-thread (not win32)) nil))
     (flet ((thread-slot-ea (slot-index)
-             (make-ea :dword #!-sb-thread :base #!-sb-thread edi-tn
+             (make-ea :dword 
+		      #!+(or (not sb-thread) win32) :base #!+(or (not sb-thread) win32) edi-tn
                       :disp (ash slot-index word-shift))))
-      #!+(or (not sb-thread) win32)
+      #!-sb-thread
       (progn
         ;; Load 'all_threads' into EDI (which was already spilled)
         ;; as the register with which to access thread slots.
@@ -502,6 +503,8 @@
           (inst mov edi-tn (make-ea :dword :base edi-tn)))
         #!-sb-dynamic-core
         (inst mov edi-tn (make-ea :dword :disp (make-fixup "all_threads" :foreign))))
+      #!+(and win32 sb-thread)
+      (inst mov edi-tn (make-ea :dword :disp +win32-tib-arbitrary-field-offset+) :fs)
 
       (inst mov eax-tn object) ; object
       (inst sub eax-tn (thread-slot-ea thread-dynspace-addr-slot) prefix)
