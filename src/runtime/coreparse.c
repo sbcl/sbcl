@@ -641,7 +641,7 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
 
 static void relocate_heap(struct heap_adjust* adj)
 {
-    if (!lisp_startup_options.noinform || SHOW_SPACE_RELOCATION) {
+    if (!lisp_startup_options.noinform && SHOW_SPACE_RELOCATION) {
         int i;
         for (i = 0; i < adj->n_ranges; ++i)
             if (adj->range[i].delta)
