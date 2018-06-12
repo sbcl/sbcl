@@ -350,7 +350,7 @@
 ;;; control flow into a single operation.
 (defun coverage-mark-lowering-pass (component asmstream)
   (declare (ignorable component asmstream))
-  #!+x86-64
+  #!+(or x86-64 x86)
   (let ((label (gen-label))
         ;; vector of lists of original source paths covered
         (src-paths (make-array 10 :fill-pointer 0))

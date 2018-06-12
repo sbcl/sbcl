@@ -972,13 +972,13 @@
                                    (cons path +code-coverage-unmarked+)))
                   (next (make-ctran))
                   (*allow-instrumenting* nil))
-              #!+x86-64 (declare (ignore store)) ; eval'd for side-effect only
+              #!+(or x86-64 x86) (declare (ignore store)) ; eval'd for side-effect only
               (push (ctran-block start)
                     (gethash path (code-coverage-blocks metadata)))
               (ir1-convert start next nil
-                           #!+x86-64
+                           #!+(or x86-64 x86)
                            `(%primitive mark-covered ',path)
-                           #!-x86-64
+                           #!-(or x86-64 x86)
                            `(locally
                                 (declare (optimize speed
                                                    (safety 0)

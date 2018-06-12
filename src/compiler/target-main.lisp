@@ -324,7 +324,7 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
         (recurse path-to-find (cdaar list) (cdr list))))
     start-char))
 
-;;;;; Coverage helpers
+;;;; Coverage helpers
 
 (defun record-code-coverage (namestring cc)
   (setf (gethash namestring (car *code-coverage-info*)) cc))

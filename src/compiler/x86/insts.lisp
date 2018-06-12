@@ -511,19 +511,32 @@
 ;;;; fixup emitters
 
 (defun emit-absolute-fixup (segment fixup)
-  (note-fixup segment :absolute fixup)
+  ;; A fixup into the code itself has a position denoted by either a label,
+  ;; or a label plus an additional offset relative to that label.
+  ;; If the latter, strip outo the addend, incoporate it into the backpatch,
+  ;; and note the fixup without the addend, because dump/apply-fixups can
+  ;; handle labels, but not a label + addend.
   (let ((offset (fixup-offset fixup)))
-    (if (label-p offset)
-        (emit-back-patch
-         segment
-         4
-         (lambda (segment posn)
-           (declare (ignore posn))
-           (emit-dword segment
-                       (- (+ (- (component-header-length)
-                                (segment-header-skew segment))
-                             (label-position offset))
-                          other-pointer-lowtag))))
+    (note-fixup segment :absolute
+                (if (typep offset '(cons label))
+                    (make-fixup nil :code-object (car offset))
+                    fixup))
+    (if (typep offset '(or label (cons label)))
+        (multiple-value-bind (label extra-offset)
+            (if (listp offset)
+                (values (car offset) (cdr offset))
+                (values offset 0))
+          (emit-back-patch
+           segment
+           4
+           (lambda (segment posn)
+             (declare (ignore posn))
+             (emit-dword segment
+                         (+ (component-header-length)
+                            (- (segment-header-skew segment))
+                            (- other-pointer-lowtag)
+                            (label-position label)
+                            extra-offset)))))
         (emit-dword segment offset))))
 
 (defun emit-relative-fixup (segment fixup)
@@ -549,7 +562,9 @@
   (base nil :type (or tn null) :read-only t)
   (index nil :type (or tn null) :read-only t)
   (scale 1 :type (member 1 2 4 8) :read-only t)
-  (disp 0 :type (or (unsigned-byte 32) (signed-byte 32) fixup) :read-only t))
+  (disp 0 :type (or (unsigned-byte 32) (signed-byte 32) fixup)
+          :read-only t))
+
 (defmethod print-object ((ea ea) stream)
   (cond ((or *print-escape* *print-readably*)
          (print-unreadable-object (ea stream :type t)
@@ -621,7 +636,7 @@
                        ((null base) #b101)
                        (t (reg-tn-encoding base)))))
        (when (and (fixup-p disp)
-                  (label-p (fixup-offset disp)))
+                  (typep (fixup-offset disp) '(or label (cons label))))
          (aver (null base))
          (aver (null index))
          (return-from emit-ea (emit-ea segment disp reg allow-constants)))
@@ -2540,3 +2555,45 @@
                       (loop repeat size
                             collect (prog1 (ldb (byte 8 0) val)
                                       (setf val (ash val -8)))))))))
+
+;;; Perform exhaustive analysis here because of the extreme degree
+;;; of confusion I have about what is allowed to reach the instruction
+;;; emitter as a raw fixup, a fixup wrapped in an EA, a label wrapped
+;;; in a fixup wrapped in an EA etc.
+(defun sb!assem::%mark-used-labels (operand)
+  (named-let recurse ((operand operand))
+    (etypecase operand
+      ((or integer tn keyword))
+      (ea
+       (let ((disp (ea-disp operand)))
+         (etypecase disp
+           (label (setf (label-usedp disp) t))
+           (fixup (recurse disp))
+           (integer))))
+      (fixup
+       (let ((offset (fixup-offset operand)))
+         (cond ((label-p offset)
+                (setf (label-usedp offset) t))
+               ((consp offset)
+                (setf (label-usedp (car offset)) t))))))))
+
+(defun sb!c::branch-opcode-p (mnemonic)
+  (member mnemonic (load-time-value
+                    (mapcar #'sb!assem::op-encoder-name
+                            '(call ret jmp jecxz break int iret
+                              ;; FIXME: will we actually decode a JMP-SHORT?
+                              ;; and why do we even have that? Someone found
+                              ;; choosers to be buggy or inefficient?
+                              loop loopz loopnz syscall
+                              byte word dword)) ; unexplained phenomena
+                    t)))
+
+;; Replace the INST-INDEXth element in INST-BUFFER with an instruction
+;; to store a coverage mark in the OFFSETth byte beyond LABEL.
+(defun sb!c::replace-coverage-instruction (inst-buffer inst-index label offset)
+  (setf (svref inst-buffer inst-index)
+        `(mov ,(make-ea :byte
+                        :disp (make-fixup nil
+                                          :code-component
+                                          (cons label offset)))
+              1)))

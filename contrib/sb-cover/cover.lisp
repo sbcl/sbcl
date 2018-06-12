@@ -91,16 +91,17 @@ image."
            (reset-coverage code))
          (sb-c:reset-code-coverage))))
 
-;; Ideally we would use the new interface where applicable,
-;; however for backward-compatibility we can extract
-;; the data and stuff it into the old representation.
-;; Update for only FILENAME if supplied, or all files if NIL.
-(defun update-legacy-coverage-info (&optional filename)
+;;; Transfer data from new-style coverage marks into old-style.
+;;; Update only data for FILENAME if supplied, or all files if NIL.
+;;; Ideally we could report directly from the new data where applicable,
+;;; however this is, for the time being, perfectly backward-compatibile.
+(defun refresh-coverage-info (&optional filename)
   ;; NAMESTRING->PATH-TABLES maps a namestring to a hashtable which maps
   ;; source paths to the legacy coverage record for that path in that file,
   ;;   e.g. (1 4 1) -> ((1 4 1) . SB-C::%CODE-COVERAGE-UNMARKED%)
-  #+x86-64
+  #+(or x86-64 x86)
   (let ((namestring->path-tables (make-hash-table :test 'equal))
+        (coverage-records (code-coverage-hashtable))
         (n-marks 0))
     (do-instrumented-code (code)
       (sb-int:binding* ((map (%find-coverage-map code) :exit-if-null)
@@ -110,7 +111,7 @@ image."
                          :exit-if-null)
                         (legacy-coverage-marks
                          (and (or (null filename) (string= namestring filename))
-                              (gethash namestring (code-coverage-hashtable)))
+                              (gethash namestring coverage-records))
                          :exit-if-null)
                         (path-lookup-table
                          (gethash namestring namestring->path-tables)))
@@ -134,7 +135,7 @@ image."
                         #+nil
                         (warn "Missing coverage entry for ~S in ~S"
                               path namestring))))))))))
-    n-marks))
+    (values coverage-records n-marks)))
 
 ) ; end MACROLET
 
@@ -144,7 +145,7 @@ The only operation that may be done on the state is passing it to
 RESTORE-COVERAGE. The representation is guaranteed to be readably printable.
 A representation that has been printed and read back will work identically
 in RESTORE-COVERAGE."
-  (update-legacy-coverage-info)
+  (refresh-coverage-info)
   (loop for file being the hash-keys of (code-coverage-hashtable)
         using (hash-value states)
         collect (cons file states)))
@@ -222,12 +223,12 @@ report, otherwise ignored. The default value is CL:IDENTITY.
          (defaults (translate-logical-pathname directory)))
     (ensure-directories-exist defaults)
     (when (eq if-matches 'identity)
-      (update-legacy-coverage-info)) ; update all
+      (refresh-coverage-info)) ; update all
     (maphash (lambda (k v)
                (declare (ignore v))
                (when (funcall if-matches k)
                  (unless (eq if-matches 'identity)
-                   (update-legacy-coverage-info k)) ; update one file
+                   (refresh-coverage-info k)) ; update one file
                  (let* ((pk (translate-logical-pathname k))
                         (n (format nil "~(~{~2,'0X~}~)"
                                    (coerce (sb-md5:md5sum-string

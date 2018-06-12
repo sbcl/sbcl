@@ -283,15 +283,16 @@
             (setq vector new-vector
                   index 0)))
         (unless (typep thing '(or function label))
-          (dolist (operand (cdr thing))
-            (if (label-p operand)
-                (setf (label-usedp operand) t)
-                ;; backend decides what labels are used
-                (%mark-used-labels operand))))
+          (unless (member (car thing) '(.align .byte .skip .coverage-mark))
+            (dolist (operand (cdr thing))
+              (if (label-p operand)
+                  (setf (label-usedp operand) t)
+                  ;; backend decides what labels are used
+                  (%mark-used-labels operand)))))
         (setf (aref vector index) thing)
         (setf (car data) (1+ index))))))
 
-#!-x86-64
+#!-(or x86-64 x86)
 (defun %mark-used-labels (operand) ; default implementation
   (declare (ignore operand)))
 

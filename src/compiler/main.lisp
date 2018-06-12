@@ -1730,7 +1730,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                   ;; Dump the code coverage records into the fasl.
                    (with-source-paths
                     (fopcompile `(record-code-coverage
-                                  ',(namestring *compile-file-pathname*)
+                                  ',(namestring sb!xc:*compile-file-pathname*)
                                   ',(let (list)
                                       (maphash (lambda (k v)
                                                  (declare (ignore k))
