@@ -431,7 +431,7 @@ static void print_environment(int argc, char *argv[])
 extern void write_protect_immobile_space();
 struct lisp_startup_options lisp_startup_options;
 int
-main(int argc, char *argv[], char *envp[])
+sbcl_main(int argc, char *argv[], char *envp[])
 {
 #ifdef LISP_FEATURE_WIN32
     /* Exception handling support structure. Evil Win32 hack. */
