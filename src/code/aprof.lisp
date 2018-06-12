@@ -129,8 +129,8 @@
   (alien-funcall (extern-alien "allocation_profiler_stop" (function void))))
 
 (defconstant +state-initial+         1)
-(defconstant +state-begin-pa+        2)
-(defconstant +state-profiler+        3)
+(defconstant +state-profiler+        2)
+(defconstant +state-begin-pa+        3)
 (defconstant +state-loaded-free-ptr+ 4)
 (defconstant +state-bumped-free-ptr+ 5)
 (defconstant +state-tested-free-ptr+ 6)
@@ -232,10 +232,6 @@
                        (null (machine-ea-index ea))
                        (eq (machine-ea-disp ea)
                            (+ profiler-index sb-vm:n-word-bytes))))
-                 ((eq opcode '|push|)
-                  ;; Known huge allocation goes straight to C call
-                  (setq size (ldb (byte 32 8) dchunk))
-                  (advance +state-trampoline-arg+))
                  (t
                   (advance-if (and (eq opcode 'mov)
                                    (let ((rm (regrm-inst-r/m 0 dstate)))
@@ -245,9 +241,14 @@
                                               sb-vm:word-shift))))
                               +state-begin-pa+))))
                (#.+state-begin-pa+
-                  (advance-if (and (eq opcode 'mov) free-ptr-p)
-                              +state-loaded-free-ptr+)
-                  (setq orig-free-ptr-reg (regrm-inst-reg dchunk dstate)))
+                (cond ((eq opcode '|push|)
+                       ;; Known huge allocation goes straight to C call
+                       (setq size (ldb (byte 32 8) dchunk))
+                       (advance +state-trampoline-arg+))
+                      (t
+                       (advance-if (and (eq opcode 'mov) free-ptr-p)
+                                   +state-loaded-free-ptr+)
+                       (setq orig-free-ptr-reg (regrm-inst-reg dchunk dstate)))))
                (#.+state-loaded-free-ptr+
                 (case opcode
                  ;; Variable-size alloc can either use LEA or ADD to compute the
@@ -538,16 +539,22 @@
            (format t "~19@t===========~%~19@t~11d~%" sum-bytes))
           (t
            (format t " =======  ===========~%~6,1,2f   ~12d~%"
-                   sum-pct sum-bytes)))))
+                   sum-pct sum-bytes)))
+    sum-bytes))
 
+;;; Call FUN and return the exact number of bytes it (an all descendant
+;;; calls) allocated, provided that they were instrumented for precise
+;;; cons profiling.
 (defun aprof-run (fun)
   (aprof-reset)
   (patch-fixups)
-  (unwind-protect
-       (progn (aprof-start) (funcall fun))
-    (aprof-stop)
-    (aprof-show)
-    (terpri)))
+  (let (nbytes)
+    (unwind-protect
+         (progn (aprof-start) (funcall fun))
+      (aprof-stop)
+      (setq nbytes (aprof-show))
+      (terpri))
+    nbytes))
 
 ;;;;
 
