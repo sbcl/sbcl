@@ -8,12 +8,46 @@
 (defpackage #:sb-cover
   (:use #:cl #:sb-c)
   (:export #:report
+           #:get-coverage
            #:reset-coverage #:clear-coverage
            #:restore-coverage #:restore-coverage-from-file
            #:save-coverage #:save-coverage-in-file
            #:store-coverage-data))
 
 (in-package #:sb-cover)
+
+(defmacro code-coverage-hashtable () `(car sb-c:*code-coverage-info*))
+
+;;;; New coverage representation (only for x86-64 as of now).
+;;;; One byte per coverage mark is stored in the unboxed constants of the code.
+(defun %find-coverage-map (code)
+  (declare (type (or sb-kernel:simple-fun
+                     sb-kernel:code-component
+                     symbol)
+                 code))
+  (etypecase code
+   (sb-kernel:simple-fun
+    (%find-coverage-map (sb-kernel:fun-code-header code)))
+   (symbol
+    (%find-coverage-map (or (macro-function code) (fdefinition code))))
+   (sb-kernel:code-component
+    (let ((n (sb-kernel:code-header-words code)))
+      (let ((map (sb-kernel:code-header-ref code (1- n))))
+        (when (typep map '(cons (eql sb-c::coverage-map)))
+          (return-from %find-coverage-map (values (cdr map) code))))))))
+
+;;; Retun just the list of soure paths in CODE that are marked covered.
+(defun get-coverage (code)
+  (multiple-value-bind (map code) (%find-coverage-map code)
+    (when map
+      (sb-int:collect ((paths))
+        (sb-sys:with-pinned-objects (code)
+          (let ((sap (sb-kernel:code-instructions code)))
+            (dotimes (i (length map) (paths))
+              (unless (zerop (sb-sys:sap-ref-8 sap i))
+                (paths (svref map i))))))))))
+
+;;;;
 
 (declaim (type (member :whole :car) *source-path-mode*))
 (defvar *source-path-mode* :whole)
@@ -30,9 +64,79 @@ STORE-COVERAGE-DATA optimization policy set to 3) are loaded again into the
 image."
   (sb-c:clear-code-coverage))
 
-(defun reset-coverage ()
+(macrolet
+    ((do-instrumented-code ((var &optional result) &body body)
+       ;; Scan list of weak-pointers to all coverage-instrumented code,
+       ;; binding VAR to each object, and removing broken weak-pointers.
+       `(let ((predecessor sb-c:*code-coverage-info*))
+          (loop
+           (let ((cell (cdr predecessor)))
+             (unless cell (return ,result))
+             (let ((,var (sb-ext:weak-pointer-value (car cell))))
+               (if ,var
+                   (progn ,@body (setq predecessor cell))
+                   (rplacd predecessor (cdr cell)))))))))
+
+(defun reset-coverage (&optional object)
   "Reset all coverage data back to the `Not executed` state."
-  (sb-c:reset-code-coverage))
+  (cond (object ; reset only this object
+         (multiple-value-bind (map code) (%find-coverage-map object)
+           (when map
+             (let ((header-length (sb-kernel:code-header-words code)))
+               (dotimes (i (ceiling (length map) sb-vm:n-word-bytes))
+                 (setf (sb-kernel:code-header-ref code (+ header-length i))
+                       0))))))
+        (t ; reset everything
+         (do-instrumented-code (code)
+           (reset-coverage code))
+         (sb-c:reset-code-coverage))))
+
+;; Ideally we would use the new interface where applicable,
+;; however for backward-compatibility we can extract
+;; the data and stuff it into the old representation.
+;; Update for only FILENAME if supplied, or all files if NIL.
+(defun update-legacy-coverage-info (&optional filename)
+  ;; NAMESTRING->PATH-TABLES maps a namestring to a hashtable which maps
+  ;; source paths to the legacy coverage record for that path in that file,
+  ;;   e.g. (1 4 1) -> ((1 4 1) . SB-C::%CODE-COVERAGE-UNMARKED%)
+  #+x86-64
+  (let ((namestring->path-tables (make-hash-table :test 'equal))
+        (n-marks 0))
+    (do-instrumented-code (code)
+      (sb-int:binding* ((map (%find-coverage-map code) :exit-if-null)
+                        (namestring
+                         (sb-c::debug-source-namestring
+                          (sb-c::debug-info-source (sb-kernel:%code-debug-info code)))
+                         :exit-if-null)
+                        (legacy-coverage-marks
+                         (and (or (null filename) (string= namestring filename))
+                              (gethash namestring (code-coverage-hashtable)))
+                         :exit-if-null)
+                        (path-lookup-table
+                         (gethash namestring namestring->path-tables)))
+        ;; Build the source path -> marked map for this file if not seen yet.
+        ;; It is of course redundant to have both representations.
+        (unless path-lookup-table
+          (setf path-lookup-table (make-hash-table :test 'equal)
+                (gethash namestring namestring->path-tables) path-lookup-table)
+          (dolist (item legacy-coverage-marks)
+            (setf (gethash (car item) path-lookup-table) item)))
+        (sb-sys:with-pinned-objects (code)
+          (let ((sap (sb-kernel:code-instructions code)))
+            (dotimes (i (length map)) ; for each recorded mark
+              (unless (zerop (sb-sys:sap-ref-8 sap i))
+                (incf n-marks)
+                ;; Set the legacy coverage mark for each path it touches
+                (dolist (path (svref map i))
+                  (let ((found (gethash path path-lookup-table)))
+                    (if found
+                        (rplacd found t)
+                        #+nil
+                        (warn "Missing coverage entry for ~S in ~S"
+                              path namestring))))))))))
+    n-marks))
+
+) ; end MACROLET
 
 (defun save-coverage ()
   "Returns an opaque representation of the current code coverage state.
@@ -40,15 +144,17 @@ The only operation that may be done on the state is passing it to
 RESTORE-COVERAGE. The representation is guaranteed to be readably printable.
 A representation that has been printed and read back will work identically
 in RESTORE-COVERAGE."
-  (loop for file being the hash-keys of sb-c:*code-coverage-info*
+  (update-legacy-coverage-info)
+  (loop for file being the hash-keys of (code-coverage-hashtable)
         using (hash-value states)
         collect (cons file states)))
 
 (defun restore-coverage (coverage-state)
   "Restore the code coverage data back to an earlier state produced by
 SAVE-COVERAGE."
+  ;; This does not update coverage stored in code object headers
   (loop for (file . states) in coverage-state
-        do (let ((image-states (gethash file sb-c:*code-coverage-info*))
+        do (let ((image-states (gethash file (code-coverage-hashtable)))
                  (table (make-hash-table :test 'equal)))
              (when image-states
                (loop for cons in image-states
@@ -115,9 +221,13 @@ report, otherwise ignored. The default value is CL:IDENTITY.
          (directory (pathname-as-directory directory))
          (defaults (translate-logical-pathname directory)))
     (ensure-directories-exist defaults)
+    (when (eq if-matches 'identity)
+      (update-legacy-coverage-info)) ; update all
     (maphash (lambda (k v)
                (declare (ignore v))
                (when (funcall if-matches k)
+                 (unless (eq if-matches 'identity)
+                   (update-legacy-coverage-info k)) ; update one file
                  (let* ((pk (translate-logical-pathname k))
                         (n (format nil "~(~{~2,'0X~}~)"
                                    (coerce (sb-md5:md5sum-string
@@ -131,7 +241,7 @@ report, otherwise ignored. The default value is CL:IDENTITY.
                                              :if-does-not-exist :create)
                        (push (list* k n (report-file k stream external-format))
                              paths))))))
-             *code-coverage-info*)
+             (code-coverage-hashtable))
     (let ((report-file (make-pathname :name "cover-index" :type "html" :defaults directory)))
       (with-open-file (stream report-file
                               :direction :output :if-exists :supersede
@@ -185,12 +295,11 @@ report, otherwise ignored. The default value is CL:IDENTITY.
          (states (make-array (length source)
                              :initial-element 0
                              :element-type '(unsigned-byte 4)))
+         (hashtable (code-coverage-hashtable))
          ;; Convert the code coverage records to a more suitable format
          ;; for this function.
-         (expr-records (convert-records (gethash file *code-coverage-info*)
-                                        :expression))
-         (branch-records (convert-records (gethash file *code-coverage-info*)
-                                          :branch))
+         (expr-records (convert-records (gethash file hashtable) :expression))
+         (branch-records (convert-records (gethash file hashtable) :branch))
          ;; Cache the source-maps
          (maps (with-input-from-string (stream source)
                  (loop with map = nil

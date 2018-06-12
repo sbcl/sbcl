@@ -38,3 +38,8 @@
   (:vop-var vop)
   (:generator 0
      (emit-label the-label)))
+
+(define-vop (mark-covered)
+  (:info path)
+  (:generator 0
+    (sb!assem::%inst 'sb!assem:.coverage-mark path)))

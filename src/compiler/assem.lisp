@@ -282,8 +282,18 @@
                 (push new-vector (cdr data)))
             (setq vector new-vector
                   index 0)))
+        (unless (typep thing '(or function label))
+          (dolist (operand (cdr thing))
+            (if (label-p operand)
+                (setf (label-usedp operand) t)
+                ;; backend decides what labels are used
+                (%mark-used-labels operand))))
         (setf (aref vector index) thing)
         (setf (car data) (1+ index))))))
+
+#!-x86-64
+(defun %mark-used-labels (operand) ; default implementation
+  (declare (ignore operand)))
 
 (defstruct asmstream
   (data-section (make-section) :read-only t)
@@ -1267,6 +1277,7 @@
                      (cons (subseq (cadr first-section) 0 last-buffer-len)
                            more-buffers)))
                (when more-sections (combine-sections more-sections)))))
+
 ;;; Combine INPUTS into one assembly stream and assemble into SEGMENT
 (defun assemble-sections (segment &rest inputs)
   (let ((**current-vop** nil)
@@ -1321,6 +1332,7 @@
                     (setf (segment-run-scheduler segment) was-scheduling
                           in-without-scheduling nil
                           was-scheduling nil))
+                   (.comment) ; ignore it
                    (t
                     ;; A strange instruction whose name starts with #\.
                     ;; but which isn't recognized as a pseudo-op.

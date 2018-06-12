@@ -565,6 +565,11 @@
         (with-pinned-objects (code)
           (read-n-bytes (fasl-input-stream) (code-instructions code) 0 n-code-bytes)
           (sb!c::apply-fasl-fixups stack code))
+        #-sb-xc-host
+        (when (typep (code-header-ref code (1- n-boxed-words))
+                     '(cons (eql sb!c::coverage-map)))
+          ;; Record this in the global list of coverage-instrumented code.
+          (atomic-push (make-weak-pointer code) (cdr *code-coverage-info*)))
         code))))
 
 ;; this gets you an #<fdefn> object, not the result of (FDEFINITION x)

@@ -1426,7 +1426,8 @@
             ;; sign-extended in this case.
             (maybe-emit-rex-for-ea segment dst nil)
             (emit-byte segment (if (eq size :byte) #xC6 #xC7))
-            (emit-ea segment dst #b000)
+            (emit-ea segment dst #b000
+                     :remaining-bytes (if (eq size :qword) 4 (size-nbyte size)))
             (emit-sized-immediate segment size src))
            ((gpr-p src) ; reg to mem
             (maybe-emit-rex-for-ea segment dst src)
@@ -3442,3 +3443,26 @@
                       (loop repeat size
                             collect (prog1 (ldb (byte 8 0) val)
                                       (setf val (ash val -8)))))))))
+
+(defun sb!assem::%mark-used-labels (operand)
+  (when (typep operand 'ea)
+    (let ((disp (ea-disp operand)))
+      (typecase disp
+       (label
+        (setf (label-usedp disp) t))
+       (label+addend
+        (setf (label-usedp (label+addend-label disp)) t))))))
+
+(defun sb!c::branch-opcode-p (mnemonic)
+  (member mnemonic (load-time-value
+                    (mapcar #'sb!assem::op-encoder-name
+                            '(call ret jmp jrcxz break int iret
+                              loop loopz loopnz syscall
+                              byte word dword)) ; unexplained phenomena
+                    t)))
+
+;; Replace the INST-INDEXth element in INST-BUFFER with an instruction
+;; to store a coverage mark in the OFFSETth byte beyond LABEL.
+(defun sb!c::replace-coverage-instruction (inst-buffer inst-index label offset)
+  (setf (svref inst-buffer inst-index)
+        `(mov ,(rip-relative-ea :byte label offset) 1)))

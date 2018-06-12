@@ -242,6 +242,12 @@
                   (t
                    (funcall gen vop)))))))
 
+    ;; Truncate the final assembly code buffer to length
+    (let ((data (cdr (asmstream-code-section asmstream))))
+      (setf (cadr data) (subseq (cadr data) 0 (car data))))
+
+    (coverage-mark-lowering-pass component asmstream)
+
     (emit-inline-constants)
     (let* ((fun-table)
            (end-text (gen-label))
@@ -338,3 +344,54 @@
        (vector-push-extend (cons constant label)
                            (asmstream-constant-vector asmstream))
        value))))
+
+;;; Translate .COVERAGE-MARK pseudo-op into machine assembly language,
+;;; combining any number of consecutive operations with no intervening
+;;; control flow into a single operation.
+(defun coverage-mark-lowering-pass (component asmstream)
+  (declare (ignorable component asmstream))
+  #!+x86-64
+  (let ((label (gen-label))
+        ;; vector of lists of original source paths covered
+        (src-paths (make-array 10 :fill-pointer 0))
+        (previous-mark)
+        (section (asmstream-code-section asmstream)))
+    (dolist (buffer (reverse (cddr section)))
+      (dotimes (i (length buffer))
+        (let ((item (svref buffer i)))
+          (typecase item
+           (label
+            (when (label-usedp item) ; control can transfer to here
+              (setq previous-mark nil)))
+           (function ; this can do anything, who knows
+            (setq previous-mark nil))
+           (t
+            (let ((mnemonic (first item)))
+              (cond ((branch-opcode-p mnemonic) ; control flow kills mark combining
+                     (setq previous-mark nil))
+                    ((eq mnemonic '.coverage-mark)
+                     (let ((path (second item)))
+                       (cond ((not previous-mark) ; record a new path
+                              (let ((mark-index
+                                     (vector-push-extend (list path) src-paths)))
+                                ;; have the backend lower it into a real instruction
+                                (replace-coverage-instruction buffer i label mark-index))
+                              (setq previous-mark t))
+                             (t ; record that the already-emitted mark pertains
+                                ; to an additional source path
+                              (push path (elt src-paths (1- (fill-pointer src-paths))))
+                              ;; turn this line into a (virtual) no-op
+                              (rplaca item '.comment))))))))))))
+    ;; Allocate space in the data section for coverage marks
+    (let ((mark-index(length src-paths)))
+      (when (plusp mark-index)
+        (setf (label-usedp label) t)
+        (let ((v (ir2-component-constants (component-info component))))
+          ;; Nothing depends on the length of the constant vector at this
+          ;; phase (codegen has not made use of component-header-length),
+          ;; so extending can be done with impunity.
+          (vector-push-extend
+           (make-constant (cons 'coverage-map
+                                (coerce src-paths 'simple-vector)))
+           v))
+        (emit (asmstream-data-section asmstream) label `(.skip ,mark-index))))))

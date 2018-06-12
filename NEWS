@@ -1,6 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-1.4.9:
+  * enhacement: SB-COVER instrumentation for x86-64 has signficantly less
+    overhead - about 30% performance penalty compared to uninstrumented code,
+    as constrasted with slowdowns in excess of 100% previously.
   * bug fix: fixed x86 GC bug causing heap corruption. (lp#1749369)
   * bug fix: improved compatibility with macOS High Sierra and graphical
     applications.

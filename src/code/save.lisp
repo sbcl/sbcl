@@ -313,6 +313,9 @@ sufficiently motivated to do lengthy fixes."
   (foreign-deinit)
   (finalizers-deinit)
   (fill *pathnames* nil)
+  ;; Clean up the simulated weak list of covered code components.
+  (rplacd sb-c:*code-coverage-info*
+          (delete-if-not #'weak-pointer-value (cdr sb-c:*code-coverage-info*)))
   (drop-all-hash-caches)
   ;; Must clear this cache if asm routines are movable.
   (setq sb-disassem::*assembler-routines-by-addr* nil)

@@ -63,9 +63,8 @@
 (defstruct (label (:include annotation)
                    (:constructor gen-label ())
                    (:copier nil))
-  ;; (doesn't need any additional information beyond what is in the
-  ;; annotation structure)
-  )
+  (usedp nil :type boolean)) ; whether it was ever used as a branch target
+
 (defmethod print-object ((label label) stream)
   (cond ((not (boundp 'sb!c::*compiler-ir-obj-map*))
          (print-unreadable-object (label stream :type t :identity t)))

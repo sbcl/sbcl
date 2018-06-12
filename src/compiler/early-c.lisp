@@ -343,6 +343,18 @@ the stack without triggering overflow protection.")
 ;;; coalesced. -- JES, 2008-01-02
 (defconstant +code-coverage-unmarked+ '%code-coverage-unmarked%)
 
+;;; Stores the code coverage instrumentation results.
+;;; The CAR is a hashtable. The CDR is a list of weak pointers to code objects
+;;; having coverage marks embedded in the unboxed constants.
+;;; Keys in the hashtable are namestrings, the
+;;; value is a list of (CONS PATH STATE), where STATE is +CODE-COVERAGE-UNMARKED+
+;;; for a path that has not been visited, and T for one that has.
+#-sb-xc-host
+(progn
+  (define-load-time-global *code-coverage-info*
+    (list (make-hash-table :test 'equal :synchronized t)))
+  (declaim (type (cons hash-table) *code-coverage-info*)))
+
 (in-package "SB!ALIEN")
 
 ;;; Information describing a heap-allocated alien.
