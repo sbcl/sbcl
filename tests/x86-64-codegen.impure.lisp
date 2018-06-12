@@ -271,9 +271,10 @@
 
 (with-test (:name :aprof-smoketest-large-vector)
   (let ((nbytes
-         (sb-aprof:aprof-run
-          (lambda ()
-            (declare (optimize sb-c::instrument-consing))
-            (make-array 45000)))))
+          (sb-aprof:aprof-run
+           (checked-compile
+            '(lambda ()
+              (declare (optimize sb-c::instrument-consing))
+              (make-array 45000))))))
     (assert (= nbytes (* (+ 45000 sb-vm:vector-data-offset)
                          8)))))
