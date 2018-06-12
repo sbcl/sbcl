@@ -489,8 +489,8 @@
                     (prefix #!+(and sb-thread (not win32)) :fs
                             #!-(and sb-thread (not win32)) nil))
     (flet ((thread-slot-ea (slot-index)
-             (make-ea :dword 
-		      #!+(or (not sb-thread) win32) :base #!+(or (not sb-thread) win32) edi-tn
+             (make-ea :dword
+                      #!+(or (not sb-thread) win32) :base #!+(or (not sb-thread) win32) edi-tn
                       :disp (ash slot-index word-shift))))
       #!-sb-thread
       (progn
