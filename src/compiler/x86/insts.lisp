@@ -2563,7 +2563,7 @@
 (defun sb!assem::%mark-used-labels (operand)
   (named-let recurse ((operand operand))
     (etypecase operand
-      ((or integer tn keyword))
+      ((or integer tn keyword null))
       (ea
        (let ((disp (ea-disp operand)))
          (etypecase disp
