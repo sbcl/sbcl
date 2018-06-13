@@ -129,14 +129,16 @@
 ;;;      (TRACE :METHODS T /could/ modify the METHOD-FUNCTION slot)
 ;;; 4. tracing particular methods
 ;;;    - need an interface.
-;;;      * (trace (method foo :around (t)))?
+;;;      * (trace (method foo :around (t)))? [ how to trace the method and not
+;;;        the generic function as a whole?]
 ;;;      * (trace :methods '((:around (t))) foo)? [probably not, interacts
-;;;        poorly with TRACE arg handling
+;;;        poorly with TRACE arg handling]
 ;;; 5. supporting non-munged arguments as an option
-;;; N. writing tests
 
 (defun method-trace-name (gf method)
-  ;; KLUDGE
+  ;; KLUDGE: we abuse NIL as second argument to mean that this is a
+  ;; combined method (i.e. something resulting from MAKE-METHOD in a
+  ;; method combination, rather than CALL-METHOD on a method object).
   (if method
       `(method ,(generic-function-name gf)
                ,@(method-qualifiers method)
