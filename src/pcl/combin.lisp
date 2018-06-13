@@ -127,38 +127,13 @@
 ;;;      some more smarts in %METHOD-FUNCTION objects?)
 ;;;    - calls to the METHOD-FUNCTION of methods without fast functions
 ;;;      (TRACE :METHODS T /could/ modify the METHOD-FUNCTION slot)
-;;; 3. supporting :BREAK T
 ;;; 4. tracing particular methods
 ;;;    - need an interface.
 ;;;      * (trace (method foo :around (t)))?
 ;;;      * (trace :methods '((:around (t))) foo)? [probably not, interacts
 ;;;        poorly with TRACE arg handling
 ;;; 5. supporting non-munged arguments as an option
-;;; 6. making SB-DEBUG:ARG (and, worse, VAR) work
 ;;; N. writing tests
-
-;;; two differences between this and SB-DEBUG::TRACE-CALL:
-;;;
-;;; 1. different frame (but is that correct?  Probably not.)
-;;;
-;;; 2. hiding the method calling conventions [ standard: arglist is
-;;;    first argument; method-call: first two arguments are
-;;;    permutation-vector and next-effective-method-call ] from sight.
-;;;    KLUDGE: not from mind; if users use :break t and try to execute
-;;;    code in the frame of the method, the real function arguments
-;;;    will be used instead.
-(defun trace-method-call (info function fmf-p &rest args)
-  (multiple-value-bind (start cookie)
-      (sb-debug::trace-start-breakpoint-fun info (if fmf-p (lambda (x) (nthcdr 2 x)) #'car))
-    (declare (type function start cookie))
-    (let ((frame (sb-di:top-frame)))
-      (apply #'funcall start frame nil args)
-      (let ((sb-debug::*traced-entries* sb-debug::*traced-entries*))
-        (declare (special sb-debug::*traced-entries*))
-        (funcall cookie frame nil)
-        (let ((vals (multiple-value-list (apply function args))))
-          (funcall (sb-debug::trace-end-breakpoint-fun info) frame nil vals nil)
-          (values-list vals))))))
 
 (defun method-trace-name (gf method)
   ;; KLUDGE
@@ -174,7 +149,7 @@
         (let ((minfo (copy-structure info)))
           (setf (sb-debug::trace-info-what minfo) (method-trace-name gf method))
           (lambda (&rest args)
-            (apply #'trace-method-call minfo fun fmf-p args)))
+            (apply #'sb-debug::trace-method-call minfo fun fmf-p args)))
         fun)))
 
 (defun make-emf-from-method

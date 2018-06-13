@@ -158,7 +158,7 @@
 ;;; hook function and a closure that can be used as the FUN-END-COOKIE
 ;;; function. The first communicates the sense of the
 ;;; TRACE-INFO-CONDITION to the second via a closure variable.
-(defun trace-start-breakpoint-fun (info &optional (args-transformer #'identity))
+(defun trace-start-breakpoint-fun (info)
   (let (conditionp)
     (values
      (lambda (frame bpt &rest args)
@@ -177,8 +177,7 @@
            (let ((*print-readably* nil)
                  (*current-level-in-print* 0)
                  (*standard-output* (make-string-output-stream))
-                 (*in-trace* t)
-                 (args (funcall args-transformer args)))
+                 (*in-trace* t))
              (ecase (trace-info-report info)
                (trace
                 (fresh-line)
@@ -257,6 +256,22 @@
         (let ((vals (multiple-value-list (apply function args))))
           (funcall (trace-end-breakpoint-fun info) frame nil vals nil)
           (values-list vals))))))
+
+;;; This function is like TRACE-CALL above, but munges the method
+;;; calling conventions into something more like what the user might
+;;; expect to see -- so not (<args> <next methods>) or (<permutation
+;;; vector> <next-emf> <arg> ...), but the method's actual arglist.
+(defun trace-method-call (info function fmf-p &rest args)
+  (let ((transform (if fmf-p (lambda (x) (nthcdr 2 x)) #'car)))
+    (multiple-value-bind (start cookie) (trace-start-breakpoint-fun info)
+      (declare (type function start cookie))
+      (let ((frame (sb-di:frame-down (sb-di:top-frame))))
+        (apply #'funcall start frame nil (funcall transform args))
+        (let ((*traced-entries* *traced-entries*))
+          (funcall cookie frame nil)
+          (let ((vals (multiple-value-list (apply function args))))
+            (funcall (trace-end-breakpoint-fun info) frame nil vals nil)
+            (values-list vals)))))))
 
 ;;; Trace one function according to the specified options. We copy the
 ;;; trace info (it was a quoted constant), fill in the functions, and
