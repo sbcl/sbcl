@@ -621,12 +621,12 @@ The following options are defined:
        functions have string names like \"DEFUN FOO\".
 
    :ENCAPSULATE {:DEFAULT | T | NIL}
-       If T, the tracing is done via encapsulation (redefining the function
-       name) rather than by modifying the function. :DEFAULT is the default,
-       and means to use encapsulation for interpreted functions and funcallable
-       instances, breakpoints otherwise. When encapsulation is used, forms are
-       *not* evaluated in the function's lexical environment, but SB-DEBUG:ARG
-       can still be used.
+       If T, the default, tracing is done via encapsulation (redefining the
+       function name) rather than by modifying the function.  :DEFAULT is
+       not the default, but means to use encapsulation for interpreted
+       functions and funcallable instances, breakpoints otherwise. When
+       encapsulation is used, forms are *not* evaluated in the function's
+       lexical environment, but SB-DEBUG:ARG can still be used.
 
    :METHODS {T | NIL}
        If T, any function argument naming a generic function will have its
