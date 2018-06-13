@@ -700,6 +700,7 @@
 ;;; to use "#!" syntax rather than rely on a bug to skip the above form.
 #+warm-build-phase
 (("src/code/warm-error"
+  "src/code/early-ntrace" ; lets PCL hook into tracing
   "src/code/room" ; for MAP-ALLOCATED-OBJECTS
   ;; We re-nickname SB-SEQUENCE as SEQUENCE now.
   ;; It could be done in genesis, but not earlier,

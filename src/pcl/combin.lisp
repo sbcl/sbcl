@@ -169,15 +169,13 @@
       `(combined-method ,(generic-function-name gf))))
 
 (defun maybe-trace-method (gf method fun fmf-p)
-  (locally (declare (notinline sb-debug::trace-info-methods (setf sb-debug::trace-info-what)))
-    (let ((info (and (boundp 'sb-debug::*traced-funs*)
-                     (gethash gf sb-debug::*traced-funs*))))
-      (if (and info (sb-debug::trace-info-methods info))
-          (let ((minfo (copy-structure info)))
-            (setf (sb-debug::trace-info-what minfo) (method-trace-name gf method))
-            (lambda (&rest args)
-              (apply #'trace-method-call minfo fun fmf-p args)))
-          fun))))
+  (let ((info (gethash gf sb-debug::*traced-funs*)))
+    (if (and info (sb-debug::trace-info-methods info))
+        (let ((minfo (copy-structure info)))
+          (setf (sb-debug::trace-info-what minfo) (method-trace-name gf method))
+          (lambda (&rest args)
+            (apply #'trace-method-call minfo fun fmf-p args)))
+        fun)))
 
 (defun make-emf-from-method
     (gf method cm-args fmf-p &optional method-alist wrappers)
