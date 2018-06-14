@@ -73,6 +73,7 @@ See also :POLICY option in WITH-COMPILATION-UNIT."
   (name nil :type symbol :read-only t)
   (expression nil :read-only t)
   (getter nil :read-only t)
+  (documentation nil :read-only t)
   (values-documentation nil :read-only t))
 
 ;;; names of recognized optimization policy qualities
@@ -303,6 +304,7 @@ See also :POLICY option in WITH-COMPILATION-UNIT."
                   ;; DESCRIBE-COMPILER-POLICY uses the getter
                   :getter (named-lambda ,(string name) (policy)
                             (policy policy ,expression))
+                  :documentation ',documentation
                   :values-documentation ',values-documentation)))
        (if number
            (setf (svref **policy-dependent-qualities** number) item)
@@ -315,9 +317,13 @@ See also :POLICY option in WITH-COMPILATION-UNIT."
              (setf **policy-dependent-qualities**
                    (replace (make-array size :initial-element item)
                             **policy-dependent-qualities**)))))
-     #-sb-xc-host
-     ,@(when documentation `((setf (fdocumentation ',name 'optimize) ,documentation)))
      ',name))
+
+#-sb-xc-host
+(defmethod documentation ((x symbol) (doc-type (eql 'optimize)))
+  (awhen (find x **policy-dependent-qualities**
+               :key #'policy-dependent-quality-name)
+    (policy-dependent-quality-documentation it)))
 
 ;;; Return a new POLICY containing the policy information represented
 ;;; by the optimize declaration SPEC. Any parameters not specified are

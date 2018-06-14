@@ -165,9 +165,6 @@
   (defmethod documentation ((x symbol) (doc-type (eql 'setf)))
     (fdocumentation x 'setf)))
 
-(defmethod documentation ((x symbol) (doc-type (eql 'optimize)))
-  (random-documentation x 'optimize))
-
 (defmethod (setf documentation) (new-value (x function) (doc-type (eql 't)))
   (setf (fun-doc x) new-value))
 
@@ -221,22 +218,6 @@
 (defmethod (setf documentation)
     (new-value (x standard-method) (doc-type (eql 't)))
   (setf (slot-value x '%documentation) new-value))
-
-;;; packages
-
-;;; KLUDGE: It's nasty having things like this accessor
-;;; (PACKAGE-DOC-STRING) floating around out in this mostly-unrelated
-;;; source file. Perhaps it would be better to support WARM-INIT-FORMS
-;;; by analogy with the existing !COLD-INIT-FORMS and have them be
-;;; EVAL'ed after basic warm load is done? That way things like this
-;;; could be defined alongside the other code which does low-level
-;;; hacking of packages.. -- WHN 19991203
-
-(defmethod documentation ((x package) (doc-type (eql 't)))
-  (package-doc-string x))
-
-(defmethod (setf documentation) (new-value (x package) (doc-type (eql 't)))
-  (setf (package-doc-string x) new-value))
 
 ;;; types, classes, and structure names
 
@@ -347,3 +328,6 @@ assigning this to it using (SETF STANDARD-INSTANCE-ACCESS).
 Value of +SLOT-UNBOUND+ is unspecified, and should not be relied to be
 of any particular type, but it is guaranteed to be suitable for EQ
 comparison.")
+
+#.(prog1 `(progn ,@*!documentation-methods*)
+    (setq *!documentation-methods* nil))

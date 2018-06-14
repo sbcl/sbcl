@@ -11,7 +11,10 @@
 
 ;;;; Rudimentary DEFMETHOD
 
-(sb!xc:defmacro defmethod (name lambda-list &rest body &aux qualifier)
+(sb!xc:defmacro defmethod (&whole form name lambda-list &rest body
+                           &aux qualifier)
+  (when (member name '((setf documentation) documentation) :test 'equal)
+    (return-from defmethod `(push ',form *!documentation-methods*)))
   (when (keywordp lambda-list)
     ;; Allow an :AFTER method in 'condition.lisp'.
     ;; It's ignored during cold-init, but eventually takes effect.
@@ -53,7 +56,8 @@
       ;; Why is SOURCE-LOC needed? Lambdas should know their location.
       (sb!c::source-location))))
 
-(defvar *!trivial-methods* '())
+(defvar *!trivial-methods* '()) ; necessary methods for system startup
+(defvar *!documentation-methods* nil) ; saved up for after PCL bootstrap
 (defun !trivial-defmethod (name specializer qualifier lambda-list lambda source-loc)
   (let ((gf (assoc name *!trivial-methods*)))
     ;; Append the method but don't bother finding a predicate for it.

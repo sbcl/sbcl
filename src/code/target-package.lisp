@@ -1811,3 +1811,8 @@ PACKAGE."
                       (:eval
                        (eval-error condition))))))
     (with-single-package-locked-error (:symbol symbol control))))
+
+(defmethod documentation ((x package) (doc-type (eql 't)))
+  (package-doc-string x))
+(defmethod (setf documentation) (new-value (x package) (doc-type (eql 't)))
+  (setf (package-doc-string x) new-value))
