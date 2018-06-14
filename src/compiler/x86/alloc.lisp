@@ -108,7 +108,7 @@
                  (#.esi-offset "alloc_overflow_esi")
                  (#.edi-offset "alloc_overflow_edi"))))
       (inst call (make-fixup dst :foreign)))
-    (inst jmp-short done)
+    (inst jmp done)
     (emit-label ok)
     ;; Swap ALLOC-TN and FREE-POINTER
     (cond ((and (tn-p size) (location= alloc-tn size))

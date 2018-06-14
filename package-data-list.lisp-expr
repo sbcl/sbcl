@@ -166,6 +166,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                "EMIT-CHOOSER" "DEFINE-BITFIELD-EMITTER"
                "DEFINE-INSTRUCTION" "DEFINE-INSTRUCTION-MACRO"
                "EMIT-POSTIT"
+               "ANY-ALIGNMENT-BETWEEN-P"
 
                "MAKE-SEGMENT" "SEGMENT-ORIGIN" "ASSEMBLE"
                "SEGMENT-HEADER-SKEW"

@@ -2324,7 +2324,7 @@
      (inst jmp :z DONE)          ; +Inf gives +Inf.
      (inst fstp fr0)                ; -Inf gives 0
      (inst fldz)
-     (inst jmp-short DONE)
+     (inst jmp DONE)
      NOINFNAN
      (inst fstp fr1)
      (inst fldl2e)
@@ -2381,7 +2381,7 @@
      (inst fstp fr0)                ; -Inf gives -1.0
      (inst fld1)
      (inst fchs)
-     (inst jmp-short DONE)
+     (inst jmp DONE)
      NOINFNAN
      ;; Free two stack slots leaving the argument on top.
      (inst fstp fr2)
@@ -3303,7 +3303,7 @@
      (inst jmp :z DONE)          ; +Inf gives +Inf.
      (inst fstp fr0)                ; -Inf gives 0
      (inst fldz)
-     (inst jmp-short DONE)
+     (inst jmp DONE)
      NOINFNAN
      (inst fstp fr1)
      (inst fldl2e)
@@ -3360,7 +3360,7 @@
      (inst fstp fr0)                ; -Inf gives -1.0
      (inst fld1)
      (inst fchs)
-     (inst jmp-short DONE)
+     (inst jmp DONE)
      NOINFNAN
      ;; Free two stack slots leaving the argument on top.
      (inst fstp fr2)

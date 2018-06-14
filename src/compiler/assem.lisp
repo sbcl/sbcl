@@ -41,6 +41,8 @@
   (%current-index 0 :type index)
   ;; a list of all the annotations that have been output to this segment
   (annotations nil :type list)
+  ;; the subset of annotations which are of type ALIGNMENT-NOTE
+  (alignment-annotations)
   ;; a pointer to the last cons cell in the annotations list. This is
   ;; so we can quickly add things to the end of the annotations list.
   (last-annotation nil :type list)
@@ -829,6 +831,7 @@
   ;; allocated in the output buffer.
   (size 0 :type index :read-only t)
   ;; the worst case alignment this chooser is guaranteed to preserve
+  ;; (Q: why can't we guarantee to preserve nothing, thus simplifying the API?)
   (alignment 0 :type alignment :read-only t)
   ;; the function to call to determine if we can use a shorter
   ;; sequence. It returns NIL if nothing shorter can be used, or emits
@@ -908,7 +911,7 @@
 
 ;;; Note that the instruction stream here depends on the actual
 ;;; positions of various labels, so can't be output until label
-;;; positions are known. Space is made in SEGMENT for at least SIZE
+;;; positions are known. Space is made in SEGMENT for at most SIZE
 ;;; bytes. When all output has been generated, the MAYBE-SHRINK
 ;;; functions for all choosers are called with three arguments: the
 ;;; segment, the position, and a magic value. The MAYBE-SHRINK
@@ -927,6 +930,15 @@
     (emit-annotation segment chooser)
     (%emit-skip segment size)
     (adjust-alignment-after-chooser segment chooser)))
+
+;;; Return T if there is an alignment annotation anywhere in between
+;;; the FROM and TO annotations.
+(defun any-alignment-between-p (segment from to)
+  (let ((from (annotation-index from))
+        (to (annotation-index to)))
+    (dolist (x (segment-alignment-annotations segment))
+      (when (<= from (annotation-index x) to)
+        (return t)))))
 
 ;;; This is called in EMIT-CHOOSER and COMPRESS-SEGMENT in order to
 ;;; recompute the current alignment information in light of this
@@ -1011,7 +1023,9 @@
                                       (byte 0 alignment)
                                       (1- (ash 1 bits)))))
              (aver (> size 0))
-             (emit-annotation segment (make-alignment bits size pattern))
+             (let ((thing (make-alignment bits size pattern)))
+               (emit-annotation segment thing)
+               (push thing (segment-alignment-annotations segment)))
              (%emit-skip segment size pattern))
            (setf (segment-alignment segment) bits)
            (setf (segment-sync-posn segment) (segment-current-posn segment)))
@@ -1066,7 +1080,7 @@
                                                            posn)
               (setf (segment-last-annotation segment) prev)
               (cond
-               ((funcall (chooser-maybe-shrink note) segment posn delta)
+               ((funcall (chooser-maybe-shrink note) segment note posn delta)
                 ;; It emitted some replacement.
                 (let ((new-size (- (segment-current-index segment)
                                    (chooser-index note)))

@@ -1653,7 +1653,8 @@ about function addresses and register values.")
   (emit-chooser
    ;; We emit either 12 or 4 bytes, so we maintain 8 byte alignments.
    segment 12 3
-   (lambda (segment posn delta-if-after)
+   (lambda (segment chooser posn delta-if-after)
+       (declare (ignore chooser))
        (let ((delta (funcall calc label posn delta-if-after)))
          (when (<= (- (ash 1 12)) delta (1- (ash 1 12)))
            (emit-back-patch segment 4

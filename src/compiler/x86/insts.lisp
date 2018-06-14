@@ -1540,6 +1540,14 @@
       (emit-byte segment #b11111111)
       (emit-ea segment where #b010)))))
 
+;;; We try to be more clever than usual here in computing the maximum allowed
+;;; branch displacement eligible for 1-byte encoding.
+;;; For a forward branch, this chooser itself is going to shrink, making the
+;;; anticipated LABEL-POSITION off by the amount of shrinkage.
+;;; (The position is correct for backward branch).
+;;; Essentially, if shrinkage occurs, the target moves move closer to the
+;;; branch instruction, unless there is an intervening .ALIGN directive
+;;; in which case it might not. (It might, but we don't know)
 (define-instruction jmp (segment cond &optional where)
   ;; conditional jumps
   (:printer short-cond-jump ((op #b0111)) '('j cc :tab label))
@@ -1549,13 +1557,24 @@
   (:printer near-jump ((op #b11101001)) )
   (:printer reg/mem ((op '(#b1111111 #b100)) (width 1)))
   (:emitter
-   (cond (where
+   (flet ((byte-disp-p (source target disp shrinkage) ; T if 1-byte displacement
+            ;; If the displacement is (signed-byte 8), then we have the answer.
+            ;; Otherwise, if the displacement is positive and could be 1 byte,
+            ;; then we check if the post-shrinkage value is in range.
+            (or (typep disp '(signed-byte 8))
+                (and (> disp 0)
+                     (<= (- disp shrinkage) 127)
+                     (not (any-alignment-between-p segment source target))))))
+     (cond
+         (where
           (emit-chooser
-           segment 6 2
-           (lambda (segment posn delta-if-after)
+           segment 6 2 ; emit either 2 or 6 bytes
+           ;; The difference in encoding lengths is 4, therefore this
+           ;; preserves 4-byte alignment ("2 bits" as we put it).
+           (lambda (segment chooser posn delta-if-after)
              (let ((disp (- (label-position where posn delta-if-after)
                             (+ posn 2))))
-               (when (<= -128 disp 127)
+               (when (byte-disp-p chooser where disp 4)
                  (emit-byte segment
                             (dpb (conditional-opcode cond)
                                  (byte 4 0)
@@ -1571,12 +1590,12 @@
                                #b10000000))
                (emit-dword segment disp)))))
          ((label-p (setq where cond))
-          (emit-chooser
+          (emit-chooser ; emit either 2 or 5 bytes; no alignment is preserved
            segment 5 0
-           (lambda (segment posn delta-if-after)
+           (lambda (segment chooser posn delta-if-after)
              (let ((disp (- (label-position where posn delta-if-after)
                             (+ posn 2))))
-               (when (<= -128 disp 127)
+               (when (byte-disp-p chooser where disp 3)
                  (emit-byte segment #b11101011)
                  (emit-byte-displacement-backpatch segment where)
                  t)))
@@ -1591,12 +1610,7 @@
           (unless (or (ea-p where) (tn-p where))
                   (error "don't know what to do with ~A" where))
           (emit-byte segment #b11111111)
-          (emit-ea segment where #b100)))))
-
-(define-instruction jmp-short (segment label)
-  (:emitter
-   (emit-byte segment #b11101011)
-   (emit-byte-displacement-backpatch segment label)))
+          (emit-ea segment where #b100))))))
 
 (define-instruction ret (segment &optional stack-delta)
   (:printer byte ((op #b11000011)))
@@ -2581,9 +2595,6 @@
   (member mnemonic (load-time-value
                     (mapcar #'sb!assem::op-encoder-name
                             '(call ret jmp jecxz break int iret
-                              ;; FIXME: will we actually decode a JMP-SHORT?
-                              ;; and why do we even have that? Someone found
-                              ;; choosers to be buggy or inefficient?
                               loop loopz loopnz syscall
                               byte word dword)) ; unexplained phenomena
                     t)))

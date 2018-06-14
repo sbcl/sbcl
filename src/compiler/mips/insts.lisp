@@ -620,8 +620,8 @@
 (defun emit-relative-branch (segment opcode r1 r2 target)
   (emit-chooser
    segment 20 2
-      #'(lambda (segment posn magic-value)
-          (declare (ignore magic-value))
+      #'(lambda (segment chooser posn magic-value)
+          (declare (ignore chooser magic-value))
           (let ((delta (ash (- (label-position target) (+ posn 4)) -2)))
             (when (typep delta '(signed-byte 16))
               (emit-back-patch segment 4
@@ -1161,7 +1161,8 @@
   (emit-chooser
    ;; We emit either 12 or 4 bytes, so we maintain 8 byte alignments.
    segment 12 3
-   #'(lambda (segment posn delta-if-after)
+   #'(lambda (segment chooser posn delta-if-after)
+       (declare (ignore chooser))
        (let ((delta (funcall calc label posn delta-if-after)))
           (when (typep delta '(signed-byte 16))
             (emit-back-patch segment 4

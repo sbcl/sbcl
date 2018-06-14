@@ -1475,7 +1475,8 @@
   (:vop-var vop)
   (:emitter
    (emit-chooser segment 8 2
-     (lambda (segment posn delta)
+     (lambda (segment chooser posn delta)
+       (declare (ignore chooser))
        (let ((disp (label-relative-displacement target posn delta)))
          (when (<= 0 disp (1- (ash 1 11)))
            (assemble (segment vop)
@@ -1504,7 +1505,8 @@
   (:vop-var vop)
   (:emitter
    (emit-chooser segment 8 2
-     (lambda (segment posn delta-if-after)
+     (lambda (segment chooser posn delta-if-after)
+       (declare (ignore chooser))
        (let ((disp (label-relative-displacement target posn delta-if-after)))
          (when (and (<= 0 disp (1- (ash 1 11)))
                     (typep imm '(signed-byte 5)))
@@ -1556,7 +1558,8 @@
    ;; We emit either 12 or 4 bytes, so we maintain 3 byte alignments.
    segment 12 3
    ;; This is the best-case that emits one instruction ( 4 bytes )
-   (lambda (segment posn delta-if-after)
+   (lambda (segment chooser posn delta-if-after)
+     (declare (ignore chooser))
      (let ((delta (funcall calc label posn delta-if-after)))
        ;; WHEN, Why not AVER ?
        (when (typep delta '(signed-byte 11))

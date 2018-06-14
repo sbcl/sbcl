@@ -1218,14 +1218,16 @@
                   (load-chunk segment delta
                               dest pc-tn absolute-delta))))
 
-            (two-instruction-maybe-shrink (segment posn magic-value)
+            (two-instruction-maybe-shrink (segment chooser posn magic-value)
+              (declare (ignore chooser))
               (let ((delta (compute-delta posn magic-value)))
                 (when (<= (integer-length delta) 8)
                   (emit-back-patch segment 4
                                    #'one-instruction-emitter)
                   t)))
 
-            (three-instruction-maybe-shrink (segment posn magic-value)
+            (three-instruction-maybe-shrink (segment chooser posn magic-value)
+              (declare (ignore chooser))
               (let ((delta (compute-delta posn magic-value)))
                 (when (<= (integer-length delta) 16)
                   (emit-chooser segment 8 2
@@ -1280,7 +1282,8 @@
                   (assemble (segment vop)
                     (inst ldr condition dest (@ pc-tn delta)))))
 
-              (two-instruction-maybe-shrink (segment posn magic-value)
+              (two-instruction-maybe-shrink (segment chooser posn magic-value)
+                (declare (ignore chooser))
                 (let ((delta (compute-delta posn magic-value)))
                   (when (<= (integer-length delta) 12)
                     (emit-back-patch segment 4

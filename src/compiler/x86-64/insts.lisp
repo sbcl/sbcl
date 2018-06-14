@@ -2272,7 +2272,16 @@
   (:printer reg/mem-default-qword ((op '(#b11111111 #b100))
                                    (reg/mem nil :printer #'print-jmp-ea)))
   (:emitter
-   (cond (where
+   (flet ((byte-disp-p (source target disp shrinkage) ; T if 1-byte displacement
+            ;; If the displacement is (signed-byte 8), then we have the answer.
+            ;; Otherwise, if the displacement is positive and could be 1 byte,
+            ;; then we check if the post-shrinkage value is in range.
+            (or (typep disp '(signed-byte 8))
+                (and (> disp 0)
+                     (<= (- disp shrinkage) 127)
+                     (not (any-alignment-between-p segment source target))))))
+     (cond
+        (where
           (cond ((fixup-p where)
                  (emit-byte segment #b00001111)
                  (emit-byte segment
@@ -2282,11 +2291,13 @@
                  (emit-relative-fixup segment where))
                 (t
                  (emit-chooser
-                  segment 6 2
-                  (lambda (segment posn delta-if-after)
+                  segment 6 2 ; emit either 2 or 6 bytes
+                  ;; The difference in encoding lengths is 4, therefore this
+                  ;; preserves 4-byte alignment ("2 bits" as we put it).
+                  (lambda (segment chooser posn delta-if-after)
                     (let ((disp (- (label-position where posn delta-if-after)
                                    (+ posn 2))))
-                      (when (<= -128 disp 127)
+                      (when (byte-disp-p chooser where disp 4)
                         (emit-byte segment
                                    (dpb (conditional-opcode cond)
                                         (byte 4 0)
@@ -2303,11 +2314,11 @@
                       (emit-signed-dword segment disp)))))))
          ((label-p (setq where cond))
           (emit-chooser
-           segment 5 0
-           (lambda (segment posn delta-if-after)
+           segment 5 0 ; emit either 2 or 5 bytes; no alignment is preserved
+           (lambda (segment chooser posn delta-if-after)
              (let ((disp (- (label-position where posn delta-if-after)
                             (+ posn 2))))
-               (when (<= -128 disp 127)
+               (when (byte-disp-p chooser where disp 3)
                  (emit-byte segment #b11101011)
                  (emit-byte-displacement-backpatch segment where)
                  t)))
@@ -2325,7 +2336,7 @@
           ;; w-bit in rex prefix is unnecessary
           (maybe-emit-rex-for-ea segment where nil :operand-size :do-not-set)
           (emit-byte segment #b11111111)
-          (emit-ea segment where #b100)))))
+          (emit-ea segment where #b100))))))
 
 (define-instruction ret (segment &optional stack-delta)
   (:printer byte ((op #b11000011)))

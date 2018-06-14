@@ -230,7 +230,8 @@
        ;; stick a nop in the long branch and then we will be
        ;; preserving 8 byte alignment
        segment 8 2 ; 2^2 is 4 byte alignment.  I think
-       #'(lambda (segment posn magic-value)
+       #'(lambda (segment chooser posn magic-value)
+           (declare (ignore chooser))
            (let ((delta (ash (- (label-position target posn magic-value) posn)
                              -2)))
              (when (typep delta '(signed-byte 14))
@@ -2015,7 +2016,8 @@
   (emit-chooser
    ;; We emit either 12 or 4 bytes, so we maintain 8 byte alignments.
    segment 12 3
-   #'(lambda (segment posn delta-if-after)
+   #'(lambda (segment chooser posn delta-if-after)
+       (declare (ignore chooser))
        (let ((delta (funcall calc label posn delta-if-after)))
          (when (<= (- (ash 1 15)) delta (1- (ash 1 15)))
            (emit-back-patch segment 4

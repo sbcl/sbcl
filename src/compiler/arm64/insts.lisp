@@ -2271,7 +2271,8 @@
                                  (ldb (byte 2 0) delta)
                                  (ldb (byte 19 2) delta)
                                  (tn-offset dest))))
-           (multi-instruction-maybe-shrink (segment posn magic-value)
+           (multi-instruction-maybe-shrink (segment chooser posn magic-value)
+             (declare (ignore chooser))
              (when (typep (funcall compute-delta posn magic-value)
                           '(signed-byte 21))
                (emit-back-patch segment 4
@@ -2334,7 +2335,8 @@
                                 (ldb (byte 19 0)
                                      (ash (compute-delta position) -2))
                                 (tn-offset dest)))
-            (multi-instruction-maybe-shrink (segment posn magic-value)
+            (multi-instruction-maybe-shrink (segment chooser posn magic-value)
+              (declare (ignore chooser))
               (let ((delta (compute-delta posn magic-value)))
                 (when (typep delta '(signed-byte 21))
                   (emit-back-patch segment 4
