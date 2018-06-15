@@ -296,7 +296,6 @@
     (ash num sb!vm:word-shift))
   ) ; EVAL-WHEN
 
-(defconstant lra-size (words-to-bytes 1))
 
 (defstruct (offs-hook (:copier nil))
   (offset 0 :type offset)
@@ -360,6 +359,8 @@
   (zerop (logand (1- size) address)))
 
 #!-(or x86 x86-64)
+(progn
+(defconstant lra-size (words-to-bytes 1))
 (defun lra-hook (chunk stream dstate)
   (declare (type dchunk chunk)
            (ignore chunk)
@@ -378,7 +379,7 @@
                 sb!vm:return-pc-widetag))
     (unless (null stream)
       (note "possible LRA header" dstate)))
-  nil)
+  nil))
 
 ;;; Print the fun-header (entry-point) pseudo-instruction at the
 ;;; current location in DSTATE to STREAM.
