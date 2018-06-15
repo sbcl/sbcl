@@ -172,11 +172,11 @@ See also :POLICY option in WITH-COMPILATION-UNIT."
                (make-policy (loop for i below n-policy-primary-qualities
                                   sum (ash #b01 (* i 2))))))
           ;; If :CONS-PROFILING was requested, then add it to the baseline policy.
-          (when (member :cons-profiling sb!xc:*features*)
-            (alter-policy policy
-                          #-sb-xc (policy-quality-name-p 'instrument-consing)
-                          #+sb-xc #.(policy-quality-name-p 'instrument-consing)
-                          2))
+          #+cons-profiling
+          (alter-policy policy
+                        #-sb-xc (policy-quality-name-p 'instrument-consing)
+                        #+sb-xc #.(policy-quality-name-p 'instrument-consing)
+                        2)
           policy)
 
         **zero-typecheck-policy**
