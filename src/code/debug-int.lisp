@@ -483,19 +483,11 @@
 ;;; real component to continue executing, as opposed to the bogus
 ;;; component which appeared in some frame's LRA location.
 (defconstant real-lra-slot
+  ;; FIXME: this isn't really right, because the 'fixups' slot
+  ;; is already accounted for in the fixed part of the code header.
   ;; X86 stores a fixup vector at the first constant slot
   #!-x86 sb!vm:code-constants-offset
   #!+x86 (1+ sb!vm:code-constants-offset))
-
-;;; These are magically converted by the compiler.
-(defun current-sp () (current-sp))
-(defun current-fp () (current-fp))
-(defun stack-ref (s n) (stack-ref s n))
-(defun %set-stack-ref (s n value) (%set-stack-ref s n value))
-(defun fun-code-header (fun) (fun-code-header fun))
-#!-(or x86 x86-64) (defun lra-code-header (lra) (lra-code-header lra))
-(defun %make-lisp-obj (value) (%make-lisp-obj value))
-(defun get-lisp-obj-address (thing) (get-lisp-obj-address thing))
 
 #!-sb-fluid (declaim (inline control-stack-pointer-valid-p))
 (defun control-stack-pointer-valid-p (x &optional (aligned t))
@@ -3329,7 +3321,9 @@ register."
 (defconstant bogus-lra-constants
   (+ sb!vm:code-constants-offset
      #!-(or x86-64 x86) 1
+     ;; Wtf???
      #!+x86-64 2
+     ;; FIXME: 'fixups' already accounted for in header.
      ;; One more for a fixup vector
      #!+x86 3))
 
