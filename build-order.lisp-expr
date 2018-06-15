@@ -769,7 +769,8 @@
   "src/pcl/documentation"
   "src/pcl/print-object"
   "src/pcl/precom1"
-  "src/pcl/precom2")
+  "src/pcl/precom2"
+  "src/code/ntrace")
 
  ("src/code/setf-funs"
   ;; miscellaneous functionality which depends on CLOS
@@ -793,7 +794,6 @@
   "src/code/inspect"
   "src/code/profile"
   #+x86-64 "src/code/aprof" ; precise allocation profiler
-  "src/code/ntrace"
   "src/code/step"
   "src/code/warm-lib"
   "src/code/alien-callback"
