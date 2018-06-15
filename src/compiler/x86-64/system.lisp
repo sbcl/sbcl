@@ -308,13 +308,6 @@
     (inst break pending-interrupt-trap)))
 
 #!+sb-thread
-;; 29 signed bits is the max before shifting left by 3 that fits in the
-;; 'displacement' of an EA. This is hugely generous.
-;; We need negative indices to reference the interrupt contexts
-(defknown current-thread-offset-sap ((signed-byte 29))
-  system-area-pointer (flushable))
-
-#!+sb-thread
 (progn
 (define-vop (current-thread-offset-sap/c)
   (:results (sap :scs (sap-reg)))

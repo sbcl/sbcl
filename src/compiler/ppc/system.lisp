@@ -196,10 +196,6 @@
     (inst unimp pending-interrupt-trap)))
 
 #!+sb-thread
-(defknown current-thread-offset-sap (signed-word)
-  system-area-pointer (flushable))
-
-#!+sb-thread
 (define-vop (current-thread-offset-sap)
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)

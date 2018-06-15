@@ -228,28 +228,36 @@
     (inst break pending-interrupt-trap)))
 
 #!+sb-thread
-(defknown current-thread-offset-sap ((unsigned-byte 32))
-  system-area-pointer (flushable))
-
-#!+sb-thread
 (define-vop (current-thread-offset-sap)
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:translate current-thread-offset-sap)
-  (:args (n :scs (unsigned-reg)
-            #!+win32 #!+win32 :to :save
-            #!-win32 #!-win32 :target sap))
-  (:arg-types unsigned-num)
+  ;; Note that SAP conflicts with N
+  (:args (n :scs (any-reg) :to :save :target sap))
+  (:arg-types tagged-num)
   (:policy :fast-safe)
   (:generator 2
     #!+win32
-    (progn
-      ;; Note that SAP conflicts with N in this case, hence the reader
-      ;; conditionals above.
-      (inst mov sap (make-ea :dword :disp +win32-tib-arbitrary-field-offset+) :fs)
-      (inst mov sap (make-ea :dword :base sap :disp 0 :index n :scale 4)))
-    #!-win32
-    (inst mov sap (make-ea :dword :disp 0 :index n :scale 4) :fs)))
+    (inst mov sap (make-ea :dword :disp +win32-tib-arbitrary-field-offset+) :fs)
+    ;; Using the FS segment, memory can be accessed only at the segment
+    ;; base specified by the descriptor (as segment-relative address 0)
+    ;; up through the segment limit. Negative indices are no good.
+    ;; Instead of accessing via FS, load thread->this into SAP,
+    ;; and then the index can be signed.
+    #!-win32 (inst mov sap (make-ea :dword :disp (ash thread-this-slot 2)) :fs)
+    (inst mov sap (make-ea :dword :base sap :index n))))
+;; ADDRESS-BASED-COUNTER-VAL uses the thread's alloc region free pointer
+;; as a quasi-random value, so that's a relatively useful case to handle
+;; without the extra instruction. Win32 needs an extra instruction always.
+#!+(and sb-thread (not win32))
+(define-vop (current-thread-offset-sap/c)
+  (:results (sap :scs (sap-reg)))
+  (:result-types system-area-pointer)
+  (:translate current-thread-offset-sap)
+  (:info n)
+  (:arg-types (:constant unsigned-byte)) ; UNSIGNED!
+  (:policy :fast-safe)
+  (:generator 1 (inst mov sap (make-ea :dword :disp (ash n 2)) :fs)))
 
 (define-vop (halt)
   (:generator 1

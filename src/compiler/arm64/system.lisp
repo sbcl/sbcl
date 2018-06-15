@@ -227,9 +227,6 @@
 
 #!+sb-thread
 (progn
-  (defknown current-thread-offset-sap (signed-word)
-      system-area-pointer (flushable))
-
   (defun ldr-str-word-offset-encodable (x)
     (ldr-str-offset-encodable (ash x word-shift)))
 

@@ -308,6 +308,8 @@
 
 ;;;; debugger support
 
+(defknown sb!vm::current-thread-offset-sap (fixnum)
+  system-area-pointer (flushable))
 (defknown current-sp () system-area-pointer (movable flushable))
 (defknown current-fp () system-area-pointer (movable flushable))
 (defknown stack-ref (system-area-pointer index) t (flushable))

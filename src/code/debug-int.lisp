@@ -862,17 +862,7 @@
                ;; the C safepoint page
                (/ sb!c:+backend-page-bytes+ n-word-bytes)))
          (context-pointer
-           ;; Using the FS segment, memory can be accessed only at the segment
-           ;; base specified by the descriptor (as segment-relative address 0)
-           ;; up through the segment limit. Negative indices are no good.
-           ;; So load via thread->this instead of the thread-local view.
-           ;; As a further complication, CURRENT-THREAD-SAP returns 0 for #-sb-thread
-           ;; which isn't useful, so basically reimplement as if for #+sb-thread.
-           #!+x86 (sap-ref-sap (sb!vm::current-thread-offset-sap sb!vm::thread-this-slot)
-                               (ash n sb!vm:word-shift))
-           ;; Otherwise, negative arg to CURRENT-THREAD-OFFSET-SAP is fine
-           ;; but the Alpha code is quite possibly wrong; I have no idea.
-           #!-x86
+           ;; The Alpha code is quite possibly wrong; I have no idea.
            (sb!vm::current-thread-offset-sap
             #!-alpha n
             #!+alpha (* 2 n))))

@@ -94,6 +94,7 @@
         (%simd-pack-tag)
         (%simd-pack-low)
         (%simd-pack-high))
+  #+sb-thread (def sb-vm::current-thread-offset-sap)
   (def current-sp ())
   (def current-fp ())
   (def stack-ref (s n))
