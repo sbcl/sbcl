@@ -497,14 +497,6 @@
 (defun %make-lisp-obj (value) (%make-lisp-obj value))
 (defun get-lisp-obj-address (thing) (get-lisp-obj-address thing))
 
-(defun fun-word-offset (fun)
-  (ldb (byte (- sb!vm:n-word-bits sb!vm:n-widetag-bits
-                ;; Chop off the layout
-                #!+(and 64-bit immobile-space) 32)
-             sb!vm:n-widetag-bits)
-       (sap-ref-word (int-sap (get-lisp-obj-address fun))
-                     (- sb!vm:fun-pointer-lowtag))))
-
 #!-sb-fluid (declaim (inline control-stack-pointer-valid-p))
 (defun control-stack-pointer-valid-p (x &optional (aligned t))
   (declare (type system-area-pointer x))
@@ -1265,11 +1257,14 @@ register."
                ,@body))
            ,result))))
 
+;;; Compute byte offset of FUNCTION into CODE-INSTRUCTIONS of its code,
+;;; which is the byte offset from the base of its code
+;;; minus the number of bytes in the boxed portion of its code header.
 (defun function-start-pc-offset (function)
   (let* ((fun (%fun-fun function))
          (code (fun-code-header fun)))
-    (- (* (fun-word-offset fun) n-word-bytes)
-       (code-header-words code))))
+    (- (%fun-code-offset fun)
+       (* (code-header-words code) sb!vm:n-word-bytes))))
 
 ;;; Return the object of type FUNCTION associated with the DEBUG-FUN,
 ;;; or NIL if the function is unavailable or is non-existent as a user
@@ -1377,9 +1372,7 @@ register."
           ;;   works for all named functions anyway.
           ;; -- WHN 20000120
           (debug-fun-from-pc component
-                             (* (- (fun-word-offset simple-fun)
-                                   (code-header-words component))
-                                sb!vm:n-word-bytes))))))
+                             (function-start-pc-offset simple-fun))))))
 
 ;;; Return the kind of the function, which is one of :OPTIONAL, :MORE
 ;;; :EXTERNAL, :TOPLEVEL, :CLEANUP, or NIL.
