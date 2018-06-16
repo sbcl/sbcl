@@ -132,7 +132,7 @@ the file system."
 (defun %defglobal (name value boundp doc docp source-location)
   (%compiler-defglobal name :always-bound value (not boundp))
   (when docp
-    (setf (fdocumentation name 'variable) doc))
+    (setf (documentation name 'variable) doc))
   (when source-location
     (setf (info :source-location :variable name) source-location))
   name)
@@ -141,7 +141,7 @@ the file system."
   (%compiler-defvar var)
   (set var val)
   (when docp
-    (setf (fdocumentation var 'variable) doc))
+    (setf (documentation var 'variable) doc))
   (when source-location
     (setf (info :source-location :variable var) source-location))
   var)
@@ -152,7 +152,7 @@ the file system."
              (not (boundp var)))
     (set var val))
   (when docp
-    (setf (fdocumentation var 'variable) doc))
+    (setf (documentation var 'variable) doc))
   (when source-location
     (setf (info :source-location :variable var) source-location))
   var)
@@ -240,3 +240,9 @@ version 1[.0.0...] or greater."
                or later is required)."
               (lisp-implementation-version)
               subversions))))
+
+(!defvar sb!pcl::*!docstrings* nil)
+(defun (setf documentation) (string name doc-type)
+  (declare (type (or null string) string))
+  (push (list string name doc-type) sb!pcl::*!docstrings*)
+  string)

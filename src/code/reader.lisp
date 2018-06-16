@@ -23,7 +23,7 @@
 (defvar *readtable*)
 (declaim (type readtable *readtable*))
 
-(setf (fdocumentation '*readtable* 'variable)
+(setf (documentation '*readtable* 'variable)
       "Variable bound to current readtable.")
 
 ;;; A standard Lisp readtable (once cold-init is through). This is for

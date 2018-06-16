@@ -88,7 +88,7 @@
   #-sb-xc-host
   (progn
     (when docp
-      (setf (fdocumentation name 'variable) doc))
+      (setf (documentation name 'variable) doc))
     (%set-symbol-value name value))
   #+sb-xc-host
   (progn

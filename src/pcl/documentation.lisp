@@ -6,15 +6,57 @@
 ;;;; This software is in the public domain and is provided with absolutely no
 ;;;; warranty. See the COPYING and CREDITS files for more information.
 
-(in-package "SB-C") ; FIXME: not the best package for FDOCUMENTATION
+(in-package "SB-PCL")
 
-;;; FDOCUMENTATION refers to STRUCTURE-CLASS which has only a skeletal
-;;; representation during cross-compilation. Better to define this late.
-(defun fdocumentation (x doc-type)
+;;; (SETF %DOC-INFO) is a thin wrapper on INFO that set or clears
+;;; a :DOCUMENTATION info value depending on whether STRING is NIL.
+;;; It, and the corresponding reader, are not for use outside this file.
+(defun (setf %doc-info) (string name doc-type)
+  (declare (type (or null string) string))
+  (let ((info-number
+         (macrolet ((info-number (class type)
+                      (meta-info-number (meta-info class type))))
+           (case doc-type
+             (variable (info-number :variable :documentation))
+             (structure
+              (cond ((eq (info :type :kind name) :instance)
+                     (info-number :type :documentation))
+                    ((info :typed-structure :info name)
+                     (info-number :typed-structure :documentation))))
+             (type (info-number :type :documentation))
+             (setf (info-number :setf :documentation))))))
+    (cond (info-number
+           (if string
+               (set-info-value name info-number string)
+             (clear-info-values name (list info-number))))
+          ((eq doc-type 'function)
+           ;; FIXME: this silently loses
+           ;; * (setf (documentation '(a bad name) 'function) "x") => "x"
+           ;; * (documentation '(a bad name) 'function) => NIL
+           ;; which is fine because as noted in pcl/documentation.lsp
+           ;;   even for supported doc types an implementation is permitted
+           ;;   to discard docs at any time
+           ;; but should a warning be issued just as for an unknown DOC-TYPE?
+           ;;
+           ;; And there's additional weirdness if you do, in this order -
+           ;;  * (setf (documentation 'foo 'function) "hi")
+           ;;  * (defun foo () "hey" 1)
+           ;;  * (documentation 'foo 'function) => "hi" ; should be "hey"
+           ;; CLHS says regarding DEFUN:
+           ;; " Documentation is attached as a documentation string to
+           ;;   /name/ (as kind function) and to the /function object/."
+           (cond ((not (legal-fun-name-p name)))
+                 ((not (equal (sb-c::real-function-name name) name))
+                  (setf (random-documentation name 'function) string))
+                 (t
+                  (setf (%fun-doc (fdefinition name)) string))))
+          ((typep name '(or symbol cons))
+           (setf (random-documentation name doc-type) string)))))
+
+;;; It would be nice not to need this at all, but there's too much spaghetti
+;;; and macrology for me to figure out where relying on a method just works.
+(defun %doc-info (x doc-type)
   (case doc-type
-    (variable
-     (typecase x
-       (symbol (values (info :variable :documentation x)))))
     (function
      ;; Unused
      (error "FUNCTION doc-type is not supported."))
@@ -29,19 +71,15 @@
      (typecase x
        (structure-class (values (info :type :documentation (class-name x))))
        (t (and (typep x 'symbol) (values (info :type :documentation x))))))
-    (setf (values (info :setf :documentation x)))
     ((t)
      (typecase x
        (function (%fun-doc x))
-       (package (package-doc-string x))
        (structure-class (values (info :type :documentation (class-name x))))
        ((or symbol cons)
         (random-documentation x doc-type))))
     (t
      (when (typep x '(or symbol cons))
        (random-documentation x doc-type)))))
-
-(in-package "SB-PCL")
 
 (defun fun-doc (x)
   (if (typep x 'generic-function)
@@ -67,6 +105,13 @@
   documentation)
 
 ;;; Generic behavior
+
+(defgeneric documentation (object doc-type)
+  (:argument-precedence-order doc-type object))
+
+(fmakunbound '(setf documentation))
+(defgeneric (setf documentation) (new-value object doc-type)
+  (:argument-precedence-order doc-type object new-value))
 
 (defmethod (setf documentation) :around (new-value (x (eql nil)) doc-type)
   (style-warn "Ignoring doc-type ~a for ~a." doc-type nil)
@@ -163,7 +208,7 @@
       (documentation it t)))
 
   (defmethod documentation ((x symbol) (doc-type (eql 'setf)))
-    (fdocumentation x 'setf)))
+    (values (info :setf :documentation x))))
 
 (defmethod (setf documentation) (new-value (x function) (doc-type (eql 't)))
   (setf (fun-doc x) new-value))
@@ -186,7 +231,7 @@
     (setf (documentation it t) new-value)))
 
 (defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'setf)))
-  (setf (fdocumentation x 'setf) new-value))
+  (setf (%doc-info x 'setf) new-value))
 
 ;;; method combinations
 (defmethod documentation ((x method-combination) (doc-type (eql 't)))
@@ -246,7 +291,7 @@
              ((find-class x nil)
               (documentation it t))
              (t
-              (fdocumentation x ',doc-type))))
+              (%doc-info x ',doc-type))))
 
           (defmethod (setf documentation) (new-value
                                            (x symbol)
@@ -255,11 +300,11 @@
              ((find-class x nil)
               (setf (documentation it t) new-value))
              (t
-              (setf (fdocumentation x ',doc-type) new-value)))))))
+              (setf (%doc-info x ',doc-type) new-value)))))))
 
   (define-type-documentation-methods structure-class
-      (fdocumentation (class-name x) 'type)
-      (setf (fdocumentation (class-name x) 'type) new-value))
+      (%doc-info (class-name x) 'type)
+      (setf (%doc-info (class-name x) 'type) new-value))
 
   (define-type-documentation-methods class
       (slot-value x '%documentation)
@@ -270,8 +315,8 @@
   ;; (if condition-class is in fact not implemented as a
   ;; standard-class or structure-class).
   (define-type-documentation-methods condition-class
-      (fdocumentation (class-name x) 'type)
-      (setf (fdocumentation (class-name x) 'type) new-value))
+      (%doc-info (class-name x) 'type)
+      (setf (%doc-info (class-name x) 'type) new-value))
 
   (define-type-documentation-lookup-methods type)
   (define-type-documentation-lookup-methods structure))
@@ -279,12 +324,12 @@
 
 ;;; variables
 (defmethod documentation ((x symbol) (doc-type (eql 'variable)))
-  (fdocumentation x 'variable))
+  (values (info :variable :documentation x)))
 
 (defmethod (setf documentation) (new-value
                                  (x symbol)
                                  (doc-type (eql 'variable)))
-  (setf (fdocumentation x 'variable) new-value))
+  (setf (%doc-info x 'variable) new-value))
 
 ;;; extra-standard methods, for getting at slot documentation
 (defmethod documentation ((slotd standard-slot-definition) (doc-type (eql 't)))
@@ -331,3 +376,6 @@ comparison.")
 
 #.(prog1 `(progn ,@*!documentation-methods*)
     (setq *!documentation-methods* nil))
+
+(dolist (args (prog1 *!docstrings* (makunbound '*!docstrings*)))
+  (apply #'(setf documentation) args))

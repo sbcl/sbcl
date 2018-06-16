@@ -242,67 +242,6 @@ return NIL. Can be set with SETF when ENV is NIL."
 
 ;;;; a subset of DOCUMENTATION functionality for bootstrapping
 
-;;; FDOCUMENTATION is like DOCUMENTATION, but with less functionality,
-;;; and implemented with DEFUN instead of DEFGENERIC so that it can
-;;; run before CLOS is set up. Supported DOC-TYPE values are
-;;;   FUNCTION
-;;;   SETF
-;;;   STRUCTURE
-;;;   T
-;;;   TYPE
-;;;   VARIABLE
-;;; FIXME: Other types end up in INFO :RANDOM-DOCUMENTATION :STUFF. I
-;;; should add some code to monitor this and make sure that nothing is
-;;; unintentionally being sent to never never land this way.
-;;; FIXME: Rename FDOCUMENTATION to BDOCUMENTATION, by analogy with
-;;; DEF!STRUCT and so forth. And consider simply saving
-;;; all the BDOCUMENTATION entries in a *BDOCUMENTATION* hash table
-;;; and slamming them into PCL once PCL gets going.
-(defun (setf fdocumentation) (string name doc-type)
-  (declare (type (or null string) string))
-  #+sb-xc-host (declare (ignore name doc-type))
-  #-sb-xc-host
-  (let ((info-number
-         (macrolet ((info-number (class type)
-                      (meta-info-number (meta-info class type))))
-           (case doc-type
-             (variable (info-number :variable :documentation))
-             (structure
-              (cond ((eq (info :type :kind name) :instance)
-                     (info-number :type :documentation))
-                    ((info :typed-structure :info name)
-                     (info-number :typed-structure :documentation))))
-             (type (info-number :type :documentation))
-             (setf (info-number :setf :documentation))))))
-    (cond (info-number
-           (if string
-               (set-info-value name info-number string)
-               (clear-info-values name (list info-number))))
-          ((eq doc-type 'function)
-           ;; FIXME: this silently loses
-           ;; * (setf (documentation '(a bad name) 'function) "x") => "x"
-           ;; * (documentation '(a bad name) 'function) => NIL
-           ;; which is fine because as noted in pcl/documentation.lsp
-           ;;   even for supported doc types an implementation is permitted
-           ;;   to discard docs at any time
-           ;; but should a warning be issued just as for an unknown DOC-TYPE?
-           ;;
-           ;; And there's additional weirdness if you do, in this order -
-           ;;  * (setf (documentation 'foo 'function) "hi")
-           ;;  * (defun foo () "hey" 1)
-           ;;  * (documentation 'foo 'function) => "hi" ; should be "hey"
-           ;; CLHS says regarding DEFUN:
-           ;; " Documentation is attached as a documentation string to
-           ;;   /name/ (as kind function) and to the /function object/."
-           (cond ((not (legal-fun-name-p name)))
-                 ((not (equal (real-function-name name) name))
-                  (setf (random-documentation name 'function) string))
-                 (t
-                  (setf (%fun-doc (fdefinition name)) string))))
-          ((typep name '(or symbol cons))
-           (setf (random-documentation name doc-type) string))))
-  string)
-
 ;; Return the number of calls to NAME that IR2 emitted as full calls,
 ;; not counting calls via #'F that went untracked.
 ;; Return 0 if the answer is nonzero but a warning was already signaled

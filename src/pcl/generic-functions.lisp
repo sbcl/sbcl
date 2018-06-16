@@ -315,11 +315,6 @@
 
 (defgeneric invalid-superclass (class superclass))
 
-(defgeneric (setf documentation) (new-value slotd doc-type)
-  (:argument-precedence-order doc-type slotd new-value))
-
-(defgeneric documentation (slotd doc-type)
-  (:argument-precedence-order doc-type slotd))
 
 ;;;; 3 arguments
 

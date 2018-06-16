@@ -98,7 +98,7 @@
   (progn (write `(%target-defstruct ,(dd-name dd))) (terpri))
 
   (when (dd-doc dd)
-    (setf (fdocumentation (dd-name dd) 'structure)
+    (setf (documentation (dd-name dd) 'structure)
           (dd-doc dd)))
 
   (let* ((classoid (find-classoid (dd-name dd)))

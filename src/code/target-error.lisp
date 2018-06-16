@@ -57,7 +57,7 @@
         (prin1 (restart-name restart) stream))
       (restart-report restart stream)))
 
-(setf (fdocumentation 'restart-name 'function)
+(setf (documentation 'restart-name 'function)
       "Return the name of the given restart object.")
 
 (defun restart-report (restart stream)

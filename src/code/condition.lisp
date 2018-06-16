@@ -314,7 +314,7 @@
      (let ((classoid (find-classoid name)))
        (setf (condition-classoid-slots classoid) slots
              (condition-classoid-direct-default-initargs classoid) direct-default-initargs
-             (fdocumentation name 'type) documentation)
+             (documentation name 'type) documentation)
 
        (dolist (slot slots)
          ;; Set up reader and writer functions.
@@ -1246,7 +1246,7 @@ longer than permitted by the deadline."))
 STEP-CONDITION-FORM holds a string representation of the form being
 stepped."))
 
-(setf (fdocumentation 'step-condition-form 'function)
+(setf (documentation 'step-condition-form 'function)
       "Form associated with the STEP-CONDITION.")
 
 (define-condition step-form-condition (step-condition)
@@ -1273,7 +1273,7 @@ STEP-NEXT, and STEP-CONTINUE."))
 (define-condition step-result-condition (step-condition)
   ((result :initarg :result :reader step-condition-result)))
 
-(setf (fdocumentation 'step-condition-result 'function)
+(setf (documentation 'step-condition-result 'function)
       "Return values associated with STEP-VALUES-CONDITION as a list,
 or the variable value associated with STEP-VARIABLE-CONDITION.")
 

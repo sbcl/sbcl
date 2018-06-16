@@ -15,7 +15,7 @@
   (reinit-internal-real-time))
 
 ;;; Implemented in unix.lisp and win32.lisp.
-(setf (fdocumentation 'get-internal-real-time 'function)
+(setf (documentation 'get-internal-real-time 'function)
       "Return the real time (\"wallclock time\") since startup in the internal
 time format. (See INTERNAL-TIME-UNITS-PER-SECOND.)")
 

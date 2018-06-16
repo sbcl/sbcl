@@ -25,7 +25,7 @@
   (n unsigned-int))
 
 (define-alien-routine ("os_get_errno" get-errno) integer)
-(setf (fdocumentation 'get-errno 'function)
+(setf (documentation 'get-errno 'function)
       "Return the value of the C library pseudo-variable named \"errno\".")
 
 ;;; Decode errno into a string.

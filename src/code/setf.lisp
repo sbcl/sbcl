@@ -419,6 +419,7 @@
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   ;;; Assign SETF macro information for NAME, making all appropriate checks.
   (defun %defsetf (name expander &optional doc)
+    (declare (ignorable doc))
     (with-single-package-locked-error
         (:symbol name "defining a setf-expander for ~A"))
     (let ((setf-fn-name `(setf ,name)))
@@ -448,8 +449,9 @@
            (style-warn "defining setf macro for ~S when ~S is also defined"
                        name setf-fn-name)))))
     (setf (info :setf :expander name) expander)
+    #-sb-xc-host
     (when doc
-      (setf (fdocumentation name 'setf) doc))
+      (setf (documentation name 'setf) doc))
     name))
 
 ;;; This is pretty broken if there are keyword arguments (lp#1452947)

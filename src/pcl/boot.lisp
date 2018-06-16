@@ -1913,7 +1913,7 @@ bootstrapping.
   (multiple-value-bind (llks nrequired noptional keywords keyword-parameters)
       (analyze-lambda-list lambda-list)
     (declare (ignore keyword-parameters))
-    (let* ((old (proclaimed-ftype name)) ;FIXME:FDOCUMENTATION instead?
+    (let* ((old (proclaimed-ftype name))
            (old-ftype (if (fun-type-p old) old nil))
            (old-restp (and old-ftype (fun-type-rest old-ftype)))
            (old-keys (and old-ftype

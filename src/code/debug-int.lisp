@@ -191,7 +191,7 @@
             (debug-var-symbol debug-var)
             (debug-var-id debug-var))))
 
-(setf (fdocumentation 'debug-var-id 'function)
+(setf (documentation 'debug-var-id 'function)
   "Return the integer that makes DEBUG-VAR's name and package unique
    with respect to other DEBUG-VARs in the same function.")
 
@@ -263,7 +263,7 @@
   (print-unreadable-object (obj str :type t)
     (prin1 (debug-block-fun-name obj) str)))
 
-(setf (fdocumentation 'debug-block-elsewhere-p 'function)
+(setf (documentation 'debug-block-elsewhere-p 'function)
   "Return whether debug-block represents elsewhere code.")
 
 (defstruct (compiled-debug-block (:include debug-block)

@@ -355,7 +355,7 @@
                  ,@(typed-copier-definitions dd)
                  ,@constructor-definitions
                  ,@(when (dd-doc dd)
-                     `((setf (fdocumentation ',(dd-name dd) 'structure)
+                     `((setf (documentation ',(dd-name dd) 'structure)
                              ',(dd-doc dd))))))))
      name)))
 

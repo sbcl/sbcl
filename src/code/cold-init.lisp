@@ -170,7 +170,7 @@
     (destructuring-bind (name source-loc &optional docstring) x
       (setf (info :variable :kind name) :constant)
       (when source-loc (setf (info :source-location :constant name) source-loc))
-      (when docstring (setf (fdocumentation name 'variable) docstring))))
+      (when docstring (setf (documentation name 'variable) docstring))))
   (!with-init-wrappers
    (dolist (x *!cold-defuns*)
      (destructuring-bind (name inline-expansion dxable-args) x

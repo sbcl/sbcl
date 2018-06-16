@@ -90,8 +90,7 @@ read by the function THREAD-ERROR-THREAD."))
                         (cdr part)))
        (format stream "    ~S~%" start)))))
 
-(setf
- (fdocumentation 'thread-error-thread 'function)
+(setf (documentation 'thread-error-thread 'function)
  "Return the offending thread that the THREAD-ERROR pertains to.")
 
 (define-condition symbol-value-in-thread-error (cell-error thread-error)
@@ -157,8 +156,7 @@ exited. The offending thread can be accessed using THREAD-ERROR-THREAD."))
 ;;; gencgc and numbers on the stack (returned by GET-LISP-OBJ-ADDRESS)
 ;;; are treated as references.
 
-(setf
- (fdocumentation 'thread-name 'function)
+(setf (documentation 'thread-name 'function)
  "Name of the thread. Can be assigned to using SETF. Thread names can be
 arbitrary printable objects, and need not be unique.")
 
@@ -417,10 +415,8 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
 
 ;;;; Mutexes
 
-(setf (fdocumentation 'make-mutex 'function)
-      "Create a mutex."
-      (fdocumentation 'mutex-name 'function)
-      "The name of the mutex. Setfable.")
+(setf (documentation 'make-mutex 'function) "Create a mutex."
+      (documentation 'mutex-name 'function) "The name of the mutex. Setfable.")
 
 #!+(and sb-thread sb-futex)
 (progn
@@ -892,10 +888,8 @@ IF-NOT-OWNER is :FORCE)."
   (print-unreadable-object (waitqueue stream :type t :identity t)
     (format stream "~@[~A~]" (waitqueue-name waitqueue))))
 
-(setf (fdocumentation 'waitqueue-name 'function)
-      "The name of the waitqueue. Setfable."
-      (fdocumentation 'make-waitqueue 'function)
-      "Create a waitqueue.")
+(setf (documentation 'waitqueue-name 'function) "The name of the waitqueue. Setfable."
+      (documentation 'make-waitqueue 'function) "Create a waitqueue.")
 
 #!+(and sb-thread sb-futex)
 (locally (declare (sb!ext:muffle-conditions sb!ext:compiler-note))
@@ -1117,9 +1111,9 @@ future."
   (mutex (make-mutex :name "semaphore lock") :read-only t)
   (queue (make-waitqueue) :read-only t))
 
-(setf (fdocumentation 'semaphore-name 'function)
+(setf (documentation 'semaphore-name 'function)
       "The name of the semaphore INSTANCE. Setfable."
-      (fdocumentation 'make-semaphore 'function)
+      (documentation 'make-semaphore 'function)
       "Create a semaphore with the supplied COUNT and NAME.")
 
 (defstruct (semaphore-notification (:constructor make-semaphore-notification ())
@@ -1129,7 +1123,7 @@ TRY-SEMAPHORE as the :NOTIFICATION argument. Consequences are undefined if
 multiple threads are using the same notification object in parallel."
   (%status nil :type boolean))
 
-(setf (fdocumentation 'make-semaphore-notification 'function)
+(setf (documentation 'make-semaphore-notification 'function)
       "Constructor for SEMAPHORE-NOTIFICATION objects. SEMAPHORE-NOTIFICATION-STATUS
 is initially NIL.")
 
@@ -1860,7 +1854,7 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
 
 (define-alien-routine "thread_yield" int)
 
-(setf (fdocumentation 'thread-yield 'function)
+(setf (documentation 'thread-yield 'function)
       "Yield the processor to other threads.")
 
 ;;; internal use only.  If you think you need to use these, either you

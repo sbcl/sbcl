@@ -155,7 +155,7 @@ future versions."
           ;; identity
           ))))
 
-(setf (fdocumentation 'make-timer 'function)
+(setf (documentation 'make-timer 'function)
       "Create a timer that runs FUNCTION when triggered.
 
 If a THREAD is supplied, FUNCTION is run in that thread. If THREAD is
