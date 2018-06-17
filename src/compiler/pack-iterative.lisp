@@ -274,7 +274,7 @@
                      (vertex-initial-domain-size vertex)
                      (sc-locations-count locs)
                      (vertex-color vertex) offset
-                     (vertex-spill-cost vertex) (tn-cost tn)
+                     (vertex-spill-cost vertex) (max (tn-cost tn) 1)
                      (tn-vertex tn) vertex)
                (cond (offset) ; precolored -> no need to track conflict
                      ((eql :component (tn-kind tn))
@@ -422,12 +422,12 @@
             (cost 0))
         (declare (fixnum cost))
         (dolist (vertex vertices)
-          (when (and (notany (lambda (existing)
+          (when (and (vertex-color-possible-p vertex color)
+                     (notany (lambda (existing)
                                (sset-member vertex
                                             (vertex-full-incidence existing)))
-                             compatible)
-                     (vertex-color-possible-p vertex color))
-            (incf cost (max 1 (vertex-spill-cost vertex)))
+                             compatible))
+            (incf cost (vertex-spill-cost vertex))
             (push vertex compatible)))
         (when (> cost best-cost)
           (setf best-color      color
