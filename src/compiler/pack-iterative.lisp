@@ -50,7 +50,7 @@
 (defstruct (vertex
              (:include sset-element)
              (:copier nil)
-             (:constructor %make-vertex (tn element-size pack-type)))
+             (:constructor %make-vertex (tn element-size size-mask pack-type)))
   ;; full incidence set. has to support iteration and efficient
   ;; membership test.
   (full-incidence  (make-sset) :type sset :read-only t)
@@ -69,6 +69,9 @@
   ;; TN this is a vertex for.
   (tn           nil :type tn :read-only t)
   (element-size nil :type (integer 1 8) :read-only t)
+  ;; ELEMENT-SIZE set bits, which can be then just shifted left by some
+  ;; color and used for testing NEIGHBOR-COLORS
+  (size-mask nil :type (unsigned-byte 8) :read-only t)
   ;; type of packing necessary. We should only have to determine
   ;; colors for :normal TNs/vertices
   (pack-type    nil :type (member :normal :wired :restricted) :read-only t)
@@ -86,7 +89,11 @@
 
 (declaim (inline make-vertex))
 (defun make-vertex (tn pack-type)
-  (%make-vertex tn (sc-element-size (tn-sc tn)) pack-type))
+  (let ((size (sc-element-size (tn-sc tn))))
+    (%make-vertex tn
+                  size
+                  (ldb (byte size 0) -1)
+                  pack-type)))
 
 (declaim (inline vertex-sc))
 (defun vertex-sc (vertex)
@@ -324,14 +331,13 @@
 
 ;; Return nil if COLOR conflicts with any of NEIGHBOR-COLORS.
 ;; Take into account element sizes of the respective SCs.
+(declaim (inline color-no-conflicts-p))
 (defun color-no-conflicts-p (color vertex)
   (declare (type sb!vm:finite-sc-offset color)
            (type vertex vertex)
            (optimize speed (safety 0)))
-  (let ((mask (dpb -1 (byte (vertex-element-size vertex) color)
-                   0)))
-    (not (logtest mask
-                  (vertex-neighbor-colors vertex)))))
+  (not (logtest (ash (vertex-size-mask vertex) color)
+                (vertex-neighbor-colors vertex))))
 
 ;; Assumes that VERTEX pack-type is :WIRED.
 (defun vertex-color-possible-p (vertex color)
@@ -463,7 +469,7 @@
   (declare (type sb!vm:finite-sc-offset new-color))
   (let* ((size (vertex-element-size vertex))
          (color (vertex-color vertex))
-         (new-mask (dpb -1 (byte size new-color) 0)))
+         (new-mask (ash (vertex-size-mask vertex) new-color)))
     ;; Multiple neighbors may share the color, can only zero out the
     ;; mask when the count falls to zero.
     (do-sset-elements (neighbor (vertex-full-incidence vertex) vertex)
@@ -506,7 +512,7 @@
            (optimize speed (safety 0)))
   (setf (vertex-color vertex) color)
   (let* ((size (vertex-element-size vertex))
-         (mask (dpb -1 (byte size color) 0)))
+         (mask (ash (vertex-size-mask vertex) color)))
     (do-sset-elements (neighbor (vertex-full-incidence vertex) vertex)
       (setf (vertex-neighbor-colors neighbor)
             (logior (vertex-neighbor-colors neighbor) mask))
