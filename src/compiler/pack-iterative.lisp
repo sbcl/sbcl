@@ -376,7 +376,7 @@
                        (eq sb (sc-sb (tn-sc current)))
                        (not (sset-member target neighbors)))
               (pushnew target vertices :test #'eq))))))
-    (nreverse vertices)))
+    vertices))
 
 ;;; Choose the "best" color for these vertices: a color is good if as
 ;;; many of these vertices simultaneously take that color, and those
