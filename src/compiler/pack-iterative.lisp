@@ -352,8 +352,14 @@
 (declaim (ftype (sfunction (vertex) sc-locations) vertex-domain)
          (inline vertex-domain))
 (defun vertex-domain (vertex)
-  (logandc2 (vertex-initial-domain vertex)
-            (vertex-neighbor-colors vertex)))
+  (let ((result 0)
+        (mask (vertex-size-mask vertex))
+        (neighbor-colors (vertex-neighbor-colors vertex)))
+    (declare (type sc-locations result))
+    (do-sc-locations (color (vertex-initial-domain vertex) result
+                      (vertex-element-size vertex))
+      (unless (logtest (ash mask color) neighbor-colors)
+        (setf (ldb (byte 1 color) result) 1)))))
 
 ;; Return a list of vertices that we might want VERTEX to share its
 ;; location with.
