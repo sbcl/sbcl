@@ -74,6 +74,13 @@
   ;; color offset
   (color nil :type (or fixnum null)))
 
+(defprinter (vertex)
+  tn
+  element-size
+  pack-type
+  spill-cost
+  color)
+
 (declaim (inline make-vertex))
 (defun make-vertex (tn pack-type)
   (%make-vertex tn (sc-element-size (tn-sc tn)) pack-type))
