@@ -200,6 +200,7 @@
 (defconstant finite-sc-offset-bits
   (integer-length (1- finite-sc-offset-limit)))
 (deftype finite-sc-offset () `(integer 0 (,finite-sc-offset-limit)))
+(deftype finite-sc-offset-map () `(unsigned-byte ,finite-sc-offset-limit))
 
 ;;;; stuff for defining reffers and setters
 

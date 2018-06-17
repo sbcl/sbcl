@@ -54,18 +54,21 @@
   ;; full incidence set. has to support iteration and efficient
   ;; membership test.
   (full-incidence  (make-sset) :type sset :read-only t)
-  ;; subset of currently considered neighbors. does not have to
-  ;; support efficient membership test, only iteration.
-  (incidence       #()         :type simple-vector)
-  (incidence-count 0           :type index)
+  ;; A mask of the colors of the neighbors
+  (neighbor-colors 0 :type sb!vm:finite-sc-offset-map)
+  ;; For each bit of the NEIGHBOR-COLORS mask this maintains the
+  ;; number of neighbors that share that color. Needed to recolor the vertex.
+  (neighbor-color-counts (load-time-value
+                          (make-array 0 :element-type '(unsigned-byte 32)))
+   :type (simple-array (unsigned-byte 32) (*)))
   ;; list of potential locations in the TN's preferred SB for the
   ;; vertex, taking into account reserve locations and preallocated
   ;; TNs.
   (initial-domain 0 :type sc-locations)
   (initial-domain-size 0 :type #.`(integer 0 ,sb!vm:finite-sc-offset-limit))
   ;; TN this is a vertex for.
-  (tn           nil :type tn                                  :read-only t)
-  (element-size nil :type fixnum                              :read-only t)
+  (tn           nil :type tn :read-only t)
+  (element-size nil :type (integer 1 8) :read-only t)
   ;; type of packing necessary. We should only have to determine
   ;; colors for :normal TNs/vertices
   (pack-type    nil :type (member :normal :wired :restricted) :read-only t)
@@ -289,8 +292,9 @@
     (collect ((colored)
               (uncolored))
       (dolist (v vertices)
-        (setf (vertex-incidence v)
-              (make-array (sset-count (vertex-full-incidence v))))
+        (setf (vertex-neighbor-color-counts v)
+              (make-array (sb-size (sc-sb (vertex-sc v)))
+                          :element-type '(unsigned-byte 32)))
         (cond ((vertex-color v)
                (aver (tn-offset (vertex-tn v)))
                (colored v))
@@ -307,10 +311,11 @@
   (declare (type vertex vertex) (type interference-graph graph))
   (let ((vertices (loop for v in (ig-vertices graph)
                         unless (eql v vertex)
-                          do (aver (not (tn-offset (vertex-tn v))))
-                             (setf (vertex-color v) nil
-                                   (vertex-incidence-count v) 0)
-                          and collect v)))
+                        do (aver (not (tn-offset (vertex-tn v))))
+                           (setf (vertex-color v) nil
+                                 (vertex-neighbor-colors v) 0)
+                           (fill (vertex-neighbor-color-counts v) 0)
+                        and collect v)))
     (setf (ig-vertices graph) vertices)
     (do-sset-elements (neighbor (vertex-full-incidence vertex) graph)
       (sset-delete vertex (vertex-full-incidence neighbor)))))
@@ -320,22 +325,13 @@
 ;; Return nil if COLOR conflicts with any of NEIGHBOR-COLORS.
 ;; Take into account element sizes of the respective SCs.
 (defun color-no-conflicts-p (color vertex)
-  (declare (type fixnum color)
+  (declare (type sb!vm:finite-sc-offset color)
            (type vertex vertex)
            (optimize speed (safety 0)))
-  (let ((incidence (vertex-incidence vertex))
-        (incidence-count (vertex-incidence-count vertex))
-        (color+size (+ color (vertex-element-size vertex))))
-    (flet ((intervals-intersect-p (color2 vertex2)
-             (declare (fixnum color2))
-             (if (< color2 color)
-                 (< color (+ color2 (vertex-element-size vertex2)))
-                 (< color2 color+size))))
-      (dotimes (i incidence-count t)
-        #-sb-xc-host (declare (optimize (sb!c::insert-array-bounds-checks 0)))
-        (let ((neighbor (aref incidence i)))
-          (when (intervals-intersect-p (vertex-color neighbor) neighbor)
-            (return nil)))))))
+  (let ((mask (dpb -1 (byte (vertex-element-size vertex) color)
+                   0)))
+    (not (logtest mask
+                  (vertex-neighbor-colors vertex)))))
 
 ;; Assumes that VERTEX pack-type is :WIRED.
 (defun vertex-color-possible-p (vertex color)
@@ -466,8 +462,28 @@
               (aver (not (tn-offset (vertex-tn target))))
               #+nil ; this check is slow
               (aver (vertex-color-possible-p target color))
+              (recolor-vertex target color)
               (setf (vertex-color target) color)))
           color)))))
+
+(defun recolor-vertex (vertex new-color)
+  (declare (type sb!vm:finite-sc-offset new-color))
+  (let* ((size (vertex-element-size vertex))
+         (color (vertex-color vertex))
+         (new-mask (dpb -1 (byte size new-color) 0)))
+    ;; Multiple neighbors may share the color, can only zero out the
+    ;; mask when the count falls to zero.
+    (do-sset-elements (neighbor (vertex-full-incidence vertex) vertex)
+      (let ((map (logior (vertex-neighbor-colors neighbor) new-mask)))
+        (declare (type sb!vm:finite-sc-offset-map map))
+        (loop for i from color below (+ color size)
+              when (zerop (decf (aref (vertex-neighbor-color-counts neighbor) i)))
+              do
+              (setf map (logxor map
+                                (truly-the sb!vm:finite-sc-offset-map (ash 1 i)))))
+        (loop for i from new-color below (+ new-color size)
+              do (incf (aref (vertex-neighbor-color-counts neighbor) i)))
+        (setf (vertex-neighbor-colors neighbor) map)))))
 
 ;; Partition vertices into those that are likely to be colored and
 ;; those that are likely to be spilled.  Assumes that the interference
@@ -484,7 +500,7 @@
          (aver (not (vertex-color vertex))) ; we already took those out above
        ;; FIXME: some interference will be with vertices that don't
        ;;  take the same number of slots. Find a smarter heuristic.
-         (cond ((< (vertex-incidence-count vertex)
+         (cond ((< (sset-count (vertex-full-incidence vertex))
                    (vertex-initial-domain-size vertex))
                 (push vertex precoloring-stack))
                (t
@@ -492,11 +508,18 @@
     (values precoloring-stack prespilling-stack)))
 
 (defun color-vertex (vertex color)
-  (declare (type vertex vertex))
+  (declare (type vertex vertex)
+           (type sb!vm:finite-sc-offset color)
+           (optimize speed (safety 0)))
   (setf (vertex-color vertex) color)
-  (do-sset-elements (neighbor (vertex-full-incidence vertex) vertex)
-    (let ((new-count (incf (vertex-incidence-count neighbor))))
-      (setf (aref (vertex-incidence neighbor) (1- new-count)) vertex))))
+  (let* ((size (vertex-element-size vertex))
+         (mask (dpb -1 (byte size color) 0)))
+    (do-sset-elements (neighbor (vertex-full-incidence vertex) vertex)
+      (setf (vertex-neighbor-colors neighbor)
+            (logior (vertex-neighbor-colors neighbor) mask))
+      ;; This is needed to recolor the vertex in RECOLOR-VERTEX
+      (loop for i from color below (+ color size)
+            do (incf (aref (vertex-neighbor-color-counts neighbor) i))))))
 
 ;; Try and color the interference graph once.
 (defun color-interference-graph (interference-graph)
