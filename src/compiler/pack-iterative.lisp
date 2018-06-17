@@ -472,22 +472,23 @@
           color)))))
 
 (defun recolor-vertex (vertex new-color)
-  (declare (type sb!vm:finite-sc-offset new-color))
+  (declare (type sb!vm:finite-sc-offset new-color)
+           (optimize (safety 0)))
   (let* ((size (vertex-element-size vertex))
          (color (vertex-color vertex))
          (new-mask (ash (vertex-size-mask vertex) new-color)))
     ;; Multiple neighbors may share the color, can only zero out the
     ;; mask when the count falls to zero.
     (do-sset-elements (neighbor (vertex-full-incidence vertex) vertex)
-      (let ((map (logior (vertex-neighbor-colors neighbor) new-mask)))
+      (let ((map (logior (vertex-neighbor-colors neighbor) new-mask))
+            (neighbor-color-counts (vertex-neighbor-color-counts neighbor)))
         (declare (type sb!vm:finite-sc-offset-map map))
-        (loop for i from color below (+ color size)
-              when (zerop (decf (aref (vertex-neighbor-color-counts neighbor) i)))
-              do
-              (setf map (logxor map
-                                (truly-the sb!vm:finite-sc-offset-map (ash 1 i)))))
-        (loop for i from new-color below (+ new-color size)
-              do (incf (aref (vertex-neighbor-color-counts neighbor) i)))
+        (loop for old from color below (+ color size)
+              for new from new-color
+              do (when (zerop (decf (aref neighbor-color-counts old)))
+                   (setf map (logxor map
+                                     (truly-the sb!vm:finite-sc-offset-map (ash 1 old)))))
+                 (incf (aref neighbor-color-counts new)))
         (setf (vertex-neighbor-colors neighbor) map)))))
 
 ;; Partition vertices into those that are likely to be colored and
