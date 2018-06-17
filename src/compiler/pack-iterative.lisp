@@ -343,18 +343,11 @@
        (sc-locations-member color (vertex-initial-domain vertex))
        (color-no-conflicts-p color vertex)))
 
-;; Sorted list of all possible locations for vertex in its preferred
-;; SC: more heavily loaded (i.e that should be tried first) locations
-;; first.  vertex-initial-domain is already sorted, only have to
-;; remove offsets that aren't currently available.
-(declaim (ftype (sfunction (vertex) sc-locations) vertex-domain))
+(declaim (ftype (sfunction (vertex) sc-locations) vertex-domain)
+         (inline vertex-domain))
 (defun vertex-domain (vertex)
-  (let ((result 0))
-    (declare (type sc-locations result))
-    (do-sc-locations (color (vertex-initial-domain vertex) result
-                            (vertex-element-size vertex))
-      (when (vertex-color-possible-p vertex color)
-        (setf (ldb (byte 1 color) result) 1)))))
+  (logandc2 (vertex-initial-domain vertex)
+            (vertex-neighbor-colors vertex)))
 
 ;; Return a list of vertices that we might want VERTEX to share its
 ;; location with.
