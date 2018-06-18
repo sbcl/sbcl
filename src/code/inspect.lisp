@@ -225,22 +225,9 @@ evaluated expressions.
              (list
               (cons "Closed over values" (%closure-values object)))))))
 
-#+sb-eval
-(defmethod inspected-parts ((object sb-eval:interpreted-function))
-  (multiple-value-bind (defn closurep name) (function-lambda-expression object)
-    (declare (ignore closurep))
-    (values (format nil "The object is an interpreted function named ~S.~%" name)
-            t
-            ;; Defined-from stuff used to be here. Someone took
-            ;; it out. FIXME: We should make it easy to get
-            ;; to DESCRIBE from the inspector.
-            (list
-             (cons "Lambda-list" (sb-eval:interpreted-function-lambda-list object))
-             (cons "Definition" defn)
-             (cons "Documentation" (sb-eval:interpreted-function-documentation object))))))
-
-#+sb-fasteval
-(defmethod inspected-parts ((object sb-interpreter:interpreted-function))
+#+(or sb-eval sb-fasteval)
+(defmethod inspected-parts ((object #+sb-fasteval sb-interpreter:interpreted-function
+                                    #+sb-eval sb-eval:interpreted-function))
   (multiple-value-bind (defn closurep name) (function-lambda-expression object)
     (declare (ignore closurep))
     (values (format nil "The object is an interpreted function named ~S.~%" name)
