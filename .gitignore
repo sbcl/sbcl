@@ -12,6 +12,7 @@
 .gdb_history
 output
 obj
+build-features.lisp-expr
 local-target-features.lisp-expr
 customize-target-features.*
 customize-backend-subfeatures.*
