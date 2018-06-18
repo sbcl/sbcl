@@ -176,7 +176,8 @@
     #!-sb-thread *alien-stack-pointer*    ; a thread slot if #!+sb-thread
      ;; interrupt handling
     #!-sb-thread *pseudo-atomic-bits*     ; ditto
-    #!-sb-thread *binding-stack-pointer*) ; ditto
+    #!-sb-thread *binding-stack-pointer* ; ditto
+    *cpuid-fn1-ecx*)
   #'equalp)
 
 ;;; FIXME: with #!+immobile-space, this should be the empty list,

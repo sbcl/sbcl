@@ -192,6 +192,9 @@ void os_link_runtime()
         link_target += LINKAGE_TABLE_ENTRY_SIZE;
     }
 #endif /* LISP_FEATURE_SB_DYNAMIC_CORE */
+#ifdef LISP_FEATURE_X86_64
+    SetSymbolValue(CPUID_FN1_ECX, (lispobj)make_fixnum(cpuid_fn1_ecx), 0);
+#endif
 }
 
 boolean

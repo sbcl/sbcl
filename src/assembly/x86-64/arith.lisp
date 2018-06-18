@@ -252,10 +252,8 @@
                          ((:arg arg (descriptor-reg any-reg) rdx-offset)
                           (:temp mask unsigned-reg rcx-offset)
                           (:temp temp unsigned-reg rax-offset))
-  (inst push temp) ; save RAX
-
-
-
+  (inst push temp)
+  (inst push mask)
 
   (let ((result arg))
     ;; See the comments below for how the algorithm works. The tricks
@@ -300,21 +298,8 @@
     (inst mov mask #x0101010101010101)
     (inst imul result mask)
     (inst shr result 56))
-  (inst pop temp)) ; restore RAX
-
-#-sb-assembling ; avoid redefinition warning
-(defun emit-foreign-logbitp (index foreign-symbol temp-reg) ; result in Z flag
-  (declare (ignorable temp-reg))
-  (multiple-value-bind (byte bit) (floor index 8)
-    #!-sb-dynamic-core
-    (inst test
-          (make-ea :byte :disp (make-fixup foreign-symbol :foreign byte))
-          (ash 1 bit))
-    #!+sb-dynamic-core
-    (progn
-      (inst mov temp-reg
-            (make-ea :qword :disp (make-fixup foreign-symbol :foreign-dataref)))
-      (inst test (make-ea :byte :base temp-reg :disp byte) (ash 1 bit)))))
+  (inst pop mask)
+  (inst pop temp))
 
 ;; To perform logcount on small integers, we test whether to use the
 ;; builtin opcode, or an assembly routine. I benchmarked this against
@@ -335,10 +320,6 @@
          ;; input/output of assembly routine
          (:temporary (:sc unsigned-reg :offset rdx-offset
                           :from (:argument 0) :to (:result 0)) rdx)
-         ;; Assembly routine clobbers RAX and RCX but only needs to save RAX,
-         ;; as this vop clobbers RCX in the call. If changed to "CALL [ADDR]"
-         ;; be sure to update the subroutine to push and pop RCX.
-         (:temporary (:sc unsigned-reg :offset rcx-offset) rcx)
          (:vop-var vop)
          (:generator ,cost
            ,@(when signed
@@ -348,11 +329,17 @@
                  (inst jmp :ge POSITIVE)
                  (inst not rdx)
                  POSITIVE))
-           ;; POPCNT = ECX bit 23 = bit 7 of byte index 2
-           ;; this use of 'rcx' is as the temporary register for performing
-           ;; a reference to foreign data with dynamic core. It has to be
-           ;; a register that conflicts with 'arg' lest we clobber it.
-           (emit-foreign-logbitp 23 "cpuid_fn1_ecx" rcx)
+           ;; POPCNT = ECX bit 23
+           (multiple-value-bind (bytes bits) (floor (+ 23 n-fixnum-tag-bits)
+                                                    n-byte-bits)
+             (inst test
+                   (make-ea :byte
+                            :disp (+ nil-value
+                                     (static-symbol-offset '*cpuid-fn1-ecx*)
+                                     (ash symbol-value-slot word-shift)
+                                     (- other-pointer-lowtag)
+                                     bytes))
+                   (ash 1 bits)))
            (inst jmp :z slow)
            ;; Intel's implementation of POPCNT on some models treats it as
            ;; a 2-operand ALU op in the manner of ADD,SUB,etc which means that

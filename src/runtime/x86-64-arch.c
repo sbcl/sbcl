@@ -43,7 +43,6 @@
 #endif
 #define BREAKPOINT_WIDTH 1
 #endif
-
 unsigned int cpuid_fn1_ecx;
 unsigned int avx_supported = 0;
 
