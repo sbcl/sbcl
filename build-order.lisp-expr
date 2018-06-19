@@ -643,6 +643,8 @@
  ("src/code/debug-int" :not-host)
  ("src/code/interr" :not-host)
 
+ ("src/code/target-load" :not-host) ; for *assembler-routines*, needed by target-disassem
+
  ;; target-only assemblerish stuff
  ("src/compiler/target-disassem"     :not-host)
  ("src/compiler/target/target-insts" :not-host)
@@ -658,8 +660,6 @@
  ("src/code/full-eval"   :not-host) ; uses INFO, ARG-COUNT-ERROR
 
  ("src/code/bit-bash"    :not-host) ; needs %NEGATE from assembly/target/arith
-
- ("src/code/target-load" :not-host) ; needs special vars from code/load.lisp
 
  #!-(or x86 x86-64)
  ("src/compiler/target/sanctify" :not-host)

@@ -19,9 +19,6 @@
 (defvar *runtime-pathname* nil
   "The absolute pathname of the running SBCL runtime.")
 
-;;; something not EQ to anything we might legitimately READ
-(define-load-time-global *eof-object* (make-symbol "EOF-OBJECT"))
-
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant max-hash sb!xc:most-positive-fixnum))
 

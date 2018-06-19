@@ -24,6 +24,9 @@
 
 ;;;; LOAD-AS-SOURCE
 
+;;; something not EQ to anything we might legitimately READ
+(define-load-time-global *eof-object* (make-symbol "EOF-OBJECT"))
+
 ;;; Load a text stream.  (Note that load-as-fasl is in another file.)
 ;; We'd like, when entering the debugger as a result of an EVAL error,
 ;; that the condition be annotated with the stream position.
@@ -232,6 +235,11 @@
           (defaulted-source-truename defaulted-source-pathname))))
 
 ;;;; linkage fixups
+
+;;; Lisp assembler routines are named by Lisp symbols, not strings,
+;;; and so can be compared by EQ.
+(define-load-time-global *assembler-routines* nil)
+(declaim (code-component *assembler-routines*))
 
 ;;; how we learn about assembler routines at startup
 (defvar *!initial-assembler-routines*)

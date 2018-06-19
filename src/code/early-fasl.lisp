@@ -124,16 +124,6 @@
 (declaim (type simple-string *fasl-file-type*))
 (defvar *fasl-file-type* "fasl")
 
-;;;; information about below-Lisp-level linkage
-
-;;; Note:
-;;;   Assembler routines are named by full Lisp symbols: they
-;;;     have packages and that sort of native Lisp stuff associated
-;;;     with them. We can compare them with EQ.
-(defglobal *assembler-routines* nil)
-#-sb-xc-host (declaim (code-component *assembler-routines*))
-
-
 ;;;; the FOP database
 
 ;;; a vector indexed by a FaslOP that yields a function which performs
