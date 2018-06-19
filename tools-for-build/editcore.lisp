@@ -253,6 +253,17 @@
   (jmp-inst nil :read-only t)
   (pop-inst nil :read-only t))
 
+(defstruct (descriptor (:constructor make-descriptor (bits)))
+  (bits 0 :type sb-ext:word))
+(defmethod print-object ((self descriptor) stream)
+  (format stream "#<ptr ~x>" (descriptor-bits self)))
+(defun descriptorize (obj)
+  (if (is-lisp-pointer (get-lisp-obj-address obj))
+      (make-descriptor (get-lisp-obj-address obj))
+      obj))
+(defun undescriptorize (target-descriptor)
+  (%make-lisp-obj (descriptor-bits target-descriptor)))
+
 (defun target-hash-table-alist (table spaces)
   (let ((table (truly-the hash-table (translate table spaces))))
     (let ((cells (the simple-vector (translate (hash-table-table table) spaces))))
@@ -261,7 +272,8 @@
              (i 2 (+ i 2)))
             ((zerop count)
              (pairs))
-          (pairs (cons (svref cells i) (svref cells (1+ i)))))))))
+          (pairs (cons (descriptorize (svref cells i))
+                       (descriptorize (svref cells (1+ i))))))))))
 
 ;;; Return either the physical or logical address of the specified symbol.
 (defun find-target-symbol (package-name symbol-name spaces
@@ -302,7 +314,7 @@
          (n (1+ (/ (- max min) entry-size)))
          (vector (make-array n)))
     (dolist (entry pairs vector)
-      (let* ((key (car entry))
+      (let* ((key (undescriptorize (car entry)))
              (entry-index (/ (- (cdr entry) min) entry-size))
              (string (translate (if (consp key) (car (translate key spaces)) key)
                                 spaces)))
@@ -605,9 +617,9 @@
       (let ((name->addr
              ;; the CDR of each alist item is a target cons (needing translation)
              (sort
-              (mapcar (lambda (entry &aux (name (translate (car entry) spaces)) ; symbol
+              (mapcar (lambda (entry &aux (name (translate (undescriptorize (car entry)) spaces)) ; symbol
                                           ;; VAL is (start end . index)
-                                          (val (translate (cdr entry) spaces))
+                                          (val (translate (undescriptorize (cdr entry)) spaces))
                                           (start (car val))
                                           (end (car (translate (cdr val) spaces))))
                         (list* (translate (symbol-name name) spaces) start end))
