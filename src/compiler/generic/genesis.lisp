@@ -2128,6 +2128,9 @@ core and return a descriptor to it."
 (defvar *code-fixup-notes*)
 (defvar *allocation-point-fixup-notes*)
 
+(defun code-unboxed-size (code)
+  (descriptor-fixnum (read-wordindexed code sb!vm:code-code-size-slot)))
+
 (declaim (ftype (sfunction (descriptor sb!vm:word sb!vm:word keyword keyword)
                            descriptor)
                 cold-fixup))
@@ -2146,8 +2149,7 @@ core and return a descriptor to it."
            (code-end-addr
             (+ obj-start-addr
                (code-header-bytes code-object)
-               (descriptor-fixnum
-                (read-wordindexed code-object sb!vm:code-code-size-slot))))
+               (code-unboxed-size code-object)))
            (gspace-base (gspace-byte-address (descriptor-gspace code-object)))
            (in-dynamic-space
             (= (gspace-identifier (descriptor-intuit-gspace code-object))
@@ -2784,8 +2786,7 @@ core and return a descriptor to it."
          (bvref-32 (descriptor-mem code-object)
                    (+ (descriptor-byte-offset code-object)
                       (code-header-bytes code-object)
-                      (descriptor-fixnum
-                       (read-wordindexed code-object sb!vm:code-code-size-slot))
+                      (code-unboxed-size code-object)
                       -2 ; skip back past the trailing CODE-N-ENTRIES
                       (* (1+ fun-index) -4))))) ; and back to the desired index
     (let ((fun (+ (logandc2 (descriptor-bits code-object) sb!vm:lowtag-mask)
@@ -2832,9 +2833,7 @@ core and return a descriptor to it."
          (offset (ash asm-routine-table-size sb!vm:word-shift))
          (space (or #!+immobile-space *immobile-varyobj* *read-only*)))
     (cond (asm-code
-           (setq offset
-                 (descriptor-fixnum (read-wordindexed asm-code
-                                                      sb!vm:code-code-size-slot)))
+           (setq offset (code-unboxed-size asm-code))
            (aver (= (gspace-free-word-index space)
                     (+ (/ offset sb!vm:n-word-bytes) header-n-words)))
            (incf (gspace-free-word-index space) (/ rounded-length sb!vm:n-word-bytes)))
@@ -3708,8 +3707,7 @@ III. initially undefined function references (alphabetically):
             (incf (gspace-free-word-index (descriptor-gspace code)) 2)
             (write-wordindexed code sb!vm:code-code-size-slot
                                (make-fixnum-descriptor
-                                (+ (descriptor-fixnum
-                                    (read-wordindexed code sb!vm:code-code-size-slot))
+                                (+ (code-unboxed-size code)
                                    (* 2 sb!vm:n-word-bytes))))))
         (setf object-file-names (remove-if #'assembler-file-p object-file-names)))
 
