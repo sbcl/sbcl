@@ -25,13 +25,17 @@
   (declare (ignorable immobile-p))
   ;; Enforce limit on boxed words dependent on how many bits it gets in header.
   (aver (typep boxed '(unsigned-byte #!+64-bit 32 #!-64-bit 22)))
+  ;; Enforce limit on unboxed size. 22 bits = 4MiB, quite generous for code.
+  (aver (typep unboxed '(unsigned-byte 22)))
   #!+gencgc
   (without-gcing
       (cond #!+immobile-code
             (immobile-p (sb!vm::allocate-immobile-code boxed unboxed))
             (t (%make-lisp-obj
                 (alien-funcall (extern-alien "alloc_code_object"
-                                             (function unsigned unsigned unsigned))
+                                             (function unsigned
+                                                       (unsigned 32)
+                                                       (unsigned 32)))
                                boxed unboxed)))))
   #!-gencgc
   (%primitive allocate-code-object boxed unboxed))
