@@ -912,7 +912,7 @@ We could try a few things to mitigate this:
 
 (defun list-allocated-objects (space &key type larger smaller count
                                      test)
-  (declare (type spaces space)
+  (declare (type (or (eql :all) spaces) space)
            (type (or index null) larger smaller type count)
            (type (or function null) test))
   (declare (dynamic-extent test))
