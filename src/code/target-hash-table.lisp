@@ -120,8 +120,12 @@
 #!-sb-fluid (declaim (inline eql-hash))
 (defun eql-hash (key)
   (declare (values hash (member t nil)))
-  (if (numberp key)
-      (equal-hash key)
+  (if (%other-pointer-subtype-p
+       key
+       '#.(list sb!vm:bignum-widetag sb!vm:ratio-widetag sb!vm:double-float-widetag
+                sb!vm:single-float-widetag
+                sb!vm:complex-widetag sb!vm:complex-single-float-widetag sb!vm:complex-double-float-widetag))
+      (values (sxhash key) nil)
       (eq-hash key)))
 
 (defun equalp-hash (key)
