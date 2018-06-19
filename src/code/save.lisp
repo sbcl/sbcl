@@ -218,6 +218,7 @@ sufficiently motivated to do lengthy fixes."
                (setf (sb-kernel:%simple-fun-type fun)
                      (ensure-gethash type type-hash type))))))
        :all))
+    (sb-c::coalesce-debug-sources)
     ;;
     (labels ((restart-lisp ()
                (handling-end-of-the-world
@@ -325,3 +326,28 @@ sufficiently motivated to do lengthy fixes."
   (setf * nil ** nil *** nil
         - nil + nil ++ nil +++ nil
         /// nil // nil / nil))
+
+sb-c::
+(defun coalesce-debug-sources ()
+  (flet ((debug-source= (a b)
+           (and (equal (debug-source-plist a) (debug-source-plist b))
+                (eql (debug-source-created a) (debug-source-created b))
+                (eql (debug-source-compiled a) (debug-source-compiled b)))))
+    (let ((ht (make-hash-table :test 'equal)))
+      (sb-vm::map-allocated-objects
+       (lambda (obj type size)
+         (declare (ignore type size))
+         (when (typep obj 'compiled-debug-info)
+           (let ((source (compiled-debug-info-source obj)))
+             (typecase source
+               (core-debug-source) ; skip
+               (debug-source
+                (let ((canonical-repr
+                       (find-if (lambda (x) (debug-source= x source))
+                                (gethash (debug-source-namestring source) ht))))
+                  (cond ((not canonical-repr)
+                         (push source (gethash (debug-source-namestring source) ht)))
+                        ((neq source canonical-repr)
+                         (setf (compiled-debug-info-source obj)
+                               canonical-repr)))))))))
+       :all))))
