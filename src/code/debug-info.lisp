@@ -374,7 +374,7 @@
   ;; That form can generate multiple functions, and those functions can
   ;; be in one or more code components. They all point at the same form.
   form
-  function)
+  (function nil :read-only t))
 
 ;;;; DEBUG-INFO structures
 

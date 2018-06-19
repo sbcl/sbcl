@@ -123,14 +123,18 @@
   (sb-vm::map-allocated-objects
    (lambda (obj type size)
      (declare (ignore size))
-     (when (= type sb-vm:code-header-widetag)
+     (case type
+      (#.sb-vm:instance-widetag
+       (when (typep obj 'sb-c::core-debug-source)
+         (setf (sb-c::core-debug-source-form obj) nil)))
+      (#.sb-vm:code-header-widetag
        (dotimes (i (sb-kernel:code-n-entries obj))
          (let ((fun (sb-kernel:%code-entry-point obj i)))
            (when (sb-impl::%simple-fun-lexpr fun)
              (sb-impl::set-simple-fun-info
               fun nil
               (sb-kernel:%simple-fun-doc fun)
-              (sb-kernel:%simple-fun-xrefs fun)))))))
+              (sb-kernel:%simple-fun-xrefs fun))))))))
    :all)
 
   ;; Fix unknown types in globaldb
