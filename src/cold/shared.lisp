@@ -207,7 +207,9 @@
         (cons arch (sort (remove-duplicates (remove arch target-feature-list))
                          #'string<))))
 
-(defvar *build-features* (read-from-file "build-features.lisp-expr"))
+(defvar *build-features* (let ((filename "build-features.lisp-expr"))
+                           (when (probe-file filename)
+                             (read-from-file filename))))
 (dolist (target-feature '(:sb-after-xc-core :cons-profiling))
   (when (member target-feature sb!xc:*features*)
     (setf sb!xc:*features* (delete target-feature sb!xc:*features*))
