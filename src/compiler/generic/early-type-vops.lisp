@@ -101,11 +101,11 @@
                        (remove single-float-widetag +immediate-types+)
                        +immediate-types+)
                    :test #'eql))
-         (function-p (if (intersection headers +fun-header-widetags+)
-                         (if (subsetp headers +fun-header-widetags+)
+         (function-p (if (intersection headers +function-widetags+)
+                         (if (subsetp headers +function-widetags+)
                              t
                              (error "can't test for mix of function subtypes ~
-                                     and normal header types"))
+                                     and other header types"))
                          nil)))
     (unless type-codes
       (error "At least one type must be supplied for TEST-TYPE."))

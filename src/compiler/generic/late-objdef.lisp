@@ -147,7 +147,7 @@ static inline lispobj compute_lispobj(lispobj* base_addr) {
           (setf (aref a (ash widetag -2))
                 (case widetag
                   (#.instance-widetag instance-pointer-lowtag)
-                  (#.+fun-header-widetags+ fun-pointer-lowtag)
+                  (#.+function-widetags+ fun-pointer-lowtag)
                   (t other-pointer-lowtag))))))
     (let ((contents (format nil "~{0x~x,~} " (coerce a 'list))))
       (format stream

@@ -268,14 +268,9 @@
   complex-array-widetag                     ;  F2   FD  EA   F5
 ))
 
-(defconstant-eqx +fun-header-widetags+
+(defconstant-eqx +function-widetags+
     '#.(list funcallable-instance-widetag simple-fun-widetag closure-widetag)
   #'equal)
-
-;;; Don't use these. They're for Slime, ltk, Conium, hu.dwim.debug
-;;; and who-knows-what-else.
-(defconstant simple-fun-header-widetag simple-fun-widetag)
-(defconstant closure-header-widetag closure-widetag)
 
 ;;; the different vector subtypes
 (defenum ()
