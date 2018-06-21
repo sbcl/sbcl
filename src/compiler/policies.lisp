@@ -184,6 +184,3 @@ compiled with this declaration in effect.")
 (define-optimization-quality allow-non-returning-tail-call
     0
   ("no" "no" "no" "yes"))
-
-;;; On the cross-compilation host, we initialize at load time
-#+sb-xc-host (!policy-cold-init-or-resanify)

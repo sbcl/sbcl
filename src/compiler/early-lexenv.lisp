@@ -41,7 +41,8 @@
 ;; The POLICY struct represents a set of policies in an order-insensitive way
 ;; that facilitates quicker lookup than scanning an alist.
 (defstruct (policy (:constructor make-policy
-                                 (primary-qualities &optional presence-bits)))
+                       (primary-qualities &optional
+                                          presence-bits dependent-qualities)))
   ;; Mask with a 1 for each quality that has an explicit value in this policy.
   ;; Primary qualities fill the mask from left-to-right and dependent qualities
   ;; from right-to-left.

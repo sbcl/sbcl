@@ -30,6 +30,7 @@
          . muffle-warning)))
 
 (defun proclaim-target-optimization ()
+  (sb!c::init-xc-policy #+cons-profiling '((sb!c::instrument-consing 2)))
   (let ((debug (if (position :sb-show sb!xc:*features*) 2 1)))
     (sb!xc:proclaim
      `(optimize
