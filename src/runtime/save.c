@@ -424,7 +424,7 @@ lose:
 
 boolean
 save_runtime_to_filehandle(FILE *output, void *runtime, size_t runtime_size,
-                           int application_type)
+                           int __attribute__((unused)) application_type)
 {
     size_t padding;
     void *padbytes;

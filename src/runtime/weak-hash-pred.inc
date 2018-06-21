@@ -1,7 +1,7 @@
-static int survived_gc_yet_KEY(lispobj key, lispobj value) {
+static int survived_gc_yet_KEY(lispobj key, lispobj __attribute__((unused)) value) {
     return !is_lisp_pointer(key) || pointer_survived_gc_yet(key);
 }
-static int survived_gc_yet_VALUE(lispobj key, lispobj value) {
+static int survived_gc_yet_VALUE(lispobj __attribute__((unused)) key, lispobj value) {
     return !is_lisp_pointer(value) || pointer_survived_gc_yet(value);
 }
 static int survived_gc_yet_AND(lispobj key, lispobj value) {

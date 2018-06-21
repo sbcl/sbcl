@@ -20,7 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int main (int argc, char *argv[]) {
+int main (int __attribute__((unused)) argc, char __attribute__((unused)) *argv[]) {
     int foo = 0x20212223;
     char *bar = (char *) &foo;
     switch(*bar) {

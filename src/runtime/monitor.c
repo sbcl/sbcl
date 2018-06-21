@@ -240,7 +240,7 @@ kill_cmd(char **ptr)
 }
 
 static void
-regs_cmd(char **ptr)
+regs_cmd(char __attribute__((unused)) **ptr)
 {
     struct thread __attribute__((unused)) *thread=arch_os_get_current_thread();
 
@@ -341,13 +341,13 @@ search_cmd(char **ptr)
  * it.) */
 
 static void
-flush_cmd(char **ptr)
+flush_cmd(char __attribute__((unused)) **ptr)
 {
     flush_vars();
 }
 
 static void
-quit_cmd(char **ptr)
+quit_cmd(char __attribute__((unused)) **ptr)
 {
     char buf[10];
 
@@ -363,7 +363,7 @@ quit_cmd(char **ptr)
 }
 
 static void
-help_cmd(char **ptr)
+help_cmd(char __attribute__((unused)) **ptr)
 {
     struct cmd *cmd;
 
@@ -375,13 +375,13 @@ help_cmd(char **ptr)
 static int done;
 
 static void
-exit_cmd(char **ptr)
+exit_cmd(char __attribute__((unused)) **ptr)
 {
     done = 1;
 }
 
 static void
-purify_cmd(char **ptr)
+purify_cmd(char __attribute__((unused)) **ptr)
 {
     purify(NIL, NIL);
 }
@@ -455,7 +455,7 @@ backtrace_cmd(char **ptr)
 }
 
 static void
-catchers_cmd(char **ptr)
+catchers_cmd(char __attribute__((unused)) **ptr)
 {
     struct catch_block *catch = (struct catch_block *)
         read_TLS(CURRENT_CATCH_BLOCK, arch_os_get_current_thread());
@@ -483,7 +483,7 @@ catchers_cmd(char **ptr)
 }
 
 static void
-grab_sigs_cmd(char **ptr)
+grab_sigs_cmd(char __attribute__((unused)) **ptr)
 {
     extern void sigint_init(void);
 

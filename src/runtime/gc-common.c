@@ -614,14 +614,14 @@ scav_immediate(lispobj *where, lispobj object)
 }
 
 static lispobj
-trans_immediate(lispobj object)
+trans_immediate(lispobj __attribute__((unused)) object)
 {
     lose("trying to transport an immediate\n");
     return NIL; /* bogus return value to satisfy static type checking */
 }
 
 static sword_t
-size_immediate(lispobj *where)
+size_immediate(lispobj __attribute__((unused)) *where)
 {
     return 1;
 }
@@ -772,7 +772,7 @@ static lispobj trans_bignum(lispobj object)
 /* 'cause the raw-addr has a function lowtag. */
 #if !defined(LISP_FEATURE_SPARC) && !defined(LISP_FEATURE_ARM)
 static sword_t
-scav_fdefn(lispobj *where, lispobj object)
+scav_fdefn(lispobj *where, lispobj __attribute__((unused)) object)
 {
     struct fdefn *fdefn = (struct fdefn *)where;
 
@@ -804,7 +804,7 @@ scav_fdefn(lispobj *where, lispobj object)
 #endif
 
 static sword_t
-scav_unboxed(lispobj *where, lispobj object)
+scav_unboxed(lispobj __attribute__((unused)) *where, lispobj object)
 {
     sword_t length = HeaderValue(object) + 1;
     return ALIGN_UP(length, 2);
@@ -877,7 +877,8 @@ NWORDS(uword_t x, uword_t n_bits)
 #define DEF_SCAV_TRANS_SIZE_UB(nbits) \
   DEF_SPECIALIZED_VECTOR(vector_unsigned_byte_##nbits, NWORDS(length, nbits))
 #define DEF_SPECIALIZED_VECTOR(name, nwords) \
-  static sword_t __attribute__((unused)) scav_##name(lispobj *where, lispobj header) { \
+  static sword_t __attribute__((unused)) scav_##name(\
+      lispobj *where, lispobj __attribute__((unused)) header) { \
     sword_t length = fixnum_value(((struct vector*)where)->length); \
     return ALIGN_UP(nwords + 2, 2); \
   } \
@@ -1325,7 +1326,8 @@ scav_vector (lispobj *where, lispobj header)
  * dead weak entries. */
 static inline void
 cull_weak_hash_table_bucket(struct hash_table *hash_table, lispobj *prev,
-                            lispobj *kv_vector, lispobj *index_vector,
+                            lispobj *kv_vector,
+                            lispobj __attribute__((unused)) *index_vector,
                             lispobj *next_vector, lispobj *hash_vector,
                             int (*alivep_test)(lispobj,lispobj),
                             void (*fix_pointers)(lispobj[2]),

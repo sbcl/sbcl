@@ -99,7 +99,9 @@ set_pty(char *pty_name)
 
 extern char **environ;
 int spawn(char *program, char *argv[], int sin, int sout, int serr,
-          int search, char *envp[], char *pty_name, int wait, char *pwd)
+          int search, char *envp[], char *pty_name,
+          int __attribute__((unused)) wait,
+          char *pwd)
 {
     pid_t pid;
     int fd;

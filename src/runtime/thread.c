@@ -343,7 +343,9 @@ schedule_thread_post_mortem(struct thread *corpse)
 
 /* Note: scribble must be stack-allocated */
 static void
-init_new_thread(struct thread *th, init_thread_data *scribble, int guardp)
+init_new_thread(struct thread *th,
+                init_thread_data __attribute__((unused)) *scribble,
+                int guardp)
 {
     int lock_ret;
 
@@ -383,7 +385,8 @@ init_new_thread(struct thread *th, init_thread_data *scribble, int guardp)
 }
 
 static void
-undo_init_new_thread(struct thread *th, init_thread_data *scribble)
+undo_init_new_thread(struct thread *th,
+                     init_thread_data __attribute__((unused)) *scribble)
 {
     int lock_ret;
 

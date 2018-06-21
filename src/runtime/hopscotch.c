@@ -471,7 +471,8 @@ tableptr hopscotch_resize_up(tableptr ht)
     return ht;
 }
 
-void hopscotch_log_stats(tableptr ht, char *tablename)
+void hopscotch_log_stats(tableptr __attribute__((unused)) ht,
+                         char __attribute__((unused)) *tablename)
 {
 #ifdef HOPSCOTCH_INSTRUMENT
     static FILE *hh_logfile;

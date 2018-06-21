@@ -1598,7 +1598,8 @@ static boolean forwardable_ptr_p(lispobj ptr)
            forwarding_pointer_p(native_pointer(ptr));
 }
 
-static void adjust_words(lispobj *where, sword_t n_words, uword_t arg)
+static void adjust_words(lispobj *where, sword_t n_words,
+                         uword_t __attribute__((unused)) arg)
 {
     int i;
     for (i=0;i<n_words;++i) {

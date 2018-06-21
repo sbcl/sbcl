@@ -766,7 +766,8 @@ purify(lispobj static_roots, lispobj read_only_roots)
 }
 #else /* LISP_FEATURE_GENCGC */
 int
-purify(lispobj static_roots, lispobj read_only_roots)
+purify(lispobj __attribute__((unused)) static_roots,
+       lispobj __attribute__((unused)) read_only_roots)
 {
     lose("purify called for GENCGC. This should not happen.");
 }

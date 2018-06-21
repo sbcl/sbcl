@@ -104,7 +104,7 @@ void defsignal(char* lisp_name, unsigned long unix_number)
 }
 
 int
-main(int argc, char *argv[])
+main(int argc, char __attribute__((unused)) *argv[])
 {
     /* don't need no steenking command line arguments */
     if (1 != argc) {

@@ -120,7 +120,9 @@ void untune_asm_routines_for_microarch(void)
 
 #ifndef _WIN64
 os_vm_address_t
-arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
+arch_get_bad_addr(int __attribute__((unused)) sig,
+                  siginfo_t *code,
+                  os_context_t __attribute__((unused)) *context)
 {
     return (os_vm_address_t)code->si_addr;
 }
@@ -211,20 +213,20 @@ arch_internal_error_arguments(os_context_t *context)
 }
 
 boolean
-arch_pseudo_atomic_atomic(os_context_t *context)
+arch_pseudo_atomic_atomic(os_context_t __attribute__((unused)) *context)
 {
     return get_pseudo_atomic_atomic(arch_os_get_current_thread());
 }
 
 void
-arch_set_pseudo_atomic_interrupted(os_context_t *context)
+arch_set_pseudo_atomic_interrupted(os_context_t __attribute__((unused)) *context)
 {
     struct thread *thread = arch_os_get_current_thread();
     set_pseudo_atomic_interrupted(thread);
 }
 
 void
-arch_clear_pseudo_atomic_interrupted(os_context_t *context)
+arch_clear_pseudo_atomic_interrupted(os_context_t __attribute__((unused)) *context)
 {
     struct thread *thread = arch_os_get_current_thread();
     clear_pseudo_atomic_interrupted(thread);
@@ -349,7 +351,9 @@ restore_breakpoint_from_single_step(os_context_t * context)
 }
 
 void
-sigtrap_handler(int signal, siginfo_t *info, os_context_t *context)
+sigtrap_handler(int __attribute__((unused)) signal,
+                siginfo_t __attribute__((unused)) *info,
+                os_context_t *context)
 {
     unsigned int trap;
 

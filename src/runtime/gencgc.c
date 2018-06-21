@@ -232,7 +232,8 @@ page_starts_contiguous_block_p(page_index_t page_index)
 
 /* True if the page is the last page in a contiguous block. */
 static inline boolean
-page_ends_contiguous_block_p(page_index_t page_index, generation_index_t gen)
+page_ends_contiguous_block_p(page_index_t page_index,
+                             generation_index_t __attribute__((unused)) gen)
 {
     // There is *always* a next page in the page table.
     boolean answer = page_bytes_used(page_index) < GENCGC_CARD_BYTES
@@ -1452,7 +1453,7 @@ copy_unboxed_object(lispobj object, sword_t nwords)
  */
 
 static sword_t
-scav_weak_pointer(lispobj *where, lispobj object)
+scav_weak_pointer(lispobj *where, lispobj __attribute__((unused)) object)
 {
     struct weak_pointer * wp = (struct weak_pointer*)where;
 
@@ -1629,7 +1630,8 @@ scavenge_pinned_ranges()
     }
 }
 
-void visit_freed_objects(char *start, sword_t nbytes)
+void visit_freed_objects(char __attribute__((unused)) *start,
+                         sword_t __attribute__((unused)) nbytes)
 {
 #ifdef TRAVERSE_FREED_OBJECTS
     /* At this point we could attempt to recycle unused TLS indices
@@ -3931,7 +3933,7 @@ gencgc_handle_wp_violation(void* fault_addr)
  * are about to let Lisp deal with it. It's basically just a
  * convenient place to set a gdb breakpoint. */
 void
-unhandled_sigmemoryfault(void *addr)
+unhandled_sigmemoryfault(void __attribute__((unused)) *addr)
 {}
 
 static void

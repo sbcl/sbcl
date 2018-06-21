@@ -688,7 +688,8 @@ check_interrupt_context_or_lose(os_context_t *context)
  */
 
 static void
-build_fake_control_stack_frames(struct thread *th,os_context_t *context)
+build_fake_control_stack_frames(struct thread __attribute__((unused)) *th,
+                                os_context_t __attribute__((unused)) *context)
 {
 #ifndef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
 
@@ -824,7 +825,7 @@ fake_foreign_function_call(os_context_t *context)
  * the usual signal mask will be restored from the context when the handler
  * finishes.  Otherwise, be careful */
 void
-undo_fake_foreign_function_call(os_context_t *context)
+undo_fake_foreign_function_call(os_context_t __attribute__((unused)) *context)
 {
     struct thread *thread=arch_os_get_current_thread();
     /* Block all blockable signals. */
@@ -1359,7 +1360,9 @@ low_level_maybe_now_maybe_later(int signal, siginfo_t *info, void *void_context)
 
 /* This function must not cons, because that may trigger a GC. */
 void
-sig_stop_for_gc_handler(int signal, siginfo_t *info, os_context_t *context)
+sig_stop_for_gc_handler(int __attribute__((unused)) signal,
+                        siginfo_t __attribute__((unused)) *info,
+                        os_context_t *context)
 {
     struct thread *thread=arch_os_get_current_thread();
     boolean was_in_lisp;
@@ -1846,7 +1849,9 @@ static volatile int sigaction_nodefer_works = -1;
 #define SA_NODEFER_TEST_KILL_SIGNAL SIGUSR1
 
 static void
-sigaction_nodefer_test_handler(int signal, siginfo_t *info, void *void_context)
+sigaction_nodefer_test_handler(int signal,
+                               siginfo_t __attribute__((unused)) *info,
+                               void __attribute__((unused)) *void_context)
 {
     sigset_t current;
     int i;
@@ -2059,7 +2064,7 @@ undoably_install_low_level_interrupt_handler (int signal,
 /* This is called from Lisp. */
 uword_t
 install_handler(int signal, void handler(int, siginfo_t*, os_context_t*),
-                int synchronous)
+                int __attribute__((unused)) synchronous)
 {
 #ifndef LISP_FEATURE_WIN32
     struct sigaction sa;
@@ -2113,7 +2118,9 @@ install_handler(int signal, void handler(int, siginfo_t*, os_context_t*),
 /* This must not go through lisp as it's allowed anytime, even when on
  * the altstack. */
 void
-sigabrt_handler(int signal, siginfo_t *info, os_context_t *context)
+sigabrt_handler(int __attribute__((unused)) signal,
+                siginfo_t __attribute__((unused)) *info,
+                os_context_t *context)
 {
     /* Save the interrupt context. No need to undo it, since lose()
      * shouldn't return. */

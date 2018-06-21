@@ -285,7 +285,7 @@ static inline struct thread *arch_os_get_current_thread(void)
 #endif
 }
 
-inline static int lisp_thread_p(os_context_t *context) {
+inline static int lisp_thread_p(os_context_t __attribute__((unused)) *context) {
 #ifdef LISP_FEATURE_SB_THREAD
     return pthread_getspecific(lisp_thread) != NULL;
 #elif defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)

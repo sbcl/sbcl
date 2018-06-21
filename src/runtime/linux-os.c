@@ -212,7 +212,8 @@ static void getuname(int *major_version, int* minor_version, int *patch_version)
     }
 }
 
-void os_init(char *argv[], char *envp[])
+void os_init(char __attribute__((unused)) *argv[],
+             char __attribute__((unused)) *envp[])
 {
     int major_version, minor_version, patch_version;
     getuname(&major_version, &minor_version, &patch_version);
@@ -443,7 +444,7 @@ os_install_interrupt_handlers(void)
 }
 
 char *
-os_get_runtime_executable_path(int external)
+os_get_runtime_executable_path(int __attribute__((unused)) external)
 {
     char path[PATH_MAX + 1];
     int size;
