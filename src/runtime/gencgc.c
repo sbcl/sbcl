@@ -4066,6 +4066,14 @@ gc_and_save(char *filename, boolean prepend_runtime,
      *  as empty pages, because we can't represent discontiguous ranges.
      */
     conservative_stack = 0;
+    /* We MUST collect all generations now, or else the coalescing by similarity
+     * would have to be extra cautious not to create any old->young pointers.
+     * Resetting oldest_gen_to_gc to its default is legal, because it is merely
+     * a hint to the collector that no significant amount of memory would be
+     * freed by increasingly aggressive levels of collection. It is NOT a mandate
+     * that some objects be retained despite appearing to be unreachable.
+     */
+    gencgc_oldest_gen_to_gc = HIGHEST_NORMAL_GENERATION;
     // From here on until exit, there is no chance of continuing
     // in Lisp if something goes wrong during GC.
     prepare_for_final_gc();
