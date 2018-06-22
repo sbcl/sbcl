@@ -439,7 +439,7 @@ lisp_backtrace(int nframes)
 #else
 
 static int
-altstack_pointer_p (void *p) {
+altstack_pointer_p (void __attribute__((unused)) *p) {
 #ifndef LISP_FEATURE_WIN32
     struct thread* thread = arch_os_get_current_thread();
     // FIXME: shouldn't this be testing '>=' start and '<' end ?
@@ -513,10 +513,10 @@ x86_call_context (void *fp, void **ra, void **ocfp)
 void
 describe_thread_state(void)
 {
-    sigset_t mask;
     struct thread *thread = arch_os_get_current_thread();
     struct interrupt_data *data = thread->interrupt_data;
 #ifndef LISP_FEATURE_WIN32
+    sigset_t mask;
     get_current_sigmask(&mask);
     printf("Signal mask:\n");
     printf(" SIGALRM = %d\n", sigismember(&mask, SIGALRM));
