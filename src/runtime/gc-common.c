@@ -1046,7 +1046,7 @@ get_array_data (lispobj array, int widetag, uword_t *length)
     }
 }
 
-static void inline add_trigger(lispobj triggering_object, lispobj* plivened_object)
+static inline void add_trigger(lispobj triggering_object, lispobj* plivened_object)
 {
     extern uword_t gc_private_cons(uword_t, uword_t);
     if (is_lisp_pointer(*plivened_object)) // Nonpointer objects are ignored
@@ -1057,7 +1057,7 @@ static void inline add_trigger(lispobj triggering_object, lispobj* plivened_obje
 }
 
 int debug_weak_ht = 0;
-static void inline add_kv_triggers(lispobj* pair, int weakness)
+static inline void add_kv_triggers(lispobj* pair, int weakness)
 {
     if (debug_weak_ht) {
         const char *const strings[3] = {"key","val","key-or-val"}; // {1, 2, 3}

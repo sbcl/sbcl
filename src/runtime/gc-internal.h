@@ -191,10 +191,12 @@ static inline lispobj funinstance_layout(lispobj* instance_ptr) { // native ptr
     return instance_ptr[3];
 }
 // No layout in simple-fun or closure, because there are no free bits
-static inline lispobj function_layout(lispobj* fun_ptr) { // native ptr
+static inline lispobj
+function_layout(lispobj __attribute__((unused)) *fun_ptr) { // native ptr
     return 0;
 }
-static inline void set_function_layout(lispobj* fun_ptr, lispobj layout) {
+static inline void set_function_layout(lispobj __attribute__((unused)) *fun_ptr,
+                                       lispobj __attribute__((unused)) layout) {
     lose("Can't assign layout");
 }
 #endif

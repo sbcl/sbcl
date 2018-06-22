@@ -155,21 +155,21 @@ extern page_index_t page_table_pages;
 
 void update_dynamic_space_free_pointer(void);
 void gc_close_region(struct alloc_region *alloc_region, int page_type_flag);
-static void inline ensure_region_closed(struct alloc_region *alloc_region,
+static inline void ensure_region_closed(struct alloc_region *alloc_region,
                                         int page_type_flag)
 {
     if (alloc_region->start_addr)
         gc_close_region(alloc_region, page_type_flag);
 }
 
-static void inline gc_set_region_empty(struct alloc_region *region)
+static inline void gc_set_region_empty(struct alloc_region *region)
 {
     /* last_page is not reset. It can be used as a hint where to resume
      * allocating after closing and re-opening the region */
     region->start_addr = region->free_pointer = region->end_addr = 0;
 }
 
-static void inline gc_init_region(struct alloc_region *region)
+static inline void gc_init_region(struct alloc_region *region)
 {
     region->last_page = 0; // must always be a valid page index
     gc_set_region_empty(region);

@@ -693,8 +693,9 @@ set_adjustment(struct heap_adjust* adj,
 
 static void
 process_directory(int count, struct ndir_entry *entry,
-                  int fd, os_vm_offset_t file_offset, int merge_core_pages,
-                  struct heap_adjust* adj)
+                  int fd, os_vm_offset_t file_offset,
+                  int __attribute__((unused)) merge_core_pages,
+                  struct heap_adjust __attribute__((unused)) *adj)
 {
     extern void immobile_space_coreparse(uword_t,uword_t);
 
