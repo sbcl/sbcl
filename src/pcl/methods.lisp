@@ -412,15 +412,16 @@
 (defmethod reinitialize-instance :around
     ((gf standard-generic-function) &rest args &key
      (lambda-list nil lambda-list-p) (argument-precedence-order nil apo-p))
-  (let ((old-mc (generic-function-method-combination gf)))
+  (let* ((old-mc (generic-function-method-combination gf))
+         (mc (getf args :method-combination old-mc)))
+    (unless (eq mc old-mc)
+      (aver (gethash gf (method-combination-%generic-functions old-mc)))
+      (aver (not (gethash gf (method-combination-%generic-functions mc)))))
     (prog1 (call-next-method)
-      (let ((mc (generic-function-method-combination gf)))
-        (unless (eq mc old-mc)
-          (aver (gethash gf (method-combination-%generic-functions old-mc)))
-          (aver (not (gethash gf (method-combination-%generic-functions mc))))
-          (remhash gf (method-combination-%generic-functions old-mc))
-          (setf (gethash gf (method-combination-%generic-functions mc)) t)
-          (flush-effective-method-cache gf)))
+      (unless (eq mc old-mc)
+        (remhash gf (method-combination-%generic-functions old-mc))
+        (setf (gethash gf (method-combination-%generic-functions mc)) t)
+        (flush-effective-method-cache gf))
       (cond
         ((and lambda-list-p apo-p)
          (set-arg-info gf
