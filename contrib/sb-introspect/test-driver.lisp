@@ -772,3 +772,33 @@
 (deftest object-size
     (plusp (sb-introspect::object-size #'print-object))
   t)
+
+;;; ASDF.  I can't even.
+(compile 'sb-introspect:map-root)
+(defun count-pointees (x simple &aux (n 0))
+  (sb-introspect:map-root (lambda (obj)
+                            (declare (ignore obj))
+                            (incf n))
+                          x
+                          :simple simple)
+  n)
+
+;;; A closure points to its underlying function, all closed-over values,
+;;; and possibly the closure's name.
+;;; #'SB-INT:CONSTANTLY-T is a nameless closure over 1 value
+(deftest map-root-closure-un (count-pointees #'SB-INT:CONSTANTLY-T nil) 2)
+;;; (SYMBOL-FUNCTION 'AND) is a named closure over 1 value
+(deftest map-root-closure-named (count-pointees (symbol-function 'and) nil) 3)
+
+;;; GFs point to their layout, implementation, slots,
+;;; and a hash-code, except that 64-bit headers can store the hash code
+;;; in the slot vector's high header bytes.
+;;; However, in either case we expect only 3 referenced objects,
+;;; because due to a strange design choice in MAP-ROOT,
+;;; it does not invoke the funarg on fixnums (or characters).
+(deftest map-root-gf (count-pointees #'make-load-form nil) 3)
+
+;;; Simple functions should point to their name, type, arglist, info,
+;;; and unless SIMPLE is specified to MAP-ROOT, the containing code.
+(deftest map-root-function-simple (count-pointees #'car t) 4)
+(deftest map-root-function-unsimple (count-pointees #'car nil) 5)

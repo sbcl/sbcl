@@ -504,11 +504,12 @@
 
 ;;;; Iterating over closure values
 
-(defmacro do-closure-values ((value closure) &body body)
+(defmacro do-closure-values ((value closure &key pad) &body body)
   (with-unique-names (i nclosure)
     `(let ((,nclosure ,closure))
        (declare (closure ,nclosure))
-       (dotimes (,i (- (1+ (get-closure-length ,nclosure)) sb!vm:closure-info-offset))
+       (dotimes (,i (- (1+ (logior (get-closure-length ,nclosure) ,(if pad 1 0)))
+                       sb!vm:closure-info-offset))
          (let ((,value (%closure-index-ref ,nclosure ,i)))
            ,@body)))))
 

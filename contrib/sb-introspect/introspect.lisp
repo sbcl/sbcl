@@ -885,8 +885,9 @@ Experimental: interface subject to change."
                  (funcall fun part))))
       (when ext
         (let ((table sb-pcl::*eql-specializer-table*))
-          (call (sb-int:with-locked-system-table (table)
-                  (gethash object table)))))
+          (multiple-value-bind (value foundp)
+              (sb-int:with-locked-system-table (table) (gethash object table))
+            (when foundp (call value)))))
       (sb-vm:do-referenced-object (object call)
         (cons
          :extend
@@ -934,9 +935,10 @@ Experimental: interface subject to change."
          :extend
          (loop for i below (code-n-entries object)
                do (call (%code-entry-point object i))))
-        (simple-fun
+        (function ; excluding CLOSURE and FUNCALLABLE-INSTANCE
          :override
-         (call (fun-code-header object))
+         (unless simple
+           (call (fun-code-header object)))
          (call (%simple-fun-name object))
          (call (%simple-fun-arglist object))
          (call (%simple-fun-type object))

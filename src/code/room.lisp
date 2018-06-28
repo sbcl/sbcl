@@ -997,7 +997,7 @@ We could try a few things to mitigate this:
           (typecase ,obj
             ,.(make-case* 'closure
                `(,functoid (%closure-fun ,obj) ,@more)
-               `(do-closure-values (.o. ,obj) (,functoid .o. ,@more)))
+               `(do-closure-values (.o. ,obj :pad t) (,functoid .o. ,@more)))
             ,.(make-case* 'funcallable-instance
                `(let ((.l. (%funcallable-instance-layout ,obj)))
                   (,functoid .l. ,@more)
@@ -1045,7 +1045,7 @@ We could try a few things to mitigate this:
                                 (logandc2 (get-lisp-obj-address ,obj) lowtag-mask))))
             ,.(make-case* 'code-component
                `(,functoid (%code-debug-info ,obj) ,@more)
-               #+(or x86 immobile-code) `(,functoid (%code-fixups,obj) ,@more)
+               #+(or x86 immobile-code) `(,functoid (%code-fixups ,obj) ,@more)
                `(loop for .i. from code-constants-offset below (code-header-words ,obj)
                       do (,functoid (code-header-ref ,obj .i.) ,@more))
                ;; Caller should extend behavior for embedded objects, like:
@@ -1053,16 +1053,13 @@ We could try a few things to mitigate this:
                ;;        do (,functoid (%code-entry-point ,obj .i.) ,@more)))
                ;; and/or visit the slots of each simple-fun but not the fun per se.
                )
-            ,.(make-case '(or float bignum #+sb-simd-pack simd-pack
+            ,.(make-case '(or float (complex float) bignum
+                              #+sb-simd-pack simd-pack
                               system-area-pointer)) ; nothing to do
             ,.(make-case 'weak-pointer `(weak-pointer-value ,obj))
             ,.(make-case 'ratio `(%numerator ,obj) `(%denominator ,obj))
-            ;; Use the non-primitive slot readers because we don't know
-            ;; which subtype of complex number this is.
-            ,.(make-case 'complex `(realpart ,obj) `(imagpart ,obj))
-            ;; Heap scans will never encounter SIMPLE-FUN so we don't really
-            ;; need it here, but just to keep it out of the T case.
-            ,.(make-case 'simple-fun)
+            ;; Visitor won't be invoked on (COMPLEX float)
+            ,.(make-case '(complex rational) `(%realpart ,obj) `(%imagpart ,obj))
             ;; Caller can do anything in the fallback case.
             ,.(make-case 't))))
       (when (> (length alterations) n-matched-alterations)
@@ -1075,7 +1072,6 @@ We could try a few things to mitigate this:
   (macrolet ((test (x) `(when (eq ,x that) (go win))))
     (tagbody
        (do-referenced-object (this test)
-         (simple-fun :delete) ; omit this type
          (code-component
           :extend
           (dotimes (i (code-n-entries this))
