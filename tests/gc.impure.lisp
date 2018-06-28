@@ -262,3 +262,18 @@
   (setf (symbol-function 'callfoo)
         (compile nil '(lambda () (loop repeat 500000000 do (foo)))))
   (funcall 'callfoo))
+
+;;; Pseudo-static large objects should retain the single-object flag
+#+gencgc ; PSEUDO-STATIC-GENERATION etc don't exist for cheneygc
+(with-test (:name :pseudostatic-large-objects)
+  (sb-vm::map-allocated-objects
+   (lambda (obj type size)
+     (declare (ignore type size))
+     (when (>= (sb-vm::primitive-object-size obj) (* 4 sb-vm:gencgc-card-bytes))
+       (let* ((addr (sb-kernel:get-lisp-obj-address obj))
+              (pte (deref sb-vm:page-table (sb-vm:find-page-index addr))))
+         (when (eq (slot pte 'sb-vm::gen) sb-vm:+pseudo-static-generation+)
+           (let* ((flags (slot pte 'sb-vm::flags))
+                  (type (ldb (byte 5 (+ #+big-endian 3)) flags)))
+             (assert (logbitp 4 type)))))))
+   :all))

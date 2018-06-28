@@ -1382,7 +1382,7 @@ static uword_t adjust_obj_ptes(page_index_t first_page,
     return bytes_freed;
 }
 
-/* Copy a large object. If the object is on large object pages,
+/* "Copy" a large object. If the object is on large object pages,
  * and satisifies the condition to remain where it is,
  * it is simply promoted, else it is copied.
  * To stay on large-object pages, the object must either be at least
@@ -1392,17 +1392,13 @@ static uword_t adjust_obj_ptes(page_index_t first_page,
  *   2 pages - ...   size >= 65040
  *   1 page  - ...   size >= 32528
  *
- * Bignums and vectors may have shrunk. If the object is not copied
- * the space needs to be reclaimed, and the page_tables corrected.
+ * Bignums and vectors may have shrunk. If the object is not copied,
+ * the slack needs to be reclaimed, and the page_tables corrected.
  *
  * Code objects can't shrink, but it's not worth adding an extra test
  * for large code just to avoid the loop that performs adjustment, so
  * go through the adjustment motions even though nothing happens.
  *
- * An object that shares pages with other objects will never move
- * to single-object pages, thus ensuring that the assignment of
- * '.singleton = 0' in prepare_for_final_gc() is meaningful.
- * The saved core should have no single-object pages.
  */
 lispobj
 copy_large_object(lispobj object, sword_t nwords, int page_type_flag)
@@ -3967,6 +3963,8 @@ prepare_for_final_gc ()
 
     prepare_immobile_space_for_final_gc ();
     for (i = 0; i < next_free_page; i++) {
+        // Compaction requires that we permit large objects to be copied henceforth.
+        // Object of size >= LARGE_OBJECT_SIZE get re-allocated to single-object pages.
         page_table[i].type &= ~SINGLE_OBJECT_FLAG;
         if (page_table[i].gen == PSEUDO_STATIC_GENERATION) {
             int used = page_bytes_used(i);
@@ -4165,13 +4163,17 @@ void gc_load_corefile_ptes(core_entry_elt_t n_ptes, core_entry_elt_t total_bytes
         for ( i = 0 ; i < npages ; ++i, ++page ) {
             struct corefile_pte pte;
             memcpy(&pte, data+i*sizeof (struct corefile_pte), sizeof pte);
-            set_page_bytes_used(page, pte.bytes_used);
-            // Low 2 bits of the corefile_pte hold the 'allocated' flag.
-            // The other bits become the scan_start_offset
-            set_page_scan_start_offset(page, pte.sso & ~0x03);
-            if ((page_table[page].type = pte.sso & 0x03) != FREE_PAGE_FLAG) {
+            // Low 2 bits of the corefile_pte hold the 'type' flags.
+            // Low bit of bytes_used indicates a large (a/k/a single) object.
+            char type = ((pte.bytes_used & 1) ? SINGLE_OBJECT_FLAG : 0)
+                        | (pte.sso & 0x03);
+            page_table[page].type = type;
+            pte.bytes_used &= ~1;
+            if (type != FREE_PAGE_FLAG) {
                 /* It is possible, though rare, for the saved page table
                  * to contain free pages below alloc_ptr. */
+                set_page_bytes_used(page, pte.bytes_used);
+                set_page_scan_start_offset(page, pte.sso & ~0x03);
                 page_table[page].gen = gen;
                 set_page_need_to_zero(page, 1);
             }
@@ -4199,7 +4201,9 @@ void gc_store_corefile_ptes(struct corefile_pte *ptes)
         uword_t word = page_scan_start_offset(i);
         gc_assert((word & 0x03) == 0);
         ptes[i].sso = word | (0x03 & page_table[i].type);
-        ptes[i].bytes_used = page_bytes_used(i);
+        page_bytes_t used = page_bytes_used(i);
+        gc_assert(!(used & LOWTAG_MASK));
+        ptes[i].bytes_used = used | page_single_obj_p(i);
     }
 }
 
