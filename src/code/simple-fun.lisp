@@ -125,7 +125,13 @@
             ;; but %CLOSURE-INDEX-REF starts indexing from the value slots.
             (if (oddp len)
                 (gethash closure **closure-names**) ; returns name and T
-                (values (%closure-index-ref closure (1- len)) t)))))))
+                (values (%closure-index-ref closure (1- len)) t))))))
+
+  (defun closure-named-inline-p (closure)
+    (declare (closure closure))
+    (with-pinned-objects (closure)
+      (and (logtest (closure-header-word closure) (namedp-bit))
+           (evenp (get-closure-length (truly-the function closure)))))))
 
 ;;; a SETFable function to return the associated debug name for FUN
 ;;; (i.e., the third value returned from CL:FUNCTION-LAMBDA-EXPRESSION),
@@ -504,11 +510,16 @@
 
 ;;;; Iterating over closure values
 
-(defmacro do-closure-values ((value closure &key pad) &body body)
+(defmacro do-closure-values ((value closure &key including-name) &body body)
   (with-unique-names (i nclosure)
     `(let ((,nclosure ,closure))
        (declare (closure ,nclosure))
-       (dotimes (,i (- (1+ (logior (get-closure-length ,nclosure) ,(if pad 1 0)))
+       (dotimes (,i (- (+ (get-closure-length ,nclosure)
+                          1
+                          ,@(and including-name
+                                 `((if (closure-named-inline-p ,nclosure)
+                                       1
+                                       0))))
                        sb!vm:closure-info-offset))
          (let ((,value (%closure-index-ref ,nclosure ,i)))
            ,@body)))))
