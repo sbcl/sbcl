@@ -114,15 +114,14 @@
     (storew t1 x 0 other-pointer-lowtag)
     (move res x)))
 
-
 (define-vop (pointer-hash)
   (:translate pointer-hash)
   (:args (ptr :scs (any-reg descriptor-reg)))
   (:results (res :scs (any-reg descriptor-reg)))
   (:policy :fast-safe)
   (:generator 1
-    (inst and res ptr (bic-mask lowtag-mask))
-    (inst lsr res res 1)))
+    (inst and res ptr (dpb -1 (byte (- n-word-bits n-fixnum-tag-bits 1)
+                                    n-fixnum-tag-bits) 0))))
 
 ;;;; Allocation
 

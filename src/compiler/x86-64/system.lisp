@@ -192,10 +192,8 @@
   (:policy :fast-safe)
   (:generator 1
     (move res ptr)
-    ;; Mask the lowtag, and shift the whole address into a positive
-    ;; fixnum.
-    (inst and res (lognot lowtag-mask))
-    (inst shr res 1)))
+    (inst and res (constantize (dpb -1 (byte (- n-word-bits n-fixnum-tag-bits 1)
+                                             n-fixnum-tag-bits) 0)))))
 
 ;;;; allocation
 
