@@ -33,7 +33,7 @@
 (test-util:with-test (:name :walk-slots-numbers
                       :fails-on :interpreter)
   (let ((c #c(45d0 33d0)))
-    (walk-slots-test c '(45d0 33d0)))
+    (walk-slots-test c nil))
   (let ((r 22/7))
     (walk-slots-test r '(22 7))))
 
