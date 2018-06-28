@@ -68,7 +68,7 @@ echo //checking for leftover cold-init symbols
         (sb-int:awhen
           (mapcan (quote apropos-list)
            (quote ("DEFINE-INFO-TYPE" "LVAR-TYPE-USING"
-                   "COPY-LIST-MACRO" "TWO-ARG-+/-"
+                   "TWO-ARG-+/-"
                    "PPRINT-TAGBODY-GUTS" "WITH-DESCRIPTOR-HANDLERS"
                    "SUBTRACT-BIGNUM-LOOP" "BIGNUM-REPLACE" "WITH-BIGNUM-BUFFERS"
                    "GCD-ASSERT" "MODULARLY" "BIGNUM-NEGATE-LOOP"

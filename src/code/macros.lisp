@@ -554,3 +554,28 @@ invoked. In that case it will store into PLACE and start over."
     (let ((fn-sym (sb!xc:gensym))) ; for ONCE-ONLY-ish purposes
       (values `((,fn-sym (%coerce-callable-to-fun ,funarg)))
               `(sb!c::%funcall ,fn-sym . ,arg-forms)))))
+
+;;; Ordinarily during self-build, nothing would need this macro except the
+;;; calls in src/code/list, and src/code/seq.
+;;; However, if cons profiling is enbled, then all calls to COPY-LIST
+;;; transform into the macro, so it must be available early.
+(sb!xc:defmacro copy-list-macro (input &key check-proper-list)
+  ;; Unless CHECK-PROPER-LIST is true, the list is copied correctly
+  ;; even if the list is not terminated by NIL. The new list is built
+  ;; by CDR'ing SPLICE which is always at the tail of the new list.
+  (with-unique-names (orig copy splice cell)
+    ;; source transform gave input the ONCE-ONLY treatment already.
+    `(when ,input
+       (let ((,copy (list (car ,input))))
+         (do ((,orig (cdr ,input) (cdr ,orig))
+              (,splice ,copy
+                       (let ((,cell (list (car ,orig))))
+                         (rplacd (truly-the cons ,splice) ,cell)
+                         ,cell)))
+           (,@(if check-proper-list
+                  `((endp ,orig))
+                  `((atom ,orig)
+                    ;; always store the CDR even if NIL. A blind write
+                    ;; is cheaper than a branch around a write.
+                    (rplacd (truly-the cons ,splice) ,orig)))
+            ,copy))))))

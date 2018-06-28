@@ -150,6 +150,13 @@
 
 (deftransform %make-list ((length item) ((constant-arg (eql 0)) t)) nil)
 
+(define-source-transform copy-list (list &environment env)
+  ;; If speed is more important than space, or cons profiling is wanted,
+  ;; then inline the whole copy loop.
+  (if (policy env (or (> speed space) (> instrument-consing 1)))
+      (once-only ((list `(the list ,list))) `(copy-list-macro ,list))
+      (values nil t))) ; give up
+
 (define-source-transform append (&rest lists)
   (case (length lists)
     (0 nil)

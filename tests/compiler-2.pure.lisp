@@ -1441,3 +1441,9 @@
          (* (aref a 0)
             (let ((z (aref a 0)))
               (complex (realpart z) (imagpart z)))))))
+
+(with-test (:name :copy-list-inlined)
+  (let ((f (checked-compile
+            `(lambda (x) (declare (optimize speed)) (copy-list x)))))
+    ;; Should not have a call to COPY-LIST (or anything)
+    (assert (not (ctu:find-code-constants f :type 'sb-kernel:fdefn)))))
