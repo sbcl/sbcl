@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-1.4.9:
+changes relative to sbcl-1.4.8:
   * enhancement: SB-COVER instrumentation for x86[-64] has signficantly less
     overhead. The performance penalty for 64-bit code has been measured at
     around 30% slower than uninstrumented code as contrasted with slowdowns
