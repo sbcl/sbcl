@@ -16,8 +16,7 @@
 ;;; FIXME: Perhaps this belongs in the %SYS package like some other
 ;;; cold load stuff.
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defvar *!cold-init-forms*))
+(defvar *!cold-init-forms*)
 
 (defmacro !begin-collecting-cold-init-forms ()
   #+sb-xc '(eval-when (:compile-toplevel :execute)
@@ -33,10 +32,9 @@
   ;; In the target Lisp, stuff the forms into a named function which
   ;; will presumably be executed at the appropriate stage of cold load
   ;; (i.e. basically as soon as possible).
-  #+sb-xc (progn
-            (setf *!cold-init-forms*
-                  (nconc *!cold-init-forms* (copy-list forms)))
-            nil)
+  #+sb-xc `(eval-when (:compile-toplevel)
+             ,@(mapcar (lambda (form) `(push ',form *!cold-init-forms*))
+                       forms))
   ;; In the cross-compilation host Lisp, cold load is not a
   ;; meaningful concept. Just execute the forms at load time.
   #-sb-xc `(progn ,@forms))
@@ -44,7 +42,7 @@
 (defmacro !defun-from-collected-cold-init-forms (name)
   #+sb-xc `(progn
              (defun ,name ()
-               ,@*!cold-init-forms*
+               ,@(reverse *!cold-init-forms*)
                (values))
              (eval-when (:compile-toplevel :execute)
                (makunbound '*!cold-init-forms*)))
@@ -134,12 +132,3 @@
 #-sb-xc-host
 (defun !%define-thread-local (dummy1 dummy2) ; to avoid warning
   (declare (ignore dummy1 dummy2)))
-
-;;; FIXME: Consider renaming this file asap.lisp,
-;;; and the renaming the various things
-;;;   *ASAP-FORMS* or *REVERSED-ASAP-FORMS*
-;;;   WITH-ASAP-FORMS
-;;;   ASAP or EVAL-WHEN-COLD-LOAD
-;;;   DEFUN-FROM-ASAP-FORMS
-;;; If so, add a comment explaining that ASAP is colloquial English for "as
-;;; soon as possible", and has nothing to do with "system area pointer".
