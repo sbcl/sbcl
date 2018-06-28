@@ -26,7 +26,7 @@
 ;; This is for SAVE-LISP-AND-DIE. It removes all accumulated stuff
 ;; that can be recreated in the normal course of evaluation.
 (defun flush-everything ()
-  (sb-vm::map-allocated-objects
+  (sb-vm:map-allocated-objects
    (lambda (obj type size)
      (declare (ignore type size))
      (when (typep obj 'interpreted-function)

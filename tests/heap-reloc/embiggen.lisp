@@ -25,7 +25,7 @@
                      (if (typep int 'fixnum)
                          (sb-bignum:make-small-bignum int)
                          int)))))
-    (sb-vm::map-allocated-objects
+    (sb-vm:map-allocated-objects
      (lambda (obj type size)
        (declare (ignore type size))
        (when (and (typep obj 'sb-kernel:layout)

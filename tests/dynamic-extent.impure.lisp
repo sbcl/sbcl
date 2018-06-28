@@ -1445,7 +1445,7 @@
                   :skipped-on (not :stack-allocatable-closures))
   (assert-no-consing
    (let ((ct 0))
-     (sb-vm::map-allocated-objects
+     (sb-vm:map-allocated-objects
       (lambda (obj type size)
         (declare (ignore obj type size))
         (incf ct))

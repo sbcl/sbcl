@@ -3155,6 +3155,7 @@ structure representations"
                              "LONG-STACK-SC-NUMBER")
                "LOWTAG-LIMIT" "LOWTAG-MASK"
                "LRA-SAVE-OFFSET"
+               "MAP-ALLOCATED-OBJECTS"
                "MAX-INTERRUPTS"
                #!+c-stack-is-control-stack "MEMORY-FAULT-EMULATION-TRAP"
                "MEMORY-USAGE"

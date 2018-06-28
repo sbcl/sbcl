@@ -48,13 +48,13 @@
                        (when (and (typep object '(cons string (simple-vector 20001)))
                                   (string= (car object) "lottajunk"))
                          (incf n-junk))))
-      (sb-vm::map-allocated-objects #'visit :dynamic)
+      (sb-vm:map-allocated-objects #'visit :dynamic)
       ;; This is probably not more than a few hundred.
       (format t "~&;; Post-test EQL-spec count: ~S, junk obj count: ~D~%"
               (hash-table-count sb-pcl::*eql-specializer-table*) n-junk)
       (sb-ext:gc :full t)
       (setq n-junk 0)
-      (sb-vm::map-allocated-objects #'visit :dynamic)
+      (sb-vm:map-allocated-objects #'visit :dynamic)
       (format t "~&;; Post-GC EQL-spec count: ~S, junk obj count: ~D~%"
               (hash-table-count sb-pcl::*eql-specializer-table*) n-junk)
       ;; There should be no stray EQL-specializers left.

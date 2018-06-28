@@ -45,13 +45,13 @@
                  (bit-vector (incf n-bitvectors))
                  (symbol     (incf n-symbols))
                  (t          (incf n-other))))))
-      (sb-vm::map-allocated-objects #'countit :all)
+      (sb-vm:map-allocated-objects #'countit :all)
       (replace before after)
       (fill after 0)
       ;; expect to see 1 cons, 1 bit-vector, 1 symbol, and nothing else
       (let ((* (cons (make-array 5 :element-type 'bit)
                      (make-symbol "WAT"))))
-        (sb-vm::map-allocated-objects #'countit :all)
+        (sb-vm:map-allocated-objects #'countit :all)
         (assert (equal (map 'list #'- after before) '(0 1 1 1)))))))
 
 (defparameter *x* ())
@@ -202,7 +202,7 @@
          (code-bits (make-array n-bits :element-type 'bit))
          (data-bits (make-array n-bits :element-type 'bit))
          (total-code-size 0))
-    (sb-vm::map-allocated-objects
+    (sb-vm:map-allocated-objects
      (lambda (obj type size)
        (declare ((and fixnum (integer 1)) size))
        ;; M-A-O disables GC, therefore GET-LISP-OBJ-ADDRESS is safe
@@ -266,7 +266,7 @@
 ;;; Pseudo-static large objects should retain the single-object flag
 #+gencgc ; PSEUDO-STATIC-GENERATION etc don't exist for cheneygc
 (with-test (:name :pseudostatic-large-objects)
-  (sb-vm::map-allocated-objects
+  (sb-vm:map-allocated-objects
    (lambda (obj type size)
      (declare (ignore type size))
      (when (>= (sb-vm::primitive-object-size obj) (* 4 sb-vm:gencgc-card-bytes))

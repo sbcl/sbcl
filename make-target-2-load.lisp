@@ -55,7 +55,7 @@
                 ;; never called post-build, it is not discarded. Also, I suspect
                 ;; that the following loop should print nothing, but it does:
 #|
-                (sb-vm::map-allocated-objects
+                (sb-vm:map-allocated-objects
                   (lambda (obj type size)
                     (declare (ignore size))
                     (when (= type sb-vm:code-header-widetag)
@@ -89,7 +89,7 @@
                          `(setf ,place nil))
                     (incf count))))
       ;; 1. Functions, macros, special operators
-      (sb-vm::map-allocated-objects
+      (sb-vm:map-allocated-objects
        (lambda (obj type size)
          (declare (ignore size))
          (case type
@@ -120,7 +120,7 @@
   ;; Globally declaiming EVAL-STORE-SOURCE-FORM 0 would work too,
   ;; but isn't it nice to know that the logic for storing the forms
   ;; actually works? (Yes)
-  (sb-vm::map-allocated-objects
+  (sb-vm:map-allocated-objects
    (lambda (obj type size)
      (declare (ignore size))
      (case type

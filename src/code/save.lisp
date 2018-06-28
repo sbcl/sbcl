@@ -205,7 +205,7 @@ sufficiently motivated to do lengthy fixes."
     (let ((arglist-hash (make-hash-table :hash-function 'equal-hash
                                          :test 'fun-names-equalish))
           (type-hash (make-hash-table :test 'equal)))
-      (sb-vm::map-allocated-objects
+      (sb-vm:map-allocated-objects
        (lambda (object widetag size)
          (declare (ignore size))
          (when (= widetag sb-vm:code-header-widetag)
@@ -334,7 +334,7 @@ sb-c::
                 (eql (debug-source-created a) (debug-source-created b))
                 (eql (debug-source-compiled a) (debug-source-compiled b)))))
     (let ((ht (make-hash-table :test 'equal)))
-      (sb-vm::map-allocated-objects
+      (sb-vm:map-allocated-objects
        (lambda (obj type size)
          (declare (ignore type size))
          (when (typep obj 'compiled-debug-info)

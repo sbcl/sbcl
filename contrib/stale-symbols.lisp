@@ -61,7 +61,7 @@
              :external))))
 
 (defun find-stale-objects ()
-  (sb-vm::map-allocated-objects
+  (sb-vm:map-allocated-objects
      (lambda (obj type size)
        (declare (optimize (safety 0))
                 (ignore size))

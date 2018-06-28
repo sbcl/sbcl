@@ -117,7 +117,7 @@ FBOUNDP."
 receives the object and its size as arguments.  SPACES should be a
 list of the symbols :dynamic, :static, :read-only, or :immobile on
 #+immobile-space"
-  (apply #'sb-vm::map-allocated-objects
+  (apply #'sb-vm:map-allocated-objects
      (lambda (obj header size)
        (when (= sb-vm:code-header-widetag header)
          (funcall fn obj size)))
@@ -999,7 +999,7 @@ Experimental: interface subject to change."
   (let* ((n-bins (+ (length size-bins) 2))
          (counts (make-array n-bins :initial-element 0))
          (size-totals (make-array n-bins :initial-element 0)))
-    (sb-vm::map-allocated-objects
+    (sb-vm:map-allocated-objects
      (lambda (obj type size)
        (declare (ignore type))
        (cond ((consp obj)

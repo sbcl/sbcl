@@ -145,7 +145,7 @@
   (ctu:assert-no-consing (sb-vm:%space-bounds :static))
   (ctu:assert-no-consing (sb-vm:space-bytes :static)))
 
-(with-test (:name (sb-vm::map-allocated-objects :no-consing)
+(with-test (:name (sb-vm:map-allocated-objects :no-consing)
                   :fails-on :cheneygc
                   :skipped-on :interpreter)
   (let ((n 0))
@@ -153,7 +153,7 @@
                        (declare (ignore obj type size))
                        (incf n)))
       (ctu:assert-no-consing
-       (sb-vm::map-allocated-objects #'f :dynamic)
+       (sb-vm:map-allocated-objects #'f :dynamic)
        5))))
 
 (with-test (:name :pack-varints-as-bignum)

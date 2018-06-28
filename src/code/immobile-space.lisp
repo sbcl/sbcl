@@ -107,7 +107,7 @@
 
       ;; Immobile space - code components can jump to immobile space,
       ;; read-only space, and C runtime routines.
-      (sb-vm::map-allocated-objects
+      (sb-vm:map-allocated-objects
        (lambda (code type size)
          (declare (ignore size))
          (when (= type code-header-widetag)
@@ -270,7 +270,7 @@
                                            ((string< name1 name2))))
                                    (< (get-lisp-obj-address (car a))
                                       (get-lisp-obj-address (car b))))))))))))
-      (sb-vm::map-allocated-objects
+      (sb-vm:map-allocated-objects
        (lambda (obj type size)
          size
          (when (= type sb-vm:code-header-widetag)
@@ -337,7 +337,7 @@
         (setf (gethash code hashset) t)
         (vector-push-extend code ordering)))
 
-    (sb-vm::map-allocated-objects
+    (sb-vm:map-allocated-objects
      (lambda (obj type size)
        (declare (ignore size))
        (when (and (= type sb-vm:code-header-widetag)
