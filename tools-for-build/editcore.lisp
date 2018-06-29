@@ -1194,14 +1194,12 @@
              (return-from scan-obj))
            (case widetag
              (#.instance-widetag
-              (let ((layout (truly-the layout
-                             (translate (%instance-layout obj) spaces))))
-                ;; FIXME: even though the layout is supplied, it's not good enough,
-                ;; because the macro references the layout-bitmap which might
-                ;; be a bignum which is a pointer into the logical core address.
-                (unless (fixnump (layout-bitmap layout))
-                  (error "Can't process bignum bitmap"))
-                (do-instance-tagged-slot (i obj :layout layout)
+              (let* ((layout (truly-the layout
+                              (translate (%instance-layout obj) spaces)))
+                     (bitmap (layout-bitmap layout))
+                     (translated
+                      (if (fixnump bitmap) bitmap (translate bitmap spaces))))
+                (do-instance-tagged-slot (i obj :bitmap translated)
                   (scanptr obj (1+ i))))
               (return-from scan-obj))
              (#.simple-vector-widetag

@@ -161,10 +161,14 @@
 ;; there would be no need at all for the LAYOUT - if it had already been
 ;; accessed, it shouldn't be another memory read]
 ;;
-(defmacro do-instance-tagged-slot ((index-var thing &key layout (pad t)) &body body)
+(defmacro do-instance-tagged-slot ((index-var thing &key layout
+                                                    ((:bitmap bitmap-expr)) (pad t))
+                                   &body body)
   (with-unique-names (instance bitmap limit)
     `(let* ((,instance ,thing)
-            (,bitmap (layout-bitmap ,(or layout `(%instance-layout ,instance))))
+            (,bitmap ,(or bitmap-expr
+                          `(layout-bitmap
+                            ,(or layout `(%instance-layout ,instance)))))
             (,limit ,(if pad
                          ;; target instances have an odd number of payload words.
                          `(logior (%instance-length ,instance) #-sb-xc-host 1)
