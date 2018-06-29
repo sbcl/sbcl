@@ -554,29 +554,18 @@ arch_set_fp_modes(unsigned int mxcsr)
 ///     it resemble a simple-fun in terms of call convention, or
 /// (3) a code-component with no simple-fun within it, that makes
 ///     closures and other funcallable-instances look like simple-funs.
+/// If the fdefn jumps to the UNDEFINED-FDEFN routine, then return 0.
 lispobj virtual_fdefn_callee_lispobj(struct fdefn* fdefn, uword_t vaddr) {
-    extern unsigned asm_routines_end;
-    if (((lispobj)fdefn->raw_addr & 0xFE) == 0xE8) {  // looks good
-        int32_t offs = UNALIGNED_LOAD32((char*)&fdefn->raw_addr + 1);
-        // Base the callee address off where the fdefn virtually is.
-        // Compensate for the offset of the raw_addr slot,
-        // and add 5 for the length of "JMP rel32" instruction.
-        unsigned int raw_fun =
-            (unsigned int)vaddr + offsetof(struct fdefn,raw_addr) + 5 + offs;
-        switch (((unsigned char*)&fdefn->raw_addr)[5]) {
-        case 0x00: // no closure/fin trampoline
-          // If the target is an assembly routine, there is no simple-fun
-          // that corresponds to the entry point. The code is kept live
-          // by *ASSEMBLER-OBJECTS*. Otherwise, return the simple-fun.
-          return raw_fun < asm_routines_end ? 0 : raw_fun - FUN_RAW_ADDR_OFFSET;
-        case 0x48: // embedded funcallable instance trampoline
-          return (raw_fun - (4<<WORD_SHIFT)) | FUN_POINTER_LOWTAG;
-        case 0x90: // general closure/fin trampoline
-          return (raw_fun - offsetof(struct code, constants)) | OTHER_POINTER_LOWTAG;
-        }
-    } else if (fdefn->raw_addr == 0)
+    unsigned char tagged_ptr_bias = ((unsigned char*)&fdefn->raw_addr)[7];
+    // If the pointer bias is 0, then this fdefn's raw_addr must
+    // point to an assembler routine entry point.
+    if (tagged_ptr_bias == 0)
         return 0;
-    lose("Can't decode fdefn raw addr @ %p: %p\n", fdefn, fdefn->raw_addr);
+    int32_t offs = UNALIGNED_LOAD32((char*)&fdefn->raw_addr + 1);
+    // Base the callee address off where the fdefn virtually is.
+    // Compensate for the offset of the raw_addr slot,
+    // and add 5 for the length of "JMP rel32" instruction.
+    return vaddr + offsetof(struct fdefn,raw_addr) + 5 + offs - tagged_ptr_bias;
 }
 lispobj fdefn_callee_lispobj(struct fdefn* fdefn) {
   return virtual_fdefn_callee_lispobj(fdefn, (uword_t)fdefn);

@@ -1874,13 +1874,26 @@ core and return a descriptor to it."
     result))
 
 #!+x86-64
-(defun encode-fdefn-raw-addr (fdefn jump-target opcode)
-  (let ((disp (- jump-target
-                 (+ (descriptor-bits fdefn)
-                    (- sb!vm:other-pointer-lowtag)
-                    (ash sb!vm:fdefn-raw-addr-slot sb!vm:word-shift)
-                    5))))
-    (logior (ash (ldb (byte 32 0) (the (signed-byte 32) disp)) 8) opcode)))
+(defun encode-fdefn-raw-addr (fdefn function jmp-target opcode)
+  (let* ((jmp-origin (+ (descriptor-bits fdefn)
+                        (- sb!vm:other-pointer-lowtag)
+                        (ash sb!vm:fdefn-raw-addr-slot sb!vm:word-shift)
+                        5))
+         (jmp-operand
+          (ldb (byte 32 0) (the (signed-byte 32) (- jmp-target jmp-origin)))))
+    (logior opcode
+            (ash jmp-operand 8)
+            (if function
+                ;; This is redundant with the logic in x86-64-vm,
+                ;; but I don't think they can be made identical.
+                (let ((tagged-ptr-bias
+                       ;; compute the difference between the entry address
+                       ;; and the tagged pointer to the called object.
+                       (the (unsigned-byte 8)
+                            (- jmp-target (descriptor-bits function)))))
+                  (logior (ash #xA890 40) ; "NOP ; TEST %AL, #xNN"
+                          (ash tagged-ptr-bias 56)))
+                0))))
 
 (defun cold-fdefinition-object (cold-name &optional leave-fn-raw
                                           (gspace #!+immobile-space *immobile-fixedobj*
@@ -1904,7 +1917,7 @@ core and return a descriptor to it."
                        0)))
               (write-wordindexed/raw fdefn sb!vm:fdefn-raw-addr-slot
                                      #!+(and immobile-code x86-64)
-                                     (encode-fdefn-raw-addr fdefn tramp #xE8)
+                                     (encode-fdefn-raw-addr fdefn nil tramp #xE8)
                                      #!-immobile-code tramp)))
           fdefn))))
 
@@ -1915,32 +1928,35 @@ core and return a descriptor to it."
      (ash sb!vm:simple-fun-code-offset sb!vm:word-shift)))
 
 ;;; Handle a DEFUN in cold-load.
-(defun cold-fset (name defn &optional inline-expansion dxable-args)
+(defun cold-fset (name function &optional inline-expansion dxable-args)
   (binding* (((cold-name warm-name)
               ;; (SETF f) was descriptorized when dumped, symbols were not.
                      (if (symbolp name)
                          (values (cold-intern name) name)
                          (values name (warm-fun-name name))))
-                    (fdefn (cold-fdefinition-object cold-name t)))
+             (fdefn (cold-fdefinition-object cold-name t)))
     (unless (cold-null (cold-fdefn-fun fdefn))
       (error "Duplicate DEFUN for ~S" warm-name))
     ;; There can't be any closures or funcallable instances.
-    (aver (= (logand (read-bits-wordindexed defn 0) sb!vm:widetag-mask)
+    (aver (= (logand (read-bits-wordindexed function 0) sb!vm:widetag-mask)
              sb!vm:simple-fun-widetag))
     (push (cold-list cold-name inline-expansion dxable-args) *!cold-defuns*)
-    (write-wordindexed fdefn sb!vm:fdefn-fun-slot defn)
+    (write-wordindexed fdefn sb!vm:fdefn-fun-slot function)
     (let ((fun-entry-addr
-            (+ (logandc2 (descriptor-bits defn) sb!vm:lowtag-mask)
+            (+ (logandc2 (descriptor-bits function) sb!vm:lowtag-mask)
                (ash sb!vm:simple-fun-code-offset sb!vm:word-shift))))
       (declare (ignorable fun-entry-addr)) ; sparc and arm don't need
-      #!+(and immobile-code x86-64)
-      (write-wordindexed/raw fdefn sb!vm:fdefn-raw-addr-slot
-                             (encode-fdefn-raw-addr fdefn fun-entry-addr #xE9))
-      #!-immobile-code
-      (progn
-        #!+(or sparc arm) (write-wordindexed fdefn sb!vm:fdefn-raw-addr-slot defn)
-        #!-(or sparc arm) (write-wordindexed/raw fdefn sb!vm:fdefn-raw-addr-slot
-                                                 fun-entry-addr)))
+      (write-wordindexed/raw
+       fdefn sb!vm:fdefn-raw-addr-slot
+       ;; X86-64 w/immobile code - raw addr encodes a JMP instruction
+       #!+(and immobile-code x86-64)
+       (encode-fdefn-raw-addr fdefn function fun-entry-addr #xE9)
+       ;; Sparc/ARM - raw addr is the function descriptor
+       #!+(and (not immobile-code) (or sparc arm))
+       (descriptor-bits function)
+       ;; All other cases - raw addr is exactly what it says
+       #!+(and (not immobile-code) (not (or sparc arm)))
+       fun-entry-addr))
     fdefn))
 
 ;;; Handle a DEFMETHOD in cold-load. "Very easily done". Right.

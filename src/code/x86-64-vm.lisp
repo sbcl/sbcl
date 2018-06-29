@@ -217,27 +217,31 @@
   (let ((trampoline (when (fun-requires-simplifying-trampoline-p fun)
                       (fun-immobilize fun)))) ; a newly made CODE object
     (with-pinned-objects (fdefn trampoline fun)
-      (binding* (((fun-entry-addr nop-byte)
-                  ;; The NOP-BYTE is an arbitrary value used to indicate the
-                  ;; kind of callee in the FDEFN-RAW-ADDR slot.
-                  ;; Though it should never be executed, it is a valid encoding.
-                  (if trampoline
-                      (values (sap-int (code-instructions trampoline)) #x90)
-                      (values (sap-ref-word (int-sap (get-lisp-obj-address fun))
-                                            (- (ash simple-fun-self-slot word-shift)
-                                               fun-pointer-lowtag))
-                              (if (simple-fun-p fun) 0 #x48))))
-                 (fdefn-addr (- (get-lisp-obj-address fdefn) ; base of the object
-                                other-pointer-lowtag))
-                 (fdefn-entry-addr (+ fdefn-addr ; address that callers jump to
-                                      (ash fdefn-raw-addr-slot word-shift)))
-                 (displacement (the (signed-byte 32)
-                                 (- fun-entry-addr (+ fdefn-entry-addr 5)))))
-        (setf (sap-ref-word (int-sap fdefn-entry-addr) 0)
-              (logior #xE9
-                      ;; Allow negative displacement
-                      (ash (ldb (byte 32 0) displacement) 8) ; JMP opcode
-                      (ash nop-byte 40))
+      (let* ((jmp-target
+              (if trampoline
+                  ;; Jump right to code-instructions. There's no simple-fun.
+                  (sap-int (code-instructions trampoline))
+                  ;; CLOSURE-CALLEE accesses the self pointer of a funcallable
+                  ;; instance w/ builtin trampoline, or a simple-fun.
+                  ;; But the result is shifted by N-FIXNUM-TAG-BITS because
+                  ;; CELL-REF yields a descriptor-reg, not an unsigned-reg.
+                  (get-lisp-obj-address (%closure-callee fun))))
+             (tagged-ptr-bias
+              ;; compute the difference between the entry address
+              ;; and the tagged pointer to the called object.
+              (the (unsigned-byte 8)
+                   (- jmp-target (get-lisp-obj-address (or trampoline fun)))))
+             (fdefn-addr (- (get-lisp-obj-address fdefn) ; base of the object
+                            other-pointer-lowtag))
+             (jmp-origin ; 5 = instruction length
+              (+ fdefn-addr (ash fdefn-raw-addr-slot word-shift) 5))
+             (jmp-operand
+              (ldb (byte 32 0) (the (signed-byte 32) (- jmp-target jmp-origin)))))
+        (setf (sap-ref-word (int-sap fdefn-addr) (ash fdefn-raw-addr-slot word-shift))
+              (logior #xE9 ; JMP opcode
+                      (ash jmp-operand 8)
+                      (ash #xA890 40) ; "NOP ; TEST %AL, #xNN"
+                      (ash tagged-ptr-bias 56))
               (sap-ref-lispobj (int-sap fdefn-addr) (ash fdefn-fun-slot word-shift))
               fun)))))
 ) ; end PROGN
