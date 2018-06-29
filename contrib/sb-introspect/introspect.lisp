@@ -1033,11 +1033,16 @@ Experimental: interface subject to change."
                                    (= this-bin-size (+ prev-bin-size 2)))
                                this-bin-size))))))))
 
-#+gencgc
 (defun largest-objects (&key (threshold sb-vm:gencgc-card-bytes)
                              (sort :size))
   (declare (type (member :address :size) sort))
   (flet ((show-obj (obj)
+           #-gencgc
+           (format t "~10x ~7x ~s~%"
+                     (get-lisp-obj-address obj)
+                     (primitive-object-size obj)
+                     (type-of obj))
+           #+gencgc
            (let* ((gen (generation-of obj))
                   (page (sb-vm::find-page-index (sb-kernel:get-lisp-obj-address obj)))
                   (flags (if (>= page 0)
