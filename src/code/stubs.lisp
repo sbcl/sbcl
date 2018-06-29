@@ -102,19 +102,14 @@
   (def fun-code-header)
   #-(or x86 x86-64) (def lra-code-header)
   (def %make-lisp-obj)
-  (def get-lisp-obj-address)
-  )
+  (def get-lisp-obj-address))
 
 (defun spin-loop-hint ()
   "Hints the processor that the current thread is spin-looping."
   (spin-loop-hint))
 
-;;; Same criterion as decides whether WIDETAGS-FROM-UNION-TYPE
-;;; should transform into a call to this.
-#.(let ((info (info :function :info '%other-pointer-subtype-p)))
-    (if (sb-c::fun-info-templates info)
-        '(defun %other-pointer-subtype-p (x choices)
-           (and (%other-pointer-p x)
-                (member (%other-pointer-widetag x) choices)
-                t))
-        (values)))
+
+(defun %other-pointer-subtype-p (x choices)
+  (and (%other-pointer-p x)
+       (member (%other-pointer-widetag x) choices)
+       t))
