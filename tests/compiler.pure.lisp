@@ -3399,13 +3399,14 @@
              ;; but it works. Unless FLOAT-ACCURACY is zero, we leave the
              ;; addition in to catch SNaNs.
              #+x86
-             (assert (and (search "FADD" disassembly1)
-                          (not (search "FADD" disassembly2))))
+             (progn
+               (assert (search "FADD" disassembly1))
+               (assert (not (search "FADD" disassembly2))))
              #+x86-64
              (let ((inst (if (typep result 'double-float)
                              "ADDSD" "ADDSS")))
-               (assert (and (search inst disassembly1)
-                            (not (search inst disassembly2)))))
+               (assert (search inst disassembly1))
+               (assert (not (search inst disassembly2))))
              (assert (eql result (funcall fun1 arg)))
              (assert (eql result (funcall fun2 arg))))))
     (test `(lambda (x) (declare (single-float x)) (+ x 0)) 123.45)
