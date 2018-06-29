@@ -1310,8 +1310,44 @@ static uword_t adjust_obj_ptes(page_index_t first_page,
                                int new_allocated)
 {
     int old_allocated = page_table[first_page].type;
-    page_index_t page = first_page;
     sword_t remaining_bytes = nwords * N_WORD_BYTES;
+    page_index_t n_full_pages = nwords / (GENCGC_CARD_BYTES / N_WORD_BYTES);
+    page_bytes_t excess = remaining_bytes & (GENCGC_CARD_BYTES - 1);
+    // page number of ending page of this object at its new size
+    page_index_t final_page = first_page + (n_full_pages - 1) + (excess != 0);
+
+    /* Decide whether there is anything to do by checking whether:
+     *  (1) the page at n_full_pages-1 beyond the first is fully used,
+     *  (2) the next fractional page, if any, has correct usage, and
+     *  (3) the page after that is not part of this object.
+     * If all those conditions are met, this is the easy case,
+     * though we may still have to change the generation and/or page type. */
+    if ((!n_full_pages || page_bytes_used(first_page+(n_full_pages-1))
+                          == GENCGC_CARD_BYTES) &&
+        (!excess || page_bytes_used(final_page) == excess) &&
+        page_scan_start_offset(1+final_page) != npage_bytes(1+final_page-first_page)) {
+        /* The 'if' below has an 'else' which subsumes the 'then' in generality.
+         * Why? Because usually we only need perform one assignment.
+         * Moreover, after a further change which makes us not look at the 'gen'
+         * of the *interior* of a page-spanning object, then the fast case
+         * reduces to "page_table[first_page].gen = new_gen". And we're done.
+         * At present, some logic assumes that every page's gen was updated */
+        page_index_t page;
+        if (old_allocated == new_allocated) { // Almost always true,
+            // except when bignums change from thread-local (boxed)
+            // to unboxed, for downstream efficiency.
+            // (And most people don't use huge bignums, so "always"
+            // is probably near "99.999% of the time")
+            for (page = first_page; page <= final_page; ++page)
+                page_table[page].gen = new_gen;
+        } else {
+            for (page = first_page; page <= final_page; ++page) {
+                page_table[page].type = new_allocated;
+                page_table[page].gen = new_gen;
+            }
+        }
+        return 0;
+    }
 
     /* The assignments to the page table here affect only one object
      * since its pages can't be shared with other objects */
@@ -1324,6 +1360,7 @@ static uword_t adjust_obj_ptes(page_index_t first_page,
         page_table[page].type = new_allocated
 
     gc_assert(page_starts_contiguous_block_p(first_page));
+    page_index_t page = first_page;
     while (remaining_bytes > (sword_t)GENCGC_CARD_BYTES) {
         gc_assert(page_bytes_used(page) == GENCGC_CARD_BYTES);
         CHECK_AND_SET_PTE_FIELDS();
@@ -1379,6 +1416,8 @@ static uword_t adjust_obj_ptes(page_index_t first_page,
                "/adjust_obj_ptes() freed %"OS_VM_SIZE_FMT"\n",
                bytes_freed));
     }
+    // If this freed nothing, it ought to have gone through the fast path.
+    gc_assert(bytes_freed != 0);
     return bytes_freed;
 }
 
@@ -4081,7 +4120,7 @@ gc_and_save(char *filename, boolean prepend_runtime,
     gencgc_alloc_start_page = next_free_page;
     collect_garbage(HIGHEST_NORMAL_GENERATION+1);
 
-    // We always coalesce copyable numbers. Addional coalescing is done
+    // We always coalesce copyable numbers. Additional coalescing is done
     // only on request, in which case a message is shown (unless verbose=0).
     if (gc_coalesce_string_literals && verbose) {
         printf("[coalescing similar vectors... ");

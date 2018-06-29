@@ -80,6 +80,12 @@ targets: $(TARGET) $(OBJTARGET) sbcl.nm sbcl.mk
 $(TARGET): $(LIBSBCL)
 	$(CC) ${LINKFLAGS} -o $@ $(USE_LIBSBCL) $(LIBS)
 
+# Enable compiling gencgc with even more assertions and/or
+# data collection, with COMPILING_TESTS. Not really used yet.
+gc-unit-tests.o: CFLAGS=-DCOMPILING_TESTS
+unit-tests: gc-unit-tests.o libsbcl.a
+	cc -g -no-pie -o $@ $^ -ldl -lpthread -lm
+
 # ld -r -o sbcl.o works on Linux, but not on other platforms.
 # On macOS, it fails to keep debug sections.
 # On mingw64, it leads to an executable that cannot be executed.
