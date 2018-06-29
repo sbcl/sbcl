@@ -28,6 +28,7 @@
 
 (defpackage :sb-introspect
   (:use "CL" "SB-KERNEL")
+  (:import-from "SB-VM" "PRIMITIVE-OBJECT-SIZE")
   (:export "ALLOCATION-INFORMATION"
            "FUNCTION-ARGLIST"
            "FUNCTION-LAMBDA-LIST"
@@ -804,7 +805,7 @@ Experimental: interface subject to change."
                          ;; bits are packed in the opposite order. And thankfully,
                          ;; this fix seems not to depend on whether the numbering
                          ;; scheme is MSB 0 or LSB 0, afaict.
-                         (let* ((index (sb-vm::find-page-index addr))
+                         (let* ((index (sb-vm:find-page-index addr))
                                 (flags (sb-alien:slot page 'sb-vm::flags))
                                 .
                                 ;; The unused WP-CLR is for ease of counting
@@ -977,13 +978,13 @@ Experimental: interface subject to change."
   object)
 
 (defun object-size (object)
-  (+ (sb-vm::primitive-object-size object)
+  (+ (primitive-object-size object)
      (typecase object
        (sb-mop:funcallable-standard-object
-        (sb-vm::primitive-object-size
+        (primitive-object-size
          (sb-pcl::standard-funcallable-instance-clos-slots object)))
        (standard-object
-        (sb-vm::primitive-object-size
+        (primitive-object-size
          (sb-pcl::standard-instance-slots object)))
        (t 0))))
 
@@ -1031,3 +1032,39 @@ Experimental: interface subject to change."
                                (or (not prev-bin-size)
                                    (= this-bin-size (+ prev-bin-size 2)))
                                this-bin-size))))))))
+
+#+gencgc
+(defun largest-objects (&key (threshold sb-vm:gencgc-card-bytes)
+                             (sort :size))
+  (declare (type (member :address :size) sort))
+  (flet ((show-obj (obj)
+           (let* ((gen (generation-of obj))
+                  (page (sb-vm::find-page-index (sb-kernel:get-lisp-obj-address obj)))
+                  (flags (if (>= page 0)
+                             (sb-alien:slot (sb-alien:deref sb-vm:page-table page)
+                                            'sb-vm::flags))))
+             (format t "~10x ~7x ~a ~:[        ~;~:*~8b~] ~s~%"
+                     (get-lisp-obj-address obj)
+                     (primitive-object-size obj)
+                     (if gen gen #\?)
+                     flags
+                     (type-of obj)))))
+    (case sort
+     (:address
+      (sb-vm:map-allocated-objects
+       (lambda (obj widetag size)
+         (declare (ignore widetag))
+         (when (>= size threshold)
+           (show-obj obj)))
+       :all))
+     (:size
+      (let (list)
+         (sb-vm:map-allocated-objects
+          (lambda (obj widetag size)
+            (declare (ignore widetag))
+            (when (>= size threshold)
+              (push obj list)))
+          :all)
+         (mapc #'show-obj
+               (stable-sort list #'> :key #'primitive-object-size))
+         nil)))))

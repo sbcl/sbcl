@@ -802,3 +802,8 @@
 ;;; and unless SIMPLE is specified to MAP-ROOT, the containing code.
 (deftest map-root-function-simple (count-pointees #'car t) 4)
 (deftest map-root-function-unsimple (count-pointees #'car nil) 5)
+
+(deftest largest-objects-smoketest
+    (let ((*standard-output* (make-broadcast-stream)))
+      (sb-introspect::largest-objects))
+  nil)
