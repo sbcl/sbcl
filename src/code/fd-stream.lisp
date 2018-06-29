@@ -964,7 +964,7 @@
 ;;; further assurance than "may" versus "will definitely not".
 (defun sysread-may-block-p (stream)
   #+win32
-  ;; This answers T at EOF on win32, I think.
+  ;; This answers T at EOF on win32.
   (not (sb-win32:handle-listen (fd-stream-fd stream)))
   #-win32
   (not (sb-unix:unix-simple-poll (fd-stream-fd stream) :input 0)))
@@ -1950,9 +1950,6 @@
                 (let ((ibuf (fd-stream-ibuf fd-stream)))
                   (or (not (eql (buffer-head ibuf) (buffer-tail ibuf)))
                       (fd-stream-listen fd-stream)
-                      #+win32
-                      (sb-win32:handle-listen (fd-stream-fd fd-stream))
-                      #-win32
                       ;; If the read can block, LISTEN will certainly return NIL.
                       (if (sysread-may-block-p fd-stream)
                           nil

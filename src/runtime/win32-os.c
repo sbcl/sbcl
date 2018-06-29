@@ -1514,19 +1514,32 @@ char *dirname(char *path)
 int
 socket_input_available(HANDLE socket)
 {
-    unsigned long count = 0, count_size = 0;
+    int count = 0;
     int wsaErrno = GetLastError();
-    int err = WSAIoctl((SOCKET)socket, FIONREAD, NULL, 0,
-                       &count, sizeof(count), &count_size, NULL, NULL);
+    TIMEVAL timeout = {0, 0};
+    fd_set readfds, errfds;
 
-    int ret;
+    FD_ZERO(&readfds);
+    FD_ZERO(&errfds);
+    FD_SET(socket, &readfds);
+    FD_SET(socket, &errfds);
 
-    if (err == 0) {
-        ret = (count > 0) ? 1 : 2;
-    } else
-        ret = 0;
+    count = select(0, &readfds, NULL, &errfds, &timeout);
     SetLastError(wsaErrno);
-    return ret;
+
+    if (count == SOCKET_ERROR)
+        /* This is an error in select() itself, not with the socket. */
+        return 0;
+    else if (count == 0)
+        return 2;
+    /* True if there is data, or the socket has been closed (i.e. a read
+     * would retrieve an EOF error) */
+    else if (FD_ISSET(socket, &readfds))
+        return 1;
+    else
+        /* This is an error in the socket. The count was positive, and
+         * it wasn't in the read set, so it must be in the error set. */
+        return 0;
 }
 
 #ifdef LISP_FEATURE_SB_THREAD

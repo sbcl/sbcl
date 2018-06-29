@@ -350,6 +350,34 @@
       (network-unreachable-error () 'network-unreachable))
   t)
 
+#+(and ipv4-support sb-thread)
+(deftest sockopt-close-wait-listen-eof
+    (let ((listen-sock (make-instance 'inet-socket :type :stream :protocol :tcp))
+          (client-sock (make-instance 'inet-socket :type :stream :protocol :tcp))
+          server-sock
+          port)
+      (unwind-protect
+           (progn
+             (socket-bind listen-sock #(127 0 0 1) 0)
+             (setf port (nth-value 1 (socket-name listen-sock)))
+             (socket-listen listen-sock 1)
+
+             (let ((client-connect-thread
+                    (sb-thread:make-thread
+                     (lambda ()
+                       (socket-connect client-sock #(127 0 0 1) port)
+                       (socket-close client-sock)))))
+               (setf server-sock (socket-accept listen-sock)))
+
+             ;; Wait for input. This should return when we get EOF
+             ;; from the client. It should /not/ hang.
+             (sb-sys:wait-until-fd-usable (socket-file-descriptor server-sock) :input)
+             (listen (socket-make-stream server-sock :input t)))
+        (socket-close listen-sock)
+        (socket-close client-sock)
+        (and server-sock (socket-close server-sock))))
+  nil)
+
 #+ipv4-support
 (deftest socket-open-p-true.1
     (socket-open-p (make-instance 'inet-socket :type :stream :protocol :tcp))

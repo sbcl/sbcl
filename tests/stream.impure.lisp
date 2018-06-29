@@ -853,4 +853,12 @@
            (sb-impl::ansi-stream-read-string-from-frc-buffer string s 0 nil)))
       (assert (= endpos 0)))))
 
+(with-test (:name :named-pipe-wait-eof)
+  (let* ((process (run-program "cat" '() :search t
+                               :wait nil :input nil :output :stream))
+         (out (process-output process)))
+    (sb-sys:wait-until-fd-usable (sb-sys:fd-stream-fd out) :input)
+    (assert (null (read-byte (process-output process) nil nil)))
+    (process-close process)))
+
 ;;; success

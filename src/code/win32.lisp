@@ -146,9 +146,11 @@
                         handle))
         (t
          (with-alien ((avail dword))
-
-           (unless (zerop (peek-named-pipe handle nil 0 nil (addr avail) nil))
-             (return-from handle-listen (plusp avail))))
+           (let* ((res (peek-named-pipe handle nil 0 nil (addr avail) nil))
+                  (code (get-last-error)))
+             (cond
+               ((not (zerop res)) (return-from handle-listen (plusp avail)))
+               ((= code error-broken-pipe) (return-from handle-listen t)))))
          (let ((res (socket-input-available handle)))
            (unless (zerop res)
              (return-from handle-listen (= res 1))))
