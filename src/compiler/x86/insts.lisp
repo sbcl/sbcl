@@ -18,7 +18,7 @@
             register-p ; FIXME: rename to GPR-P
             make-ea ea-disp width-bits) "SB!VM")
   ;; Imports from SB-VM into this package
-  (import '(sb!vm::frame-byte-offset
+  (import '(sb!vm::frame-byte-offset sb!vm::ebp-tn
             sb!vm::registers sb!vm::float-registers sb!vm::stack))) ; SB names
 
 (defconstant +disassem-inst-alignment-bytes+ 1)
@@ -601,14 +601,12 @@
        (registers
         (emit-mod-reg-r/m-byte segment #b11 reg (reg-tn-encoding thing)))
        (stack
-        ;; Convert stack tns into an index off of EBP.
-        (let ((disp (frame-byte-offset (tn-offset thing))))
-          (cond ((<= -128 disp 127)
-                 (emit-mod-reg-r/m-byte segment #b01 reg #b101)
-                 (emit-byte segment disp))
-                (t
-                 (emit-mod-reg-r/m-byte segment #b10 reg #b101)
-                 (emit-dword segment disp)))))
+        ;; Could this be refactored to fall into the EA case below instead
+        ;; of consing a new EA? Probably.  Does it matter? Probably not.
+        (emit-ea segment
+                 (make-ea :dword :base ebp-tn
+                          :disp (frame-byte-offset (tn-offset thing)))
+                 reg))
        (constant
         (unless allow-constants
           (error
