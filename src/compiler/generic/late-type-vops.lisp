@@ -55,6 +55,22 @@
 
 (!define-type-vop %other-pointer-p (other-pointer-lowtag))
 
+;; A vop that accepts a computed set of widetags.
+(define-vop (%other-pointer-subtype-p type-predicate)
+  (:translate %other-pointer-subtype-p)
+  (:info target not-p widetags)
+  (:arg-types * (:constant t)) ; voodoo - 'target' and 'not-p' are absent
+  (:generator 15 ; arbitrary
+    (multiple-value-bind (headers exceptions)
+        (#!+(or x86 x86-64) canonicalize-widetags+exceptions
+         #!-(or x86 x86-64) canonicalize-widetags widetags)
+      (declare (ignorable exceptions))
+      (%test-headers value target not-p nil headers
+                     . #!+(or x86-64 x86) (:except exceptions)
+                       #!-(or x86-64 x86) (:temp temp)))))
+
+
+
 (!define-type-vop bignump (bignum-widetag))
 
 (!define-type-vop ratiop (ratio-widetag))
@@ -218,3 +234,4 @@
 (!define-type-vop simd-pack-p (simd-pack-widetag))
 
 (!define-type-vop unbound-marker-p (unbound-marker-widetag))
+

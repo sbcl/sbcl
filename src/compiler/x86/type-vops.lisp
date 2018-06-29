@@ -354,14 +354,3 @@
        (inst test al-tn other-pointer-lowtag)
        (inst jmp (if not-p :nz :z) target))
     DROP-THRU))
-
-;; A vop that accepts a computed set of widetags.
-(define-vop (%other-pointer-subtype-p type-predicate)
-  (:translate %other-pointer-subtype-p)
-  (:info target not-p widetags)
-  (:arg-types * (:constant t)) ; voodoo - 'target' and 'not-p' are absent
-  (:generator 15 ; arbitrary
-    (multiple-value-bind (headers exceptions)
-        (canonicalize-widetags+exceptions widetags)
-      (%test-headers value target not-p nil headers
-                     :except exceptions))))
