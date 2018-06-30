@@ -31,7 +31,7 @@
 
       (emit-label loop)
 
-      (test-type ptr not-list t (list-pointer-lowtag) :temp temp)
+      (test-type ptr temp not-list t (list-pointer-lowtag))
 
       (loadw ptr ptr cons-cdr-slot list-pointer-lowtag)
       (inst addi count count (fixnumize 1))

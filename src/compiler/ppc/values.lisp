@@ -104,7 +104,7 @@
       (loadw list list cons-cdr-slot list-pointer-lowtag)
       (inst addi csp-tn csp-tn n-word-bytes)
       (storew temp csp-tn -1)
-      (test-type list loop nil (list-pointer-lowtag) :temp ndescr)
+      (test-type list ndescr loop nil (list-pointer-lowtag))
       (cerror-call vop 'bogus-arg-to-values-list-error list)
 
       (emit-label done)

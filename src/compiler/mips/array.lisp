@@ -71,7 +71,7 @@
   (:generator 5
     (let ((error (generate-error-code vop 'invalid-array-index-error
                                       array bound index)))
-      (%test-fixnum index error t :temp temp)
+      (%test-fixnum index temp error t)
       (inst sltu temp index bound)
       (inst beq temp error)
       (inst nop))))

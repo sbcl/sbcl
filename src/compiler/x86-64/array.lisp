@@ -164,7 +164,7 @@
                      (fixnumize (tn-value index))
                      index)))
       (when (and %test-fixnum (not (integerp index)))
-        (%test-fixnum index error t))
+        (%test-fixnum index nil error t))
       (inst cmp bound index)
       ;; We use below-or-equal even though it's an unsigned test,
       ;; because negative indexes appear as large unsigned numbers.

@@ -12,33 +12,33 @@
 (in-package "SB!VM")
 
 ;;; Test generation utilities.
-(defun %test-fixnum (value target not-p &key temp)
+(defun %test-fixnum (value temp target not-p)
   (declare (ignore temp))
   (assemble ()
     (inst extru value 31 2 zero-tn (if not-p := :<>))
     (inst b target :nullify t)))
 
-(defun %test-fixnum-and-headers (value target not-p headers &key temp)
+(defun %test-fixnum-and-headers (value temp target not-p headers)
   (let ((drop-through (gen-label)))
     (assemble ()
       (inst extru value 31 2 zero-tn :<>)
       (inst b (if not-p drop-through target) :nullify t))
-    (%test-headers value target not-p nil headers
-                   :drop-through drop-through :temp temp)))
+    (%test-headers value temp target not-p nil headers
+                   :drop-through drop-through)))
 
-(defun %test-immediate (value target not-p immediate &key temp)
+(defun %test-immediate (value temp target not-p immediate)
   (assemble ()
     (inst extru value 31 8 temp)
     (inst bci := not-p immediate temp target)))
 
-(defun %test-lowtag (value target not-p lowtag &key temp temp-loaded)
+(defun %test-lowtag (value temp target not-p lowtag &key temp-loaded)
   (assemble ()
     (unless temp-loaded
       (inst extru value 31 3 temp))
     (inst bci := not-p lowtag temp target)))
 
-(defun %test-headers (value target not-p function-p headers
-                      &key temp (drop-through (gen-label)) temp-loaded)
+(defun %test-headers (value temp target not-p function-p headers
+                      &key (drop-through (gen-label)) temp-loaded)
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
     (multiple-value-bind
         (equal greater-or-equal when-true when-false)
@@ -49,8 +49,8 @@
             (values :<> :< drop-through target)
             (values := :>= target drop-through))
       (assemble ()
-        (%test-lowtag value when-false t lowtag
-                      :temp temp :temp-loaded temp-loaded)
+        (%test-lowtag value temp when-false t lowtag
+                      :temp-loaded temp-loaded)
         (inst ldb (- 3 lowtag) value temp)
         (do ((remaining headers (cdr remaining)))
             ((null remaining))
@@ -148,14 +148,14 @@
   (:translate symbolp)
   (:generator 12
     (inst bc := nil value null-tn (if not-p drop-thru target))
-    (test-type value target not-p (symbol-widetag) :temp temp)
+    (test-type value temp target not-p (symbol-widetag))
     DROP-THRU))
 
 (define-vop (consp type-predicate)
   (:translate consp)
   (:generator 8
     (inst bc := nil value null-tn (if not-p target drop-thru))
-    (test-type value target not-p (list-pointer-lowtag) :temp temp)
+    (test-type value temp target not-p (list-pointer-lowtag))
     DROP-THRU))
 
 

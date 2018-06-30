@@ -12,7 +12,7 @@
 (in-package "SB!VM")
 
 
-(defun %test-fixnum (value target not-p &key temp)
+(defun %test-fixnum (value temp target not-p)
   (declare (ignore temp))
   (assemble ()
     (inst andcc zero-tn value fixnum-tag-mask)
@@ -21,17 +21,15 @@
         (inst b (if not-p :ne :eq) target))
     (inst nop)))
 
-(defun %test-fixnum-and-headers (value target not-p headers
-                                 &key temp)
+(defun %test-fixnum-and-headers (value temp target not-p headers)
   (let ((drop-through (gen-label)))
     (assemble ()
       (inst andcc zero-tn value fixnum-tag-mask)
       (inst b :eq (if not-p drop-through target)))
-    (%test-headers value target not-p nil headers
-                   :drop-through drop-through
-                   :temp temp)))
+    (%test-headers value temp target not-p nil headers
+                   :drop-through drop-through)))
 
-(defun %test-immediate (value target not-p immediate &key temp)
+(defun %test-immediate (value temp target not-p immediate)
   (assemble ()
     (inst and temp value widetag-mask)
     (inst cmp temp immediate)
@@ -39,8 +37,8 @@
     (inst b (if not-p :ne :eq) target)
     (inst nop)))
 
-(defun %test-lowtag (value target not-p lowtag
-                     &key temp skip-nop)
+(defun %test-lowtag (value temp target not-p lowtag
+                     &key skip-nop)
   (assemble ()
     (inst and temp value lowtag-mask)
     (inst cmp temp lowtag)
@@ -49,15 +47,15 @@
     (unless skip-nop
       (inst nop))))
 
-(defun %test-headers (value target not-p function-p headers
-                      &key temp (drop-through (gen-label)))
+(defun %test-headers (value temp target not-p function-p headers
+                      &key (drop-through (gen-label)))
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
     (multiple-value-bind (when-true when-false)
         (if not-p
             (values drop-through target)
             (values target drop-through))
       (assemble ()
-        (%test-lowtag value when-false t lowtag :temp temp)
+        (%test-lowtag value temp when-false t lowtag)
         (load-type temp value (- lowtag))
         (do ((remaining headers (cdr remaining)))
             ((null remaining))
@@ -140,7 +138,7 @@
                         (values target not-target))
                   (inst andcc zero-tn value fixnum-tag-mask)
                   (inst b :eq yep)
-                  (test-type value nope t (other-pointer-lowtag) :temp temp)
+                  (test-type value temp nope t (other-pointer-lowtag))
                   (loadw temp value 0 other-pointer-lowtag)
                   (inst cmp temp (+ (ash 1 n-widetag-bits)
                                     bignum-widetag))
@@ -173,7 +171,7 @@
                   (inst cmp value)
 
                   ;; If not, is it an other pointer?
-                  (test-type value nope t (other-pointer-lowtag) :temp temp)
+                  (test-type value temp nope t (other-pointer-lowtag))
                   ;; Get the header.
                   (loadw temp value 0 other-pointer-lowtag)
                   ;; Is it one?
@@ -217,7 +215,7 @@
                      (is-symbol-label (if not-p drop-thru target)))
                 (inst cmp value null-tn)
                 (inst b :eq is-symbol-label)
-                (test-type value target not-p (symbol-widetag) :temp temp)
+                (test-type value temp target not-p (symbol-widetag))
                 (emit-label drop-thru))))
 
 (define-vop (consp type-predicate)
@@ -227,5 +225,5 @@
                      (is-not-cons-label (if not-p target drop-thru)))
                 (inst cmp value null-tn)
                 (inst b :eq is-not-cons-label)
-                (test-type value target not-p (list-pointer-lowtag) :temp temp)
+                (test-type value temp target not-p (list-pointer-lowtag))
                 (emit-label drop-thru))))

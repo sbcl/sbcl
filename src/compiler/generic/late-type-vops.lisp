@@ -11,25 +11,45 @@
 (in-package "SB!VM")
 
 
+;;; FIXME: backend-specific junk doesn't belong in compiler/generic.
+
+#!+(or x86 x86-64)
+(progn
 (define-vop (type-predicate)
   (:args (value :scs (any-reg descriptor-reg)))
-  (:temporary #!+(or x86 x86-64)
-              (:sc unsigned-reg :offset eax-offset)
-              #!-(or x86 x86-64)
-              (:sc non-descriptor-reg)
-              temp)
-  #!+(or x86 x86-64)
-  (:ignore temp)
+  (:temporary (:sc unsigned-reg :offset eax-offset) temp)
   (:conditional)
   (:info target not-p)
   (:policy :fast-safe))
-
-#!+(or x86 x86-64)
 (define-vop (simple-type-predicate)
   (:args (value :scs (any-reg descriptor-reg control-stack)))
   (:conditional)
   (:info target not-p)
   (:policy :fast-safe))
+;; A vop that accepts a computed set of widetags.
+(define-vop (%other-pointer-subtype-p type-predicate)
+  (:translate %other-pointer-subtype-p)
+  (:info target not-p widetags)
+  (:arg-types * (:constant t)) ; voodoo - 'target' and 'not-p' are absent
+  (:generator 15 ; arbitrary
+    (multiple-value-bind (headers except) (canonicalize-widetags+exceptions widetags)
+      (%test-headers value temp target not-p nil headers :except except)))))
+
+#!-(or x86 x86-64)
+(progn
+(define-vop (type-predicate)
+  (:args (value :scs (any-reg descriptor-reg)))
+  (:temporary (:sc non-descriptor-reg) temp)
+  (:conditional)
+  (:info target not-p)
+  (:policy :fast-safe))
+;; A vop that accepts a computed set of widetags.
+(define-vop (%other-pointer-subtype-p type-predicate)
+  (:translate %other-pointer-subtype-p)
+  (:info target not-p widetags)
+  (:arg-types * (:constant t)) ; voodoo - 'target' and 'not-p' are absent
+  (:generator 15 ; arbitrary
+    (%test-headers value temp target not-p nil (canonicalize-widetags widetags)))))
 
 (defmacro !define-type-vop (pred-name type-codes
                              &optional (inherit 'type-predicate))
@@ -40,8 +60,9 @@
     `(define-vop (,pred-name ,inherit)
        (:translate ,pred-name)
        (:generator ,cost
-         (test-type value target not-p ,type-codes
-                    #!-(or x86-64 x86) :temp #!-(or x86-64 x86) temp)))))
+         (test-type value
+                    ,(if (eq inherit 'simple-type-predicate) nil 'temp)
+                    target not-p ,type-codes)))))
 
 (!define-type-vop fixnump
   #.fixnum-lowtags
@@ -54,22 +75,6 @@
 (!define-type-vop %instancep (instance-pointer-lowtag))
 
 (!define-type-vop %other-pointer-p (other-pointer-lowtag))
-
-;; A vop that accepts a computed set of widetags.
-(define-vop (%other-pointer-subtype-p type-predicate)
-  (:translate %other-pointer-subtype-p)
-  (:info target not-p widetags)
-  (:arg-types * (:constant t)) ; voodoo - 'target' and 'not-p' are absent
-  (:generator 15 ; arbitrary
-    (multiple-value-bind (headers exceptions)
-        (#!+(or x86 x86-64) canonicalize-widetags+exceptions
-         #!-(or x86 x86-64) canonicalize-widetags widetags)
-      (declare (ignorable exceptions))
-      (%test-headers value target not-p nil headers
-                     . #!+(or x86-64 x86) (:except exceptions)
-                       #!-(or x86-64 x86) (:temp temp)))))
-
-
 
 (!define-type-vop bignump (bignum-widetag))
 

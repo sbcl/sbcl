@@ -16,17 +16,19 @@
 (defun generate-fixnum-test (value)
   (emit-optimized-test-inst value fixnum-tag-mask))
 
-(defun %test-fixnum (value target not-p)
+(defun %test-fixnum (value temp target not-p)
+  (declare (ignore temp))
   (generate-fixnum-test value)
   (inst jmp (if not-p :nz :z) target))
 
-(defun %test-fixnum-and-headers (value target not-p headers)
+(defun %test-fixnum-and-headers (value temp target not-p headers)
   (let ((drop-through (gen-label)))
     (generate-fixnum-test value)
     (inst jmp :z (if not-p drop-through target))
-    (%test-headers value target not-p nil headers :drop-through drop-through)))
+    (%test-headers value temp target not-p nil headers :drop-through drop-through)))
 
-(defun %test-immediate (value target not-p immediate)
+(defun %test-immediate (value temp target not-p immediate)
+  (declare (ignore temp))
   ;; Code a single instruction byte test if possible.
   (let ((offset (tn-offset value)))
     (cond ((and (sc-is value any-reg descriptor-reg)
@@ -41,7 +43,8 @@
            (inst cmp al-tn immediate))))
   (inst jmp (if not-p :ne :e) target))
 
-(defun %test-lowtag (value target not-p lowtag)
+(defun %test-lowtag (value temp target not-p lowtag)
+  (declare (ignore temp))
   (inst lea eax-tn (make-ea :dword :base value :disp (- lowtag)))
   (inst test al-tn lowtag-mask)
   ;; FIXME: another 'optimization' which doesn't appear to work:
@@ -54,7 +57,7 @@
     (inst prefetchnta (make-ea :byte :base value :disp (- lowtag))))
   (inst jmp (if not-p :ne :e) target))
 
-(defun %test-headers (value target not-p function-p headers
+(defun %test-headers (value temp target not-p function-p headers
                             &key except (drop-through (gen-label)))
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
     (multiple-value-bind (equal less-or-equal greater-or-equal when-true when-false)
@@ -65,7 +68,7 @@
         (if not-p
             (values :ne :a :b drop-through target)
             (values :e :na :nb target drop-through))
-      (%test-lowtag value when-false t lowtag)
+      (%test-lowtag value temp when-false t lowtag)
       (cond
         ((and (null (cdr headers))
               (not except)
@@ -182,6 +185,7 @@
   (:conditional :z)
   (:arg-types signed-num)
   (:translate fixnump)
+  (:ignore temp)
   (:generator 5
     ;; Hackers Delight, p. 53: signed
     ;;    a <= x <= a + 2^n - 1
@@ -197,6 +201,7 @@
 
 (define-vop (signed-byte-32-p type-predicate)
   (:translate signed-byte-32-p)
+  (:ignore temp)
   (:generator 45
     (multiple-value-bind (yep nope)
         (if not-p
@@ -218,6 +223,7 @@
 ;;; exactly two digits and the second digit all zeros.
 (define-vop (unsigned-byte-32-p type-predicate)
   (:translate unsigned-byte-32-p)
+  (:ignore temp)
   (:generator 45
     (let ((not-target (gen-label))
           (single-word (gen-label))
@@ -326,6 +332,7 @@
 
 (define-vop (symbolp type-predicate)
   (:translate symbolp)
+  (:ignore temp)
   (:generator 12
     (let ((is-symbol-label (if not-p DROP-THRU target))
           (widetag-tn (make-ea :byte :base value :disp (- other-pointer-lowtag))))
@@ -343,6 +350,7 @@
 
 (define-vop (consp type-predicate)
   (:translate consp)
+  (:ignore temp)
   (:generator 8
      (let ((is-not-cons-label (if not-p target drop-thru)))
        ;; It could have been done with just TEST-TYPE, but using CMP on

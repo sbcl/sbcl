@@ -25,7 +25,6 @@
   (:policy :fast-safe)
   (:vop-var vop)
   (:save-p :compute-only)
-  (:ignore eax)
   (:generator 40
     ;; Move OBJECT into a temp we can bash on, and initialize the count.
     (move ptr object)
@@ -44,7 +43,7 @@
     (inst jmp :e DONE)
     ;; Otherwise, check to see whether we hit the end of a dotted list. If
     ;; not, loop back for more.
-    (%test-lowtag ptr LOOP nil list-pointer-lowtag)
+    (%test-lowtag ptr eax LOOP nil list-pointer-lowtag)
     ;; It's dotted all right. Flame out.
     (error-call vop 'object-not-list-error ptr)
     ;; We be done.

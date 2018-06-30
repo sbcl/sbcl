@@ -100,7 +100,7 @@
   (:generator 5
     (let ((error (generate-error-code vop 'invalid-array-index-error array bound index)))
       (when %test-fixnum
-        (%test-fixnum index error t))
+        (%test-fixnum index nil error t))
       (inst cmp index bound)
       (inst b :hs error))))
 

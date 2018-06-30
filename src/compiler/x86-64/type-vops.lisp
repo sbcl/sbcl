@@ -35,7 +35,8 @@
                value))
         fixnum-tag-mask))
 
-(defun %test-fixnum (value target not-p)
+(defun %test-fixnum (value temp target not-p)
+  (declare (ignore temp))
   (generate-fixnum-test value)
   (inst jmp (if not-p :nz :z) target))
 
@@ -48,31 +49,31 @@
   (inst lea target (make-ea :dword :base value :disp (- lowtag))))
 
 ;; Numerics including fixnum, excluding short-float. (INTEGER,RATIONAL)
-(defun %test-fixnum-and-headers (value target not-p headers)
+(defun %test-fixnum-and-headers (value temp target not-p headers)
   (let ((drop-through (gen-label)))
     (case n-fixnum-tag-bits
      (1 (%lea-for-lowtag-test eax-tn value other-pointer-lowtag)
         (inst test al-tn 1)
         (inst jmp :nz (if not-p drop-through target)) ; inverted
-        (%test-headers value target not-p nil headers
+        (%test-headers value temp target not-p nil headers
                        :drop-through drop-through :compute-eax nil))
      (t
       (generate-fixnum-test value)
       (inst jmp :z (if not-p drop-through target))
-      (%test-headers value target not-p nil headers
+      (%test-headers value temp target not-p nil headers
                      :drop-through drop-through)))))
 
 ;; I can see no reason this would ever be used.
 ;; (or fixnum character|unbound-marker) is implausible.
 (defun %test-fixnum-and-immediate (value target not-p immediate)
+  (error "WAT")
   (let ((drop-through (gen-label)))
     (generate-fixnum-test value)
     (inst jmp :z (if not-p drop-through target))
     (%test-immediate value target not-p immediate drop-through)))
 
 ;; Numerics
-(defun %test-fixnum-immediate-and-headers (value target not-p immediate
-                                           headers)
+(defun %test-fixnum-immediate-and-headers (value temp target not-p immediate headers)
   (let ((drop-through (gen-label)))
     (case n-fixnum-tag-bits
      (1 (%lea-for-lowtag-test eax-tn value other-pointer-lowtag)
@@ -80,15 +81,16 @@
         (inst jmp :nz (if not-p drop-through target)) ; inverted
         (inst cmp al-tn (- immediate other-pointer-lowtag))
         (inst jmp :e (if not-p drop-through target))
-        (%test-headers value target not-p nil headers
+        (%test-headers value temp target not-p nil headers
                        :drop-through drop-through :compute-eax nil))
      (t (generate-fixnum-test value)
         (inst jmp :z (if not-p drop-through target))
-        (%test-immediate-and-headers value target not-p immediate headers
+        (%test-immediate-and-headers value temp target not-p immediate headers
                                      drop-through)))))
 
-(defun %test-immediate (value target not-p immediate
+(defun %test-immediate (value temp target not-p immediate
                         &optional (drop-through (gen-label)))
+  (declare (ignore temp))
   ;; Code a single instruction byte test if possible.
   (cond ((sc-is value any-reg descriptor-reg)
          (inst cmp (reg-in-size value :byte) immediate))
@@ -99,7 +101,7 @@
   (emit-label drop-through))
 
 ;; Numerics including short-float, excluding fixnum
-(defun %test-immediate-and-headers (value target not-p immediate headers
+(defun %test-immediate-and-headers (value temp target not-p immediate headers
                                     &optional (drop-through (gen-label)))
   ;; Code a single instruction byte test if possible.
   (cond ((sc-is value any-reg descriptor-reg)
@@ -108,17 +110,19 @@
          (move rax-tn value)
          (inst cmp al-tn immediate)))
   (inst jmp :e (if not-p drop-through target))
-  (%test-headers value target not-p nil headers :drop-through drop-through))
+  (%test-headers value temp target not-p nil headers :drop-through drop-through))
 
-(defun %test-lowtag (value target not-p lowtag)
+(defun %test-lowtag (value temp target not-p lowtag)
+  (declare (ignore temp))
   (%lea-for-lowtag-test eax-tn value lowtag)
   (inst test al-tn lowtag-mask)
   (inst jmp (if not-p :nz :z) target))
 
-(defun %test-headers (value target not-p function-p headers
+(defun %test-headers (value temp target not-p function-p headers
                       &key except
                            (drop-through (gen-label))
                            (compute-eax t))
+  (declare (ignore temp))
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
     (multiple-value-bind (equal less-or-equal greater-or-equal when-true
                                 when-false)
@@ -241,6 +245,7 @@
 
 (define-vop (signed-byte-64-p type-predicate)
   (:translate signed-byte-64-p)
+  (:ignore temp) ; FIXME: use temp, not al-tn
   (:generator 45
     (multiple-value-bind (yep nope)
         (if not-p
@@ -269,6 +274,7 @@
 ;;; exactly two digits and the second digit all zeros.
 (define-vop (unsigned-byte-64-p type-predicate)
   (:translate unsigned-byte-64-p)
+  (:ignore temp) ; FIXME: use temp, not al-tn
   (:generator 45
     (let ((not-target (gen-label))
           (single-word (gen-label))
@@ -380,7 +386,7 @@
     (let ((is-symbol-label (if not-p DROP-THRU target)))
       (inst cmp value nil-value)
       (inst jmp :e is-symbol-label)
-      (test-type value target not-p (symbol-widetag)))
+      (test-type value temp target not-p (symbol-widetag)))
     DROP-THRU))
 
 (define-vop (consp type-predicate)
@@ -389,5 +395,5 @@
     (let ((is-not-cons-label (if not-p target DROP-THRU)))
       (inst cmp value nil-value)
       (inst jmp :e is-not-cons-label)
-      (test-type value target not-p (list-pointer-lowtag)))
+      (test-type value temp target not-p (list-pointer-lowtag)))
     DROP-THRU))

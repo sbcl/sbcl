@@ -36,11 +36,11 @@
       (inst cmp ptr null-tn)
       (inst b :eq done)
 
-      (test-type ptr not-list t (list-pointer-lowtag) :temp temp)
+      (test-type ptr temp not-list t (list-pointer-lowtag))
 
       (loadw ptr ptr cons-cdr-slot list-pointer-lowtag)
       (inst add count count (fixnumize 1))
-      (test-type ptr loop nil (list-pointer-lowtag) :temp temp)
+      (test-type ptr temp loop nil (list-pointer-lowtag))
 
       (emit-label not-list)
 
