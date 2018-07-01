@@ -3,7 +3,6 @@
 #-sb-unicode
 (sb-ext:exit :code 104)
 
-;; use "1AＡあ胡玥姮" for tests
 (let ((str (coerce '(#\u0031 #\u0041 #\uff21 #\u3042 #\u80e1 #\u73a5 #\u59ee)
                    'string))
       (gbk '(#x31 #x41 #xa3 #xc1 #xa4 #xa2 #xba #xfa #xab #x68 #x8a #xac))

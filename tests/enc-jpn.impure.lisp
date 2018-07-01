@@ -2,7 +2,6 @@
 #-sb-unicode
 (sb-ext:exit :code 104)
 
-;; use "AｱＡあ漾燹釭" for tests
 (let ((str (coerce '(#\u0041 #\uff71 #\uff21 #\u3042 #\u6f3e #\u71f9 #\u91ed)
                    'string))
       (eucjp '(#x41 #x8e #xb1 #xa3 #xc1 #xa4 #xa2 #xdf #xa1 #xe0 #xa1
