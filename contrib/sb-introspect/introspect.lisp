@@ -1033,7 +1033,8 @@ Experimental: interface subject to change."
                                    (= this-bin-size (+ prev-bin-size 2)))
                                this-bin-size))))))))
 
-(defun largest-objects (&key (threshold sb-vm:gencgc-card-bytes)
+(defun largest-objects (&key (threshold #+gencgc sb-vm:gencgc-card-bytes
+                                        #-gencgc sb-c:+backend-page-bytes+)
                              (sort :size))
   (declare (type (member :address :size) sort))
   (flet ((show-obj (obj)
