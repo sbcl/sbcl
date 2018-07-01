@@ -316,6 +316,8 @@
            (if (plusp amount)
                (inst mov result (lsl number amount))
                (inst mov result (asr number (- amount)))))
+          ((<= amount -32)
+           (inst mov result (asr number 31)))
           (t
            (inst mov result 0)))))
 
