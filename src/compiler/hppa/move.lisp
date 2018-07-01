@@ -181,23 +181,54 @@
   (:note "signed word to integer coercion")
   (:generator 18
     (move arg x)
-    (let ((done (gen-label)))
-      ;; Extract the top three bits.
-      (inst extrs x 2 3 temp :=)
-      ;; Invert them (unless they are already zero).
-      (inst uaddcm zero-tn temp temp)
-      ;; If we are left with zero, it will fit in a fixnum.  So branch around
-      ;; the bignum-construction, doing the shift in the delay slot.
-      (inst comb := temp zero-tn done)
-      (inst sll x n-fixnum-tag-bits y)
-      ;; Make a single-digit bignum.
-      (with-fixed-allocation
-          (y nil temp bignum-widetag (1+ bignum-digits-offset) nil)
-        (storew x y bignum-digits-offset other-pointer-lowtag))
-      (emit-label done))))
+    ;; Extract the top three bits.
+    (inst extrs x 2 3 temp :=)
+    ;; Invert them (unless they are already zero).
+    (inst uaddcm zero-tn temp temp)
+    ;; If we are left with zero, it will fit in a fixnum.  So branch around
+    ;; the bignum-construction, doing the shift in the delay slot.
+    (inst comb := temp zero-tn done)
+    (inst sll x n-fixnum-tag-bits y)
+    ;; Make a single-digit bignum.
+    (with-fixed-allocation
+        (y nil temp bignum-widetag (1+ bignum-digits-offset) nil)
+      (storew x y bignum-digits-offset other-pointer-lowtag))
+    DONE))
 
 (define-move-vop move-from-signed :move
   (signed-reg) (descriptor-reg))
+
+(define-vop (move-from-fixnum+1)
+  (:args (x :scs (signed-reg unsigned-reg)))
+  (:results (y :scs (any-reg descriptor-reg)))
+  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:vop-var vop)
+  (:generator 4
+    ;; Extract the top three bits.
+    (inst extrs x 2 3 temp :=)
+    ;; Invert them (unless they are already zero).
+    (inst uaddcm zero-tn temp temp)
+    ;; If we are left with zero, it will fit in a fixnum.  So branch around
+    ;; the bignum-construction, doing the shift in the delay slot.
+    (inst comb := temp zero-tn done)
+    (inst sll x n-fixnum-tag-bits y)
+    (load-constant vop (emit-constant (1+ sb!xc:most-positive-fixnum))
+                   y)
+    DONE))
+
+(define-vop (move-from-fixnum-1 move-from-fixnum+1)
+  (:generator 4
+    ;; Extract the top three bits.
+    (inst extrs x 2 3 temp :=)
+    ;; Invert them (unless they are already zero).
+    (inst uaddcm zero-tn temp temp)
+    ;; If we are left with zero, it will fit in a fixnum.  So branch around
+    ;; the bignum-construction, doing the shift in the delay slot.
+    (inst comb := temp zero-tn done)
+    (inst sll x n-fixnum-tag-bits y)
+    (load-constant vop (emit-constant (1- sb!xc:most-negative-fixnum))
+                   y)
+    DONE))
 
 ;;; Check for fixnum, and possibly allocate one or two word bignum
 ;;; result.  Use a worst-case cost to make sure people know they may

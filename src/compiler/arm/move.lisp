@@ -213,13 +213,11 @@
 ;;; RESULT may be a bignum, so we have to check.  Use a worst-case
 ;;; cost to make sure people know they may be number consing.
 (define-vop (move-from-signed)
-  (:args (arg :scs (signed-reg unsigned-reg) :target x))
+  (:args (x :scs (signed-reg unsigned-reg)))
   (:results (y :scs (any-reg descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) x)
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
   (:note "signed word to integer coercion")
   (:generator 20
-    (move x arg)
     (inst adds pa-flag x x)
     (inst adds :vc y pa-flag pa-flag)
     (inst b :vc DONE)
@@ -230,17 +228,37 @@
 (define-move-vop move-from-signed :move
   (signed-reg) (descriptor-reg))
 
+(define-vop (move-from-fixnum+1)
+  (:args (x :scs (signed-reg unsigned-reg) :target temp))
+  (:results (y :scs (any-reg descriptor-reg)))
+  (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) temp)
+  (:vop-var vop)
+  (:generator 4
+    (inst adds temp x x)
+    (inst adds :vc y temp temp)
+    (inst b :vc DONE)
+    (load-constant vop (emit-constant (1+ sb!xc:most-positive-fixnum))
+                   y)
+    DONE))
+
+(define-vop (move-from-fixnum-1 move-from-fixnum+1)
+  (:generator 4
+    (inst adds temp x x)
+    (inst adds :vc y temp temp)
+    (inst b :vc DONE)
+    (load-constant vop (emit-constant (1- sb!xc:most-negative-fixnum))
+                   y)
+    DONE))
+
 ;;; Check for fixnum, and possibly allocate one or two word bignum
 ;;; result.  Use a worst-case cost to make sure people know they may
 ;;; be number consing.
 (define-vop (move-from-unsigned)
-  (:args (arg :scs (signed-reg unsigned-reg) :target x))
+  (:args (x :scs (signed-reg unsigned-reg)))
   (:results (y :scs (any-reg descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) x)
   (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
   (:note "unsigned word to integer coercion")
   (:generator 20
-    (move x arg)
     (inst tst x (ash (1- (ash 1 (- n-word-bits
                                    n-positive-fixnum-bits)))
                      n-positive-fixnum-bits))

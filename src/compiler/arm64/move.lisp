@@ -376,6 +376,25 @@
 (define-move-vop move-from-signed :move
   (signed-reg) (descriptor-reg))
 
+(define-vop (move-from-fixnum+1)
+  (:args (x :scs (signed-reg unsigned-reg)))
+  (:results (y :scs (any-reg descriptor-reg)))
+  (:vop-var vop)
+  (:generator 4
+    (inst adds y x x)
+    (inst b :vc DONE)
+    (load-constant vop (emit-constant (1+ sb!xc:most-positive-fixnum))
+                   y)
+    DONE))
+
+(define-vop (move-from-fixnum-1 move-from-fixnum+1)
+  (:generator 4
+    (inst adds y x x)
+    (inst b :vc DONE)
+    (load-constant vop (emit-constant (1- sb!xc:most-negative-fixnum))
+                   y)
+    DONE))
+
 ;;; Check for fixnum, and possibly allocate one or two word bignum
 ;;; result.  Use a worst-case cost to make sure people know they may
 ;;; be number consing.

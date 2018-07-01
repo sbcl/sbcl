@@ -208,28 +208,65 @@
   (:note "signed word to integer coercion")
   (:generator 20
     (move x arg)
-    (let ((fixnum (gen-label))
-          (done (gen-label)))
-      (inst sra temp x n-positive-fixnum-bits)
-      (inst cmp temp)
-      (inst b :eq fixnum)
-      (inst orncc temp zero-tn temp)
-      (inst b :eq done)
-      (inst sll y x n-fixnum-tag-bits)
+    (inst sra temp x n-positive-fixnum-bits)
+    (inst cmp temp)
+    (inst b :eq fixnum)
+    (inst orncc temp zero-tn temp)
+    (inst b :eq done)
+    (inst sll y x n-fixnum-tag-bits)
 
-      (with-fixed-allocation
+    (with-fixed-allocation
         (y temp bignum-widetag (1+ bignum-digits-offset))
-        (storew x y bignum-digits-offset other-pointer-lowtag))
-      (inst b done)
-      (inst nop)
+      (storew x y bignum-digits-offset other-pointer-lowtag))
+    (inst b done)
+    (inst nop)
 
-      (emit-label fixnum)
-      (inst sll y x n-fixnum-tag-bits)
-      (emit-label done))))
+    FIXNUM
+    (inst sll y x n-fixnum-tag-bits)
+    DONE))
 
 (define-move-vop move-from-signed :move
   (signed-reg) (descriptor-reg))
 
+(define-vop (move-from-fixnum+1)
+  (:args (x :scs (signed-reg unsigned-reg)))
+  (:results (y :scs (any-reg descriptor-reg)))
+  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:vop-var vop)
+  (:generator 4
+    (inst sra temp x n-positive-fixnum-bits)
+    (inst cmp temp)
+    (inst b :eq fixnum)
+    (inst orncc temp zero-tn temp)
+    (inst b :eq done)
+    (inst sll y x n-fixnum-tag-bits)
+
+    (load-constant vop (emit-constant (1+ sb!xc:most-positive-fixnum))
+                   y)
+    (inst b done)
+    (inst nop)
+
+    FIXNUM
+    (inst sll y x n-fixnum-tag-bits)
+    DONE))
+
+(define-vop (move-from-fixnum-1 move-from-fixnum+1)
+  (:generator 4
+    (inst sra temp x n-positive-fixnum-bits)
+    (inst cmp temp)
+    (inst b :eq fixnum)
+    (inst orncc temp zero-tn temp)
+    (inst b :eq done)
+    (inst sll y x n-fixnum-tag-bits)
+
+    (load-constant vop (emit-constant (1- sb!xc:most-negative-fixnum))
+                   y)
+    (inst b done)
+    (inst nop)
+
+    FIXNUM
+    (inst sll y x n-fixnum-tag-bits)
+    DONE))
 
 ;;; Check for fixnum, and possibly allocate one or two word bignum
 ;;; result.  Use a worst-case cost to make sure people know they may

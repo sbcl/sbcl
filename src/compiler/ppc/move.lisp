@@ -177,18 +177,45 @@
   (:note "signed word to integer coercion")
   (:generator 20
     (move x arg)
-    (let ((done (gen-label)))
-      (inst mtxer zero-tn)              ; clear sticky overflow bit in XER, CR0
-      (inst addo temp x x)              ; set XER OV if top two bits differ
-      (inst addo. temp temp temp)       ; set CR0 SO if any top three bits differ
-      (inst slwi y x n-fixnum-tag-bits) ; assume fixnum (tagged ok, maybe lost some high bits)
-      (inst bns done)
+    (inst mtxer zero-tn)              ; clear sticky overflow bit in XER, CR0
+    (inst addo temp x x)              ; set XER OV if top two bits differ
+    (inst addo. temp temp temp)       ; set CR0 SO if any top three bits differ
+    (inst slwi y x n-fixnum-tag-bits) ; assume fixnum (tagged ok, maybe lost some high bits)
+    (inst bns done)
 
-      (with-fixed-allocation (y pa-flag temp bignum-widetag (1+ bignum-digits-offset))
-        (storew x y bignum-digits-offset other-pointer-lowtag))
-      (emit-label done))))
+    (with-fixed-allocation (y pa-flag temp bignum-widetag (1+ bignum-digits-offset))
+      (storew x y bignum-digits-offset other-pointer-lowtag))
+    DONE))
 (define-move-vop move-from-signed :move
   (signed-reg) (descriptor-reg))
+
+(define-vop (move-from-fixnum+1)
+  (:args (arg :scs (signed-reg unsigned-reg) :target x))
+  (:results (y :scs (any-reg descriptor-reg)))
+  (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) x temp)
+  (:vop-var vop)
+  (:generator 4
+    (move x arg)
+    (inst mtxer zero-tn)              ; clear sticky overflow bit in XER, CR0
+    (inst addo temp x x)              ; set XER OV if top two bits differ
+    (inst addo. temp temp temp)       ; set CR0 SO if any top three bits differ
+    (inst slwi y x n-fixnum-tag-bits) ; assume fixnum (tagged ok, maybe lost some high bits)
+    (inst bns done)
+    (load-constant vop (emit-constant (1+ sb!xc:most-positive-fixnum))
+                   y)
+    DONE))
+
+(define-vop (move-from-fixnum-1 move-from-fixnum+1)
+  (:generator 4
+    (move x arg)
+    (inst mtxer zero-tn)              ; clear sticky overflow bit in XER, CR0
+    (inst addo temp x x)              ; set XER OV if top two bits differ
+    (inst addo. temp temp temp)       ; set CR0 SO if any top three bits differ
+    (inst slwi y x n-fixnum-tag-bits) ; assume fixnum (tagged ok, maybe lost some high bits)
+    (inst bns done)
+    (load-constant vop (emit-constant (1- sb!xc:most-negative-fixnum))
+                   y)
+    DONE))
 
 ;;; Check for fixnum, and possibly allocate one or two word bignum
 ;;; result.  Use a worst-case cost to make sure people know they may
