@@ -448,25 +448,30 @@
          (vop (tn-ref-vop op))
          (node (vop-node vop))
          (block (vop-block vop)))
-    (flet ((check-sc (scn sc)
-             (when (sc-allowed-by-primitive-type sc ptype)
-               (let ((res (find-move-vop op-tn write-p sc ptype
-                                         #'sc-move-vops)))
-                 (when res
-                   (when (>= (vop-info-cost res)
-                             *efficiency-note-cost-threshold*)
-                     (maybe-emit-coerce-efficiency-note res op dest-tn))
-                   (let ((temp (make-representation-tn ptype scn)))
-                     (change-tn-ref-tn op temp)
-                     (cond
-                       ((not write-p)
-                        (emit-move-template node block res op-tn temp before))
-                       ((and (null (tn-reads op-tn))
-                             (eq (tn-kind op-tn) :normal)))
-                       (t
-                        (emit-move-template node block res temp op-tn
-                                            before))))
-                   t)))))
+    (labels ((emit-move (vop x y)
+               (when (>= (vop-info-cost vop)
+                         *efficiency-note-cost-threshold*)
+                 (maybe-emit-coerce-efficiency-note vop op dest-tn))
+               (emit-move-template node block vop x y before))
+             (check-sc (scn sc)
+               (when (sc-allowed-by-primitive-type sc ptype)
+                 (let ((res (find-move-vop op-tn write-p sc ptype
+                                           #'sc-move-vops)))
+                   (when res
+                     (let ((temp (make-representation-tn ptype scn)))
+                       (change-tn-ref-tn op temp)
+                       (cond
+                         ((not write-p)
+                          (emit-move (or (maybe-move-from-fixnum+-1 op-tn temp)
+                                         res)
+                                     op-tn temp))
+                         ((and (null (tn-reads op-tn))
+                               (eq (tn-kind op-tn) :normal)))
+                         (t
+                          (emit-move (or (maybe-move-from-fixnum+-1 temp op-tn op-tn)
+                                         res)
+                                     temp op-tn))))
+                     t)))))
       ;; Search the non-stack load SCs first.
       (dotimes (scn sb!vm:sc-number-limit)
         (let ((sc (svref *backend-sc-numbers* scn)))
@@ -585,18 +590,16 @@
                       (node-lvar node)))
            (locs (and lvar
                       (ir2-lvar-locs (lvar-info lvar)))))
-      (when (and (null (cdr locs))
-                 (eq (car locs) tn))
-        (setf type (type-union type
-                               (lvar-type lvar)))))))
+      (if (and (null (cdr locs))
+               (eq (car locs) tn))
+          (setf type (type-union type
+                                 (lvar-type lvar)))
+          (return *empty-type*)))))
 
-(defun maybe-move-from-fixnum+-1 (x y)
-  (when (and (eq (tn-primitive-type y) *backend-t-primitive-type*)
-             (or (equal (primitive-type-specifier (tn-primitive-type x))
-                        `(signed-byte ,sb!vm:n-word-bits))
-                 (equal (primitive-type-specifier (tn-primitive-type x))
-                        `(unsigned-byte ,(1- sb!vm:n-word-bits)))))
-    (let ((type (tn-type x)))
+(defun maybe-move-from-fixnum+-1 (x y &optional (original-x x))
+  (when (and (sc-is y sb!vm::descriptor-reg)
+             (sc-is x sb!vm::signed-reg sb!vm::unsigned-reg))
+    (let ((type (tn-type original-x)))
       (cond ((eq type *empty-type*)
              nil)
             ((csubtypep type

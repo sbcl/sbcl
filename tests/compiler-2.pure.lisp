@@ -1447,3 +1447,32 @@
             `(lambda (x) (declare (optimize speed)) (copy-list x)))))
     ;; Should not have a call to COPY-LIST (or anything)
     (assert (not (ctu:find-code-constants f :type 'sb-kernel:fdefn)))))
+
+(with-test (:name :move-from-fixnum+-1)
+  (checked-compile-and-assert
+   (:allow-notes nil)
+   `(lambda (x)
+      (declare (fixnum x))
+      (1- x))
+   ((0) -1)
+   ((most-positive-fixnum) (1- most-positive-fixnum))
+   ((most-negative-fixnum) (1- most-negative-fixnum)))
+  (checked-compile-and-assert
+   (:allow-notes nil)
+   `(lambda (x)
+      (declare (fixnum x))
+      (1+ x))
+   ((0) 1)
+   ((most-positive-fixnum) (1+ most-positive-fixnum))
+   ((most-negative-fixnum) (1+ most-negative-fixnum)))
+  (checked-compile-and-assert
+   (:allow-notes nil)
+   `(lambda (a x)
+      (declare (fixnum x))
+      (if a
+          10
+          (1+ x)))
+   ((nil 0) 1)
+   ((t 0) 10)
+   ((nil most-positive-fixnum) (1+ most-positive-fixnum))
+   ((nil most-negative-fixnum) (1+ most-negative-fixnum))))
