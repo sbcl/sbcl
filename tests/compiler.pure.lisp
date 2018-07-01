@@ -2088,7 +2088,7 @@
   (let ((notes (nth-value
                 4 (checked-compile '(lambda (x)
                                      (declare (optimize (speed 3)))
-                                     (1+ x))))))
+                                     (+ x 2))))))
     ;; forced-to-do GENERIC-+, etc, possible word -> bignum conversion note
     (assert (> (length notes) 1)))
 
@@ -2096,7 +2096,7 @@
                 4 (checked-compile '(lambda (x)
                                      (declare (optimize (speed 3)))
                                      (check-type x fixnum)
-                                     (1+ x))))))
+                                     (+ x 2))))))
     ;; Only the posssible word -> bignum conversion note
     (assert (= (length notes) 1))))
 

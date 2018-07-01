@@ -216,6 +216,22 @@
 (define-move-vop move-from-signed :move
   (signed-reg) (descriptor-reg))
 
+(define-vop (move-from-fixnum+1)
+  (:args (x :scs (signed-reg unsigned-reg)))
+  (:results (y :scs (any-reg descriptor-reg)))
+  (:generator 4
+    (inst imul y x (ash 1 n-fixnum-tag-bits))
+    (inst jmp :no done)
+    (inst mov y (emit-constant (1+ sb!xc:most-positive-fixnum)))
+    done))
+
+(define-vop (move-from-fixnum-1 move-from-fixnum+1)
+  (:generator 4
+    (inst imul y x (ash 1 n-fixnum-tag-bits))
+    (inst jmp :no done)
+    (inst mov y (emit-constant (1- sb!xc:most-negative-fixnum)))
+    done))
+
 ;;; Convert an untagged unsigned word to a lispobj -- fixnum or bignum
 ;;; as the case may be. Fixnum case inline, bignum case in an assembly
 ;;; routine.

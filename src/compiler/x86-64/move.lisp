@@ -288,6 +288,22 @@
 (define-move-vop move-from-signed :move
   (signed-reg) (descriptor-reg))
 
+(define-vop (move-from-fixnum+1)
+  (:args (x :scs (signed-reg unsigned-reg)))
+  (:results (y :scs (any-reg descriptor-reg)))
+  (:generator 4
+    #.(aver (= n-fixnum-tag-bits 1))
+    (move y x)
+    (inst shl y 1)
+    (inst cmov :o y (emit-constant (1+ sb!xc:most-positive-fixnum)))))
+
+(define-vop (move-from-fixnum-1 move-from-fixnum+1)
+  (:generator 4
+    #.(aver (= n-fixnum-tag-bits 1))
+    (move y x)
+    (inst shl y 1)
+    (inst cmov :o y (emit-constant (1- sb!xc:most-negative-fixnum)))))
+
 ;;; Convert an untagged unsigned word to a lispobj -- fixnum or bignum
 ;;; as the case may be. Fixnum case inline, bignum case in an assembly
 ;;; routine.
@@ -298,25 +314,25 @@
   (:vop-var vop)
   ;; Worst case cost to make sure people know they may be number consing.
   (:generator 20
-     (aver (not (location= x y)))
-     (inst mov y #.(ash (1- (ash 1 (1+ n-fixnum-tag-bits)))
-                         n-positive-fixnum-bits))
-      ;; The assembly routines test the sign flag from this one, so if
-      ;; you change stuff here, make sure the sign flag doesn't get
-      ;; overwritten before the CALL!
-     (inst test x y)
-      ;; Using LEA is faster but bigger than MOV+SHL; it also doesn't
-      ;; twiddle the sign flag.  The cost of doing this speculatively
-      ;; should be noise compared to bignum consing if that is needed
-      ;; and saves one branch.
-     (if (= n-fixnum-tag-bits 1)
-         (inst lea y (make-ea :qword :base x :index x))
-         (inst lea y (make-ea :qword :index x
-                              :scale (ash 1 n-fixnum-tag-bits))))
-     (inst jmp :z done)
-     (inst mov y x)
-     (invoke-asm-routine 'call #.(bignum-from-reg 'y "UNSIGNED") vop)
-     DONE))
+              (aver (not (location= x y)))
+              (inst mov y #.(ash (1- (ash 1 (1+ n-fixnum-tag-bits)))
+                                 n-positive-fixnum-bits))
+              ;; The assembly routines test the sign flag from this one, so if
+              ;; you change stuff here, make sure the sign flag doesn't get
+              ;; overwritten before the CALL!
+              (inst test x y)
+              ;; Using LEA is faster but bigger than MOV+SHL; it also doesn't
+              ;; twiddle the sign flag.  The cost of doing this speculatively
+              ;; should be noise compared to bignum consing if that is needed
+              ;; and saves one branch.
+              (if (= n-fixnum-tag-bits 1)
+                  (inst lea y (make-ea :qword :base x :index x))
+                  (inst lea y (make-ea :qword :index x
+                                              :scale (ash 1 n-fixnum-tag-bits))))
+              (inst jmp :z done)
+              (inst mov y x)
+              (invoke-asm-routine 'call #.(bignum-from-reg 'y "UNSIGNED") vop)
+              DONE))
 (define-move-vop move-from-unsigned :move
   (unsigned-reg) (descriptor-reg))
 
