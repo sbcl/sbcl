@@ -501,7 +501,7 @@
 
 ;;;; raw instance slot accessors
 
-(defun make-ea-for-raw-slot (object index &optional (displacement 0))
+(defun instance-slot-ea (object index &optional (displacement 0))
   ;; instance-init vops pass a literal integer, ref/set can use an immediate tn
   (let ((imm-index (cond ((integerp index) index)
                          ((sc-is index immediate) (tn-value index)))))
@@ -519,7 +519,7 @@
   (:results (value :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 5
-    (inst mov value (make-ea-for-raw-slot object index))))
+    (inst mov value (instance-slot-ea object index))))
 
 (define-vop (raw-instance-set/word)
   (:translate %raw-instance-set/word)
@@ -531,7 +531,7 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 5
-    (inst mov (make-ea-for-raw-slot object index) value)
+    (inst mov (instance-slot-ea object index) value)
     (move result value)))
 
 (define-vop (raw-instance-init/word)
@@ -540,7 +540,7 @@
   (:arg-types * unsigned-num)
   (:info index)
   (:generator 5
-    (inst mov (make-ea-for-raw-slot object index) value)))
+    (inst mov (instance-slot-ea object index) value)))
 
 (define-vop (raw-instance-ref/signed-word)
   (:translate %raw-instance-ref/signed-word)
@@ -550,7 +550,7 @@
   (:results (value :scs (signed-reg)))
   (:result-types signed-num)
   (:generator 5
-    (inst mov value (make-ea-for-raw-slot object index))))
+    (inst mov value (instance-slot-ea object index))))
 
 (define-vop (raw-instance-set/signed-word)
   (:translate %raw-instance-set/signed-word)
@@ -562,7 +562,7 @@
   (:results (result :scs (signed-reg)))
   (:result-types signed-num)
   (:generator 5
-    (inst mov (make-ea-for-raw-slot object index) value)
+    (inst mov (instance-slot-ea object index) value)
     (move result value)))
 
 (define-vop (raw-instance-init/signed-word)
@@ -571,7 +571,7 @@
   (:arg-types * signed-num)
   (:info index)
   (:generator 5
-    (inst mov (make-ea-for-raw-slot object index) value)))
+    (inst mov (instance-slot-ea object index) value)))
 
 (define-vop (raw-instance-atomic-incf/word)
   (:translate %raw-instance-atomic-incf/word)
@@ -583,7 +583,7 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 5
-    (inst xadd (make-ea-for-raw-slot object index) diff :lock)
+    (inst xadd (instance-slot-ea object index) diff :lock)
     (move result diff)))
 
 (define-vop (raw-instance-ref/single)
@@ -595,7 +595,7 @@
   (:result-types single-float)
   (:generator 5
     (with-empty-tn@fp-top(value)
-      (inst fld (make-ea-for-raw-slot object index)))))
+      (inst fld (instance-slot-ea object index)))))
 
 (define-vop (raw-instance-set/single)
   (:translate %raw-instance-set/single)
@@ -609,7 +609,7 @@
   (:generator 5
     (unless (zerop (tn-offset value))
       (inst fxch value))
-    (inst fst (make-ea-for-raw-slot object index))
+    (inst fst (instance-slot-ea object index))
     (cond
       ((zerop (tn-offset value))
         (unless (zerop (tn-offset result))
@@ -628,7 +628,7 @@
   (:info index)
   (:generator 5
     (with-tn@fp-top (value)
-      (inst fst (make-ea-for-raw-slot object index)))))
+      (inst fst (instance-slot-ea object index)))))
 
 (define-vop (raw-instance-ref/double)
   (:translate %raw-instance-ref/double)
@@ -639,7 +639,7 @@
   (:result-types double-float)
   (:generator 5
     (with-empty-tn@fp-top(value)
-      (inst fldd (make-ea-for-raw-slot object index)))))
+      (inst fldd (instance-slot-ea object index)))))
 
 (define-vop (raw-instance-set/double)
   (:translate %raw-instance-set/double)
@@ -653,7 +653,7 @@
   (:generator 5
     (unless (zerop (tn-offset value))
       (inst fxch value))
-    (inst fstd (make-ea-for-raw-slot object index))
+    (inst fstd (instance-slot-ea object index))
     (cond
       ((zerop (tn-offset value))
         (unless (zerop (tn-offset result))
@@ -672,7 +672,7 @@
   (:info index)
   (:generator 5
     (with-tn@fp-top (value)
-      (inst fstd (make-ea-for-raw-slot object index)))))
+      (inst fstd (instance-slot-ea object index)))))
 
 (define-vop (raw-instance-ref/complex-single)
   (:translate %raw-instance-ref/complex-single)
@@ -685,10 +685,10 @@
   (:generator 5
     (let ((real-tn (complex-single-reg-real-tn value)))
       (with-empty-tn@fp-top (real-tn)
-        (inst fld (make-ea-for-raw-slot object index))))
+        (inst fld (instance-slot-ea object index))))
     (let ((imag-tn (complex-single-reg-imag-tn value)))
       (with-empty-tn@fp-top (imag-tn)
-        (inst fld (make-ea-for-raw-slot object index 1))))))
+        (inst fld (instance-slot-ea object index 1))))))
 
 (define-vop (raw-instance-set/complex-single)
   (:translate %raw-instance-set/complex-single)
@@ -704,14 +704,14 @@
           (result-real (complex-single-reg-real-tn result)))
       (cond ((zerop (tn-offset value-real))
              ;; Value is in ST0.
-             (inst fst (make-ea-for-raw-slot object index))
+             (inst fst (instance-slot-ea object index))
              (unless (zerop (tn-offset result-real))
                ;; Value is in ST0 but not result.
                (inst fst result-real)))
             (t
              ;; Value is not in ST0.
              (inst fxch value-real)
-             (inst fst (make-ea-for-raw-slot object index))
+             (inst fst (instance-slot-ea object index))
              (cond ((zerop (tn-offset result-real))
                     ;; The result is in ST0.
                     (inst fst value-real))
@@ -723,7 +723,7 @@
     (let ((value-imag (complex-single-reg-imag-tn value))
           (result-imag (complex-single-reg-imag-tn result)))
       (inst fxch value-imag)
-      (inst fst (make-ea-for-raw-slot object index 1))
+      (inst fst (instance-slot-ea object index 1))
       (unless (location= value-imag result-imag)
         (inst fst result-imag))
       (inst fxch value-imag))))
@@ -736,10 +736,10 @@
   (:generator 5
     (let ((value-real (complex-single-reg-real-tn value)))
       (with-tn@fp-top (value-real)
-        (inst fst (make-ea-for-raw-slot object index))))
+        (inst fst (instance-slot-ea object index))))
     (let ((value-imag (complex-single-reg-imag-tn value)))
       (with-tn@fp-top (value-imag)
-        (inst fst (make-ea-for-raw-slot object index 1))))))
+        (inst fst (instance-slot-ea object index 1))))))
 
 (define-vop (raw-instance-ref/complex-double)
   (:translate %raw-instance-ref/complex-double)
@@ -752,10 +752,10 @@
   (:generator 7
     (let ((real-tn (complex-double-reg-real-tn value)))
       (with-empty-tn@fp-top (real-tn)
-        (inst fldd (make-ea-for-raw-slot object index))))
+        (inst fldd (instance-slot-ea object index))))
     (let ((imag-tn (complex-double-reg-imag-tn value)))
       (with-empty-tn@fp-top (imag-tn)
-        (inst fldd (make-ea-for-raw-slot object index 2))))))
+        (inst fldd (instance-slot-ea object index 2))))))
 
 (define-vop (raw-instance-set/complex-double)
   (:translate %raw-instance-set/complex-double)
@@ -771,14 +771,14 @@
           (result-real (complex-double-reg-real-tn result)))
       (cond ((zerop (tn-offset value-real))
              ;; Value is in ST0.
-             (inst fstd (make-ea-for-raw-slot object index))
+             (inst fstd (instance-slot-ea object index))
              (unless (zerop (tn-offset result-real))
                ;; Value is in ST0 but not result.
                (inst fstd result-real)))
             (t
              ;; Value is not in ST0.
              (inst fxch value-real)
-             (inst fstd (make-ea-for-raw-slot object index))
+             (inst fstd (instance-slot-ea object index))
              (cond ((zerop (tn-offset result-real))
                     ;; The result is in ST0.
                     (inst fstd value-real))
@@ -790,7 +790,7 @@
     (let ((value-imag (complex-double-reg-imag-tn value))
           (result-imag (complex-double-reg-imag-tn result)))
       (inst fxch value-imag)
-      (inst fstd (make-ea-for-raw-slot object index 2))
+      (inst fstd (instance-slot-ea object index 2))
       (unless (location= value-imag result-imag)
         (inst fstd result-imag))
       (inst fxch value-imag))))
@@ -803,10 +803,10 @@
   (:generator 20
     (let ((value-real (complex-double-reg-real-tn value)))
       (with-tn@fp-top (value-real)
-        (inst fstd (make-ea-for-raw-slot object index))))
+        (inst fstd (instance-slot-ea object index))))
     (let ((value-imag (complex-double-reg-imag-tn value)))
       (with-tn@fp-top (value-imag)
-        (inst fstd (make-ea-for-raw-slot object index 2))))))
+        (inst fstd (instance-slot-ea object index 2))))))
 
 ;;;;
 

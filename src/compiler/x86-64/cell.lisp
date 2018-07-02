@@ -694,7 +694,7 @@
 
 ;;;; raw instance slot accessors
 
-(flet ((make-ea-for-raw-slot (object index)
+(flet ((instance-slot-ea (object index)
          (etypecase index
            (integer
               (make-ea :qword
@@ -719,7 +719,7 @@
               (:results (value :scs (,result-sc)))
               (:result-types ,result-type)
               (:generator 5
-                (inst ,inst value (make-ea-for-raw-slot object index))))
+                (inst ,inst value (instance-slot-ea object index))))
             (define-vop (,(symbolicate "RAW-INSTANCE-REF-C/" suffix))
               (:translate ,(symbolicate "%RAW-INSTANCE-REF/" suffix))
               (:policy :fast-safe)
@@ -733,7 +733,7 @@
               (:results (value :scs (,result-sc)))
               (:result-types ,result-type)
               (:generator 4
-                (inst ,inst/c value (make-ea-for-raw-slot object index))))
+                (inst ,inst/c value (instance-slot-ea object index))))
             (define-vop (,(symbolicate "RAW-INSTANCE-SET/" suffix))
               (:translate ,(symbolicate "%RAW-INSTANCE-SET/" suffix))
               (:policy :fast-safe)
@@ -744,7 +744,7 @@
               (:results (result :scs (,result-sc)))
               (:result-types ,result-type)
               (:generator 5
-                (inst ,inst (make-ea-for-raw-slot object index) value)
+                (inst ,inst (instance-slot-ea object index) value)
                 (move result value)))
             (define-vop (,(symbolicate "RAW-INSTANCE-SET-C/" suffix))
               (:translate ,(symbolicate "%RAW-INSTANCE-SET/" suffix))
@@ -759,7 +759,7 @@
               (:results (result :scs (,result-sc)))
               (:result-types ,result-type)
               (:generator 4
-                (inst ,inst/c (make-ea-for-raw-slot object index) value)
+                (inst ,inst/c (instance-slot-ea object index) value)
                 (move result value)))
             (define-vop (,(symbolicate "RAW-INSTANCE-INIT/" suffix))
               (:args (object :scs (descriptor-reg))
@@ -767,7 +767,7 @@
               (:arg-types * ,result-type)
               (:info index)
               (:generator 4
-                (inst ,inst/c (make-ea-for-raw-slot object index) value))))))
+                (inst ,inst/c (instance-slot-ea object index) value))))))
     (def word unsigned-reg unsigned-num mov)
     (def signed-word signed-reg signed-num mov)
     (def single single-reg single-float movss)
@@ -786,7 +786,7 @@
     (:results (result :scs (unsigned-reg)))
     (:result-types unsigned-num)
     (:generator 5
-      (inst xadd (make-ea-for-raw-slot object index) diff :lock)
+      (inst xadd (instance-slot-ea object index) diff :lock)
       (move result diff)))
 
   (define-vop (raw-instance-atomic-incf-c/word)
@@ -802,7 +802,7 @@
     (:results (result :scs (unsigned-reg)))
     (:result-types unsigned-num)
     (:generator 4
-      (inst xadd (make-ea-for-raw-slot object index) diff :lock)
+      (inst xadd (instance-slot-ea object index) diff :lock)
       (move result diff))))
 
 ;;;;
