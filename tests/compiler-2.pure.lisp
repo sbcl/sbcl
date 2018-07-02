@@ -1476,3 +1476,10 @@
    ((t 0) 10)
    ((nil most-positive-fixnum) (1+ most-positive-fixnum))
    ((nil most-negative-fixnum) (1+ most-negative-fixnum))))
+
+(with-test (:name :coalesce-more-ltn-numbers-constants)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x)
+         (list 1 1 ,@(make-list 100 :initial-element 'x)))
+    ((1) (make-list 102 :initial-element 1) :test #'equal)))

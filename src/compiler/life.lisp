@@ -311,7 +311,7 @@
              (tn-ref-across op)))
         ((null op))
       (let ((tn (tn-ref-tn op)))
-        (unless (eq (tn-kind tn) :unused)
+        (unless (member (tn-kind tn) '(:unused :constant))
           (assert
            (flet ((frob (refs)
                     (do ((ref refs (tn-ref-next ref)))
