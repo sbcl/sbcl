@@ -72,19 +72,6 @@
 (defmacro load-symbol (reg symbol)
   `(inst mov ,reg (+ nil-value (static-symbol-offset ,symbol))))
 
-(defmacro make-ea-for-symbol-value (symbol)
-  `(make-ea :qword
-    :disp (+ nil-value
-           (static-symbol-offset ',symbol)
-           (ash symbol-value-slot word-shift)
-           (- other-pointer-lowtag))))
-
-(defmacro load-symbol-value (reg symbol)
-  `(inst mov ,reg (make-ea-for-symbol-value ,symbol)))
-
-(defmacro store-symbol-value (reg symbol)
-  `(inst mov (make-ea-for-symbol-value ,symbol) ,reg))
-
 ;; Return the effective address of the value slot of static SYMBOL.
 (defun static-symbol-value-ea (symbol)
    (make-ea :qword
@@ -125,17 +112,15 @@
 #!-sb-thread
 (progn
   (defmacro load-tl-symbol-value (reg symbol)
-    `(load-symbol-value ,reg ,symbol))
+    `(inst mov ,reg (static-symbol-value-ea ',symbol)))
   (defmacro store-tl-symbol-value (reg symbol)
-    `(store-symbol-value ,reg ,symbol)))
+    `(inst mov (static-symbol-value-ea ',symbol) ,reg)))
 
 (defmacro load-binding-stack-pointer (reg)
-  #!+sb-thread `(inst mov ,reg (symbol-known-tls-cell '*binding-stack-pointer*))
-  #!-sb-thread `(load-symbol-value ,reg *binding-stack-pointer*))
+  `(load-tl-symbol-value ,reg *binding-stack-pointer*))
 
 (defmacro store-binding-stack-pointer (reg)
-  #!+sb-thread `(inst mov (symbol-known-tls-cell '*binding-stack-pointer*) ,reg)
-  #!-sb-thread `(store-symbol-value ,reg *binding-stack-pointer*))
+  `(store-tl-symbol-value ,reg *binding-stack-pointer*))
 
 (defmacro load-type (target source &optional (offset 0))
   "Loads the type bits of a pointer into target independent of
@@ -215,13 +200,7 @@
     `(let ((,label (gen-label))
            (,pa-bits-ea
             #!+sb-thread (thread-slot-ea thread-pseudo-atomic-bits-slot)
-            #!-sb-thread
-            (make-ea :qword
-                     :disp (+ nil-value
-                            (static-symbol-offset
-                             '*pseudo-atomic-bits*)
-                            (ash symbol-value-slot word-shift)
-                            (- other-pointer-lowtag)))))
+            #!-sb-thread (static-symbol-value-ea '*pseudo-atomic-bits*)))
        (inst mov ,pa-bits-ea rbp-tn)
        ,@forms
        (inst xor ,pa-bits-ea rbp-tn)

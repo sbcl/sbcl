@@ -83,7 +83,7 @@
      (:res result (unsigned-reg) rax-offset))
   (let* ((scratch-reg rcx-tn) ; RCX gets callee-saved, not declared as a temp
          ;; The free-index and lock are in the low and high halves of 1 qword.
-         (free-tls-index-ea (make-ea-for-symbol-value *free-tls-index*))
+         (free-tls-index-ea (static-symbol-value-ea '*free-tls-index*))
          (lock-bit 63) ; the qword's sign bit (any bit > 31 would work fine)
          (tls-full (gen-label)))
     ;; A pseudo-atomic section avoids bad behavior if the current thread were
