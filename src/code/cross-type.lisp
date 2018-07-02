@@ -295,7 +295,7 @@
                     (values nil t))
                    (t
                     (warn-and-give-up))))
-            ((target-type-is-in '(stream instance
+            ((target-type-is-in '(stream instance sb!impl::string-output-stream
                                   broadcast-stream file-stream))
              ;; Neither target CL:STREAM nor target SB!KERNEL:INSTANCE
              ;; is implemented as a STRUCTURE-OBJECT, so they'll fall
