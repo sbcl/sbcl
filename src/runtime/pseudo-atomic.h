@@ -36,13 +36,13 @@
 #endif
 
 static inline int
-get_pseudo_atomic_atomic(struct thread *thread)
+get_pseudo_atomic_atomic(struct thread __attribute__((unused)) *thread)
 {
     return (THREAD_PA_BITS(thread) & (~1)) != 0;
 }
 
 static inline void
-set_pseudo_atomic_atomic(struct thread *thread)
+set_pseudo_atomic_atomic(struct thread __attribute__((unused)) *thread)
 {
     lispobj *p = &THREAD_PA_BITS(thread);
     if (*p)
@@ -55,7 +55,7 @@ set_pseudo_atomic_atomic(struct thread *thread)
 }
 
 static inline void
-clear_pseudo_atomic_atomic(struct thread *thread)
+clear_pseudo_atomic_atomic(struct thread __attribute__((unused)) *thread)
 {
     lispobj *p = &THREAD_PA_BITS(thread);
     __asm__ __volatile__
@@ -66,7 +66,7 @@ clear_pseudo_atomic_atomic(struct thread *thread)
 }
 
 static inline int
-get_pseudo_atomic_interrupted(struct thread *thread)
+get_pseudo_atomic_interrupted(struct thread __attribute__((unused)) *thread)
 {
     return THREAD_PA_BITS(thread) & 1;
 }
