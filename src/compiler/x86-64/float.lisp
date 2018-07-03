@@ -187,23 +187,24 @@
 
 ;;; Move from a descriptor to a float register.
 (define-vop (move-to-single-reg)
-   (:args (x :scs (descriptor-reg) :target tmp
+   (:args (x :scs (descriptor-reg)
              :load-if (not (sc-is x control-stack))))
-   (:temporary (:sc unsigned-reg :from :argument :to :result) tmp)
    (:results (y :scs (single-reg)))
-   (:note "pointer to float coercion")
+   (:note "descriptor to float coercion")
    (:generator 2
      (sc-case x
        (descriptor-reg
-        (move tmp x)
-        (inst shr tmp 32)
-        (inst movd y (reg-in-size tmp :dword)))
+        ;; After MOVD, vector element 0 holds a single-float whose bits are
+        ;; SINGLE-FLOAT-WIDETAG. That's fine, it's an ordinary denormal float.
+        (inst movd y x)
+        ;; Move bits [63:32] into [31:0] and move bits [127:96]
+        ;; into the other 3 vector elements so that [63:32] is zeroed.
+        (inst shufps y y #4r3331))
        (control-stack
-        ;; When the single-float descriptor is in memory, the untagging
-        ;; is done in the target XMM register. This is faster than going
-        ;; through a general-purpose register and the code is smaller.
-        (inst movq y x)
-        (inst shufps y y #4r3331)))))
+        ;; Directly load high 4 bytes of descriptor from its stack address
+        (inst movss y (make-ea :dword
+                               :base rbp-tn
+                               :disp (+ (frame-byte-offset (tn-offset x)) 4)))))))
 (define-move-vop move-to-single-reg :move (descriptor-reg) (single-reg))
 
 ;;; Move from a descriptor to a float stack.
