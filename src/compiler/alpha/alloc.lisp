@@ -77,7 +77,7 @@
 ;;;; special purpose inline allocators
 
 (define-vop (allocate-code-object)
-  (:args (boxed-arg :scs (any-reg))
+  (:args (boxed-arg :scs (any-reg) :to :save)
          (unboxed-arg :scs (any-reg)))
   (:results (result :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)

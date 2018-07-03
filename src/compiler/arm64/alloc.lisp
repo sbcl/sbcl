@@ -72,7 +72,7 @@
 #!-gencgc
 (define-vop (allocate-code-object)
   (:args (boxed-arg :scs (unsigned-reg))
-         (unboxed-arg :scs (any-reg)))
+         (unboxed-arg :scs (any-reg) :to :save))
   (:results (result :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:temporary (:scs (non-descriptor-reg)) size)

@@ -16,20 +16,6 @@
 
 (in-package "SB!C")
 
-;;; ** FIXME **: when ALLOCATE-CODE-OBJECT is expressed as in the commented-out
-;;; block below, it is miscompiled on ppc + cheneygc as evident from failure to
-;;; complete cold-init. Random experimentation showed that inserting any call in
-;;; between the AVERs fixed the miscompilation, as did changing AVER to ASSERT.
-#|
-(declaim (ftype (sfunction (boolean fixnum fixnum) code-component)
-                allocate-code-object))
-(defun allocate-code-object (immobile-p boxed unboxed)
-  (declare (ignorable immobile-p))
-  (aver (typep boxed '(unsigned-byte 22)))
-  (aver (typep unboxed '(unsigned-byte 22)))
-  (%primitive allocate-code-object boxed unboxed))
-|#
-
 ;;; Enforce limit on boxed words dependent on how many bits it gets in header.
 ;;; Enforce limit on unboxed size. 22 bits = 4MiB, quite generous for code.
 (declaim (ftype (sfunction (boolean (unsigned-byte #!+64-bit 32 #!-64-bit 22)

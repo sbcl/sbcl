@@ -129,7 +129,7 @@
 
 (define-vop (allocate-code-object)
   (:args (boxed-arg :scs (any-reg))
-         (unboxed-arg :scs (any-reg)))
+         (unboxed-arg :scs (any-reg) :to :save))
   (:results (result :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:temporary (:scs (any-reg) :from (:argument 0)) boxed)

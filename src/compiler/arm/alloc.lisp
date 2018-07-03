@@ -73,7 +73,7 @@
   ;; BOXED is a count of words as a fixnum; it is therefore also a byte count
   ;; as a raw value because n-fixnum-tag-bits = word-shift.
   (:args (boxed :scs (any-reg))
-         (unboxed-arg :scs (any-reg)))
+         (unboxed-arg :scs (any-reg) :to :save))
   (:results (result :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:temporary (:scs (non-descriptor-reg)) size)
