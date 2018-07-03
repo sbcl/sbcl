@@ -239,7 +239,7 @@
   (:note "complex float to pointer coercion")
   (:generator 13
      (fixed-alloc y complex-single-float-widetag complex-single-float-size node)
-     (inst movq (ea-for-csf-data-desc y) x)))
+     (inst movlps (ea-for-csf-data-desc y) x)))
 (define-move-vop move-from-complex-single :move
   (complex-single-reg) (descriptor-reg))
 
@@ -264,6 +264,10 @@
                   (:generator 2
                     ,(ecase format
                       (:single
+                       ;; Use an integer move since there's no better choice.
+                       ;; - movaps moves 128 bits of data, which is wrong.
+                       ;; - movsd moves 64 bits as one double-float
+                       ;; - movlps moves 64 bits, but doesn't zero the upper bits
                          '(inst movq y (ea-for-csf-data-desc x)))
                       (:double
                          '(inst movapd y (ea-for-cdf-data-desc x))))))
