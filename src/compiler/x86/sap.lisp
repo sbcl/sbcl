@@ -116,7 +116,7 @@
                 (not (location= ptr res)))
            (sc-case offset
              (signed-reg
-              (inst lea res (make-ea :dword :base ptr :index offset :scale 1)))
+              (inst lea res (make-ea :dword :base ptr :index offset)))
              (immediate
               (inst lea res (make-ea :dword :base ptr
                                      :disp (tn-value offset))))))

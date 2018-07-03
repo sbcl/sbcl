@@ -507,7 +507,7 @@
                          ((sc-is index immediate) (tn-value index)))))
     (make-ea :dword :base object
              ;; If index is a register, it needs no scaling - it has tag bits.
-             :index (unless imm-index index) :scale 1
+             :index (unless imm-index index)
              :disp (- (ash (+ (or imm-index 0) displacement instance-slots-offset)
                            word-shift) instance-pointer-lowtag))))
 

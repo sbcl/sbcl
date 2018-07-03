@@ -1383,8 +1383,7 @@
     (move count supplied)
     ;; SP at this point points at the last arg pushed.
     ;; Point to the first more-arg, not above it.
-    (inst lea context (make-ea :dword :base esp-tn
-                               :index count :scale 1
+    (inst lea context (make-ea :dword :base esp-tn :index count
                                :disp (- (+ (fixnumize fixed) n-word-bytes))))
     (unless (zerop fixed)
       (inst sub count (fixnumize fixed)))))

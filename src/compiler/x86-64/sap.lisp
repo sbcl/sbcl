@@ -117,16 +117,14 @@
                 (not (location= ptr res)))
            (sc-case offset
              (signed-reg
-              (inst lea res (make-ea :qword :base ptr :index offset :scale 1)))
+              (inst lea res (make-ea :qword :base ptr :index offset)))
              (immediate
               (let ((value (tn-value offset)))
                 (cond ((typep value '(or (signed-byte 32) (unsigned-byte 31)))
                        (inst lea res (make-ea :qword :base ptr :disp value)))
                       (t
                        (inst mov temp value)
-                       (inst lea res (make-ea :qword :base ptr
-                                              :index temp
-                                              :scale 1))))))))
+                       (inst lea res (make-ea :qword :base ptr :index temp))))))))
           (t
            (move res ptr)
            (sc-case offset

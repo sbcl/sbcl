@@ -764,8 +764,7 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 4
-    (inst xadd (make-ea :dword :base array
-                        :scale 1 :index index
+    (inst xadd (make-ea :dword :base array :index index
                         :disp (- (* vector-data-offset n-word-bytes)
                                  other-pointer-lowtag))
           diff :lock)

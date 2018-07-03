@@ -250,7 +250,7 @@
   (:generator 2
     (cond ((and (sc-is x any-reg) (sc-is y any-reg) (sc-is r any-reg)
                 (not (location= x r)))
-           (inst lea r (make-ea :dword :base x :index y :scale 1)))
+           (inst lea r (make-ea :dword :base x :index y)))
           (t
            (move r x)
            (inst add r y)))))
@@ -289,7 +289,7 @@
   (:generator 5
     (cond ((and (sc-is x signed-reg) (sc-is y signed-reg) (sc-is r signed-reg)
                 (not (location= x r)))
-           (inst lea r (make-ea :dword :base x :index y :scale 1)))
+           (inst lea r (make-ea :dword :base x :index y)))
           (t
            (move r x)
            (inst add r y)))))
@@ -397,7 +397,7 @@
   (:generator 5
     (cond ((and (sc-is x unsigned-reg) (sc-is y unsigned-reg)
                 (sc-is r unsigned-reg) (not (location= x r)))
-           (inst lea r (make-ea :dword :base x :index y :scale 1)))
+           (inst lea r (make-ea :dword :base x :index y)))
           (t
            (move r x)
            (inst add r y)))))
