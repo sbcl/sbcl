@@ -27,7 +27,11 @@
                                (undefined-alien-tramp-tagged
                                 (+ xundefined-alien-tramp
                                    fun-pointer-lowtag))))
-    ((:temp r8-tn unsigned-reg r8-offset))
+    ((:temp r8 unsigned-reg r8-offset)
+     (:temp r0 descriptor-reg r0-offset)
+     (:temp r1 descriptor-reg r1-offset)
+     (:temp r2 descriptor-reg r2-offset)
+     (:temp lexenv descriptor-reg lexenv-offset))
   HEADER
   (inst word simple-fun-widetag)
   (inst word (make-fixup 'undefined-alien-tramp-tagged
@@ -36,8 +40,13 @@
     (inst word nil-value))
 
   UNDEFINED-ALIEN-TRAMP
+  ;; Zero out C arguments, they are not descriptors
+  (inst mov r0 0)
+  (inst mov r1 0)
+  (inst mov r2 0)
+  (inst mov lexenv 0)
   (inst adr code-tn header fun-pointer-lowtag)
-  (error-call nil 'undefined-alien-fun-error r8-tn))
+  (error-call nil 'undefined-alien-fun-error r8))
 
 (define-assembly-routine
     (xclosure-tramp (:return-style :none)

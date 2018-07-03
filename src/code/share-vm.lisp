@@ -110,42 +110,15 @@
     (declare (type (alien (* unsigned)) addr))
     (setf (deref addr kludge-big-endian-short-pointer-offset) new)))
 
-;;; A note about the #!+arm special case below -
-;;; Revision 678177b100bcf6aa caused new behavior in the register allocator.
-;;; [Its author said "for backends that store registers in SCs in an order
-;;; different from the one defined by offsets, (iterative) register allocation
-;;; may yield different results after that commit."]
-;;; Well, somehow we end up putting random bits in a boxed register.
-;;; If this occurs in the foreign call sequence, and the foreign function
-;;; happens to be undefined, then we hit UNDEFINED-ALIEN-TRAMP, which transfers
-;;; control to SB-KERNEL:INTERNAL-ERROR which tries to deduce the code object
-;;; containing the errant PC. It does that by calling CODE-OBJECT-FROM-CONTEXT
-;;; which seems to think that it has the right to read *every* boxed register
-;;; to see if the PC partakes of the interior pointer relative to that register.
-;;; Problem is, if the boxed register contains junk, then SAP-REF-LISPOBJ
-;;; returns junk, and things just go downhill from there, leading to
-;;; infinite recursion and "CORRUPTION WARNING".
-;;; So we must carefully pre-test the supplied register as a raw word
-;;; to see if the low bits do not indicate that it is a pointer.
 (declaim (inline boxed-context-register))
 (defun boxed-context-register (context index)
   (declare (type (alien (* os-context-t)) context))
   (let ((addr (context-register-addr context index)))
     (declare (type (alien (* unsigned)) addr))
     ;; No LISPOBJ alien type, so grab the SAP and use SAP-REF-LISPOBJ.
-    (macrolet ((ref-it ()
-                 `(sap-ref-lispobj
-                   (alien-sap addr)
-                   (* kludge-big-endian-short-pointer-offset n-word-bytes))))
-      #!+arm
-      (if (= 2 (logand (sap-ref-word (alien-sap addr)
-                                     (* kludge-big-endian-short-pointer-offset
-                                        n-word-bytes))
-                       #b11))
-          0 ; anything we would return is illegal. So just fake it
-          (ref-it))
-      #!-arm
-      (ref-it))))
+    (sap-ref-lispobj
+     (alien-sap addr)
+     (* kludge-big-endian-short-pointer-offset n-word-bytes))))
 
 (declaim (inline %set-boxed-context-register))
 (defun %set-boxed-context-register (context index new)
