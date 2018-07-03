@@ -1130,22 +1130,28 @@
              (union-type
               (union-type-types arg))
              (t
-              (list arg)))))
+              (list arg))))
+         (ignore-hairy-type (type)
+           (if (and (intersection-type-p type)
+                    (find-if #'hairy-type-p (intersection-type-types type)))
+               (find-if-not #'hairy-type-p (intersection-type-types type))
+               type)))
     (unless (eq arg *empty-type*)
       ;; Make sure all args are some type of numeric-type. For member
       ;; types, convert the list of members into a union of equivalent
       ;; single-element member-type's.
       (let ((new-args nil))
         (dolist (arg (listify arg))
-          (if (member-type-p arg)
-              ;; Run down the list of members and convert to a list of
-              ;; member types.
-              (mapc-member-type-members
-               (lambda (member)
-                 (push (if (numberp member) (make-eql-type member) *empty-type*)
-                       new-args))
-               arg)
-              (push arg new-args)))
+          (let ((arg (ignore-hairy-type arg)))
+            (if (member-type-p arg)
+                ;; Run down the list of members and convert to a list of
+                ;; member types.
+                (mapc-member-type-members
+                 (lambda (member)
+                   (push (if (numberp member) (make-eql-type member) *empty-type*)
+                         new-args))
+                 arg)
+                (push arg new-args))))
         (unless (member *empty-type* new-args)
           new-args)))))
 
@@ -1258,11 +1264,7 @@
 ;;; we didn't do this, we wouldn't be able to tell.
 (defun two-arg-derive-type (arg1 arg2 derive-fun fun)
   (declare (type function derive-fun fun))
-  (labels ((ignore-hairy-type (type)
-             (if (intersection-type-p type)
-                 (find-if-not #'hairy-type-p (intersection-type-types type))
-                 type))
-           (deriver (x y same-arg)
+  (labels ((deriver (x y same-arg)
              (cond ((and (member-type-p x) (member-type-p y))
                     (let* ((x (first (member-type-members x)))
                            (y (first (member-type-members y)))
@@ -1284,39 +1286,34 @@
                     (funcall derive-fun x (convert-member-type y) same-arg))
                    ((and (numeric-type-p x) (numeric-type-p y))
                     (funcall derive-fun x y same-arg))
-                   ;; Ignore hairy types in intersections
-                   ((and (or (intersection-type-p x)
-                             (intersection-type-p y))
-                         (let ((x (ignore-hairy-type x))
-                               (y (ignore-hairy-type y)))
-                           (and x y
-                                (deriver x y same-arg)))))
                    (t
-                    *universal-type*))))
-    (let ((same-arg (same-leaf-ref-p arg1 arg2))
-          (a1 (prepare-arg-for-derive-type (lvar-type arg1)))
-          (a2 (prepare-arg-for-derive-type (lvar-type arg2))))
-      (when (and a1 a2)
-        (let ((results nil))
-          (if same-arg
-              ;; Since the args are the same LVARs, just run down the
-              ;; lists.
-              (dolist (x a1)
-                (let ((result (deriver x x same-arg)))
-                  (if (listp result)
-                      (setf results (append results result))
-                      (push result results))))
-              ;; Try all pairwise combinations.
-              (dolist (x a1)
-                (dolist (y a2)
-                  (let ((result (or (deriver x y same-arg)
-                                    (numeric-contagion x y))))
-                    (if (listp result)
-                        (setf results (append results result))
-                        (push result results))))))
-          (if (rest results)
-              (make-derived-union-type results)
-              (first results)))))))
+                    *universal-type*)))
+           (derive (type1 type2 same-arg)
+             (let ((a1 (prepare-arg-for-derive-type type1))
+                   (a2 (prepare-arg-for-derive-type type2)))
+              (when (and a1 a2)
+                (let ((results nil))
+                  (if same-arg
+                      ;; Since the args are the same LVARs, just run down the
+                      ;; lists.
+                      (dolist (x a1)
+                        (let ((result (deriver x x same-arg)))
+                          (if (listp result)
+                              (setf results (append results result))
+                              (push result results))))
+                      ;; Try all pairwise combinations.
+                      (dolist (x a1)
+                        (dolist (y a2)
+                          (let ((result (or (deriver x y same-arg)
+                                            (numeric-contagion x y))))
+                            (if (listp result)
+                                (setf results (append results result))
+                                (push result results))))))
+                  (if (rest results)
+                      (make-derived-union-type results)
+                      (first results)))))))
+    (derive (lvar-type arg1) (lvar-type arg2)
+            (same-leaf-ref-p arg1 arg2))))
 
 #+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (progn

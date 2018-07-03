@@ -1413,12 +1413,18 @@
 
 (with-test (:name :type-derivation-hairy-types)
   (checked-compile-and-assert
-      ()
-      `(lambda (n s)
-         (declare (fixnum n))
-         (ash (the (satisfies eval) n)
-              (the (integer * 0) s)))
-    ((1234 -4) 77)))
+   ()
+   `(lambda (n s)
+      (declare (fixnum n))
+      (ash (the (satisfies eval) n)
+           (the (integer * 0) s)))
+   ((1234 -4) 77))
+  (checked-compile-and-assert
+   ()
+   `(lambda (p)
+      (declare (type (member #c(0.5d0 4.0d0) #c(0 -1)) p))
+      (/ (the (satisfies eval) p)))
+   ((#c(0 -1)) #C(0 1))))
 
 (with-test (:name :assert-lvar-type-intersection)
   (checked-compile-and-assert
