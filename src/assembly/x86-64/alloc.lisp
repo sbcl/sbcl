@@ -129,7 +129,7 @@
     (emit-label tls-full)
     ;; The disassembly of this code looks nicer when the failure path
     ;; immediately follows the ordinary path vs. being in *ELSEWHERE*.
-    (inst pop (reg-in-size scratch-reg :qword)) ; balance the stack
+    (inst pop scratch-reg) ; balance the stack
     (inst btr free-tls-index-ea lock-bit :lock)
     (%clear-pseudo-atomic)
     ;; There's a spurious RET instruction auto-inserted, but no matter.
