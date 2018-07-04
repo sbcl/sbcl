@@ -16,31 +16,6 @@
 
 (in-package "SB!C")
 
-;;; Enforce limit on boxed words dependent on how many bits it gets in header.
-;;; Enforce limit on unboxed size. 22 bits = 4MiB, quite generous for code.
-(declaim (ftype (sfunction (boolean (unsigned-byte #!+64-bit 32 #!-64-bit 22)
-                                    (unsigned-byte 22))
-                           code-component)
-                allocate-code-object))
-;;; Allocate a code component with BOXED words in the header
-;;; followed by UNBOXED bytes of raw data.
-;;; BOXED must be the exact count of boxed words desired. No adjustments
-;;; are made for alignment considerations or the fixed slots.
-(defun allocate-code-object (immobile-p boxed unboxed)
-  (declare (ignorable immobile-p))
-  #!+gencgc
-  (without-gcing
-      (cond #!+immobile-code
-            (immobile-p (sb!vm::allocate-immobile-code boxed unboxed))
-            (t (%make-lisp-obj
-                (alien-funcall (extern-alien "alloc_code_object"
-                                             (function unsigned
-                                                       (unsigned 32)
-                                                       (unsigned 32)))
-                               boxed unboxed)))))
-  #!-gencgc
-  (%primitive allocate-code-object boxed unboxed))
-
 ;;; Map of code-component -> list of PC offsets at which allocations occur.
 ;;; This table is needed in order to enable allocation profiling.
 (define-load-time-global *allocation-point-fixups*

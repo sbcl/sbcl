@@ -20,7 +20,8 @@
 #ifdef LISP_FEATURE_GENCGC
 extern lispobj *lisp_alloc(struct alloc_region *region, sword_t nbytes,
                            int page_type_flag, struct thread *thread);
-extern lispobj alloc_code_object(unsigned boxed, unsigned unboxed);
+extern lispobj alloc_code_object(unsigned boxed, unsigned unboxed,
+                                 unsigned serialno);
 #endif
 
 #define DX_ALLOC_SAP(var_name, ptr)                                        \

@@ -44,6 +44,22 @@
 #!+immobile-space
 (progn
 
+(define-alien-variable varyobj-space-size (unsigned 32))
+(define-alien-variable ("FIXEDOBJ_SPACE_START" fixedobj-space-start) unsigned-long)
+(define-alien-variable ("VARYOBJ_SPACE_START" varyobj-space-start) unsigned-long)
+(define-alien-variable ("varyobj_free_pointer" *varyobj-space-free-pointer*)
+  system-area-pointer)
+(define-alien-variable ("fixedobj_free_pointer" *fixedobj-space-free-pointer*)
+  system-area-pointer)
+(defun immobile-space-addr-p (addr)
+  (declare (type word addr))
+  (or (let ((start fixedobj-space-start))
+        (<= start addr (truly-the word (+ start (1- fixedobj-space-size)))))
+      (let ((start varyobj-space-start))
+        (<= start addr (truly-the word (+ start (1- varyobj-space-size)))))))
+(defun immobile-space-obj-p (obj)
+  (immobile-space-addr-p (get-lisp-obj-address obj)))
+
 (define-load-time-global *immobile-space-mutex*
     (sb!thread:make-mutex :name "Immobile space"))
 
@@ -356,18 +372,6 @@
                             #!-64-bit simple-array-unsigned-byte-32-widetag
                             n-elements n-elements))
 
-;;; This is called when we're already inside WITHOUT-GCing
-(defun allocate-immobile-code (n-boxed-words n-unboxed-bytes)
-  (let* ((total-bytes (align-up (+ (* n-boxed-words n-word-bytes) n-unboxed-bytes)
-                                (* 2 n-word-bytes)))
-         (code (allocate-immobile-bytes
-                total-bytes
-                (make-code-header-word n-boxed-words)
-                (ash n-unboxed-bytes n-fixnum-tag-bits)
-                other-pointer-lowtag)))
-    (setf (%code-debug-info code) nil)
-    code))
-
 (defun alloc-immobile-symbol ()
   (values (%primitive alloc-immobile-fixedobj other-pointer-lowtag symbol-size
                       (logior (ash (1- symbol-size) n-widetag-bits) symbol-widetag)
@@ -405,7 +409,7 @@
           (truly-the word
            (+ (get-lisp-obj-address gf) (- fun-pointer-lowtag) (ash 4 word-shift))))
     (%set-funcallable-instance-info gf 0 slot-vector)
-    (sb!vm::!set-fin-trampoline gf)
+    (!set-fin-trampoline gf)
     gf))
 
 (defun alloc-immobile-trampoline ()
@@ -414,3 +418,50 @@
                       (ash (* 2 n-word-bytes) n-fixnum-tag-bits))))
 ) ; end PROGN
 ) ; end PROGN
+
+;;; Enforce limit on boxed words dependent on how many bits it gets in header.
+;;; Enforce limit on unboxed size. 22 bits = 4MiB, quite generous for code.
+(declaim (ftype (sfunction (boolean (unsigned-byte #!+64-bit 32 #!-64-bit 22)
+                                    (unsigned-byte 22))
+                           code-component)
+                allocate-code-object))
+;;; Allocate a code component with BOXED words in the header
+;;; followed by UNBOXED bytes of raw data.
+;;; BOXED must be the exact count of boxed words desired. No adjustments
+;;; are made for alignment considerations or the fixed slots.
+(defun allocate-code-object (immobile-p boxed unboxed)
+  (declare (ignorable immobile-p))
+  #!+gencgc
+  ;; This uses ATOMIC-INCF to get automatic wraparound, not because atomicity
+  ;; makes things deterministic per se. If multiple threads are allocating
+  ;; code objects, the order is unpredictable.
+  (let ((serialno (atomic-incf sb!fasl::*code-serialno*)))
+    (without-gcing
+      (cond #!+immobile-code
+            (immobile-p
+             (let ((code (allocate-immobile-bytes
+                          (align-up (+ (* boxed n-word-bytes) unboxed)
+                                    (* 2 n-word-bytes))
+                          (make-code-header-word boxed)
+                          (logior (logand (ash serialno 32) most-positive-word)
+                                  (ash unboxed n-fixnum-tag-bits))
+                          other-pointer-lowtag)))
+               (setf (%code-debug-info code) nil)
+               code))
+            (t (%make-lisp-obj
+                (alien-funcall (extern-alien "alloc_code_object"
+                                             (function unsigned
+                                                       (unsigned 32)
+                                                       (unsigned 32)
+                                                       (unsigned 32)))
+                               boxed unboxed serialno))))))
+  #!-gencgc
+  (%primitive allocate-code-object boxed unboxed))
+
+#!+64-bit
+(progn
+  (declaim (inline %code-code-size))
+  (defun %code-serialno (code) ; return high 4 bytes
+    (ash (%%code-code-size code) (- n-fixnum-tag-bits 32)))
+  (defun %code-code-size (code) ; clip to max imposed by allocate-code-object
+    (ldb (byte 22 0) (%%code-code-size code))))

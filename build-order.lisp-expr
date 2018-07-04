@@ -612,6 +612,7 @@
  ("src/compiler/generic/target-core" :not-host) ; uses stuff from
                                                 ;   "compiler/generic/core"
 
+ ("src/code/alloc"             :not-host) ; needs foo-SPACE-START
  ("src/code/simple-fun"        :not-host) ; function slot accessors
  ("src/code/eval"              :not-host) ; uses INFO, wants compiler macro
  ("src/code/target-package"    :not-host) ; needs "code/package"
@@ -639,7 +640,6 @@
  ("src/code/timer" :not-host)
 
  ;; defines SB!DI:DO-DEBUG-FUN-BLOCKS, needed by target-disassem.lisp
- ("src/code/alloc"  :not-host) ; needs foo-SPACE-START
  ("src/code/debug-int" :not-host)
  ("src/code/interr" :not-host)
 

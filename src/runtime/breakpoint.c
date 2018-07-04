@@ -120,8 +120,9 @@ static long compute_offset(os_context_t *context, lispobj code)
         if (pc < code_start)
             return 0;
         else {
-            uword_t offset = pc - code_start;
-            if (offset >= (uword_t)fixnum_value(codeptr->code_size))
+            int offset = pc - code_start;
+            // Cast out high 32 bits of code_size if lispobj is 64 bits.
+            if (offset >= fixnum_value((uint32_t)codeptr->code_size))
                 return 0;
             else
                 return make_fixnum(offset);

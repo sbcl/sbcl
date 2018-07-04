@@ -377,11 +377,12 @@ code_header_words(lispobj header) // given header = code->header
 }
 
 #include "align.h"
-static inline sword_t
+static inline unsigned int
 code_unboxed_nwords(lispobj n) // given n = code->code_size
 {
     // Return ceiling |N / N_WORD_BYTES|
-    return (fixnum_value(n) + (N_WORD_BYTES-1)) >> WORD_SHIFT;
+    // Cast out high 32 bits of code_size if lispobj is 64 bits.
+    return (fixnum_value((uint32_t)n) + (N_WORD_BYTES-1)) >> WORD_SHIFT;
 }
 
 #if defined(LISP_FEATURE_WIN32)

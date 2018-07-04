@@ -149,9 +149,11 @@
   ;; This is the size of instructions in bytes, not aligned.
   ;; Adding the size from the header and aligned code-size will yield
   ;; the total size of the code-object.
+  ;; The upper 4 bytes in 8-byte words can be used for ancillary data.
   (code-size :type index
              :ref-known (flushable movable)
-             :ref-trans %code-code-size)
+             :ref-trans #!+64-bit %%code-code-size ; serialno + size
+                        #!-64-bit %code-code-size)
   (debug-info :type t
               :ref-known (flushable)
               :ref-trans %code-debug-info

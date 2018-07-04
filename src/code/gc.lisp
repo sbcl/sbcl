@@ -38,26 +38,6 @@
              (- (sap-int (sb!c::dynamic-space-free-pointer))
                 (current-dynamic-space-start))))
 
-#!+immobile-space
-(progn
-  (define-alien-variable sb!vm:varyobj-space-size (unsigned 32))
-  #!+relocatable-heap
-  (progn
-    (define-alien-variable ("FIXEDOBJ_SPACE_START" sb!vm:fixedobj-space-start) unsigned-long)
-    (define-alien-variable ("VARYOBJ_SPACE_START" sb!vm:varyobj-space-start) unsigned-long))
-  (define-alien-variable ("varyobj_free_pointer" sb!vm:*varyobj-space-free-pointer*)
-    system-area-pointer)
-  (define-alien-variable ("fixedobj_free_pointer" sb!vm:*fixedobj-space-free-pointer*)
-    system-area-pointer)
-  (defun immobile-space-addr-p (addr)
-    (declare (type word addr))
-    (or (let ((start sb!vm:fixedobj-space-start))
-          (<= start addr (truly-the word (+ start (1- sb!vm:fixedobj-space-size)))))
-        (let ((start sb!vm:varyobj-space-start))
-          (<= start addr (truly-the word (+ start (1- sb!vm:varyobj-space-size)))))))
-  (defun immobile-space-obj-p (obj)
-    (immobile-space-addr-p (get-lisp-obj-address obj))))
-
 (defun static-space-usage ()
   (- (sap-int sb!vm:*static-space-free-pointer*) sb!vm:static-space-start))
 

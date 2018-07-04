@@ -277,3 +277,15 @@
                   (type (ldb (byte 5 (+ #+big-endian 3)) flags)))
              (assert (logbitp 4 type)))))))
    :all))
+
+#+64-bit ; code-serialno not defined unless 64-bit
+(with-test (:name :unique-code-serialno)
+  (let ((a (make-array 100000 :element-type 'bit :initial-element 0)))
+    (sb-vm:map-allocated-objects
+     (lambda (obj type size)
+       (when (and (= type sb-vm:code-header-widetag)
+                  (plusp (sb-kernel:code-n-entries obj)))
+         (let ((serial (sb-kernel:%code-serialno obj)))
+           (assert (zerop (aref a serial)))
+           (setf (aref a serial) 1))))
+     :all)))

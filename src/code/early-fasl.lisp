@@ -171,3 +171,10 @@
   ;; NIL if we're executing normally.
   (skip-until nil))
 (declaim (freeze-type fasl-input))
+
+;;; Unique number assigned into high 4 bytes of 64-bit code size slot
+;;; so that we can sort the contents of varyobj space in a more-or-less
+;;; predictable manner based on the order in which code was loaded.
+;;; This wraps around at 32 bits, but it's still deterministic.
+(define-load-time-global *code-serialno* 0)
+(declaim (fixnum *code-serialno*))

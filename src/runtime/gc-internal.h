@@ -92,9 +92,10 @@ do {                                                                   \
  */
 static inline unsigned int*
 code_fun_table(struct code* code) {
-  return (unsigned int*)((char*)code
-                         + code_header_words(code->header) * N_WORD_BYTES
-                         + fixnum_value(code->code_size) - sizeof (uint16_t));
+  return (unsigned int*)
+      ((char*)code + code_header_words(code->header) * N_WORD_BYTES
+       // Cast out high 32 bits of code_size if lispobj is 64 bits.
+       + fixnum_value((uint32_t)code->code_size) - sizeof (uint16_t));
 }
 static inline unsigned short
 code_n_funs(struct code* code) {

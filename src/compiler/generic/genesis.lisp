@@ -1739,6 +1739,9 @@ core and return a descriptor to it."
     (cold-set 'sb!vm::*free-tls-index*
               (make-descriptor (ash *genesis-tls-counter* sb!vm:word-shift))))
 
+  #!+64-bit
+  (cold-set '*code-serialno* (make-fixnum-descriptor (1+ *code-serialno*)))
+
   (dolist (symbol sb!impl::*cache-vector-symbols*)
     (cold-set symbol *nil-descriptor*))
 
@@ -2145,7 +2148,10 @@ core and return a descriptor to it."
 (defvar *allocation-point-fixup-notes*)
 
 (defun code-unboxed-size (code)
-  (descriptor-fixnum (read-wordindexed code sb!vm:code-code-size-slot)))
+  ;; though ALLOCATE-CODE-OBJECT imposes a size limit, the exact limit
+  ;; doesn't matter, provided we examine only the low 4 bytes.
+  (ash (ldb (byte 32 0) (read-bits-wordindexed code sb!vm:code-code-size-slot))
+       (- sb!vm:n-fixnum-tag-bits)))
 
 (declaim (ftype (sfunction (descriptor sb!vm:word sb!vm:word keyword keyword)
                            descriptor)
@@ -2754,7 +2760,9 @@ core and return a descriptor to it."
                           (make-code-header-data aligned-n-boxed-words)
                           sb!vm:code-header-widetag)
        (write-wordindexed des sb!vm:code-code-size-slot
-                          (make-fixnum-descriptor code-size))
+                          (make-random-descriptor
+                           (logior #!+64-bit (ash (incf *code-serialno*) 32)
+                                   (ash code-size sb!vm:n-fixnum-tag-bits))))
        (write-wordindexed des sb!vm:code-debug-info-slot debug-info)
        (do ((index (1- n-boxed-words) (1- index)))
            ((< index sb!vm:code-constants-offset))
