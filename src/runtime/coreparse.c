@@ -827,9 +827,13 @@ process_directory(int count, struct ndir_entry *entry,
                 addr = FIXEDOBJ_SPACE_START + FIXEDOBJ_SPACE_SIZE;
             else
 #endif
-            if (request)
+            if (request) {
                 addr = (uword_t)os_validate(sub_2gb_flag ? MOVABLE_LOW : MOVABLE,
                                             (os_vm_address_t)addr, request);
+                if (!addr) {
+                    lose("Can't allocate %p bytes for space %d", request, id);
+                }
+            }
             switch (id) {
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
             case IMMOBILE_FIXEDOBJ_CORE_SPACE_ID:
