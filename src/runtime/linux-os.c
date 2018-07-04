@@ -281,9 +281,6 @@ int os_preinit(char *argv[], char *envp[])
      * by setting a personality flag and re-executing. (We need
      * to re-execute, since the memory maps that can conflict with
      * the SBCL spaces have already been done at this point).
-     *
-     * Since randomization is currently implemented only on x86 kernels,
-     * don't do this trick on other platforms.
      */
     int major_version, minor_version, patch_version;
     getuname(&major_version, &minor_version, &patch_version);
