@@ -2181,7 +2181,7 @@ core and return a descriptor to it."
       ;; FIXME: every other backend has the code factored out nicely into
       ;; {target}-vm.lisp, but x86 doesn't. Is it really so impossible?
       ;; See FIXUP-CODE-OBJECT in x86-vm.lisp and x86-64-vm.lisp.
-      ;; Except for the use of saps, this is basically identical.
+      ;; Except for the use of saps, this is nearly identical.
       (when (ecase kind
              (:absolute
               (setf (bvref-32 gspace-data gspace-byte-offset)
@@ -2193,8 +2193,8 @@ core and return a descriptor to it."
               ;; because we have RIP-relative addressing, but references to
               ;; other immobile-space objects must be recorded.
               #!+x86-64
-              (member flavor '(:named-call :layout :immobile-object
-                               :assembly-routine :static-call)))
+              (member flavor '(:named-call :static-call :layout :immobile-object
+                               :assembly-routine :assembly-routine*)))
              #!+x86-64
              (:absolute64
               (setf (bvref-64 gspace-data gspace-byte-offset)

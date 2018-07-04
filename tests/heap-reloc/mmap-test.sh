@@ -5,7 +5,8 @@
 # Specify that some symbols are undefined so that the complete
 # contents of 'wrap.o' and 'largefile.o' get pulled in.
 # FIXME: maybe need '-m32' flag and whatnot
-cc -o test-sbcl -g -Wl,-ufstat_wrapper -Wl,-ulseek_largefile -Wl,-uspawn \
+cc -o test-sbcl -g \
+  -Wl,-ufstat_wrapper -Wl,-uget_timezone -Wl,-ulseek_largefile -Wl,-uspawn \
   -Wl,--export-dynamic -no-pie fake-mman.c ../../src/runtime/libsbcl.a \
   -ldl -lpthread -lm
 

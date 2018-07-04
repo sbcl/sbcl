@@ -134,7 +134,8 @@ EOF
 chmod u+x "$tmpcore"
 ./"$tmpcore" --no-userinit --no-sysinit <<EOF
   (assert (eql (extern-alien "thread_control_stack_size" unsigned) (* 160 1024)))
-  (assert (eql (dynamic-space-size) (* 200 1048576)))
+  ; allow slight shrinkage if heap relocation has to adjust for alignment
+  (assert (<= 0 (- (* 200 1048576) (dynamic-space-size)) 65536))
 EOF
 run_sbcl_with_core "$tmpcore" --control-stack-size 200KB --dynamic-space-size 250MB --no-userinit --no-sysinit <<EOF
   (assert (eql (extern-alien "thread_control_stack_size" unsigned) (* 200 1024)))

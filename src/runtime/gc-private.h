@@ -124,7 +124,6 @@ static inline boolean filler_obj_p(lispobj __attribute__((unused)) *obj) { retur
 #else
 
 extern void enliven_immobile_obj(lispobj*,int);
-extern void fixup_immobile_refs(lispobj (*)(lispobj), lispobj, struct code*);
 
 #define IMMOBILE_OBJ_VISITED_FLAG    0x10
 #define IMMOBILE_OBJ_GENERATION_MASK 0x0f // mask off the VISITED flag
