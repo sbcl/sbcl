@@ -2280,7 +2280,19 @@ static void fixup_immobile_refs(lispobj fixups, struct code* code)
         } else if (ptr < asm_routines_end) {
             // Call to asm routine using "CALL [#xNNNN]" form
         } else {
-            lose("unexpected immobile-space pointer %p", ptr);
+            /* Depending on things, a call to immobile code from dynamic space
+             * might be emitted as "MOV RAX, #x{addr} ; CALL RAX" where {addr}
+             * is a simple-fun entry point. So assert that */
+            header_addr = (lispobj*)(ptr - offsetof(struct simple_fun, code));
+            lispobj header_word =
+                *(forwarding_pointer_p(header_addr) ?
+                  tempspace_addr(native_pointer(forwarding_pointer_value(header_addr))) :
+                  header_addr);
+            gc_assert(widetag_of(header_word) == SIMPLE_FUN_WIDETAG);
+            if (forwarding_pointer_p(header_addr))
+                UNALIGNED_STORE32(fixup_where,
+                                  forwarding_pointer_value(header_addr)
+                                  + FUN_RAW_ADDR_OFFSET);
         }
     }
 }

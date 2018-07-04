@@ -37,6 +37,13 @@ check_status_maybe_lose "SAVE-LISP-AND-DIE :TOPLEVEL" $? 0 "(saved core ran)"
 # diagnosed and fixed by Dan Barlow in sbcl-0.7.7.29
 run_sbcl <<EOF
   (defun foo (x) (+ x 11))
+  ;; The basic smoke test includes a test that immobile-space defragmentation
+  ;; supports calls to "static" functions - those called without reference
+  ;; to an fdefn, from a caller in dynamic space.
+  ;; dynamic space should be the default for compilation to memory,
+  ;; but maybe someone changed it :immobile, so bind it to be certain.
+  (let (#+immobile-space (sb-c::*compile-to-memory-space* :dynamic))
+     (defvar *afun* (compile nil '(lambda (x) (- (length x))))))
   (save-lisp-and-die "$tmpcore")
 EOF
 run_sbcl_with_core "$tmpcore" --no-userinit --no-sysinit \
