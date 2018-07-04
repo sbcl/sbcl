@@ -245,7 +245,7 @@ typedef s32 sword_t;
    alpha64 has arrived, all this nastiness can go away */
 #if 64 == N_WORD_BITS
 #define LOW_WORD(c) ((uintptr_t)c)
-#define OBJ_FMTX PRIx64
+#define OBJ_FMTX PRIxPTR
 typedef uintptr_t lispobj;
 #else
 #define OBJ_FMTX "x"
