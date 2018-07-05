@@ -251,7 +251,7 @@ sufficiently motivated to do lengthy fixes."
             ;; Scan roots as close as possible to GC-AND-SAVE, in case anything
             ;; prior causes compilation to occur into immobile space.
             ;; Failing to see all immobile code would miss some relocs.
-            (sb-kernel::choose-code-component-order root-structures))
+            (sb-vm::choose-code-component-order root-structures))
           ;; Save the restart function. Logically a passed argument, but can't be,
           ;; as it would require pinning around the whole save operation.
           (with-pinned-objects (#'restart-lisp)

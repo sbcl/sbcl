@@ -158,7 +158,7 @@
     (assert (not (gc-logfile)))
     (delete-file p)))
 
-#+immobile-code
+#+nil ; immobile-code
 (with-test (:name (sb-kernel::order-by-in-degree :uninterned-function-names))
   ;; This creates two functions whose names are uninterned symbols and
   ;; that are both referenced once, resulting in a tie
@@ -283,6 +283,7 @@
   (let ((a (make-array 100000 :element-type 'bit :initial-element 0)))
     (sb-vm:map-allocated-objects
      (lambda (obj type size)
+       (declare (ignore size))
        (when (and (= type sb-vm:code-header-widetag)
                   (plusp (sb-kernel:code-n-entries obj)))
          (let ((serial (sb-kernel:%code-serialno obj)))

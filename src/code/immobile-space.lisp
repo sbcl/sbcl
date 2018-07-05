@@ -229,8 +229,119 @@
          seg dstate)))
     (setf (sb-vm::fdefn-has-static-callers fdefn) 0))) ; Clear static link flag
 
-(in-package "SB-KERNEL")
+(in-package "SB-VM")
 
+;;; Return the caller -> callee graph as an array grouped by caller.
+;;; i.e. each element is (CALLING-CODE-COMPONENT . CODE-COMPONENT*)).
+;;; A call is assumed only if we see a function or fdefn in the calling
+;;; component. This underestimates the call graph of course,
+;;; because it's impossible to predict whether calls occur through symbols,
+;;; arrays of functions, or anything else. But it's a good approximation.
+(defun compute-direct-call-graph (&optional verbose)
+  (let ((graph (make-array 10000 :adjustable t :fill-pointer 0))
+        (gf-code-cache (make-hash-table :test 'eq))
+        (n-code-objs 0))
+    (labels ((get-gf-code (gf)
+               (ensure-gethash
+                gf gf-code-cache
+                (let (result)
+                  (dolist (method (sb-mop:generic-function-methods gf) result)
+                    (let ((fun (sb-mop:method-function method)))
+                      (if (typep fun 'sb-pcl::%method-function)
+                          (setq result
+                                (list* (code-from-fun (sb-pcl::%method-function-fast-function fun))
+                                       (code-from-fun (%funcallable-instance-function fun))
+                                       result))
+                          (pushnew (code-from-fun fun) result)))))))
+             (code-from-fun (fun)
+               (ecase (fun-subtype fun)
+                 (#.simple-fun-widetag
+                  (fun-code-header fun))
+                 (#.funcallable-instance-widetag
+                  (code-from-fun (%funcallable-instance-function fun)))
+                 (#.closure-widetag
+                  (fun-code-header (%closure-fun fun))))))
+      (map-allocated-objects
+       (lambda (obj type size)
+         obj size
+         (when (and (= type code-header-widetag)
+                    (plusp (code-n-entries obj)))
+           (incf n-code-objs)
+           (let (list)
+             (loop for j from code-constants-offset
+                   below (code-header-words obj)
+                   do (let* ((const (code-header-ref obj j))
+                             (fun (typecase const
+                                    (fdefn (fdefn-fun const))
+                                    (function const))))
+                        (when fun
+                          (if (typep fun 'generic-function)
+                              ;; Don't claim thousands of callees
+                              (unless (and (typep const 'fdefn)
+                                           (eq (fdefn-name const) 'print-object))
+                                (setf list (union (copy-list (get-gf-code fun))
+                                                  list)))
+                              (pushnew (code-from-fun fun) list :test 'eq)))))
+             (when list
+               (vector-push-extend (cons obj list) graph)))))
+       :immobile))
+    (when verbose
+      (format t "~&Call graph: ~D nodes, ~D with out-edges, max-edges=~D~%"
+              n-code-objs
+              (length graph)
+              (reduce (lambda (x y) (max x (length (cdr y))))
+                      graph :initial-value 0)))
+    graph))
+
+;;; Return list of code components ordered in a quasi-predictable way,
+;;; provided that LOAD happened in a most 1 thread.
+;;; In general: user code sorts before system code, never-called code sorts
+;;; to the end, and ties are impossible due to uniqueness of serial#.
+(defun deterministically-sort-immobile-code ()
+  (let ((forward-graph (compute-direct-call-graph))
+        (reverse-graph (make-hash-table :test 'eq))
+        (ranking))
+    ;; Compute the inverted call graph as a hash-table
+    ;; for O(1) lookup of callers of any component.
+    (dovector (item forward-graph)
+      (let ((caller (car item))
+            (callees (cdr item)))
+        (dolist (callee callees)
+          (push caller (gethash callee reverse-graph)))))
+    ;; Compute popularity of each code component in varyobj space
+    (map-allocated-objects
+     (lambda (obj type size)
+       (declare (ignore size))
+       (when (and (= type code-header-widetag)
+                  (plusp (code-n-entries obj))
+                  (immobile-space-addr-p (get-lisp-obj-address obj)))
+         (push (cons (length (gethash obj reverse-graph)) obj) ranking)))
+     :immobile)
+    ;; Sort by a 4-part key:
+    ;; -  1 bit  : 0 = ever called, 1 = apparently un-called
+    ;; -  1 bit  : system/non-system source file (system has lower precedence)
+    ;; -  8 bits : popularity (as computed above)
+    ;; - 32 bits : code component serial# (as stored on creation)
+    (flet ((calc-key (item &aux (code (cdr item)))
+             (let ((systemp
+                    (or (let ((di (%code-debug-info code)))
+                          (and (typep di 'sb-c::compiled-debug-info)
+                               (let ((src (sb-c::compiled-debug-info-source di)))
+                                 (and (typep src 'sb-c::debug-source)
+                                      (let ((str (sb-c::debug-source-namestring src)))
+                                        (if (= (mismatch str "SYS:") 4) 1))))))
+                        0))
+                   ;; cap the popularity index to 255 and negate so that higher
+                   ;; sorts earlier
+                   (popularity (- 255 (min (car item) 255)))
+                   (serialno (sb-impl::%code-serialno code)))
+               (logior (ash (if (= (car item) 0) 1 0) 41)
+                       (ash systemp 40)
+                       (ash popularity 32)
+                       serialno))))
+      (mapcar #'cdr (sort ranking #'< :key #'calc-key)))))
+
+#+nil
 (defun order-by-in-degree ()
   (let ((compiler-stuff (make-hash-table :test 'eq))
         (other-stuff (make-hash-table :test 'eq)))
@@ -295,15 +406,15 @@
 ;;; organization to random chance.
 ;;; Note that these aren't roots in the GC sense, just a locality sense.
 (defun choose-code-component-order (&optional roots)
+  (declare (ignore roots))
   (let ((ordering (make-array 10000 :adjustable t :fill-pointer 0))
         (hashset (make-hash-table :test 'eq)))
 
-    ;; Place assembler routines first.
-    (let ((code sb-fasl:*assembler-routines*))
-      (setf (gethash code hashset) t)
-      (vector-push-extend code ordering))
-
-    (labels ((visit (thing)
+    (labels ((emplace (code)
+               (unless (gethash code hashset)
+                 (setf (gethash code hashset) t)
+                 (vector-push-extend code ordering)))
+             (visit (thing)
                (typecase thing
                  (code-component (visit-code thing))
                  (simple-fun (visit-code (fun-code-header thing)))
@@ -325,27 +436,29 @@
                             (fdefn  (awhen (fdefn-fun obj) (visit it)))
                             (symbol (visit obj))
                             (vector (map nil #'visit obj)))))))
+
+      ;; Place assembler routines first.
+      (emplace sb-fasl:*assembler-routines*)
+      ;; Place functions called by assembler routines next.
+      (dovector (f +static-fdefns+)
+        (emplace (fun-code-header (symbol-function f))))
+      #+nil
       (mapc #'visit
             (mapcan (lambda (x)
                       (let ((f (coerce x 'function)))
                         (when (simple-fun-p f)
                           (list (fun-code-header f)))))
-                    (or roots '(read eval print compile)))))
+                    (or roots '(read eval print compile))))
 
-    (dolist (code (order-by-in-degree))
-      (unless (gethash code hashset)
-        (setf (gethash code hashset) t)
-        (vector-push-extend code ordering)))
+      (mapc #'emplace (deterministically-sort-immobile-code))
 
-    (sb-vm:map-allocated-objects
-     (lambda (obj type size)
-       (declare (ignore size))
-       (when (and (= type sb-vm:code-header-widetag)
-                  (not (typep (%code-debug-info obj) 'function))
-                  (not (gethash obj hashset)))
-         (setf (gethash obj hashset) t)
-         (vector-push-extend obj ordering)))
-     :immobile)
+      (map-allocated-objects
+       (lambda (obj type size)
+         (declare (ignore size))
+         (when (and (= type code-header-widetag)
+                    (not (typep (%code-debug-info obj) 'function)))
+           (emplace obj)))
+       :immobile))
 
     (let* ((n (length ordering))
            (array (make-alien int (1+ (* n 2)))))
@@ -356,7 +469,7 @@
       (setf (extern-alien "code_component_order" unsigned)
             (sap-int (alien-value-sap array)))))
 
-  (multiple-value-bind (index relocs) (sb-vm::collect-immobile-code-relocs)
+  (multiple-value-bind (index relocs) (collect-immobile-code-relocs)
     (let* ((n (length index))
            (array (make-alien int n)))
       (dotimes (i n) (setf (deref array i) (aref index i)))
