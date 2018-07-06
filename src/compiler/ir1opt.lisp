@@ -38,6 +38,26 @@
              ;; check for EQL types and singleton numeric types
              (values (type-singleton-p type))))))
 
+;;; Are all the uses constant?
+(defun constant-lvar-uses-p (thing)
+  (declare (type (or lvar null) thing))
+  (and (lvar-p thing)
+       (let* ((type (lvar-type thing))
+              (principal-lvar (principal-lvar thing))
+              (uses (lvar-uses principal-lvar))
+              leaf)
+         (when (consp uses)
+           (loop for use in uses
+                 always
+                 (and (ref-p use)
+                      (constant-p (setf leaf (ref-leaf use)))
+                      ;; LEAF may be a CONSTANT behind a cast that will
+                      ;; later turn out to be of the wrong type.
+                      ;; And ir1-transforms suffer from this because
+                      ;; they expect LVAR-VALUE to be of a restricted type.
+                      (or (not (lvar-reoptimize principal-lvar))
+                          (ctypep (constant-value leaf) type))))))))
+
 ;;; Return the constant value for an LVAR whose only use is a constant
 ;;; node.
 (declaim (ftype (function (lvar) t) lvar-value))
@@ -52,6 +72,12 @@
           (unless constantp
             (error "~S used on non-constant LVAR ~S" 'lvar-value lvar))
           value))))
+
+(defun lvar-uses-values (lvar)
+  (let ((uses (principal-lvar-use lvar)))
+    (loop for use in uses
+          for leaf = (ref-leaf use)
+          collect (constant-value leaf))))
 
 ;;;; interface for obtaining results of type inference
 
@@ -63,17 +89,17 @@
 ;;; slot is true, just return that value, otherwise recompute and
 ;;; stash the value there.
 (defmacro lvar-type-using (lvar accessor)
-     `(let ((uses (lvar-uses ,lvar)))
-        (cond ((null uses) *empty-type*)
-              ((listp uses)
-               (do ((res (,accessor (first uses))
-                         (values-type-union (,accessor (first current))
-                                            res))
-                    (current (rest uses) (rest current)))
-                   ((or (null current) (eq res *wild-type*))
-                    res)))
-              (t
-               (,accessor uses)))))
+  `(let ((uses (lvar-uses ,lvar)))
+     (cond ((null uses) *empty-type*)
+           ((listp uses)
+            (do ((res (,accessor (first uses))
+                      (values-type-union (,accessor (first current))
+                                         res))
+                 (current (rest uses) (rest current)))
+                ((or (null current) (eq res *wild-type*))
+                 res)))
+           (t
+            (,accessor uses)))))
 
 (defun %lvar-derived-type (lvar)
   (lvar-type-using lvar node-derived-type))
@@ -2333,20 +2359,28 @@
              (uses (lvar-uses value))
              (lvar (or (and (ref-p uses)
                             (lambda-var-ref-lvar uses))
-                       value)))
-        (when (constant-lvar-p lvar)
-          (let ((*compiler-error-context* cast)
-                (value (lvar-value lvar)))
-            (unless (or (and
-                         (not (consp value))
-                         (not (arrayp value))
-                         (not (type= (cast-asserted-type cast)
-                                     (specifier-type 'hash-table))))
-                        (typep value '(vector * 0)))
-              (warn 'constant-modified
-                    :fun-name (shiftf (modifying-cast-caller cast) nil) ;; warn once
-                    :value value)
-              t))))))
+                       value))
+             (*compiler-error-context* cast))
+        (flet ((modifiable-p (value)
+                 (or (consp value)
+                     (and (arrayp value)
+                          (not (typep value '(vector * 0))))
+                     (hash-table-p value))))
+          (cond ((constant-lvar-p lvar)
+                 (let ((value (lvar-value lvar)))
+                   (when (modifiable-p value)
+                     (warn 'constant-modified
+                           :fun-name (shiftf (modifying-cast-caller cast) nil) ;; warn once
+                           :values (list value))
+                     t)))
+                ((constant-lvar-uses-p lvar)
+                 (let ((values (lvar-uses-values lvar)))
+                   (when (and values
+                              (every #'modifiable-p values))
+                     (warn 'constant-modified
+                           :fun-name (shiftf (modifying-cast-caller cast) nil) ;; warn once
+                           :values values)
+                     t))))))))
 
 (defun may-delete-cast-with-hook (cast)
   (or (not (cast-with-hook-hook cast)) ;; run once

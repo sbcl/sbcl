@@ -854,12 +854,12 @@
 
 (define-condition constant-modified (reference-condition warning)
   ((fun-name :initarg :fun-name :reader constant-modified-fun-name)
-   (value :initarg :value :reader constant-modified-value))
+   (values :initform nil :initarg :values :reader constant-modified-values))
   (:report (lambda (c s)
              (format s "~@<Destructive function ~S called on ~
-                        constant data: ~s.~@:>"
+                        constant data: ~{~s~^, ~}~:>"
                      (constant-modified-fun-name c)
-                     (constant-modified-value c))))
+                     (constant-modified-values c))))
   (:default-initargs :references '((:ansi-cl :special-operator quote)
                                    (:ansi-cl :section (3 2 2 3)))))
 

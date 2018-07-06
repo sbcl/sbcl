@@ -775,6 +775,19 @@
                           :allow-warnings 'sb-int:constant-modified)))
       1)))
 
+(with-test (:name (debug :constant-modification.2))
+  (assert
+   (= (length (nth-value 2
+                         (checked-compile
+                          `(lambda (x)
+                             (declare (optimize (debug 2)))
+                             (let ((m (if x
+                                          "abc"
+                                          "fgh")))
+                               (delete x m)))
+                          :allow-warnings 'sb-int:constant-modified)))
+      1)))
+
 (with-test (:name (debug :unused-tn-long-arglist))
   (checked-compile-and-assert
       ()
