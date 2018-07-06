@@ -42,7 +42,7 @@ run_sbcl <<EOF
   ;; to an fdefn, from a caller in dynamic space.
   ;; dynamic space should be the default for compilation to memory,
   ;; but maybe someone changed it :immobile, so bind it to be certain.
-  (let (#+immobile-space (sb-c::*compile-to-memory-space* :dynamic))
+  (let (#+immobile-code (sb-c::*compile-to-memory-space* :dynamic))
      (defvar *afun* (compile nil '(lambda (x) (- (length x))))))
   (save-lisp-and-die "$tmpcore")
 EOF

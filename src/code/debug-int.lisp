@@ -1323,7 +1323,7 @@ register."
                 (when (typep val 'sb!interpreter:interpreted-function)
                   (%fun-name val))))))) ; Get its name
        ((sb!c::compiled-debug-fun-closure-save compiler-debug-fun)
-        (sb!impl::closure-name
+        (%fun-name
          (if (all-args-available-p frame)
              (sub-access-debug-var-slot (frame-pointer frame)
                                         sb!c:closure-sc

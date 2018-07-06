@@ -997,7 +997,7 @@ We could try a few things to mitigate this:
           (typecase ,obj
             ,.(make-case* 'closure
                `(,functoid (%closure-fun ,obj) ,@more)
-               `(do-closure-values (.o. ,obj :including-name t)
+               `(do-closure-values (.o. ,obj :include-extra-values t)
                   (,functoid .o. ,@more)))
             ,.(make-case* 'funcallable-instance
                `(let ((.l. (%funcallable-instance-layout ,obj)))

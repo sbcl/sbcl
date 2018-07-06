@@ -205,7 +205,7 @@ only."
     (clear-info :function :type symbol)
     (setf (info :function :kind symbol) :macro)
     (setf (info :function :macro-function symbol) function)
-    #-sb-xc-host (install-guard-function symbol `(:macro ,symbol) nil))
+    #-sb-xc-host (install-guard-function symbol `(:macro ,symbol)))
   function)
 
 (defun sb!xc:compiler-macro-function (name &optional env)
