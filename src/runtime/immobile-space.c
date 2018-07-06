@@ -2268,7 +2268,8 @@ static void fixup_immobile_refs(lispobj fixups, struct code* code)
             gc_assert(header_addr);
             if (forwarding_pointer_p(header_addr)) {
                 lispobj fpval = forwarding_pointer_value(header_addr);
-                int widetag = widetag_of(*tempspace_addr(native_pointer(fpval)));
+                int __attribute__((unused)) widetag =
+                    widetag_of(*tempspace_addr(native_pointer(fpval)));
                 // Must be an interior pointer to a symbol value slot
                 // or fdefn raw addr slow
                 gc_assert(widetag == SYMBOL_WIDETAG
@@ -2284,7 +2285,7 @@ static void fixup_immobile_refs(lispobj fixups, struct code* code)
              * might be emitted as "MOV RAX, #x{addr} ; CALL RAX" where {addr}
              * is a simple-fun entry point. So assert that */
             header_addr = (lispobj*)(ptr - offsetof(struct simple_fun, code));
-            lispobj header_word =
+            lispobj __attribute__((unused)) header_word =
                 *(forwarding_pointer_p(header_addr) ?
                   tempspace_addr(native_pointer(forwarding_pointer_value(header_addr))) :
                   header_addr);
