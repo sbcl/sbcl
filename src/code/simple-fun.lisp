@@ -334,43 +334,6 @@
              (bug "bogus INFO for ~S: ~S" simple-fun info)))))
   doc)
 
-(defun %fun-doc (function)
-  (typecase function
-    #!+sb-fasteval
-    (sb!interpreter:interpreted-function
-     (sb!interpreter:proto-fn-docstring (sb!interpreter:fun-proto-fn function)))
-    #!+sb-eval
-    (sb!eval:interpreted-function
-     (sb!eval:interpreted-function-documentation function))
-    (t
-     (when (closurep function)
-       (let ((val (nth-value +closure-doc-index+ (closure-extra-values function))))
-         (unless (unbound-marker-p val)
-           (return-from %fun-doc val))))
-     (%simple-fun-doc (%fun-fun function)))))
-
-(defun (setf %fun-doc) (new-value function)
-  (declare (type (or null string) new-value))
-  (typecase function
-    #!+sb-fasteval
-    (sb!interpreter:interpreted-function
-     (setf (sb!interpreter:proto-fn-docstring
-            (sb!interpreter:fun-proto-fn function)) new-value))
-    #!+sb-eval
-    (sb!eval:interpreted-function
-     (setf (sb!eval:interpreted-function-documentation function) new-value))
-    (closure
-     (set-closure-extra-values
-      function nil
-      (pack-closure-extra-values
-       (nth-value +closure-name-index+ (closure-extra-values function))
-       new-value)))
-    (simple-fun
-     ;; Don't allow PCL CTORs and other random functions through
-     ;; because we don't want to affect builtin docstrings.
-     (setf (%simple-fun-doc function) new-value)))
-  new-value)
-
 (defun %simple-fun-next (simple-fun) ; DO NOT USE IN NEW CODE
   (%code-entry-point (fun-code-header simple-fun)
                      (1+ (%simple-fun-index simple-fun))))

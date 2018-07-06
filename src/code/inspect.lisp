@@ -238,7 +238,7 @@ evaluated expressions.
             (list
              (cons "Lambda-list" (%fun-lambda-list object))
              (cons "Definition" defn)
-             (cons "Documentation" (%fun-doc object))))))
+             (cons "Documentation" (documentation object t))))))
 
 (defmethod inspected-parts ((object vector))
   (values (format nil

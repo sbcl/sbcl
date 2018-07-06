@@ -1373,6 +1373,11 @@ possibly temporarily, because it might be used internally."
                "DESCRIPTOR-SAP"
                "DO-PACKED-VARINTS"
 
+               "CLOSURE-EXTRA-VALUES"
+               "PACK-CLOSURE-EXTRA-VALUES"
+               "SET-CLOSURE-EXTRA-VALUES"
+               "+CLOSURE-NAME-INDEX+"
+
                ;; These could be moved back into SB!EXT if someone has
                ;; compelling reasons, but hopefully we can get by
                ;; without supporting them, at least not as publicly
@@ -2105,7 +2110,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "%CLOSURE-VALUES"
 
                ;; Abstract function accessors
-               "%FUN-DOC"
                "%FUN-FUN"
                "%FUN-LAMBDA-LIST"
                "%FUN-NAME"

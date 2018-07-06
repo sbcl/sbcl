@@ -8,6 +8,48 @@
 
 (in-package "SB-PCL")
 
+(defun fun-doc (function)
+  (typecase function
+    #+sb-fasteval
+    (sb-interpreter:interpreted-function
+     (sb-interpreter:proto-fn-docstring (sb-interpreter:fun-proto-fn function)))
+    #+sb-eval
+    (sb-eval:interpreted-function
+     (sb-eval:interpreted-function-documentation function))
+    (generic-function
+     (slot-value function '%documentation))
+    (t
+     (when (closurep function)
+       (let ((val (nth-value sb-impl::+closure-doc-index+
+                             (closure-extra-values function))))
+         (unless (unbound-marker-p val)
+           (return-from fun-doc val))))
+     (%simple-fun-doc (%fun-fun function)))))
+
+(defun (setf fun-doc) (new-value function)
+  (declare (type (or null string) new-value))
+  (typecase function
+    #+sb-fasteval
+    (sb-interpreter:interpreted-function
+     (setf (sb-interpreter:proto-fn-docstring
+            (sb-interpreter:fun-proto-fn function)) new-value))
+    #+sb-eval
+    (sb-eval:interpreted-function
+     (setf (sb-eval:interpreted-function-documentation function) new-value))
+    (generic-function
+     (setf (slot-value function '%documentation) new-value))
+    (closure
+     (set-closure-extra-values
+      function nil
+      (pack-closure-extra-values
+       (nth-value +closure-name-index+ (closure-extra-values function))
+       new-value)))
+    (simple-fun
+     ;; Don't allow PCL CTORs and other random functions through
+     ;; because we don't want to affect builtin docstrings.
+     (setf (%simple-fun-doc function) new-value)))
+  new-value)
+
 ;;; (SETF %DOC-INFO) is a thin wrapper on INFO that set or clears
 ;;; a :DOCUMENTATION info value depending on whether STRING is NIL.
 ;;; It, and the corresponding reader, are not for use outside this file.
@@ -49,7 +91,7 @@
                  ((not (equal (sb-c::real-function-name name) name))
                   (setf (random-documentation name 'function) string))
                  (t
-                  (setf (%fun-doc (fdefinition name)) string))))
+                  (setf (fun-doc (fdefinition name)) string))))
           ((typep name '(or symbol cons))
            (setf (random-documentation name doc-type) string)))))
 
@@ -73,23 +115,13 @@
        (t (and (typep x 'symbol) (values (info :type :documentation x))))))
     ((t)
      (typecase x
-       (function (%fun-doc x))
+       (function (fun-doc x))
        (structure-class (values (info :type :documentation (class-name x))))
        ((or symbol cons)
         (random-documentation x doc-type))))
     (t
      (when (typep x '(or symbol cons))
        (random-documentation x doc-type)))))
-
-(defun fun-doc (x)
-  (if (typep x 'generic-function)
-      (slot-value x '%documentation)
-      (%fun-doc x)))
-
-(defun (setf fun-doc) (new-value x)
-  (if (typep x 'generic-function)
-      (setf (slot-value x '%documentation) new-value)
-      (setf (%fun-doc x) new-value)))
 
 (defun set-function-name-documentation (name documentation)
   (aver name)

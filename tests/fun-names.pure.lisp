@@ -55,5 +55,5 @@
             (sb-impl::closure-extra-values closure)
           (assert (eq stored-name name))
           (assert (eq stored-doc doc)))
-        (assert (string= (sb-kernel:%fun-doc closure)
+        (assert (string= (documentation closure t)
                          (if (eq doc sb-pcl:+slot-unbound+) "doc" doc)))))))

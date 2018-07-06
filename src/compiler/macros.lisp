@@ -50,7 +50,7 @@
         (values))
       #-sb-xc-host
       (progn (install-guard-function ',name '(:special ,name))
-             (setf (%fun-doc (symbol-function ',name)) ',doc))
+             (setf (documentation (symbol-function ',name) t) ',doc))
            ;; FIXME: Evidently "there can only be one!" -- we overwrite any
            ;; other :IR1-CONVERT value. This deserves a warning, I think.
       (setf (info :function :ir1-convert ',name) #',fn-name)
