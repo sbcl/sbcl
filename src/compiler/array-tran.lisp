@@ -1266,51 +1266,51 @@
     (give-up-ir1-transform "The axis is not constant."))
   ;; Dimensions may change thanks to ADJUST-ARRAY, so we need the
   ;; conservative type.
-  (let ((array-type (lvar-conservative-type array))
-        (axis (lvar-value axis)))
-    (let ((dims (array-type-dimensions-or-give-up array-type)))
-      (unless (listp dims)
-        (give-up-ir1-transform
-         "The array dimensions are unknown; must call ARRAY-DIMENSION at runtime."))
-      (unless (> (length dims) axis)
-        (abort-ir1-transform "The array has dimensions ~S, ~W is too large."
-                             dims
-                             axis))
-      (let ((dim (nth axis dims)))
-        (cond ((integerp dim)
-               dim)
-              ((= (length dims) 1)
-               (ecase (conservative-array-type-complexp array-type)
-                 ((t)
-                  '(%array-dimension array 0))
-                 ((nil)
-                  '(vector-length array))
-                 ((:maybe)
-                  `(if (array-header-p array)
-                       (%array-dimension array axis)
-                       (vector-length array)))))
-              (t
-               '(%array-dimension array axis)))))))
+  (let* ((array-type (lvar-conservative-type array))
+         (axis (lvar-value axis))
+         (dims (array-type-dimensions-or-give-up array-type)))
+    (unless (listp dims)
+      (give-up-ir1-transform
+       "The array dimensions are unknown; must call ARRAY-DIMENSION at runtime."))
+    (unless (> (length dims) axis)
+      (abort-ir1-transform "The array has dimensions ~S, ~W is too large."
+                           dims
+                           axis))
+    (let ((dim (nth axis dims)))
+      (cond ((integerp dim)
+             dim)
+            ((= (length dims) 1)
+             (ecase (conservative-array-type-complexp array-type)
+               ((t)
+                '(%array-dimension array 0))
+               ((nil)
+                '(vector-length array))
+               ((:maybe)
+                `(if (array-header-p array)
+                     (%array-dimension array axis)
+                     (vector-length array)))))
+            (t
+             '(%array-dimension array axis))))))
 
 (deftransform %array-dimension ((array axis)
                                 (array (constant-arg index)))
   (let* ((array-type (lvar-conservative-type array))
          (dims (array-type-dimensions-or-give-up array-type))
-         (axis (lvar-value axis)))
-    (let ((dim (nth axis dims)))
-      (if (integerp dim)
-          dim
-          (give-up-ir1-transform)))))
+         (axis (lvar-value axis))
+         (dim (and (listp dims)
+                   (nth axis dims))))
+    (if (integerp dim)
+        dim
+        (give-up-ir1-transform))))
 
 ;;; If the length has been declared and it's simple, just return it.
 (deftransform length ((vector)
                       ((simple-array * (*))))
-  (let ((type (lvar-type vector)))
-    (let ((dims (array-type-dimensions-or-give-up type)))
-      (unless (and (listp dims) (integerp (car dims)))
-        (give-up-ir1-transform
-         "Vector length is unknown, must call LENGTH at runtime."))
-      (car dims))))
+  (let* ((type (lvar-type vector))
+         (dims (array-type-dimensions-or-give-up type)))
+    (unless (and (listp dims) (integerp (car dims)))
+      (give-up-ir1-transform
+       "Vector length is unknown, must call LENGTH at runtime."))))
 
 ;;; All vectors can get their length by using VECTOR-LENGTH. If it's
 ;;; simple, it will extract the length slot from the vector. It it's
@@ -1322,13 +1322,13 @@
 ;;; If a simple array with known dimensions, then VECTOR-LENGTH is a
 ;;; compile-time constant.
 (deftransform vector-length ((vector))
-  (let ((vtype (lvar-type vector)))
-    (let ((dim (first (array-type-dimensions-or-give-up vtype))))
-      (when (eq dim '*)
-        (give-up-ir1-transform))
-      (when (conservative-array-type-complexp vtype)
-        (give-up-ir1-transform))
-      dim)))
+  (let* ((vtype (lvar-type vector))
+         (dim (first (array-type-dimensions-or-give-up vtype))))
+    (when (eq dim '*)
+      (give-up-ir1-transform))
+    (when (conservative-array-type-complexp vtype)
+      (give-up-ir1-transform))
+    dim))
 
 ;;; Again, if we can tell the results from the type, just use it.
 ;;; Otherwise, if we know the rank, convert into a computation based
@@ -1348,19 +1348,19 @@
 
 ;;; Only complex vectors have fill pointers.
 (deftransform array-has-fill-pointer-p ((array))
-  (let ((array-type (lvar-type array)))
-    (let ((dims (array-type-dimensions-or-give-up array-type)))
-      (if (and (listp dims) (not (= (length dims) 1)))
-          nil
-          (ecase (conservative-array-type-complexp array-type)
-            ((t)
-             t)
-            ((nil)
-             nil)
-            ((:maybe)
-             (give-up-ir1-transform
-              "The array type is ambiguous; must call ~
-               ARRAY-HAS-FILL-POINTER-P at runtime.")))))))
+  (let* ((array-type (lvar-type array))
+         (dims (array-type-dimensions-or-give-up array-type)))
+    (if (and (listp dims) (not (= (length dims) 1)))
+        nil
+        (ecase (conservative-array-type-complexp array-type)
+          ((t)
+           t)
+          ((nil)
+           nil)
+          ((:maybe)
+           (give-up-ir1-transform
+            "The array type is ambiguous; must call ~
+               ARRAY-HAS-FILL-POINTER-P at runtime."))))))
 
 (deftransform check-bound ((array dimension index) * * :node node)
   ;; This is simply to avoid multiple evaluation of INDEX by the
