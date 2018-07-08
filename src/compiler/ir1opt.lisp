@@ -282,7 +282,11 @@
           (setf (block-reoptimize block) t)
           (reoptimize-component component :maybe))
         (loop for cast in (lvar-dependent-casts lvar)
-              do (setf (node-reoptimize cast) t))))
+              unless (node-deleted cast)
+              do
+              (setf (node-reoptimize cast) t)
+              (setf (block-reoptimize (node-block cast)) t)
+              (reoptimize-component (node-component cast) :maybe))))
     (do-uses (node lvar)
       (setf (block-type-check (node-block node)) t)))
   (values))
@@ -603,7 +607,9 @@
                      (delq node (basic-var-sets var)))
                (unlink-node node))))
           (cast
-           (unless (cast-type-check node)
+           (unless (or (cast-type-check node)
+                       (and (bound-cast-p node)
+                            (bound-cast-check node)))
              (flush-dest (cast-value node))
              (unlink-node node)))))))
 
