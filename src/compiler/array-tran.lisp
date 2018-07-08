@@ -1292,6 +1292,16 @@
               (t
                '(%array-dimension array axis)))))))
 
+(deftransform %array-dimension ((array axis)
+                                (array (constant-arg index)))
+  (let* ((array-type (lvar-conservative-type array))
+         (dims (array-type-dimensions-or-give-up array-type))
+         (axis (lvar-value axis)))
+    (let ((dim (nth axis dims)))
+      (if (integerp dim)
+          dim
+          (give-up-ir1-transform)))))
+
 ;;; If the length has been declared and it's simple, just return it.
 (deftransform length ((vector)
                       ((simple-array * (*))))
@@ -1631,7 +1641,7 @@
 
   (deftransform (setf aref) ((new-value array &rest subscripts))
     (with-row-major-index (array subscripts index new-value)
-                          (hairy-data-vector-set array index new-value))))
+      (hairy-data-vector-set array index new-value))))
 
 ;; For AREF of vectors we do the bounds checking in the callee. This
 ;; lets us do a significantly more efficient check for simple-arrays
