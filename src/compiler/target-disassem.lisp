@@ -2131,11 +2131,14 @@
   (cadr (svref sb!c:+backend-internal-errors+ errnum)))
 
 (defun get-random-tn-name (sc+offset)
-  (sb!c:location-print-name
-   (sb!c:make-random-tn :kind :normal
-                        :sc (svref sb!c:*backend-sc-numbers*
-                                   (sb!c:sc+offset-scn sc+offset))
-                        :offset (sb!c:sc+offset-offset sc+offset))))
+  (let ((sc (sb!c:sc+offset-scn sc+offset))
+        (offset (sb!c:sc+offset-offset sc+offset)))
+    (if (= sc sb!vm:immediate-sc-number)
+        (princ-to-string offset)
+        (sb!c:location-print-name
+         (sb!c:make-random-tn :kind :normal
+                              :sc (svref sb!c:*backend-sc-numbers* sc)
+                              :offset offset)))))
 
 ;;; When called from an error break instruction's :DISASSEM-CONTROL (or
 ;;; :DISASSEM-PRINTER) function, will correctly deal with printing the
