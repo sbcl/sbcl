@@ -481,14 +481,18 @@
 ;;;
 ;;; Secondary return value is true if passing the generated tests implies that
 ;;; the array has a header.
-(defun test-array-dimensions (obj type stype)
+(defun test-array-dimensions (obj type stype
+                              simple-array-header-p)
   (declare (type array-type type stype))
   (let ((obj `(truly-the ,(type-specifier stype) ,obj))
-        (dims (array-type-dimensions type)))
+        (dims (array-type-dimensions type))
+        (header-test (if simple-array-header-p
+                         `(simple-array-header-p ,obj)
+                         `(array-header-p ,obj))))
     (unless (or (eq dims '*)
                 (equal dims (array-type-dimensions stype)))
       (cond ((cdr dims)
-             (values `((array-header-p ,obj)
+             (values `(,header-test
                        ,@(when (eq (array-type-dimensions stype) '*)
                                `((= (%array-rank ,obj) ,(length dims))))
                        ,@(loop for d in dims
@@ -497,7 +501,7 @@
                                collect `(= (%array-dimension ,obj ,i) ,d)))
                      t))
             ((not dims)
-             (values `((array-header-p ,obj)
+             (values `(,header-test
                        (= (%array-rank ,obj) 0))
                      t))
             ((not (array-type-complexp type))
@@ -506,13 +510,13 @@
                            `((= (vector-length ,obj) ,@dims)))
                          nil)
                  (values (if (eq '* (car dims))
-                             `((not (array-header-p ,obj)))
-                             `((not (array-header-p ,obj))
+                             `((not ,header-test))
+                             `((not ,header-test)
                                (= (vector-length ,obj) ,@dims)))
                          nil)))
             (t
              (values (unless (eq '* (car dims))
-                       `((if (array-header-p ,obj)
+                       `((if ,header-test
                              (= (%array-dimension ,obj 0) ,@dims)
                              (= (vector-length ,obj) ,@dims))))
                      nil))))))
@@ -550,47 +554,52 @@
   ;; this nonstandard predicate can be generically defined for all backends.
   (let ((dims (array-type-dimensions type))
         (et (array-type-element-type type)))
-   (if (and (not (array-type-complexp type))
-            (eq et *wild-type*)
-            (equal dims '(*)))
-       (return-from source-transform-array-typep
-         `(simple-rank-1-array-*-p ,obj)))
-    (multiple-value-bind (pred stype) (find-supertype-predicate type)
-      (if (and (array-type-p stype)
-               ;; (If the element type hasn't been defined yet, it's
-               ;; not safe to assume here that it will eventually
-               ;; have (UPGRADED-ARRAY-ELEMENT-TYPE type)=T, so punt.)
-               (not (unknown-type-p (array-type-element-type type)))
-               (or (eq (array-type-complexp stype) (array-type-complexp type))
-                   (and (eql (array-type-complexp stype) :maybe)
-                        (eql (array-type-complexp type) t))))
-          (let ((complex-tag (and
-                              (eql (array-type-complexp type) t)
-                              (singleton-p dims)
-                              (and (neq et *wild-type*)
-                                   (sb!vm:saetp-complex-typecode
-                                    (find-saetp-by-ctype (array-type-element-type type)))))))
-            (once-only ((n-obj obj))
-              (if complex-tag
-                  `(and (eq (%other-pointer-widetag ,n-obj) ,complex-tag)
-                        ,@(unless (eq (car dims) '*)
-                            `((= (%array-dimension ,n-obj 0) ,(car dims)))))
-                  (multiple-value-bind (tests headerp)
-                      (test-array-dimensions n-obj type stype)
-                    `(and ,@(unless (and headerp (eql pred 'arrayp))
-                              ;; ARRAY-HEADER-P from TESTS will test for that
-                              `((,pred ,n-obj)))
-                          ,@(when (and (eql (array-type-complexp stype) :maybe)
-                                       (eql (array-type-complexp type) t))
-                              ;; KLUDGE: this is a bit lame; if we get here,
-                              ;; we already know that N-OBJ is an array, but
-                              ;; (NOT SIMPLE-ARRAY) doesn't know that.  On the
-                              ;; other hand, this should get compiled down to
-                              ;; two widetag tests, so it's only a bit lame.
-                              `((typep ,n-obj '(not simple-array))))
-                          ,@tests
-                          ,@(test-array-element-type n-obj type stype headerp))))))
-          `(%typep ,obj ',(type-specifier type))))))
+    (if (and (not (array-type-complexp type))
+             (eq et *wild-type*)
+             (equal dims '(*)))
+        `(simple-rank-1-array-*-p ,obj)
+        (multiple-value-bind (pred stype) (find-supertype-predicate type)
+          (if (and (array-type-p stype)
+                   ;; (If the element type hasn't been defined yet, it's
+                   ;; not safe to assume here that it will eventually
+                   ;; have (UPGRADED-ARRAY-ELEMENT-TYPE type)=T, so punt.)
+                   (not (unknown-type-p (array-type-element-type type)))
+                   (or (eq (array-type-complexp stype) (array-type-complexp type))
+                       (and (eql (array-type-complexp stype) :maybe)
+                            (eql (array-type-complexp type) t))))
+              (let ((complex-tag (and
+                                  (eql (array-type-complexp type) t)
+                                  (singleton-p dims)
+                                  (and (neq et *wild-type*)
+                                       (sb!vm:saetp-complex-typecode
+                                        (find-saetp-by-ctype (array-type-element-type type))))))
+                    (simple-array-header-p
+                      (and (null (array-type-complexp stype))
+                           (listp dims)
+                           (cdr dims))))
+                (once-only ((n-obj obj))
+                  (if complex-tag
+                      `(and (eq (%other-pointer-widetag ,n-obj) ,complex-tag)
+                            ,@(unless (eq (car dims) '*)
+                                `((= (%array-dimension ,n-obj 0) ,(car dims)))))
+                      (multiple-value-bind (tests headerp)
+                          (test-array-dimensions n-obj type stype
+                                                 simple-array-header-p)
+                        `(and ,@(unless (or (and headerp (eql pred 'arrayp))
+                                            simple-array-header-p)
+                                  ;; ARRAY-HEADER-P from TESTS will test for that
+                                  `((,pred ,n-obj)))
+                              ,@(when (and (eql (array-type-complexp stype) :maybe)
+                                           (eql (array-type-complexp type) t))
+                                  ;; KLUDGE: this is a bit lame; if we get here,
+                                  ;; we already know that N-OBJ is an array, but
+                                  ;; (NOT SIMPLE-ARRAY) doesn't know that.  On the
+                                  ;; other hand, this should get compiled down to
+                                  ;; two widetag tests, so it's only a bit lame.
+                                  `((typep ,n-obj '(not simple-array))))
+                              ,@tests
+                              ,@(test-array-element-type n-obj type stype headerp))))))
+              `(%typep ,obj ',(type-specifier type)))))))
 
 ;;; Transform a type test against some instance type. The type test is
 ;;; flushed if the result is known at compile time. If not properly

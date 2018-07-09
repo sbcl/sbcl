@@ -145,6 +145,9 @@
    complex-base-string-widetag complex-bit-vector-widetag
    complex-vector-widetag complex-array-widetag complex-vector-nil-widetag))
 
+(!define-type-vop simple-array-header-p
+  (simple-array-widetag))
+
 (!define-type-vop stringp
   (#!+sb-unicode simple-character-string-widetag
    #!+sb-unicode complex-character-string-widetag
