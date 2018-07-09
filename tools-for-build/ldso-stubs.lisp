@@ -111,7 +111,7 @@ ldso_stub__ ## fct: ;                           \\
         .level  2.0
         .text"
 
-#!+(and (not darwin) ppc) "
+#!+(and (not darwin) (or ppc ppc64)) "
 #define LDSO_STUBIFY(fct)                       \\
 .globl ldso_stub__ ## fct ;                     \\
         .type    ldso_stub__ ## fct,@function ; \\

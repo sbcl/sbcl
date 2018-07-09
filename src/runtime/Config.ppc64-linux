@@ -1,0 +1,37 @@
+# -*- makefile -*- for the C-level run-time support for SBCL
+
+# This software is part of the SBCL system. See the README file for
+# more information.
+#
+# This software is derived from the CMU CL system, which was
+# written at Carnegie Mellon University and released into the
+# public domain. The software is in the public domain and is
+# provided with absolutely no warranty. See the COPYING and CREDITS
+# files for more information.
+
+CFLAGS += -m64
+LINKFLAGS += -rdynamic -m64
+NM = ./linux-nm
+
+ASSEM_SRC = ppc64-assem.S ldso-stubs.S
+ARCH_SRC = ppc64-arch.c
+
+OS_SRC = linux-os.c linux-mman.c ppc64-linux-os.c
+OS_LIBS = -ldl
+
+ifdef LISP_FEATURE_GENCGC
+  GC_SRC = fullcgc.c gencgc.c traceroot.c
+else
+  GC_SRC = cheneygc.c
+endif
+
+ifdef LISP_FEATURE_SB_THREAD
+  OS_LIBS += -lpthread
+endif
+ifdef LISP_FEATURE_SB_CORE_COMPRESSION
+  OS_LIBS += -lz
+endif
+
+# Nothing to do for after-grovel-headers.
+.PHONY: after-grovel-headers
+after-grovel-headers:
