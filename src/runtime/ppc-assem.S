@@ -5,7 +5,7 @@
 
 #define LANGUAGE_ASSEMBLY
 
-#include "sbcl.h" 
+#include "sbcl.h"
 #include "lispregs.h"
 #include "globals.h"
 
@@ -63,7 +63,7 @@ x:
 #define store(reg,temp,global) \
 	lis temp,global@ha; stw reg,global@l(temp)
 #endif
-	
+
 #define	FIRST_SAVE_FPR	14	/* lowest-numbered non-volatile FPR */
 #ifdef LISP_FEATURE_DARWIN
 #define	FIRST_SAVE_GPR	13	/* lowest-numbered non-volatile GPR */
@@ -190,8 +190,8 @@ x:
 	mtcr REG(0) @ \
 	lwz REG(0),8(REG(1)) @ \
 	mtlr REG(0) @ \
-	
-#else	
+
+#else
 
 #define C_FULL_PROLOG \
 	mflr 0 ; \
@@ -282,7 +282,7 @@ x:
 	lwz 1,0(1) ; \
 	lwz 0,4(1) ; \
 	mtlr 0 ; \
-	
+
 #endif
 
 #ifdef LISP_FEATURE_SB_SAFEPOINT
@@ -402,11 +402,11 @@ x:
 	addi reg_LIP,reg_CODE,SIMPLE_FUN_CODE_OFFSET
 	mtctr reg_LIP
 	slwi reg_NARGS,reg_NL2,2
-	bctr			
-	
+	bctr
+
 	.align 3
 lra:
-	.long RETURN_PC_WIDETAG 
+	.long RETURN_PC_WIDETAG
 
 	/* Blow off any extra values. */
 	mr reg_CSP,reg_OCFP
@@ -446,7 +446,7 @@ lra:
 	subi reg_ALLOC, reg_ALLOC, flag_PseudoAtomic
 	andi. reg_NL3, reg_ALLOC, flag_PseudoAtomicInterrupted
 	twnei reg_NL3,0
-	
+
 	/* Back to C */
 	C_FULL_EPILOG
 	blr
@@ -495,7 +495,7 @@ lra:
 	clrrwi reg_NFP,reg_ALLOC,3
 	store(reg_NFP,reg_CFUNC,CSYMBOL(dynamic_space_free_pointer))
 	/* load(reg_CFUNC,current_thread) */
-	
+
 	store(reg_BSP,reg_CFUNC,CSYMBOL(current_binding_stack_pointer))
 	store(reg_CSP,reg_CFUNC,CSYMBOL(current_control_stack_pointer))
 	store(reg_CFP,reg_CFUNC,CSYMBOL(current_control_frame_pointer))
@@ -614,11 +614,11 @@ lra:
 	subi reg_ALLOC, reg_ALLOC, flag_PseudoAtomic
 	andi. reg_NL3, reg_ALLOC, flag_PseudoAtomicInterrupted
 	twnei reg_NL3, 0
-	
+
 	/* Reset the lisp stack. */
 	mr reg_CSP,reg_CFP
 	mr reg_CFP,reg_OCFP
-	
+
 	/* And back into Lisp. */
 	blr
 

@@ -41,7 +41,6 @@ void pick_fuzzed_addresses(unsigned long *addr1,
     }
     char __attribute__((unused)) *buf = fgets(line, sizeof line, f);
     line_number = atoi(line);
-    void* result = 0;
     for (i = 0 ; i <= line_number ; ++i) {
         int ok;
         ok = fgets(line, sizeof line, f) != NULL && line[0] != '\n';

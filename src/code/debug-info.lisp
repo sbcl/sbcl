@@ -399,7 +399,7 @@
   ;; vector.
   (fun-map (missing-arg) :type simple-vector :read-only t)
   ;; Location contexts
-  ;; Either a simple-vector or a context if there's only one context.
+  ;; A (simple-array * (*)) or a context if there's only one context.
   (contexts nil :type t :read-only t)
   (tlf-num+offset nil :type integer))
 
