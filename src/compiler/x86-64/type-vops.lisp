@@ -397,3 +397,13 @@
       (inst jmp :e is-not-cons-label)
       (test-type value temp target not-p (list-pointer-lowtag)))
     DROP-THRU))
+
+(define-vop (widetag=)
+  (:translate widetag=)
+  (:policy :fast-safe)
+  (:args (x :scs (descriptor-reg)))
+  (:info widetag)
+  (:arg-types * (:constant t))
+  (:conditional :e)
+  (:generator 2
+   (inst cmp (make-ea :byte :base x :disp (- other-pointer-lowtag)) widetag)))

@@ -157,6 +157,10 @@
 (defknown %set-array-dimension (t index index) index
   ())
 (defknown %array-rank (t) array-rank
+    (flushable))
+
+#!+x86-64
+(defknown (%array-rank= widetag=) (t t) boolean
   (flushable))
 
 (defknown sb!kernel::check-array-shape (simple-array list)

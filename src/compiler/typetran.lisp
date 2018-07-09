@@ -494,7 +494,10 @@
       (cond ((cdr dims)
              (values `(,header-test
                        ,@(when (eq (array-type-dimensions stype) '*)
-                               `((= (%array-rank ,obj) ,(length dims))))
+                           #!+x86-64
+                           `((%array-rank= ,obj ,(length dims)))
+                           #!-x86-64
+                           `((= (%array-rank ,obj) ,(length dims))))
                        ,@(loop for d in dims
                                for i from 0
                                unless (eq '* d)
@@ -537,7 +540,10 @@
              ;; If we know OBJ is an array header, and that the array is
              ;; simple, we also know there is exactly one indirection to
              ;; follow.
-             `((eq (%other-pointer-widetag (%array-data ,obj)) ,typecode))
+             `(#!-x86-64
+               (eq (%other-pointer-widetag (%array-data ,obj)) ,typecode)
+               #!+x86-64
+               (widetag= (%array-data ,obj) ,typecode))
              `((do ((,data ,(if headerp `(%array-data ,obj) obj)
                            (%array-data ,data)))
                    ((not (array-header-p ,data))

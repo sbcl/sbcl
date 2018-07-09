@@ -97,6 +97,7 @@
                   ;; (falling through to low-level implementation)
                   (,pred object)))))
   (def-type-predicate-wrapper array-header-p)
+  (def-type-predicate-wrapper simple-array-header-p)
   (def-type-predicate-wrapper arrayp)
   (def-type-predicate-wrapper atom)
   ;; Testing for BASE-CHAR-P is usually redundant on #-sb-unicode,

@@ -104,6 +104,18 @@
                      :index res
                      :base (if (= scale 2) res nil)
                      :disp (- (* scale (1- array-dimensions-offset))))))))
+
+(define-vop (array-rank=)
+  (:translate %array-rank=)
+  (:policy :fast-safe)
+  (:args (array :scs (descriptor-reg)))
+  (:info rank)
+  (:arg-types * (:constant t))
+  (:conditional :e)
+  (:generator 2
+    (inst cmp (make-ea :dword :base array :disp (1+ (- other-pointer-lowtag)))
+          (+ rank
+             (1- array-dimensions-offset)))))
 
 ;;;; bounds checking routine
 (define-vop (check-bound)
