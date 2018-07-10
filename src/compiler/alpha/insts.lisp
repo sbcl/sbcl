@@ -20,8 +20,6 @@
             sb!vm::zero-tn sb!vm::fp-single-zero-tn sb!vm::fp-double-zero-tn
             sb!vm::zero-offset sb!vm::null-offset sb!vm::code-offset)))
 
-(defconstant +disassem-inst-alignment-bytes+ 4)
-
 
 ;;;; utility functions
 

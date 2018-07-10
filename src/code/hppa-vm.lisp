@@ -12,7 +12,7 @@
 (!with-bigvec-or-sap
 (defun fixup-code-object (code offset value kind flavor)
   (declare (ignore flavor))
-  (unless (zerop (rem offset n-word-bytes))
+  (unless (zerop (rem offset sb!assem:+inst-alignment-bytes+))
     (error "Unaligned instruction?  offset=#x~X." offset))
   (let* ((sap (code-instructions code))
          (inst (sap-ref-32 sap offset)))

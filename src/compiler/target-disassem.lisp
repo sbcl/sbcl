@@ -1035,7 +1035,7 @@
 
 ;;; Make a disassembler-state object.
 (defun make-dstate (&optional (fun-hooks *default-dstate-hooks*))
-  (let ((alignment +disassem-inst-alignment-bytes+)
+  (let ((alignment sb!assem:+inst-alignment-bytes+)
         (arg-column
          (+ 2 ; for the leading "; " on each line
             (or *disassem-location-column-width* 0)

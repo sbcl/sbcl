@@ -134,8 +134,6 @@
 
 ;;;; Initial disassembler setup.
 
-(defconstant +disassem-inst-alignment-bytes+ 4)
-
 (defvar *disassem-use-lisp-reg-names* t)
 
 ; In each define-instruction the form (:dependencies ...)

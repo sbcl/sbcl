@@ -21,8 +21,6 @@
   (import '(sb!vm::frame-byte-offset sb!vm::ebp-tn
             sb!vm::registers sb!vm::float-registers sb!vm::stack))) ; SB names
 
-(defconstant +disassem-inst-alignment-bytes+ 1)
-
 (deftype reg () '(unsigned-byte 3))
 
 (defconstant +default-operand-size+ :dword)

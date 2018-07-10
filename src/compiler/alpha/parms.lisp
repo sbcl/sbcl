@@ -10,6 +10,7 @@
 (in-package "SB!VM")
 
 (defconstant sb!assem:assem-scheduler-p nil)
+(defconstant sb!assem:+inst-alignment-bytes+ 4)
 
 (defconstant +backend-fasl-file-implementation+ :alpha)
 

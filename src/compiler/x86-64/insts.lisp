@@ -22,8 +22,6 @@
   (import '(sb!vm::frame-byte-offset sb!vm::rip-tn sb!vm::rbp-tn
             sb!vm::registers sb!vm::float-registers sb!vm::stack))) ; SB names
 
-(defconstant +disassem-inst-alignment-bytes+ 1)
-
 ;;; This type is used mostly in disassembly and represents legacy
 ;;; registers only. R8-R15 are handled separately.
 (deftype reg () '(unsigned-byte 3))

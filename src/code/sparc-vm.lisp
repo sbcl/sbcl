@@ -21,7 +21,7 @@
 (defun fixup-code-object (code offset fixup kind flavor)
   (declare (type index offset))
   (declare (ignore flavor))
-  (unless (zerop (rem offset n-word-bytes))
+  (unless (zerop (rem offset sb!assem:+inst-alignment-bytes+))
     (error "Unaligned instruction?  offset=#x~X." offset))
   (let ((sap (code-instructions code)))
     (ecase kind

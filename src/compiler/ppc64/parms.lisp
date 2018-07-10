@@ -16,6 +16,7 @@
 ; ok, so we're supposed to use our instruction scheduler, but we don't,
 ; because of "needs a little more work in the assembler"
 (defconstant sb!assem:assem-scheduler-p nil)
+(defconstant sb!assem:+inst-alignment-bytes+ 4)
 
 (defconstant +backend-fasl-file-implementation+ :ppc)
   ;; On Linux, the ABI specifies the page size to be 4k-64k, use the
