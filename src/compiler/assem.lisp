@@ -386,8 +386,12 @@
                   `(note-write-dependency ,',segment ,',inst ,loc ,@keys)))
        ,@body)))
 
-#!+(or hppa sparc ppc ppc64 mips) ; only for platforms with scheduling assembler.
-(progn
+#.(unless assem-scheduler-p
+    '(defmacro schedule-pending-instructions (segment)
+      (declare (ignore segment))))
+
+#.(when assem-scheduler-p
+'(progn
 (defun note-read-dependency (segment inst read)
   (multiple-value-bind (loc-num size)
       (sb!c:location-number read)
@@ -454,7 +458,6 @@
           (setf (svref (segment-writers segment) index) nil))
         (push inst (svref (segment-writers segment) index)))))
   (values))
-) ; end PROGN
 
 ;;; This routine is called by due to uses of the INST macro when the
 ;;; scheduler is turned on. The change to the dependency graph has
@@ -492,9 +495,6 @@
       (when (zerop countdown)
         (schedule-pending-instructions segment))))
   (values))
-
-#!-(or mips ppc ppc64 sparc) ; not defined for platforms other than these
-(defun sb!c:emit-nop (seg) seg (bug "EMIT-NOP"))
 
 ;;; Emit all the pending instructions, and reset any state. This is
 ;;; called whenever we hit a label (i.e. an entry point of some kind)
@@ -791,6 +791,7 @@
              (setf (segment-emittable-insts-queue segment)
                    (cons inst remaining))))))
   (values))
+)) ; end PROGN
 
 ;;;; structure used during output emission
 

@@ -1798,10 +1798,6 @@
   (define-instruction-macro not. (ra rs)
     `(inst nor. ,ra ,rs ,rs))
 
-
-  (defun emit-nop (segment)
-                           (emit-word segment #x60000000))
-
   (define-instruction-macro extlwi (ra rs n b)
     `(inst rlwinm ,ra ,rs ,b 0 (1- ,n)))
 
