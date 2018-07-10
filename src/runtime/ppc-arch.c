@@ -591,7 +591,7 @@ void arch_install_interrupt_handlers()
 void
 ppc_flush_icache(os_vm_address_t address, os_vm_size_t length)
 {
-  os_vm_address_t end = (os_vm_address_t) ((int)(address+length+(32-1)) &~(32-1));
+  os_vm_address_t end = PTR_ALIGN_UP(address+length, 32);
   extern void ppc_flush_cache_line(os_vm_address_t);
 
   while (address < end) {
