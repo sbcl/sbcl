@@ -541,9 +541,6 @@
 ;;;; Primitive emitters.
 
 
-(define-bitfield-emitter emit-word 32
-  (byte 32 0))
-
 (define-bitfield-emitter emit-dword 64
   (byte 64 0))
 
@@ -2018,17 +2015,17 @@
 
 ;;;; Instructions for dumping data and header objects.
 
-(define-instruction word (segment word)
-  (:declare (type (or (unsigned-byte 32) (signed-byte 32) fixup) word))
+(define-instruction dword (segment dword)
+  (:declare (type (or (unsigned-byte 32) (signed-byte 32) fixup) dword))
   :pinned
   (:delay 0)
   (:emitter
-   (etypecase word
+   (etypecase dword
      (fixup
-      (note-fixup segment :absolute word)
-      (emit-word segment 0))
+      (note-fixup segment :absolute dword)
+      (emit-dword segment 0))
      (integer
-      (emit-word segment word)))))
+      (emit-dword segment dword)))))
 
 (define-instruction byte (segment byte)
   (:declare (type (or (unsigned-byte 8) (signed-byte 8)) byte))

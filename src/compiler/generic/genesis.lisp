@@ -788,9 +788,8 @@ core and return a descriptor to it."
       (64
        (let ((bits (ecase sb!c:*backend-byte-order*
                      (:little-endian (logior low-bits (ash high-bits 32)))
-                     ;; Just guessing.
-                     #+nil (:big-endian (logior (logand high-bits #xffffffff)
-                                                (ash low-bits 32))))))
+                     (:big-endian (logior (logand high-bits #xffffffff)
+                                          (ash low-bits 32))))))
          (write-wordindexed/raw address index bits))))
 
     address))
