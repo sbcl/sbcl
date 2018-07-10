@@ -121,9 +121,8 @@
   (:results (res :scs (any-reg descriptor-reg)))
   (:policy :fast-safe)
   (:generator 1
-    ;; FIXME: It would be better if this would mask the lowtag,
-    ;; and shift the result into a positive fixnum like on x86.
-    (inst rlwinm res ptr n-fixnum-tag-bits 1 n-positive-fixnum-bits)))
+    (inst andi. res ptr lowtag-mask)
+    (inst sldi res res 1)))
 
 
 ;;;; Allocation

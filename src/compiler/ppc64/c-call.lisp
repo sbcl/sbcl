@@ -45,8 +45,8 @@
 
 (define-alien-type-method (integer :arg-tn) (type state)
   (if (alien-integer-type-signed type)
-      (int-arg state 'signed-byte-32 signed-reg-sc-number signed-stack-sc-number)
-      (int-arg state 'unsigned-byte-32 unsigned-reg-sc-number unsigned-stack-sc-number)))
+      (int-arg state 'signed-byte-64 signed-reg-sc-number signed-stack-sc-number)
+      (int-arg state 'unsigned-byte-64 unsigned-reg-sc-number unsigned-stack-sc-number)))
 
 (define-alien-type-method (system-area-pointer :arg-tn) (type state)
   (declare (ignore type))
@@ -87,7 +87,7 @@
            (incf (arg-state-fpr-args state))
            ;; Assign outgoing FPRs starting at FP1
            (list (make-wired-tn* 'single-float single-reg-sc-number (1+ fprs))
-                 (int-arg state 'signed-byte-32 signed-reg-sc-number signed-stack-sc-number)))
+                 (int-arg state 'signed-byte-64 signed-reg-sc-number signed-stack-sc-number)))
           ((< fprs 13)
            ;; See comments below for double-float.
            (incf (arg-state-fpr-args state))
@@ -130,13 +130,13 @@
            ;; TNs for the float reg and for the int regs.
            ;;
            (list (make-wired-tn* 'double-float double-reg-sc-number (1+ fprs))
-                 (int-arg state 'signed-byte-32 signed-reg-sc-number signed-stack-sc-number)
-                 (int-arg state 'unsigned-byte-32 unsigned-reg-sc-number unsigned-stack-sc-number)))
+                 (int-arg state 'signed-byte-64 signed-reg-sc-number signed-stack-sc-number)
+                 (int-arg state 'unsigned-byte-64 unsigned-reg-sc-number unsigned-stack-sc-number)))
           ((< fprs 13)
            (incf (arg-state-fpr-args state))
            (list (make-wired-tn* 'double-float double-reg-sc-number (1+ fprs))
-                 (int-arg state 'signed-byte-32 signed-reg-sc-number signed-stack-sc-number)
-                 (int-arg state 'unsigned-byte-32 unsigned-reg-sc-number unsigned-stack-sc-number)))
+                 (int-arg state 'signed-byte-64 signed-reg-sc-number signed-stack-sc-number)
+                 (int-arg state 'unsigned-byte-64 unsigned-reg-sc-number unsigned-stack-sc-number)))
           (t
            ;; Pass on stack only
            (let ((stack-offset (arg-state-stack-frame-size state)))
@@ -186,8 +186,8 @@
     (setf (result-state-num-results state) (1+ num-results))
     (multiple-value-bind (ptype reg-sc)
         (if (alien-integer-type-signed type)
-            (values 'signed-byte-32 signed-reg-sc-number)
-            (values 'unsigned-byte-32 unsigned-reg-sc-number))
+            (values 'signed-byte-64 signed-reg-sc-number)
+            (values 'unsigned-byte-64 unsigned-reg-sc-number))
       (make-wired-tn* ptype reg-sc (result-reg-offset num-results)))))
 
 (defun make-call-out-tns (type)

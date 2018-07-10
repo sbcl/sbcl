@@ -40,11 +40,11 @@
 (defconstant gencgc-release-granularity +backend-page-bytes+)
 
 ;;; number of bits per word where a word holds one lisp descriptor
-(defconstant n-word-bits 32)
+(defconstant n-word-bits 64)
 
 ;;; the natural width of a machine word (as seen in e.g. register width,
 ;;; address space)
-(defconstant n-machine-word-bits 32)
+(defconstant n-machine-word-bits 64)
 
 ;;; flags for the generational garbage collector
 (defconstant pseudo-atomic-interrupted-flag 1)
@@ -72,7 +72,7 @@
   (+ (byte-size single-float-significand-byte) 1))
 
 (defconstant double-float-digits
-  (+ (byte-size double-float-significand-byte) n-word-bits 1))
+  (+ (byte-size double-float-significand-byte) 32 1))
 
 
 (defconstant float-inexact-trap-bit (ash 1 0))

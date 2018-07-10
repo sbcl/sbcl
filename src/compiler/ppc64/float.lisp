@@ -75,10 +75,55 @@
                   (:results (y :scs (descriptor-reg)))
                   (:variant ,@args))
                 (define-move-vop ,name :move (,sc) (descriptor-reg)))))
-  (frob move-from-single single-reg
-    nil single-float-size single-float-widetag single-float-value-slot)
+  ;(frob move-from-single single-reg
+  ;  nil single-float-size single-float-widetag single-float-value-slot)
   (frob move-from-double double-reg
     t double-float-size double-float-widetag double-float-value-slot))
+
+(define-vop (move-from-single)
+  (:args (x :scs (single-reg) :to :save))
+  (:temporary (:scs (signed-reg)) temp)
+  (:results (y :scs (descriptor-reg)))
+  (:vop-var vop)
+  (:note "float to pointer coercion")
+  (:generator 4
+    ;; We use the stack because we can't move from float registers to gpr registers directly
+    (let* ((dword-offset 8) ;; We need to use one double word in stack
+           (low-word-offset (if (eq *backend-byte-order* :big-endian) dword-offset (+ 4 dword-offset))))
+      (inst li temp single-float-widetag)
+      ;; temp = [single-float-widetag|xxxxxxxx]
+      (inst std temp csp-tn dword-offset) ;; Store on stack
+      ;; stack:
+      ;;   big-endian: [xxxxxxxx|single-float-widetag]
+      ;;   little    : [single-float-widetag|xxxxxxxx]
+      (inst stfs x csp-tn low-word-offset)
+      ;;   big-endian: [float|single-float-widetag]
+      ;;   little    : [single-float-widetag|float]
+      (inst ld y csp-tn dword-offset))))
+
+(define-move-vop move-from-single :move
+  (single-reg) (descriptor-reg))
+
+(define-vop (move-to-single)
+  (:args (x :scs (descriptor-reg)))
+  (:results (y :scs (single-reg)))
+  (:vop-var vop)
+  (:note "pointer to float coercion")
+  (:generator 2
+    ;; We use the stack because we can't move from gpr registers to float registers directly
+    (let* ((dword-offset 8) ;; We need to use one double word in stack
+           (low-word-offset (if (eq *backend-byte-order* :big-endian) dword-offset (+ 4 dword-offset))))
+      ;; x
+      ;;   big-endian: [float|single-float-widetag]
+      ;;   little    : [single-float-widetag|float]
+      (inst std x csp-tn dword-offset)
+      ;; stack:
+      ;;   big-endian: [float|single-float-widetag]
+      ;;   little    : [single-float-widetag|float]
+      (inst lfs y csp-tn low-word-offset)))) ;; Now y = float
+
+(define-move-vop move-to-single :move
+  (descriptor-reg) (single-reg))
 
 (macrolet ((frob (name sc double-p value)
              `(progn
@@ -90,7 +135,6 @@
                     (inst ,(if double-p 'lfd 'lfs) y x
                           (- (* ,value n-word-bytes) other-pointer-lowtag))))
                 (define-move-vop ,name :move (descriptor-reg) (,sc)))))
-  (frob move-to-single single-reg nil single-float-value-slot)
   (frob move-to-double double-reg t double-float-value-slot))
 
 
@@ -225,16 +269,16 @@
   (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
   (:note "complex single float to pointer coercion")
   (:generator 13
-     (with-fixed-allocation (y pa-flag ndescr complex-single-float-widetag
-                               complex-single-float-size)
-       (let ((real-tn (complex-single-reg-real-tn x)))
-         (inst stfs real-tn y (- (* complex-single-float-real-slot
-                                    n-word-bytes)
-                                 other-pointer-lowtag)))
-       (let ((imag-tn (complex-single-reg-imag-tn x)))
-         (inst stfs imag-tn y (- (* complex-single-float-imag-slot
-                                    n-word-bytes)
-                                 other-pointer-lowtag))))))
+    (with-fixed-allocation (y pa-flag ndescr complex-single-float-widetag
+                              complex-single-float-size)
+      (let ((real-tn (complex-single-reg-real-tn x)))
+        (inst stfs real-tn y (- (* complex-single-float-data-slot
+                                   n-word-bytes)
+                                other-pointer-lowtag)))
+      (let ((imag-tn (complex-single-reg-imag-tn x)))
+        (inst stfs imag-tn y (- (* (1+ complex-single-float-data-slot)
+                                   n-word-bytes)
+                                other-pointer-lowtag))))))
 ;;;
 (define-move-vop move-from-complex-single :move
   (complex-single-reg) (descriptor-reg))
@@ -270,10 +314,10 @@
   (:note "pointer to complex float coercion")
   (:generator 2
     (let ((real-tn (complex-single-reg-real-tn y)))
-      (inst lfs real-tn x (- (* complex-single-float-real-slot n-word-bytes)
+      (inst lfs real-tn x (- (* complex-single-float-data-slot n-word-bytes)
                              other-pointer-lowtag)))
     (let ((imag-tn (complex-single-reg-imag-tn y)))
-      (inst lfs imag-tn x (- (* complex-single-float-imag-slot n-word-bytes)
+      (inst lfs imag-tn x (- (* (1+ complex-single-float-data-slot) n-word-bytes)
                              other-pointer-lowtag)))))
 (define-move-vop move-to-complex-single :move
   (descriptor-reg) (complex-single-reg))
@@ -633,9 +677,10 @@
                 (* (tn-offset stack-temp) n-word-bytes)))
          (single-stack
           (inst lwz bits (current-nfp-tn vop)
-                (* (tn-offset float) n-word-bytes)))
-         (descriptor-reg
-          (loadw bits float single-float-value-slot other-pointer-lowtag))))
+                (* (tn-offset float) n-word-bytes)))))
+         ;; FIXME: check. Does this case apply?
+         ;; (descriptor-reg
+         ;; (loadw bits float single-float-value-slot other-pointer-lowtag))))
       (signed-stack
        (inst stfs float (current-nfp-tn vop)
                 (* (tn-offset bits) n-word-bytes))))))

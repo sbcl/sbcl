@@ -1924,7 +1924,7 @@
            (type (member :little-endian :big-endian) byte-order))
   (if (or (eq length 1)
           (and (eq byte-order #!+big-endian :big-endian #!+little-endian :little-endian)
-               #!-(or arm arm64 ppc x86 x86-64) ; unaligned loads are ok for these
+               #!-(or arm arm64 ppc ppc64 x86 x86-64) ; unaligned loads are ok for these
                (not (logtest (1- length) (sap-int (sap+ sap offset))))))
       (case length
         (8 (sap-ref-64 sap offset))

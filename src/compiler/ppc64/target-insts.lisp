@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!PPC-ASM")
+(in-package "SB!PPC64-ASM")
 
 (defun maybe-add-notes (regno dstate)
   (let* ((inst (sap-ref-int (dstate-segment-sap dstate)

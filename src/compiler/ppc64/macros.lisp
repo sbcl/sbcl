@@ -24,8 +24,12 @@
     ((def (op inst shift)
        `(defmacro ,op (object base &optional (offset 0) (lowtag 0))
           `(inst ,',inst ,object ,base (- (ash ,offset ,,shift) ,lowtag)))))
-  (def loadw lwz word-shift)
   (def storew stw word-shift))
+
+(defmacro loadw (object base &optional (offset 0) (lowtag 0))
+  `(progn
+     (inst addi nl6-tn ,base (- (ash ,offset word-shift) ,lowtag)) ;; FIXME: CHANGE REGISTER AND SHIFTING
+     (inst ld ,object nl6-tn 0)))
 
 (defmacro load-symbol (reg symbol)
   `(inst addi ,reg null-tn (static-symbol-offset ,symbol)))

@@ -329,7 +329,8 @@
  #!+hppa  ("src/code/hppa-vm")
  #!+x86   ("src/code/x86-vm"   :not-host)
  #!+x86-64("src/code/x86-64-vm"   :not-host)
- #!+ppc   ("src/code/ppc-vm")
+ #!+(or ppc ppc64)
+ ("src/code/ppc-vm")
  #!+alpha ("src/code/alpha-vm")
  #!+mips  ("src/code/mips-vm")
  #!+arm   ("src/code/arm-vm")
@@ -533,7 +534,7 @@
   ;; x compilation, for now we blithely ignore them and press on to more
   ;; x pressing problems. Someday, though, it would be nice to figure out
   ;; x what the problem is and fix it.
-  #!+(or ppc) :ignore-failure-p)
+  #!+(or ppc ppc64) :ignore-failure-p)
  ("src/code/cross-modular"  :not-target)
 
  ("src/compiler/generic/late-type-vops") ;; KLUDGE: it's not so late anymore

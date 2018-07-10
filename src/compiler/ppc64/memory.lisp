@@ -73,6 +73,8 @@
        ,@(when write-p
            '((move result value))))))
 
+;; FIXME: CHECK Add dword
+;(define-indexer dword-index-ref nil 0)
 (define-indexer word-index-ref nil lwz lwzx 0)
 (define-indexer word-index-set t stw stwx 0)
 (define-indexer halfword-index-ref nil lhz lhzx 1)

@@ -479,7 +479,7 @@
                      (immediate
                       (let ((amount (tn-value amount)))
                         (aver (> amount 0))
-                        (inst slwi result number amount))))))))
+                        (inst sldi result number amount))))))))
   ;; FIXME: There's the opportunity for a sneaky optimization here, I
   ;; think: a FAST-ASH-LEFT-C/FIXNUM=>SIGNED vop.  -- CSR, 2003-09-03
   (def fast-ash-left/fixnum=>fixnum any-reg tagged-num any-reg 2)
@@ -566,7 +566,7 @@
          (if (minusp amount)
              (let ((amount (min 31 (- amount))))
                (inst srawi result number amount))
-             (inst slwi result number amount)))))))
+             (inst sldi result number amount)))))))
 
 (define-vop (signed-byte-32-len)
   (:translate integer-length)
@@ -687,6 +687,9 @@
           (- 31 n-fixnum-tag-bits))))
 
 ;;;; Modular functions:
+
+;;; FIXME: This should all be correctly ported to 64 bit
+
 (define-modular-fun lognot-mod32 (x) lognot :untagged nil 32)
 (define-vop (lognot-mod32/unsigned=>unsigned)
   (:translate lognot-mod32)
@@ -700,11 +703,11 @@
 
 (define-vop (fast-ash-left-mod32-c/unsigned=>unsigned
              fast-ash-c/unsigned=>unsigned)
-  (:translate ash-left-mod32))
+  (:translate ash-left-mod64))
 
 (define-vop (fast-ash-left-mod32/unsigned=>unsigned
              fast-ash-left/unsigned=>unsigned))
-(deftransform ash-left-mod32 ((integer count)
+(deftransform ash-left-mod64 ((integer count)
                               ((unsigned-byte 32) (unsigned-byte 5)))
   (when (sb!c::constant-lvar-p count)
     (sb!c::give-up-ir1-transform))

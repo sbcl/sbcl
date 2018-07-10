@@ -386,7 +386,7 @@
                   `(note-write-dependency ,',segment ,',inst ,loc ,@keys)))
        ,@body)))
 
-#!+(or hppa sparc ppc mips) ; only for platforms with scheduling assembler.
+#!+(or hppa sparc ppc ppc64 mips) ; only for platforms with scheduling assembler.
 (progn
 (defun note-read-dependency (segment inst read)
   (multiple-value-bind (loc-num size)
@@ -493,7 +493,7 @@
         (schedule-pending-instructions segment))))
   (values))
 
-#!-(or mips ppc sparc) ; not defined for platforms other than these
+#!-(or mips ppc ppc64 sparc) ; not defined for platforms other than these
 (defun sb!c:emit-nop (seg) seg (bug "EMIT-NOP"))
 
 ;;; Emit all the pending instructions, and reset any state. This is

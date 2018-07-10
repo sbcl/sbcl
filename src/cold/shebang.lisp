@@ -25,7 +25,7 @@
 (defvar sb!xc:*features*)
 
 (defun target-platform-keyword (&optional (features sb!xc:*features*))
-  (let ((arch (intersection '(:alpha :arm :arm64 :hppa :mips :ppc :sparc :x86 :x86-64)
+  (let ((arch (intersection '(:alpha :arm :arm64 :hppa :mips :ppc :ppc64 :sparc :x86 :x86-64)
                             features)))
     (cond ((not arch) (error "No architecture selected"))
           ((> (length arch) 1) (error "More than one architecture selected")))

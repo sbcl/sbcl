@@ -134,6 +134,7 @@
   (any-reg
    registers
    :locations #.(append non-descriptor-regs descriptor-regs)
+   :reserve-locations (#.nl6-offset)
    :constant-scs (zero immediate)
    :save-p t
    :alternate-scs (control-stack))
@@ -162,6 +163,7 @@
   ;; Non-Descriptor characters
   (character-reg registers
    :locations #.non-descriptor-regs
+   :reserve-locations (#.nl6-offset)
    :constant-scs (immediate)
    :save-p t
    :alternate-scs (character-stack))
@@ -169,6 +171,7 @@
   ;; Non-Descriptor SAP's (arbitrary pointers into address space)
   (sap-reg registers
    :locations #.non-descriptor-regs
+   :reserve-locations (#.nl6-offset)
    :constant-scs (immediate)
    :save-p t
    :alternate-scs (sap-stack))
@@ -176,11 +179,13 @@
   ;; Non-Descriptor (signed or unsigned) numbers.
   (signed-reg registers
    :locations #.non-descriptor-regs
+   :reserve-locations (#.nl6-offset)
    :constant-scs (zero immediate)
    :save-p t
    :alternate-scs (signed-stack))
   (unsigned-reg registers
    :locations #.non-descriptor-regs
+   :reserve-locations (#.nl6-offset)
    :constant-scs (zero immediate)
    :save-p t
    :alternate-scs (unsigned-stack))
@@ -387,3 +392,12 @@
 (defun primitive-type-indirect-cell-type (ptype)
   (declare (ignore ptype))
   nil)
+
+;;; We need a permanently reserved register to hold the offset in a load
+;;; or store instruction of 8 bytes.
+;;; Those instructions require the displacement be a multiple of 4 bytes
+;;; which precludes subtracting a lowtag in the same instruction.
+;;; See ld instruction for reference
+(defglobal nl6-tn (make-random-tn :kind :normal
+                                  :sc (sc-or-lose 'unsigned-reg)
+                                  :offset nl6-offset))

@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!PPC-ASM")
+(in-package "SB!PPC64-ASM")
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; Imports from this package into SB-VM
@@ -543,7 +543,9 @@
 
 (define-bitfield-emitter emit-word 32
   (byte 32 0))
-(define-bitfield-emitter emit-dword 64 (byte 64 0))
+
+(define-bitfield-emitter emit-dword 64
+  (byte 64 0))
 
 (define-bitfield-emitter emit-i-form-inst 32
   (byte 6 26) (byte 24 2) (byte 1 1) (byte 1 0))
@@ -556,6 +558,9 @@
 
 (define-bitfield-emitter emit-d-form-inst 32
   (byte 6 26) (byte 5 21) (byte 5 16) (byte 16 0))
+
+(define-bitfield-emitter emit-unpacked-d-form-inst 32
+  (byte 6 26) (byte 3 23) (byte 1 22) (byte 1 21) (byte 5 16) (byte 16 0))
 
 ; Also used for XL-form.  What's the difference ?
 (define-bitfield-emitter emit-x-form-inst 32
@@ -574,7 +579,11 @@
 (define-bitfield-emitter emit-a-form-inst 32
   (byte 6 26) (byte 5 21) (byte 5 16) (byte 5 11) (byte 5 6) (byte 5 1) (byte 1 0))
 
+(define-bitfield-emitter emit-md-form-inst 32
+  (byte 6 26) (byte 5 21) (byte 5 16) (byte 5 11) (byte 6 5) (byte 3 2) (byte 1 1) (byte 1 0))
 
+(define-bitfield-emitter emit-ds-form-inst 32
+  (byte 6 26) (byte 5 21) (byte 5 16) (byte 14 2) (byte 2 0))
 
 
 (eval-when (:compile-toplevel :execute)
@@ -884,6 +893,15 @@
                    ,xo
                    ,rc))))
 
+           (define-ds-instruction (name op subop)
+             `(define-instruction ,name (segment rt ra si)
+                (:declare (type (signed-byte 16) si))
+                (:printer d ((op ,op)))
+                (:emitter
+                 (if (= (mod si 4) 0)
+                     (emit-ds-form-inst segment ,op (reg-tn-encoding rt) (reg-tn-encoding ra) (ash si -2) ,subop)
+                     (error "Displacement should be a multiple of 4")))))
+
            (define-2-a-instructions (name op xo &key (cost 1) other-dependencies)
                `(progn
                  (define-a-instruction ,name ,op ,xo 0 :cost ,cost :other-dependencies ,other-dependencies)
@@ -982,6 +1000,18 @@
                        (valid-cr-field-encoding crf)
                        (reg-tn-encoding ra)
                        ui)))
+
+
+  (define-instruction cmpi (segment bf l ra si)
+    (:printer d-crf-si ((op 11) (l l)) '(:name :tab bf "," l "," ra "," si))
+    (:emitter
+     (emit-unpacked-d-form-inst segment
+                            11
+                            bf
+                            0 ; Reserved bit '/'
+                            l
+                            (reg-tn-encoding ra)
+                            si)))
 
   (define-instruction cmpwi (segment crf ra  &optional (si nil si-p))
     (:printer d-crf-si ((op 11) (l 0)) '(:name :tab bf "," ra "," si))
@@ -1245,6 +1275,16 @@
     (:emitter
      (emit-a-form-inst segment 23 (reg-tn-encoding rs) (reg-tn-encoding ra) (reg-tn-encoding rb) mb me 1)))
 
+  (define-instruction rldicr (segment ra rs sh me)
+    (:printer m ((op 30) (rc 0) (rb nil :type 'reg)))
+    (:emitter
+     (emit-md-form-inst segment 30 (reg-tn-encoding rs) (reg-tn-encoding ra) (logand sh #b011111) me 1 (ash (logand sh #b100000) -5) 0)))
+
+  (define-instruction rldicr. (segment ra rs sh me)
+    (:printer m ((op 30) (rc 1) (rb nil :type 'reg)))
+    (:emitter
+     (emit-md-form-inst segment 30 (reg-tn-encoding rs) (reg-tn-encoding ra) (logand sh #b011111) me 1 (ash (logand sh #b100000) -5) 1)))
+
 
   (define-d-rs-ui-instruction ori 24)
 
@@ -1296,6 +1336,7 @@
   (define-x-instruction lwarx 31 20)
   (define-x-instruction lwzx 31 23)
   (define-2-x-5-instructions slw 31 24)
+  (define-2-x-5-instructions sld 31 27)
   (define-2-x-10-instructions cntlzw 31 26)
   (define-2-x-5-instructions and 31 28)
 
@@ -1607,6 +1648,9 @@
   (define-d-frs-instruction stfd 54)
   (define-d-frs-instruction stfdu 55 :other-dependencies ((writes ra)))
 
+  (define-ds-instruction ld 58  #b00)
+  (define-ds-instruction ldu 58 #b01)
+
   (define-2-a-tab-instructions fdivs 59 18 :cost 17)
   (define-2-a-tab-instructions fsubs 59 20)
   (define-2-a-tab-instructions fadds 59 21)
@@ -1615,6 +1659,8 @@
   (define-2-a-instructions fmadds 59 29 :cost 4)
   (define-2-a-instructions fnmsubs 59 30 :cost 4)
   (define-2-a-instructions fnmadds 59 31 :cost 4)
+
+  (define-ds-instruction std 62 #b00)
 
   (define-instruction fcmpu (segment crfd fra frb)
     (:printer x-15 ((op 63) (xo 0)))
@@ -1786,6 +1832,9 @@
   (define-instruction-macro clrrwi. (ra rs n)
     `(inst rlwinm. ,ra ,rs 0 0 (- 31 ,n)))
 
+  (define-instruction-macro cmpdi (rx value)
+    `(inst cmpi 0 1 ,rx ,value))
+
   (define-instruction-macro inslw (ra rs n b)
     `(inst rlwimi ,ra ,rs (- 32 ,b) ,b (+ ,b (1- ,n))))
 
@@ -1808,10 +1857,16 @@
     `(inst rlwinm ,ra ,rs ,n 0 (- 31 ,n)))
 
   (define-instruction-macro slwi. (ra rs n)
-    `(inst rlwinm. ,ra ,rs ,n 0 (- 31 ,n))))
+    `(inst rlwinm. ,ra ,rs ,n 0 (- 31 ,n)))
 
+  (define-instruction-macro sldi (ra rs n)
+    `(inst rldicr ,ra ,rs ,n (- 64 ,n)))
 
+  (define-instruction-macro srdi (ra rs n)
+    `(inst rldicr ,ra ,rs (- 64 ,n) ,n))
 
+  (define-instruction-macro srdi. (ra rs n)
+    `(inst rldicr ,ra ,rs (- 64 ,n) ,n)))
 
 #|
 (macrolet
@@ -1945,6 +2000,17 @@
                                 high-half))
               (unless (zerop low-half)
                 (inst ori reg reg low-half))))))
+    ((or (signed-byte 64) (unsigned-byte 64))
+     (let* ((quarter-1 (ldb (byte 16 0) value))
+            (quarter-2 (ldb (byte 16 16) value))
+            (quarter-3 (ldb (byte 16 32) value))
+            (quarter-4 (ldb (byte 16 48) value)))
+       (inst lis reg quarter-4)
+       (inst ori reg reg quarter-3)
+       (inst sldi reg reg 32)
+       (inst oris reg reg quarter-2)
+       (inst ori reg reg quarter-1)))
+
     (fixup
      (inst lis reg value)
      (inst addi reg reg value))))

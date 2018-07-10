@@ -180,7 +180,7 @@
     (inst mtxer zero-tn)              ; clear sticky overflow bit in XER, CR0
     (inst addo temp x x)              ; set XER OV if top two bits differ
     (inst addo. temp temp temp)       ; set CR0 SO if any top three bits differ
-    (inst slwi y x n-fixnum-tag-bits) ; assume fixnum (tagged ok, maybe lost some high bits)
+    (inst sldi y x n-fixnum-tag-bits) ; assume fixnum (tagged ok, maybe lost some high bits)
     (inst bns done)
 
     (with-fixed-allocation (y pa-flag temp bignum-widetag (1+ bignum-digits-offset))
@@ -230,13 +230,13 @@
     (move x arg)
     (let ((done (gen-label))
           (one-word (gen-label)))
-      (inst srawi. temp x n-positive-fixnum-bits)
-      (inst slwi y x n-fixnum-tag-bits)
+      (inst srdi. temp x n-positive-fixnum-bits)
+      (inst sldi y x n-fixnum-tag-bits)
       (inst beq done)
 
       (with-fixed-allocation
           (y pa-flag temp bignum-widetag (+ 2 bignum-digits-offset))
-        (inst cmpwi x 0)
+        (inst cmpdi x 0)
         (inst li temp (logior (ash 1 n-widetag-bits) bignum-widetag))
         (inst bge one-word)
         (inst li temp (logior (ash 2 n-widetag-bits) bignum-widetag))

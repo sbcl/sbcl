@@ -711,6 +711,16 @@ elif [ "$sbcl_arch" = "ppc" ]; then
             exit 1
 	fi
     fi
+elif [ "$sbcl_arch" = "ppc64" ]; then
+    printf ' :64-bit :64-bit-registers' >> $ltf
+    printf ' :gencgc :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
+    printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
+    printf ' :linkage-table :raw-instance-init-vops :memory-barrier-vops' >> $ltf
+    printf ' :compare-and-swap-vops :multiply-high-vops :alien-callbacks' >> $ltf
+    # there is no glibc bug that requires the 'where-is-mcontext' hack.
+    # (Sufficiently new glibc uses the correct definition, which is the same as
+    # 2.3.1, so define our constant for that)
+    echo '#define GLIBC231_STYLE_UCONTEXT 1' > src/runtime/ppc-linux-mcontext.h
 elif [ "$sbcl_arch" = "sparc" ]; then
     # Test the compiler in order to see if we are building on Sun
     # toolchain as opposed to GNU binutils, and write the appropriate

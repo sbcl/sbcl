@@ -24,6 +24,19 @@
     (%test-headers value temp target not-p nil headers
                    :drop-through drop-through)))
 
+(defun %test-fixnum-immediate-and-headers (value temp target not-p immediate headers)
+  (let ((drop-through (gen-label)))
+    (inst andi. temp value widetag-mask)
+    (inst b? (if not-p :ne :eq) target)
+    (%test-immediate-and-headers value temp target not-p immediate headers
+                                 :drop-through drop-through)))
+
+(defun %test-immediate-and-headers (value temp target not-p immediate headers
+                                    &key (drop-through (gen-label)))
+  (inst cmpwi temp immediate)
+  (inst b? (if not-p :ne :eq) target)
+  (%test-headers value temp target not-p nil headers :drop-through drop-through))
+
 (defun %test-immediate (value temp target not-p immediate)
   (assemble ()
     (inst andi. temp value widetag-mask)
@@ -102,73 +115,69 @@
 
 ;;;; Other integer ranges.
 
-;;; A (signed-byte 32) can be represented with either fixnum or a bignum with
+;;; A (SIGNED-BYTE 64) can be represented with either fixnum or a bignum with
 ;;; exactly one digit.
 
-(define-vop (signed-byte-32-p type-predicate)
-  (:translate signed-byte-32-p)
+(define-vop (signed-byte-64-p type-predicate)
+  (:translate signed-byte-64-p)
   (:generator 45
-    (let ((not-target (gen-label)))
-      (multiple-value-bind
-          (yep nope)
-          (if not-p
-              (values not-target target)
-              (values target not-target))
-        (inst andi. temp value fixnum-tag-mask)
-        (inst beq yep)
-        (test-type value temp nope t (other-pointer-lowtag))
-        (loadw temp value 0 other-pointer-lowtag)
-        (inst cmpwi temp (+ (ash 1 n-widetag-bits)
-                          bignum-widetag))
-        (inst b? (if not-p :ne :eq) target)
-        (emit-label not-target)))))
+    (multiple-value-bind (yep nope)
+        (if not-p
+            (values not-target target)
+            (values target not-target))
+      (inst andi. temp value fixnum-tag-mask)
+      (inst b? :eq yep)
+      (test-type value temp nope t (other-pointer-lowtag))
+      (loadw temp value 0 other-pointer-lowtag)
+      (inst cmpdi temp (+ (ash 1 n-widetag-bits) bignum-widetag))
+      (inst b? (if not-p :ne :eq) target))
+    not-target))
 
-;;; An (unsigned-byte 32) can be represented with either a positive fixnum, a
-;;; bignum with exactly one positive digit, or a bignum with exactly two digits
-;;; and the second digit all zeros.
-
-(define-vop (unsigned-byte-32-p type-predicate)
-  (:translate unsigned-byte-32-p)
+;;; An (unsigned-byte 64) can be represented with either a positive
+;;; fixnum, a bignum with exactly one positive digit, or a bignum with
+;;; exactly two digits and the second digit all zeros.
+(define-vop (unsigned-byte-64-p type-predicate)
+  (:translate unsigned-byte-64-p)
   (:generator 45
     (let ((not-target (gen-label))
           (single-word (gen-label))
           (fixnum (gen-label)))
-      (multiple-value-bind
-          (yep nope)
+      (multiple-value-bind (yep nope)
           (if not-p
               (values not-target target)
               (values target not-target))
         ;; Is it a fixnum?
-        (inst andi. temp value fixnum-tag-mask)
-        (inst cmpwi :cr1 value 0)
-        (inst beq fixnum)
+        (move temp value)
+        (inst andi. temp temp lowtag-mask) ;; We are only comparing the last byte
+        (inst cmpi 2 1 temp fixnum-tag-mask) ;; 2 => Set EQ flag FIXME: CHECK L
+        (inst b? :eq fixnum)
 
         ;; If not, is it an other pointer?
-        (test-type value temp nope t (other-pointer-lowtag))
+        (inst cmpi 2 1 temp other-pointer-lowtag) ;; 2 => Set EQ flag FIXME: CHECK L
+        (inst b? :ne nope)
         ;; Get the header.
         (loadw temp value 0 other-pointer-lowtag)
         ;; Is it one?
-        (inst cmpwi temp (+ (ash 1 n-widetag-bits) bignum-widetag))
-        (inst beq single-word)
-        ;; If it's other than two, we can't be an (unsigned-byte 32)
-        (inst cmpwi temp (+ (ash 2 n-widetag-bits) bignum-widetag))
-        (inst bne nope)
-        ;; Get the second digit.
+        (inst cmpi 2 1 temp (+ (ash 1 n-widetag-bits) bignum-widetag))
+        (inst b? :eq single-word)
+        ;; If it's other than two, we can't be an (unsigned-byte 64)
+        (inst cmpi 2 1 temp (+ (ash 2 n-widetag-bits) bignum-widetag))
+        (inst b? :ne nope)
+        ;; Compare the second digit to zero.
         (loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
-        ;; All zeros, its an (unsigned-byte 32).
-        (inst cmpwi temp 0)
-        (inst beq yep)
-        ;; Otherwise, it isn't.
+        (inst and. temp temp temp)
+        (inst b? :eq yep) ; All zeros, its an (unsigned-byte 64).
         (inst b nope)
 
         (emit-label single-word)
         ;; Get the single digit.
         (loadw temp value bignum-digits-offset other-pointer-lowtag)
-        (inst cmpwi :cr1 temp 0)
+        (inst cmpdi temp 0) ;; FIXME: PPC 32 bits version is using CR1, why?
 
-        ;; positive implies (unsigned-byte 32).
+        ;; positive implies (unsigned-byte 64).
         (emit-label fixnum)
-        (inst b?  :cr1 (if not-p :lt :ge) target)
+        (inst and. temp temp temp)
+        (inst b? (if not-p :gt :eq) target)
 
         (emit-label not-target)))))
 

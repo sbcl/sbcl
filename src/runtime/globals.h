@@ -134,7 +134,7 @@ extern void globals_init(void);
 #  endif
 # endif
 /**/
-# ifdef LISP_FEATURE_PPC
+# if defined(LISP_FEATURE_PPC) || defined(LISP_FEATURE_PPC64)
 #  ifdef LISP_FEATURE_DARWIN
 #   define EXTERN(name,bytes) .globl _ ## name
 #  else
