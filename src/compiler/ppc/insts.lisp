@@ -1976,7 +1976,7 @@
 
 (defun emit-header-data (segment type)
   (emit-back-patch
-   segment 4
+   segment n-word-bytes
    #'(lambda (segment posn)
        (emit-word segment
                   (logior type

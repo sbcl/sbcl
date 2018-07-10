@@ -543,6 +543,7 @@
 
 (define-bitfield-emitter emit-word 32
   (byte 32 0))
+(define-bitfield-emitter emit-dword 64 (byte 64 0))
 
 (define-bitfield-emitter emit-i-form-inst 32
   (byte 6 26) (byte 24 2) (byte 1 1) (byte 1 0))
@@ -1976,12 +1977,12 @@
 
 (defun emit-header-data (segment type)
   (emit-back-patch
-   segment 4
+   segment n-word-bytes
    #'(lambda (segment posn)
-       (emit-word segment
-                  (logior type
-                          (ash (+ posn (component-header-length))
-                               (- n-widetag-bits word-shift)))))))
+       (emit-dword segment
+                   (logior type
+                           (ash (+ posn (component-header-length))
+                                (- n-widetag-bits word-shift)))))))
 
 (define-instruction simple-fun-header-word (segment)
   :pinned
