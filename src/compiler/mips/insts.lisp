@@ -304,9 +304,6 @@
 (define-bitfield-emitter emit-word 32
   (byte 32 0))
 
-(define-bitfield-emitter emit-short 16
-  (byte 16 0))
-
 (define-bitfield-emitter emit-immediate-inst 32
   (byte 6 26) (byte 5 21) (byte 5 16) (byte 16 0))
 
@@ -1113,14 +1110,6 @@
       (emit-word segment 0))
      (integer
       (emit-word segment word)))))
-
-(define-instruction short (segment short)
-  (:declare (type (or (unsigned-byte 16) (signed-byte 16)) short))
-  :pinned
-  (:cost 0)
-  (:delay 0)
-  (:emitter
-   (emit-short segment short)))
 
 (define-instruction byte (segment byte)
   (:declare (type (or (unsigned-byte 8) (signed-byte 8)) byte))

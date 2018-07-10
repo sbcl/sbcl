@@ -620,9 +620,6 @@ about function addresses and register values.")
 (define-bitfield-emitter emit-word 32
   (byte 32 0))
 
-(define-bitfield-emitter emit-short 16
-  (byte 16 0))
-
 (define-bitfield-emitter emit-format-1 32
   (byte 2 30) (byte 30 0))
 
@@ -1606,22 +1603,12 @@ about function addresses and register values.")
      (integer
       (emit-word segment word)))))
 
-(define-instruction short (segment short)
-  (:declare (type (or (unsigned-byte 16) (signed-byte 16)) short))
-  :pinned
-  (:delay 0)
-  (:emitter
-   (emit-short segment short)))
-
 (define-instruction byte (segment byte)
   (:declare (type (or (unsigned-byte 8) (signed-byte 8)) byte))
   :pinned
   (:delay 0)
   (:emitter
    (emit-byte segment byte)))
-
-(define-bitfield-emitter emit-header-object 32
-  (byte 24 8) (byte 8 0))
 
 (defun emit-header-data (segment type)
   (emit-back-patch
