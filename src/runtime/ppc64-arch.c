@@ -198,6 +198,10 @@ should_branch(os_context_t *context, unsigned int orig_inst)
                       !(((cr >> (31-bi_field)) ^ (bo_field >> 3)) & 1));
 }
 
+static sword_t sign_extend(uword_t word, int n_bits) {
+  return (sword_t)(word<<(N_WORD_BITS-n_bits)) >> (N_WORD_BITS-n_bits);
+}
+
 void
 arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 {
@@ -223,28 +227,20 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 
     if (op == 18) {
         /* Branch  I-form */
-        unsigned int displacement = orig_inst & 0x03fffffc;
-        /* Sign extend */
-        if (displacement & 0x02000000) {
-            displacement |= 0xc0000000;
-        }
+        sword_t displacement = sign_extend(orig_inst & 0x03fffffc, 26);
         if (orig_inst & 2) { /* Absolute Address */
             next_pc = (unsigned int *)displacement;
         } else {
-            next_pc = (unsigned int *)(((unsigned int)pc) + displacement);
+            next_pc = (unsigned int *)((uword_t)pc + displacement);
         }
     } else if ((op == 16)
                && should_branch(context, orig_inst)) {
         /* Branch Conditional  B-form */
-        unsigned int displacement = orig_inst & 0x0000fffc;
-        /* Sign extend */
-        if (displacement & 0x00008000) {
-            displacement |= 0xffff0000;
-        }
+        sword_t displacement = sign_extend(orig_inst & 0x0000fffc, 16);
         if (orig_inst & 2) { /* Absolute Address */
             next_pc = (unsigned int *)displacement;
         } else {
-            next_pc = (unsigned int *)(((unsigned int)pc) + displacement);
+            next_pc = (unsigned int *)((uword_t)pc + displacement);
         }
     } else if ((op == 19) && (sub_op == 16)
                && should_branch(context, orig_inst)) {
@@ -495,9 +491,9 @@ handle_allocation_trap(os_context_t * context)
      * instructions when threading is enabled and four instructions
      * otherwise. */
 #ifdef LISP_FEATURE_SB_THREAD
-    (*os_context_pc_addr(context)) = (unsigned int)(pc + 2);
+    (*os_context_pc_addr(context)) = (uword_t)(pc + 2);
 #else
-    (*os_context_pc_addr(context)) = (unsigned int)(pc + 4);
+    (*os_context_pc_addr(context)) = (uword_t)(pc + 4);
 #endif
 
 }
@@ -512,8 +508,7 @@ arch_handle_breakpoint(os_context_t *context)
 void
 arch_handle_fun_end_breakpoint(os_context_t *context)
 {
-    *os_context_pc_addr(context)
-        =(int)handle_fun_end_breakpoint(context);
+    *os_context_pc_addr(context) = (uword_t)handle_fun_end_breakpoint(context);
 }
 
 void
