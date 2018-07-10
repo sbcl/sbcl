@@ -2779,14 +2779,15 @@ core and return a descriptor to it."
                                          :end end)
          (when *show-pre-fixup-code-p*
            (format *trace-output*
-                   "~&/raw code from code-fop ~W ~W:~%"
+                   "~&LOAD-CODE: ~d header words, ~d code bytes.~%"
                    n-boxed-words code-size)
            (do ((i start (+ i sb!vm:n-word-bytes)))
                ((>= i end))
              (format *trace-output*
-                     "/#X~8,'0x: #X~8,'0x~%"
+                     " ~X: ~V,'.X~%"
                      (+ i (gspace-byte-address (descriptor-gspace des)))
-                     (bvref-32 (descriptor-mem des) i)))))
+                     (* 2 sb!vm:n-word-bytes)
+                     (bvref-word (descriptor-mem des) i)))))
        (apply-fixups (%fasl-input-stack fasl-input) des 0))))
 
 #-c-headers-only
