@@ -13,8 +13,7 @@ CFLAGS += -m64
 LINKFLAGS += -rdynamic -m64
 NM = ./linux-nm
 
-# FIXME: ldso-stubs.S does not link
-ASSEM_SRC = ppc64-assem.S
+ASSEM_SRC = ppc64-assem.S ldso-stubs.S
 ARCH_SRC = ppc64-arch.c
 
 OS_SRC = linux-os.c linux-mman.c ppc-linux-os.c

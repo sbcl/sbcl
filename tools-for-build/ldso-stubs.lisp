@@ -21,16 +21,13 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-#!-sparc
-(defun ldso-stubify (fct stream)
-  (format stream "LDSO_STUBIFY(~A)~%" fct))
-
 ;;; This is an attempt to follow DB's hint of sbcl-devel
 ;;; 2001-09-18. -- CSR
 ;;;
 ;;; And an attempt to work around the Sun toolchain... --ns
-#!+sparc
-(defun ldso-stubify (fct stream)
+(defun ldso-stubify (index fct stream)
+  (declare (ignorable index))
+  #!+sparc
   (apply #'format stream "
 .globl ldso_stub__~A ;                          \\
         FUNCDEF(ldso_stub__~A) ;                \\
@@ -40,10 +37,9 @@ ldso_stub__~A: ;                                \\
         nop /* delay slot*/     ;               \\
 .L~Ae1: ;                                       \\
         .size    ldso_stub__~A,.L~Ae1-ldso_stub__~A ;~%"
-          (make-list 9 :initial-element fct)))
+          (make-list 9 :initial-element fct))
 
-#!+hppa
-(defun ldso-stubify (fct stream)
+  #!+hppa
   (let ((stub (format nil "ldso_stub__~a" fct)))
     (apply #'format stream (list
 "    .export ~A
@@ -52,7 +48,45 @@ ldso_stub__~A: ;                                \\
     .callinfo
     b,n ~a
     .procend
-    .import ~a,code~%" stub stub fct fct))))
+    .import ~a,code~%" stub stub fct fct)))
+
+  #!+ppc64
+  ;; The ABI requires that we leave a 'nop' where the linker can insert a load
+  ;; of r2 after the callee returns. Naively making the obvious change to the
+  ;; 32-bit stub - adding a nop after the 'b' - does not work; it gets the same
+  ;; error as if the nop were absent.  I think the linker expects to see a
+  ;; function descriptor for this stub, to decide whether r2 differs for the
+  ;; callee. The error message is suboptimal in claiming that there was no nop
+  ;; despite that there is.
+  ;; Ironically we don't care if r2 is restored when coming back into Lisp
+  ;; because we don't use. Nonetheless, this makes the C code build.
+  ;; It would be nice to figure out if we can have the effect of tail call
+  ;; by just using 'b' instead of 'bl' though.
+  (format stream " .globl ~A
+ .p2align 2
+ .type ~:*~A,@function
+ .section .opd,\"aw\",@progbits
+~:*~A:
+ .p2align 3
+ .quad .Lfunc_begin~D, .TOC.@tocbase, 0
+ .text
+.Lfunc_begin~:*~D:
+ mflr 0
+ std 31, -8(1)
+ std 0, 16(1)
+ stdu 1, -128(1)
+ mr 31, 1
+ bl ~A
+ nop
+ .long 0
+ .quad 0
+.Lfunc_end~2:*~D:
+ .size ~2:*~A, .Lfunc_end~D-.Lfunc_begin~:*~D~2%"
+          (format nil "ldso_stub__~a" fct)
+          index fct)
+
+  #!-(or sparc hppa ppc64)
+  (format stream "LDSO_STUBIFY(~A)~%" fct))
 
 (defvar *preludes* '("
 /* This is an automatically generated file, please do not hand-edit it.
@@ -111,7 +145,7 @@ ldso_stub__ ## fct: ;                           \\
         .level  2.0
         .text"
 
-#!+(and (not darwin) (or ppc ppc64)) "
+#!+(and (not darwin) ppc) "
 #define LDSO_STUBIFY(fct)                       \\
 .globl ldso_stub__ ## fct ;                     \\
         .type    ldso_stub__ ## fct,@function ; \\
@@ -137,6 +171,8 @@ _ldso_stub__ ## fct:                             @\\
 _ldso_stub__ ## fct ## $lazy_ptr:                @\\
         .indirect_symbol _ ## fct               @\\
         .long dyld_stub_binding_helper"
+
+#!+ppc64 ""
 
 ;;; darwin x86 assembler is weird and follows the ppc assembler syntax
 #!+(and darwin x86) "
@@ -354,9 +390,10 @@ ldso_stub__ ## fct: ;                  \\
   (assert (= (length *preludes*) 2))
   (dolist (pre *preludes*)
     (write-line pre f))
-  (dolist (stub *stubs*)
-    (check-type stub string)
-    (ldso-stubify stub f))
+  (let ((i -1))
+    (dolist (stub *stubs*)
+      (check-type stub string)
+      (ldso-stubify (incf i) stub f)))
   (format f "
 #ifdef __ELF__
 // Mark the object as not requiring an executable stack.
