@@ -273,8 +273,34 @@
   (let ((nbytes
           (sb-aprof:aprof-run
            (checked-compile
-            '(lambda ()
+            '(sb-int:named-lambda "test" ()
               (declare (optimize sb-c::instrument-consing))
               (make-array 45000))))))
     (assert (= nbytes (* (+ 45000 sb-vm:vector-data-offset)
                          8)))))
+
+sb-vm::
+(define-vop (cl-user::alloc-to-r8)
+  (:temporary (:sc any-reg :offset r8-offset :from :eval) result)
+  (:node-var node)
+  (:generator 1
+    (let* ((bytes large-object-size) ; payload + header total
+           (words (- (/ bytes n-word-bytes) vector-data-offset)))
+      (instrument-alloc bytes node)
+      (pseudo-atomic
+       (allocation result bytes node nil other-pointer-lowtag)
+       (storew* simple-array-unsigned-byte-64-widetag result 0
+                other-pointer-lowtag t)
+       (storew* (fixnumize words) result vector-length-slot
+                other-pointer-lowtag t)))))
+
+(with-test (:name :aprof-smoketest-large-vector-to-upper-register)
+  (let ((nbytes
+          (sb-aprof:aprof-run
+           (checked-compile
+            '(sb-int:named-lambda "test" ()
+              (declare (optimize sb-c::instrument-consing))
+              (sb-sys:%primitive cl-user::alloc-to-r8)
+              nil)))))
+    (assert (= nbytes sb-vm:large-object-size))))
+

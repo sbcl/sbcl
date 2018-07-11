@@ -251,6 +251,9 @@
                             sb-vm::map-stack-references
                             sb-vm::thread-profile-data-slot
                             sb-vm::thread-alloc-region-slot
+                            ;; need this for defining a vop which
+                            ;; tests the x86-64 allocation profiler
+                            sb-vm::pseudo-atomic
                             ;; Naughty outside-world code uses this.
                             sb-vm::thread-control-stack-start-slot
                             sb-vm::primitive-object-size))

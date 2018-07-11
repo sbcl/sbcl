@@ -69,7 +69,7 @@
   (:import-from #:sb-di #:valid-lisp-pointer-p)
   (:import-from #:sb-disassem #:dstate-inst-properties)
   (:import-from #:sb-x86-64-asm
-                #:lock #:x66 #:rex #:+rex-r+
+                #:lock #:x66 #:rex #:+rex-b+
                 #:inst-operand-size
                 #:machine-ea-p
                 #:machine-ea-base
@@ -357,7 +357,7 @@
                (#.+state-called+
                 (cond ((and (eq opcode '|pop|) (<= #x58 opcode-byte #x5F))
                        (setq target-reg
-                             (+ (if (logtest +rex-r+ (dstate-inst-properties dstate))
+                             (+ (if (logtest +rex-b+ (dstate-inst-properties dstate))
                                     8 0)
                                 (- opcode-byte #x58)))
                        (advance +state-result-popped+))
