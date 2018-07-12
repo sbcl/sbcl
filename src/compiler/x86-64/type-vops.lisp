@@ -13,14 +13,6 @@
 
 ;;;; test generation utilities
 
-;;; Optimize the case of moving a 64-bit value into RAX when not caring
-;;; about the upper 32 bits: often the REX prefix can be spared.
-(defun move-qword-to-eax (value)
-  (if (and (sc-is value any-reg descriptor-reg)
-           (< (tn-offset value) r8-offset))
-      (move eax-tn (reg-in-size value :dword))
-      (move rax-tn value)))
-
 (defun generate-fixnum-test (value)
   "Set the Z flag if VALUE is fixnum"
   (inst test
@@ -40,23 +32,18 @@
   (generate-fixnum-test value)
   (inst jmp (if not-p :nz :z) target))
 
-;;; General FIXME: it's fine that we wire these to use rAX which has
-;;; the shortest encoding, but for goodness sake can we pass the TN
-;;; from the VOP like every other backend does? Freely referencing the
-;;; permanent globals RAX-TN,EAX-TN,AL-TN is a bad way to go about it.
-
-(defun %lea-for-lowtag-test (target value lowtag)
-  (inst lea target (make-ea :dword :base value :disp (- lowtag))))
+(defun %lea-for-lowtag-test (temp value lowtag)
+  (inst lea (reg-in-size temp :dword) (make-ea :dword :base value :disp (- lowtag))))
 
 ;; Numerics including fixnum, excluding short-float. (INTEGER,RATIONAL)
 (defun %test-fixnum-and-headers (value temp target not-p headers)
   (let ((drop-through (gen-label)))
     (case n-fixnum-tag-bits
-     (1 (%lea-for-lowtag-test eax-tn value other-pointer-lowtag)
-        (inst test al-tn 1)
+     (1 (%lea-for-lowtag-test temp value other-pointer-lowtag)
+        (inst test (reg-in-size temp :byte) 1)
         (inst jmp :nz (if not-p drop-through target)) ; inverted
         (%test-headers value temp target not-p nil headers
-                       :drop-through drop-through :compute-eax nil))
+                       :drop-through drop-through :compute-temp nil))
      (t
       (generate-fixnum-test value)
       (inst jmp :z (if not-p drop-through target))
@@ -74,15 +61,16 @@
 
 ;; Numerics
 (defun %test-fixnum-immediate-and-headers (value temp target not-p immediate headers)
-  (let ((drop-through (gen-label)))
+  (let ((drop-through (gen-label))
+        (byte-temp (reg-in-size temp :byte)))
     (case n-fixnum-tag-bits
-     (1 (%lea-for-lowtag-test eax-tn value other-pointer-lowtag)
-        (inst test al-tn 1)
+     (1 (%lea-for-lowtag-test temp value other-pointer-lowtag)
+        (inst test byte-temp 1)
         (inst jmp :nz (if not-p drop-through target)) ; inverted
-        (inst cmp al-tn (- immediate other-pointer-lowtag))
+        (inst cmp byte-temp (- immediate other-pointer-lowtag))
         (inst jmp :e (if not-p drop-through target))
         (%test-headers value temp target not-p nil headers
-                       :drop-through drop-through :compute-eax nil))
+                       :drop-through drop-through :compute-temp nil))
      (t (generate-fixnum-test value)
         (inst jmp :z (if not-p drop-through target))
         (%test-immediate-and-headers value temp target not-p immediate headers
@@ -90,13 +78,12 @@
 
 (defun %test-immediate (value temp target not-p immediate
                         &optional (drop-through (gen-label)))
-  (declare (ignore temp))
   ;; Code a single instruction byte test if possible.
   (cond ((sc-is value any-reg descriptor-reg)
          (inst cmp (reg-in-size value :byte) immediate))
         (t
-         (move rax-tn value)
-         (inst cmp al-tn immediate)))
+         (move temp value)
+         (inst cmp (reg-in-size temp :byte) immediate)))
   (inst jmp (if not-p :ne :e) target)
   (emit-label drop-through))
 
@@ -107,22 +94,20 @@
   (cond ((sc-is value any-reg descriptor-reg)
          (inst cmp (reg-in-size value :byte) immediate))
         (t
-         (move rax-tn value)
-         (inst cmp al-tn immediate)))
+         (move temp value)
+         (inst cmp (reg-in-size temp :byte) immediate)))
   (inst jmp :e (if not-p drop-through target))
   (%test-headers value temp target not-p nil headers :drop-through drop-through))
 
 (defun %test-lowtag (value temp target not-p lowtag)
-  (declare (ignore temp))
-  (%lea-for-lowtag-test eax-tn value lowtag)
-  (inst test al-tn lowtag-mask)
+  (%lea-for-lowtag-test temp value lowtag)
+  (inst test (reg-in-size temp :byte) lowtag-mask)
   (inst jmp (if not-p :nz :z) target))
 
 (defun %test-headers (value temp target not-p function-p headers
                       &key except
                            (drop-through (gen-label))
-                           (compute-eax t))
-  (declare (ignore temp))
+                           (compute-temp t))
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
     (multiple-value-bind (equal less-or-equal greater-or-equal when-true
                                 when-false)
@@ -133,9 +118,9 @@
         (if not-p
             (values :ne :a :b drop-through target)
             (values :e :na :nb target drop-through))
-      (when compute-eax
-        (%lea-for-lowtag-test eax-tn value lowtag))
-      (inst test al-tn lowtag-mask)
+      (when compute-temp
+        (%lea-for-lowtag-test temp value lowtag))
+      (inst test (reg-in-size temp :byte) lowtag-mask)
       (inst jmp :nz when-false)
       ;; FIXME: this backend seems to be missing the special logic for
       ;;        testing exactly two widetags differing only in a single bit,
@@ -156,25 +141,27 @@
                                     (= (cdar headers) complex-array-widetag)))
                            (make-ea :byte :base value :disp (- lowtag))
                            (progn
-                             (inst mov eax-tn (make-ea :dword :base value
-                                                       :disp (- lowtag)))
-                             al-tn))))
+                             (inst mov (reg-in-size temp :dword)
+                                   (make-ea :dword :base value
+                                                   :disp (- lowtag)))
+                             (reg-in-size temp :byte)))))
           ((null remaining))
         (dolist (widetag except) ; only after loading widetag-tn
-          (inst cmp al-tn widetag)
+          (inst cmp (reg-in-size temp :byte) widetag)
           (inst jmp :e when-false))
         (setq except nil)
         (let ((header (car remaining))
               (last (null (cdr remaining))))
           (cond
            ((atom header)
-            (inst cmp widetag-tn header)
+            (inst cmp widetag-tn header) ; :byte size
             (if last
                 (inst jmp equal target)
                 (inst jmp :e when-true)))
            (t
              (let ((start (car header))
-                   (end (cdr header)))
+                   (end (cdr header))
+                   (byte-temp (reg-in-size temp :byte)))
                (cond
                  ((= start bignum-widetag)
                   (inst cmp widetag-tn end)
@@ -187,13 +174,13 @@
                       (inst jmp greater-or-equal target)
                       (inst jmp :b when-false)))
                  ((not last)
-                  (inst cmp al-tn start)
+                  (inst cmp byte-temp start)
                   (inst jmp :b when-false)
-                  (inst cmp al-tn end)
+                  (inst cmp byte-temp end)
                   (inst jmp :be when-true))
                  (t
-                  (inst sub al-tn start)
-                  (inst cmp al-tn (- end start))
+                  (inst sub byte-temp start)
+                  (inst cmp byte-temp (- end start))
                   (inst jmp less-or-equal target))))))))
       (emit-label drop-through))))
 
@@ -245,24 +232,27 @@
 
 (define-vop (signed-byte-64-p type-predicate)
   (:translate signed-byte-64-p)
-  (:ignore temp) ; FIXME: use temp, not al-tn
   (:generator 45
     (multiple-value-bind (yep nope)
         (if not-p
             (values not-target target)
             (values target not-target))
       #.(case n-fixnum-tag-bits
-          (1 '(progn
-               (%lea-for-lowtag-test eax-tn value other-pointer-lowtag)
-               (inst test al-tn fixnum-tag-mask) ; 0th bit = 1 => fixnum
+          (1 '(let ((byte-temp (reg-in-size temp :byte)))
+               (%lea-for-lowtag-test temp value other-pointer-lowtag)
+               (inst test byte-temp fixnum-tag-mask) ; 0th bit = 1 => fixnum
                (inst jmp :nz yep)
-               (inst test al-tn lowtag-mask)))
-          (t '(progn
-               (move-qword-to-eax value)
-               (inst test al-tn fixnum-tag-mask)
+               (inst test byte-temp lowtag-mask)))
+          (t '(let ((byte-temp (reg-in-size temp :byte)))
+               ;; we'll only examine 1 byte, but moving a :dword is preferable
+               ;; as it doesn't require the CPU to retain the other 7 bytes.
+               (if (gpr-p value)
+                   (inst mov (reg-in-size temp :dword) (reg-in-size value :dword))
+                   (inst mov temp value))
+               (inst test byte-temp fixnum-tag-mask)
                (inst jmp :e yep)
-               (inst and al-tn lowtag-mask)
-               (inst cmp al-tn other-pointer-lowtag))))
+               (inst and byte-temp lowtag-mask)
+               (inst cmp byte-temp other-pointer-lowtag))))
       (inst jmp :ne nope)
       (inst cmp (make-ea-for-object-slot value 0 other-pointer-lowtag)
             (+ (ash 1 n-widetag-bits) bignum-widetag))
@@ -274,46 +264,49 @@
 ;;; exactly two digits and the second digit all zeros.
 (define-vop (unsigned-byte-64-p type-predicate)
   (:translate unsigned-byte-64-p)
-  (:ignore temp) ; FIXME: use temp, not al-tn
   (:generator 45
     (let ((not-target (gen-label))
           (single-word (gen-label))
-          (fixnum (gen-label)))
+          (fixnum (gen-label))
+          (byte-temp (reg-in-size temp :byte)))
       (multiple-value-bind (yep nope)
           (if not-p
               (values not-target target)
               (values target not-target))
         ;; Is it a fixnum?
-        (move rax-tn value)
-        (inst test al-tn fixnum-tag-mask)
+        (if (gpr-p value)
+            (inst mov (reg-in-size temp :dword) (reg-in-size value :dword))
+            (inst mov temp value))
+        (inst test byte-temp fixnum-tag-mask)
         (inst jmp :e fixnum)
 
         ;; If not, is it an other pointer?
-        (inst and al-tn lowtag-mask)
-        (inst cmp al-tn other-pointer-lowtag)
+        (inst and byte-temp lowtag-mask)
+        (inst cmp byte-temp other-pointer-lowtag)
         (inst jmp :ne nope)
         ;; Get the header.
-        (loadw rax-tn value 0 other-pointer-lowtag)
+        (loadw temp value 0 other-pointer-lowtag)
         ;; Is it one?
-        (inst cmp rax-tn (+ (ash 1 n-widetag-bits) bignum-widetag))
+        (inst cmp temp (+ (ash 1 n-widetag-bits) bignum-widetag))
         (inst jmp :e single-word)
         ;; If it's other than two, we can't be an (unsigned-byte 64)
-        ;: Leave RAX holding 0 in the affirmative case.
-        (inst sub rax-tn (+ (ash 2 n-widetag-bits) bignum-widetag))
+        ;: Leave TEMP holding 0 in the affirmative case.
+        (inst sub temp (+ (ash 2 n-widetag-bits) bignum-widetag))
         (inst jmp :ne nope)
-        ;; Compare the second digit to zero (in RAX).
+        ;; Compare the second digit to zero (in TEMP).
         (inst cmp (make-ea-for-object-slot value (1+ bignum-digits-offset)
-                                           other-pointer-lowtag) rax-tn)
+                                           other-pointer-lowtag)
+              temp)
         (inst jmp :z yep) ; All zeros, its an (unsigned-byte 64).
         (inst jmp nope)
 
         (emit-label single-word)
         ;; Get the single digit.
-        (loadw rax-tn value bignum-digits-offset other-pointer-lowtag)
+        (loadw temp value bignum-digits-offset other-pointer-lowtag)
 
         ;; positive implies (unsigned-byte 64).
         (emit-label fixnum)
-        (inst test rax-tn rax-tn)
+        (inst test temp temp)
         (inst jmp (if not-p :s :ns) target)
 
         (emit-label not-target)))))
