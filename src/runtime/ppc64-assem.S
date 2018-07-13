@@ -398,7 +398,8 @@ x:
 	addi reg_LRA,reg_LRA,OTHER_POINTER_LOWTAG
 
 	/* Function is an indirect closure */
-	lwz reg_CODE,SIMPLE_FUN_SELF_OFFSET(reg_LEXENV)
+	addi reg_A0,reg_LEXENV,SIMPLE_FUN_SELF_OFFSET
+	ld reg_CODE,0(reg_A0)
 	addi reg_LIP,reg_CODE,SIMPLE_FUN_CODE_OFFSET
 	mtctr reg_LIP
 	slwi reg_NARGS,reg_NL2,2
