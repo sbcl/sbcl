@@ -121,7 +121,7 @@
       (immediate
        (if (zerop (tn-value skip))
            (move src context)
-           (inst lea src (make-ea :dword :base context
+           (inst lea src (make-ea :qword :base context
                                   :disp (- (* (tn-value skip)
                                               n-word-bytes))))))
       (any-reg

@@ -267,7 +267,8 @@
   ;; there is an info-vector in the slot, it has at least one element.
   ;; This would compile to almost the same code without a VOP,
   ;; but using a jmp around a mov instead.
-  (inst lea temp (make-ea :dword :base result :disp (- list-pointer-lowtag)))
+  (inst lea (reg-in-size temp :dword)
+        (make-ea :dword :base result :disp (- list-pointer-lowtag)))
   (inst test (reg-in-size temp :byte) lowtag-mask)
   (inst cmov :e result
         (make-ea-for-object-slot result cons-cdr-slot list-pointer-lowtag)))

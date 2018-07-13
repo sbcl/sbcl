@@ -579,19 +579,19 @@
   (:generator 50
    ;; With the exception of bignums, these objects have effectively
    ;; 32-bit headers because the high half contains other data.
-   (multiple-value-bind (bytes header extra)
+   (multiple-value-bind (bytes header)
       (if (= type bignum-widetag)
-          (values bytes header extra)
+          (values bytes header)
           (values (reg-in-size bytes  :dword)
-                  (reg-in-size header :dword)
-                  (reg-in-size extra  :dword)))
+                  (reg-in-size header :dword)))
     (inst lea bytes
-          (make-ea :qword :disp (* (1+ words) n-word-bytes) :index extra
+          (make-ea :byte
+                   :disp (* (1+ words) n-word-bytes) :index extra
                    :scale (ash 1 (- word-shift n-fixnum-tag-bits))))
     (inst mov header bytes)
     (inst shl header (- n-widetag-bits word-shift)) ; w+1 to length field
     (inst lea header                    ; (w-1 << 8) | type
-          (make-ea :qword :base header
+          (make-ea :byte :base header
                    :disp (+ (ash -2 n-widetag-bits) type)))
     (inst and bytes (lognot lowtag-mask)))
     (instrument-alloc bytes node)

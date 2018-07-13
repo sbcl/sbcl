@@ -1658,6 +1658,18 @@
     (reg/mem nil :use-label #'lea-compute-label :printer #'lea-print-ea)))
   (:emitter
    (aver (or (dword-reg-p dst) (qword-reg-p dst)))
+   ;; This next assertion is somewhat meaningless, and so commented out.
+   ;; But it can be added back in to find "weird" combinations
+   ;; of EA size and destination register size.
+   ;; Barring use of the address-size-override prefix, EAs don't really have a
+   ;; size as distinct from the operation size. Since we treat them as sized
+   ;; (for the moment, until the assembler is overhauled), then make sure that
+   ;; someone didn't think that the destination size is implied by the source
+   ;; size. i.e. make sure they actually match.
+   #+nil
+   (aver (or (eq (operand-size dst) (ea-size src))
+             ;; allow :BYTE to act as sort of a generic EA size
+             (eq (ea-size src) :byte)))
    (maybe-emit-rex-for-ea segment src dst
                           :operand-size (if (dword-reg-p dst) :dword :qword))
    (emit-byte segment #b10001101)
