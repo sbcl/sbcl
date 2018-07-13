@@ -2122,64 +2122,44 @@
 
 ;;;; string manipulation
 
-(define-instruction cmps (segment size)
-  (:printer string-op ((op #b1010011)))
-  (:emitter
-   (maybe-emit-operand-size-prefix segment size)
-   (maybe-emit-rex-prefix segment size nil nil nil)
-   (emit-byte segment (if (eq size :byte) #b10100110 #b10100111))))
+(flet ((emit (segment opcode size)
+         (maybe-emit-operand-size-prefix segment size)
+         (maybe-emit-rex-prefix segment size nil nil nil)
+         (emit-byte segment (logior (ash opcode 1)
+                                    (if (eq size :byte) 0 1)))))
+  (define-instruction movs (segment size)
+    (:printer string-op ((op #b1010010)))
+    (:emitter (emit segment #b1010010 size)))
 
-(define-instruction ins (segment acc)
-  (:printer string-op ((op #b0110110)))
-  (:emitter
-   (let ((size (operand-size acc)))
+  (define-instruction cmps (segment size)
+    (:printer string-op ((op #b1010011)))
+    (:emitter (emit segment #b1010011 size)))
+
+  (define-instruction lods (segment acc)
+    (:printer string-op ((op #b1010110)))
+    (:emitter (aver (accumulator-p acc))
+              (emit segment #b1010110 (operand-size acc))))
+
+  (define-instruction scas (segment acc)
+    (:printer string-op ((op #b1010111)))
+    (:emitter (aver (accumulator-p acc))
+              (emit segment #b1010111 (operand-size acc))))
+
+  (define-instruction stos (segment acc)
+    (:printer string-op ((op #b1010101)))
+    (:emitter (aver (accumulator-p acc))
+              (emit segment #b1010101 (operand-size acc))))
+
+  (define-instruction ins (segment acc)
+    (:printer string-op ((op #b0110110)))
+    (:emitter (aver (accumulator-p acc))
+              (emit segment #b0110110 (operand-size acc))))
+
+  (define-instruction outs (segment acc)
+    (:printer string-op ((op #b0110111)))
+    (:emitter
      (aver (accumulator-p acc))
-     (maybe-emit-operand-size-prefix segment size)
-     (maybe-emit-rex-prefix segment size nil nil nil)
-     (emit-byte segment (if (eq size :byte) #b01101100 #b01101101)))))
-
-(define-instruction lods (segment acc)
-  (:printer string-op ((op #b1010110)))
-  (:emitter
-   (let ((size (operand-size acc)))
-     (aver (accumulator-p acc))
-     (maybe-emit-operand-size-prefix segment size)
-     (maybe-emit-rex-prefix segment size nil nil nil)
-     (emit-byte segment (if (eq size :byte) #b10101100 #b10101101)))))
-
-(define-instruction movs (segment size)
-  (:printer string-op ((op #b1010010)))
-  (:emitter
-   (maybe-emit-operand-size-prefix segment size)
-   (maybe-emit-rex-prefix segment size nil nil nil)
-   (emit-byte segment (if (eq size :byte) #b10100100 #b10100101))))
-
-(define-instruction outs (segment acc)
-  (:printer string-op ((op #b0110111)))
-  (:emitter
-   (let ((size (operand-size acc)))
-     (aver (accumulator-p acc))
-     (maybe-emit-operand-size-prefix segment size)
-     (maybe-emit-rex-prefix segment size nil nil nil)
-     (emit-byte segment (if (eq size :byte) #b01101110 #b01101111)))))
-
-(define-instruction scas (segment acc)
-  (:printer string-op ((op #b1010111)))
-  (:emitter
-   (let ((size (operand-size acc)))
-     (aver (accumulator-p acc))
-     (maybe-emit-operand-size-prefix segment size)
-     (maybe-emit-rex-prefix segment size nil nil nil)
-     (emit-byte segment (if (eq size :byte) #b10101110 #b10101111)))))
-
-(define-instruction stos (segment acc)
-  (:printer string-op ((op #b1010101)))
-  (:emitter
-   (let ((size (operand-size acc)))
-     (aver (accumulator-p acc))
-     (maybe-emit-operand-size-prefix segment size)
-     (maybe-emit-rex-prefix segment size nil nil nil)
-     (emit-byte segment (if (eq size :byte) #b10101010 #b10101011)))))
+     (emit segment #b0110111 (operand-size acc)))))
 
 (define-instruction xlat (segment)
   (:printer byte ((op #b11010111)))
