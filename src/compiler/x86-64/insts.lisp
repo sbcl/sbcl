@@ -1540,54 +1540,46 @@
   ; (:printer reg-reg/mem ((op #x63) (reg nil :type 'reg)))
   (:emitter (emit-move-with-extension segment dst src nil)))
 
-(define-instruction push (segment src)
-  ;; register
-  (:printer reg-no-width-default-qword ((op #b01010)))
-  ;; register/memory
-  (:printer reg/mem-default-qword ((op '(#b11111111 #b110))))
-  ;; immediate
-  (:printer byte ((op #b01101010) (imm nil :type 'signed-imm-byte))
-            '(:name :tab imm))
-  (:printer byte ((op #b01101000)
-                  (imm nil :type 'signed-imm-data-default-qword))
-            '(:name :tab imm))
-  ;; ### segment registers?
-
-  (:emitter
-   (cond ((integerp src)
-          (cond ((<= -128 src 127)
-                 (emit-byte segment #b01101010)
-                 (emit-byte segment src))
-                (t
-                 ;; A REX-prefix is not needed because the operand size
-                 ;; defaults to 64 bits. The size of the immediate is 32
-                 ;; bits and it is sign-extended.
-                 (emit-byte segment #b01101000)
-                 (emit-signed-dword segment src))))
-         (t
-          (let ((size (operand-size src)))
-            (aver (or (eq size :qword) (eq size :word)))
-            (maybe-emit-operand-size-prefix segment size)
-            (maybe-emit-rex-for-ea segment src nil :operand-size :do-not-set)
-            (cond ((gpr-p src)
-                   (emit-byte+reg segment #x50 src))
+(flet ((emit* (segment thing gpr-opcode mem-opcode subcode allowp)
+         (let ((size (operand-size thing)))
+           (aver (or (eq size :qword) (eq size :word)))
+           (maybe-emit-operand-size-prefix segment size)
+           (maybe-emit-rex-for-ea segment thing nil :operand-size :do-not-set)
+           (cond ((gpr-p thing)
+                  (emit-byte+reg segment gpr-opcode thing))
                   (t
-                   (emit-byte segment #b11111111)
-                   (emit-ea segment src #b110 :allow-constants t))))))))
-
-(define-instruction pop (segment dst)
-  (:printer reg-no-width-default-qword ((op #b01011)))
-  (:printer reg/mem-default-qword ((op '(#b10001111 #b000))))
-  (:emitter
-   (let ((size (operand-size dst)))
-     (aver (or (eq size :qword) (eq size :word)))
-     (maybe-emit-operand-size-prefix segment size)
-     (maybe-emit-rex-for-ea segment dst nil :operand-size :do-not-set)
-     (cond ((gpr-p dst)
-            (emit-byte+reg segment #x58 dst))
+                   (emit-byte segment mem-opcode)
+                   (emit-ea segment thing subcode :allow-constants allowp))))))
+  (define-instruction push (segment src)
+    ;; register
+    (:printer reg-no-width-default-qword ((op #b01010)))
+    ;; register/memory
+    (:printer reg/mem-default-qword ((op '(#b11111111 #b110))))
+    ;; immediate
+    (:printer byte ((op #b01101010) (imm nil :type 'signed-imm-byte))
+              '(:name :tab imm))
+    (:printer byte ((op #b01101000)
+                    (imm nil :type 'signed-imm-data-default-qword))
+              '(:name :tab imm))
+    ;; ### segment registers?
+    (:emitter
+     (cond ((integerp src)
+            (cond ((<= -128 src 127)
+                   (emit-byte segment #b01101010)
+                   (emit-byte segment src))
+                  (t
+                   ;; A REX-prefix is not needed because the operand size
+                   ;; defaults to 64 bits. The size of the immediate is 32
+                   ;; bits and it is sign-extended.
+                   (emit-byte segment #b01101000)
+                   (emit-signed-dword segment src))))
            (t
-            (emit-byte segment #b10001111)
-            (emit-ea segment dst #b000))))))
+            (emit* segment src #x50 #b11111111 #b110 t)))))
+
+  (define-instruction pop (segment dst)
+    (:printer reg-no-width-default-qword ((op #b01011)))
+    (:printer reg/mem-default-qword ((op '(#b10001111 #b000))))
+    (:emitter (emit* segment dst #x58 #b10001111 #b000 nil))))
 
 ;;; Compared to x86 we need to take two particularities into account
 ;;; here:
@@ -1846,36 +1838,27 @@
   (define or  #b001)
   (define xor #b110))
 
-;;; The one-byte encodings for INC and DEC are used as REX prefixes
-;;; in 64-bit mode so we always use the two-byte form.
-(define-instruction inc (segment dst &optional prefix)
-  (:printer reg/mem ((op '(#b1111111 #b000))))
-  (:emitter
-   (emit-prefix segment prefix)
-   (let ((size (operand-size dst)))
-     (maybe-emit-operand-size-prefix segment size)
-     (maybe-emit-rex-for-ea segment dst nil)
-     (emit-byte segment (if (eq size :byte) #b11111110 #b11111111))
-     (emit-ea segment dst #b000))))
-
-(define-instruction dec (segment dst &optional prefix)
-  (:printer reg/mem ((op '(#b1111111 #b001))))
-  (:emitter
-   (emit-prefix segment prefix)
-   (let ((size (operand-size dst)))
-     (maybe-emit-operand-size-prefix segment size)
-     (maybe-emit-rex-for-ea segment dst nil)
-     (emit-byte segment (if (eq size :byte) #b11111110 #b11111111))
-     (emit-ea segment dst #b001))))
-
-(define-instruction neg (segment dst)
-  (:printer reg/mem ((op '(#b1111011 #b011))))
-  (:emitter
-   (let ((size (operand-size dst)))
-     (maybe-emit-operand-size-prefix segment size)
-     (maybe-emit-rex-for-ea segment dst nil)
-     (emit-byte segment (if (eq size :byte) #b11110110 #b11110111))
-     (emit-ea segment dst #b011))))
+(flet ((emit* (segment prefix opcode subcode dst)
+         (emit-prefix segment prefix)
+         (let ((size (operand-size dst)))
+           (maybe-emit-operand-size-prefix segment size)
+           (maybe-emit-rex-for-ea segment dst nil)
+           (emit-byte segment (logior (ash opcode 1) (if (eq size :byte) 0 1)))
+           (emit-ea segment dst subcode))))
+  (define-instruction not (segment dst &optional prefix)
+    (:printer reg/mem ((op '(#b1111011 #b010))))
+    (:emitter (emit* segment prefix #b1111011 #b010 dst)))
+  (define-instruction neg (segment dst &optional prefix)
+    (:printer reg/mem ((op '(#b1111011 #b011))))
+    (:emitter (emit* segment prefix #b1111011 #b011 dst)))
+  ;; The one-byte encodings for INC and DEC are used as REX prefixes
+  ;; in 64-bit mode so we always use the two-byte form.
+  (define-instruction inc (segment dst &optional prefix)
+    (:printer reg/mem ((op '(#b1111111 #b000))))
+    (:emitter (emit* segment prefix #b1111111 #b000 dst)))
+  (define-instruction dec (segment dst &optional prefix)
+    (:printer reg/mem ((op '(#b1111111 #b001))))
+    (:emitter (emit* segment prefix #b1111111 #b001 dst))))
 
 (define-instruction mul (segment dst src)
   (:printer accum-reg/mem ((op '(#b1111011 #b100))))
@@ -2110,56 +2093,46 @@
               (test-reg-and-something that this))
              (t
               (error "bogus operands for TEST: ~S and ~S" this that)))))))
-
-(define-instruction not (segment dst)
-  (:printer reg/mem ((op '(#b1111011 #b010))))
-  (:emitter
-   (let ((size (operand-size dst)))
-     (maybe-emit-operand-size-prefix segment size)
-     (maybe-emit-rex-for-ea segment dst nil)
-     (emit-byte segment (if (eq size :byte) #b11110110 #b11110111))
-     (emit-ea segment dst #b010))))
 
 ;;;; string manipulation
 
-(flet ((emit (segment opcode size)
+(flet ((emit* (segment opcode size)
          (maybe-emit-operand-size-prefix segment size)
          (maybe-emit-rex-prefix segment size nil nil nil)
          (emit-byte segment (logior (ash opcode 1)
                                     (if (eq size :byte) 0 1)))))
   (define-instruction movs (segment size)
     (:printer string-op ((op #b1010010)))
-    (:emitter (emit segment #b1010010 size)))
+    (:emitter (emit* segment #b1010010 size)))
 
   (define-instruction cmps (segment size)
     (:printer string-op ((op #b1010011)))
-    (:emitter (emit segment #b1010011 size)))
+    (:emitter (emit* segment #b1010011 size)))
 
   (define-instruction lods (segment acc)
     (:printer string-op ((op #b1010110)))
     (:emitter (aver (accumulator-p acc))
-              (emit segment #b1010110 (operand-size acc))))
+              (emit* segment #b1010110 (operand-size acc))))
 
   (define-instruction scas (segment acc)
     (:printer string-op ((op #b1010111)))
     (:emitter (aver (accumulator-p acc))
-              (emit segment #b1010111 (operand-size acc))))
+              (emit* segment #b1010111 (operand-size acc))))
 
   (define-instruction stos (segment acc)
     (:printer string-op ((op #b1010101)))
     (:emitter (aver (accumulator-p acc))
-              (emit segment #b1010101 (operand-size acc))))
+              (emit* segment #b1010101 (operand-size acc))))
 
   (define-instruction ins (segment acc)
     (:printer string-op ((op #b0110110)))
     (:emitter (aver (accumulator-p acc))
-              (emit segment #b0110110 (operand-size acc))))
+              (emit* segment #b0110110 (operand-size acc))))
 
   (define-instruction outs (segment acc)
     (:printer string-op ((op #b0110111)))
-    (:emitter
-     (aver (accumulator-p acc))
-     (emit segment #b0110111 (operand-size acc)))))
+    (:emitter (aver (accumulator-p acc))
+              (emit* segment #b0110111 (operand-size acc)))))
 
 (define-instruction xlat (segment)
   (:printer byte ((op #b11010111)))
@@ -2169,29 +2142,23 @@
 
 ;;;; bit manipulation
 
-(define-instruction bsf (segment dst src)
-  (:printer ext-reg-reg/mem-no-width ((op #b10111100)))
-  (:emitter
-   (let ((size (matching-operand-size dst src)))
-     (when (eq size :byte)
-       (error "can't scan bytes: ~S" src))
-     (maybe-emit-operand-size-prefix segment size)
-     (maybe-emit-rex-for-ea segment src dst)
-     (emit-byte segment #b00001111)
-     (emit-byte segment #b10111100)
-     (emit-ea segment src (reg-tn-encoding dst)))))
+(flet ((emit* (segment opcode dst src)
+         (let ((size (matching-operand-size dst src)))
+           (when (eq size :byte)
+             (error "can't scan bytes: ~S" src))
+           (maybe-emit-operand-size-prefix segment size)
+           (maybe-emit-rex-for-ea segment src dst)
+           (emit-byte segment #b00001111)
+           (emit-byte segment opcode)
+           (emit-ea segment src (reg-tn-encoding dst)))))
 
-(define-instruction bsr (segment dst src)
-  (:printer ext-reg-reg/mem-no-width ((op #b10111101)))
-  (:emitter
-   (let ((size (matching-operand-size dst src)))
-     (when (eq size :byte)
-       (error "can't scan bytes: ~S" src))
-     (maybe-emit-operand-size-prefix segment size)
-     (maybe-emit-rex-for-ea segment src dst)
-     (emit-byte segment #b00001111)
-     (emit-byte segment #b10111101)
-     (emit-ea segment src (reg-tn-encoding dst)))))
+  (define-instruction bsf (segment dst src)
+    (:printer ext-reg-reg/mem-no-width ((op #b10111100)))
+    (:emitter (emit* segment #b10111100 dst src)))
+
+  (define-instruction bsr (segment dst src)
+    (:printer ext-reg-reg/mem-no-width ((op #b10111101)))
+    (:emitter (emit* segment #b10111101 dst src))))
 
 (defun emit-bit-test-and-mumble (segment src index opcode)
   (let ((size (operand-size src)))
@@ -3178,34 +3145,29 @@
    (emit-byte segment #xc3)
    (emit-ea segment dst (reg-tn-encoding src))))
 
-(define-instruction prefetch (segment type src)
-  (:printer ext-reg/mem-no-width ((op '(#x18 0)))
-            '("PREFETCHNTA" :tab reg/mem))
-  (:printer ext-reg/mem-no-width ((op '(#x18 1)))
-            '("PREFETCHT0" :tab reg/mem))
-  (:printer ext-reg/mem-no-width ((op '(#x18 2)))
-            '("PREFETCHT1" :tab reg/mem))
-  (:printer ext-reg/mem-no-width ((op '(#x18 3)))
-            '("PREFETCHT2" :tab reg/mem))
-  (:emitter
-   (aver (not (register-p src)))
-   (aver (eq (operand-size src) :byte))
-   (let ((type (position type #(:nta :t0 :t1 :t2))))
-     (aver type)
-     (maybe-emit-rex-for-ea segment src nil)
-     (emit-byte segment #x0f)
-     (emit-byte segment #x18)
-     (emit-ea segment src type))))
+(flet ((emit* (segment opcode subcode src)
+         (aver (not (register-p src)))
+         (aver (eq (operand-size src) :byte))
+         (aver subcode)
+         (maybe-emit-rex-for-ea segment src nil)
+         (emit-byte segment #x0f)
+         (emit-byte segment opcode)
+         (emit-ea segment src subcode)))
 
-(define-instruction clflush (segment src)
-  (:printer ext-reg/mem-no-width ((op '(#xae 7))))
-  (:emitter
-   (aver (not (register-p src)))
-   (aver (eq (operand-size src) :byte))
-   (maybe-emit-rex-for-ea segment src nil)
-   (emit-byte segment #x0f)
-   (emit-byte segment #xae)
-   (emit-ea segment src 7)))
+  (define-instruction prefetch (segment type src)
+    (:printer ext-reg/mem-no-width ((op '(#x18 0)))
+              '("PREFETCHNTA" :tab reg/mem))
+    (:printer ext-reg/mem-no-width ((op '(#x18 1)))
+              '("PREFETCHT0" :tab reg/mem))
+    (:printer ext-reg/mem-no-width ((op '(#x18 2)))
+              '("PREFETCHT1" :tab reg/mem))
+    (:printer ext-reg/mem-no-width ((op '(#x18 3)))
+              '("PREFETCHT2" :tab reg/mem))
+    (:emitter (emit* segment #x18 (position type #(:nta :t0 :t1 :t2)) src)))
+
+  (define-instruction clflush (segment src)
+    (:printer ext-reg/mem-no-width ((op '(#xae 7))))
+    (:emitter (emit* segment #xae 7 src))))
 
 (macrolet ((define-fence-instruction (name last-byte)
                `(define-instruction ,name (segment)
@@ -3224,25 +3186,21 @@
    (emit-byte segment #xf3)
    (emit-byte segment #x90)))
 
-(define-instruction ldmxcsr (segment src)
-  (:printer ext-reg/mem-no-width ((op '(#xae 2))))
-  (:emitter
-   (aver (not (register-p src)))
-   (aver (eq (operand-size src) :dword))
-   (maybe-emit-rex-for-ea segment src nil)
-   (emit-byte segment #x0f)
-   (emit-byte segment #xae)
-   (emit-ea segment src 2)))
+(flet ((emit* (segment ea subcode)
+         (aver (not (register-p ea)))
+         (aver (eq (operand-size ea) :dword))
+         (maybe-emit-rex-for-ea segment ea nil)
+         (emit-byte segment #x0f)
+         (emit-byte segment #xae)
+         (emit-ea segment ea subcode)))
 
-(define-instruction stmxcsr (segment dst)
-  (:printer ext-reg/mem-no-width ((op '(#xae 3))))
-  (:emitter
-   (aver (not (register-p dst)))
-   (aver (eq (operand-size dst) :dword))
-   (maybe-emit-rex-for-ea segment dst nil)
-   (emit-byte segment #x0f)
-   (emit-byte segment #xae)
-   (emit-ea segment dst 3)))
+  (define-instruction ldmxcsr (segment src)
+    (:printer ext-reg/mem-no-width ((op '(#xae 2))))
+    (:emitter (emit* segment src 2)))
+
+  (define-instruction stmxcsr (segment dst)
+    (:printer ext-reg/mem-no-width ((op '(#xae 3))))
+    (:emitter (emit* segment dst 3))))
 
 (define-instruction popcnt (segment dst src)
   (:printer f3-escape-reg-reg/mem ((op #xB8)))
