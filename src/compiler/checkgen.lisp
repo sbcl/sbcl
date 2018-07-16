@@ -304,36 +304,30 @@
   (let* ((lvar (node-lvar cast))
          (dest (and lvar (lvar-dest lvar))))
     (and (combination-p dest)
-         (or
-          ;; Special case, %CHECK-BOUND tests both for fixnum and
-          ;; bound, which is equivalent to testing for INDEX.
-          (and (equal (combination-fun-debug-name dest) '(lambda-inlined check-bound))
-               (values-subtypep (values-specifier-type  '(values index &optional))
-                                (cast-type-to-check cast)))
-          ;; The theory is that the type assertion is from a declaration on the
-          ;; callee, so the callee should be able to do the check. We want to
-          ;; let the callee do the check, because it is possible that by the
-          ;; time of call that declaration will be changed and we do not want
-          ;; to make people recompile all calls to a function when they were
-          ;; originally compiled with a bad declaration.
-          ;;
-          ;; ALMOST-IMMEDIATELY-USED-P ensures that we don't delegate casts
-          ;; that occur before nodes that can cause observable side effects --
-          ;; most commonly other non-external casts: so the order in which
-          ;; possible type errors are signalled matches with the evaluation
-          ;; order.
-          ;;
-          ;; FIXME: We should let more cases be handled by the callee then we
-          ;; currently do, see: https://bugs.launchpad.net/sbcl/+bug/309104
-          ;; This is not fixable quite here, though, because flow-analysis has
-          ;; deleted the LVAR of the cast by the time we get here, so there is
-          ;; no destination. Perhaps we should mark cases inserted by
-          ;; ASSERT-CALL-TYPE explicitly, and delete those whose destination is
-          ;; deemed unreachable?
-          (and
-           (almost-immediately-used-p lvar cast)
-           (values (values-subtypep (lvar-externally-checkable-type lvar)
-                                    (cast-type-to-check cast))))))))
+         ;; The theory is that the type assertion is from a declaration on the
+         ;; callee, so the callee should be able to do the check. We want to
+         ;; let the callee do the check, because it is possible that by the
+         ;; time of call that declaration will be changed and we do not want
+         ;; to make people recompile all calls to a function when they were
+         ;; originally compiled with a bad declaration.
+         ;;
+         ;; ALMOST-IMMEDIATELY-USED-P ensures that we don't delegate casts
+         ;; that occur before nodes that can cause observable side effects --
+         ;; most commonly other non-external casts: so the order in which
+         ;; possible type errors are signalled matches with the evaluation
+         ;; order.
+         ;;
+         ;; FIXME: We should let more cases be handled by the callee then we
+         ;; currently do, see: https://bugs.launchpad.net/sbcl/+bug/309104
+         ;; This is not fixable quite here, though, because flow-analysis has
+         ;; deleted the LVAR of the cast by the time we get here, so there is
+         ;; no destination. Perhaps we should mark cases inserted by
+         ;; ASSERT-CALL-TYPE explicitly, and delete those whose destination is
+         ;; deemed unreachable?
+         (and
+          (almost-immediately-used-p lvar cast)
+          (values (values-subtypep (lvar-externally-checkable-type lvar)
+                                   (cast-type-to-check cast)))))))
 
 ;; Type specifiers handled by the general-purpose MAKE-TYPE-CHECK-FORM are often
 ;; trivial enough to have an internal error number assigned to them that can be

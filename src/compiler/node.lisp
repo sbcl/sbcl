@@ -1545,6 +1545,9 @@
 ;;; The hook is called when the value becomes constant
 (def!struct (cast-with-hook (:include cast) (:copier nil))
   (hook #'missing-arg :type (or null function)))
+
+;;; Inserted by ARRAY-CALL-TYPE-DERIVER so that it can be later deleted
+(def!struct (array-index-cast (:include cast) (:copier nil)))
 
 ;;;; non-local exit support
 ;;;;

@@ -1009,6 +1009,20 @@ and no value was provided for it." name))))))))))
         (use-lvar cast internal-lvar)
         t))))
 
+(defun assert-array-index-lvar-type (lvar type policy)
+  (let ((internal-lvar (make-lvar))
+        (dest (lvar-dest lvar)))
+    (substitute-lvar internal-lvar lvar)
+    (with-ir1-environment-from-node dest
+      (let ((cast (make-array-index-cast
+                   :asserted-type type
+                   :type-to-check (maybe-weaken-check type policy)
+                   :value lvar
+                   :derived-type (coerce-to-values type))))
+        (%insert-cast-before dest cast)
+        (use-lvar cast internal-lvar)
+        t))))
+
 (defun assert-cast-with-hook (lvar type policy
                               hook)
   (let ((internal-lvar (make-lvar))

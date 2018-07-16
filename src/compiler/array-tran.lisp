@@ -1362,9 +1362,13 @@
             "The array type is ambiguous; must call ~
                ARRAY-HAS-FILL-POINTER-P at runtime."))))))
 
-(deftransform check-bound ((array dimension index) * * :node node)
-  ;; This is simply to avoid multiple evaluation of INDEX by the
-  ;; translator, it's easier to wrap it in a lambda from DEFTRANSFORM
+(deftransform check-bound ((array dimension index))
+  ;; %CHECK-BOUND will perform both bound and type checking when
+  ;; necessary, delete the cast so that it doesn't get confused by
+  ;; its derived type.
+  (let ((use (principal-lvar-ref-use index)))
+    (when (array-index-cast-p use)
+      (delete-cast use)))
   `(bound-cast array ,(if (constant-lvar-p dimension)
                           (lvar-value dimension)
                           'dimension)

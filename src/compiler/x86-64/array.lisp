@@ -127,7 +127,6 @@
                 :load-if (not (and (sc-is index immediate)
                                    (typep (tn-value index)
                                           'sc-offset)))))
-  ;(:arg-types * positive-fixnum *)
   (:variant-vars %test-fixnum)
   (:variant t)
   (:vop-var vop)
@@ -149,6 +148,14 @@
   (:policy :fast)
   (:variant nil)
   (:variant-cost 4))
+
+(define-vop (check-bound/fixnum check-bound)
+  (:args (array)
+         (bound)
+         (index :scs (any-reg)))
+  (:arg-types * * tagged-num)
+  (:variant nil)
+  (:variant-cost 4))
 
 ;;;; accessors/setters
 
@@ -164,8 +171,7 @@
                 (define-full-setter+offset
                   ,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" type)
                   ,type vector-data-offset other-pointer-lowtag ,scs
-                  ,element-type data-vector-set-with-offset)))
-           )
+                  ,element-type data-vector-set-with-offset))))
   (def-full-data-vector-frobs simple-vector * descriptor-reg any-reg immediate)
   (def-full-data-vector-frobs simple-array-unsigned-byte-64 unsigned-num
     unsigned-reg)

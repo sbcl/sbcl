@@ -89,6 +89,15 @@
                    use))))
     (plu lvar)))
 
+(defun principal-lvar-ref-use (lvar)
+  (labels ((recurse (lvar)
+             (when lvar
+               (let ((use (lvar-uses lvar)))
+                 (if (ref-p use)
+                     (recurse (lambda-var-ref-lvar use))
+                     use)))))
+    (recurse lvar)))
+
 (defun principal-lvar-dest (lvar)
   (labels ((pld (lvar)
              (and lvar

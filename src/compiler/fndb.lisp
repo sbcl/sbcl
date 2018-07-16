@@ -1089,7 +1089,9 @@
 
 (defknown aref (array &rest index) t (foldable)
   :call-type-deriver #'array-call-type-deriver)
-(defknown row-major-aref (array index) t (foldable))
+(defknown row-major-aref (array index) t (foldable)
+  :call-type-deriver (lambda (call trusted)
+                       (array-call-type-deriver call trusted nil t)))
 
 (defknown array-element-type (array) (or list symbol)
   (foldable flushable))
@@ -1897,7 +1899,9 @@
 (defknown (setf aref) (t (modifying array) &rest index) t ()
   :call-type-deriver (lambda (call trusted)
                        (array-call-type-deriver call trusted t)))
-(defknown %set-row-major-aref ((modifying array) index t) t ())
+(defknown %set-row-major-aref ((modifying array) index t) t ()
+  :call-type-deriver (lambda (call trusted)
+                       (array-call-type-deriver call trusted t t)))
 (defknown (%rplaca %rplacd) ((modifying cons) t) t ()
   :derive-type #'result-type-last-arg)
 (defknown %put (symbol t t) t ())
