@@ -121,8 +121,12 @@
 (define-vop (check-bound)
   (:translate %check-bound)
   (:policy :fast-safe)
-  (:args (array :scs (descriptor-reg))
-         (bound :scs (any-reg descriptor-reg))
+  (:args (array :scs (descriptor-reg constant))
+         (bound :scs (any-reg descriptor-reg)
+                :load-if (not (and (sc-is bound immediate)
+                                   (typep (tn-value bound)
+                                          'sc-offset)
+                                   (not (sc-is index immediate)))))
          (index :scs (any-reg descriptor-reg)
                 :load-if (not (and (sc-is index immediate)
                                    (typep (tn-value index)
@@ -134,16 +138,20 @@
   (:generator 5
     (let ((error (generate-error-code vop 'invalid-array-index-error
                                       array bound index))
+          (bound (if (sc-is bound immediate)
+                     (fixnumize (tn-value bound))
+                     bound))
           (index (if (sc-is index immediate)
                      (fixnumize (tn-value index))
                      index)))
       (when (and %test-fixnum (not (integerp index)))
         (%test-fixnum index nil error t))
-      (inst cmp bound index)
-      ;; We use below-or-equal even though it's an unsigned test,
-      ;; because negative indexes appear as large unsigned numbers.
-      ;; Therefore, we get the <0 and >=bound test all rolled into one.
-      (inst jmp :be error))))
+      (cond ((integerp bound)
+             (inst cmp index bound)
+             (inst jmp :nb error))
+            (t
+             (inst cmp bound index)
+             (inst jmp :be error))))))
 (define-vop (check-bound/fast check-bound)
   (:policy :fast)
   (:variant nil)
