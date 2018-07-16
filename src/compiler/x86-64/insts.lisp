@@ -941,10 +941,6 @@
 (define-bitfield-emitter emit-sib-byte 8
   (byte 2 6) (byte 3 3) (byte 3 0))
 
-(define-bitfield-emitter emit-rex-byte 8
-  (byte 4 4) (byte 1 3) (byte 1 2) (byte 1 1) (byte 1 0))
-
-
 
 ;;;; fixup emitters
 
@@ -1169,6 +1165,41 @@
 
 (defconstant +operand-size-prefix-byte+ #b01100110)
 
+(defconstant +regclass-gpr+ 0)
+(defconstant +regclass-fpr+ 1)
+
+;;; Size is :BYTE,:HIGH-BYTE,:WORD,:DWORD,:QWORD
+;;; INDEX is the index in the register file for the class and size.
+;;; TODO: may want to re-think whether the high byte registers are better
+;;; represented with SIZE = :BYTE using an index number that is in a
+;;; range that does not overlap 0 through 15, rather than a different "size"
+;;; and a range that does overlap the :BYTE registers.
+(defun make-gpr-id (size index)
+  (declare (type (mod 16) index))
+  (when (eq size :high-byte)
+    (aver (<= 0 index 3))) ; only A,C,D,B have a corresponding 'h' register
+  (logior (ash (position size #(:byte :high-byte :word :dword :qword)) 5)
+          (ash index 1)))
+
+(defun make-fpr-id (index)
+  (declare (type (mod 16) index))
+  (logior (ash index 1) 1)) ; low bit = FPR, not GPR
+
+(defun reg-index (register-id)
+  (ldb (byte 4 1) register-id))
+(defun is-gpr-id-p (register-id)
+  (not (logbitp 0 register-id)))
+(defun gpr-size (register-id)
+  (aref #(:byte :high-byte :word :dword :qword) (ldb (byte 3 5) register-id)))
+
+(defun tn-reg-id (tn)
+  (cond ((null tn) nil)
+        ((eq (sb-name (sc-sb (tn-sc tn))) 'float-registers)
+         (make-fpr-id (tn-offset tn)))
+        (t
+         (make-gpr-id (sc-operand-size (tn-sc tn))
+                      (ash (tn-offset tn) -1)))))
+
 (defun maybe-emit-operand-size-prefix (segment size)
   (unless (or (eq size :byte)
               (eq size :qword)          ; REX prefix handles this
@@ -1177,69 +1208,47 @@
 
 ;;; A REX prefix must be emitted if at least one of the following
 ;;; conditions is true:
-;;  1. The operand size is :QWORD and the default operand size of the
-;;     instruction is not :QWORD.
-;;; 2. The instruction references an extended register.
-;;; 3. The instruction references one of the byte registers SIL, DIL,
-;;;    SPL or BPL.
+;;; 1. Any of the WRXB bits are nonzero, which occurs if:
+;;;    (a) The operand size is :QWORD and the default operand size of the
+;;;        instruction is not :QWORD, or
+;;;    (b) The instruction references a register above 7.
+;;; 2. The instruction references one of the byte registers SIL, DIL,
+;;;    SPL or BPL in the 'R' or 'B' encoding fields. X can be ignored
+;;;    because the index in an EA is never byte-sized.
 
-;;; Emit a REX prefix if necessary. OPERAND-SIZE is used to determine
+;;; Emit a REX prefix if necessary. WIDTH is used to determine
 ;;; whether to set REX.W. Callers pass it explicitly as :DO-NOT-SET if
-;;; this should not happen, for example because the instruction's
-;;; default operand size is qword. R, X and B are NIL or TNs specifying
-;;; registers the encodings of which are extended with the REX.R, REX.X
-;;; and REX.B bit, respectively. To determine whether one of the byte
-;;; registers is used that can only be accessed using a REX prefix, we
-;;; need only to test R and B, because X is only used for the index
-;;; register of an effective address and therefore never byte-sized.
-;;; For R we can avoid calculating the size of the TN because it is
-;;; always OPERAND-SIZE. The size of B must be calculated here because
-;;; B can be address-sized (if it is the base register of an effective
-;;; address), of OPERAND-SIZE (if the instruction operates on two
-;;; registers) or of some different size (in the instructions that
-;;; combine arguments of different sizes: MOVZX, MOVSX, MOVSXD and
-;;; several SSE instructions, e.g. CVTSD2SI). We don't distinguish
-;;; between general-purpose and floating point registers for this case
-;;; because only general-purpose registers can be byte-sized at all.
-(defun maybe-emit-rex-prefix (segment operand-size r x b)
-  (declare (type (member nil :byte :word :dword :qword :do-not-set)
-                 operand-size)
-           (type (or null tn) r x b))
-  (labels ((if-hi (r)
-             (if (and r (> (tn-offset r)
-                           ;; offset of r8 is 16, offset of xmm8 is 8
-                           (if (eq (sb-name (sc-sb (tn-sc r)))
-                                   'float-registers)
-                               7
-                               15)))
-                 1
-                 0))
-           (reg-4-7-p (r)
-             ;; Assuming R is a TN describing a general-purpose
-             ;; register, return true if it references register
-             ;; 4 upto 7.
-             (<= 8 (tn-offset r) 15)))
-    (let ((rex-w (if (eq operand-size :qword) 1 0))
-          (rex-r (if-hi r))
-          (rex-x (if-hi x))
-          (rex-b (if-hi b)))
-      (when (or (not (zerop (logior rex-w rex-r rex-x rex-b)))
-                (and r
-                     (eq operand-size :byte)
-                     (reg-4-7-p r))
-                (and b
-                     (eq (operand-size b) :byte)
-                     (reg-4-7-p b)))
-        (emit-rex-byte segment #b0100 rex-w rex-r rex-x rex-b)))))
+;;; this should not happen, for example because the instruction's default
+;;; operand size is qword. (FIXME: is totally redundant with NIL)
+;;; R, X and B are NIL or REG-IDs specifying registers the encodings of
+;;; which may be extended with the REX.R, REX.X and REX.B bit, respectively.
+(defun emit-rex-if-needed (segment width r x b)
+  (declare (type (member nil :byte :word :dword :qword :do-not-set) width)
+           (type (or null fixnum) r x b))
+  (flet ((encoding-bit3-p (reg-id)
+           (and reg-id (logbitp 3 (reg-index reg-id))))
+         (spl/bpl/sil/dil-p (reg-id)
+           (and reg-id
+                (is-gpr-id-p reg-id)
+                (eq (gpr-size reg-id) :byte)
+                (<= 4 (reg-index reg-id) 7))))
+    (let ((wrxb (logior (if (eq width :qword)   #b1000 0)
+                        (if (encoding-bit3-p r) #b0100 0)
+                        (if (encoding-bit3-p x) #b0010 0)
+                        (if (encoding-bit3-p b) #b0001 0))))
+      (when (or (not (eql wrxb 0))
+                (spl/bpl/sil/dil-p r)
+                (spl/bpl/sil/dil-p b))
+        (emit-byte segment (logior #x40 wrxb))))))
 
 ;;; Emit a REX prefix if necessary. The operand size is determined from
 ;;; THING or can be overridden by OPERAND-SIZE. This and REG are always
-;;; passed to MAYBE-EMIT-REX-PREFIX. Additionally, if THING is an EA we
+;;; passed to EMIT-REX-IF-NEEDED. Additionally, if THING is an EA we
 ;;; pass its index and base registers; if it is a register TN, we pass
 ;;; only itself.
 ;;; In contrast to EMIT-EA above, neither stack TNs nor fixups need to
 ;;; be treated specially here: If THING is a stack TN, neither it nor
-;;; any of its components are passed to MAYBE-EMIT-REX-PREFIX which
+;;; any of its components are passed to EMIT-REX-IF-NEEDED which
 ;;; works correctly because stack references always use RBP as the base
 ;;; register and never use an index register so no extended registers
 ;;; need to be accessed. Fixups are assembled using an addressing mode
@@ -1252,17 +1261,18 @@
            (type (member nil :byte :word :dword :qword :do-not-set)
                  operand-size))
   (let ((ea-p (ea-p thing)))
-    (maybe-emit-rex-prefix segment
+    (emit-rex-if-needed    segment
                            (or operand-size (operand-size thing))
-                           reg
-                           (and ea-p (ea-index thing))
+                           (tn-reg-id reg)
+                           (and ea-p (tn-reg-id (ea-index thing)))
                            (cond (ea-p
                                   (let ((base (ea-base thing)))
-                                    (unless (eq base rip-tn) base)))
-                                 ((and (tn-p thing)
-                                       (member (sb-name (sc-sb (tn-sc thing)))
-                                               '(float-registers registers)))
-                                  thing)
+                                    (unless (eq base rip-tn)
+                                      (tn-reg-id base))))
+                                 ((tn-p thing)
+                                  (when (member (sb-name (sc-sb (tn-sc thing)))
+                                                '(float-registers registers))
+                                    (tn-reg-id thing)))
                                  (t nil)))))
 
 (defun operand-size (thing)
@@ -1379,7 +1389,8 @@
                           (if (and (eq size :qword) (typep src '(unsigned-byte 32)))
                               :dword
                               size)))
-                     (maybe-emit-rex-prefix segment immediate-size nil nil dst))
+                     (emit-rex-if-needed segment immediate-size
+                                         nil nil (tn-reg-id dst)))
                    (acond ((neq size :qword) ; :dword or smaller dst is straightforward
                            (emit-byte+reg segment (if (eq size :byte) #xB0 #xB8) dst)
                            (emit-sized-immediate segment size src))
@@ -1406,7 +1417,7 @@
                         (member (fixup-flavor src)
                                 '(:named-call :static-call :assembly-routine
                                   :layout :immobile-object :foreign)))
-                   (maybe-emit-rex-prefix segment :dword nil nil dst)
+                   (emit-rex-if-needed segment :dword nil nil (tn-reg-id dst))
                    (emit-byte+reg segment #xB8 dst)
                    (emit-absolute-fixup segment src))
                   (t
@@ -1465,7 +1476,7 @@
      (aver (and (accumulator-p reg) (typep ea 'word)))
      (let ((size (operand-size reg)))
        (maybe-emit-operand-size-prefix segment size)
-       (maybe-emit-rex-prefix segment size nil nil nil)
+       (emit-rex-if-needed segment size nil nil nil)
        (emit-byte segment (logior (if (eq size :byte) #xA0 #xA1) dir-bit))
        (emit-qword segment ea)))))
 
@@ -1937,7 +1948,8 @@
   (:printer ext-reg-no-width ((op #b11001)))
   (:emitter
    (let ((size (operand-size dst)))
-     (maybe-emit-rex-prefix segment size nil nil dst)
+     (aver (member size '(:dword :qword)))
+     (emit-rex-if-needed segment size nil nil (tn-reg-id dst))
      (emit-byte segment #x0f)
      (emit-byte+reg segment #xC8 dst))))
 
@@ -1959,7 +1971,7 @@
 (define-instruction cdqe (segment)
   (:printer rex-byte ((op #b10011000)))
   (:emitter
-   (maybe-emit-rex-prefix segment :qword nil nil nil)
+   (emit-rex-if-needed segment :qword nil nil nil)
    (emit-byte segment #b10011000)))
 
 ;;; CWD -- Convert Word to Double Word. DX:AX <- sign_xtnd(AX)
@@ -1980,7 +1992,7 @@
 (define-instruction cqo (segment)
   (:printer rex-byte ((op #b10011001)))
   (:emitter
-   (maybe-emit-rex-prefix segment :qword nil nil nil)
+   (emit-rex-if-needed segment :qword nil nil nil)
    (emit-byte segment #b10011001)))
 
 (define-instruction xadd (segment dst src &optional prefix)
@@ -2098,7 +2110,7 @@
 
 (flet ((emit* (segment opcode size)
          (maybe-emit-operand-size-prefix segment size)
-         (maybe-emit-rex-prefix segment size nil nil nil)
+         (emit-rex-if-needed segment size nil nil nil)
          (emit-byte segment (logior (ash opcode 1)
                                     (if (eq size :byte) 0 1)))))
   (define-instruction movs (segment size)
@@ -2541,7 +2553,7 @@
     (emit-byte segment prefix))
   ;; dst/src is encoded in the r/m field, not r; REX.B must be
   ;; set to use extended XMM registers
-  (maybe-emit-rex-prefix segment operand-size nil nil dst/src)
+  (emit-rex-if-needed segment operand-size nil nil (tn-reg-id dst/src))
   (emit-byte segment #x0F)
   (emit-byte segment opcode)
   (emit-byte segment (logior (ash (logior #b11000 /i) 3)
