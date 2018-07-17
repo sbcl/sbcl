@@ -14,7 +14,7 @@ LINKFLAGS += -rdynamic -m64
 NM = ./linux-nm
 
 ASSEM_SRC = ppc64-assem.S ldso-stubs.S
-ARCH_SRC = ppc64-arch.c
+ARCH_SRC = ppc-arch.c
 
 OS_SRC = linux-os.c linux-mman.c ppc-linux-os.c
 OS_LIBS = -ldl

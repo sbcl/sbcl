@@ -260,6 +260,7 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
     os_flush_icache((os_vm_address_t)next_pc, sizeof(unsigned int));
 }
 
+#define INLINE_ALLOC_DEBUG 0
 #ifdef LISP_FEATURE_GENCGC
 /*
  * Return non-zero if the current instruction is an allocation trap
@@ -282,7 +283,7 @@ allocation_trap_p(os_context_t * context)
     pc = (unsigned int *) (*os_context_pc_addr(context));
     inst = *pc;
 
-#if 0
+#if INLINE_ALLOC_DEBUG
     fprintf(stderr, "allocation_trap_p at %p:  inst = 0x%08x\n", pc, inst);
 #endif
 
@@ -299,7 +300,7 @@ allocation_trap_p(os_context_t * context)
         unsigned int add_inst;
 
         add_inst = pc[-1];
-#if 0
+#if INLINE_ALLOC_DEBUG
         fprintf(stderr, "   add inst at %p:  inst = 0x%08x\n",
                 pc - 1, add_inst);
 #endif
@@ -317,7 +318,7 @@ allocation_trap_p(os_context_t * context)
     return 0;
 }
 
-extern struct alloc_region boxed_region;
+#define boxed_region gc_alloc_region[0]
 
 void
 handle_allocation_trap(os_context_t * context)
@@ -325,7 +326,7 @@ handle_allocation_trap(os_context_t * context)
     unsigned int *pc;
     unsigned int inst;
     unsigned int target;
-    unsigned int __attribute__((unused)) target_ptr, end_addr;
+    uword_t __attribute__((unused)) target_ptr, end_addr;
     unsigned int opcode;
     int size;
     boolean were_in_lisp;
@@ -334,7 +335,7 @@ handle_allocation_trap(os_context_t * context)
     target = 0;
     size = 0;
 
-#if 0
+#if INLINE_ALLOC_DEBUG
     fprintf(stderr, "In handle_allocation_trap\n");
 #endif
 
@@ -363,19 +364,17 @@ handle_allocation_trap(os_context_t * context)
 
     target_ptr = *os_context_register_addr(context, target);
 
-#if 0
+#if INLINE_ALLOC_DEBUG
     fprintf(stderr, "handle_allocation_trap at %p:\n", pc);
     fprintf(stderr, "boxed_region.free_pointer: %p\n", boxed_region.free_pointer);
     fprintf(stderr, "boxed_region.end_addr: %p\n", boxed_region.end_addr);
-    fprintf(stderr, "target reg: %d, end_addr reg: %d\n", target, end_addr);
-    fprintf(stderr, "target: %x\n", *os_context_register_addr(context, target));
-    fprintf(stderr, "end_addr: %x\n", *os_context_register_addr(context, end_addr));
-#endif
-
-#if 0
-    fprintf(stderr, "handle_allocation_trap at %p:\n", pc);
-    fprintf(stderr, "  trap inst = 0x%08x\n", inst);
-    fprintf(stderr, "  target reg = %s\n", lisp_register_names[target]);
+    fprintf(stderr, "target reg: %d, end_addr reg: %ld\n", target, end_addr);
+    fprintf(stderr, "target: %"OBJ_FMTX"\n",
+            (uword_t)*os_context_register_addr(context, target));
+    fprintf(stderr, "end_addr: %"OBJ_FMTX"\n",
+            (uword_t)*os_context_register_addr(context, end_addr));
+    fprintf(stderr, "trap inst = 0x%08x\n", inst);
+    fprintf(stderr, "target reg = %s\n", lisp_register_names[target]);
 #endif
 
     /*
@@ -385,7 +384,7 @@ handle_allocation_trap(os_context_t * context)
      */
     inst = pc[-1];
     opcode = inst >> 26;
-#if 0
+#if INLINE_ALLOC_DEBUG
     fprintf(stderr, "  add inst  = 0x%08x, opcode = %d\n", inst, opcode);
 #endif
     if (opcode == 14) {
@@ -404,31 +403,24 @@ handle_allocation_trap(os_context_t * context)
         int reg;
 
         reg = (inst >> 11) & 0x1f;
-#if 0
+#if INLINE_ALLOC_DEBUG
         fprintf(stderr, "  add, reg = %s\n", lisp_register_names[reg]);
 #endif
         size = *os_context_register_addr(context, reg);
 
     }
 
-#if 0
+#if INLINE_ALLOC_DEBUG
     fprintf(stderr, "Alloc %d to %s\n", size, lisp_register_names[target]);
-#endif
-
-#ifdef INLINE_ALLOC_DEBUG
-    if ((((unsigned long)boxed_region.end_addr + size) / PAGE_SIZE) ==
-        (((unsigned long)boxed_region.end_addr) / PAGE_SIZE)) {
+    if ((((unsigned long)boxed_region.end_addr + size) / GENCGC_CARD_BYTES) ==
+        (((unsigned long)boxed_region.end_addr) / GENCGC_CARD_BYTES)) {
       fprintf(stderr,"*** possibly bogus trap allocation of %d bytes at %p\n",
-              size, target_ptr);
+              size, (void*)target_ptr);
       fprintf(stderr, "    dynamic_space_free_pointer: %p, boxed_region.end_addr %p\n",
               dynamic_space_free_pointer, boxed_region.end_addr);
     }
-#endif
-
-#if 0
     fprintf(stderr, "Ready to alloc\n");
-    fprintf(stderr, "free_pointer = 0x%08x\n",
-            dynamic_space_free_pointer);
+    fprintf(stderr, "free_pointer = %p\n", dynamic_space_free_pointer);
 #endif
 
     /*
@@ -442,10 +434,6 @@ handle_allocation_trap(os_context_t * context)
     /*    dynamic_space_free_pointer =
         (lispobj *) ((long) dynamic_space_free_pointer - size);
     */
-#if 0
-    fprintf(stderr, "free_pointer = 0x%08x new\n",
-            dynamic_space_free_pointer);
-#endif
 
     {
         extern lispobj* alloc(sword_t);
@@ -456,10 +444,9 @@ handle_allocation_trap(os_context_t * context)
         data->allocation_trap_context = 0;
     }
 
-#if 0
+#if INLINE_ALLOC_DEBUG
     fprintf(stderr, "alloc returned %p\n", memory);
-    fprintf(stderr, "free_pointer = 0x%08x\n",
-            dynamic_space_free_pointer);
+    fprintf(stderr, "free_pointer = %p\n", dynamic_space_free_pointer);
 #endif
 
     /*
@@ -468,7 +455,7 @@ handle_allocation_trap(os_context_t * context)
      */
     memory += size;
 
-#if 0
+#if INLINE_ALLOC_DEBUG
     fprintf(stderr, "object end at %p\n", memory);
 #endif
 

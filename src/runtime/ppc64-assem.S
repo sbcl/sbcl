@@ -59,20 +59,22 @@ x:
 	stw reg,lo16(global)(temp) ; Comment
 #else
 #define load(reg,global) \
-	lis reg,global@ha; lwz reg,global@l(reg)
+	lis reg,global@ha       ; \
+	ld reg,global@l(reg)
 #define store(reg,temp,global) \
-	lis temp,global@ha; stw reg,global@l(temp)
+	lis temp,global@ha  	; \
+	std reg,global@l(temp)
 #endif
 
 #define	FIRST_SAVE_FPR	14	/* lowest-numbered non-volatile FPR */
 #ifdef LISP_FEATURE_DARWIN
 #define	FIRST_SAVE_GPR	13	/* lowest-numbered non-volatile GPR */
-#define NGPR_SAVE_BYTES(n) ((32-(n))*4)
-#define FRAME_ARG_BYTES(n)  (((((n)+6)*4)+15)&~15)
+#define NGPR_SAVE_BYTES(n) ((32-(n))*8)
+#define FRAME_ARG_BYTES(n)  (((((n)+6)*8)+15)&~15)
 #else
 #define	FIRST_SAVE_GPR	14	/* lowest-numbered non-volatile GPR */
-#define NGPR_SAVE_BYTES(n) ((32-(~1&((n)+1)))*4)
-#define FRAME_ARG_BYTES(n)  (((((n)+2)*4)+15)&~15)
+#define NGPR_SAVE_BYTES(n) ((32-(~1&((n)+1)))*8)
+#define FRAME_ARG_BYTES(n)  (((((n)+2)*8)+15)&~15)
 #endif
 #define	NFPR_SAVE_BYTES(n) ((32-(n))*8)
 
@@ -80,19 +82,19 @@ x:
 #define FRAME_SIZE(first_g,first_f,out_arg_words,savecr) \
 (NFPR_SAVE_BYTES(first_f)+ NGPR_SAVE_BYTES(first_g)+ FRAME_ARG_BYTES(out_arg_words))
 #define SAVE_FPR(n) stfd f##n,-8*(32- n)(r11)
-#define SAVE_GPR(n) stw r##n,-4*(32- n)(r11)
+#define SAVE_GPR(n) std r##n,-8*(32- n)(r11)
 #define FULL_FRAME_SIZE (FRAME_SIZE(FIRST_SAVE_GPR,FIRST_SAVE_FPR,8,1)+15&~15)
 #define RESTORE_FPR(n) lfd f##n,-8*(32- n)(r11)
-#define RESTORE_GPR(n) lwz r##n,-4*(32- n)(r11)
+#define RESTORE_GPR(n) ld r##n,-8*(32- n)(r11)
 #else
 #define FRAME_SIZE(first_g,first_f,out_arg_words,savecr) \
 (NFPR_SAVE_BYTES(first_f)+ NGPR_SAVE_BYTES(first_g)+ FRAME_ARG_BYTES(out_arg_words+savecr))
 #define SAVE_FPR(n) stfd n,-8*(32-(n))(11)
-#define SAVE_GPR(n) stw n,-4*(32-(n))(11)
+#define SAVE_GPR(n) std n,-8*(32-(n))(11)
 #define FULL_FRAME_SIZE FRAME_SIZE(FIRST_SAVE_GPR,FIRST_SAVE_FPR,0,1)
 
 #define RESTORE_FPR(n) lfd n,-8*(32-(n))(11)
-#define RESTORE_GPR(n) lwz n,-4*(32-(n))(11)
+#define RESTORE_GPR(n) ld n,-8*(32-(n))(11)
 #endif
 
 #ifdef LISP_FEATURE_DARWIN
@@ -100,11 +102,11 @@ x:
 	nop @\
 	nop @ \
 	mfcr REG(0) @ \
-	stw REG(0),4(REG(1)) @ \
+	std REG(0),4(REG(1)) @ \
 	mflr REG(0) @ \
-	stw REG(0),8(REG(1)) @ \
+	std REG(0),8(REG(1)) @ \
 	mr REG(11),REG(1) @ \
-	stwu REG(1),-FULL_FRAME_SIZE(REG(1)) @ \
+	stdu REG(1),-FULL_FRAME_SIZE(REG(1)) @ \
 	SAVE_FPR(14) @ \
 	SAVE_FPR(15) @ \
 	SAVE_FPR(16) @ \
@@ -185,19 +187,19 @@ x:
 	RESTORE_FPR(29) @ \
 	RESTORE_FPR(30) @ \
 	RESTORE_FPR(31) @ \
-	lwz REG(1),0(REG(1)) @ \
-	lwz REG(0),4(REG(1)) @ \
+	ld REG(1),0(REG(1)) @ \
+	ld REG(0),8(REG(1)) @ \
 	mtcr REG(0) @ \
-	lwz REG(0),8(REG(1)) @ \
+	ld REG(0),16(REG(1)) @ \
 	mtlr REG(0) @ \
 
 #else
 
 #define C_FULL_PROLOG \
 	mflr 0 ; \
-	stw 0,4(1) ; \
+	std 0,4(1) ; \
 	mr 11,1 ; \
-	stwu 1,-FULL_FRAME_SIZE(1) ; \
+	stdu 1,-FULL_FRAME_SIZE(1) ; \
 	SAVE_FPR(14) ; \
 	SAVE_FPR(15) ; \
 	SAVE_FPR(16) ; \
@@ -236,10 +238,10 @@ x:
 	SAVE_GPR(30) ; \
 	SAVE_GPR(31) ; \
 	mfcr 0	; \
-	stw 0,8(1)
+	std 0,8(1)
 
 #define C_FULL_EPILOG \
-	lwz 5,8(1) ; \
+	ld 5,8(1) ; \
 	mtcrf 255,5 ; \
 	la 11,FULL_FRAME_SIZE-NFPR_SAVE_BYTES(FIRST_SAVE_FPR)(1) ; \
 	RESTORE_GPR(14) ; \
@@ -279,8 +281,8 @@ x:
 	RESTORE_FPR(29) ; \
 	RESTORE_FPR(30) ; \
 	RESTORE_FPR(31) ; \
-	lwz 1,0(1) ; \
-	lwz 0,4(1) ; \
+	ld 1,0(1) ; \
+	ld 0,4(1) ; \
 	mtlr 0 ; \
 
 #endif
@@ -326,7 +328,6 @@ x:
 	mr reg_NL1, reg_A1
 	mr reg_NL0, reg_A0
 #endif
-	/* store(reg_POLL,11,saver2) */
 	/* Initialize tagged registers */
 	li reg_ZERO,0
 	li reg_CODE,0
@@ -356,10 +357,10 @@ x:
 
 	li reg_ALLOC,flag_PseudoAtomic
 #if defined(LISP_FEATURE_SB_THREAD)
-	stw reg_ZERO,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_THREAD)
-	lwz reg_BSP,THREAD_BINDING_STACK_POINTER_OFFSET(reg_THREAD)
-	lwz reg_CSP,THREAD_CONTROL_STACK_POINTER_OFFSET(reg_THREAD)
-	lwz reg_OCFP,THREAD_CONTROL_FRAME_POINTER_OFFSET(reg_THREAD)
+	std reg_ZERO,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_THREAD)
+	ld reg_BSP,THREAD_BINDING_STACK_POINTER_OFFSET(reg_THREAD)
+	ld reg_CSP,THREAD_CONTROL_STACK_POINTER_OFFSET(reg_THREAD)
+	ld reg_OCFP,THREAD_CONTROL_FRAME_POINTER_OFFSET(reg_THREAD)
 #else
 	store(reg_ZERO,reg_NL4,CSYMBOL(foreign_function_call_active))
 	load(reg_BSP,CSYMBOL(current_binding_stack_pointer))
@@ -382,10 +383,10 @@ x:
 
 	mr reg_CFP,reg_NL1
 	mr reg_LEXENV,reg_NL0
-	lwz reg_A0,0(reg_CFP)
-	lwz reg_A1,4(reg_CFP)
-	lwz reg_A2,8(reg_CFP)
-	lwz reg_A3,12(reg_CFP)
+	ld reg_A0,0(reg_CFP)
+	ld reg_A1,8(reg_CFP)
+	ld reg_A2,16(reg_CFP)
+	ld reg_A3,24(reg_CFP)
 
 	/* Calculate LRA */
 #ifdef LISP_FEATURE_DARWIN
@@ -402,7 +403,7 @@ x:
 	ld reg_CODE,0(reg_A0)
 	addi reg_LIP,reg_CODE,SIMPLE_FUN_CODE_OFFSET
 	mtctr reg_LIP
-	slwi reg_NARGS,reg_NL2,2
+	sldi reg_NARGS, reg_NL2, N_FIXNUM_TAG_BITS
 	bctr
 
 	.align 3
@@ -422,22 +423,20 @@ lra:
 
 #if defined(LISP_FEATURE_SB_THREAD)
 	/* Store lisp state */
-	stw reg_BSP,THREAD_BINDING_STACK_POINTER_OFFSET(reg_THREAD)
-	stw reg_CSP,THREAD_CONTROL_STACK_POINTER_OFFSET(reg_THREAD)
-	stw reg_CFP,THREAD_CONTROL_FRAME_POINTER_OFFSET(reg_THREAD)
+	std reg_BSP,THREAD_BINDING_STACK_POINTER_OFFSET(reg_THREAD)
+	std reg_CSP,THREAD_CONTROL_STACK_POINTER_OFFSET(reg_THREAD)
+	std reg_CFP,THREAD_CONTROL_FRAME_POINTER_OFFSET(reg_THREAD)
 
 	/* No longer in Lisp. */
-	stw reg_ALLOC,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_THREAD)
+	std reg_ALLOC,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_THREAD)
 #else
 	/* Store lisp state */
 	clrrwi reg_NL1,reg_ALLOC,3
 	store(reg_NL1,reg_NL2,CSYMBOL(dynamic_space_free_pointer))
-	/* store(reg_POLL,reg_NL2,poll_flag) */
 	/* load(reg_NL2,current_thread) */
 	store(reg_BSP,reg_NL2,CSYMBOL(current_binding_stack_pointer))
 	store(reg_CSP,reg_NL2,CSYMBOL(current_control_stack_pointer))
 	store(reg_CFP,reg_NL2,CSYMBOL(current_control_frame_pointer))
-	/* load(reg_POLL,saver2) */
 
 	/* No longer in Lisp. */
 	store(reg_NL1,reg_NL2,CSYMBOL(foreign_function_call_active))
@@ -455,6 +454,12 @@ lra:
 
 
 	GFUNCDEF(call_into_c)
+	/* In the 64-bit ABI, a function pointer is a pointer to a
+	 * 3-word "function descriptor" the first word of which contains the
+	 * entry address, and the second the value that the callee needs
+	 * in the TOC register. The third word can be ignored for C. */
+	ld reg_TOC, 8(reg_CFUNC)
+	ld reg_CFUNC, 0(reg_CFUNC)
 	/* We're kind of low on unboxed, non-dedicated registers here:
 	most of the unboxed registers may have outgoing C args in them.
 	CFUNC is going to have to go in the CTR in a moment, anyway
@@ -468,8 +473,8 @@ lra:
 	mr reg_OCFP,reg_CFP
 	mr reg_CFP,reg_CSP
 	la reg_CSP,32(reg_CSP)
-	stw reg_OCFP,0(reg_CFP)
-	stw reg_CODE,8(reg_CFP)
+	std reg_OCFP,0(reg_CFP)
+	std reg_CODE,8(reg_CFP)
 	/* The pseudo-atomic mechanism wants to use reg_NL3, but that
 	may be an outgoing C argument.  Copy reg_NL3 to something that's
 	unboxed and -not- one of the C argument registers */
@@ -481,16 +486,16 @@ lra:
 	/* Convert the return address to an offset and save it on the stack. */
 	sub reg_NFP,reg_LIP,reg_CODE
 	la reg_NFP,OTHER_POINTER_LOWTAG(reg_NFP)
-	stw reg_NFP,4(reg_CFP)
+	std reg_NFP,8(reg_CFP)
 
 #ifdef LISP_FEATURE_SB_THREAD
 	/* Store Lisp state */
-	stw reg_BSP,THREAD_BINDING_STACK_POINTER_OFFSET(reg_THREAD)
-	stw reg_CSP,THREAD_CONTROL_STACK_POINTER_OFFSET(reg_THREAD)
-	stw reg_CFP,THREAD_CONTROL_FRAME_POINTER_OFFSET(reg_THREAD)
+	std reg_BSP,THREAD_BINDING_STACK_POINTER_OFFSET(reg_THREAD)
+	std reg_CSP,THREAD_CONTROL_STACK_POINTER_OFFSET(reg_THREAD)
+	std reg_CFP,THREAD_CONTROL_FRAME_POINTER_OFFSET(reg_THREAD)
 
 	/* No longer in Lisp. */
-	stw reg_CSP,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_THREAD)
+	std reg_CSP,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_THREAD)
 #else
 	/* Store Lisp state */
 	clrrwi reg_NFP,reg_ALLOC,3
@@ -504,7 +509,6 @@ lra:
 	/* No longer in Lisp */
 	store(reg_CSP,reg_CFUNC,CSYMBOL(foreign_function_call_active))
 #endif
-	/* load(reg_POLL,saver2) */
 	/* Disable pseudo-atomic; check pending interrupt */
 	subi reg_ALLOC, reg_ALLOC, flag_PseudoAtomic
 	andi. reg_NL3, reg_ALLOC, flag_PseudoAtomicInterrupted
@@ -603,8 +607,8 @@ lra:
 	I can't imagine why they'd have moved */
 
 	/* Get the return address back. */
-	lwz reg_LIP,4(reg_CFP)
-	lwz reg_CODE,8(reg_CFP)
+	lwz reg_LIP,8(reg_CFP)
+	lwz reg_CODE,16(reg_CFP)
 	add reg_LIP,reg_CODE,reg_LIP
 	la reg_LIP,-OTHER_POINTER_LOWTAG(reg_LIP)
 

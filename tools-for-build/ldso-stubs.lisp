@@ -72,12 +72,14 @@ ldso_stub__~A: ;                                \\
  .text
 .Lfunc_begin~:*~D:
  mflr 0
- std 31, -8(1)
  std 0, 16(1)
- stdu 1, -128(1)
- mr 31, 1
+ stdu 1, -112(1)
  bl ~A
  nop
+ addi 1, 1, 112
+ ld 0, 16(1)
+ mtlr 0
+ blr
  .long 0
  .quad 0
 .Lfunc_end~2:*~D:
