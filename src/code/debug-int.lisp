@@ -2666,8 +2666,8 @@ register."
   (let ((d-source (code-location-debug-source location)))
     (let* ((offset (code-location-toplevel-form-offset location))
            (res
-             (cond ((and (typep d-source 'sb!c::core-debug-source)
-                         (sb!c::core-debug-source-form d-source)))
+             (cond ((and (core-debug-source-p d-source)
+                         (core-debug-source-form d-source)))
                    ((debug-source-namestring d-source)
                     (get-file-toplevel-form location))
                    (t (bug "Don't know how to use a DEBUG-SOURCE without ~

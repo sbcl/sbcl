@@ -479,12 +479,13 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
       :doc "private: primitives used to write debuggers"
       :use ("CL" "SB!EXT" "SB!INT" "SB!KERNEL" "SB!SYS" "SB!VM")
       :import-from (("SB!C"
-                     "DEBUG-SOURCE-FORM" "DEBUG-SOURCE-NAMESTRING"
+                     "DEBUG-SOURCE-NAMESTRING"
                      "DEBUG-SOURCE-CREATED" "DEBUG-SOURCE-COMPILED"
                      "MAKE-DEBUG-SOURCE"
-                     "DEBUG-SOURCE" "DEBUG-SOURCE-P"))
-      :reexport ("DEBUG-SOURCE-FORM"
-                 "DEBUG-SOURCE-NAMESTRING"
+                     "DEBUG-SOURCE" "DEBUG-SOURCE-P"
+                     "CORE-DEBUG-SOURCE" "CORE-DEBUG-SOURCE-P"
+                     "CORE-DEBUG-SOURCE-FORM"))
+      :reexport ("DEBUG-SOURCE-NAMESTRING"
                  "DEBUG-SOURCE-CREATED" "DEBUG-SOURCE-COMPILED"
                  "DEBUG-SOURCE" "DEBUG-SOURCE-P")
       :export ("ACTIVATE-BREAKPOINT"
