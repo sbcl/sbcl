@@ -556,9 +556,6 @@
 (define-bitfield-emitter emit-d-form-inst 32
   (byte 6 26) (byte 5 21) (byte 5 16) (byte 16 0))
 
-(define-bitfield-emitter emit-unpacked-d-form-inst 32
-  (byte 6 26) (byte 3 23) (byte 1 22) (byte 1 21) (byte 5 16) (byte 16 0))
-
 ; Also used for XL-form.  What's the difference ?
 (define-bitfield-emitter emit-x-form-inst 32
   (byte 6 26) (byte 5 21) (byte 5 16) (byte 5 11) (byte 10 1) (byte 1 0))
@@ -985,43 +982,23 @@
   (define-d-si-instruction mulli 7 :cost 5)
   (define-d-si-instruction subfic 8)
 
-  (define-instruction cmplwi (segment crf ra &optional (ui nil ui-p))
-    (:printer d-crf-ui ((op 10) (l 0)) '(:name :tab bf "," ra "," ui))
-    (:dependencies (if ui-p (reads ra) (reads crf)) (writes :ccr))
-    (:delay 1)
-    (:emitter
-     (unless ui-p
-       (setq ui ra ra crf crf :cr0))
-     (emit-d-form-inst segment
-                       10
-                       (valid-cr-field-encoding crf)
-                       (reg-tn-encoding ra)
-                       ui)))
-
-
-  (define-instruction cmpi (segment bf l ra si)
-    (:printer d-crf-si ((op 11) (l l)) '(:name :tab bf "," l "," ra "," si))
-    (:emitter
-     (emit-unpacked-d-form-inst segment
-                            11
-                            bf
-                            0 ; Reserved bit '/'
-                            l
-                            (reg-tn-encoding ra)
-                            si)))
-
-  (define-instruction cmpwi (segment crf ra  &optional (si nil si-p))
-    (:printer d-crf-si ((op 11) (l 0)) '(:name :tab bf "," ra "," si))
-    (:dependencies (if si-p (reads ra) (reads crf)) (writes :ccr))
-    (:delay 1)
-    (:emitter
-     (unless si-p
-       (setq si ra ra crf crf :cr0))
-     (emit-d-form-inst segment
-                       11
-                       (valid-cr-field-encoding crf)
-                       (reg-tn-encoding ra)
-                       si)))
+  (macrolet ((def (mnemonic op L)
+                  `(define-instruction ,mnemonic (segment crf ra &optional (imm nil imm-p))
+                  (:printer d-crf-si ((op ,op) (l ,L)) '(:name :tab bf "," ra "," imm))
+                  (:dependencies (if imm-p (reads ra) (reads crf)) (writes :ccr))
+                  (:delay 1)
+                  (:emitter
+                   (unless imm-p
+                     (setq imm ra ra crf crf :cr0))
+                   (emit-d-form-inst segment
+                                     ,op
+                                     (logior (valid-cr-field-encoding crf) ,L)
+                                     (reg-tn-encoding ra)
+                                     (ldb (byte 16 0) imm))))))
+    (def cmpwi 11 0)
+    (def cmpdi 11 1)
+    (def cmplwi 10 0)
+    (def cmpldi 10 1))
 
   (define-d-si-instruction addic 12 :other-dependencies ((writes :xer)))
   (define-d-si-instruction addic. 13 :other-dependencies ((writes :xer) (writes :ccr)))
@@ -1272,16 +1249,21 @@
     (:emitter
      (emit-a-form-inst segment 23 (reg-tn-encoding rs) (reg-tn-encoding ra) (reg-tn-encoding rb) mb me 1)))
 
-  (define-instruction rldicr (segment ra rs sh me)
-    (:printer m ((op 30) (rc 0) (rb nil :type 'reg)))
-    (:emitter
-     (emit-md-form-inst segment 30 (reg-tn-encoding rs) (reg-tn-encoding ra) (logand sh #b011111) me 1 (ash (logand sh #b100000) -5) 0)))
-
-  (define-instruction rldicr. (segment ra rs sh me)
-    (:printer m ((op 30) (rc 1) (rb nil :type 'reg)))
-    (:emitter
-     (emit-md-form-inst segment 30 (reg-tn-encoding rs) (reg-tn-encoding ra) (logand sh #b011111) me 1 (ash (logand sh #b100000) -5) 1)))
-
+  (macrolet ((def (mnemonic op Rc)
+               `(define-instruction ,mnemonic (segment ra rs sh m)
+                  (:printer m ((op 30) (rc 0) (rb nil :type 'reg)))
+                  (:emitter
+                   (emit-md-form-inst
+                    segment 30 (reg-tn-encoding rs) (reg-tn-encoding ra)
+                    (ldb (byte 5 0) sh)
+                    (logior (ash (ldb (byte 5 0) m) 1) (ldb (byte 1 5) m))
+                    ,op (ldb (byte 1 5) sh) ,rc)))))
+    (def rldicl  0 0)
+    (def rldicl. 0 1)
+    (def rldicr  1 0)
+    (def rldicr. 1 1)
+    (def rldic   2 0)
+    (def rldic.  2 1))
 
   (define-d-rs-ui-instruction ori 24)
 
@@ -1298,20 +1280,25 @@
   (define-d-rs-ui-instruction andi. 28 :other-dependencies ((writes :ccr)))
   (define-d-rs-ui-instruction andis. 29 :other-dependencies ((writes :ccr)))
 
-  (define-instruction cmpw (segment crf ra  &optional (rb nil rb-p))
-    (:printer x-14 ((op 31) (xo 0) (l 0)) '(:name :tab bf "," ra "," rb))
-    (:delay 1)
-    (:dependencies (reads ra) (if rb-p (reads rb) (reads crf)) (reads :xer) (writes :ccr))
-    (:emitter
-     (unless rb-p
-       (setq rb ra ra crf crf :cr0))
-     (emit-x-form-inst segment
-                       31
-                       (valid-cr-field-encoding crf)
-                       (reg-tn-encoding ra)
-                       (reg-tn-encoding rb)
-                       0
-                       0)))
+  (macrolet ((def (mnemonic L XO)
+               `(define-instruction ,mnemonic (segment crf ra  &optional (rb nil rb-p))
+                  (:printer x-14 ((op 31) (xo ,xo) (l ,L)) '(:name :tab bf "," ra "," rb))
+                  (:delay 1)
+                  (:dependencies (reads ra) (if rb-p (reads rb) (reads crf)) (reads :xer) (writes :ccr))
+                  (:emitter
+                   (unless rb-p
+                     (setq rb ra ra crf crf :cr0))
+                   (emit-x-form-inst segment
+                                     31
+                                     (logior (valid-cr-field-encoding crf) ,L)
+                                     (reg-tn-encoding ra)
+                                     (reg-tn-encoding rb)
+                                     ,xo
+                                     0)))))
+    (def cmpw 0 0)
+    (def cmpd 1 0)
+    (def cmplw 0 32)
+    (def cmpld 1 32))
 
   (define-instruction tw (segment tcond ra rb)
     (:printer x-19 ((op 31) (xo 4)))
@@ -1336,22 +1323,6 @@
   (define-2-x-5-instructions sld 31 27)
   (define-2-x-10-instructions cntlzw 31 26)
   (define-2-x-5-instructions and 31 28)
-
-  (define-instruction cmplw (segment crf ra  &optional (rb nil rb-p))
-    (:printer x-14 ((op 31) (xo 32) (l 0)) '(:name :tab bf "," ra "," rb))
-    (:delay 1)
-    (:dependencies (reads ra) (if rb-p (reads rb) (reads crf)) (reads :xer) (writes :ccr))
-    (:emitter
-     (unless rb-p
-       (setq rb ra ra crf crf :cr0))
-     (emit-x-form-inst segment
-                       31
-                       (valid-cr-field-encoding crf)
-                       (reg-tn-encoding ra)
-                       (reg-tn-encoding rb)
-                       32
-                       0)))
-
 
   (define-4-xo-instructions subf 31 40)
                                         ; dcbst
@@ -1388,6 +1359,12 @@
   (define-x-5-st-instruction stwcx. 31 150 t :other-dependencies ((writes :ccr)))
   (define-x-5-st-instruction stwx 31 151 nil)
   (define-x-5-st-instruction stwux 31 183 nil :other-dependencies ((writes ra)))
+
+  (define-x-instruction ldx 31 21) ; load doubleword indexed
+  (define-x-instruction ldux 31 53) ; load doubleword with update indexed
+  (define-x-5-st-instruction stdx 31 149 nil) ; store doubleword indexed
+  (define-x-5-st-instruction stdux 31 181 nil) ; store doubleword with update indexed
+
   (define-4-xo-a-instructions subfze 31 200 :always-reads-xer t :always-writes-xer t)
   (define-4-xo-a-instructions addze 31 202 :always-reads-xer t :always-writes-xer t)
   (define-x-5-st-instruction stbx 31 215 nil)
@@ -1658,6 +1635,7 @@
   (define-2-a-instructions fnmadds 59 31 :cost 4)
 
   (define-ds-instruction std 62 #b00)
+  (define-ds-instruction stdu 62 #b01)
 
   (define-instruction fcmpu (segment crfd fra frb)
     (:printer x-15 ((op 63) (xo 0)))
@@ -1825,9 +1803,6 @@
   (define-instruction-macro clrrwi. (ra rs n)
     `(inst rlwinm. ,ra ,rs 0 0 (- 31 ,n)))
 
-  (define-instruction-macro cmpdi (rx value)
-    `(inst cmpi 0 1 ,rx ,value))
-
   (define-instruction-macro inslw (ra rs n b)
     `(inst rlwimi ,ra ,rs (- 32 ,b) ,b (+ ,b (1- ,n))))
 
@@ -1853,7 +1828,7 @@
     `(inst rlwinm. ,ra ,rs ,n 0 (- 31 ,n)))
 
   (define-instruction-macro sldi (ra rs n)
-    `(inst rldicr ,ra ,rs ,n (- 64 ,n)))
+    `(inst rldicr ,ra ,rs ,n (- 63 ,n)))
 
   (define-instruction-macro srdi (ra rs n)
     `(inst rldicr ,ra ,rs (- 64 ,n) ,n))
@@ -1985,14 +1960,19 @@
        (declare (type (unsigned-byte 16) high-half low-half))
        (cond ((and (logbitp 15 low-half) (= high-half #xffff))
               (inst li reg (dpb low-half (byte 16 0) -1)))
-             ((and (not (logbitp 15 low-half)) (zerop high-half))
-              (inst li reg low-half))
              (t
               (inst lis reg (if (logbitp 15 high-half)
                                 (dpb high-half (byte 16 0) -1)
                                 high-half))
               (unless (zerop low-half)
-                (inst ori reg reg low-half))))))
+                (inst ori reg reg low-half))))
+       ;; Clear left if sign extension "accidentally" happened.
+       ;; This suggests futher possibilities- any string of consecutive 1 bits
+       ;; (and some discontiguous strings) can be computed in at most 3
+       ;; instructions: load -1, clear left, clear right, possibly omitting
+       ;; either clear if not needed; or: load -1, clear left, rotate.
+       (when (and (plusp value) (logbitp 15 high-half))
+         (inst rldicl reg reg 0 32))))
     ((or (signed-byte 64) (unsigned-byte 64))
      (let* ((quarter-1 (ldb (byte 16 0) value))
             (quarter-2 (ldb (byte 16 16) value))

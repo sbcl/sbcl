@@ -21,15 +21,16 @@
        (inst mr ,n-dst ,n-src))))
 
 (macrolet
-    ((def (op inst shift)
-       `(defmacro ,op (object base &optional (offset 0) (lowtag 0))
-          `(inst ,',inst ,object ,base (- (ash ,offset ,,shift) ,lowtag)))))
-  (def storew stw word-shift))
-
-(defmacro loadw (object base &optional (offset 0) (lowtag 0))
-  `(progn
-     (inst addi nl6-tn ,base (- (ash ,offset word-shift) ,lowtag)) ;; FIXME: CHANGE REGISTER AND SHIFTING
-     (inst ld ,object nl6-tn 0)))
+    ((def (op inst inst-indexed)
+       `(defun ,op (object base &optional (offset 0) (lowtag 0))
+          (let ((displacement (- (ash offset word-shift) lowtag)))
+            (cond ((logtest displacement #b11) ; not directly encodable in ld/std
+                   (inst li nl6-tn displacement)
+                   (inst ,inst-indexed object base nl6-tn))
+                  (t
+                   (inst ,inst object base displacement)))))))
+  (def loadw ld ldx)
+  (def storew std stdx))
 
 (defmacro load-symbol (reg symbol)
   `(inst addi ,reg null-tn (static-symbol-offset ,symbol)))
@@ -215,9 +216,9 @@
        #!-sb-thread
        (inst lr ,flag-tn (make-fixup "gc_alloc_region" :foreign))
        #!-sb-thread
-       (inst lwz ,result-tn ,flag-tn 0)
+       (inst ld ,result-tn ,flag-tn 0)
        #!+sb-thread
-       (inst lwz ,result-tn thread-base-tn (* thread-alloc-region-slot
+       (inst ld ,result-tn thread-base-tn (* thread-alloc-region-slot
                                               n-word-bytes))
 
        ;; we can optimize this to only use one fixup here, once we get
@@ -225,9 +226,9 @@
        ;; (inst lr ,flag-tn (make-fixup "gc_alloc_region" :foreign 4))
        ;; (inst lwz ,flag-tn ,flag-tn 0)
        #!-sb-thread
-       (inst lwz ,flag-tn ,flag-tn 4)
+       (inst ld ,flag-tn ,flag-tn n-word-bytes)
        #!+sb-thread
-       (inst lwz ,flag-tn thread-base-tn (* (1+ thread-alloc-region-slot)
+       (inst ld ,flag-tn thread-base-tn (* (1+ thread-alloc-region-slot)
                                             n-word-bytes))
 
        (without-scheduling ()
@@ -245,15 +246,17 @@
          ;; the actual end of the region?  If so, we need a full alloc.
          ;; The C code depends on this exact form of instruction.  If
          ;; either changes, you have to change the other appropriately!
+         ;; FIXME: shouldn't this be "tw :lgt" ? otherwise we're saying
+         ;; that allocation fails if we exactly hit the end pointer
          (inst tw :lge ,result-tn ,flag-tn)
 
          ;; The C code depends on this instruction sequence taking up
          ;; #!-sb-thread three #!+sb-thread one machine instruction.
          ;; The lr of a fixup counts as two instructions.
          #!-sb-thread
-         (inst lr ,flag-tn (make-fixup "gc_alloc_region" :foreign))
-         #!-sb-thread
-         (inst stw ,result-tn ,flag-tn 0)
+         (progn
+           (inst lr ,flag-tn (make-fixup "gc_alloc_region" :foreign))
+           (inst std ,result-tn ,flag-tn 0))
          #!+sb-thread
          (inst stw ,result-tn thread-base-tn (* thread-alloc-region-slot
                                                 n-word-bytes)))

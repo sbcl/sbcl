@@ -126,7 +126,7 @@
             (values not-target target)
             (values target not-target))
       (inst andi. temp value fixnum-tag-mask)
-      (inst b? :eq yep)
+      (inst beq yep)
       (test-type value temp nope t (other-pointer-lowtag))
       (loadw temp value 0 other-pointer-lowtag)
       (inst cmpdi temp (+ (ash 1 n-widetag-bits) bignum-widetag))
@@ -147,37 +147,36 @@
               (values not-target target)
               (values target not-target))
         ;; Is it a fixnum?
-        (move temp value)
-        (inst andi. temp temp lowtag-mask) ;; We are only comparing the last byte
-        (inst cmpi 2 1 temp fixnum-tag-mask) ;; 2 => Set EQ flag FIXME: CHECK L
-        (inst b? :eq fixnum)
+        (inst andi. temp value fixnum-tag-mask)
+        (inst cmpwi :cr1 value 0) ; is this really necessary?
+        (inst beq fixnum)
 
         ;; If not, is it an other pointer?
-        (inst cmpi 2 1 temp other-pointer-lowtag) ;; 2 => Set EQ flag FIXME: CHECK L
-        (inst b? :ne nope)
+        (test-type value temp nope t (other-pointer-lowtag))
         ;; Get the header.
         (loadw temp value 0 other-pointer-lowtag)
         ;; Is it one?
-        (inst cmpi 2 1 temp (+ (ash 1 n-widetag-bits) bignum-widetag))
-        (inst b? :eq single-word)
+        (inst cmpdi temp (+ (ash 1 n-widetag-bits) bignum-widetag))
+        (inst beq single-word)
         ;; If it's other than two, we can't be an (unsigned-byte 64)
-        (inst cmpi 2 1 temp (+ (ash 2 n-widetag-bits) bignum-widetag))
-        (inst b? :ne nope)
-        ;; Compare the second digit to zero.
+        (inst cmpdi temp (+ (ash 2 n-widetag-bits) bignum-widetag))
+        (inst bne nope)
+        ;; Get the second digit.
         (loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
-        (inst and. temp temp temp)
-        (inst b? :eq yep) ; All zeros, its an (unsigned-byte 64).
+        ;; All zeros, its an (unsigned-byte 32).
+        (inst cmpdi temp 0)
+        (inst beq yep)
+        ;; Otherwise, it isn't.
         (inst b nope)
 
         (emit-label single-word)
         ;; Get the single digit.
         (loadw temp value bignum-digits-offset other-pointer-lowtag)
-        (inst cmpdi temp 0) ;; FIXME: PPC 32 bits version is using CR1, why?
+        (inst cmpdi :cr1 temp 0)
 
         ;; positive implies (unsigned-byte 64).
         (emit-label fixnum)
-        (inst and. temp temp temp)
-        (inst b? (if not-p :gt :eq) target)
+        (inst b? :cr1 (if not-p :lt :ge) target)
 
         (emit-label not-target)))))
 

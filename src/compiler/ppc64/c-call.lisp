@@ -427,10 +427,10 @@
                                    +stack-alignment-bytes+)
                                 +stack-alignment-bytes+))))
         (cond ((>= delta (ash -1 16))
-               (inst stwu nsp-tn nsp-tn delta))
+               (inst stdu nsp-tn nsp-tn delta))
               (t
                (inst lr temp delta)
-               (inst stwux  nsp-tn nsp-tn temp)))))
+               (inst stdux  nsp-tn nsp-tn temp)))))
     (unless (location= result nsp-tn)
       ;; They are only location= when the result tn was allocated by
       ;; make-call-out-tns above, which takes the number-stack-displacement
@@ -448,7 +448,7 @@
         (cond ((< delta (ash 1 16))
                (inst addi nsp-tn nsp-tn delta))
               (t
-               (inst lwz nsp-tn nsp-tn 0)))))))
+               (inst ld nsp-tn nsp-tn 0)))))))
 
 #-sb-xc-host
 (progn
@@ -578,9 +578,9 @@
                                                 n-word-bytes)))
                                     (dotimes (k words)
                                       ;; Copy from memory to memory.
-                                      (inst lwz r0 stack-pointer
+                                      (inst ld r0 stack-pointer
                                             in-offset)
-                                      (inst stw r0 stack-pointer
+                                      (inst std r0 stack-pointer
                                             out-offset)
                                       (incf out-words-processed)
                                       (incf out-offset n-word-bytes)
@@ -644,9 +644,9 @@
 
               ;; Setup everything.  Now save sp, setup the frame.
               (inst mflr r0)
-              (inst stw r0 stack-pointer (* 2 n-word-bytes)) ; FIXME: magic
+              (inst std r0 stack-pointer (* 2 n-word-bytes)) ; FIXME: magic
                                         ; constant, copied from Darwin.
-              (inst stwu stack-pointer stack-pointer (- frame-size))
+              (inst stdu stack-pointer stack-pointer (- frame-size))
 
               ;; And make the call.
               (load-address-into
@@ -659,8 +659,8 @@
 
               ;; We're back!  Restore sp and lr, load the
               ;; return value from just under sp, and return.
-              (inst lwz stack-pointer stack-pointer 0)
-              (inst lwz r0 stack-pointer (* 2 n-word-bytes))
+              (inst ld stack-pointer stack-pointer 0)
+              (inst ld r0 stack-pointer (* 2 n-word-bytes))
               (inst mtlr r0)
               (cond
                 ((sb!alien::alien-single-float-type-p result-type)
@@ -681,7 +681,7 @@
                        do
                        (unless gpr
                          (bug "Out of return registers in alien-callback trampoline."))
-                       (inst lwz gpr stack-pointer offset))))
+                       (inst ld gpr stack-pointer offset))))
               (inst blr))))
         (finalize-segment segment)
 
@@ -795,15 +795,15 @@
                 ;; Save sp, setup the frame
                 (inst mflr r0)
                 (inst stw r0 sp (* 2 n-word-bytes)) ; FIXME: magic constant
-                (inst stwu sp sp (- frame-size))
+                (inst stdu sp sp (- frame-size))
                 ;; Make the call
                 (load-address-into r0 (foreign-symbol-address "funcall3"))
                 (inst mtlr r0)
                 (inst blrl))
               ;; We're back!  Restore sp and lr, load the return value from just
               ;; under sp, and return.
-              (inst lwz sp sp 0)
-              (inst lwz r0 sp (* 2 n-word-bytes))
+              (inst ld sp sp 0)
+              (inst ld r0 sp (* 2 n-word-bytes))
               (inst mtlr r0)
               (cond
                 ((sb!alien::alien-single-float-type-p result-type)
@@ -824,7 +824,7 @@
                     do
                       (unless gpr
                         (bug "Out of return registers in alien-callback trampoline."))
-                      (inst lwz gpr sp offset))))
+                      (inst ld gpr sp offset))))
               (inst blr))))
         (finalize-segment segment)
         ;; Now that the segment is done, convert it to a static

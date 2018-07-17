@@ -499,10 +499,10 @@
   (:generator 5
     (let ((positive (gen-label))
           (done (gen-label)))
-      (inst cmpwi amount 0)
+      (inst cmpdi amount 0)
       (inst neg ndesc amount)
       (inst bge positive)
-      (inst cmpwi ndesc 31)
+      (inst cmpdi ndesc 31)
       (inst srw result number ndesc)
       (inst ble done)
       (move result zero-tn)
@@ -546,10 +546,10 @@
       (signed-reg
        (let ((positive (gen-label))
              (done (gen-label)))
-         (inst cmpwi amount 0)
+         (inst cmpdi amount 0)
          (inst neg ndesc amount)
          (inst bge positive)
-         (inst cmpwi ndesc 31)
+         (inst cmpdi ndesc 31)
          (inst sraw result number ndesc)
          (inst ble done)
          (inst srawi result number 31)
@@ -846,25 +846,25 @@
 (define-vop (fast-if-</fixnum fast-conditional/fixnum)
   (:translate <)
   (:generator 4
-    (inst cmpw x y)
+    (inst cmpd x y)
     (inst b? (if not-p :ge :lt) target)))
 
 (define-vop (fast-if-<-c/fixnum fast-conditional-c/fixnum)
   (:translate <)
   (:generator 3
-    (inst cmpwi x (fixnumize y))
+    (inst cmpdi x (fixnumize y))
     (inst b? (if not-p :ge :lt) target)))
 
 (define-vop (fast-if-</signed fast-conditional/signed)
   (:translate <)
   (:generator 6
-    (inst cmpw x y)
+    (inst cmpd x y)
     (inst b? (if not-p :ge :lt) target)))
 
 (define-vop (fast-if-<-c/signed fast-conditional-c/signed)
   (:translate <)
   (:generator 5
-    (inst cmpwi x y)
+    (inst cmpdi x y)
     (inst b? (if not-p :ge :lt) target)))
 
 (define-vop (fast-if-</unsigned fast-conditional/unsigned)
@@ -876,67 +876,67 @@
 (define-vop (fast-if-<-c/unsigned fast-conditional-c/unsigned)
   (:translate <)
   (:generator 5
-    (inst cmplwi x y)
+    (inst cmpldi x y)
     (inst b? (if not-p :ge :lt) target)))
 
 (define-vop (fast-if->/fixnum fast-conditional/fixnum)
   (:translate >)
   (:generator 4
-    (inst cmpw x y)
+    (inst cmpd x y)
     (inst b? (if not-p :le :gt) target)))
 
 (define-vop (fast-if->-c/fixnum fast-conditional-c/fixnum)
   (:translate >)
   (:generator 3
-    (inst cmpwi x (fixnumize y))
+    (inst cmpdi x (fixnumize y))
     (inst b? (if not-p :le :gt) target)))
 
 (define-vop (fast-if->/signed fast-conditional/signed)
   (:translate >)
   (:generator 6
-    (inst cmpw x y)
+    (inst cmpd x y)
     (inst b? (if not-p :le :gt) target)))
 
 (define-vop (fast-if->-c/signed fast-conditional-c/signed)
   (:translate >)
   (:generator 5
-    (inst cmpwi x y)
+    (inst cmpdi x y)
     (inst b? (if not-p :le :gt) target)))
 
 (define-vop (fast-if->/unsigned fast-conditional/unsigned)
   (:translate >)
   (:generator 6
-    (inst cmplw x y)
+    (inst cmpld x y)
     (inst b? (if not-p :le :gt) target)))
 
 (define-vop (fast-if->-c/unsigned fast-conditional-c/unsigned)
   (:translate >)
   (:generator 5
-    (inst cmplwi x y)
+    (inst cmpldi x y)
     (inst b? (if not-p :le :gt) target)))
 
 (define-vop (fast-if-eql/signed fast-conditional/signed)
   (:translate eql)
   (:generator 6
-    (inst cmpw x y)
+    (inst cmpd x y)
     (inst b? (if not-p :ne :eq) target)))
 
 (define-vop (fast-if-eql-c/signed fast-conditional-c/signed)
   (:translate eql)
   (:generator 5
-    (inst cmpwi x y)
+    (inst cmpdi x y)
     (inst b? (if not-p :ne :eq) target)))
 
 (define-vop (fast-if-eql/unsigned fast-conditional/unsigned)
   (:translate eql)
   (:generator 6
-    (inst cmplw x y)
+    (inst cmpld x y)
     (inst b? (if not-p :ne :eq) target)))
 
 (define-vop (fast-if-eql-c/unsigned fast-conditional-c/unsigned)
   (:translate eql)
   (:generator 5
-    (inst cmplwi x y)
+    (inst cmpldi x y)
     (inst b? (if not-p :ne :eq) target)))
 
 
@@ -957,7 +957,7 @@
   (:note "inline fixnum comparison")
   (:translate eql)
   (:generator 4
-    (inst cmpw x y)
+    (inst cmpd x y)
     (inst b? (if not-p :ne :eq) target)))
 ;;;
 (define-vop (generic-eql/fixnum fast-eql/fixnum)
@@ -970,7 +970,7 @@
   (:info target not-p y)
   (:translate eql)
   (:generator 2
-    (inst cmpwi x (fixnumize y))
+    (inst cmpdi x (fixnumize y))
     (inst b? (if not-p :ne :eq) target)))
 ;;;
 (define-vop (generic-eql-c/fixnum fast-eql-c/fixnum)
@@ -1036,7 +1036,7 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 3
     (let ((done (gen-label)))
-      (inst cmpwi digit 0)
+      (inst cmpdi digit 0)
       (move result null-tn)
       (inst blt done)
       (load-symbol result t)

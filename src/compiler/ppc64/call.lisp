@@ -131,7 +131,7 @@
       (when nfp-tn
         (let ((nbytes (bytes-needed-for-non-descriptor-stack-frame)))
           (when (> nbytes number-stack-displacement)
-            (inst stwu nsp-tn nsp-tn (- nbytes))
+            (inst stdu nsp-tn nsp-tn (- nbytes))
             (inst addi nfp-tn nsp-tn number-stack-displacement)))))))
 
 (define-vop (allocate-frame)
@@ -145,7 +145,7 @@
     (when (ir2-physenv-number-stack-p callee)
       (let* ((nbytes (bytes-needed-for-non-descriptor-stack-frame)))
         (when (> nbytes number-stack-displacement)
-          (inst stwu nsp-tn nsp-tn (- (bytes-needed-for-non-descriptor-stack-frame)))
+          (inst stdu nsp-tn nsp-tn (- (bytes-needed-for-non-descriptor-stack-frame)))
           (inst addi nfp nsp-tn number-stack-displacement))))))
 
 ;;; Allocate a partial frame for passing stack arguments in a full call.  Nargs
@@ -273,7 +273,7 @@ default-value-8
                     (tn (tn-ref-tn val)))
                 (defaults (cons default-lab tn))
 
-                (inst lwz move-temp ocfp-tn (* i n-word-bytes))
+                (inst ld move-temp ocfp-tn (* i n-word-bytes))
                 (inst ble default-lab)
                 (inst addic. temp temp (- (fixnumize 1)))
                 (store-stack-tn tn move-temp)))
@@ -799,7 +799,11 @@ default-value-8
                         (- (ash simple-fun-code-offset word-shift)
                            fun-pointer-lowtag))))
                (:direct
-                `((inst lwz entry-point null-tn (static-fun-offset fun)))))
+                ;; Load fdefn-raw-address using NIL as the base pointer.
+                ;; This has the usual problem that the displacement in
+                ;; the DS instruction form isn't a multiple of 4.
+                `((inst li nl6-tn (static-fun-offset fun))
+                  (inst ldx entry-point null-tn nl6-tn))))
            (loop
              (if filler
                  (do-next-filler)
@@ -984,7 +988,7 @@ default-value-8
                    number-stack-displacement))))
       ;; Check for the single case.
       (inst cmpwi nvals-arg (fixnumize 1))
-      (inst lwz a0 vals-arg 0)
+      (inst ld a0 vals-arg 0)
       (inst bne not-single)
       ;; Return with one value.
       (move csp-tn cfp-tn)
@@ -1033,7 +1037,7 @@ default-value-8
       (when nfp-tn
         (let ((nbytes (bytes-needed-for-non-descriptor-stack-frame)))
           (when (> nbytes number-stack-displacement)
-            (inst stwu nsp-tn nsp-tn (- nbytes))
+            (inst stdu nsp-tn nsp-tn (- nbytes))
             (inst addi nfp-tn nsp-tn number-stack-displacement)))))
     ;; Compute the end of the MORE arg area (and our overall frame
     ;; allocation) into the stack pointer, skipping the rest of the
@@ -1083,8 +1087,8 @@ default-value-8
              ;; overlapping some of the MORE args, and we need to copy
              ;; the list starting from the end (so that we don't
              ;; overwrite any elements before they're copied).
-             (inst lwz temp dst (- (* (1+ delta) n-word-bytes)))
-             (inst stwu temp dst (- n-word-bytes))
+             (inst ld temp dst (- (* (1+ delta) n-word-bytes)))
+             (inst stdu temp dst (- n-word-bytes))
              (inst cmpw dst result)
              (inst bgt LOOP))
             (t
@@ -1092,7 +1096,7 @@ default-value-8
              ;; is beyond the end of the allocated stack frame, and we
              ;; need to copy the list from the start in order to close
              ;; the gap.
-             (inst lwz temp result (- (* delta n-word-bytes)))
+             (inst ld temp result (- (* delta n-word-bytes)))
              (inst stw temp result 0)
              (inst addi result result n-word-bytes)
              (inst cmpw dst result)

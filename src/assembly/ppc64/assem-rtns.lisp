@@ -34,13 +34,13 @@
   (inst cmpwi nvals 0)
   (inst ble default-a0-and-on)
   (inst cmpwi nvals (fixnumize 2))
-  (inst lwz a1 vals (* 1 n-word-bytes))
+  (inst ld a1 vals (* 1 n-word-bytes))
   (inst ble default-a2-and-on)
   (inst cmpwi nvals (fixnumize 3))
-  (inst lwz a2 vals (* 2 n-word-bytes))
+  (inst ld a2 vals (* 2 n-word-bytes))
   (inst ble default-a3-and-on)
   (inst cmpwi nvals (fixnumize 4))
-  (inst lwz a3 vals (* 3 n-word-bytes))
+  (inst ld a3 vals (* 3 n-word-bytes))
   (inst ble done)
 
   ;; Copy the remaining args to the top of the stack.
@@ -50,9 +50,9 @@
 
   LOOP
   (inst subic. count count (fixnumize 1))
-  (inst lwz temp src 0)
+  (inst ld temp src 0)
   (inst addi src src n-word-bytes)
-  (inst stw temp dst 0)
+  (inst std temp dst 0)
   (inst addi dst dst n-word-bytes)
   (inst bge loop)
 
@@ -110,10 +110,10 @@
 
   ;; Load the argument regs (must do this now, 'cause the blt might
   ;; trash these locations)
-  (inst lwz a0 args (* 0 n-word-bytes))
-  (inst lwz a1 args (* 1 n-word-bytes))
-  (inst lwz a2 args (* 2 n-word-bytes))
-  (inst lwz a3 args (* 3 n-word-bytes))
+  (inst ld a0 args (* 0 n-word-bytes))
+  (inst ld a1 args (* 1 n-word-bytes))
+  (inst ld a2 args (* 2 n-word-bytes))
+  (inst ld a3 args (* 3 n-word-bytes))
 
   ;; Calc SRC, DST, and COUNT
   (inst addic. count nargs (fixnumize (- register-arg-count)))
@@ -123,9 +123,9 @@
 
   LOOP
   ;; Copy one arg.
-  (inst lwz temp src 0)
+  (inst ld temp src 0)
   (inst addi src src n-word-bytes)
-  (inst stw temp dst 0)
+  (inst std temp dst 0)
   (inst addic. count count (fixnumize -1))
   (inst addi dst dst n-word-bytes)
   (inst bgt loop)
