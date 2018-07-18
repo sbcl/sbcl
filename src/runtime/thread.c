@@ -267,27 +267,21 @@ schedule_thread_post_mortem(struct thread *corpse)
 static struct thread_post_mortem *
 plan_thread_post_mortem(struct thread *corpse)
 {
-    if (corpse) {
-        struct thread_post_mortem *post_mortem = malloc(sizeof(struct thread_post_mortem));
-        gc_assert(post_mortem);
-        post_mortem->os_thread = corpse->os_thread;
-        post_mortem->os_address = corpse->os_address;
-
-        return post_mortem;
-    } else {
-        /* FIXME: When does this happen? */
-        return NULL;
-    }
+    gc_assert(corpse);
+    struct thread_post_mortem *post_mortem = malloc(sizeof(struct thread_post_mortem));
+    gc_assert(post_mortem);
+    post_mortem->os_thread = corpse->os_thread;
+    post_mortem->os_address = corpse->os_address;
+    return post_mortem;
 }
 
 static void
 perform_thread_post_mortem(struct thread_post_mortem *post_mortem)
 {
+    gc_assert(post_mortem);
 #ifdef CREATE_POST_MORTEM_THREAD
     pthread_detach(pthread_self());
 #endif
-    int result;
-    if (post_mortem) {
         /* The thread may exit before pthread_create() has finished
            initialization and it may write into already unmapped
            memory. This lock doesn't actually need to protect
@@ -297,18 +291,17 @@ perform_thread_post_mortem(struct thread_post_mortem *post_mortem)
            Possible improvements: stash the address of the thread
            struct for which a pthread is being created and don't lock
            here if it's not the one being terminated. */
-        result = pthread_mutex_lock(&create_thread_lock);
-        gc_assert(result == 0);
-        result = pthread_mutex_unlock(&create_thread_lock);
-        gc_assert(result == 0);
+    int result = pthread_mutex_lock(&create_thread_lock);
+    gc_assert(result == 0);
+    result = pthread_mutex_unlock(&create_thread_lock);
+    gc_assert(result == 0);
 
-        if ((result = pthread_join(post_mortem->os_thread, NULL))) {
-            lose("Error calling pthread_join in perform_thread_post_mortem:\n%s",
-                 strerror(result));
-        }
-        os_invalidate(post_mortem->os_address, THREAD_STRUCT_SIZE);
-        free(post_mortem);
+    if ((result = pthread_join(post_mortem->os_thread, NULL))) {
+        lose("Error calling pthread_join in perform_thread_post_mortem:\n%s",
+             strerror(result));
     }
+    os_invalidate(post_mortem->os_address, THREAD_STRUCT_SIZE);
+    free(post_mortem);
 }
 
 static void
@@ -323,10 +316,17 @@ schedule_thread_post_mortem(struct thread *corpse)
         int result = pthread_create(&thread, NULL, perform_thread_post_mortem, post_mortem);
         gc_assert(!result);
 #else
+        // This strange little mechanism is a FIFO buffer of capacity 1.
+        // Byt stuffing one new thing in and reading the old one out, we ensure
+        // that at least one pthread_create() has completed by this point.
+        // In particular, the thread we're post-morteming must have completed
+        // because thread creation is completely serialized (which is
+        // somewhat unfortunate).
         post_mortem = (struct thread_post_mortem *)
             swap_lispobjs((lispobj *)(void *)&pending_thread_post_mortem,
                           (lispobj)post_mortem);
-        perform_thread_post_mortem(post_mortem);
+        if (post_mortem) // this is the previous object now
+            perform_thread_post_mortem(post_mortem);
 #endif
     }
 }
