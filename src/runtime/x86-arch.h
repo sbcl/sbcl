@@ -16,24 +16,6 @@
 #define ARCH_HAS_STACK_POINTER
 #define ALIEN_STACK_GROWS_DOWNWARD
 
-static inline lispobj
-swap_lispobjs(volatile lispobj *dest, lispobj value)
-{
-    lispobj old_value;
-#if defined(LISP_FEATURE_DARWIN)
-    asm volatile ("lock/xchg %0,(%1)"
-         : "=r" (old_value)
-         : "r" (dest), "0" (value)
-         : "memory");
-#else
-    asm volatile ("lock xchg %0,(%1)"
-         : "=r" (old_value)
-         : "r" (dest), "0" (value)
-         : "memory");
-#endif
-    return old_value;
-}
-
 extern void fast_bzero_detect(void *, size_t);
 extern void (*fast_bzero_pointer)(void *, size_t);
 

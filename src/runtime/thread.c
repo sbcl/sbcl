@@ -67,7 +67,7 @@ struct thread_post_mortem {
     os_vm_address_t os_address;
 };
 
-static struct thread_post_mortem * volatile pending_thread_post_mortem = 0;
+static struct thread_post_mortem *pending_thread_post_mortem = 0;
 #endif
 
 int dynamic_values_bytes=TLS_SIZE*sizeof(lispobj);  /* same for all threads */
@@ -304,6 +304,35 @@ perform_thread_post_mortem(struct thread_post_mortem *post_mortem)
     free(post_mortem);
 }
 
+static inline struct thread_post_mortem*
+fifo_buffer_shift(struct thread_post_mortem** dest,
+                  struct thread_post_mortem* value)
+{
+#ifdef __ATOMIC_SEQ_CST
+    return __atomic_exchange_n(dest, value, __ATOMIC_SEQ_CST);
+#elif defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+    /* I'd like to remove this case but I don't know whether MSVC has
+     * either of __atomic_exchange_n() or __sync_val_compare_and_swap() */
+    lispobj old_value;
+    asm volatile
+        ("lock xchg %0,(%1)"
+         : "=r" (old_value)
+         : "r" (dest), "0" (value)
+         : "memory");
+    return old_value;
+#else
+    // We don't want a compare-and-swap, but if that's all we have,
+    // then build an atomic exchange out of compare-and-swap
+    lispobj old =  *dest;
+    while (1) {
+        lispobj actual = __sync_val_compare_and_swap(dest, old, value);
+        if (actual == old)
+            return old;
+        old = actual;
+    }
+#endif
+}
+
 static void
 schedule_thread_post_mortem(struct thread *corpse)
 {
@@ -317,14 +346,12 @@ schedule_thread_post_mortem(struct thread *corpse)
         gc_assert(!result);
 #else
         // This strange little mechanism is a FIFO buffer of capacity 1.
-        // Byt stuffing one new thing in and reading the old one out, we ensure
+        // By stuffing one new thing in and reading the old one out, we ensure
         // that at least one pthread_create() has completed by this point.
         // In particular, the thread we're post-morteming must have completed
         // because thread creation is completely serialized (which is
         // somewhat unfortunate).
-        post_mortem = (struct thread_post_mortem *)
-            swap_lispobjs((lispobj *)(void *)&pending_thread_post_mortem,
-                          (lispobj)post_mortem);
+        post_mortem = fifo_buffer_shift(&pending_thread_post_mortem, post_mortem);
         if (post_mortem) // this is the previous object now
             perform_thread_post_mortem(post_mortem);
 #endif
