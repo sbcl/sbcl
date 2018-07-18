@@ -1790,3 +1790,8 @@
                     (specifier-type '(eql t)))
                    (t
                     nil)))))))
+
+(defoptimizer (array-header-p constraint-propagate-if)
+    ((array) node gen)
+  (declare (ignore gen))
+  (values array (specifier-type '(and array (not (simple-array * (*)))))))

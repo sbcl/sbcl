@@ -152,12 +152,12 @@
 (defknown sb!vm::cas-header-data-high
     (t (unsigned-byte 32) (unsigned-byte 32)) (unsigned-byte 32)))
 
-(defknown %array-dimension (t index) index
+(defknown %array-dimension (array index) index
   (flushable))
-(defknown %set-array-dimension (t index index) index
+(defknown %set-array-dimension (array index index) index
   ())
-(defknown %array-rank (t) array-rank
-    (flushable))
+(defknown %array-rank (array) array-rank
+  (flushable))
 
 #!+x86-64
 (defknown (%array-rank= widetag=) (t t) boolean

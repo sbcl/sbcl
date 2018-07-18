@@ -3707,62 +3707,9 @@ used for a COMPLEX component.~:@>"
 
 
 ;;; Return the type that describes all objects that are in X but not
-;;; in Y. If we can't determine this type, then return NIL.
-;;;
-;;; For now, we only are clever dealing with union and member types.
-;;; If either type is not a union type, then we pretend that it is a
-;;; union of just one type. What we do is remove from X all the types
-;;; that are a subtype any type in Y. If any type in X intersects with
-;;; a type in Y but is not a subtype, then we give up.
-;;;
-;;; We must also special-case any member type that appears in the
-;;; union. We remove from X's members all objects that are TYPEP to Y.
-;;; If Y has any members, we must be careful that none of those
-;;; members are CTYPEP to any of Y's non-member types. We give up in
-;;; this case, since to compute that difference we would have to break
-;;; the type from X into some collection of types that represents the
-;;; type without that particular element. This seems too hairy to be
-;;; worthwhile, given its low utility.
+;;; in Y.
 (defun type-difference (x y)
-  (if (and (numeric-type-p x) (numeric-type-p y))
-      ;; Numeric types are easy. Are there any others we should handle like this?
-      (type-intersection x (type-negation y))
-      (let ((x-types (if (union-type-p x) (union-type-types x) (list x)))
-            (y-types (if (union-type-p y) (union-type-types y) (list y))))
-        (collect ((res))
-          (dolist (x-type x-types)
-            (if (member-type-p x-type)
-                (let ((xset (alloc-xset))
-                      (fp-zeroes nil))
-                  (mapc-member-type-members
-                   (lambda (elt)
-                     (multiple-value-bind (ok sure) (ctypep elt y)
-                       (unless sure
-                         (return-from type-difference nil))
-                       (unless ok
-                         (if (fp-zero-p elt)
-                             (pushnew elt fp-zeroes)
-                             (add-to-xset elt xset)))))
-                   x-type)
-                  (unless (and (xset-empty-p xset) (not fp-zeroes))
-                    (res (make-member-type xset fp-zeroes))))
-                (dolist (y-type y-types (res x-type))
-                  (multiple-value-bind (val win) (csubtypep x-type y-type)
-                    (unless win (return-from type-difference nil))
-                    (when val (return))
-                    (when (types-equal-or-intersect x-type y-type)
-                      (return-from type-difference nil))))))
-          (let ((y-mem (find-if #'member-type-p y-types)))
-            (when y-mem
-              (dolist (x-type x-types)
-                (unless (member-type-p x-type)
-                  (mapc-member-type-members
-                   (lambda (member)
-                     (multiple-value-bind (ok sure) (ctypep member x-type)
-                       (when (or (not sure) ok)
-                         (return-from type-difference nil))))
-                   y-mem)))))
-          (apply #'type-union (res))))))
+  (type-intersection x (type-negation y)))
 
 (!def-type-translator array ((:context context)
                              &optional (element-type '*)
