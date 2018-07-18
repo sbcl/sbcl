@@ -25,13 +25,8 @@
 #define reg_NL6       REG(9)    /* Last (7th) FF param */
 #define reg_FDEFN     REG(10)   /* was NL7 until recently -dan */
 #define reg_NARGS     REG(11)
-#ifdef LISP_FEATURE_DARWIN
 #define reg_CFUNC     REG(12)   /* Silly to blow a reg on FF-name */
 #define reg_NFP       REG(13)   /* Lisp may save around FF-call */
-#else
-#define reg_NFP       REG(12)   /* Lisp may save around FF-call */
-#define reg_CFUNC     REG(13)   /* Silly to blow a reg on FF-name */
-#endif
 #define reg_BSP       REG(14)   /* Binding stack pointer */
 #define reg_CFP       REG(15)   /* Control/value stack frame pointer */
 #define reg_CSP       REG(16)   /* Control/value stack top */

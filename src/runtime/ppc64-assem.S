@@ -1,8 +1,3 @@
-#ifdef __ELF__
-// Mark the object as not requiring an executable stack.
-.section .note.GNU-stack,"",%progbits
-#endif
-
 #define LANGUAGE_ASSEMBLY
 
 #include "sbcl.h"
@@ -58,12 +53,12 @@ x:
 	lis temp,ha16(global) @\
 	stw reg,lo16(global)(temp) ; Comment
 #else
-#define load(reg,global) \
-	lis reg,global@ha       ; \
-	ld reg,global@l(reg)
-#define store(reg,temp,global) \
-	lis temp,global@ha  	; \
-	std reg,global@l(temp)
+#define load(reg,csym) \
+	addis reg, 2, ptr_##csym@toc@ha ; ld reg, ptr_##csym@toc@l(reg) ; ld reg, 0(reg)
+#define store(reg,temp,csym) \
+	addis temp, 2, ptr_##csym@toc@ha ; ld temp, ptr_##csym@toc@l(temp) ; std reg, 0(temp)
+#define wordstore(reg,temp,csym) \
+	addis temp, 2, ptr_##csym@toc@ha ; ld temp, ptr_##csym@toc@l(temp) ; stw reg, 0(temp)
 #endif
 
 #define	FIRST_SAVE_FPR	14	/* lowest-numbered non-volatile FPR */
@@ -92,7 +87,6 @@ x:
 #define SAVE_FPR(n) stfd n,-8*(32-(n))(11)
 #define SAVE_GPR(n) std n,-8*(32-(n))(11)
 #define FULL_FRAME_SIZE FRAME_SIZE(FIRST_SAVE_GPR,FIRST_SAVE_FPR,0,1)
-
 #define RESTORE_FPR(n) lfd n,-8*(32-(n))(11)
 #define RESTORE_GPR(n) ld n,-8*(32-(n))(11)
 #endif
@@ -195,11 +189,36 @@ x:
 
 #else
 
+/*
+
+From PPC-elf64abi:
+The following figure shows the stack frame organization. SP in the figure denotes the stack pointer (general purpose register r1) of the called function after it has executed code establishing its stack frame
+
+High Address
+
+          +-> Back chain
+          |   Floating point register save area
+          |   General register save area
+          |   VRSAVE save word (32-bits)
+          |   Alignment padding (4 or 12 bytes)
+          |   Vector register save area (quadword aligned)
+          |   Local variable space
+          |   Parameter save area    (SP + 48)
+          |   TOC save area          (SP + 40)
+          |   link editor doubleword (SP + 32)
+          |   compiler doubleword    (SP + 24)
+          |   LR save area           (SP + 16)
+          |   CR save area           (SP + 8)
+SP  --->  +-- Back chain             (SP + 0)
+
+Low Address
+
+*/
 #define C_FULL_PROLOG \
 	mflr 0 ; \
-	std 0,4(1) ; \
+	std 0,16(1) /* Save into LR save area */; \
 	mr 11,1 ; \
-	stdu 1,-FULL_FRAME_SIZE(1) ; \
+	stdu 1,-FULL_FRAME_SIZE(1) /* Update SP and back chain atomically */; \
 	SAVE_FPR(14) ; \
 	SAVE_FPR(15) ; \
 	SAVE_FPR(16) ; \
@@ -238,10 +257,11 @@ x:
 	SAVE_GPR(30) ; \
 	SAVE_GPR(31) ; \
 	mfcr 0	; \
-	std 0,8(1)
+	std 0,8(1) /* Save into CR save area */
+	std 2,40(1) /* Save into TOC save area */
 
 #define C_FULL_EPILOG \
-	ld 5,8(1) ; \
+	ld 5,8(1) /* Restore CR */ ; \
 	mtcrf 255,5 ; \
 	la 11,FULL_FRAME_SIZE-NFPR_SAVE_BYTES(FIRST_SAVE_FPR)(1) ; \
 	RESTORE_GPR(14) ; \
@@ -281,8 +301,9 @@ x:
 	RESTORE_FPR(29) ; \
 	RESTORE_FPR(30) ; \
 	RESTORE_FPR(31) ; \
-	ld 1,0(1) ; \
-	ld 0,4(1) ; \
+	ld reg_NSP,0(1) /* Restore Stack Pointer from Back Chain */ ; \
+	ld 0,16(1) /* Restore LR from LR save area */ ; \
+	ld reg_TOC,40(1) /* Restor TOC from TOC save area */
 	mtlr 0 ; \
 
 #endif
@@ -290,6 +311,20 @@ x:
 #ifdef LISP_FEATURE_SB_SAFEPOINT
 /* the CSP page sits right before the thread */
 # define THREAD_SAVED_CSP_OFFSET (-N_WORD_BYTES)
+#endif
+
+/* We create a pointer into the actual csymbol
+   This way the symbol ptr_ symbol lives within a 32 bits offset
+   of the TOC. See Store and Load macros in this file */
+#define indirect_ptr(csym) ptr_##csym: .quad CSYMBOL(csym)
+indirect_ptr(current_binding_stack_pointer)
+indirect_ptr(current_control_stack_pointer)
+indirect_ptr(current_control_frame_pointer)
+indirect_ptr(dynamic_space_free_pointer)
+indirect_ptr(foreign_function_call_active)
+indirect_ptr(all_threads)
+#if defined(LISP_FEATURE_SB_THREAD)
+indirect_ptr(specials)
 #endif
 
 	.text
@@ -313,7 +348,7 @@ x:
 	mr reg_A2, reg_NL2
 
 	/* Call out to obtain our TLS block. */
-	load(reg_NL0,CSYMBOL(specials))
+	load(reg_NL0,specials)
 	/* This won't work on darwin: wrong fixup style.  And is it
 	 * supposed to be lis/ori or lis/addi?  Or does it differ
 	 * between darwin and everything else again? */
@@ -346,7 +381,7 @@ x:
 	li reg_L2,0
 #endif
 	li reg_LIP,0
-#ifdef LISP_FEATURE_DARWIN	
+#ifdef LISP_FEATURE_DARWIN
 	lis reg_NULL,hi16(NIL)
 	ori reg_NULL,reg_NULL,lo16(NIL)
 #else
@@ -362,16 +397,16 @@ x:
 	ld reg_CSP,THREAD_CONTROL_STACK_POINTER_OFFSET(reg_THREAD)
 	ld reg_OCFP,THREAD_CONTROL_FRAME_POINTER_OFFSET(reg_THREAD)
 #else
-	store(reg_ZERO,reg_NL4,CSYMBOL(foreign_function_call_active))
-	load(reg_BSP,CSYMBOL(current_binding_stack_pointer))
-	load(reg_CSP,CSYMBOL(current_control_stack_pointer))
-	load(reg_OCFP,CSYMBOL(current_control_frame_pointer))
+	wordstore(reg_ZERO,reg_NL4,foreign_function_call_active)
+	load(reg_BSP,current_binding_stack_pointer)
+	load(reg_CSP,current_control_stack_pointer)
+	load(reg_OCFP,current_control_frame_pointer)
 #endif
 	/* This is important for CHENEYGC: It's the allocation
 	 * pointer.  It's also important for ROOM on GENCGC:
 	 * It's a pointer to the end of dynamic space, used to
 	 * determine where to stop in MAP-ALLOCATED-OBJECTS. */
-	load(reg_NL4,CSYMBOL(dynamic_space_free_pointer))
+	load(reg_NL4,dynamic_space_free_pointer)
 	add reg_ALLOC,reg_ALLOC,reg_NL4
 
 	/* No longer atomic, and check for interrupt */
@@ -399,8 +434,8 @@ x:
 	addi reg_LRA,reg_LRA,OTHER_POINTER_LOWTAG
 
 	/* Function is an indirect closure */
-	addi reg_A0,reg_LEXENV,SIMPLE_FUN_SELF_OFFSET
-	ld reg_CODE,0(reg_A0)
+	addi reg_NL0,reg_LEXENV,SIMPLE_FUN_SELF_OFFSET
+	ld reg_CODE,0(reg_NL0)
 	addi reg_LIP,reg_CODE,SIMPLE_FUN_CODE_OFFSET
 	mtctr reg_LIP
 	sldi reg_NARGS, reg_NL2, N_FIXNUM_TAG_BITS
@@ -432,14 +467,14 @@ lra:
 #else
 	/* Store lisp state */
 	clrrwi reg_NL1,reg_ALLOC,3
-	store(reg_NL1,reg_NL2,CSYMBOL(dynamic_space_free_pointer))
+	store(reg_NL1,reg_NL2,dynamic_space_free_pointer)
 	/* load(reg_NL2,current_thread) */
-	store(reg_BSP,reg_NL2,CSYMBOL(current_binding_stack_pointer))
-	store(reg_CSP,reg_NL2,CSYMBOL(current_control_stack_pointer))
-	store(reg_CFP,reg_NL2,CSYMBOL(current_control_frame_pointer))
+	store(reg_BSP,reg_NL2,current_binding_stack_pointer)
+	store(reg_CSP,reg_NL2,current_control_stack_pointer)
+	store(reg_CFP,reg_NL2,current_control_frame_pointer)
 
 	/* No longer in Lisp. */
-	store(reg_NL1,reg_NL2,CSYMBOL(foreign_function_call_active))
+	store(reg_NL1,reg_NL2,foreign_function_call_active)
 #endif
 
 	/* Check for interrupt */
@@ -474,7 +509,7 @@ lra:
 	mr reg_CFP,reg_CSP
 	la reg_CSP,32(reg_CSP)
 	std reg_OCFP,0(reg_CFP)
-	std reg_CODE,8(reg_CFP)
+	std reg_CODE,16(reg_CFP)
 	/* The pseudo-atomic mechanism wants to use reg_NL3, but that
 	may be an outgoing C argument.  Copy reg_NL3 to something that's
 	unboxed and -not- one of the C argument registers */
@@ -499,15 +534,15 @@ lra:
 #else
 	/* Store Lisp state */
 	clrrwi reg_NFP,reg_ALLOC,3
-	store(reg_NFP,reg_CFUNC,CSYMBOL(dynamic_space_free_pointer))
+	store(reg_NFP,reg_CFUNC,dynamic_space_free_pointer)
 	/* load(reg_CFUNC,current_thread) */
 
-	store(reg_BSP,reg_CFUNC,CSYMBOL(current_binding_stack_pointer))
-	store(reg_CSP,reg_CFUNC,CSYMBOL(current_control_stack_pointer))
-	store(reg_CFP,reg_CFUNC,CSYMBOL(current_control_frame_pointer))
+	store(reg_BSP,reg_CFUNC,current_binding_stack_pointer)
+	store(reg_CSP,reg_CFUNC,current_control_stack_pointer)
+	store(reg_CFP,reg_CFUNC,current_control_frame_pointer)
 
 	/* No longer in Lisp */
-	store(reg_CSP,reg_CFUNC,CSYMBOL(foreign_function_call_active))
+	store(reg_CSP,reg_CFUNC,foreign_function_call_active)
 #endif
 	/* Disable pseudo-atomic; check pending interrupt */
 	subi reg_ALLOC, reg_ALLOC, flag_PseudoAtomic
@@ -517,10 +552,10 @@ lra:
 #ifdef LISP_FEATURE_SB_SAFEPOINT
 	/* OK to run GC without stopping this thread from this point on. */
 #  ifdef LISP_FEATURE_SB_THREAD
-	stw reg_CSP,THREAD_SAVED_CSP_OFFSET(reg_THREAD)
+	std reg_CSP,THREAD_SAVED_CSP_OFFSET(reg_THREAD)
 #  else
-	load(reg_CFUNC,CSYMBOL(all_threads))
-	stw reg_CSP,THREAD_SAVED_CSP_OFFSET(reg_CFUNC)
+	load(reg_CFUNC,all_threads)
+	std reg_CSP,THREAD_SAVED_CSP_OFFSET(reg_CFUNC)
 #  endif
 #endif
 
@@ -570,10 +605,10 @@ lra:
 # ifdef LISP_FEATURE_SB_SAFEPOINT
 	/* No longer OK to run GC except at safepoints. */
 #  ifdef LISP_FEATURE_SB_THREAD
-	stw reg_ZERO,THREAD_SAVED_CSP_OFFSET(reg_THREAD)
+	std reg_ZERO,THREAD_SAVED_CSP_OFFSET(reg_THREAD)
 #  else
-	load(reg_BSP,CSYMBOL(all_threads))
-	stw reg_ZERO,THREAD_SAVED_CSP_OFFSET(reg_BSP)
+	load(reg_BSP,all_threads)
+	std reg_ZERO,THREAD_SAVED_CSP_OFFSET(reg_BSP)
 #  endif
 # endif
 
@@ -582,33 +617,33 @@ lra:
 
 #if defined(LISP_FEATURE_SB_THREAD)
 	/* No longer in foreign function call. */
-	stw reg_ZERO,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_THREAD)
+	std reg_ZERO,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_THREAD)
 
 	/* The binding stack pointer isn't preserved by C. */
-	lwz reg_BSP,THREAD_BINDING_STACK_POINTER_OFFSET(reg_THREAD)
+	ld reg_BSP,THREAD_BINDING_STACK_POINTER_OFFSET(reg_THREAD)
 #else
 	/* No long in foreign function call. */
-	store(reg_ZERO,reg_NL2,CSYMBOL(foreign_function_call_active))
+	store(reg_ZERO,reg_NL2,foreign_function_call_active)
 
 	/* The free pointer may have moved */
 	/* (moved below) */
 
 	/* The BSP wasn't preserved by C, so load it */
-	load(reg_BSP,CSYMBOL(current_binding_stack_pointer))
+	load(reg_BSP,current_binding_stack_pointer)
 #endif
 	/* This is important for CHENEYGC: It's the allocation
 	 * pointer.  It's also important for ROOM on GENCGC:
 	 * It's a pointer to the end of dynamic space, used to
 	 * determine where to stop in MAP-ALLOCATED-OBJECTS. */
-	load(reg_NL4,CSYMBOL(dynamic_space_free_pointer))
+	load(reg_NL4,dynamic_space_free_pointer)
 	add reg_ALLOC,reg_ALLOC,reg_NL4
 
 	/* Other lisp stack/frame pointers were preserved by C.
 	I can't imagine why they'd have moved */
 
 	/* Get the return address back. */
-	lwz reg_LIP,8(reg_CFP)
-	lwz reg_CODE,16(reg_CFP)
+	ld reg_LIP,8(reg_CFP)
+	ld reg_CODE,16(reg_CFP)
 	add reg_LIP,reg_CODE,reg_LIP
 	la reg_LIP,-OTHER_POINTER_LOWTAG(reg_LIP)
 
@@ -713,3 +748,8 @@ CSYMBOL(fun_end_breakpoint_end):
 	blr
 /* King Nato's branch has a nop here. Do we need this? */
 	SET_SIZE(do_pending_interrupt)
+
+#ifdef __ELF__
+// Mark the object as not requiring an executable stack.
+.section .note.GNU-stack,"",%progbits
+#endif
