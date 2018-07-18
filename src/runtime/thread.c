@@ -62,12 +62,7 @@
 # define IMMEDIATE_POST_MORTEM
 #endif
 
-struct thread_post_mortem {
-    os_thread_t os_thread;
-    os_vm_address_t os_address;
-};
-
-static struct thread_post_mortem *pending_thread_post_mortem = 0;
+static struct thread *postmortem_thread;
 #endif
 
 int dynamic_values_bytes=TLS_SIZE*sizeof(lispobj);  /* same for all threads */
@@ -236,6 +231,24 @@ initial_thread_trampoline(struct thread *th)
 
 #ifdef LISP_FEATURE_SB_THREAD
 
+/* THREAD POST MORTEM CLEANUP
+ *
+ * Memory allocated for the thread stacks cannot be reclaimed while
+ * the thread is still alive, so we need a mechanism for post mortem
+ * cleanups. FIXME: We actually have two, for historical reasons as
+ * the saying goes. Do we really need two? Nikodemus guesses that
+ * not anymore, now that we properly call pthread_attr_destroy before
+ * freeing the stack. */
+
+static void free_thread_struct(struct thread *th)
+{
+#if defined(LISP_FEATURE_WIN32)
+    os_invalidate_free((os_vm_address_t) th->os_address, THREAD_STRUCT_SIZE);
+#else
+    os_invalidate((os_vm_address_t) th->os_address, THREAD_STRUCT_SIZE);
+#endif
+}
+
 # if defined(IMMEDIATE_POST_MORTEM)
 
 /*
@@ -246,37 +259,13 @@ static void
 schedule_thread_post_mortem(struct thread *corpse)
 {
     pthread_detach(pthread_self());
-#if defined(LISP_FEATURE_WIN32)
-    os_invalidate_free(corpse->os_address, THREAD_STRUCT_SIZE);
-#else
-    os_invalidate(corpse->os_address, THREAD_STRUCT_SIZE);
-#endif
+    free_thread_struct(corpse);
 }
 
 # else
 
-/* THREAD POST MORTEM CLEANUP
- *
- * Memory allocated for the thread stacks cannot be reclaimed while
- * the thread is still alive, so we need a mechanism for post mortem
- * cleanups. FIXME: We actually have two, for historical reasons as
- * the saying goes. Do we really need two? Nikodemus guesses that
- * not anymore, now that we properly call pthread_attr_destroy before
- * freeing the stack. */
-
-static struct thread_post_mortem *
-plan_thread_post_mortem(struct thread *corpse)
-{
-    gc_assert(corpse);
-    struct thread_post_mortem *post_mortem = malloc(sizeof(struct thread_post_mortem));
-    gc_assert(post_mortem);
-    post_mortem->os_thread = corpse->os_thread;
-    post_mortem->os_address = corpse->os_address;
-    return post_mortem;
-}
-
 static void
-perform_thread_post_mortem(struct thread_post_mortem *post_mortem)
+perform_thread_post_mortem(struct thread *post_mortem)
 {
     gc_assert(post_mortem);
         /* The thread may exit before pthread_create() has finished
@@ -297,13 +286,11 @@ perform_thread_post_mortem(struct thread_post_mortem *post_mortem)
         lose("Error calling pthread_join in perform_thread_post_mortem:\n%s",
              strerror(result));
     }
-    os_invalidate(post_mortem->os_address, THREAD_STRUCT_SIZE);
-    free(post_mortem);
+    free_thread_struct(post_mortem);
 }
 
-static inline struct thread_post_mortem*
-fifo_buffer_shift(struct thread_post_mortem** dest,
-                  struct thread_post_mortem* value)
+static inline struct thread*
+fifo_buffer_shift(struct thread** dest, struct thread* value)
 {
 #ifdef __ATOMIC_SEQ_CST
     return __atomic_exchange_n(dest, value, __ATOMIC_SEQ_CST);
@@ -333,20 +320,16 @@ fifo_buffer_shift(struct thread_post_mortem** dest,
 static void
 schedule_thread_post_mortem(struct thread *corpse)
 {
-    struct thread_post_mortem *post_mortem = NULL;
-    if (corpse) {
-        post_mortem = plan_thread_post_mortem(corpse);
-
-        // This strange little mechanism is a FIFO buffer of capacity 1.
-        // By stuffing one new thing in and reading the old one out, we ensure
-        // that at least one pthread_create() has completed by this point.
-        // In particular, the thread we're post-morteming must have completed
-        // because thread creation is completely serialized (which is
-        // somewhat unfortunate).
-        post_mortem = fifo_buffer_shift(&pending_thread_post_mortem, post_mortem);
-        if (post_mortem) // this is the previous object now
-            perform_thread_post_mortem(post_mortem);
-    }
+    gc_assert(corpse);
+    // This strange little mechanism is a FIFO buffer of capacity 1.
+    // By stuffing one new thing in and reading the old one out, we ensure
+    // that at least one pthread_create() has completed by this point.
+    // In particular, the thread we're post-morteming must have completed
+    // because thread creation is completely serialized (which is
+    // somewhat unfortunate).
+    struct thread* previous = fifo_buffer_shift(&postmortem_thread, corpse);
+    if (previous) // any random thread which pre-deceased me
+        perform_thread_post_mortem(previous);
 }
 
 # endif /* !IMMEDIATE_POST_MORTEM */
@@ -497,7 +480,6 @@ void* new_thread_trampoline(void* arg)
 }
 
 static struct thread *create_thread_struct(lispobj);
-static void free_thread_struct(struct thread *th);
 
 void
 attach_os_thread(init_thread_data *scribble)
@@ -624,16 +606,6 @@ callback_wrapper_trampoline(
     }
 }
 #endif /* LISP_FEATURE_SB_THREAD */
-
-static void __attribute__((unused))
-free_thread_struct(struct thread *th)
-{
-#if defined(LISP_FEATURE_WIN32)
-    os_invalidate_free((os_vm_address_t) th->os_address, THREAD_STRUCT_SIZE);
-#else
-    os_invalidate((os_vm_address_t) th->os_address, THREAD_STRUCT_SIZE);
-#endif
-}
 
 /* this is called from any other thread to create the new one, and
  * initialize all parts of it that can be initialized from another
