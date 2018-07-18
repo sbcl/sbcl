@@ -259,8 +259,8 @@ schedule_thread_post_mortem(struct thread *corpse)
  *
  * Memory allocated for the thread stacks cannot be reclaimed while
  * the thread is still alive, so we need a mechanism for post mortem
- * cleanups. FIXME: We actually have three, for historical reasons as
- * the saying goes. Do we really need three? Nikodemus guesses that
+ * cleanups. FIXME: We actually have two, for historical reasons as
+ * the saying goes. Do we really need two? Nikodemus guesses that
  * not anymore, now that we properly call pthread_attr_destroy before
  * freeing the stack. */
 
@@ -279,9 +279,6 @@ static void
 perform_thread_post_mortem(struct thread_post_mortem *post_mortem)
 {
     gc_assert(post_mortem);
-#ifdef CREATE_POST_MORTEM_THREAD
-    pthread_detach(pthread_self());
-#endif
         /* The thread may exit before pthread_create() has finished
            initialization and it may write into already unmapped
            memory. This lock doesn't actually need to protect
@@ -340,11 +337,6 @@ schedule_thread_post_mortem(struct thread *corpse)
     if (corpse) {
         post_mortem = plan_thread_post_mortem(corpse);
 
-#ifdef CREATE_POST_MORTEM_THREAD
-        pthread_t thread;
-        int result = pthread_create(&thread, NULL, perform_thread_post_mortem, post_mortem);
-        gc_assert(!result);
-#else
         // This strange little mechanism is a FIFO buffer of capacity 1.
         // By stuffing one new thing in and reading the old one out, we ensure
         // that at least one pthread_create() has completed by this point.
@@ -354,7 +346,6 @@ schedule_thread_post_mortem(struct thread *corpse)
         post_mortem = fifo_buffer_shift(&pending_thread_post_mortem, post_mortem);
         if (post_mortem) // this is the previous object now
             perform_thread_post_mortem(post_mortem);
-#endif
     }
 }
 
