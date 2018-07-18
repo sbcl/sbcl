@@ -360,14 +360,20 @@
              `((:translate ,translate)))
      (:policy :fast-safe)
      (:args (object :scs (descriptor-reg))
-            (index :scs (any-reg)))
+            (index :scs (any-reg immediate)))
      (:arg-types ,type tagged-num)
      (:temporary (:scs (interior-reg)) lip)
      (:results (value :scs ,scs))
      (:result-types ,el-type)
      (:generator 5
-       (inst add lip object (lsl index (- word-shift n-fixnum-tag-bits)))
-       (loadw value lip ,offset ,lowtag))))
+       (sc-case index
+         (immediate
+          (inst ldr value (@ object (load-store-offset
+                                     (- (ash (+ ,offset (tn-value index)) word-shift)
+                                        ,lowtag)))))
+         (t
+          (inst add lip object (lsl index (- word-shift n-fixnum-tag-bits)))
+          (loadw value lip ,offset ,lowtag))))))
 
 (defmacro define-full-setter (name type offset lowtag scs el-type
                               &optional translate)
@@ -376,15 +382,21 @@
              `((:translate ,translate)))
      (:policy :fast-safe)
      (:args (object :scs (descriptor-reg))
-            (index :scs (any-reg))
+            (index :scs (any-reg immediate))
             (value :scs ,scs :target result))
      (:arg-types ,type tagged-num ,el-type)
      (:temporary (:scs (interior-reg)) lip)
      (:results (result :scs ,scs))
      (:result-types ,el-type)
      (:generator 2
-       (inst add lip object (lsl index (- word-shift n-fixnum-tag-bits)))
-       (storew value lip ,offset ,lowtag)
+       (sc-case index
+         (immediate
+          (inst str value (@ object (load-store-offset
+                                     (- (ash (+ ,offset (tn-value index)) word-shift)
+                                        ,lowtag)))))
+         (t
+          (inst add lip object (lsl index (- word-shift n-fixnum-tag-bits)))
+          (storew value lip ,offset ,lowtag)))
        (move result value))))
 
 (defmacro define-partial-reffer (name type size signed offset lowtag scs
@@ -394,25 +406,40 @@
              `((:translate ,translate)))
      (:policy :fast-safe)
      (:args (object :scs (descriptor-reg))
-            (index :scs (unsigned-reg)))
-     (:arg-types ,type positive-fixnum)
+            (index :scs (any-reg unsigned-reg immediate)))
+     (:arg-types ,type tagged-num)
      (:results (value :scs ,scs))
      (:result-types ,el-type)
      (:temporary (:scs (interior-reg)) lip)
      (:generator 5
-       ,@(ecase size
-           (:byte
-            `((inst add lip object index)
-              (inst ,(if signed 'ldrsb 'ldrb)
-                    value (@ lip (- (* ,offset n-word-bytes) ,lowtag)))))
-           (:short
-            `((inst add lip object (lsl index 1))
-              (inst ,(if signed 'ldrsh 'ldrh)
-                    value (@ lip (- (* ,offset n-word-bytes) ,lowtag)))))
-           (:word
-            `((inst add lip object (lsl index 2))
-              (inst ,(if signed 'ldrsw 'ldr) (32-bit-reg value)
-                    (@ lip (- (* ,offset n-word-bytes) ,lowtag)))))))))
+       ,@(multiple-value-bind (op shift)
+             (ecase size
+               (:byte
+                (values (if signed 'ldrsb 'ldrb) 0))
+               (:short
+                (values (if signed 'ldrsh 'ldrh) 1))
+               (:word
+                (values (if signed 'ldrsw 'ldr) 2)))
+           (let ((value (if (and (eq size :word)
+                                 (not signed))
+                            '(32-bit-reg value)
+                            'value)))
+             `((sc-case index
+                 (immediate
+                  (inst ,op ,value (@ object (load-store-offset
+                                              (+
+                                               (ash (tn-value index) ,shift)
+                                               (- (* ,offset n-word-bytes) ,lowtag))))))
+                 (t
+                  (let ((shift ,shift))
+                    (sc-case index
+                      (any-reg
+                       (decf shift n-fixnum-tag-bits)))
+                    (inst add lip object (if (minusp shift)
+                                             (asr index (- shift))
+                                             (lsl index shift)))
+                    (inst ,op
+                          ,value (@ lip (- (* ,offset n-word-bytes) ,lowtag))))))))))))
 
 (defmacro define-partial-setter (name type size offset lowtag scs el-type
                                  &optional translate)
@@ -421,23 +448,40 @@
              `((:translate ,translate)))
      (:policy :fast-safe)
      (:args (object :scs (descriptor-reg))
-            (index :scs (unsigned-reg))
+            (index :scs (any-reg unsigned-reg immediate))
             (value :scs ,scs :target result))
-     (:arg-types ,type positive-fixnum ,el-type)
+     (:arg-types ,type tagged-num ,el-type)
      (:temporary (:scs (interior-reg)) lip)
      (:results (result :scs ,scs))
      (:result-types ,el-type)
      (:generator 5
-       ,@(ecase size
-           (:byte
-            `((inst add lip object index)
-              (inst strb value (@ lip (- (* ,offset n-word-bytes) ,lowtag)))))
-           (:short
-            `((inst add lip object (lsl index 1))
-              (inst strh value (@ lip (- (* ,offset n-word-bytes) ,lowtag)))))
-           (:word
-            `((inst add lip object (lsl index 2))
-              (inst str (32-bit-reg value) (@ lip (- (* ,offset n-word-bytes) ,lowtag))))))
+       ,@(multiple-value-bind (op shift)
+             (ecase size
+               (:byte
+                (values 'strb 0))
+               (:short
+                (values 'strh 1))
+               (:word
+                (values 'str 2)))
+           (let ((value (if (eq size :word)
+                            '(32-bit-reg value)
+                            'value)))
+             `((sc-case index
+                 (immediate
+                  (inst ,op ,value (@ object (load-store-offset
+                                              (+
+                                               (ash (tn-value index) ,shift)
+                                               (- (* ,offset n-word-bytes) ,lowtag))))))
+                 (t
+                  (let ((shift ,shift))
+                    (sc-case index
+                      (any-reg
+                       (decf shift n-fixnum-tag-bits)))
+                    (inst add lip object (if (minusp shift)
+                                             (asr index (- shift))
+                                             (lsl index shift)))
+                    (inst ,op
+                          ,value (@ lip (- (* ,offset n-word-bytes) ,lowtag)))))))))
        (move result value))))
 
 (defun load-inline-constant (dst value &optional lip)
