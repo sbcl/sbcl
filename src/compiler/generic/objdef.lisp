@@ -419,8 +419,6 @@
   (binding-stack-start :c-type "lispobj *" :pointer t
                        :special *binding-stack-start*)
 
-  #!+sb-thread
-  (os-attr :c-type "pthread_attr_t *" :pointer t)
   #!+(and sb-thread (not sb-safepoint))
   (state-sem :c-type "os_sem_t *" :pointer t)
   #!+(and sb-thread (not sb-safepoint))

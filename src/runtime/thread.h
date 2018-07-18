@@ -58,7 +58,6 @@ extern int kill_safely(os_thread_t os_thread, int signal);
 struct nonpointer_thread_data
 {
 #ifdef LISP_FEATURE_SB_THREAD
-    pthread_attr_t os_attr;
 #ifndef LISP_FEATURE_SB_SAFEPOINT
     os_sem_t state_sem;
     os_sem_t state_not_running_sem;

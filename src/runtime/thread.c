@@ -64,7 +64,6 @@
 
 struct thread_post_mortem {
     os_thread_t os_thread;
-    pthread_attr_t *os_attr;
     os_vm_address_t os_address;
 };
 
@@ -247,8 +246,6 @@ static void
 schedule_thread_post_mortem(struct thread *corpse)
 {
     pthread_detach(pthread_self());
-    int result = pthread_attr_destroy(corpse->os_attr);
-    gc_assert(!result);
 #if defined(LISP_FEATURE_WIN32)
     os_invalidate_free(corpse->os_address, THREAD_STRUCT_SIZE);
 #else
@@ -274,7 +271,6 @@ plan_thread_post_mortem(struct thread *corpse)
         struct thread_post_mortem *post_mortem = malloc(sizeof(struct thread_post_mortem));
         gc_assert(post_mortem);
         post_mortem->os_thread = corpse->os_thread;
-        post_mortem->os_attr = corpse->os_attr;
         post_mortem->os_address = corpse->os_address;
 
         return post_mortem;
@@ -308,10 +304,6 @@ perform_thread_post_mortem(struct thread_post_mortem *post_mortem)
 
         if ((result = pthread_join(post_mortem->os_thread, NULL))) {
             lose("Error calling pthread_join in perform_thread_post_mortem:\n%s",
-                 strerror(result));
-        }
-        if ((result = pthread_attr_destroy(post_mortem->os_attr))) {
-            lose("Error calling pthread_attr_destroy in perform_thread_post_mortem:\n%s",
                  strerror(result));
         }
         os_invalidate(post_mortem->os_address, THREAD_STRUCT_SIZE);
@@ -504,11 +496,6 @@ attach_os_thread(init_thread_data *scribble)
        together with locking the deferrable signals above. */
     unblock_gc_signals(0, 0);
 #endif
-
-    /* We don't actually want a pthread_attr here, but rather than add
-     * `if's to the post-mostem, let's just keep that code happy by
-     * keeping it initialized: */
-    pthread_attr_init(th->os_attr);
 
 #if !defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
     /* On windows, arch_os_thread_init will take care of finding the
@@ -754,7 +741,6 @@ create_thread_struct(lispobj initial_function) {
     th->interrupt_data = &nonpointer_data->interrupt_data;
 
 #ifdef LISP_FEATURE_SB_THREAD
-    th->os_attr = &nonpointer_data->os_attr;
 # ifndef LISP_FEATURE_SB_SAFEPOINT
     th->state_sem = &nonpointer_data->state_sem;
     th->state_not_running_sem = &nonpointer_data->state_not_running_sem;
@@ -885,56 +871,53 @@ extern int pthread_attr_setstack (pthread_attr_t *__attr, void *__stackaddr,
                                   size_t __stacksize);
 #endif
 
+/* Call pthread_create() and return 1 for success, 0 for failure */
 boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
 {
     /* The new thread inherits the restrictive signal mask set here,
      * and enables signals again when it is set up properly. */
     sigset_t oldset;
-    boolean r=1;
-    int retcode = 0, initcode;
-
-    FSHOW_SIGNAL((stderr,"/create_os_thread: creating new thread\n"));
+    int retcode = 0;
+    boolean success = 0;
 
     /* Blocking deferrable signals is enough, no need to block
      * SIG_STOP_FOR_GC because the child process is not linked onto
      * all_threads until it's ready. */
     block_deferrable_signals(&oldset);
 
-    /* See perform_thread_post_mortem for at least one reason why this lock is neccessary */
-    retcode = pthread_mutex_lock(&create_thread_lock);
-    gc_assert(retcode == 0);
-    FSHOW_SIGNAL((stderr,"/create_os_thread: got lock\n"));
+    pthread_attr_t attr;
+    if (pthread_attr_init(&attr) == 0) {
 
-    if((initcode = pthread_attr_init(th->os_attr)) ||
+    /* See perform_thread_post_mortem for at least one reason why this lock is neccessary */
+        retcode = pthread_mutex_lock(&create_thread_lock);
+        gc_assert(retcode == 0);
+
        /* call_into_lisp_first_time switches the stack for the initial
         * thread. For the others, we use this. */
+        if (
 #if defined(LISP_FEATURE_WIN32)
-       (pthread_attr_setstacksize(th->os_attr, thread_control_stack_size)) ||
+       (pthread_attr_setstacksize(&attr, thread_control_stack_size)) ||
 #else
 # if defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
-       (pthread_attr_setstack(th->os_attr,th->control_stack_start,
+       (pthread_attr_setstack(&attr, th->control_stack_start,
                               thread_control_stack_size)) ||
 # else
-       (pthread_attr_setstack(th->os_attr,th->alien_stack_start,
+       (pthread_attr_setstack(&attr, th->alien_stack_start,
                               ALIEN_STACK_SIZE)) ||
 # endif
 #endif
-       (retcode = pthread_create(kid_tid, th->os_attr, new_thread_trampoline, th))) {
-        FSHOW_SIGNAL((stderr, "init = %d\n", initcode));
-        FSHOW_SIGNAL((stderr, "pthread_create returned %d, errno %d\n",
-                      retcode, errno));
-        if(retcode < 0) {
-            perror("create_os_thread");
+       (retcode = pthread_create(kid_tid, &attr, new_thread_trampoline, th))) {
+          perror("create_os_thread");
+        } else {
+          success = 1;
         }
-        r=0;
+        retcode = pthread_mutex_unlock(&create_thread_lock);
+        gc_assert(retcode == 0);
+        pthread_attr_destroy(&attr);
     }
 
-    retcode = pthread_mutex_unlock(&create_thread_lock);
-    gc_assert(retcode == 0);
-    FSHOW_SIGNAL((stderr,"/create_os_thread: released lock\n"));
-
     thread_sigmask(SIG_SETMASK,&oldset,0);
-    return r;
+    return success;
 }
 
 os_thread_t create_thread(lispobj initial_function) {
