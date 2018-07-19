@@ -1719,20 +1719,19 @@
 
 ;;;; interrupt instructions
 
-(define-instruction break (segment code)
-  (:declare (type (unsigned-byte 8) code))
-  #!-ud2-breakpoints (:printer byte-imm ((op #b11001100))
+(define-instruction break (segment &optional (code nil codep))
+  #!-ud2-breakpoints (:printer byte-imm ((op #xCC))
                                '(:name :tab code) :control #'break-control)
-  #!+ud2-breakpoints (:printer word-imm ((op #b0000101100001111))
+  #!+ud2-breakpoints (:printer word-imm ((op #x0B0F))
                                '(:name :tab code) :control #'break-control)
   (:emitter
-   #!-ud2-breakpoints (emit-byte segment #b11001100)
+   #!-ud2-breakpoints (emit-byte segment #xCC)
    ;; On darwin, trap handling via SIGTRAP is unreliable, therefore we
    ;; throw a sigill with 0x0b0f instead and check for this in the
    ;; SIGILL handler and pass it on to the sigtrap handler if
    ;; appropriate
-   #!+ud2-breakpoints (emit-word segment #b0000101100001111)
-   (emit-byte segment code)))
+   #!+ud2-breakpoints (emit-word segment #x0B0F)
+   (when codep (emit-byte segment (the (unsigned-byte 8) code)))))
 
 (define-instruction int (segment number)
   (:declare (type (unsigned-byte 8) number))
@@ -1787,14 +1786,6 @@
 (define-instruction byte (segment byte)
   (:emitter
    (emit-byte segment byte)))
-
-(define-instruction word (segment word)
-  (:emitter
-   (emit-word segment word)))
-
-(define-instruction dword (segment dword)
-  (:emitter
-   (emit-dword segment dword)))
 
 (defun emit-header-data (segment type)
   (emit-back-patch
