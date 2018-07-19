@@ -446,7 +446,7 @@
 (define-instruction-format (ext-reg-reg/mem 24
                                         :default-printer
                                         `(:name :tab reg ", " reg/mem))
-  (prefix  :field (byte 8 0)    :value #b00001111)
+  (prefix  :field (byte 8 0)    :value #x0F)
   (op      :field (byte 7 9))
   (width   :field (byte 1 8)    :type 'width)
   (reg/mem :fields (list (byte 2 22) (byte 3 16))
@@ -458,7 +458,7 @@
 (define-instruction-format (ext-reg-reg/mem-no-width 24
                                         :default-printer
                                         `(:name :tab reg ", " reg/mem))
-  (prefix  :field (byte 8 0)    :value #b00001111)
+  (prefix  :field (byte 8 0)    :value #x0F)
   (op      :field (byte 8 8))
   (reg/mem :fields (list (byte 2 22) (byte 3 16))
                                 :type 'reg/mem)
@@ -469,7 +469,7 @@
 (define-instruction-format (ext-reg/mem-no-width 24
                                         :default-printer
                                         `(:name :tab reg/mem))
-  (prefix  :field (byte 8 0)    :value #b00001111)
+  (prefix  :field (byte 8 0)    :value #x0F)
   (op      :fields (list (byte 8 8) (byte 3 19)))
   (reg/mem :fields (list (byte 2 22) (byte 3 16))
                                 :type 'reg/mem))
@@ -477,14 +477,14 @@
 ;;; reg-no-width with #x0f prefix
 (define-instruction-format (ext-reg-no-width 16
                                         :default-printer '(:name :tab reg))
-  (prefix  :field (byte 8 0)    :value #b00001111)
+  (prefix  :field (byte 8 0)    :value #x0F)
   (op    :field (byte 5 11))
   (reg   :field (byte 3 8) :type 'reg-b))
 
-;;; Same as reg/mem, but with a prefix of #b00001111
+;;; Same as reg/mem, but with a prefix of #x0F
 (define-instruction-format (ext-reg/mem 24
                                         :default-printer '(:name :tab reg/mem))
-  (prefix  :field (byte 8 0)    :value #b00001111)
+  (prefix  :field (byte 8 0)    :value #x0F)
   (op      :fields (list (byte 7 9) (byte 3 19)))
   (width   :field (byte 1 8)    :type 'width)
   (reg/mem :fields (list (byte 2 22) (byte 3 16))
@@ -831,7 +831,7 @@
   (label :field (byte 8 8) :type 'displacement))
 
 (define-instruction-format (near-cond-jump 48)
-  (op    :fields (list (byte 8 0) (byte 4 12)) :value '(#b00001111 #b1000))
+  (op    :fields (list (byte 8 0) (byte 4 12)) :value '(#x0F #b1000))
   (cc    :field (byte 4 8) :type 'condition-code)
   (label :field (byte 32 16) :type 'displacement :reader near-cond-jump-displacement))
 
@@ -840,7 +840,7 @@
   (label :field (byte 32 8) :type 'displacement :reader near-jump-displacement))
 
 (define-instruction-format (cond-set 24 :default-printer '('set cc :tab reg/mem))
-  (prefix :field (byte 8 0) :value #b00001111)
+  (prefix :field (byte 8 0) :value #x0F)
   (op    :field (byte 4 12) :value #b1001)
   (cc    :field (byte 4 8) :type 'condition-code)
   (reg/mem :fields (list (byte 2 22) (byte 3 16))
@@ -850,7 +850,7 @@
 (define-instruction-format (cond-move 24
                                      :default-printer
                                         '('cmov cc :tab reg ", " reg/mem))
-  (prefix  :field (byte 8 0)    :value #b00001111)
+  (prefix  :field (byte 8 0)    :value #x0F)
   (op      :field (byte 4 12)   :value #b0100)
   (cc      :field (byte 4 8)    :type 'condition-code)
   (reg/mem :fields (list (byte 2 22) (byte 3 16))
@@ -972,6 +972,10 @@
     (float-registers
      (mod (tn-offset tn) 8))))
 
+(defmacro emit-bytes (segment &rest bytes)
+  `(progn ,@(mapcar (lambda (x) `(emit-byte ,segment ,x)) bytes)))
+(defun opcode+size-bit (opcode size)
+  (if (eq size :byte) opcode (logior opcode 1)))
 (defun emit-byte+reg (seg byte reg)
   (emit-byte seg (+ byte (reg-tn-encoding reg))))
 
@@ -1347,21 +1351,18 @@
             nil :print-name nil))
 
 (define-instruction lock (segment)
-  (:printer byte ((op #b11110000)) nil))
+  (:printer byte ((op #xF0)) nil))
 
 (define-instruction rep (segment)
-  (:emitter
-   (emit-byte segment #b11110011)))
+  (:emitter (emit-byte segment #xF3)))
 
 (define-instruction repe (segment)
-  (:printer byte ((op #b11110011)) nil)
-  (:emitter
-   (emit-byte segment #b11110011)))
+  (:printer byte ((op #xF3)) nil)
+  (:emitter (emit-byte segment #xF3)))
 
 (define-instruction repne (segment)
-  (:printer byte ((op #b11110010)) nil)
-  (:emitter
-   (emit-byte segment #b11110010)))
+  (:printer byte ((op #xF2)) nil)
+  (:emitter (emit-byte segment #xF2)))
 
 ;;;; general data transfer
 
@@ -1422,7 +1423,7 @@
                    (emit-absolute-fixup segment src))
                   (t
                    (maybe-emit-rex-for-ea segment src dst)
-                   (emit-byte segment (if (eq size :byte) #x8A #x8B))
+                   (emit-byte segment (opcode+size-bit #x8A size))
                    (emit-ea segment src (reg-tn-encoding dst)
                             :allow-constants t))))
            ((integerp src) ; imm to memory
@@ -1430,13 +1431,13 @@
             ;; destination is a 64-bit location. The value is
             ;; sign-extended in this case.
             (maybe-emit-rex-for-ea segment dst nil)
-            (emit-byte segment (if (eq size :byte) #xC6 #xC7))
+            (emit-byte segment (opcode+size-bit #xC6 size))
             (emit-ea segment dst #b000
                      :remaining-bytes (if (eq size :qword) 4 (size-nbyte size)))
             (emit-sized-immediate segment size src))
            ((gpr-p src) ; reg to mem
             (maybe-emit-rex-for-ea segment dst src)
-            (emit-byte segment (if (eq size :byte) #x88 #x89))
+            (emit-byte segment (opcode+size-bit #x88 size))
             (emit-ea segment dst (reg-tn-encoding src)))
            ((fixup-p src)
             ;; Generally we can't MOV a fixupped value into an EA, since
@@ -1477,7 +1478,7 @@
      (let ((size (operand-size reg)))
        (maybe-emit-operand-size-prefix segment size)
        (emit-rex-if-needed segment size nil nil nil)
-       (emit-byte segment (logior (if (eq size :byte) #xA0 #xA1) dir-bit))
+       (emit-byte segment (logior (opcode+size-bit #xA0 size) dir-bit))
        (emit-qword segment ea)))))
 
 ;;; Emit a sign-extending (if SIGNED-P is true) or zero-extending move.
@@ -1491,7 +1492,7 @@
   (aver (gpr-p dst))
   (let ((dst-size (operand-size dst))
         (src-size (operand-size src))
-        (opcode (if signed-p #b10111110 #b10110110)))
+        (opcode (if signed-p #xBE #xB6)))
     (macrolet ((emitter (operand-size &rest bytes)
                  `(progn
                    (maybe-emit-rex-for-ea segment src dst
@@ -1504,15 +1505,15 @@
         (:word
          (aver (eq src-size :byte))
          (maybe-emit-operand-size-prefix segment :word)
-         (emitter :word #b00001111 opcode))
+         (emitter :word #x0F opcode))
         ((:dword :qword)
          (unless signed-p
            (setf dst-size :dword))
          (ecase src-size
            (:byte
-            (emitter dst-size #b00001111 opcode))
+            (emitter dst-size #x0F opcode))
            (:word
-            (emitter dst-size #b00001111 (logior opcode 1)))
+            (emitter dst-size #x0F (logior opcode 1)))
            (:dword
             (aver (or (not signed-p) (eq dst-size :qword)))
             (emitter dst-size
@@ -1576,8 +1577,7 @@
     (:emitter
      (cond ((integerp src)
             (cond ((<= -128 src 127)
-                   (emit-byte segment #b01101010)
-                   (emit-byte segment src))
+                   (emit-bytes segment #x6A src))
                   (t
                    ;; A REX-prefix is not needed because the operand size
                    ;; defaults to 64 bits. The size of the immediate is 32
@@ -1641,7 +1641,7 @@
                     (xchg-reg-with-something acc something)))
               (xchg-reg-with-something (reg something)
                 (maybe-emit-rex-for-ea segment something reg)
-                (emit-byte segment (if (eq size :byte) #b10000110 #b10000111))
+                (emit-byte segment (opcode+size-bit #x86 size))
                 (emit-ea segment something (reg-tn-encoding reg))))
        (cond ((accumulator-p operand1)
               (xchg-acc-with-something operand1 operand2))
@@ -1675,7 +1675,7 @@
              (eq (ea-size src) :byte)))
    (maybe-emit-rex-for-ea segment src dst
                           :operand-size (if (dword-reg-p dst) :dword :qword))
-   (emit-byte segment #b10001101)
+   (emit-byte segment #x8D)
    (emit-ea segment src (reg-tn-encoding dst))))
 
 (define-instruction cmpxchg (segment dst src &optional prefix)
@@ -1687,99 +1687,47 @@
    (let ((size (matching-operand-size src dst)))
      (maybe-emit-operand-size-prefix segment size)
      (maybe-emit-rex-for-ea segment dst src)
-     (emit-byte segment #b00001111)
-     (emit-byte segment (if (eq size :byte) #b10110000 #b10110001))
+     (emit-bytes segment #x0F (opcode+size-bit #xB0 size))
      (emit-ea segment dst (reg-tn-encoding src)))))
 
 (define-instruction cmpxchg16b (segment mem &optional prefix)
-  (:printer ext-reg/mem-no-width
-            ((op '(#xC7 1))))
+  (:printer ext-reg/mem-no-width ((op '(#xC7 1))))
   (:emitter
    (aver (not (gpr-p mem)))
    (emit-prefix segment prefix)
    (maybe-emit-rex-for-ea segment mem nil :operand-size :qword)
-   (emit-byte segment #x0F)
-   (emit-byte segment #xC7)
-   (emit-ea segment mem 1))) ; operand extension
+   (emit-bytes segment #x0F #xC7)
+   (emit-ea segment mem 1)))
 
 (define-instruction rdrand (segment dst)
-  (:printer ext-reg/mem-no-width
-            ((op '(#xC7 6))))
+  (:printer ext-reg/mem-no-width ((op '(#xC7 6))))
   (:emitter
    (aver (gpr-p dst))
    (maybe-emit-operand-size-prefix segment (operand-size dst))
    (maybe-emit-rex-for-ea segment dst nil)
-   (emit-byte segment #x0F)
-   (emit-byte segment #xC7)
+   (emit-bytes segment #x0F #xC7)
    (emit-ea segment dst 6)))
 
 ;;;; flag control instructions
 
-;;; CLC -- Clear Carry Flag.
-(define-instruction clc (segment)
-  (:printer byte ((op #b11111000)))
-  (:emitter
-   (emit-byte segment #b11111000)))
-
-;;; CLD -- Clear Direction Flag.
-(define-instruction cld (segment)
-  (:printer byte ((op #b11111100)))
-  (:emitter
-   (emit-byte segment #b11111100)))
-
-;;; CLI -- Clear Iterrupt Enable Flag.
-(define-instruction cli (segment)
-  (:printer byte ((op #b11111010)))
-  (:emitter
-   (emit-byte segment #b11111010)))
-
-;;; CMC -- Complement Carry Flag.
-(define-instruction cmc (segment)
-  (:printer byte ((op #b11110101)))
-  (:emitter
-   (emit-byte segment #b11110101)))
-
-;;; LAHF -- Load AH into flags.
-(define-instruction lahf (segment)
-  (:printer byte ((op #b10011111)))
-  (:emitter
-   (emit-byte segment #b10011111)))
-
-;;; POPF -- Pop flags.
-(define-instruction popf (segment)
-  (:printer byte ((op #b10011101)))
-  (:emitter
-   (emit-byte segment #b10011101)))
-
-;;; PUSHF -- push flags.
-(define-instruction pushf (segment)
-  (:printer byte ((op #b10011100)))
-  (:emitter
-   (emit-byte segment #b10011100)))
-
-;;; SAHF -- Store AH into flags.
-(define-instruction sahf (segment)
-  (:printer byte ((op #b10011110)))
-  (:emitter
-   (emit-byte segment #b10011110)))
-
-;;; STC -- Set Carry Flag.
-(define-instruction stc (segment)
-  (:printer byte ((op #b11111001)))
-  (:emitter
-   (emit-byte segment #b11111001)))
-
-;;; STD -- Set Direction Flag.
-(define-instruction std (segment)
-  (:printer byte ((op #b11111101)))
-  (:emitter
-   (emit-byte segment #b11111101)))
-
-;;; STI -- Set Interrupt Enable Flag.
-(define-instruction sti (segment)
-  (:printer byte ((op #b11111011)))
-  (:emitter
-   (emit-byte segment #b11111011)))
+(macrolet ((def (mnemonic opcode)
+             `(define-instruction ,mnemonic (segment)
+                (:printer byte ((op ,opcode)))
+                (:emitter (emit-byte segment ,opcode)))))
+  (def wait  #x9B) ; Wait.
+  (def pushf #x9C) ; Push flags.
+  (def popf  #x9D) ; Pop flags.
+  (def sahf  #x9E) ; Store AH into flags.
+  (def lahf  #x9F) ; Load AH from flags.
+  (def hlt   #xF4) ; Halt
+  (def cmc   #xF5) ; Complement Carry Flag.
+  (def clc   #xF8) ; Clear Carry Flag.
+  (def stc   #xF9) ; Set Carry Flag.
+  (def cli   #xFA) ; Clear Iterrupt Enable Flag.
+  (def sti   #xFB) ; Set Interrupt Enable Flag.
+  (def cld   #xFC) ; Clear Direction Flag.
+  (def std   #xFD) ; Set Direction Flag.
+)
 
 ;;;; arithmetic
 
@@ -1799,11 +1747,9 @@
       (maybe-emit-rex-for-ea segment dst nil)
       (cond ((accumulator-p dst)
              (emit-byte segment
-                        (dpb opcode
-                             (byte 3 3)
-                             (if (eq size :byte) #b00000100 #b00000101))))
+                        (opcode+size-bit (dpb opcode (byte 3 3) #b00000100) size)))
             (t
-             (emit-byte segment (if (eq size :byte) #b10000000 #b10000001))
+             (emit-byte segment (opcode+size-bit #x80 size))
              (emit-ea segment dst opcode :allow-constants allow-constants)))
       (if (fixup-p src)
           (emit-absolute-fixup segment src)
@@ -1854,7 +1800,7 @@
          (let ((size (operand-size dst)))
            (maybe-emit-operand-size-prefix segment size)
            (maybe-emit-rex-for-ea segment dst nil)
-           (emit-byte segment (logior (ash opcode 1) (if (eq size :byte) 0 1)))
+           (emit-byte segment (opcode+size-bit (ash opcode 1) size))
            (emit-ea segment dst subcode))))
   (define-instruction not (segment dst &optional prefix)
     (:printer reg/mem ((op '(#b1111011 #b010))))
@@ -1878,7 +1824,7 @@
      (aver (accumulator-p dst))
      (maybe-emit-operand-size-prefix segment size)
      (maybe-emit-rex-for-ea segment src nil)
-     (emit-byte segment (if (eq size :byte) #b11110110 #b11110111))
+     (emit-byte segment (opcode+size-bit #xF6 size))
      (emit-ea segment src #b100))))
 
 (define-instruction imul (segment dst &optional src1 src2)
@@ -1914,35 +1860,28 @@
                 (let ((size (matching-operand-size dst src1)))
                   (maybe-emit-operand-size-prefix segment size)
                   (maybe-emit-rex-for-ea segment src1 dst)
-                  (emit-byte segment #b00001111)
-                  (emit-byte segment #b10101111)
+                  (emit-bytes segment #x0F #xAF)
                   (emit-ea segment src1 (reg-tn-encoding dst)))))
            (t
             (let ((size (operand-size dst)))
               (maybe-emit-operand-size-prefix segment size)
               (maybe-emit-rex-for-ea segment dst nil)
-              (emit-byte segment (if (eq size :byte) #b11110110 #b11110111))
+              (emit-byte segment (opcode+size-bit #xF6 size))
               (emit-ea segment dst #b101)))))))
 
-(define-instruction div (segment dst src)
-  (:printer accum-reg/mem ((op '(#b1111011 #b110))))
-  (:emitter
-   (let ((size (matching-operand-size dst src)))
-     (aver (accumulator-p dst))
-     (maybe-emit-operand-size-prefix segment size)
-     (maybe-emit-rex-for-ea segment src nil)
-     (emit-byte segment (if (eq size :byte) #b11110110 #b11110111))
-     (emit-ea segment src #b110))))
-
-(define-instruction idiv (segment dst src)
-  (:printer accum-reg/mem ((op '(#b1111011 #b111))))
-  (:emitter
-   (let ((size (matching-operand-size dst src)))
-     (aver (accumulator-p dst))
-     (maybe-emit-operand-size-prefix segment size)
-     (maybe-emit-rex-for-ea segment src nil)
-     (emit-byte segment (if (eq size :byte) #b11110110 #b11110111))
-     (emit-ea segment src #b111))))
+(flet ((emit* (segment dst src subcode)
+         (let ((size (matching-operand-size dst src)))
+           (aver (accumulator-p dst))
+           (maybe-emit-operand-size-prefix segment size)
+           (maybe-emit-rex-for-ea segment src nil)
+           (emit-byte segment (opcode+size-bit #xF6 size))
+           (emit-ea segment src subcode))))
+  (define-instruction div (segment dst src)
+    (:printer accum-reg/mem ((op '(#b1111011 #b110))))
+    (:emitter (emit* segment dst src #b110)))
+  (define-instruction idiv (segment dst src)
+    (:printer accum-reg/mem ((op '(#b1111011 #b111))))
+    (:emitter (emit* segment dst src #b111))))
 
 (define-instruction bswap (segment dst)
   (:printer ext-reg-no-width ((op #b11001)))
@@ -1955,45 +1894,45 @@
 
 ;;; CBW -- Convert Byte to Word. AX <- sign_xtnd(AL)
 (define-instruction cbw (segment)
-  (:printer x66-byte ((op #b10011000)))
+  (:printer x66-byte ((op #x98)))
   (:emitter
    (maybe-emit-operand-size-prefix segment :word)
-   (emit-byte segment #b10011000)))
+   (emit-byte segment #x98)))
 
 ;;; CWDE -- Convert Word To Double Word Extended. EAX <- sign_xtnd(AX)
 (define-instruction cwde (segment)
-  (:printer byte ((op #b10011000)))
+  (:printer byte ((op #x98)))
   (:emitter
    (maybe-emit-operand-size-prefix segment :dword)
-   (emit-byte segment #b10011000)))
+   (emit-byte segment #x98)))
 
 ;;; CDQE -- Convert Double Word To Quad Word Extended. RAX <- sign_xtnd(EAX)
 (define-instruction cdqe (segment)
-  (:printer rex-byte ((op #b10011000)))
+  (:printer rex-byte ((op #x98)))
   (:emitter
    (emit-rex-if-needed segment :qword nil nil nil)
-   (emit-byte segment #b10011000)))
+   (emit-byte segment #x98)))
 
 ;;; CWD -- Convert Word to Double Word. DX:AX <- sign_xtnd(AX)
 (define-instruction cwd (segment)
-  (:printer x66-byte ((op #b10011001)))
+  (:printer x66-byte ((op #x99)))
   (:emitter
    (maybe-emit-operand-size-prefix segment :word)
-   (emit-byte segment #b10011001)))
+   (emit-byte segment #x99)))
 
 ;;; CDQ -- Convert Double Word to Quad Word. EDX:EAX <- sign_xtnd(EAX)
 (define-instruction cdq (segment)
-  (:printer byte ((op #b10011001)))
+  (:printer byte ((op #x99)))
   (:emitter
    (maybe-emit-operand-size-prefix segment :dword)
-   (emit-byte segment #b10011001)))
+   (emit-byte segment #x99)))
 
 ;;; CQO -- Convert Quad Word to Octaword. RDX:RAX <- sign_xtnd(RAX)
 (define-instruction cqo (segment)
-  (:printer rex-byte ((op #b10011001)))
+  (:printer rex-byte ((op #x99)))
   (:emitter
    (emit-rex-if-needed segment :qword nil nil nil)
-   (emit-byte segment #b10011001)))
+   (emit-byte segment #x99)))
 
 (define-instruction xadd (segment dst src &optional prefix)
   ;; Register/Memory with Register.
@@ -2004,8 +1943,7 @@
    (let ((size (matching-operand-size src dst)))
      (maybe-emit-operand-size-prefix segment size)
      (maybe-emit-rex-for-ea segment dst src)
-     (emit-byte segment #b00001111)
-     (emit-byte segment (if (eq size :byte) #b11000000 #b11000001))
+     (emit-bytes segment #x0F (opcode+size-bit #xC0 size))
      (emit-ea segment dst (reg-tn-encoding src)))))
 
 
@@ -2026,7 +1964,7 @@
            (let ((size (operand-size dst)))
              (maybe-emit-operand-size-prefix segment size)
              (maybe-emit-rex-for-ea segment dst nil)
-             (emit-byte segment (if (eq size :byte) opcode (logior opcode 1))))
+             (emit-byte segment (opcode+size-bit opcode size)))
            (emit-ea segment dst subcode)
            (when immed
              (emit-byte segment amount)))))
@@ -2051,9 +1989,9 @@
              (error "Double shift requires word or larger operand"))
            (maybe-emit-operand-size-prefix segment size)
            (maybe-emit-rex-for-ea segment dst src)
-           (emit-byte segment #b00001111)
-           (emit-byte segment (dpb opcode (byte 1 3)
-                                   (if (eq amt :cl) #b10100101 #b10100100)))
+           (emit-bytes segment #x0F
+                       ;; SHLD = A4 or A5; SHRD = AC or AD
+                       (dpb opcode (byte 1 3) (if (eq amt :cl) #xA5 #xA4)))
            (emit-ea segment dst (reg-tn-encoding src))
            (unless (eq amt :cl)
              (emit-byte segment amt)))))
@@ -2078,18 +2016,16 @@
      (flet ((test-immed-and-something (immed something)
               (cond ((accumulator-p something)
                      (maybe-emit-rex-for-ea segment something nil)
-                     (emit-byte segment
-                                (if (eq size :byte) #b10101000 #b10101001))
+                     (emit-byte segment (opcode+size-bit #xA8 size))
                      (emit-sized-immediate segment size immed))
                     (t
                      (maybe-emit-rex-for-ea segment something nil)
-                     (emit-byte segment
-                                (if (eq size :byte) #b11110110 #b11110111))
+                     (emit-byte segment (opcode+size-bit #xF6 size))
                      (emit-ea segment something #b000)
                      (emit-sized-immediate segment size immed))))
             (test-reg-and-something (reg something)
               (maybe-emit-rex-for-ea segment something reg)
-              (emit-byte segment (if (eq size :byte) #b10000100 #b10000101))
+              (emit-byte segment (opcode+size-bit #x84 size))
               (emit-ea segment something (reg-tn-encoding reg))))
        (cond ((integerp that)
               (test-immed-and-something that this))
@@ -2107,8 +2043,7 @@
 (flet ((emit* (segment opcode size)
          (maybe-emit-operand-size-prefix segment size)
          (emit-rex-if-needed segment size nil nil nil)
-         (emit-byte segment (logior (ash opcode 1)
-                                    (if (eq size :byte) 0 1)))))
+         (emit-byte segment (opcode+size-bit (ash opcode 1) size))))
   (define-instruction movs (segment size)
     (:printer string-op ((op #b1010010)))
     (:emitter (emit* segment #b1010010 size)))
@@ -2156,71 +2091,67 @@
              (error "can't scan bytes: ~S" src))
            (maybe-emit-operand-size-prefix segment size)
            (maybe-emit-rex-for-ea segment src dst)
-           (emit-byte segment #b00001111)
-           (emit-byte segment opcode)
+           (emit-bytes segment #x0F opcode)
            (emit-ea segment src (reg-tn-encoding dst)))))
 
   (define-instruction bsf (segment dst src)
-    (:printer ext-reg-reg/mem-no-width ((op #b10111100)))
-    (:emitter (emit* segment #b10111100 dst src)))
+    (:printer ext-reg-reg/mem-no-width ((op #xBC)))
+    (:emitter (emit* segment #xBC dst src)))
 
   (define-instruction bsr (segment dst src)
-    (:printer ext-reg-reg/mem-no-width ((op #b10111101)))
-    (:emitter (emit* segment #b10111101 dst src))))
+    (:printer ext-reg-reg/mem-no-width ((op #xBD)))
+    (:emitter (emit* segment #xBD dst src))))
 
-(defun emit-bit-test-and-mumble (segment src index opcode)
-  (let ((size (operand-size src)))
-    (when (eq size :byte)
-      (error "can't scan bytes: ~S" src))
-    (maybe-emit-operand-size-prefix segment size)
-    (cond ((integerp index)
-           (maybe-emit-rex-for-ea segment src nil)
-           (emit-byte segment #b00001111)
-           (emit-byte segment #b10111010)
-           (emit-ea segment src opcode)
-           (emit-byte segment index))
-          (t
-           (maybe-emit-rex-for-ea segment src index)
-           (emit-byte segment #b00001111)
-           (emit-byte segment (dpb opcode (byte 3 3) #b10000011))
-           (emit-ea segment src (reg-tn-encoding index))))))
+(flet ((emit* (segment src index opcode)
+         (let ((size (operand-size src)))
+           (when (eq size :byte)
+             (error "can't scan bytes: ~S" src))
+           (maybe-emit-operand-size-prefix segment size)
+           (cond ((integerp index)
+                  (maybe-emit-rex-for-ea segment src nil)
+                  (emit-bytes segment #x0F #xBA)
+                  (emit-ea segment src opcode)
+                  (emit-byte segment index))
+                 (t
+                  (maybe-emit-rex-for-ea segment src index)
+                  (emit-bytes segment #x0F (dpb opcode (byte 3 3) #b10000011))
+                  (emit-ea segment src (reg-tn-encoding index)))))))
 
-(macrolet ((define (inst opcode-extension)
-             `(define-instruction ,inst (segment src index &optional prefix)
-                (:printer ext-reg/mem-no-width+imm8
-                          ((op '(#xBA ,opcode-extension))
-                           (reg/mem nil :type 'sized-reg/mem)))
-                (:printer ext-reg-reg/mem-no-width
-                          ((op ,(dpb opcode-extension (byte 3 3) #b10000011))
-                           (reg/mem nil :type 'sized-reg/mem))
-                          '(:name :tab reg/mem ", " reg))
-                (:emitter
-                 (emit-prefix segment prefix)
-                 (emit-bit-test-and-mumble segment src index
-                                           ,opcode-extension)))))
-  (define bt  4)
-  (define bts 5)
-  (define btr 6)
-  (define btc 7))
+  (macrolet ((define (inst opcode-extension)
+               `(define-instruction ,inst (segment src index &optional prefix)
+                  (:printer ext-reg/mem-no-width+imm8
+                            ((op '(#xBA ,opcode-extension))
+                             (reg/mem nil :type 'sized-reg/mem)))
+                  (:printer ext-reg-reg/mem-no-width
+                            ((op ,(dpb opcode-extension (byte 3 3) #b10000011))
+                             (reg/mem nil :type 'sized-reg/mem))
+                            '(:name :tab reg/mem ", " reg))
+                  (:emitter
+                   (emit-prefix segment prefix)
+                   (emit* segment src index ,opcode-extension)))))
+    (define bt  4)
+    (define bts 5)
+    (define btr 6)
+    (define btc 7)))
 
 
 ;;;; control transfer
 
 (define-instruction call (segment where)
   (:printer near-jump ((op #xE8)))
-  (:printer reg/mem-default-qword ((op '(#b11111111 #b010))
+  (:printer reg/mem-default-qword ((op '(#xFF #b010))
                                    (reg/mem nil :printer #'print-jmp-ea)))
   (:emitter
    (typecase where
      (label
-      (emit-byte segment #b11101000) ; 32 bit relative
+      (emit-byte segment #xE8) ; 32 bit relative
       (emit-dword-displacement-backpatch segment where))
      (fixup
-      (emit-byte segment #b11101000)
+      (emit-byte segment #xE8)
       (emit-relative-fixup segment where))
      (t
       (maybe-emit-rex-for-ea segment where nil :operand-size :do-not-set)
-      (emit-byte segment #b11111111)
+      (emit-byte segment #xFF)
       (emit-ea segment where #b010)))))
 
 (define-instruction jmp (segment cond &optional where)
@@ -2230,7 +2161,7 @@
   ;; unconditional jumps
   (:printer short-jump ((op #b1011)))
   (:printer near-jump ((op #xE9)))
-  (:printer reg/mem-default-qword ((op '(#b11111111 #b100))
+  (:printer reg/mem-default-qword ((op '(#xFF #b100))
                                    (reg/mem nil :printer #'print-jmp-ea)))
   (:emitter
    (flet ((byte-disp-p (source target disp shrinkage) ; T if 1-byte displacement
@@ -2244,11 +2175,10 @@
      (cond
         (where
           (cond ((fixup-p where)
-                 (emit-byte segment #b00001111)
-                 (emit-byte segment
-                            (dpb (conditional-opcode cond)
-                                 (byte 4 0)
-                                 #b10000000))
+                 (emit-bytes segment #x0F
+                             (dpb (conditional-opcode cond)
+                                  (byte 4 0)
+                                  #b10000000))
                  (emit-relative-fixup segment where))
                 (t
                  (emit-chooser
@@ -2267,11 +2197,10 @@
                         t)))
                   (lambda (segment posn)
                     (let ((disp (- (label-position where) (+ posn 6))))
-                      (emit-byte segment #b00001111)
-                      (emit-byte segment
-                                 (dpb (conditional-opcode cond)
-                                      (byte 4 0)
-                                      #b10000000))
+                      (emit-bytes segment #x0F
+                                  (dpb (conditional-opcode cond)
+                                       (byte 4 0)
+                                       #b10000000))
                       (emit-signed-dword segment disp)))))))
          ((label-p (setq where cond))
           (emit-chooser
@@ -2280,15 +2209,15 @@
              (let ((disp (- (label-position where posn delta-if-after)
                             (+ posn 2))))
                (when (byte-disp-p chooser where disp 3)
-                 (emit-byte segment #b11101011)
+                 (emit-byte segment #xEB)
                  (emit-byte-displacement-backpatch segment where)
                  t)))
            (lambda (segment posn)
              (let ((disp (- (label-position where) (+ posn 5))))
-               (emit-byte segment #b11101001)
+               (emit-byte segment #xE9)
                (emit-signed-dword segment disp)))))
          ((fixup-p where)
-          (emit-byte segment #b11101001)
+          (emit-byte segment #xE9)
           (emit-relative-fixup segment where))
          (t
           (unless (or (ea-p where) (tn-p where))
@@ -2300,38 +2229,37 @@
           (emit-ea segment where #b100))))))
 
 (define-instruction ret (segment &optional stack-delta)
-  (:printer byte ((op #b11000011)))
-  (:printer byte ((op #b11000010) (imm nil :type 'imm-word-16))
-            '(:name :tab imm))
+  (:printer byte ((op #xC3)))
+  (:printer byte ((op #xC2) (imm nil :type 'imm-word-16)) '(:name :tab imm))
   (:emitter
    (cond ((and stack-delta (not (zerop stack-delta)))
-          (emit-byte segment #b11000010)
+          (emit-byte segment #xC2)
           (emit-word segment stack-delta))
          (t
-          (emit-byte segment #b11000011)))))
+          (emit-byte segment #xC3)))))
 
 (define-instruction jrcxz (segment target)
   (:printer short-jump ((op #b0011)))
   (:emitter
-   (emit-byte segment #b11100011)
+   (emit-byte segment #xE3)
    (emit-byte-displacement-backpatch segment target)))
 
 (define-instruction loop (segment target)
   (:printer short-jump ((op #b0010)))
   (:emitter
-   (emit-byte segment #b11100010)       ; pfw this was 11100011, or jecxz!!!!
+   (emit-byte segment #xE2)
    (emit-byte-displacement-backpatch segment target)))
 
 (define-instruction loopz (segment target)
   (:printer short-jump ((op #b0001)))
   (:emitter
-   (emit-byte segment #b11100001)
+   (emit-byte segment #xE1)
    (emit-byte-displacement-backpatch segment target)))
 
 (define-instruction loopnz (segment target)
   (:printer short-jump ((op #b0000)))
   (:emitter
-   (emit-byte segment #b11100000)
+   (emit-byte segment #xE0)
    (emit-byte-displacement-backpatch segment target)))
 
 ;;;; conditional move
@@ -2340,10 +2268,10 @@
   (:emitter
    (aver (gpr-p dst))
    (let ((size (matching-operand-size dst src)))
-     (aver (or (eq size :word) (eq size :dword) (eq size :qword)))
+     (aver (neq size :byte))
      (maybe-emit-operand-size-prefix segment size))
    (maybe-emit-rex-for-ea segment src dst)
-   (emit-byte segment #b00001111)
+   (emit-byte segment #x0F)
    (emit-byte segment (dpb (conditional-opcode cond) (byte 4 0) #b01000000))
    (emit-ea segment src (reg-tn-encoding dst) :allow-constants t)))
 
@@ -2353,7 +2281,7 @@
   (:printer cond-set ())
   (:emitter
    (maybe-emit-rex-for-ea segment dst nil :operand-size :byte)
-   (emit-byte segment #b00001111)
+   (emit-byte segment #x0F)
    (emit-byte segment (dpb (conditional-opcode cond) (byte 4 0) #b10010000))
    (emit-ea segment dst #b000)))
 
@@ -2362,16 +2290,15 @@
 (define-instruction enter (segment disp &optional (level 0))
   (:declare (type (unsigned-byte 16) disp)
             (type (unsigned-byte 8) level))
-  (:printer enter-format ((op #b11001000)))
+  (:printer enter-format ((op #xC8)))
   (:emitter
-   (emit-byte segment #b11001000)
+   (emit-byte segment #xC8)
    (emit-word segment disp)
    (emit-byte segment level)))
 
 (define-instruction leave (segment)
-  (:printer byte ((op #b11001001)))
-  (:emitter
-   (emit-byte segment #b11001001)))
+  (:printer byte ((op #xC9)))
+  (:emitter (emit-byte segment #xC9)))
 
 ;;;; interrupt instructions
 
@@ -2391,33 +2318,25 @@
 
 (define-instruction int (segment number)
   (:declare (type (unsigned-byte 8) number))
-  (:printer byte-imm ((op #b11001101)))
+  (:printer byte-imm ((op #xCD)))
   (:emitter
    (etypecase number
      ((member 3 4)
       (emit-byte segment (if (eql number 4) #xCE #xCC)))
      ((unsigned-byte 8)
-      (emit-byte segment #b11001101)
-      (emit-byte segment number)))))
+      (emit-bytes segment #xCD number)))))
 
 (define-instruction iret (segment)
-  (:printer byte ((op #b11001111)))
-  (:emitter
-   (emit-byte segment #b11001111)))
+  (:printer byte ((op #xCF)))
+  (:emitter (emit-byte segment #xCF)))
 
 ;;;; processor control
 
-(define-instruction hlt (segment)
-  (:printer byte ((op #b11110100)))
-  (:emitter
-   (emit-byte segment #b11110100)))
-
 (define-instruction nop (segment)
-  (:printer byte ((op #b10010000)))
+  (:printer byte ((op #x90)))
   ;; multi-byte NOP
   (:printer ext-reg/mem-no-width ((op '(#x1f 0))) '(:name))
-  (:emitter
-   (emit-byte segment #b10010000)))
+  (:emitter (emit-byte segment #x90)))
 
 ;;; Emit a sequence of single- or multi-byte NOPs to fill AMOUNT many
 ;;; bytes with the smallest possible number of such instructions.
@@ -2446,15 +2365,9 @@
           (decf amount max-length)
           (return)))))
 
-(define-instruction wait (segment)
-  (:printer byte ((op #b10011011)))
-  (:emitter
-   (emit-byte segment #b10011011)))
-
 (define-instruction syscall (segment)
-  (:printer two-bytes ((op '(#x0f #x05))))
-  (:emitter
-   (emit-word segment #x050F)))
+  (:printer two-bytes ((op '(#x0F #x05))))
+  (:emitter (emit-bytes segment #x0F #x05)))
 
 
 ;;;; miscellaneous hackery
@@ -2526,8 +2439,7 @@
   (if operand-size
       (maybe-emit-rex-for-ea segment src dst :operand-size operand-size)
       (maybe-emit-rex-for-ea segment src dst))
-  (emit-byte segment #x0f)
-  (emit-byte segment opcode)
+  (emit-bytes segment #x0f opcode)
   (emit-ea segment src (reg-tn-encoding dst) :remaining-bytes remaining-bytes))
 
 ;; 0110 0110:0000 1111:0111 00gg: 11 010 xmmreg:imm8
@@ -3171,19 +3083,14 @@
 (macrolet ((define-fence-instruction (name last-byte)
                `(define-instruction ,name (segment)
                   (:printer three-bytes ((op '(#x0f #xae ,last-byte))))
-                  (:emitter
-                   (emit-byte segment #x0f)
-                   (emit-byte segment #xae)
-                   (emit-byte segment ,last-byte)))))
-  (define-fence-instruction lfence #b11101000)
-  (define-fence-instruction mfence #b11110000)
-  (define-fence-instruction sfence #b11111000))
+                  (:emitter (emit-bytes segment #x0f #xae ,last-byte)))))
+  (define-fence-instruction lfence #xE8)
+  (define-fence-instruction mfence #xF0)
+  (define-fence-instruction sfence #xF8))
 
 (define-instruction pause (segment)
   (:printer two-bytes ((op '(#xf3 #x90))))
-  (:emitter
-   (emit-byte segment #xf3)
-   (emit-byte segment #x90)))
+  (:emitter (emit-bytes segment #xf3 #x90)))
 
 (flet ((emit* (segment ea subcode)
          (aver (not (register-p ea)))
@@ -3243,16 +3150,12 @@
 ;;;; Miscellany
 
 (define-instruction cpuid (segment)
-  (:printer two-bytes ((op '(#b00001111 #b10100010))))
-  (:emitter
-   (emit-byte segment #b00001111)
-   (emit-byte segment #b10100010)))
+  (:printer two-bytes ((op '(#x0F #xA2))))
+  (:emitter (emit-bytes segment #x0F #xA2)))
 
 (define-instruction rdtsc (segment)
-  (:printer two-bytes ((op '(#b00001111 #b00110001))))
-  (:emitter
-   (emit-byte segment #b00001111)
-   (emit-byte segment #b00110001)))
+  (:printer two-bytes ((op '(#x0F #x31))))
+  (:emitter (emit-bytes segment #x0f #x31)))
 
 ;;;; Intel TSX - some user library (STMX) used to define these,
 ;;;; but it's not really supported and they actually belong here.
@@ -3270,8 +3173,7 @@
 (define-instruction xbegin (segment &optional where)
   (:printer xbegin ())
   (:emitter
-   (emit-byte segment #xc7)
-   (emit-byte segment #xf8)
+   (emit-bytes segment #xc7 #xf8)
    (if where
        ;; emit 32-bit, signed relative offset for where
        (emit-dword-displacement-backpatch segment where)
@@ -3280,25 +3182,17 @@
 
 (define-instruction xend (segment)
   (:printer three-bytes ((op '(#x0f #x01 #xd5))))
-  (:emitter
-   (emit-byte segment #x0f)
-   (emit-byte segment #x01)
-   (emit-byte segment #xd5)))
+  (:emitter (emit-bytes segment #x0f #x01 #xd5)))
 
 (define-instruction xabort (segment reason)
   (:printer xabort ())
   (:emitter
    (aver (<= 0 reason #xff))
-   (emit-byte segment #xc6)
-   (emit-byte segment #xf8)
-   (emit-byte segment reason)))
+   (emit-bytes segment #xc6 #xf8 reason)))
 
 (define-instruction xtest (segment)
   (:printer three-bytes ((op '(#x0f #x01 #xd6))))
-  (:emitter
-   (emit-byte segment #x0f)
-   (emit-byte segment #x01)
-   (emit-byte segment #xd6)))
+  (:emitter (emit-bytes segment #x0f #x01 #xd6)))
 
 (define-instruction xacquire (segment) ;; same prefix byte as repne/repnz
   (:emitter
