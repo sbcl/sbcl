@@ -1034,7 +1034,7 @@ line break."
 
 (defun pprint-let (stream list &rest noise)
   (declare (ignore noise))
-  (funcall (formatter "~:<~^~W~^ ~@_~:<~@{~:<~^~W~@{ ~_~W~}~:>~^ ~_~}~:>~1I~:@_~@{~W~^ ~_~}~:>")
+  (funcall (formatter "~:<~^~W~^ ~@_~:<~@{~:<~^~W~@{ ~_~W~}~:>~^ ~_~}~:>~1I~^~:@_~@{~W~^ ~_~}~:>")
            stream
            list))
 
