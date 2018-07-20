@@ -12,23 +12,11 @@
 (in-package "SB!VM")
 
 
-;; If chopping X to 32 bits and sign-extending is equal to the original X,
-;; return the chopped X, which the CPU will always treat as signed.
-;; Notably this allows MOST-POSITIVE-WORD to be an immediate constant.
-(defun immediate32-p (x)
-  (typecase x
-    ((signed-byte 32) x)
-    ;; Alternatively, the lower bound #xFFFFFFFF80000000 could
-    ;; be spelled as (MASK-FIELD (BYTE 33 31) -1)
-    ((integer #.(- (expt 2 64) (expt 2 31)) #.most-positive-word)
-     (sb!c::mask-signed-field 32 x))
-    (t nil)))
-
-;; If 'immediate32-p' is true, use it; otherwise use a RIP-relative constant.
+;; If 'plausible-signed-imm32-operand-p' is true, use it; otherwise use a RIP-relative constant.
 ;; I couldn't think of a more accurate name for this other than maybe
 ;; 'signed-immediate32-or-rip-relativize' which is just too awful.
 (defun constantize (x)
-  (or (immediate32-p x)
+  (or (plausible-signed-imm32-operand-p x)
       (register-inline-constant :qword x)))
 
 ;;;; unary operations
@@ -1227,7 +1215,7 @@ constant shift greater than word length")))
                     (sc-is y immediate))
            (setf y (tn-value y)))
          (when (integerp y)
-           (acond ((immediate32-p y)
+           (acond ((plausible-signed-imm32-operand-p y)
                    (return-from ensure-not-mem+mem (values x it)))
                   ((typep y '(unsigned-byte 32))
                    ;; Rather than a RIP-relative constant, load a dword (w/o sign-extend)
@@ -1998,7 +1986,7 @@ constant shift greater than word length")))
   (:info mask)
   (:result-types unsigned-num)
   (:generator 4
-     (cond ((or (immediate32-p mask)
+     (cond ((or (plausible-signed-imm32-operand-p mask)
                 (location= x r))
             (loadw r x bignum-digits-offset other-pointer-lowtag)
             (unless (or (eql mask -1)
@@ -2100,7 +2088,7 @@ constant shift greater than word length")))
         DONE
         (unless (or fixnum-mask-p
                     (= mask most-positive-word))
-          (inst and r (or (immediate32-p mask)
+          (inst and r (or (plausible-signed-imm32-operand-p mask)
                           (constantize mask))))))))
 
 (in-package "SB!C")

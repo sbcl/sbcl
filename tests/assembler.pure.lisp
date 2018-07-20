@@ -70,8 +70,27 @@
 
 (with-test (:name :assemble-unsigned-qword-to-mem :skipped-on (not :x86-64))
   ;; unsigned bits cast as signed bits
-  (test-assemble `(mov ,(make-ea :qword :base rcx-tn) #xffffffff801234BB)
-                 "48C701BB341280   MOV QWORD PTR [RCX], -2146290501"))
+  (let ((const #xffffffff801234BB))
+    (test-assemble `(mov ,(make-ea :qword :base rcx-tn) ,const)
+                   "48C701BB341280   MOV QWORD PTR [RCX], -2146290501")
+    ;; Do not truncate to just the lower bits
+    (dolist (size '(:byte :word :dword))
+      (handler-case (test-assemble `(mov ,(make-ea size :base rcx-tn) ,const)
+                                   "")
+        (type-error nil)
+        (:no-error (x) x (error "Should not assemble"))))))
+
+(with-test (:name :unsigned-as-signed-imm8 :skipped-on (not :x86-64))
+  ;; PUSH
+  (test-assemble `(push #xfffffffffffffffc) "6AFC             PUSH -4")
+
+  ;; ADD/SUB/etc
+  (test-assemble `(and ,rax-tn #xffffffffffffff8c)
+                 "4883E08C         AND RAX, -116")
+  (test-assemble `(sub ,eax-tn #xfffffffc) "83E8FC           SUB EAX, -4")
+  ;; Register AX could use the special 1-byte opcode and non-sign-extended
+  ;; imm16 operand; the encoding length is the same either way.
+  (test-assemble `(or ,ax-tn #xfff7) "6683C8F7         OR AX, -9"))
 
 (with-test (:name :disassemble-movabs-instruction :skipped-on (not :x86-64))
   (let* ((bytes (coerce '(#x48 #xA1 8 7 6 5 4 3 2 1

@@ -207,7 +207,7 @@
     (cond
       ((sc-is y immediate)
        (let* ((value (encode-value-if-immediate y))
-              (immediate (immediate32-p value)))
+              (immediate (plausible-signed-imm32-operand-p value)))
          (cond ((fixup-p value) ; immobile object
                 (inst cmp x value))
                ((and (zerop value) (sc-is x any-reg descriptor-reg))

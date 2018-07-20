@@ -28,7 +28,7 @@
                               ;; immobile-object fixups must fit in 32 bits
                               (eq (fixup-flavor bits) :immobile-object)
                               bits)
-                         (immediate32-p bits))
+                         (plausible-signed-imm32-operand-p bits))
                      (inst mov ea it))
                     (t
                      (inst mov temp-reg-tn bits)

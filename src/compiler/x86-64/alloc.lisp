@@ -391,7 +391,7 @@
                      ,answer)))
            (compute-end ()
              `(let ((size (cond ((or (not (fixnump size))
-                                     (immediate32-p size))
+                                     (plausible-signed-imm32-operand-p size))
                                  size)
                                 (t
                                  (inst mov limit size)
