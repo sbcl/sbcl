@@ -68,6 +68,11 @@
   (test-assemble `(crc32 ,r9-tn ,(make-ea :qword :base r14-tn :index r15-tn))
                  "F24F0F38F10C3E   CRC32 R9, QWORD PTR [R14+R15]"))
 
+(with-test (:name :assemble-unsigned-qword-to-mem :skipped-on (not :x86-64))
+  ;; unsigned bits cast as signed bits
+  (test-assemble `(mov ,(make-ea :qword :base rcx-tn) #xffffffff801234BB)
+                 "48C701BB341280   MOV QWORD PTR [RCX], -2146290501"))
+
 (with-test (:name :disassemble-movabs-instruction :skipped-on (not :x86-64))
   (let* ((bytes (coerce '(#x48 #xA1 8 7 6 5 4 3 2 1
                           #xA1 8 7 6 5 4 3 2 1

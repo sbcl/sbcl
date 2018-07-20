@@ -716,14 +716,12 @@
             src-size
             (error "can't tell the size of either ~S or ~S" dst src)))))
 
-(defun emit-sized-immediate (segment size value)
+(defun emit-imm-operand (segment value size)
+  ;; In order by descending popularity
   (ecase size
-    (:byte
-     (emit-byte segment value))
-    (:word
-     (emit-word segment value))
-    (:dword
-     (emit-dword segment value))))
+    (:byte  (emit-byte segment value))
+    (:dword (emit-dword segment value))
+    (:word  (emit-word segment value))))
 
 ;;;; prefixes
 
@@ -789,7 +787,7 @@
                    (emit-byte+reg segment (if (eq size :byte) #xB0 #xB8) dst)
                    (if (fixup-p src)
                        (emit-absolute-fixup segment src)
-                       (emit-sized-immediate segment size src)))
+                       (emit-imm-operand segment src size)))
                   ((and (fixup-p src) (accumulator-p dst))
                    (emit-byte segment
                               (if (eq size :byte)
@@ -808,7 +806,7 @@
            ((integerp src)
             (emit-byte segment (if (eq size :byte) #b11000110 #b11000111))
             (emit-ea segment dst #b000)
-            (emit-sized-immediate segment size src))
+            (emit-imm-operand segment src size))
            ((register-p src)
             (emit-byte segment (if (eq size :byte) #b10001000 #b10001001))
             (emit-ea segment dst (reg-tn-encoding src)))
@@ -1070,11 +1068,11 @@
                              (if (eq size :byte)
                                  #b00000100
                                  #b00000101)))
-             (emit-sized-immediate segment size src))
+             (emit-imm-operand segment src size))
             (t
              (emit-byte segment (if (eq size :byte) #b10000000 #b10000001))
              (emit-ea segment dst opcode allow-constants)
-             (emit-sized-immediate segment size src))))
+             (emit-imm-operand segment src size))))
      ((register-p src)
       (emit-byte segment
                  (dpb opcode
@@ -1193,7 +1191,7 @@
               (emit-ea segment r/m (reg-tn-encoding reg))
               (if sx
                   (emit-byte segment immed)
-                  (emit-sized-immediate segment size immed)))))
+                  (emit-imm-operand segment immed size)))))
      (cond (src2
             (r/m-with-immed-to-reg dst src1 src2))
            (src1
@@ -1360,13 +1358,12 @@
      (flet ((test-immed-and-something (immed something)
               (cond ((accumulator-p something)
                      (emit-byte segment
-                                (if (eq size :byte) #b10101000 #b10101001))
-                     (emit-sized-immediate segment size immed))
+                                (if (eq size :byte) #b10101000 #b10101001)))
                     (t
                      (emit-byte segment
                                 (if (eq size :byte) #b11110110 #b11110111))
-                     (emit-ea segment something #b000)
-                     (emit-sized-immediate segment size immed))))
+                     (emit-ea segment something #b000)))
+              (emit-imm-operand segment immed size))
             (test-reg-and-something (reg something)
               (emit-byte segment (if (eq size :byte) #b10000100 #b10000101))
               (emit-ea segment something (reg-tn-encoding reg))))

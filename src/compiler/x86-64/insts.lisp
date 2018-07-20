@@ -19,7 +19,8 @@
             ea-p sized-ea ea-base ea-index
             make-ea ea-disp rip-relative-ea) "SB!VM")
   ;; Imports from SB-VM into this package
-  (import '(sb!vm::frame-byte-offset sb!vm::rip-tn sb!vm::rbp-tn
+  (import '(sb!vm::immediate32-p
+            sb!vm::frame-byte-offset sb!vm::rip-tn sb!vm::rbp-tn
             sb!vm::registers sb!vm::float-registers sb!vm::stack))) ; SB names
 
 ;;; This type is used mostly in disassembly and represents legacy
@@ -921,6 +922,9 @@
   (byte 32 0))
 (declaim (notinline emit-dword))
 
+(define-bitfield-emitter emit-qword 64
+  (byte 64 0))
+
 ;;; Most uses of dwords are as displacements or as immediate values in
 ;;; 64-bit operations. In these cases they are sign-extended to 64 bits.
 ;;; EMIT-DWORD is unsuitable there because it accepts values of type
@@ -931,9 +935,6 @@
            (type (signed-byte 32) value))
   (declare (inline emit-dword))
   (emit-dword segment value))
-
-(define-bitfield-emitter emit-qword 64
-  (byte 64 0))
 
 (define-bitfield-emitter emit-mod-reg-r/m-byte 8
   (byte 2 6) (byte 3 3) (byte 3 0))
@@ -1311,21 +1312,16 @@
             (error "can't tell the size of either ~S or ~S" dst src)))))
 
 ;;; Except in a very few cases (MOV instructions A1, A3 and B8 - BF)
-;;; we expect dword data bytes even when 64 bit work is being done.
-;;; But A1 and A3 are currently unused and B8 - BF use EMIT-QWORD
-;;; directly, so we emit all quad constants as dwords, additionally
-;;; making sure that they survive the sign-extension to 64 bits
-;;; unchanged.
-(defun emit-sized-immediate (segment size value)
+;;; we expect dword immediate operands even for 64 bit operations.
+;;; Those opcodes call EMIT-QWORD directly. All other uses of :qword
+;;; constants should fit in a :dword
+(defun emit-imm-operand (segment value size)
+  ;; In order by descending popularity
   (ecase size
-    (:byte
-     (emit-byte segment value))
-    (:word
-     (emit-word segment value))
-    (:dword
-     (emit-dword segment value))
-    (:qword
-     (emit-signed-dword segment value))))
+    (:byte  (emit-byte segment value))
+    (:dword (emit-dword segment value))
+    (:qword (emit-signed-dword segment value))
+    (:word  (emit-word segment value))))
 
 ;;;; prefixes
 
@@ -1384,17 +1380,17 @@
      (cond ((gpr-p dst)
             (cond ((integerp src)
                    ;; We want to encode the immediate using the fewest bytes possible.
-                   (let ((immediate-size
+                   (let ((imm-size
                           ;; If it's a :qword constant that fits in an unsigned
                           ;; :dword, then use a zero-extended :dword immediate.
                           (if (and (eq size :qword) (typep src '(unsigned-byte 32)))
                               :dword
                               size)))
-                     (emit-rex-if-needed segment immediate-size
+                     (emit-rex-if-needed segment imm-size
                                          nil nil (tn-reg-id dst)))
                    (acond ((neq size :qword) ; :dword or smaller dst is straightforward
                            (emit-byte+reg segment (if (eq size :byte) #xB0 #xB8) dst)
-                           (emit-sized-immediate segment size src))
+                           (emit-imm-operand segment src size))
                           ;; This must be move to a :qword register.
                           ((typep src '(unsigned-byte 32))
                            ;; Encode as B8+dst using operand size of 32 bits
@@ -1402,7 +1398,7 @@
                            ;; Instruction size: 5 if no REX prefix, or 6 with.
                            (emit-byte+reg segment #xB8 dst)
                            (emit-dword segment src))
-                          ((sb!vm::immediate32-p src)
+                          ((immediate32-p src)
                            ;; It's either a signed-byte-32, or a large unsigned
                            ;; value whose 33 high bits are all 1.
                            ;; Encode as C7 which sign-extends a 32-bit imm to 64 bits.
@@ -1430,11 +1426,16 @@
             ;; C7 only deals with 32 bit immediates even if the
             ;; destination is a 64-bit location. The value is
             ;; sign-extended in this case.
-            (maybe-emit-rex-for-ea segment dst nil)
-            (emit-byte segment (opcode+size-bit #xC6 size))
-            (emit-ea segment dst #b000
-                     :remaining-bytes (if (eq size :qword) 4 (size-nbyte size)))
-            (emit-sized-immediate segment size src))
+            (let ((imm-size (if (eq size :qword) :dword size))
+                  ;; If IMMEDIATE32-P returns NIL, use the original value,
+                  ;; which will signal an error in EMIT-IMMEDIATE
+                  (imm-val (or (immediate32-p src) src)))
+              (maybe-emit-rex-for-ea segment dst nil)
+              (emit-byte segment (opcode+size-bit #xC6 size))
+              ;; The EA could be RIP-relative, thus it is important
+              ;; to get :REMAINING-BYTES correct.
+              (emit-ea segment dst #b000 :remaining-bytes (size-nbyte imm-size))
+              (emit-imm-operand segment imm-val imm-size)))
            ((gpr-p src) ; reg to mem
             (maybe-emit-rex-for-ea segment dst src)
             (emit-byte segment (opcode+size-bit #x88 size))
@@ -1753,7 +1754,7 @@
              (emit-ea segment dst opcode :allow-constants allow-constants)))
       (if (fixup-p src)
           (emit-absolute-fixup segment src)
-          (emit-sized-immediate segment size src)))
+          (emit-imm-operand segment src size)))
      ((gpr-p src)
       (maybe-emit-rex-for-ea segment dst src)
       (emit-byte segment
@@ -1851,7 +1852,7 @@
               (emit-ea segment r/m (reg-tn-encoding reg))
               (if sx
                   (emit-byte segment immed)
-                  (emit-sized-immediate segment size immed)))))
+                  (emit-imm-operand segment immed size)))))
      (cond (src2
             (r/m-with-immed-to-reg dst src1 src2))
            (src1
@@ -2014,15 +2015,13 @@
    (let ((size (matching-operand-size this that)))
      (maybe-emit-operand-size-prefix segment size)
      (flet ((test-immed-and-something (immed something)
+              (maybe-emit-rex-for-ea segment something nil)
               (cond ((accumulator-p something)
-                     (maybe-emit-rex-for-ea segment something nil)
-                     (emit-byte segment (opcode+size-bit #xA8 size))
-                     (emit-sized-immediate segment size immed))
+                     (emit-byte segment (opcode+size-bit #xA8 size)))
                     (t
-                     (maybe-emit-rex-for-ea segment something nil)
                      (emit-byte segment (opcode+size-bit #xF6 size))
-                     (emit-ea segment something #b000)
-                     (emit-sized-immediate segment size immed))))
+                     (emit-ea segment something #b000)))
+              (emit-imm-operand segment immed size))
             (test-reg-and-something (reg something)
               (maybe-emit-rex-for-ea segment something reg)
               (emit-byte segment (opcode+size-bit #x84 size))

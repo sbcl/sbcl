@@ -18,6 +18,8 @@
 (defun immediate32-p (x)
   (typecase x
     ((signed-byte 32) x)
+    ;; Alternatively, the lower bound #xFFFFFFFF80000000 could
+    ;; be spelled as (MASK-FIELD (BYTE 33 31) -1)
     ((integer #.(- (expt 2 64) (expt 2 31)) #.most-positive-word)
      (sb!c::mask-signed-field 32 x))
     (t nil)))
