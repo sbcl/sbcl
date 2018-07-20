@@ -524,6 +524,7 @@ necessary, since type inference may take arbitrarily long to converge.")
         (maybe-mumble "constraint ")
         (constraint-propagate component))
       (when (retry-delayed-ir1-transforms :constraint)
+        (setf loop-count 0) ;; otherwise nothing may get retried
         (maybe-mumble "Rtran "))
       (flet ((want-reoptimization-p ()
                (or (component-reoptimize component)
