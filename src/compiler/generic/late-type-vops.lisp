@@ -53,10 +53,9 @@
 
 (defmacro !define-type-vop (pred-name type-codes
                              &optional (inherit 'type-predicate))
-  (let ((cost (+ (* 2 (length type-codes))
-                 (if (> (reduce #'max type-codes :key #'eval) lowtag-limit)
-                     7
-                     2))))
+  (let ((cost (if (> (reduce #'max type-codes :key #'eval) lowtag-limit)
+                  7
+                  4)))
     `(define-vop (,pred-name ,inherit)
        (:translate ,pred-name)
        (:generator ,cost
