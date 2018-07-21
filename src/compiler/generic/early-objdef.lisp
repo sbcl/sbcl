@@ -272,11 +272,14 @@
     '#.(list funcallable-instance-widetag simple-fun-widetag closure-widetag)
   #'equal)
 
-;;; the different vector subtypes
-(defenum ()
-  vector-normal-subtype
-  vector-unused-subtype
-  vector-valid-hashing-subtype)
+;;; the different vector subtypes - these are flag bits, not an enumeration
+(defconstant vector-normal-subtype  0)
+;; If vector is weak but NOT a hash-table backing vector
+(defconstant vector-weak-subtype 1)
+(defconstant vector-weak-visited-subtype 2) ; weak + GC bit
+;; a valid-hashing vector might also be weak,
+;; but we set ONLY the hashing bit when it backs a hash-table
+(defconstant vector-valid-hashing-subtype 4)
 
 ;;; These next two constants must not occupy the same byte of a
 ;;; vector header word as the values in the preceding defenum.

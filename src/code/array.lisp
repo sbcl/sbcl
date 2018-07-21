@@ -1827,3 +1827,22 @@ function to be removed without further warning."
 ;;; Horrible kludge for the "static-vectors" system
 ;;; which uses an internal symbol in SB-IMPL.
 (import '%vector-widetag-and-n-bits-shift 'sb!impl)
+
+(defun make-weak-vector (length &key (initial-contents nil contents-p)
+                                     (initial-element nil element-p))
+  (declare (index length))
+  (when (and element-p contents-p)
+    (error "Can't specify both :INITIAL-ELEMENT and :INITIAL-CONTENTS"))
+  (let ((v (if contents-p
+               (make-array length :initial-contents initial-contents)
+               (make-array length :initial-element
+                           ;; 0 is the usual default, but NIL makes more sense
+                           ;; for weak vectors because it's the value assigned
+                           ;; when a pointer is broken by GC.
+                           (if element-p initial-element nil)))))
+    (set-header-data v vector-weak-subtype)
+    v))
+
+(defun weak-vector-p (x)
+  (and (simple-vector-p x)
+       (eql (get-header-data x) vector-weak-subtype)))

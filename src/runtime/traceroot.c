@@ -736,6 +736,8 @@ static uword_t build_refs(lispobj* where, lispobj* end,
                     continue;
                 }
             }
+            if (is_vector_subtype(*where, VectorWeak))
+                continue;
             break;
         default:
             if (!(other_immediate_lowtag_p(widetag) && lowtag_for_widetag[widetag>>2]))

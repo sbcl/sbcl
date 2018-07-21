@@ -106,7 +106,18 @@ code_n_funs(struct code* code) {
         ? *((unsigned short*)code_fun_table(code)) >> 4 : 0;
 }
 
-#define is_vector_subtype(header, val) ((HeaderValue(header) & 3) == subtype_##val)
+// Test for presence of a bit in vector's header.
+// As a special case, if 'val' is 0, then test for all bits clear.
+#define is_vector_subtype(header, val) \
+  (subtype_##val ? (HeaderValue(header) & subtype_##val) : \
+   !(HeaderValue(header) & 7))
+
+// Mask out the fullcgc mark bit when asserting header validity
+#define UNSET_WEAK_VECTOR_VISITED(v) \
+  gc_assert((v->header & 0xffff) == \
+    (((subtype_VectorWeakVisited|subtype_VectorWeak) << N_WIDETAG_BITS) \
+     | SIMPLE_VECTOR_WIDETAG)); \
+  v->header ^= subtype_VectorWeakVisited << N_WIDETAG_BITS
 
 // Iterate over the native pointers to each function in 'code_var'
 // offsets are stored as the number of bytes into the instructions

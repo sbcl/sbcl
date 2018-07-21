@@ -13,6 +13,28 @@
 
 (in-package :cl-user)
 
+(defvar *weak-vect* (make-weak-vector 8))
+(with-test (:name :weak-vector)
+  (let ((a *weak-vect*)
+        (random-symbol (make-symbol "FRED")))
+    (setf (aref a 0) (cons 'foo 'bar)
+          (aref a 1) (format nil "Time is: ~D~%" (get-internal-real-time))
+          (aref a 2) 'interned-symbol
+          (aref a 3) random-symbol
+          (aref a 4) 18
+          (aref a 5) (+ most-positive-fixnum (random 100) (random 100))
+          (aref a 6) (make-hash-table))
+    (assert (typep (aref a 5) 'bignum))
+    (assert (weak-vector-p a))
+    (sb-sys:scrub-control-stack)
+    (gc)
+    (assert (eq (aref a 2) 'interned-symbol))
+    (assert (eq (aref a 3) random-symbol))
+    (assert (= (aref a 4) 18))
+    ;; broken cells are the cons, string, bignum, hash-table, plus one NIL
+    ;; cell that was never assigned into
+    (assert (= (count nil *weak-vect*) 5))))
+
 ;;; Make sure MAP-REFERENCING-OBJECTS doesn't spuriously treat raw bits as
 ;;; potential pointers. Also make sure it sees the SYMBOL-INFO slot.
 (defstruct afoo (slot nil :type sb-ext:word))

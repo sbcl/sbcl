@@ -16,7 +16,8 @@
  * Logically this code is common to both GCs, but it requires some
  * knowledge of gencgc's structures. You might think it should be split
  * into two wholly separate implementation files, but the single file
- * facilitates exercising the malloc/free-based even when we don't need it.
+ * facilitates exercising the malloc/free-based implementation
+ * with either GC.
  */
 
 #define PRIVATE_CONS_DEBUG 0

@@ -69,6 +69,7 @@ gc_general_copy_object(lispobj object, long nwords, int page_type_flag)
 }
 
 extern sword_t (*scavtab[256])(lispobj *where, lispobj object);
+extern struct cons *weak_vectors; /* in gc-common.c */
 extern struct hash_table *weak_hash_tables; /* in gc-common.c */
 
 // These next two are prototyped for both GCs
@@ -76,6 +77,7 @@ extern struct hash_table *weak_hash_tables; /* in gc-common.c */
 void gc_mark_range(lispobj*start, long count);
 void gc_mark_obj(lispobj);
 void gc_dispose_private_pages();
+void add_to_weak_vector_list(lispobj* vector, lispobj header);
 
 extern void heap_scavenge(lispobj *start, lispobj *limit);
 extern sword_t scavenge(lispobj *start, sword_t n_words);

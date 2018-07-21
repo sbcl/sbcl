@@ -62,6 +62,7 @@ sword_t (*scavtab[256])(lispobj *where, lispobj object);
 static lispobj (*transother[64])(lispobj object);
 sword_t (*sizetab[256])(lispobj *where);
 struct weak_pointer *weak_pointer_chain = WEAK_POINTER_CHAIN_END;
+struct cons *weak_vectors;
 
 os_vm_size_t bytes_consed_between_gcs = 12*1024*1024;
 
@@ -933,6 +934,19 @@ trans_weak_pointer(lispobj object)
     return copy;
 }
 
+/* Check whether 'pointee' was forwarded. If it has been, update the contents
+ * of 'cell' to point to it. Otherwise, set 'cell' to 'broken'.
+ * Note that this macro has no braces around the body because one of the uses
+ * of it needs to stick on another 'else' or two */
+#define TEST_WEAK_CELL(cell, pointee, broken) \
+    lispobj *native = native_pointer(pointee); \
+    if (from_space_p(pointee)) \
+        cell = forwarding_pointer_p(native) ? \
+               LOW_WORD(forwarding_pointer_value(native)) : broken; \
+    else if (immobile_space_p(pointee)) { \
+        if (immobile_obj_gen_bits(native) == from_space) cell = broken; \
+    }
+
 void scan_weak_pointers(void)
 {
     struct weak_pointer *wp, *next_wp;
@@ -941,33 +955,43 @@ void scan_weak_pointers(void)
         next_wp = wp->next;
         wp->next = NULL;
 
-        lispobj pointee = wp->value;
-        gc_assert(is_lisp_pointer(pointee));
-        lispobj *objaddr = native_pointer(pointee);
+        lispobj val = wp->value;
+        /* A weak pointer is placed onto the list only if it points to an object
+         * that could potentially die. So first of all, 'val' must be a pointer,
+         * and secondly it must not be in the assumed live set, which is checked
+         * below by way of falling into lose(), which shouldn't happen */
+        gc_assert(is_lisp_pointer(val));
 
         /* Now, we need to check whether the object has been forwarded. If
          * it has been, the weak pointer is still good and needs to be
          * updated. Otherwise, the weak pointer needs to be broken. */
-
-        if (from_space_p(pointee)) {
-            wp->value = forwarding_pointer_p(objaddr) ?
-                LOW_WORD(forwarding_pointer_value(objaddr)) : UNBOUND_MARKER_WIDETAG;
-        }
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-          else if (immobile_space_p(pointee)) {
-            if (immobile_obj_gen_bits(objaddr) == from_space)
-                wp->value = UNBOUND_MARKER_WIDETAG;
-        }
-#endif
+        TEST_WEAK_CELL(wp->value, val, UNBOUND_MARKER_WIDETAG)
 #ifdef LISP_FEATURE_GENCGC
         // Large objects are "moved" by touching the page table gen field.
         // Do nothing if the target of this weak pointer had that happen.
-        else if (new_space_p(pointee)) { }
+        else if (new_space_p(val)) { }
 #endif
         else
             lose("unbreakable pointer %p", wp);
     }
     weak_pointer_chain = WEAK_POINTER_CHAIN_END;
+
+    struct cons* vectors = weak_vectors;
+    while (vectors) {
+        struct vector* vector = (struct vector*)vectors->car;
+        vectors = (struct cons*)vectors->cdr;
+        UNSET_WEAK_VECTOR_VISITED(vector);
+        sword_t len = fixnum_value(vector->length);
+        sword_t i;
+        for (i = 0; i<len; ++i) {
+            lispobj val = vector->data[i];
+            // Ignore non-pointers
+            if (is_lisp_pointer(val)) {
+                TEST_WEAK_CELL(vector->data[i], val, NIL);
+            }
+        }
+    }
+    weak_vectors = 0;
 }
 
 
@@ -1038,9 +1062,19 @@ get_array_data (lispobj array, int widetag, uword_t *length)
     }
 }
 
+extern uword_t gc_private_cons(uword_t, uword_t);
+
+void add_to_weak_vector_list(lispobj* vector, lispobj header)
+{
+    if (!is_vector_subtype(header, VectorWeakVisited)) {
+        weak_vectors = (struct cons*)gc_private_cons((uword_t)vector,
+                                                     (uword_t)weak_vectors);
+        *vector |= subtype_VectorWeakVisited << N_WIDETAG_BITS;
+    }
+}
+
 static inline void add_trigger(lispobj triggering_object, lispobj* plivened_object)
 {
-    extern uword_t gc_private_cons(uword_t, uword_t);
     if (is_lisp_pointer(*plivened_object)) // Nonpointer objects are ignored
         hopscotch_put(&weak_objects, triggering_object,
                       gc_private_cons((uword_t)plivened_object,
@@ -1235,15 +1269,19 @@ sword_t
 scav_vector (lispobj *where, lispobj header)
 {
     sword_t kv_length = fixnum_value(where[1]);
-    struct hash_table *hash_table;
 
     /* SB-VM:VECTOR-VALID-HASHING-SUBTYPE is set for EQ-based and weak
      * hash tables in the Lisp HASH-TABLE code to indicate need for
      * special GC support. */
     if (is_vector_subtype(header, VectorNormal)) {
  normal:
-      scavenge(where + 2, kv_length);
-      return ALIGN_UP(kv_length + 2, 2);
+        scavenge(where + 2, kv_length);
+        goto done;
+    }
+
+    if (is_vector_subtype(header, VectorWeak)) {
+        add_to_weak_vector_list(where, header);
+        goto done;
     }
 
     /* Scavenge element 0, which may be a hash-table structure. */
@@ -1261,7 +1299,7 @@ scav_vector (lispobj *where, lispobj header)
                 "by locks.\n", (void*)&where[2]);
         goto normal;
     }
-    hash_table = (struct hash_table *)native_pointer(where[2]);
+    struct hash_table *hash_table  = (struct hash_table *)native_pointer(where[2]);
     if (widetag_of(hash_table->header) != INSTANCE_WIDETAG) {
         lose("hash table not instance (%"OBJ_FMTX" at %p)\n",
              hash_table->header,
@@ -1310,7 +1348,7 @@ scav_vector (lispobj *where, lispobj header)
             weak_hash_tables = hash_table;
         }
     }
-
+ done:
     return (ALIGN_UP(kv_length + 2, 2));
 }
 

@@ -2063,7 +2063,7 @@ update_page_write_prot(page_index_t page)
     return (wp_it);
 }
 
-/* Is this page holding a normal (non-hashtable) large-object
+/* Is this page holding a normal (non-weak, non-hashtable) large-object
  * simple-vector? */
 static inline boolean large_simple_vector_p(page_index_t page) {
     if (!page_single_obj_p(page))

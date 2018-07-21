@@ -15,6 +15,8 @@
 #include "gencgc-private.h"
 #include "genesis/gc-tables.h"
 #include "genesis/closure.h"
+#include "genesis/cons.h"
+#include "genesis/vector.h"
 #include "genesis/layout.h"
 #include "genesis/hash-table.h"
 #include "immobile-space.h"
@@ -298,6 +300,10 @@ static void trace_object(lispobj* where)
             }
             return;
         }
+        if (is_vector_subtype(header, VectorWeak)) {
+            add_to_weak_vector_list(where, header);
+            return;
+        }
         break;
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
     /* on x86[-64], closure->fun is a fixnum-qua-pointer. Convert it to a lisp
@@ -402,6 +408,22 @@ static void smash_weak_pointers()
             wp->value = UNBOUND_MARKER_WIDETAG;
     }
     weak_pointer_chain = WEAK_POINTER_CHAIN_END;
+
+    struct cons* vectors = weak_vectors;
+    while (vectors) {
+        struct vector* vector = (struct vector*)vectors->car;
+        vectors = (struct cons*)vectors->cdr;
+        UNSET_WEAK_VECTOR_VISITED(vector);
+        sword_t len = fixnum_value(vector->length);
+        sword_t i;
+        for (i = 0; i<len; ++i) {
+            lispobj obj = vector->data[i];
+            // Ignore non-pointers
+            if (is_lisp_pointer(obj) && !pointer_survived_gc_yet(obj))
+                vector->data[i] = NIL;
+        }
+    }
+    weak_vectors = 0;
 }
 
 __attribute__((unused)) static char *fillerp(lispobj* where)
