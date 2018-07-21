@@ -69,7 +69,6 @@ gc_general_copy_object(lispobj object, long nwords, int page_type_flag)
 }
 
 extern sword_t (*scavtab[256])(lispobj *where, lispobj object);
-extern struct weak_pointer *weak_pointers; /* in gc-common.c */
 extern struct hash_table *weak_hash_tables; /* in gc-common.c */
 
 // These next two are prototyped for both GCs
@@ -155,8 +154,8 @@ static inline boolean filler_obj_p(lispobj* obj) {
 
 #endif /* immobile space */
 
-#define WEAK_POINTER_NWORDS \
-        ALIGN_UP((sizeof(struct weak_pointer) / sizeof(lispobj)), 2)
+#define WEAK_POINTER_CHAIN_END (void*)(intptr_t)-1
+#define WEAK_POINTER_NWORDS ALIGN_UP(WEAK_POINTER_SIZE,2)
 
 static inline boolean weak_pointer_breakable_p(struct weak_pointer *wp)
 {
@@ -169,6 +168,20 @@ static inline boolean weak_pointer_breakable_p(struct weak_pointer *wp)
              immobile_obj_gen_bits(native_pointer(pointee)) == from_space)
 #endif
             );
+}
+
+static inline void add_to_weak_pointer_chain(struct weak_pointer *wp) {
+    /* Link 'wp' into weak_pointer_chain using its 'next' field.
+     * We ensure that 'next' is always NULL when the weak pointer isn't
+     * in the chain, and not NULL otherwise. The end of the chain
+     * is denoted by WEAK_POINTER_CHAIN_END which is distinct from NULL.
+     * The test of whether the weak pointer has been placed in the chain
+     * is performed in 'scav_weak_pointer' for gencgc.
+     * In cheneygc, chaining is performed in 'trans_weak_pointer'
+     * which works just as well, since an object is transported
+     * at most once per GC cycle */
+    wp->next = (struct weak_pointer *)LOW_WORD(weak_pointer_chain);
+    weak_pointer_chain = wp;
 }
 
 /// Same as Lisp LOGBITP, except no negative bignums allowed.

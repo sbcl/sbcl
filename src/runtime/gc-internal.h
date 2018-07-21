@@ -29,6 +29,7 @@
 #include "interr.h" /* for lose() */
 
 extern const char *widetag_names[];
+extern struct weak_pointer *weak_pointer_chain; /* in gc-common.c */
 
 /// Enable extra debug-only checks if DEBUG
 #ifdef DEBUG

@@ -1507,7 +1507,7 @@ scav_weak_pointer(lispobj *where, lispobj __attribute__((unused)) object)
          * so even if incorrect, it should be relatively harmless)
          */
         gc_dcheck(!page_table[find_page_index(wp)].write_protected);
-        add_to_weak_pointer_list(wp);
+        add_to_weak_pointer_chain(wp);
     }
 
     /* Do not let GC scavenge the value slot of the weak pointer.
@@ -3011,9 +3011,6 @@ garbage_collect_generation(generation_index_t generation, int raise)
 
     /* Check that weak hash tables were processed in the previous GC. */
     gc_assert(weak_hash_tables == NULL);
-
-    /* Initialize the weak pointer list. */
-    weak_pointers = NULL;
 
     /* When a generation is not being raised it is transported to a
      * temporary generation (NUM_GENERATIONS), and lowered when

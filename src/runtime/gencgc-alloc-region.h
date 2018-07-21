@@ -30,6 +30,5 @@ struct alloc_region {
 // One region for each of {BOXED,UNBOXED,CODE}_PAGE_FLAG
 extern struct alloc_region  gc_alloc_region[3];
 extern generation_index_t from_space, new_space;
-extern struct weak_pointer *weak_pointers;
 
 #endif /*  _GENCGC_ALLOC_REGION_H_ */

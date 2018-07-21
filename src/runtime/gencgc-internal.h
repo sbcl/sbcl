@@ -247,20 +247,6 @@ static boolean __attribute__((unused)) new_space_p(lispobj obj)
     return page_index >= 0 && page_table[page_index].gen == new_space;
 }
 
-#include "genesis/weak-pointer.h"
-static inline void add_to_weak_pointer_list(struct weak_pointer *wp) {
-    /* Since we overwrite the 'next' field, we have to make
-     * sure not to do so for pointers already in the list.
-     * Instead of searching the list of weak_pointers each
-     * time, we ensure that next is always NULL when the weak
-     * pointer isn't in the list, and not NULL otherwise.
-     * Since we can't use NULL to denote end of list, we
-     * use a pointer back to the same weak_pointer.
-     */
-    wp->next = weak_pointers ? weak_pointers : wp;
-    weak_pointers = wp;
-}
-
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 struct fixedobj_page { // 12 bytes per page
     union immobile_page_attr {

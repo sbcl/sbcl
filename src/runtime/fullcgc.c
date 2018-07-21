@@ -321,7 +321,7 @@ static void trace_object(lispobj* where)
     case WEAK_POINTER_WIDETAG:
         weakptr = (struct weak_pointer*)where;
         if (is_lisp_pointer(weakptr->value) && interesting_pointer_p(weakptr->value))
-            add_to_weak_pointer_list(weakptr);
+            add_to_weak_pointer_chain(weakptr);
         return;
     default:
         if (unboxed_obj_widetag_p(widetag)) return;
@@ -392,19 +392,16 @@ void execute_full_mark_phase()
 static void smash_weak_pointers()
 {
     struct weak_pointer *wp, *next_wp;
-    for (wp = weak_pointers, next_wp = NULL; wp != NULL; wp = next_wp) {
-        gc_assert(widetag_of(wp->header)==WEAK_POINTER_WIDETAG);
-
+    for (wp = weak_pointer_chain; wp != WEAK_POINTER_CHAIN_END; wp = next_wp) {
+        gc_assert(widetag_of(wp->header) == WEAK_POINTER_WIDETAG);
         next_wp = wp->next;
         wp->next = NULL;
-        if (next_wp == wp) /* gencgc uses a ref to self for end of list */
-            next_wp = NULL;
-
         lispobj pointee = wp->value;
         gc_assert(is_lisp_pointer(pointee));
         if (!pointer_survived_gc_yet(pointee))
             wp->value = UNBOUND_MARKER_WIDETAG;
     }
+    weak_pointer_chain = WEAK_POINTER_CHAIN_END;
 }
 
 __attribute__((unused)) static char *fillerp(lispobj* where)

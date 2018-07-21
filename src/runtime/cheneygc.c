@@ -133,10 +133,6 @@ collect_garbage(generation_index_t ignore)
     }
     new_space_free_pointer = new_space;
 
-    /* Initialize the weak pointer list. */
-    weak_pointers = (struct weak_pointer *) NULL;
-
-
     /* Scavenge all of the roots. */
 #ifdef PRINTNOISE
     printf("Scavenging interrupt contexts ...\n");

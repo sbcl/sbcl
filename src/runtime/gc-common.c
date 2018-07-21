@@ -61,7 +61,7 @@ os_vm_size_t thread_control_stack_size = DEFAULT_CONTROL_STACK_SIZE;
 sword_t (*scavtab[256])(lispobj *where, lispobj object);
 static lispobj (*transother[64])(lispobj object);
 sword_t (*sizetab[256])(lispobj *where);
-struct weak_pointer *weak_pointers;
+struct weak_pointer *weak_pointer_chain = WEAK_POINTER_CHAIN_END;
 
 os_vm_size_t bytes_consed_between_gcs = 12*1024*1024;
 
@@ -918,10 +918,6 @@ trans_weak_pointer(lispobj object)
     lispobj copy;
     gc_dcheck(lowtag_of(object) == OTHER_POINTER_LOWTAG);
 
-#if defined(DEBUG_WEAK)
-    printf("Transporting weak pointer from 0x%08x\n", object);
-#endif
-
     /* Need to remember where all the weak pointers are that have */
     /* been transported so they can be fixed up in a post-GC pass. */
 
@@ -931,10 +927,8 @@ trans_weak_pointer(lispobj object)
 
     gc_dcheck(widetag_of(wp->header)==WEAK_POINTER_WIDETAG);
     /* Push the weak pointer onto the list of weak pointers. */
-    if (weak_pointer_breakable_p(wp)) {
-        wp->next = (struct weak_pointer *)LOW_WORD(weak_pointers);
-        weak_pointers = wp;
-    }
+    if (weak_pointer_breakable_p(wp))
+        add_to_weak_pointer_chain(wp);
 #endif
     return copy;
 }
@@ -942,13 +936,10 @@ trans_weak_pointer(lispobj object)
 void scan_weak_pointers(void)
 {
     struct weak_pointer *wp, *next_wp;
-    for (wp = weak_pointers, next_wp = NULL; wp != NULL; wp = next_wp) {
-        gc_assert(widetag_of(wp->header)==WEAK_POINTER_WIDETAG);
-
+    for (wp = weak_pointer_chain; wp != WEAK_POINTER_CHAIN_END; wp = next_wp) {
+        gc_assert(widetag_of(wp->header) == WEAK_POINTER_WIDETAG);
         next_wp = wp->next;
         wp->next = NULL;
-        if (next_wp == wp) /* gencgc uses a ref to self for end of list */
-            next_wp = NULL;
 
         lispobj pointee = wp->value;
         gc_assert(is_lisp_pointer(pointee));
@@ -976,6 +967,7 @@ void scan_weak_pointers(void)
         else
             lose("unbreakable pointer %p", wp);
     }
+    weak_pointer_chain = WEAK_POINTER_CHAIN_END;
 }
 
 
