@@ -479,15 +479,17 @@ write_generation_stats(FILE *file)
                 " %11"OS_VM_SIZE_FMT
                 " %7"PAGE_INDEX_FMT" %3d %7.4f\n",
                 i, pagect[0], pagect[1], pagect[2], pagect[3], pinned_cnt,
-                gen->bytes_allocated,
-                npage_bytes(tot_pages) - generations[i].bytes_allocated,
-                gen->gc_trigger,
+                (uintptr_t)gen->bytes_allocated,
+                (uintptr_t)npage_bytes(tot_pages) - generations[i].bytes_allocated,
+                (uintptr_t)gen->gc_trigger,
                 count_generation_pages(i, 0),
                 gen->num_gc,
                 generation_average_age(i));
     }
-    fprintf(file,"           Total bytes allocated    = %13"OS_VM_SIZE_FMT"\n", bytes_allocated);
-    fprintf(file,"           Dynamic-space-size bytes = %13"OS_VM_SIZE_FMT"\n", dynamic_space_size);
+    fprintf(file,"           Total bytes allocated    = %13"OS_VM_SIZE_FMT"\n",
+            (uintptr_t)bytes_allocated);
+    fprintf(file,"           Dynamic-space-size bytes = %13"OS_VM_SIZE_FMT"\n",
+            (uintptr_t)dynamic_space_size);
 
 #ifdef LISP_FEATURE_X86
     fpu_restore(fpu_state);
@@ -3599,7 +3601,7 @@ collect_garbage(generation_index_t last_gen)
         int n;
         // fprintf() can - and does - cause deadlock here.
         // snprintf() seems to work fine.
-        n = snprintf(buf, sizeof buf, MESSAGE, auto_gc_trigger);
+        n = snprintf(buf, sizeof buf, MESSAGE, (uintptr_t)auto_gc_trigger);
         ignore_value(write(2, buf, n));
 #undef MESSAGE
     }
@@ -3946,7 +3948,7 @@ gencgc_handle_wp_violation(void* fault_addr)
                         page_index,
                         find_page_index(boxed_region.start_addr),
                         boxed_region.last_page,
-                        page_scan_start_offset(page_index),
+                        (uintptr_t)page_scan_start_offset(page_index),
                         page_bytes_used(page_index),
                         page_table[page_index].type,
                         page_table[page_index].write_protected,
