@@ -890,6 +890,7 @@
       (let* ((fun (lambda-var-home var))
              (vars (lambda-vars fun))
              (lvar (and (lambda-refs fun)
+                        (null (cdr (lambda-refs fun)))
                         (ref-lvar (car (lambda-refs fun)))))
              (combination (and lvar
                                (lvar-dest lvar))))

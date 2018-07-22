@@ -1502,3 +1502,17 @@
       `(lambda (x)
          (list 1 1 ,@(make-list 100 :initial-element 'x)))
     ((1) (make-list 102 :initial-element 1) :test #'equal)))
+
+(with-test (:name (:lambda-var-ref-lvar :multiple-refs))
+  (checked-compile-and-assert
+   ()
+   `(lambda (vector index)
+      (labels ((update (index)
+                 (let ((old (svref vector index)))
+                   (if (eq old 10)
+                       (update index)
+                       old)))
+               (wrap (index)
+                 (update index)))
+        (wrap index)))
+   ((#(1 2 3) 1) 2)))
