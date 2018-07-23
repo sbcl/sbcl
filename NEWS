@@ -1,7 +1,14 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-1.4.9:
-  * enhancement: added SB-EXT:MAKE-WEAK-VECTOR
+  * enhancement: added SB-EXT:MAKE-WEAK-VECTOR.
+  * enhancement: constant-modification detection warnings can be generated
+    in the presence of conditional constructs.
+  * optimization: better bounds-checking on x86[-64] and ARM64.
+  * optimization: adding 1 to or subtracting 1 from a fixnum variable does not
+    cons.
+  * bug fixes: fix a number of bugs revealed by random testing (lp#1782826,
+    lp#1779878, lp#1779737)
 
 changes in sbcl-1.4.9 relative to sbcl-1.4.8:
   * enhancement: SB-COVER instrumentation for x86[-64] has signficantly less
