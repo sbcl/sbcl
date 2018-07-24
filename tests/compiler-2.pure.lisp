@@ -1516,3 +1516,11 @@
                  (update index)))
         (wrap index)))
    ((#(1 2 3) 1) 2)))
+
+(with-test (:name :string-type-unparsing)
+  (checked-compile-and-assert
+      ()
+      `(lambda (s)
+         (declare (type (string 1) s))
+         (the (or simple-array (member 1/2 "ba" 0 #\3)) s))
+    ((#1="a") #1#)))
