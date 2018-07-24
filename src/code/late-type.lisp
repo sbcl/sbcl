@@ -3234,7 +3234,7 @@ used for a COMPLEX component.~:@>"
          (let ((types (copy-list (union-type-types string-ctype))))
            (and (loop for type in (union-type-types ctype)
                       for matching = (and (array-type-p type)
-                                          (not (array-type-complexp type))
+                                          (neq (array-type-complexp type) t)
                                           (find type types
                                                 :test #'csubtypep))
                       always matching
