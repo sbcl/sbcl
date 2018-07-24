@@ -56,15 +56,16 @@
                                        (- word-shift ,shift)))
                               (ash offset word-shift))
                            lowtag)))
-            (etypecase offset
-              ((signed-byte 16)
-               (inst ,ri-op value object offset))
-              ((or (unsigned-byte 32) (signed-byte 32))
-               (inst lr temp offset)
-               (inst ,rr-op value object temp)))))
+            (if (and (typep offset '(signed-byte 16))
+                     (or (> ,shift 0) ;; If it's not word-index
+                         (not (logtest offset #b11)))) ;; Or the displacement is a multiple of 4
+                (inst ,ri-op value object offset)
+                (progn
+                  (inst lr temp offset)
+                  (inst ,rr-op value object temp)))))
          (t
           ,@(unless (zerop shift)
-              `((inst srwi temp index ,shift)))
+              `((inst srdi temp index ,shift)))
           (inst addi temp ,(if (zerop shift) 'index 'temp)
                 (- (ash offset word-shift) lowtag))
           (inst ,rr-op value object temp)))
@@ -73,16 +74,16 @@
        ,@(when write-p
            '((move result value))))))
 
-;; FIXME: CHECK Add dword
-;(define-indexer dword-index-ref nil 0)
-(define-indexer word-index-ref nil lwz lwzx 0)
-(define-indexer word-index-set t stw stwx 0)
-(define-indexer halfword-index-ref nil lhz lhzx 1)
-(define-indexer signed-halfword-index-ref nil lha lhax 1)
-(define-indexer halfword-index-set t sth sthx 1)
-(define-indexer byte-index-ref nil lbz lbzx 2)
-(define-indexer signed-byte-index-ref nil lbz lbzx 2 t)
-(define-indexer byte-index-set t stb stbx 2)
+(define-indexer word-index-ref nil ld ldx 0) ;; Word means Lisp Word
+(define-indexer word-index-set t std stdx 0)
+(define-indexer 32-bits-index-ref nil lwz lwzx 1)
+(define-indexer 32-bits-index-set t stw stwx 1)
+(define-indexer 16-bits-index-ref nil lhz lhzx 2)
+(define-indexer signed-16-bits-index-ref nil lha lhax 2)
+(define-indexer 16-bits-index-set t sth sthx 2)
+(define-indexer byte-index-ref nil lbz lbzx 3)
+(define-indexer signed-byte-index-ref nil lbz lbzx 3 t)
+(define-indexer byte-index-set t stb stbx 3)
 
 (define-vop (word-index-cas)
   (:args (object :scs (descriptor-reg))

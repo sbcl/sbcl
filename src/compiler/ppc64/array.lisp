@@ -123,16 +123,16 @@
     positive-fixnum unsigned-reg)
   (def-data-vector-frobs simple-array-unsigned-byte-8 byte-index
     positive-fixnum unsigned-reg)
-  (def-data-vector-frobs simple-array-unsigned-byte-15 halfword-index
+  (def-data-vector-frobs simple-array-unsigned-byte-15 16-bits-index
     positive-fixnum unsigned-reg)
-  (def-data-vector-frobs simple-array-unsigned-byte-16 halfword-index
+  (def-data-vector-frobs simple-array-unsigned-byte-16 16-bits-index
     positive-fixnum unsigned-reg)
-  (def-data-vector-frobs simple-array-unsigned-byte-31 word-index
+  (def-data-vector-frobs simple-array-unsigned-byte-31 32-bits-index
     unsigned-num unsigned-reg)
-  (def-data-vector-frobs simple-array-unsigned-byte-32 word-index
+  (def-data-vector-frobs simple-array-unsigned-byte-32 32-bits-index
     unsigned-num unsigned-reg)
   (def-data-vector-frobs simple-array-unsigned-byte-63 word-index
-    unsigned-num unsigned-reg) ;; FIXME: Implement dword-index
+    unsigned-num unsigned-reg)
   (def-data-vector-frobs simple-array-unsigned-byte-64 word-index
     unsigned-num unsigned-reg)
 
@@ -141,10 +141,10 @@
     positive-fixnum any-reg)
   (def-data-vector-frobs simple-array-fixnum word-index
     tagged-num any-reg)
-  (def-data-vector-frobs simple-array-signed-byte-32 word-index
+  (def-data-vector-frobs simple-array-signed-byte-32 32-bits-index
     signed-num signed-reg)
   (def-data-vector-frobs simple-array-signed-byte-64 word-index
-    signed-num signed-reg)) ;; FIXME: Implement dword-index
+    signed-num signed-reg))
 
 (define-vop (%compare-and-swap-svref word-index-cas)
   (:note "inline array compare-and-swap")
@@ -530,7 +530,7 @@
   (:result-types tagged-num))
 
 (define-vop (data-vector-ref/simple-array-signed-byte-16
-             signed-halfword-index-ref)
+             signed-16-bits-index-ref)
   (:note "inline array access")
   (:variant vector-data-offset other-pointer-lowtag)
   (:translate data-vector-ref)
@@ -538,7 +538,7 @@
   (:results (value :scs (signed-reg)))
   (:result-types tagged-num))
 
-(define-vop (data-vector-set/simple-array-signed-byte-16 halfword-index-set)
+(define-vop (data-vector-set/simple-array-signed-byte-16 16-bits-index-set)
   (:note "inline array store")
   (:variant vector-data-offset other-pointer-lowtag)
   (:translate data-vector-set)
