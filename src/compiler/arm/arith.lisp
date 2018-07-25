@@ -134,10 +134,11 @@
                           `(inst ,op r y x)
                           `(inst ,op r x y))))
        (define-vop (,(symbolicate 'fast- translate '-c/fixnum=>fixnum)
-                     fast-fixnum-binop-c)
+                    fast-fixnum-binop-c)
+         ,@(when invert-r `((:temporary (:sc non-descriptor-reg :target r) temp)))
          (:translate ,translate)
          (:generator 1
-          (composite-immediate-instruction ,cop r x y :fixnumize t :neg-op ,neg-op :invert-y ,invert-y :invert-r ,invert-r :single-op-op ,(when try-single-op op))))
+          (composite-immediate-instruction ,cop r x y :fixnumize t :neg-op ,neg-op :invert-y ,invert-y :invert-r ,invert-r ,@(when invert-r `(:temporary temp)) :single-op-op ,(when try-single-op op))))
        (define-vop (,(symbolicate 'fast- translate '/signed=>signed)
                      fast-signed-binop)
          (:translate ,translate)
