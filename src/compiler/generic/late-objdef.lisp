@@ -44,22 +44,32 @@
     (complex-double-float "unboxed")
 
     (code-header "code_header")
+    ;; For all 3 function subtypes, the transporter is "lose"
+    ;; because functions are not OTHER pointer objects.
     ;; The scavenge function for fun-header is basically "lose",
     ;; but it's only defined on non-x86 platforms for some reason.
-    (simple-fun ,(or #!+(or x86 x86-64) "lose" "fun_header") "fun_header" "lose")
-    (closure ,(or #!+(or x86 x86-64) "closure" "short_boxed") "short_boxed")
+    ;; The sizer is "lose" because it's an error if a function is encountered
+    ;; in a heap scan.
+    (simple-fun ,(or #!+(or x86 x86-64) "lose" "fun_header") "lose" "lose")
+    ;; The closure scavenge function needs to know if the "self" slot
+    ;; has pointer nature though it be fixnum tagged, as on x86.
+    ;; The sizer is short_boxed.
+    (closure ,(or #!+(or x86 x86-64) "closure" "short_boxed") "lose" "short_boxed")
+    ;; Like closure, but these can also have a layout pointer in the high header bytes.
     (funcallable-instance ,(or #!+compact-instance-header "funinstance" "short_boxed")
-                                 "short_boxed")
+                          "lose" "short_boxed")
     ;; These have a scav and trans function, but no size function.
     #!-(or x86 x86-64) (return-pc "return_pc_header" "return_pc_header" "lose")
 
     (value-cell "boxed")
     (symbol "tiny_boxed")
-    (character "immediate")
+    ;; Can't transport characters as "other" pointer objects.
+    ;; It should be a cons cell half which would go through trans_list()
+    (character "immediate" "lose" "immediate")
     (sap "unboxed")
     (unbound-marker "immediate")
     (weak-pointer "lose" "weak_pointer" "boxed")
-    (instance "instance" "instance" "short_boxed")
+    (instance "instance" "lose" "short_boxed")
     (fdefn ,(or #!+(or sparc arm) "boxed" "fdefn") "tiny_boxed")
 
     (no-tls-value-marker "immediate")
