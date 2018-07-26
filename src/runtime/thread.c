@@ -974,8 +974,10 @@ void gc_stop_the_world()
                 /* This thread has exited. */
                 gc_assert(thread_state(p)==STATE_DEAD);
             } else if (status) {
-                lose("cannot send suspend thread=%lu: %d, %s\n",
-                     p->os_thread,status,strerror(status));
+                lose("cannot send suspend thread=%lx: %d, %s",
+                     // KLUDGE: assume that os_thread can be cast as long.
+                     // See comment in 'interr.h' about that.
+                     (long)p->os_thread,status,strerror(status));
             }
         }
     }
@@ -1010,7 +1012,7 @@ void gc_start_the_world()
             if (state != STATE_DEAD) {
                 if(state != STATE_STOPPED) {
                     lose("gc_start_the_world: wrong thread state is %"OBJ_FMTX,
-                         fixnum_value(state));
+                         (lispobj)fixnum_value(state));
                 }
                 FSHOW_SIGNAL((stderr, "/gc_start_the_world: resuming %lu\n",
                               p->os_thread));

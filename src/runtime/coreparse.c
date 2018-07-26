@@ -47,6 +47,15 @@
 # include <zlib.h>
 #endif
 
+/* build_id must match between the C code and .core file because a core
+ * is only guaranteed to be compatible with the C runtime that created it.
+ * We can't easily detect whether the sources were patched after saving
+ * a core, but we can easily enforce a matching build_id.
+ * Note that fasls have a different way of ensuring compatibility with the
+ * core: the contents of version.lisp-expr are written into the fasl.
+ * Both checks avoid confusion for end-users, but the build_id test
+ * is more geared toward developers as it can change with each rebuild.
+ */
 unsigned char build_id[] =
 // The suffix added to build-id indicates which flavor of C compiler was used.
 // This enforces that when you put :MSAN in your Lisp features, you don't
@@ -1000,14 +1009,13 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
 {
     void *header;
     core_entry_elt_t val, *ptr;
-    os_vm_size_t len, remaining_len;
+    os_vm_size_t len, remaining_len, stringlen;
     int fd = open_binary(file, O_RDONLY);
     ssize_t count;
     lispobj initial_function = NIL;
     struct heap_adjust adj;
     memset(&adj, 0, sizeof adj);
 
-    FSHOW((stderr, "/entering load_core_file(%s)\n", file));
     if (fd < 0) {
         fprintf(stderr, "could not open file \"%s\"\n", file);
         perror("open");
@@ -1021,72 +1029,46 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
     if (count < (ssize_t) os_vm_page_size) {
         lose("premature end of core file\n");
     }
-    SHOW("successfully read first page of core");
 
     ptr = header;
     val = *ptr++;
 
-    if (val != CORE_MAGIC) {
+    if (val != CORE_MAGIC)
         lose("invalid magic number in core: %"OBJ_FMTX" should have been %x"OBJ_FMTX,
-             val, CORE_MAGIC);
-    }
-    SHOW("found CORE_MAGIC");
+             (lispobj)val, CORE_MAGIC);
 
-#define WORD_FMTX OS_VM_SIZE_FMTX
     for ( ; ; ptr += remaining_len) {
         val = *ptr++;
         len = *ptr++;
         remaining_len = len - 2; /* (-2 to cancel the two ++ operations) */
-        FSHOW((stderr, "/val=0x%"WORD_FMTX", remaining_len=0x%"WORD_FMTX"\n",
-               val, remaining_len));
-
         switch (val) {
-
-        case END_CORE_ENTRY_TYPE_CODE:
-            free(header);
-            close(fd);
-            return initial_function;
-
         case BUILD_ID_CORE_ENTRY_TYPE_CODE:
-            SHOW("BUILD_ID_CORE_ENTRY_TYPE_CODE case");
-            {
-                os_vm_size_t stringlen = *ptr++;
-                --remaining_len;
-                gc_assert(remaining_len * sizeof (core_entry_elt_t) >= stringlen);
-                if (sizeof build_id == stringlen+1 && !memcmp(ptr, build_id, stringlen))
-                    break;
-                /* .core files are not binary-compatible between
-                 * builds because we can't easily detect whether the
-                 * sources were patched between the time the
-                 * dumping-the-.core runtime was built and the time
-                 * that the loading-the-.core runtime was built.
-                 *
-                 * (We could easily detect whether version.lisp-expr
-                 * was changed, but people experimenting with patches
-                 * don't necessarily update version.lisp-expr.) */
-                fprintf(stderr,
-                        "core was built for runtime \"%.*s\" but this is \"%s\"\n",
-                        (int)stringlen, (char*)ptr, build_id);
-                lose("can't load .core for different runtime, sorry\n");
-            }
-
+            stringlen = *ptr++;
+            --remaining_len;
+            gc_assert(remaining_len * sizeof (core_entry_elt_t) >= stringlen);
+            if (stringlen+1 != sizeof build_id || memcmp(ptr, build_id, stringlen))
+                lose("core was built for runtime \"%.*s\" but this is \"%s\"",
+                     (int)stringlen, (char*)ptr, build_id);
+            break;
         case DIRECTORY_CORE_ENTRY_TYPE_CODE:
             process_directory(remaining_len / NDIR_ENTRY_LENGTH,
                               (struct ndir_entry*)ptr, fd, file_offset,
                               merge_core_pages, &adj);
             break;
-
-        case INITIAL_FUN_CORE_ENTRY_TYPE_CODE:
-            initial_function = adjust_word(&adj, (lispobj)*ptr);
-            break;
-
         case PAGE_TABLE_CORE_ENTRY_TYPE_CODE:
             gc_load_corefile_ptes(ptr[0], ptr[1],
                                   file_offset + (ptr[2] + 1) * os_vm_page_size, fd);
             break;
+        case INITIAL_FUN_CORE_ENTRY_TYPE_CODE:
+            initial_function = adjust_word(&adj, (lispobj)*ptr);
+            break;
+        case END_CORE_ENTRY_TYPE_CODE:
+            free(header);
+            close(fd);
+            return initial_function;
         case RUNTIME_OPTIONS_MAGIC: break; // already processed
         default:
-            lose("unknown core file entry: 0x%"WORD_FMTX"\n", val);
+            lose("unknown core header entry: %"OBJ_FMTX, (lispobj)val);
         }
     }
 }

@@ -1415,8 +1415,10 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
     }
 
     if(thread_state(thread)!=STATE_RUNNING) {
+        // macOS warns if OBJ_FMTX is used to format a 'sword_t'
+        // which fixnum_value() returns.
         lose("sig_stop_for_gc_handler: wrong thread state: %"OBJ_FMTX,
-             fixnum_value(thread->state));
+             (lispobj)fixnum_value(thread->state));
     }
 
     set_thread_state(thread,STATE_STOPPED);
@@ -1433,7 +1435,7 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
 
     if(thread_state(thread)!=STATE_RUNNING) {
         lose("sig_stop_for_gc_handler: wrong thread state on wakeup: %"OBJ_FMTX,
-             fixnum_value(thread_state(thread)));
+             (lispobj)fixnum_value(thread_state(thread)));
     }
 
     if (was_in_lisp) {

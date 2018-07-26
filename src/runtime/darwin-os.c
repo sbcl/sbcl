@@ -247,7 +247,8 @@ os_sem_wait(os_sem_t *sem, char *what)
     case KERN_ABORTED:
         goto restart;
     default:
-        lose("%s: os_sem_wait(%p): %lu, %s", what, sem, ret, strerror(errno));
+        lose("%s: os_sem_wait(%p): %lu, %s",
+             what, sem, (long unsigned)ret, strerror(errno));
     }
 }
 
@@ -351,7 +352,7 @@ sb_nanosleep(time_t sec, int nsec) {
 
     ret = clock_get_time(clock_port, &start_time);
     if (ret != KERN_SUCCESS) {
-            lose(mach_error_string(ret));
+            lose("%s", mach_error_string(ret));
     }
 
     for (;;) {
@@ -366,7 +367,7 @@ sb_nanosleep(time_t sec, int nsec) {
             if (errno == EINTR) {
                 ret = clock_get_time(clock_port, &current_time);
                 if (ret != KERN_SUCCESS) {
-                    lose(mach_error_string(ret));
+                    lose("%s", mach_error_string(ret));
                 }
                 time_t elapsed_sec = current_time.tv_sec - start_time.tv_sec;
                 int elapsed_nsec = current_time.tv_nsec - start_time.tv_nsec;

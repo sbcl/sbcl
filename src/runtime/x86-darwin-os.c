@@ -384,7 +384,7 @@ catch_exception_raise(mach_port_t exception_port,
 
     if (mach_port_get_context(mach_task_self(), exception_port, (mach_vm_address_t *)&th)
         != KERN_SUCCESS) {
-        lose("Can't find the thread for an exception %p", exception_port);
+        lose("Can't find the thread for an exception %u", exception_port);
     }
 
     /* Get state and info */
