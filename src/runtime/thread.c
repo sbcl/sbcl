@@ -170,7 +170,7 @@ wait_for_thread_state_change(struct thread *thread, lispobj state)
             thread->state_not_stopped_waitcount++;
             break;
         default:
-            lose("Invalid state in wait_for_thread_state_change: "OBJ_FMTX"\n", state);
+            lose("Invalid state in wait_for_thread_state_change: %"OBJ_FMTX, state);
         }
     } else {
         wait_sem = NULL;
@@ -1009,7 +1009,7 @@ void gc_start_the_world()
             lispobj state = thread_state(p);
             if (state != STATE_DEAD) {
                 if(state != STATE_STOPPED) {
-                    lose("gc_start_the_world: wrong thread state is %d\n",
+                    lose("gc_start_the_world: wrong thread state is %"OBJ_FMTX,
                          fixnum_value(state));
                 }
                 FSHOW_SIGNAL((stderr, "/gc_start_the_world: resuming %lu\n",

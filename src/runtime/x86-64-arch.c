@@ -393,7 +393,7 @@ sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context) {
 #endif
 
     fake_foreign_function_call(context);
-    lose("Unhandled SIGILL at %p.", *os_context_pc_addr(context));
+    lose("Unhandled SIGILL at %p.", (void*)*os_context_pc_addr(context));
 }
 
 #ifdef X86_64_SIGFPE_FIXUP
@@ -676,7 +676,7 @@ allocation_tracker_counted(uword_t* sp)
         // but since this is self-modifying code, the most stringent memory
         // order is prudent.
         if (!__sync_bool_compare_and_swap(pc, word_at_pc, new_inst))
-            lose("alloc profiler failed to rewrite instruction @ %lx", pc);
+            lose("alloc profiler failed to rewrite instruction @ %p", pc);
         if (index != 2)
             record_pc(pc, index, 0);
     }
@@ -715,7 +715,7 @@ allocation_tracker_sized(uword_t* sp)
         // opcode is changed, fallthrough to the next instruction occurs.
         if (!__sync_bool_compare_and_swap(pc+1, word_after_pc, new_inst2) ||
             !__sync_bool_compare_and_swap(pc,   word_at_pc,    new_inst1))
-            lose("alloc profiler failed to rewrite instructions @ %lx", pc);
+            lose("alloc profiler failed to rewrite instructions @ %p", pc);
         if (index != 0) // can't record a PC for the overflow counts
             record_pc(pc, index, 1);
     }

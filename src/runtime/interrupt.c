@@ -322,7 +322,7 @@ all_signals_blocked_p(sigset_t *sigset, sigset_t *sigset2,
     if (has_blocked && has_unblocked) {
         char buf[3*64]; // assuming worst case 64 signals present in sigset
         sigset_tostring(sigset, buf, sizeof buf);
-        lose("%s signals partially blocked: {%s}\n", name);
+        lose("%s signals partially blocked: {%s}\n", name, buf);
     }
     if (has_blocked)
         return 1;
@@ -1080,7 +1080,7 @@ interrupt_handle_pending(os_context_t *context)
          * an interrupt arrived during GC (POST-GC, really) it was
          * handled. */
         if (original_pending_handler != data->pending_handler)
-            lose("pending handler changed in gc: %x -> %x.",
+            lose("pending handler changed in gc: %p -> %p.",
                  original_pending_handler, data->pending_handler);
     }
 
@@ -1297,7 +1297,7 @@ store_signal_data_for_later (struct interrupt_data *data, void *handler,
                              siginfo_t *info, os_context_t *context)
 {
     if (data->pending_handler)
-        lose("tried to overwrite pending interrupt handler %x with %x\n",
+        lose("tried to overwrite pending interrupt handler %p with %p",
              data->pending_handler, handler);
     if (!handler)
         lose("tried to defer null interrupt handler\n");
@@ -1415,7 +1415,7 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
     }
 
     if(thread_state(thread)!=STATE_RUNNING) {
-        lose("sig_stop_for_gc_handler: wrong thread state: %ld\n",
+        lose("sig_stop_for_gc_handler: wrong thread state: %"OBJ_FMTX,
              fixnum_value(thread->state));
     }
 
@@ -1432,7 +1432,7 @@ sig_stop_for_gc_handler(int __attribute__((unused)) signal,
     FSHOW_SIGNAL((stderr,"resumed\n"));
 
     if(thread_state(thread)!=STATE_RUNNING) {
-        lose("sig_stop_for_gc_handler: wrong thread state on wakeup: %ld\n",
+        lose("sig_stop_for_gc_handler: wrong thread state on wakeup: %"OBJ_FMTX,
              fixnum_value(thread_state(thread)));
     }
 
@@ -1726,7 +1726,7 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
        addr < CONTROL_STACK_HARD_GUARD_PAGE(th) + os_vm_page_size) {
         fake_foreign_function_call(context);
         lose("Control stack exhausted, fault: %p, PC: %p",
-             addr, *os_context_pc_addr(context));
+             addr, (void*)*os_context_pc_addr(context));
     }
     else if(addr >= CONTROL_STACK_GUARD_PAGE(th) &&
             addr < CONTROL_STACK_GUARD_PAGE(th) + os_vm_page_size) {
@@ -1737,7 +1737,7 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
         if (lose_on_corruption_p || gc_active_p) {
             fake_foreign_function_call(context);
             lose("Control stack exhausted, fault: %p, PC: %p",
-                 addr, *os_context_pc_addr(context));
+                 addr, (void*)*os_context_pc_addr(context));
         }
         if (th->control_stack_guard_page_protected == NIL)
             lose("control_stack_guard_page_protected NIL");

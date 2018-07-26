@@ -244,7 +244,7 @@ deduce_thread(void (*context_scanner)(), uword_t pointer, char** pc)
             }
         }
         if (!esp || esp == (void*) -1)
-            lose("deduce_thread: no SP known for thread %x (OS %x)", th, th->os_thread);
+            UNKNOWN_STACK_POINTER_ERROR("deduce_thread", th);
         void** where;
         for (where = ((void **)th->control_stack_end)-1; where >= esp;  where--)
             if ((uword_t)*where == pointer) {

@@ -228,7 +228,8 @@ void os_map(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
                   fd, (off_t) offset);
     if (actual == MAP_FAILED || (addr && (addr != actual))) {
         perror("mmap");
-        lose("unexpected mmap(%d, %d, ...) failure\n", addr, len);
+        lose("unexpected mmap(%"OBJ_FMTX", %"OBJ_FMTX") failure\n",
+             (uword_t)addr, (uword_t)len);
     }
 }
 

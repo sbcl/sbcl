@@ -2634,7 +2634,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                             "younger obj from WP'd code header page");
                     // 2. the object header must be marked as written
                     if (!header_rememberedp(*state->object_start))
-                        lose("code @ %p (g%d). word @ %p -> %lx (g%d)\n",
+                        lose("code @ %p (g%d). word @ %p -> %"OBJ_FMTX" (g%d)",
                              state->object_start, state->object_gen,
                              where, thing, gen_of(thing));
                 } else {
@@ -2678,7 +2678,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
             /* skip immediates */
         } else if (!(other_immediate_lowtag_p(widetag)
                      && lowtag_for_widetag[widetag>>2])) {
-            lose("Unhandled widetag %p at %p\n", widetag, where);
+            lose("Unhandled widetag %d at %p", widetag, where);
         } else if (unboxed_obj_widetag_p(widetag)) {
             count = sizetab[widetag](where);
         } else switch(widetag) {
@@ -3150,8 +3150,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
             esp = (void*)&raise;
 # endif
             if (!esp || esp == (void*) -1)
-                lose("garbage_collect: no SP known for thread %x (OS %x)",
-                     th, th->os_thread);
+                UNKNOWN_STACK_POINTER_ERROR("garbage_collect", th);
             // This loop would be more naturally expressed as
             //  for (ptr = esp; ptr < th->control_stack_end; ++ptr)
             // However there is a very subtle problem with that: 'esp = &raise'

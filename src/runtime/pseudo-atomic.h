@@ -46,7 +46,7 @@ set_pseudo_atomic_atomic(struct thread __attribute__((unused)) *thread)
 {
     lispobj *p = &THREAD_PA_BITS(thread);
     if (*p)
-        lose("set_pseudo_atomic_atomic: pseudo atomic bits is %d.", *p);
+        lose("set_pseudo_atomic_atomic: pseudo atomic bits is %"OBJ_FMTX, *p);
     __asm__ __volatile__
         ("or" LISPOBJ_ASM_SUFFIX " %0,%1"
          :

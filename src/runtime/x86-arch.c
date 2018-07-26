@@ -318,7 +318,7 @@ sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context) {
     }
 #endif
     fake_foreign_function_call(context);
-    lose("Unhandled SIGILL at %p.", *os_context_pc_addr(context));
+    lose("Unhandled SIGILL at %p.", (void*)*os_context_pc_addr(context));
 }
 #endif /* not LISP_FEATURE_WIN32 */
 
@@ -397,7 +397,7 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
     } else {
         /* This used to just print a note to stderr, but bogus fixups seem to
          * indicate real heap corruption, so a hard failure is in order. */
-        lose("fixup vector %p has a bad widetag: %d\n",
+        lose("fixup vector %x has a bad widetag: %#x",
              fixups, widetag_of(*native_pointer(fixups)));
     }
 }

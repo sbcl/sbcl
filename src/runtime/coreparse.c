@@ -629,7 +629,7 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
               && specialized_vector_widetag_p(widetag))
               continue;
           else
-              lose("Unrecognized heap object: @%p: %lx\n", where, header_word);
+              lose("Unrecognized heap object: @%p: %"OBJ_FMTX, where, header_word);
         }
         adjust_pointers(where+1, nwords-1, adj);
     }
@@ -772,12 +772,12 @@ process_directory(int count, struct ndir_entry *entry,
 #endif
 
     for ( ; --count>= 0; ++entry) {
-        sword_t id = entry->identifier;
+        long id = entry->identifier;
         uword_t addr = entry->address;
         int compressed = id & DEFLATED_CORE_SPACE_ID_FLAG;
         id -= compressed;
         if (id < 1 || id > MAX_CORE_SPACE_ID)
-            lose("unknown space ID %ld addr %p\n", id, addr);
+            lose("unknown space ID %ld addr %p\n", id, (void*)addr);
 
 #ifndef LISP_FEATURE_RELOCATABLE_HEAP
         int enforce_address = 1;
@@ -831,7 +831,8 @@ process_directory(int count, struct ndir_entry *entry,
                 addr = (uword_t)os_validate(sub_2gb_flag ? MOVABLE_LOW : MOVABLE,
                                             (os_vm_address_t)addr, request);
                 if (!addr) {
-                    lose("Can't allocate %p bytes for space %d", request, id);
+                    lose("Can't allocate %#"OBJ_FMTX" bytes for space %ld",
+                         (lispobj)request, id);
                 }
             }
             switch (id) {
@@ -1026,9 +1027,8 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
     val = *ptr++;
 
     if (val != CORE_MAGIC) {
-        lose("invalid magic number in core: 0x%lx should have been 0x%x.",
-             val,
-             CORE_MAGIC);
+        lose("invalid magic number in core: %"OBJ_FMTX" should have been %x"OBJ_FMTX,
+             val, CORE_MAGIC);
     }
     SHOW("found CORE_MAGIC");
 
