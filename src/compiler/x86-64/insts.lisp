@@ -57,11 +57,12 @@
 ;;; REX-R            A REX prefix with the "register" bit set was found
 ;;; REX-X            A REX prefix with the "index" bit set was found
 ;;; REX-B            A REX prefix with the "base" bit set was found
-(defconstant +allow-qword-imm+ #b100000000)
-(defconstant +operand-size-8+  #b010000000)
-(defconstant +operand-size-16+ #b001000000)
-(defconstant +fs-segment+      #b000100000)
-(defconstant +rex+             #b000010000)
+(defconstant +allow-qword-imm+ #b1000000000)
+(defconstant +imm-size-8+      #b0100000000)
+(defconstant +operand-size-8+  #b0010000000)
+(defconstant +operand-size-16+ #b0001000000)
+(defconstant +fs-segment+      #b0000100000)
+(defconstant +rex+             #b0000010000)
 ;;; The next 4 exactly correspond to the bits in the REX prefix itself,
 ;;; to avoid unpacking and stuffing into inst-properties one at a time.
 (defconstant +rex-w+           #b1000)
@@ -1858,47 +1859,49 @@
      (emit-byte segment (opcode+size-bit #xF6 size))
      (emit-ea segment src #b100))))
 
-(define-instruction imul (segment dst &optional src1 src2)
-  (:printer accum-reg/mem ((op '(#b1111011 #b101))))
-  (:printer ext-reg-reg/mem-no-width ((op #b10101111)))
-  ;; These next two are like a single format where one bit in the opcode byte
-  ;; determines the size of the immediate datum. A REG-REG/MEM-IMM format
-  ;; would save one entry in the decoding table, since that bit would become
-  ;; "don't care" from a decoding perspective, but we don't have (many) other
-  ;; 3-operand opcodes in the general purpose (non-SSE) opcode space.
-  (:printer reg-reg/mem ((op #b0110100) (width 1)
-                         (imm nil :type 'signed-imm-data))
-            '(:name :tab reg ", " reg/mem ", " imm))
-  (:printer reg-reg/mem ((op #b0110101) (width 1)
-                         (imm nil :type 'signed-imm-byte))
-            '(:name :tab reg ", " reg/mem ", " imm))
+(define-instruction-format (imul-3-operand 16 :include reg-reg/mem)
+  (op    :fields (list (byte 6 2) (byte 1 0)) :value '(#b011010 1))
+  (width :field (byte 1 1)
+         :prefilter (lambda (dstate value)
+                      (unless (eql value 0)
+                        (dstate-setprop dstate +imm-size-8+))))
+  (imm   :prefilter
+         (lambda (dstate)
+           (let ((nbytes
+                  (if (dstate-getprop dstate +imm-size-8+)
+                      1
+                      (min 4 (size-nbyte (inst-operand-size dstate))))))
+             (read-signed-suffix (* nbytes 8) dstate)))))
+
+(define-instruction imul (segment dst &optional src imm)
+  ;; default accum-reg/mem printer is wrong here because 1-operand imul
+  ;; is very different from 2-operand, not merely a shorter syntax for it.
+  (:printer accum-reg/mem ((op '(#b1111011 #b101))) '(:name :tab reg/mem))
+  (:printer ext-reg-reg/mem-no-width ((op #xAF))) ; 2-operand
+  (:printer imul-3-operand () '(:name :tab reg ", " reg/mem ", " imm))
   (:emitter
-   (flet ((r/m-with-immed-to-reg (reg r/m immed)
-            (let* ((size (matching-operand-size reg r/m))
-                   (sx (and (not (eq size :byte)) (<= -128 immed 127))))
-              (maybe-emit-operand-size-prefix segment size)
-              (maybe-emit-rex-for-ea segment r/m reg)
-              (emit-byte segment (if sx #b01101011 #b01101001))
-              (emit-ea segment r/m (reg-tn-encoding reg))
-              (if sx
-                  (emit-byte segment immed)
-                  (emit-imm-operand segment immed size)))))
-     (cond (src2
-            (r/m-with-immed-to-reg dst src1 src2))
-           (src1
-            (if (integerp src1)
-                (r/m-with-immed-to-reg dst dst src1)
-                (let ((size (matching-operand-size dst src1)))
-                  (maybe-emit-operand-size-prefix segment size)
-                  (maybe-emit-rex-for-ea segment src1 dst)
-                  (emit-bytes segment #x0F #xAF)
-                  (emit-ea segment src1 (reg-tn-encoding dst)))))
+   (let ((operand-size (matching-operand-size dst src)))
+     (cond ((not src) ; 1-operand form affects RDX:RAX or subregisters thereof
+            (aver (not imm))
+            (maybe-emit-operand-size-prefix segment operand-size)
+            (maybe-emit-rex-for-ea segment dst nil)
+            (emit-byte segment (opcode+size-bit #xF6 operand-size))
+            (emit-ea segment dst #b101))
            (t
-            (let ((size (operand-size dst)))
-              (maybe-emit-operand-size-prefix segment size)
-              (maybe-emit-rex-for-ea segment dst nil)
-              (emit-byte segment (opcode+size-bit #xF6 size))
-              (emit-ea segment dst #b101)))))))
+            (aver (neq operand-size :byte))
+            ;; If two operands and the second is immediate, it's really 3-operand
+            ;; form with the same dst and src, which has to be a register.
+            (when (and (integerp src) (not imm))
+              (setq imm src src dst))
+            (let ((imm-size (if (typep imm '(signed-byte 8)) :byte operand-size)))
+              (maybe-emit-operand-size-prefix segment operand-size)
+              (maybe-emit-rex-for-ea segment src dst)
+              (if imm
+                  (emit-byte segment (if (eq imm-size :byte) #x6B #x69))
+                  (emit-bytes segment #x0F #xAF))
+              (emit-ea segment src (reg-tn-encoding dst))
+              (if imm
+                  (emit-imm-operand segment imm imm-size))))))))
 
 (flet ((emit* (segment dst src subcode)
          (let ((size (matching-operand-size dst src)))

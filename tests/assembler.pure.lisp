@@ -166,6 +166,12 @@
     (try `(add ,rcx-tn ,(memref :qword)) "48034D00         ADD RCX, [$fp]")
     ))
 
+(with-test (:name :disassemble-imul :skipped-on (not (or :x86 :x86-64)))
+  (test-assemble `(imul ,dl-tn)  "F6EA             IMUL DL")
+  (test-assemble `(imul ,cx-tn)  "66F7E9           IMUL CX")
+  (test-assemble `(imul ,ebx-tn) "F7EB             IMUL EBX")
+  (test-assemble `(imul ,edi-tn 92) "6BFF5C           IMUL EDI, EDI, 92"))
+
 (with-test (:name :disassemble-fs-prefix :skipped-on (not (or :x86-64)))
   (let ((bytes (coerce '(#x64 #xF0 #x44 #x08 #x04 #x25 #x00 #x04 #x10 #x20)
                        '(array (unsigned-byte 8) 1)))

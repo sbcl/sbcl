@@ -136,10 +136,11 @@
              (princ (schar (symbol-name (inst-operand-size dstate)) 0)
                     stream)))
 
-(defconstant +fs-segment-prefix+ #b0001)
-(defconstant +gs-segment-prefix+ #b0010)
-(defconstant +operand-size-8+    #b0100)
-(defconstant +operand-size-16+   #b1000)
+(defconstant +fs-segment-prefix+ #b00001)
+(defconstant +gs-segment-prefix+ #b00010)
+(defconstant +operand-size-8+    #b00100)
+(defconstant +operand-size-16+   #b01000)
+(defconstant +imm-size-8+        #b10000)
 
 ;;; Used to capture the effect of the #x66 operand size override prefix.
 (define-arg-type x66
@@ -551,6 +552,10 @@
     (logior (ash (logand offset 1) 2)
             (ash offset -1))))
 
+(defmacro emit-bytes (segment &rest bytes)
+  `(progn ,@(mapcar (lambda (x) `(emit-byte ,segment ,x)) bytes)))
+(defun opcode+size-bit (opcode size)
+  (if (eq size :byte) opcode (logior opcode 1)))
 (defun emit-byte+reg (seg byte reg)
   (emit-byte seg (+ byte (reg-tn-encoding reg))))
 
@@ -1173,40 +1178,45 @@
      (emit-byte segment (if (eq size :byte) #b11110110 #b11110111))
      (emit-ea segment src #b100))))
 
-(define-instruction imul (segment dst &optional src1 src2)
-  (:printer accum-reg/mem ((op '(#b1111011 #b101))))
-  (:printer ext-reg-reg/mem ((op #b1010111)))
-  (:printer reg-reg/mem ((op #b0110100) (width 1)
-                         (imm nil :type 'signed-imm-word))
-            '(:name :tab reg ", " reg/mem ", " imm))
-  (:printer reg-reg/mem ((op #b0110101) (width 1)
-                         (imm nil :type 'signed-imm-byte))
-            '(:name :tab reg ", " reg/mem ", " imm))
+(define-instruction-format (imul-3-operand 16 :include reg-reg/mem)
+  (op    :fields (list (byte 6 2) (byte 1 0)) :value '(#b011010 1))
+  (width :field (byte 1 1)
+         :prefilter (lambda (dstate value)
+                      (unless (eql value 0)
+                        (dstate-setprop dstate +imm-size-8+))))
+  (imm   :prefilter
+         (lambda (dstate)
+           (let ((nbytes
+                  (if (dstate-getprop dstate +imm-size-8+)
+                      1
+                      (size-nbyte (inst-operand-size dstate)))))
+             (read-signed-suffix (* nbytes 8) dstate)))))
+
+(define-instruction imul (segment dst &optional src imm)
+  (:printer accum-reg/mem ((op '(#b1111011 #b101))) '(:name :tab reg/mem))
+  (:printer ext-reg-reg/mem-no-width ((op #xAF)))
+  (:printer imul-3-operand () '(:name :tab reg ", " reg/mem ", " imm))
   (:emitter
-   (flet ((r/m-with-immed-to-reg (reg r/m immed)
-            (let* ((size (matching-operand-size reg r/m))
-                   (sx (and (not (eq size :byte)) (<= -128 immed 127))))
-              (maybe-emit-operand-size-prefix segment size)
-              (emit-byte segment (if sx #b01101011 #b01101001))
-              (emit-ea segment r/m (reg-tn-encoding reg))
-              (if sx
-                  (emit-byte segment immed)
-                  (emit-imm-operand segment immed size)))))
-     (cond (src2
-            (r/m-with-immed-to-reg dst src1 src2))
-           (src1
-            (if (integerp src1)
-                (r/m-with-immed-to-reg dst dst src1)
-                (let ((size (matching-operand-size dst src1)))
-                  (maybe-emit-operand-size-prefix segment size)
-                  (emit-byte segment #b00001111)
-                  (emit-byte segment #b10101111)
-                  (emit-ea segment src1 (reg-tn-encoding dst)))))
+   (let ((operand-size (matching-operand-size dst src)))
+     (cond ((not src) ; 1-operand form affects EDX:EAX or subregisters thereof
+            (aver (not imm))
+            (maybe-emit-operand-size-prefix segment operand-size)
+            (emit-byte segment (opcode+size-bit #xF6 operand-size))
+            (emit-ea segment dst #b101))
            (t
-            (let ((size (operand-size dst)))
-              (maybe-emit-operand-size-prefix segment size)
-              (emit-byte segment (if (eq size :byte) #b11110110 #b11110111))
-              (emit-ea segment dst #b101)))))))
+            (aver (neq operand-size :byte))
+            ;; If two operands and the second is immediate, it's really 3-operand
+            ;; form with the same dst and src, which has to be a register.
+            (when (and (integerp src) (not imm))
+              (setq imm src src dst))
+            (let ((imm-size (if (typep imm '(signed-byte 8)) :byte operand-size)))
+              (maybe-emit-operand-size-prefix segment operand-size)
+              (if imm
+                  (emit-byte segment (if (eq imm-size :byte) #x6B #x69))
+                  (emit-bytes segment #x0F #xAF))
+              (emit-ea segment src (reg-tn-encoding dst))
+              (if imm
+                  (emit-imm-operand segment imm imm-size))))))))
 
 (define-instruction div (segment dst src)
   (:printer accum-reg/mem ((op '(#b1111011 #b110))))
