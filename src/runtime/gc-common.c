@@ -176,7 +176,7 @@ static inline void scav1(lispobj* object_ptr, lispobj object)
     } else {
 #if (N_WORD_BITS == 32) && defined(LISP_FEATURE_GENCGC)
         if (forwarding_pointer_p(object_ptr))
-          lose("unexpected forwarding pointer in scavenge @ %p\n",
+          lose("unexpected forwarding pointer in scavenge @ %p",
                object_ptr);
 #endif
         /* It points somewhere other than oldspace. Leave it
@@ -395,8 +395,8 @@ size_code_header(lispobj *where)
 static sword_t
 scav_return_pc_header(lispobj *where, lispobj object)
 {
-    lose("attempted to scavenge a return PC header where=%p object=%#lx\n",
-         where, (uword_t) object);
+    lose("attempted to scavenge a return PC header where=%p object=%"OBJ_FMTX,
+         where, object);
     return 0; /* bogus return value to satisfy static type checking */
 }
 
@@ -444,8 +444,8 @@ scav_closure(lispobj *where, lispobj header)
 static sword_t
 scav_fun_header(lispobj *where, lispobj object)
 {
-    lose("attempted to scavenge a function header where=%p object=%#lx\n",
-         where, (uword_t) object);
+    lose("attempted to scavenge a function header where=%p object=%"OBJ_FMTX,
+         where, object);
     return 0; /* bogus return value to satisfy static type checking */
 }
 #endif /* LISP_FEATURE_X86 */
@@ -1182,18 +1182,18 @@ boolean scav_hash_table_entries(struct hash_table *hash_table,
     lispobj *kv_vector = get_array_data(hash_table->table,
                                         SIMPLE_VECTOR_WIDETAG, &kv_length);
     if (kv_vector == NULL)
-        lose("invalid kv_vector %x\n", hash_table->table);
+        lose("invalid kv_vector %"OBJ_FMTX, hash_table->table);
 
     lispobj *index_vector = get_array_data(hash_table->index_vector,
                                            SIMPLE_ARRAY_WORD_WIDETAG, &length);
     if (index_vector == NULL)
-        lose("invalid index_vector %x\n", hash_table->index_vector);
+        lose("invalid index_vector %"OBJ_FMTX, hash_table->index_vector);
 
     lispobj *next_vector = get_array_data(hash_table->next_vector,
                                           SIMPLE_ARRAY_WORD_WIDETAG,
                                           &next_vector_length);
     if (next_vector == NULL)
-        lose("invalid next_vector %x\n", hash_table->next_vector);
+        lose("invalid next_vector %"OBJ_FMTX, hash_table->next_vector);
 
     lispobj *hash_vector = get_array_data(hash_table->hash_vector,
                                           SIMPLE_ARRAY_WORD_WIDETAG,
@@ -1467,9 +1467,8 @@ void cull_weak_hash_tables(int (*alivep[5])(lispobj,lispobj))
 static sword_t
 scav_lose(lispobj *where, lispobj object)
 {
-    lose("no scavenge function for object %p (widetag 0x%x)\n",
-         (uword_t)object,
-         widetag_of(*where));
+    lose("no scavenge function for object %p (widetag %#x)",
+         (void*)object, widetag_of(*where));
 
     return 0; /* bogus return value to satisfy static type checking */
 }
@@ -1477,18 +1476,16 @@ scav_lose(lispobj *where, lispobj object)
 static lispobj
 trans_lose(lispobj object)
 {
-    lose("no transport function for object %p (widetag 0x%x)\n",
-         (void*)object,
-         widetag_of(*native_pointer(object)));
+    lose("no transport function for object %p (widetag %#x)",
+         (void*)object, widetag_of(*native_pointer(object)));
     return NIL; /* bogus return value to satisfy static type checking */
 }
 
 static sword_t
 size_lose(lispobj *where)
 {
-    lose("no size function for object at %p (widetag 0x%x)\n",
-         (void*)where,
-         widetag_of(*where));
+    lose("no size function for object at %p (widetag %#x)",
+         (void*)where, widetag_of(*where));
     return 1; /* bogus return value to satisfy static type checking */
 }
 boolean valid_widetag_p(unsigned char widetag) {
@@ -1868,7 +1865,7 @@ scavenge_control_stack(struct thread *th)
         lispobj object = *object_ptr;
 #ifdef LISP_FEATURE_GENCGC
         if (forwarding_pointer_p(object_ptr))
-            lose("unexpected forwarding pointer in scavenge_control_stack: %p, start=%p, end=%p\n",
+            lose("unexpected forwarding pointer in scavenge_control_stack: %p, start=%p, end=%p",
                  object_ptr, th->control_stack_start, access_control_stack_pointer(th));
 #endif
         if (is_lisp_pointer(object) && from_space_p(object)) {
@@ -1885,7 +1882,7 @@ scavenge_control_stack(struct thread *th)
                 gc_assert(n_words_scavenged == 1);
             }
         } else if (scavtab[widetag_of(object)] == scav_lose) {
-            lose("unboxed object in scavenge_control_stack: %p->%x, start=%p, end=%p\n",
+            lose("unboxed object in scavenge_control_stack: %p->%x, start=%p, end=%p",
                  object_ptr, object, th->control_stack_start, access_control_stack_pointer(th));
         }
     }
