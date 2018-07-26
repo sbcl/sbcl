@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-1.4.9:
+changes in sbcl-1.4.10 relative to sbcl-1.4.9:
   * enhancement: added SB-EXT:MAKE-WEAK-VECTOR.
   * enhancement: constant-modification detection warnings can be generated
     in the presence of conditional constructs.
