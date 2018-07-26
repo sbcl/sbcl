@@ -801,9 +801,18 @@
               (multiple-value-bind (constantp value) (type-singleton-p ctype)
                 (and constantp
                      `(eql ,object ',value))))
-         (let ((pred (cdr (assoc ctype *backend-type-predicates*
-                                 :test #'type=))))
-           (when pred `(,pred ,object)))
+         (handler-case
+             (or
+              (let ((pred (cdr (assoc ctype *backend-type-predicates*
+                                      :test #'type=))))
+                (when pred `(,pred ,object)))
+              (let ((pred (cdr (assoc (type-negation ctype)
+                                      *backend-type-predicates*
+                                      :test #'type=))))
+                (when pred `(not (,pred ,object)))))
+           #+sb-xc-host
+           (sb!kernel::cross-type-warning
+             nil))
          (typecase ctype
            (hairy-type
             (source-transform-hairy-typep object ctype))
