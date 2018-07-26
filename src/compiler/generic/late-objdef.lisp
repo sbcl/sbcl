@@ -65,7 +65,7 @@
     (symbol "tiny_boxed")
     ;; Can't transport characters as "other" pointer objects.
     ;; It should be a cons cell half which would go through trans_list()
-    (character "immediate" "lose" "immediate")
+    (character "immediate")
     (sap "unboxed")
     (unbound-marker "immediate")
     (weak-pointer "lose" "weak_pointer" "boxed")
@@ -186,6 +186,11 @@ static inline lispobj compute_lispobj(lispobj* base_addr) {
                        (svref sizetab i) "pointer"))))))
     (dolist (entry *scav/trans/size*)
       (destructuring-bind (widetag scav &optional (trans scav) (size trans)) entry
+        ;; immediates use trans_lose which is what trans_immediate did anyway.
+        ;; Substitution here makes the *scav/trans/size* table definition
+        ;; more clear, because single-float is either immediate or unboxed,
+        ;; and it's not nice to repeat the reader conditional expressing that.
+        (when (string= trans "immediate") (setq trans "lose"))
         (setf (svref scavtab widetag) scav
               (svref transtab (ash widetag -2)) trans
               (svref sizetab widetag) size)))

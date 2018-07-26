@@ -469,19 +469,13 @@ trans_fun_header(lispobj object)
  * instances
  */
 
-static lispobj
-trans_instance(lispobj object)
-{
-    gc_dcheck(instancep(object));
-    lispobj header = *(lispobj*)(object - INSTANCE_POINTER_LOWTAG);
-    return copy_object(object, 1 + (instance_length(header)|1));
-}
-
 static sword_t
 scav_instance_pointer(lispobj *where, lispobj object)
 {
+    gc_dcheck(instancep(object));
+    lispobj header = *(lispobj*)(object - INSTANCE_POINTER_LOWTAG);
     /* Object is a pointer into from space - not a FP. */
-    lispobj copy = trans_instance(object);
+    lispobj copy = copy_object(object, 1 + (instance_length(header)|1));
 
     gc_dcheck(copy != object);
 
@@ -496,24 +490,7 @@ scav_instance_pointer(lispobj *where, lispobj object)
  * lists and conses
  */
 
-static lispobj trans_list(lispobj object);
-
-static sword_t
-scav_list_pointer(lispobj *where, lispobj object)
-{
-    gc_dcheck(listp(object));
-
-    lispobj copy = trans_list(object);
-    gc_dcheck(copy != object);
-
-    CHECK_COPY_POSTCONDITIONS(copy, LIST_POINTER_LOWTAG);
-
-    *where = copy;
-    return 1;
-}
-
-
-static lispobj
+static inline lispobj
 trans_list(lispobj object)
 {
     /* Copy 'object'. */
@@ -550,6 +527,19 @@ trans_list(lispobj object)
     return new_list_pointer;
 }
 
+static sword_t
+scav_list_pointer(lispobj *where, lispobj object)
+{
+    gc_dcheck(listp(object));
+
+    lispobj copy = trans_list(object);
+    gc_dcheck(copy != object);
+
+    CHECK_COPY_POSTCONDITIONS(copy, LIST_POINTER_LOWTAG);
+
+    *where = copy;
+    return 1;
+}
 
 /*
  * scavenging and transporting other pointers
@@ -612,13 +602,6 @@ scav_immediate(lispobj *where, lispobj object)
     object = *++where;
     if (is_lisp_pointer(object)) scav1(where, object);
     return 2;
-}
-
-static lispobj
-trans_immediate(lispobj __attribute__((unused)) object)
-{
-    lose("trying to transport an immediate\n");
-    return NIL; /* bogus return value to satisfy static type checking */
 }
 
 static sword_t
