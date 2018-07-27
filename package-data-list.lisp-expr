@@ -470,7 +470,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "FRAME-HAS-DEBUG-TAG-P"
                "UNWIND-TO-FRAME-AND-CALL"
                ;; Deprecated
-               "BACKTRACE" "BACKTRACE-AS-LIST" "*SHOW-ENTRY-POINT-DETAILS*"
+               "BACKTRACE" "BACKTRACE-AS-LIST"
                ;; Replaced by
                "PRINT-BACKTRACE" "LIST-BACKTRACE"))
 
