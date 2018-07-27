@@ -295,7 +295,8 @@
 ;;; Load a signed integer LENGTH bytes long from FASL-INPUT-STREAM.
 (defun load-s-integer (length fasl-input-stream)
   (declare (fixnum length)
-           (optimize speed))
+           (optimize speed)
+           #-sb-xc-host (muffle-conditions compiler-note))
   (with-fast-read-byte ((unsigned-byte 8) fasl-input-stream)
     (do* ((index length (1- index))
           (byte 0 (fast-read-byte))

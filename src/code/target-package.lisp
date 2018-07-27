@@ -1732,7 +1732,7 @@ PACKAGE."
   ;; the defknown isn't enough
   (declare (type fixnum start-state) (type index index)
            (type simple-vector sym-vec) (type list pkglist))
-  (declare (optimize speed))
+  (declare (optimize speed) (muffle-conditions compiler-note))
   (labels
       ((advance (state) ; STATE is the one just completed
          (case (logand state #b11)
