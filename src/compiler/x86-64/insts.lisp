@@ -1202,8 +1202,6 @@
 
 ;;;; utilities
 
-(defconstant +operand-size-prefix-byte+ #b01100110)
-
 (defconstant +regclass-gpr+ 0)
 (defconstant +regclass-fpr+ 1)
 
@@ -1239,12 +1237,6 @@
          (make-gpr-id (sc-operand-size (tn-sc tn))
                       (ash (tn-offset tn) -1)))))
 
-(defun maybe-emit-operand-size-prefix (segment size)
-  (unless (or (eq size :byte)
-              (eq size :qword)          ; REX prefix handles this
-              (eq size +default-operand-size+))
-    (emit-byte segment +operand-size-prefix-byte+)))
-
 ;;; A REX prefix must be emitted if at least one of the following
 ;;; conditions is true:
 ;;; 1. Any of the WRXB bits are nonzero, which occurs if:
@@ -1258,11 +1250,11 @@
 ;;; Emit a REX prefix if necessary. WIDTH is used to determine
 ;;; whether to set REX.W. Callers pass it explicitly as :DO-NOT-SET if
 ;;; this should not happen, for example because the instruction's default
-;;; operand size is qword. (FIXME: is totally redundant with NIL)
+;;; operand size is qword.
 ;;; R, X and B are NIL or REG-IDs specifying registers the encodings of
 ;;; which may be extended with the REX.R, REX.X and REX.B bit, respectively.
 (defun emit-rex-if-needed (segment width r x b)
-  (declare (type (member nil :byte :word :dword :qword :do-not-set) width)
+  (declare (type (member :byte :word :dword :qword :do-not-set) width)
            (type (or null fixnum) r x b))
   (flet ((encoding-bit3-p (reg-id)
            (and reg-id (logbitp 3 (reg-index reg-id))))
@@ -1280,31 +1272,35 @@
                 (spl/bpl/sil/dil-p b))
         (emit-byte segment (logior #x40 wrxb))))))
 
-;;; Emit a REX prefix if necessary. The operand size is determined from
-;;; THING or can be overridden by OPERAND-SIZE. This and REG are always
-;;; passed to EMIT-REX-IF-NEEDED. Additionally, if THING is an EA we
-;;; pass its index and base registers; if it is a register TN, we pass
-;;; only itself.
-;;; In contrast to EMIT-EA above, neither stack TNs nor fixups need to
-;;; be treated specially here: If THING is a stack TN, neither it nor
-;;; any of its components are passed to EMIT-REX-IF-NEEDED which
-;;; works correctly because stack references always use RBP as the base
-;;; register and never use an index register so no extended registers
-;;; need to be accessed. Fixups are assembled using an addressing mode
-;;; of displacement-only or RIP-plus-displacement (see EMIT-EA), so may
-;;; not reference an extended register. The displacement-only addressing
-;;; mode requires that REX.X is 0, which is ensured here.
-(defun maybe-emit-rex-for-ea (segment thing reg &key operand-size)
-  (declare (type (or ea tn fixup) thing)
-           (type (or null tn) reg)
-           (type (member nil :byte :word :dword :qword :do-not-set)
-                 operand-size))
+;;; Emit any instruction prefixes as required.
+;;; THING is a register or memory operand of some kind. It and REG
+;;; are always passed to EMIT-REX-IF-NEEDED.
+;;; Additionally, if THING is an EA we pass its index and base registers;
+;;; if it is a register TN, we pass only itself, as the 'B' register.
+;;; If THING is a stack TN, neither it nor any of its components are passed
+;;; to EMIT-REX-IF-NEEDED, which works correctly because stack references
+;;; always use RBP as the base register and never use an index register,
+;;; so no extended registers need to be accessed.
+;;; Fixups are assembled using an addressing mode of displacement-only or
+;;; RIP-plus-displacement (see EMIT-EA), so will not reference an extended
+;;; register.
+(defun emit-prefixes (segment thing reg operand-size &key lock)
+  (declare (type (or ea tn fixup null) thing)
+           (type (or null tn integer) reg)
+           (type (member :byte :word :dword :qword :do-not-set) operand-size))
   (let ((ea-p (ea-p thing)))
+    ;; Legacy prefixes are order-insensitive, but let's match the
+    ;; output of the system assembler for consistency's sake.
+    (when (eq operand-size :word)
+      (emit-byte segment #x66))
+    (ecase lock
+      ((nil))
+      (:lock (emit-byte segment #xf0))) ; even if #!+sb-thread
     (emit-rex-if-needed    segment
-                           (or operand-size (operand-size thing))
-                           (tn-reg-id reg)
-                           (and ea-p (tn-reg-id (ea-index thing)))
-                           (cond (ea-p
+                           operand-size ; REX.W
+                           (and (tn-p reg) (tn-reg-id reg)) ; REX.R
+                           (and ea-p (tn-reg-id (ea-index thing))) ; REX.X
+                           (cond (ea-p ; REX.B
                                   (let ((base (ea-base thing)))
                                     (unless (eq base rip-tn)
                                       (tn-reg-id base))))
@@ -1365,16 +1361,7 @@
 (define-instruction x66 (segment)
   (:printer x66 () nil :print-name nil))
 
-(defun emit-prefix (segment name)
-  (declare (ignorable segment))
-  (ecase name
-    ((nil))
-    (:lock
-     #!+sb-thread
-     (emit-byte segment #xf0))))
-
 (define-instruction fs (segment)
-  (:emitter (emit-byte segment #x64))
   (:printer byte ((op #x64 :prefilter (lambda (dstate value)
                                         (declare (ignore value))
                                         (dstate-setprop dstate +fs-segment+))))
@@ -1407,10 +1394,8 @@
   (:printer reg-reg/mem-dir ((op #b100010)))
   ;; immediate to register/memory
   (:printer reg/mem-imm/asm-routine ((op '(#b1100011 #b000))))
-
   (:emitter
    (let ((size (matching-operand-size dst src)))
-     (maybe-emit-operand-size-prefix segment size)
      (cond ((gpr-p dst)
             (cond ((integerp src)
                    ;; We want to encode the immediate using the fewest bytes possible.
@@ -1420,8 +1405,7 @@
                           (if (and (eq size :qword) (typep src '(unsigned-byte 32)))
                               :dword
                               size)))
-                     (emit-rex-if-needed segment imm-size
-                                         nil nil (tn-reg-id dst)))
+                     (emit-prefixes segment dst nil imm-size))
                    (acond ((neq size :qword) ; :dword or smaller dst is straightforward
                            (emit-byte+reg segment (if (eq size :byte) #xB0 #xB8) dst)
                            (emit-imm-operand segment src size))
@@ -1448,11 +1432,11 @@
                         (member (fixup-flavor src)
                                 '(:named-call :static-call :assembly-routine
                                   :layout :immobile-object :foreign)))
-                   (emit-rex-if-needed segment :dword nil nil (tn-reg-id dst))
+                   (emit-prefixes segment dst nil :dword)
                    (emit-byte+reg segment #xB8 dst)
                    (emit-absolute-fixup segment src))
                   (t
-                   (maybe-emit-rex-for-ea segment src dst)
+                   (emit-prefixes segment src dst size)
                    (emit-byte segment (opcode+size-bit #x8A size))
                    (emit-ea segment src (reg-tn-encoding dst)
                             :allow-constants t))))
@@ -1466,28 +1450,26 @@
                   (imm-val (or (and (eq size :qword)
                                     (plausible-signed-imm32-operand-p src))
                                src)))
-              (maybe-emit-rex-for-ea segment dst nil)
+              (emit-prefixes segment dst nil size)
               (emit-byte segment (opcode+size-bit #xC6 size))
               ;; The EA could be RIP-relative, thus it is important
               ;; to get :REMAINING-BYTES correct.
               (emit-ea segment dst #b000 :remaining-bytes (size-nbyte imm-size))
               (emit-imm-operand segment imm-val imm-size)))
            ((gpr-p src) ; reg to mem
-            (maybe-emit-rex-for-ea segment dst src)
+            (emit-prefixes segment dst src size)
             (emit-byte segment (opcode+size-bit #x88 size))
             (emit-ea segment dst (reg-tn-encoding src)))
            ((fixup-p src)
-            ;; Generally we can't MOV a fixupped value into an EA, since
-            ;; MOV on non-registers can only take a 32-bit immediate arg.
-            ;; Make an exception for :FOREIGN fixups (pretty much just
-            ;; the runtime asm, since other foreign calls go through the
-            ;; the linkage table) and for linkage table references, since
-            ;; these should always end up in low memory.
+            ;; MOV to memory take at most a 32-bit immediate arg.
+            ;; The acceptable fixup flavors are enumerated here.
+            ;; The linkage table and immobile spaces reside at
+            ;; low enough addresses that this works.
             (aver (or (member (fixup-flavor src)
                               '(:foreign :foreign-dataref :symbol-tls-index
                                 :assembly-routine :layout :immobile-object))
                       (eq (ea-size dst) :dword)))
-            (maybe-emit-rex-for-ea segment dst nil)
+            (emit-prefixes segment dst nil size)
             (emit-byte segment #xC7)
             (emit-ea segment dst #b000)
             (emit-absolute-fixup segment src))
@@ -1513,8 +1495,7 @@
        (if (gpr-p dst) (values dst src 0) (values src dst 2))
      (aver (and (accumulator-p reg) (typep ea 'word)))
      (let ((size (operand-size reg)))
-       (maybe-emit-operand-size-prefix segment size)
-       (emit-rex-if-needed segment size nil nil nil)
+       (emit-prefixes segment nil nil size)
        (emit-byte segment (logior (opcode+size-bit #xA0 size) dir-bit))
        (emit-qword segment ea)))))
 
@@ -1540,8 +1521,7 @@
            (when (and (not signed-p) (eq dst-size :qword))
              (setf dst-size :dword))
            (aver (> (size-nbyte dst-size) (size-nbyte src-size)))
-           (maybe-emit-operand-size-prefix segment dst-size)
-           (maybe-emit-rex-for-ea segment src dst :operand-size dst-size)
+           (emit-prefixes segment src dst dst-size)
            (if (eq src-size :dword)
                ;; AMD calls this MOVSXD. If emitted without REX.W, it writes
                ;; only 32 bits. That is discouraged, and we don't do it.
@@ -1582,8 +1562,7 @@
 (flet ((emit* (segment thing gpr-opcode mem-opcode subcode allowp)
          (let ((size (operand-size thing)))
            (aver (or (eq size :qword) (eq size :word)))
-           (maybe-emit-operand-size-prefix segment size)
-           (maybe-emit-rex-for-ea segment thing nil :operand-size :do-not-set)
+           (emit-prefixes segment thing nil (if (eq size :word) :word :do-not-set))
            (cond ((gpr-p thing)
                   (emit-byte+reg segment gpr-opcode thing))
                   (t
@@ -1657,7 +1636,6 @@
   (:printer reg-reg/mem ((op #b1000011)))
   (:emitter
    (let ((size (matching-operand-size operand1 operand2)))
-     (maybe-emit-operand-size-prefix segment size)
      (labels ((xchg-acc-with-something (acc something)
                 (if (and (not (eq size :byte))
                          (gpr-p something)
@@ -1665,11 +1643,11 @@
                          (not (and (= (tn-offset something) sb!vm::eax-offset)
                                    (eq size :dword))))
                     (progn
-                      (maybe-emit-rex-for-ea segment something acc)
+                      (emit-prefixes segment something acc size)
                       (emit-byte+reg segment #x90 something))
                     (xchg-reg-with-something acc something)))
               (xchg-reg-with-something (reg something)
-                (maybe-emit-rex-for-ea segment something reg)
+                (emit-prefixes segment something reg size)
                 (emit-byte segment (opcode+size-bit #x86 size))
                 (emit-ea segment something (reg-tn-encoding reg))))
        (cond ((accumulator-p operand1)
@@ -1702,8 +1680,7 @@
    (aver (or (eq (operand-size dst) (ea-size src))
              ;; allow :BYTE to act as sort of a generic EA size
              (eq (ea-size src) :byte)))
-   (maybe-emit-rex-for-ea segment src dst
-                          :operand-size (if (dword-reg-p dst) :dword :qword))
+   (emit-prefixes segment src dst (operand-size dst))
    (emit-byte segment #x8D)
    (emit-ea segment src (reg-tn-encoding dst))))
 
@@ -1712,10 +1689,8 @@
   (:printer ext-reg-reg/mem ((op #b1011000)) '(:name :tab reg/mem ", " reg))
   (:emitter
    (aver (gpr-p src))
-   (emit-prefix segment prefix)
    (let ((size (matching-operand-size src dst)))
-     (maybe-emit-operand-size-prefix segment size)
-     (maybe-emit-rex-for-ea segment dst src)
+     (emit-prefixes segment dst src size :lock prefix)
      (emit-bytes segment #x0F (opcode+size-bit #xB0 size))
      (emit-ea segment dst (reg-tn-encoding src)))))
 
@@ -1723,8 +1698,7 @@
   (:printer ext-reg/mem-no-width ((op '(#xC7 1))))
   (:emitter
    (aver (not (gpr-p mem)))
-   (emit-prefix segment prefix)
-   (maybe-emit-rex-for-ea segment mem nil :operand-size :qword)
+   (emit-prefixes segment mem nil :qword :lock prefix)
    (emit-bytes segment #x0F #xC7)
    (emit-ea segment mem 1)))
 
@@ -1732,8 +1706,7 @@
   (:printer ext-reg/mem-no-width ((op '(#xC7 6))))
   (:emitter
    (aver (gpr-p dst))
-   (maybe-emit-operand-size-prefix segment (operand-size dst))
-   (maybe-emit-rex-for-ea segment dst nil)
+   (emit-prefixes segment dst nil (operand-size dst))
    (emit-bytes segment #x0F #xC7)
    (emit-ea segment dst 6)))
 
@@ -1760,20 +1733,18 @@
 
 ;;;; arithmetic
 
-(flet ((emit* (name segment prefix dst src opcode allowp)
-         (emit-prefix segment prefix)
+(flet ((emit* (name segment lockp dst src opcode allowp)
          (let ((size (matching-operand-size dst src)))
-           (maybe-emit-operand-size-prefix segment size)
            (acond
             ((and (neq size :byte) (plausible-signed-imm8-operand-p src size))
-             (maybe-emit-rex-for-ea segment dst nil)
+             (emit-prefixes segment dst nil size :lock lockp)
              (emit-byte segment #x83)
              (emit-ea segment dst opcode :allow-constants allowp)
              (emit-byte segment it))
             ((or (integerp src)
                  (and (fixup-p src)
                       (memq (fixup-flavor src) '(:layout :immobile-object))))
-             (maybe-emit-rex-for-ea segment dst nil)
+             (emit-prefixes segment dst nil size :lock lockp)
              (cond ((accumulator-p dst)
                     (emit-byte segment
                                (opcode+size-bit (dpb opcode (byte 3 3) #b00000100)
@@ -1792,7 +1763,7 @@
                  (cond ((gpr-p src) (values dst src #b00))
                        ((gpr-p dst) (values src dst #b10))
                        (t (error "bogus operands to ~A" name)))
-               (maybe-emit-rex-for-ea segment reg/mem reg)
+               (emit-prefixes segment reg/mem reg size :lock lockp)
                (emit-byte segment
                           (opcode+size-bit (dpb opcode (byte 3 3) dir-bit) size))
                (emit-ea segment reg/mem (reg-tn-encoding reg)
@@ -1817,11 +1788,9 @@
     (define or  #b001)
     (define xor #b110)))
 
-(flet ((emit* (segment prefix opcode subcode dst)
-         (emit-prefix segment prefix)
+(flet ((emit* (segment lockp opcode subcode dst)
          (let ((size (operand-size dst)))
-           (maybe-emit-operand-size-prefix segment size)
-           (maybe-emit-rex-for-ea segment dst nil)
+           (emit-prefixes segment dst nil size :lock lockp)
            (emit-byte segment (opcode+size-bit (ash opcode 1) size))
            (emit-ea segment dst subcode))))
   (define-instruction not (segment dst &optional prefix)
@@ -1844,8 +1813,7 @@
   (:emitter
    (let ((size (matching-operand-size dst src)))
      (aver (accumulator-p dst))
-     (maybe-emit-operand-size-prefix segment size)
-     (maybe-emit-rex-for-ea segment src nil)
+     (emit-prefixes segment src nil size)
      (emit-byte segment (opcode+size-bit #xF6 size))
      (emit-ea segment src #b100))))
 
@@ -1873,8 +1841,7 @@
    (let ((operand-size (matching-operand-size dst src)))
      (cond ((not src) ; 1-operand form affects RDX:RAX or subregisters thereof
             (aver (not imm))
-            (maybe-emit-operand-size-prefix segment operand-size)
-            (maybe-emit-rex-for-ea segment dst nil)
+            (emit-prefixes segment dst nil operand-size)
             (emit-byte segment (opcode+size-bit #xF6 operand-size))
             (emit-ea segment dst #b101))
            (t
@@ -1884,8 +1851,7 @@
             (when (and (integerp src) (not imm))
               (setq imm src src dst))
             (let ((imm-size (if (typep imm '(signed-byte 8)) :byte operand-size)))
-              (maybe-emit-operand-size-prefix segment operand-size)
-              (maybe-emit-rex-for-ea segment src dst)
+              (emit-prefixes segment src dst operand-size)
               (if imm
                   (emit-byte segment (if (eq imm-size :byte) #x6B #x69))
                   (emit-bytes segment #x0F #xAF))
@@ -1896,8 +1862,7 @@
 (flet ((emit* (segment dst src subcode)
          (let ((size (matching-operand-size dst src)))
            (aver (accumulator-p dst))
-           (maybe-emit-operand-size-prefix segment size)
-           (maybe-emit-rex-for-ea segment src nil)
+           (emit-prefixes segment src nil size)
            (emit-byte segment (opcode+size-bit #xF6 size))
            (emit-ea segment src subcode))))
   (define-instruction div (segment dst src)
@@ -1912,7 +1877,7 @@
   (:emitter
    (let ((size (operand-size dst)))
      (aver (member size '(:dword :qword)))
-     (emit-rex-if-needed segment size nil nil (tn-reg-id dst))
+     (emit-prefixes segment dst nil size)
      (emit-byte segment #x0f)
      (emit-byte+reg segment #xC8 dst))))
 
@@ -1920,42 +1885,38 @@
 (define-instruction cbw (segment)
   (:printer x66-byte ((op #x98)))
   (:emitter
-   (maybe-emit-operand-size-prefix segment :word)
+   (emit-prefixes segment nil nil :word)
    (emit-byte segment #x98)))
 
 ;;; CWDE -- Convert Word To Double Word Extended. EAX <- sign_xtnd(AX)
 (define-instruction cwde (segment)
   (:printer byte ((op #x98)))
-  (:emitter
-   (maybe-emit-operand-size-prefix segment :dword)
-   (emit-byte segment #x98)))
+  (:emitter (emit-byte segment #x98)))
 
 ;;; CDQE -- Convert Double Word To Quad Word Extended. RAX <- sign_xtnd(EAX)
 (define-instruction cdqe (segment)
   (:printer rex-byte ((op #x98)))
   (:emitter
-   (emit-rex-if-needed segment :qword nil nil nil)
+   (emit-prefixes segment nil nil :qword)
    (emit-byte segment #x98)))
 
 ;;; CWD -- Convert Word to Double Word. DX:AX <- sign_xtnd(AX)
 (define-instruction cwd (segment)
   (:printer x66-byte ((op #x99)))
   (:emitter
-   (maybe-emit-operand-size-prefix segment :word)
+   (emit-prefixes segment nil nil :word)
    (emit-byte segment #x99)))
 
 ;;; CDQ -- Convert Double Word to Quad Word. EDX:EAX <- sign_xtnd(EAX)
 (define-instruction cdq (segment)
   (:printer byte ((op #x99)))
-  (:emitter
-   (maybe-emit-operand-size-prefix segment :dword)
-   (emit-byte segment #x99)))
+  (:emitter (emit-byte segment #x99)))
 
 ;;; CQO -- Convert Quad Word to Octaword. RDX:RAX <- sign_xtnd(RAX)
 (define-instruction cqo (segment)
   (:printer rex-byte ((op #x99)))
   (:emitter
-   (emit-rex-if-needed segment :qword nil nil nil)
+   (emit-prefixes segment nil nil :qword)
    (emit-byte segment #x99)))
 
 (define-instruction xadd (segment dst src &optional prefix)
@@ -1963,10 +1924,8 @@
   (:printer ext-reg-reg/mem ((op #b1100000)) '(:name :tab reg/mem ", " reg))
   (:emitter
    (aver (gpr-p src))
-   (emit-prefix segment prefix)
    (let ((size (matching-operand-size src dst)))
-     (maybe-emit-operand-size-prefix segment size)
-     (maybe-emit-rex-for-ea segment dst src)
+     (emit-prefixes segment dst src size :lock prefix)
      (emit-bytes segment #x0F (opcode+size-bit #xC0 size))
      (emit-ea segment dst (reg-tn-encoding src)))))
 
@@ -1986,8 +1945,7 @@
                (1   (values #b11010000 nil))
                (t   (values #b11000000 t)))
            (let ((size (operand-size dst)))
-             (maybe-emit-operand-size-prefix segment size)
-             (maybe-emit-rex-for-ea segment dst nil)
+             (emit-prefixes segment dst nil size)
              (emit-byte segment (opcode+size-bit opcode size)))
            (emit-ea segment dst subcode)
            (when immed
@@ -2011,8 +1969,7 @@
          (let ((size (matching-operand-size dst src)))
            (when (eq size :byte)
              (error "Double shift requires word or larger operand"))
-           (maybe-emit-operand-size-prefix segment size)
-           (maybe-emit-rex-for-ea segment dst src)
+           (emit-prefixes segment dst src size)
            (emit-bytes segment #x0F
                        ;; SHLD = A4 or A5; SHRD = AC or AD
                        (dpb opcode (byte 1 3) (if (eq amt :cl) #xA5 #xA4)))
@@ -2030,15 +1987,18 @@
     (define shld 0 #b10100000)
     (define shrd 1 #b10101000)))
 
+(defun mem-ref-p (x)
+  (or (ea-p x) (and (tn-p x) (not (gpr-p x)))))
+
 (define-instruction test (segment this that)
   (:printer accum-imm ((op #b1010100)))
   (:printer reg/mem-imm ((op '(#b1111011 #b000))))
-  ;; 'objdump -d' always shows the memory arg as the second operand,
-  ;; so we should show it first operand since we use Intel syntax.
-  (:printer reg-reg/mem ((op #b1000010)) '(:name :tab reg/mem ", " reg))
+  (:printer reg-reg/mem ((op #b1000010)))
   (:emitter
+   (when (and (gpr-p this) (mem-ref-p that))
+     (rotatef this that))
    (let ((size (matching-operand-size this that)))
-     (maybe-emit-operand-size-prefix segment size)
+     (emit-prefixes segment this that size)
      ;; gas disallows the constant as the first arg (in at&t syntax)
      ;; but does allow a memory arg as either operand.
      (cond ((integerp this) (error "Inverted arguments to TEST"))
@@ -2048,7 +2008,6 @@
             ;; qword is bitwise equivalent to a signed dword.
             (awhen (and (eq size :qword) (plausible-signed-imm32-operand-p that))
               (setq that it))
-            (maybe-emit-rex-for-ea segment this nil)
             (cond ((accumulator-p this)
                    (emit-byte segment (opcode+size-bit #xA8 size)))
                   (t
@@ -2056,17 +2015,13 @@
                    (emit-ea segment this #b000)))
             (emit-imm-operand segment that size))
            (t
-            (when (and (gpr-p this) (typep that '(or tn ea)))
-              (rotatef this that))
-            (maybe-emit-rex-for-ea segment this that)
             (emit-byte segment (opcode+size-bit #x84 size))
             (emit-ea segment this (reg-tn-encoding that)))))))
 
 ;;;; string manipulation
 
 (flet ((emit* (segment opcode size)
-         (maybe-emit-operand-size-prefix segment size)
-         (emit-rex-if-needed segment size nil nil nil)
+         (emit-prefixes segment nil nil size)
          (emit-byte segment (opcode+size-bit (ash opcode 1) size))))
   (define-instruction movs (segment size)
     (:printer string-op ((op #b1010010)))
@@ -2113,8 +2068,7 @@
          (let ((size (matching-operand-size dst src)))
            (when (eq size :byte)
              (error "can't scan bytes: ~S" src))
-           (maybe-emit-operand-size-prefix segment size)
-           (maybe-emit-rex-for-ea segment src dst)
+           (emit-prefixes segment src dst size)
            (emit-bytes segment #x0F opcode)
            (emit-ea segment src (reg-tn-encoding dst)))))
 
@@ -2126,18 +2080,16 @@
     (:printer ext-reg-reg/mem-no-width ((op #xBD)))
     (:emitter (emit* segment #xBD dst src))))
 
-(flet ((emit* (segment src index opcode)
+(flet ((emit* (segment src index opcode lock)
          (let ((size (operand-size src)))
            (when (eq size :byte)
-             (error "can't scan bytes: ~S" src))
-           (maybe-emit-operand-size-prefix segment size)
+             (error "can't test byte: ~S" src))
+           (emit-prefixes segment src index size :lock lock)
            (cond ((integerp index)
-                  (maybe-emit-rex-for-ea segment src nil)
                   (emit-bytes segment #x0F #xBA)
                   (emit-ea segment src opcode)
                   (emit-byte segment index))
                  (t
-                  (maybe-emit-rex-for-ea segment src index)
                   (emit-bytes segment #x0F (dpb opcode (byte 3 3) #b10000011))
                   (emit-ea segment src (reg-tn-encoding index)))))))
 
@@ -2150,9 +2102,7 @@
                             ((op ,(dpb opcode-extension (byte 3 3) #b10000011))
                              (reg/mem nil :type 'sized-reg/mem))
                             '(:name :tab reg/mem ", " reg))
-                  (:emitter
-                   (emit-prefix segment prefix)
-                   (emit* segment src index ,opcode-extension)))))
+                  (:emitter (emit* segment src index ,opcode-extension prefix)))))
     (define bt  4)
     (define bts 5)
     (define btr 6)
@@ -2174,7 +2124,7 @@
       (emit-byte segment #xE8)
       (emit-relative-fixup segment where))
      (t
-      (maybe-emit-rex-for-ea segment where nil :operand-size :do-not-set)
+      (emit-prefixes segment where nil :do-not-set)
       (emit-byte segment #xFF)
       (emit-ea segment where #b010)))))
 
@@ -2248,7 +2198,7 @@
             (error "don't know what to do with ~A" where))
           ;; near jump defaults to 64 bit
           ;; w-bit in rex prefix is unnecessary
-          (maybe-emit-rex-for-ea segment where nil :operand-size :do-not-set)
+          (emit-prefixes segment where nil :do-not-set)
           (emit-byte segment #b11111111)
           (emit-ea segment where #b100))))))
 
@@ -2293,8 +2243,7 @@
    (aver (gpr-p dst))
    (let ((size (matching-operand-size dst src)))
      (aver (neq size :byte))
-     (maybe-emit-operand-size-prefix segment size))
-   (maybe-emit-rex-for-ea segment src dst)
+     (emit-prefixes segment src dst size))
    (emit-byte segment #x0F)
    (emit-byte segment (dpb (conditional-opcode cond) (byte 4 0) #b01000000))
    (emit-ea segment src (reg-tn-encoding dst) :allow-constants t)))
@@ -2304,7 +2253,7 @@
 (define-instruction set (segment dst cond)
   (:printer cond-set ())
   (:emitter
-   (maybe-emit-rex-for-ea segment dst nil :operand-size :byte)
+   (emit-prefixes segment dst nil :byte)
    (emit-byte segment #x0F)
    (emit-byte segment (dpb (conditional-opcode cond) (byte 4 0) #b10010000))
    (emit-ea segment dst #b000)))
@@ -2460,9 +2409,7 @@
                       &key operand-size (remaining-bytes 0))
   (when prefix
     (emit-byte segment prefix))
-  (if operand-size
-      (maybe-emit-rex-for-ea segment src dst :operand-size operand-size)
-      (maybe-emit-rex-for-ea segment src dst))
+  (emit-prefixes segment src dst (or operand-size (operand-size src)))
   (emit-bytes segment #x0f opcode)
   (emit-ea segment src (reg-tn-encoding dst) :remaining-bytes remaining-bytes))
 
@@ -2476,7 +2423,7 @@
     (emit-byte segment prefix))
   ;; dst/src is encoded in the r/m field, not r; REX.B must be
   ;; set to use extended XMM registers
-  (emit-rex-if-needed segment operand-size nil nil (tn-reg-id dst/src))
+  (emit-prefixes segment dst/src nil operand-size)
   (emit-byte segment #x0F)
   (emit-byte segment opcode)
   (emit-byte segment (logior (ash (logior #b11000 /i) 3)
@@ -2487,9 +2434,7 @@
                             &key operand-size (remaining-bytes 0))
   (when prefix
     (emit-byte segment prefix))
-  (if operand-size
-      (maybe-emit-rex-for-ea segment src dst :operand-size operand-size)
-      (maybe-emit-rex-for-ea segment src dst))
+  (emit-prefixes segment src dst (or operand-size (operand-size src)))
   (emit-byte segment #x0f)
   (emit-byte segment op1)
   (emit-byte segment op2)
@@ -3075,16 +3020,15 @@
   (:emitter
    (aver (not (register-p dst)))
    (aver (gpr-p src))
-   (maybe-emit-rex-for-ea segment dst src)
-   (emit-byte segment #x0f)
-   (emit-byte segment #xc3)
+   (emit-prefixes segment dst src (operand-size src))
+   (emit-bytes segment #x0f #xc3)
    (emit-ea segment dst (reg-tn-encoding src))))
 
 (flet ((emit* (segment opcode subcode src)
          (aver (not (register-p src)))
          (aver (eq (operand-size src) :byte))
          (aver subcode)
-         (maybe-emit-rex-for-ea segment src nil)
+         (emit-prefixes segment src nil :byte)
          (emit-byte segment #x0f)
          (emit-byte segment opcode)
          (emit-ea segment src subcode)))
@@ -3119,9 +3063,8 @@
 (flet ((emit* (segment ea subcode)
          (aver (not (register-p ea)))
          (aver (eq (operand-size ea) :dword))
-         (maybe-emit-rex-for-ea segment ea nil)
-         (emit-byte segment #x0f)
-         (emit-byte segment #xae)
+         (emit-prefixes segment ea nil :dword)
+         (emit-bytes segment #x0f #xae)
          (emit-ea segment ea subcode)))
 
   (define-instruction ldmxcsr (segment src)
@@ -3164,9 +3107,9 @@
                 (memq src-size (case dst-size
                                  (:dword '(:byte :word :dword))
                                  (:qword '(:byte :qword))))))
-     (maybe-emit-operand-size-prefix segment src-size)
+     (emit-prefixes segment nil nil (if (eq src-size :word) :word :do-not-set))
      (emit-sse-inst-2byte segment dst src #xf2 #x38
-                          (if (eq src-size :byte) #xf0 #xf1)
+                          (opcode+size-bit #xf0 src-size)
                           ;; :OPERAND-SIZE is ordinarily determined
                           ;; from 'src', so override it to use 'dst'.
                           :operand-size dst-size))))
