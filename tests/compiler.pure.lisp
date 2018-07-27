@@ -6471,7 +6471,15 @@
     (() (values 0 0))))
 
 #+sb-unicode
-(with-test (:name :base-char-weakinging)
+(with-test (:name :base-char-weakening)
   (checked-compile-and-assert (:optimize :safe)
       `(lambda (x) (the base-char x))
     (((code-char 252)) (condition 'type-error))))
+
+(with-test (:name (logandc1 :constant-second-arg))
+  (checked-compile-and-assert ()
+    `(lambda (p1 p2)
+       (declare (type (integer ,(- (expt 2 31)) ,(1- (expt 2 31))) p1)
+                (type (eql -1) p2))
+       (logandc1 p1 p2))
+    ((-3 -1) 2)))
