@@ -34,6 +34,11 @@
                                           (1- (length string)))))) ; chop final newline
       (assert (string= line expect)))))
 
+(defun check-does-not-assemble (instruction)
+  (handler-case (test-assemble instruction "")
+    (error nil)
+    (:no-error (x) x (error "Should not assemble"))))
+
 (with-test (:name :assemble-movti-instruction :skipped-on (not :x86-64))
   (flet ((test-movnti (dst src expect)
            (test-assemble `(movnti ,dst ,src) expect)))
@@ -68,17 +73,14 @@
   (test-assemble `(crc32 ,r9-tn ,(make-ea :qword :base r14-tn :index r15-tn))
                  "F24F0F38F10C3E   CRC32 R9, QWORD PTR [R14+R15]"))
 
-(with-test (:name :assemble-unsigned-qword-to-mem :skipped-on (not :x86-64))
+(with-test (:name :assemble-unsigned-qword-imm-to-mem :skipped-on (not :x86-64))
   ;; unsigned bits cast as signed bits
   (let ((const #xffffffff801234BB))
     (test-assemble `(mov ,(make-ea :qword :base rcx-tn) ,const)
                    "48C701BB341280   MOV QWORD PTR [RCX], -2146290501")
     ;; Do not truncate to just the lower bits
     (dolist (size '(:byte :word :dword))
-      (handler-case (test-assemble `(mov ,(make-ea size :base rcx-tn) ,const)
-                                   "")
-        (type-error nil)
-        (:no-error (x) x (error "Should not assemble"))))))
+      (check-does-not-assemble `(mov ,(make-ea size :base rcx-tn) ,const)))))
 
 (with-test (:name :unsigned-as-signed-imm8 :skipped-on (not :x86-64))
   ;; PUSH
@@ -91,6 +93,27 @@
   ;; Register AX could use the special 1-byte opcode and non-sign-extended
   ;; imm16 operand; the encoding length is the same either way.
   (test-assemble `(or ,ax-tn #xfff7) "6683C8F7         OR AX, -9"))
+
+(with-test (:name :assemble-movsx :skipped-on (not :x86-64))
+  ;; source = :BYTE, signed
+  (check-does-not-assemble `(movsx ,r8b-tn ,cl-tn))
+  (test-assemble `(movsx ,r8w-tn ,cl-tn) "66440FBEC1       MOVSX R8W, CL")
+  (test-assemble `(movsx ,r8d-tn ,cl-tn) "440FBEC1         MOVSX R8D, CL")
+  (test-assemble `(movsx ,r8-tn  ,cl-tn) "4C0FBEC1         MOVSX R8, CL")
+  ;; source = :BYTE, unsigned
+  (check-does-not-assemble `(movzx ,r8b-tn ,cl-tn))
+  (test-assemble `(movzx ,r8w-tn ,cl-tn) "66440FB6C1       MOVZX R8W, CL")
+  (test-assemble `(movzx ,r8d-tn ,cl-tn) "440FB6C1         MOVZX R8D, CL")
+  (test-assemble `(movzx ,r8-tn  ,cl-tn) "440FB6C1         MOVZX R8D, CL") ; R8D, not R8
+  ;; source = :WORD, signed
+  (test-assemble `(movsx ,r8d-tn ,cx-tn) "440FBFC1         MOVSX R8D, CX")
+  (test-assemble `(movsx ,r8-tn ,cx-tn)  "4C0FBFC1         MOVSX R8, CX")
+  ;; source = :WORD, unsigned
+  (test-assemble `(movzx ,r8d-tn ,cx-tn) "440FB7C1         MOVZX R8D, CX")
+  (test-assemble `(movzx ,r8-tn ,cx-tn)  "440FB7C1         MOVZX R8D, CX") ; R8D, not R8
+  ;; source = :DWORD, signed and unsigned
+  (test-assemble `(movsx ,r8-tn ,ecx-tn) "4C63C1           MOVSX R8, ECX")
+  (check-does-not-assemble `(movzx ,r8-tn ,ecx-tn))) ; should use MOV instead
 
 (with-test (:name :disassemble-movabs-instruction :skipped-on (not :x86-64))
   (let* ((bytes (coerce '(#x48 #xA1 8 7 6 5 4 3 2 1

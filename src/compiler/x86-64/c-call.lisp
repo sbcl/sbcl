@@ -207,7 +207,7 @@
   (:results (res :scs (signed-reg)))
   (:result-types fixnum)
   (:generator 1
-   (inst movsxd res
+   (inst movsx res
          (make-random-tn :kind :normal
                          :sc (sc-or-lose (ecase size
                                            (8 'byte-reg)

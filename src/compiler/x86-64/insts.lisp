@@ -1518,44 +1518,6 @@
        (emit-byte segment (logior (opcode+size-bit #xA0 size) dir-bit))
        (emit-qword segment ea)))))
 
-;;; Emit a sign-extending (if SIGNED-P is true) or zero-extending move.
-;;; To achieve the shortest possible encoding zero extensions into a
-;;; 64-bit destination are assembled as a straight 32-bit MOV (if the
-;;; source size is 32 bits) or as MOVZX with a 32-bit destination (if
-;;; the source size is 8 or 16 bits). Due to the implicit zero extension
-;;; to 64 bits this has the same effect as a MOVZX with 64-bit
-;;; destination but often needs no REX prefix.
-(defun emit-move-with-extension (segment dst src signed-p)
-  (aver (gpr-p dst))
-  (let ((dst-size (operand-size dst))
-        (src-size (operand-size src))
-        (opcode (if signed-p #xBE #xB6)))
-    (macrolet ((emitter (operand-size &rest bytes)
-                 `(progn
-                   (maybe-emit-rex-for-ea segment src dst
-                                          :operand-size ,operand-size)
-                   ,@(mapcar (lambda (byte)
-                               `(emit-byte segment ,byte))
-                             bytes)
-                   (emit-ea segment src (reg-tn-encoding dst)))))
-      (ecase dst-size
-        (:word
-         (aver (eq src-size :byte))
-         (maybe-emit-operand-size-prefix segment :word)
-         (emitter :word #x0F opcode))
-        ((:dword :qword)
-         (unless signed-p
-           (setf dst-size :dword))
-         (ecase src-size
-           (:byte
-            (emitter dst-size #x0F opcode))
-           (:word
-            (emitter dst-size #x0F (logior opcode 1)))
-           (:dword
-            (aver (or (not signed-p) (eq dst-size :qword)))
-            (emitter dst-size
-                     (if signed-p #x63 #x8b))))))))) ; movsxd or straight mov
-
 ;; MOV[SZ]X - #x66 or REX selects the destination REG size, wherein :byte isn't
 ;; a possibility.  The 'width' bit selects a source r/m size of :byte or :word.
 (define-instruction-format
@@ -1566,28 +1528,56 @@
               (t (:using #'print-sized-word-reg/mem reg/mem)))))
   (width :prefilter nil)) ; doesn't affect DSTATE
 
-(define-instruction movsx (segment dst src)
-  (:printer move-with-extension ((op #b1011111)))
-  (:emitter (emit-move-with-extension segment dst src :signed)))
+;;; Emit a sign-extending (if SIGNED-P is true) or zero-extending move.
+(flet ((emit* (segment dst src signed-p)
+         (aver (gpr-p dst))
+         (let ((dst-size (operand-size dst)) ; DST size governs the OPERAND-SIZE
+               (src-size (operand-size src)) ; SRC size is controlled by the opcode
+               (opcode (if signed-p #xBE #xB6)))
+           ;; Zero-extending into a 64-bit register is the same as zero-extending
+           ;; into the 32-bit register. If the source is also 32-bits, then it
+           ;; needs to use our synthetic MOVZXD instruction, which is really MOV.
+           (when (and (not signed-p) (eq dst-size :qword))
+             (setf dst-size :dword))
+           (aver (> (size-nbyte dst-size) (size-nbyte src-size)))
+           (maybe-emit-operand-size-prefix segment dst-size)
+           (maybe-emit-rex-for-ea segment src dst :operand-size dst-size)
+           (if (eq src-size :dword)
+               ;; AMD calls this MOVSXD. If emitted without REX.W, it writes
+               ;; only 32 bits. That is discouraged, and we don't do it.
+               ;; (As checked by the AVER that dst is strictly larger than src)
+               (emit-byte segment #x63)
+               (emit-bytes segment #x0F (opcode+size-bit opcode src-size)))
+           (emit-ea segment src (reg-tn-encoding dst)))))
 
-(define-instruction movzx (segment dst src)
-  (:printer move-with-extension ((op #b1011011)))
-  (:emitter (emit-move-with-extension segment dst src nil)))
+  (define-instruction movsx (segment dst src)
+    (:printer move-with-extension ((op #b1011111)))
+    (:printer reg-reg/mem ((op #b0110001) (width 1)
+                           (reg/mem nil :type 'sized-dword-reg/mem)))
+    (:emitter (emit* segment dst src :signed)))
 
-;;; The regular use of MOVSXD is with an operand size of :qword. This
-;;; sign-extends the dword source into the qword destination register.
-;;; If the operand size is :dword the instruction zero-extends the dword
-;;; source into the qword destination register, i.e. it does the same as
-;;; a dword MOV into a register.
-(define-instruction movsxd (segment dst src)
-  (:printer reg-reg/mem ((op #b0110001) (width 1)
-                         (reg/mem nil :type 'sized-dword-reg/mem)))
-  (:emitter (emit-move-with-extension segment dst src :signed)))
+  (define-instruction movzx (segment dst src)
+    (:printer move-with-extension ((op #b1011011)))
+    (:emitter (emit* segment dst src nil))))
 
-;;; this is not a real amd64 instruction, of course
-(define-instruction movzxd (segment dst src)
-  ; (:printer reg-reg/mem ((op #x63) (reg nil :type 'reg)))
-  (:emitter (emit-move-with-extension segment dst src nil)))
+;;; This instruction is merely MOVSX with constraints on src + dst size
+;;; of :dword + :qword respectively. The mnemonic is specified by AMD
+;;; but is redundant. Indeed gcc and clang on linux allow 'movsx %eax, %rbx',
+;;; objdump shows it as 'movslq' (move-sign-extended-long-to-quad),
+;;; and Apple clang doesn't accept this mnemonic as far as I could tell.
+(define-instruction-macro movsxd (dst src) `(%movsxd ,dst ,src))
+(defun %movsxd (dst src)
+  (aver (and (gpr-p dst) (eq (operand-size dst) :qword)))
+  (aver (eq (operand-size src) :dword))
+  (inst movsx dst src))
+
+;;; This is not a real amd64 instruction. It exists to simplify
+;;; the vop generator for 32-bit array ref and sap-ref-32.
+(define-instruction-macro movzxd (dst src) `(%movzxd ,dst ,src))
+(defun %movzxd (dst src)
+  (aver (and (gpr-p dst) (eq (operand-size dst) :qword)))
+  (aver (eq (operand-size src) :dword))
+  (inst mov (sb!vm::reg-in-size dst :dword) src))
 
 (flet ((emit* (segment thing gpr-opcode mem-opcode subcode allowp)
          (let ((size (operand-size thing)))
