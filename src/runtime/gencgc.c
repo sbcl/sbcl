@@ -1327,7 +1327,7 @@ static uword_t adjust_obj_ptes(page_index_t first_page,
     if ((!n_full_pages || page_bytes_used(first_page+(n_full_pages-1))
                           == GENCGC_CARD_BYTES) &&
         (!excess || page_bytes_used(final_page) == excess) &&
-        page_scan_start_offset(1+final_page) != npage_bytes(1+final_page-first_page)) {
+        page_starts_contiguous_block_p(1+final_page)) {
         /* The 'if' below has an 'else' which subsumes the 'then' in generality.
          * Why? Because usually we only need perform one assignment.
          * Moreover, after a further change which makes us not look at the 'gen'
@@ -1336,10 +1336,8 @@ static uword_t adjust_obj_ptes(page_index_t first_page,
          * At present, some logic assumes that every page's gen was updated */
         page_index_t page;
         if (old_allocated == new_allocated) { // Almost always true,
-            // except when bignums change from thread-local (boxed)
-            // to unboxed, for downstream efficiency.
-            // (And most people don't use huge bignums, so "always"
-            // is probably near "99.999% of the time")
+            // except when bignums or specialized arrays change from thread-local
+            // (boxed) allocation to unboxed, for downstream efficiency.
             for (page = first_page; page <= final_page; ++page)
                 page_table[page].gen = new_gen;
         } else {
