@@ -383,7 +383,7 @@
   (assert (typep #p"" 'sb-kernel:instance))
   (assert-tri-eq t t (subtypep '(member #p"") 'sb-kernel:instance)))
 
-(with-test (:name (sb-kernel:type= simd-pack))
+(with-test (:name (sb-kernel:type= :simd-pack))
   (dolist (x '(single-float double-float))
     (let ((spec `(simd-pack ,x)))
       (assert (equal (multiple-value-list (ctype= spec spec)) '(t t))))))
