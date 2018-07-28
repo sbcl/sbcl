@@ -3770,8 +3770,10 @@ used for a COMPLEX component.~:@>"
 
   (!define-type-method (simd-pack :simple-=) (type1 type2)
      (declare (type simd-pack-type type1 type2))
-     (null (set-exclusive-or (simd-pack-type-element-type type1)
-                             (simd-pack-type-element-type type2))))
+     (values
+      (null (set-exclusive-or (simd-pack-type-element-type type1)
+                              (simd-pack-type-element-type type2)))
+      t))
 
   (!define-type-method (simd-pack :simple-subtypep) (type1 type2)
      (declare (type simd-pack-type type1 type2))

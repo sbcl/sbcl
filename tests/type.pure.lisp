@@ -13,8 +13,14 @@
 ;;;; Utilities
 
 (defun ctype= (left right)
-  (sb-kernel:type= (sb-kernel:specifier-type left)
-                   (sb-kernel:specifier-type right)))
+  (let ((a (sb-kernel:specifier-type left)))
+    ;; SPECIFIER-TYPE is a memoized function, and TYPE= is a trivial
+    ;; operation if A and B are EQ.
+    ;; To actually exercise the type operation, remove the memoized parse.
+    (sb-int:drop-all-hash-caches)
+    (let ((b (sb-kernel:specifier-type right)))
+      (assert (not (eq a b)))
+      (sb-kernel:type= a b))))
 
 (defmacro assert-tri-eq (expected-result expected-certainp form)
   (sb-int:with-unique-names (result certainp)
@@ -376,6 +382,11 @@
 (with-test (:name (typep subtypep sb-kernel:instance))
   (assert (typep #p"" 'sb-kernel:instance))
   (assert-tri-eq t t (subtypep '(member #p"") 'sb-kernel:instance)))
+
+(with-test (:name (sb-kernel:type= simd-pack))
+  (dolist (x '(single-float double-float))
+    (let ((spec `(simd-pack ,x)))
+      (assert (equal (multiple-value-list (ctype= spec spec)) '(t t))))))
 
 (with-test (:name (typep :character-set :negation))
   (flet ((generate-chars ()
