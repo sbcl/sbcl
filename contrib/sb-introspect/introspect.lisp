@@ -949,10 +949,7 @@ Experimental: interface subject to change."
          (when ext
            (dolist (thread (sb-thread:list-all-threads))
              (call (sb-thread:symbol-value-in-thread object thread nil))))
-         (handler-case
-             ;; We don't have GLOBAL-BOUNDP, and there's no ERRORP arg.
-             (call (sb-ext:symbol-global-value object))
-           (unbound-variable ()))
+         (call (sb-sys:%primitive sb-c:fast-symbol-global-value object))
          ;; These first two are probably unnecessary.
          ;; The functoid values, if present, are in SYMBOL-INFO
          ;; which is traversed whether or not EXT was true.

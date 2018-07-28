@@ -168,3 +168,10 @@
     (assert (= tot-bytes (* 16 n-word-bytes)))
     ;; 2 conses and 1 bit-vector
     (assert (= n-kids 3))))
+
+(defvar *some-symbol* 'a)
+(test-util:with-test (:name :symbol-refs)
+  (sb-int:collect ((results))
+    (let ((*some-symbol* 'b))
+      (do-referenced-object ('*some-symbol* results)))
+    (assert (eq (first (results)) 'a))))

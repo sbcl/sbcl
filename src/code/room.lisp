@@ -1033,7 +1033,7 @@ We could try a few things to mitigate this:
                `(%array-displaced-from ,obj))
             ,.(make-case 'array)
             ,.(make-case 'symbol
-               `(%primitive sb-c:fast-symbol-value ,obj)
+               `(%primitive sb-c:fast-symbol-global-value ,obj)
                `(symbol-info ,obj)
                `(symbol-name ,obj)
                `(symbol-package ,obj))
