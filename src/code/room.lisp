@@ -990,7 +990,10 @@ We could try a few things to mitigate this:
          ,.(make-case 'cons `(car ,obj) `(cdr ,obj))
          ,.(make-case* 'instance
             `(let ((.l. (%instance-layout ,obj)))
-               (,functoid .l. ,@more)
+               ;; Though we've bound %INSTANCE-LAYOUT to a variable,
+               ;; pass the form %INSTANCE-LAYOUT to functoid
+               ;; in case it wants to examine the form
+               (,functoid (%instance-layout ,obj) ,@more)
                (do-instance-tagged-slot (.i. ,obj :layout .l. :pad nil)
                  (,functoid (%instance-ref ,obj .i.) ,@more))))
          (function
@@ -998,10 +1001,14 @@ We could try a few things to mitigate this:
             ,.(make-case* 'closure
                `(,functoid (%closure-fun ,obj) ,@more)
                `(do-closure-values (.o. ,obj :include-extra-values t)
+                  ;; FIXME: doesn't allow setf, but of course there is
+                  ;; no closure-index-set anyway, so .O. might be unused
+                  ;; if functoid is a macro that does nothing.
                   (,functoid .o. ,@more)))
             ,.(make-case* 'funcallable-instance
                `(let ((.l. (%funcallable-instance-layout ,obj)))
-                  (,functoid .l. ,@more)
+                  ;; As for INSTANCE, allow the functoid to see the access form
+                  (,functoid (%funcallable-instance-layout ,obj) ,@more)
                   (,functoid (%funcallable-instance-function ,obj) ,@more)
                   (ecase (layout-bitmap .l.)
                     (#.sb-kernel::+layout-all-tagged+

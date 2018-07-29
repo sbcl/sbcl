@@ -191,6 +191,10 @@ sufficiently motivated to do lengthy fixes."
     (when (eql t compression)
       (setf compression -1))
 
+    ;; C code will GC again (nonconservatively if pertinent), but the coalescing
+    ;; steps done below will be more efficient if some junk is removed now.
+    #+gencgc (gc :full t)
+
     ;; Share EQUALP FUN-INFOs
     (let ((ht (make-hash-table :test 'equalp)))
       (sb-int:call-with-each-globaldb-name
@@ -317,6 +321,9 @@ sufficiently motivated to do lengthy fixes."
   ;; Clean up the simulated weak list of covered code components.
   (rplacd sb-c:*code-coverage-info*
           (delete-if-not #'weak-pointer-value (cdr sb-c:*code-coverage-info*)))
+  ;; Clearing the hash caches must be done after coalescing ctype instances
+  ;; because coalescing compares by TYPE= which creates more cache entries.
+  (coalesce-ctypes)
   (drop-all-hash-caches)
   ;; Must clear this cache if asm routines are movable.
   (setq sb-disassem::*assembler-routines-by-addr* nil)
@@ -326,6 +333,111 @@ sufficiently motivated to do lengthy fixes."
   (setf * nil ** nil *** nil
         - nil + nil ++ nil +++ nil
         /// nil // nil / nil))
+
+;;; Try to produce a unique representative of each ctype in memory as
+;;; compared by TYPE=, redirecting references on to the chosen representative.
+;;; In the base SBCL image this removes about 400 ctypes instances.
+;;; When saving a large application it can (and does) remove thousands more.
+;;; This is actually not about space saving, but reducing non-determinism.
+;;; Because of the random nature of the type caches (using opaque hashes that
+;;; are generated based on memory address) it's totally arbitrary when we create
+;;; new instances of ctypes. Coalescing tries to make it less so.  As to
+;;; reproducibility, the fact that type-hash-value is an unintelligent key
+;;; is a big problem. I can't think of how to easily make it intelligent,
+;;; but it might work to zero them all out, and restore the hash on demand
+;;; (much the way symbol-hash is lazily computed) which ought to be fine
+;;; since all hash caches start out empty.
+;;; Doing too much consing within MAP-ALLOCATED-OBJECTS can lead to heap
+;;; exhaustion (due to inhibited GC), so this takes several passes.
+(defun coalesce-ctypes (&optional verbose)
+  (let* ((dynspace-start (current-dynamic-space-start))
+         (dynspace-end (+ dynspace-start (dynamic-space-size)))
+         (table (make-hash-table :test 'equal))
+         interned-ctypes
+         referencing-objects)
+    (labels ((in-dynamic-space-p (obj)
+               (let ((a (get-lisp-obj-address obj)))
+                 (and (sb-vm:is-lisp-pointer a)
+                      (>= a dynspace-start)
+                      (< a dynspace-end))))
+             (interesting-subpart-p (part)
+               ;; Heap objects can point to "dead" stack objects - those
+               ;; from a no-longer-existing stack frame - so only examine
+               ;; outgoing references within the dynamic space.
+               ;; As to why the pointing object didn't die - who knows?
+               (and (in-dynamic-space-p part)
+                    (typep part 'ctype)
+                    ;; PART is not interesting if it points to an interned
+                    ;; ctype, because that's already a canonical object.
+                    (not (minusp (type-hash-value part)))))
+             (coalesce (type &aux (spec (type-specifier type)))
+               (dolist (choice (gethash spec table)
+                               (progn (push type (gethash spec table)) type))
+                 (when (type= choice type)
+                   (return choice)))))
+      ;; Start by collecting interned types, as well as any object that points
+      ;; to a ctype.
+      ;; Interned ctypes (mostly classoids, but a few others) have the aspect
+      ;; that if two specifiers are equal, then they map to the same internal
+      ;; object. This does not discount the possibility that some other ctype
+      ;; could be EQ to that type, as occurs with array upgrading.
+      (sb-vm:map-allocated-objects
+       (lambda (obj type size)
+         (declare (ignore type size))
+         (when (and (typep obj 'ctype) (minusp (type-hash-value obj)))
+           (push obj interned-ctypes))
+         (macrolet ((examine (form)
+                      ;; when the subpart of OBJ is possibly going
+                      ;; to get coalesced, then record OBJ.
+                      `(when (interesting-subpart-p ,form)
+                         (push obj referencing-objects)
+                         (return-from skip))))
+           ;; Wrap a block named other than NIL since
+           ;; DO-REFERENCED-OBJECTS has several named NIL.
+           (block skip (sb-vm:do-referenced-object (obj examine)))))
+       :all)
+      (when verbose
+        (format t "Found ~d interned types, ~d referencing objects~%"
+                (length interned-ctypes) (length referencing-objects)))
+      (dolist (type interned-ctypes)
+        (setf (gethash (type-specifier type) table) (list type)))
+      (dolist (obj referencing-objects)
+        (let (written)
+          (macrolet ((examine (form &aux (accessor (if (listp form) (car form))))
+                       (cond
+                         ((not (listp form))
+                          ;; do-closure-values passes an access form that
+                          ;; can't be inverted to a writing form
+                          `(progn ,form nil))
+                         ((eq accessor 'data-vector-ref)
+                          `(let ((part ,form))
+                             (when (interesting-subpart-p part)
+                               (let ((new (coalesce part)))
+                                 (unless (eq new part)
+                                   (setf (svref obj ,(caddr form)) new
+                                         written t))))))
+                         ((and (eq accessor '%primitive)
+                               (eq (cadr form) 'sb-c:fast-symbol-global-value))
+                          `(let ((part ,form))
+                             (when (interesting-subpart-p part)
+                               (setf (symbol-global-value obj) (coalesce part)))))
+                         ((not (memq accessor
+                                     '(%closure-fun
+                                       symbol-package symbol-name fdefn-name
+                                       %numerator %denominator
+                                       %realpart %imagpart
+                                       %make-lisp-obj ; fdefn referent
+                                       ;; hope no weak pointers point at ctypes
+                                       weak-pointer-value)))
+                          `(let ((part ,form))
+                             (when (interesting-subpart-p part)
+                               (setf ,form (coalesce part))))))))
+            (sb-vm:do-referenced-object (obj examine)
+              (simple-vector
+               :extend
+               (when (and written (eql sb-vm:vector-valid-hashing-subtype
+                                       (get-header-data obj)))
+                 (setf (svref obj 1) 1)))))))))) ; set need-to-rehash
 
 sb-c::
 (defun coalesce-debug-sources ()
