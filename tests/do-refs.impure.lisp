@@ -170,8 +170,10 @@
     (assert (= n-kids 3))))
 
 (defvar *some-symbol* 'a)
-(test-util:with-test (:name :symbol-refs)
+(test-util:with-test (:name :symbol-refs
+                      :fails-on :interpreter)
   (sb-int:collect ((results))
     (let ((*some-symbol* 'b))
       (do-referenced-object ('*some-symbol* results)))
-    (assert (eq (first (results)) 'a))))
+    (assert (eq (first (results)) #+sb-thread 'a
+                                  #-sb-thread 'b))))
