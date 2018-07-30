@@ -420,7 +420,8 @@ sufficiently motivated to do lengthy fixes."
                                (eq (cadr form) 'sb-c:fast-symbol-global-value))
                           `(let ((part ,form))
                              (when (interesting-subpart-p part)
-                               (setf (symbol-global-value obj) (coalesce part)))))
+                               ;; just do it - skip the attempt-to-modify check
+                               (%set-symbol-global-value obj (coalesce part)))))
                          ((not (memq accessor
                                      '(%closure-fun
                                        symbol-package symbol-name fdefn-name

@@ -17,7 +17,8 @@
             `(progn
                #+sb-xc-host
                (progn (defvar ,global-sym
-                        (mark-ctype-interned (make-named-type :name ',type)))
+                        (!make-named-type (gen-ctype-hash-for-name ',type :named)
+                                          ',type))
                       ;; Make it known as a constant in the cross-compiler.
                       (setf (info :variable :kind ',global-sym) :constant))
                (!cold-init-forms

@@ -200,7 +200,7 @@
 ;; Each CTYPE instance (incl. subtypes thereof) has a random opaque hash value.
 ;; Hashes are mixed together to form a lookup key in the memoization wrappers
 ;; for most operations in CTYPES. This works because CTYPEs are immutable.
-;; But some bits are "stolen" from the hash as flag bits.
+;; But some bits are "stolen" from the HASH-VALUE slot as flag bits.
 ;; The sign bit indicates that the object is the *only* object representing
 ;; its type-specifier - it is an "interned" object.
 ;; The next highest bit indicates that the object, if compared for TYPE=
@@ -218,8 +218,11 @@
 ;;; Represent an index into *SPECIALIZED-ARRAY-ELEMENT-TYPE-PROPERTIES*
 ;;; if applicable. For types which are not array specializations,
 ;;; the bits are arbitrary.
+(defconstant +ctype-saetp-index-bits+ 5)
 (defmacro !ctype-saetp-index (x)
-  `(ldb (byte 5 ,(- sb!vm:n-positive-fixnum-bits 6)) (type-hash-value ,x)))
+  `(ldb (byte +ctype-saetp-index-bits+
+              ,(- sb!vm:n-positive-fixnum-bits (1+ +ctype-saetp-index-bits+)))
+        (type-hash-value ,x)))
 
 (def!struct (ctype (:conc-name type-)
                    (:constructor nil)
@@ -267,22 +270,37 @@
                     +type-admits-type=-optimization+)
                 (type-hash-value obj)))
   obj)
-
-;; For cold-init: improve the randomness of the hash.
-;; (The host uses at most 21 bits of randomness. See CTYPE-RANDOM)
-#+sb-xc
-(defun !fix-ctype-hash (obj)
-  (let ((saetp-index (!ctype-saetp-index obj)))
-    ;; Preserve the interned-p and type=-optimization bits
-    ;; by flipping only the bits under the hash-mask.
-    (setf (type-hash-value obj)
-          (logxor (logand (sb!impl::quasi-random-address-based-hash
-                           *ctype-hash-state* +ctype-hash-mask+))
-                   (type-hash-value obj)))
-    ;; Except that some of those "non-intelligent" bits contain
-    ;; critical information, if this type is an array specialization.
-    (setf (!ctype-saetp-index obj) saetp-index))
-  obj)
+;;; Classoids and named types can use the name as the source of the hash.
+;;; A string's hash is stable across builds which is a nice aspect.
+(defun gen-ctype-hash-for-name (symbol &optional (metatype :classoid))
+  (declare (ignorable symbol metatype))
+  (let ((hash
+         ;; When cross-compiling, the goal is to produce deterministic fasls
+         ;; regardless of the host. So we must not use SXHASH.
+         #+sb-xc-host (ctype-random +ctype-hash-mask+)
+         ;; In the target, pick the hash based on the symbol
+         ;; to try to produce repeatable cores across rebuilds.
+         #-sb-xc-host
+         ;; the named-type NIL can use a string-based (deterministic) hash,
+         ;; whereas classoids with no name should get a pseudo-random hash
+         (if (or symbol (eq metatype :named))
+             ;; symbol hashes don't use the package so  mix that in too
+             (let ((pkg-hash (acond ((symbol-package symbol)
+                                     (sxhash (sb!impl::package-%name it)))
+                                    (t 0)))
+                   (name-hash (sxhash (symbol-name symbol))))
+               (logand (ecase metatype
+                         ;; Hash two different ways in case a classoid
+                         ;; and named type share the symbol (like T)
+                         (:classoid (logxor pkg-hash name-hash))
+                         (:named    (lognot (logxor pkg-hash name-hash))))
+                       +ctype-hash-mask+))
+             ;; anonymous classoid (do we support those?) or other metatype
+             (sb!impl::quasi-random-address-based-hash
+              *ctype-hash-state* +ctype-hash-mask+))))
+    (logior sb!xc:most-negative-fixnum       ; "interned" bit
+            +type-admits-type=-optimization+ ; fast TYPE= bit
+            hash)))
 
 (declaim (inline type-might-contain-other-types-p))
 (defun type-might-contain-other-types-p (ctype)
@@ -394,7 +412,7 @@
             ;; Fixup the class first, in case fixing the hash needs the class.
             ;; (It doesn't currently, but just in case it does)
             (setf (%instance-ref instance ,slot-index) type-class)
-            (!fix-ctype-hash instance)))))))
+            (!improve-ctype-hash instance ',name)))))))
 
 ;;; Define the translation from a type-specifier to a type structure for
 ;;; some particular type. Syntax is identical to DEFTYPE.
@@ -538,6 +556,7 @@
 ;;; "Decision Procedure for SUBTYPEP" paper.
 (defstruct (named-type (:include ctype
                                  (class-info (type-class-or-lose 'named)))
+                       (:constructor !make-named-type (hash-value name))
                        (:copier nil))
   (name nil :type symbol :read-only t))
 

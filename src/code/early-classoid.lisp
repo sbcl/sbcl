@@ -241,6 +241,29 @@
   ;; NIL if none assigned yet
   (pcl-class nil))
 
+;;; A helper to make classoid (and named-type) hash values stable.
+;;; For other ctypes, generally improve the randomness of the hash.
+;;; (The host uses at most 21 bits of randomness. See CTYPE-RANDOM)
+#+sb-xc
+(defun !improve-ctype-hash (obj type-class-name)
+  (let ((hash (case type-class-name
+                (named
+                 (gen-ctype-hash-for-name (named-type-name obj) :named))
+                (classoid
+                 (write-string (string (classoid-name obj)))
+                 (gen-ctype-hash-for-name (classoid-name obj)))
+                (t
+                 (gen-ctype-hash-for-name nil))))
+        ;; Preserve the interned-p and type=-optimization bits
+        ;; by affecting only bits under the ctype-hash-mask.
+        ;; Upper 5 hash bits might be an index into SAETP array
+        ;; (if this ctype is exactly a type to which upgrade occurs)
+        (nbits (- (integer-length +ctype-hash-mask+)
+                  +ctype-saetp-index-bits+)))
+    (setf (type-hash-value obj)
+          (dpb hash (byte nbits 0) (type-hash-value obj))))
+  obj)
+
 ;;;; object types to represent classes
 
 ;;; An UNDEFINED-CLASSOID is a cookie we make up to stick in forward
@@ -262,7 +285,7 @@
 ;;; translated classes, only their translation.
 (def!struct (built-in-classoid (:include classoid)
                                (:copier nil)
-                               (:constructor make-built-in-classoid))
+                               (:constructor !make-built-in-classoid))
   ;; the type we translate to on parsing. If NIL, then this class
   ;; stands on its own; or it can be set to :INITIALIZING for a period
   ;; during cold-load.
@@ -270,7 +293,8 @@
 
 (def!struct (condition-classoid (:include classoid)
                                 (:copier nil)
-                                (:constructor make-condition-classoid))
+                                (:constructor %make-condition-classoid
+                                    (hash-value name)))
   ;; list of CONDITION-SLOT structures for the direct slots of this
   ;; class
   (slots nil :type list)
@@ -294,6 +318,8 @@
   ;; Values for these slots must be computed in the dynamic
   ;; environment of MAKE-CONDITION.
   (hairy-slots nil :type list))
+(defun make-condition-classoid (&key name)
+  (%make-condition-classoid (gen-ctype-hash-for-name name) name))
 
 ;;;; classoid namespace
 
