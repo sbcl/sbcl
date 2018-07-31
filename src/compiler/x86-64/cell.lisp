@@ -474,7 +474,10 @@
     (inst mov (thread-tls-ea tls-index) val)))
 
 (define-vop (bind) ; bind a known symbol
-  (:args (val :scs (any-reg descriptor-reg)))
+  (:args (val :scs (any-reg descriptor-reg)
+              :load-if (not (let ((imm (encode-value-if-immediate val)))
+                              (or (fixup-p imm)
+                                  (plausible-signed-imm32-operand-p imm))))))
   (:temporary (:sc unsigned-reg) bsp tmp)
   (:info symbol)
   (:generator 10
@@ -491,7 +494,7 @@
       ;; a REX prefix if 'bsp' happens to be any of the low 8 registers.
       (inst mov (make-ea :dword :base bsp
                          :disp (ash binding-symbol-slot word-shift)) tls-index)
-      (inst mov tls-cell val)))))
+      (inst mov tls-cell (encode-value-if-immediate val))))))
 
 #!-sb-thread
 (define-vop (dynbind)
