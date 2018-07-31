@@ -176,20 +176,23 @@ constant pool."
       (sb-c::fun-info-templates fun-info))))
 
 (defun find-vop-source (name)
-  (let* ((vop (gethash name sb-c::*backend-template-names*))
+  (let* ((vop (gethash name sb-c::*backend-parsed-vops*))
          (translating (vops-translating-fun name))
          (vops (if vop
                    (cons vop (remove vop translating))
                    translating)))
     (loop for vop in vops
-          for name = (sb-c::vop-info-name vop)
-          for loc = (sb-c::vop-parse-source-location
-                     (gethash name sb-c::*backend-parsed-vops*))
+          for vop-parse = (if (typep vop 'sb-c::vop-parse)
+                              vop
+                              (gethash (sb-c::vop-info-name vop)
+                                       sb-c::*backend-parsed-vops*))
+          for name = (sb-c::vop-parse-name vop-parse)
+          for loc = (sb-c::vop-parse-source-location vop-parse)
           when loc
           collect (let ((source (translate-source-location loc)))
                     (setf (definition-source-description source)
-                          (if (sb-c::vop-info-note vop)
-                              (list name (sb-c::vop-info-note vop))
+                          (if (sb-c::vop-parse-note vop-parse)
+                              (list name (sb-c::vop-parse-note vop-parse))
                               (list name)))
                     source))))
 
