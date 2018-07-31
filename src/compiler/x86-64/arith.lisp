@@ -170,8 +170,14 @@
                   (:translate ,translate)
                   (:generator 1
                    ,@(or c/fixnum=>fixnum
-                         `((move r x)
-                           (inst ,op r (constantize (fixnumize y)))))))
+                         `((cond
+                             ,@(and (eq op 'sub)
+                                    `(((and (not (location= r x))
+                                            (typep (- (fixnumize y)) '(signed-byte 32)))
+                                       (inst lea r (make-ea :qword :base x :disp (- (fixnumize y)))))))
+                             (t
+                              (move r x)
+                              (inst ,op r (constantize (fixnumize y)))))))))
                 (define-vop (,(symbolicate "FAST-" translate "/SIGNED=>SIGNED")
                              fast-signed-binop)
                   (:translate ,translate)
@@ -182,7 +188,14 @@
                   (:translate ,translate)
                   (:generator ,untagged-penalty
                    ,@(or c/signed=>signed
-                         `((move r x) (inst ,op r (constantize y))))))
+                         `((cond
+                             ,@(and (eq op 'sub)
+                                    `(((and (not (location= r x))
+                                            (typep (- y) '(signed-byte 32)))
+                                       (inst lea r (make-ea :qword :base x :disp (- y))))))
+                             (t
+                              (move r x)
+                              (inst ,op r (constantize y))))))))
                 (define-vop (,(symbolicate "FAST-"
                                            translate
                                            "/UNSIGNED=>UNSIGNED")
@@ -197,7 +210,14 @@
                   (:translate ,translate)
                   (:generator ,untagged-penalty
                    ,@(or c/unsigned=>unsigned
-                         `((move r x) (inst ,op r (constantize y)))))))))
+                         `((cond
+                             ,@(and (eq op 'sub)
+                                    `(((and (not (location= r x))
+                                            (typep (- y) '(signed-byte 32)))
+                                       (inst lea r (make-ea :qword :base x :disp (- y))))))
+                             (t
+                              (move r x)
+                              (inst ,op r (constantize y)))))))))))
 
   ;;(define-binop + 4 add)
   (define-binop - 4 sub)
