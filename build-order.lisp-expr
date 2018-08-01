@@ -41,6 +41,7 @@
 ;;; standard and lacks the custom character macro handler.
 ;;; If you must test a host feature, use "#.(cl:if ..)" syntax.
 (
+ ("src/code/scratch" :not-host :trace-file)
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; miscellaneous
  ;; This comes as early as possible, so that we catch the source locations
