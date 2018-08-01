@@ -43,16 +43,13 @@
 
   ;; As per the calling convention EBX is expected to point at the SP
   ;; before the stack frame.
-  (inst lea ebx (make-ea :qword :base rbp-tn
-                         :disp (* sp->fp-offset n-word-bytes)))
+  (inst lea ebx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
 
   ;; Save the count, the return address and restore the frame pointer,
   ;; because the loop is going to destroy them.
   (inst mov edx ecx)
-  (inst mov eax (make-ea :qword :base rbp-tn
-                         :disp (frame-byte-offset return-pc-save-offset)))
-  (inst mov rbp-tn (make-ea :qword :base rbp-tn
-                            :disp (frame-byte-offset ocfp-save-offset)))
+  (inst mov eax (ea (frame-byte-offset return-pc-save-offset) rbp-tn))
+  (inst mov rbp-tn (ea (frame-byte-offset ocfp-save-offset) rbp-tn))
   ;; Blit the values down the stack. Note: there might be overlap, so
   ;; we have to be careful not to clobber values before we've read
   ;; them. Because the stack builds down, we are copying to a larger
@@ -61,19 +58,14 @@
   (zeroize loop-index)
   LOOP
   (inst sub loop-index n-word-bytes)
-  (inst mov temp
-        (make-ea :qword :base esi
-                        :index loop-index))
-  (inst mov
-        (make-ea :qword :base ebx
-                        :index loop-index)
-        temp)
+  (inst mov temp (ea esi loop-index))
+  (inst mov (ea ebx loop-index) temp)
 
   (inst sub edx (fixnumize 1))
   (inst jmp :nz LOOP)
 
   ;; Set the stack top to the last result.
-  (inst lea rsp-tn (make-ea :qword :base ebx :index loop-index))
+  (inst lea rsp-tn (ea ebx loop-index))
 
   ;; Load the register args.
   (loadw edx ebx -1)
@@ -87,8 +79,7 @@
 
   ;; Handle the register arg cases.
   ZERO-VALUES
-  (inst lea ebx (make-ea :qword :base rbp-tn
-                         :disp (* sp->fp-offset n-word-bytes)))
+  (inst lea ebx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
   (inst mov edx nil-value)
   (inst mov edi edx)
   (inst mov esi edx)
@@ -107,8 +98,7 @@
   (inst ret)
 
   TWO-VALUES
-  (inst lea ebx (make-ea :qword :base rbp-tn
-                         :disp (* sp->fp-offset n-word-bytes)))
+  (inst lea ebx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
   (loadw edx esi -1)
   (loadw edi esi -2)
   (inst mov esi nil-value)
@@ -118,8 +108,7 @@
   (inst ret)
 
   THREE-VALUES
-  (inst lea ebx (make-ea :qword :base rbp-tn
-                         :disp (* sp->fp-offset n-word-bytes)))
+  (inst lea ebx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
   (loadw edx esi -1)
   (loadw edi esi -2)
   (loadw esi esi -3)
@@ -166,7 +155,7 @@
     ;; our way down.
     (inst shr ecx n-fixnum-tag-bits)
     (inst std)                          ; count down
-    (inst lea edi (make-ea :qword :base rbp-tn :disp (frame-byte-offset 0)))
+    (inst lea edi (ea (frame-byte-offset 0) rbp-tn))
     (inst sub esi n-word-bytes)
     (inst rep)
     (inst movs :qword)
@@ -181,7 +170,7 @@
     (popw rbp-tn (frame-word-offset ocfp-save-offset))
 
     ;; Blow off the stack above the arguments.
-    (inst lea rsp-tn (make-ea :qword :base edi :disp n-word-bytes))
+    (inst lea rsp-tn (ea n-word-bytes edi))
 
     ;; remaining register args
     (inst mov edi edx)
@@ -194,10 +183,7 @@
     ;; And jump into the function.
     (if jump-to-the-end
         (inst jmp end)
-        (inst jmp
-              (make-ea :byte :base eax
-                             :disp (- (* closure-fun-slot n-word-bytes)
-                                      fun-pointer-lowtag))))
+        (inst jmp (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag) eax)))
 
     ;; All the arguments fit in registers, so load them.
     REGISTER-ARGS
@@ -206,8 +192,7 @@
     (loadw esi esi -3)
 
     ;; Clear most of the stack.
-    (inst lea rsp-tn
-          (make-ea :qword :base rbp-tn :disp (* (- sp->fp-offset 3) n-word-bytes)))
+    (inst lea rsp-tn (ea (* (- sp->fp-offset 3) n-word-bytes) rbp-tn))
 
     ;; Push the return-pc so it looks like we just called.
     (pushw rbp-tn (frame-word-offset return-pc-save-offset))
@@ -225,9 +210,7 @@
      (:temp esi unsigned-reg rsi-offset))
   (!prepare-for-tail-call-variable eax ebx ecx edx edi esi)
 
-  (inst jmp (make-ea :byte :base eax
-                     :disp (- (* closure-fun-slot n-word-bytes)
-                              fun-pointer-lowtag))))
+  (inst jmp (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag) eax)))
 
 #+sb-assembling
 (define-assembly-routine
@@ -246,9 +229,7 @@
   (%lea-for-lowtag-test ebx-tn fun fun-pointer-lowtag)
   (inst test bl-tn lowtag-mask)
   (inst jmp :nz (make-fixup 'tail-call-symbol :assembly-routine))
-  (inst jmp (make-ea :byte :base eax
-                           :disp (- (* closure-fun-slot n-word-bytes)
-                                    fun-pointer-lowtag))))
+  (inst jmp (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag) eax)))
 
 #+sb-assembling
 (define-assembly-routine (call-symbol
@@ -258,39 +239,31 @@
      (:temp length (any-reg descriptor-reg) rax-offset)
      (:temp vector (any-reg descriptor-reg) rbx-offset))
   ;; Jump over CALL QWORD PTR [RAX-3] in the caller
-  (inst add (make-ea :qword :base rsp-tn) 3)
+  (inst add (ea 0 rsp-tn nil nil :qword) 3)
   (emit-alignment n-lowtag-bits :long-nop)
 
   TAIL-CALL-SYMBOL
   (%lea-for-lowtag-test vector fun other-pointer-lowtag)
   (inst test (reg-in-size vector :byte) lowtag-mask)
   (inst jmp :nz not-callable)
-  (inst cmp (make-ea :byte :base fun :disp (- other-pointer-lowtag))
-        symbol-widetag)
+  (inst cmp (ea (- other-pointer-lowtag) fun nil nil :byte) symbol-widetag)
   (inst jmp :ne not-callable)
   (load-symbol-info-vector vector fun r11-tn)
   ;; info-vector-fdefn
   (inst cmp vector nil-value)
   (inst jmp :e undefined)
 
-  (inst mov r10d-tn (make-ea :dword :base vector
-                                    :disp (- (* 2 n-word-bytes) other-pointer-lowtag)))
+  (inst mov r10d-tn (ea (- (* 2 n-word-bytes) other-pointer-lowtag) vector))
   (inst and r10d-tn (fixnumize (1- (ash 1 (* info-number-bits 2)))))
   (inst cmp r10d-tn (fixnumize (1+ (ash +fdefn-info-num+ info-number-bits))))
   (inst jmp :b undefined)
 
   (loadw length vector 1 other-pointer-lowtag)
-  (inst mov fun (make-ea :qword :base vector
-                                :index length
-                                :scale 4
-                                :disp
-                                (- 8 other-pointer-lowtag)))
+  (inst mov fun (ea (- 8 other-pointer-lowtag) vector length 4))
 
   (let ((fdefn-raw-addr
-          (make-ea :qword :base fun
-                          :disp (- (* fdefn-raw-addr-slot
-                                      n-word-bytes)
-                                   other-pointer-lowtag))))
+          (ea (- (* fdefn-raw-addr-slot n-word-bytes) other-pointer-lowtag)
+              fun)))
     #!+immobile-code
     (progn
       (inst lea vector fdefn-raw-addr)
@@ -303,7 +276,7 @@
   (inst cmp fun nil-value) ;; NIL doesn't have SYMBOL-WIDETAG
   (inst jmp :e undefined)
 
-  (inst pop (make-ea :qword :base rbp-tn :disp n-word-bytes))
+  (inst pop (ea n-word-bytes rbp-tn))
   (emit-error-break nil error-trap (error-number-or-lose 'sb!kernel::object-not-callable-error)
                     (list fun)))
 
@@ -389,8 +362,7 @@
   ;; be saved on the stack: the block in edx-tn, start in ebx-tn, and
   ;; count in ecx-tn.
 
-  (inst jmp (make-ea :byte :base block
-                     :disp (* unwind-block-entry-pc-slot n-word-bytes))))
+  (inst jmp (ea (* unwind-block-entry-pc-slot n-word-bytes) block)))
 
 ;;; Perform a store to code, updating the GC page (card) protection bits.
 ;;; This is not a "good" implementation of soft card marking.
@@ -420,14 +392,12 @@
     ;; because there's no way to get back into C code anyhow.
     #!+sb-dynamic-core
     (progn
-      (inst mov thread-base-tn
-            (make-ea :qword :disp (make-fixup "all_threads" :foreign-dataref)))
-      (inst mov thread-base-tn (make-ea :qword :base thread-base-tn)))
+      (inst mov thread-base-tn (ea (make-fixup "all_threads" :foreign-dataref)))
+      (inst mov thread-base-tn (ea thread-base-tn)))
     #!-sb-dynamic-core
-    (inst mov thread-base-tn
-          (make-ea :qword :disp (make-fixup "all_threads" :foreign))))
+    (inst mov thread-base-tn (ea (make-fixup "all_threads" :foreign))))
 
-  (inst mov temp-reg-tn (make-ea :qword :base rsp-tn :disp 24))
+  (inst mov temp-reg-tn (ea 24 rsp-tn))
   (inst sub temp-reg-tn (thread-slot-ea thread-varyobj-space-addr-slot))
   (inst shr temp-reg-tn (1- (integer-length immobile-card-bytes)))
   (pseudo-atomic
@@ -435,11 +405,11 @@
       (inst cmp temp-reg-tn (thread-slot-ea thread-varyobj-card-count-slot))
       (inst jmp :ae try-dynamic-space)
       (inst mov rdi-tn (thread-slot-ea thread-varyobj-card-marks-slot))
-      (inst bts (make-ea :qword :base rdi-tn) temp-reg-tn :lock)
+      (inst bts (ea rdi-tn) temp-reg-tn :lock)
       (inst jmp store)
 
       TRY-DYNAMIC-SPACE
-      (inst mov temp-reg-tn (make-ea :qword :base rsp-tn :disp 24)) ; reload
+      (inst mov temp-reg-tn (ea 24 rsp-tn)) ; reload
       (inst sub temp-reg-tn (thread-slot-ea thread-dynspace-addr-slot))
       (inst shr temp-reg-tn (1- (integer-length gencgc-card-bytes)))
       (inst cmp temp-reg-tn (thread-slot-ea thread-dynspace-card-count-slot))
@@ -453,28 +423,23 @@
              (inst shl temp-reg-tn 3) ; multiply by 8
              (inst add temp-reg-tn (thread-slot-ea thread-dynspace-pte-base-slot))
              ;; clear WP - bit index 5 of flags byte
-             (inst and (make-ea :byte :base temp-reg-tn :disp 6) (lognot (ash 1 5))
-                   :lock))
+             (inst and (ea 6 temp-reg-tn nil nil :byte) (lognot (ash 1 5)) :lock))
             (t
-             (inst lea temp-reg-tn ; multiply by 3
-                   (make-ea :qword :base temp-reg-tn :index temp-reg-tn :scale 2))
+             (inst lea temp-reg-tn (ea temp-reg-tn temp-reg-tn 2)) ; multiply by 3
              (inst shl temp-reg-tn 2) ; then by 4, = 12
              (inst add temp-reg-tn (thread-slot-ea thread-dynspace-pte-base-slot))
              ;; clear WP
-             (inst and (make-ea :byte :base temp-reg-tn :disp 8) (lognot (ash 1 5))
-                   :lock)))
+             (inst and (ea 8 temp-reg-tn nil nil :byte) (lognot (ash 1 5)) :lock)))
 
       STORE
-      (inst mov rdi-tn (make-ea :qword :base rsp-tn :disp 24))      ; object
-      (inst mov temp-reg-tn (make-ea :qword :base rsp-tn :disp 32)) ; word index
-      (inst mov rax-tn (make-ea :qword :base rsp-tn :disp 40))      ; newval
+      (inst mov rdi-tn (ea 24 rsp-tn))      ; object
+      (inst mov temp-reg-tn (ea 32 rsp-tn)) ; word index
+      (inst mov rax-tn (ea 40 rsp-tn))      ; newval
       ;; set 'written' flag in the code header
-      (inst or (make-ea :byte :base rdi-tn :disp (- 3 other-pointer-lowtag))
-            #x40 :lock)
+      (inst or (ea (- 3 other-pointer-lowtag) rdi-tn nil nil :byte) #x40 :lock)
       ;; store newval into object
-      (inst mov (make-ea :qword :base rdi-tn
-                         :index temp-reg-tn :scale (ash 1 word-shift)
-                         :disp (- other-pointer-lowtag)) rax-tn)))
+      (inst mov (ea (- other-pointer-lowtag) rdi-tn temp-reg-tn n-word-bytes)
+            rax-tn)))
   (inst pop rdi-tn) ; restore
   (inst pop rax-tn)
   (inst ret 24)) ; remove 3 stack args

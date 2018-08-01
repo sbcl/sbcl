@@ -15,7 +15,7 @@
          (cond ((sb!c::code-immobile-p vop)
                 (make-fixup routine :assembly-routine))
                (t
-                (make-ea :qword :disp (make-fixup routine :assembly-routine*))))))
+                (ea (make-fixup routine :assembly-routine*))))))
     (ecase inst
       (jmp  (inst jmp fixup))
       (call (inst call fixup)))))

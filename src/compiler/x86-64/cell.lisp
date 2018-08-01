@@ -43,12 +43,12 @@
                   (inst shr (reg-in-size temp-reg-tn :dword) n-widetag-bits)
                   ;; now temp-reg-tn holds the difference in words from code to fun.
                   (inst push temp-reg-tn)
-                  (inst add (make-ea :qword :base rsp-tn) offset) ; for particular slot
+                  (inst add (ea 0 rsp-tn nil nil :qword) offset) ; for particular slot
                   ;; finish computing the code address
                   (inst neg temp-reg-tn)
                   (inst lea temp-reg-tn
-                        (make-ea :qword :base object :index temp-reg-tn :scale n-word-bytes
-                                 :disp (- other-pointer-lowtag fun-pointer-lowtag)))
+                        (ea (- other-pointer-lowtag fun-pointer-lowtag)
+                            object temp-reg-tn n-word-bytes))
                   (inst push temp-reg-tn))
                  (t ; is code already
                   (inst push offset)
@@ -66,15 +66,12 @@
     (cond #!+compact-instance-header
           ((and (eq name '%make-structure-instance) (eql offset :layout))
         ;; The layout is in the upper half of the header word.
-           (inst mov
-              (make-ea :dword :base object :disp (- 4 instance-pointer-lowtag))
-              (if (sc-is value immediate)
-                  (make-fixup (tn-value value) :layout)
-                  (reg-in-size value :dword))))
+           (inst mov (ea (- 4 instance-pointer-lowtag) object nil nil :dword)
+                 (if (sc-is value immediate)
+                     (make-fixup (tn-value value) :layout)
+                     (reg-in-size value :dword))))
           ((sc-is value immediate)
-           (move-immediate (make-ea :qword
-                                    :base object
-                                    :disp (- (* offset n-word-bytes) lowtag))
+           (move-immediate (ea (- (* offset n-word-bytes) lowtag) object nil nil :qword)
                            (encode-value-if-immediate value)
                            temp-reg-tn (not dx-p)))
           (t
@@ -92,8 +89,7 @@
   (:results (result :scs (descriptor-reg any-reg)))
   (:generator 5
      (move rax old)
-     (inst cmpxchg (make-ea :qword :base object
-                            :disp (- (* offset n-word-bytes) lowtag))
+     (inst cmpxchg (ea (- (* offset n-word-bytes) lowtag) object)
            new :lock)
      (move result rax)))
 
@@ -157,9 +153,8 @@
              `(progn
                 (inst mov (reg-in-size cell :dword) (tls-index-of symbol))
                 (inst lea cell
-                      (make-ea :qword :base thread-base-tn :index cell
-                               :disp (- other-pointer-lowtag
-                                        (ash symbol-value-slot word-shift))))
+                      (ea (- other-pointer-lowtag (ash symbol-value-slot word-shift))
+                          thread-base-tn cell))
                 (inst cmp (access-value-slot cell :dword) ; TLS reference
                       no-tls-value-marker-widetag)
                 (inst cmov :e cell symbol))) ; now possibly get the symbol
@@ -410,11 +405,10 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 38
     (inst mov raw (make-fixup 'closure-tramp :assembly-routine))
-    (inst cmp (make-ea :byte :base function :disp (- fun-pointer-lowtag))
+    (inst cmp (ea (- fun-pointer-lowtag) function nil nil :byte)
           simple-fun-widetag)
     (inst cmov :e raw
-          (make-ea :qword :base function
-                   :disp (- (* simple-fun-self-slot n-word-bytes) fun-pointer-lowtag)))
+          (ea (- (* simple-fun-self-slot n-word-bytes) fun-pointer-lowtag) function))
     (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
     (storew raw fdefn fdefn-raw-addr-slot other-pointer-lowtag)
     (move result function)))
@@ -430,7 +424,7 @@
     #!+immobile-code
     (let ((tramp (make-fixup 'undefined-fdefn :assembly-routine)))
      (if (sb!c::code-immobile-p vop)
-         (inst lea temp (make-ea :qword :base rip-tn :disp tramp))
+         (inst lea temp (ea tramp rip-tn))
          (inst mov temp tramp))
      ;; Compute displacement from the call site
      (inst sub (reg-in-size temp :dword) (reg-in-size fdefn :dword))
@@ -498,8 +492,8 @@
       (storew tmp bsp binding-value-slot)
       ;; Indices are small enough to be written as :DWORDs which avoids
       ;; a REX prefix if 'bsp' happens to be any of the low 8 registers.
-      (inst mov (make-ea :dword :base bsp
-                         :disp (ash binding-symbol-slot word-shift)) tls-index)
+      (inst mov (ea (ash binding-symbol-slot word-shift) bsp nil nil :dword)
+            tls-index)
       (inst mov tls-cell (encode-value-if-immediate val))))))
 
 #!-sb-thread
@@ -534,7 +528,7 @@
           (loadw temp bsp binding-value-slot)
           (inst mov tls-cell temp)
           ;; Zero out the stack.
-          (inst movapd (make-ea :qword :base bsp) zero))
+          (inst movapd (ea bsp) zero))
     (store-binding-stack-pointer bsp)))
 
 #!-sb-thread
@@ -565,8 +559,7 @@
     ;; 32-bits.
     #!+sb-thread
     (let ((tls-index (reg-in-size symbol :dword)))
-      (inst mov tls-index
-            (make-ea :dword :base bsp :disp (* binding-symbol-slot n-word-bytes)))
+      (inst mov tls-index (ea (* binding-symbol-slot n-word-bytes) bsp))
       (inst test tls-index tls-index))
     #!-sb-thread
     (progn
@@ -580,7 +573,7 @@
     (inst mov (thread-tls-ea symbol) value)
 
     SKIP
-    (inst movapd (make-ea :qword :base bsp) zero)
+    (inst movapd (ea bsp) zero)
 
     (inst cmp where bsp)
     (inst jmp :ne LOOP)
@@ -642,8 +635,7 @@
   (:result-types positive-fixnum)
   (:generator 4
     (let ((res (reg-in-size res :dword)))
-      (inst movzx res (make-ea :word :base struct
-                               :disp (1+ (- instance-pointer-lowtag))))
+      (inst movzx res (ea (1+ (- instance-pointer-lowtag)) struct nil nil :word))
       (inst shl res n-fixnum-tag-bits))))
 
 #!+compact-instance-header
@@ -656,7 +648,7 @@
    (:variant-vars lowtag)
    (:variant instance-pointer-lowtag)
    (:generator 1
-    (inst mov (reg-in-size res :dword) (make-ea :dword :base object :disp (- 4 lowtag)))))
+    (inst mov (reg-in-size res :dword) (ea (- 4 lowtag) object))))
  (define-vop (%set-instance-layout)
    (:translate %set-instance-layout)
    (:policy :fast-safe)
@@ -666,7 +658,7 @@
    (:variant-vars lowtag)
    (:variant instance-pointer-lowtag)
    (:generator 2
-    (inst mov (make-ea :dword :base object :disp (- 4 lowtag)) (reg-in-size value :dword))
+    (inst mov (ea (- 4 lowtag) object) (reg-in-size value :dword))
     (move res value)))
  (define-vop (%funcallable-instance-layout %instance-layout)
    (:translate %funcallable-instance-layout)
@@ -706,17 +698,14 @@
 (flet ((instance-slot-ea (object index)
          (etypecase index
            (integer
-              (make-ea :qword
-                       :base object
-                       :disp (+ (* (+ instance-slots-offset index) n-word-bytes)
-                                (- instance-pointer-lowtag))))
+              (ea (+ (* (+ instance-slots-offset index) n-word-bytes)
+                     (- instance-pointer-lowtag))
+                  object nil nil :qword))
            (tn
-              (make-ea :qword
-                       :base object
-                       :index index
-                       :scale (ash 1 (- word-shift n-fixnum-tag-bits))
-                       :disp (+ (* instance-slots-offset n-word-bytes)
-                                (- instance-pointer-lowtag)))))))
+              (ea (+ (* instance-slots-offset n-word-bytes)
+                     (- instance-pointer-lowtag))
+                  object index (ash 1 (- word-shift n-fixnum-tag-bits))
+                  :qword)))))
   (macrolet
       ((def (suffix result-sc result-type inst &optional (inst/c inst))
          `(progn
@@ -865,11 +854,10 @@
                             expected-old-lo expected-old-hi new-lo new-hi
                             eax ebx ecx edx result-lo result-hi)))))
   (define-cmpxchg-vop compare-and-exchange-pair
-      (make-ea :dword :base object :disp (- list-pointer-lowtag))
+      (ea (- list-pointer-lowtag) object)
       ((:translate %cons-cas-pair)))
   (define-cmpxchg-vop compare-and-exchange-pair-indexed
-      (make-ea :dword :base object :disp offset :index index
-                      :scale (ash n-word-bytes (- n-fixnum-tag-bits)))
+      (ea offset object index (ash n-word-bytes (- n-fixnum-tag-bits)))
       ((:variant-vars offset))
       ((index :scs (descriptor-reg any-reg) :to :eval))))
 

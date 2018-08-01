@@ -12,10 +12,7 @@
 (in-package "SB!VM")
 
 (macrolet ((ea-for-xf-desc (tn slot)
-             `(make-ea
-               :qword :base ,tn
-               :disp (- (* ,slot n-word-bytes)
-                        other-pointer-lowtag))))
+             `(ea (- (* ,slot n-word-bytes) other-pointer-lowtag) ,tn)))
   (defun ea-for-df-desc (tn)
     (ea-for-xf-desc tn double-float-value-slot))
   ;; complex floats
@@ -35,9 +32,7 @@
 
 (macrolet ((ea-for-xf-stack (tn kind)
              (declare (ignore kind))
-             `(make-ea
-               :qword :base rbp-tn
-               :disp (frame-byte-offset (tn-offset ,tn)))))
+             `(ea (frame-byte-offset (tn-offset ,tn)) rbp-tn)))
   (defun ea-for-sf-stack (tn)
     (ea-for-xf-stack tn :single))
   (defun ea-for-df-stack (tn)
@@ -202,9 +197,7 @@
         (inst shufps y y #4r3331))
        (control-stack
         ;; Directly load high 4 bytes of descriptor from its stack address
-        (inst movss y (make-ea :dword
-                               :base rbp-tn
-                               :disp (+ (frame-byte-offset (tn-offset x)) 4)))))))
+        (inst movss y (ea (+ (frame-byte-offset (tn-offset x)) 4) rbp-tn))))))
 (define-move-vop move-to-single-reg :move (descriptor-reg) (single-reg))
 
 ;;; Move from a descriptor to a float stack.
@@ -216,8 +209,7 @@
   (:generator 2
     (move tmp x)
     (inst shr tmp 32)
-    (let ((slot (make-ea :dword :base rbp-tn
-                         :disp (frame-byte-offset (tn-offset y)))))
+    (let ((slot (ea (frame-byte-offset (tn-offset y)) rbp-tn)))
       (inst mov slot (reg-in-size tmp :dword)))))
 (define-move-vop move-to-single-stack :move (descriptor-reg) (single-stack))
 
@@ -296,13 +288,11 @@
                       (,stack-sc
                        (if (= (tn-offset fp) esp-offset)
                            (let* ((offset (* (tn-offset y) n-word-bytes))
-                                  (ea (make-ea :dword :base fp :disp offset)))
+                                  (ea (ea offset fp)))
                              ,@(ecase format
                                       (:single '((inst movss ea x)))
                                       (:double '((inst movsd ea x)))))
-                           (let ((ea (make-ea
-                                      :dword :base fp
-                                      :disp (frame-byte-offset (tn-offset y)))))
+                           (let ((ea (ea (frame-byte-offset (tn-offset y)) fp)))
                              ,@(ecase format
                                  (:single '((inst movss ea x)))
                                  (:double '((inst movsd ea x))))))))))
@@ -1230,8 +1220,7 @@
            (inst movd res (reg-in-size bits :dword)))
           (signed-stack
            (inst movss res
-                 (make-ea :dword :base rbp-tn
-                          :disp (frame-byte-offset (tn-offset bits))))))))))
+                 (ea (frame-byte-offset (tn-offset bits)) rbp-tn))))))))
 
 (define-vop (make-single-float-c)
   (:results (res :scs (single-reg single-stack descriptor-reg)))
@@ -1292,10 +1281,9 @@
         (let ((dword-bits (reg-in-size bits :dword)))
           (inst movd dword-bits float)
           (inst movsxd bits dword-bits)))
-       (single-stack
-        (inst movsxd bits (make-ea :dword ; c.f. ea-for-sf-stack
-                                   :base rbp-tn
-                                   :disp (frame-byte-offset (tn-offset float)))))
+       (single-stack ; c.f. ea-for-sf-stack
+        (inst movsxd bits
+              (ea (frame-byte-offset (tn-offset float)) rbp-tn nil nil :dword)))
        (descriptor-reg
         (move bits float)
         (inst sar bits 32)))))
@@ -1338,12 +1326,10 @@
         (double-reg
          (inst movsd temp float)
          (inst mov dword-lo-bits
-               (make-ea :dword :base rbp-tn
-                        :disp (frame-byte-offset (tn-offset temp)))))
+               (ea (frame-byte-offset (tn-offset temp)) rbp-tn)))
         (double-stack
          (inst mov dword-lo-bits
-               (make-ea :dword :base rbp-tn
-                        :disp (frame-byte-offset (tn-offset float)))))
+               (ea (frame-byte-offset (tn-offset float)) rbp-tn)))
         (descriptor-reg
          (inst mov dword-lo-bits
                (make-ea-for-object-slot-half float double-float-value-slot

@@ -12,8 +12,7 @@
 (in-package "SB!VM")
 
 (defun ea-for-sse-stack (tn &optional (base rbp-tn))
-  (make-ea :qword :base base
-           :disp (frame-byte-offset (1+ (tn-offset tn)))))
+  (ea (frame-byte-offset (1+ (tn-offset tn))) base))
 
 (defun float-sse-p (tn)
   (sc-is tn single-sse-reg single-sse-stack single-sse-immediate

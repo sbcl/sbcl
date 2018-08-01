@@ -43,8 +43,8 @@
     (move temp offset)
     (inst neg temp)
     (inst mov result
-          (make-ea :qword :base sap :disp (frame-byte-offset 0) :index temp
-                   :scale (ash 1 (- word-shift n-fixnum-tag-bits))))))
+          (ea (frame-byte-offset 0) sap
+              temp (ash 1 (- word-shift n-fixnum-tag-bits))))))
 
 (define-vop (write-control-stack)
   (:translate %set-stack-ref)
@@ -60,8 +60,8 @@
     (move temp offset)
     (inst neg temp)
     (inst mov
-          (make-ea :qword :base sap :disp (frame-byte-offset 0) :index temp
-                   :scale (ash 1 (- word-shift n-fixnum-tag-bits)))
+          (ea (frame-byte-offset 0) sap
+              temp (ash 1 (- word-shift n-fixnum-tag-bits)))
           value)
     (move result value)))
 
@@ -82,9 +82,8 @@
       (inst shr (reg-in-size temp :dword) n-widetag-bits)
       (inst jmp :z bogus)
       (inst neg temp)
-      (inst lea code
-            (make-ea :qword :base thing :index temp :scale n-word-bytes
-                            :disp (- other-pointer-lowtag fun-pointer-lowtag)))
+      (inst lea code (ea (- other-pointer-lowtag fun-pointer-lowtag)
+                         thing temp n-word-bytes))
       (emit-label done)
       (assemble (:elsewhere)
         (emit-label bogus)

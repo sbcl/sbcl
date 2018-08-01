@@ -31,14 +31,13 @@
 
 (defun !static-fun-addr (name)
   #!+immobile-code (make-fixup name :static-call)
-  #!-immobile-code
-  (make-ea :qword :disp (+ nil-value (static-fun-offset name))))
+  #!-immobile-code (ea (+ nil-value (static-fun-offset name))))
 
 (defun !call-static-fun (fun arg-count)
   (inst push rbp-tn)
   (inst mov rbp-tn rsp-tn)
   (inst sub rsp-tn (* n-word-bytes 2))
-  (inst mov (make-ea :qword :base rsp-tn) rbp-tn)
+  (inst mov (ea rsp-tn) rbp-tn)
   (inst mov rbp-tn rsp-tn)
   (inst mov rcx-tn (fixnumize arg-count))
   (inst call (!static-fun-addr fun))
@@ -48,8 +47,7 @@
   (inst push rbp-tn)
   (inst mov rbp-tn rsp-tn)
   (inst sub rsp-tn n-word-bytes)
-  (inst push (make-ea :qword :base rbp-tn
-                             :disp (frame-byte-offset return-pc-save-offset)))
+  (inst push (ea (frame-byte-offset return-pc-save-offset) rbp-tn))
   (inst mov rcx-tn (fixnumize arg-count))
   (inst jmp (!static-fun-addr fun))))
 
@@ -332,13 +330,16 @@
            ;; POPCNT = ECX bit 23
            (multiple-value-bind (bytes bits) (floor (+ 23 n-fixnum-tag-bits)
                                                     n-byte-bits)
+             ;; FIXME: should be
+             ;;    (INST TEST :BYTE (STATIC-SYMBOL-VALUE-EA '*BLAH*) CONST)
+             ;; but can't do that until sizes are removed from EAs
+             ;; because STATIC-SYMBOL-VALUE-EA returns a :QWORD ea for now.
              (inst test
-                   (make-ea :byte
-                            :disp (+ nil-value
-                                     (static-symbol-offset '*cpuid-fn1-ecx*)
-                                     (ash symbol-value-slot word-shift)
-                                     (- other-pointer-lowtag)
-                                     bytes))
+                   (ea (+ nil-value
+                          (static-symbol-offset '*cpuid-fn1-ecx*)
+                          (ash symbol-value-slot word-shift)
+                          (- other-pointer-lowtag)
+                          bytes) nil nil nil :byte)
                    (ash 1 bits)))
            (inst jmp :z slow)
            ;; Intel's implementation of POPCNT on some models treats it as
@@ -389,26 +390,22 @@
   (inst cmp x y)
   (inst jmp :e done) ; Z condition flag contains the answer
   ;; check that both have other-pointer-lowtag
-  (inst lea (reg-in-size rax :dword)
-        (make-ea :dword :base x :disp (- other-pointer-lowtag)))
-  (inst lea (reg-in-size rcx :dword)
-        (make-ea :dword :base y :disp (- other-pointer-lowtag)))
+  (inst lea (reg-in-size rax :dword) (ea (- other-pointer-lowtag) x))
+  (inst lea (reg-in-size rcx :dword) (ea (- other-pointer-lowtag) y))
   (inst or (reg-in-size rax :dword) (reg-in-size rcx :dword))
   (inst test (reg-in-size rax :byte) lowtag-mask)
   (inst jmp :ne done)
   ;; Compare the entire header word, ensuring that if at least one
   ;; argument is a bignum, then both are.
-  (inst mov rcx (make-ea :qword :base x :disp (- other-pointer-lowtag)))
-  (inst cmp rcx (make-ea :qword :base y :disp (- other-pointer-lowtag)))
+  (inst mov rcx (ea (- other-pointer-lowtag) x))
+  (inst cmp rcx (ea (- other-pointer-lowtag) y))
   (inst jmp :ne done)
   (inst shr rcx n-widetag-bits)
   ;; can you have 0 payload words? probably not, but let's be safe here.
   (inst jrcxz done)
   loop
-  (inst mov rax (make-ea :qword :base x :disp (- other-pointer-lowtag)
-                         :index rcx :scale 8))
-  (inst cmp rax (make-ea :qword :base y :disp (- other-pointer-lowtag)
-                         :index rcx :scale 8))
+  (inst mov rax (ea (- other-pointer-lowtag) x rcx 8))
+  (inst cmp rax (ea (- other-pointer-lowtag) y rcx 8))
   ;; These next 3 instructions are the equivalent of "LOOPNZ LOOP"
   ;; but had significantly better performance for me, consistent with claims
   ;; of most optimization guides saying that LOOP was deliberately pessimized

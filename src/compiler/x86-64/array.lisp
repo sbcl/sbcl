@@ -29,14 +29,10 @@
   (:results (result :scs (descriptor-reg) :from :eval))
   (:node-var node)
   (:generator 13
-    (inst lea bytes
-          (make-ea :qword
-                   :index rank :scale (ash 1 (- word-shift n-fixnum-tag-bits))
-                   :disp (+ (* array-dimensions-offset n-word-bytes)
-                            lowtag-mask)))
+    (inst lea bytes (ea (+ (* array-dimensions-offset n-word-bytes) lowtag-mask)
+                        nil rank (ash 1 (- word-shift n-fixnum-tag-bits))))
     (inst and bytes (lognot lowtag-mask))
-    (inst lea header (make-ea :qword :base rank
-                              :disp (fixnumize (1- array-dimensions-offset))))
+    (inst lea header (ea (fixnumize (1- array-dimensions-offset)) rank))
     (inst shl header n-widetag-bits)
     (inst or  header type)
     (inst shr header n-fixnum-tag-bits)
@@ -83,8 +79,7 @@
   (:generator 3
     ;; An unaligned dword read not spanning a 16-byte boundary is as fast as
     ;; and shorter by 5 bytes than a qword read and right-shift by 8.
-    (inst mov (reg-in-size res :dword)
-          (make-ea :dword :base x :disp (1+ (- other-pointer-lowtag))))
+    (inst mov (reg-in-size res :dword) (ea (1+ (- other-pointer-lowtag)) x))
     (inst sub (reg-in-size res :dword) (1- array-dimensions-offset))))
 
 (define-vop (array-rank-vop=>fixnum)
@@ -94,16 +89,12 @@
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
   (:generator 2
-    (inst mov (reg-in-size res :dword)
-          (make-ea :dword :base x :disp (1+ (- other-pointer-lowtag))))
+    (inst mov (reg-in-size res :dword) (ea (1+ (- other-pointer-lowtag)) x))
     (inst lea (reg-in-size res :dword)
           (let ((scale (ash 1 n-fixnum-tag-bits)))
             ;; Compute [res*N-disp]. for N=2 use [res+res-disp]
-            (make-ea :dword
-                     :scale (if (= scale 2) 1 scale)
-                     :index res
-                     :base (if (= scale 2) res nil)
-                     :disp (- (* scale (1- array-dimensions-offset))))))))
+            (ea (- (* scale (1- array-dimensions-offset)))
+                (if (= scale 2) res nil) res (if (= scale 2) 1 scale))))))
 
 (define-vop (array-rank=)
   (:translate %array-rank=)
@@ -113,7 +104,7 @@
   (:arg-types * (:constant t))
   (:conditional :e)
   (:generator 2
-    (inst cmp (make-ea :dword :base array :disp (1+ (- other-pointer-lowtag)))
+    (inst cmp (ea (1+ (- other-pointer-lowtag)) array nil nil :dword)
           (+ rank
              (1- array-dimensions-offset)))))
 
@@ -215,10 +206,9 @@
     ;; using 32-bit operand size might elide the REX prefix on mov + shift
     (multiple-value-bind (dword-index bit) (floor index 32)
       (inst mov (reg-in-size result :dword)
-                (make-ea :dword :base object
-                         :disp (+ (* dword-index 4)
-                                  (- (* vector-data-offset n-word-bytes)
-                                     other-pointer-lowtag))))
+                (ea (+ (* dword-index 4)
+                       (- (* vector-data-offset n-word-bytes) other-pointer-lowtag))
+                    object))
       (let ((right-shift (- bit n-fixnum-tag-bits)))
         (cond ((plusp right-shift)
                (inst shr (reg-in-size result :dword) right-shift))
@@ -237,10 +227,8 @@
   (:results (result :scs (any-reg)))
   (:result-types positive-fixnum)
   (:generator 4
-    (inst bt (make-ea :qword :base object
-                      :disp (- (* vector-data-offset n-word-bytes)
-                               other-pointer-lowtag))
-             index)
+    (inst bt (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
+                 object) index)
     (inst sbb (reg-in-size result :dword) (reg-in-size result :dword))
     (inst and (reg-in-size result :dword) (fixnumize 1))))
 
@@ -265,9 +253,8 @@
            (move ecx index)
            (inst shr ecx ,bit-shift)
            (inst mov result
-                 (make-ea :qword :base object :index ecx :scale n-word-bytes
-                          :disp (- (* vector-data-offset n-word-bytes)
-                                   other-pointer-lowtag)))
+                 (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
+                     object ecx n-word-bytes))
            (move ecx index)
            ;; We used to mask ECX for all values of BITS, but since
            ;; Intel's documentation says that the chip will mask shift
@@ -316,10 +303,8 @@
            (move word-index index)
            (inst shr word-index ,bit-shift)
            (inst mov old
-                 (make-ea :qword :base object :index word-index
-                          :scale n-word-bytes
-                          :disp (- (* vector-data-offset n-word-bytes)
-                                   other-pointer-lowtag)))
+                 (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
+                     object word-index n-word-bytes))
            (move ecx index)
            ;; We used to mask ECX for all values of BITS, but since
            ;; Intel's documentation says that the chip will mask shift
@@ -340,10 +325,8 @@
              (unsigned-reg
               (inst or old value)))
            (inst rol old :cl)
-           (inst mov (make-ea :qword :base object :index word-index
-                              :scale n-word-bytes
-                              :disp (- (* vector-data-offset n-word-bytes)
-                                       other-pointer-lowtag))
+           (inst mov (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
+                         object word-index n-word-bytes)
                  old)
            (sc-case value
              (immediate
@@ -366,10 +349,9 @@
            (aver (zerop offset))
            (multiple-value-bind (word extra) (floor index ,elements-per-word)
              (inst mov old
-                   (make-ea :qword :base object
-                            :disp (- (* (+ word vector-data-offset)
-                                        n-word-bytes)
-                                     other-pointer-lowtag)))
+                   (ea (- (* (+ word vector-data-offset) n-word-bytes)
+                          other-pointer-lowtag)
+                       object))
              (sc-case value
                (immediate
                 (let* ((value (tn-value value))
@@ -391,10 +373,9 @@
                   (inst or old value)
                   (unless (zerop shift)
                     (inst rol old shift)))))
-             (inst mov (make-ea :qword :base object
-                                :disp (- (* (+ word vector-data-offset)
-                                            n-word-bytes)
-                                         other-pointer-lowtag))
+             (inst mov (ea (- (* (+ word vector-data-offset) n-word-bytes)
+                              other-pointer-lowtag)
+                           object)
                    old)
              (sc-case value
                (immediate
@@ -411,17 +392,17 @@
   (let ((ea-size (if (= element-size 4) :dword :qword)))
     (etypecase index
       (integer
-       (make-ea ea-size :base object
-                :disp (- (+ (* vector-data-offset n-word-bytes)
-                            (* (+ index offset) element-size)
-                            complex-offset)
-                         other-pointer-lowtag)))
+       (ea (- (+ (* vector-data-offset n-word-bytes)
+                 (* (+ index offset) element-size)
+                 complex-offset)
+              other-pointer-lowtag)
+           object nil nil ea-size))
       (tn
-       (make-ea ea-size :base object :index index :scale scale
-                :disp (- (+ (* vector-data-offset n-word-bytes)
-                            (* offset element-size)
-                            complex-offset)
-                         other-pointer-lowtag))))))
+       (ea (- (+ (* vector-data-offset n-word-bytes)
+                 (* offset element-size)
+                 complex-offset)
+              other-pointer-lowtag)
+           object index scale ea-size)))))
 
 #.
 (let ((use-temp (<= word-shift n-fixnum-tag-bits)))
@@ -733,11 +714,10 @@
            (:results (value :scs ,scs))
            (:result-types ,type)
            (:generator 5
-                       (inst ,mov-inst value
-                             (make-ea ,operand-size :base object :index index :scale ,scale
-                                      :disp (- (+ (* vector-data-offset n-word-bytes)
-                                                  (* offset ,n-bytes))
-                                               other-pointer-lowtag)))))
+             (inst ,mov-inst value
+                   (ea (- (+ (* vector-data-offset n-word-bytes)
+                             (* offset ,n-bytes)) other-pointer-lowtag)
+                       object index ,scale ,operand-size))))
          (define-vop (,(symbolicate "DATA-VECTOR-REF-WITH-OFFSET/" ptype "-C"))
            (:translate data-vector-ref-with-offset)
            (:policy :fast-safe)
@@ -749,12 +729,12 @@
            (:results (value :scs ,scs))
            (:result-types ,type)
            (:generator 4
-                       (inst ,mov-inst value
-                             (make-ea ,operand-size :base object
-                                      :disp (- (+ (* vector-data-offset n-word-bytes)
-                                                  (* ,n-bytes index)
-                                                  (* ,n-bytes offset))
-                                               other-pointer-lowtag)))))
+             (inst ,mov-inst value
+                   (ea (- (+ (* vector-data-offset n-word-bytes)
+                             (* ,n-bytes index)
+                             (* ,n-bytes offset))
+                          other-pointer-lowtag)
+                       object nil nil ,operand-size))))
          (define-vop (,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype))
            (:translate data-vector-set-with-offset)
            (:policy :fast-safe)
@@ -769,13 +749,11 @@
            (:results (result :scs ,scs))
            (:result-types ,type)
            (:generator 5
-                       (inst mov (make-ea ,operand-size :base object :index index :scale ,scale
-                                          :disp (- (+ (* vector-data-offset n-word-bytes)
-                                                      (* offset ,n-bytes))
-                                                   other-pointer-lowtag))
-                             (reg-in-size value ,operand-size))
-                       (move result value)))
-
+             (inst mov (ea (- (+ (* vector-data-offset n-word-bytes)
+                                 (* offset ,n-bytes)) other-pointer-lowtag)
+                           object index ,scale ,operand-size)
+                   (reg-in-size value ,operand-size))
+             (move result value)))
          (define-vop (,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype "-C"))
            (:translate data-vector-set-with-offset)
            (:policy :fast-safe)
@@ -789,13 +767,13 @@
            (:results (result :scs ,scs))
            (:result-types ,type)
            (:generator 4
-                       (inst mov (make-ea ,operand-size :base object
-                                          :disp (- (+ (* vector-data-offset n-word-bytes)
-                                                      (* ,n-bytes index)
-                                                      (* ,n-bytes offset))
-                                                   other-pointer-lowtag))
-                             (reg-in-size value ,operand-size))
-                       (move result value))))))))
+             (inst mov (ea (- (+ (* vector-data-offset n-word-bytes)
+                                 (* ,n-bytes index)
+                                 (* ,n-bytes offset))
+                              other-pointer-lowtag)
+                           object nil nil ,operand-size)
+                   (reg-in-size value ,operand-size))
+             (move result value))))))))
   (define-data-vector-frobs simple-array-unsigned-byte-7 movzx :byte
     positive-fixnum unsigned-reg signed-reg)
   (define-data-vector-frobs simple-array-unsigned-byte-8 movzx :byte
@@ -841,11 +819,8 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 4
-    (inst xadd (make-ea :qword :base array
-                        :scale (ash 1 (- word-shift n-fixnum-tag-bits))
-                        :index index
-                        :disp (- (* vector-data-offset n-word-bytes)
-                                 other-pointer-lowtag))
+    (inst xadd (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
+                   array index (ash 1 (- word-shift n-fixnum-tag-bits)))
           diff :lock)
     (move result diff)))
 
@@ -860,14 +835,13 @@
   (:generator 1
     (inst cmp
           (if (sc-is index immediate)
-              (make-ea :dword :base vector
-                       :disp (+ (- other-pointer-lowtag)
-                                (ash (+ vector-data-offset (tn-value index))
-                                     word-shift)))
-              (make-ea :dword :base vector
-                       :disp (+ (- other-pointer-lowtag)
-                                (ash vector-data-offset word-shift))
-                       :index index :scale (ash 1 (- word-shift n-fixnum-tag-bits))))
+              (ea (+ (- other-pointer-lowtag)
+                     (ash (+ vector-data-offset (tn-value index)) word-shift))
+                  vector nil nil :dword)
+              (ea (+ (- other-pointer-lowtag)
+                     (ash vector-data-offset word-shift))
+                  vector index (ash 1 (- word-shift n-fixnum-tag-bits))
+                  :dword))
           (if (sc-is thing immediate)
               (make-fixup (tn-value thing) :layout)
               thing))))

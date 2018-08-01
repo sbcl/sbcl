@@ -36,8 +36,8 @@
                                     float12-tn float13-tn float14-tn float15-tn)
                                   collect
                                   (if (eql op 'pop)
-                                      `(inst movaps ,float (make-ea :qword :base rsp-tn :disp ,i))
-                                      `(inst movaps (make-ea :qword :base rsp-tn :disp ,i) ,float))))))
+                                      `(inst movaps ,float (ea ,i rsp-tn))
+                                      `(inst movaps (ea ,i rsp-tn) ,float))))))
             (inst cld)
             (inst push rbp-tn)
             (inst mov rbp-tn rsp-tn)
@@ -56,23 +56,23 @@
             (inst ret ,stack-delta)))))
 
   (def (alloc-tramp "alloc" progn)
-    ((inst mov rdi-tn (make-ea :qword :base rbp-tn :disp 16))) ; arg
-    ((inst mov (make-ea :qword :base rbp-tn :disp 16) rax-tn))) ; result
+    ((inst mov rdi-tn (ea 16 rbp-tn))) ; arg
+    ((inst mov (ea 16 rbp-tn) rax-tn))) ; result
 
   (def (alloc-tramp-r11 "alloc" progn
                         :do-not-preserve (r11-tn)
                         :stack-delta 8) ;; remove the size parameter
-    ((inst mov rdi-tn (make-ea :qword :base rbp-tn :disp 16))) ; arg
+    ((inst mov rdi-tn (ea 16 rbp-tn))) ; arg
     ((inst mov r11-tn rax-tn))) ; result
 
   ;; These routines are for the deterministic allocation profiler.
   ;; The C support routine's argument is the return PC
   (def (enable-alloc-counter "allocation_tracker_counted" pseudo-atomic)
-    ((inst lea rdi-tn (make-ea :qword :base rbp-tn :disp 8))) ; arg
+    ((inst lea rdi-tn (ea 8 rbp-tn))) ; arg
     ()) ; result
 
   (def (enable-sized-alloc-counter "allocation_tracker_sized" pseudo-atomic)
-    ((inst lea rdi-tn (make-ea :qword :base rbp-tn :disp 8))) ; arg
+    ((inst lea rdi-tn (ea 8 rbp-tn))) ; arg
     ())) ; result
 
 (define-assembly-routine
@@ -91,13 +91,10 @@
           (+ 5 (ash fdefn-raw-addr-slot word-shift) (- other-pointer-lowtag))))
   #!+immobile-code
   UNDEFINED-TRAMP
-  (inst pop (make-ea :qword :base rbp-tn :disp n-word-bytes))
+  (inst pop (ea n-word-bytes rbp-tn))
   (emit-error-break nil cerror-trap (error-number-or-lose 'undefined-fun-error) (list rax))
-  (inst push (make-ea :qword :base rbp-tn :disp n-word-bytes))
-  (inst jmp
-        (make-ea :qword :base rax
-                        :disp (- (* closure-fun-slot n-word-bytes)
-                                 fun-pointer-lowtag))))
+  (inst push (ea n-word-bytes rbp-tn))
+  (inst jmp (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag) rax)))
 
 #!-sb-dynamic-core
 (define-assembly-routine
@@ -119,20 +116,20 @@
   (inst push rax-tn) ; save registers in case we want to see the old values
   (inst push rbx-tn)
   ;; load RAX with the PC after the call site
-  (inst mov rax-tn (make-ea :qword :base rsp-tn :disp 16))
+  (inst mov rax-tn (ea 16 rsp-tn))
   ;; load RBX with the signed 32-bit immediate from the call instruction
-  (inst movsx rbx-tn (make-ea :dword :base rax-tn :disp -4))
+  (inst movsx rbx-tn (ea -4 rax-tn nil nil :dword))
   ;; if at [PC-5] we see #x25 then it was a call with 32-bit mem addr
   ;; if ...              #xE8 then ...                32-bit offset
-  (inst cmp (make-ea :byte :base rax-tn :disp -5) #x25)
+  (inst cmp (ea -5 rax-tn nil nil :byte) #x25)
   (inst jmp :e ABSOLUTE)
-  (inst cmp (make-ea :byte :base rax-tn :disp -5) #xE8)
+  (inst cmp (ea -5 rax-tn nil nil :byte) #xE8)
   (inst jmp :e RELATIVE)
   ;; failing those, assume RBX was valid. ("can't happen")
-  (inst mov rbx-tn (make-ea :qword :base rsp-tn)) ; restore pushed value of RBX
+  (inst mov rbx-tn (ea rsp-tn)) ; restore pushed value of RBX
   (inst jmp trap)
   ABSOLUTE
-  (inst lea rbx-tn (make-ea :qword :base rbx-tn :disp -8))
+  (inst lea rbx-tn (ea -8 rbx-tn))
   (inst jmp TRAP)
   RELATIVE
   (inst add rbx-tn rax-tn)

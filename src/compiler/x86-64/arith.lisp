@@ -174,7 +174,7 @@
                              ,@(and (eq op 'sub)
                                     `(((and (not (location= r x))
                                             (typep (- (fixnumize y)) '(signed-byte 32)))
-                                       (inst lea r (make-ea :qword :base x :disp (- (fixnumize y)))))))
+                                       (inst lea r (ea (- (fixnumize y)) x)))))
                              (t
                               (move r x)
                               (inst ,op r (constantize (fixnumize y)))))))))
@@ -192,7 +192,7 @@
                              ,@(and (eq op 'sub)
                                     `(((and (not (location= r x))
                                             (typep (- y) '(signed-byte 32)))
-                                       (inst lea r (make-ea :qword :base x :disp (- y))))))
+                                       (inst lea r (ea (- y) x)))))
                              (t
                               (move r x)
                               (inst ,op r (constantize y))))))))
@@ -214,7 +214,7 @@
                              ,@(and (eq op 'sub)
                                     `(((and (not (location= r x))
                                             (typep (- y) '(signed-byte 32)))
-                                       (inst lea r (make-ea :qword :base x :disp (- y))))))
+                                       (inst lea r (ea (- y) x)))))
                              (t
                               (move r x)
                               (inst ,op r (constantize y)))))))))))
@@ -298,7 +298,7 @@
   (:generator 2
     (cond ((and (sc-is x any-reg) (sc-is y any-reg) (sc-is r any-reg)
                 (not (location= x r)))
-           (inst lea r (make-ea :qword :base x :index y)))
+           (inst lea r (ea x y)))
           (t
            (move r x)
            (inst add r y)))))
@@ -315,7 +315,7 @@
     (let ((y (fixnumize y)))
       (cond ((and (not (location= x r))
                   (typep y '(signed-byte 32)))
-             (inst lea r (make-ea :qword :base x :disp y)))
+             (inst lea r (ea y x)))
             (t
              (move r x)
              (inst add r (constantize y)))))))
@@ -338,7 +338,7 @@
   (:generator 5
     (cond ((and (sc-is x signed-reg) (sc-is y signed-reg) (sc-is r signed-reg)
                 (not (location= x r)))
-           (inst lea r (make-ea :qword :base x :index y)))
+           (inst lea r (ea x y)))
           (t
            (move r x)
            (inst add r y)))))
@@ -390,7 +390,7 @@
     (cond ((and (sc-is x signed-reg) (sc-is r signed-reg)
                 (not (location= x r))
                 (typep y '(signed-byte 32)))
-           (inst lea r (make-ea :qword :base x :disp y)))
+           (inst lea r (ea y x)))
           (t
            (move r x)
            (cond ((= y 1)
@@ -417,7 +417,7 @@
   (:generator 5
     (cond ((and (sc-is x unsigned-reg) (sc-is y unsigned-reg)
                 (sc-is r unsigned-reg) (not (location= x r)))
-           (inst lea r (make-ea :qword :base x :index y)))
+           (inst lea r (ea x y)))
           (t
            (move r x)
            (inst add r y)))))
@@ -438,7 +438,7 @@
     (cond ((and (sc-is x unsigned-reg) (sc-is r unsigned-reg)
                 (not (location= x r))
                 (typep y '(unsigned-byte 31)))
-           (inst lea r (make-ea :qword :base x :disp y)))
+           (inst lea r (ea y x)))
           (t
            (move r x)
            (cond ((= y 1)
@@ -579,9 +579,8 @@
     (if (location= quo eax)
         (inst shl eax n-fixnum-tag-bits)
         (if (= n-fixnum-tag-bits 1)
-            (inst lea quo (make-ea :qword :base eax :index eax))
-            (inst lea quo (make-ea :qword :index eax
-                                   :scale (ash 1 n-fixnum-tag-bits)))))
+            (inst lea quo (ea eax eax))
+            (inst lea quo (ea nil eax (ash 1 n-fixnum-tag-bits)))))
     (move rem edx)))
 
 (define-vop (fast-truncate-c/fixnum=>fixnum fast-safe-arith-op)
@@ -608,9 +607,8 @@
     (if (location= quo eax)
         (inst shl eax n-fixnum-tag-bits)
         (if (= n-fixnum-tag-bits 1)
-            (inst lea quo (make-ea :qword :base eax :index eax))
-            (inst lea quo (make-ea :qword :index eax
-                                   :scale (ash 1 n-fixnum-tag-bits)))))
+            (inst lea quo (ea eax eax))
+            (inst lea quo (ea nil eax (ash 1 n-fixnum-tag-bits)))))
     (move rem edx)))
 
 (define-vop (fast-truncate/unsigned=>unsigned fast-safe-arith-op)
@@ -737,11 +735,11 @@
   (:variant-vars modularp)
   (:generator 2
     (cond ((and (= amount 1) (not (location= number result)))
-           (inst lea result (make-ea :qword :base number :index number)))
+           (inst lea result (ea number number)))
           ((and (= amount 2) (not (location= number result)))
-           (inst lea result (make-ea :qword :index number :scale 4)))
+           (inst lea result (ea nil number 4)))
           ((and (= amount 3) (not (location= number result)))
-           (inst lea result (make-ea :qword :index number :scale 8)))
+           (inst lea result (ea nil number 8)))
           (t
            (move result number)
            (cond ((< -64 amount 64)
@@ -803,11 +801,11 @@ constant shift greater than word length")))
   (:note "inline ASH")
   (:generator 3
     (cond ((and (= amount 1) (not (location= number result)))
-           (inst lea result (make-ea :qword :base number :index number)))
+           (inst lea result (ea number number)))
           ((and (= amount 2) (not (location= number result)))
-           (inst lea result (make-ea :qword :index number :scale 4)))
+           (inst lea result (ea nil number 4)))
           ((and (= amount 3) (not (location= number result)))
-           (inst lea result (make-ea :qword :index number :scale 8)))
+           (inst lea result (ea nil number 8)))
           (t
            (move result number)
            (cond ((plusp amount) (inst shl result amount))
@@ -830,11 +828,11 @@ constant shift greater than word length")))
   (:note "inline ASH")
   (:generator 3
     (cond ((and (= amount 1) (not (location= number result)))
-           (inst lea result (make-ea :qword :base number :index number)))
+           (inst lea result (ea number number)))
           ((and (= amount 2) (not (location= number result)))
-           (inst lea result (make-ea :qword :index number :scale 4)))
+           (inst lea result (ea nil number 4)))
           ((and (= amount 3) (not (location= number result)))
-           (inst lea result (make-ea :qword :index number :scale 8)))
+           (inst lea result (ea nil number 8)))
           (t
            (move result number)
            (cond ((< -64 amount 64) ;; XXXX
@@ -997,6 +995,7 @@ constant shift greater than word length")))
   integer
   (foldable flushable movable))
 
+;;; FIXME: arg order should be (DISP BASE INDEX SCALE) to match EA constructor
 (defun %lea (base index scale disp)
   (+ base (* index scale) disp))
 
@@ -1014,8 +1013,7 @@ constant shift greater than word length")))
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:generator 5
-    (inst lea r (make-ea :qword :base base :index index
-                         :scale scale :disp disp))))
+    (inst lea r (ea disp base index scale))))
 
 (define-vop (%lea/signed=>signed)
   (:translate %lea)
@@ -1029,8 +1027,7 @@ constant shift greater than word length")))
   (:results (r :scs (signed-reg)))
   (:result-types signed-num)
   (:generator 4
-    (inst lea r (make-ea :qword :base base :index index
-                         :scale scale :disp disp))))
+    (inst lea r (ea disp base index scale))))
 
 (define-vop (%lea/fixnum=>fixnum)
   (:translate %lea)
@@ -1044,8 +1041,7 @@ constant shift greater than word length")))
   (:results (r :scs (any-reg)))
   (:result-types tagged-num)
   (:generator 3
-    (inst lea r (make-ea :qword :base base :index index
-                         :scale scale :disp disp))))
+    (inst lea r (ea disp base index scale))))
 
 ;;; FIXME: before making knowledge of this too public, it needs to be
 ;;; fixed so that it's actually _faster_ than the non-CMOV version; at
@@ -1297,7 +1293,7 @@ constant shift greater than word length")))
            (let ((disp (frame-byte-offset (tn-offset x))))
              (when reducible-to-byte-p
                (setq size :byte disp (1+ disp) y (ash y -8)))
-             (setq x (make-ea size :base rbp-tn :disp disp))))
+             (setq x (ea disp rbp-tn nil nil size))))
           (t
            (aver (gpr-p x))
            (if (and reducible-to-byte-p (<= (tn-offset x) 6)) ; 0, 2, 4, 6
@@ -2055,10 +2051,9 @@ constant shift greater than word length")))
            (ecase width
              (64 (loadw r x bignum-digits-offset other-pointer-lowtag))
              ((32 16 8)
-              (inst movsx r (make-ea (bits->size width)
-                                     :base x
-                                     :disp (- (* bignum-digits-offset n-word-bytes)
-                                              other-pointer-lowtag))))))
+              (inst movsx r (ea (- (* bignum-digits-offset n-word-bytes)
+                                   other-pointer-lowtag)
+                                x nil nil (bits->size width))))))
           (t
            (loadw r x bignum-digits-offset other-pointer-lowtag)
            (let ((delta (- n-word-bits width)))

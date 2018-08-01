@@ -40,7 +40,7 @@
     (inst jmp :be LOOP)
     (inst cld)
     DONE
-    (inst lea rsp-tn (make-ea :qword :base rdi :disp n-word-bytes))
+    (inst lea rsp-tn (ea n-word-bytes rdi))
     (inst sub rdi rsi)
     (loop for moved = moved-ptrs then (tn-ref-across moved)
           while moved
@@ -121,9 +121,7 @@
       (immediate
        (if (zerop (tn-value skip))
            (move src context)
-           (inst lea src (make-ea :qword :base context
-                                  :disp (- (* (tn-value skip)
-                                              n-word-bytes))))))
+           (inst lea src (ea (- (* (tn-value skip) n-word-bytes)) context))))
       (any-reg
        (cond ((= word-shift n-fixnum-tag-bits)
               (move src context)
@@ -134,16 +132,14 @@
               ;; With a stack size of about 2MB, the limit is absurd anyway.
               (inst neg skip)
               (inst lea src
-                    (make-ea :qword :base context :index skip
-                             :scale (ash 1 (- word-shift n-fixnum-tag-bits))))
+                    (ea context skip (ash 1 (- word-shift n-fixnum-tag-bits))))
               (inst neg skip)))))
 
     (unless (eq (tn-kind count) :unused)
       (move count num))
     (if (location= loop-index num)
         (inst shl num (- word-shift n-fixnum-tag-bits))
-        (inst lea loop-index (make-ea :byte :index num
-                                            :scale (ash 1 (- word-shift n-fixnum-tag-bits)))))
+        (inst lea loop-index (ea nil num (ash 1 (- word-shift n-fixnum-tag-bits)))))
     (inst mov start rsp-tn)
     (inst jrcxz DONE)  ; check for 0 count?
 
@@ -151,9 +147,9 @@
     (inst sub src loop-index)
 
     LOOP
-    (inst mov temp (make-ea :qword :base src :index loop-index))
+    (inst mov temp (ea src loop-index))
     (inst sub loop-index n-word-bytes)
-    (inst mov (make-ea :qword :base rsp-tn :index loop-index) temp)
+    (inst mov (ea rsp-tn loop-index) temp)
     (inst jmp :nz LOOP)
 
     DONE))

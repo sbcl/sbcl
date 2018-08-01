@@ -110,7 +110,7 @@
        (inst mov
              ;; XXX: If the sb-unicode case needs to handle c-call,
              ;; why does the non-unicode case not need to?
-             (make-ea :byte :base fp :disp (frame-byte-offset (tn-offset y)))
+             (ea (frame-byte-offset (tn-offset y)) fp nil nil :byte)
              x)
        #!+sb-unicode
        (if (= (tn-offset fp) esp-offset)
@@ -221,8 +221,7 @@
   (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 4
-    (inst lea (reg-in-size temp :dword)
-          (make-ea :dword :base value :disp (- character-widetag)))
+    (inst lea (reg-in-size temp :dword) (ea (- character-widetag) value))
     (inst test (reg-in-size temp :dword) (lognot #x7F00))))
 
 #!+sb-unicode

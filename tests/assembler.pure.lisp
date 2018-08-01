@@ -148,7 +148,7 @@
     (try `(bt ,(memref :word)  ,ax-tn)  "660FA34500       BT WORD PTR [$fp], AX")
     (try `(bt ,(memref :dword) ,eax-tn) "0FA34500         BT DWORD PTR [$fp], EAX")
     #+x86-64
-    (try `(bt ,(memref :qword) ,eax-tn) "480FA34500       BT QWORD PTR [$fp], RAX")
+    (try `(bt ,(memref :qword) ,rax-tn) "480FA34500       BT QWORD PTR [$fp], RAX")
     (try `(bt ,(memref :word)  3) "660FBA650003     BT WORD PTR [$fp], 3")
     (try `(bt ,(memref :dword) 3) "0FBA650003       BT DWORD PTR [$fp], 3")
     #+x86-64

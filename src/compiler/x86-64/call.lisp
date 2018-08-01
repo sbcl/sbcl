@@ -100,11 +100,8 @@
 
 (macrolet ((define-frame-op
                (suffix sc stack-sc instruction
-                &optional (ea
-                           `(make-ea :qword
-                                     :base frame-pointer
-                                     :disp (frame-byte-offset
-                                            (tn-offset variable-home-tn)))))
+                &optional (ea `(ea (frame-byte-offset (tn-offset variable-home-tn))
+                                   frame-pointer)))
                (let ((reffer (symbolicate 'ancestor-frame-ref '/ suffix))
                      (setter (symbolicate 'ancestor-frame-set '/ suffix)))
                  `(progn
@@ -186,7 +183,7 @@
 (defun emit-lea (target source disp)
   (if (eql disp 0)
       (inst mov target source)
-      (inst lea target (make-ea :qword :base source :disp disp))))
+      (inst lea target (ea disp source))))
 
 (define-vop (xep-setup-sp)
   (:generator 1
@@ -203,8 +200,7 @@
   (:info callee)
   (:ignore nfp callee)
   (:generator 2
-    (inst lea res (make-ea :qword :base rsp-tn
-                           :disp (- (* sp->fp-offset n-word-bytes))))
+    (inst lea res (ea (- (* sp->fp-offset n-word-bytes)) rsp-tn))
     (inst sub rsp-tn (* n-word-bytes (sb-allocated-size 'stack)))))
 
 (defun make-stack-pointer-tn (&optional nargs)
@@ -238,7 +234,7 @@
              (inst sub rsp-tn stack-size)
              (move res rsp-tn))
             (t
-             (inst lea res (make-ea :qword :base rsp-tn :disp (- fp-offset)))
+             (inst lea res (ea (- fp-offset) rsp-tn))
              (inst sub rsp-tn stack-size))))))
 
 ;;; Emit code needed at the return-point from an unknown-values call
@@ -383,7 +379,7 @@
       (inst jmp :c variable-values)
       (cond ((location= start (first *register-arg-tns*))
              (inst push (first *register-arg-tns*))
-             (inst lea start (make-ea :qword :base rsp-tn :disp n-word-bytes)))
+             (inst lea start (ea n-word-bytes rsp-tn)))
             (t (inst mov start rsp-tn)
                (inst push (first *register-arg-tns*))))
       (unless (eq (tn-kind count) :unused)
@@ -829,15 +825,12 @@
                           (inst ,(if (eq return :tail) 'jmp 'call) target))
                        #!-immobile-code
                        `(inst ,(if (eq return :tail) 'jmp 'call)
-                              (make-ea :qword :disp
-                                       (+ nil-value (static-fun-offset fun)))))
+                              (ea (+ nil-value (static-fun-offset fun)))))
                       #!-immobile-code
                       (named
                        `(inst ,(if (eq return :tail) 'jmp 'call)
-                              (make-ea :qword :base rax
-                                              :disp (- (* fdefn-raw-addr-slot
-                                                          n-word-bytes)
-                                                       other-pointer-lowtag))))
+                              (ea (- (* fdefn-raw-addr-slot n-word-bytes)
+                                     other-pointer-lowtag) rax)))
                       ((eq return :tail)
                        `(tail-call-unnamed rax callable vop))
                       (t
@@ -892,9 +885,8 @@
 
 (defun tail-call-unnamed (fun designator-p vop)
   (let ((relative-call (sb!c::code-immobile-p vop))
-        (fun-ea (make-ea :qword :base fun
-                         :disp (- (* closure-fun-slot n-word-bytes)
-                                  fun-pointer-lowtag))))
+        (fun-ea (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag)
+                    fun)))
     (if designator-p
         (assemble ()
           (%lea-for-lowtag-test ebx-tn fun fun-pointer-lowtag)
@@ -916,9 +908,8 @@
       (inst jmp :z call)
       (invoke-asm-routine 'call 'call-symbol vop))
     call
-    (inst call (make-ea :qword :base fun
-                        :disp (- (* closure-fun-slot n-word-bytes)
-                                 fun-pointer-lowtag)))))
+    (inst call (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag)
+                   fun))))
 
 ;;; This is defined separately, since it needs special code that BLT's
 ;;; the arguments down. All the real work is done in the assembly
@@ -1003,8 +994,7 @@
       ;; This is handled in RETURN-SINGLE.
       (error "nvalues is 1"))
     ;; Establish the values pointer and values count.
-    (inst lea rbx (make-ea :qword :base rbp-tn
-                           :disp (* sp->fp-offset n-word-bytes)))
+    (inst lea rbx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
     (if (zerop nvals)
         (zeroize rcx) ; smaller
         (inst mov rcx (fixnumize nvals)))
@@ -1032,13 +1022,11 @@
            ;; Clear as much of the stack as possible, but not past the
            ;; old frame address.
            (inst lea rsp-tn
-                 (make-ea :qword :base rbp-tn
-                          :disp (frame-byte-offset (1- nvals))))
+                 (ea (frame-byte-offset (1- nvals)) rbp-tn))
            (move rbp-tn old-fp)
-           (inst push (make-ea :qword :base rbx
-                               :disp (frame-byte-offset
-                                      (+ sp->fp-offset
-                                         (tn-offset return-pc)))))
+           (inst push (ea (frame-byte-offset
+                           (+ sp->fp-offset (tn-offset return-pc)))
+                          rbx))
            (inst ret)))))
 
 ;;; Do unknown-values return of an arbitrary number of values (passed
@@ -1127,11 +1115,8 @@
     (inst lea (if (<= fixed (sb-allocated-size 'stack))
                   rsp-tn
                   source)
-          (make-ea :qword :base rbp-tn
-                          :index temp :scale (ash 1 (- word-shift n-fixnum-tag-bits))
-                          :disp (* n-word-bytes
-                                   (- (+ sp->fp-offset fixed)
-                                      (sb-allocated-size 'stack)))))
+          (ea (* n-word-bytes (- (+ sp->fp-offset fixed) (sb-allocated-size 'stack)))
+              rbp-tn temp (ash 1 (- word-shift n-fixnum-tag-bits))))
 
     ;; Now: nargs>=1 && nargs>fixed
 
@@ -1152,17 +1137,15 @@
            (inst jmp :be DO-REGS))
           (t
            ;; Number to copy = nargs-fixed
-           (inst lea rbx-tn (make-ea :qword :base rcx-tn
-                                     :disp (- (fixnumize fixed))))))
+           (inst lea rbx-tn (ea (- (fixnumize fixed)) rcx-tn))))
 
     ;; Initialize R8 to be the end of args.
     ;; Swap with SP if necessary to mirror the previous condition
     (inst lea (if (<= fixed (sb-allocated-size 'stack))
                   source
                   rsp-tn)
-          (make-ea :qword :base rbp-tn
-                          :index temp :scale (ash 1 (- word-shift n-fixnum-tag-bits))
-                          :disp (* sp->fp-offset n-word-bytes)))
+          (ea (* sp->fp-offset n-word-bytes)
+              rbp-tn temp (ash 1 (- word-shift n-fixnum-tag-bits))))
 
     ;; src: rbp + temp + sp->fp
     ;; dst: rbp + temp + sp->fp + (fixed - [stack-size])
@@ -1177,8 +1160,8 @@
              ;; much worse than an explicit loop for small blocks.
 
              (emit-label loop)
-             (inst mov temp (make-ea :qword :base source :index copy-index))
-             (inst mov (make-ea :qword :base rsp-tn :index copy-index) temp)
+             (inst mov temp (ea source copy-index))
+             (inst mov (ea rsp-tn copy-index) temp)
              (inst add copy-index n-word-bytes)
              (inst sub rbx-tn (fixnumize 1))
              (inst jmp :nz loop))
@@ -1186,11 +1169,8 @@
              ;; dst is higher than src; copy backward
              (emit-label loop)
              (inst sub rbx-tn (fixnumize 1))
-             (inst mov temp (make-ea :qword :base rsp-tn
-                                     :index rbx-tn :scale fixnum->word))
-             (inst mov (make-ea :qword :base source
-                                :index rbx-tn :scale fixnum->word)
-                   temp)
+             (inst mov temp (ea rsp-tn rbx-tn fixnum->word))
+             (inst mov (ea source rbx-tn fixnum->word) temp)
              (inst jmp :nz loop)
              ;; done with the stack--stack copy. Reset RSP to its final
              ;; value
@@ -1204,12 +1184,10 @@
       (do ((i fixed))
           ( nil )
         ;; Store it relative to rbp
-        (inst mov (make-ea :qword :base rbp-tn
-                           :disp (* n-word-bytes
-                                    (- sp->fp-offset
-                                       (+ 1
-                                          (- i fixed)
-                                          (sb-allocated-size 'stack)))))
+        (inst mov (ea (* n-word-bytes
+                         (- sp->fp-offset
+                            (+ 1 (- i fixed) (sb-allocated-size 'stack))))
+                       rbp-tn)
               (nth i *register-arg-tns*))
 
         (incf i)
@@ -1242,11 +1220,9 @@
             (keyword :scs (descriptor-reg any-reg)))
   (:result-types * *)
   (:generator 4
-     (inst mov value (make-ea :qword :base object :index index
-                              :scale (ash 1 (- word-shift n-fixnum-tag-bits))))
-     (inst mov keyword (make-ea :qword :base object :index index
-                                :scale (ash 1 (- word-shift n-fixnum-tag-bits))
-                                :disp n-word-bytes))))
+     (inst mov value (ea object index (ash 1 (- word-shift n-fixnum-tag-bits))))
+     (inst mov keyword (ea n-word-bytes object index
+                           (ash 1 (- word-shift n-fixnum-tag-bits))))))
 
 (define-vop (more-arg/c)
   (:translate sb!c::%more-arg)
@@ -1257,8 +1233,7 @@
   (:results (value :scs (descriptor-reg any-reg)))
   (:result-types *)
   (:generator 3
-    (inst mov value (make-ea :qword :base object
-                                    :disp (- (* index n-word-bytes))))))
+    (inst mov value (ea (- (* index n-word-bytes)) object))))
 
 (define-vop (more-arg)
   (:translate sb!c::%more-arg)
@@ -1271,8 +1246,8 @@
   (:generator 4
     (move value index)
     (inst neg value)
-    (inst mov value (make-ea :qword :base object :index value
-                             :scale (ash 1 (- word-shift n-fixnum-tag-bits))))))
+    (inst mov value (ea object value
+                        (ash 1 (- word-shift n-fixnum-tag-bits))))))
 
 ;;; Turn more arg (context, count) into a list.
 (define-vop (listify-rest-args)
@@ -1297,7 +1272,7 @@
       ;; Check to see whether there are no args, and just return NIL if so.
       (inst mov result nil-value)
       (inst jrcxz done)
-      (inst lea dst (make-ea :qword :index rcx :scale (ash 2 (- word-shift n-fixnum-tag-bits))))
+      (inst lea dst (ea nil rcx (ash 2 (- word-shift n-fixnum-tag-bits))))
       (unless stack-allocate-p
         (instrument-alloc dst node))
       (maybe-pseudo-atomic stack-allocate-p
@@ -1317,7 +1292,7 @@
        (storew dst dst -1 list-pointer-lowtag)
        (emit-label enter)
        ;; Grab one value and stash it in the car of this cons.
-       (inst mov rax (make-ea :qword :base src))
+       (inst mov rax (ea src))
        (inst sub src n-word-bytes)
        (storew rax dst 0 list-pointer-lowtag)
        ;; Go back for more.
@@ -1351,10 +1326,9 @@
     (move count supplied)
     ;; SP at this point points at the last arg pushed.
     ;; Point to the first more-arg, not above it.
-    (inst lea context (make-ea :qword :base rsp-tn
-                               :index count
-                               :scale (ash 1 (- word-shift n-fixnum-tag-bits))
-                               :disp (- (* (1+ fixed) n-word-bytes))))
+    (inst lea context (ea (- (* (1+ fixed) n-word-bytes))
+                          rsp-tn count
+                          (ash 1 (- word-shift n-fixnum-tag-bits))))
     (unless (zerop fixed)
       (inst sub count (fixnumize fixed)))))
 
@@ -1436,11 +1410,10 @@
   #!+sb-thread
   (inst cmp (thread-slot-ea thread-stepping-slot) 0)
   #!-sb-thread
-  (inst cmp (make-ea :byte
-                     :disp (+ nil-value (static-symbol-offset
-                                         'sb!impl::*stepping*)
-                              (* symbol-value-slot n-word-bytes)
-                              (- other-pointer-lowtag)))
+  (inst cmp (ea (+ nil-value (static-symbol-offset 'sb!impl::*stepping*)
+                   (* symbol-value-slot n-word-bytes)
+                   (- other-pointer-lowtag))
+                nil nil nil :byte)
         0))
 
 (define-vop (step-instrument-before-vop)

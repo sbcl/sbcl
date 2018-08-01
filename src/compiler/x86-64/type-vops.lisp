@@ -21,8 +21,7 @@
               ;; This is hooey. None of the type-vops presently allow
               ;; control-stack as a storage class.
               ((sc-is value control-stack)
-               (make-ea :byte :base rbp-tn
-                        :disp (frame-byte-offset (tn-offset value))))
+               (ea (frame-byte-offset (tn-offset value)) rbp-tn nil nil :byte))
               (t
                value))
         fixnum-tag-mask))
@@ -33,7 +32,7 @@
   (inst jmp (if not-p :nz :z) target))
 
 (defun %lea-for-lowtag-test (temp value lowtag)
-  (inst lea (reg-in-size temp :dword) (make-ea :dword :base value :disp (- lowtag))))
+  (inst lea (reg-in-size temp :dword) (ea (- lowtag) value)))
 
 ;; Numerics including fixnum, excluding short-float. (INTEGER,RATIONAL)
 (defun %test-fixnum-and-headers (value temp target not-p headers)
@@ -139,11 +138,9 @@
                                 (or (atom (car headers))
                                     (= (caar headers) bignum-widetag)
                                     (= (cdar headers) complex-array-widetag)))
-                           (make-ea :byte :base value :disp (- lowtag))
+                           (ea (- lowtag) value nil nil :byte)
                            (progn
-                             (inst mov (reg-in-size temp :dword)
-                                   (make-ea :dword :base value
-                                                   :disp (- lowtag)))
+                             (inst mov (reg-in-size temp :dword) (ea (- lowtag) value))
                              (reg-in-size temp :byte)))))
           ((null remaining))
         (dolist (widetag except) ; only after loading widetag-tn
@@ -399,4 +396,4 @@
   (:arg-types * (:constant t))
   (:conditional :e)
   (:generator 2
-   (inst cmp (make-ea :byte :base x :disp (- other-pointer-lowtag)) widetag)))
+   (inst cmp (ea (- other-pointer-lowtag) x nil nil :byte) widetag)))

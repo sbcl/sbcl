@@ -17,13 +17,11 @@
 
 (defun catch-block-ea (tn)
   (aver (sc-is tn catch-block))
-  (make-ea :qword :base rbp-tn
-           :disp (frame-byte-offset (+ -1 (tn-offset tn) catch-block-size))))
+  (ea (frame-byte-offset (+ -1 (tn-offset tn) catch-block-size)) rbp-tn))
 
 (defun unwind-block-ea (tn)
   (aver (sc-is tn unwind-block))
-  (make-ea :qword :base rbp-tn
-                  :disp (frame-byte-offset (+ -1 (tn-offset tn) unwind-block-size))))
+  (ea (frame-byte-offset (+ -1 (tn-offset tn) unwind-block-size)) rbp-tn))
 
 ;;;; Save and restore dynamic environment.
 ;;;;
@@ -195,7 +193,7 @@
     (emit-label label)
     (note-this-location vop :non-local-entry)
 
-    (inst lea rsi (make-ea :qword :base source :disp (- n-word-bytes)))
+    (inst lea rsi (ea (- n-word-bytes) source))
     ;; The 'top' arg contains the %esp value saved at the time the
     ;; catch block was created and points to where the thrown values
     ;; should sit.
@@ -216,7 +214,7 @@
     (inst cld)
     DONE
     ;; Reset the CSP at last moved arg.
-    (inst lea rsp-tn (make-ea :qword :base rdi :disp n-word-bytes))))
+    (inst lea rsp-tn (ea n-word-bytes rdi))))
 
 
 ;;; This VOP is just to force the TNs used in the cleanup onto the stack.
@@ -269,14 +267,11 @@
     (zeroize rcx-tn)
 
     ;; Clear the stack
-    (inst lea rsp-tn
-          (make-ea :qword :base rbp-tn
-                   :disp (* (- sp->fp-offset 3) n-word-bytes)))
+    (inst lea rsp-tn (ea (* (- sp->fp-offset 3) n-word-bytes) rbp-tn))
 
     ;; Push the return-pc so it looks like we just called.
     (pushw rbp-tn (frame-word-offset return-pc-save-offset))
 
     ;; Call it
-    (inst jmp (make-ea :qword :base block
-                       :disp (- (* closure-fun-slot n-word-bytes)
-                                fun-pointer-lowtag)))))
+    (inst jmp (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag)
+                  block))))

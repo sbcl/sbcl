@@ -33,11 +33,8 @@
   ;; but 'vector' is pinned because it's in a register, so this is ok.
   ;; If we had a precise GC we'd want to keep start and limit as offsets
   ;; because we couldn't tie them both to the vector.
-  (inst lea start (make-ea :qword
-                           :base vector :index start
-                           :scale (ash 1 (- word-shift n-fixnum-tag-bits))
-                           :disp (- (ash vector-data-offset word-shift)
-                                    other-pointer-lowtag)))
+  (inst lea start (ea (- (ash vector-data-offset word-shift) other-pointer-lowtag)
+                      vector start (ash 1 (- word-shift n-fixnum-tag-bits))))
   ;; REP STOS has a fixed cost that makes it suboptimal below
   ;; a certain fairly high threshold - about 350 objects in my testing.
   (inst cmp count (fixnumize 350))
@@ -60,7 +57,7 @@
   ;; if address ends in 8, we must write 1 word before using MOVDQA
   (inst test (reg-in-size start :byte) #b1000)
   (inst jmp :z SETUP)
-  (inst mov (make-ea :qword :base start) item)
+  (inst mov (ea start) item)
   (inst add start n-word-bytes)
   (inst sub count (fixnumize 1))
   SETUP
@@ -78,24 +75,22 @@
   ;; MOVNTDQ is supposedly faster, but would require a trailing SFENCE
   ;; which measurably harms performance on a small number of iterations.
   UNROLL-LOOP ; Write 4 double-quads = 8 lisp objects
-  (inst movdqa (make-ea :qword :base start :disp  0) wordpair)
-  (inst movdqa (make-ea :qword :base start :disp 16) wordpair)
-  (inst movdqa (make-ea :qword :base start :disp 32) wordpair)
-  (inst movdqa (make-ea :qword :base start :disp 48) wordpair)
+  (inst movdqa (ea  0 start) wordpair)
+  (inst movdqa (ea 16 start) wordpair)
+  (inst movdqa (ea 32 start) wordpair)
+  (inst movdqa (ea 48 start) wordpair)
   (inst add start (* 8 n-word-bytes))
   (inst cmp start count)
   (inst jmp :b UNROLL-LOOP)
   FINISH
   ;; Now recompute 'count' as the ending address
-  (inst lea count (make-ea :qword
-                           :base vector :index end
-                           :scale (ash 1 (- word-shift n-fixnum-tag-bits))
-                           :disp (- (ash vector-data-offset word-shift)
-                                    other-pointer-lowtag)))
+  (inst lea count (ea (- (ash vector-data-offset word-shift) other-pointer-lowtag)
+                      vector
+                      end (ash 1 (- word-shift n-fixnum-tag-bits))))
   (inst cmp start count)
   (inst jmp :ae DONE)
   FINAL-LOOP
-  (inst mov (make-ea :qword :base start) item)
+  (inst mov (ea start) item)
   (inst add start n-word-bytes)
   (inst cmp start count)
   (inst jmp :b FINAL-LOOP))

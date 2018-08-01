@@ -307,7 +307,7 @@
          (arg args (tn-ref-across arg)))
         ((null arg))
       ;; KLUDGE: assume all parameters are 8 bytes or less
-      (inst mov (make-ea :qword :base rax :disp n) 0)))
+      (inst mov (ea n rax nil nil :qword) 0)))
   #!-win32
   ;; ABI: AL contains amount of arguments passed in XMM registers
   ;; for vararg calls.
@@ -329,7 +329,7 @@
 
   (inst call (cond ((tn-p fun) fun)
                    ((sb!c::code-immobile-p vop) (make-fixup fun :foreign))
-                   (t (make-ea :qword :disp (make-fixup fun :foreign 8)))))
+                   (t (ea (make-fixup fun :foreign 8)))))
   ;; For the undefined alien error
   (note-this-location vop :internal-error)
   #!+win32 (inst add rsp-tn #x20)       ;MS_ABI: remove shadow space
@@ -399,7 +399,7 @@
            (rsp rsp-tn)
            #!+(and win32 sb-thread) (r8 r8-tn)
            (xmm0 float0-tn)
-           ([rsp] (make-ea :qword :base rsp :disp 0))
+           ([rsp] (ea rsp))
            ;; How many arguments have been copied
            (arg-count 0)
            ;; How many arguments have been copied from the stack
@@ -419,16 +419,11 @@
                 ;; A TN pointing to the stack location where the
                 ;; current argument should be stored for the purposes
                 ;; of ENTER-ALIEN-CALLBACK.
-                (target-tn (make-ea :qword :base rsp
-                                   :disp (* arg-count
-                                            n-word-bytes)))
+                (target-tn (ea (* arg-count n-word-bytes) rsp))
                 ;; A TN pointing to the stack location that contains
                 ;; the next argument passed on the stack.
-                (stack-arg-tn (make-ea :qword :base rsp
-                                       :disp (* (+ 1
-                                                   (length argument-types)
-                                                   stack-argument-count)
-                                                n-word-bytes))))
+                (stack-arg-tn (ea (* (+ 1 (length argument-types) stack-argument-count)
+                                     n-word-bytes) rsp)))
             (incf arg-count)
             (cond (integerp
                    (let ((gpr (pop gprs)))
@@ -462,7 +457,7 @@
         #!-sb-thread
         (progn
           ;; arg0 to FUNCALL3 (function)
-          (inst mov rdi (make-ea :qword :disp (static-fdefn-fun-addr 'enter-alien-callback)))
+          (inst mov rdi (ea (static-fdefn-fun-addr 'enter-alien-callback)))
           ;; arg0 to ENTER-ALIEN-CALLBACK (trampoline index)
           (inst mov rsi (fixnumize index))
           ;; arg1 to ENTER-ALIEN-CALLBACK (pointer to argument vector)

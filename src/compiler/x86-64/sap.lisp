@@ -117,14 +117,14 @@
                 (not (location= ptr res)))
            (sc-case offset
              (signed-reg
-              (inst lea res (make-ea :qword :base ptr :index offset)))
+              (inst lea res (ea ptr offset)))
              (immediate
               (let ((value (tn-value offset)))
-                (cond ((typep value '(or (signed-byte 32) (unsigned-byte 31)))
-                       (inst lea res (make-ea :qword :base ptr :disp value)))
+                (cond ((typep value '(signed-byte 32))
+                       (inst lea res (ea value ptr)))
                       (t
                        (inst mov temp value)
-                       (inst lea res (make-ea :qword :base ptr :index temp))))))))
+                       (inst lea res (ea ptr temp))))))))
           (t
            (move res ptr)
            (sc-case offset
@@ -132,7 +132,7 @@
               (inst add res offset))
              (immediate
               (let ((value (tn-value offset)))
-                (cond ((typep value '(or (signed-byte 32) (unsigned-byte 31)))
+                (cond ((typep value '(signed-byte 32))
                        (inst add res (tn-value offset)))
                       (t
                        (inst mov temp value)
@@ -165,12 +165,10 @@
         (inst add sap offset))
       (inst mov temp-reg-tn msan-mem-to-shadow-xor-const)
       (inst xor temp-reg-tn sap)
-      (inst mov (make-ea size :base temp-reg-tn) 0)
+      (inst mov (ea 0 temp-reg-tn nil nil size) 0)
       (unless (eql offset 0) ; restore SAP as if nothing happened
         (inst sub sap offset))))
-  (inst mov
-        (make-ea size :base sap :index ea-index :disp ea-disp)
-        (reg-in-size value size))
+  (inst mov (ea ea-disp sap ea-index) (reg-in-size value size))
   (move result value))
 
 (macrolet ((def-system-ref-and-set (ref-name
@@ -191,8 +189,7 @@
                     (:results (result :scs (,sc)))
                     (:result-types ,type)
                     (:generator 5
-                      (inst ,ref-insn result
-                            (make-ea ,size :base sap :index offset))))
+                      (inst ,ref-insn result (ea 0 sap offset 1 ,size))))
                   (define-vop (,ref-name-c)
                     (:translate ,ref-name)
                     (:policy :fast-safe)
@@ -203,8 +200,7 @@
                     (:results (result :scs (,sc)))
                     (:result-types ,type)
                     (:generator 4
-                      (inst ,ref-insn result
-                            (make-ea ,size :base sap :disp offset))))
+                      (inst ,ref-insn result (ea offset sap nil nil ,size))))
                   (define-vop (,set-name)
                     (:translate ,set-name)
                     (:policy :fast-safe)
@@ -259,7 +255,7 @@
   (:results (result :scs (double-reg)))
   (:result-types double-float)
   (:generator 5
-     (inst movsd result (make-ea :qword :base sap :index offset))))
+     (inst movsd result (ea sap offset))))
 
 (define-vop (sap-ref-double-c)
   (:translate sap-ref-double)
@@ -270,7 +266,7 @@
   (:results (result :scs (double-reg)))
   (:result-types double-float)
   (:generator 4
-     (inst movsd result (make-ea :qword :base sap :disp offset))))
+     (inst movsd result (ea offset sap))))
 
 (define-vop (%set-sap-ref-double)
   (:translate %set-sap-ref-double)
@@ -282,7 +278,7 @@
   (:results (result :scs (double-reg)))
   (:result-types double-float)
   (:generator 5
-    (inst movsd (make-ea :qword :base sap :index offset) value)
+    (inst movsd (ea sap offset) value)
     (move result value)))
 
 (define-vop (%set-sap-ref-double-c)
@@ -295,7 +291,7 @@
   (:results (result :scs (double-reg)))
   (:result-types double-float)
   (:generator 4
-    (inst movsd (make-ea :qword :base sap :disp offset) value)
+    (inst movsd (ea offset sap) value)
     (move result value)))
 
 ;;;; SAP-REF-SINGLE
@@ -309,7 +305,7 @@
   (:results (result :scs (single-reg)))
   (:result-types single-float)
   (:generator 5
-     (inst movss result (make-ea :dword :base sap :index offset))))
+     (inst movss result (ea sap offset))))
 
 (define-vop (sap-ref-single-c)
   (:translate sap-ref-single)
@@ -320,7 +316,7 @@
   (:results (result :scs (single-reg)))
   (:result-types single-float)
   (:generator 4
-     (inst movss result (make-ea :dword :base sap :disp offset))))
+     (inst movss result (ea offset sap))))
 
 (define-vop (%set-sap-ref-single)
   (:translate %set-sap-ref-single)
@@ -332,7 +328,7 @@
   (:results (result :scs (single-reg)))
   (:result-types single-float)
   (:generator 5
-    (inst movss (make-ea :dword :base sap :index offset) value)
+    (inst movss (ea sap offset) value)
     (move result value)))
 
 (define-vop (%set-sap-ref-single-c)
@@ -345,7 +341,7 @@
   (:results (result :scs (single-reg)))
   (:result-types single-float)
   (:generator 4
-    (inst movss (make-ea :dword :base sap :disp offset) value)
+    (inst movss (ea offset sap) value)
     (move result value)))
 
 
@@ -361,7 +357,7 @@
     (let ((disp (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)))
       (if (location= sap vector)
           (inst add sap disp)
-          (inst lea sap (make-ea :qword :base vector :disp disp))))))
+          (inst lea sap (ea disp vector))))))
 
 ;;; Compare and swap
 (define-vop (signed-sap-cas-32)
@@ -377,7 +373,6 @@
   (:result-types signed-num)
   (:generator 5
     (inst mov eax (reg-in-size oldval :dword))
-    (inst cmpxchg (make-ea :dword :base sap :index offset)
-          (reg-in-size newval :dword) :lock)
+    (inst cmpxchg (ea sap offset) (reg-in-size newval :dword) :lock)
     (inst mov (reg-in-size result :dword) eax)))
 

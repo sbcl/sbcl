@@ -13,11 +13,11 @@
 (in-package "SB!VM")
 
 (defun symbol-slot-ea (symbol slot &optional (size :qword))
-  (make-ea size :disp
-           (let ((offset (- (* slot n-word-bytes) other-pointer-lowtag)))
+  (ea (let ((offset (- (* slot n-word-bytes) other-pointer-lowtag)))
              (if (static-symbol-p symbol)
                  (+ nil-value (static-symbol-offset symbol) offset)
-                 (make-fixup symbol :immobile-object offset)))))
+                 (make-fixup symbol :immobile-object offset)))
+      nil nil nil size))
 
 (defun gen-cell-set (ea value result)
   (when (sc-is value immediate)
@@ -153,16 +153,14 @@
                (inst jmp :nz err)
                (if const
                    (cond ((typep const '(signed-byte 32))
-                          (inst lea newval
-                                (make-ea :qword :base rax :disp const)))
+                          (inst lea newval (ea const rax)))
                          (t
                           (inst mov newval const)
                           (inst add newval rax)))
                    ,(if (eq inherit 'cell-xsub)
                         `(progn (move newval rax)
                                 (inst sub newval delta))
-                        `(inst lea newval
-                               (make-ea :qword :base rax :index delta))))
+                        `(inst lea newval (ea rax delta))))
                (inst cmpxchg
                      (make-ea-for-object-slot cell ,slot list-pointer-lowtag)
                      newval :lock)

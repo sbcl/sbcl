@@ -39,20 +39,24 @@
        (inst mov dst src)))))
 
 (defmacro make-ea-for-object-slot (ptr slot lowtag)
-  `(make-ea :qword :base ,ptr :disp (- (* ,slot n-word-bytes) ,lowtag)))
+  ;; Explicitly :qword sized because we use this in such instructions as
+  ;; (inst mov (make-ea-for-object-slot ..) immediate)
+  `(ea (- (* ,slot n-word-bytes) ,lowtag) ,ptr nil nil :qword))
 (defmacro make-ea-for-object-slot-half (ptr slot lowtag)
-  `(make-ea :dword :base ,ptr :disp (- (* ,slot n-word-bytes) ,lowtag)))
+  `(ea (- (* ,slot n-word-bytes) ,lowtag) ,ptr nil nil :dword))
 (defmacro tls-index-of (sym)
-  `(make-ea :dword :base ,sym :disp (+ 4 (- other-pointer-lowtag))))
+  `(ea (+ 4 (- other-pointer-lowtag)) ,sym nil nil :dword))
 
 (defmacro loadw (value ptr &optional (slot 0) (lowtag 0))
   `(inst mov ,value (make-ea-for-object-slot ,ptr ,slot ,lowtag)))
 
 (defun storew (value ptr &optional (slot 0) (lowtag 0))
+  ;; FIXME: do we really use STOREW for other than :QWORD ?
+  ;; Shouldn't sub-lispword stores use something more appropriately named?
   (let* ((size (if (tn-p value)
                    (sc-operand-size (tn-sc value))
                    :qword))
-         (ea (make-ea size :base ptr :disp (- (* slot n-word-bytes) lowtag))))
+         (ea (ea (- (* slot n-word-bytes) lowtag) ptr nil nil size)))
     (cond ((and (integerp value)
                 (not (typep value '(signed-byte 32))))
            (inst mov temp-reg-tn value)
@@ -74,11 +78,12 @@
 
 ;; Return the effective address of the value slot of static SYMBOL.
 (defun static-symbol-value-ea (symbol)
-   (make-ea :qword
-            :disp (+ nil-value
-                     (static-symbol-offset symbol)
-                     (ash symbol-value-slot word-shift)
-                     (- other-pointer-lowtag))))
+   (ea (+ nil-value
+          (static-symbol-offset symbol)
+          (ash symbol-value-slot word-shift)
+          (- other-pointer-lowtag))
+       ;; Explicit :QWORD because of mem+imm mode for some instructions.
+       nil nil nil :qword))
 
 (defun thread-tls-ea (index &optional (size :qword))
   (if (tn-p index)
@@ -87,11 +92,11 @@
       ;; RIP-relative addressing. (And attempting to encode an index is illegal)
       ;; So the 'mod' bits must be nonzero, which mandates encoding of an
       ;; explicit displacement of 0.  Using INDEX as base avoids the extra byte.
-      (make-ea size :base index :index thread-base-tn)
-      (make-ea size :base thread-base-tn :disp index)))
+      (ea 0 index thread-base-tn 1 size)
+      (ea index thread-base-tn nil nil size)))
 
 (defun thread-slot-ea (slot-index &optional (size :qword))
-  (make-ea size :base thread-base-tn :disp (ash slot-index word-shift)))
+  (ea (ash slot-index word-shift) thread-base-tn nil nil size))
 
 #!+sb-thread
 (progn
@@ -125,7 +130,7 @@
 (defmacro load-type (target source &optional (offset 0))
   "Loads the type bits of a pointer into target independent of
    byte-ordering issues."
-  `(inst movzx ,target (make-ea :byte :base ,source :disp ,offset)))
+  `(inst movzx ,target (ea ,offset ,source nil nil :byte)))
 
 ;;;; error code
 (defun emit-error-break (vop kind code values)
@@ -179,9 +184,8 @@
 
 #!+sb-safepoint
 (defun emit-safepoint ()
-  (inst test al-tn (make-ea :byte :disp
-                            (- nil-value n-word-bytes other-pointer-lowtag
-                               gc-safepoint-trap-offset))))
+  (inst test al-tn (ea (- nil-value n-word-bytes other-pointer-lowtag
+                          gc-safepoint-trap-offset))))
 
 (defmacro pseudo-atomic (&rest forms)
   #!+sb-safepoint-strictly
@@ -229,11 +233,12 @@
        (:generator 5
          (move rax old-value)
          (inst cmpxchg
-               (make-ea :qword :base object
-                        :index  (unless (sc-is index immediate) index)
-                        :scale (ash 1 (- word-shift n-fixnum-tag-bits))
-                        :disp (- (* (+ (if (sc-is index immediate) (tn-value index) 0)
-                                       ,offset) n-word-bytes) ,lowtag))
+               (ea (- (* (+ (if (sc-is index immediate) (tn-value index) 0) ,offset)
+                         n-word-bytes)
+                      ,lowtag)
+                   object
+                   (unless (sc-is index immediate) index)
+                   (ash 1 (- word-shift n-fixnum-tag-bits)))
                new-value :lock)
          (move value rax)))))
 
@@ -249,10 +254,8 @@
        (:results (value :scs ,scs))
        (:result-types ,el-type)
        (:generator 3                    ; pw was 5
-         (inst mov value (make-ea :qword :base object :index index
-                                  :scale (ash 1 (- word-shift n-fixnum-tag-bits))
-                                  :disp (- (* ,offset n-word-bytes)
-                                           ,lowtag)))))
+         (inst mov value (ea (- (* ,offset n-word-bytes) ,lowtag)
+                             object index (ash 1 (- word-shift n-fixnum-tag-bits))))))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate
            `((:translate ,translate)))
@@ -265,9 +268,8 @@
        (:results (value :scs ,scs))
        (:result-types ,el-type)
        (:generator 2                    ; pw was 5
-         (inst mov value (make-ea :qword :base object
-                                  :disp (- (* (+ ,offset index) n-word-bytes)
-                                           ,lowtag)))))))
+         (inst mov value (ea (- (* (+ ,offset index) n-word-bytes) ,lowtag)
+                             object))))))
 
 (defmacro define-full-reffer+offset (name type offset lowtag scs el-type &optional translate)
   `(progn
@@ -284,10 +286,8 @@
        (:results (value :scs ,scs))
        (:result-types ,el-type)
        (:generator 3                    ; pw was 5
-         (inst mov value (make-ea :qword :base object :index index
-                                  :scale (ash 1 (- word-shift n-fixnum-tag-bits))
-                                  :disp (- (* (+ ,offset offset) n-word-bytes)
-                                           ,lowtag)))))
+         (inst mov value (ea (- (* (+ ,offset offset) n-word-bytes) ,lowtag)
+                             object index (ash 1 (- word-shift n-fixnum-tag-bits))))))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate
            `((:translate ,translate)))
@@ -302,9 +302,8 @@
        (:results (value :scs ,scs))
        (:result-types ,el-type)
        (:generator 2                    ; pw was 5
-         (inst mov value (make-ea :qword :base object
-                                  :disp (- (* (+ ,offset index offset) n-word-bytes)
-                                           ,lowtag)))))))
+         (inst mov value (ea (- (* (+ ,offset index offset) n-word-bytes) ,lowtag)
+                             object))))))
 
 (defmacro define-full-setter (name type offset lowtag scs el-type &optional translate)
   (let ((want-both-variants
@@ -332,14 +331,13 @@
                  ;; but this macro declares the index arg as 'any-reg', so it has a tag bit,
                  ;; so we'll push the arg and then shift right as the next instruction.
                  (inst push index)
-                 (inst shr (make-ea :qword :base rsp-tn) n-fixnum-tag-bits)
+                 (inst shr (ea 0 rsp-tn nil nil :qword) n-fixnum-tag-bits)
                  (inst push object)
                  (invoke-asm-routine 'call 'code-header-set vop)
                  (move result value))
                `((gen-cell-set
-                   (make-ea :qword :base object :index index
-                            :scale (ash 1 (- word-shift n-fixnum-tag-bits))
-                            :disp (- (* ,offset n-word-bytes) ,lowtag))
+                   (ea (- (* ,offset n-word-bytes) ,lowtag)
+                       object index (ash 1 (- word-shift n-fixnum-tag-bits)))
                    value result)))))
      ,@(when want-both-variants
          `((define-vop (,(symbolicate name "-C"))
@@ -357,9 +355,8 @@
             (:result-types ,el-type)
             (:generator 3                    ; was 5
               (gen-cell-set
-                   (make-ea :qword :base object
-                            :disp (- (* (+ ,offset index) n-word-bytes)
-                                     ,lowtag))
+                   (ea (- (* (+ ,offset index) n-word-bytes) ,lowtag)
+                       object)
                    value result))))))))
 
 (defmacro define-full-setter+offset (name type offset lowtag scs el-type &optional translate)
@@ -381,9 +378,8 @@
        (:result-types ,el-type)
        (:generator 4                    ; was 5
          (gen-cell-set
-                   (make-ea :qword :base object :index index
-                            :scale (ash 1 (- word-shift n-fixnum-tag-bits))
-                            :disp (- (* (+ ,offset offset) n-word-bytes) ,lowtag))
+                   (ea (- (* (+ ,offset offset) n-word-bytes) ,lowtag)
+                       object index (ash 1 (- word-shift n-fixnum-tag-bits)))
                    value result)))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate
@@ -403,8 +399,7 @@
        (:result-types ,el-type)
        (:generator 3                    ; was 5
          (gen-cell-set
-                   (make-ea :qword :base object
-                            :disp (- (* (+ ,offset index offset) n-word-bytes)
-                                     ,lowtag))
+                   (ea (- (* (+ ,offset index offset) n-word-bytes) ,lowtag)
+                       object)
                    value result)))))
 

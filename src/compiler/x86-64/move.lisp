@@ -237,9 +237,8 @@
     (cond ((and (sc-is x signed-reg unsigned-reg)
                 (not (location= x y)))
            (if (= n-fixnum-tag-bits 1)
-               (inst lea y (make-ea :qword :base x :index x))
-               (inst lea y (make-ea :qword :index x
-                                    :scale (ash 1 n-fixnum-tag-bits)))))
+               (inst lea y (ea x x))
+               (inst lea y (ea nil x (ash 1 n-fixnum-tag-bits)))))
           (t
            ;; Uses: If x is a reg 2 + 3; if x = y uses only 3 bytes
            (move y x)
@@ -326,9 +325,8 @@
               ;; should be noise compared to bignum consing if that is needed
               ;; and saves one branch.
               (if (= n-fixnum-tag-bits 1)
-                  (inst lea y (make-ea :qword :base x :index x))
-                  (inst lea y (make-ea :qword :index x
-                                              :scale (ash 1 n-fixnum-tag-bits))))
+                  (inst lea y (ea x x))
+                  (inst lea y (ea nil x (ash 1 n-fixnum-tag-bits))))
               (inst jmp :z done)
               (inst mov y x)
               (invoke-asm-routine 'call #.(bignum-from-reg 'y "UNSIGNED") vop)

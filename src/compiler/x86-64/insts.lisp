@@ -18,7 +18,7 @@
             plausible-signed-imm32-operand-p
             register-p gpr-p xmm-register-p
             ea-p sized-ea ea-base ea-index
-            make-ea ea-disp rip-relative-ea) "SB!VM")
+            ea make-ea ea-disp rip-relative-ea) "SB!VM")
   ;; Imports from SB-VM into this package
   (import '(sb!vm::frame-byte-offset sb!vm::rip-tn sb!vm::rbp-tn
             sb!vm::registers sb!vm::float-registers sb!vm::stack))) ; SB names
@@ -1023,11 +1023,13 @@
   (addend 0 :type (signed-byte 32)))
 
 (defstruct (ea (:constructor make-ea (size &key base index scale disp))
+               (:constructor %ea (disp base index scale size))
                (:copier nil))
   ;; note that we can represent an EA with a QWORD size, but EMIT-EA
   ;; can't actually emit it on its own: caller also needs to emit REX
   ;; prefix
-  (size nil :type (member :byte :word :dword :qword) :read-only t)
+  (size :unspecific :type (member :byte :word :dword :qword :unspecific)
+        :read-only t)
   (base nil :type (or tn null) :read-only t)
   (index nil :type (or tn null) :read-only t)
   (scale 1 :type (member 1 2 4 8) :read-only t)
@@ -1063,16 +1065,51 @@
             (format stream "+~A" (ea-disp ea))))
          (write-char #\] stream))))
 
+;;; BOA constructor for EA has these acceptable forms:
+;;;   (EA displacement &OPTIONAL base-register index-register scale size)
+;;;   (EA base-register &OPTIONAL index-register scale)
+;;;
+;;; mnemonic device: the syntax is like AT&T "disp(%rbase,%rindex,scale)"
+;;; where the leading "disp" is optional.
+;;;
+;;; Most instructions can determine an EA size based on the size of a register
+;;; operand. The few that can't are mem+immediate mode instructions, and
+;;; instructions which need explicit differently sized register + EA.
+;;; The assembler will be changed to parse a qualifier on the instruction
+;;; similarly to other syntaxes:
+;;;
+;;;  AT&T  : testb $0x40(%rax)
+;;;  Intel : test byte ptr [%eax], 40
+;;;  SBCL  : (TEST :BYTE (EA RAX-TN) #x40)
+;;;
+;;; Until that change is completed, EAs themselves will convey an optional size,
+;;; specifiable only if you pass all constructor arguments.
+;;;
+(defun ea (displacement &optional base (index nil indexp) (scale 1 scalep)
+                        (size :unspecific))
+  (when (or (null displacement) (gpr-p displacement))
+    ;; Sans-displacement syntax requires that size be :unspecific.
+    ;; Use the longer syntax meanwhile if you need an explicit size.
+    (aver (not scalep))
+    (setq scale (if indexp index 1)
+          index base
+          base displacement
+          displacement 0))
+  ;; FIXME: until SIZE is removed, the caller might have to specify INDEX
+  ;; and SCALE even if undesired. Allow NIL for the scale. but only when
+  ;; INDEX is null, and set it to 1 if so (which is the default).
+  ;; Scale could be NIL only if index was also specified, since they're
+  ;; no longer keywords. This AVER prevents accidental use of
+  ;; (EA 0 base index nil :dword) and similar. The OR below would have
+  ;; passed valid arguments to %EA and not be detected otherwise.
+  (when index (aver scale))
+  (%ea displacement base index (or scale 1) size))
+
 (defun rip-relative-ea (size label &optional addend)
-  (make-ea size :base rip-tn
-                :disp (if addend
-                          (make-label+addend label addend)
-                          label)))
+  (%ea (if addend (make-label+addend label addend) label) rip-tn nil 1 size))
 
 (defun sized-ea (ea new-size)
-  (make-ea new-size
-           :base (ea-base ea) :index (ea-index ea) :scale (ea-scale ea)
-           :disp (ea-disp ea)))
+  (%ea (ea-disp ea) (ea-base ea) (ea-index ea) (ea-scale ea) new-size))
 
 (defun emit-byte-displacement-backpatch (segment target)
   (emit-back-patch segment 1
@@ -1098,10 +1135,7 @@
        (stack
         ;; Could this be refactored to fall into the EA case below instead
         ;; of consing a new EA? Probably.  Does it matter? Probably not.
-        (emit-ea segment
-                 (make-ea :qword :base rbp-tn
-                          :disp (frame-byte-offset (tn-offset thing)))
-                 reg))
+        (emit-ea segment (ea (frame-byte-offset (tn-offset thing)) rbp-tn) reg))
        (constant
         (unless allow-constants
           ;; Why?
@@ -1316,7 +1350,8 @@
      (or (sb!c:sc-operand-size (tn-sc thing))
          (error "can't tell the size of ~S" thing)))
     (ea
-     (ea-size thing))
+     (unless (eq (ea-size thing) :unspecific)
+       (ea-size thing)))
     (fixup
      ;; GNA.  Guess who spelt "flavor" correctly first time round?
      ;; There's a strong argument in my mind to change all uses of
@@ -1560,7 +1595,7 @@
   (inst mov (sb!vm::reg-in-size dst :dword) src))
 
 (flet ((emit* (segment thing gpr-opcode mem-opcode subcode allowp)
-         (let ((size (operand-size thing)))
+         (let ((size (or (operand-size thing) :qword)))
            (aver (or (eq size :qword) (eq size :word)))
            (emit-prefixes segment thing nil (if (eq size :word) :word :do-not-set))
            (cond ((gpr-p thing)
@@ -2081,7 +2116,7 @@
     (:emitter (emit* segment #xBD dst src))))
 
 (flet ((emit* (segment src index opcode lock)
-         (let ((size (operand-size src)))
+         (let ((size (matching-operand-size src index)))
            (when (eq size :byte)
              (error "can't test byte: ~S" src))
            (emit-prefixes segment src index size :lock lock)
