@@ -503,7 +503,7 @@ between the ~A definition and the ~A definition"
                                 (:constructor %make-structure-classoid
                                     (hash-value name))))
 (defun make-structure-classoid (&key name)
-  (%make-structure-classoid (gen-ctype-hash-for-name name) name))
+  (%make-structure-classoid (interned-type-hash name) name))
 
 ;;;; classoid namespace
 
@@ -1120,7 +1120,7 @@ between the ~A definition and the ~A definition"
                      (setf (classoid-cell-classoid
                             (find-classoid-cell name :create t))
                            (!make-built-in-classoid
-                             :hash-value (gen-ctype-hash-for-name name)
+                             :hash-value (interned-type-hash name)
                              :name name
                              :translation (if trans-p :initializing nil)
                              :direct-superclasses

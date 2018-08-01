@@ -256,23 +256,9 @@
               ;; be a read/write slot?
               :read-only nil))
 
-;;; The "interned" bit indicates uniqueness of the internal representation of
-;;; any specifier that parses to this object.
-;;; Not all interned types admit TYPE= optimization. As one example:
-;;; (type= (specifier-type '(array (unsigned-byte 6) (*)))
-;;;        (specifier-type '(array (unsigned-byte 7) (*)))) => T and T
-;;; because we preserve the difference in spelling of the two types.
-(defun mark-ctype-interned (obj)
-  (setf (type-hash-value obj)
-        (logior sb!xc:most-negative-fixnum
-                (if (eq (type-class-name (type-class-info obj)) 'array)
-                    0
-                    +type-admits-type=-optimization+)
-                (type-hash-value obj)))
-  obj)
 ;;; Classoids and named types can use the name as the source of the hash.
 ;;; A string's hash is stable across builds which is a nice aspect.
-(defun gen-ctype-hash-for-name (symbol &optional (metatype :classoid))
+(defun interned-type-hash (&optional symbol (metatype 'classoid))
   (declare (ignorable symbol metatype))
   (let ((hash
          ;; When cross-compiling, the goal is to produce deterministic fasls
@@ -283,23 +269,32 @@
          #-sb-xc-host
          ;; the named-type NIL can use a string-based (deterministic) hash,
          ;; whereas classoids with no name should get a pseudo-random hash
-         (if (or symbol (eq metatype :named))
+         (if (or symbol (eq metatype 'named))
              ;; symbol hashes don't use the package so  mix that in too
-             (let ((pkg-hash (acond ((symbol-package symbol)
-                                     (sxhash (sb!impl::package-%name it)))
-                                    (t 0)))
-                   (name-hash (sxhash (symbol-name symbol))))
+             (let* ((pkg-hash (acond ((symbol-package symbol)
+                                      (sxhash (sb!impl::package-%name it)))
+                                     (t 0)))
+                    (mixed (logxor pkg-hash (sxhash (symbol-name symbol)))))
                (logand (ecase metatype
                          ;; Hash two different ways in case a classoid
                          ;; and named type share the symbol (like T)
-                         (:classoid (logxor pkg-hash name-hash))
-                         (:named    (lognot (logxor pkg-hash name-hash))))
+                         (classoid mixed)
+                         (named    (lognot mixed)))
                        +ctype-hash-mask+))
              ;; anonymous classoid (do we support those?) or other metatype
              (sb!impl::quasi-random-address-based-hash
               *ctype-hash-state* +ctype-hash-mask+))))
     (logior sb!xc:most-negative-fixnum       ; "interned" bit
-            +type-admits-type=-optimization+ ; fast TYPE= bit
+            ;; All metatypes of interned ctypes except for ARRAY allow
+            ;; the TYPE= optimization that two instances of the type
+            ;; which are not EQ are not TYPE=. With arrays it is possible
+            ;; for TYPE= to return T given two non-EQ ctypes both of which
+            ;; are interned objects, e.g.
+            ;; (type= (specifier-type '(array (unsigned-byte 6) (*)))
+            ;;        (specifier-type '(array (unsigned-byte 7) (*)))) => T, T
+            (if (eq metatype 'array)
+                0
+                +type-admits-type=-optimization+)
             hash)))
 
 (declaim (inline type-might-contain-other-types-p))
@@ -567,6 +562,8 @@
                                   (class-info (type-class-or-lose 'member)))
                         (:copier nil)
                         (:constructor %make-member-type (xset fp-zeroes))
+                        (:constructor !make-interned-member-type
+                            (hash-value xset fp-zeroes))
                         #-sb-xc-host (:pure nil))
   (xset nil :type xset :read-only t)
   (fp-zeroes nil :type list :read-only t))
@@ -577,6 +574,9 @@
                                  (class-info (type-class-or-lose 'array)))
                        (:constructor %make-array-type
                         (dimensions complexp element-type
+                                    specialized-element-type))
+                       (:constructor !make-interned-array-type
+                        (hash-value dimensions complexp element-type
                                     specialized-element-type))
                        (:copier nil))
   ;; the dimensions of the array, or * if unspecified. If a dimension
@@ -593,6 +593,7 @@
             (:include ctype
                       (class-info (type-class-or-lose 'character-set)))
             (:constructor %make-character-set-type (pairs))
+            (:constructor !make-interned-character-set-type (hash-value pairs))
             (:copier nil))
   (pairs (missing-arg) :type list :read-only t))
 
@@ -698,9 +699,9 @@
 
 ;;; A CONS-TYPE is used to represent a CONS type.
 (defstruct (cons-type (:include ctype (class-info (type-class-or-lose 'cons)))
-                      (:constructor
-                       %make-cons-type (car-type
-                                        cdr-type))
+                      (:constructor %make-cons-type (car-type cdr-type))
+                      (:constructor !make-interned-cons-type
+                          (hash-value car-type cdr-type))
                       (:copier nil))
   ;; the CAR and CDR element types (to support ANSI (CONS FOO BAR) types)
   (car-type (missing-arg) :type ctype :read-only t)
@@ -757,7 +758,10 @@
                      (:copier nil)
                      (:constructor
                       %make-fun-type (required optional rest
-                                      keyp keywords allowp wild-args returns)))
+                                      keyp keywords allowp wild-args returns))
+                     (:constructor !make-interned-fun-type
+                         (hash-value required optional rest keyp keywords
+                          allowp wild-args returns)))
   ;; true if the arguments are unrestrictive, i.e. *
   (wild-args nil :type boolean :read-only t)
   ;; type describing the return values. This is a values type

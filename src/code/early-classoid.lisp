@@ -248,12 +248,11 @@
 (defun !improve-ctype-hash (obj type-class-name)
   (let ((hash (case type-class-name
                 (named
-                 (gen-ctype-hash-for-name (named-type-name obj) :named))
+                 (interned-type-hash (named-type-name obj) 'named))
                 (classoid
-                 (write-string (string (classoid-name obj)))
-                 (gen-ctype-hash-for-name (classoid-name obj)))
+                 (interned-type-hash (classoid-name obj)))
                 (t
-                 (gen-ctype-hash-for-name nil))))
+                 (interned-type-hash))))
         ;; Preserve the interned-p and type=-optimization bits
         ;; by affecting only bits under the ctype-hash-mask.
         ;; Upper 5 hash bits might be an index into SAETP array
@@ -319,7 +318,7 @@
   ;; environment of MAKE-CONDITION.
   (hairy-slots nil :type list))
 (defun make-condition-classoid (&key name)
-  (%make-condition-classoid (gen-ctype-hash-for-name name) name))
+  (%make-condition-classoid (interned-type-hash name) name))
 
 ;;;; classoid namespace
 

@@ -19,7 +19,7 @@
       (declare (ignore specifier))
       ;; Technically the instances are not read-only,
       ;; because the hash-value slot is rewritten.
-      `(load-time-value (mark-ctype-interned ,constructor) nil))
+      `(load-time-value ,constructor nil))
 
     (defmacro literal-ctype-vector (var)
       `(load-time-value ,var nil)))
@@ -77,9 +77,9 @@
 #+sb-xc-host
 (progn
   (defvar *satisfies-keywordp-type*
-    (mark-ctype-interned (%make-hairy-type '(satisfies keywordp))))
+    (!make-interned-hairy-type '(satisfies keywordp)))
   (defvar *fun-name-type*
-    (mark-ctype-interned (%make-hairy-type '(satisfies legal-fun-name-p)))))
+    (!make-interned-hairy-type '(satisfies legal-fun-name-p))))
 
 ;;; An UNKNOWN-TYPE is a type not known to the type system (not yet
 ;;; defined). We make this distinction since we don't want to complain
@@ -237,9 +237,9 @@
 #+sb-xc-host
 (defvar *interned-fun-types*
   (flet ((fun-type (n)
-           (mark-ctype-interned
-            (%make-fun-type (make-list n :initial-element *universal-type*)
-                            nil nil nil nil nil nil *wild-type*))))
+           (!make-interned-fun-type (interned-type-hash)
+                                    (make-list n :initial-element *universal-type*)
+                                    nil nil nil nil nil nil *wild-type*)))
     (vector (fun-type 0) (fun-type 1) (fun-type 2) (fun-type 3))))
 
 (defun make-fun-type (&key required optional rest
@@ -292,9 +292,9 @@
   (defvar *interned-signed-byte-types*)
   (defvar *interned-unsigned-byte-types*)
   (macrolet ((int-type (low high)
-               `(mark-ctype-interned
-                 (%make-numeric-type :class 'integer :enumerable t
-                                     :low ,low :high ,high))))
+               `(%make-numeric-type :hash-value (interned-type-hash)
+                                    :class 'integer :enumerable t
+                                    :low ,low :high ,high)))
     (setq *interned-signed-byte-types*
           (let ((v (make-array sb!vm:n-word-bits))
                 (j -1))
@@ -344,7 +344,8 @@
           (float
            (macrolet ((float-type (fmt complexp)
                         `(literal-ctype
-                          (%make-numeric-type :class 'float :complexp ,complexp
+                          (%make-numeric-type :hash-value (interned-type-hash)
+                                              :class 'float :complexp ,complexp
                                               :format ',fmt :enumerable nil)
                           ,(if (eq complexp :complex) `(complex ,fmt) fmt))))
              (when (and (null low) (null high))
@@ -360,9 +361,9 @@
           (integer
            (macrolet ((int-type (low high)
                         `(literal-ctype
-                          (%make-numeric-type
-                           :class 'integer :low ,low :high ,high
-                           :enumerable (if (and ,low ,high) t nil))
+                          (%make-numeric-type :hash-value (interned-type-hash)
+                                              :class 'integer :low ,low :high ,high
+                                              :enumerable (if (and ,low ,high) t nil))
                           (integer ,(or low '*) ,(or high '*)))))
              (cond ((neq complexp :real) nil)
                    ((and (eql low 0) (eql high (1- sb!xc:array-dimension-limit)))
@@ -387,7 +388,9 @@
                     (int-type nil #.(1- sb!xc:most-negative-fixnum))))))
           (rational
            (when (and (eq complexp :real) (null low) (eq high low))
-             (literal-ctype (%make-numeric-type :class 'rational) rational))))
+             (literal-ctype (%make-numeric-type :hash-value (interned-type-hash)
+                                                :class 'rational)
+                            rational))))
         (let ((result (%make-numeric-type :class class :format format
                                           :complexp complexp
                                           :low low :high high
@@ -439,7 +442,9 @@
     (unless (cdr pairs)
       (macrolet ((range (low high)
                    `(return-from make-character-set-type
-                      (literal-ctype (%make-character-set-type '((,low . ,high)))
+                      (literal-ctype (!make-interned-character-set-type
+                                      (interned-type-hash)
+                                      '((,low . ,high)))
                                      (character-set ((,low . ,high)))))))
         (let* ((pair (car pairs))
                (low (car pair))
@@ -468,7 +473,8 @@
 (defvar *interned-array-types*
   (labels ((make-1 (type-index dims complexp type)
              (setf (!ctype-saetp-index type) type-index)
-             (mark-ctype-interned (%make-array-type dims complexp type type)))
+             (!make-interned-array-type (interned-type-hash nil 'array)
+                                        dims complexp type type))
            (make-all (element-type type-index array)
              (replace array
                       (list (make-1 type-index '(*) nil    element-type)
@@ -585,7 +591,9 @@
              (unless unpaired
                (macrolet ((member-type (&rest elts)
                             `(literal-ctype
-                              (%make-member-type (xset-from-list ',elts) nil)
+                              (!make-interned-member-type (interned-type-hash)
+                                                          (xset-from-list ',elts)
+                                                          nil)
                               (member ,@elts))))
                  (let ((elts (xset-data xset)))
                    (when (singleton-p elts)
@@ -663,7 +671,9 @@
         ;; but it improves the hit rate in the function caches.
         ((and (type= car-type *universal-type*)
               (type= cdr-type *universal-type*))
-         (literal-ctype (%make-cons-type *universal-type* *universal-type*)
+         (literal-ctype (!make-interned-cons-type (interned-type-hash)
+                                                  *universal-type*
+                                                  *universal-type*)
                         cons))
         (t
          (%make-cons-type car-type cdr-type))))

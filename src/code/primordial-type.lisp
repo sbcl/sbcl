@@ -17,7 +17,7 @@
             `(progn
                #+sb-xc-host
                (progn (defvar ,global-sym
-                        (!make-named-type (gen-ctype-hash-for-name ',type :named)
+                        (!make-named-type (interned-type-hash ',type 'named)
                                           ',type))
                       ;; Make it known as a constant in the cross-compiler.
                       (setf (info :variable :kind ',global-sym) :constant))
@@ -73,6 +73,8 @@
 (defstruct (hairy-type (:include ctype
                         (class-info (type-class-or-lose 'hairy)))
                        (:constructor %make-hairy-type (specifier))
+                       (:constructor !make-interned-hairy-type
+                           (specifier &aux (hash-value (interned-type-hash))))
                        (:copier nil)
                        #!+cmu (:pure nil))
   ;; the Common Lisp type-specifier of the type we represent
