@@ -334,6 +334,7 @@
  #+mips  ("src/code/mips-vm")
  #+arm   ("src/code/arm-vm")
  #+arm64 ("src/code/arm64-vm")
+ #+rv32 ("src/code/rv32-vm")
 
  ;; RANDOM-LAYOUT-CLOS-HASH (in 'class') uses RANDOM, the transform for which
  ;; uses GENERATE-RANDOM-EXPR-FOR-POWER-OF-2 which becomes BIG-RANDOM-CHUNK,
