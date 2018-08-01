@@ -288,7 +288,7 @@
           (let ((vop (car inst)))
             (when (sb!c::vop-p vop) (pop inst)))
           (unless (member (car inst) '(.align .byte .skip .coverage-mark))
-            (dolist (operand (cdr thing))
+            (dolist (operand (cdr inst))
               (if (label-p operand)
                   (setf (label-usedp operand) t)
                   ;; backend decides what labels are used
