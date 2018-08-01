@@ -258,41 +258,43 @@
 
 ;;; Instructions are streamed into a SECTION before (optionally combining
 ;;; sections and) assembling into a SEGMENT.
-;;; The SECTION representation is just a list: (LAST-VOP INDEX . BUFFERS).
+;;; The SECTION representation is just a list: (INDEX . BUFFERS).
 ;;; Each BUFFER is a simple-vector.
 ;;; Because the elsewhere section and unboxed data section often hold nothing,
 ;;; we start with an empty vector to avoid waste.
-(defun make-section () (list nil 0 #()))
-(defmacro section-last-vop (section) `(car ,section))
-(defmacro section-last-buf-length (section) `(cadr ,section))
-(defmacro section-last-buf (section) `(caddr ,section))
+(defun make-section () (list 0 #()))
+(defmacro section-buf-chain (section) `(cdr ,section))
+(defmacro section-buf-index (section) `(car ,section))
+(defmacro section-last-buf (section) `(cadr ,section))
 (defun emit (section &rest things)
   ;; each element of THINGS can be:
   ;; - a list (symbol . args) for a machine instruction or assembler directive
   ;; - a label
   ;; - a function to emit a postit
-  (let ((data (cdr section)))
-    (dolist (thing things)
-      (let ((index (car data))
-            (vector (the simple-vector (cadr data))))
-        (unless (< index (length vector))
-          ;; We double the size, but rather than copying the old data into the new,
-          ;; just grow the chain of vectors. No need to materialize a single vector.
-          (let ((new-vector (make-array (max 10 (* (length vector) 2)))))
-            (if (= (length vector) 0)
-                (rplaca (cdr data) new-vector)
-                (push new-vector (cdr data)))
-            (setq vector new-vector
-                  index 0)))
-        (unless (typep thing '(or function label))
-          (unless (member (car thing) '(.align .byte .skip .coverage-mark))
+  (dolist (thing things)
+    (let ((vector (the simple-vector (section-last-buf section)))
+          (index (section-buf-index section)))
+      (unless (< index (length vector))
+        ;; We double the size, but rather than copying the old data into the new,
+        ;; just grow the chain of vectors. No need to materialize a single vector.
+        (let ((new-vector (make-array (max 10 (* (length vector) 2)))))
+          (if (= (length vector) 0)
+              (rplaca (cdr section) new-vector)
+              (push new-vector (cdr section)))
+          (setq vector new-vector
+                index 0)))
+      (unless (typep thing '(or function label))
+        (let ((inst thing))
+          (let ((vop (car inst)))
+            (when (sb!c::vop-p vop) (pop inst)))
+          (unless (member (car inst) '(.align .byte .skip .coverage-mark))
             (dolist (operand (cdr thing))
               (if (label-p operand)
                   (setf (label-usedp operand) t)
                   ;; backend decides what labels are used
-                  (%mark-used-labels operand)))))
-        (setf (aref vector index) thing)
-        (setf (car data) (1+ index))))))
+                  (%mark-used-labels operand))))))
+      (setf (aref vector index) thing)
+      (setf (section-buf-index section) (1+ index)))))
 
 #!-(or x86-64 x86)
 (defun %mark-used-labels (operand) ; default implementation
@@ -1279,20 +1281,18 @@
                          (string string-designator))
                      *backend-instruction-set-package*))))
 
-;;; Join all sections into one and return only the chain of buffers,
-;;; NOT an actual section.
+;;; Append all buffer chains of all sections, placing them in forward order.
 (defun combine-sections (sections)
-  (let ((first-section (cdar sections))
-        (more-sections (cdr sections)))
+  (let ((first (car sections)))
     ;; There shouldn't be much consing due to this REVAPPEND. We're not
     ;; reversing the contents of the buffers, just the buffer chain itself.
-    (revappend (let ((last-buffer-len (car first-section))
-                     (more-buffers (cddr first-section)))
+    (revappend (let ((last-buffer-len (section-buf-index first))
+                     (more-buffers (cddr first)))
                  (if (eql last-buffer-len 0)
                      more-buffers ; Exclude empty buffer
-                     (cons (subseq (cadr first-section) 0 last-buffer-len)
+                     (cons (subseq (section-last-buf first) 0 last-buffer-len)
                            more-buffers)))
-               (when more-sections (combine-sections more-sections)))))
+               (awhen (rest sections) (combine-sections it)))))
 
 ;;; Combine INPUTS into one assembly stream and assemble into SEGMENT
 (defun assemble-sections (segment &rest inputs)
@@ -1321,61 +1321,72 @@
       (dovector (operation buffer)
         (etypecase operation
           (cons
-           (let ((mnemonic (the symbol (car operation)))
-                 (operands (cdr operation)))
-             (if (char/= (char (symbol-name mnemonic) 0) #\.) ; not a pseudo-op
-                 (apply mnemonic operands segment operands)
-                 ;; potentially a pseudo-op
+           (let ((first (car operation)))
+             (when (sb!c::vop-p first)
+               (setq **current-vop** first)
+               (pop operation)))
+           (block op
+             (let ((mnemonic (the symbol (car operation)))
+                   (operands (cdr operation)))
+               (when (char= (char (symbol-name mnemonic) 0) #\.)
+                 ;; potentially a pseudo-op. Any mnemonic can start with a dot,
+                 ;; not just the ones handled here by the generic assembler.
                  (case mnemonic
                    (.align
                     (destructuring-bind (bits &optional (pattern 0)) operands
-                      (%emit-alignment segment **current-vop** bits pattern)))
+                      (%emit-alignment segment **current-vop** bits pattern))
+                    (return-from op))
                    (.byte ; takes >1 byte, unlike inst BYTE which takes only 1
-                    (dolist (byte operands)
+                    (dolist (byte operands (return-from op))
                       (emit-byte segment byte)))
                    (.skip
                     (destructuring-bind (n-bytes &optional (pattern 0)) operands
-                      (%emit-skip segment n-bytes pattern)))
+                      (%emit-skip segment n-bytes pattern))
+                    (return-from op))
                    (.begin-without-scheduling
                     (aver (not in-without-scheduling))
                     (setq in-without-scheduling t
                           was-scheduling (segment-run-scheduler segment))
                     (when was-scheduling
                       (schedule-pending-instructions segment)
-                      (setf (segment-run-scheduler segment) nil)))
+                      (setf (segment-run-scheduler segment) nil))
+                    (return-from op))
                    (.end-without-scheduling
                     (aver in-without-scheduling)
                     (setf (segment-run-scheduler segment) was-scheduling
                           in-without-scheduling nil
-                          was-scheduling nil))
-                   (.comment) ; ignore it
-                   (t
-                    ;; A strange instruction whose name starts with #\.
-                    ;; but which isn't recognized as a pseudo-op.
-                    (apply mnemonic operands segment operands))))))
+                          was-scheduling nil)
+                    (return-from op))
+                   (.comment ; ignore it
+                    (return-from op))))
+               (apply mnemonic operands segment operands))))
           (label (%emit-label segment **current-vop** operation))
           (function (%emit-postit segment operation)))))))
+
+(defun truncate-section-to-length (section)
+  (setf (section-last-buf section)
+        (subseq (section-last-buf section) 0 (section-buf-index section))))
 
 ;;; Tack SECOND on to the end of FIRST, and reset SECOND to be empty.
 ;;; Typically for appending the elsewhere section to the regular section.
 (defun join-sections (first second)
-  ;; Truncate the first sections' last buffer to its in-use length
-  (setf (section-last-buf first)
-        (subseq (section-last-buf first) 0 (section-last-buf-length first)))
+  ;; Truncate the first section's last buffer to its in-use length
+  (truncate-section-to-length first)
   ;; Extend FIRST's chain of buffers with those in SECOND
-  (setf (cddr first) (nconc (cddr second) (cddr first)))
+  (setf (section-buf-chain first) (nconc (section-buf-chain second)
+                                         (section-buf-chain first)))
   ;; Set the in-use length of the buffer that is now the final buffer
   ;; in FIRST's chain of buffers with the in-use length from SECOND.
-  (setf (section-last-buf-length first) (section-last-buf-length second))
+  (setf (section-buf-index first) (section-buf-index second))
   ;; Clear out SECOND
-  (setf (cddr second) (list #()) (section-last-buf-length second) 0))
+  (setf (section-buf-chain second) (list #())
+        (section-buf-index second) 0))
 
 ;;; Produce a unified vector of the section contents.
 ;;; Might be useful for something, but not at present.
 (defun section-contents (section)
-  (pop section)
-  (let* ((last-buffer-length (car section))
-         (chain (cdr section))
+  (let* ((last-buffer-length (section-buf-index section))
+         (chain (section-buf-chain section))
          (total-length (+ last-buffer-length
                           ;; all but the last must be completely full
                           (reduce #'+ (cdr chain) :key #'length)))
@@ -1429,7 +1440,10 @@
     (typecase dest
       (cons ; streaming in to the assembler
        (trace-inst dest mnemonic operands)
-       (emit dest `(,mnemonic . ,operands)))
+       (let ((v **current-vop**)
+             (inst `(,mnemonic . ,operands)))
+         (aver (typep v '(or null sb!c::vop)))
+         (emit dest (if v (cons v inst) inst))))
       (segment ; streaming out of the assembler
        ;; Pass operands to the machine instruction encoder as a list and as
        ;; spread arguments. The list alleviates the need for emitter to listify

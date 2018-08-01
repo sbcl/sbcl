@@ -132,7 +132,7 @@
                         :offset ,(reg-spec-offset reg))))
                    regs)
        ,@(decls)
-       (assemble (:code ',name)
+       (assemble (:code 'nil)
          ,@(expand-align-option (cadr (assoc :align options)))
          ,name
          (push (list ',name ,name 0) *entry-points*)

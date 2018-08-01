@@ -243,8 +243,7 @@
                    (funcall gen vop)))))))
 
     ;; Truncate the final assembly code buffer to length
-    (let ((data (cdr (asmstream-code-section asmstream))))
-      (setf (cadr data) (subseq (cadr data) 0 (car data))))
+    (sb!assem::truncate-section-to-length (asmstream-code-section asmstream))
 
     (coverage-mark-lowering-pass component asmstream)
 
@@ -348,15 +347,16 @@
 ;;; Translate .COVERAGE-MARK pseudo-op into machine assembly language,
 ;;; combining any number of consecutive operations with no intervening
 ;;; control flow into a single operation.
+;;; FIXME: this pass runs even if no coverage instrumentation was generated.
 (defun coverage-mark-lowering-pass (component asmstream)
   (declare (ignorable component asmstream))
   #!+(or x86-64 x86)
   (let ((label (gen-label))
         ;; vector of lists of original source paths covered
         (src-paths (make-array 10 :fill-pointer 0))
-        (previous-mark)
-        (section (asmstream-code-section asmstream)))
-    (dolist (buffer (reverse (cddr section)))
+        (previous-mark))
+    (dolist (buffer (reverse (sb!assem::section-buf-chain
+                              (asmstream-code-section asmstream))))
       (dotimes (i (length buffer))
         (let ((item (svref buffer i)))
           (typecase item
@@ -367,6 +367,9 @@
             (setq previous-mark nil))
            (t
             (let ((mnemonic (first item)))
+              (when (vop-p mnemonic)
+                (pop item)
+                (setq mnemonic (first item)))
               (cond ((branch-opcode-p mnemonic) ; control flow kills mark combining
                      (setq previous-mark nil))
                     ((eq mnemonic '.coverage-mark)
@@ -383,7 +386,7 @@
                               ;; turn this line into a (virtual) no-op
                               (rplaca item '.comment))))))))))))
     ;; Allocate space in the data section for coverage marks
-    (let ((mark-index(length src-paths)))
+    (let ((mark-index (length src-paths)))
       (when (plusp mark-index)
         (setf (label-usedp label) t)
         (let ((v (ir2-component-constants (component-info component))))
