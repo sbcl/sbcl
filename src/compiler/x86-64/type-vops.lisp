@@ -190,7 +190,7 @@
   (:temporary (:sc unsigned-reg :from (:argument 0)) tmp)
   (:info)
   (:conditional :z)
-  (:generator 5
+  (:generator 3
     (move tmp value)
     (inst shr tmp n-positive-fixnum-bits)))
 
@@ -202,7 +202,7 @@
   (:temporary (:sc unsigned-reg) temp)
   (:arg-types signed-num)
   (:translate fixnump)
-  (:generator 5
+  (:generator 3
     ;; Hackers Delight, p. 53: signed
     ;;    a <= x <= a + 2^n - 1
     ;; is equivalent to unsigned
@@ -219,7 +219,7 @@
   (:temporary (:sc unsigned-reg :from (:argument 0)) temp)
   (:arg-types signed-num)
   (:translate fixnump)
-  (:generator 5
+  (:generator 3
     (move temp value)
     ;; The overflow flag will be set if the reg's sign bit changes.
     (inst shl temp 1)))

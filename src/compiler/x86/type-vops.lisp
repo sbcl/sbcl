@@ -173,7 +173,7 @@
   (:conditional :be)
   (:arg-types unsigned-num)
   (:translate fixnump)
-  (:generator 5
+  (:generator 3
     ;; We could encode this with :Z and SHR, analogously to the signed-byte-32
     ;; case below -- as we do on x86-64 -- but that costs us an extra
     ;; register. Compromises...
@@ -186,7 +186,7 @@
   (:arg-types signed-num)
   (:translate fixnump)
   (:ignore temp)
-  (:generator 5
+  (:generator 3
     ;; Hackers Delight, p. 53: signed
     ;;    a <= x <= a + 2^n - 1
     ;; is equivalent to unsigned

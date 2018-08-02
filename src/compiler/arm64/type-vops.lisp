@@ -191,7 +191,7 @@
   (:arg-types unsigned-num)
   (:translate fixnump)
   (:conditional :eq)
-  (:generator 5
+  (:generator 3
     (inst tst value (ash (1- (ash 1 (- n-word-bits
                                    n-positive-fixnum-bits)))
                      n-positive-fixnum-bits))))
@@ -202,7 +202,7 @@
   (:info)
   (:arg-types signed-num)
   (:translate fixnump)
-  (:generator 5
+  (:generator 3
     (inst adds temp value value)))
 
 ;;; MOD type checks
