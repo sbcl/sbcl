@@ -13,43 +13,38 @@
 
 ;;;; type frobbing VOPs
 
+;;; For non-list pointer descriptors, return the header's widetag byte.
+;;; For lists and non-pointers, return the low 8 descriptor bits.
+;;; We need not return exactly list-pointer-lowtag for lists - the high 4 bits
+;;; are arbitrary. Similarly we don't care that fixnums return other than 0.
+;;; Provided that the result is the correct index to **built-in-class-codes**
+;;; everything works out fine.  All backends should follow this simpler model,
+;;; but might or might not opt to use the same technique of producing a native
+;;; pointer and doing one memory access for all 3 non-list pointer types.
 (define-vop (widetag-of)
   (:translate widetag-of)
   (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg)))
-  (:temporary (:sc unsigned-reg :offset rax-offset :target result
-                   :to (:result 0)) rax)
+  (:args (object :scs (any-reg descriptor-reg)))
+  (:temporary (:sc unsigned-reg :target result :to (:result 0)) temp)
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (inst movzx rax (reg-in-size object :byte))
-    (inst and al-tn lowtag-mask)
-    (inst cmp al-tn other-pointer-lowtag)
-    (inst jmp :e OTHER-PTR)
-    (inst cmp al-tn fun-pointer-lowtag)
-    (inst jmp :e FUNCTION-PTR)
-
-    ;; Pick off fixnums.
-    (inst test al-tn fixnum-tag-mask)
-    (inst jmp :e DONE)
-
-    ;; Pick off structures and list pointers.
-    (inst test al-tn 2)
-    (inst jmp :ne DONE)
-
-    ;; must be an other immediate
-    (inst movzx rax (reg-in-size object :byte))
+    (inst lea (reg-in-size temp :dword) (ea -3 object))
+    (inst test (reg-in-size temp :byte) 3)
+    (inst jmp :nz IMMEDIATE)
+    (inst and (reg-in-size temp :byte) lowtag-mask)
+    (inst cmp (reg-in-size temp :byte) (- list-pointer-lowtag 3))
+    (inst jmp :e IMMEDIATE)
+    ;; It's a function, instance, or other pointer.
+    (inst mov temp object)
+    ;; OBJECT is implicitly pinned, TEMP can GC-safely point to it
+    ;; with no lowtag.
+    (inst and temp (lognot lowtag-mask)) ; native pointer
+    (inst movzx (reg-in-size result :dword) (ea 0 temp nil nil :byte))
     (inst jmp DONE)
-
-    FUNCTION-PTR
-    (load-type rax object (- fun-pointer-lowtag))
-    (inst jmp DONE)
-
-    OTHER-PTR
-    (load-type rax object (- other-pointer-lowtag))
-
-    DONE
-    (move result rax)))
+    IMMEDIATE
+    (inst movzx (reg-in-size result :dword) (reg-in-size object :byte))
+    DONE))
 
 #!+compact-instance-header
 ;; ~20 instructions vs. 35

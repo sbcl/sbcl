@@ -1215,21 +1215,21 @@ between the ~A definition and the ~A definition"
   #-sb-xc-host (/show0 "about to set *BUILT-IN-CLASS-CODES*")
   (setq **built-in-class-codes**
         (let* ((initial-element (classoid-layout (find-classoid 'random-class)))
-               (res (make-array 256 :initial-element initial-element)))
-          (dolist (x *!built-in-classes* res)
+               (table (make-array 256 :initial-element initial-element)))
+          (dolist (x *!built-in-classes*)
             (destructuring-bind (name &key codes &allow-other-keys)
                                 x
               (let ((layout (classoid-layout (find-classoid name))))
                 (dolist (code codes)
-                  (setf (svref res code) layout)))))))
-  #!+immobile-space
-  (let ((table **built-in-class-codes**))
-    (loop with layout = (aref table sb!vm:list-pointer-lowtag)
-          for i from sb!vm:list-pointer-lowtag by 16 below 256
-          do (setf (aref table i) layout))
-    (loop with layout = (aref table sb!vm:even-fixnum-lowtag)
-          for i from sb!vm:even-fixnum-lowtag by (ash 1 sb!vm:n-fixnum-tag-bits) below 256
-          do (setf (aref table i) layout)))
-  #-sb-xc-host (/show0 "done setting *BUILT-IN-CLASS-CODES*"))
+                  (setf (svref table code) layout)))))
+          (loop with layout = (aref table sb!vm:list-pointer-lowtag)
+                for i from sb!vm:list-pointer-lowtag by (* 2 sb!vm:n-word-bytes)
+                below 256
+                do (setf (aref table i) layout))
+          (loop with layout = (aref table sb!vm:even-fixnum-lowtag)
+                for i from sb!vm:even-fixnum-lowtag by (ash 1 sb!vm:n-fixnum-tag-bits)
+                below 256
+                do (setf (aref table i) layout))
+          table)))
 
 (!defun-from-collected-cold-init-forms !classes-cold-init)

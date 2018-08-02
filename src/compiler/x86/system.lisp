@@ -16,39 +16,31 @@
 (define-vop (widetag-of)
   (:translate widetag-of)
   (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg)))
+  (:args (object :scs (any-reg descriptor-reg)))
   (:temporary (:sc unsigned-reg :offset eax-offset :to (:result 0)) eax)
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
     (inst mov eax object)
-    (inst and al-tn lowtag-mask)
-    (inst cmp al-tn other-pointer-lowtag)
-    (inst jmp :e other-ptr)
-    (inst cmp al-tn fun-pointer-lowtag)
-    (inst jmp :e function-ptr)
-
-    ;; Pick off structures and list pointers.
     (inst test al-tn 1)
-    (inst jmp :ne done)
-
-    ;; Pick off fixnums.
-    (inst and al-tn fixnum-tag-mask)
-    (inst jmp :e done)
-
-    ;; must be an other immediate
+    (inst jmp :z IMMEDIATE)
+    (inst and al-tn lowtag-mask)
+    (inst cmp al-tn list-pointer-lowtag)
+    (inst jmp :e IMMEDIATE)
+    ;; It's a function, instance, or other pointer.
     (inst mov eax object)
-    (inst jmp done)
+    ;; OBJECT is implicitly pinned, EAX can GC-safely point to it
+    ;; with no lowtag.
+    (inst and eax (lognot lowtag-mask)) ; native pointer
+    (inst movzx result (make-ea :byte :base eax))
+    (inst jmp DONE)
+    IMMEDIATE
+    ;; If OBJECT is in ESI or EDI we can't do a MOVZX byte-to-dword
+    ;; because there are no SIL,DIL registers. Use MOV + AND instead.
+    (move result object)
+    (inst and result #xFF)
+    DONE))
 
-    FUNCTION-PTR
-    (load-type al-tn object (- fun-pointer-lowtag))
-    (inst jmp done)
-
-    OTHER-PTR
-    (load-type al-tn object (- other-pointer-lowtag))
-
-    DONE
-    (inst movzx result al-tn)))
 
 (define-vop (%other-pointer-widetag)
   (:translate %other-pointer-widetag)
