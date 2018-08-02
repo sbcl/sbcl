@@ -348,24 +348,34 @@
 (defun source-transform-union-typep (object type)
   (let* ((types (union-type-types type))
          (type-cons (specifier-type 'cons))
+         (type-symbol (specifier-type 'symbol))
          (mtype (find-if #'member-type-p types))
          (members (when mtype (member-type-members mtype))))
-    (if (and mtype
-             (memq nil members)
-             (memq type-cons types))
-        `(or (listp ,object)
-             (typep ,object
-                    '(or ,@(mapcar #'type-specifier
-                            (remove type-cons
-                             (remove mtype types)))
-                      (member ,@(remove nil members)))))
-        (multiple-value-bind (widetags more-types)
-            (sb!kernel::widetags-from-union-type types)
-          `(or ,@(if widetags
-                     `((%other-pointer-subtype-p ,object ',widetags)))
-               ,@(mapcar (lambda (x)
-                           `(typep ,object ',(type-specifier x)))
-                         more-types))))))
+    (cond ((and mtype
+                (memq nil members)
+                (memq type-cons types))
+           `(or (listp ,object)
+                (typep ,object
+                       '(or ,@(mapcar #'type-specifier
+                               (remove type-cons
+                                (remove mtype types)))
+                         (member ,@(remove nil members))))))
+          ((and (memq type-cons types)
+                (memq type-symbol types))
+           `(or (listp ,object)
+                (non-null-symbol-p ,object)
+                (typep ,object
+                       '(or ,@(mapcar #'type-specifier
+                               (remove type-cons
+                                (remove type-symbol types)))))))
+          (t
+           (multiple-value-bind (widetags more-types)
+               (sb!kernel::widetags-from-union-type types)
+             `(or ,@(if widetags
+                        `((%other-pointer-subtype-p ,object ',widetags)))
+                  ,@(mapcar (lambda (x)
+                              `(typep ,object ',(type-specifier x)))
+                            more-types)))))))
 
 ;;; Do source transformation for TYPEP of a known intersection type.
 (defun source-transform-intersection-typep (object type)

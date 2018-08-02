@@ -68,8 +68,9 @@
            sb!vm::unbound-marker-p
            simple-fun-p
            closurep
-           funcallable-instance-p)
-  (t) boolean (movable foldable flushable))
+           funcallable-instance-p
+           non-null-symbol-p)
+    (t) boolean (movable foldable flushable))
 
 (defknown #.(loop for (name) in *vector-without-complex-typecode-infos*
                   collect name)

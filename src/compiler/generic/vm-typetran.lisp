@@ -119,3 +119,4 @@
 ;;; Unlike the un-%'ed versions, these are true type predicates,
 ;;; accepting any type object.
 (define-type-predicate %standard-char-p standard-char)
+(define-type-predicate non-null-symbol-p (and symbol (not null)))

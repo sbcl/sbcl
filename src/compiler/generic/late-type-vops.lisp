@@ -71,6 +71,8 @@
 
 (!define-type-vop listp (list-pointer-lowtag))
 
+(!define-type-vop non-null-symbol-p (symbol-widetag))
+
 (!define-type-vop %instancep (instance-pointer-lowtag))
 
 (!define-type-vop %other-pointer-p (other-pointer-lowtag))
