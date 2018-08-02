@@ -267,30 +267,29 @@
                  (rational 'rational)
                  (float (or (numeric-type-format type) 'float))
                  ((nil) 'real))))
-    (once-only ((n-object object))
-      (ecase (numeric-type-complexp type)
-        (:real
-         (cond #!+(or x86 x86-64 arm arm64) ;; Not implemented elsewhere yet
-               ((and
-                 (eql (numeric-type-class type) 'integer)
-                 (eql (numeric-type-low type) 0)
-                 (fixnump (numeric-type-high type)))
-                `(fixnum-mod-p ,n-object ,(numeric-type-high type)))
-               (t
-                `(and (typep ,n-object ',base)
-                      ,(transform-numeric-bound-test n-object type base)))))
-        (:complex
-         `(and (complexp ,n-object)
-               ,(once-only ((n-real `(realpart (truly-the complex ,n-object)))
-                            (n-imag `(imagpart (truly-the complex ,n-object))))
-                  `(progn
-                     ,n-imag ; ignorable
-                     (and (typep ,n-real ',base)
-                          ,@(when (eq class 'integer)
-                              `((typep ,n-imag ',base)))
-                          ,(transform-numeric-bound-test n-real type base)
-                          ,(transform-numeric-bound-test n-imag type
-                                                         base))))))))))
+    (ecase (numeric-type-complexp type)
+      (:real
+       (cond #!+(or x86 x86-64 arm arm64) ;; Not implemented elsewhere yet
+             ((and
+               (eql (numeric-type-class type) 'integer)
+               (eql (numeric-type-low type) 0)
+               (fixnump (numeric-type-high type)))
+              `(fixnum-mod-p ,object ,(numeric-type-high type)))
+             (t
+              `(and (typep ,object ',base)
+                    ,(transform-numeric-bound-test object type base)))))
+      (:complex
+       `(and (complexp ,object)
+             ,(once-only ((n-real `(realpart (truly-the complex ,object)))
+                          (n-imag `(imagpart (truly-the complex ,object))))
+                `(progn
+                   ,n-imag ; ignorable
+                   (and (typep ,n-real ',base)
+                        ,@(when (eq class 'integer)
+                            `((typep ,n-imag ',base)))
+                        ,(transform-numeric-bound-test n-real type base)
+                        ,(transform-numeric-bound-test n-imag type
+                                                       base)))))))))
 
 ;;; Do the source transformation for a test of a hairy type. AND,
 ;;; SATISFIES and NOT are converted into the obvious code. We convert
@@ -328,10 +327,9 @@
                           `(funcall (global-function ,name) ,object))
                      t nil)))
              ((not and)
-              (once-only ((n-obj object))
-                `(,(first spec) ,@(mapcar (lambda (x)
-                                            `(typep ,n-obj ',x))
-                                          (rest spec))))))))))
+              `(,(first spec) ,@(mapcar (lambda (x)
+                                          `(typep ,object ',x))
+                                        (rest spec)))))))))
 
 (defun source-transform-negation-typep (object type)
   (declare (type negation-type type))
@@ -352,30 +350,28 @@
          (type-cons (specifier-type 'cons))
          (mtype (find-if #'member-type-p types))
          (members (when mtype (member-type-members mtype))))
-    (once-only ((n-obj object))
-      (if (and mtype
-               (memq nil members)
-               (memq type-cons types))
-          `(or (listp ,n-obj)
-               (typep ,n-obj
-                      '(or ,@(mapcar #'type-specifier
-                                     (remove type-cons
-                                             (remove mtype types)))
-                        (member ,@(remove nil members)))))
-          (multiple-value-bind (widetags more-types)
-              (sb!kernel::widetags-from-union-type types)
-            `(or ,@(if widetags
-                       `((%other-pointer-subtype-p ,n-obj ',widetags)))
-                 ,@(mapcar (lambda (x)
-                             `(typep ,n-obj ',(type-specifier x)))
-                           more-types)))))))
+    (if (and mtype
+             (memq nil members)
+             (memq type-cons types))
+        `(or (listp ,object)
+             (typep ,object
+                    '(or ,@(mapcar #'type-specifier
+                            (remove type-cons
+                             (remove mtype types)))
+                      (member ,@(remove nil members)))))
+        (multiple-value-bind (widetags more-types)
+            (sb!kernel::widetags-from-union-type types)
+          `(or ,@(if widetags
+                     `((%other-pointer-subtype-p ,object ',widetags)))
+               ,@(mapcar (lambda (x)
+                           `(typep ,object ',(type-specifier x)))
+                         more-types))))))
 
 ;;; Do source transformation for TYPEP of a known intersection type.
 (defun source-transform-intersection-typep (object type)
-  (once-only ((n-obj object))
-    `(and ,@(mapcar (lambda (x)
-                      `(typep ,n-obj ',(type-specifier x)))
-                    (intersection-type-types type)))))
+  `(and ,@(mapcar (lambda (x)
+                    `(typep ,object ',(type-specifier x)))
+                  (intersection-type-types type))))
 
 ;;; If necessary recurse to check the cons type.
 (defun source-transform-cons-typep (object type)
@@ -409,23 +405,21 @@
                       ;; because NIL is not a keyword.
                       (equal (hairy-type-specifier ctype)
                              '(satisfies keywordp))))))
-          (let* ((n-obj (sb!xc:gensym))
-                 (car-test
+          (let ((car-test
                   (and car-test-p
-                       `((typep (car ,n-obj) ',(type-specifier car-type)))))
-                 (cdr-test
+                       `((typep (car ,object) ',(type-specifier car-type)))))
+                (cdr-test
                   (and cdr-test-p
-                       `((typep (cdr ,n-obj) ',(type-specifier cdr-type))))))
-            `(let ((,n-obj ,object))
-               ;; Being paranoid, perform the safely weakenable test first
-               ;; so that the other part doesn't execute on an object that
-               ;; it would not have gotten, were the CONSP test not weakened.
-               ,(cond ((and car-test-p (safely-weakened car-type))
-                       `(and (listp ,n-obj) ,@car-test ,@cdr-test))
-                      ((and cdr-test-p (safely-weakened cdr-type))
-                       `(and (listp ,n-obj) ,@cdr-test ,@car-test))
-                      (t
-                       `(and (consp ,n-obj) ,@car-test ,@cdr-test)))))))))
+                       `((typep (cdr ,object) ',(type-specifier cdr-type))))))
+            ;; Being paranoid, perform the safely weakenable test first
+            ;; so that the other part doesn't execute on an object that
+            ;; it would not have gotten, were the CONSP test not weakened.
+            (cond ((and car-test-p (safely-weakened car-type))
+                   `(and (listp ,object) ,@car-test ,@cdr-test))
+                  ((and cdr-test-p (safely-weakened cdr-type))
+                   `(and (listp ,object) ,@cdr-test ,@car-test))
+                  (t
+                   `(and (consp ,object) ,@car-test ,@cdr-test))))))))
 
 (defun source-transform-character-set-typep (object type)
   (let ((pairs (character-set-type-pairs type)))
@@ -437,28 +431,26 @@
                 `(base-char-p ,object))
                ((= (cdar pairs) (1- sb!xc:char-code-limit))
                 `(characterp ,object))))
-        (once-only ((n-obj object))
-          (let ((n-code (gensym "CODE")))
-            `(and (characterp ,n-obj)
-                  (let ((,n-code (sb!xc:char-code ,n-obj)))
-                    (or
-                     ,@(loop for pair in pairs
-                             collect
-                             `(<= ,(car pair) ,n-code ,(cdr pair)))))))))))
+        (let ((n-code (gensym "CODE")))
+          `(and (characterp ,object)
+                (let ((,n-code (sb!xc:char-code ,object)))
+                  (or
+                   ,@(loop for pair in pairs
+                           collect
+                           `(<= ,(car pair) ,n-code ,(cdr pair))))))))))
 
 #!+sb-simd-pack
 (defun source-transform-simd-pack-typep (object type)
   (if (type= type (specifier-type 'simd-pack))
       `(simd-pack-p ,object)
-      (once-only ((n-obj object))
-        (let ((n-tag (gensym "TAG")))
-          `(and
-            (simd-pack-p ,n-obj)
-            (let ((,n-tag (%simd-pack-tag ,n-obj)))
-              (or ,@(loop
-                      for type in (simd-pack-type-element-type type)
-                      for index = (position type *simd-pack-element-types*)
-                      collect `(eql ,n-tag ,index)))))))))
+      (let ((n-tag (gensym "TAG")))
+        `(and
+          (simd-pack-p ,object)
+          (let ((,n-tag (%simd-pack-tag ,object)))
+            (or ,@(loop
+                    for type in (simd-pack-type-element-type type)
+                    for index = (position type *simd-pack-element-types*)
+                    collect `(eql ,n-tag ,index))))))))
 
 ;;; Return the predicate and type from the most specific entry in
 ;;; *TYPE-PREDICATES* that is a supertype of TYPE.
@@ -552,7 +544,7 @@
 ;;; If we can find a type predicate that tests for the type without
 ;;; dimensions, then use that predicate and test for dimensions.
 ;;; Otherwise, just do %TYPEP.
-(defun source-transform-array-typep (obj type)
+(defun source-transform-array-typep (object type)
   ;; Intercept (SIMPLE-ARRAY * (*)) because otherwise it tests
   ;; (AND SIMPLE-ARRAY (NOT ARRAY-HEADER)) to weed out rank 0 and >1.
   ;; By design the simple arrays of of rank 1 occupy a contiguous
@@ -563,7 +555,7 @@
     (if (and (not (array-type-complexp type))
              (eq et *wild-type*)
              (equal dims '(*)))
-        `(simple-rank-1-array-*-p ,obj)
+        `(simple-rank-1-array-*-p ,object)
         (multiple-value-bind (pred stype) (find-supertype-predicate type)
           (if (and (array-type-p stype)
                    ;; (If the element type hasn't been defined yet, it's
@@ -583,29 +575,28 @@
                       (and (null (array-type-complexp stype))
                            (listp dims)
                            (cdr dims))))
-                (once-only ((n-obj obj))
-                  (if complex-tag
-                      `(and (eq (%other-pointer-widetag ,n-obj) ,complex-tag)
-                            ,@(unless (eq (car dims) '*)
-                                `((= (%array-dimension ,n-obj 0) ,(car dims)))))
-                      (multiple-value-bind (tests headerp)
-                          (test-array-dimensions n-obj type stype
-                                                 simple-array-header-p)
-                        `(and ,@(unless (or (and headerp (eql pred 'arrayp))
-                                            simple-array-header-p)
-                                  ;; ARRAY-HEADER-P from TESTS will test for that
-                                  `((,pred ,n-obj)))
-                              ,@(when (and (eql (array-type-complexp stype) :maybe)
-                                           (eql (array-type-complexp type) t))
-                                  ;; KLUDGE: this is a bit lame; if we get here,
-                                  ;; we already know that N-OBJ is an array, but
-                                  ;; (NOT SIMPLE-ARRAY) doesn't know that.  On the
-                                  ;; other hand, this should get compiled down to
-                                  ;; two widetag tests, so it's only a bit lame.
-                                  `((typep ,n-obj '(not simple-array))))
-                              ,@tests
-                              ,@(test-array-element-type n-obj type stype headerp))))))
-              `(%typep ,obj ',(type-specifier type)))))))
+                (if complex-tag
+                    `(and (eq (%other-pointer-widetag ,object) ,complex-tag)
+                          ,@(unless (eq (car dims) '*)
+                              `((= (%array-dimension ,object 0) ,(car dims)))))
+                    (multiple-value-bind (tests headerp)
+                        (test-array-dimensions object type stype
+                                               simple-array-header-p)
+                      `(and ,@(unless (or (and headerp (eql pred 'arrayp))
+                                          simple-array-header-p)
+                                ;; ARRAY-HEADER-P from TESTS will test for that
+                                `((,pred ,object)))
+                            ,@(when (and (eql (array-type-complexp stype) :maybe)
+                                         (eql (array-type-complexp type) t))
+                                ;; KLUDGE: this is a bit lame; if we get here,
+                                ;; we already know that OBJECT is an array, but
+                                ;; (NOT SIMPLE-ARRAY) doesn't know that.  On the
+                                ;; other hand, this should get compiled down to
+                                ;; two widetag tests, so it's only a bit lame.
+                                `((typep ,object '(not simple-array))))
+                            ,@tests
+                            ,@(test-array-element-type object type stype headerp)))))
+              `(%typep ,object ',(type-specifier type)))))))
 
 ;;; Transform a type test against some instance type. The type test is
 ;;; flushed if the result is known at compile time. If not properly

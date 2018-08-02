@@ -929,11 +929,9 @@
   ;; Ensure we don't pessimize rank 1 specialized array.
   ;; (SIMPLE unboxed vector is done differently)
   (let* ((hair (sb-kernel:specifier-type '(sb-kernel:unboxed-array 1)))
-         (xform (sb-c::source-transform-union-typep 'myobj hair))
-         (g (caar (cadr xform)))) ; (LET ((#:g MYOBJ)) ...)
+         (xform (sb-c::source-transform-union-typep 'myobj hair)))
     (assert (equal xform
-                   `(let ((,g myobj))
-                      (or (typep ,g '(and vector (not (array t)))))))))
+                   '(or (typep myobj '(and vector (not (array t))))))))
 
   ;; Exclude one subtype at a time and make sure they all work.
   (dotimes (i (length sb-vm:*specialized-array-element-type-properties*))
@@ -946,13 +944,11 @@
                   unless (eql i j)
                   collect `(array ,(sb-vm:saetp-specifier x))))
            (xform
-            (sb-c::source-transform-union-typep 'myobj
-             (sb-kernel:specifier-type `(or ,@(shuffle hair) fixnum))))
-           (g (caar (cadr xform)))) ; (LET ((#:g MYOBJ)) ...)
+             (sb-c::source-transform-union-typep 'myobj
+             (sb-kernel:specifier-type `(or ,@(shuffle hair) fixnum)))))
       (assert (equal xform
-                     `(let ((,g myobj))
-                        (or (typep ,g '(and array (not (array ,excluded-type))))
-                            (typep ,g 'fixnum))))))))
+                     `(or (typep myobj '(and array (not (array ,excluded-type))))
+                          (typep myobj 'fixnum)))))))
 
 (with-test (:name :interned-type-specifiers)
   ;; In general specifiers can repeatedly parse the same due to
