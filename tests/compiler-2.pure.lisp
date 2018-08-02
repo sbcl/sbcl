@@ -1524,3 +1524,12 @@
          (declare (type (string 1) s))
          (the (or simple-array (member 1/2 "ba" 0 #\3)) s))
     ((#1="a") #1#)))
+
+(with-test (:name :primitive-type-function)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x)
+         (funcall (the (and atom (not null)) x))
+         )
+    ((#'list) nil)
+    (('list) nil)))
