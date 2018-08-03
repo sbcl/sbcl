@@ -336,15 +336,48 @@
   (let ((spec (type-specifier (negation-type-type type))))
     `(not (typep ,object ',spec))))
 
+;;; Test lengths of equally specialized simple arrays once
+(defun group-vector-type-length-tests (object types)
+  (let (groups
+        any-grouped)
+    (loop for type in types
+          do
+          (if (and (array-type-p type)
+                   (not (array-type-complexp type))
+                   (typep (array-type-dimensions type) '(cons integer null))
+                   (or (eq (array-type-element-type type) *wild-type*)
+                       (neq (array-type-specialized-element-type type) *wild-type*)))
+              (push type
+                    (getf groups
+                          (array-type-specialized-element-type type)))
+              (push type (getf groups :other))))
+    (loop for (el-type types) on groups by #'cddr
+          do
+          (cond ((eq el-type :other))
+                ((> (length types) 1)
+                 (setf any-grouped t))
+                (t
+                 (push (car types)
+                       (getf groups :other)))))
+    (when any-grouped
+      (let ((other (getf groups :other)))
+        `(or
+          ,@(loop for (el-type types) on groups by #'cddr
+                  when (and (neq el-type :other)
+                            (> (length types) 1))
+                  collect `(and (typep ,object
+                                       '(simple-array ,(type-specifier el-type) (*)))
+                                (typep (vector-length
+                                        (truly-the (simple-array * (*)) ,object))
+                                       '(member ,@(loop for type in types
+                                                        collect (car (array-type-dimensions type)))))))
+          ,@(and
+             other
+             `((typep ,object '(or ,@(mapcar #'type-specifier other))))))))))
+
 ;;; Do source transformation for TYPEP of a known union type. If a
 ;;; union type contains LIST, then we pull that out and make it into a
-;;; single LISTP call.  Note that if SYMBOL is in the union, then LIST
-;;; will be a subtype even without there being any (member NIL).  We
-;;; currently just drop through to the general code in this case,
-;;; rather than trying to optimize it (but FIXME CSR 2004-04-05: it
-;;; wouldn't be hard to optimize it after all).
-;;; FIXME: if the CONSP|NIL -> LISTP optimization kicks in,
-;;;        we forgo the array optimizations.
+;;; single LISTP call.
 (defun source-transform-union-typep (object type)
   (let* ((types (union-type-types type))
          (type-cons (specifier-type 'cons))
@@ -368,14 +401,17 @@
                        '(or ,@(mapcar #'type-specifier
                                (remove type-cons
                                 (remove type-symbol types)))))))
+          ((group-vector-type-length-tests object types))
           (t
            (multiple-value-bind (widetags more-types)
                (sb!kernel::widetags-from-union-type types)
-             `(or ,@(if widetags
-                        `((%other-pointer-subtype-p ,object ',widetags)))
-                  ,@(mapcar (lambda (x)
-                              `(typep ,object ',(type-specifier x)))
-                            more-types)))))))
+             (if widetags
+                 `(or (%other-pointer-subtype-p ,object ',widetags)
+                      (typep ,object '(or ,@(mapcar #'type-specifier more-types))))
+                 `(or
+                   ,@(mapcar (lambda (x)
+                               `(typep ,object ',(type-specifier x)))
+                             more-types))))))))
 
 ;;; Do source transformation for TYPEP of a known intersection type.
 (defun source-transform-intersection-typep (object type)
