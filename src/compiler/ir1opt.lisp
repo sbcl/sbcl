@@ -1880,10 +1880,20 @@
              (dest (lvar-dest lvar))
              (dest-lvar (when (valued-node-p dest) (node-lvar dest))))
     (when (and
-           ;; Think about (LET ((A ...)) (IF ... A ...)): two
-           ;; LVAR-USEs should not be met on one path. Another problem
-           ;; is with dynamic-extent.
-           (eq (lvar-uses lvar) ref)
+           ;; Consider
+           ;; (let ((x (the integer x))
+           ;;       (y (the integer y)))
+           ;;   (print (if c x y)))
+           ;; If both substituted X and Y will write to the same LVAR
+           ;; before C is checked.
+           (or (eq (lvar-uses lvar) ref)
+               ;; Handle a trivial exception when the REF is executed
+               ;; at the very beginning, this helps with optimizing
+               ;; nested IFs.
+               (let* ((next-ctran (node-next (lambda-bind (lambda-var-home var))))
+                      (next-node (and next-ctran
+                                      (ctran-next next-ctran))))
+                 (eq next-node ref)))
            (not (block-delete-p (node-block ref)))
            ;; If the destinatation is dynamic extent, don't substitute unless
            ;; the source is as well.
