@@ -336,7 +336,8 @@
   (let ((spec (type-specifier (negation-type-type type))))
     `(not (typep ,object ',spec))))
 
-;;; Test lengths of equally specialized simple arrays once
+;;; Check the type of a group of equally specialized but of
+;;; different length simple arrays once
 (defun group-vector-type-length-tests (object types)
   (let (groups
         any-grouped)
@@ -375,6 +376,68 @@
              other
              `((typep ,object '(or ,@(mapcar #'type-specifier other))))))))))
 
+;;; Test the length of multiple arrays types once
+(defun group-vector-length-type-tests (object types)
+  (let (groups
+        any-grouped)
+    (loop for type in types
+          do
+          (if (and (array-type-p type)
+                   (typep (array-type-dimensions type) '(cons integer null)))
+              (push type (getf groups (car (array-type-dimensions type))))
+              (push type (getf groups :other))))
+    (loop for (length types) on groups by #'cddr
+          do
+          (cond ((eq length :other))
+                ((> (length types) 1)
+                 (setf any-grouped t))
+                (t
+                 (push (car types)
+                       (getf groups :other)))))
+    (when any-grouped
+      (let ((other (getf groups :other)))
+        `(or
+          ,@(loop for (length types) on groups by #'cddr
+                  for any-complex = nil
+                  for any-simple = nil
+                  when (and (neq length :other)
+                            (> (length types) 1))
+                  collect `(and (typep ,object
+                                       '(or
+                                         ,@(loop for type in types
+                                                 for complex = (array-type-complexp type)
+                                                 do (cond (complex
+                                                           (setf any-complex t)
+                                                           (when (eq complex :maybe)
+                                                             (setf any-simple t)))
+                                                          (t
+                                                           (setf any-simple t)))
+
+                                                 collect
+                                                 (type-specifier
+                                                  (make-array-type '(*)
+                                                                   :complexp complex
+                                                                   :element-type
+                                                                   (array-type-element-type type)
+                                                                   :specialized-element-type
+                                                                   (array-type-specialized-element-type type))))))
+                                ,(cond
+                                   ((not any-complex)
+                                    `(= (vector-length (truly-the (simple-array * (*)) ,object))
+                                        ,length))
+                                   ((not any-simple)
+                                    `(= (%array-dimension (truly-the vector ,object) 0)
+                                        ,length))
+                                   (t
+                                    `(if (array-header-p ,object)
+                                         (= (%array-dimension (truly-the vector ,object) 0)
+                                            ,length)
+                                         (= (vector-length (truly-the vector ,object))
+                                            ,length))))))
+          ,@(and
+             other
+             `((typep ,object '(or ,@(mapcar #'type-specifier other))))))))))
+
 ;;; Do source transformation for TYPEP of a known union type. If a
 ;;; union type contains LIST, then we pull that out and make it into a
 ;;; single LISTP call.
@@ -402,6 +465,7 @@
                                (remove type-cons
                                 (remove type-symbol types)))))))
           ((group-vector-type-length-tests object types))
+          ((group-vector-length-type-tests object types))
           (t
            (multiple-value-bind (widetags more-types)
                (sb!kernel::widetags-from-union-type types)
