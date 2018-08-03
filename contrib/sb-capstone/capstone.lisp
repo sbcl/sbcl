@@ -242,11 +242,11 @@
 
 (defconstant cs-opt-off 0)
 (defconstant cs-opt-on 1)
-(defconstant cs-opt-syntax-default 2)
-(defconstant cs-opt-syntax-intel 3)
-(defconstant cs-opt-syntax-att 4)
-(defconstant cs-opt-syntax-noregname 5)
-(defconstant cs-opt-syntax-masm 6)
+(defconstant cs-opt-syntax-default 0)
+(defconstant cs-opt-syntax-intel 1)
+(defconstant cs-opt-syntax-att 2)
+(defconstant cs-opt-syntax-noregname 3)
+(defconstant cs-opt-syntax-masm 4)
 
 (defconstant cs-op-invalid 0)
 (defconstant cs-op-reg 1)
