@@ -359,3 +359,11 @@
   (checked-compile
    '(lambda (a)
      (search '(0 1 0 2) a :start1 4 :end1 5))))
+
+(with-test (:name :bound-mismatch-union-types)
+  (assert (nth-value 1
+                     (checked-compile
+                      '(lambda (x)
+                        (declare ((or (simple-string 10) (simple-string 15)) x))
+                        (aref x 100))
+                      :allow-warnings t))))

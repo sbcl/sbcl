@@ -1303,15 +1303,6 @@
         dim
         (give-up-ir1-transform))))
 
-;;; If the length has been declared and it's simple, just return it.
-(deftransform length ((vector)
-                      ((simple-array * (*))))
-  (let* ((type (lvar-type vector))
-         (dims (array-type-dimensions-or-give-up type)))
-    (unless (and (listp dims) (integerp (car dims)))
-      (give-up-ir1-transform
-       "Vector length is unknown, must call LENGTH at runtime."))))
-
 ;;; All vectors can get their length by using VECTOR-LENGTH. If it's
 ;;; simple, it will extract the length slot from the vector. It it's
 ;;; complex, it will extract the fill pointer slot from the array
@@ -1329,6 +1320,25 @@
     (when (conservative-array-type-complexp vtype)
       (give-up-ir1-transform))
     dim))
+
+(defoptimizer (vector-length derive-type) ((vector))
+  (let ((array-type (lvar-conservative-type vector))
+        min-length
+        max-length)
+    (when (union-type-p array-type)
+      (when (loop for type in (union-type-types array-type)
+                  always (and (array-type-p type)
+                              (typep (array-type-dimensions type)
+                                     '(cons integer null)))
+                  do (let ((length (car (array-type-dimensions type))))
+                       (when (or (not min-length)
+                                 (< length min-length))
+                         (setf min-length length))
+                       (when (or (not max-length)
+                                 (> length max-length))
+                         (setf max-length length))))
+        (specifier-type `(integer ,min-length
+                                  ,max-length))))))
 
 ;;; Again, if we can tell the results from the type, just use it.
 ;;; Otherwise, if we know the rank, convert into a computation based
