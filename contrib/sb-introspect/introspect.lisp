@@ -329,20 +329,19 @@ If an unsupported TYPE is requested, the function will return NIL.
               (find-definition-source package)))))
        ;; TRANSFORM and OPTIMIZER handling from swank-sbcl
        ((:transform)
-        (when (symbolp name)
-          (let ((fun-info (sb-int:info :function :info name)))
-            (when fun-info
-              (loop for xform in (sb-c::fun-info-transforms fun-info)
-                    for source = (find-definition-source
-                                  (sb-c::transform-function xform))
-                    for typespec = (type-specifier
-                                    (sb-c::transform-type xform))
-                    for note = (sb-c::transform-note xform)
-                    do (setf (definition-source-description source)
-                             (if (consp typespec)
-                                 (list (second typespec) note)
-                                 (list note)))
-                    collect source)))))
+        (let ((fun-info (sb-int:info :function :info name)))
+          (when fun-info
+            (loop for xform in (sb-c::fun-info-transforms fun-info)
+                  for source = (find-definition-source
+                                (sb-c::transform-function xform))
+                  for typespec = (type-specifier
+                                  (sb-c::transform-type xform))
+                  for note = (sb-c::transform-note xform)
+                  do (setf (definition-source-description source)
+                           (if (consp typespec)
+                               (list (second typespec) note)
+                               (list note)))
+                  collect source))))
        ((:optimizer)
         (let ((fun-info (and (symbolp name)
                              (sb-int:info :function :info name))))
