@@ -462,13 +462,14 @@
                        (change-tn-ref-tn op temp)
                        (cond
                          ((not write-p)
-                          (emit-move (or (maybe-move-from-fixnum+-1 op-tn temp)
+                          (emit-move (or (maybe-move-from-fixnum+-1 op-tn temp
+                                                                    op)
                                          res)
                                      op-tn temp))
                          ((and (null (tn-reads op-tn))
                                (eq (tn-kind op-tn) :normal)))
                          (t
-                          (emit-move (or (maybe-move-from-fixnum+-1 temp op-tn op-tn)
+                          (emit-move (or (maybe-move-from-fixnum+-1 temp op-tn op)
                                          res)
                                      temp op-tn))))
                      t)))))
@@ -580,27 +581,11 @@
                                 after)))))
   (values))
 
-(defun tn-type (tn)
-  (do ((type *empty-type*)
-       (ref (tn-writes tn) (tn-ref-next ref)))
-      ((null ref) type)
-    (let* ((tn (tn-ref-tn ref))
-           (node (vop-node (tn-ref-vop (tn-writes tn))))
-           (lvar (and (valued-node-p node)
-                      (node-lvar node)))
-           (locs (and lvar
-                      (ir2-lvar-locs (lvar-info lvar)))))
-      (if (and (null (cdr locs))
-               (eq (car locs) tn))
-          (setf type (type-union type
-                                 (lvar-type lvar)))
-          (return *empty-type*)))))
-
-(defun maybe-move-from-fixnum+-1 (x y &optional (original-x x))
+(defun maybe-move-from-fixnum+-1 (x y &optional x-tn-ref)
   (when (and (sc-is y sb!vm::descriptor-reg)
              (sc-is x sb!vm::signed-reg sb!vm::unsigned-reg))
-    (let ((type (tn-type original-x)))
-      (cond ((eq type *empty-type*)
+    (let ((type (tn-ref-type x-tn-ref)))
+      (cond ((not type)
              nil)
             ((csubtypep type
                         (specifier-type `(integer ,sb!xc:most-negative-fixnum
@@ -637,7 +622,9 @@
                   (delete-vop vop))
                  ((eq res info))
                  (res
-                  (let ((res (or (maybe-move-from-fixnum+-1 x y)
+
+                  (let ((res (or (maybe-move-from-fixnum+-1 x y
+                                                            args)
                                  res)))
                     (when (>= (vop-info-cost res)
                               *efficiency-note-cost-threshold*)

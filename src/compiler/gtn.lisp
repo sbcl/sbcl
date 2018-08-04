@@ -56,20 +56,21 @@
                                         (policy node (zerop debug))
                                         (policy node (= speed 3))))))
         (cond
-         ((and (lambda-var-indirect var)
-               (not (lambda-var-explicit-value-cell var)))
-          ;; Force closed-over indirect LAMBDA-VARs without explicit
-          ;; VALUE-CELLs to the stack, and make sure that they are
-          ;; live over the dynamic contour of the physenv.
-          (setf (tn-sc res) (if ptype-info
-                                (second ptype-info)
-                                (sc-or-lose 'sb!vm::control-stack)))
-          (physenv-live-tn res (lambda-physenv fun)))
+          ((and (lambda-var-indirect var)
+                (not (lambda-var-explicit-value-cell var)))
+           ;; Force closed-over indirect LAMBDA-VARs without explicit
+           ;; VALUE-CELLs to the stack, and make sure that they are
+           ;; live over the dynamic contour of the physenv.
+           (setf (tn-sc res) (if ptype-info
+                                 (second ptype-info)
+                                 (sc-or-lose 'sb!vm::control-stack)))
+           (physenv-live-tn res (lambda-physenv fun)))
 
-         (debug-variable-p
-          (physenv-debug-live-tn res (lambda-physenv fun))))
+          (debug-variable-p
+           (physenv-debug-live-tn res (lambda-physenv fun))))
 
         (setf (tn-leaf res) var)
+        (setf (tn-type res) (leaf-type var))
         (setf (leaf-info var) res))))
   (values))
 
@@ -179,10 +180,12 @@
       (if (or (eq count :unknown) use-standard)
           (make-return-info :kind :unknown
                             :count count
-                            :types ptypes)
+                            :primitive-types ptypes
+                            :types types)
           (make-return-info :kind :fixed
                             :count count
-                            :types ptypes
+                            :primitive-types ptypes
+                            :types types
                             :locations (mapcar #'make-normal-tn ptypes))))))
 
 ;;; If TAIL-SET doesn't have any INFO, then make a RETURN-INFO for it.

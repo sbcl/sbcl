@@ -463,7 +463,8 @@
   (count (missing-arg) :type (or index (member :unknown)))
   ;; If count isn't :UNKNOWN, then this is a list of the
   ;; primitive-types of each value.
-  (types () :type list)
+  (primitive-types () :type list)
+  (types nil :type list)
   ;; If kind is :FIXED, then this is the list of the TNs that we
   ;; return the values in.
   (locations () :type list))
@@ -554,7 +555,9 @@
   ;; vice-versa.
   (target nil :type (or null tn-ref))
   ;; the load TN allocated for this operand, if any
-  (load-tn nil :type (or tn null)))
+  (load-tn nil :type (or tn null))
+  ;; The type of the LVAR the TN of this TN-REF is used for.
+  (type nil :type (or ctype null)))
 
 ;;; A TEMPLATE object represents a particular IR2 coding strategy for
 ;;; a known function.
@@ -991,6 +994,12 @@
   ;; the primitive-type for this TN's value. Null in restricted or
   ;; wired TNs.
   (primitive-type nil :type (or primitive-type null))
+  ;; The type of the LVAR this TN is used for.
+  ;; Meaningless after copy-propagate or other optimizations are performed
+  ;; and TN-REF-TYPE should be used instead.
+  ;; The only purpose of this slot is for REFERENCE-TN to populate
+  ;; TN-REF-TYPE.
+  (type nil :type (or ctype null))
   ;; If this TN represents a variable or constant, then this is the
   ;; corresponding LEAF.
   (leaf nil :type (or leaf null))

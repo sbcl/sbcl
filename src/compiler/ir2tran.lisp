@@ -19,6 +19,8 @@
   (declare (type node node) (type ir2-block block) (type tn x y))
   (aver (neq (tn-kind x) :unused))
   (aver (neq (tn-kind y) :unused))
+  (unless (tn-type y)
+    (setf (tn-type y) (tn-type x)))
   (unless (eq x y)
     (vop move node block x y))
   (values))
@@ -1475,7 +1477,7 @@
      ((and (eq (return-info-kind returns) :fixed)
            (not (xep-p fun)))
       (let ((locs (lvar-tns node block lvar
-                                    (return-info-types returns))))
+                                    (return-info-primitive-types returns))))
         (vop* known-return node block
               (old-fp return-pc (reference-tn-list locs nil))
               (nil)

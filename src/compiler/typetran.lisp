@@ -429,7 +429,7 @@
                                     `(= (%array-dimension (truly-the vector ,object) 0)
                                         ,length))
                                    (t
-                                    `(if (array-header-p ,object)
+                                    `(if (array-header-p (truly-the vector ,object))
                                          (= (%array-dimension (truly-the vector ,object) 0)
                                             ,length)
                                          (= (vector-length (truly-the vector ,object))

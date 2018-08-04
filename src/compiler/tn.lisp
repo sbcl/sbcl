@@ -297,9 +297,11 @@
   (declare (type tn tn) (type boolean write-p))
   (let ((res (make-tn-ref tn write-p)))
     (unless (eql (tn-kind tn) :unused)
+      (setf (tn-ref-type res)
+            (tn-type tn))
       (if write-p
-         (push-in tn-ref-next res (tn-writes tn))
-         (push-in tn-ref-next res (tn-reads tn))))
+          (push-in tn-ref-next res (tn-writes tn))
+          (push-in tn-ref-next res (tn-reads tn))))
     res))
 
 ;;; Make TN-REFS to reference each TN in TNs, linked together by

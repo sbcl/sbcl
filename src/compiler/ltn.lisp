@@ -125,6 +125,7 @@
      ((lvar-delayed-leaf lvar)
       (setf (ir2-lvar-kind info) :delayed))
      (t (let ((tn (make-normal-tn (ir2-lvar-primitive-type info))))
+          (setf (tn-type tn) (lvar-type lvar))
           (setf (ir2-lvar-locs info) (list tn))
           (when (lvar-dynamic-extent lvar)
             (setf (ir2-lvar-stack-pointer info)
@@ -246,7 +247,7 @@
 
 ;;; Annotate LVAR for a fixed, but arbitrary number of values, of the
 ;;; specified primitive TYPES.
-(defun annotate-fixed-values-lvar (lvar types)
+(defun annotate-fixed-values-lvar (lvar types &optional lvar-types)
   (declare (type lvar lvar) (list types))
   (let ((info (make-ir2-lvar nil)))
     (setf (ir2-lvar-locs info)
@@ -254,6 +255,10 @@
                 collect (if type
                             (make-normal-tn type)
                             (make-unused-tn))))
+    (when lvar-types
+      (loop for type in lvar-types
+            for tn in (ir2-lvar-locs info)
+            do (setf (tn-type tn) type)))
     (setf (lvar-info lvar) info)
     (when (lvar-dynamic-extent lvar)
       (aver (proper-list-of-length-p types 1))
@@ -288,7 +293,7 @@
   (let* ((lvar (return-result node))
          (fun (return-lambda node))
          (returns (tail-set-info (lambda-tail-set fun)))
-         (types (return-info-types returns)))
+         (types (return-info-primitive-types returns)))
     (if (eq (return-info-count returns) :unknown)
         (collect ((res *empty-type* values-type-union))
           (do-uses (use (return-result node))
@@ -305,8 +310,10 @@
               (if (eq kind :unknown)
                   (annotate-unknown-values-lvar lvar)
                   (annotate-fixed-values-lvar
-                   lvar (mapcar #'primitive-type types))))))
-        (annotate-fixed-values-lvar lvar types)))
+                   lvar (mapcar #'primitive-type types)
+                   types)))))
+        (annotate-fixed-values-lvar lvar types
+                                    (return-info-types returns))))
 
   (values))
 
@@ -897,10 +904,11 @@
               (ctype (lvar-derived-type value)))
          (multiple-value-bind (types rest)
              (values-type-types ctype (specifier-type 'null))
-           (annotate-fixed-values-lvar
-            value
-            (mapcar #'primitive-type
-                    (adjust-list types count rest))))))))
+           (let ((types (adjust-list types count rest)))
+             (annotate-fixed-values-lvar
+              value
+              (mapcar #'primitive-type types)
+              types)))))))
   (values))
 
 
