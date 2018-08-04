@@ -610,6 +610,7 @@
           (if (and (consp type) (eq (car type) ':constant))
               (info-args (lvar-value arg))
               (let ((ref (reference-tn (lvar-tn node block arg) nil)))
+                (setf (tn-ref-type ref) (lvar-type arg))
                 (if last
                     (setf (tn-ref-across last) ref)
                     (setf first ref))
