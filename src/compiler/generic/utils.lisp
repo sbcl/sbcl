@@ -164,3 +164,15 @@
   (:translate sb!kernel::gc-safepoint)
   (:generator 0
     (emit-safepoint)))
+
+(defun other-pointer-tn-ref-p (tn-ref)
+  (and (sc-is (tn-ref-tn tn-ref) descriptor-reg)
+       (tn-ref-type tn-ref)
+       (not (types-equal-or-intersect
+             (tn-ref-type tn-ref)
+             (specifier-type '(or fixnum
+                               #!+64-bit single-float
+                               function
+                               list
+                               instance
+                               character))))))

@@ -117,10 +117,14 @@
         (if not-p
             (values :ne :a :b drop-through target)
             (values :e :na :nb target drop-through))
-      (when compute-temp
-        (%lea-for-lowtag-test temp value lowtag))
-      (inst test (reg-in-size temp :byte) lowtag-mask)
-      (inst jmp :nz when-false)
+
+      (unless (and (eq lowtag other-pointer-lowtag)
+                   (other-pointer-tn-ref-p (sb!c::vop-args
+                                            sb!assem::**current-vop**)))
+        (when compute-temp
+          (%lea-for-lowtag-test temp value lowtag))
+        (inst test (reg-in-size temp :byte) lowtag-mask)
+        (inst jmp :nz when-false))
       ;; FIXME: this backend seems to be missing the special logic for
       ;;        testing exactly two widetags differing only in a single bit,
       ;;        which through evolution is almost totally unworkable anyway...
