@@ -62,14 +62,16 @@
 (defun %test-headers (value temp target not-p function-p headers
                       &key (drop-through (gen-label))
                            value-tn-ref)
-  (declare (ignore value-tn-ref))
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
     (multiple-value-bind (when-true when-false)
         (if not-p
             (values drop-through target)
             (values target drop-through))
       (assemble ()
-        (%test-lowtag value temp when-false t lowtag)
+        (unless (and value-tn-ref
+                     (eq lowtag other-pointer-lowtag)
+                     (other-pointer-tn-ref-p value-tn-ref)) 
+          (%test-lowtag value temp when-false t lowtag))
         (load-type temp value (- lowtag))
         (do ((remaining headers (cdr remaining)))
             ((null remaining))

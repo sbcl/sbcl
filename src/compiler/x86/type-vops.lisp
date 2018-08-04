@@ -60,7 +60,6 @@
 
 (defun %test-headers (value temp target not-p function-p headers
                       &key except (drop-through (gen-label)) value-tn-ref)
-  (declare (ignore value-tn-ref))
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
     (multiple-value-bind (equal less-or-equal greater-or-equal when-true when-false)
         ;; EQUAL, LESS-OR-EQUAL and GREATER-OR-EQUAL are the conditions for
@@ -70,7 +69,10 @@
         (if not-p
             (values :ne :a :b drop-through target)
             (values :e :na :nb target drop-through))
-      (%test-lowtag value temp when-false t lowtag)
+      (unless (and value-tn-ref
+                   (eq lowtag other-pointer-lowtag)
+                   (other-pointer-tn-ref-p value-tn-ref)) 
+        (%test-lowtag value temp when-false t lowtag))
       (cond
         ((and (null (cdr headers))
               (not except)
@@ -151,9 +153,7 @@
                         (inst cmp al-tn start)
                         (inst jmp :b when-false)
                         (inst cmp al-tn end)
-                        (if last
-                            (inst jmp less-or-equal target)
-                            (inst jmp :be when-true)))
+                        (inst jmp :be when-true))
                        (t
                         (inst sub al-tn start)
                         (inst cmp al-tn (- end start))
