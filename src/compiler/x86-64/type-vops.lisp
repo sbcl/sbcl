@@ -386,9 +386,18 @@
   (:translate symbolp)
   (:generator 12
     (let ((is-symbol-label (if not-p DROP-THRU target)))
-      (inst cmp value nil-value)
-      (inst jmp :e is-symbol-label)
-      (test-type value temp target not-p (symbol-widetag)))
+      (unless (and (tn-ref-type args)
+                   (not (types-equal-or-intersect (tn-ref-type args)
+                                                  (specifier-type 'null))))
+        (inst cmp value nil-value)
+        (inst jmp :e is-symbol-label)
+        ;; Checked for NIL, can avoid checking for other-pointer-widetag
+        (when (tn-ref-type args)
+          (setf (tn-ref-type args)
+                (type-intersection (tn-ref-type args)
+                                   (specifier-type '(not null))))))
+      (test-type value temp target not-p (symbol-widetag)
+                 :value-tn-ref args))
     DROP-THRU))
 
 (define-vop (consp type-predicate)
