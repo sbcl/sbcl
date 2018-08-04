@@ -18,13 +18,14 @@
     (inst extru value 31 2 zero-tn (if not-p := :<>))
     (inst b target :nullify t)))
 
-(defun %test-fixnum-and-headers (value temp target not-p headers)
+(defun %test-fixnum-and-headers (value temp target not-p headers &key value-tn-ref)
   (let ((drop-through (gen-label)))
     (assemble ()
       (inst extru value 31 2 zero-tn :<>)
       (inst b (if not-p drop-through target) :nullify t))
     (%test-headers value temp target not-p nil headers
-                   :drop-through drop-through)))
+                   :drop-through drop-through
+                   :value-tn-ref value-tn-ref)))
 
 (defun %test-immediate (value temp target not-p immediate)
   (assemble ()
@@ -38,7 +39,9 @@
     (inst bci := not-p lowtag temp target)))
 
 (defun %test-headers (value temp target not-p function-p headers
-                      &key (drop-through (gen-label)) temp-loaded)
+                      &key (drop-through (gen-label)) temp-loaded
+                           value-tn-ref)
+  (declare (ignore value-tn-ref))
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
     (multiple-value-bind
         (equal greater-or-equal when-true when-false)

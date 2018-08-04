@@ -109,6 +109,8 @@
                          nil)))
     (unless type-codes
       (error "At least one type must be supplied for TEST-TYPE."))
+    (unless headers
+      (remf other-args :value-tn-ref))
     (cond
       (fixnump
        (when (remove-if (lambda (x)
@@ -161,7 +163,7 @@
        `(%test-lowtag ,value ,temp ,target ,not-p ,(car lowtags) ,@other-args))
       (headers
        `(%test-headers ,value ,temp ,target ,not-p ,function-p
-         ',(canonicalize-widetags headers)
-         ,@other-args))
+                       ',(canonicalize-widetags headers)
+                       ,@other-args))
       (t
        (error "nothing to test?")))))

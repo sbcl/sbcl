@@ -35,14 +35,16 @@
   (inst lea (reg-in-size temp :dword) (ea (- lowtag) value)))
 
 ;; Numerics including fixnum, excluding short-float. (INTEGER,RATIONAL)
-(defun %test-fixnum-and-headers (value temp target not-p headers)
+(defun %test-fixnum-and-headers (value temp target not-p headers
+                                 &key value-tn-ref)
   (let ((drop-through (gen-label)))
     (case n-fixnum-tag-bits
      (1 (%lea-for-lowtag-test temp value other-pointer-lowtag)
         (inst test (reg-in-size temp :byte) 1)
         (inst jmp :nz (if not-p drop-through target)) ; inverted
         (%test-headers value temp target not-p nil headers
-                       :drop-through drop-through :compute-temp nil))
+                       :drop-through drop-through :compute-temp nil
+                       :value-tn-ref value-tn-ref))
      (t
       (generate-fixnum-test value)
       (inst jmp :z (if not-p drop-through target))
@@ -59,7 +61,8 @@
     (%test-immediate value target not-p immediate drop-through)))
 
 ;; Numerics
-(defun %test-fixnum-immediate-and-headers (value temp target not-p immediate headers)
+(defun %test-fixnum-immediate-and-headers (value temp target not-p immediate headers
+                                           &key value-tn-ref)
   (let ((drop-through (gen-label))
         (byte-temp (reg-in-size temp :byte)))
     (case n-fixnum-tag-bits
@@ -69,11 +72,12 @@
         (inst cmp byte-temp (- immediate other-pointer-lowtag))
         (inst jmp :e (if not-p drop-through target))
         (%test-headers value temp target not-p nil headers
-                       :drop-through drop-through :compute-temp nil))
+                       :drop-through drop-through :compute-temp nil
+                       :value-tn-ref value-tn-ref))
      (t (generate-fixnum-test value)
         (inst jmp :z (if not-p drop-through target))
         (%test-immediate-and-headers value temp target not-p immediate headers
-                                     drop-through)))))
+                                     :drop-through drop-through)))))
 
 (defun %test-immediate (value temp target not-p immediate
                         &optional (drop-through (gen-label)))
@@ -88,7 +92,8 @@
 
 ;; Numerics including short-float, excluding fixnum
 (defun %test-immediate-and-headers (value temp target not-p immediate headers
-                                    &optional (drop-through (gen-label)))
+                                    &key (drop-through (gen-label))
+                                         value-tn-ref)
   ;; Code a single instruction byte test if possible.
   (cond ((sc-is value any-reg descriptor-reg)
          (inst cmp (reg-in-size value :byte) immediate))
@@ -96,7 +101,9 @@
          (move temp value)
          (inst cmp (reg-in-size temp :byte) immediate)))
   (inst jmp :e (if not-p drop-through target))
-  (%test-headers value temp target not-p nil headers :drop-through drop-through))
+  (%test-headers value temp target not-p nil headers
+                 :drop-through drop-through
+                 :value-tn-ref value-tn-ref))
 
 (defun %test-lowtag (value temp target not-p lowtag)
   (%lea-for-lowtag-test temp value lowtag)
@@ -106,7 +113,8 @@
 (defun %test-headers (value temp target not-p function-p headers
                       &key except
                            (drop-through (gen-label))
-                           (compute-temp t))
+                           (compute-temp t)
+                           value-tn-ref)
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
     (multiple-value-bind (equal less-or-equal greater-or-equal when-true
                                 when-false)
@@ -118,9 +126,9 @@
             (values :ne :a :b drop-through target)
             (values :e :na :nb target drop-through))
 
-      (unless (and (eq lowtag other-pointer-lowtag)
-                   (other-pointer-tn-ref-p (sb!c::vop-args
-                                            sb!assem::**current-vop**)))
+      (unless (and value-tn-ref
+                   (eq lowtag other-pointer-lowtag)
+                   (other-pointer-tn-ref-p value-tn-ref))
         (when compute-temp
           (%lea-for-lowtag-test temp value lowtag))
         (inst test (reg-in-size temp :byte) lowtag-mask)
@@ -399,5 +407,6 @@
   (:info widetag)
   (:arg-types * (:constant t))
   (:conditional :e)
+  (:args-var args)
   (:generator 2
    (inst cmp (ea (- other-pointer-lowtag) x nil nil :byte) widetag)))

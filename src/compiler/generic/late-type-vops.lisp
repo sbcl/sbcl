@@ -20,11 +20,13 @@
   (:temporary (:sc unsigned-reg :offset eax-offset) temp)
   (:conditional)
   (:info target not-p)
+  (:args-var args)
   (:policy :fast-safe))
 (define-vop (simple-type-predicate)
   (:args (value :scs (any-reg descriptor-reg control-stack)))
   (:conditional)
   (:info target not-p)
+  (:args-var args)
   (:policy :fast-safe))
 ;; A vop that accepts a computed set of widetags.
 (define-vop (%other-pointer-subtype-p type-predicate)
@@ -33,7 +35,8 @@
   (:arg-types * (:constant t)) ; voodoo - 'target' and 'not-p' are absent
   (:generator 15 ; arbitrary
     (multiple-value-bind (headers except) (canonicalize-widetags+exceptions widetags)
-      (%test-headers value temp target not-p nil headers :except except)))))
+      (%test-headers value temp target not-p nil headers :except except
+                                                         :value-tn-ref args)))))
 
 #!-(or x86 x86-64)
 (progn
@@ -42,14 +45,17 @@
   (:temporary (:sc non-descriptor-reg) temp)
   (:conditional)
   (:info target not-p)
+  (:args-var args)
   (:policy :fast-safe))
 ;; A vop that accepts a computed set of widetags.
 (define-vop (%other-pointer-subtype-p type-predicate)
   (:translate %other-pointer-subtype-p)
   (:info target not-p widetags)
   (:arg-types * (:constant t)) ; voodoo - 'target' and 'not-p' are absent
+  (:args-var args)
   (:generator 15 ; arbitrary
-    (%test-headers value temp target not-p nil (canonicalize-widetags widetags)))))
+    (%test-headers value temp target not-p nil (canonicalize-widetags widetags)
+                   :value-tn-ref args))))
 
 (defmacro !define-type-vop (pred-name type-codes
                              &optional (inherit 'type-predicate))
@@ -61,7 +67,8 @@
        (:generator ,cost
          (test-type value
                     ,(if (eq inherit 'simple-type-predicate) nil 'temp)
-                    target not-p ,type-codes)))))
+                    target not-p ,type-codes
+                    :value-tn-ref args)))))
 
 (!define-type-vop fixnump
   #.fixnum-lowtags

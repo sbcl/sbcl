@@ -21,11 +21,12 @@
   (generate-fixnum-test value)
   (inst jmp (if not-p :nz :z) target))
 
-(defun %test-fixnum-and-headers (value temp target not-p headers)
+(defun %test-fixnum-and-headers (value temp target not-p headers &key value-tn-ref)
   (let ((drop-through (gen-label)))
     (generate-fixnum-test value)
     (inst jmp :z (if not-p drop-through target))
-    (%test-headers value temp target not-p nil headers :drop-through drop-through)))
+    (%test-headers value temp target not-p nil headers
+                   :drop-through drop-through :value-tn-ref value-tn-ref)))
 
 (defun %test-immediate (value temp target not-p immediate)
   (declare (ignore temp))
@@ -58,7 +59,8 @@
   (inst jmp (if not-p :ne :e) target))
 
 (defun %test-headers (value temp target not-p function-p headers
-                            &key except (drop-through (gen-label)))
+                      &key except (drop-through (gen-label)) value-tn-ref)
+  (declare (ignore value-tn-ref))
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
     (multiple-value-bind (equal less-or-equal greater-or-equal when-true when-false)
         ;; EQUAL, LESS-OR-EQUAL and GREATER-OR-EQUAL are the conditions for
