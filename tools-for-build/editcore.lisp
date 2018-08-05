@@ -808,7 +808,8 @@
            (%widetag-of (word)
              (logand word widetag-mask)))
     (format output " .text~% .file \"sbcl.core\"
- .globl __lisp_code_start, __lisp_code_end~% .balign 4096~%__lisp_code_start:~%")
+ .globl __lisp_code_start, lisp_jit_code, __lisp_code_end
+ .balign 4096~%__lisp_code_start:~%")
 
     ;; Scan the assembly routines.
     (let* ((code-component (make-code-obj code-addr))
@@ -900,8 +901,11 @@
            (error "Strange code component: ~S" code)))
         (incf code-addr objsize))))
 
-  ;; coreparse uses unpadded __lisp_code_end to set varyobj_free_pointer
-  (format output "__lisp_code_end:~%")
+  ;; coreparse uses the 'lisp_jit_code' symbol to set varyobj_free_pointer
+  ;; The intent is that compilation to memory can use this reserved area
+  ;; (if space remains) so that profilers can associate a C symbol with the
+  ;; program counter range. It's better than nothing.
+  (format output "lisp_jit_code:~%")
 
   ;; Pad so that non-lisp code can't be colocated on a GC page.
   ;; (Lack of Lisp object headers in C code is the issue)
@@ -918,6 +922,10 @@
                 nwords)
         (when (plusp nwords)
           (format output " .fill ~d~%" (* nwords n-word-bytes))))))
+  ;; Extend with .5 MB of filler
+  (format output " .fill ~D~%__lisp_code_end:
+ .size lisp_jit_code, .-lisp_jit_code~%"
+          (* 512 1024))
   ; (format t "~&linker-relocs=~D~%" n-linker-relocs)
   (values core total-code-size n-linker-relocs))
 
@@ -1480,14 +1488,16 @@
             (setf (%vector-raw-bits core-header code-start-fixup-ofs) 0)
             (write-sequence core-header output) ; Copy prepared header
             (force-output output)
-            ;; Change SB-C::*COMPILE[-FILE]-TO-MEMORY-SPACE* to :DYNAMIC
+            ;; Change SB-C::*COMPILE-FILE-TO-MEMORY-SPACE* to :DYNAMIC
+            ;; and SB-C::*COMPILE-TO-MEMORY-SPACE* to :AUTO
             ;; in case the resulting executable needs to compile anything.
             ;; (Call frame info will be missing, but at least it's something.)
-            (dolist (name '("*COMPILE-FILE-TO-MEMORY-SPACE*"
-                            "*COMPILE-TO-MEMORY-SPACE*"))
-              (%set-symbol-global-value
-               (find-target-symbol "SB-C" name map)
-               (find-target-symbol "KEYWORD" "DYNAMIC" map :logical)))
+            (dolist (item '(("*COMPILE-FILE-TO-MEMORY-SPACE*" . "DYNAMIC")
+                            ("*COMPILE-TO-MEMORY-SPACE*" . "AUTO")))
+              (destructuring-bind (symbol . value) item
+                (%set-symbol-global-value
+                 (find-target-symbol "SB-C" symbol map)
+                 (find-target-symbol "KEYWORD" value map :logical))))
             ;;
             (dolist (space data-spaces) ; Copy pages from memory
               (let ((start (space-physaddr space map))

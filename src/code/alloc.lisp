@@ -416,6 +416,13 @@
   (values (%primitive alloc-immobile-fixedobj other-pointer-lowtag 6
                       #.(make-code-header-word 4) ; boxed word count
                       (ash (* 2 n-word-bytes) n-fixnum-tag-bits))))
+
+;;; Test whether there is room to allocate NBYTES.
+;;; This only looks at the space in the frontier, not the free space list.
+(defun immobile-code-free-space-check (nbytes)
+  (let ((avail (- (+ varyobj-space-start varyobj-space-size)
+                  (sap-int *varyobj-space-free-pointer*))))
+    (>= avail nbytes)))
 ) ; end PROGN
 ) ; end PROGN
 

@@ -37,8 +37,7 @@
          (won nil)
          (asmstream (make-asmstream))
          (*asmstream* asmstream)
-         (*adjustable-vectors* nil)
-         #!+immobile-code (*code-is-immobile* t))
+         (*adjustable-vectors* nil))
     (unwind-protect
         (let ((*features* (cons :sb-assembling *features*)))
           (load (merge-pathnames name (make-pathname :type "lisp")))

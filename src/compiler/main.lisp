@@ -551,9 +551,8 @@ necessary, since type inference may take arbitrarily long to converge.")
 
 #!+immobile-code
 (progn
-  (declaim (type (member :immobile :dynamic)
-                 *compile-to-memory-space*
-                 *compile-file-to-memory-space*))
+  (declaim (type (member :immobile :dynamic :auto) *compile-to-memory-space*)
+           (type (member :immobile :dynamic) *compile-file-to-memory-space*))
   ;; COMPILE-FILE puts all nontoplevel code in immobile space, but COMPILE
   ;; offers a choice. Because the collector does not run often enough (yet),
   ;; COMPILE usually places code in the dynamic space managed by our copying GC.
@@ -562,14 +561,19 @@ necessary, since type inference may take arbitrarily long to converge.")
   (defvar *compile-to-memory-space* :immobile) ; BUILD-TIME default
   (defvar *compile-file-to-memory-space* :immobile) ; BUILD-TIME default
   (defun code-immobile-p (thing)
-    (if (fasl-output-p *compile-object*)
-        (and (eq *compile-file-to-memory-space* :immobile)
-             (neq (component-kind (typecase thing
-                                    (vop  (node-component (vop-node thing)))
-                                    (node (node-component thing))
-                                    (t    thing)))
-                  :toplevel))
-        (eq *compile-to-memory-space* :immobile))))
+    #+sb-xc-host (declare (ignore thing)) #+sb-xc-host t
+    #-sb-xc-host
+    (let ((component (typecase thing
+                       (vop  (node-component (vop-node thing)))
+                       (node (node-component thing))
+                       (t    thing))))
+      (eq (setf (component-mem-space component)
+                (if (fasl-output-p *compile-object*)
+                    (and (eq *compile-file-to-memory-space* :immobile)
+                         (neq (component-kind component) :toplevel)
+                         :immobile)
+                    *compile-to-memory-space*))
+          :immobile))))
 
 (defun %compile-component (component)
   (let ((*adjustable-vectors* nil)) ; Needed both by codegen and fasl writer
@@ -644,9 +648,7 @@ necessary, since type inference may take arbitrarily long to converge.")
 
           (multiple-value-bind (segment text-length fun-table
                                 elsewhere-label fixup-notes)
-              (let (#!+immobile-code
-                    (*code-is-immobile* (code-immobile-p component)))
-                (generate-code component))
+              (generate-code component)
 
             (let ((bytes (sb!assem:segment-contents-as-vector segment))
                   (object *compile-object*)

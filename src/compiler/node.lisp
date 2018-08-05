@@ -394,6 +394,10 @@
                          (outer-loop (make-loop :kind :outer :head head)))))
   ;; unique ID for debugging
   #!+sb-show (id (new-object-id) :read-only t)
+  ;; space where this component will be allocated in
+  ;; :auto won't make any codegen optimizations pertinent to immobile space,
+  ;; but will place the code there given sufficient available space.
+  (mem-space nil :type (member nil :dynamic :immobile :auto))
   ;; the kind of component
   ;;
   ;; (The terminology here is left over from before

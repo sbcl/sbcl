@@ -84,7 +84,7 @@ open_binary(char *filename, int mode)
 #if defined(LISP_FEATURE_LINUX) && defined(LISP_FEATURE_IMMOBILE_CODE)
 #define ELFCORE 1
 extern __attribute__((weak)) lispobj
- __lisp_code_start, __lisp_code_end, __lisp_linkage_values;
+ __lisp_code_start, lisp_jit_code, __lisp_code_end, __lisp_linkage_values;
 static inline boolean code_in_elf() { return &__lisp_code_start != 0; }
 #else
 #define ELFCORE 0
@@ -737,9 +737,8 @@ process_directory(int count, struct ndir_entry *entry,
 #if ELFCORE
     if (&__lisp_code_start) {
         VARYOBJ_SPACE_START = (uword_t)&__lisp_code_start;
-        varyobj_free_pointer = &__lisp_code_end;
-        uword_t aligned_end = ALIGN_UP((uword_t)&__lisp_code_end, IMMOBILE_CARD_BYTES);
-        varyobj_space_size = aligned_end - VARYOBJ_SPACE_START;
+        varyobj_free_pointer = &lisp_jit_code;
+        varyobj_space_size = (uword_t)&__lisp_code_end - VARYOBJ_SPACE_START;
         spaces[IMMOBILE_VARYOBJ_CORE_SPACE_ID].len = varyobj_space_size;
         gc_assert(varyobj_free_pointer >= (lispobj*)VARYOBJ_SPACE_START);
 #if !ENABLE_PAGE_PROTECTION

@@ -150,9 +150,14 @@
   (let ((debug-info (debug-info-for-component component)))
     (let* ((2comp (component-info component))
            (constants (ir2-component-constants 2comp))
+           (nboxed (align-up (length constants) sb!c::code-boxed-words-align))
+           (total-bytes (+ (* nboxed sb!vm:n-word-bytes)
+                           (align-up length (* 2 sb!vm:n-word-bytes))))
            (code-obj (allocate-code-object
-                      (or #!+immobile-code (eq *compile-to-memory-space* :immobile))
-                      (align-up (length constants) sb!c::code-boxed-words-align)
+                      (case (component-mem-space component)
+                        (:immobile t)
+                        (:auto (sb!vm::immobile-code-free-space-check total-bytes)))
+                      nboxed
                       length)))
 
       ;; The following operations need the code pinned:
