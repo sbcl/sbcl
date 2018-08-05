@@ -11,6 +11,28 @@
 
 (in-package "SB-VM")
 
+(defun make-return-pc-passing-location (standard)
+  (if standard
+      (make-wired-tn *backend-t-primitive-type* descriptor-reg-sc-number lra-offset)
+      (make-restricted-tn *backend-t-primitive-type* descriptor-reg-sc-number)))
+
+(defun make-old-fp-passing-location ()
+  (make-wired-tn *fixnum-primitive-type* immediate-arg-scn ocfp-offset))
+
+(defconstant old-fp-passing-offset
+  (make-sc+offset descriptor-reg-sc-number ocfp-offset))
+
+(defun make-old-fp-save-location (env)
+  (specify-save-tn
+   (physenv-debug-live-tn (make-normal-tn *fixnum-primitive-type*) env)
+   (make-wired-tn *fixnum-primitive-type* control-stack-arg-scn ocfp-save-offset)))
+(defun make-return-pc-save-location (env)
+  (specify-save-tn
+   (physenv-debug-live-tn (make-normal-tn *backend-t-primitive-type*) env)
+   (make-wired-tn *backend-t-primitive-type* control-stack-arg-scn lra-save-offset)))
+(defun make-arg-count-location ()
+  (make-wired-tn *fixnum-primitive-type* immediate-arg-scn nargs-offset))
+
 (define-vop (current-fp)
   (:results (val :scs (any-reg)))
   (:generator 1))
