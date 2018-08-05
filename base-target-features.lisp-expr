@@ -311,11 +311,6 @@
  ;; This doesn't affect the build at all, merely declares how things are.
  :package-local-nicknames
 
- ;; This affects the definition of a lot of things in bignum.lisp. It
- ;; doesn't seem to be documented anywhere what systems it might apply
- ;; to. It doesn't seem to be needed for X86 systems anyway.
- ; :32x16-divide
-
  ;; This is set in classic CMU CL, and presumably there it means
  ;; that the floating point arithmetic implementation
  ;; conforms to IEEE's standard. Here it definitely means that the
