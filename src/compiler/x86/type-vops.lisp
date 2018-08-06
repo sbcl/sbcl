@@ -71,7 +71,7 @@
             (values :e :na :nb target drop-through))
       (unless (and value-tn-ref
                    (eq lowtag other-pointer-lowtag)
-                   (other-pointer-tn-ref-p value-tn-ref)) 
+                   (other-pointer-tn-ref-p value-tn-ref))
         (%test-lowtag value temp when-false t lowtag))
       (cond
         ((and (null (cdr headers))
