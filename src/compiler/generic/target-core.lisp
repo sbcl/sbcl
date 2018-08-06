@@ -155,7 +155,9 @@
                            (align-up length (* 2 sb!vm:n-word-bytes))))
            (code-obj (allocate-code-object
                       (case (component-mem-space component)
+                        #!+immobile-code
                         (:immobile t)
+                        #!+immobile-code
                         (:auto (sb!vm::immobile-code-free-space-check total-bytes)))
                       nboxed
                       length)))
