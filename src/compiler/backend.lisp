@@ -166,8 +166,10 @@ conditionalization.
 ;;; The default value of NIL means use only unguarded VOPs. The
 ;;; initial value is customizeable via
 ;;; customize-backend-subfeatures.lisp
-(defglobal *backend-subfeatures*
-  '#.(sort (copy-list sb-cold:*shebang-backend-subfeatures*) #'string<))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defvar *backend-subfeatures*
+    '#.(sort (copy-list sb-cold:*shebang-backend-subfeatures*) #'string<)))
+(declaim (always-bound *backend-subfeatures*))
 
 ;;; possible *BACKEND-SUBFEATURES* values:
 ;;;
