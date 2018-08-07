@@ -768,20 +768,10 @@
         ((atom source)
          `(local-princ ',source))
         ((eq (car source) :using)
-         (unless (or (stringp (cadr source))
-                     (and (listp (cadr source))
-                          (eq (caadr source) 'function)))
-           (pd-error "The first arg to :USING must be a string or #'function."))
-         ;; For (:using #'F) to be stuffed in properly, the printer as expressed
-         ;; in its DSL would have to compile-time expand into a thing that
-         ;; reconstructs it such that #'F forms don't appear inside quoted list
-         ;; structure. Lacking the ability to do that, we treat #'F as a bit of
-         ;; syntax to be evaluated manually.
-         (compile-print (caddr source) funstate
-                        (let ((f (cadr source)))
-                          (if (typep f '(cons (eql function) (cons symbol null)))
-                              (symbol-function (second f))
-                              f))))
+         (let ((f (cadr source)))
+          (unless (typep f '(or string (cons (eql function) (cons symbol null))))
+            (pd-error "The first arg to :USING must be a string or #'function."))
+          (compile-print (caddr source) funstate f)))
         ((eq (car source) :plus-integer)
          ;; prints the given field proceed with a + or a -
          (let ((form
