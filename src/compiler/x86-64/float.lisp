@@ -1250,11 +1250,24 @@
   (:translate make-double-float)
   (:policy :fast-safe)
   (:vop-var vop)
-  (:generator 2
+  (:generator 4
     (move temp hi-bits)
     (inst shl temp 32)
     (inst or temp lo-bits)
     (inst movd res temp)))
+(define-vop (make-double-float/sse4) ; 2 instructions and no temp
+  (:args (hi-bits :scs (signed-reg))
+         (lo-bits :scs (unsigned-reg)))
+  (:results (res :scs (double-reg)))
+  (:arg-types signed-num unsigned-num)
+  (:result-types double-float)
+  (:translate make-double-float)
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:guard (member :sse4 *backend-subfeatures*))
+  (:generator 2
+    (inst movd res (reg-in-size lo-bits :dword))
+    (inst pinsrd res hi-bits 1)))
 
 (define-vop (make-double-float-c)
   (:results (res :scs (double-reg)))

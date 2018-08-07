@@ -156,12 +156,26 @@
 
 (define-vop (%simd-pack-high)
   (:translate %simd-pack-high)
+  (:args (x :scs (int-sse-reg double-sse-reg single-sse-reg)
+            :target tmp))
+  (:arg-types simd-pack)
+  (:temporary (:sc sse-reg :from (:argument 0)) tmp)
+  (:results (dst :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:policy :fast-safe)
+  (:generator 3
+    (move tmp x)
+    (inst psrldq tmp 8)
+    (inst movd dst tmp)))
+(define-vop (%simd-pack-high/sse4) ; 1 instruction and no temp
+  (:translate %simd-pack-high)
   (:args (x :scs (int-sse-reg double-sse-reg single-sse-reg)))
   (:arg-types simd-pack)
   (:results (dst :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:policy :fast-safe)
-  (:generator 3
+  (:guard (member :sse4 *backend-subfeatures*))
+  (:generator 1
     (inst pextrq dst x 1)))
 
 (define-vop (%make-simd-pack)
