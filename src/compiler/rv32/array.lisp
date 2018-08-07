@@ -13,8 +13,11 @@
 
 (macrolet
     ((def-full-data-vector-frobs (type element-type &rest scs)
-       (let ((setname (symbolicate "DATA-VECTOR-SET/" type)))
+       (let ((refname (symbolicate "DATA-VECTOR-REF/" type))
+             (setname (symbolicate "DATA-VECTOR-SET/" type)))
          `(progn
+            (define-full-reffer ,refname ,type
+              vector-data-offset other-pointer-lowtag ,scs ,element-type data-vector-ref)
             (define-full-setter ,setname ,type
               vector-data-offset other-pointer-lowtag ,scs ,element-type data-vector-set))))
      (def-partial-data-vector-frobs (type element-type size signed &rest scs)

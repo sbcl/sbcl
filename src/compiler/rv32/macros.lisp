@@ -15,6 +15,7 @@
   `(progn
      (define-vop (,name)
        ,@(when translate `((:translate ,translate)))
+       (:policy :fast-safe)
        (:args (object :scs (descriptor-reg)) (index :scs (any-reg)))
        (:arg-types ,type tagged-num)
        (:results (value :scs ,scs))
