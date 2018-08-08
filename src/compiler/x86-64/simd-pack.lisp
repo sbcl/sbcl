@@ -152,7 +152,7 @@
   (:result-types unsigned-num)
   (:policy :fast-safe)
   (:generator 3
-    (inst movd dst x)))
+    (inst movq dst x)))
 
 (define-vop (%simd-pack-high)
   (:translate %simd-pack-high)
@@ -166,7 +166,7 @@
   (:generator 3
     (move tmp x)
     (inst psrldq tmp 8)
-    (inst movd dst tmp)))
+    (inst movq dst tmp)))
 (define-vop (%simd-pack-high/sse4) ; 1 instruction and no temp
   (:translate %simd-pack-high)
   (:args (x :scs (int-sse-reg double-sse-reg single-sse-reg)))
@@ -205,8 +205,8 @@
   (:results (dst :scs (int-sse-reg)))
   (:result-types simd-pack-int)
   (:generator 5
-    (inst movd dst lo)
-    (inst movd tmp hi)
+    (inst movq dst lo)
+    (inst movq tmp hi)
     (inst punpcklqdq dst tmp)))
 
 #-sb-xc-host

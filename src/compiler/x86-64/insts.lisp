@@ -2778,38 +2778,94 @@
    (emit-regular-2byte-sse-inst segment dst src #x66 #x38 #x2a))
   . #.(2byte-sse-inst-printer-list '2byte-xmm-xmm/mem #x66 #x38 #x2a))
 
-;;; MOVQ
-(define-instruction movq (segment dst src)
-  (:emitter
-   (cond ((xmm-register-p dst)
-          (emit-sse-inst segment dst src #xf3 #x7e
-                         :operand-size :do-not-set))
-         (t
-          (aver (xmm-register-p src))
-          (emit-sse-inst segment src dst #x66 #xd6
-                         :operand-size :do-not-set))))
-  . #.(append (sse-inst-printer-list 'xmm-xmm/mem #xf3 #x7e)
-              (sse-inst-printer-list 'xmm-xmm/mem #x66 #xd6
-                                     :printer '(:name :tab reg/mem ", " reg))))
+;;; Move a 32-bit value (MOVD) or 64-bit value (MOVQ)
+;;; MOVD has encodings for xmm <-> r/m32.
+;;; MOVQ has encodings for xmm <-> r/m64 and xmm <-> xmm/m64.
+;;; (We do not support the encodings for MMX registers)
+;;;
+;;; Troubles stem from a difference in interpretation.
+;;; AMD's suggests the following mapping of mnemonic to functionality:
+;;;  * MOVD = the encoding "66 0f 6e" or "66 0f 7e" (chosen by direction)
+;;;  * MOVQ = the encoding "f3 0f 7e" or "66 0f d6" (chosen by direction)
+;;; whereas Intel (more mnemonically) documents these as:
+;;;  * MOVD = movement of a doubleword
+;;;  * MOVQ = movement of a quadword, having 4 encodings
+;;;
+;;; Additionally, AMD documents that "their" MOVD has encodings for
+;;; "xmm <-> r/m64" (as REX.W+MOVD) and they imply that "their" MOVQ does
+;;; NOT have encodings for "xmm <-> r/m64" (because that's REX.W+MOVD)
+;;; Beneath it all, the binary encodings do the right thing. It's a question
+;;; of naming. Assemblers do the right thing in any case.
+;;;
+;;; As can be seen here, all these operations are named the same by objdump:
+;;;      f3 0f 7e 00             movq   (%rax),%xmm0  \ 64-bit-only move
+;;;      66 0f d6 00             movq   %xmm0,(%rax)  /
+;;;      66 48 0f 6e 00          movq   (%rax),%xmm0  \ REX.W + MOVD
+;;;      66 48 0f 7e 00          movq   %xmm0,(%rax)  /
+;;;
+;;; The shorter encoding is the one that can't access GPRs and
+;;; has no 32-bit form, nor requires REX.W bit to extend to 64 bits.
+;;; AMD names the latter two lines MOVD. This is a bit of an oxymoron.
+;;;
+;;; Anyway, the upshot is severalfold:
+;;; (1) Our MOVQ emitter needs to accept a 64-bit GPR<->XMM move emitting
+;;;     a "66 REX 0f {6e|7e}" encoding. AMD (reluctantly?) concurs in the
+;;;     latest doc (24594-Rev.3.26-May 2018) that this form of MOVD is
+;;;     "Also known as MOVQ in some developer tools" (page 231)
+;;; (2) It's absurd to disassemble a 64-bit move as MOVD in lieu of MOVQ.
+;;;     I could find no tool that actually does that, nor should we.
+;;;     This is simply saying that we can faithfully round-trip our own asm.
+;;; (3) On top of that, we'll _require_ that MOVD only operate on 32 bits,
+;;;     and MOVQ on 64 bits. This is stricter than other assemblers.
+;;;     The rationale is after removing REG-IN-SIZE, the correct behavior
+;;;     is obtained with no further "opcode modifier" such as
+;;;     (INST MOVD :QWORD X Y) ; <- What is this, I can't even.
+;;;
+;;; For further reading:
+;;; https://www.gamedev.net/blogs/entry/2250281-demystifying-sse-move-instructions/
+;;; which nowhere says "and by the way, MOVD can move 64 bits"
+;;;
+#-sb-xc-host
+(defun print-mov[dq]-opcode  (dchunk inst stream dstate)
+  (declare (ignore dchunk inst))
+  (princ (if (dstate-getprop dstate +rex-w+) 'movq 'movd) stream))
+
+(flet ((move-xmm<->gpr (segment dst src expected-size)
+         (cond ((xmm-register-p dst)
+                (aver (eq (operand-size src) expected-size))
+                (emit-sse-inst segment dst src #x66 #x6e))
+               (t
+                (aver (xmm-register-p src))
+                (aver (eq (operand-size dst) expected-size))
+                (emit-sse-inst segment src dst #x66 #x7e)))))
+  (define-instruction movd (segment dst src)
+    (:emitter (move-xmm<->gpr segment dst src :dword))
+    . #.(append (sse-inst-printer-list 'xmm-reg/mem #x66 #x6e
+                 :printer '(#'print-mov[dq]-opcode :tab reg ", " reg/mem))
+                (sse-inst-printer-list 'xmm-reg/mem #x66 #x7e
+                 :printer '(#'print-mov[dq]-opcode :tab reg/mem ", " reg))))
+
+  (define-instruction movq (segment dst src)
+    (:emitter
+     (cond ((or (gpr-p src) (gpr-p dst))
+            (move-xmm<->gpr segment dst src :qword))
+           (t
+            (aver (neq (operand-size src) :dword)) ; could be :float,:complex,:qword
+            (aver (neq (operand-size dst) :dword))
+            (cond ((xmm-register-p dst)
+                   (emit-sse-inst segment dst src #xf3 #x7e
+                                  :operand-size :do-not-set))
+                  (t
+                   (aver (xmm-register-p src))
+                   (emit-sse-inst segment src dst #x66 #xd6
+                                  :operand-size :do-not-set))))))
+    . #.(append (sse-inst-printer-list 'xmm-xmm/mem #xf3 #x7e)
+                (sse-inst-printer-list 'xmm-xmm/mem #x66 #xd6
+                                  :printer '(:name :tab reg/mem ", " reg)))))
 
 ;;; Instructions having an XMM register as the destination operand
 ;;; and a general-purpose register or a memory location as the source
 ;;; operand. The operand size is calculated from the source operand.
-
-;;; MOVD - Move a 32- or 64-bit value from a general-purpose register or
-;;; a memory location to the low order 32 or 64 bits of an XMM register
-;;; with zero extension or vice versa.
-;;; We do not support the MMX version of this instruction.
-(define-instruction movd (segment dst src)
-  (:emitter
-   (cond ((xmm-register-p dst)
-          (emit-sse-inst segment dst src #x66 #x6e))
-         (t
-          (aver (xmm-register-p src))
-          (emit-sse-inst segment src dst #x66 #x7e))))
-  . #.(append (sse-inst-printer-list 'xmm-reg/mem #x66 #x6e)
-              (sse-inst-printer-list 'xmm-reg/mem #x66 #x7e
-                                     :printer '(:name :tab reg/mem ", " reg))))
 
 (macrolet ((define-extract-sse-instruction (name prefix op1 op2
                                             &key explicit-qword)

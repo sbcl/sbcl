@@ -66,7 +66,7 @@
   ;; For a very small number of elements, the unrolled loop won't execute.
   (inst jmp :z FINISH)
   ;; Load the xmm register.
-  (inst movd wordpair item)
+  (inst movq wordpair item)
   (inst pshufd wordpair wordpair #b01000100)
   ;; Multiply count by 64 (= 8 lisp objects) and add to 'start'
   ;; to get the upper limit of the loop.

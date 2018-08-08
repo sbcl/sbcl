@@ -189,9 +189,9 @@
    (:generator 2
      (sc-case x
        (descriptor-reg
-        ;; After MOVD, vector element 0 holds a single-float whose bits are
+        ;; After MOVQ, vector element 0 holds a single-float whose bits are
         ;; SINGLE-FLOAT-WIDETAG. That's fine, it's an ordinary denormal float.
-        (inst movd y x)
+        (inst movq y x)
         ;; Move bits [63:32] into [31:0] and move bits [127:96]
         ;; into the other 3 vector elements so that [63:32] is zeroed.
         (inst shufps y y #4r3331))
@@ -1254,7 +1254,7 @@
     (move temp hi-bits)
     (inst shl temp 32)
     (inst or temp lo-bits)
-    (inst movd res temp)))
+    (inst movq res temp)))
 (define-vop (make-double-float/sse4) ; 2 instructions and no temp
   (:args (hi-bits :scs (signed-reg))
          (lo-bits :scs (unsigned-reg)))
