@@ -106,7 +106,9 @@
                       (:translate ,translate)))
                 (:args ,@(mapcar (lambda (arg)
                                    `(,arg :scs (descriptor-reg any-reg character-reg
-                                                unsigned-reg signed-reg constant)
+                                                unsigned-reg signed-reg constant
+                                                single-reg double-reg
+                                                complex-single-reg complex-double-reg)
                                           #!+immobile-space
                                           ,@(if (eq name 'type-check-error)
                                                 `(:load-if (type-err-type-tn-loadp ,arg)))))
