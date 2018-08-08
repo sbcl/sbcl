@@ -20,21 +20,21 @@
 
 ;;; Make these INLINE, since the call to C is at least as compact as a
 ;;; Lisp call, and saves number consing to boot.
-(eval-when (:compile-toplevel :execute)
-
-(sb!xc:defmacro def-math-rtn (name num-args &optional wrapper)
+(defmacro def-math-rtn (name num-args &optional wrapper)
   (let ((function (symbolicate "%" (string-upcase name)))
         (args (loop for i below num-args
                     collect (intern (format nil "ARG~D" i)))))
     `(progn
        (declaim (inline ,function))
        (defun ,function ,args
-         (alien-funcall
-          (extern-alien ,(format nil "~:[~;sb_~]~a" wrapper name)
-                        (function double-float
-                                  ,@(loop repeat num-args
-                                          collect 'double-float)))
-          ,@args)))))
+         (truly-the ;; avoid checking the result
+          ,(type-specifier (fun-type-returns (info :function :type function)))
+          (alien-funcall
+           (extern-alien ,(format nil "~:[~;sb_~]~a" wrapper name)
+                         (function double-float
+                                   ,@(loop repeat num-args
+                                           collect 'double-float)))
+           ,@args))))))
 
 (defun handle-reals (function var)
   `((((foreach fixnum single-float bignum ratio))
@@ -45,7 +45,6 @@
 (defun handle-complex (form)
   `((((foreach (complex double-float) (complex single-float) (complex rational)))
      ,form)))
-) ; EVAL-WHEN
 
 #!+x86 ;; for constant folding
 (macrolet ((def (name ll)
