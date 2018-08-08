@@ -11,7 +11,7 @@
 
 (defglobal *alien-type-classes* (make-hash-table :test 'eq))
 
-(!define-thread-local *saved-fp-and-pcs* nil)
+(!define-thread-local *saved-fp* nil)
 
 (defvar *new-auxiliary-types* nil)
 

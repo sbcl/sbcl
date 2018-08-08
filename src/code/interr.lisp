@@ -381,18 +381,7 @@
           ;; Needs to be done before anything is bound
           (%primitive sb!c:current-binding-pointer)))
     (infinite-error-protect
-     (let* ((alien-context (sap-alien context (* os-context-t)))
-            #!+c-stack-is-control-stack
-            (fp-and-pc (make-array 2 :element-type 'word)))
-       #!+c-stack-is-control-stack
-       (declare (truly-dynamic-extent fp-and-pc))
-       #!+c-stack-is-control-stack
-       (setf (aref fp-and-pc 0) (sb!vm:context-register alien-context sb!vm::cfp-offset)
-             (aref fp-and-pc 1) (sb!sys:sap-int (sb!vm:context-pc alien-context)))
-       (let (#!+c-stack-is-control-stack
-             (*saved-fp-and-pcs* (cons fp-and-pc *saved-fp-and-pcs*)))
-         #!+c-stack-is-control-stack
-         (declare (truly-dynamic-extent *saved-fp-and-pcs*)))
+     (let ((alien-context (sap-alien context (* os-context-t))))
        (multiple-value-bind (error-number arguments
                              *current-internal-trap-number*)
            (sb!vm::with-pinned-context-code-object (alien-context)

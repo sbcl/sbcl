@@ -308,21 +308,19 @@ Examples:
         sap)))
 
 #!+c-stack-is-control-stack
-(declaim (inline invoke-with-saved-fp-and-pc))
+(declaim (inline invoke-with-saved-fp))
 ;;; On :c-stack-is-control-stack platforms, this DEFUN must appear prior to the
 ;;; first cross-compile-time use of ALIEN-FUNCALL, the transform of which is
-;;; an invocation of INVOKE-WITH-SAVED-FP-AND-PC, which should be inlined.
+;;; an invocation of INVOKE-WITH-SAVED-FP, which should be inlined.
 ;;; Makes no sense when compiling for the host.
 #!+(and c-stack-is-control-stack (host-feature sb-xc))
-(defun invoke-with-saved-fp-and-pc (fn)
+(defun invoke-with-saved-fp (fn)
   (declare #-sb-xc-host (muffle-conditions compiler-note)
            (optimize (speed 3)))
-  (dx-let ((fp-and-pc (make-array 2 :element-type 'word)))
-    (setf (aref fp-and-pc 0) (sb!kernel:get-lisp-obj-address
-                              (sb!kernel:%caller-frame))
-          (aref fp-and-pc 1) (sap-int (sb!kernel:%caller-pc)))
-    (dx-let ((*saved-fp-and-pcs* (cons fp-and-pc *saved-fp-and-pcs*)))
-      (funcall fn))))
+  ;; No need to link to the previous value, it can be fetched from the binding stack.
+  (let ((*saved-fp*
+          (truly-the fixnum (sap-int (sb!kernel:current-fp)))))
+    (funcall fn)))
 
 #!-sb-fluid (declaim (inline free-alien))
 (defun free-alien (alien)
