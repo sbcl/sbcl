@@ -18,6 +18,17 @@
   #!+long-float 3.14159265358979323846264338327950288419716939937511l0
   #!-long-float 3.14159265358979323846264338327950288419716939937511d0)
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun handle-reals (function var)
+    `((((foreach fixnum single-float bignum ratio))
+       (coerce (,function (coerce ,var 'double-float)) 'single-float))
+      ((double-float)
+       (,function ,var))))
+
+  (defun handle-complex (form)
+    `((((foreach (complex double-float) (complex single-float) (complex rational)))
+       ,form))))
+
 ;;; Make these INLINE, since the call to C is at least as compact as a
 ;;; Lisp call, and saves number consing to boot.
 (defmacro def-math-rtn (name num-args &optional wrapper)
@@ -36,15 +47,6 @@
                                            collect 'double-float)))
            ,@args))))))
 
-(defun handle-reals (function var)
-  `((((foreach fixnum single-float bignum ratio))
-     (coerce (,function (coerce ,var 'double-float)) 'single-float))
-    ((double-float)
-     (,function ,var))))
-
-(defun handle-complex (form)
-  `((((foreach (complex double-float) (complex single-float) (complex rational)))
-     ,form)))
 
 #!+x86 ;; for constant folding
 (macrolet ((def (name ll)
