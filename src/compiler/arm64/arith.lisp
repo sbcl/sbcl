@@ -936,9 +936,8 @@
   (:result-types signed-num)
   (:info width)
   (:generator 3
-    (cond ((zerop width)
-           (inst mov r 0))
-          ((= width 64)
+    (aver (/= width 0))
+    (cond ((= width 64)
            (move r x))
           (t
            (inst sbfm r x 0 (1- width))))))
@@ -952,11 +951,9 @@
   (:result-types signed-num)
   (:info width)
   (:generator 4
-    (cond ((zerop width)
-           (inst mov r 0))
-          (t
-           (loadw r x bignum-digits-offset other-pointer-lowtag)
-           (inst sbfm r r 0 (1- width))))))
+    (aver (/= width 0))
+    (loadw r x bignum-digits-offset other-pointer-lowtag)
+    (inst sbfm r r 0 (1- width))))
 
 (define-vop (mask-signed-field-fixnum)
   (:translate sb!c::mask-signed-field)

@@ -3423,10 +3423,11 @@
 (deftransform mask-signed-field ((size x) ((constant-arg t) *) *)
   "fold identity operation"
   (let ((size (lvar-value size)))
-    (when (= size 0) (give-up-ir1-transform))
-    (unless (csubtypep (lvar-type x) (specifier-type `(signed-byte ,size)))
-      (give-up-ir1-transform))
-    'x))
+    (cond ((= size 0) 0)
+          ((csubtypep (lvar-type x) (specifier-type `(signed-byte ,size)))
+           'x)
+          (t
+           (give-up-ir1-transform)))))
 
 (deftransform logior ((x y) (* (constant-arg integer)) *)
   "fold identity operation"
