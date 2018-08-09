@@ -591,52 +591,6 @@
     `(lambda (function ,@names)
        (alien-funcall (deref function) ,@names))))
 
-#-sb-xc-host
-(defun walk-binding-stack (symbol function)
-  (let* (#!+sb-thread
-         (tls-index #!+sb-thread
-                    (get-lisp-obj-address (symbol-tls-index symbol)))
-         (current-value
-           #!+sb-thread
-           (sap-ref-lispobj (sb!thread::current-thread-sap) tls-index)
-           #!-sb-thread
-           (symbol-value symbol)))
-    (funcall function current-value)
-    (loop for start = (descriptor-sap sb!vm:*binding-stack-start*)
-          for pointer = (descriptor-sap sb!vm::*binding-stack-pointer*)
-          then (sap+ pointer (* sb!vm:n-word-bytes -2))
-          while (sap> pointer start)
-          when
-          #!+sb-thread (eq (sap-ref-word pointer (* sb!vm:n-word-bytes -1)) tls-index)
-          #!-sb-thread (eq (sap-ref-lispobj pointer (* sb!vm:n-word-bytes -1)) symbol)
-          do (unless (or #!+sb-thread
-                         (= (sap-ref-word pointer (* sb!vm:n-word-bytes -2))
-                            sb!vm:no-tls-value-marker-widetag))
-               (funcall function
-                        (sap-ref-lispobj pointer
-                                         (* sb!vm:n-word-bytes -2)))))))
-
-#!+(and c-stack-is-control-stack (not (host-feature sb-xc-host)))
-(defun find-saved-fp-and-pc (fp)
-  (block nil
-    (walk-binding-stack
-     '*saved-fp*
-     (lambda (x)
-       (when x
-         (let* ((saved-fp (int-sap x))
-                (caller-fp (sap-ref-sap saved-fp
-                                        (sb!vm::frame-byte-offset
-                                         sb!vm:ocfp-save-offset))))
-           (when (#!+stack-grows-downward-not-upward
-                  sap>
-                  #!-stack-grows-downward-not-upward
-                  sap<
-                  caller-fp fp)
-             (return (values caller-fp
-                             (sap-ref-sap saved-fp
-                                          (sb!vm::frame-byte-offset
-                                           sb!vm:return-pc-save-offset)))))))))))
-
 (deftransform alien-funcall ((function &rest args) * * :node node)
   (let ((type (lvar-type function)))
     (unless (alien-type-type-p type)

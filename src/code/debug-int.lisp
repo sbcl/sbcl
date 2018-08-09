@@ -650,9 +650,54 @@
 #!+(or x86 x86-64)
 (defun find-saved-frame-down (fp up-frame)
   (multiple-value-bind (saved-fp saved-pc)
-      (sb!alien-internals:find-saved-fp-and-pc fp)
+      (find-saved-fp-and-pc fp)
     (when saved-fp
       (compute-calling-frame saved-fp saved-pc up-frame t))))
+
+(defun walk-binding-stack (symbol function)
+  (let* (#!+sb-thread
+         (tls-index #!+sb-thread
+                    (get-lisp-obj-address (symbol-tls-index symbol)))
+         (current-value
+           #!+sb-thread
+           (sap-ref-lispobj (sb!thread::current-thread-sap) tls-index)
+           #!-sb-thread
+           (symbol-value symbol)))
+    (funcall function current-value)
+    (loop for start = (descriptor-sap *binding-stack-start*)
+          for pointer = (descriptor-sap sb!vm::*binding-stack-pointer*)
+          then (sap+ pointer (* n-word-bytes -2))
+          while (sap> pointer start)
+          when
+          #!+sb-thread (eq (sap-ref-word pointer (* n-word-bytes -1)) tls-index)
+          #!-sb-thread (eq (sap-ref-lispobj pointer (* n-word-bytes -1)) symbol)
+          do (unless (or #!+sb-thread
+                         (= (sap-ref-word pointer (* n-word-bytes -2))
+                            no-tls-value-marker-widetag))
+               (funcall function
+                        (sap-ref-lispobj pointer
+                                         (* n-word-bytes -2)))))))
+
+#!+c-stack-is-control-stack
+(defun find-saved-fp-and-pc (fp)
+  (block nil
+    (walk-binding-stack
+     '*saved-fp*
+     (lambda (x)
+       (when x
+         (let* ((saved-fp (int-sap x))
+                (caller-fp (sap-ref-sap saved-fp
+                                        (sb!vm::frame-byte-offset
+                                         ocfp-save-offset))))
+           (when (#!+stack-grows-downward-not-upward
+                  sap>
+                  #!-stack-grows-downward-not-upward
+                  sap<
+                  caller-fp fp)
+             (return (values caller-fp
+                             (sap-ref-sap saved-fp
+                                          (sb!vm::frame-byte-offset
+                                           return-pc-save-offset)))))))))))
 
 (defun return-pc-offset-for-location (debug-fun location)
   (declare (ignorable debug-fun location))
