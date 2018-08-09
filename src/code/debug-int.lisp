@@ -663,26 +663,28 @@
            (sap-ref-lispobj (sb!thread::current-thread-sap) tls-index)
            #!-sb-thread
            (symbol-value symbol)))
-    (funcall function current-value)
-    (loop for start = (descriptor-sap *binding-stack-start*)
-          for pointer = (descriptor-sap sb!vm::*binding-stack-pointer*)
-          then (sap+ pointer (* n-word-bytes -2))
-          while (sap> pointer start)
-          when
-          #!+sb-thread (eq (sap-ref-word pointer (* n-word-bytes -1)) tls-index)
-          #!-sb-thread (eq (sap-ref-lispobj pointer (* n-word-bytes -1)) symbol)
-          do (unless (or #!+sb-thread
-                         (= (sap-ref-word pointer (* n-word-bytes -2))
-                            no-tls-value-marker-widetag))
-               (funcall function
-                        (sap-ref-lispobj pointer
-                                         (* n-word-bytes -2)))))))
+    (unless (eq (get-lisp-obj-address current-value)
+                no-tls-value-marker-widetag)
+      (funcall function current-value)
+      (loop for start = (descriptor-sap *binding-stack-start*)
+            for pointer = (descriptor-sap sb!vm::*binding-stack-pointer*)
+            then (sap+ pointer (* n-word-bytes -2))
+            while (sap> pointer start)
+            when
+            #!+sb-thread (eq (sap-ref-word pointer (* n-word-bytes -1)) tls-index)
+            #!-sb-thread (eq (sap-ref-lispobj pointer (* n-word-bytes -1)) symbol)
+            do (unless (or #!+sb-thread
+                           (= (sap-ref-word pointer (* n-word-bytes -2))
+                              no-tls-value-marker-widetag))
+                 (funcall function
+                          (sap-ref-lispobj pointer
+                                           (* n-word-bytes -2))))))))
 
 #!+c-stack-is-control-stack
 (defun find-saved-fp-and-pc (fp)
   (block nil
     (walk-binding-stack
-     '*saved-fp*
+     'sb!alien-internals:*saved-fp*
      (lambda (x)
        (when x
          (let* ((saved-fp (int-sap x))
