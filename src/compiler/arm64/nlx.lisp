@@ -112,22 +112,20 @@
                    (= catch-block-entry-pc-slot 3)))
     (inst compute-lra temp lip entry-label)
     (inst stp code-tn temp (@ result (* n-word-bytes 2)))
-    #.(assert (and (= catch-block-tag-slot 4)
-                   (= catch-block-previous-catch-slot 5)))
+    #.(assert (and (= catch-block-previous-catch-slot 4)
+                   (= catch-block-tag-slot 5)))
     (load-tl-symbol-value temp *current-catch-block*)
-    (inst stp tag temp (@ result (* n-word-bytes 4)))
+    (inst stp temp tag (@ result (* n-word-bytes 4)))
     (store-tl-symbol-value result *current-catch-block*)
 
     (move block result)))
 
-;;; Just set the current unwind-protect to TN's address.  This
+;;; Just set the current unwind-protect to UWP.  This
 ;;; instantiates an unwind block as an unwind-protect.
 (define-vop (set-unwind-protect)
-  (:args (tn))
-  (:temporary (:scs (descriptor-reg)) new-uwp)
+  (:args (uwp))
   (:generator 7
-    (inst add new-uwp cfp-tn (add-sub-immediate (* (tn-offset tn) n-word-bytes)))
-    (store-tl-symbol-value new-uwp *current-unwind-protect-block*)))
+    (store-tl-symbol-value uwp *current-unwind-protect-block*)))
 
 (define-vop (unlink-catch-block)
   (:temporary (:scs (any-reg)) block)

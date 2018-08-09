@@ -120,14 +120,12 @@
 
     (move result block)))
 
-;;; Just set the current unwind-protect to TN's address. This
+;;; Just set the current unwind-protect to UWP. This
 ;;; instantiates an unwind block as an unwind-protect.
 (define-vop (set-unwind-protect)
-  (:args (tn))
-  (:temporary (:scs (descriptor-reg)) new-uwp)
+  (:args (uwp))
   (:generator 7
-    (inst lda new-uwp (* (tn-offset tn) n-word-bytes) cfp-tn)
-    (store-symbol-value new-uwp *current-unwind-protect-block*)))
+    (store-symbol-value uwp *current-unwind-protect-block*)))
 
 (define-vop (unlink-catch-block)
   (:temporary (:scs (any-reg)) block)

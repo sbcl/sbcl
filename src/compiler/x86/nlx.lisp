@@ -105,22 +105,21 @@
     (storew temp block catch-block-previous-catch-slot)
     (store-tl-symbol-value block *current-catch-block* temp)))
 
-;;; Just set the current unwind-protect to TN's address. This instantiates an
+;;; Just set the current unwind-protect to UWP. This instantiates an
 ;;; unwind block as an unwind-protect.
 (define-vop (set-unwind-protect)
-  (:args (tn))
-  (:temporary (:sc unsigned-reg) new-uwp #!+sb-thread tls #!+win32 seh-frame)
+  (:args (uwp))
+  (:temporary (:sc unsigned-reg) #!+sb-thread tls #!+win32 seh-frame)
   (:generator 7
-    (inst lea new-uwp (unwind-block-ea tn))
     #!+win32
     (progn
       (storew (make-fixup 'uwp-seh-handler :assembly-routine)
-              new-uwp unwind-block-seh-frame-handler-slot)
+              uwp unwind-block-seh-frame-handler-slot)
       (inst lea seh-frame
-            (make-ea-for-object-slot new-uwp
+            (make-ea-for-object-slot uwp
                                      unwind-block-next-seh-frame-slot 0))
       (inst mov (make-ea :dword :disp 0) seh-frame :fs))
-    (store-tl-symbol-value new-uwp *current-unwind-protect-block* tls)))
+    (store-tl-symbol-value uwp *current-unwind-protect-block* tls)))
 
 (define-vop (unlink-catch-block)
   (:temporary (:sc unsigned-reg) #!+sb-thread tls block)

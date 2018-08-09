@@ -1910,7 +1910,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
            (emit-make-value-cell node block res (ir2-nlx-info-home 2info))
            (emit-move node block res (ir2-nlx-info-home 2info))))
       (:unwind-protect
-       (vop set-unwind-protect node block block-tn))
+       (vop set-unwind-protect node block res))
       (:catch)))
 
   (values))

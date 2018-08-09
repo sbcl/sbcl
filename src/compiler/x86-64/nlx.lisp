@@ -99,14 +99,12 @@
     (load-binding-stack-pointer temp)
     (storew temp block catch-block-bsp-slot)))
 
-;;; Just set the current unwind-protect to TN's address. This instantiates an
+;;; Just set the current unwind-protect to UWP. This instantiates an
 ;;; unwind block as an unwind-protect.
 (define-vop (set-unwind-protect)
-  (:args (tn))
-  (:temporary (:sc unsigned-reg) new-uwp)
+  (:args (uwp))
   (:generator 7
-    (inst lea new-uwp (unwind-block-ea tn))
-    (store-tl-symbol-value new-uwp *current-unwind-protect-block*)))
+    (store-tl-symbol-value uwp *current-unwind-protect-block*)))
 
 (define-vop (unlink-catch-block)
   (:temporary (:sc unsigned-reg) block)

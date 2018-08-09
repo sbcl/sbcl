@@ -159,9 +159,9 @@
   (let ((error (generate-error-code nil 'unseen-throw-tag-error target)))
     (inst cbz catch error))
 
-  #.(assert (and (= catch-block-tag-slot 4)
-                 (= catch-block-previous-catch-slot 5)))
-  (inst ldp tag tmp-tn (@ catch (* 4 n-word-bytes)))
+  #.(assert (and (= catch-block-previous-catch-slot 4)
+                 (= catch-block-tag-slot 5)))
+  (inst ldp tmp-tn tag (@ catch (* 4 n-word-bytes)))
   (inst cmp tag target)
   (inst b :eq DONE)
   (inst mov catch tmp-tn)
