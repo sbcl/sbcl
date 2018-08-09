@@ -217,5 +217,7 @@
                      (if (nlx-info-safe-p nlx)
                          (make-normal-tn *backend-t-primitive-type*)
                          (make-stack-pointer-tn)))
-             :save-sp (make-nlx-sp-tn physenv)))))
+             :save-sp (unless (eq (cleanup-kind (nlx-info-cleanup nlx))
+                                  :unwind-protect)
+                        (make-nlx-sp-tn physenv))))))
   (values))

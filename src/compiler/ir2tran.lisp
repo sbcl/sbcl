@@ -1895,7 +1895,8 @@ not stack-allocated LVAR ~S." source-lvar)))))
     (vop* save-dynamic-state node block
           (nil)
           ((reference-tn-list (cdr (ir2-nlx-info-dynamic-state 2info)) t)))
-    (vop current-stack-pointer node block (ir2-nlx-info-save-sp 2info))
+    (unless (eq kind :unwind-protect)
+      (vop current-stack-pointer node block (ir2-nlx-info-save-sp 2info)))
 
     (ecase kind
       (:catch

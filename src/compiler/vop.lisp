@@ -481,7 +481,7 @@
   ;; unwind-block, so we leave this slot null.
   (home nil :type (or tn null))
   ;; the saved control stack pointer
-  (save-sp (missing-arg) :type tn)
+  (save-sp nil :type (or tn null))
   ;; the list of dynamic state save TNs
 
   (dynamic-state #!-x86-64
