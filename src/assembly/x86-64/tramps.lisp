@@ -118,7 +118,7 @@
   ;; load RAX with the PC after the call site
   (inst mov rax-tn (ea 16 rsp-tn))
   ;; load RBX with the signed 32-bit immediate from the call instruction
-  (inst movsx rbx-tn (ea -4 rax-tn nil nil :dword))
+  (inst movsx '(:dword :qword) rbx-tn (ea -4 rax-tn))
   ;; if at [PC-5] we see #x25 then it was a call with 32-bit mem addr
   ;; if ...              #xE8 then ...                32-bit offset
   (inst cmp (ea -5 rax-tn nil nil :byte) #x25)

@@ -1291,12 +1291,11 @@
   (:generator 4
      (sc-case float
        (single-reg
-        (let ((dword-bits (reg-in-size bits :dword)))
-          (inst movd dword-bits float)
-          (inst movsxd bits dword-bits)))
+        (inst movd (reg-in-size bits :dword) float)
+        (inst movsx '(:dword :qword) bits bits))
        (single-stack ; c.f. ea-for-sf-stack
-        (inst movsxd bits
-              (ea (frame-byte-offset (tn-offset float)) rbp-tn nil nil :dword)))
+        (inst movsx '(:dword :qword)
+              bits (ea (frame-byte-offset (tn-offset float)) rbp-tn)))
        (descriptor-reg
         (move bits float)
         (inst sar bits 32)))))

@@ -634,9 +634,8 @@
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
   (:generator 4
-    (let ((res (reg-in-size res :dword)))
-      (inst movzx res (ea (1+ (- instance-pointer-lowtag)) struct nil nil :word))
-      (inst shl res n-fixnum-tag-bits))))
+    (inst movzx '(:word :dword) res (ea (1+ (- instance-pointer-lowtag)) struct))
+    (inst shl (reg-in-size res :dword) n-fixnum-tag-bits)))
 
 #!+compact-instance-header
 (progn

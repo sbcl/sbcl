@@ -40,10 +40,10 @@
     ;; OBJECT is implicitly pinned, TEMP can GC-safely point to it
     ;; with no lowtag.
     (inst and temp (lognot lowtag-mask)) ; native pointer
-    (inst movzx (reg-in-size result :dword) (ea 0 temp nil nil :byte))
+    (inst movzx '(:byte :dword) result (ea temp))
     (inst jmp DONE)
     IMMEDIATE
-    (inst movzx (reg-in-size result :dword) (reg-in-size object :byte))
+    (inst movzx '(:byte :dword) result object)
     DONE))
 
 #!+compact-instance-header
@@ -72,12 +72,12 @@
       (inst test (reg-in-size rax :byte) #b1111)
       (inst jmp  :ne imm-or-list)
       ;; It's an other-pointer. Read the widetag.
-      (inst movzx (reg-in-size rax :dword) (ea 0 rax nil nil :byte))
+      (inst movzx '(:byte :dword) rax (ea rax))
       (inst jmp  load-from-vector)
       IMM-OR-LIST
       (inst cmp  object nil-value)
       (inst jmp  :eq NULL)
-      (inst movzx (reg-in-size rax :dword) (reg-in-size object :byte))
+      (inst movzx '(:byte :dword) rax (reg-in-size object :byte))
       LOAD-FROM-VECTOR
       (inst mov  result layouts)
       (inst mov  (reg-in-size result :dword)
@@ -88,23 +88,22 @@
       (inst mov  result (make-fixup (find-layout 'null) :layout))
       DONE))
 
+(macrolet ((load-type (target source lowtag)
+             `(inst movzx '(:byte :dword) ,target (ea (- ,lowtag) ,source))))
 (define-vop (%other-pointer-widetag)
   (:translate %other-pointer-widetag)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
-  (:generator 6
-    (load-type result object (- other-pointer-lowtag))))
-
+  (:generator 1 (load-type result object other-pointer-lowtag)))
 (define-vop (fun-subtype)
   (:translate fun-subtype)
   (:policy :fast-safe)
   (:args (function :scs (descriptor-reg)))
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
-  (:generator 6
-    (load-type result function (- fun-pointer-lowtag))))
+  (:generator 1 (load-type result function fun-pointer-lowtag))))
 
 (define-vop (get-header-data)
   (:translate get-header-data)
@@ -123,8 +122,8 @@
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
   (:generator 6
+    (inst movzx '(:word :dword) res (ea (1+ (- fun-pointer-lowtag)) x))
     (let ((res (reg-in-size res :dword)))
-      (inst movzx res (ea (1+ (- fun-pointer-lowtag)) x nil nil :word))
       (inst btr res 15) ; Clear the NAMEDP header bit
       (inst shl res n-fixnum-tag-bits))))
 

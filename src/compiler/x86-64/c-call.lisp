@@ -207,13 +207,7 @@
   (:results (res :scs (signed-reg)))
   (:result-types fixnum)
   (:generator 1
-   (inst movsx res
-         (make-random-tn :kind :normal
-                         :sc (sc-or-lose (ecase size
-                                           (8 'byte-reg)
-                                           (16 'word-reg)
-                                           (32 'dword-reg)))
-                         :offset (tn-offset val)))))
+    (inst movsx `(,(ecase size (8 :byte) (16 :word) (32 :dword)) :qword) res val)))
 
 #-sb-xc-host
 (defun sign-extend (x size)

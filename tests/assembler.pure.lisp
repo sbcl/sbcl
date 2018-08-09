@@ -96,24 +96,24 @@
 
 (with-test (:name :assemble-movsx :skipped-on (not :x86-64))
   ;; source = :BYTE, signed
-  (check-does-not-assemble `(movsx ,r8b-tn ,cl-tn))
-  (test-assemble `(movsx ,r8w-tn ,cl-tn) "66440FBEC1       MOVSX R8W, CL")
-  (test-assemble `(movsx ,r8d-tn ,cl-tn) "440FBEC1         MOVSX R8D, CL")
-  (test-assemble `(movsx ,r8-tn  ,cl-tn) "4C0FBEC1         MOVSX R8, CL")
+  (check-does-not-assemble `(movsx '(:byte :byte) ,r8b-tn ,cl-tn))
+  (test-assemble `(movsx (:byte :word)  ,r8w-tn ,cl-tn) "66440FBEC1       MOVSX R8W, CL")
+  (test-assemble `(movsx (:byte :dword) ,r8d-tn ,cl-tn) "440FBEC1         MOVSX R8D, CL")
+  (test-assemble `(movsx (:byte :qword) ,r8-tn  ,cl-tn) "4C0FBEC1         MOVSX R8, CL")
   ;; source = :BYTE, unsigned
-  (check-does-not-assemble `(movzx ,r8b-tn ,cl-tn))
-  (test-assemble `(movzx ,r8w-tn ,cl-tn) "66440FB6C1       MOVZX R8W, CL")
-  (test-assemble `(movzx ,r8d-tn ,cl-tn) "440FB6C1         MOVZX R8D, CL")
-  (test-assemble `(movzx ,r8-tn  ,cl-tn) "440FB6C1         MOVZX R8D, CL") ; R8D, not R8
+  (check-does-not-assemble `(movzx '(:byte :byte) ,r8b-tn ,cl-tn))
+  (test-assemble `(movzx (:byte :word)  ,r8w-tn ,cl-tn) "66440FB6C1       MOVZX R8W, CL")
+  (test-assemble `(movzx (:byte :dword) ,r8d-tn ,cl-tn) "440FB6C1         MOVZX R8D, CL")
+  (test-assemble `(movzx (:byte :qword) ,r8-tn  ,cl-tn) "440FB6C1         MOVZX R8D, CL") ; R8D, not R8
   ;; source = :WORD, signed
-  (test-assemble `(movsx ,r8d-tn ,cx-tn) "440FBFC1         MOVSX R8D, CX")
-  (test-assemble `(movsx ,r8-tn ,cx-tn)  "4C0FBFC1         MOVSX R8, CX")
+  (test-assemble `(movsx (:word :dword) ,r8d-tn ,cx-tn) "440FBFC1         MOVSX R8D, CX")
+  (test-assemble `(movsx (:word :qword) ,r8-tn ,cx-tn)  "4C0FBFC1         MOVSX R8, CX")
   ;; source = :WORD, unsigned
-  (test-assemble `(movzx ,r8d-tn ,cx-tn) "440FB7C1         MOVZX R8D, CX")
-  (test-assemble `(movzx ,r8-tn ,cx-tn)  "440FB7C1         MOVZX R8D, CX") ; R8D, not R8
+  (test-assemble `(movzx (:word :dword) ,r8d-tn ,cx-tn) "440FB7C1         MOVZX R8D, CX")
+  (test-assemble `(movzx (:word :qword) ,r8-tn ,cx-tn)  "440FB7C1         MOVZX R8D, CX") ; R8D, not R8
   ;; source = :DWORD, signed and unsigned
-  (test-assemble `(movsx ,r8-tn ,ecx-tn) "4C63C1           MOVSX R8, ECX")
-  (check-does-not-assemble `(movzx ,r8-tn ,ecx-tn))) ; should use MOV instead
+  (test-assemble `(movsx (:dword :qword) ,r8-tn ,ecx-tn) "4C63C1           MOVSX R8, ECX")
+  (check-does-not-assemble `(movzx '(:dword :qword) ,r8-tn ,ecx-tn))) ; should use MOV instead
 
 (with-test (:name :disassemble-movabs-instruction :skipped-on (not :x86-64))
   (let* ((bytes (coerce '(#x48 #xA1 8 7 6 5 4 3 2 1

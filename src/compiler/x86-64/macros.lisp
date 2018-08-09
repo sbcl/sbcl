@@ -126,11 +126,6 @@
 
 (defmacro store-binding-stack-pointer (reg)
   `(store-tl-symbol-value ,reg *binding-stack-pointer*))
-
-(defmacro load-type (target source &optional (offset 0))
-  "Loads the type bits of a pointer into target independent of
-   byte-ordering issues."
-  `(inst movzx ,target (ea ,offset ,source nil nil :byte)))
 
 ;;;; error code
 (defun emit-error-break (vop kind code values)

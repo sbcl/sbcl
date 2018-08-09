@@ -2034,7 +2034,7 @@ constant shift greater than word length")))
    (:generator 3
      (case width
        ((8 16 32)
-        (inst movsx r (reg-in-size x (bits->size width))))
+        (inst movsx `(,(bits->size width) :qword) r x))
        (t
         (move r x)
         (shift-unshift r width)))))
@@ -2050,9 +2050,9 @@ constant shift greater than word length")))
    (:generator 4
      (case width
        ((8 16 32)
-        (inst movsx r (ea (- (* bignum-digits-offset n-word-bytes)
-                             other-pointer-lowtag)
-                          x nil nil (bits->size width))))
+        (inst movsx `(,(bits->size width) :qword)
+              r
+              (ea (- (* bignum-digits-offset n-word-bytes) other-pointer-lowtag) x)))
        (t
         (loadw r x bignum-digits-offset other-pointer-lowtag)
         (shift-unshift r width))))))

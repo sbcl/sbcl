@@ -178,7 +178,12 @@
                                     type
                                     size)
              (let ((ref-name-c (symbolicate ref-name "-C"))
-                   (set-name-c (symbolicate set-name "-C")))
+                   (set-name-c (symbolicate set-name "-C"))
+                   (opcode-modifier
+                    (ecase ref-insn
+                     (movzx `(,size :dword))
+                     (movsx `(,size :qword))
+                     (mov   nil))))
                `(progn
                   (define-vop (,ref-name)
                     (:translate ,ref-name)
@@ -189,7 +194,9 @@
                     (:results (result :scs (,sc)))
                     (:result-types ,type)
                     (:generator 5
-                      (inst ,ref-insn result (ea 0 sap offset 1 ,size))))
+                      ,(if opcode-modifier
+                           `(inst ,ref-insn ',opcode-modifier result (ea sap offset))
+                           `(inst ,ref-insn (reg-in-size result ,size) (ea 0 sap offset 1 ,size)))))
                   (define-vop (,ref-name-c)
                     (:translate ,ref-name)
                     (:policy :fast-safe)
@@ -200,7 +207,9 @@
                     (:results (result :scs (,sc)))
                     (:result-types ,type)
                     (:generator 4
-                      (inst ,ref-insn result (ea offset sap nil nil ,size))))
+                      ,(if opcode-modifier
+                           `(inst ,ref-insn ',opcode-modifier result (ea offset sap))
+                           `(inst ,ref-insn (reg-in-size result ,size) (ea offset sap nil nil ,size)))))
                   (define-vop (,set-name)
                     (:translate ,set-name)
                     (:policy :fast-safe)
@@ -231,9 +240,9 @@
     unsigned-reg positive-fixnum :word)
   (def-system-ref-and-set signed-sap-ref-16 %set-signed-sap-ref-16 movsx
     signed-reg tagged-num :word)
-  (def-system-ref-and-set sap-ref-32 %set-sap-ref-32 movzxd
+  (def-system-ref-and-set sap-ref-32 %set-sap-ref-32 mov
     unsigned-reg unsigned-num :dword)
-  (def-system-ref-and-set signed-sap-ref-32 %set-signed-sap-ref-32 movsxd
+  (def-system-ref-and-set signed-sap-ref-32 %set-signed-sap-ref-32 movsx
     signed-reg signed-num :dword)
   (def-system-ref-and-set sap-ref-64 %set-sap-ref-64 mov
     unsigned-reg unsigned-num :qword)
