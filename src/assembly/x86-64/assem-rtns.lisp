@@ -330,7 +330,12 @@
                          ((:arg block (any-reg descriptor-reg) rax-offset)
                           (:arg start (any-reg descriptor-reg) rbx-offset)
                           (:arg count (any-reg descriptor-reg) rcx-offset)
-                          (:temp uwp unsigned-reg rsi-offset))
+                          (:temp uwp unsigned-reg rsi-offset)
+                          ;; for unbind-to-here
+                          (:temp where unsigned-reg r8-offset)
+                          (:temp symbol unsigned-reg r9-offset)
+                          (:temp value unsigned-reg r10-offset)
+                          (:temp zero complex-double-reg float0-offset))
   (declare (ignore start count))
 
   (let ((error (generate-error-code nil 'invalid-unwind-error)))
@@ -358,6 +363,8 @@
 
   (loadw rbp-tn block unwind-block-cfp-slot)
 
+  (loadw where block unwind-block-bsp-slot)
+  (unbind-to-here where symbol value uwp zero)
   ;; Uwp-entry expects some things in known locations so that they can
   ;; be saved on the stack: the block in edx-tn, start in ebx-tn, and
   ;; count in ecx-tn.

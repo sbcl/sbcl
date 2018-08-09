@@ -544,11 +544,9 @@
     (inst sub bsp (* binding-size n-word-bytes))
     (store-binding-stack-pointer bsp)))
 
-(define-vop (unbind-to-here)
-  (:args (where :scs (descriptor-reg any-reg)))
-  (:temporary (:sc unsigned-reg) symbol value bsp)
-  (:temporary (:sc complex-double-reg) zero)
-  (:generator 0
+(defun unbind-to-here (where symbol value bsp
+                       zero)
+  (assemble ()
     (load-binding-stack-pointer bsp)
     (inst cmp where bsp)
     (inst jmp :e DONE)
@@ -580,6 +578,13 @@
     (store-binding-stack-pointer bsp)
 
     DONE))
+
+(define-vop (unbind-to-here)
+  (:args (where :scs (descriptor-reg any-reg)))
+  (:temporary (:sc unsigned-reg) symbol value bsp)
+  (:temporary (:sc complex-double-reg) zero)
+  (:generator 0
+    (unbind-to-here where symbol value bsp zero)))
 
 ;;;; closure indexing
 

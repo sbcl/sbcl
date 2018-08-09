@@ -71,7 +71,9 @@
     (storew temp block unwind-block-uwp-slot)
     (storew rbp-tn block unwind-block-cfp-slot)
     (inst lea temp (rip-relative-ea :qword entry-label))
-    (storew temp block unwind-block-entry-pc-slot)))
+    (storew temp block unwind-block-entry-pc-slot)
+    (load-binding-stack-pointer temp)
+    (storew temp block unwind-block-bsp-slot)))
 
 ;;; like MAKE-UNWIND-BLOCK, except that we also store in the specified
 ;;; tag, and link the block into the CURRENT-CATCH list
@@ -91,7 +93,9 @@
     (storew tag block catch-block-tag-slot)
     (load-tl-symbol-value temp *current-catch-block*)
     (storew temp block catch-block-previous-catch-slot)
-    (store-tl-symbol-value block *current-catch-block*)))
+    (store-tl-symbol-value block *current-catch-block*)
+    (load-binding-stack-pointer temp)
+    (storew temp block catch-block-bsp-slot)))
 
 ;;; Just set the current unwind-protect to TN's address. This instantiates an
 ;;; unwind block as an unwind-protect.
@@ -231,8 +235,9 @@
 (define-vop (unwind-to-frame-and-call)
     (:args (ofp :scs (descriptor-reg))
            (uwp :scs (descriptor-reg))
-           (function :scs (descriptor-reg) :to :load :target saved-function))
-  (:arg-types system-area-pointer system-area-pointer t)
+           (function :scs (descriptor-reg) :to :load :target saved-function)
+           (bsp :scs (any-reg descriptor-reg)))
+  (:arg-types system-area-pointer system-area-pointer t t)
   (:temporary (:sc sap-reg) temp)
   (:temporary (:sc descriptor-reg :offset rbx-offset) saved-function)
   (:temporary (:sc unsigned-reg :offset rax-offset) block)
@@ -255,6 +260,7 @@
 
     (inst lea temp-reg-tn (rip-relative-ea :qword entry-label))
     (storew temp-reg-tn block unwind-block-entry-pc-slot)
+    (storew bsp block catch-block-bsp-slot)
 
     ;; Run any required UWPs.
     (invoke-asm-routine 'jmp 'unwind vop)

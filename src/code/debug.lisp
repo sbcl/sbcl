@@ -1775,10 +1775,12 @@ forms that explicitly control this kind of evaluation.")
                            ;; function, we need to restore the binding
                            ;; stack and the catch block. The unwind block
                            ;; is taken care of by the VOP.
+                           #!-x86-64
                            (sb!vm::%primitive sb!vm::unbind-to-here
                                               unbind-to)
                            (setf sb!vm::*current-catch-block* block)
-                           (funcall thunk)))))
+                           (funcall thunk))
+                         #!+x86-64 unbind-to)))
   #!-unwind-to-frame-and-call-vop
   (let ((tag (gensym)))
     (replace-frame-catch-tag frame

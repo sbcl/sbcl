@@ -284,6 +284,7 @@
   (cfp :c-type #!-alpha "lispobj *" #!+alpha "u32")
   #!-(or x86 x86-64) code
   entry-pc
+  #!+x86-64 bsp
   #!+win32 next-seh-frame
   #!+win32 seh-frame-handler)
 
@@ -292,6 +293,7 @@
   (cfp :c-type #!-alpha "lispobj *" #!+alpha "u32")
   #!-(or x86 x86-64) code
   entry-pc
+  #!+x86-64 bsp
   #!+(and win32 x86) next-seh-frame
   #!+(and win32 x86) seh-frame-handler
   tag
