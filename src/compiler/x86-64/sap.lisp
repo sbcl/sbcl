@@ -179,11 +179,8 @@
                                     size)
              (let ((ref-name-c (symbolicate ref-name "-C"))
                    (set-name-c (symbolicate set-name "-C"))
-                   (opcode-modifier
-                    (ecase ref-insn
-                     (movzx `(,size :dword))
-                     (movsx `(,size :qword))
-                     (mov   nil))))
+                   (opcode-modifier (unless (eq ref-insn 'mov)
+                                      `(,size :qword))))
                `(progn
                   (define-vop (,ref-name)
                     (:translate ,ref-name)
@@ -240,7 +237,7 @@
     unsigned-reg positive-fixnum :word)
   (def-system-ref-and-set signed-sap-ref-16 %set-signed-sap-ref-16 movsx
     signed-reg tagged-num :word)
-  (def-system-ref-and-set sap-ref-32 %set-sap-ref-32 mov
+  (def-system-ref-and-set sap-ref-32 %set-sap-ref-32 movzx
     unsigned-reg unsigned-num :dword)
   (def-system-ref-and-set signed-sap-ref-32 %set-signed-sap-ref-32 movsx
     signed-reg signed-num :dword)

@@ -1429,9 +1429,10 @@
   (:printer reg-reg/mem-dir ((op #b100010)))
   ;; immediate to register/memory
   (:printer reg/mem-imm/asm-routine ((op '(#b1100011 #b000))))
-  (:emitter
-   (let ((size (matching-operand-size dst src)))
-     (cond ((gpr-p dst)
+  (:emitter (emit-mov segment (matching-operand-size dst src) dst src)))
+
+(defun emit-mov (segment size dst src)
+  (cond ((gpr-p dst)
             (cond ((integerp src)
                    ;; We want to encode the immediate using the fewest bytes possible.
                    (let ((imm-size
@@ -1475,7 +1476,7 @@
                    (emit-byte segment (opcode+size-bit #x8A size))
                    (emit-ea segment src (reg-tn-encoding dst)
                             :allow-constants t))))
-           ((integerp src) ; imm to memory
+        ((integerp src) ; imm to memory
             ;; C7 only deals with 32 bit immediates even if the
             ;; destination is a 64-bit location. The value is
             ;; sign-extended in this case.
@@ -1491,11 +1492,11 @@
               ;; to get :REMAINING-BYTES correct.
               (emit-ea segment dst #b000 :remaining-bytes (size-nbyte imm-size))
               (emit-imm-operand segment imm-val imm-size)))
-           ((gpr-p src) ; reg to mem
+        ((gpr-p src) ; reg to mem
             (emit-prefixes segment dst src size)
             (emit-byte segment (opcode+size-bit #x88 size))
             (emit-ea segment dst (reg-tn-encoding src)))
-           ((fixup-p src)
+        ((fixup-p src)
             ;; MOV to memory take at most a 32-bit immediate arg.
             ;; The acceptable fixup flavors are enumerated here.
             ;; The linkage table and immobile spaces reside at
@@ -1508,8 +1509,8 @@
             (emit-byte segment #xC7)
             (emit-ea segment dst #b000)
             (emit-absolute-fixup segment src))
-           (t
-            (error "bogus arguments to MOV: ~S ~S" dst src))))))
+        (t
+            (error "bogus arguments to MOV: ~S ~S" dst src))))
 
 ;;; MOVABS is not a mnemonic according to the CPU vendors, but every (dis)assembler
 ;;; in popular use chooses this mnemonic instead of MOV with an 8-byte operand.
@@ -1550,11 +1551,16 @@
          (let ((dst-size (cadr sizes)) ; DST-SIZE size governs the OPERAND-SIZE
                (src-size (car sizes))  ; SRC-SIZE is controlled by the opcode
                (opcode (if signed-p #xBE #xB6)))
+           (aver (> (size-nbyte dst-size) (size-nbyte src-size)))
            ;; Zero-extending into a 64-bit register is the same as zero-extending
            ;; into the 32-bit register.
            (when (and (not signed-p) (eq dst-size :qword))
+             ;; It's slightly strange for the assembler to output a different instruction
+             ;; from the one you said to. I'm not sure how to feel about this.
+             ;; There might be reasons you wanted to emit a certain thing.
+             (when (eq src-size :dword) ; this is a straight MOV
+               (return-from emit* (emit-mov segment :dword dst src)))
              (setf dst-size :dword))
-           (aver (> (size-nbyte dst-size) (size-nbyte src-size)))
            (emit-prefixes segment src dst dst-size)
            (if (eq src-size :dword)
                ;; AMD calls this MOVSXD. If emitted without REX.W, it writes

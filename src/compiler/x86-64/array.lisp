@@ -693,17 +693,21 @@
 ;;; {un,}signed-byte-{8,16,32} and characters
 (macrolet ((define-data-vector-frobs (ptype mov-inst operand-size
                                             type &rest scs)
-  (let ((opcode-modifier
-         (ecase mov-inst
-          (movzx `(,operand-size :dword))
-          (movsx `(,operand-size :qword))
-          (mov   nil)))
-        (n-bytes (the (member 1 2 4) (size-nbyte operand-size))))
-    (multiple-value-bind (index-sc scale)
-        (if (>= n-bytes (ash 1 n-fixnum-tag-bits))
-            (values 'any-reg (ash n-bytes (- n-fixnum-tag-bits)))
-            (values 'signed-reg n-bytes))
-      `(progn
+  (binding* ((opcode-modifier `(,operand-size :qword))
+             (n-bytes (the (member 1 2 4) (size-nbyte operand-size)))
+             ((index-sc scale)
+              (if (>= n-bytes (ash 1 n-fixnum-tag-bits))
+                  (values 'any-reg (ash n-bytes (- n-fixnum-tag-bits)))
+                  (values 'signed-reg n-bytes)))
+             (ea-expr `(ea (+ (* vector-data-offset n-word-bytes)
+                              (* offset ,n-bytes)
+                              (- other-pointer-lowtag))
+                           object index ,scale))
+             (ea-expr-const `(ea (+ (* vector-data-offset n-word-bytes)
+                                    (* ,n-bytes (+ index offset))
+                                    (- other-pointer-lowtag))
+                                 object)))
+    `(progn
          (define-vop (,(symbolicate "DATA-VECTOR-REF-WITH-OFFSET/" ptype))
            (:translate data-vector-ref-with-offset)
            (:policy :fast-safe)
@@ -715,14 +719,7 @@
                                                          ,n-bytes vector-data-offset)))
            (:results (value :scs ,scs))
            (:result-types ,type)
-           (:generator 5
-             (let ((disp (- (+ (* vector-data-offset n-word-bytes)
-                             (* offset ,n-bytes)) other-pointer-lowtag)))
-               ,(if opcode-modifier
-                    `(inst ,mov-inst ',opcode-modifier value
-                           (ea disp object index ,scale))
-                    `(inst ,mov-inst (reg-in-size value ,operand-size)
-                           (ea disp object index ,scale ,operand-size))))))
+           (:generator 5 (inst ,mov-inst ',opcode-modifier value ,ea-expr)))
          (define-vop (,(symbolicate "DATA-VECTOR-REF-WITH-OFFSET/" ptype "-C"))
            (:translate data-vector-ref-with-offset)
            (:policy :fast-safe)
@@ -733,15 +730,7 @@
                                                          ,n-bytes vector-data-offset)))
            (:results (value :scs ,scs))
            (:result-types ,type)
-           (:generator 4
-             (let ((disp (- (+ (* vector-data-offset n-word-bytes)
-                             (* ,n-bytes index)
-                             (* ,n-bytes offset))
-                          other-pointer-lowtag)))
-               ,(if opcode-modifier
-                    `(inst ,mov-inst ',opcode-modifier value (ea disp object))
-                    `(inst ,mov-inst (reg-in-size value ,operand-size)
-                           (ea disp object nil nil ,operand-size))))))
+           (:generator 4 (inst ,mov-inst ',opcode-modifier value ,ea-expr-const)))
          (define-vop (,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype))
            (:translate data-vector-set-with-offset)
            (:policy :fast-safe)
@@ -756,10 +745,7 @@
            (:results (result :scs ,scs))
            (:result-types ,type)
            (:generator 5
-             (inst mov (ea (- (+ (* vector-data-offset n-word-bytes)
-                                 (* offset ,n-bytes)) other-pointer-lowtag)
-                           object index ,scale ,operand-size)
-                   (reg-in-size value ,operand-size))
+             (inst mov ,ea-expr (reg-in-size value ,operand-size))
              (move result value)))
          (define-vop (,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype "-C"))
            (:translate data-vector-set-with-offset)
@@ -774,13 +760,8 @@
            (:results (result :scs ,scs))
            (:result-types ,type)
            (:generator 4
-             (inst mov (ea (- (+ (* vector-data-offset n-word-bytes)
-                                 (* ,n-bytes index)
-                                 (* ,n-bytes offset))
-                              other-pointer-lowtag)
-                           object nil nil ,operand-size)
-                   (reg-in-size value ,operand-size))
-             (move result value))))))))
+             (inst mov ,ea-expr-const (reg-in-size value ,operand-size))
+             (move result value)))))))
   (define-data-vector-frobs simple-array-unsigned-byte-7 movzx :byte
     positive-fixnum unsigned-reg signed-reg)
   (define-data-vector-frobs simple-array-unsigned-byte-8 movzx :byte
@@ -796,14 +777,14 @@
     positive-fixnum unsigned-reg signed-reg)
   (define-data-vector-frobs simple-array-signed-byte-16 movsx :word
     tagged-num signed-reg)
-  (define-data-vector-frobs simple-array-unsigned-byte-32 mov :dword
+  (define-data-vector-frobs simple-array-unsigned-byte-32 movzx :dword
     positive-fixnum unsigned-reg signed-reg)
-  (define-data-vector-frobs simple-array-unsigned-byte-31 mov :dword
+  (define-data-vector-frobs simple-array-unsigned-byte-31 movzx :dword
     positive-fixnum unsigned-reg signed-reg)
   (define-data-vector-frobs simple-array-signed-byte-32 movsx :dword
     tagged-num signed-reg)
   #!+sb-unicode
-  (define-data-vector-frobs simple-character-string mov :dword
+  (define-data-vector-frobs simple-character-string movzx :dword
     character character-reg))
 
 

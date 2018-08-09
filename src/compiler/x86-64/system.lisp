@@ -77,7 +77,7 @@
       IMM-OR-LIST
       (inst cmp  object nil-value)
       (inst jmp  :eq NULL)
-      (inst movzx '(:byte :dword) rax (reg-in-size object :byte))
+      (inst movzx '(:byte :dword) rax object)
       LOAD-FROM-VECTOR
       (inst mov  result layouts)
       (inst mov  (reg-in-size result :dword)
