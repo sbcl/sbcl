@@ -363,6 +363,9 @@
 
   (loadw rbp-tn block unwind-block-cfp-slot)
 
+  (loadw uwp block unwind-block-current-catch-slot)
+  (store-tl-symbol-value uwp *current-catch-block*)
+
   (loadw where block unwind-block-bsp-slot)
   (unbind-to-here where symbol value uwp zero)
   ;; Uwp-entry expects some things in known locations so that they can

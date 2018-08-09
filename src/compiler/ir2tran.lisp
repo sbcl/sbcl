@@ -1891,7 +1891,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
     #!-x86-64
     (vop current-binding-pointer node block
          (car (ir2-nlx-info-dynamic-state 2info)))
-
+    #!-x86-64
     (vop* save-dynamic-state node block
           (nil)
           ((reference-tn-list (cdr (ir2-nlx-info-dynamic-state 2info)) t)))
@@ -1993,6 +1993,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
       (vop count-me node block *dynamic-counts-tn*
            (block-number (ir2-block-block block))))
 
+    #!-x86-64
     (vop* restore-dynamic-state node block
           ((reference-tn-list (cdr (ir2-nlx-info-dynamic-state 2info)) nil))
           (nil))

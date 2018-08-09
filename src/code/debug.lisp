@@ -1763,24 +1763,26 @@ forms that explicitly control this kind of evaluation.")
     ;;   * The catch block that should be active after the unwind
     ;;   * The values that the binding stack pointer should have after the
     ;;     unwind.
-    (let ((block (sap-int/fixnum (find-enclosing-catch-block frame)))
+    (let ((catch-block (sap-int/fixnum (find-enclosing-catch-block frame)))
           (unbind-to (find-binding-stack-pointer frame)))
       ;; This VOP will run the neccessary cleanup forms, reset the fp, and
       ;; then call the supplied function.
       (sb!vm::%primitive sb!vm::unwind-to-frame-and-call
                          (sb!di::frame-pointer frame)
                          (find-enclosing-uwp frame)
+                         #!-x86-64
                          (lambda ()
                            ;; Before calling the user-specified
                            ;; function, we need to restore the binding
                            ;; stack and the catch block. The unwind block
                            ;; is taken care of by the VOP.
-                           #!-x86-64
                            (sb!vm::%primitive sb!vm::unbind-to-here
                                               unbind-to)
-                           (setf sb!vm::*current-catch-block* block)
+                           (setf sb!vm::*current-catch-block* catch-block)
                            (funcall thunk))
-                         #!+x86-64 unbind-to)))
+                         #!+x86-64 thunk
+                         #!+x86-64 unbind-to
+                         #!+x86-64 catch-block)))
   #!-unwind-to-frame-and-call-vop
   (let ((tag (gensym)))
     (replace-frame-catch-tag frame

@@ -483,9 +483,11 @@
   ;; the saved control stack pointer
   (save-sp (missing-arg) :type tn)
   ;; the list of dynamic state save TNs
-  (dynamic-state (list* #!+x86-64 (make-stack-pointer-tn)
-                        #!-x86-64 nil
+
+  (dynamic-state #!-x86-64
+                 (list* (make-stack-pointer-tn)
                         (make-dynamic-state-tns))
+                 #!+x86-64 nil
                  :type list)
   ;; the target label for NLX entry
   (target (gen-label) :type label))
