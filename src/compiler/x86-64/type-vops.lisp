@@ -410,3 +410,38 @@
   (:args-var args)
   (:generator 2
    (inst cmp (ea (- other-pointer-lowtag) x nil nil :byte) widetag)))
+
+(defknown layout-eq (instance t) boolean (flushable))
+(define-vop (layout-eq)
+  (:translate layout-eq)
+  (:policy :fast-safe)
+  (:conditional :e)
+  (:args (instance :scs (descriptor-reg))
+         (layout :scs (descriptor-reg immediate)))
+  (:generator 1
+    (inst cmp (ea (- 4 instance-pointer-lowtag) instance nil nil :dword)
+          (if (sc-is layout immediate)
+              (make-fixup (tn-value layout) :layout)
+              layout))))
+
+(defknown layout-inherits-ref-eq (simple-vector index t) boolean (flushable))
+(define-vop (layout-inherits-ref-eq)
+  (:translate layout-inherits-ref-eq)
+  (:policy :fast-safe)
+  (:conditional :e)
+  (:args (vector :scs (descriptor-reg))
+         (index :scs (any-reg descriptor-reg immediate))
+         (thing :scs (descriptor-reg immediate)))
+  (:generator 1
+    (inst cmp
+          (if (sc-is index immediate)
+              (ea (+ (- other-pointer-lowtag)
+                     (ash (+ vector-data-offset (tn-value index)) word-shift))
+                  vector nil nil :dword)
+              (ea (+ (- other-pointer-lowtag)
+                     (ash vector-data-offset word-shift))
+                  vector index (ash 1 (- word-shift n-fixnum-tag-bits))
+                  :dword))
+          (if (sc-is thing immediate)
+              (make-fixup (tn-value thing) :layout)
+              thing))))

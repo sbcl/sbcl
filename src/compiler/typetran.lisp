@@ -725,11 +725,7 @@
   (let* ((spec (lvar-value spec))
          (class (specifier-type spec))
          (name (classoid-name class))
-         (otype (lvar-type object))
-         (layout (let ((res (info :type :compiler-layout name)))
-                   (if (and res (not (layout-invalid res)))
-                       res
-                       nil))))
+         (otype (lvar-type object)))
     (cond
       ;; Flush tests whose result is known at compile time.
       ((not (types-equal-or-intersect otype class))
@@ -744,7 +740,14 @@
       (t
        ;; Delay the type transform to give type propagation a chance.
        (delay-ir1-transform node :constraint)
+       (transform-instance-typep class)))))
 
+(defun transform-instance-typep (class)
+  (let* ((name (classoid-name class))
+          (layout (let ((res (info :type :compiler-layout name)))
+                   (if (and res (not (layout-invalid res)))
+                       res
+                       nil))))
        ;; FIXME: (TYPEP X 'ERROR) - or any condition - checks whether X
        ;; has the lowtag of either an ordinary or funcallable instance.
        ;; But you can not define a class that is both CONDITION and FUNCTION
@@ -795,13 +798,17 @@
                                    (declare (ignore classoid))
                                    (return layout)))))
               (flet ((check-layout (layout-getter)
-                       (if other-layout
-                           ;; It's faster to compare two layouts than
-                           ;; doing whatever is done below
-                           `(let ((object-layout ,layout-getter))
-                              (or (eq object-layout ',layout)
-                                  (eq object-layout ',other-layout)))
-                           `(eq ,layout-getter ',layout))))
+                       (cond (other-layout
+                              ;; It's faster to compare two layouts than
+                              ;; doing whatever is done below
+                              `(let ((object-layout ,layout-getter))
+                                 (or (eq object-layout ',layout)
+                                     (eq object-layout ',other-layout))))
+                             #!+(vop-named sb!vm::layout-eq)
+                             ((equal layout-getter '(%instance-layout object))
+                              `(sb!vm::layout-eq object ',layout))
+                             (t
+                              `(eq ,layout-getter ',layout)))))
                 (if pred
                     `(and ,pred ,(check-layout get-layout))
                     `(block typep ,(check-layout get-layout-or-return-false))))))
@@ -883,7 +890,7 @@
 
            (t
             `(classoid-cell-typep ',(find-classoid-cell name :create t)
-                                  object))))))))
+                                  object))))))
 
 ;;; If the specifier argument is a quoted constant, then we consider
 ;;; converting into a simple predicate or other stuff. If the type is
