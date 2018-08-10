@@ -9,10 +9,48 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-
 (in-package "SB-VM")
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defvar *register-names* (make-array 32 :initial-element nil)))
 
+(macrolet ((defreg (name offset)
+             (let ((offset-sym (symbolicate name "-OFFSET")))
+               `(eval-when (:compile-toplevel :load-toplevel :execute)
+                  (defconstant ,offset-sym ,offset)
+                  (setf (svref *register-names* ,offset-sym) ,(symbol-name name)))))
+           (defregset (name &rest regs)
+             (flet ((offset-namify (n) (symbolicate n "-OFFSET")))
+               `(eval-when (:compile-toplevel :load-toplevel :execute)
+                  (defparameter ,name
+                    (list ,@(mapcar #'offset-namify regs))))))
+           (define-argument-register-set (&rest args)
+             `(progn
+                (defregset *register-arg-offsets* ,@args)
+                (defconstant register-arg-count ,(length args)))))
+  (defreg zero 0)
+  (defreg lr 1)
+  (defreg nsp 2)
+  (defreg lra 5) ; alternate link register
+  (defreg cfp 6)
+  (defreg ocfp 7)
+  (defreg nfp 8)
+  (defreg csp 9)
+  (defreg a0 10)
+  (defreg nl0 11)
+  (defreg a1 12)
+  (defreg nl1 13)
+  (defreg a2 14)
+  (defreg nl2 15)
+  (defreg a3 16)
+  (defreg nl3 17)
+  (defreg nargs 31)
+
+  (defregset non-descriptor-regs nl0 nl1 nl2 nl3 nargs nfp)
+  (defregset descriptor-regs a0 a1 a2 a3 ocfp lra)
+
+  (define-argument-register-set a0 a1 a2 a3))
+
 (!define-storage-bases
  (define-storage-base registers :finite :size 32)
  (define-storage-base control-stack :unbounded :size 8)
@@ -30,9 +68,10 @@
  (zero immediate-constant)
 
  (control-stack control-stack)
- (any-reg registers :alternate-scs (control-stack) :constant-scs (immediate))
- (descriptor-reg registers :alternate-scs (control-stack))
- (non-descriptor-reg registers)
+ (any-reg registers :locations #.(append non-descriptor-regs descriptor-regs)
+          :alternate-scs (control-stack) :constant-scs (immediate))
+ (descriptor-reg registers :locations #.descriptor-regs :alternate-scs (control-stack))
+ (non-descriptor-reg registers :locations #.non-descriptor-regs)
 
  (character-stack non-descriptor-stack)
  (character-reg registers :alternate-scs (character-stack))
@@ -56,49 +95,6 @@
  (catch-block control-stack :element-size catch-block-size)
  (unwind-block control-stack :element-size unwind-block-size)
  )
-
-(defvar *register-names* (make-array 32 :initial-element nil))
-
-(macrolet ((defreg (name offset)
-             (let ((offset-sym (symbolicate name "-OFFSET")))
-               `(progn
-                  (defconstant ,offset-sym ,offset)
-                  (setf (svref *register-names* ,offset-sym) ,(symbol-name name)))))
-           (defregset (name &rest regs)
-             (flet ((offset-namify (n) (symbolicate n "-OFFSET")))
-               `(defparameter ,name
-                  (list ,@(mapcar #'offset-namify regs)))))
-           (define-argument-register-set (&rest args)
-             `(progn
-                (defregset *register-arg-offsets* ,@args)
-                (defconstant register-arg-count ,(length args))
-                (defparameter *register-arg-tns*
-                  (let ((drsc (sc-or-lose 'descriptor-reg)))
-                    (flet ((make (n) (make-random-tn :kind :normal :sc drsc :offset n)))
-                      (mapcar #'make *register-arg-offsets*)))))))
-  (defreg zero 0)
-  (defreg lr 1)
-  (defreg nsp 2)
-  (defreg lra 5) ; alternate link register
-  (defreg cfp 6)
-  (defreg ocfp 7)
-  (defreg nfp 8)
-  (defreg csp 9)
-  (defreg a0 10)
-  (defreg nl0 11)
-  (defreg a1 12)
-  (defreg nl1 13)
-  (defreg a2 14)
-  (defreg nl2 15)
-  (defreg a3 16)
-  (defreg nl3 17)
-  (defreg nargs 31)
-
-  (defregset non-descriptor-regs nl0 nl1 nl2 nl3 nargs nfp)
-  (defregset descriptor-regs a0 a1 a2 a3 ocfp lra)
-
-  (define-argument-register-set a0 a1 a2 a3))
-
 (defun immediate-constant-sc (value)
   (typecase value
     ((integer #.sb-xc:most-negative-fixnum #.sb-xc:most-positive-fixnum) immediate-sc-number)))
@@ -113,6 +109,11 @@
 (defconstant ocfp-save-offset 0)
 (defconstant lra-save-offset 1)
 (defconstant nfp-save-offset 2)
+
+(defparameter *register-arg-tns*
+  (let ((drsc (sc-or-lose 'descriptor-reg)))
+    (flet ((make (n) (make-random-tn :kind :normal :sc drsc :offset n)))
+      (mapcar #'make *register-arg-offsets*))))
 
 (defun location-print-name (tn)
   (declare (type tn tn))
