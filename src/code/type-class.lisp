@@ -224,6 +224,14 @@
               ,(- sb!vm:n-positive-fixnum-bits (1+ +ctype-saetp-index-bits+)))
         (type-hash-value ,x)))
 
+;;; Generate a random hash value for use in memoization
+;;; CMUCL used address-based tables, but we store a few intelligent bits
+;;; in the hash, as well as the pseudorandom bits
+(defun new-type-hash ()
+   #+sb-xc-host (ctype-random +ctype-hash-mask+)
+   #-sb-xc-host (sb!impl::quasi-random-address-based-hash
+                 *ctype-hash-state* +ctype-hash-mask+))
+
 (def!struct (ctype (:conc-name type-)
                    (:constructor nil)
                    (:copier nil)
@@ -246,19 +254,17 @@
   ;;   implementation of RANDOM)
   ;; - in the target, use scrambled bits from the allocation pointer
   ;;   instead.
-  (hash-value
-   #+sb-xc-host (ctype-random +ctype-hash-mask+)
-   #-sb-xc-host (sb!impl::quasi-random-address-based-hash
-                 *ctype-hash-state* +ctype-hash-mask+)
+  (hash-value (new-type-hash)
               :type (signed-byte #.sb!vm:n-fixnum-bits)
-              ;; FIXME: is there a better way to initialize the hash value
-              ;; and its flag bit simultaneously rather than have it
-              ;; be a read/write slot?
-              :read-only nil))
+              ;; This is logically read-only, but because the host can not
+              ;; calculate target hash values - it would need the identical
+              ;; string hash algorithm and some other things - the hash is
+              ;; reset during cold-init using low-level tricks.
+              :read-only t))
 
 ;;; Classoids and named types can use the name as the source of the hash.
 ;;; A string's hash is stable across builds which is a nice aspect.
-(defun interned-type-hash (&optional symbol (metatype 'classoid))
+(defun interned-type-hash (&optional symbol (metatype 'classoid) saetp-index)
   (declare (ignorable symbol metatype))
   (let ((hash
          ;; When cross-compiling, the goal is to produce deterministic fasls
@@ -284,6 +290,11 @@
              ;; anonymous classoid (do we support those?) or other metatype
              (sb!impl::quasi-random-address-based-hash
               *ctype-hash-state* +ctype-hash-mask+))))
+    (when saetp-index
+      (setf (ldb (byte +ctype-saetp-index-bits+
+                       (- sb!vm:n-positive-fixnum-bits (1+ +ctype-saetp-index-bits+)))
+                 hash)
+            saetp-index))
     (logior sb!xc:most-negative-fixnum       ; "interned" bit
             ;; All metatypes of interned ctypes except for ARRAY allow
             ;; the TYPE= optimization that two instances of the type
@@ -559,7 +570,9 @@
 ;;; bother with this at this level because MEMBER types are fairly
 ;;; important and union and intersection are well defined.
 (defstruct (member-type (:include ctype
-                                  (class-info (type-class-or-lose 'member)))
+                         (hash-value (logior +type-admits-type=-optimization+
+                                             (new-type-hash)))
+                         (class-info (type-class-or-lose 'member)))
                         (:copier nil)
                         (:constructor %make-member-type (xset fp-zeroes))
                         (:constructor !make-interned-member-type
@@ -659,7 +672,9 @@
 ;;; A NUMERIC-TYPE represents any numeric type, including things
 ;;; such as FIXNUM.
 (defstruct (numeric-type (:include ctype
-                                   (class-info (type-class-or-lose 'number)))
+                          (hash-value (logior +type-admits-type=-optimization+
+                                              (new-type-hash)))
+                          (class-info (type-class-or-lose 'number)))
                          (:constructor %make-numeric-type)
                          (:copier nil))
   ;; Formerly defined in every CTYPE, but now just in the ones

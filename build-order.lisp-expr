@@ -170,6 +170,7 @@
  ("src/code/target-lfhash" :not-host)
  ("src/compiler/info-vector" :c-headers)
  ("src/compiler/globaldb" :c-headers)
+ ("src/compiler/generic/vm-array" :c-headers)
  ("src/code/primordial-type" :c-headers)
  ("src/code/early-classoid" :c-headers)
  ("src/code/early-alieneval" :c-headers)  ; for funs and vars needed at build and run time
@@ -185,7 +186,6 @@
  ("src/code/cold-error"  :not-host)
  ("src/code/fdefinition" :not-host)
 
- ("src/compiler/generic/vm-array" :c-headers)
  ("src/code/weak"          :not-host)
  ;; 'target-alieneval' needs FILL-POINTER which is defined in 'array'
  ("src/code/array"         :not-host) ; needs WEAK-POINTER-VALUE

@@ -42,16 +42,16 @@
                              specifier
                              (type-specifier (symbol-value constructor)))))
 
-    (sb!xc:defmacro literal-ctype-vector (var)
-      (let ((vector (symbol-value var)))
-        `(truly-the (simple-vector ,(length vector))
-          (load-time-value
+    (sb!xc:defmacro literal-ctype-vector (var &aux (vector (symbol-value var)))
+      `(truly-the (simple-vector ,(length vector))
+         (load-time-value
            (vector ,@(map 'list
                           (lambda (x)
                             (if (ctype-p x)
                                 `(!specifier-type ',(type-specifier x))
                                 x)) ; allow NIL or 0 in the vector
-                          vector)) t))))))
+                          vector))
+           t)))))
 
 (!begin-collecting-cold-init-forms)
 
@@ -285,6 +285,14 @@
 (!define-type-class number :enumerable #'numeric-type-enumerable
                     :might-contain-other-types nil)
 
+(defun interned-numeric-type (specifier &rest args)
+  (apply '%make-numeric-type
+         :hash-value (interned-type-hash
+                      nil nil
+                      (when specifier
+                        (sb!vm::saetp-index-or-lose specifier)))
+         args))
+
 #+sb-xc-host
 (progn
   ;; Work around an ABCL bug. This fails to load:
@@ -292,18 +300,24 @@
   (defvar *interned-signed-byte-types*)
   (defvar *interned-unsigned-byte-types*)
   (macrolet ((int-type (low high)
-               `(%make-numeric-type :hash-value (interned-type-hash)
-                                    :class 'integer :enumerable t
-                                    :low ,low :high ,high)))
+               `(interned-numeric-type (when (sb!c::find-saetp spec) spec)
+                                       :class 'integer :enumerable t
+                                       :low ,low :high ,high)))
     (setq *interned-signed-byte-types*
-          (let ((v (make-array sb!vm:n-word-bits))
-                (j -1))
-            (dotimes (i sb!vm:n-word-bits v)
-              (setf (svref v i) (int-type j (lognot j)) j (ash j 1)))))
+          (do ((v (make-array sb!vm:n-word-bits))
+               (i 1 (1+ i))
+               (j -1))
+              ((> i sb!vm:n-word-bits) v)
+            (let ((spec (if (= i sb!vm:n-fixnum-bits)
+                            'fixnum
+                            `(signed-byte ,i))))
+              (setf (svref v (1- i)) (int-type j (lognot j))
+                    j (ash j 1)))))
     (setq *interned-unsigned-byte-types*
           (let ((v (make-array (1+ sb!vm:n-word-bits))))
             (dotimes (i (length v) v)
-              (setf (svref v i) (int-type 0 (1- (ash 1 i)))))))))
+              (let ((spec (if (= i 1) 'bit `(unsigned-byte ,i))))
+                (setf (svref v i) (int-type 0 (1- (ash 1 i))))))))))
 
 ;;; Impose canonicalization rules for NUMERIC-TYPE. Note that in some
 ;;; cases, despite the name, we return *EMPTY-TYPE* instead of a
@@ -342,12 +356,13 @@
         ;; a point in the type lattice, or construct a new one.
     (or (case class
           (float
-           (macrolet ((float-type (fmt complexp)
-                        `(literal-ctype
-                          (%make-numeric-type :hash-value (interned-type-hash)
+           (macrolet ((float-type (fmt complexp
+                                   &aux (spec (if (eq complexp :complex)
+                                                  `(complex ,fmt) fmt)))
+                        `(literal-ctype (interned-numeric-type ',spec
                                               :class 'float :complexp ,complexp
                                               :format ',fmt :enumerable nil)
-                          ,(if (eq complexp :complex) `(complex ,fmt) fmt))))
+                                        ,spec)))
              (when (and (null low) (null high))
                (case format
                  (single-float
@@ -361,7 +376,7 @@
           (integer
            (macrolet ((int-type (low high)
                         `(literal-ctype
-                          (%make-numeric-type :hash-value (interned-type-hash)
+                          (interned-numeric-type nil
                                               :class 'integer :low ,low :high ,high
                                               :enumerable (if (and ,low ,high) t nil))
                           (integer ,(or low '*) ,(or high '*)))))
@@ -388,16 +403,10 @@
                     (int-type nil #.(1- sb!xc:most-negative-fixnum))))))
           (rational
            (when (and (eq complexp :real) (null low) (eq high low))
-             (literal-ctype (%make-numeric-type :hash-value (interned-type-hash)
-                                                :class 'rational)
+             (literal-ctype (interned-numeric-type nil :class 'rational)
                             rational))))
-        (let ((result (%make-numeric-type :class class :format format
-                                          :complexp complexp
-                                          :low low :high high
-                                          :enumerable enumerable)))
-          (setf (type-hash-value result)
-                (logior (type-hash-value result) +type-admits-type=-optimization+))
-          result))))
+        (%make-numeric-type :class class :format format :complexp complexp
+                            :low low :high high :enumerable enumerable))))
 
 (defun modified-numeric-type (base
                               &key
@@ -440,24 +449,27 @@
     (unless pairs
       (return-from make-character-set-type *empty-type*))
     (unless (cdr pairs)
-      (macrolet ((range (low high)
+      (macrolet ((range (low high &optional saetp-index)
                    `(return-from make-character-set-type
                       (literal-ctype (!make-interned-character-set-type
-                                      (interned-type-hash)
+                                      (interned-type-hash nil nil ,saetp-index)
                                       '((,low . ,high)))
                                      (character-set ((,low . ,high)))))))
         (let* ((pair (car pairs))
                (low (car pair))
                (high (cdr pair)))
           (cond ((eql high (1- sb!xc:char-code-limit))
-                 (cond ((eql low 0) (range 0 #.(1- sb!xc:char-code-limit)))
+                 (cond ((eql low 0)
+                        (range 0 #.(1- sb!xc:char-code-limit)
+                               (sb!vm::saetp-index-or-lose 'character)))
                        #!+sb-unicode
                        ((eql low base-char-code-limit)
                         (range #.base-char-code-limit
                                #.(1- sb!xc:char-code-limit)))))
                 #!+sb-unicode
                 ((and (eql low 0) (eql high (1- base-char-code-limit)))
-                 (range 0 #.(1- base-char-code-limit)))))))
+                 (range 0 #.(1- base-char-code-limit)
+                        (sb!vm::saetp-index-or-lose 'base-char)))))))
     (%make-character-set-type pairs)))
 
 (!define-type-class array :enumerable nil
@@ -472,7 +484,7 @@
 (progn
 (defvar *interned-array-types*
   (labels ((make-1 (type-index dims complexp type)
-             (setf (!ctype-saetp-index type) type-index)
+             (aver (= (!ctype-saetp-index type) type-index))
              (!make-interned-array-type (interned-type-hash nil 'array)
                                         dims complexp type type))
            (make-all (element-type type-index array)
@@ -606,11 +618,7 @@
                      ;; (when not represented as a hash-table).
                      (return (member-type t nil))))))
              (when (or unpaired (not (xset-empty-p xset)))
-               (let ((result (%make-member-type xset unpaired)))
-                 (setf (type-hash-value result)
-                       (logior (type-hash-value result)
-                               +type-admits-type=-optimization+))
-                 result)))))
+               (%make-member-type xset unpaired)))))
       ;; The actual member-type contains the XSET (with no FP zeroes),
       ;; and a list of unpaired zeroes.
       (if float-types

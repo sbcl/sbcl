@@ -53,8 +53,6 @@
   ;; we don't need to cons a new copy)
   (n-pad-elements (missing-arg) :type index :read-only t))
 
-;; Simulate DEFINE-LOAD-TIME-GLOBAL - always bound in the image
-;; but not eval'd in the compiler.
 (define-load-time-global *specialized-array-element-type-properties*
   (map 'simple-vector
        (lambda (args)
@@ -187,6 +185,11 @@
 (defun saetp-n-bits-shift (saetp)
   (max (1- (integer-length (saetp-n-bits saetp)))
        0)) ;; because of NIL
+
+(defun saetp-index-or-lose (element-type)
+  (or (position element-type sb!vm:*specialized-array-element-type-properties*
+                :key #'sb!vm:saetp-specifier :test #'equal)
+      (error "No saetp for ~S" element-type)))
 
 (in-package "SB!C")
 

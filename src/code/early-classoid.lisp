@@ -259,8 +259,12 @@
         ;; (if this ctype is exactly a type to which upgrade occurs)
         (nbits (- (integer-length +ctype-hash-mask+)
                   +ctype-saetp-index-bits+)))
-    (setf (type-hash-value obj)
-          (dpb hash (byte nbits 0) (type-hash-value obj))))
+    (macrolet ((slot-index ()
+                 (let* ((dd (find-defstruct-description 'ctype))
+                        (dsd (find 'hash-value (dd-slots dd) :key #'dsd-name)))
+                   (dsd-index dsd))))
+      (setf (%instance-ref obj (slot-index))
+            (dpb hash (byte nbits 0) (type-hash-value obj)))))
   obj)
 
 ;;;; object types to represent classes
