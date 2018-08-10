@@ -114,5 +114,15 @@
 (defconstant lra-save-offset 1)
 (defconstant nfp-save-offset 2)
 
+(defun location-print-name (tn)
+  (declare (type tn tn))
+  (let ((sb (sb-name (sc-sb (tn-sc tn))))
+        (offset (tn-offset tn)))
+    (ecase sb
+      (registers (or (svref *register-names* offset)
+                     (format nil "x~D" offset)))
+      (float-registers (format nil "f~D" offset))
+      (constant (format nil "Const~D" offset)))))
+
 (defun combination-implementation-style (node)
   (values :default nil))
