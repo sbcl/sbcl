@@ -201,10 +201,9 @@
     ;; The 'top' arg contains the %esp value saved at the time the
     ;; catch block was created and points to where the thrown values
     ;; should sit.
-    (move rdi top)
-    (move result rdi)
+    (move result top)
+    (inst lea rdi (ea (- n-word-bytes) result))
 
-    (inst sub rdi n-word-bytes)
     (move rcx count)                    ; fixnum words == bytes
     (unless (eq (tn-kind num) :unused)
       (move num rcx))
