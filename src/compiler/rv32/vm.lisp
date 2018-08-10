@@ -30,7 +30,7 @@
  (zero immediate-constant)
 
  (control-stack control-stack)
- (any-reg registers :alternate-scs (control-stack))
+ (any-reg registers :alternate-scs (control-stack) :constant-scs (immediate))
  (descriptor-reg registers :alternate-scs (control-stack))
  (non-descriptor-reg registers)
 

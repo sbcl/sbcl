@@ -11,6 +11,16 @@
 
 (in-package "SB-VM")
 
+(define-move-fun (load-immediate 1) (vop x y)
+    ((immediate) (any-reg descriptor-reg))
+  (let ((val (tn-value x)))
+    (etypecase val
+      (integer (load-immediate-word y (fixnumize val))))))
+
+(define-move-fun (load-number 1) (vop x y)
+    ((immediate) (signed-reg unsigned-reg))
+  (load-immediate-word y (tn-value x)))
+
 (define-move-fun (load-stack 5) (vop x y)
   ((control-stack) (any-reg descriptor-reg))
   (load-stack-tn y x))
@@ -37,12 +47,36 @@
   (:args (x :scs (any-reg descriptor-reg)))
   (:results (y :scs (any-reg descriptor-reg control-stack)))
   (:generator 0))
+(define-move-vop move :move
+  (any-reg descriptor-reg) (any-reg descriptor-reg))
 
+(define-vop (move-to-word/fixnum)
+  (:args (x :scs (any-reg descriptor-reg)))
+  (:results (y :scs (signed-reg unsigned-reg)))
+  (:arg-types tagged-num)
+  (:generator 1))
+(define-move-vop move-to-word/fixnum :move
+  (any-reg descriptor-reg) (signed-reg unsigned-reg))
 (define-vop (move-from-word/fixnum)
   (:args (x :scs (signed-reg unsigned-reg) :target y))
   (:results (y :scs (any-reg descriptor-reg)))
   (:result-types tagged-num)
-  (:generator 0))
+  (:generator 1))
+(define-move-vop move-from-word/fixnum :move
+  (signed-reg unsigned-reg) (any-reg descriptor-reg))
+
+(define-vop (move-from-signed)
+  (:args (x :scs (signed-reg unsigned-reg) :target y))
+  (:results (y :scs (any-reg descriptor-reg)))
+  (:generator 18))
+(define-move-vop move-from-signed :move
+  (signed-reg) (descriptor-reg))
+(define-vop (move-from-unsigned)
+  (:args (x :scs (signed-reg unsigned-reg) :target y))
+  (:results (y :scs (any-reg descriptor-reg)))
+  (:generator 20))
+(define-move-vop move-from-unsigned :move
+  (unsigned-reg) (descriptor-reg))
 
 (define-vop (word-move)
   (:args (x :scs (signed-reg unsigned-reg) :target y))
