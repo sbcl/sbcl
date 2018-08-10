@@ -273,7 +273,7 @@
       (setf (hole-size hole) (- hole-end hole))))
   (add-to-freelist hole))
 
-(defun allocate-immobile-bytes (n-bytes word0 word1 lowtag)
+(defun allocate-immobile-bytes (n-bytes word0 word1 lowtag errorp)
   (declare (type (and fixnum unsigned-byte) n-bytes))
   (setq n-bytes (align-up n-bytes (* 2 n-word-bytes)))
   ;; Can't allocate fewer than 4 words due to min hole size.
@@ -312,9 +312,12 @@
                      (free-ptr (+ addr n-bytes))
                      (limit (+ varyobj-space-start varyobj-space-size)))
                 (when (> free-ptr limit)
-                  (format t "~&Immobile space exhausted~%")
-                  (sb!debug:print-backtrace)
-                  (sb!impl::%halt))
+                  (cond (errorp
+                         (format t "~&Immobile space exhausted~%")
+                         (sb!debug:print-backtrace)
+                         (sb!impl::%halt))
+                        (t
+                         (return-from allocate-immobile-bytes 0))))
                 (set-varyobj-space-free-pointer free-ptr)
                 addr))))
      (aver (not (logtest addr lowtag-mask))) ; Assert proper alignment
@@ -357,7 +360,8 @@
   (allocate-immobile-bytes (pad-data-block (+ words vector-data-offset))
                            widetag
                            (fixnumize length)
-                           other-pointer-lowtag))
+                           other-pointer-lowtag
+                           t))
 
 (defun allocate-immobile-simple-vector (n-elements)
   (allocate-immobile-vector simple-vector-widetag n-elements n-elements))
@@ -428,40 +432,43 @@
 
 ;;; Enforce limit on boxed words dependent on how many bits it gets in header.
 ;;; Enforce limit on unboxed size. 22 bits = 4MiB, quite generous for code.
-(declaim (ftype (sfunction (boolean (unsigned-byte #!+64-bit 32 #!-64-bit 22)
-                                    (unsigned-byte 22))
+(declaim (ftype (sfunction (t (unsigned-byte #!+64-bit 32 #!-64-bit 22)
+                              (unsigned-byte 22))
                            code-component)
                 allocate-code-object))
 ;;; Allocate a code component with BOXED words in the header
 ;;; followed by UNBOXED bytes of raw data.
 ;;; BOXED must be the exact count of boxed words desired. No adjustments
 ;;; are made for alignment considerations or the fixed slots.
-(defun allocate-code-object (immobile-p boxed unboxed)
-  (declare (ignorable immobile-p))
+(defun allocate-code-object (space boxed unboxed)
+  (declare (ignorable space))
   #!+gencgc
   ;; This uses ATOMIC-INCF to get automatic wraparound, not because atomicity
   ;; makes things deterministic per se. If multiple threads are allocating
   ;; code objects, the order is unpredictable.
   (let ((serialno (atomic-incf sb!fasl::*code-serialno*)))
+    ;; FIXME: remove this use of WITHOUT-GCing and use pseudo-atomic.
     (without-gcing
-      (cond #!+immobile-code
-            (immobile-p
-             (let ((code (allocate-immobile-bytes
+      (block nil
+        #!+immobile-code
+        (when (member space '(:immobile :auto))
+          (let ((code (allocate-immobile-bytes
                           (align-up (+ (* boxed n-word-bytes) unboxed)
                                     (* 2 n-word-bytes))
                           (make-code-header-word boxed)
                           (logior (logand (ash serialno 32) most-positive-word)
                                   (ash unboxed n-fixnum-tag-bits))
-                          other-pointer-lowtag)))
-               (setf (%code-debug-info code) nil)
-               code))
-            (t (%make-lisp-obj
-                (alien-funcall (extern-alien "alloc_code_object"
-                                             (function unsigned
-                                                       (unsigned 32)
-                                                       (unsigned 32)
-                                                       (unsigned 32)))
-                               boxed unboxed serialno))))))
+                          other-pointer-lowtag
+                          (eq space :immobile))))
+            (unless (eql code 0)
+              (setf (%code-debug-info code) nil)
+              (return code))
+            #+nil (warn "immobile code space is too small")))
+        (%make-lisp-obj
+         (alien-funcall (extern-alien "alloc_code_object"
+                                      (function unsigned (unsigned 32)
+                                                (unsigned 32) (unsigned 32)))
+                        boxed unboxed serialno)))))
   #!-gencgc
   (%primitive allocate-code-object boxed unboxed))
 

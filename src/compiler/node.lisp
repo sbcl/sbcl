@@ -397,7 +397,7 @@
   ;; space where this component will be allocated in
   ;; :auto won't make any codegen optimizations pertinent to immobile space,
   ;; but will place the code there given sufficient available space.
-  (mem-space nil :type (member nil :dynamic :immobile :auto))
+  (%mem-space nil :type (member nil :dynamic :immobile :auto))
   ;; the kind of component
   ;;
   ;; (The terminology here is left over from before

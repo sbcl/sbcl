@@ -152,15 +152,7 @@
            (constants (ir2-component-constants 2comp))
            (nboxed (align-up (length constants) sb!c::code-boxed-words-align))
            (code-obj (allocate-code-object
-                      (case (component-mem-space component)
-                        #!+immobile-code
-                        (:immobile t)
-                        #!+immobile-code
-                        (:auto (sb!vm::immobile-code-free-space-check
-                                (+ (* nboxed sb!vm:n-word-bytes)
-                                   (align-up length (* 2 sb!vm:n-word-bytes))))))
-                      nboxed
-                      length)))
+                      (component-mem-space component) nboxed length)))
 
       ;; The following operations need the code pinned:
       ;; 1. copying into code-instructions (a SAP)

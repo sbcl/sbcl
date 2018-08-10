@@ -549,6 +549,10 @@ necessary, since type inference may take arbitrarily long to converge.")
   (ir1-finalize component)
   (values))
 
+#!-immobile-code
+(defun component-mem-space (component)
+  (component-%mem-space component))
+
 #!+immobile-code
 (progn
   (declaim (type (member :immobile :dynamic :auto) *compile-to-memory-space*)
@@ -560,6 +564,14 @@ necessary, since type inference may take arbitrarily long to converge.")
   ;; The real default is set to :DYNAMIC in make-target-2-load.lisp
   (defvar *compile-to-memory-space* :immobile) ; BUILD-TIME default
   (defvar *compile-file-to-memory-space* :immobile) ; BUILD-TIME default
+  (defun component-mem-space (component)
+    (or (component-%mem-space component)
+        (setf (component-%mem-space component)
+              (if (fasl-output-p *compile-object*)
+                  (and (eq *compile-file-to-memory-space* :immobile)
+                       (neq (component-kind component) :toplevel)
+                       :immobile)
+                      *compile-to-memory-space*))))
   (defun code-immobile-p (thing)
     #+sb-xc-host (declare (ignore thing)) #+sb-xc-host t
     #-sb-xc-host
@@ -567,13 +579,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                        (vop  (node-component (vop-node thing)))
                        (node (node-component thing))
                        (t    thing))))
-      (eq (setf (component-mem-space component)
-                (if (fasl-output-p *compile-object*)
-                    (and (eq *compile-file-to-memory-space* :immobile)
-                         (neq (component-kind component) :toplevel)
-                         :immobile)
-                    *compile-to-memory-space*))
-          :immobile))))
+      (eq (component-mem-space component) :immobile))))
 
 (defun %compile-component (component)
   (let ((*adjustable-vectors* nil)) ; Needed both by codegen and fasl writer
