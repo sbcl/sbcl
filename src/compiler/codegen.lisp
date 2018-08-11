@@ -276,7 +276,7 @@
                (asmstream-elsewhere-section asmstream)
                fun-table-section))
            (octets
-            (finalize-segment segment))
+            (segment-buffer segment))
            (index
             (label-position start-fun-table)))
       (flet ((store-ub16 (index val)

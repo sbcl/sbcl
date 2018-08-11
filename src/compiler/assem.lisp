@@ -1318,7 +1318,7 @@
     (%emit-label segment nil (segment-origin segment))
     #!+sb-dyncount
     (setf (segment-collect-dynamic-statistics segment) *collect-dynamic-statistics*)
-    (dolist (buffer sections segment)
+    (dolist (buffer sections)
       (dovector (operation buffer)
         (etypecase operation
           (cons
@@ -1362,7 +1362,9 @@
                     (return-from op))))
                (apply mnemonic operands segment operands))))
           (label (%emit-label segment **current-vop** operation))
-          (function (%emit-postit segment operation)))))))
+          (function (%emit-postit segment operation)))))
+    (finalize-segment segment)
+    segment))
 
 (defun truncate-section-to-length (section)
   (setf (section-last-buf section)

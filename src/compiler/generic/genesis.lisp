@@ -2247,14 +2247,6 @@ core and return a descriptor to it."
                         *cold-foreign-symbol-table*
                         (hash-table-count *cold-foreign-symbol-table*)))))
 
-;;; Leave space for this many assembly routine addresses so that we can create
-;;; a vector of entrypoints in the code component header, allowing for
-;;; memory-indirect call on x86 where would otherwise a register would be needed
-;;; due to lack of an absolute call instruction.
-(defconstant asm-routine-table-size ; must be a multiple of 2
-  (+ #!+x86    40
-     #!+x86-64 64))
-
 ;;; *COLD-FOREIGN-SYMBOL-TABLE* becomes *!INITIAL-FOREIGN-SYMBOLS* in
 ;;; the core. When the core is loaded, !LOADER-COLD-INIT uses this to
 ;;; create *STATIC-FOREIGN-SYMBOLS*, which the code in
@@ -2280,17 +2272,12 @@ core and return a descriptor to it."
     (cold-set (cold-intern '*assembler-routines*) *cold-assembler-obj*)
     (setq *cold-assembler-routines*
           (sort *cold-assembler-routines* #'< :key #'cdr))
-    (when (plusp asm-routine-table-size)
-      ;; The number of routines must be strictly less than the table size
-      ;; so that there's room for a 0 word marking the end of the list.
-      ;; relocate_heap() in 'coreparse' finds the end that way.
-      (unless (< (length *cold-assembler-routines*) asm-routine-table-size)
-        (bug "Please increase ASM-ROUTINE-TABLE-SIZE for this platform"))
-      (let ((index (round-up sb!vm:code-constants-offset 2)))
-        (dolist (item *cold-assembler-routines*)
-          (write-wordindexed/raw *cold-assembler-obj* index
-                                 (lookup-assembler-reference (car item)))
-          (incf index))))
+    #!+(or x86 x86-64) ; fill in the indirect call table
+    (let ((index (round-up sb!vm:code-constants-offset 2)))
+      (dolist (item *cold-assembler-routines*)
+        (write-wordindexed/raw *cold-assembler-obj* index
+                               (lookup-assembler-reference (car item)))
+        (incf index)))
     (to-core *cold-assembler-routines*
              (lambda (rtn)
                (cold-cons (cold-intern (first rtn)) (make-fixnum-descriptor (cdr rtn))))
@@ -2783,7 +2770,7 @@ core and return a descriptor to it."
                      (+ i (gspace-byte-address (descriptor-gspace des)))
                      (* 2 sb!vm:n-word-bytes)
                      (bvref-word (descriptor-mem des) i)))))
-       (apply-fixups (%fasl-input-stack fasl-input) des 0))))
+       (apply-fixups (%fasl-input-stack fasl-input) des))))
 
 #-c-headers-only
 (let ((i (get 'fop-load-code 'opcode)))
@@ -2848,41 +2835,36 @@ core and return a descriptor to it."
           ;; Note: we round the number of constants up to ensure that
           ;; the code vector will be properly aligned.
           (round-up sb!vm:code-constants-offset 2))
-         ;; OFFSET is the byte offset into CODE-INSTRUCTIONS
-         ;; at which this newly loaded set of routines will begin.
-         (offset (ash asm-routine-table-size sb!vm:word-shift))
          (space (or #!+immobile-space *immobile-varyobj* *read-only*))
          (asm-code
           (allocate-cold-descriptor
                   space
-                  (+ (ash header-n-words sb!vm:word-shift) offset length)
+                  (+ (ash header-n-words sb!vm:word-shift) length)
                   sb!vm:other-pointer-lowtag)))
     (setf *cold-assembler-obj* asm-code)
     (write-header-word asm-code
                        (sb!vm::make-code-header-word header-n-words))
     (write-wordindexed asm-code sb!vm:code-code-size-slot
-                       (make-fixnum-descriptor (+ offset rounded-length)))
+                       (make-fixnum-descriptor rounded-length))
     (let ((start (+ (descriptor-byte-offset asm-code)
-                    (ash header-n-words sb!vm:word-shift)
-                    offset)))
+                    (ash header-n-words sb!vm:word-shift))))
       (read-bigvec-as-sequence-or-die (descriptor-mem asm-code)
                                       (fasl-input-stream)
                                       :start start
                                       :end (+ start length)))
     ;; Update the name -> address table.
     (dotimes (i (descriptor-fixnum (pop-stack)))
-      (let ((offset (+ offset (descriptor-fixnum (pop-stack))))
+      (let ((offset (descriptor-fixnum (pop-stack)))
             (name (pop-stack)))
         (push (cons name offset) *cold-assembler-routines*)))
-    (apply-fixups (%fasl-input-stack (fasl-input)) asm-code offset)))
+    (apply-fixups (%fasl-input-stack (fasl-input)) asm-code)))
 
 ;;; Target variant of this is defined in 'target-load'
-(defun apply-fixups (fop-stack code-obj extra-offset)
+(defun apply-fixups (fop-stack code-obj)
   (dotimes (i (descriptor-fixnum (pop-fop-stack fop-stack)) code-obj)
     (binding* ((info (descriptor-fixnum (pop-fop-stack fop-stack)))
                (sym (pop-fop-stack fop-stack))
                ((offset kind flavor) (!unpack-fixup-info info)))
-      (incf offset extra-offset) ; for assembler routines
       (if (eq flavor :static-call)
           (push (list sym kind code-obj offset) *cold-static-call-fixups*)
           (cold-fixup

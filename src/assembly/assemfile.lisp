@@ -37,6 +37,12 @@
     (unwind-protect
         (let ((*features* (cons :sb-assembling *features*)))
           (load (merge-pathnames name (make-pathname :type "lisp")))
+          ;; Leave room for the indirect call table. relocate_heap() in
+          ;; 'coreparse' finds the end with a 0 word so add 1 extra word.
+          #!+(or x86 x86-64)
+          (emit (asmstream-data-section asmstream)
+                `(.skip ,(* (align-up (1+ (length *entry-points*)) 2)
+                            sb!vm:n-word-bytes)))
           (when (emit-inline-constants)
             ;; Ensure alignment to double-Lispword in case a raw constant
             ;; causes misalignment, as actually happens on ARM64.
@@ -55,7 +61,7 @@
                   (asmstream-code-section asmstream)
                   (asmstream-elsewhere-section asmstream))))
             (dump-assembler-routines segment
-                                     (finalize-segment segment)
+                                     (segment-buffer segment)
                                      (sb!assem::segment-fixup-notes segment)
                                      *entry-points*
                                      lap-fasl-output))
