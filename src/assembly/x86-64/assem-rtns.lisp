@@ -131,7 +131,7 @@
 ;;; between RSI and the stack top.
 #-sb-assembling ; avoid "Redefinition" warning (this file is processed twice)
 (defun !prepare-for-tail-call-variable (fun temp nargs rdx rdi rsi
-                                        r8 loop-index r10
+                                        r8 r9 r10
                                         &optional jump-to-the-end)
   (assemble ()
     ;; Calculate NARGS (as a fixnum)
