@@ -613,22 +613,24 @@
 
 ;;;; allocating images of primitive objects in the cold core
 
-(defun write-header-word (des header-data widetag)
+(defun write-header-word (des header-word)
   ;; In immobile space, all objects start life as pseudo-static as if by 'save'.
   (let ((gen #!+gencgc (if (or #!+immobile-space
                                (let ((gspace (descriptor-gspace des)))
                                  (or (eq gspace *immobile-fixedobj*)
                                      (eq gspace *immobile-varyobj*))))
                            sb!vm:+pseudo-static-generation+
-                         0)
+                           0)
              #!-gencgc 0))
-    (write-wordindexed/raw des 0
-                           (logior (ash (logior (ash gen 16) header-data)
-                                        sb!vm:n-widetag-bits) widetag))))
+    (write-wordindexed/raw des 0 (logior (ash gen 24) header-word))))
+
+(defun write-header-data+tag (des header-data widetag)
+  (write-header-word des (logior (ash header-data sb!vm:n-widetag-bits)
+                                 widetag)))
 
 (defun set-header-data (object data)
-  (write-header-word object data (ldb (byte sb!vm:n-widetag-bits 0)
-                                      (read-bits-wordindexed object 0)))
+  (write-header-data+tag object data (ldb (byte sb!vm:n-widetag-bits 0)
+                                          (read-bits-wordindexed object 0)))
   object) ; return the object itself, like SB!KERNEL:SET-HEADER-DATA
 
 (defun get-header-data (object)
@@ -655,7 +657,7 @@
               gspace (ash (1+ length) sb!vm:word-shift)
               sb!vm:other-pointer-lowtag
               (make-page-attributes nil 0))))
-    (write-header-word des length widetag)
+    (write-header-data+tag des length widetag)
     des))
 (defun allocate-vector-object (gspace element-bits length widetag)
   "Allocate LENGTH units of ELEMENT-BITS size plus a header plus a length slot in
@@ -667,7 +669,7 @@
          (des (allocate-cold-descriptor gspace
                                         (+ bytes (* 2 sb!vm:n-word-bytes))
                                         sb!vm:other-pointer-lowtag)))
-    (write-header-word des 0 widetag)
+    (write-header-data+tag des 0 widetag)
     (write-wordindexed des
                        sb!vm:vector-length-slot
                        (make-fixnum-descriptor length))
@@ -692,11 +694,11 @@
                               sb!vm:instance-pointer-lowtag is-layout)))
     ;; Length as stored in the header is the exact number of useful words
     ;; that follow, as is customary. A padding word, if any is not "useful"
-    (write-header-word des
-                       (logior layout-length
-                               #!+compact-instance-header
-                               (if layout (ash (descriptor-bits layout) 24) 0))
-                       sb!vm:instance-widetag)
+    (write-header-word
+     des
+     (logior #!+compact-instance-header (ash (descriptor-bits layout) 32)
+             (ash layout-length sb!vm:n-widetag-bits)
+             sb!vm:instance-widetag))
     #!-compact-instance-header
     (write-wordindexed des sb!vm:instance-slots-offset layout)
     des))
@@ -1361,7 +1363,8 @@ core and return a descriptor to it."
 (defun cold-find-classoid-cell (name &key create)
   (aver (eq create t))
   (or (gethash name *classoid-cells*)
-      (let ((layout (gethash 'sb!kernel::classoid-cell *cold-layouts*)) ; ok if nil
+      (let ((layout (or (gethash 'sb!kernel::classoid-cell *cold-layouts*) ; ok if nil
+                        (make-fixnum-descriptor 0)))
             (host-layout (find-layout 'sb!kernel::classoid-cell)))
         (setf (gethash name *classoid-cells*)
               (write-slots (allocate-struct *dynamic* layout
@@ -2574,7 +2577,7 @@ core and return a descriptor to it."
          (result (allocate-object *dynamic*
                                   (+ sb!vm:array-dimensions-offset rank)
                                   sb!vm:other-pointer-lowtag)))
-    (write-header-word result rank sb!vm:simple-array-widetag)
+    (write-header-data+tag result rank sb!vm:simple-array-widetag)
     (write-wordindexed result sb!vm:array-fill-pointer-slot *nil-descriptor*)
     (write-wordindexed result sb!vm:array-data-slot data-vector)
     (write-wordindexed result sb!vm:array-displacement-slot *nil-descriptor*)
@@ -2738,11 +2741,6 @@ core and return a descriptor to it."
 ;;; fixups (or function headers) are applied.
 (defvar *show-pre-fixup-code-p* nil)
 
-;;; Invert GET-HEADER-DATA for a code object
-(defun make-code-header-data (boxed-nwords)
-  (ash (sb!vm::make-code-header-word boxed-nwords)
-       (- sb!vm:n-widetag-bits)))
-
 (defun cold-load-code (fasl-input code-size n-boxed-words)
   (macrolet ((pop-stack () '(pop-fop-stack (%fasl-input-stack fasl-input))))
      (let* (;; The number of constants is rounded up to even (if required)
@@ -2757,8 +2755,7 @@ core and return a descriptor to it."
                   sb!vm:other-pointer-lowtag :code)))
        (declare (ignorable immobile-p))
        (write-header-word des
-                          (make-code-header-data aligned-n-boxed-words)
-                          sb!vm:code-header-widetag)
+                          (sb!vm::make-code-header-word aligned-n-boxed-words))
        (write-wordindexed des sb!vm:code-code-size-slot
                           (make-random-descriptor
                            (logior #!+64-bit (ash (incf *code-serialno*) 32)
@@ -2864,8 +2861,7 @@ core and return a descriptor to it."
                   sb!vm:other-pointer-lowtag)))
     (setf *cold-assembler-obj* asm-code)
     (write-header-word asm-code
-                       (make-code-header-data header-n-words)
-                       sb!vm:code-header-widetag)
+                       (sb!vm::make-code-header-word header-n-words))
     (write-wordindexed asm-code sb!vm:code-code-size-slot
                        (make-fixnum-descriptor (+ offset rounded-length)))
     (let ((start (+ (descriptor-byte-offset asm-code)
