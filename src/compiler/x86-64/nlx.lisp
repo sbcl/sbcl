@@ -180,16 +180,15 @@
     (inst mov rsp-tn sp)))
 
 (define-vop (nlx-entry-multiple)
-  (:args (top)
-         (source)
+  (:args (top :target result)
+         (source :to :save)
          (count :target rcx))
   ;; Again, no SC restrictions for the args, 'cause the loading would
   ;; happen before the entry label.
   (:info label)
   (:temporary (:sc unsigned-reg :offset rcx-offset :from (:argument 2)) rcx)
-  (:temporary (:sc unsigned-reg :offset rsi-offset) rsi)
-  (:temporary (:sc unsigned-reg :offset rdi-offset) rdi)
-  (:results (result :scs (any-reg) :from (:argument 0))
+  (:temporary (:sc unsigned-reg) loop-index temp)
+  (:results (result :scs (any-reg))
             (num :scs (any-reg control-stack)))
   (:save-p :force-to-stack)
   (:vop-var vop)
@@ -197,27 +196,26 @@
     (emit-label label)
     (note-this-location vop :non-local-entry)
 
-    (inst lea rsi (ea (- n-word-bytes) source))
     ;; The 'top' arg contains the %esp value saved at the time the
     ;; catch block was created and points to where the thrown values
     ;; should sit.
     (move result top)
-    (inst lea rdi (ea (- n-word-bytes) result))
 
-    (move rcx count)                    ; fixnum words == bytes
     (unless (eq (tn-kind num) :unused)
-      (move num rcx))
-    (inst shr rcx n-fixnum-tag-bits)    ; word count for <rep movs>
-    ;; If we got zero, we be done.
+      (move num count))
+    (move rcx count)
     (inst jrcxz DONE)
-    ;; Copy them down.
-    (inst std)
-    (inst rep)
-    (inst movs :qword)
-    (inst cld)
+    (zeroize loop-index)
+    LOOP
+    (inst sub loop-index n-word-bytes)
+    (inst mov temp (ea source loop-index))
+    (inst mov (ea result loop-index) temp)
+
+    (inst sub rcx (fixnumize 1))
+    (inst jmp :nz LOOP)
     DONE
     ;; Reset the CSP at last moved arg.
-    (inst lea rsp-tn (ea n-word-bytes rdi))))
+    (inst lea rsp-tn (ea result loop-index))))
 
 
 ;;; This VOP is just to force the TNs used in the cleanup onto the stack.
