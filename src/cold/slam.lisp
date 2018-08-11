@@ -20,7 +20,7 @@
 
 ;;; basic test for up-to-date-ness of output with respect to input in
 ;;; the sense of Unix make(1)
-(defun output-up-to-date-wrt-input-p (output input)
+(defun output-up-to-date-wrt-input-p (output input &optional flags)
   (and (probe-file output)
        ;; (Strict #'> and lax #'>= each have problems here, which
        ;; could become more noticeable as computation speed
@@ -29,7 +29,15 @@
        ;; recompile unnecessarily than sometimes bogusly to assume
        ;; up-to-date-ness.)
        (> (file-write-date output)
-          (file-write-date input))))
+          (file-write-date input))
+       (if (member :assem flags)
+           (every (lambda (stem)
+                    (output-up-to-date-wrt-input-p
+                     output (stem-source-path stem)))
+                  (with-open-file (f "src/assembly/master.lisp")
+                    ;; form is (MAPC (LAMBDA ()) '("file" ...))
+                    (second (third (read f)))))
+           t)))
 
 ;;; One possible use-case for slam.sh is to generate a trace-file for
 ;;; a file that is suddenly of interest, but was not of interest
@@ -42,7 +50,7 @@
   (unless (position :not-target flags)
     (let ((srcname (stem-source-path stem))
           (objname (stem-object-path stem flags :target-compile)))
-      (when (or (not (output-up-to-date-wrt-input-p objname srcname))
+      (when (or (not (output-up-to-date-wrt-input-p objname srcname flags))
                 ;; Back to our "new-trace-file" case, also build if
                 ;; a trace file is desired but is out-of-date.
                 (and (position :trace-file flags)

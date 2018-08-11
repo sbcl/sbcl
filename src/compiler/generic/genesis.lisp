@@ -2282,6 +2282,7 @@ core and return a descriptor to it."
     (when (plusp asm-routine-table-size)
       ;; The number of routines must be strictly less than the table size
       ;; so that there's room for a 0 word marking the end of the list.
+      ;; relocate_heap() in 'coreparse' finds the end that way.
       (unless (< (length *cold-assembler-routines*) asm-routine-table-size)
         (bug "Please increase ASM-ROUTINE-TABLE-SIZE for this platform"))
       (let ((index (round-up sb!vm:code-constants-offset 2)))
@@ -2845,32 +2846,26 @@ core and return a descriptor to it."
   (values))
 
 (define-cold-fop (fop-assembler-code)
+  (aver (not *cold-assembler-obj*))
   (let* ((length (read-word-arg (fasl-input-stream)))
          (rounded-length (round-up length (* 2 sb!vm:n-word-bytes)))
          (header-n-words
           ;; Note: we round the number of constants up to ensure that
           ;; the code vector will be properly aligned.
           (round-up sb!vm:code-constants-offset 2))
-         (asm-code *cold-assembler-obj*)
          ;; OFFSET is the byte offset into CODE-INSTRUCTIONS
          ;; at which this newly loaded set of routines will begin.
          (offset (ash asm-routine-table-size sb!vm:word-shift))
-         (space (or #!+immobile-space *immobile-varyobj* *read-only*)))
-    (cond (asm-code
-           (setq offset (code-unboxed-size asm-code))
-           (aver (= (gspace-free-word-index space)
-                    (+ (/ offset sb!vm:n-word-bytes) header-n-words)))
-           (incf (gspace-free-word-index space) (/ rounded-length sb!vm:n-word-bytes)))
-          (t
-           (setq asm-code
-                 (allocate-cold-descriptor
+         (space (or #!+immobile-space *immobile-varyobj* *read-only*))
+         (asm-code
+          (allocate-cold-descriptor
                   space
                   (+ (ash header-n-words sb!vm:word-shift) offset length)
-                  sb!vm:other-pointer-lowtag))
-           (setf *cold-assembler-obj* asm-code)
-           (write-header-word asm-code
-                              (make-code-header-data header-n-words)
-                              sb!vm:code-header-widetag)))
+                  sb!vm:other-pointer-lowtag)))
+    (setf *cold-assembler-obj* asm-code)
+    (write-header-word asm-code
+                       (make-code-header-data header-n-words)
+                       sb!vm:code-header-widetag)
     (write-wordindexed asm-code sb!vm:code-code-size-slot
                        (make-fixnum-descriptor (+ offset rounded-length)))
     (let ((start (+ (descriptor-byte-offset asm-code)

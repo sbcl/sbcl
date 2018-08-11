@@ -564,11 +564,7 @@
  ("src/assembly/target/arith")
  ("src/assembly/target/alloc")
  ;; assembly files are all loaded by genesis before any compiled files.
- ("src/assembly/target/tramps"     :assem :not-host)
- ("src/assembly/target/assem-rtns" :assem :not-host)
- ("src/assembly/target/array"      :assem :not-host)
- ("src/assembly/target/arith"      :assem :not-host)
- ("src/assembly/target/alloc"      :assem :not-host)
+ ("src/assembly/master" :assem :not-host)
 
  ("src/compiler/pseudo-vops")
 

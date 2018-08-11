@@ -22,13 +22,9 @@
 ;;; COMPILE-FILE, but in fact it's arguably more like LOAD, even down
 ;;; to the return convention. It LOADs a file, then writes out any
 ;;; assembly code created by the process.
-(defun assemble-file (name
-                      &key
-                      (output-file (make-pathname :defaults name
-                                                  :type "assem")))
+(defun assemble-file (name &key (output-file (error "Missing keyword")))
   (when sb-cold::*compile-for-effect-only*
     (return-from assemble-file t))
-  ;; FIXME: Consider nuking the filename defaulting logic here.
   (let* ((*emit-assembly-code-not-vops-p* t)
          (name (pathname name))
          ;; the fasl file currently being output to
