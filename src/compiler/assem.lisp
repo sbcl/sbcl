@@ -305,6 +305,7 @@
   (code-section (make-section) :read-only t)
   (elsewhere-section (make-section) :read-only t)
   (elsewhere-label (gen-label) :read-only t)
+  (inter-function-padding :normal :type (member :normal :nop))
   ;; for collecting unique "unboxed constants" prior to placing them
   ;; into the data section
   (constant-table (make-hash-table :test #'equal) :read-only t)

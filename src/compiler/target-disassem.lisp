@@ -1066,9 +1066,9 @@
            (length (seg-length segment))
            (offset (code-offs-to-segment-offs (%fun-code-offset fun) segment)))
       (when (<= 0 offset length)
-        ;; Up to 2 words of zeros might be present to align the next
-        ;; simple-fun. Limit on OFFSET is to avoid incorrect triggering
-        ;; in case of unexpected weirdness. FIXME: verify all zero bytes
+        ;; Up to 2 words (less a byte) of padding might be present to align the
+        ;; next simple-fun. Limit on OFFSET is to avoid incorrect triggering
+        ;; in case of unexpected weirdness.
         (when (< 0 offset (* sb!vm:n-word-bytes 2))
           (push (make-offs-hook
                  :fun (lambda (stream dstate)
