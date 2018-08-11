@@ -1364,7 +1364,7 @@ core and return a descriptor to it."
   (aver (eq create t))
   (or (gethash name *classoid-cells*)
       (let ((layout (or (gethash 'sb!kernel::classoid-cell *cold-layouts*) ; ok if nil
-                        (make-fixnum-descriptor 0)))
+                        #!+compact-instance-header (make-fixnum-descriptor 0)))
             (host-layout (find-layout 'sb!kernel::classoid-cell)))
         (setf (gethash name *classoid-cells*)
               (write-slots (allocate-struct *dynamic* layout
