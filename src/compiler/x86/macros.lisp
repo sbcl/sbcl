@@ -188,15 +188,6 @@
 ;;; place and there's no logical single place to attach documentation.
 ;;; grep (mostly in src/runtime) is your friend
 
-;;; KLUDGE: since the stack on the x86 is treated conservatively, it
-;;; does not matter whether a signal occurs during construction of a
-;;; dynamic-extent object, as the half-finished construction of the
-;;; object will not cause any difficulty.  We can therefore elide
-(defmacro maybe-pseudo-atomic (not-really-p &body forms)
-  `(if ,not-really-p
-       (progn ,@forms)
-       (pseudo-atomic ,@forms)))
-
 ;;; Unsafely clear pa flags so that the image can properly lose in a
 ;;; pa section.
 #!+sb-thread
@@ -212,9 +203,9 @@
                              (- nil-value n-word-bytes other-pointer-lowtag
                                 gc-safepoint-trap-offset))))
 
-(defmacro pseudo-atomic (&rest forms)
+(defmacro pseudo-atomic ((&key elide-if) &rest forms)
   #!+sb-safepoint-strictly
-  `(progn ,@forms (emit-safepoint))
+  `(progn ,@forms (unless ,elide-if (emit-safepoint)))
   #!-sb-safepoint-strictly
   (with-unique-names (label pa-bits-ea)
     `(let ((,label (gen-label))
@@ -223,20 +214,22 @@
             (make-ea :dword :disp (* 4 thread-pseudo-atomic-bits-slot))
             #!-sb-thread
             (make-ea-for-symbol-value *pseudo-atomic-bits* :dword)))
-       (inst mov ,pa-bits-ea ebp-tn #!+sb-thread :fs)
+       (unless ,elide-if
+         (inst mov ,pa-bits-ea ebp-tn #!+sb-thread :fs))
        ,@forms
-       (inst xor ,pa-bits-ea ebp-tn #!+sb-thread :fs)
-       (inst jmp :z ,label)
-       ;; if PAI was set, interrupts were disabled at the same time
-       ;; using the process signal mask.
-       (inst break pending-interrupt-trap)
-       (emit-label ,label)
-       #!+sb-safepoint
-       ;; In this case, when allocation thinks a GC should be done, it
-       ;; does not mark PA as interrupted, but schedules a safepoint
-       ;; trap instead.  Let's take the opportunity to trigger that
-       ;; safepoint right now.
-       (emit-safepoint))))
+       (unless ,elide-if
+         (inst xor ,pa-bits-ea ebp-tn #!+sb-thread :fs)
+         (inst jmp :z ,label)
+         ;; if PAI was set, interrupts were disabled at the same time
+         ;; using the process signal mask.
+         (inst break pending-interrupt-trap)
+         (emit-label ,label)
+         #!+sb-safepoint
+         ;; In this case, when allocation thinks a GC should be done, it
+         ;; does not mark PA as interrupted, but schedules a safepoint
+         ;; trap instead.  Let's take the opportunity to trigger that
+         ;; safepoint right now.
+         (emit-safepoint)))))
 
 ;;;; indexed references
 

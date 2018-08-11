@@ -1708,7 +1708,7 @@
                    '((note-this-location vop :internal-error)
                      ;; Catch any pending FPE exceptions.
                      (inst wait)))
-                (,(if round-p 'progn 'pseudo-atomic)
+                (,@(if round-p '(progn) '(pseudo-atomic ()))
                  ;; Normal mode (for now) is "round to best".
                  (with-tn@fp-top (x)
                    ,@(unless round-p

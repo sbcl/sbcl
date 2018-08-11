@@ -153,7 +153,7 @@
                     &aux (bytes (pad-data-block size)))
   (unless stack-allocate-p
     (instrument-alloc bytes node))
-  (maybe-pseudo-atomic stack-allocate-p
+  (pseudo-atomic (:elide-if stack-allocate-p)
       (allocation result-tn bytes node stack-allocate-p other-pointer-lowtag)
       (storew* (logior (ash (1- size) n-widetag-bits) widetag)
                result-tn 0 other-pointer-lowtag
@@ -193,7 +193,7 @@
                     (size (* (pad-data-block cons-size) cons-cells)))
                (unless stack-allocate-p
                  (instrument-alloc size node))
-               (maybe-pseudo-atomic stack-allocate-p
+               (pseudo-atomic (:elide-if stack-allocate-p)
                 (allocation res size node stack-allocate-p list-pointer-lowtag)
                 (move ptr res)
                 (dotimes (i (1- cons-cells))
@@ -278,7 +278,7 @@
       ;; so don't move it inside.
       (let ((size (calc-size-in-bytes words result)))
         (instrument-alloc size node)
-        (pseudo-atomic
+        (pseudo-atomic ()
          (allocation result size node nil other-pointer-lowtag)
          (put-header result type length t)))))
 
@@ -429,7 +429,7 @@
             (no-init
              (and (sc-is element immediate) (eql (tn-value element) 0))))
         (instrument-alloc size node)
-        (pseudo-atomic
+        (pseudo-atomic ()
          (allocation result size node nil list-pointer-lowtag)
          (compute-end)
          (inst mov next result)
@@ -472,7 +472,7 @@
           (header (logior (ash (1- words) n-widetag-bits) closure-widetag)))
      (unless stack-allocate-p
        (instrument-alloc bytes node))
-     (maybe-pseudo-atomic stack-allocate-p
+     (pseudo-atomic (:elide-if stack-allocate-p)
        (allocation result bytes node stack-allocate-p fun-pointer-lowtag)
        (storew* #!-immobile-space header ; write the widetag and size
                 #!+immobile-space        ; ... plus the layout pointer
@@ -528,7 +528,7 @@
     (progn name) ; possibly not used
     (unless stack-allocate-p
       (instrument-alloc bytes node))
-    (maybe-pseudo-atomic stack-allocate-p
+    (pseudo-atomic (:elide-if stack-allocate-p)
      (allocation result bytes node stack-allocate-p lowtag)
      (when type
        (let* ((widetag (if (typep type 'layout) instance-widetag type))
@@ -580,7 +580,7 @@
           (ea (+ (ash -2 n-widetag-bits) type) header))
     (inst and bytes (lognot lowtag-mask)))
     (instrument-alloc bytes node)
-    (pseudo-atomic
+    (pseudo-atomic ()
      (allocation result bytes node nil lowtag)
      (storew header result 0 lowtag))))
 
@@ -604,7 +604,7 @@
    ;; RSP needn't be restored because the allocators all return immediately
    ;; which has that effect
    (inst and rsp-tn -16)
-   (pseudo-atomic
+   (pseudo-atomic ()
      (c-call "alloc_fixedobj")
      (inst lea result (ea lowtag c-result))
      ;; If code, the next word must be set within the P-A
@@ -624,7 +624,7 @@
    ;; RSP needn't be restored because the allocators all return immediately
    ;; which has that effect
    (inst and rsp-tn -16)
-   (pseudo-atomic (c-call "alloc_layout"))
+   (pseudo-atomic () (c-call "alloc_layout"))
    (move result c-result)))
 ) ; end MACROLET
 

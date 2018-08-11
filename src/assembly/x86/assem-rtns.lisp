@@ -509,7 +509,7 @@
       (inst mov eax-tn object) ; object
       (inst sub eax-tn (thread-slot-ea thread-dynspace-addr-slot) prefix)
       (inst shr eax-tn (1- (integer-length gencgc-card-bytes)))
-      (pseudo-atomic
+      (pseudo-atomic ()
         (assemble ()
           (inst cmp eax-tn (thread-slot-ea thread-dynspace-card-count-slot)
                 prefix)

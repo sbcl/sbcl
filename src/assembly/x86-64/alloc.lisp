@@ -90,7 +90,7 @@
     ;; to receive an interrupt causing it to do a slow operation between
     ;; acquisition and release of the spinlock. Preventing GC is irrelevant,
     ;; but would not be if we recycled tls indices of garbage symbols.
-    (pseudo-atomic
+    (pseudo-atomic ()
      (assemble () ; for conversion of tagbody-like labels to assembler labels
      RETRY
        (inst bts free-tls-index-ea lock-bit :lock)

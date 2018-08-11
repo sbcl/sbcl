@@ -1336,7 +1336,7 @@
       (inst mov result nil-value)
       (inst jecxz done)
       (inst lea dst (make-ea :dword :base ecx :index ecx))
-      (maybe-pseudo-atomic stack-allocate-p
+      (pseudo-atomic (:elide-if stack-allocate-p)
        (allocation dst dst node stack-allocate-p list-pointer-lowtag)
        ;; Set decrement mode (successive args at lower addresses)
        (inst std)

@@ -164,7 +164,7 @@
 ;;; header having the specified WIDETAG value. The result is placed in
 ;;; RESULT-TN.
 (defun fixed-alloc (result-tn widetag size node &optional stack-allocate-p)
-  (maybe-pseudo-atomic stack-allocate-p
+  (pseudo-atomic (:elide-if stack-allocate-p)
       (allocation result-tn (pad-data-block size) node stack-allocate-p
                   other-pointer-lowtag)
       (storew (logior (ash (1- size) n-widetag-bits) widetag)
@@ -198,7 +198,7 @@
                      (storew reg ,list ,slot list-pointer-lowtag))))
              (let ((cons-cells (if star (1- num) num))
                    (stack-allocate-p (node-stack-allocate-p node)))
-               (maybe-pseudo-atomic stack-allocate-p
+               (pseudo-atomic (:elide-if stack-allocate-p)
                 (allocation res (* (pad-data-block cons-size) cons-cells) node
                             stack-allocate-p list-pointer-lowtag)
                 (move ptr res)
@@ -251,7 +251,7 @@
                                                    n-word-bytes))))
                    (inst and result (lognot lowtag-mask))
                    result))))
-      (pseudo-atomic
+      (pseudo-atomic ()
        (allocation result size node)
        (inst lea result (make-ea :byte :base result :disp other-pointer-lowtag))
        (sc-case type
@@ -332,7 +332,7 @@
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
   (:generator 10
-   (maybe-pseudo-atomic stack-allocate-p
+   (pseudo-atomic (:elide-if stack-allocate-p)
      (let ((size (+ length closure-info-offset)))
        (allocation result (pad-data-block size) node
                    stack-allocate-p
@@ -398,7 +398,7 @@
                                        ,@cases)))))
           (aver (null type))
           (inst call (make-fixup dst :assembly-routine)))
-        (maybe-pseudo-atomic stack-allocate-p
+        (pseudo-atomic (:elide-if stack-allocate-p)
          (allocation result (pad-data-block words) node stack-allocate-p lowtag)
          (when type
            (storew (logior (ash (1- words) n-widetag-bits) type)
@@ -423,7 +423,7 @@
     (inst lea header                    ; (w-1 << 8) | type
           (make-ea :dword :base header :disp (+ (ash -2 n-widetag-bits) type)))
     (inst and bytes (lognot lowtag-mask))
-    (pseudo-atomic
+    (pseudo-atomic ()
      (allocation result bytes node)
      (inst lea result (make-ea :byte :base result :disp lowtag))
      (storew header result 0 lowtag))))

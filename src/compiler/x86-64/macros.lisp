@@ -166,11 +166,6 @@
 ;;; place and there's no logical single place to attach documentation.
 ;;; grep (mostly in src/runtime) is your friend
 
-(defmacro maybe-pseudo-atomic (not-really-p &body body)
-  `(if ,not-really-p
-       (progn ,@body)
-       (pseudo-atomic ,@body)))
-
 ;;; Unsafely clear pa flags so that the image can properly lose in a
 ;;; pa section.
 #!+sb-thread
@@ -182,29 +177,31 @@
   (inst test al-tn (ea (- nil-value n-word-bytes other-pointer-lowtag
                           gc-safepoint-trap-offset))))
 
-(defmacro pseudo-atomic (&rest forms)
+(defmacro pseudo-atomic ((&key elide-if) &rest forms)
   #!+sb-safepoint-strictly
-  `(progn ,@forms (emit-safepoint))
+  `(progn ,@forms (unless ,elide-if (emit-safepoint)))
   #!-sb-safepoint-strictly
   (with-unique-names (label pa-bits-ea)
     `(let ((,label (gen-label))
            (,pa-bits-ea
             #!+sb-thread (thread-slot-ea thread-pseudo-atomic-bits-slot)
             #!-sb-thread (static-symbol-value-ea '*pseudo-atomic-bits*)))
-       (inst mov ,pa-bits-ea rbp-tn)
+       (unless ,elide-if
+         (inst mov ,pa-bits-ea rbp-tn))
        ,@forms
-       (inst xor ,pa-bits-ea rbp-tn)
-       (inst jmp :z ,label)
-       ;; if PAI was set, interrupts were disabled at the same time
-       ;; using the process signal mask.
-       (inst break pending-interrupt-trap)
-       (emit-label ,label)
-       #!+sb-safepoint
-       ;; In this case, when allocation thinks a GC should be done, it
-       ;; does not mark PA as interrupted, but schedules a safepoint
-       ;; trap instead.  Let's take the opportunity to trigger that
-       ;; safepoint right now.
-       (emit-safepoint))))
+       (unless ,elide-if
+         (inst xor ,pa-bits-ea rbp-tn)
+         (inst jmp :z ,label)
+         ;; if PAI was set, interrupts were disabled at the same time
+         ;; using the process signal mask.
+         (inst break pending-interrupt-trap)
+         (emit-label ,label)
+         #!+sb-safepoint
+         ;; In this case, when allocation thinks a GC should be done, it
+         ;; does not mark PA as interrupted, but schedules a safepoint
+         ;; trap instead.  Let's take the opportunity to trigger that
+         ;; safepoint right now.
+         (emit-safepoint)))))
 
 ;;;; indexed references
 

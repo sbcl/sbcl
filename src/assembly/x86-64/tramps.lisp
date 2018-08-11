@@ -6,7 +6,7 @@
 (in-package "SB!VM")
 
 (macrolet
-    ((def ((name c-name wrap-call &key do-not-preserve (stack-delta 0))
+    ((def ((name c-name pseudo-atomic &key do-not-preserve (stack-delta 0))
            move-arg
            move-result)
        `(define-assembly-routine
@@ -46,8 +46,9 @@
             (map-floats push)
             (map-registers push)
             ,@move-arg
-            ;; asm routines can always call foreign code with a relative operand
-            (,wrap-call (inst call (make-fixup ,c-name :foreign)))
+            (pseudo-atomic (:elide-if (not ,pseudo-atomic))
+              ;; asm routines can always call foreign code with a relative operand
+              (inst call (make-fixup ,c-name :foreign)))
             ,@move-result
             (map-registers pop)
             (map-floats pop)
@@ -55,11 +56,11 @@
             (inst pop rbp-tn)
             (inst ret ,stack-delta)))))
 
-  (def (alloc-tramp "alloc" progn)
+  (def (alloc-tramp "alloc" nil)
     ((inst mov rdi-tn (ea 16 rbp-tn))) ; arg
     ((inst mov (ea 16 rbp-tn) rax-tn))) ; result
 
-  (def (alloc-tramp-r11 "alloc" progn
+  (def (alloc-tramp-r11 "alloc" nil
                         :do-not-preserve (r11-tn)
                         :stack-delta 8) ;; remove the size parameter
     ((inst mov rdi-tn (ea 16 rbp-tn))) ; arg
@@ -67,11 +68,11 @@
 
   ;; These routines are for the deterministic allocation profiler.
   ;; The C support routine's argument is the return PC
-  (def (enable-alloc-counter "allocation_tracker_counted" pseudo-atomic)
+  (def (enable-alloc-counter "allocation_tracker_counted" t)
     ((inst lea rdi-tn (ea 8 rbp-tn))) ; arg
     ()) ; result
 
-  (def (enable-sized-alloc-counter "allocation_tracker_sized" pseudo-atomic)
+  (def (enable-sized-alloc-counter "allocation_tracker_sized" t)
     ((inst lea rdi-tn (ea 8 rbp-tn))) ; arg
     ())) ; result
 

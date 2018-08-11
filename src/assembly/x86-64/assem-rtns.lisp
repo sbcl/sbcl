@@ -404,7 +404,7 @@
   (inst mov temp-reg-tn (ea 24 rsp-tn))
   (inst sub temp-reg-tn (thread-slot-ea thread-varyobj-space-addr-slot))
   (inst shr temp-reg-tn (1- (integer-length immobile-card-bytes)))
-  (pseudo-atomic
+  (pseudo-atomic ()
     (assemble ()
       (inst cmp temp-reg-tn (thread-slot-ea thread-varyobj-card-count-slot))
       (inst jmp :ae try-dynamic-space)

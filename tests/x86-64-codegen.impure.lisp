@@ -287,7 +287,7 @@ sb-vm::
     (let* ((bytes large-object-size) ; payload + header total
            (words (- (/ bytes n-word-bytes) vector-data-offset)))
       (instrument-alloc bytes node)
-      (pseudo-atomic
+      (pseudo-atomic ()
        (allocation result bytes node nil other-pointer-lowtag)
        (storew* simple-array-unsigned-byte-64-widetag result 0
                 other-pointer-lowtag t)

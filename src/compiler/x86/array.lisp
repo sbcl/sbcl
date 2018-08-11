@@ -34,7 +34,7 @@
     (inst shl header n-widetag-bits)
     (inst or  header type)
     (inst shr header 2)
-    (pseudo-atomic
+    (pseudo-atomic ()
      (allocation result bytes node nil other-pointer-lowtag)
      (storew header result 0 other-pointer-lowtag))))
 
@@ -54,7 +54,7 @@
            (header (logior (ash header-size
                                 n-widetag-bits)
                            type)))
-     (pseudo-atomic
+     (pseudo-atomic ()
       (allocation result bytes node nil other-pointer-lowtag)
       (storew header result 0 other-pointer-lowtag)))))
 
