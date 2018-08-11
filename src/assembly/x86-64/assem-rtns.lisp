@@ -21,34 +21,34 @@
 (define-assembly-routine
     (return-multiple (:return-style :none))
     (;; These are really arguments.
-     (:temp ecx unsigned-reg rcx-offset)
-     (:temp esi unsigned-reg rsi-offset)
+     (:temp rcx unsigned-reg rcx-offset)
+     (:temp rsi unsigned-reg rsi-offset)
 
      ;; These we need as temporaries.
-     (:temp eax unsigned-reg rax-offset)
-     (:temp ebx unsigned-reg rbx-offset)
-     (:temp edx unsigned-reg rdx-offset)
-     (:temp edi unsigned-reg rdi-offset)
+     (:temp rax unsigned-reg rax-offset)
+     (:temp rbx unsigned-reg rbx-offset)
+     (:temp rdx unsigned-reg rdx-offset)
+     (:temp rdi unsigned-reg rdi-offset)
      (:temp temp unsigned-reg r8-offset)
      (:temp loop-index unsigned-reg r9-offset))
 
   ;; Pick off the cases where everything fits in register args.
   (inst jrcxz ZERO-VALUES)
-  (inst cmp ecx (fixnumize 1))
+  (inst cmp rcx (fixnumize 1))
   (inst jmp :e ONE-VALUE)
-  (inst cmp ecx (fixnumize 2))
+  (inst cmp rcx (fixnumize 2))
   (inst jmp :e TWO-VALUES)
-  (inst cmp ecx (fixnumize 3))
+  (inst cmp rcx (fixnumize 3))
   (inst jmp :e THREE-VALUES)
 
-  ;; As per the calling convention EBX is expected to point at the SP
+  ;; As per the calling convention RBX is expected to point at the SP
   ;; before the stack frame.
-  (inst lea ebx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
+  (inst lea rbx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
 
   ;; Save the count, the return address and restore the frame pointer,
   ;; because the loop is going to destroy them.
-  (inst mov edx ecx)
-  (inst mov eax (ea (frame-byte-offset return-pc-save-offset) rbp-tn))
+  (inst mov rdx rcx)
+  (inst mov rax (ea (frame-byte-offset return-pc-save-offset) rbp-tn))
   (inst mov rbp-tn (ea (frame-byte-offset ocfp-save-offset) rbp-tn))
   ;; Blit the values down the stack. Note: there might be overlap, so
   ;; we have to be careful not to clobber values before we've read
@@ -58,31 +58,31 @@
   (zeroize loop-index)
   LOOP
   (inst sub loop-index n-word-bytes)
-  (inst mov temp (ea esi loop-index))
-  (inst mov (ea ebx loop-index) temp)
+  (inst mov temp (ea rsi loop-index))
+  (inst mov (ea rbx loop-index) temp)
 
-  (inst sub edx (fixnumize 1))
+  (inst sub rdx (fixnumize 1))
   (inst jmp :nz LOOP)
 
   ;; Set the stack top to the last result.
-  (inst lea rsp-tn (ea ebx loop-index))
+  (inst lea rsp-tn (ea rbx loop-index))
 
   ;; Load the register args.
-  (loadw edx ebx -1)
-  (loadw edi ebx -2)
-  (loadw esi ebx -3)
+  (loadw rdx rbx -1)
+  (loadw rdi rbx -2)
+  (loadw rsi rbx -3)
 
   ;; And back we go.
   (inst stc)
-  (inst push eax)
+  (inst push rax)
   (inst ret)
 
   ;; Handle the register arg cases.
   ZERO-VALUES
-  (inst lea ebx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
-  (inst mov edx nil-value)
-  (inst mov edi edx)
-  (inst mov esi edx)
+  (inst lea rbx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
+  (inst mov rdx nil-value)
+  (inst mov rdi rdx)
+  (inst mov rsi rdx)
   (inst mov rsp-tn rbp-tn)
   (inst stc)
   (inst pop rbp-tn)
@@ -91,27 +91,27 @@
   ;; Note: we can get this, because the return-multiple vop doesn't
   ;; check for this case when size > speed.
   ONE-VALUE
-  (loadw edx esi -1)
+  (loadw rdx rsi -1)
   (inst mov rsp-tn rbp-tn)
   (inst clc)
   (inst pop rbp-tn)
   (inst ret)
 
   TWO-VALUES
-  (inst lea ebx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
-  (loadw edx esi -1)
-  (loadw edi esi -2)
-  (inst mov esi nil-value)
+  (inst lea rbx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
+  (loadw rdx rsi -1)
+  (loadw rdi rsi -2)
+  (inst mov rsi nil-value)
   (inst mov rsp-tn rbp-tn)
   (inst stc)
   (inst pop rbp-tn)
   (inst ret)
 
   THREE-VALUES
-  (inst lea ebx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
-  (loadw edx esi -1)
-  (loadw edi esi -2)
-  (loadw esi esi -3)
+  (inst lea rbx (ea (* sp->fp-offset n-word-bytes) rbp-tn))
+  (loadw rdx rsi -1)
+  (loadw rdi rsi -2)
+  (loadw rsi rsi -3)
   (inst mov rsp-tn rbp-tn)
   (inst stc)
   (inst pop rbp-tn)
@@ -123,73 +123,63 @@
 ;;; of our stack frame (where args are produced) to the start of our
 ;;; stack frame (where args are expected).
 ;;;
-;;; We take the function to call in EAX and a pointer to the arguments in
-;;; ESI. EBP says the same over the jump, and the old frame pointer is
+;;; We take the function to call in RAX and a pointer to the arguments in
+;;; RSI. EBP stays the same over the jump, and the old frame pointer is
 ;;; still saved in the first stack slot. The return-pc is saved in
 ;;; the second stack slot, so we have to push it to make it look like
-;;; we actually called. We also have to compute ECX from the difference
-;;; between ESI and the stack top.
+;;; we actually called. We also have to compute RCX from the difference
+;;; between RSI and the stack top.
 #-sb-assembling ; avoid "Redefinition" warning (this file is processed twice)
-(defun !prepare-for-tail-call-variable (eax ebx ecx edx edi esi
+(defun !prepare-for-tail-call-variable (fun temp nargs rdx rdi rsi
+                                        r8 loop-index r10
                                         &optional jump-to-the-end)
   (assemble ()
     ;; Calculate NARGS (as a fixnum)
-    (move ecx esi)
-    (inst sub ecx rsp-tn)
+    (move nargs rsi)
+    (inst sub nargs rsp-tn)
     #!-#.(cl:if (cl:= sb!vm:word-shift sb!vm:n-fixnum-tag-bits) '(and) '(or))
-    (inst shr ecx (- word-shift n-fixnum-tag-bits))
+    (inst shr nargs (- word-shift n-fixnum-tag-bits))
 
     ;; Check for all the args fitting the registers.
-    (inst cmp ecx (fixnumize register-arg-count))
+    (inst cmp nargs (fixnumize register-arg-count))
     (inst jmp :le REGISTER-ARGS)
 
-    ;; Save the OLD-FP and RETURN-PC because the blit is going to trash
-    ;; those stack locations. Save the ECX, because the loop is going to
-    ;; trash it.
-    (pushw rbp-tn (frame-word-offset ocfp-save-offset))
-    (loadw ebx rbp-tn (frame-word-offset return-pc-save-offset))
-    (inst push ecx)
+    (inst mov r8 rsi)
+
+    ;; Register args
+    (loadw rdx rsi -1)
+    (loadw rdi rsi -2)
+    (loadw rsi rsi -3)
 
     ;; Do the blit. Because we are coping from smaller addresses to
     ;; larger addresses, we have to start at the largest pair and work
     ;; our way down.
-    (inst shr ecx n-fixnum-tag-bits)
-    (inst std)                          ; count down
-    (inst lea edi (ea (frame-byte-offset 0) rbp-tn))
-    (inst sub esi n-word-bytes)
-    (inst rep)
-    (inst movs :qword)
-    (inst cld)
+    (zeroize temp)
+    (inst lea r9 (ea (- (fixnumize register-arg-count)) nargs))
+    LOOP
+    (inst sub temp n-word-bytes)
+    (inst mov r10 (ea (- (* register-arg-count n-word-bytes)) r8 temp))
+    (inst mov (ea (frame-byte-offset (1- register-arg-count)) rbp-tn temp) r10)
 
-    ;; Load the register arguments carefully.
-    (loadw edx rbp-tn (frame-word-offset ocfp-save-offset))
-
-    ;; Restore OLD-FP and ECX.
-    (inst pop ecx)
-    ;; Overwrites a1
-    (popw rbp-tn (frame-word-offset ocfp-save-offset))
+    (inst sub r9 (fixnumize 1))
+    (inst jmp :nz LOOP)
 
     ;; Blow off the stack above the arguments.
-    (inst lea rsp-tn (ea n-word-bytes edi))
+    (inst lea rsp-tn (ea (frame-byte-offset (1- register-arg-count)) rbp-tn temp))
 
-    ;; remaining register args
-    (inst mov edi edx)
-    (loadw edx rbp-tn (frame-word-offset 0))
-    (loadw esi rbp-tn (frame-word-offset 2))
-
-    ;; Push the (saved) return-pc so it looks like we just called.
-    (inst push ebx)
+    ;; Push the return-pc so it looks like we just called.
+    (pushw rbp-tn (frame-word-offset return-pc-save-offset))
 
     ;; And jump into the function.
     (if jump-to-the-end
         (inst jmp end)
-        (inst jmp (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag) eax)))
+        (inst jmp (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag) fun)))
 
     ;; All the arguments fit in registers, so load them.
     REGISTER-ARGS
-    (loadw edx esi -1)
-    (loadw edi esi -2)
-    (loadw esi esi -3)
+    (loadw rdx rsi -1)
+    (loadw rdi rsi -2)
+    (loadw rsi rsi -3)
 
     ;; Clear most of the stack.
     (inst lea rsp-tn (ea (* (- sp->fp-offset 3) n-word-bytes) rbp-tn))
@@ -202,34 +192,38 @@
 (define-assembly-routine
     (tail-call-variable
      (:return-style :none))
-    ((:temp eax unsigned-reg rax-offset)
-     (:temp ebx unsigned-reg rbx-offset)
-     (:temp ecx unsigned-reg rcx-offset)
-     (:temp edx unsigned-reg rdx-offset)
-     (:temp edi unsigned-reg rdi-offset)
-     (:temp esi unsigned-reg rsi-offset))
-  (!prepare-for-tail-call-variable eax ebx ecx edx edi esi)
+    ((:temp fun unsigned-reg rax-offset)
+     (:temp temp unsigned-reg rbx-offset)
+     (:temp nargs unsigned-reg rcx-offset)
+     (:temp rdx unsigned-reg rdx-offset)
+     (:temp rdi unsigned-reg rdi-offset)
+     (:temp rsi unsigned-reg rsi-offset)
+     (:temp r8 unsigned-reg r8-offset)
+     (:temp r9 unsigned-reg r9-offset)
+     (:temp r10 unsigned-reg r10-offset))
+  (!prepare-for-tail-call-variable fun temp nargs rdx rdi rsi r8 r9 r10)
 
-  (inst jmp (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag) eax)))
+  (inst jmp (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag) fun)))
 
 #+sb-assembling
 (define-assembly-routine
     (tail-call-callable-variable
      (:return-style :none))
+    ((:temp fun unsigned-reg rax-offset)
+     (:temp temp unsigned-reg rbx-offset)
+     (:temp nargs unsigned-reg rcx-offset)
+     (:temp rdx unsigned-reg rdx-offset)
+     (:temp rdi unsigned-reg rdi-offset)
+     (:temp rsi unsigned-reg rsi-offset)
+     (:temp r8 unsigned-reg r8-offset)
+     (:temp r9 unsigned-reg r9-offset)
+     (:temp r10 unsigned-reg r10-offset))
+  (!prepare-for-tail-call-variable fun temp nargs rdx rdi rsi r8 r9 r10 t)
 
-    ((:temp eax unsigned-reg rax-offset)
-     (:temp ebx unsigned-reg rbx-offset)
-     (:temp ecx unsigned-reg rcx-offset)
-     (:temp edx unsigned-reg rdx-offset)
-     (:temp edi unsigned-reg rdi-offset)
-     (:temp esi unsigned-reg rsi-offset)
-     (:temp fun (any-reg descriptor-reg) rax-offset))
-  (!prepare-for-tail-call-variable eax ebx ecx edx edi esi t)
-
-  (%lea-for-lowtag-test ebx-tn fun fun-pointer-lowtag)
+  (%lea-for-lowtag-test rbx-tn fun fun-pointer-lowtag)
   (inst test bl-tn lowtag-mask)
   (inst jmp :nz (make-fixup 'tail-call-symbol :assembly-routine))
-  (inst jmp (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag) eax)))
+  (inst jmp (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag) fun)))
 
 #+sb-assembling
 (define-assembly-routine (call-symbol
@@ -316,7 +310,7 @@
 
   EXIT
 
-  ;; Here EAX points to catch block containing symbol pointed to by EDX.
+  ;; Here RAX points to catch block containing symbol pointed to by RDX.
   ;; An extra RET gets stuffed after the JMP, but oh well. You can't just change
   ;; the :return-style to :none because that also affects the call sequence.
   (inst jmp (make-fixup 'unwind :assembly-routine)))
@@ -369,8 +363,8 @@
   (loadw where block unwind-block-bsp-slot)
   (unbind-to-here where symbol value uwp zero)
   ;; Uwp-entry expects some things in known locations so that they can
-  ;; be saved on the stack: the block in edx-tn, start in ebx-tn, and
-  ;; count in ecx-tn.
+  ;; be saved on the stack: the block in rdx-tn, start in rbx-tn, and
+  ;; count in rcx-tn.
 
   (inst jmp (ea (* unwind-block-entry-pc-slot n-word-bytes) block)))
 
