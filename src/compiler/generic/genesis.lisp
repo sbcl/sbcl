@@ -1309,12 +1309,10 @@ core and return a descriptor to it."
   ;; Word following the header is the layout
   (write-wordindexed thing sb!vm:instance-slots-offset layout))
 
-(defun cold-layout-of (cold-struct)
-  #!+compact-instance-header
-  (let ((bits (ash (read-bits-wordindexed cold-struct 0) -32)))
-    (if (zerop bits) *nil-descriptor* (make-random-descriptor bits)))
-  #!-compact-instance-header
-  (read-wordindexed cold-struct sb!vm:instance-slots-offset))
+(defun layout-assigned-p (cold-struct)
+  (/= 0 (or #!+compact-instance-header
+            (ash (read-bits-wordindexed cold-struct 0) -32)
+            (read-bits-wordindexed cold-struct sb!vm:instance-slots-offset))))
 
 (defun initialize-layouts ()
   (clrhash *cold-layouts*)
@@ -1364,7 +1362,7 @@ core and return a descriptor to it."
   (aver (eq create t))
   (or (gethash name *classoid-cells*)
       (let ((layout (or (gethash 'sb!kernel::classoid-cell *cold-layouts*) ; ok if nil
-                        #!+compact-instance-header (make-fixnum-descriptor 0)))
+                        (make-fixnum-descriptor 0)))
             (host-layout (find-layout 'sb!kernel::classoid-cell)))
         (setf (gethash name *classoid-cells*)
               (write-slots (allocate-struct *dynamic* layout
@@ -1985,7 +1983,7 @@ core and return a descriptor to it."
                ;; knew when something later must backpatch a cold layout
                ;; so that it could make a note to itself to do those ASAP
                ;; after the cold layout became known.
-               (when (cold-null (cold-layout-of cold-classoid-cell))
+               (unless (layout-assigned-p cold-classoid-cell)
                  (set-instance-layout cold-classoid-cell layout))
                (setf (gethash symbol hashtable)
                      (packed-info-insert

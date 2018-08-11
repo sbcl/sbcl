@@ -411,6 +411,10 @@
   (:generator 2
    (inst cmp (ea (- other-pointer-lowtag) x nil nil :byte) widetag)))
 
+;;; TRANSFORM-INSTANCE-TYPEP checks for this vop by name and will try to use it,
+;;; so don't define it if inapplicable.
+#!+compact-instance-header
+(progn
 (defknown layout-eq (instance t) boolean (flushable))
 (define-vop (layout-eq)
   (:translate layout-eq)
@@ -422,7 +426,7 @@
     (inst cmp (ea (- 4 instance-pointer-lowtag) instance nil nil :dword)
           (if (sc-is layout immediate)
               (make-fixup (tn-value layout) :layout)
-              layout))))
+              layout)))))
 
 (defknown layout-inherits-ref-eq (simple-vector index t) boolean (flushable))
 (define-vop (layout-inherits-ref-eq)
