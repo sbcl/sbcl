@@ -1026,6 +1026,16 @@
           (setq last ref))))
       first))
 
+#!+call-symbol
+(defun fun-tn-type (lvar tn)
+  (cond ((neq (tn-primitive-type tn) *backend-t-primitive-type*)
+         :function)
+        ((types-equal-or-intersect (lvar-type lvar)
+                                   (specifier-type 'function))
+         :designator)
+        (t
+         :symbol)))
+
 ;;; Move the arguments into the passing locations and do a (possibly
 ;;; named) tail call.
 (defun ir2-convert-tail-full-call (node block)
@@ -1035,17 +1045,17 @@
          (nargs (length args))
          (pass-refs (move-tail-full-call-args node block))
          (old-fp (ir2-physenv-old-fp env))
-         (return-pc (ir2-physenv-return-pc env)))
-
+         (return-pc (ir2-physenv-return-pc env))
+         (fun-lvar (basic-combination-fun node)))
     (multiple-value-bind (fun-tn named)
-        (fun-lvar-tn node block (basic-combination-fun node))
+        (fun-lvar-tn node block fun-lvar)
       (cond ((not named)
              (vop* tail-call node block
                    (fun-tn old-fp return-pc pass-refs)
                    (nil)
                    nargs (emit-step-p node)
                    #!+call-symbol
-                   (eq (tn-primitive-type fun-tn) *backend-t-primitive-type*)))
+                   (fun-tn-type fun-lvar fun-tn)))
             #!-immobile-code
             ((eq fun-tn named)
              (vop* static-tail-call-named node block
@@ -1056,7 +1066,7 @@
              (vop* tail-call-named node block
                    (#!-immobile-code fun-tn old-fp return-pc pass-refs) ; args
                    (nil)                ; results
-                   nargs #!+immobile-code named (emit-step-p node))))))  ; info
+                   nargs #!+immobile-code named (emit-step-p node)))))) ; info
   (values))
 
 ;;; like IR2-CONVERT-LOCAL-CALL-ARGS, only different
@@ -1099,14 +1109,15 @@
                                           (t
                                            (standard-arg-location i))))))
            (loc-refs (reference-tn-list locs t))
-           (nvals (length locs)))
+           (nvals (length locs))
+           (fun-lvar (basic-combination-fun node)))
       (multiple-value-bind (fun-tn named)
-          (fun-lvar-tn node block (basic-combination-fun node))
+          (fun-lvar-tn node block fun-lvar)
         (cond ((not named)
                (vop* call node block (fp fun-tn args) (loc-refs)
                      arg-locs nargs nvals (emit-step-p node)
                      #!+call-symbol
-                     (eq (tn-primitive-type fun-tn) *backend-t-primitive-type*)))
+                     (fun-tn-type fun-lvar fun-tn)))
               #!-immobile-code
               ((eq fun-tn named)
                (vop* static-call-named node block
@@ -1130,14 +1141,15 @@
       (ir2-convert-full-call-args node block)
     (let* ((lvar (node-lvar node))
            (locs (ir2-lvar-locs (lvar-info lvar)))
-           (loc-refs (reference-tn-list locs t)))
+           (loc-refs (reference-tn-list locs t))
+           (fun-lvar (basic-combination-fun node)))
       (multiple-value-bind (fun-tn named)
-          (fun-lvar-tn node block (basic-combination-fun node))
+          (fun-lvar-tn node block fun-lvar)
         (cond ((not named)
                (vop* multiple-call node block (fp fun-tn args) (loc-refs)
                      arg-locs nargs (emit-step-p node)
                      #!+call-symbol
-                     (eq (tn-primitive-type fun-tn) *backend-t-primitive-type*)))
+                     (fun-tn-type fun-lvar fun-tn)))
               #!-immobile-code
               ((eq fun-tn named)
                (vop* static-multiple-call-named node block
@@ -1577,9 +1589,10 @@
          (tails (and (node-tail-p node)
                      (lambda-tail-set (node-home-lambda node))))
          (lvar (node-lvar node))
-         (2lvar (and lvar (lvar-info lvar))))
+         (2lvar (and lvar (lvar-info lvar)))
+         (fun-lvar (basic-combination-fun node)))
     (multiple-value-bind (fun named)
-        (fun-lvar-tn node block (basic-combination-fun node))
+        (fun-lvar-tn node block fun-lvar)
       (aver (and (not named)
                  (eq (ir2-lvar-kind start-lvar) :unknown)))
       (cond
@@ -1589,21 +1602,21 @@
                (ir2-physenv-old-fp env)
                (ir2-physenv-return-pc env)
                #!+call-symbol
-               (eq (tn-primitive-type fun) *backend-t-primitive-type*))))
+               (fun-tn-type fun-lvar fun))))
        ((and 2lvar
              (eq (ir2-lvar-kind 2lvar) :unknown))
         (vop* multiple-call-variable node block (start fun nil)
               ((reference-tn-list (ir2-lvar-locs 2lvar) t))
               (emit-step-p node)
-              #!+call-symbol
-              (eq (tn-primitive-type fun) *backend-t-primitive-type*)))
+               #!+call-symbol
+               (fun-tn-type fun-lvar fun)))
        (t
         (let ((locs (standard-result-tns lvar)))
           (vop* call-variable node block (start fun nil)
                 ((reference-tn-list locs t)) (length locs)
                 (emit-step-p node)
                 #!+call-symbol
-                (eq (tn-primitive-type fun) *backend-t-primitive-type*))
+                (fun-tn-type fun-lvar fun))
           (move-lvar-result node block locs lvar)))))))
 
 ;;; Reset the stack pointer to the start of the specified
