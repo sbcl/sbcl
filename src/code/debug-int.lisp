@@ -687,7 +687,7 @@
      'sb!alien-internals:*saved-fp*
      (lambda (x)
        (when x
-         (let* ((saved-fp (int-sap x))
+         (let* ((saved-fp (descriptor-sap x))
                 (caller-fp (sap-ref-sap saved-fp
                                         (sb!vm::frame-byte-offset
                                          ocfp-save-offset))))

@@ -316,8 +316,8 @@
 
 (defknown sb!vm::current-thread-offset-sap (fixnum)
   system-area-pointer (flushable))
-(defknown current-sp () system-area-pointer (movable flushable))
-(defknown current-fp () system-area-pointer (movable flushable))
+(defknown (current-sp current-fp) () system-area-pointer (movable flushable))
+(defknown current-fp-fixnum () fixnum (movable flushable))
 (defknown stack-ref (system-area-pointer index) t (flushable))
 (defknown %set-stack-ref (system-area-pointer index t) t ())
 (defknown lra-code-header (t) t (movable flushable))

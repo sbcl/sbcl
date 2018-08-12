@@ -881,6 +881,12 @@
 
   (values))
 
+(defoptimizer (current-fp-fixnum ir2-convert) (() node block)
+  (let ((lvar (node-lvar node))
+        (current-fp (make-stack-pointer-tn)))
+    (vop current-fp node block current-fp)
+    (move-lvar-result node block (list current-fp) lvar)))
+
 ;;; Convert an :ASSIGNMENT call. This is just like a tail local call,
 ;;; except that the caller and callee environment are the same, so we
 ;;; don't need to mess with the environment locations, return PC, etc.

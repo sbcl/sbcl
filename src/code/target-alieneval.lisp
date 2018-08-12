@@ -318,8 +318,7 @@ Examples:
   (declare #-sb-xc-host (muffle-conditions compiler-note)
            (optimize (speed 3)))
   ;; No need to link to the previous value, it can be fetched from the binding stack.
-  (let ((*saved-fp*
-          (truly-the fixnum (sap-int (sb!kernel:current-fp)))))
+  (let ((*saved-fp* (sb!c::current-fp-fixnum)))
     (funcall fn)))
 
 #!-sb-fluid (declaim (inline free-alien))
