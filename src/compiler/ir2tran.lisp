@@ -547,9 +547,12 @@
           (:unknown
            (let ((locs (loop for tn in results
                              collect (cond #!+(or x86 x86-64)
-                                           ((constant-tn-p tn)
+                                           ((eq (tn-kind tn) :constant)
                                             tn)
-                                           ((eq (tn-primitive-type tn) *backend-t-primitive-type*)
+                                           ((and
+                                             #!-(or x86 x86-64)
+                                             (neq (tn-kind tn) :constant)
+                                             (eq (tn-primitive-type tn) *backend-t-primitive-type*))
                                             tn)
                                            ((let ((new (make-normal-tn *backend-t-primitive-type*)))
                                               (emit-move node block tn new)
