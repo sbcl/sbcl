@@ -54,16 +54,18 @@
 ;;; bogus SC that reflects the costs of the memory-to-memory moves for each
 ;;; operand, but this seems unworthwhile.
 (define-vop (push-values)
-  (:args (vals :more t))
-  (:temporary (:sc unsigned-reg :to (:result 0) :target start) temp)
-  (:results (start) (count))
+  (:args (vals :more t
+               :scs (descriptor-reg)))
+  (:results (start :from :load) (count))
   (:info nvals)
   (:generator 20
-    (move temp rsp-tn)                  ; WARN pointing 1 below
+    (move start rsp-tn)
     (do ((val vals (tn-ref-across val)))
         ((null val))
-      (inst push (tn-ref-tn val)))
-    (move start temp)
+      (inst push (let ((value (encode-value-if-immediate (tn-ref-tn val))))
+                   (if (integerp value)
+                       (constantize value)
+                       value))))
     (unless (eq (tn-kind count) :unused)
       (inst mov count (fixnumize nvals)))))
 

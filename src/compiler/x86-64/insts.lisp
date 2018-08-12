@@ -1589,9 +1589,9 @@
            (emit-prefixes segment thing nil (if (eq size :word) :word :do-not-set))
            (cond ((gpr-p thing)
                   (emit-byte+reg segment gpr-opcode thing))
-                  (t
-                   (emit-byte segment mem-opcode)
-                   (emit-ea segment thing subcode :allow-constants allowp))))))
+                 (t
+                  (emit-byte segment mem-opcode)
+                  (emit-ea segment thing subcode :allow-constants allowp))))))
   (define-instruction push (segment src)
     ;; register
     (:printer reg-no-width-default-qword ((op #b01010)))
@@ -1616,6 +1616,9 @@
                             (values #x68 :qword))))
               (emit-byte segment opcode)
               (emit-imm-operand segment imm operand-size)))
+           ((fixup-p src)
+            (emit-byte segment #x68)
+            (emit-absolute-fixup segment src))
            (t
             (emit* segment src #x50 #xFF 6 t)))))
 

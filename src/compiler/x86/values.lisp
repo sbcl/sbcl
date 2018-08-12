@@ -55,15 +55,13 @@
 ;;; operand, but this seems unworthwhile.
 (define-vop (push-values)
   (:args (vals :more t))
-  (:temporary (:sc unsigned-reg :to (:result 0) :target start) temp)
-  (:results (start) (count))
+  (:results (start :from :load) (count))
   (:info nvals)
   (:generator 20
-    (move temp esp-tn)                  ; WARN pointing 1 below
+    (move start esp-tn)                 ; WARN pointing 1 below
     (do ((val vals (tn-ref-across val)))
         ((null val))
-      (inst push (tn-ref-tn val)))
-    (move start temp)
+      (inst push (encode-value-if-immediate (tn-ref-tn val))))
     (inst mov count (fixnumize nvals))))
 
 ;;; Push a list of values on the stack, returning Start and Count as used in

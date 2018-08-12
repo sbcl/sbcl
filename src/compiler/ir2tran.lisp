@@ -102,19 +102,20 @@
              (indirect (lambda-var-indirect leaf))
              (explicit (lambda-var-explicit-value-cell leaf)))
          (cond
-          ((and indirect explicit)
-           (vop value-cell-ref node block tn res))
-          ((and indirect
-                (not (eq (node-physenv node)
-                         (lambda-physenv (lambda-var-home leaf)))))
-           (let ((reffer (third (primitive-type-indirect-cell-type
-                                 (primitive-type (leaf-type leaf))))))
-             (if reffer
-                 (funcall reffer node block tn (leaf-info leaf) res)
-                 (vop ancestor-frame-ref node block tn (leaf-info leaf) res))))
-          (t (emit-move node block tn res)))))
+           ((and indirect explicit)
+            (vop value-cell-ref node block tn res))
+           ((and indirect
+                 (not (eq (node-physenv node)
+                          (lambda-physenv (lambda-var-home leaf)))))
+            (let ((reffer (third (primitive-type-indirect-cell-type
+                                  (primitive-type (leaf-type leaf))))))
+              (if reffer
+                  (funcall reffer node block tn (leaf-info leaf) res)
+                  (vop ancestor-frame-ref node block tn (leaf-info leaf) res))))
+           (t (emit-move node block tn res)))))
       (constant
-       (emit-move node block (make-constant-tn leaf) res))
+       (move-lvar-result node block (list (make-constant-tn leaf)) lvar)
+       (return-from ir2-convert-ref))
       (functional
        (ir2-convert-closure node block leaf res))
       (global-var
@@ -544,13 +545,19 @@
              (unless (eq locs results)
                (move-results-coerced node block results locs))))
           (:unknown
-           (let* ((nvals (length results))
-                  (locs (make-standard-value-tns nvals)))
-             (move-results-coerced node block results locs)
+           (let ((locs (loop for tn in results
+                             collect (cond #!+(or x86 x86-64)
+                                           ((constant-tn-p tn)
+                                            tn)
+                                           ((eq (tn-primitive-type tn) *backend-t-primitive-type*)
+                                            tn)
+                                           ((let ((new (make-normal-tn *backend-t-primitive-type*)))
+                                              (emit-move node block tn new)
+                                              new))))))
              (vop* push-values node block
                    ((reference-tn-list locs nil))
                    ((reference-tn-list (ir2-lvar-locs 2lvar) t))
-                   nvals)))))))
+                   (length results))))))))
   (values))
 
 ;;; CAST
