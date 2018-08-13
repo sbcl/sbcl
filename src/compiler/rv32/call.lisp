@@ -50,7 +50,8 @@
 
 (define-vop (xep-allocate-frame)
   (:info start-lab)
-  (:generator 1))
+  (:generator 1
+    (emit-label start-lab)))
 
 (define-vop (xep-setup-sp)
   (:generator 1))
@@ -67,7 +68,13 @@
 
 (define-vop (unknown-values-receiver)
   (:results (start :scs (any-reg)) (count :scs (any-reg))))
-
+
+(defun emit-block-header (start-label trampoline-label fall-thru-p align-p)
+  (declare (ignore fall-thru-p alignp))
+  (when trampoline-label
+    (emit-label trampoline-label))
+  (emit-label start-label))
+
 (define-vop (call-local)
   (:args (fp) (nfp) (args :more t))
   (:results (values :more t))

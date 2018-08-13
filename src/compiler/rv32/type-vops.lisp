@@ -10,3 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
+
+(defun %test-headers (value temp target not-p function-p headers
+                      &key (drop-through)))
+

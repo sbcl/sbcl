@@ -10,7 +10,13 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
+(defun emit-error-break (vop kind code values)
+  (assemble ()
+    (when vop (note-this-location vop :internal-error))
+    (emit-internal-error kind code values)
+    (emit-alignment word-shift)))
+
 (defmacro define-full-reffer (name type offset lowtag scs eltype &optional translate)
   `(progn
      (define-vop (,name)

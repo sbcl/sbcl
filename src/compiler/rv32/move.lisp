@@ -11,6 +11,8 @@
 
 (in-package "SB-VM")
 
+(defun load-immediate-word (y val))
+
 (define-move-fun (load-immediate 1) (vop x y)
     ((immediate) (any-reg descriptor-reg))
   (let ((val (tn-value x)))

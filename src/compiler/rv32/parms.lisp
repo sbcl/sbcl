@@ -80,7 +80,6 @@
 
 ;;;; other miscellaneous constants
 
-#+nil
 (defenum (:start 8)
   halt-trap
   pending-interrupt-trap
