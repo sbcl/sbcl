@@ -1533,3 +1533,11 @@
          )
     ((#'list) nil)
     (('list) nil)))
+
+(with-test (:name :copyprop-sc-mismatch-between-moves
+            :skipped-on :interpreter)
+  (let ((f (checked-compile
+            '(lambda (f x)
+              (let ((x (the double-float x)))
+                (values (funcall f x) (> x 1d0)))))))
+    (ctu:assert-no-consing (funcall f #'identity 1d0))))
