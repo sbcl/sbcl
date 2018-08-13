@@ -110,7 +110,11 @@
   (do ((ref (tn-reads tn) (tn-ref-next ref)))
       ((null ref) t)
     (let ((vop (tn-ref-vop ref)))
-      (unless (eq (ir2-block-block (vop-block vop)) block)
+      ;; MOVEs can be chained and read in other blocks. This is done
+      ;; not for correctness but for memory usage reduction, so there
+      ;; is no need to follow all the chains, just be conservative.
+      (when (or (eq (vop-info-name (vop-info vop)) 'move)
+                (neq (ir2-block-block (vop-block vop)) block))
         (return)))))
 
 ;;; Init the sets in BLOCK for copy propagation. To find GEN, we just
