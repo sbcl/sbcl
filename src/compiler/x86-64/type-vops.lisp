@@ -15,14 +15,15 @@
 
 (defun generate-fixnum-test (value)
   "Set the Z flag if VALUE is fixnum"
-  (inst test
-        (cond ((sc-is value any-reg descriptor-reg)
-               (reg-in-size value :byte))
-              ;; This is hooey. None of the type-vops presently allow
+  (inst test :byte
+        (cond ;; This is hooey. None of the type-vops presently allow
               ;; control-stack as a storage class.
               ((sc-is value control-stack)
-               (ea (frame-byte-offset (tn-offset value)) rbp-tn nil nil :byte))
+               (ea (frame-byte-offset (tn-offset value)) rbp-tn))
               (t
+               ;; Don't check for (ANY-REG DESCRIPTOR-REG) because VALUE
+               ;; can have a "weird" SC that would not have tag bits.
+               ;; Sometimes a vop temp is specified as UNSIGNED-REG, e.g.
                value))
         fixnum-tag-mask))
 
@@ -63,13 +64,12 @@
 ;; Numerics
 (defun %test-fixnum-immediate-and-headers (value temp target not-p immediate headers
                                            &key value-tn-ref)
-  (let ((drop-through (gen-label))
-        (byte-temp (reg-in-size temp :byte)))
+  (let ((drop-through (gen-label)))
     (case n-fixnum-tag-bits
      (1 (%lea-for-lowtag-test temp value other-pointer-lowtag)
-        (inst test byte-temp 1)
+        (inst test :byte temp 1)
         (inst jmp :nz (if not-p drop-through target)) ; inverted
-        (inst cmp byte-temp (- immediate other-pointer-lowtag))
+        (inst cmp :byte temp (- immediate other-pointer-lowtag))
         (inst jmp :e (if not-p drop-through target))
         (%test-headers value temp target not-p nil headers
                        :drop-through drop-through :compute-temp nil
@@ -150,10 +150,9 @@
                                 (or (atom (car headers))
                                     (= (caar headers) bignum-widetag)
                                     (= (cdar headers) complex-array-widetag)))
-                           (ea (- lowtag) value nil nil :byte)
-                           (progn
-                             (inst mov :dword temp (ea (- lowtag) value))
-                             (reg-in-size temp :byte)))))
+                           (ea (- lowtag) value)
+                           (progn (inst mov :dword temp (ea (- lowtag) value))
+                                  temp))))
           ((null remaining))
         (dolist (widetag except) ; only after loading widetag-tn
           (inst cmp :byte temp widetag)
@@ -163,33 +162,32 @@
               (last (null (cdr remaining))))
           (cond
            ((atom header)
-            (inst cmp widetag-tn header) ; :byte size
+            (inst cmp :byte widetag-tn header)
             (if last
                 (inst jmp equal target)
                 (inst jmp :e when-true)))
            (t
              (let ((start (car header))
-                   (end (cdr header))
-                   (byte-temp (reg-in-size temp :byte)))
+                   (end (cdr header)))
                (cond
                  ((= start bignum-widetag)
-                  (inst cmp widetag-tn end)
+                  (inst cmp :byte widetag-tn end)
                   (if last
                       (inst jmp less-or-equal target)
                       (inst jmp :be when-true)))
                  ((= end complex-array-widetag)
-                  (inst cmp widetag-tn start)
+                  (inst cmp :byte widetag-tn start)
                   (if last
                       (inst jmp greater-or-equal target)
                       (inst jmp :b when-false)))
                  ((not last)
-                  (inst cmp byte-temp start)
+                  (inst cmp :byte temp start)
                   (inst jmp :b when-false)
-                  (inst cmp byte-temp end)
+                  (inst cmp :byte temp end)
                   (inst jmp :be when-true))
                  (t
-                  (inst sub byte-temp start)
-                  (inst cmp byte-temp (- end start))
+                  (inst sub :byte temp start)
+                  (inst cmp :byte temp (- end start))
                   (inst jmp less-or-equal target))))))))
       (emit-label drop-through))))
 
@@ -246,22 +244,18 @@
         (if not-p
             (values not-target target)
             (values target not-target))
-      #.(case n-fixnum-tag-bits
-          (1 '(let ((byte-temp (reg-in-size temp :byte)))
-               (%lea-for-lowtag-test temp value other-pointer-lowtag)
-               (inst test byte-temp fixnum-tag-mask) ; 0th bit = 1 => fixnum
-               (inst jmp :nz yep)
-               (inst test byte-temp lowtag-mask)))
-          (t '(let ((byte-temp (reg-in-size temp :byte)))
-               ;; we'll only examine 1 byte, but moving a :dword is preferable
-               ;; as it doesn't require the CPU to retain the other 7 bytes.
-               (if (gpr-p value)
-                   (inst mov :dword temp value)
-                   (inst mov temp value))
-               (inst test byte-temp fixnum-tag-mask)
-               (inst jmp :e yep)
-               (inst and byte-temp lowtag-mask)
-               (inst cmp byte-temp other-pointer-lowtag))))
+      (case n-fixnum-tag-bits
+        (1 (%lea-for-lowtag-test temp value other-pointer-lowtag)
+           (inst test :byte temp fixnum-tag-mask) ; 0th bit = 1 => fixnum
+           (inst jmp :nz yep)
+           (inst test :byte temp lowtag-mask))
+        (t ;; we'll only examine 1 byte, but moving a :dword is preferable
+           ;; as it doesn't require the CPU to retain the other 7 bytes.
+           (inst mov :dword temp value)
+           (inst test :byte temp fixnum-tag-mask)
+           (inst jmp :e yep)
+           (inst and :byte temp lowtag-mask)
+           (inst cmp :byte temp other-pointer-lowtag)))
       (inst jmp :ne nope)
       (inst cmp (make-ea-for-object-slot value 0 other-pointer-lowtag)
             (+ (ash 1 n-widetag-bits) bignum-widetag))
@@ -276,22 +270,19 @@
   (:generator 45
     (let ((not-target (gen-label))
           (single-word (gen-label))
-          (fixnum (gen-label))
-          (byte-temp (reg-in-size temp :byte)))
+          (fixnum (gen-label)))
       (multiple-value-bind (yep nope)
           (if not-p
               (values not-target target)
               (values target not-target))
         ;; Is it a fixnum?
-        (if (gpr-p value)
-            (inst mov :dword temp value)
-            (inst mov temp value))
-        (inst test byte-temp fixnum-tag-mask)
+        (inst mov :dword temp value)
+        (inst test :byte temp fixnum-tag-mask)
         (inst jmp :e fixnum)
 
         ;; If not, is it an other pointer?
-        (inst and byte-temp lowtag-mask)
-        (inst cmp byte-temp other-pointer-lowtag)
+        (inst and :byte temp lowtag-mask)
+        (inst cmp :byte temp other-pointer-lowtag)
         (inst jmp :ne nope)
         ;; Get the header.
         (loadw temp value 0 other-pointer-lowtag)
