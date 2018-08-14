@@ -1425,10 +1425,8 @@
 ;;; Use of REG-IN-SIZE here instead of MAKE-GPR-ID is a temporary kludge.
 ;;; EMIT-PREFIXES expects to receive TNs, not reg IDs.
 (defun sized-thing (thing size)
-  (if (and (eq size :byte)
-           (gpr-p thing)
-           (neq (operand-size thing) :byte))
-      (sb!vm::reg-in-size thing :byte)
+  (if (and (gpr-p thing) (neq (operand-size thing) size))
+      (sb!vm::reg-in-size thing size)
       thing))
 
 (define-instruction mov (segment maybe-size dst &optional src)
@@ -2863,13 +2861,15 @@
   (declare (ignore dchunk inst))
   (princ (if (dstate-getprop dstate +rex-w+) 'movq 'movd) stream))
 
-(flet ((move-xmm<->gpr (segment dst src expected-size)
+(flet ((move-xmm<->gpr (segment dst src size)
+         ;; We no longer AVER that the size of the src/dst is exactly :DWORD.
+         ;; So you can write (MOVD float0-tn rax-tn) and it will move 32 bits.
+         (setq dst (sized-thing dst size)
+               src (sized-thing src size))
          (cond ((xmm-register-p dst)
-                (aver (eq (operand-size src) expected-size))
                 (emit-sse-inst segment dst src #x66 #x6e))
                (t
                 (aver (xmm-register-p src))
-                (aver (eq (operand-size dst) expected-size))
                 (emit-sse-inst segment src dst #x66 #x7e)))))
   (define-instruction movd (segment dst src)
     (:emitter (move-xmm<->gpr segment dst src :dword))
@@ -2883,8 +2883,6 @@
      (cond ((or (gpr-p src) (gpr-p dst))
             (move-xmm<->gpr segment dst src :qword))
            (t
-            (aver (neq (operand-size src) :dword)) ; could be :float,:complex,:qword
-            (aver (neq (operand-size dst) :dword))
             (cond ((xmm-register-p dst)
                    (emit-sse-inst segment dst src #xf3 #x7e
                                   :operand-size :do-not-set))

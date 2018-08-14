@@ -162,9 +162,9 @@
   (:results (y :scs (descriptor-reg)))
   (:note "float to pointer coercion")
   (:generator 4
-    (inst movd (reg-in-size y :dword) x)
+    (inst movd y x)
     (inst shl y 32)
-    (inst or y single-float-widetag)))
+    (inst or :byte y single-float-widetag)))
 
 (define-move-vop move-from-single :move
   (single-reg) (descriptor-reg))
@@ -1216,7 +1216,7 @@
        (single-reg
         (sc-case bits
           (signed-reg
-           (inst movd res (reg-in-size bits :dword)))
+           (inst movd res bits))
           (signed-stack
            (inst movss res
                  (ea (frame-byte-offset (tn-offset bits)) rbp-tn))))))))
@@ -1265,7 +1265,7 @@
   (:vop-var vop)
   (:guard (member :sse4 *backend-subfeatures*))
   (:generator 2
-    (inst movd res (reg-in-size lo-bits :dword))
+    (inst movd res lo-bits)
     (inst pinsrd res hi-bits 1)))
 
 (define-vop (make-double-float-c)
@@ -1290,7 +1290,7 @@
   (:generator 4
      (sc-case float
        (single-reg
-        (inst movd (reg-in-size bits :dword) float)
+        (inst movd bits float)
         (inst movsx '(:dword :qword) bits bits))
        (single-stack ; c.f. ea-for-sf-stack
         (inst movsx '(:dword :qword)

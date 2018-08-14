@@ -36,7 +36,7 @@
       (move rcx count)
       (inst cmp :dword rcx 0)
       (inst jmp :ge label)
-      (inst neg (sb-vm::reg-in-size rcx :dword))
+      (inst neg :dword rcx)
       (inst ror :dword result :cl)
       (inst jmp end)
       (emit-label label)
