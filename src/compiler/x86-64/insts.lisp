@@ -1420,6 +1420,17 @@
 
 ;;;; general data transfer
 
+;;; Cast THING into a diferent size so that EMIT-PREFIXES can decide whether
+;;; it's looking at a :BYTE register that requires a REX prefix.
+;;; Use of REG-IN-SIZE here instead of MAKE-GPR-ID is a temporary kludge.
+;;; EMIT-PREFIXES expects to receive TNs, not reg IDs.
+(defun sized-thing (thing size)
+  (if (and (eq size :byte)
+           (gpr-p thing)
+           (neq (operand-size thing) :byte))
+      (sb!vm::reg-in-size thing :byte)
+      thing))
+
 (define-instruction mov (segment maybe-size dst &optional src)
   ;; immediate to register
   (:printer reg ((op #b1011 :prefilter (lambda (dstate value)
@@ -1438,7 +1449,7 @@
                      (t
                       (setq src dst dst maybe-size)
                       (matching-operand-size dst src)))))
-     (emit-mov segment size dst src))))
+     (emit-mov segment size (sized-thing dst size) (sized-thing src size)))))
 
 (defun emit-mov (segment size dst src)
   (cond ((gpr-p dst)
@@ -1570,7 +1581,7 @@
              (when (eq src-size :dword) ; this is a straight MOV
                (return-from emit* (emit-mov segment :dword dst src)))
              (setf dst-size :dword))
-           (emit-prefixes segment src dst dst-size)
+           (emit-prefixes segment (sized-thing src src-size) dst dst-size)
            (if (eq src-size :dword)
                ;; AMD calls this MOVSXD. If emitted without REX.W, it writes
                ;; only 32 bits. That is discouraged, and we don't do it.
@@ -1723,7 +1734,7 @@
                       (shiftf prefix src dst maybe-size)
                       (matching-operand-size src dst)))))
      (aver (gpr-p src))
-     (emit-prefixes segment dst src size :lock prefix)
+     (emit-prefixes segment dst (sized-thing src size) size :lock prefix)
      (emit-bytes segment #x0F (opcode+size-bit #xB0 size))
      (emit-ea segment dst (reg-tn-encoding src)))))
 
@@ -1771,6 +1782,8 @@
                            (t
                             (shiftf lockp src dst maybe-size)
                             (matching-operand-size dst src)))))
+           (setq src (sized-thing src size)
+                 dst (sized-thing dst size))
            (acond
             ((and (neq size :byte) (plausible-signed-imm8-operand-p src size))
              (emit-prefixes segment dst nil size :lock lockp)
@@ -1829,7 +1842,7 @@
                            (t
                             (shiftf lockp dst maybe-size)
                             (operand-size dst)))))
-           (emit-prefixes segment dst nil size :lock lockp)
+           (emit-prefixes segment (sized-thing dst size) nil size :lock lockp)
            (emit-byte segment (opcode+size-bit (ash opcode 1) size))
            (emit-ea segment dst subcode))))
   (define-instruction not (segment maybe-size &optional dst prefix)
@@ -1989,7 +2002,7 @@
                  (:cl (values #b11010010 nil))
                  (1   (values #b11010000 nil))
                  (t   (values #b11000000 t)))
-             (emit-prefixes segment dst nil size)
+             (emit-prefixes segment (sized-thing dst size) nil size)
              (emit-byte segment (opcode+size-bit opcode size))
              (emit-ea segment dst subcode)
              (when immed
@@ -2045,6 +2058,8 @@
                      (t
                       (setq that this this maybe-size)
                       (matching-operand-size this that)))))
+     (setq this (sized-thing this size)
+           that (sized-thing that size))
      (when (and (gpr-p this) (mem-ref-p that))
        (rotatef this that))
      (emit-prefixes segment this that size)
