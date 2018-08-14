@@ -17,6 +17,11 @@
 ;;; from the C alloc() function by way of the alloc-tramp
 ;;; assembly routine.
 
+(defun tagify (result base lowtag)
+  (if (eql lowtag 0)
+      (inst mov result base)
+      (inst lea result (ea lowtag base))))
+
 (defun stack-allocation (alloc-tn size lowtag)
   (aver (not (location= alloc-tn rsp-tn)))
   (inst sub rsp-tn size)
@@ -28,7 +33,7 @@
   ;; - The real issue is that it's not obvious that the stack is
   ;;   16-byte-aligned at *all* times. Maybe it is, maybe it isn't.
   (inst and rsp-tn #.(lognot lowtag-mask))
-  (inst lea alloc-tn (ea lowtag rsp-tn))
+  (tagify alloc-tn rsp-tn lowtag)
   (values))
 
 (defun %alloc-tramp (node result-tn size lowtag)
@@ -121,6 +126,17 @@
                (and (integerp size)
                     (>= size large-object-size)))
            (%alloc-tramp node alloc-tn size lowtag))
+          ((and (integerp size) (eql lowtag 0))
+           (inst mov alloc-tn free-pointer)
+           (inst lea temp-reg-tn (ea size alloc-tn))
+           (inst cmp temp-reg-tn end-addr)
+           (inst jmp :a NOT-INLINE)
+           (inst mov free-pointer temp-reg-tn)
+           (emit-label DONE)
+           (assemble (:elsewhere)
+             (emit-label NOT-INLINE)
+             (%alloc-tramp node alloc-tn size nil)
+             (inst jmp DONE)))
           (t
            (inst mov temp-reg-tn free-pointer)
            (cond ((integerp size)
@@ -133,9 +149,7 @@
            (inst jmp :a NOT-INLINE)
            (inst mov free-pointer alloc-tn)
            (emit-label DONE)
-           (if lowtag
-               (inst lea alloc-tn (ea lowtag temp-reg-tn))
-               (inst mov alloc-tn temp-reg-tn))
+           (tagify alloc-tn temp-reg-tn lowtag)
            (assemble (:elsewhere)
              (emit-label NOT-INLINE)
              (cond ((and (tn-p size) (location= size alloc-tn)) ; recover SIZE
@@ -529,7 +543,9 @@
     (unless stack-allocate-p
       (instrument-alloc bytes node))
     (pseudo-atomic (:elide-if stack-allocate-p)
-     (allocation result bytes node stack-allocate-p lowtag)
+     ;; If storing a header word, defer ORing in the lowtag until after
+     ;; the header is written so that displacement can be 0.
+     (allocation result bytes node stack-allocate-p (if type 0 lowtag))
      (when type
        (let* ((widetag (if (typep type 'layout) instance-widetag type))
               (header (logior (ash (1- words) n-widetag-bits) widetag)))
@@ -539,12 +555,13 @@
              ;; filled in when the layout is stored. Can't use STOREW* though,
              ;; because it tries to store as few bytes as possible,
              ;; where this instruction must write exactly 4 bytes.
-             (inst mov (ea (- lowtag) result nil nil :dword) header)
-             (storew* header result 0 lowtag (not stack-allocate-p)))
-         (unless (eq type widetag) ; TYPE is actually a LAYOUT
-           (inst mov (ea (+ 4 (- lowtag)) result nil nil :dword)
-                 ;; XXX: should layout fixups use a name, not a layout object?
-                 (make-fixup type :layout)))))))))
+             (inst mov (ea 0 result nil nil :dword) header)
+             (storew* header result 0 0 (not stack-allocate-p)))
+         (inst or (reg-in-size result :byte) lowtag))))
+    (when (typep type 'layout)
+      (inst mov (ea (+ 4 (- lowtag)) result nil nil :dword)
+            ;; XXX: should layout fixups use a name, not a layout object?
+            (make-fixup type :layout))))))
 
 ;;; Allocate a non-vector variable-length object.
 ;;; Exactly 4 allocators are rendered via this vop:
