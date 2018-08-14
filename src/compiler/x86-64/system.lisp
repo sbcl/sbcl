@@ -123,9 +123,8 @@
   (:result-types positive-fixnum)
   (:generator 6
     (inst movzx '(:word :dword) res (ea (1+ (- fun-pointer-lowtag)) x))
-    (let ((res (reg-in-size res :dword)))
-      (inst btr res 15) ; Clear the NAMEDP header bit
-      (inst shl res n-fixnum-tag-bits))))
+    (inst btr :dword res 15) ; Clear the NAMEDP header bit
+    (inst shl :dword res n-fixnum-tag-bits)))
 
 (define-vop (set-header-data)
   (:translate set-header-data)
@@ -168,8 +167,7 @@
   (:result-types positive-fixnum)
   (:generator 5
      (move rax old)
-     (inst cmpxchg (ea (- 4 other-pointer-lowtag) object)
-           (reg-in-size new :dword) :lock)
+     (inst cmpxchg :dword (ea (- 4 other-pointer-lowtag) object) new :lock)
      (inst lea result (ea nil rax (ash 1 n-fixnum-tag-bits)))))
 
 (define-vop (pointer-hash)

@@ -168,7 +168,7 @@
       (inst mov (ea 0 temp-reg-tn nil nil size) 0)
       (unless (eql offset 0) ; restore SAP as if nothing happened
         (inst sub sap offset))))
-  (inst mov (ea ea-disp sap ea-index) (reg-in-size value size))
+  (inst mov size (ea ea-disp sap ea-index) value)
   (move result value))
 
 (macrolet ((def-system-ref-and-set (ref-name
@@ -179,8 +179,7 @@
                                     size)
              (let ((ref-name-c (symbolicate ref-name "-C"))
                    (set-name-c (symbolicate set-name "-C"))
-                   (opcode-modifier (unless (eq ref-insn 'mov)
-                                      `(,size :qword))))
+                   (modifier (if (eq ref-insn 'mov) size `(,size :qword))))
                `(progn
                   (define-vop (,ref-name)
                     (:translate ,ref-name)
@@ -191,9 +190,7 @@
                     (:results (result :scs (,sc)))
                     (:result-types ,type)
                     (:generator 5
-                      ,(if opcode-modifier
-                           `(inst ,ref-insn ',opcode-modifier result (ea sap offset))
-                           `(inst ,ref-insn (reg-in-size result ,size) (ea 0 sap offset 1 ,size)))))
+                      (inst ,ref-insn ',modifier result (ea sap offset))))
                   (define-vop (,ref-name-c)
                     (:translate ,ref-name)
                     (:policy :fast-safe)
@@ -204,9 +201,7 @@
                     (:results (result :scs (,sc)))
                     (:result-types ,type)
                     (:generator 4
-                      ,(if opcode-modifier
-                           `(inst ,ref-insn ',opcode-modifier result (ea offset sap))
-                           `(inst ,ref-insn (reg-in-size result ,size) (ea offset sap nil nil ,size)))))
+                      (inst ,ref-insn ',modifier result (ea offset sap))))
                   (define-vop (,set-name)
                     (:translate ,set-name)
                     (:policy :fast-safe)
@@ -379,6 +374,6 @@
   (:result-types signed-num)
   (:generator 5
     (inst mov :dword eax oldval)
-    (inst cmpxchg (ea sap offset) (reg-in-size newval :dword) :lock)
+    (inst cmpxchg :dword (ea sap offset) newval :lock)
     (inst mov :dword result eax)))
 

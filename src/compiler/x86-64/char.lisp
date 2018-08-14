@@ -28,13 +28,11 @@
   (:note "character untagging")
   (:generator 1
     (cond ((and (sc-is y character-reg) (sc-is x any-reg descriptor-reg))
-           (let ((y-dword (reg-in-size y :dword)))
-             (unless (location= x y)
-               (inst mov y-dword (reg-in-size x :dword)))
-             (inst shr y-dword n-widetag-bits)))
+           (unless (location= x y)
+             (inst mov :dword y x)))
           (t
-           (move y x)
-           (inst shr y n-widetag-bits)))))
+           (move y x)))
+    (inst shr :dword y n-widetag-bits)))
 #!-sb-unicode
 (define-vop (move-to-character)
   (:args (x :scs (any-reg control-stack)))
@@ -59,11 +57,10 @@
   (:results (y :scs (any-reg descriptor-reg)))
   (:note "character tagging")
   (:generator 1
-    (let ((y-dword (reg-in-size y :dword)))
-      (unless (location= x y)
-        (inst mov y-dword (reg-in-size x :dword)))
-      (inst shl y-dword n-widetag-bits)
-      (inst or y-dword character-widetag))))
+    (unless (location= x y)
+      (inst mov :dword y x))
+    (inst shl :dword y n-widetag-bits)
+    (inst or :dword y character-widetag)))
 #!-sb-unicode
 (define-vop (move-from-character)
   (:args (x :scs (character-reg character-stack)))

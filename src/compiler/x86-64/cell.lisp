@@ -556,9 +556,9 @@
     ;; on sb-thread symbol is actually a tls-index, and it fits into
     ;; 32-bits.
     #!+sb-thread
-    (let ((tls-index (reg-in-size symbol :dword)))
-      (inst mov tls-index (ea (* binding-symbol-slot n-word-bytes) bsp))
-      (inst test tls-index tls-index))
+    (progn
+      (inst mov :dword symbol (ea (* binding-symbol-slot n-word-bytes) bsp))
+      (inst test :dword symbol symbol))
     #!-sb-thread
     (progn
       (loadw symbol bsp binding-symbol-slot)
