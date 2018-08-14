@@ -53,7 +53,7 @@
       (inst pop result-tn)))
 
   (when lowtag
-    (inst or (reg-in-size result-tn :byte) lowtag))
+    (inst or :byte result-tn lowtag))
   (values))
 
 ;;; Insert allocation profiler instrumentation
@@ -557,7 +557,7 @@
              ;; where this instruction must write exactly 4 bytes.
              (inst mov (ea 0 result nil nil :dword) header)
              (storew* header result 0 0 (not stack-allocate-p)))
-         (inst or (reg-in-size result :byte) lowtag))))
+         (inst or :byte result lowtag))))
     (when (typep type 'layout)
       (inst mov (ea (+ 4 (- lowtag)) result nil nil :dword)
             ;; XXX: should layout fixups use a name, not a layout object?

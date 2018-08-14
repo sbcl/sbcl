@@ -32,7 +32,7 @@
   (inst jmp (if not-p :nz :z) target))
 
 (defun %lea-for-lowtag-test (temp value lowtag)
-  (inst lea (reg-in-size temp :dword) (ea (- lowtag) value)))
+  (inst lea :dword temp (ea (- lowtag) value)))
 
 ;; Numerics including fixnum, excluding short-float. (INTEGER,RATIONAL)
 (defun %test-fixnum-and-headers (value temp target not-p headers
@@ -40,7 +40,7 @@
   (let ((drop-through (gen-label)))
     (case n-fixnum-tag-bits
      (1 (%lea-for-lowtag-test temp value other-pointer-lowtag)
-        (inst test (reg-in-size temp :byte) 1)
+        (inst test :byte temp 1)
         (inst jmp :nz (if not-p drop-through target)) ; inverted
         (%test-headers value temp target not-p nil headers
                        :drop-through drop-through :compute-temp nil
@@ -83,10 +83,10 @@
                         &optional (drop-through (gen-label)))
   ;; Code a single instruction byte test if possible.
   (cond ((sc-is value any-reg descriptor-reg)
-         (inst cmp (reg-in-size value :byte) immediate))
+         (inst cmp :byte value immediate))
         (t
-         (move temp value)
-         (inst cmp (reg-in-size temp :byte) immediate)))
+         (move temp value) ; FIXME - why load?
+         (inst cmp :byte temp immediate)))
   (inst jmp (if not-p :ne :e) target)
   (emit-label drop-through))
 
@@ -96,10 +96,10 @@
                                          value-tn-ref)
   ;; Code a single instruction byte test if possible.
   (cond ((sc-is value any-reg descriptor-reg)
-         (inst cmp (reg-in-size value :byte) immediate))
+         (inst cmp :byte value immediate))
         (t
-         (move temp value)
-         (inst cmp (reg-in-size temp :byte) immediate)))
+         (move temp value) ; FIXME - why load?
+         (inst cmp :byte temp immediate)))
   (inst jmp :e (if not-p drop-through target))
   (%test-headers value temp target not-p nil headers
                  :drop-through drop-through
@@ -107,7 +107,7 @@
 
 (defun %test-lowtag (value temp target not-p lowtag)
   (%lea-for-lowtag-test temp value lowtag)
-  (inst test (reg-in-size temp :byte) lowtag-mask)
+  (inst test :byte temp lowtag-mask)
   (inst jmp (if not-p :nz :z) target))
 
 (defun %test-headers (value temp target not-p function-p headers
@@ -131,7 +131,7 @@
                    (other-pointer-tn-ref-p value-tn-ref))
         (when compute-temp
           (%lea-for-lowtag-test temp value lowtag))
-        (inst test (reg-in-size temp :byte) lowtag-mask)
+        (inst test :byte temp lowtag-mask)
         (inst jmp :nz when-false))
       ;; FIXME: this backend seems to be missing the special logic for
       ;;        testing exactly two widetags differing only in a single bit,
@@ -152,11 +152,11 @@
                                     (= (cdar headers) complex-array-widetag)))
                            (ea (- lowtag) value nil nil :byte)
                            (progn
-                             (inst mov (reg-in-size temp :dword) (ea (- lowtag) value))
+                             (inst mov :dword temp (ea (- lowtag) value))
                              (reg-in-size temp :byte)))))
           ((null remaining))
         (dolist (widetag except) ; only after loading widetag-tn
-          (inst cmp (reg-in-size temp :byte) widetag)
+          (inst cmp :byte temp widetag)
           (inst jmp :e when-false))
         (setq except nil)
         (let ((header (car remaining))
@@ -256,7 +256,7 @@
                ;; we'll only examine 1 byte, but moving a :dword is preferable
                ;; as it doesn't require the CPU to retain the other 7 bytes.
                (if (gpr-p value)
-                   (inst mov (reg-in-size temp :dword) (reg-in-size value :dword))
+                   (inst mov :dword temp value)
                    (inst mov temp value))
                (inst test byte-temp fixnum-tag-mask)
                (inst jmp :e yep)
@@ -284,7 +284,7 @@
               (values target not-target))
         ;; Is it a fixnum?
         (if (gpr-p value)
-            (inst mov (reg-in-size temp :dword) (reg-in-size value :dword))
+            (inst mov :dword temp value)
             (inst mov temp value))
         (inst test byte-temp fixnum-tag-mask)
         (inst jmp :e fixnum)

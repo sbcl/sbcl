@@ -79,8 +79,8 @@
   (:generator 3
     ;; An unaligned dword read not spanning a 16-byte boundary is as fast as
     ;; and shorter by 5 bytes than a qword read and right-shift by 8.
-    (inst mov (reg-in-size res :dword) (ea (1+ (- other-pointer-lowtag)) x))
-    (inst sub (reg-in-size res :dword) (1- array-dimensions-offset))))
+    (inst mov :dword res (ea (1+ (- other-pointer-lowtag)) x))
+    (inst sub :dword res (1- array-dimensions-offset))))
 
 (define-vop (array-rank-vop=>fixnum)
   (:translate %array-rank)
@@ -89,8 +89,8 @@
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
   (:generator 2
-    (inst mov (reg-in-size res :dword) (ea (1+ (- other-pointer-lowtag)) x))
-    (inst lea (reg-in-size res :dword)
+    (inst mov :dword res (ea (1+ (- other-pointer-lowtag)) x))
+    (inst lea :dword res
           (let ((scale (ash 1 n-fixnum-tag-bits)))
             ;; Compute [res*N-disp]. for N=2 use [res+res-disp]
             (ea (- (* scale (1- array-dimensions-offset)))
@@ -205,16 +205,16 @@
   (:generator 3
     ;; using 32-bit operand size might elide the REX prefix on mov + shift
     (multiple-value-bind (dword-index bit) (floor index 32)
-      (inst mov (reg-in-size result :dword)
+      (inst mov :dword result
                 (ea (+ (* dword-index 4)
                        (- (* vector-data-offset n-word-bytes) other-pointer-lowtag))
                     object))
       (let ((right-shift (- bit n-fixnum-tag-bits)))
         (cond ((plusp right-shift)
-               (inst shr (reg-in-size result :dword) right-shift))
+               (inst shr :dword result right-shift))
               ((minusp right-shift) ; = left shift
-               (inst shl (reg-in-size result :dword) (- right-shift))))))
-    (inst and (reg-in-size result :dword) (fixnumize 1))))
+               (inst shl :dword result (- right-shift))))))
+    (inst and :dword result (fixnumize 1))))
 
 (define-vop (data-vector-ref-with-offset/simple-bit-vector)
   (:translate data-vector-ref-with-offset)
@@ -229,8 +229,8 @@
   (:generator 4
     (inst bt (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
                  object) index)
-    (inst sbb (reg-in-size result :dword) (reg-in-size result :dword))
-    (inst and (reg-in-size result :dword) (fixnumize 1))))
+    (inst sbb :dword result result)
+    (inst and :dword result (fixnumize 1))))
 
 (macrolet ((def-small-data-vector-frobs (type bits)
              (let* ((elements-per-word (floor n-word-bits bits))
@@ -745,7 +745,7 @@
            (:results (result :scs ,scs))
            (:result-types ,type)
            (:generator 5
-             (inst mov ,ea-expr (reg-in-size value ,operand-size))
+             (inst mov ,operand-size ,ea-expr value)
              (move result value)))
          (define-vop (,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/" ptype "-C"))
            (:translate data-vector-set-with-offset)
@@ -760,7 +760,7 @@
            (:results (result :scs ,scs))
            (:result-types ,type)
            (:generator 4
-             (inst mov ,ea-expr-const (reg-in-size value ,operand-size))
+             (inst mov ,operand-size ,ea-expr-const value)
              (move result value)))))))
   (define-data-vector-frobs simple-array-unsigned-byte-7 movzx :byte
     positive-fixnum unsigned-reg signed-reg)

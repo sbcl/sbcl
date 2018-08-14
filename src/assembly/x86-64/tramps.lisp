@@ -86,7 +86,7 @@
   #!+immobile-code
   (progn
     (inst pop rax) ; gets the address of the fdefn (plus some)
-    (inst sub (reg-in-size rax :dword)
+    (inst sub :dword rax
           ;; Subtract the length of the JMP instruction plus offset to the
           ;; raw-addr-slot, and add back the lowtag. Voila, a tagged descriptor.
           (+ 5 (ash fdefn-raw-addr-slot word-shift) (- other-pointer-lowtag))))

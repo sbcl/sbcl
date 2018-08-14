@@ -16,8 +16,8 @@
     (aver (not (= count 0)))
     (move result integer)
     (if (> count 0)
-        (inst rol (sb-vm::reg-in-size result :dword) count)
-        (inst ror (sb-vm::reg-in-size result :dword) (- count)))))
+        (inst rol :dword result count)
+        (inst ror :dword result (- count)))))
 
 (define-vop (%32bit-rotate-byte)
   (:policy :fast-safe)
@@ -34,13 +34,13 @@
           (end (gen-label)))
       (move result integer)
       (move rcx count)
-      (inst cmp (sb-vm::reg-in-size rcx :dword) 0)
+      (inst cmp :dword rcx 0)
       (inst jmp :ge label)
       (inst neg (sb-vm::reg-in-size rcx :dword))
-      (inst ror (sb-vm::reg-in-size result :dword) :cl)
+      (inst ror :dword result :cl)
       (inst jmp end)
       (emit-label label)
-      (inst rol (sb-vm::reg-in-size result :dword) :cl)
+      (inst rol :dword result :cl)
       (emit-label end))))
 
 ;;; 64-bit rotates

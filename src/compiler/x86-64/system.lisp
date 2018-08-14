@@ -29,11 +29,11 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (inst lea (reg-in-size temp :dword) (ea -3 object))
-    (inst test (reg-in-size temp :byte) 3)
+    (inst lea :dword temp (ea -3 object))
+    (inst test :byte temp 3)
     (inst jmp :nz IMMEDIATE)
-    (inst and (reg-in-size temp :byte) lowtag-mask)
-    (inst cmp (reg-in-size temp :byte) (- list-pointer-lowtag 3))
+    (inst and :byte temp lowtag-mask)
+    (inst cmp :byte temp (- list-pointer-lowtag 3))
     (inst jmp :e IMMEDIATE)
     ;; It's a function, instance, or other pointer.
     (inst mov temp object)
@@ -60,16 +60,16 @@
       ;;         #b1011 fun
       ;;         #b1111 other
       (inst mov  rax object)
-      (inst xor  (reg-in-size rax :byte) #b0011)
-      (inst test (reg-in-size rax :byte) #b0111)
+      (inst xor  :byte rax #b0011)
+      (inst test :byte rax #b0111)
       (inst jmp  :ne try-other)
       ;; It's an instance or function. Both have the layout in the header.
-      (inst and  (reg-in-size rax :byte) #b11110111)
-      (inst mov  (reg-in-size result :dword) (ea 4 rax))
+      (inst and  :byte rax #b11110111)
+      (inst mov  :dword result (ea 4 rax))
       (inst jmp  done)
       TRY-OTHER
-      (inst xor  (reg-in-size rax :byte) #b1100)
-      (inst test (reg-in-size rax :byte) #b1111)
+      (inst xor  :byte rax #b1100)
+      (inst test :byte rax #b1111)
       (inst jmp  :ne imm-or-list)
       ;; It's an other-pointer. Read the widetag.
       (inst movzx '(:byte :dword) rax (ea rax))
@@ -80,7 +80,7 @@
       (inst movzx '(:byte :dword) rax object)
       LOAD-FROM-VECTOR
       (inst mov  result layouts)
-      (inst mov  (reg-in-size result :dword)
+      (inst mov  :dword result
             (ea (+ (ash vector-data-offset word-shift) (- other-pointer-lowtag))
                 result rax 8))
       (inst jmp  done)
@@ -150,7 +150,7 @@
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
   (:generator 6
-    (inst mov (reg-in-size res :dword) (ea (- 4 other-pointer-lowtag) x))
+    (inst mov :dword res (ea (- 4 other-pointer-lowtag) x))
     (inst shl res n-fixnum-tag-bits)))
 
 ;;; Swap the high half of the header word of an object
@@ -209,7 +209,7 @@
   (:results (sap :scs (sap-reg) :from (:argument 0)))
   (:result-types system-area-pointer)
   (:generator 10
-    (inst mov (reg-in-size sap :dword) (ea (- 4 other-pointer-lowtag) code))
+    (inst mov :dword sap (ea (- 4 other-pointer-lowtag) code))
     (inst lea sap (ea (- other-pointer-lowtag) code sap n-word-bytes))))
 
 (define-vop (compute-fun)
@@ -218,7 +218,7 @@
   (:arg-types * positive-fixnum)
   (:results (func :scs (descriptor-reg) :from (:argument 0)))
   (:generator 10
-    (inst mov (reg-in-size func :dword) (ea (- 4 other-pointer-lowtag) code))
+    (inst mov :dword func (ea (- 4 other-pointer-lowtag) code))
     (inst lea func
           (ea (- fun-pointer-lowtag other-pointer-lowtag)
               offset func n-word-bytes))
@@ -248,8 +248,8 @@
   ;; there is an info-vector in the slot, it has at least one element.
   ;; This would compile to almost the same code without a VOP,
   ;; but using a jmp around a mov instead.
-  (inst lea (reg-in-size temp :dword) (ea (- list-pointer-lowtag) result))
-  (inst test (reg-in-size temp :byte) lowtag-mask)
+  (inst lea :dword temp (ea (- list-pointer-lowtag) result))
+  (inst test :byte temp lowtag-mask)
   (inst cmov :e result
         (make-ea-for-object-slot result cons-cdr-slot list-pointer-lowtag)))
 
@@ -274,7 +274,7 @@
     ;; so if the info slot holds a vector, this gets a fixnum- it's not a plist.
     (loadw res res cons-car-slot list-pointer-lowtag)
     (inst mov temp nil-value)
-    (inst test (reg-in-size res :byte) fixnum-tag-mask)
+    (inst test :byte res fixnum-tag-mask)
     (inst cmov :e res temp)))
 
 ;;;; other miscellaneous VOPs

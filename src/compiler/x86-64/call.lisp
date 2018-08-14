@@ -296,10 +296,8 @@
                  for count from 2 below register-arg-count
                  unless (eq (tn-kind (tn-ref-tn tn-ref)) :unused)
                  do
-                 (inst mov (reg-in-size (tn-ref-tn tn-ref) :dword)
-                       (if 2nd-tn-live
-                           (reg-in-size 2nd-tn :dword)
-                           nil-value)))))
+                 (inst mov :dword (tn-ref-tn tn-ref)
+                       (if 2nd-tn-live 2nd-tn nil-value)))))
            (inst mov rbx-tn rsp-tn)
            (emit-label regs-defaulted)))
        (when (< register-arg-count

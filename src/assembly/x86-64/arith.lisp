@@ -14,20 +14,14 @@
 #-sb-assembling ; avoid redefinition warning
 (progn
 (defun !both-fixnum-p (temp x y)
-  (inst mov (reg-in-size temp :dword)
-        (reg-in-size x :dword))
-  (inst or (reg-in-size temp :dword)
-        (reg-in-size y :dword))
-  (inst test (reg-in-size temp :byte)
-        fixnum-tag-mask))
+  (inst mov :dword temp x)
+  (inst or :dword temp y)
+  (inst test :byte temp fixnum-tag-mask))
 
 (defun !some-fixnum-p (temp x y)
-  (inst mov (reg-in-size temp :dword)
-        (reg-in-size x :dword))
-  (inst and (reg-in-size temp :dword)
-        (reg-in-size y :dword))
-  (inst test (reg-in-size temp :byte)
-        fixnum-tag-mask))
+  (inst mov :dword temp x)
+  (inst and :dword temp y)
+  (inst test :byte temp fixnum-tag-mask))
 
 (defun !static-fun-addr (name)
   #!+immobile-code (make-fixup name :static-call)
@@ -154,7 +148,7 @@
                          ((:arg x (descriptor-reg any-reg) rdx-offset)
                           (:res res (descriptor-reg any-reg) rdx-offset)
                           (:temp rcx unsigned-reg rcx-offset))
-  (inst test (reg-in-size x :byte) fixnum-tag-mask)
+  (inst test :byte x fixnum-tag-mask)
   (inst jmp :z FIXNUM)
 
   (!tail-call-static-fun '%negate 1)
@@ -390,10 +384,10 @@
   (inst cmp x y)
   (inst jmp :e done) ; Z condition flag contains the answer
   ;; check that both have other-pointer-lowtag
-  (inst lea (reg-in-size rax :dword) (ea (- other-pointer-lowtag) x))
-  (inst lea (reg-in-size rcx :dword) (ea (- other-pointer-lowtag) y))
-  (inst or (reg-in-size rax :dword) (reg-in-size rcx :dword))
-  (inst test (reg-in-size rax :byte) lowtag-mask)
+  (inst lea :dword rax (ea (- other-pointer-lowtag) x))
+  (inst lea :dword rcx (ea (- other-pointer-lowtag) y))
+  (inst or :dword rax rcx)
+  (inst test :byte rax lowtag-mask)
   (inst jmp :ne done)
   ;; Compare the entire header word, ensuring that if at least one
   ;; argument is a bignum, then both are.

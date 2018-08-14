@@ -221,8 +221,8 @@
   (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 4
-    (inst lea (reg-in-size temp :dword) (ea (- character-widetag) value))
-    (inst test (reg-in-size temp :dword) (lognot #x7F00))))
+    (inst lea :dword temp (ea (- character-widetag) value))
+    (inst test :dword temp (lognot #x7F00))))
 
 #!+sb-unicode
 (define-vop (base-char-p-character)
@@ -233,7 +233,7 @@
   (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 3
-    (inst test (reg-in-size value :dword) (lognot #x7FFF))))
+    (inst test :dword value (lognot #x7FFF))))
 
 #!+sb-unicode
 (define-vop (base-char-p-character-reg)
@@ -244,4 +244,4 @@
   (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 2
-    (inst cmp (reg-in-size value :dword) base-char-code-limit)))
+    (inst cmp :dword value base-char-code-limit)))

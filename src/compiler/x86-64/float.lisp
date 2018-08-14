@@ -209,8 +209,7 @@
   (:generator 2
     (move tmp x)
     (inst shr tmp 32)
-    (let ((slot (ea (frame-byte-offset (tn-offset y)) rbp-tn)))
-      (inst mov slot (reg-in-size tmp :dword)))))
+    (inst mov :dword (ea (frame-byte-offset (tn-offset y)) rbp-tn) tmp)))
 (define-move-vop move-to-single-stack :move (descriptor-reg) (single-stack))
 
 (define-vop (move-to-double)
@@ -1333,19 +1332,18 @@
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 5
-     (let ((dword-lo-bits (reg-in-size lo-bits :dword)))
-       (sc-case float
+     (sc-case float
         (double-reg
          (inst movsd temp float)
-         (inst mov dword-lo-bits
+         (inst mov :dword lo-bits
                (ea (frame-byte-offset (tn-offset temp)) rbp-tn)))
         (double-stack
-         (inst mov dword-lo-bits
+         (inst mov :dword lo-bits
                (ea (frame-byte-offset (tn-offset float)) rbp-tn)))
         (descriptor-reg
-         (inst mov dword-lo-bits
+         (inst mov :dword lo-bits
                (make-ea-for-object-slot-half float double-float-value-slot
-                                             other-pointer-lowtag)))))))
+                                             other-pointer-lowtag))))))
 
 
 

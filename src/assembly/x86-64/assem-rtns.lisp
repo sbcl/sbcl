@@ -238,7 +238,7 @@
 
   TAIL-CALL-SYMBOL
   (%lea-for-lowtag-test vector fun other-pointer-lowtag)
-  (inst test (reg-in-size vector :byte) lowtag-mask)
+  (inst test :byte vector lowtag-mask)
   (inst jmp :nz not-callable)
   (inst cmp (ea (- other-pointer-lowtag) fun nil nil :byte) symbol-widetag)
   (inst jmp :ne not-callable)

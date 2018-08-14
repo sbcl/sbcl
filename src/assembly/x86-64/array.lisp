@@ -55,7 +55,7 @@
   (inst test count count)
   (inst jmp :z DONE)
   ;; if address ends in 8, we must write 1 word before using MOVDQA
-  (inst test (reg-in-size start :byte) #b1000)
+  (inst test :byte start #b1000)
   (inst jmp :z SETUP)
   (inst mov (ea start) item)
   (inst add start n-word-bytes)

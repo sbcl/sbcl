@@ -107,18 +107,18 @@
        ;; and re-read the memory (safe because transition can only occur to
        ;; a nonzero value), then jump out to end the PA section.
        (inst btr free-tls-index-ea lock-bit :lock)
-       (inst mov (reg-in-size symbol :dword) (tls-index-of symbol))
+       (inst mov :dword symbol (tls-index-of symbol))
        (inst jmp done)
      NEW-TLS-INDEX
        ;; Allocate a new tls-index.
        (inst push scratch-reg)
        (inst mov scratch-reg free-tls-index-ea)
        ;; Must ignore the semaphore bit in the register's high half.
-       (inst cmp (reg-in-size scratch-reg :dword) (* tls-size n-word-bytes))
+       (inst cmp :dword scratch-reg (* tls-size n-word-bytes))
        (inst jmp :ae tls-full)
        ;; scratch-reg goes into symbol's TLS and into the arg/result reg.
-       (inst mov (tls-index-of symbol) (reg-in-size scratch-reg :dword))
-       (inst mov (reg-in-size result :dword) (reg-in-size scratch-reg :dword))
+       (inst mov :dword (tls-index-of symbol) scratch-reg)
+       (inst mov :dword result scratch-reg)
        ;; Load scratch-reg with a constant that clears the lock bit
        ;; and bumps the free index in one go.
        (inst mov scratch-reg (+ (- (ash 1 lock-bit)) n-word-bytes))

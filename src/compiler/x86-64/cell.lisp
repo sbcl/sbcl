@@ -38,9 +38,9 @@
            ;; Push the slot index into code, then code itself
            (cond ((= lowtag fun-pointer-lowtag)
                   ;; compute code address similarly to CODE-FROM-FUNCTION vop
-                  (inst mov (reg-in-size temp-reg-tn :dword)
+                  (inst mov :dword temp-reg-tn
                         (make-ea-for-object-slot-half object 0 fun-pointer-lowtag))
-                  (inst shr (reg-in-size temp-reg-tn :dword) n-widetag-bits)
+                  (inst shr :dword temp-reg-tn n-widetag-bits)
                   ;; now temp-reg-tn holds the difference in words from code to fun.
                   (inst push temp-reg-tn)
                   (inst add (ea 0 rsp-tn nil nil :qword) offset) ; for particular slot
@@ -66,10 +66,10 @@
     (cond #!+compact-instance-header
           ((and (eq name '%make-structure-instance) (eql offset :layout))
         ;; The layout is in the upper half of the header word.
-           (inst mov (ea (- 4 instance-pointer-lowtag) object nil nil :dword)
+           (inst mov :dword (ea (- 4 instance-pointer-lowtag) object)
                  (if (sc-is value immediate)
                      (make-fixup (tn-value value) :layout)
-                     (reg-in-size value :dword))))
+                     value)))
           ((sc-is value immediate)
            (move-immediate (ea (- (* offset n-word-bytes) lowtag) object nil nil :qword)
                            (encode-value-if-immediate value)
@@ -128,7 +128,7 @@
   (:generator 9
     (let ((err-lab (generate-error-code vop 'unbound-symbol-error object)))
       (loadw value object symbol-value-slot other-pointer-lowtag)
-      (inst cmp (reg-in-size value :dword) unbound-marker-widetag)
+      (inst cmp :dword value unbound-marker-widetag)
       (inst jmp :e err-lab))))
 
 ;; Return the DISP field to use in an EA relative to thread-base-tn
@@ -151,7 +151,7 @@
            ;; (2) conditionally make CELL point to the symbol itself
            (compute-virtual-symbol ()
              `(progn
-                (inst mov (reg-in-size cell :dword) (tls-index-of symbol))
+                (inst mov :dword cell (tls-index-of symbol))
                 (inst lea cell
                       (ea (- other-pointer-lowtag (ash symbol-value-slot word-shift))
                           thread-base-tn cell))
@@ -193,7 +193,7 @@
         #!-sb-thread (progn (move rax old)
                             ;; is the :LOCK is necessary?
                             (inst cmpxchg (access-value-slot symbol) new :lock))
-        (inst cmp (reg-in-size rax :dword) unbound-marker-widetag)
+        (inst cmp :dword rax unbound-marker-widetag)
         (inst jmp :e unbound)
         (move result rax))))
 
@@ -257,7 +257,7 @@
                 (immediate
                  ;; load the TLS index from the symbol. TODO: use [RIP-n] mode
                  ;; for immobile code to make it automatically relocatable.
-                 (inst mov (reg-in-size value :dword)
+                 (inst mov :dword value
                        ;; slot index 1/2 is the high half of the header word.
                        (symbol-slot-ea known-symbol 1/2 :dword))
                  ;; read the TLS value using that index
@@ -266,16 +266,16 @@
 
                  ;; These reads are inextricably data-dependent
                  (inst mov symbol-reg symbol) ; = MOV REG, [RIP-N]
-                 (inst mov (reg-in-size value :dword) (tls-index-of symbol-reg))
+                 (inst mov :dword value (tls-index-of symbol-reg))
                  (inst mov value (thread-tls-ea value :qword)))))
 
              (t                      ; SYMBOL-VALUE of a random symbol
-              (inst mov (reg-in-size symbol-reg :dword) (tls-index-of symbol))
+              (inst mov :dword symbol-reg (tls-index-of symbol))
               (inst mov value (thread-tls-ea symbol-reg :qword))
               (setq symbol-reg symbol)))
 
            ;; Load the global value if the TLS value didn't exist
-           (inst cmp (reg-in-size value :dword) no-tls-value-marker-widetag)
+           (inst cmp :dword value no-tls-value-marker-widetag)
            (inst cmov :e value
                  (if (and known-symbol-p (sc-is symbol immediate))
                      (symbol-slot-ea known-symbol symbol-value-slot) ; MOV Rxx, imm32
@@ -283,7 +283,7 @@
 
         (when check-boundp
           (assemble ()
-            (inst cmp (reg-in-size value :dword) unbound-marker-widetag)
+            (inst cmp :dword value unbound-marker-widetag)
             (let* ((immediatep (sc-is symbol immediate))
                    (staticp (and immediatep (static-symbol-p known-symbol)))
                    (*location-context* (make-restart-location RETRY value)))
@@ -389,7 +389,7 @@
   (:generator 10
     (loadw value object fdefn-fun-slot other-pointer-lowtag)
     ;; byte comparison works because lowtags of function and nil differ
-    (inst cmp (reg-in-size value :byte) (logand nil-value #xff))
+    (inst cmp :byte value (logand nil-value #xff))
     (let* ((*location-context* (make-restart-location RETRY value))
            (err-lab (generate-error-code vop 'undefined-fun-error object)))
       (inst jmp :e err-lab))
@@ -427,12 +427,12 @@
          (inst lea temp (ea tramp rip-tn))
          (inst mov temp tramp))
      ;; Compute displacement from the call site
-     (inst sub (reg-in-size temp :dword) (reg-in-size fdefn :dword))
-     (inst sub (reg-in-size temp :dword)
+     (inst sub :dword temp fdefn)
+     (inst sub :dword temp
            (+ (- other-pointer-lowtag) (ash fdefn-raw-addr-slot word-shift) 5))
      ;; Compute the encoding of a "CALL rel32" instruction
      (inst shl temp 8)
-     (inst or (reg-in-size temp :byte) #xE8)
+     (inst or :byte temp #xE8)
      ;; Store
      (storew nil-value fdefn fdefn-fun-slot other-pointer-lowtag)
      (storew temp fdefn fdefn-raw-addr-slot other-pointer-lowtag))
@@ -460,10 +460,10 @@
   (:vop-var vop)
   (:generator 10
     (load-binding-stack-pointer bsp)
-    (inst mov (reg-in-size tls-index :dword) (tls-index-of symbol))
+    (inst mov :dword tls-index (tls-index-of symbol))
     (inst add bsp (* binding-size n-word-bytes))
     (store-binding-stack-pointer bsp)
-    (inst test (reg-in-size tls-index :dword) (reg-in-size tls-index :dword))
+    (inst test :dword tls-index tls-index)
     (inst jmp :ne TLS-INDEX-VALID)
     (inst mov tls-index symbol)
     (invoke-asm-routine 'call 'alloc-tls-index vop)
@@ -640,7 +640,7 @@
   (:result-types positive-fixnum)
   (:generator 4
     (inst movzx '(:word :dword) res (ea (1+ (- instance-pointer-lowtag)) struct))
-    (inst shl (reg-in-size res :dword) n-fixnum-tag-bits)))
+    (inst shl :dword res n-fixnum-tag-bits)))
 
 #!+compact-instance-header
 (progn
@@ -652,7 +652,7 @@
    (:variant-vars lowtag)
    (:variant instance-pointer-lowtag)
    (:generator 1
-    (inst mov (reg-in-size res :dword) (ea (- 4 lowtag) object))))
+    (inst mov :dword res (ea (- 4 lowtag) object))))
  (define-vop (%set-instance-layout)
    (:translate %set-instance-layout)
    (:policy :fast-safe)
@@ -662,7 +662,7 @@
    (:variant-vars lowtag)
    (:variant instance-pointer-lowtag)
    (:generator 2
-    (inst mov (ea (- 4 lowtag) object) (reg-in-size value :dword))
+    (inst mov :dword (ea (- 4 lowtag) object) value)
     (move res value)))
  (define-vop (%funcallable-instance-layout %instance-layout)
    (:translate %funcallable-instance-layout)

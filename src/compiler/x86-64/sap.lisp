@@ -378,7 +378,7 @@
   (:results (result :scs (signed-reg)))
   (:result-types signed-num)
   (:generator 5
-    (inst mov eax (reg-in-size oldval :dword))
+    (inst mov :dword eax oldval)
     (inst cmpxchg (ea sap offset) (reg-in-size newval :dword) :lock)
-    (inst mov (reg-in-size result :dword) eax)))
+    (inst mov :dword result eax)))
 
