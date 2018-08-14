@@ -1911,6 +1911,7 @@ win32_unix_write(HANDLE handle, void * buf, int count)
     LARGE_INTEGER file_position;
     BOOL seekable;
     BOOL ok;
+    DWORD errorCode;
 
     if (console_handle_p(handle)) {
         return win32_write_console(handle,buf,count);
@@ -1931,12 +1932,13 @@ win32_unix_write(HANDLE handle, void * buf, int count)
 
     WITH_INTERRUPTIBLE_IO(handle) {
         ok = WriteFile(handle, buf, count, &written_bytes, &overlapped);
+        if (!ok)
+            errorCode = GetLastError();
     }
 
     if (ok) {
         goto done_something;
     } else {
-        DWORD errorCode = GetLastError();
         if (errorCode==ERROR_OPERATION_ABORTED) {
             GetOverlappedResult(handle,&overlapped,&written_bytes,FALSE);
             errno = EINTR;
@@ -2006,13 +2008,14 @@ win32_unix_read(HANDLE handle, void * buf, int count)
 
     WITH_INTERRUPTIBLE_IO(handle) {
         ok = ReadFile(handle,buf,count,&read_bytes, &overlapped);
+        if (!ok)
+            errorCode = GetLastError();
     }
 
     if (ok) {
         /* immediately */
         goto done_something;
     } else {
-        errorCode = GetLastError();
         if (errorCode == ERROR_HANDLE_EOF ||
             errorCode == ERROR_BROKEN_PIPE ||
             errorCode == ERROR_NETNAME_DELETED) {
