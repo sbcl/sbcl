@@ -1110,8 +1110,8 @@
   (when index (aver scale))
   (%ea displacement base index (or scale 1) size))
 
-(defun rip-relative-ea (size label &optional addend)
-  (%ea (if addend (make-label+addend label addend) label) rip-tn nil 1 size))
+(defun rip-relative-ea (label &optional addend)
+  (%ea (if addend (make-label+addend label addend) label) rip-tn nil 1 :unspecific))
 
 (defun emit-byte-displacement-backpatch (segment target)
   (emit-back-patch segment 1
@@ -1146,8 +1146,7 @@
         ;; To access the constant at index 5 out of 6 constants, that's simply
         ;; word index -1 from the origin label, and so on.
         (emit-ea segment
-                 (rip-relative-ea :qword
-                                  (segment-origin segment) ; = word index 0
+                 (rip-relative-ea (segment-origin segment) ; = word index 0
                                   (- (* (tn-offset thing) n-word-bytes)
                                      (component-header-length)))
                  reg :remaining-bytes remaining-bytes))))
@@ -3362,11 +3361,9 @@
                        (double-float-low-bits (realpart value))))))))
 
 (defun inline-constant-value (constant)
-  (let ((label (gen-label))
-        (size  (ecase (car constant)
-                 ((:byte :word :dword :qword) (car constant))
-                 ((:oword) :qword))))
-    (values label (rip-relative-ea size label))))
+  (declare (ignore constant)) ; weird!
+  (let ((label (gen-label)))
+    (values label (rip-relative-ea label))))
 
 (defun sort-inline-constants (constants)
   (stable-sort constants #'> :key (lambda (constant)
@@ -3405,4 +3402,4 @@
 ;; to store a coverage mark in the OFFSETth byte beyond LABEL.
 (defun sb!c::replace-coverage-instruction (inst-buffer inst-index label offset)
   (setf (svref inst-buffer inst-index)
-        `(mov ,(rip-relative-ea :byte label offset) 1)))
+        `(mov :byte ,(rip-relative-ea label offset) 1)))

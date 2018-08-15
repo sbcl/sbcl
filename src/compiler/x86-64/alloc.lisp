@@ -496,8 +496,7 @@
      ;; This is due to scav_closure() assuming that it can always subtract
      ;; FUN_RAW_ADDR_OFFSET from closure->fun to obtain a Lisp object,
      ;; without any precheck for whether that word is currently 0.
-     (inst lea temp (rip-relative-ea :qword label
-                                     (ash simple-fun-code-offset word-shift)))
+     (inst lea temp (rip-relative-ea label (ash simple-fun-code-offset word-shift)))
      (storew temp result closure-fun-slot fun-pointer-lowtag))))
 
 ;;; The compiler likes to be able to directly make value cells.
