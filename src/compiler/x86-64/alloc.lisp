@@ -324,8 +324,7 @@
           #!+linux ; unimplemented for others
           (let ((words-savep
                  ;; 'words' might be co-located with any of the temps
-                 (or (location= words rdi) (location= words rcx) (location= words rax)))
-                (rax rax))
+                 (or (location= words rdi) (location= words rcx) (location= words rax))))
             (setq rax-zeroed (not (location= words rax)))
             (when words-savep ; use 'result' to save 'words'
               (inst mov result words))
@@ -334,9 +333,7 @@
                   (t
                    (inst lea rcx
                          (ea (ash vector-data-offset n-fixnum-tag-bits) words))
-                   (if (= n-fixnum-tag-bits 1)
-                       (setq rax (reg-in-size rax :dword)) ; don't bother shifting rcx
-                       (inst shr rcx n-fixnum-tag-bits))))
+                   (inst shr rcx n-fixnum-tag-bits)))
             (inst mov rdi msan-mem-to-shadow-xor-const)
             (inst xor rdi rsp-tn) ; compute shadow address
             (zeroize rax)
@@ -349,14 +346,14 @@
         (unless (sb!c::vector-initialized-p node)
           (let ((data-addr
                   (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
-                      result nil nil :qword)))
+                      result)))
             (block zero-fill
               (cond ((sc-is words immediate)
                      (let ((n (tn-value words)))
                        (cond ((> n 8)
                               (inst mov rcx (tn-value words)))
                              ((= n 1)
-                              (inst mov data-addr 0)
+                              (inst mov :qword data-addr 0)
                               (return-from zero-fill))
                              (t
                               (multiple-value-bind (double single) (truncate n 2)
@@ -365,8 +362,7 @@
                                   (inst movapd data-addr zero)
                                   (setf data-addr
                                         (ea (+ (ea-disp data-addr) (* n-word-bytes 2))
-                                            (ea-base data-addr)
-                                            nil nil :qword)))
+                                            (ea-base data-addr))))
                                 (unless (zerop single)
                                   (inst movaps data-addr zero))
                                 (return-from zero-fill))))))
@@ -582,24 +578,20 @@
   (:node-var node)
   (:generator 50
    ;; With the exception of bignums, these objects have effectively
-   ;; 32-bit headers because the high half contains other data.
-   (multiple-value-bind (bytes header)
-      (if (= type bignum-widetag)
-          (values bytes header)
-          (values (reg-in-size bytes  :dword)
-                  (reg-in-size header :dword)))
-    (inst lea bytes
-          (ea (* (1+ words) n-word-bytes) nil
-              extra (ash 1 (- word-shift n-fixnum-tag-bits))))
-    (inst mov header bytes)
-    (inst shl header (- n-widetag-bits word-shift)) ; w+1 to length field
-    (inst lea header                    ; (w-1 << 8) | type
-          (ea (+ (ash -2 n-widetag-bits) type) header))
-    (inst and bytes (lognot lowtag-mask)))
-    (instrument-alloc bytes node)
-    (pseudo-atomic ()
-     (allocation result bytes node nil lowtag)
-     (storew header result 0 lowtag))))
+   ;; 32-bit headers because the high 4 byes contain a layout pointer.
+   (let ((operand-size (if (= type bignum-widetag) :qword :dword)))
+      (inst lea operand-size bytes
+            (ea (* (1+ words) n-word-bytes) nil
+                extra (ash 1 (- word-shift n-fixnum-tag-bits))))
+      (inst mov operand-size header bytes)
+      (inst shl operand-size header (- n-widetag-bits word-shift)) ; w+1 to length field
+      (inst lea operand-size header                    ; (w-1 << 8) | type
+            (ea (+ (ash -2 n-widetag-bits) type) header))
+      (inst and operand-size bytes (lognot lowtag-mask)))
+      (instrument-alloc bytes node)
+      (pseudo-atomic ()
+       (allocation result bytes node nil lowtag)
+       (storew header result 0 lowtag))))
 
 #!+immobile-space
 (macrolet ((c-call (name)
