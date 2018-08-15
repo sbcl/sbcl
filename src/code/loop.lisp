@@ -1345,10 +1345,10 @@ code to be loaded.
     (multiple-value-bind (vector-form constantp vector-value)
         (loop-constant-fold-if-possible val 'vector)
       (loop-make-var
-        vector-var vector-form
-        (if (and (consp vector-form) (eq (car vector-form) 'the))
-            (cadr vector-form)
-            'vector))
+       vector-var vector-form
+       (if (and (consp vector-form) (eq (car vector-form) 'the))
+           (cadr vector-form)
+           'vector))
       (loop-make-var index-var 0 'fixnum)
       (let* ((length 0)
              (length-form (cond ((not constantp)
@@ -1357,18 +1357,11 @@ code to be loaded.
                                          (wrappers *loop*))
                                    v))
                                 (t (setq length (length vector-value)))))
-             (first-test `(>= ,index-var ,length-form))
-             (other-test first-test)
+             (test `(>= ,index-var ,length-form))
              (step `(,var (aref ,vector-var ,index-var)))
              (pstep `(,index-var (1+ ,index-var))))
         (declare (fixnum length))
-        (when constantp
-          (setq first-test (= length 0))
-          (when (<= length 1)
-            (setq other-test t)))
-        `(,other-test ,step () ,pstep
-          ,@(and (neq first-test other-test)
-                 `(,first-test ,step () ,pstep)))))))
+        `(,test ,step () ,pstep)))))
 
 ;;;; list iteration
 
