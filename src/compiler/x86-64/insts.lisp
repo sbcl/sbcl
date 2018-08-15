@@ -995,19 +995,22 @@
 
 ;;;; the effective-address (ea) structure
 
-(declaim (ftype (sfunction (tn) (mod 8)) reg-tn-encoding))
+(declaim (ftype (sfunction ((or tn (cons tn))) (mod 8)) reg-tn-encoding))
 (defun reg-tn-encoding (tn)
-  (declare (type tn tn))
   ;; ea only has space for three bits of register number: regs r8
   ;; and up are selected by a REX prefix byte which caller is responsible
   ;; for having emitted where necessary already
-  (ecase (sb-name (sc-sb (tn-sc tn)))
-    (registers
-     (let ((offset (mod (tn-offset tn) 16)))
-       (logior (ash (logand offset 1) 2)
-               (ash offset -1))))
-    (float-registers
-     (mod (tn-offset tn) 8))))
+  (if (typep tn '(cons tn (eql :high-byte)))
+      ;; FIXME: should signal an error if this encoding had a REX prefix
+      ;; since in that case it is not possible to encode high-byte regs.
+      (+ 4 (ash (tn-offset (car tn)) -1))
+      (ecase (sb-name (sc-sb (tn-sc tn)))
+        (registers
+         (let ((offset (mod (tn-offset tn) 16)))
+           (logior (ash (logand offset 1) 2)
+                   (ash offset -1))))
+        (float-registers
+         (mod (tn-offset tn) 8)))))
 
 (defmacro emit-bytes (segment &rest bytes)
   `(progn ,@(mapcar (lambda (x) `(emit-byte ,segment ,x)) bytes)))
@@ -1130,8 +1133,8 @@
 
 (defun emit-ea (segment thing reg &key allow-constants (remaining-bytes 0))
   (etypecase thing
-    (tn
-     (ecase (sb-name (sc-sb (tn-sc thing)))
+    ((or tn (cons tn))
+     (ecase (sb-name (sc-sb (tn-sc (if (listp thing) (car thing) thing))))
        ((registers float-registers)
         (emit-mod-reg-r/m-byte segment #b11 reg (reg-tn-encoding thing)))
        (stack
@@ -1267,6 +1270,8 @@
 
 (defun tn-reg-id (tn)
   (cond ((null tn) nil)
+        ((typep tn '(cons tn (eql :high-byte)))
+         (make-gpr-id :high-byte (ash (tn-offset (car tn)) -1)))
         ((eq (sb-name (sc-sb (tn-sc tn))) 'float-registers)
          (make-fpr-id (tn-offset tn)))
         (t
@@ -1321,7 +1326,7 @@
 ;;; RIP-plus-displacement (see EMIT-EA), so will not reference an extended
 ;;; register.
 (defun emit-prefixes (segment thing reg operand-size &key lock)
-  (declare (type (or ea tn fixup null) thing)
+  (declare (type (or ea tn fixup null (cons tn)) thing)
            (type (or null tn integer) reg)
            (type (member :byte :word :dword :qword :do-not-set) operand-size))
   (let ((ea-p (ea-p thing)))
@@ -1340,10 +1345,11 @@
                                   (let ((base (ea-base thing)))
                                     (unless (eq base rip-tn)
                                       (tn-reg-id base))))
-                                 ((tn-p thing)
-                                  (when (member (sb-name (sc-sb (tn-sc thing)))
-                                                '(float-registers registers))
-                                    (tn-reg-id thing)))
+                                 ((or (tn-p thing) (consp thing))
+                                  (let ((tn (if (listp thing) (car thing) thing)))
+                                    (when (member (sb-name (sc-sb (tn-sc tn)))
+                                                  '(float-registers registers))
+                                      (tn-reg-id thing))))
                                  (t nil)))))
 
 (defun operand-size (thing)

@@ -1286,24 +1286,21 @@ constant shift greater than word length")))
     (cond ((not size)
            ;; Ensure that both operands are acceptable
            ;; by possibly loading one into TEMP-REG-TN
-           (multiple-value-setq (x y) (ensure-not-mem+mem x y)))
+           (multiple-value-setq (x y) (ensure-not-mem+mem x y))
+           (inst test :qword x y))
           ((sc-is x control-stack unsigned-stack signed-stack)
            ;; Otherwise, when using an immediate operand smaller
            ;; than 64 bits, narrow the reg/mem operand to match.
            (let ((disp (frame-byte-offset (tn-offset x))))
              (when reducible-to-byte-p
                (setq size :byte disp (1+ disp) y (ash y -8)))
-             (setq x (ea disp rbp-tn nil nil size))))
+             (inst test size (ea disp rbp-tn) y)))
           (t
            (aver (gpr-p x))
            (if (and reducible-to-byte-p (<= (tn-offset x) 6)) ; 0, 2, 4, 6
                ;; Use upper byte of word reg (AX -> AH, BX -> BX ...)
-               (setq x (make-random-tn :kind :normal
-                                       :sc (sc-or-lose 'byte-reg)
-                                       :offset (1+ (tn-offset x)))
-                     y (ash y -8))
-               (setq x (reg-in-size x size))))))
-  (inst test x y))
+               (inst test :byte `(,x . :high-byte) (ash y -8))
+               (inst test size x y))))))
 
 ;; Stolen liberally from the x86 32-bit implementation.
 (macrolet ((define-logtest-vops ()
@@ -1357,7 +1354,7 @@ constant shift greater than word length")))
   (:arg-types tagged-num (:constant (integer 0 #.(- 63 n-fixnum-tag-bits))))
   (:generator 4
     (let ((bit (+ y n-fixnum-tag-bits)))
-      (inst bt (if (<= bit 31) (reg-in-size x :dword) x) bit))))
+      (inst bt (if (<= bit 31) :dword :qword) x bit))))
 
 (define-vop (fast-logbitp/signed fast-conditional/signed)
   (:args (x :scs (signed-reg signed-stack))
