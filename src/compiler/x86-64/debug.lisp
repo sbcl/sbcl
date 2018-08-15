@@ -77,8 +77,7 @@
       ;; The largest displacement in words from a code header to
       ;; the header word of a contained function is #xFFFFFF.
       ;; (See FUN_HEADER_NWORDS_MASK in 'gc.h')
-      (inst mov :dword temp
-            (make-ea-for-object-slot-half thing 0 fun-pointer-lowtag))
+      (inst mov :dword temp (ea (- fun-pointer-lowtag) thing))
       (inst shr :dword temp n-widetag-bits)
       (inst jmp :z bogus)
       (inst neg temp)

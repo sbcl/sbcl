@@ -38,8 +38,7 @@
            ;; Push the slot index into code, then code itself
            (cond ((= lowtag fun-pointer-lowtag)
                   ;; compute code address similarly to CODE-FROM-FUNCTION vop
-                  (inst mov :dword temp-reg-tn
-                        (make-ea-for-object-slot-half object 0 fun-pointer-lowtag))
+                  (inst mov :dword temp-reg-tn (ea (- fun-pointer-lowtag) object))
                   (inst shr :dword temp-reg-tn n-widetag-bits)
                   ;; now temp-reg-tn holds the difference in words from code to fun.
                   (inst push temp-reg-tn)
@@ -155,17 +154,14 @@
                 (inst lea cell
                       (ea (- other-pointer-lowtag (ash symbol-value-slot word-shift))
                           thread-base-tn cell))
-                (inst cmp (access-value-slot cell :dword) ; TLS reference
+                (inst cmp :dword (symbol-value-slot-ea cell) ; TLS reference
                       no-tls-value-marker-widetag)
                 (inst cmov :e cell symbol))) ; now possibly get the symbol
            (access-wired-tls-val (sym) ; SYM is a symbol
              `(thread-tls-ea (load-time-tls-offset ,sym)))
-           (access-value-slot (sym &optional (size :qword)) ; SYM is a TN
-             (ecase size
-               (:dword `(make-ea-for-object-slot-half
-                         ,sym symbol-value-slot other-pointer-lowtag))
-               (:qword `(make-ea-for-object-slot
-                         ,sym symbol-value-slot other-pointer-lowtag)))))
+           (symbol-value-slot-ea (sym) ; SYM is a TN
+             `(ea (- (* symbol-value-slot n-word-bytes) other-pointer-lowtag)
+                  ,sym)))
 
   (define-vop (%compare-and-swap-symbol-value)
     (:translate %compare-and-swap-symbol-value)
@@ -189,10 +185,10 @@
       (let ((unbound (generate-error-code vop 'unbound-symbol-error symbol)))
         #!+sb-thread (progn (compute-virtual-symbol)
                             (move rax old)
-                            (inst cmpxchg (access-value-slot cell) new :lock))
+                            (inst cmpxchg (symbol-value-slot-ea cell) new :lock))
         #!-sb-thread (progn (move rax old)
                             ;; is the :LOCK is necessary?
-                            (inst cmpxchg (access-value-slot symbol) new :lock))
+                            (inst cmpxchg (symbol-value-slot-ea symbol) new :lock))
         (inst cmp :dword rax unbound-marker-widetag)
         (inst jmp :e unbound)
         (move result rax))))
@@ -211,7 +207,7 @@
       (inst cmpxchg
             (if (sc-is symbol immediate)
                 (symbol-slot-ea (tn-value symbol) symbol-value-slot)
-                (access-value-slot symbol))
+                (symbol-value-slot-ea symbol))
             new :lock)
       (move result rax)))
 
@@ -227,7 +223,7 @@
         ;; a register, so we can't conditionally move into the TLS and
         ;; conditionally move in the opposite flag sense to the symbol.
         (compute-virtual-symbol)
-        (gen-cell-set (access-value-slot cell) value nil)))
+        (gen-cell-set (symbol-value-slot-ea cell) value nil)))
 
     ;; This code is tested by 'codegen.impure.lisp'
     (defun emit-symeval (value symbol symbol-reg check-boundp vop)
@@ -279,7 +275,7 @@
            (inst cmov :e value
                  (if (and known-symbol-p (sc-is symbol immediate))
                      (symbol-slot-ea known-symbol symbol-value-slot) ; MOV Rxx, imm32
-                     (access-value-slot symbol-reg)))))
+                     (symbol-value-slot-ea symbol-reg)))))
 
         (when check-boundp
           (assemble ()
@@ -338,7 +334,7 @@
         (inst mov temp (tls-index-of object))
         (inst mov temp (thread-tls-ea temp :dword))
         (inst cmp temp no-tls-value-marker-widetag)
-        (inst cmov :e temp (access-value-slot object :dword))
+        (inst cmov :e temp (symbol-value-slot-ea object))
         (inst cmp temp unbound-marker-widetag))))
 
 ) ; END OF MACROLET
@@ -356,8 +352,9 @@
     (:args (symbol :scs (descriptor-reg)))
     (:conditional :ne)
     (:generator 9
-      (inst cmp (make-ea-for-object-slot-half
-                 symbol symbol-value-slot other-pointer-lowtag)
+      (inst cmp (make-ea-for-object-slot
+                 symbol symbol-value-slot other-pointer-lowtag
+                 :dword)
             unbound-marker-widetag))))
 
 (define-vop (symbol-hash)

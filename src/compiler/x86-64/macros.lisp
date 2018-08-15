@@ -38,12 +38,8 @@
       (t
        (inst mov dst src)))))
 
-(defmacro make-ea-for-object-slot (ptr slot lowtag)
-  ;; Explicitly :qword sized because we use this in such instructions as
-  ;; (inst mov (make-ea-for-object-slot ..) immediate)
-  `(ea (- (* ,slot n-word-bytes) ,lowtag) ,ptr nil nil :qword))
-(defmacro make-ea-for-object-slot-half (ptr slot lowtag)
-  `(ea (- (* ,slot n-word-bytes) ,lowtag) ,ptr nil nil :dword))
+(defmacro make-ea-for-object-slot (ptr slot lowtag &optional (size :qword))
+  `(ea (- (* ,slot n-word-bytes) ,lowtag) ,ptr nil nil ,size))
 (defmacro tls-index-of (sym)
   `(ea (+ 4 (- other-pointer-lowtag)) ,sym nil nil :dword))
 

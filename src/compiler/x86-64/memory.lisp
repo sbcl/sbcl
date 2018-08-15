@@ -29,7 +29,7 @@
                               (eq (fixup-flavor bits) :immobile-object)
                               bits)
                          (plausible-signed-imm32-operand-p bits))
-                     (inst mov ea it))
+                     (inst mov :qword ea it))
                     (t
                      (inst mov temp-reg-tn bits)
                      (inst mov ea temp-reg-tn)))
@@ -48,7 +48,7 @@
              (inst mov result bits)
              (inst mov ea result)
              (return-from gen-cell-set)))))
-  (inst mov ea value)
+  (inst mov :qword ea value) ; specify the size for when VALUE is an integer
   (when result
     ;; Ideally we would skip this move if RESULT is unused hereafter,
     ;; but unfortunately (NOT (TN-READS RESULT)) isn't equivalent
