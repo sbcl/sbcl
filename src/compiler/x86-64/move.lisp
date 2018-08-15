@@ -90,15 +90,16 @@
      ;; It would be nice to pull it all together in one place.
      ;; The basic idea is that storing any byte-aligned 8-bit value
      ;; should be a single byte write, etc.
-     (when (and zeroed (ea-p target))
-       (setq target (sized-ea target
-                              (typecase val
-                                ((unsigned-byte 8) :byte)
-                                ((unsigned-byte 16) :word)
-                                ;; signed-32 is no good, as it needs sign-extension.
-                                ((unsigned-byte 32) :dword)
-                                (t :qword)))))
-     (inst mov target val))
+     (let ((operand-size
+            (or (and zeroed
+                     (ea-p target)
+                     (typecase val
+                       ((unsigned-byte 8) :byte)
+                       ((unsigned-byte 16) :word)
+                       ;; signed-32 is no good, as it needs sign-extension.
+                       ((unsigned-byte 32) :dword)))
+                :qword)))
+       (inst mov operand-size target val)))
     ;; Otherwise go through the temporary register
     (tmp-tn
      (inst mov tmp-tn val)

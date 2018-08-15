@@ -17,7 +17,7 @@
   (import '(conditional-opcode
             plausible-signed-imm32-operand-p
             register-p gpr-p xmm-register-p
-            ea-p sized-ea ea-base ea-index size-nbyte
+            ea-p ea-base ea-index size-nbyte
             ea make-ea ea-disp rip-relative-ea) "SB!VM")
   ;; Imports from SB-VM into this package
   (import '(sb!vm::frame-byte-offset sb!vm::rip-tn sb!vm::rbp-tn
@@ -1112,9 +1112,6 @@
 
 (defun rip-relative-ea (size label &optional addend)
   (%ea (if addend (make-label+addend label addend) label) rip-tn nil 1 size))
-
-(defun sized-ea (ea new-size)
-  (%ea (ea-disp ea) (ea-base ea) (ea-index ea) (ea-scale ea) new-size))
 
 (defun emit-byte-displacement-backpatch (segment target)
   (emit-back-patch segment 1
