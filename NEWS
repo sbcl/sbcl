@@ -1,6 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.4.10:
   * optimization: improved type checking routines for various compound types.
+  * optimization: array bound checks are elided on vectors when the index is
+    known to be less than the length, including LOOP ACROSS.
 
 changes in sbcl-1.4.10 relative to sbcl-1.4.9:
   * enhancement: added SB-EXT:MAKE-WEAK-VECTOR.

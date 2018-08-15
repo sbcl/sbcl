@@ -1337,7 +1337,9 @@
   ;; CONSTANT nodes are always anonymous, since we wish to coalesce named and
   ;; unnamed constants that are equivalent, we need to keep track of the
   ;; reference name for XREF.
-  (%source-name (missing-arg) :type symbol :read-only t))
+  (%source-name (missing-arg) :type symbol :read-only t)
+  ;; Constraints that cannot be expressed as NODE-DERIVED-TYPE
+  constraints)
 (defprinter (ref :identity t)
   #!+sb-show id
   (%source-name :test (neq %source-name '.anonymous.))

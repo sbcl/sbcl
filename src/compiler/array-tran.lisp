@@ -1372,6 +1372,23 @@
             "The array type is ambiguous; must call ~
                ARRAY-HAS-FILL-POINTER-P at runtime."))))))
 
+(deftransform %check-bound ((array dimension index) ((simple-array * (*)) * *))
+  (let ((array-ref (lvar-uses array))
+        (index-ref (lvar-uses index)))
+    (unless (and
+             (ref-p array-ref)
+             (ref-p index-ref)
+             (or
+              (loop for constraint in (ref-constraints array-ref)
+                    thereis (and (eq (constraint-y constraint)
+                                     (ref-leaf index-ref))))
+              (loop for constraint in (ref-constraints index-ref)
+                    thereis (and (eq (constraint-y constraint)
+                                     (ref-leaf array-ref))))))
+      (give-up-ir1-transform)))
+  ;; It's in bounds but it may be of the wrong type
+  `(the (and fixnum unsigned-byte) index))
+
 (deftransform check-bound ((array dimension index))
   ;; %CHECK-BOUND will perform both bound and type checking when
   ;; necessary, delete the cast so that it doesn't get confused by
