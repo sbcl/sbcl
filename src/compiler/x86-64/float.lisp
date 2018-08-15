@@ -1303,7 +1303,6 @@
   (:args (float :scs (double-reg descriptor-reg)
                 :load-if (not (sc-is float double-stack))))
   (:results (hi-bits :scs (signed-reg)))
-  (:temporary (:sc signed-stack :from :argument :to :result) temp)
   (:arg-types double-float)
   (:result-types signed-num)
   (:translate double-float-high-bits)
@@ -1312,20 +1311,21 @@
   (:generator 5
      (sc-case float
        (double-reg
-        (inst movsd temp float)
-        (move hi-bits temp))
+        (inst movq hi-bits float)
+        (inst sar hi-bits 32))
        (double-stack
-        (loadw hi-bits ebp-tn (frame-word-offset (tn-offset float))))
+        (inst movsx '(:dword :qword) hi-bits
+              (ea (+ 4 (frame-byte-offset (tn-offset float))) rbp-tn)))
        (descriptor-reg
-        (loadw hi-bits float double-float-value-slot
-               other-pointer-lowtag)))
-     (inst sar hi-bits 32)))
+        (inst movsx '(:dword :qword) hi-bits
+              (ea (+ 4 (ash double-float-value-slot word-shift)
+                       (- other-pointer-lowtag))
+                  float))))))
 
 (define-vop (double-float-low-bits)
   (:args (float :scs (double-reg descriptor-reg)
                 :load-if (not (sc-is float double-stack))))
   (:results (lo-bits :scs (unsigned-reg)))
-  (:temporary (:sc signed-stack :from :argument :to :result) temp)
   (:arg-types double-float)
   (:result-types unsigned-num)
   (:translate double-float-low-bits)
@@ -1334,17 +1334,17 @@
   (:generator 5
      (sc-case float
         (double-reg
-         (inst movsd temp float)
-         (inst mov :dword lo-bits
-               (ea (frame-byte-offset (tn-offset temp)) rbp-tn)))
+         ;; It might be more technically correct to use MOVQ followed by zeroing
+         ;; the high 32 bits of the GPR with "MOV :dword lo-bits lo-bits",
+         ;; but we know that MOVD moves exactly the right bits.
+         (inst movd lo-bits float))
         (double-stack
          (inst mov :dword lo-bits
                (ea (frame-byte-offset (tn-offset float)) rbp-tn)))
         (descriptor-reg
          (inst mov :dword lo-bits
-               (make-ea-for-object-slot-half float double-float-value-slot
-                                             other-pointer-lowtag))))))
-
+               (make-ea-for-object-slot float double-float-value-slot
+                                        other-pointer-lowtag))))))
 
 
 ;;;; complex float VOPs
