@@ -301,7 +301,7 @@
          (arg args (tn-ref-across arg)))
         ((null arg))
       ;; KLUDGE: assume all parameters are 8 bytes or less
-      (inst mov (ea n rax nil nil :qword) 0)))
+      (inst mov :qword (ea n rax) 0)))
   #!-win32
   ;; ABI: AL contains amount of arguments passed in XMM registers
   ;; for vararg calls.
@@ -356,7 +356,7 @@
       (aver (not (location= result rsp-tn)))
       (unless (zerop amount)
         (let ((delta (align-up amount 8)))
-          (inst sub (alien-stack-ptr) delta)))
+          (inst sub :qword (alien-stack-ptr) delta)))
       (inst mov result (alien-stack-ptr)))))
 
 ;;; not strictly part of the c-call convention, but needed for the

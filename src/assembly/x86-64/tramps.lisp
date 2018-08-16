@@ -122,9 +122,9 @@
   (inst movsx '(:dword :qword) rbx-tn (ea -4 rax-tn))
   ;; if at [PC-5] we see #x25 then it was a call with 32-bit mem addr
   ;; if ...              #xE8 then ...                32-bit offset
-  (inst cmp (ea -5 rax-tn nil nil :byte) #x25)
+  (inst cmp :byte (ea -5 rax-tn) #x25)
   (inst jmp :e ABSOLUTE)
-  (inst cmp (ea -5 rax-tn nil nil :byte) #xE8)
+  (inst cmp :byte (ea -5 rax-tn) #xE8)
   (inst jmp :e RELATIVE)
   ;; failing those, assume RBX was valid. ("can't happen")
   (inst mov rbx-tn (ea rsp-tn)) ; restore pushed value of RBX

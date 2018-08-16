@@ -38,27 +38,26 @@
       (t
        (inst mov dst src)))))
 
-(defmacro make-ea-for-object-slot (ptr slot lowtag &optional (size :qword))
-  `(ea (- (* ,slot n-word-bytes) ,lowtag) ,ptr nil nil ,size))
+(defmacro make-ea-for-object-slot (ptr slot lowtag)
+  `(ea (- (* ,slot n-word-bytes) ,lowtag) ,ptr))
 (defmacro tls-index-of (sym)
-  `(ea (+ 4 (- other-pointer-lowtag)) ,sym nil nil :dword))
+  `(ea (+ 4 (- other-pointer-lowtag)) ,sym))
 
 (defmacro loadw (value ptr &optional (slot 0) (lowtag 0))
   `(inst mov ,value (make-ea-for-object-slot ,ptr ,slot ,lowtag)))
 
 (defun storew (value ptr &optional (slot 0) (lowtag 0))
-  ;; FIXME: do we really use STOREW for other than :QWORD ?
-  ;; Shouldn't sub-lispword stores use something more appropriately named?
   (let* ((size (if (tn-p value)
                    (sc-operand-size (tn-sc value))
                    :qword))
-         (ea (ea (- (* slot n-word-bytes) lowtag) ptr nil nil size)))
+         (ea (ea (- (* slot n-word-bytes) lowtag) ptr)))
+    (aver (eq size :qword))
     (cond ((and (integerp value)
                 (not (typep value '(signed-byte 32))))
            (inst mov temp-reg-tn value)
            (inst mov ea temp-reg-tn))
           (t
-           (inst mov ea value)))))
+           (inst mov :qword ea value)))))
 
 (defmacro pushw (ptr &optional (slot 0) (lowtag 0))
   `(inst push (make-ea-for-object-slot ,ptr ,slot ,lowtag)))
@@ -77,22 +76,21 @@
    (ea (+ nil-value
           (static-symbol-offset symbol)
           (ash symbol-value-slot word-shift)
-          (- other-pointer-lowtag))
-       ;; Explicit :QWORD because of mem+imm mode for some instructions.
-       nil nil nil :qword))
+          (- other-pointer-lowtag))))
 
-(defun thread-tls-ea (index &optional (size :qword))
-  (if (tn-p index)
-      ;; Due to an encoding peculiarity, flipping the base and index is better.
-      ;; Base of r13 is reg=5 in ModRegRM, so if mod were 0, it would imply
-      ;; RIP-relative addressing. (And attempting to encode an index is illegal)
-      ;; So the 'mod' bits must be nonzero, which mandates encoding of an
-      ;; explicit displacement of 0.  Using INDEX as base avoids the extra byte.
-      (ea 0 index thread-base-tn 1 size)
-      (ea index thread-base-tn nil nil size)))
+(defun thread-tls-ea (index)
+  ;; Whether index is an an integer or a register, the EA constructor
+  ;; call is the same.
+  ;; Due to an encoding peculiarity, using thread-base-tn as the index register
+  ;; is better when index is non-constant.
+  ;; Base of r13 is reg=5 in ModRegRM, so if mod were 0, it would imply
+  ;; RIP-relative addressing. (And attempting to encode an index is illegal)
+  ;; So the 'mod' bits must be nonzero, which mandates encoding of an
+  ;; explicit displacement of 0.  Using INDEX as base avoids the extra byte.
+  (ea index thread-base-tn))
 
-(defun thread-slot-ea (slot-index &optional (size :qword))
-  (ea (ash slot-index word-shift) thread-base-tn nil nil size))
+(defun thread-slot-ea (slot-index)
+  (ea (ash slot-index word-shift) thread-base-tn))
 
 #!+sb-thread
 (progn
@@ -166,7 +164,7 @@
 ;;; pa section.
 #!+sb-thread
 (defmacro %clear-pseudo-atomic ()
-  '(inst mov (thread-slot-ea thread-pseudo-atomic-bits-slot) 0))
+  '(inst mov :qword (thread-slot-ea thread-pseudo-atomic-bits-slot) 0))
 
 #!+sb-safepoint
 (defun emit-safepoint ()
@@ -319,7 +317,7 @@
                  ;; but this macro declares the index arg as 'any-reg', so it has a tag bit,
                  ;; so we'll push the arg and then shift right as the next instruction.
                  (inst push index)
-                 (inst shr (ea 0 rsp-tn nil nil :qword) n-fixnum-tag-bits)
+                 (inst shr :qword (ea rsp-tn) n-fixnum-tag-bits)
                  (inst push object)
                  (invoke-asm-routine 'call 'code-header-set vop)
                  (move result value))

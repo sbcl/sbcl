@@ -328,12 +328,12 @@
              ;;    (INST TEST :BYTE (STATIC-SYMBOL-VALUE-EA '*BLAH*) CONST)
              ;; but can't do that until sizes are removed from EAs
              ;; because STATIC-SYMBOL-VALUE-EA returns a :QWORD ea for now.
-             (inst test
+             (inst test :byte
                    (ea (+ nil-value
                           (static-symbol-offset '*cpuid-fn1-ecx*)
                           (ash symbol-value-slot word-shift)
                           (- other-pointer-lowtag)
-                          bytes) nil nil nil :byte)
+                          bytes))
                    (ash 1 bits)))
            (inst jmp :z slow)
            ;; Intel's implementation of POPCNT on some models treats it as

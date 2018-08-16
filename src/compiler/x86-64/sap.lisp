@@ -165,7 +165,7 @@
         (inst add sap offset))
       (inst mov temp-reg-tn msan-mem-to-shadow-xor-const)
       (inst xor temp-reg-tn sap)
-      (inst mov (ea 0 temp-reg-tn nil nil size) 0)
+      (inst mov size (ea 0 temp-reg-tn) 0)
       (unless (eql offset 0) ; restore SAP as if nothing happened
         (inst sub sap offset))))
   (inst mov size (ea ea-disp sap ea-index) value)

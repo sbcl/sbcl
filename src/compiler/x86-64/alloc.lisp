@@ -256,7 +256,7 @@
                            ((typep word '(unsigned-byte 16)) :word)
                            ;; Definitely a (signed-byte 32) due to pre-test.
                            (t :dword))))
-        (inst mov (ea (- (* slot n-word-bytes) lowtag) object nil nil size) word))))
+        (inst mov size (ea (- (* slot n-word-bytes) lowtag) object) word))))
 
 ;;; ALLOCATE-VECTOR
 (macrolet ((calc-size-in-bytes (n-words result-tn)
@@ -550,11 +550,11 @@
              ;; filled in when the layout is stored. Can't use STOREW* though,
              ;; because it tries to store as few bytes as possible,
              ;; where this instruction must write exactly 4 bytes.
-             (inst mov (ea 0 result nil nil :dword) header)
+             (inst mov :dword (ea 0 result) header)
              (storew* header result 0 0 (not stack-allocate-p)))
          (inst or :byte result lowtag))))
     (when (typep type 'layout)
-      (inst mov (ea (+ 4 (- lowtag)) result nil nil :dword)
+      (inst mov :dword (ea (+ 4 (- lowtag)) result)
             ;; XXX: should layout fixups use a name, not a layout object?
             (make-fixup type :layout))))))
 
@@ -618,7 +618,7 @@
      ;; If code, the next word must be set within the P-A
      ;; otherwise the GC would compute the wrong object size.
      (when word1
-       (inst mov (ea (- n-word-bytes lowtag) result nil nil :qword) word1)))))
+       (inst mov :qword (ea (- n-word-bytes lowtag) result) word1)))))
 (define-vop (alloc-immobile-layout)
   (:args (slots :scs (descriptor-reg) :target c-arg1))
   (:temporary (:sc unsigned-reg :from (:argument 0) :to :eval :offset rdi-offset)

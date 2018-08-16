@@ -1028,11 +1028,12 @@
   (addend 0 :type (signed-byte 32)))
 
 (defstruct (ea (:constructor make-ea (size &key base index scale disp))
-               (:constructor %ea (disp base index scale size))
+               (:constructor %ea (disp base index scale))
                (:copier nil))
-  ;; note that we can represent an EA with a QWORD size, but EMIT-EA
-  ;; can't actually emit it on its own: caller also needs to emit REX
-  ;; prefix
+  ;; FIXME: SIZE is unnecessary, but is here for backward-compatibility
+  ;; temporarily anyway. Our code only creates EAs with :unspecific,
+  ;; but 3rd-party uses of the assembler might expect the size to do something.
+  ;; All such code will have to be fixed before removing this slot.
   (size :unspecific :type (member :byte :word :dword :qword :unspecific)
         :read-only t)
   (base nil :type (or tn null) :read-only t)
@@ -1045,15 +1046,15 @@
   (cond ((or *print-escape* *print-readably*)
          (print-unreadable-object (ea stream :type t)
            (format stream
-                   "~S~@[ base=~S~]~@[ index=~S~]~@[ scale=~S~]~@[ disp=~S~]"
-                   (ea-size ea)
+                   "~@[ base=~S~]~@[ index=~S~]~@[ scale=~S~]~@[ disp=~S~]"
                    (let ((b (ea-base ea))) (if (eq b rip-tn) :RIP b))
                    (ea-index ea)
                    (let ((scale (ea-scale ea)))
                      (if (= scale 1) nil scale))
                    (ea-disp ea))))
         (t
-         (format stream "~A PTR [" (symbol-name (ea-size ea)))
+         ;; This is ridiculous. READ won't really read an EA in this syntax.
+         (format stream "PTR [")
          (awhen (ea-base ea)
            (write-string (if (eq it rip-tn) "RIP" (sb!c:location-print-name it))
                          stream)
@@ -1071,7 +1072,7 @@
          (write-char #\] stream))))
 
 ;;; BOA constructor for EA has these acceptable forms:
-;;;   (EA displacement &OPTIONAL base-register index-register scale size)
+;;;   (EA displacement &OPTIONAL base-register index-register scale)
 ;;;   (EA base-register &OPTIONAL index-register scale)
 ;;;
 ;;; mnemonic device: the syntax is like AT&T "disp(%rbase,%rindex,scale)"
@@ -1080,38 +1081,23 @@
 ;;; Most instructions can determine an EA size based on the size of a register
 ;;; operand. The few that can't are mem+immediate mode instructions, and
 ;;; instructions which need explicit differently sized register + EA.
-;;; The assembler will be changed to parse a qualifier on the instruction
-;;; similarly to other syntaxes:
+;;; In those cases, the instruction syntax includes a size, as in:
 ;;;
 ;;;  AT&T  : testb $0x40(%rax)
-;;;  Intel : test byte ptr [%eax], 40
+;;;  Intel : test byte ptr [rax], 40
 ;;;  SBCL  : (TEST :BYTE (EA RAX-TN) #x40)
 ;;;
-;;; Until that change is completed, EAs themselves will convey an optional size,
-;;; specifiable only if you pass all constructor arguments.
-;;;
-(defun ea (displacement &optional base (index nil indexp) (scale 1 scalep)
-                        (size :unspecific))
+(defun ea (displacement &optional base (index nil indexp) (scale 1 scalep))
   (when (or (null displacement) (gpr-p displacement))
-    ;; Sans-displacement syntax requires that size be :unspecific.
-    ;; Use the longer syntax meanwhile if you need an explicit size.
     (aver (not scalep))
     (setq scale (if indexp index 1)
           index base
           base displacement
           displacement 0))
-  ;; FIXME: until SIZE is removed, the caller might have to specify INDEX
-  ;; and SCALE even if undesired. Allow NIL for the scale. but only when
-  ;; INDEX is null, and set it to 1 if so (which is the default).
-  ;; Scale could be NIL only if index was also specified, since they're
-  ;; no longer keywords. This AVER prevents accidental use of
-  ;; (EA 0 base index nil :dword) and similar. The OR below would have
-  ;; passed valid arguments to %EA and not be detected otherwise.
-  (when index (aver scale))
-  (%ea displacement base index (or scale 1) size))
+  (%ea displacement base index scale))
 
 (defun rip-relative-ea (label &optional addend)
-  (%ea (if addend (make-label+addend label addend) label) rip-tn nil 1 :unspecific))
+  (%ea (if addend (make-label+addend label addend) label) rip-tn nil 1))
 
 (defun emit-byte-displacement-backpatch (segment target)
   (emit-back-patch segment 1
@@ -1353,7 +1339,7 @@
     (tn
      (or (sb!c:sc-operand-size (tn-sc thing))
          (error "can't tell the size of ~S" thing)))
-    (ea
+    (ea ; FIXME: remove this case, let EA fall through to returning NIL
      (unless (eq (ea-size thing) :unspecific)
        (ea-size thing)))
     (fixup
@@ -1521,10 +1507,9 @@
             ;; The acceptable fixup flavors are enumerated here.
             ;; The linkage table and immobile spaces reside at
             ;; low enough addresses that this works.
-            (aver (or (member (fixup-flavor src)
-                              '(:foreign :foreign-dataref :symbol-tls-index
-                                :assembly-routine :layout :immobile-object))
-                      (eq (ea-size dst) :dword)))
+            (aver (member (fixup-flavor src)
+                          '(:foreign :foreign-dataref :symbol-tls-index
+                            :assembly-routine :layout :immobile-object)))
             (emit-prefixes segment dst nil size)
             (emit-byte segment #xC7)
             (emit-ea segment dst #b000)

@@ -42,7 +42,7 @@
                   (inst shr :dword temp-reg-tn n-widetag-bits)
                   ;; now temp-reg-tn holds the difference in words from code to fun.
                   (inst push temp-reg-tn)
-                  (inst add (ea 0 rsp-tn nil nil :qword) offset) ; for particular slot
+                  (inst add :qword (ea 0 rsp-tn) offset) ; for particular slot
                   ;; finish computing the code address
                   (inst neg temp-reg-tn)
                   (inst lea temp-reg-tn
@@ -70,7 +70,7 @@
                      (make-fixup (tn-value value) :layout)
                      value)))
           ((sc-is value immediate)
-           (move-immediate (ea (- (* offset n-word-bytes) lowtag) object nil nil :qword)
+           (move-immediate (ea (- (* offset n-word-bytes) lowtag) object)
                            (encode-value-if-immediate value)
                            temp-reg-tn (not dx-p)))
           (t
@@ -255,19 +255,19 @@
                  ;; for immobile code to make it automatically relocatable.
                  (inst mov :dword value
                        ;; slot index 1/2 is the high half of the header word.
-                       (symbol-slot-ea known-symbol 1/2 :dword))
+                       (symbol-slot-ea known-symbol 1/2))
                  ;; read the TLS value using that index
-                 (inst mov value (thread-tls-ea value :qword)))
+                 (inst mov value (thread-tls-ea value)))
                 (constant
 
                  ;; These reads are inextricably data-dependent
                  (inst mov symbol-reg symbol) ; = MOV REG, [RIP-N]
                  (inst mov :dword value (tls-index-of symbol-reg))
-                 (inst mov value (thread-tls-ea value :qword)))))
+                 (inst mov value (thread-tls-ea value)))))
 
              (t                      ; SYMBOL-VALUE of a random symbol
               (inst mov :dword symbol-reg (tls-index-of symbol))
-              (inst mov value (thread-tls-ea symbol-reg :qword))
+              (inst mov value (thread-tls-ea symbol-reg))
               (setq symbol-reg symbol)))
 
            ;; Load the global value if the TLS value didn't exist
@@ -332,7 +332,7 @@
       (:temporary (:sc dword-reg) temp)
       (:generator 9
         (inst mov temp (tls-index-of object))
-        (inst mov temp (thread-tls-ea temp :dword))
+        (inst mov temp (thread-tls-ea temp))
         (inst cmp temp no-tls-value-marker-widetag)
         (inst cmov :e temp (symbol-value-slot-ea object))
         (inst cmp temp unbound-marker-widetag))))
@@ -489,9 +489,8 @@
       (storew tmp bsp binding-value-slot)
       ;; Indices are small enough to be written as :DWORDs which avoids
       ;; a REX prefix if 'bsp' happens to be any of the low 8 registers.
-      (inst mov (ea (ash binding-symbol-slot word-shift) bsp nil nil :dword)
-            tls-index)
-      (inst mov tls-cell (encode-value-if-immediate val))))))
+      (inst mov :dword (ea (ash binding-symbol-slot word-shift) bsp) tls-index)
+      (inst mov :qword tls-cell (encode-value-if-immediate val))))))
 
 #!-sb-thread
 (define-vop (dynbind)
@@ -701,12 +700,11 @@
            (integer
               (ea (+ (* (+ instance-slots-offset index) n-word-bytes)
                      (- instance-pointer-lowtag))
-                  object nil nil :qword))
+                  object))
            (tn
               (ea (+ (* instance-slots-offset n-word-bytes)
                      (- instance-pointer-lowtag))
-                  object index (ash 1 (- word-shift n-fixnum-tag-bits))
-                  :qword)))))
+                  object index (ash 1 (- word-shift n-fixnum-tag-bits)))))))
   (macrolet
       ((def (suffix result-sc result-type inst &optional (inst/c inst))
          `(progn

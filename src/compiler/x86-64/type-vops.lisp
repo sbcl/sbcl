@@ -257,7 +257,7 @@
            (inst and :byte temp lowtag-mask)
            (inst cmp :byte temp other-pointer-lowtag)))
       (inst jmp :ne nope)
-      (inst cmp (make-ea-for-object-slot value 0 other-pointer-lowtag)
+      (inst cmp :qword (ea (- other-pointer-lowtag) value)
             (+ (ash 1 n-widetag-bits) bignum-widetag))
       (inst jmp (if not-p :ne :e) target))
     NOT-TARGET))
@@ -400,7 +400,7 @@
   (:conditional :e)
   (:args-var args)
   (:generator 2
-   (inst cmp (ea (- other-pointer-lowtag) x nil nil :byte) widetag)))
+   (inst cmp :byte (ea (- other-pointer-lowtag) x) widetag)))
 
 ;;; TRANSFORM-INSTANCE-TYPEP checks for this vop by name and will try to use it,
 ;;; so don't define it if inapplicable.
@@ -414,7 +414,8 @@
   (:args (instance :scs (descriptor-reg))
          (layout :scs (descriptor-reg immediate)))
   (:generator 1
-    (inst cmp (ea (- 4 instance-pointer-lowtag) instance nil nil :dword)
+    (inst cmp :dword
+          (ea (- 4 instance-pointer-lowtag) instance)
           (if (sc-is layout immediate)
               (make-fixup (tn-value layout) :layout)
               layout)))))
@@ -428,15 +429,14 @@
          (index :scs (any-reg descriptor-reg immediate))
          (thing :scs (descriptor-reg immediate)))
   (:generator 1
-    (inst cmp
+    (inst cmp :dword
           (if (sc-is index immediate)
               (ea (+ (- other-pointer-lowtag)
                      (ash (+ vector-data-offset (tn-value index)) word-shift))
-                  vector nil nil :dword)
+                  vector)
               (ea (+ (- other-pointer-lowtag)
                      (ash vector-data-offset word-shift))
-                  vector index (ash 1 (- word-shift n-fixnum-tag-bits))
-                  :dword))
+                  vector index (ash 1 (- word-shift n-fixnum-tag-bits))))
           (if (sc-is thing immediate)
               (make-fixup (tn-value thing) :layout)
               thing))))

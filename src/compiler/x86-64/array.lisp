@@ -104,7 +104,8 @@
   (:arg-types * (:constant t))
   (:conditional :e)
   (:generator 2
-    (inst cmp (ea (1+ (- other-pointer-lowtag)) array nil nil :dword)
+    (inst cmp :dword
+          (ea (1+ (- other-pointer-lowtag)) array)
           (+ rank
              (1- array-dimensions-offset)))))
 
@@ -389,20 +390,19 @@
 
 (defun make-ea-for-float-ref (object index offset element-size
                               &key (scale 1) (complex-offset 0))
-  (let ((ea-size (if (= element-size 4) :dword :qword)))
-    (etypecase index
+  (etypecase index
       (integer
        (ea (- (+ (* vector-data-offset n-word-bytes)
                  (* (+ index offset) element-size)
                  complex-offset)
               other-pointer-lowtag)
-           object nil nil ea-size))
+           object))
       (tn
        (ea (- (+ (* vector-data-offset n-word-bytes)
                  (* offset element-size)
                  complex-offset)
               other-pointer-lowtag)
-           object index scale ea-size)))))
+           object index scale))))
 
 #.
 (let ((use-temp (<= word-shift n-fixnum-tag-bits)))

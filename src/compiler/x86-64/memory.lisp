@@ -12,12 +12,11 @@
 
 (in-package "SB!VM")
 
-(defun symbol-slot-ea (symbol slot &optional (size :qword))
+(defun symbol-slot-ea (symbol slot)
   (ea (let ((offset (- (* slot n-word-bytes) other-pointer-lowtag)))
              (if (static-symbol-p symbol)
                  (+ nil-value (static-symbol-offset symbol) offset)
-                 (make-fixup symbol :immobile-object offset)))
-      nil nil nil size))
+                 (make-fixup symbol :immobile-object offset)))))
 
 (defun gen-cell-set (ea value result)
   (when (sc-is value immediate)

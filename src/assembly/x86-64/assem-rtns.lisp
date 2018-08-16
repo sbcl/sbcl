@@ -233,14 +233,14 @@
      (:temp length (any-reg descriptor-reg) rax-offset)
      (:temp vector (any-reg descriptor-reg) rbx-offset))
   ;; Jump over CALL QWORD PTR [RAX-3] in the caller
-  (inst add (ea 0 rsp-tn nil nil :qword) 3)
+  (inst add :qword (ea rsp-tn) 3)
   (emit-alignment n-lowtag-bits :long-nop)
 
   TAIL-CALL-SYMBOL
   (%lea-for-lowtag-test vector fun other-pointer-lowtag)
   (inst test :byte vector lowtag-mask)
   (inst jmp :nz not-callable)
-  (inst cmp (ea (- other-pointer-lowtag) fun nil nil :byte) symbol-widetag)
+  (inst cmp :byte (ea (- other-pointer-lowtag) fun) symbol-widetag)
   (inst jmp :ne not-callable)
   (load-symbol-info-vector vector fun r11-tn)
   ;; info-vector-fdefn
@@ -427,20 +427,20 @@
              (inst shl temp-reg-tn 3) ; multiply by 8
              (inst add temp-reg-tn (thread-slot-ea thread-dynspace-pte-base-slot))
              ;; clear WP - bit index 5 of flags byte
-             (inst and (ea 6 temp-reg-tn nil nil :byte) (lognot (ash 1 5)) :lock))
+             (inst and :byte (ea 6 temp-reg-tn) (lognot (ash 1 5)) :lock))
             (t
              (inst lea temp-reg-tn (ea temp-reg-tn temp-reg-tn 2)) ; multiply by 3
              (inst shl temp-reg-tn 2) ; then by 4, = 12
              (inst add temp-reg-tn (thread-slot-ea thread-dynspace-pte-base-slot))
              ;; clear WP
-             (inst and (ea 8 temp-reg-tn nil nil :byte) (lognot (ash 1 5)) :lock)))
+             (inst and :byte (ea 8 temp-reg-tn) (lognot (ash 1 5)) :lock)))
 
       STORE
       (inst mov rdi-tn (ea 24 rsp-tn))      ; object
       (inst mov temp-reg-tn (ea 32 rsp-tn)) ; word index
       (inst mov rax-tn (ea 40 rsp-tn))      ; newval
       ;; set 'written' flag in the code header
-      (inst or (ea (- 3 other-pointer-lowtag) rdi-tn nil nil :byte) #x40 :lock)
+      (inst or :byte (ea (- 3 other-pointer-lowtag) rdi-tn) #x40 :lock)
       ;; store newval into object
       (inst mov (ea (- other-pointer-lowtag) rdi-tn temp-reg-tn n-word-bytes)
             rax-tn)))

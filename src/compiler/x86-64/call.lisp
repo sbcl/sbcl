@@ -1396,14 +1396,8 @@
   ;; and reading a slot from a thread structure would require an extra
   ;; register on -SB-THREAD. While this isn't critical for x86-64,
   ;; it's more serious for x86.
-  #!+sb-thread
-  (inst cmp (thread-slot-ea thread-stepping-slot) 0)
-  #!-sb-thread
-  (inst cmp (ea (+ nil-value (static-symbol-offset 'sb!impl::*stepping*)
-                   (* symbol-value-slot n-word-bytes)
-                   (- other-pointer-lowtag))
-                nil nil nil :byte)
-        0))
+  #!+sb-thread (inst cmp :byte (thread-slot-ea thread-stepping-slot) 0)
+  #!-sb-thread (inst cmp :byte (static-symbol-value-ea 'sb!impl::*stepping*) 0))
 
 (define-vop (step-instrument-before-vop)
   (:policy :fast-safe)
