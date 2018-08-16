@@ -98,12 +98,12 @@
 
 (with-test (:name :assemble-movsx :skipped-on (not :x86-64))
   ;; source = :BYTE, signed
-  (check-does-not-assemble `(movsx '(:byte :byte) ,r8b-tn ,cl-tn))
+  (check-does-not-assemble `(movsx (:byte :byte) ,r8b-tn ,cl-tn))
   (test-assemble `(movsx (:byte :word)  ,r8w-tn ,cl-tn) "66440FBEC1       MOVSX R8W, CL")
   (test-assemble `(movsx (:byte :dword) ,r8d-tn ,cl-tn) "440FBEC1         MOVSX R8D, CL")
   (test-assemble `(movsx (:byte :qword) ,r8-tn  ,cl-tn) "4C0FBEC1         MOVSX R8, CL")
   ;; source = :BYTE, unsigned
-  (check-does-not-assemble `(movzx '(:byte :byte) ,r8b-tn ,cl-tn))
+  (check-does-not-assemble `(movzx (:byte :byte) ,r8b-tn ,cl-tn))
   (test-assemble `(movzx (:byte :word)  ,r8w-tn ,cl-tn) "66440FB6C1       MOVZX R8W, CL")
   (test-assemble `(movzx (:byte :dword) ,r8d-tn ,cl-tn) "440FB6C1         MOVZX R8D, CL")
   (test-assemble `(movzx (:byte :qword) ,r8-tn  ,cl-tn) "440FB6C1         MOVZX R8D, CL") ; R8D, not R8
@@ -115,7 +115,7 @@
   (test-assemble `(movzx (:word :qword) ,r8-tn ,cx-tn)  "440FB7C1         MOVZX R8D, CX") ; R8D, not R8
   ;; source = :DWORD, signed and unsigned
   (test-assemble `(movsx (:dword :qword) ,r8-tn ,ecx-tn) "4C63C1           MOVSX R8, ECX")
-  (check-does-not-assemble `(movzx '(:dword :qword) ,r8-tn ,ecx-tn))) ; should use MOV instead
+  (test-assemble `(movzx (:dword :qword) ,r8-tn ,ecx-tn) "448BC1           MOV R8D, ECX"))
 
 (with-test (:name :disassemble-movabs-instruction :skipped-on (not :x86-64))
   (let* ((bytes (coerce '(#x48 #xA1 8 7 6 5 4 3 2 1
@@ -244,3 +244,11 @@
                  "660F6EC0         MOVD XMM0, EAX")
   (test-assemble `(movq ,float0-tn ,eax-tn)
                  "66480F6EC0       MOVQ XMM0, RAX"))
+
+(with-test (:name :assemble-high-byte-regs :skipped-on (not :x86-64))
+  (test-assemble `(cmp (,rdx-tn . :high-byte) 1)
+                 "80FE01           CMP DH, 1")
+  (test-assemble `(mov (,edx-tn . :high-byte) (,rcx-tn . :high-byte))
+                 "8AF5             MOV DH, CH")
+  ;; can not use legacy high byte reg in a REX-prefixed instruction
+  (check-does-not-assemble `(movsx (:byte :qword) ,rax-tn (,rbx-tn . :high-byte))))

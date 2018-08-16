@@ -26,6 +26,7 @@
   ;; array operations are rather slow compared to simple ones).
   (buffer (make-array 100 :element-type 'assembly-unit)
           :type (simple-array assembly-unit 1))
+  (encoder-state)
   ;; whether or not to run the scheduler. Note: if the instruction
   ;; definitions were not compiled with the scheduler turned on, this
   ;; has no effect.
