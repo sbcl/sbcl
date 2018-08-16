@@ -352,9 +352,8 @@
     (:args (symbol :scs (descriptor-reg)))
     (:conditional :ne)
     (:generator 9
-      (inst cmp (make-ea-for-object-slot
-                 symbol symbol-value-slot other-pointer-lowtag
-                 :dword)
+      (inst cmp :dword (make-ea-for-object-slot
+                 symbol symbol-value-slot other-pointer-lowtag)
             unbound-marker-widetag))))
 
 (define-vop (symbol-hash)
