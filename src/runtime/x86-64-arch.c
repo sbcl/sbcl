@@ -376,7 +376,9 @@ sigtrap_handler(int __attribute__((unused)) signal,
 }
 
 void
-sigill_handler(int signal, siginfo_t *siginfo, os_context_t *context) {
+sigill_handler(int __attribute__((unused)) signal,
+               siginfo_t __attribute__((unused)) *siginfo,
+               os_context_t *context) {
     /* Triggering SIGTRAP using int3 is unreliable on OS X/x86, so
      * we need to use illegal instructions for traps.
      */

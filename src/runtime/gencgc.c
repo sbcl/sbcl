@@ -498,7 +498,7 @@ write_generation_stats(FILE *file)
 
 extern void
 write_heap_exhaustion_report(FILE *file, long available, long requested,
-                             struct thread *thread)
+                             struct thread __attribute__((unused)) *thread)
 {
     fprintf(file,
             "Heap exhausted during %s: %ld bytes available, %ld requested.\n",
@@ -2928,7 +2928,8 @@ write_protect_generation_pages(generation_index_t generation)
 
 #if !GENCGC_IS_PRECISE
 static void
-preserve_context_registers (void (*proc)(os_context_register_t), os_context_t *c)
+preserve_context_registers (void __attribute__((unused)) (*proc)(os_context_register_t),
+                            os_context_t __attribute__((unused)) *c)
 {
 #ifdef LISP_FEATURE_SB_THREAD
     void **ptr;

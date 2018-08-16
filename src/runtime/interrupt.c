@@ -363,7 +363,7 @@ sigaddset_blockable(sigset_t *sigset)
 }
 
 void
-sigaddset_gc(sigset_t *sigset)
+sigaddset_gc(sigset_t __attribute__((unused)) *sigset)
 {
 #ifdef THREADS_USING_GCSIGNAL
     sigaddset(sigset,SIG_STOP_FOR_GC);
@@ -592,7 +592,7 @@ maybe_save_gc_mask_and_block_deferrables(sigset_t *sigset)
  * enabled, without the protection of *GC-INHIBIT* T and there is gc
  * (or stop for gc) pending, but we haven't trapped yet? */
 int
-in_leaving_without_gcing_race_p(struct thread *thread)
+in_leaving_without_gcing_race_p(struct thread __attribute__((unused)) *thread)
 {
     return ((read_TLS(IN_WITHOUT_GCING,thread) != NIL) &&
             (read_TLS(INTERRUPTS_ENABLED,thread) != NIL) &&
