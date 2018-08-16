@@ -42,45 +42,47 @@
 (with-test (:name :assemble-movti-instruction :skipped-on (not :x86-64))
   (flet ((test-movnti (dst src expect)
            (test-assemble `(movnti ,dst ,src) expect)))
-    (test-movnti (make-ea :dword :base rdi-tn :disp 57) eax-tn
-                 "0FC34739         MOVNTI [RDI+57], EAX")
-    (test-movnti (make-ea :qword :base rax-tn) r12-tn
-                 "4C0FC320         MOVNTI [RAX], R12")))
+    (test-movnti (ea 57 rdi-tn) eax-tn "0FC34739         MOVNTI [RDI+57], EAX")
+    (test-movnti (ea rax-tn) r12-tn "4C0FC320         MOVNTI [RAX], R12")))
 
 (with-test (:name :assemble-crc32 :skipped-on (not :x86-64))
   ;; Destination size = :DWORD
-  (test-assemble `(crc32 ,eax-tn ,(make-ea :byte  :base rbp-tn))
+  (test-assemble `(crc32 :byte ,eax-tn ,(ea rbp-tn))
                  "F20F38F04500     CRC32 EAX, BYTE PTR [RBP]")
-  (test-assemble `(crc32 ,eax-tn ,(make-ea :word  :base rbp-tn))
+  (test-assemble `(crc32 :byte ,eax-tn (,rcx-tn . :high-byte))
+                 "F20F38F0C5       CRC32 EAX, CH")
+  (test-assemble `(crc32 :byte ,eax-tn ,dil-tn)
+                 "F2400F38F0C7     CRC32 EAX, DIL")
+  (test-assemble `(crc32 :word ,eax-tn ,(ea rbp-tn))
                  "66F20F38F14500   CRC32 EAX, WORD PTR [RBP]")
-  (test-assemble `(crc32 ,eax-tn ,(make-ea :dword :base rbp-tn))
+  (test-assemble `(crc32 :dword ,eax-tn ,(ea rbp-tn))
                  "F20F38F14500     CRC32 EAX, DWORD PTR [RBP]")
   ;; these check that the presence of REX does not per se change the width.
-  (test-assemble `(crc32 ,r9d-tn ,(make-ea :byte  :base r14-tn :index r15-tn))
+  (test-assemble `(crc32 :byte ,r9d-tn ,(ea r14-tn r15-tn))
                  "F2470F38F00C3E   CRC32 R9D, BYTE PTR [R14+R15]")
-  (test-assemble `(crc32 ,r9d-tn ,(make-ea :word  :base r14-tn :index r15-tn))
+  (test-assemble `(crc32 :word ,r9d-tn ,(ea r14-tn r15-tn))
                  "66F2470F38F10C3E CRC32 R9D, WORD PTR [R14+R15]")
-  (test-assemble `(crc32 ,r9d-tn ,(make-ea :dword :base r14-tn :index r15-tn))
+  (test-assemble `(crc32 :dword ,r9d-tn ,(ea r14-tn r15-tn))
                  "F2470F38F10C3E   CRC32 R9D, DWORD PTR [R14+R15]")
   ;; Destination size = :QWORD
-  (test-assemble `(crc32 ,rax-tn ,(make-ea :byte  :base rbp-tn))
+  (test-assemble `(crc32 :byte ,rax-tn ,(ea rbp-tn))
                  "F2480F38F04500   CRC32 RAX, BYTE PTR [RBP]")
-  (test-assemble `(crc32 ,rax-tn ,(make-ea :qword :base rbp-tn))
+  (test-assemble `(crc32 :qword ,rax-tn ,(ea rbp-tn))
                  "F2480F38F14500   CRC32 RAX, QWORD PTR [RBP]")
   ;; now with high regs
-  (test-assemble `(crc32 ,r9-tn ,(make-ea :byte  :base r14-tn :index r15-tn))
+  (test-assemble `(crc32 :byte ,r9-tn ,(ea r14-tn r15-tn))
                  "F24F0F38F00C3E   CRC32 R9, BYTE PTR [R14+R15]")
-  (test-assemble `(crc32 ,r9-tn ,(make-ea :qword :base r14-tn :index r15-tn))
+  (test-assemble `(crc32 :qword ,r9-tn ,(ea r14-tn r15-tn))
                  "F24F0F38F10C3E   CRC32 R9, QWORD PTR [R14+R15]"))
 
 (with-test (:name :assemble-unsigned-qword-imm-to-mem :skipped-on (not :x86-64))
   ;; unsigned bits cast as signed bits
   (let ((const #xffffffff801234BB))
-    (test-assemble `(mov ,(make-ea :qword :base rcx-tn) ,const)
+    (test-assemble `(mov :qword ,(ea rcx-tn) ,const)
                    "48C701BB341280   MOV QWORD PTR [RCX], -2146290501")
     ;; Do not truncate to just the lower bits
     (dolist (size '(:byte :word :dword))
-      (check-does-not-assemble `(mov ,(make-ea size :base rcx-tn) ,const)))))
+      (check-does-not-assemble `(mov ,size ,(ea rcx-tn) ,const)))))
 
 (with-test (:name :unsigned-as-signed-imm8 :skipped-on (not :x86-64))
   ;; PUSH

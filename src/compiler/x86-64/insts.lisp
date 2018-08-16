@@ -3208,7 +3208,7 @@
    (aver (not (eq (operand-size src) :byte)))
    (emit-sse-inst segment dst src #xf3 #xb8)))
 
-(define-instruction crc32 (segment dst src)
+(define-instruction crc32 (segment src-size dst src)
   ;; The low bit of the final opcode byte sets the source size.
   ;; REX.W bit sets the destination size. can't have #x66 prefix and REX.W = 1.
   (:printer ext-2byte-prefix-reg-reg/mem
@@ -3222,8 +3222,7 @@
              (src-width nil :field (byte 1 32) :prefilter #'prefilter-width)
              (reg nil :printer #'print-d/q-word-reg)))
   (:emitter
-   (let ((dst-size (operand-size dst))
-         (src-size (operand-size src)))
+   (let ((dst-size (operand-size dst)))
      ;; The following operand size combinations are possible:
      ;;   dst = r32, src = r/m{8, 16, 32}
      ;;   dst = r64, src = r/m{8, 64}
