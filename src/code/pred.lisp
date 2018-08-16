@@ -141,6 +141,9 @@
   #!+sb-simd-pack (def-type-predicate-wrapper simd-pack-p)
   (def-type-predicate-wrapper %instancep)
   (def-type-predicate-wrapper symbolp)
+  ;; The interpreter needs this because it assumes that any type spec
+  ;; in SB-C::*BACKEND-TYPE-PREDICATES* has a callable predicate.
+  (def-type-predicate-wrapper non-null-symbol-p)
   (def-type-predicate-wrapper %other-pointer-p)
   (def-type-predicate-wrapper system-area-pointer-p)
   (def-type-predicate-wrapper unbound-marker-p)

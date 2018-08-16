@@ -289,3 +289,7 @@
 (test-util:with-test (:name :argless-lambda)
   (assert (eq ((lambda () (declare (special *some-var*)) (setq *some-var* t)))
               t)))
+
+(test-util:with-test (:name :typecheck-symbol-not-null)
+  (funcall (lambda (x) (the (and symbol (not null)) x))
+           'foo))
