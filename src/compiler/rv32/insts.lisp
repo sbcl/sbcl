@@ -48,6 +48,11 @@
   (funct3 :field (byte 3 12))
   (opcode (byte 7 0)))
 
+(define-bitfield-emitter %emit-s-inst 32
+  (byte 7 25) (byte 5 20) (byte 5 15) (byte 3 12) (byte 5 7) (byte 7 0))
+(defun emit-s-inst (segment imm rs2 rs1 funct3 opcode)
+  (%emit-s-inst segment (ldb (byte 7 5) imm) (tn-offset rs2) (tn-offset rs1) funct3 (ldb (byte 5 0) imm) opcode))
+
 (define-instruction-format (b 32)
   (imm :fields (list (byte 1 31) (byte 1 7) (byte 6 25) (byte 4 8)))
   (rs2 :field (byte 5 20))
@@ -55,15 +60,37 @@
   (funct3 :field (byte 3 12))
   (opcode (byte 7 0)))
 
+(define-bitfield-emitter %emit-b-inst 32
+  (byte 1 31) (byte 6 25) (byte 5 20) (byte 5 15) (byte 3 12) (byte 4 8) (byte 1 7) (byte 7 0))
+(defun emit-b-inst (segment imm rs2 rs1 funct3 opcode)
+  (aver (not (logbitp 0 imm)))
+  (%emit-b-inst segment (ldb (byte 1 12) imm) (ldb (byte 6 5) imm)
+                (tn-offset rs2) (tn-offset rs1) funct3 (ldb (byte 4 1) imm)
+                (ldb (byte 1 11) imm) opcode))
+
 (define-instruction-format (u 32)
   (imm :field (byte 20 12))
   (rd :field (byte 5 7))
   (opcode (byte 7 0)))
 
+(define-bitfield-emitter %emit-u-inst 32
+  (byte 20 12) (byte 5 7) (byte 7 0))
+(defun emit-u-inst (segment imm rd opcode)
+  (aver (= 0 (ldb (byte 12 0) imm)))
+  (%emit-u-inst segment imm (tn-offset rd) opcode))
+
 (define-instruction-format (j 32)
   (imm :fields (list (byte 1 31) (byte 8 12) (byte 1 20) (byte 10 21)))
   (rd :field (byte 5 7))
   (opcode (byte 7 0)))
+
+(define-bitfield-emitter %emit-j-inst 32
+  (byte 1 31) (byte 10 21) (byte 1 20) (byte 8 12) (byte 5 7) (byte 7 0))
+(defun emit-j-inst (segment imm rd opcode)
+  (aver (not (logbitp 0 imm)))
+  (%emit-j-inst segment (ldb (byte 1 20) imm) (ldb (byte 10 1) imm)
+                (ldb (byte 1 11) imm) (ldb (byte 8 12) imm)
+                (tn-offset rd) opcode))
 
 (define-instruction lw (segment rd rs1 offset)
   (:printer i ((funct3 #b010) (opcode #b0000011)))
