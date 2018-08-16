@@ -92,12 +92,154 @@
                 (ldb (byte 1 11) imm) (ldb (byte 8 12) imm)
                 (tn-offset rd) opcode))
 
-(define-instruction lw (segment rd rs1 offset)
-  (:printer i ((funct3 #b010) (opcode #b0000011)))
+(define-instruction lui (segment rd ui)
+  (:printer u ((opcode #b0110111)))
   (:emitter
-   (emit-i-inst segment offset rs1 #b010 rd #b0000011)))
+   (emit-u-inst segment ui rd #b0110111)))
 
-(define-instruction add (segment rd rs1 rs2)
-  (:printer r ((funct7 #b0000000) (funct3 #b000) (opcode #b0110011)))
+(define-instruction auipc (segment rd ui)
+  (:printer u ((opcode #b0010111)))
   (:emitter
-   (emit-r-inst segment #b0000000 rs2 rs1 #b000 rd #b0110011)))
+   (emit-u-inst segment ui rd #b0010111)))
+
+(define-instruction jal (segment lr offset)
+  (:printer j ((opcode #b1101111)))
+  (:emitter
+   (emit-j-inst segment offset lr #b1101111)))
+
+(define-instruction jalr (segment lr rs offset)
+  (:printer i ((funct3 #b000) (opcode #b1100111)))
+  (:emitter
+   (emit-i-inst segment offset rs #b000 lr opcode)))
+
+(macrolet ((define-branch-instruction (name funct3)
+             `(define-instruction ,name (segment rs1 rs2 offset)
+                (:printer b ((funct3 ,funct3) (opcode #b1100011)))
+                (:emitter
+                 (emit-b-inst segment offset rs2 rs1 ,funct3 #b1100011)))))
+  (define-branch-instruction beq #b000)
+  (define-branch-instruction bne #b001)
+  (define-branch-instruction blt #b100)
+  (define-branch-instruction bge #b101)
+  (define-branch-instruction bltu #b110)
+  (define-branch-instruction bgeu #b111))
+
+(macrolet ((define-load-instruction (name funct3)
+             `(define-instruction ,name (segment rd rs offset)
+                (:printer i ((funct3 ,funct3) (opcode #b0000011)))
+                (:emitter
+                 (emit-i-inst segment offset rs ,funct3 rd #b0000011)))))
+  (define-load-instruction lb #b000)
+  (define-load-instruction lh #b001)
+  (define-load-instruction lw #b010)
+  (define-load-instruction lbu #b100)
+  (define-load-instruction lhu #b101))
+
+(macrolet ((define-store-instruction (name funct3)
+             `(define-instruction ,name (segment rs2 rs1 offset)
+                (:printer s ((funct3 ,funct3) (opcode #b0100011)))
+                (:emitter
+                 (emit-s-inst segment offset rs2 rs1 ,funct3 opcode)))))
+  (define-store-instruction sb #b000)
+  (define-store-instruction sh #b001)
+  (define-store-instruction sw #b010))
+
+(macrolet ((define-immediate-arith-instruction (name funct3 &optional (imm 'imm))
+             `(define-instruction ,name (segment rd rs imm)
+                (:printer i ((funct3 ,funct3) (opcode #b0010011)))
+                (:emitter
+                 (let ((imm ,imm))
+                   (emit-i-inst segment imm rs ,funct3 rd #b0010011))))))
+  (define-immediate-arith-instruction addi #b000)
+  (define-immediate-arith-instruction slti #b010)
+  (define-immediate-arith-instruction sltiu #b011)
+  (define-immediate-arith-instruction xori #b100)
+  (define-immediate-arith-instruction ori #b110)
+  (define-immediate-arith-instruction andi #b111)
+  (define-immediate-arith-instruction slli #b001
+    (progn (aver (< imm n-word-bits)) imm))
+  (define-immediate-arith-instruction srli #b101
+    (progn (aver (< imm n-word-bits)) imm))
+  (define-immediate-arith-instruction srai #b101
+    (progn (aver (< imm n-word-bits)) (dpb 1 (byte 1 10) imm))))
+
+(defmacro define-register-arith-instruction (name funct7 funct3 opcode)
+  `(define-instruction ,name (segment rd rs1 rs2)
+     (:printer r ((funct7 ,funct7) (funct3 ,funct3) (opcode ,opcode)))
+     (:emitter
+      (emit-r-inst segment ,funct7 rs2 rs1 ,funct3 rd ,opcode))))
+
+(macrolet ((define-rv32i-arith-instruction (name funct7 funct3)
+             `(define-register-arith-instruction ,name ,funct7 ,funct3 #b0110011)))
+  (define-rv32i-arith-instruction add #b0000000 #b000)
+  (define-rv32i-arith-instruction sub #b0100000 #b000)
+  (define-rv32i-arith-instruction sll #b0000000 #b001)
+  (define-rv32i-arith-instruction slt #b0000000 #b010)
+  (define-rv32i-arith-instruction sltu #b0000000 #b011)
+  (define-rv32i-arith-instruction xor #b0000000 #b100)
+  (define-rv32i-arith-instruction srl #b0000000 #b101)
+  (define-rv32i-arith-instruction sra #b0100000 #b101)
+  (define-rv32i-arith-instruction or #b0000000 #b110)
+  (define-rv32i-arith-instruction and #b0000000 #b111))
+
+(define-instruction-format (fence 32)
+  (funct4 (byte 4 28) :value #b0000)
+  (pred (byte 4 24))
+  (succ (byte 4 20))
+  (rs1 (byte 5 15) :value #b00000)
+  (funct3 (byte 3 12))
+  (rd (byte 5 7) :value #b00000)
+  (opcode (byte 7 0) :value #b0001111))
+
+(defun fence-encoding (ops)
+  (let ((vals '(:i 8 :o 4 :r 2 :w 1)))
+    (typecase ops
+      ((unsigned-byte 4) ops)
+      (list
+       (let ((result 0))
+         (dolist (op ops result)
+           (setq result (logior result (getf vals op))))))
+      ((or string symbol)
+       (let ((ops (string ops))
+             (result 0))
+         (dovector (op ops result)
+           (setq result (logior result (getf vals (keywordicate op))))))))))
+
+(define-bitfield-emitter %emit-fence-inst 32
+  (byte 4 28) (byte 4 24) (byte 4 20) (byte 5 15) (byte 3 12) (byte 5 7) (byte 7 0))
+(defun emit-fence-inst (segment pred succ funct3)
+  (%emit-fence-inst segment #b0000 (fence-encoding pred) (fence-encoding succ)
+                    #b00000 funct3 #b00000 #b0001111))
+
+(define-instruction fence (segment pred succ)
+  (:printer fence ())
+  (:emitter
+   (emit-fence-inst segment pred succ #b000)))
+(define-instruction fence.i (segment)
+  (:printer fence ((pred #b0000) (succ #b0000)))
+  (:emitter
+   (emit-fence-inst segment #b0000 #b0000 #b001)))
+
+(define-instruction ecall (segment)
+  (:printer i ((imm #b000000000000) (rs1 #b00000) (funct3 #b000)
+               (rd #b00000) (opcode #b1110011)))
+  (:emitter
+   (%emit-i-inst segment #b000000000000 #b00000 #b000 #b00000 #b1110011)))
+(define-instruction ebreak (segment)
+  (:printer i ((imm #b000000000001) (rs1 #b00000) (funct3 #b000)
+               (rd #b00000) (opcode #b1110011)))
+  (:emitter
+   (%emit-i-inst segment #b000000000001 #b00000 #b000 #b00000 #b1110011)))
+
+;;; save CSR instructions for later - CSR
+
+(macrolet ((define-rv32m-arith-instruction (name funct3)
+             `(define-register-arith-instruction ,name #b0000001 ,funct3 #b0110011)))
+  (define-rv32m-arith-instruction mul #b000)
+  (define-rv32m-arith-instruction mulh #b001)
+  (define-rv32m-arith-instruction mulhsu #b010)
+  (define-rv32m-arith-instruction mulhu #b011)
+  (define-rv32m-arith-instruction div #b100)
+  (define-rv32m-arith-instruction divu #b101)
+  (define-rv32m-arith-instruction rem #b110)
+  (define-rv32m-arith-instruction remu #b111))
