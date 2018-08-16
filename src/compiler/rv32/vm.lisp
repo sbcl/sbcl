@@ -44,6 +44,7 @@
   (defreg nl2 15)
   (defreg a3 16)
   (defreg nl3 17)
+  (defreg lip 30)
   (defreg nargs 31)
 
   (defregset non-descriptor-regs nl0 nl1 nl2 nl3 nargs nfp)
@@ -72,6 +73,7 @@
           :alternate-scs (control-stack) :constant-scs (immediate))
  (descriptor-reg registers :locations #.descriptor-regs :alternate-scs (control-stack))
  (non-descriptor-reg registers :locations #.non-descriptor-regs)
+ (interior-reg registers :locations (#.lip-offset))
 
  (character-stack non-descriptor-stack)
  (character-reg registers :alternate-scs (character-stack))

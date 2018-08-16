@@ -24,9 +24,12 @@
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg)) (index :scs (any-reg)))
        (:arg-types ,type tagged-num)
+       (:temporary (:scs (interior-reg)) lip)
        (:results (value :scs ,scs))
        (:result-types ,eltype)
-       (:generator 5))))
+       (:generator 5
+         (inst add lip object index)
+         (inst lw value lip (- (ash ,offset word-shift) ,lowtag))))))
 
 (defmacro define-full-setter (name type offset lowtag scs eltype &optional translate)
   `(progn
