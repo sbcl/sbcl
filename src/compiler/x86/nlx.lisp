@@ -109,6 +109,7 @@
 ;;; unwind block as an unwind-protect.
 (define-vop (set-unwind-protect)
   (:args (uwp))
+  #!+(or sb-thread win32)
   (:temporary (:sc unsigned-reg) #!+sb-thread tls #!+win32 seh-frame)
   (:generator 7
     #!+win32
