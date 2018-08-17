@@ -284,21 +284,21 @@
   (cfp :c-type #!-alpha "lispobj *" #!+alpha "u32")
   #!-(or x86 x86-64) code
   entry-pc
+  #!+(and win32 x86) next-seh-frame
+  #!+(and win32 x86) seh-frame-handler
   #!+x86-64 bsp
   #!+x86-64
-  current-catch
-  #!+win32 next-seh-frame
-  #!+win32 seh-frame-handler)
+  current-catch)
 
 (!define-primitive-object (catch-block)
   (uwp :c-type #!-alpha "struct unwind_block *" #!+alpha "u32")
   (cfp :c-type #!-alpha "lispobj *" #!+alpha "u32")
   #!-(or x86 x86-64) code
   entry-pc
-  #!+x86-64 bsp
-  (previous-catch :c-type #!-alpha "struct catch_block *" #!+alpha "u32")
   #!+(and win32 x86) next-seh-frame
   #!+(and win32 x86) seh-frame-handler
+  #!+x86-64 bsp
+  (previous-catch :c-type #!-alpha "struct catch_block *" #!+alpha "u32")
   tag)
 
 ;;;; symbols
