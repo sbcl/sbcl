@@ -20,6 +20,7 @@
 
 ;;; Bind this to a stream to capture various internal debugging output.
 (defvar *compiler-trace-output* nil)
+(defvar *compile-trace-targets* '(:ir1 :ir2 :vop :disassemble))
 
 ;;; The current block compilation state. These are initialized to the
 ;;; :BLOCK-COMPILE and :ENTRY-POINTS arguments that COMPILE-FILE was
@@ -647,27 +648,32 @@ necessary, since type inference may take arbitrarily long to converge.")
           (ir2-optimize-jumps component)
           (optimize-constant-loads component)
           (when *compiler-trace-output*
-            (describe-component component *compiler-trace-output*)
-            (describe-ir2-component component *compiler-trace-output*))
+            (when (memq :ir1 *compile-trace-targets*)
+              (describe-component component *compiler-trace-output*))
+            (when (memq :ir2 *compile-trace-targets*)
+             (describe-ir2-component component *compiler-trace-output*)))
 
           (maybe-mumble "code ")
-
           (multiple-value-bind (segment text-length fun-table
                                 elsewhere-label fixup-notes)
-              (generate-code component)
+              (let ((*compiler-trace-output*
+                      (and (memq :vop *compile-trace-targets*)
+                           *compiler-trace-output*)))
+                (generate-code component))
 
             (let ((bytes (sb!assem:segment-contents-as-vector segment))
                   (object *compile-object*)
                   (*elsewhere-label* elsewhere-label)) ; KLUDGE
 
-              (when *compiler-trace-output*
+              (when (and *compiler-trace-output*
+                         (memq :disassemble *compile-trace-targets*))
                 (let ((ranges
-                       (maplist (lambda (list)
-                                  (cons (+ (car list)
-                                           (ash sb!vm:simple-fun-code-offset
-                                                sb!vm:word-shift))
-                                        (or (cadr list) text-length)))
-                                fun-table)))
+                        (maplist (lambda (list)
+                                   (cons (+ (car list)
+                                            (ash sb!vm:simple-fun-code-offset
+                                                 sb!vm:word-shift))
+                                         (or (cadr list) text-length)))
+                                 fun-table)))
                   (declare (ignorable ranges))
                   (format *compiler-trace-output*
                           "~|~%disassembly of code for ~S~2%" component)
@@ -676,11 +682,11 @@ necessary, since type inference may take arbitrarily long to converge.")
                    bytes ranges *compiler-trace-output*)))
 
               (funcall (etypecase object
-                        (fasl-output (maybe-mumble "fasl") #'fasl-dump-component)
-                        #-sb-xc-host ; no compiling to core
-                        (core-object (maybe-mumble "core") #'make-core-component)
-                        (null (lambda (&rest dummies)
-                                (declare (ignore dummies)))))
+                         (fasl-output (maybe-mumble "fasl") #'fasl-dump-component)
+                         #-sb-xc-host   ; no compiling to core
+                         (core-object (maybe-mumble "core") #'make-core-component)
+                         (null (lambda (&rest dummies)
+                                 (declare (ignore dummies)))))
                        component segment (length bytes) fixup-notes
                        object))))))
 
