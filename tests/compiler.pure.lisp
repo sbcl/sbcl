@@ -962,7 +962,7 @@
 ;;; MISC.101 and MISC.103: FLUSH-DEST did not mark the USE's block for
 ;;; type check regeneration
 (with-test (:name (compile :flush-dest :use :regenerate-type-check :misc.101))
-  (checked-compile-and-assert (:allow-warnings 'sb-int:type-warning)
+  (checked-compile-and-assert (:allow-style-warnings 'sb-int:type-style-warning)
       '(lambda (a c)
          (declare (type (integer 185501219873 303014665162) a))
          (declare (type (integer -160758 255724) c))
@@ -975,7 +975,7 @@
                   (min v8 v6)))))
     ((259448422916 173715) 259448422916)))
 (with-test (:name (compile :flush-dest :use :regenerate-type-check :misc.103))
-  (checked-compile-and-assert (:allow-warnings 'sb-int:type-warning)
+  (checked-compile-and-assert (:allow-style-warnings 'sb-int:type-style-warning)
       '(lambda (a b)
         (min -80
          (abs
@@ -990,7 +990,7 @@
 
 ;;; various MISC.*, related to NODEs/LVARs with derived type NIL
 (with-test (:name (compile :node/lvar :derive-type :misc.1))
-  (checked-compile-and-assert (:allow-warnings t)
+  (checked-compile-and-assert (:allow-style-warnings 'sb-int:type-style-warning)
       '(lambda (c)
          (declare (type (integer -3924 1001809828) c))
          (min 47 (if (ldb-test (byte 2 14) c)
@@ -1018,7 +1018,7 @@
                b))))
     ((2950453607 -4) -815145134)))
 (with-test (:name (compile :node/lvar :derive-type :misc.4))
-  (checked-compile-and-assert (:allow-warnings 'sb-int:type-warning)
+  (checked-compile-and-assert (:allow-style-warnings 'sb-int:type-style-warning)
       '(lambda (b c)
          (declare (type (integer -29742055786 23602182204) b))
          (declare (type (integer -7409 -2075) c))
@@ -1030,7 +1030,7 @@
             (%f2))))
     ((22992834060 -5833) (values 82674 0))))
 (with-test (:name (compile :node/lvar :derive-type :misc.5))
-  (checked-compile-and-assert (:allow-warnings 'sb-int:type-warning)
+  (checked-compile-and-assert (:allow-style-warnings 'sb-int:type-style-warning)
       '(lambda (a)
          (declare (type (integer -944 -472) a))
          (round
@@ -1607,9 +1607,9 @@
                                  (if (/= 0 a)
                                      c
                                      (ignore-errors
-                                       (progn (if (ldb-test (byte 0 0) (rational (throw 'ct7 0))) 0 0) 0))))
+                                      (progn (if (ldb-test (byte 0 0) (rational (throw 'ct7 0))) 0 0) 0))))
                         0 0)))
-                   :allow-warnings 'sb-int:type-warning)
+                   :allow-style-warnings 'sb-int:type-style-warning)
                   391833530 -32785211))))
 
 ;;; efficiency notes for ordinary code

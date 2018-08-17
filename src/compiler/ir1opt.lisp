@@ -2460,6 +2460,9 @@
                    (add-lvar-use use lvar)
                    (unlink-blocks (node-block use) (node-block cast))
                    (link-blocks (node-block use) next-block)
+                   ;; At least one use is good, downgrade any possible
+                   ;; type conflicts to style warnings.
+                   (setf (cast-silent-conflict cast) :style-warning)
                    (when (and (return-p dest)
                               (basic-combination-p use)
                               (eq (basic-combination-kind use) :local))
@@ -2499,6 +2502,13 @@
                 (if (cast-silent-conflict cast)
                     (let ((dummy-sym (gensym)))
                       `(let ((,dummy-sym 'dummy))
+                         ,@(and (eq (cast-silent-conflict cast) :style-warning)
+                                `((%compile-time-type-style-warn ,dummy-sym
+                                                                 ',(type-specifier atype)
+                                                                 ',(type-specifier value-type)
+                                                                 ',detail
+                                                                 ',(compile-time-type-error-context context)
+                                                                 ',(cast-context cast))))
                          ,(internal-type-error-call dummy-sym atype
                                                     (cast-context cast))
                          ,dummy-sym))

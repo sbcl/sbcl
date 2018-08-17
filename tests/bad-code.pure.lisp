@@ -367,3 +367,10 @@
                         (declare ((or (simple-string 10) (simple-string 15)) x))
                         (aref x 100))
                       :allow-warnings t))))
+
+(with-test (:name :uses-with-bad-types)
+  (assert (nth-value 3
+                     (checked-compile
+                      '(lambda (x)
+                        (the integer (if x 10)))
+                      :allow-style-warnings t))))

@@ -1495,7 +1495,7 @@
   (context nil)
   ;; Avoid compile time type conflict warnings.
   ;; Used by things that expand into ETYPECASE.
-  (silent-conflict nil :type boolean))
+  (silent-conflict nil :type (or boolean (eql :style-warning))))
 (defprinter (cast :identity t)
   %type-check
   value
