@@ -654,6 +654,30 @@
                                         constraints)
              ptype nil)))))
 
+(defun array-in-bounds-p-constraints (constraints index-lvar index-var
+                                      length-lvar)
+  (let ((index-constant
+          (and (not index-var)
+               (let ((use (principal-lvar-use index-lvar)))
+                 (and (ref-p use)
+                      (constant-p (ref-leaf use))
+                      (ref-leaf use)))))
+        (array-lvar
+          (let ((use (principal-lvar-ref-use length-lvar)))
+            (and (combination-p use)
+                 (lvar-fun-is (combination-fun use)
+                              '(vector-length))
+                 (car (combination-args use))))))
+    (when (and (or index-var index-constant)
+               array-lvar)
+      (let ((array-var (ok-lvar-lambda-var array-lvar constraints)))
+        (when array-var
+          (if index-constant
+              ;; Attach the constaraint to the array if
+              ;; the index is constant
+              (values 'array-in-bounds-p array-var index-constant)
+              (values 'array-in-bounds-p index-var array-var)))))))
+
 ;;; Add test constraints to the consequent and alternative blocks of
 ;;; the test represented by USE.
 (defun add-test-constraints (use if constraints)
@@ -726,31 +750,14 @@
                  ((< >)
                   (when (= (length args) 2)
                     (flet ((handle-array-in-bounds-p (index-arg index-var length-arg)
-                             (let ((use (principal-lvar-ref-use length-arg))
-                                   (index-constant
-                                     (and (not index-var)
-                                          (let ((use (principal-lvar-use index-arg)))
-                                            (and (ref-p use)
-                                                 (constant-p (ref-leaf use))
-                                                 (ref-leaf use))))))
-                               (when (and (or index-var index-constant)
-                                          (combination-p use)
-                                          (lvar-fun-is (combination-fun use)
-                                                       '(vector-length)))
-                                 (let ((array-var (ok-lvar-lambda-var (car (combination-args use))
-                                                                      constraints)))
-                                   (when array-var
-                                     (when index-constant
-                                       ;; Attach the constaraint to the array if
-                                       ;; the index is constant
-                                       (psetf array-var index-constant
-                                              index-var array-var))
-                                     (add-test-constraint quick-p
-                                                          'array-in-bounds-p
-                                                          index-var
-                                                          array-var
-                                                          nil constraints
-                                                          consequent-constraints)))))))
+                             (multiple-value-bind (kind x y)
+                                 (array-in-bounds-p-constraints constraints index-arg index-var
+                                                                length-arg)
+                               (when kind
+                                 (add-test-constraint quick-p
+                                                      kind x y
+                                                      nil constraints
+                                                      consequent-constraints)))))
                       (let* ((arg1 (first args))
                              (var1 (ok-lvar-lambda-var arg1 constraints))
                              (arg2 (second args))
@@ -1015,12 +1022,24 @@
          (when preprocess-refs-p
            (constrain-ref-type node gen))))
       (cast
-       (let ((lvar (cast-value node)))
-         (let ((var (ok-lvar-lambda-var lvar gen)))
-           (when var
-             (let ((atype (single-value-type (cast-derived-type node)))) ;FIXME
-               (unless (eq atype *universal-type*)
-                 (conset-add-constraint-to-eql gen 'typep var atype nil)))))))
+
+       (let* ((lvar (cast-value node))
+              (var (ok-lvar-lambda-var lvar gen)))
+         (when var
+           (let ((atype (single-value-type (cast-derived-type node)))) ;FIXME
+             (unless (eq atype *universal-type*)
+               (conset-add-constraint-to-eql gen 'typep var atype nil))))
+         (when (and (bound-cast-p node)
+                    (bound-cast-check node)
+                    (not (node-deleted (bound-cast-check node))))
+           (let ((check-bound (bound-cast-check node)))
+             (destructuring-bind (array dim index)
+                 (combination-args check-bound)
+               (declare (ignore array))
+               (multiple-value-bind (kind x y)
+                   (array-in-bounds-p-constraints gen index var dim)
+                 (when kind
+                   (conset-add-constraint-to-eql gen kind x y nil))))))))
       (cset
        (binding* ((var (set-var node))
                   (nil (lambda-var-p var) :exit-if-null)
