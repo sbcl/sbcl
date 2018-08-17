@@ -112,7 +112,7 @@
 ;;; unwind block as an unwind-protect.
 ;;;
 (define-vop (set-unwind-protect)
-  (:args (uwp))
+  (:args (uwp :scs (any-reg)))
   (:generator 7
     (store-symbol-value uwp *current-unwind-protect-block*)))
 

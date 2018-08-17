@@ -125,7 +125,7 @@
 ;;; unwind block as an unwind-protect.
 ;;;
 (define-vop (set-unwind-protect)
-  (:args (uwp))
+  (:args (uwp :scs (any-reg)))
   #!+sb-thread (:temporary (:scs (any-reg)) temp)
   (:generator 7
     (store-tl-symbol-value uwp *current-unwind-protect-block* temp)))

@@ -102,7 +102,7 @@
 ;;; Just set the current unwind-protect to UWP. This instantiates an
 ;;; unwind block as an unwind-protect.
 (define-vop (set-unwind-protect)
-  (:args (uwp))
+  (:args (uwp :scs (any-reg)))
   (:generator 7
     (store-tl-symbol-value uwp *current-unwind-protect-block*)))
 
