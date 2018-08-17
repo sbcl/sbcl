@@ -39,13 +39,8 @@
   (:results (y :scs (character-reg #+nil character-stack)))
   (:note "character untagging")
   (:generator 1
-    (let ((y-wide-tn (make-random-tn
-                      :kind :normal
-                      :sc (sc-or-lose 'any-reg)
-                      :offset (tn-offset y))))
-      (move y-wide-tn x)
-      (inst shr y-wide-tn 8)
-      (inst and y-wide-tn #xff))))
+    (inst mov :dword y x)
+    (inst shr :dword y 8)))
 (define-move-vop move-to-character :move
   (any-reg #!-sb-unicode control-stack)
   (character-reg))
@@ -67,12 +62,9 @@
   (:results (y :scs (any-reg descriptor-reg #+nil control-stack)))
   (:note "character tagging")
   (:generator 1
-    (move (make-random-tn :kind :normal :sc (sc-or-lose 'character-reg)
-                          :offset (tn-offset y))
-          x)
-    (inst shl y n-widetag-bits)
-    (inst or y character-widetag)
-    (inst and y #xffff)))
+    (inst movzx '(:byte :dword) y x)
+    (inst shl :dword y n-widetag-bits)
+    (inst or :dword y character-widetag)))
 (define-move-vop move-from-character :move
   (character-reg)
   (any-reg descriptor-reg #!-sb-unicode control-stack))
@@ -107,7 +99,7 @@
        (inst mov
              ;; XXX: If the sb-unicode case needs to handle c-call,
              ;; why does the non-unicode case not need to?
-             (ea (frame-byte-offset (tn-offset y)) fp nil nil :byte)
+             (ea (frame-byte-offset (tn-offset y)) fp)
              x)
        #!+sb-unicode
        (if (= (tn-offset fp) esp-offset)
@@ -133,7 +125,7 @@
   (:result-types positive-fixnum)
   (:generator 1
     #!-sb-unicode
-    (inst movzx res ch)
+    (inst movzx '(:byte :qword) res ch)
     #!+sb-unicode
     (move res ch)))
 

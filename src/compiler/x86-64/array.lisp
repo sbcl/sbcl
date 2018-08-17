@@ -693,7 +693,9 @@
 ;;; {un,}signed-byte-{8,16,32} and characters
 (macrolet ((define-data-vector-frobs (ptype mov-inst operand-size
                                             type &rest scs)
-  (binding* ((opcode-modifier `(,operand-size :qword))
+  (binding* ((opcode-modifier (if (eq mov-inst 'mov)
+                                  operand-size
+                                  `(,operand-size :qword)))
              (n-bytes (the (member 1 2 4) (size-nbyte operand-size)))
              ((index-sc scale)
               (if (>= n-bytes (ash 1 n-fixnum-tag-bits))
