@@ -2307,8 +2307,7 @@ core and return a descriptor to it."
          (fname (symbolicate "COLD-" name)))
     (unless code
       (error "~S is not a defined FOP." name))
-    (when (and (plusp argc) (not (singleton-p arglist)))
-      (error "~S must take one argument" name))
+    (aver (= (length arglist) argc))
     `(progn
        (defun ,fname (.fasl-input. ,@arglist)
          (declare (ignorable .fasl-input.))
@@ -2319,8 +2318,7 @@ core and return a descriptor to it."
            ,@forms))
        ;; We simply overwrite elements of **FOP-FUNS** since the contents
        ;; of the host are never propagated directly into the target core.
-       ,@(loop for i from code to (logior code (if (plusp argc) 3 0))
-               collect `(setf (svref **fop-funs** ,i) #',fname)))))
+       (setf (svref **fop-funs** ,code) #',fname))))
 
 ;;; Cause a fop to be undefined in cold load.
 (defmacro not-cold-fop (name)
@@ -2424,15 +2422,9 @@ core and return a descriptor to it."
     (read-string-as-bytes (%fasl-input-stream fasl-input) string)
     (push-fop-table (intern string package) fasl-input)))
 
-;; I don't feel like hacking up DEFINE-COLD-FOP any more than necessary,
-;; so this code is handcrafted to accept two operands.
-#-c-headers-only
-(flet ((fop-cold-symbol-in-package-save (fasl-input length+flag pkg-index)
-         (cold-load-symbol length+flag (ref-fop-table fasl-input pkg-index)
-                           fasl-input)))
-  (let ((i (get 'fop-symbol-in-package-save 'opcode)))
-    (fill **fop-funs** #'fop-cold-symbol-in-package-save :start i :end (+ i 4))
-    (values)))
+(define-cold-fop (fop-symbol-in-package-save (length+flag pkg-index))
+  (cold-load-symbol length+flag (ref-fop-table (fasl-input) pkg-index)
+                    (fasl-input)))
 
 (define-cold-fop (fop-lisp-symbol-save (length+flag))
   (cold-load-symbol length+flag *cl-package* (fasl-input)))
@@ -2726,19 +2718,17 @@ core and return a descriptor to it."
 ;;; fixups (or function headers) are applied.
 (defvar *show-pre-fixup-code-p* nil)
 
-(defun cold-load-code (fasl-input code-size n-boxed-words)
-  (macrolet ((pop-stack () '(pop-fop-stack (%fasl-input-stack fasl-input))))
-     (let* (;; The number of constants is rounded up to even (if required)
+(define-cold-fop (fop-load-code (immobile-p n-boxed-words code-size))
+  (progn immobile-p) ; potentially unused
+  (let* (;; The number of constants is rounded up to even (if required)
             ;; to ensure that the code vector will be properly aligned.
             (aligned-n-boxed-words (align-up n-boxed-words sb!c::code-boxed-words-align))
-            (immobile-p (pop-stack))
             (debug-info (pop-stack))
             (des (allocate-cold-descriptor
-                  (or #!+immobile-code (and immobile-p *immobile-varyobj*)
+                  (or #!+immobile-code (and (eql immobile-p 1) *immobile-varyobj*)
                       *dynamic*)
                   (+ (ash aligned-n-boxed-words sb!vm:word-shift) code-size)
                   sb!vm:other-pointer-lowtag :code)))
-       (declare (ignorable immobile-p))
        (write-header-word des
                           (sb!vm::make-code-header-word aligned-n-boxed-words))
        (write-wordindexed des sb!vm:code-code-size-slot
@@ -2756,7 +2746,7 @@ core and return a descriptor to it."
                         (ash aligned-n-boxed-words sb!vm:word-shift)))
               (end (+ start code-size)))
          (read-bigvec-as-sequence-or-die (descriptor-mem des)
-                                         (%fasl-input-stream fasl-input)
+                                         (fasl-input-stream)
                                          :start start
                                          :end end)
          (when *show-pre-fixup-code-p*
@@ -2770,12 +2760,7 @@ core and return a descriptor to it."
                      (+ i (gspace-byte-address (descriptor-gspace des)))
                      (* 2 sb!vm:n-word-bytes)
                      (bvref-word (descriptor-mem des) i)))))
-       (apply-fixups (%fasl-input-stack fasl-input) des))))
-
-#-c-headers-only
-(let ((i (get 'fop-load-code 'opcode)))
-  (fill **fop-funs** #'cold-load-code :start i :end (+ i 4))
-  (values))
+       (apply-fixups (%fasl-input-stack (fasl-input)) des)))
 
 (defun resolve-deferred-known-funs ()
   (dolist (item *deferred-known-fun-refs*)
@@ -2803,10 +2788,10 @@ core and return a descriptor to it."
         (error "unaligned function entry ~S ~S" code-object fun-index))
       (make-descriptor (logior fun sb!vm:fun-pointer-lowtag)))))
 
-(defun cold-fop-fun-entry (fasl-input fun-index)
+(define-cold-fop (fop-fun-entry (fun-index))
   (binding* (((info type arglist name code-object)
               (macrolet ((pop-stack ()
-                           '(pop-fop-stack (%fasl-input-stack fasl-input))))
+                           '(pop-fop-stack (%fasl-input-stack (fasl-input)))))
                 (values (pop-stack) (pop-stack) (pop-stack) (pop-stack) (pop-stack))))
              (fn (compute-fun code-object fun-index)))
     #!+(or x86 x86-64) ; store a machine-native pointer to the function entry
@@ -2821,11 +2806,6 @@ core and return a descriptor to it."
     (write-wordindexed fn sb!vm:simple-fun-type-slot type)
     (write-wordindexed fn sb!vm::simple-fun-info-slot info)
     fn))
-
-#-c-headers-only
-(let ((i (get 'fop-fun-entry 'opcode)))
-  (fill **fop-funs** #'cold-fop-fun-entry :start i :end (+ i 4))
-  (values))
 
 (define-cold-fop (fop-assembler-code)
   (aver (not *cold-assembler-obj*))

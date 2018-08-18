@@ -435,15 +435,11 @@
                        ((zerop n-operands)
                         (funcall function fasl-input))
                        (t
-                        (let (arg1 arg2 arg3)
-                          (with-fast-read-byte ((unsigned-byte 8) stream)
-                            ;; The low 2 bits of the opcode determine the
-                            ;; number of octets used for the 1st operand.
-                            (setq arg1 (fast-read-var-u-integer (ash 1 (logand byte 3)))))
-                          (when (>= n-operands 2)
-                            (setq arg2 (read-varint-arg fasl-input))
-                            (when (>= n-operands 3)
-                              (setq arg3 (read-varint-arg fasl-input))))
+                        (let ((arg1 (read-varint-arg fasl-input))
+                              (arg2 (when (>= n-operands 2)
+                                      (read-varint-arg fasl-input)))
+                              (arg3 (when (>= n-operands 3)
+                                      (read-varint-arg fasl-input))))
                           (tracing (format *trace-output* "{~D~@[,~D~@[,~D~]~]}"
                                            arg1 arg2 arg3))
                           (case n-operands
