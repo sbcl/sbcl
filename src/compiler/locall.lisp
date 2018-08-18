@@ -1024,6 +1024,7 @@
           (derive-node-type use call-type)))
       (substitute-lvar-uses lvar result
                             (and lvar (eq (lvar-uses lvar) call)))))
+
   (values))
 
 ;;; We are converting FUN to be a LET when the call is in a non-tail

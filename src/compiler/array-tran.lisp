@@ -1610,7 +1610,11 @@
     (with-unique-names (n-vector)
       `(let ((,n-vector ,vector))
          (truly-the ,elt-type (data-vector-set
-                               (the* (simple-vector :modifying (setf svref)) ,n-vector)
+                               (the simple-vector
+                                    (with-annotations
+                                        (,(make-lvar-modified-annotation :caller
+                                                                         '(setf svref)))
+                                      ,n-vector))
                                (check-bound ,n-vector (length ,n-vector) ,index)
                                (the ,elt-type ,value)))))))
 

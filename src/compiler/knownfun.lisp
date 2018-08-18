@@ -450,13 +450,12 @@
          (args (combination-args call)))
     (when (fun-type-p type)
       (flet ((assert-type (arg type &optional set index)
-               (when (cond (set
-                            (assert-modifying-lvar-type arg type
-                                                        (lvar-fun-name fun)
-                                                        policy))
-                           (index
+               (when (cond (index
                             (assert-array-index-lvar-type arg type policy))
                            (t
+                            (when set
+                              (add-annotation arg
+                                              (make-lvar-modified-annotation :caller (lvar-fun-name fun))))
                             (assert-lvar-type arg type policy)))
                  (unless trusted (reoptimize-lvar arg)))))
         (let ((required (fun-type-required type)))

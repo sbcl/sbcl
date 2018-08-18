@@ -288,15 +288,9 @@
               (setf (block-reoptimize (node-block cast)) t)
               (reoptimize-component (node-component cast) :maybe))))
     (do-uses (node lvar)
-      (setf (block-type-check (node-block node)) t)))
+      (setf (block-type-check (node-block node)) t))
+    (process-annotations lvar))
   (values))
-
-(defun reoptimize-lvar-uses (lvar)
-  (declare (type lvar lvar))
-  (do-uses (use lvar)
-    (setf (node-reoptimize use) t)
-    (setf (block-reoptimize (node-block use)) t)
-    (reoptimize-component (node-component use) :maybe)))
 
 ;;; Annotate NODE to indicate that its result has been proven to be
 ;;; TYPEP to RTYPE. After IR1 conversion has happened, this is the
@@ -1604,86 +1598,95 @@
 ;;; If there is more than one value, then we transform the call into a
 ;;; VALUES form.
 (defun constant-fold-call (call)
-  (let* ((fun-name (lvar-fun-name (combination-fun call) t))
-         (type (info :function :type fun-name))
-         (args (mapcar (lambda (lvar)
-                         (if (lvar-p lvar)
-                             (let ((name (lvar-fun-name lvar t)))
-                               (if name
-                                   (fdefinition name)
-                                   (lvar-value lvar)))
-                             lvar))
-                       (let ((args (combination-args call)))
-                         (if (fun-type-p type)
-                             (resolve-key-args args type)
-                             args)))))
-    (multiple-value-bind (values win)
-        (careful-call fun-name
-                      args
-                      call
-                      ;; Note: CMU CL had COMPILER-WARN here, and that
-                      ;; seems more natural, but it's probably not.
-                      ;;
-                      ;; It's especially not while bug 173 exists:
-                      ;; Expressions like
-                      ;;   (COND (END
-                      ;;          (UNLESS (OR UNSAFE? (<= END SIZE)))
-                      ;;            ...))
-                      ;; can cause constant-folding TYPE-ERRORs (in
-                      ;; #'<=) when END can be proved to be NIL, even
-                      ;; though the code is perfectly legal and safe
-                      ;; because a NIL value of END means that the
-                      ;; #'<= will never be executed.
-                      ;;
-                      ;; Moreover, even without bug 173,
-                      ;; quite-possibly-valid code like
-                      ;;   (COND ((NONINLINED-PREDICATE END)
-                      ;;          (UNLESS (<= END SIZE))
-                      ;;            ...))
-                      ;; (where NONINLINED-PREDICATE is something the
-                      ;; compiler can't do at compile time, but which
-                      ;; turns out to make the #'<= expression
-                      ;; unreachable when END=NIL) could cause errors
-                      ;; when the compiler tries to constant-fold (<=
-                      ;; END SIZE).
-                      ;;
-                      ;; So, with or without bug 173, it'd be
-                      ;; unnecessarily evil to do a full
-                      ;; COMPILER-WARNING (and thus return FAILURE-P=T
-                      ;; from COMPILE-FILE) for legal code, so we we
-                      ;; use a wimpier COMPILE-STYLE-WARNING instead.
-                      #-sb-xc-host #'compiler-style-warn
-                      ;; On the other hand, for code we control, we
-                      ;; should be able to work around any bug
-                      ;; 173-related problems, and in particular we
-                      ;; want to be alerted to calls to our own
-                      ;; functions which aren't being folded away; a
-                      ;; COMPILER-WARNING is butch enough to stop the
-                      ;; SBCL build itself in its tracks.
-                      #+sb-xc-host #'compiler-warn
-                      "constant folding")
-      (cond ((not win)
-             (setf (combination-kind call) :error))
-            ((and (proper-list-of-length-p values 1))
-             (with-ir1-environment-from-node call
-               (let* ((lvar (node-lvar call))
-                      (prev (node-prev call))
-                      (intermediate-ctran (make-ctran)))
-                 (%delete-lvar-use call)
-                 (setf (ctran-next prev) nil)
-                 (setf (node-prev call) nil)
-                 (reference-constant prev intermediate-ctran lvar
-                                     (first values))
-                 (link-node-to-previous-ctran call intermediate-ctran)
-                 (reoptimize-lvar lvar)
-                 (flush-combination call))))
-            (t (let ((dummies (make-gensym-list (length args))))
-                 (transform-call
-                  call
-                  `(lambda ,dummies
-                     (declare (ignore ,@dummies))
-                     (values ,@(mapcar (lambda (x) `',x) values)))
-                  fun-name))))))
+  (flet ((value (lvar)
+           (if (lvar-p lvar)
+               (let ((name (lvar-fun-name lvar t)))
+                 (if name
+                     (fdefinition name)
+                     (lvar-value lvar)))
+               lvar)))
+   (let* ((fun-name (lvar-fun-name (combination-fun call) t))
+          (type (info :function :type fun-name))
+          (lvar-args (let ((args (combination-args call)))
+                       (if (fun-type-p type)
+                           (resolve-key-args args type)
+                           args)))
+          (args (mapcar #'value lvar-args)))
+     (multiple-value-bind (values win)
+         (careful-call fun-name
+                       args
+                       call
+                       ;; Note: CMU CL had COMPILER-WARN here, and that
+                       ;; seems more natural, but it's probably not.
+                       ;;
+                       ;; It's especially not while bug 173 exists:
+                       ;; Expressions like
+                       ;;   (COND (END
+                       ;;          (UNLESS (OR UNSAFE? (<= END SIZE)))
+                       ;;            ...))
+                       ;; can cause constant-folding TYPE-ERRORs (in
+                       ;; #'<=) when END can be proved to be NIL, even
+                       ;; though the code is perfectly legal and safe
+                       ;; because a NIL value of END means that the
+                       ;; #'<= will never be executed.
+                       ;;
+                       ;; Moreover, even without bug 173,
+                       ;; quite-possibly-valid code like
+                       ;;   (COND ((NONINLINED-PREDICATE END)
+                       ;;          (UNLESS (<= END SIZE))
+                       ;;            ...))
+                       ;; (where NONINLINED-PREDICATE is something the
+                       ;; compiler can't do at compile time, but which
+                       ;; turns out to make the #'<= expression
+                       ;; unreachable when END=NIL) could cause errors
+                       ;; when the compiler tries to constant-fold (<=
+                       ;; END SIZE).
+                       ;;
+                       ;; So, with or without bug 173, it'd be
+                       ;; unnecessarily evil to do a full
+                       ;; COMPILER-WARNING (and thus return FAILURE-P=T
+                       ;; from COMPILE-FILE) for legal code, so we we
+                       ;; use a wimpier COMPILE-STYLE-WARNING instead.
+                       #-sb-xc-host #'compiler-style-warn
+                       ;; On the other hand, for code we control, we
+                       ;; should be able to work around any bug
+                       ;; 173-related problems, and in particular we
+                       ;; want to be alerted to calls to our own
+                       ;; functions which aren't being folded away; a
+                       ;; COMPILER-WARNING is butch enough to stop the
+                       ;; SBCL build itself in its tracks.
+                       #+sb-xc-host #'compiler-warn
+                       "constant folding")
+       (cond ((not win)
+              (setf (combination-kind call) :error))
+             ((and (proper-list-of-length-p values 1))
+              (with-ir1-environment-from-node call
+                (let* ((lvar (node-lvar call))
+                       (prev (node-prev call))
+                       (intermediate-ctran (make-ctran)))
+                  (%delete-lvar-use call)
+                  (setf (ctran-next prev) nil)
+                  (setf (node-prev call) nil)
+                  (reference-constant prev intermediate-ctran lvar
+                                      (first values))
+                  (link-node-to-previous-ctran call intermediate-ctran)
+                  (reoptimize-lvar lvar)
+                  (flush-combination call))))
+             (t (let ((dummies (make-gensym-list (length args))))
+                  (transform-call
+                   call
+                   `(lambda ,dummies
+                      (declare (ignore ,@dummies))
+                      (values ,@(mapcar (lambda (x)
+                                          (let ((lvar
+                                                  (find x lvar-args :key #'value)))
+                                            ;; Don't lose any annotations
+                                            (if (and lvar
+                                                     (lvar-annotations lvar))
+                                                `(with-annotations ,(lvar-annotations lvar) ',x)
+                                                `',x)))
+                                        values)))
+                   fun-name)))))))
   (values))
 
 ;;;; local call optimization
@@ -2009,6 +2012,7 @@
                                          ;; (NODE-DERIVED-TYPE USE) would
                                          ;; be better -- APD, 2003-05-15
                                          (leaf-type var)))
+                     (propagate-lvar-annotations-to-refs arg var)
                      (propagate-to-refs var type)
                      (unless (preserve-single-use-debug-var-p call var)
                        (update-lvar-dependencies leaf arg)
@@ -2028,7 +2032,7 @@
              (not (preserve-single-use-debug-var-p call var))
              (substitute-single-use-lvar arg var)))
        (t
-        (propagate-to-refs var type))))
+         (propagate-to-refs var type))))
    call
    :reoptimize t)
 
@@ -2370,46 +2374,6 @@
       (setf (bound-cast-check cast) nil)))
   (bound-cast-derived cast))
 
-(defun may-delete-modifying-cast (cast)
-  (or (not (modifying-cast-caller cast)) ;; already warned
-      (let* ((value (cast-value cast))
-             (uses (lvar-uses value))
-             (lvar (or (and (ref-p uses)
-                            (lambda-var-ref-lvar uses))
-                       value))
-             (*compiler-error-context* cast))
-        (flet ((modifiable-p (value)
-                 (or (consp value)
-                     (and (arrayp value)
-                          (not (typep value '(vector * 0))))
-                     (hash-table-p value))))
-          (cond ((constant-lvar-p lvar)
-                 (let ((value (lvar-value lvar)))
-                   (when (modifiable-p value)
-                     (warn 'constant-modified
-                           :fun-name (shiftf (modifying-cast-caller cast) nil) ;; warn once
-                           :values (list value))
-                     t)))
-                ((constant-lvar-uses-p lvar)
-                 (let ((values (lvar-uses-values lvar)))
-                   (when (and values
-                              (every #'modifiable-p values))
-                     (warn 'constant-modified
-                           :fun-name (shiftf (modifying-cast-caller cast) nil) ;; warn once
-                           :values values)
-                     t))))))))
-
-(defun may-delete-cast-with-hook (cast)
-  (or (not (cast-with-hook-hook cast)) ;; run once
-      (let ((value (cast-value cast)))
-        (when (constant-lvar-p value)
-          (let ((*compiler-error-context* cast))
-            (funcall (cast-with-hook-hook cast)
-                     (lvar-value value))
-            ;; Run once
-            (setf (cast-with-hook-hook cast) nil))
-          t))))
-
 (defun may-delete-cast (cast)
   (typecase cast
     (vestigial-exit-cast
@@ -2418,10 +2382,6 @@
      (may-delete-function-designator-cast cast))
     (bound-cast
      (may-delete-bound-cast cast))
-    (modifying-cast
-     (may-delete-modifying-cast cast))
-    (cast-with-hook
-     (may-delete-cast-with-hook cast))
     (t t)))
 
 ;;; Delete or move around casts when possible

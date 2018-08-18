@@ -1656,7 +1656,9 @@ necessary, since type inference may take arbitrarily long to converge.")
          (let ((ctxt *compiler-error-context*))
            (lexenv-handled-conditions
             (etypecase ctxt
-             (node (node-lexenv ctxt))
+              (node (node-lexenv ctxt))
+              (lvar-annotation
+               (lvar-annotation-lexenv ctxt))
              (compiler-error-context
               (let ((lexenv (compiler-error-context-lexenv ctxt)))
                 (aver lexenv)

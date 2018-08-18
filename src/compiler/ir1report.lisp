@@ -97,7 +97,8 @@
 
 ;;; If true, this is the node which is used as context in compiler warning
 ;;; messages.
-(declaim (type (or null compiler-error-context node) *compiler-error-context*))
+(declaim (type (or null compiler-error-context node
+                   lvar-annotation) *compiler-error-context*))
 (defvar *compiler-error-context* nil)
 
 ;;; a plist mapping macro names to source context parsers. Each parser
@@ -237,8 +238,12 @@
   (let ((context *compiler-error-context*))
     (if (compiler-error-context-p context)
         (values context t)
-        (let* ((path (or (and (node-p context) (node-source-path context))
-                         (and (boundp '*current-path*) *current-path*)))
+        (let* ((path (cond ((node-p context)
+                            (node-source-path context))
+                           ((lvar-annotation-p context)
+                            (lvar-annotation-source-path context))
+                           ((boundp '*current-path*)
+                            *current-path*)))
                (old
                 (find (when path (source-path-original-source path))
                       (remove-if #'null old-contexts)
@@ -260,9 +265,12 @@
                       (nth-value 1 (find-source-root tlf *source-info*))
                       :path path
                       :original-source-path (source-path-original-source path)
-                      :lexenv (if context
-                                  (node-lexenv context)
-                                  (if (boundp '*lexenv*) *lexenv* nil)))
+                      :lexenv (cond ((node-p context)
+                                     (node-lexenv context))
+                                    ((lvar-annotation-p context)
+                                     (lvar-annotation-lexenv context))
+                                    ((boundp '*lexenv*)
+                                     *lexenv*)))
                      nil)))))))))
 
 ;;;; printing error messages

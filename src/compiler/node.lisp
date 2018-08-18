@@ -94,8 +94,33 @@
   (dynamic-extent nil :type (or null cleanup))
   ;; something or other that the back end annotates this lvar with
   (info nil)
-  (dependent-casts nil))
+  (dependent-casts nil)
+  (annotations nil))
 (!set-load-form-method lvar (:xc :target) :ignore-it)
+
+
+(defstruct lvar-annotation
+  (source-path nil :type list)
+  lexenv
+  fired
+  delay-until-ir2)
+
+(defprinter (lvar-annotation)
+  fired
+  delay-until-ir2)
+
+(defstruct (lvar-modified-annotation
+            (:include lvar-annotation
+             (delay-until-ir2 t)))
+  caller)
+
+(defstruct (lvar-hook
+            (:include lvar-annotation))
+  (hook #'missing-arg :type function))
+
+(defstruct (lvar-type-spec-annotation
+            (:include lvar-hook
+             (delay-until-ir2 t))))
 
 (defmethod print-object ((x lvar) stream)
   (print-unreadable-object (x stream :type t :identity t)
@@ -1542,15 +1567,6 @@
   (caller :test caller)
   (arg-specs :test arg-specs)
   (result-specs :test result-specs))
-
-;;; Something will modify this value, warn if it's a constant
-(def!struct (modifying-cast (:include cast) (:copier nil))
-  ;; NIL after a warning has been issued
-  caller)
-
-;;; The hook is called when the value becomes constant
-(def!struct (cast-with-hook (:include cast) (:copier nil))
-  (hook #'missing-arg :type (or null function)))
 
 ;;; Inserted by ARRAY-CALL-TYPE-DERIVER so that it can be later deleted
 (def!struct (array-index-cast (:include cast) (:copier nil)))

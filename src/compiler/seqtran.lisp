@@ -146,7 +146,9 @@
                                  (lvar-value result-type-arg)))
                             (if (null result-type-arg-value)
                                 'null
-                                result-type-arg-value)))))
+                                result-type-arg-value))))
+         (result-ctype (ir1-transform-specifier-type
+                        result-type)))
     `(lambda (result-type-arg fun ,@seq-names)
        (truly-the ,result-type
          ,(cond ((policy node (< safety 3))
@@ -158,25 +160,23 @@
                  `(sequence-of-checked-length-given-type ,bare
                                                          result-type-arg))
                 (t
-                 (let ((result-ctype (ir1-transform-specifier-type
-                                      result-type)))
-                   (if (array-type-p result-ctype)
-                       (let ((dims (array-type-dimensions result-ctype)))
-                         (unless (singleton-p dims)
-                           (give-up-ir1-transform "invalid sequence type"))
-                         (let ((dim (first dims)))
-                           (if (eq dim '*)
-                               bare
-                               `(vector-of-checked-length-given-length ,bare
-                                                                       ,dim))))
-                       ;; FIXME: this is wrong, as not all subtypes of
-                       ;; VECTOR are ARRAY-TYPEs [consider, for
-                       ;; example, (OR (VECTOR T 3) (VECTOR T
-                       ;; 4))]. However, it's difficult to see what we
-                       ;; should put here... maybe we should
-                       ;; GIVE-UP-IR1-TRANSFORM if the type is a
-                       ;; subtype of VECTOR but not an ARRAY-TYPE?
-                       bare))))))))
+                 (if (array-type-p result-ctype)
+                     (let ((dims (array-type-dimensions result-ctype)))
+                       (unless (singleton-p dims)
+                         (give-up-ir1-transform "invalid sequence type"))
+                       (let ((dim (first dims)))
+                         (if (eq dim '*)
+                             bare
+                             `(vector-of-checked-length-given-length ,bare
+                                                                     ,dim))))
+                     ;; FIXME: this is wrong, as not all subtypes of
+                     ;; VECTOR are ARRAY-TYPEs [consider, for
+                     ;; example, (OR (VECTOR T 3) (VECTOR T
+                     ;; 4))]. However, it's difficult to see what we
+                     ;; should put here... maybe we should
+                     ;; GIVE-UP-IR1-TRANSFORM if the type is a
+                     ;; subtype of VECTOR but not an ARRAY-TYPE?
+                     bare)))))))
 
 ;;; Return a DO loop, mapping a function FUN to elements of
 ;;; sequences. SEQS is a list of lvars, SEQ-NAMES - list of variables,

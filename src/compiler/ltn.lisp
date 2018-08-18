@@ -886,6 +886,7 @@
 
 (defun ltn-annotate-casts (lvar)
   (declare (type lvar lvar))
+  (process-annotations lvar t)
   (do-uses (node lvar)
     (when (cast-p node)
       (ltn-annotate-cast node))))

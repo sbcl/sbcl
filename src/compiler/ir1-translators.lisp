@@ -979,8 +979,10 @@ other."
                     ((compiler-values-specifier-type type))
                     (t
                      (ir1-convert start next result
-                                  `(error "Bad type specifier: ~a"
-                                          ,type))
+                                  `(progn
+                                     ,value
+                                     (error "Bad type specifier: ~a"
+                                            ',type)))
                      (return-from the-in-policy)))))
     (cond ((or (eq type *wild-type*)
                (eq type *universal-type*)
@@ -1045,33 +1047,26 @@ care."
 
 ;;; THE with some options for the CAST
 (def-ir1-translator the* (((value-type &key context silent-conflict
-                                       truly
-                                       modifying) form)
+                                       truly) form)
                           start next result)
   (let* ((policy (lexenv-policy *lexenv*))
          (value-type (values-specifier-type value-type))
-         (cast (if modifying
-                   (let* ((value-ctran (make-ctran))
-                          (value-lvar (make-lvar))
-                          (cast (make-modifying-cast
-                                 :asserted-type value-type
-                                 :type-to-check (maybe-weaken-check value-type
-                                                                    (if truly
-                                                                        **zero-typecheck-policy**
-                                                                        policy))
-                                 :value value-lvar
-                                 :derived-type (coerce-to-values value-type)
-                                 :caller modifying)))
-                     (ir1-convert start value-ctran value-lvar form)
-                     (link-node-to-previous-ctran cast value-ctran)
-                     (setf (lvar-dest value-lvar) cast)
-                     (use-continuation cast next result)
-                     cast)
-                   (the-in-policy value-type form policy start next result))))
+         (cast (the-in-policy value-type form (if truly
+                                                  **zero-typecheck-policy**
+                                                  policy)
+                              start next result)))
     (when cast
-
       (setf (cast-context cast) context)
       (setf (cast-silent-conflict cast) silent-conflict))))
+
+(def-ir1-translator with-annotations ((annotations form)
+                                      start next result)
+  (ir1-convert start next result form)
+  (when result
+    (loop for annotation in annotations
+          do (add-annotation
+              result
+              annotation))))
 
 (def-ir1-translator bound-cast ((array bound index) start next result)
   (let ((check-bound-tran (make-ctran))

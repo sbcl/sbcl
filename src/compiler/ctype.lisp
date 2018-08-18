@@ -994,21 +994,6 @@ and no value was provided for it." name))))))))))
                    unknown-keys)
           (funcall unknown-keys-fun))))))
 
-(defun assert-modifying-lvar-type (lvar type caller policy)
-  (let ((internal-lvar (make-lvar))
-        (dest (lvar-dest lvar)))
-    (substitute-lvar internal-lvar lvar)
-    (with-ir1-environment-from-node dest
-      (let ((cast (make-modifying-cast
-                   :asserted-type type
-                   :type-to-check (maybe-weaken-check type policy)
-                   :value lvar
-                   :derived-type (coerce-to-values type)
-                   :caller caller)))
-        (%insert-cast-before dest cast)
-        (use-lvar cast internal-lvar)
-        t))))
-
 (defun assert-array-index-lvar-type (lvar type policy)
   (let ((internal-lvar (make-lvar))
         (dest (lvar-dest lvar)))
@@ -1023,37 +1008,25 @@ and no value was provided for it." name))))))))))
         (use-lvar cast internal-lvar)
         t))))
 
-(defun assert-cast-with-hook (lvar type policy
-                              hook)
-  (let ((internal-lvar (make-lvar))
-        (dest (lvar-dest lvar)))
-    (substitute-lvar internal-lvar lvar)
-    (with-ir1-environment-from-node dest
-      (let ((cast (make-cast-with-hook
-                   :asserted-type type
-                   :type-to-check (maybe-weaken-check type policy)
-                   :value lvar
-                   :derived-type (coerce-to-values type)
-                   :hook hook)))
-        (%insert-cast-before dest cast)
-        (use-lvar cast internal-lvar)
-        t))))
-
 (defun apply-type-annotation (fun-name arg type lvars policy &optional annotation)
   (case (car annotation)
     (function-designator
      (assert-function-designator fun-name lvars arg (cdr annotation))
      t)
     (modifying
-     (if (policy policy (> check-constant-modification 0))
-         (assert-modifying-lvar-type arg type fun-name policy)
-         (assert-lvar-type arg type policy)))
+     (when (policy policy (> check-constant-modification 0))
+       (add-annotation arg
+                       (make-lvar-modified-annotation :caller fun-name)))
+     (assert-lvar-type arg type policy))
     (type-specifier
-     (assert-cast-with-hook arg type policy
-                            (lambda (value)
-                              (unless (and (eql value :default)
-                                           (eq fun-name 'open))
-                                (compiler-specifier-type value)))))
+     (add-annotation arg
+                     (make-lvar-type-spec-annotation
+                      :hook
+                      (lambda (value)
+                        (unless (and (eql value :default)
+                                     (eq fun-name 'open))
+                          (compiler-specifier-type value)))))
+     (assert-lvar-type arg type policy))
     (t
      (assert-lvar-type arg type policy))))
 

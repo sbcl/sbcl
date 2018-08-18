@@ -98,6 +98,16 @@
                      use)))))
     (recurse lvar)))
 
+(defun principal-lvar-ref (lvar)
+  (labels ((recurse (lvar ref)
+             (if lvar
+                 (let ((use (lvar-uses lvar)))
+                   (if (ref-p use)
+                       (recurse (lambda-var-ref-lvar use) use)
+                       ref))
+                 ref)))
+    (recurse lvar nil)))
+
 (defun principal-lvar-dest (lvar)
   (labels ((pld (lvar)
              (and lvar
@@ -265,6 +275,7 @@
      (update-lvar-dependencies new (lambda-var-ref-lvar old)))
     (lvar
      (when (lvar-p new)
+       (propagate-lvar-annotations new old)
        (do-uses (node old)
          (when (exit-p node)
            ;; Inlined functions will try to use the lvar in the lexenv
@@ -2775,3 +2786,106 @@ is :ANY, the function name is not checked."
                                   (funcall function singleton-arg
                                            (pop vars) type))
                             (setf vars (nthcdr length vars))))))))))
+
+(defun propagate-lvar-annotations-to-refs (lvar var)
+  (when (lvar-annotations lvar)
+    (dolist (ref (leaf-refs var))
+      (when (node-lvar ref)
+        (propagate-lvar-annotations (node-lvar ref) lvar)))))
+
+(defun propagate-lvar-annotations (new old)
+  (setf
+   (lvar-annotations new)
+   (cond ((not (lvar-annotations new))
+          (lvar-annotations old))
+         ((not (lvar-annotations old))
+          (lvar-annotations new))
+         (t
+          ;; Get only the outermost annotation, avoiding multiple
+          ;; warnings coming from source transforms.
+          (let ((all (union (lvar-annotations old) (lvar-annotations new))))
+            (loop for annotation in all
+                  for type = (type-of annotation)
+                  for source-path = (lvar-annotation-source-path annotation)
+                  when (or (eq (car source-path) 'original-source-start)
+                           (loop for other in all
+                                 for other-source-path = (lvar-annotation-source-path other)
+                                 never (and (not (eq annotation other))
+                                            (eq type (type-of other))
+                                            (or (eq (car other-source-path) 'original-source-start)
+                                                (member (car other-source-path)
+                                                        source-path)))))
+                  collect annotation)))))
+  (process-annotations new))
+
+(defun process-lvar-modified-annotation (lvar annotation)
+  (let* ((uses (lvar-uses lvar))
+         (lvar (or (and (ref-p uses)
+                        (let ((ref (principal-lvar-ref lvar)))
+                          (and ref
+                               (or
+                                (lambda-var-ref-lvar ref)
+                                (node-lvar ref)))))
+                   lvar)))
+    (flet ((modifiable-p (value)
+             (or (consp value)
+                 (and (arrayp value)
+                      (not (typep value '(vector * 0))))
+                 (hash-table-p value))))
+      (cond ((constant-lvar-p lvar)
+             (let ((value (lvar-value lvar)))
+               (when (modifiable-p value)
+                 (warn 'constant-modified
+                       :fun-name (lvar-modified-annotation-caller annotation)
+                       :values (list value))
+                 t)))
+            ((constant-lvar-uses-p lvar)
+             (let ((values (lvar-uses-values lvar)))
+               (when (and values
+                          (every #'modifiable-p values))
+                 (warn 'constant-modified
+                       :fun-name (lvar-modified-annotation-caller annotation)
+                       :values values)
+                 t)))))))
+
+(defun process-lvar-hook-annotation (lvar annotation)
+  (when (constant-lvar-p lvar)
+    (funcall (lvar-hook-hook annotation)
+             (lvar-value lvar))
+    t))
+
+(defun process-annotations (lvar &optional ir2)
+  (unless (and (combination-p (lvar-dest lvar))
+               (lvar-fun-is
+                (combination-fun (lvar-dest lvar))
+                ;; KLUDGE: after some type derivation and merging with other types
+                ;; a path can be emerge which is erronous and has a bad constant,
+                ;; but another value can still be good.
+                ;; see compiler.pure/generate-type-checks-on-dead-blocks
+                '(%type-check-error %type-check-error/c)))
+    (loop for annot in (lvar-annotations lvar)
+          unless (or (lvar-annotation-fired annot)
+                     (and (not ir2)
+                          (lvar-annotation-delay-until-ir2 annot)))
+          do
+          (let ((*compiler-error-context* annot))
+            (when (typecase annot
+                    (lvar-modified-annotation
+                     (process-lvar-modified-annotation lvar annot))
+                    (lvar-hook
+                     (process-lvar-hook-annotation lvar annot)))
+              (setf (lvar-annotation-fired annot) t))))))
+
+(defun add-annotation (lvar annotation)
+  (setf (lvar-annotation-source-path annotation)
+        (if (boundp '*current-path*)
+            *current-path*
+            (node-source-path (lvar-dest lvar))))
+  (setf (lvar-annotation-lexenv annotation)
+        (or (and
+             (lvar-dest lvar)
+             (node-lexenv (lvar-dest lvar)))
+            *lexenv*))
+  (push annotation (lvar-annotations lvar))
+  (unless (lvar-annotation-delay-until-ir2 annotation)
+    (process-annotations lvar)))
