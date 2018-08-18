@@ -380,8 +380,8 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
   (:info index)
   (:generator 0
     (inst inc (ea (- (* (+ vector-data-offset index) n-word-bytes)
-                                other-pointer-lowtag)
-                  count-vector nil nil :qword))))
+                     other-pointer-lowtag)
+                  count-vector))))
 
 ;;;; Memory barrier support
 

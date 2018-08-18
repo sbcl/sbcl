@@ -401,7 +401,7 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 38
     (inst mov raw (make-fixup 'closure-tramp :assembly-routine))
-    (inst cmp (ea (- fun-pointer-lowtag) function nil nil :byte)
+    (inst cmp :byte (ea (- fun-pointer-lowtag) function)
           simple-fun-widetag)
     (inst cmov :e raw
           (ea (- (* simple-fun-self-slot n-word-bytes) fun-pointer-lowtag) function))
