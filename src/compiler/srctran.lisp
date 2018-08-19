@@ -180,28 +180,22 @@
     (return-from derive-append-type (specifier-type 'null)))
   (let* ((cons-type (specifier-type 'cons))
          (null-type (specifier-type 'null))
-         (list-type (specifier-type 'list))
          (last (lvar-type (car (last args)))))
     ;; Derive the actual return type, assuming that all but the last
     ;; arguments are LISTs (otherwise, APPEND/NCONC doesn't return).
     (loop with all-nil = t       ; all but the last args are NIL?
           with some-cons = nil   ; some args are conses?
           for (arg next) on args
-          for lvar-type = (type-approx-intersection2 (lvar-type arg)
-                                                     list-type)
+          for lvar-type = (lvar-type arg)
           while next
-          do (multiple-value-bind (typep definitely)
-                 (ctypep nil lvar-type)
-               (cond ((type= lvar-type *empty-type*)
-                      ;; type mismatch! insert an inline check that'll cause
-                      ;; compile-time warnings.
-                      (assert-lvar-type arg list-type
-                                        (lexenv-policy *lexenv*)))
-                     (some-cons) ; we know result's a cons -- nothing to do
-                     ((and (not typep) definitely) ; can't be NIL
-                      (setf some-cons t))          ; must be a CONS
-                     (all-nil
-                      (setf all-nil (csubtypep lvar-type null-type)))))
+          do
+          (multiple-value-bind (typep definitely)
+              (ctypep nil lvar-type)
+            (cond (some-cons) ; we know result's a cons -- nothing to do
+                  ((and (not typep) definitely) ; can't be NIL
+                   (setf some-cons t))          ; must be a CONS
+                  (all-nil
+                   (setf all-nil (csubtypep lvar-type null-type)))))
           finally
              ;; if some of the previous arguments are CONSes so is the result;
              ;; if all the previous values are NIL, we're a fancy identity;

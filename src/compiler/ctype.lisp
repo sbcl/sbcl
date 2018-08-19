@@ -1013,21 +1013,25 @@ and no value was provided for it." name))))))))))
     (function-designator
      (assert-function-designator fun-name lvars arg (cdr annotation))
      t)
-    (modifying
-     (when (policy policy (> check-constant-modification 0))
-       (add-annotation arg
-                       (make-lvar-modified-annotation :caller fun-name)))
-     (assert-lvar-type arg type policy))
-    (type-specifier
-     (add-annotation arg
-                     (make-lvar-type-spec-annotation
-                      :hook
-                      (lambda (value)
-                        (unless (and (eql value :default)
-                                     (eq fun-name 'open))
-                          (compiler-specifier-type value)))))
-     (assert-lvar-type arg type policy))
     (t
+     (case (car annotation)
+       (modifying
+        (when (policy policy (> check-constant-modification 0))
+          (add-annotation arg
+                          (make-lvar-modified-annotation :caller fun-name))))
+       (type-specifier
+        (add-annotation arg
+                        (make-lvar-type-spec-annotation
+                         :hook
+                         (lambda (value)
+                           (unless (and (eql value :default)
+                                        (eq fun-name 'open))
+                             (compiler-specifier-type value))))))
+       ((proper-list proper-sequence
+                     proper-or-circular-list proper-or-dotted-list)
+        (add-annotation arg
+                        (make-lvar-proper-sequence-annotation
+                         :kind (car annotation)))))
      (assert-lvar-type arg type policy))))
 
 ;;; Assert that CALL is to a function of the specified TYPE. It is

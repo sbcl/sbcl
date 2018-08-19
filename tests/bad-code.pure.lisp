@@ -329,7 +329,8 @@
   (assert (nth-value 3
                      (checked-compile
                       '(lambda () (position 0 '(1 2 0 5 . 5)))
-                      :allow-style-warnings t))))
+                      :allow-style-warnings t
+                      :allow-warnings t))))
 
 (with-test (:name :source-form-context-dotted-list)
   (assert (nth-value 1
@@ -384,4 +385,30 @@
                                      (z #(10))
                                      (z #(a))))
                                  :allow-warnings t)))
-             1)))
+             2)))
+
+(with-test (:name :improper-list)
+  (assert (nth-value 1
+                     (checked-compile
+                      '(lambda (x) (concatenate 'string x '(#\a . #\b)))
+                      :allow-warnings t)))
+  (assert (nth-value 1
+                     (checked-compile
+                      '(lambda (x) (concatenate 'list x '(1 2 . 3)))
+                      :allow-warnings t)))
+  (assert (nth-value 1
+                     (checked-compile
+                      '(lambda (x) (concatenate 'vector x '(1 2 . 3)))
+                      :allow-warnings t))))
+
+(with-test (:name :improper-list.2)
+  (assert (nth-value 1
+                     (checked-compile
+                      '(lambda ()
+                        (member-if #'(lambda (x) (evenp x)) '(1 2 3 . 4)))
+                      :allow-warnings t)))
+  (assert (nth-value 1
+                     (checked-compile
+                      '(lambda (x)
+                        (search '(a . b) x))
+                      :allow-warnings t))))

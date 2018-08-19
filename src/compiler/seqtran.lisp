@@ -548,7 +548,9 @@
                         ,(open-code (cdr tail))))))
         (let* ((cp (constant-lvar-p list))
                (c-list (when cp (lvar-value list))))
-          (cond ((and cp c-list (policy node (>= speed space))
+          (cond ((and cp c-list
+                      (proper-list-p c-list)
+                      (policy node (>= speed space))
                       (not (nthcdr *list-open-code-limit* c-list)))
                  `(let ((pred ,pred-expr)
                         ,@(when key `((key ,key-form))))
@@ -1276,7 +1278,9 @@
   (if key
       (give-up-ir1-transform)
       (let* ((pattern (lvar-value pattern))
-             (pattern-start (cond ((constant-lvar-p start1)
+             (pattern-start (cond ((not (proper-sequence-p pattern))
+                                   (give-up-ir1-transform))
+                                  ((constant-lvar-p start1)
                                    (lvar-value start1))
                                   ((not start1)
                                    0)
@@ -1598,6 +1602,7 @@
                 (loop for var in vars
                       for lvar in lvars
                       collect (if (and (constant-lvar-p lvar)
+                                       (proper-sequence-p (lvar-value lvar))
                                        (every #'characterp (lvar-value lvar)))
                                   (coerce (lvar-value lvar) 'string)
                                   var))))
@@ -1713,7 +1718,9 @@
              ;; unknown type.
              (loop for var in vars
                    for lvar in lvars
-                   collect (if (constant-lvar-p lvar)
+                   collect (if (and (constant-lvar-p lvar)
+                                    (proper-sequence-p (lvar-value lvar))
+                                    (not (typep (lvar-value lvar) type)))
                                `',(coerce (lvar-value lvar) type)
                                var))))
 

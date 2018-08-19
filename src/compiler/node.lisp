@@ -102,16 +102,13 @@
 (defstruct lvar-annotation
   (source-path nil :type list)
   lexenv
-  fired
-  delay-until-ir2)
+  fired)
 
 (defprinter (lvar-annotation)
-  fired
-  delay-until-ir2)
+  fired)
 
 (defstruct (lvar-modified-annotation
-            (:include lvar-annotation
-             (delay-until-ir2 t)))
+            (:include lvar-annotation))
   caller)
 
 (defstruct (lvar-hook
@@ -119,8 +116,12 @@
   (hook #'missing-arg :type function))
 
 (defstruct (lvar-type-spec-annotation
-            (:include lvar-hook
-             (delay-until-ir2 t))))
+            (:include lvar-hook)))
+
+(defstruct (lvar-proper-sequence-annotation
+            (:include lvar-annotation))
+  (kind :sequence :type (member proper-list proper-sequence
+                                proper-or-circular-list proper-or-dotted-list)))
 
 (defmethod print-object ((x lvar) stream)
   (print-unreadable-object (x stream :type t :identity t)

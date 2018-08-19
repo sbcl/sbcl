@@ -179,13 +179,17 @@
           (labels ((annotation-p (x)
                      (typep x '(or (cons (member function function-designator modifying
                                           inhibit-flushing))
-                                (member type-specifier))))
+                                (member type-specifier proper-sequence proper-list
+                                 proper-or-dotted-list proper-or-circular-list))))
                    (strip-annotation (x)
                      (if (consp x)
                          (ecase (car x)
                            ((function function-designator) (car x))
                            ((modifying inhibit-flushing) (cadr x)))
-                         x))
+                         (case x
+                           (proper-sequence 'sequence)
+                           ((proper-list proper-or-dotted-list proper-or-circular-list) 'list)
+                           (t x))))
                    (process-positional (type)
                      (incf i)
                      (cond ((annotation-p type)
@@ -477,3 +481,19 @@
                 do (assert-type (pop args) type nil t))
           (loop for subscript in args
                 do (assert-type subscript (fun-type-rest type) nil t)))))))
+
+(defun append-call-type-deriver (call trusted)
+  (let* ((policy (lexenv-policy (node-lexenv call)))
+         (args (combination-args call))
+         (list-type (specifier-type 'list)))
+    ;; All but the last argument should be proper lists
+    (loop for (arg next) on args
+          while next
+          do
+          (add-annotation
+           arg
+           (make-lvar-proper-sequence-annotation
+            :kind 'proper-list))
+          (when (and (assert-lvar-type arg list-type policy)
+                     (not trusted))
+            (reoptimize-lvar arg)))))

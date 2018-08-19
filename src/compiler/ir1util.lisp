@@ -2787,17 +2787,49 @@ is :ANY, the function name is not checked."
                                            (pop vars) type))
                             (setf vars (nthcdr length vars))))))))))
 
+
+(defun proper-or-circular-list-p (x)
+  (if (consp x)
+      (let ((rabbit (cdr x))
+            (turtle x))
+        (flet ((pop-rabbit ()
+                 (when (eql rabbit turtle) ; circular
+                   (return-from proper-or-circular-list-p t))
+                 (when (atom rabbit)
+                   (return-from proper-or-circular-list-p (null rabbit)))
+                 (pop rabbit)))
+          (loop (pop-rabbit)
+                (pop-rabbit)
+                (pop turtle))))
+      (null x)))
+
+(defun proper-or-dotted-list-p (x)
+  (if (consp x)
+      (let ((rabbit (cdr x))
+            (turtle x))
+        (flet ((pop-rabbit ()
+                 (when (eql rabbit turtle) ; circular
+                   (return-from proper-or-dotted-list-p nil))
+                 (when (atom rabbit)
+                   (return-from proper-or-dotted-list-p t))
+                 (pop rabbit)))
+          (loop (pop-rabbit)
+                (pop-rabbit)
+                (pop turtle))))
+      (null x)))
+
 (defun map-lambda-var-refs-from-calls (function lambda-var)
-  (let* ((home (lambda-var-home lambda-var))
-         (vars (lambda-vars home)))
-    (dolist (ref (lambda-refs home))
-      (let ((combination (node-dest ref)))
-        (when (and (combination-p combination)
-                   (eq (combination-kind combination) :local))
-          (loop for v in vars
-                for arg in (combination-args combination)
-                when (eq v lambda-var)
-                do (funcall function combination arg)))))))
+  (when (not (lambda-var-sets lambda-var))
+    (let* ((home (lambda-var-home lambda-var))
+           (vars (lambda-vars home)))
+      (dolist (ref (lambda-refs home))
+        (let ((combination (node-dest ref)))
+          (when (and (combination-p combination)
+                     (eq (combination-kind combination) :local))
+            (loop for v in vars
+                  for arg in (combination-args combination)
+                  when (eq v lambda-var)
+                  do (funcall function combination arg))))))))
 
 (defun propagate-lvar-annotations-to-refs (lvar var)
   (when (lvar-annotations lvar)
@@ -2827,10 +2859,9 @@ is :ANY, the function name is not checked."
                                             (or (eq (car other-source-path) 'original-source-start)
                                                 (member (car other-source-path)
                                                         source-path)))))
-                  collect annotation)))))
-  (process-annotations new))
+                  collect annotation))))))
 
-(defun process-lvar-modified-annotation (lvar annotation &optional seen)
+(defun lvar-constants (lvar &optional seen)
   (let* ((uses (lvar-uses lvar))
          (lvar (or (and (ref-p uses)
                         (let ((ref (principal-lvar-ref lvar)))
@@ -2839,41 +2870,96 @@ is :ANY, the function name is not checked."
                                 (lambda-var-ref-lvar ref)
                                 (node-lvar ref)))))
                    lvar)))
-    (flet ((modifiable-p (value)
-             (or (consp value)
-                 (and (arrayp value)
-                      (not (typep value '(vector * 0))))
-                 (hash-table-p value))))
-      (cond ((constant-lvar-p lvar)
-             (let ((value (lvar-value lvar)))
-               (when (modifiable-p value)
+    (cond ((constant-lvar-p lvar)
+           (values :values (list (lvar-value lvar))))
+          ((constant-lvar-uses-p lvar)
+           (values :values (lvar-uses-values lvar)))
+          ((ref-p uses)
+           (let* ((ref (principal-lvar-ref lvar))
+                  (leaf (and ref
+                             (ref-leaf ref))))
+             (when (lambda-var-p leaf)
+               (let ((seen (or seen
+                               (make-hash-table :test #'eq)))
+                     constants)
+                 (setf (gethash lvar seen) t)
+                 (map-lambda-var-refs-from-calls
+                  (lambda (call lvar)
+                    (unless (gethash lvar seen)
+                      (setf (gethash lvar seen) t)
+                      (multiple-value-bind (type values)
+                          (lvar-constants lvar seen)
+                        (when type
+                          (push (cons call values) constants)))))
+                  leaf)
+                 (when constants
+                   (values :calls constants)))))))))
+
+(defun process-lvar-modified-annotation (lvar annotation)
+  (multiple-value-bind (type values) (lvar-constants lvar)
+    (labels ((modifiable-p (value)
+               (or (consp value)
+                   (and (arrayp value)
+                        (not (typep value '(vector * 0))))
+                   (hash-table-p value)))
+             (report (values)
+               (when (every #'modifiable-p values)
                  (warn 'constant-modified
                        :fun-name (lvar-modified-annotation-caller annotation)
-                       :values (list value))
-                 t)))
-            ((constant-lvar-uses-p lvar)
-             (let ((values (lvar-uses-values lvar)))
-               (when (and values
-                          (every #'modifiable-p values))
-                 (warn 'constant-modified
-                       :fun-name (lvar-modified-annotation-caller annotation)
-                       :values values)
-                 t)))
-            ((ref-p uses)
-             (let* ((ref (principal-lvar-ref lvar))
-                    (leaf (and ref
-                               (ref-leaf ref))))
-               (when (lambda-var-p leaf)
-                 (let ((seen (or seen
-                                 (make-hash-table :test #'eq))))
-                   (setf (gethash lvar seen) t)
-                   (map-lambda-var-refs-from-calls
-                    (lambda (*compiler-error-context* lvar)
-                      (unless (gethash lvar seen)
-                        (setf (gethash lvar seen) t)
-                        (when (process-lvar-modified-annotation lvar annotation seen)
-                          (return-from process-lvar-modified-annotation t))))
-                    leaf)))))))))
+                       :values values))))
+     (case type
+       (:values
+        (report values)
+        t)
+       (:calls
+        (loop for (call . values) in values
+              do (let ((*compiler-error-context* call))
+                   (report values)))
+        t)))))
+
+(defun process-lvar-proper-sequence-annotation (lvar annotation)
+  (multiple-value-bind (type values) (lvar-constants lvar)
+    (let ((kind (lvar-proper-sequence-annotation-kind annotation)))
+      (labels ((bad-p (value)
+                 (case kind
+                   (proper-list
+                    (and (listp value)
+                         (not (proper-list-p value))))
+                   (proper-sequence
+                    (and (typep value 'sequence)
+                         (not (proper-sequence-p value))))
+                   (proper-or-circular-list
+                    (and (listp value)
+                         (not (proper-or-circular-list-p value))))
+                   (proper-or-dotted-list
+                    (and (listp value)
+                         (not (proper-or-dotted-list-p value))))))
+               (report (values)
+                 (when (every #'bad-p values)
+                   (if (singleton-p values)
+                       (warn 'type-warning
+                             :format-control
+                             "~@<~2I~_~S ~Iis not a proper ~a.~@:>"
+                             :format-arguments (list (car values)
+                                                     (if (eq kind 'proper-sequence)
+                                                         "sequence"
+                                                         "list")))
+                       (warn 'type-warning
+                             :format-control
+                             "~@<~2I~_~{~s~^, ~} ~Iare not proper ~as.~@:>"
+                             :format-arguments (list values
+                                                     (if (eq kind 'proper-sequence)
+                                                         "sequence"
+                                                         "list")))))))
+        (case type
+          (:values
+           (report values)
+           t)
+          (:calls
+           (loop for (call . values) in values
+                 do (let ((*compiler-error-context* call))
+                      (report values)))
+           t))))))
 
 (defun process-lvar-hook-annotation (lvar annotation)
   (when (constant-lvar-p lvar)
@@ -2881,7 +2967,7 @@ is :ANY, the function name is not checked."
              (lvar-value lvar))
     t))
 
-(defun process-annotations (lvar &optional ir2)
+(defun process-annotations (lvar)
   (unless (and (combination-p (lvar-dest lvar))
                (lvar-fun-is
                 (combination-fun (lvar-dest lvar))
@@ -2891,14 +2977,14 @@ is :ANY, the function name is not checked."
                 ;; see compiler.pure/generate-type-checks-on-dead-blocks
                 '(%type-check-error %type-check-error/c)))
     (loop for annot in (lvar-annotations lvar)
-          unless (or (lvar-annotation-fired annot)
-                     (and (not ir2)
-                          (lvar-annotation-delay-until-ir2 annot)))
+          unless (lvar-annotation-fired annot)
           do
           (let ((*compiler-error-context* annot))
             (when (typecase annot
                     (lvar-modified-annotation
                      (process-lvar-modified-annotation lvar annot))
+                    (lvar-proper-sequence-annotation
+                     (process-lvar-proper-sequence-annotation lvar annot))
                     (lvar-hook
                      (process-lvar-hook-annotation lvar annot)))
               (setf (lvar-annotation-fired annot) t))))))
@@ -2913,6 +2999,5 @@ is :ANY, the function name is not checked."
              (lvar-dest lvar)
              (node-lexenv (lvar-dest lvar)))
             *lexenv*))
-  (push annotation (lvar-annotations lvar))
-  (unless (lvar-annotation-delay-until-ir2 annotation)
-    (process-annotations lvar)))
+  (pushnew annotation (lvar-annotations lvar)
+           :key #'type-of))

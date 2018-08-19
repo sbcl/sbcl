@@ -288,8 +288,7 @@
               (setf (block-reoptimize (node-block cast)) t)
               (reoptimize-component (node-component cast) :maybe))))
     (do-uses (node lvar)
-      (setf (block-type-check (node-block node)) t))
-    (process-annotations lvar))
+      (setf (block-type-check (node-block node)) t)))
   (values))
 
 ;;; Annotate NODE to indicate that its result has been proven to be
