@@ -1004,6 +1004,9 @@
       (let* ((args (splice-fun-args dims :any 2)) ; the args to CONS
              (dummy (cadr args)))
         (flush-dest dummy)
+        ;; Don't want (list (list x)) to become a valid dimension specifier.
+        (assert-lvar-type (car args) (specifier-type 'index)
+                          (%coerce-to-policy call))
         (setf (combination-args call) (delete dummy (combination-args call)))
         (return-from make-array
           (transform-make-array-vector (car args)

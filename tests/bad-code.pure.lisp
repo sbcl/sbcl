@@ -171,6 +171,14 @@
                     (make-array (list x) :fill-pointer 0)))
                :allow-warnings t))))
 
+(with-test (:name (make-array :dimensions :unraveling-list))
+  (assert
+   (nth-value 1
+              (checked-compile
+               `(lambda (x)
+                  (make-array (list (list 10)) :adjustable x))
+               :allow-warnings t))))
+
 (with-test (:name :&rest-ref-bad-n)
   (assert
    (nth-value 1
