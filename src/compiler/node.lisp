@@ -98,7 +98,10 @@
   (annotations nil))
 (!set-load-form-method lvar (:xc :target) :ignore-it)
 
-
+;;; These are used for annottating a LVAR with information that can't
+;;; be expressed using types.
+;;; Right now it's basically used for tracking constants and checking
+;;; them for things like proper sequence, or valid type specifier.
 (defstruct lvar-annotation
   (source-path nil :type list)
   lexenv
