@@ -2787,6 +2787,18 @@ is :ANY, the function name is not checked."
                                            (pop vars) type))
                             (setf vars (nthcdr length vars))))))))))
 
+(defun map-lambda-var-refs-from-calls (function lambda-var)
+  (let* ((home (lambda-var-home lambda-var))
+         (vars (lambda-vars home)))
+    (dolist (ref (lambda-refs home))
+      (let ((combination (node-dest ref)))
+        (when (and (combination-p combination)
+                   (eq (combination-kind combination) :local))
+          (loop for v in vars
+                for arg in (combination-args combination)
+                when (eq v lambda-var)
+                do (funcall function combination arg)))))))
+
 (defun propagate-lvar-annotations-to-refs (lvar var)
   (when (lvar-annotations lvar)
     (dolist (ref (leaf-refs var))
@@ -2818,7 +2830,7 @@ is :ANY, the function name is not checked."
                   collect annotation)))))
   (process-annotations new))
 
-(defun process-lvar-modified-annotation (lvar annotation)
+(defun process-lvar-modified-annotation (lvar annotation &optional seen)
   (let* ((uses (lvar-uses lvar))
          (lvar (or (and (ref-p uses)
                         (let ((ref (principal-lvar-ref lvar)))
@@ -2846,7 +2858,22 @@ is :ANY, the function name is not checked."
                  (warn 'constant-modified
                        :fun-name (lvar-modified-annotation-caller annotation)
                        :values values)
-                 t)))))))
+                 t)))
+            ((ref-p uses)
+             (let* ((ref (principal-lvar-ref lvar))
+                    (leaf (and ref
+                               (ref-leaf ref))))
+               (when (lambda-var-p leaf)
+                 (let ((seen (or seen
+                                 (make-hash-table :test #'eq))))
+                   (setf (gethash lvar seen) t)
+                   (map-lambda-var-refs-from-calls
+                    (lambda (*compiler-error-context* lvar)
+                      (unless (gethash lvar seen)
+                        (setf (gethash lvar seen) t)
+                        (when (process-lvar-modified-annotation lvar annotation seen)
+                          (return-from process-lvar-modified-annotation t))))
+                    leaf)))))))))
 
 (defun process-lvar-hook-annotation (lvar annotation)
   (when (constant-lvar-p lvar)

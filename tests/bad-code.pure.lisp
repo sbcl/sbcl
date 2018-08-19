@@ -374,3 +374,14 @@
                       '(lambda (x)
                         (the integer (if x 10)))
                       :allow-style-warnings t))))
+
+(with-test (:name :constant-modification-local-function)
+  (assert (= (length (nth-value 2
+                                (checked-compile
+                                 '(lambda ()
+                                   (flet ((z (a)
+                                            (setf (aref a 0) 10)))
+                                     (z #(10))
+                                     (z #(a))))
+                                 :allow-warnings t)))
+             1)))
