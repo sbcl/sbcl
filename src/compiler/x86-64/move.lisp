@@ -63,11 +63,10 @@
                (not (or (location= x y)
                         (and (sc-is x any-reg descriptor-reg immediate)
                              (sc-is y control-stack))))))
-  (:temporary (:sc unsigned-reg) temp)
   (:generator 0
     (if (and (sc-is x immediate)
              (sc-is y any-reg descriptor-reg control-stack))
-        (move-immediate y (encode-value-if-immediate x) temp)
+        (move-immediate y (encode-value-if-immediate x) temp-reg-tn)
         (move y x))))
 
 (define-move-vop move :move
