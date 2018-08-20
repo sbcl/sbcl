@@ -839,35 +839,6 @@
               ;; race conditions in the debugger involving
               ;; backtraces from asynchronous interrupts.
               (setf (tn-sc tn) (tn-sc save-tn)))))))))
-
-;;; Iterate over the normal TNs, folding over the depth of the looops
-;;; that the TN is used in and storing the result in TN-LOOP-DEPTH.
-;;: reducer is the function used to join depth values together. #'max
-;;; gives the maximum depth, #'+ the sum.
-(defun assign-tn-depths (component &key (reducer #'max))
-  (declare (type function reducer))
-  (when *loop-analyze*
-    ;; We only use tn depth for normal TNs
-    (do ((tn (ir2-component-normal-tns (component-info component))
-             (tn-next tn)))
-        ((null tn))
-      (let ((depth 0))
-        (declare (type fixnum depth))
-        (flet ((frob (ref)
-                 (declare (type (or null tn-ref) ref))
-                 (do ((ref ref (tn-ref-next ref)))
-                     ((null ref))
-                   (let* ((vop (tn-ref-vop ref))
-                          (block (ir2-block-block (vop-block vop)))
-                          (loop (block-loop block)))
-                     (setf depth (funcall reducer
-                                          depth
-                                          (if loop
-                                              (loop-depth loop)
-                                              0)))))))
-          (frob (tn-reads tn))
-          (frob (tn-writes tn))
-          (setf (tn-loop-depth tn) depth))))))
 
 ;;;; load TN packing
 

@@ -572,15 +572,8 @@
 ;; Try to color the graph. If some TNs are left uncolored, find a
 ;; spill candidate, force it on the stack, and try again.
 (defun iterate-color (vertices component)
-  (let* ((spilled 0)
-         ;; presorting edges helps; later sorts are stable, so this
-         ;; ends up sorting by (sum of) loop depth for TNs with equal
-         ;; costs.
-         (vertices (stable-sort vertices #'>
-                                :key (lambda (vertex)
-                                       (tn-loop-depth
-                                        (vertex-tn vertex)))))
-         (graph (make-interference-graph vertices component)))
+  (let ((graph (make-interference-graph vertices component))
+        (spilled 0))
     (declare (index spilled))
     (labels ((spill-candidates-p (vertex)
                (unless (vertex-color vertex)
@@ -672,8 +665,6 @@
                            (minusp (tn-cost tn))))) ; TN lives in many calls
         ;; otherwise, we'll let the final pass handle them.
         (vertices (make-vertex tn :normal))))
-    ;; Sum loop depths to guide the spilling logic
-    (assign-tn-depths component :reducer #'+)
     ;; Iteratively find a coloring/spill partition, and allocate those
     ;; for which we have a location
     (pack-colored (iterate-color (vertices) component)
