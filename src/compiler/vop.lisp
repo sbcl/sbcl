@@ -812,7 +812,6 @@
   ;; is set, then the location is in use somewhere in the block, and
   ;; thus has a conflict for always-live TNs.
   (always-live '#() :type simple-vector)
-  (always-live-count '#() :type simple-vector)
   ;; a vector containing the TN currently live in each location in the
   ;; SB, or NIL if the location is unused. This is used during load-tn pack.
   (live-tns '#() :type simple-vector)
@@ -820,7 +819,8 @@
   ;; might not be virgin, and thus must be reinitialized when PACK
   ;; starts. Less then the length of those vectors when not all of the
   ;; length was used on the previously packed component.
-  (last-block-count 0 :type index))
+  (last-block-count 0 :type index)
+  (wired-map 0 :type sb!vm:finite-sc-offset-map))
 (declaim (freeze-type storage-base finite-sb-template finite-sb))
 
 ;;; Give this a toplevel value so that it can be declaimed ALWAYS-BOUND.
@@ -844,8 +844,9 @@
   `(fsb-conflicts (svref *finite-sbs* (finite-sb-index ,sb))))
 (defmacro finite-sb-always-live (sb)
   `(fsb-always-live (svref *finite-sbs* (finite-sb-index ,sb))))
-(defmacro finite-sb-always-live-count (sb)
-  `(fsb-always-live-count (svref *finite-sbs* (finite-sb-index ,sb))))
+(defmacro finite-sb-wired-map (sb)
+  `(fsb-wired-map (svref *finite-sbs* (finite-sb-index ,sb))))
+
 (defmacro finite-sb-live-tns (sb)
   `(fsb-live-tns (svref *finite-sbs* (finite-sb-index ,sb))))
 (defmacro finite-sb-last-block-count (sb)

@@ -369,7 +369,6 @@ Examples:
                      `(make-finite-sb
                        :conflicts (make-array ,size :initial-element #())
                        :always-live (make-array ,size :initial-element #*)
-                       :always-live-count (make-array ,size :initial-element 0)
                        :live-tns (make-array ,size :initial-element nil)))))))
      (unwind-protect
          (let ((*warnings-p* nil)

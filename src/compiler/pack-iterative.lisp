@@ -600,7 +600,7 @@
 ;;; Nice interface
 
 ;; Just pack vertices that have been assigned a color.
-(defun pack-colored (colored-vertices optimize)
+(defun pack-colored (colored-vertices)
   (dolist (vertex colored-vertices)
     (let* ((color (vertex-color vertex))
            (tn (vertex-tn vertex)))
@@ -608,14 +608,14 @@
             (color
              (aver (not (conflicts-in-sc tn (tn-sc tn) color)))
              (setf (tn-offset tn) color)
-             (pack-wired-tn (vertex-tn vertex) optimize))
+             (pack-wired-tn (vertex-tn vertex)))
             (t
              ;; we better not have a :restricted TN not packed in its
              ;; finite SC
              (aver (neq (vertex-pack-type vertex) :restricted)))))))
 
 ;; Pack pre-allocated TNs, collect vertices, and color.
-(defun pack-iterative (component 2comp optimize)
+(defun pack-iterative (component 2comp)
   (declare (type component component) (type ir2-component 2comp))
   (collect ((vertices))
     ;; Pack TNs that *must* be in a certain location, but still
@@ -624,7 +624,7 @@
     (do ((tn (ir2-component-wired-tns 2comp) (tn-next tn)))
         ((null tn))
       (unless (eq (tn-kind tn) :arg-pass)
-        (pack-wired-tn tn optimize)
+        (pack-wired-tn tn)
         (unless (unbounded-tn-p tn)
           (vertices (make-vertex tn :wired)))))
 
@@ -645,7 +645,7 @@
       ;; nice targeting.
       (flet ((pack-tns (tns)
                (dolist (tn (stable-sort tns #'> :key #'tn-cost))
-                 (pack-tn tn t optimize))))
+                 (pack-tn tn t))))
         (pack-tns (component))
         (pack-tns (normal))))
 
@@ -667,6 +667,5 @@
         (vertices (make-vertex tn :normal))))
     ;; Iteratively find a coloring/spill partition, and allocate those
     ;; for which we have a location
-    (pack-colored (iterate-color (vertices) component)
-                  optimize))
+    (pack-colored (iterate-color (vertices) component)))
   nil)
