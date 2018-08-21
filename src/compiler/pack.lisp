@@ -1349,8 +1349,7 @@
   (let* ((sb (sc-sb sc))
          (element-size (sc-element-size sc))
          (alignment (sc-alignment sc))
-         (align-mask (1- alignment))
-         (size (finite-sb-current-size sb)))
+         (align-mask (1- alignment)))
     (labels ((attempt-location (start-offset)
                (let ((conflict (conflicts-in-sc tn sc start-offset)))
                  (if conflict
@@ -1358,13 +1357,13 @@
                                align-mask)
                      (return-from select-location start-offset))))
              (try (locations)
-               (do-sc-locations (location locations nil
-                                 (sc-element-size sc))
+               (do-sc-locations (location locations nil element-size)
                  (attempt-location location))))
       (if (eq (sb-kind sb) :unbounded)
-          (loop with offset = 0
-                until (> (+ offset element-size) size) do
-                (setf offset (attempt-location offset)))
+          (let ((size (finite-sb-current-size sb)))
+            (loop with offset = 0
+                  until (> (+ offset element-size) size) do
+                  (setf offset (attempt-location offset))))
           (let* ((locations (sc-locations sc))
                  (reserved (sc-reserve-locations sc))
                  (wired (logandc2 (finite-sb-wired-map sb) reserved)))
@@ -1507,7 +1506,7 @@
              tn offset sc (tn-kind tn)))
 
     (unless (eq (sb-kind sb) :unbounded)
-      (setf (ldb (byte 1 offset)
+      (setf (ldb (byte 1 (truly-the sb!vm:finite-sc-offset offset))
                  (finite-sb-wired-map sb))
             1))
     (add-location-conflicts original sc offset)))

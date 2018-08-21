@@ -75,10 +75,12 @@
                 (increment `(the sb!vm:finite-sc-offset ,(or increment 1))))
       (labels ((make-block (start end)
                  `(loop named #:noname
-                        for ,location of-type (integer 0 ,sb!vm:finite-sc-offset-limit)
+                        for ,location
                         from ,start below ,end by ,increment
                         when (logbitp ,location ,locations)
-                          do ,@body))
+                        do (locally (declare (sb!vm:finite-sc-offset
+                                              ,location))
+                             ,@body)))
                (make-guarded-block (start end)
                  (unless (and (numberp limit) (<= limit start))
                    (let ((mask (dpb -1 (byte mid start) 0)))
