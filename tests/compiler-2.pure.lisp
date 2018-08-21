@@ -1541,3 +1541,14 @@
               (let ((x (the double-float x)))
                 (values (funcall f x) (> x 1d0)))))))
     (ctu:assert-no-consing (funcall f #'identity 1d0))))
+
+(with-test (:name :infer-iteration-var-type)
+  (let ((f (checked-compile
+            '(lambda (s)
+              (declare ((integer 1 2) s))
+              (let ((r 16))
+                (loop for i from 16 below 32 by s
+                      do (setf r i))
+                r)))))
+    (assert (equal (sb-impl::%simple-fun-type f)
+                   '(function ((integer 1 2)) (values (integer 16 31) &optional))))))

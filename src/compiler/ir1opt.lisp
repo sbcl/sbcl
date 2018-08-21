@@ -1812,8 +1812,7 @@
 ;;; the union of the INITIAL-TYPE and the types of all the set
 ;;; values and to a PROPAGATE-TO-REFS with this type.
 (defun propagate-from-sets (var initial-type)
-  (let ((changes (not (csubtypep (lambda-var-last-initial-type var) initial-type)))
-        (types nil))
+  (let ((types nil))
     (dolist (set (lambda-var-sets var))
       (let ((type (lvar-type (set-value set))))
         (push type types)
@@ -1821,14 +1820,11 @@
           (let ((old-type (node-derived-type set)))
             (unless (values-subtypep old-type type)
               (derive-node-type set (make-single-value-type type))
-              (maybe-terminate-block set nil)
-              (setf changes t)))
+              (maybe-terminate-block set nil)))
           (setf (node-reoptimize set) nil))))
-    (when changes
-      (setf (lambda-var-last-initial-type var) initial-type)
-      (let ((res-type (or (maybe-infer-iteration-var-type var initial-type)
-                          (apply #'type-union initial-type types))))
-        (propagate-to-refs var res-type))))
+    (let ((res-type (or (maybe-infer-iteration-var-type var initial-type)
+                        (apply #'type-union initial-type types))))
+      (propagate-to-refs var res-type)))
   (values))
 
 ;;; If a LET variable, find the initial value's type and do
