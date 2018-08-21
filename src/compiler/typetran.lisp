@@ -276,9 +276,15 @@
        (cond #!+(or x86 x86-64 arm arm64) ;; Not implemented elsewhere yet
              ((and
                (eql (numeric-type-class type) 'integer)
-               (eql (numeric-type-low type) 0)
+               (or (eql (numeric-type-low type) 0)
+                   (eql (numeric-type-low type) 1))
                (fixnump (numeric-type-high type)))
-              `(fixnum-mod-p ,object ,(numeric-type-high type)))
+              (let ((mod-p
+                      `(fixnum-mod-p ,object ,(numeric-type-high type))))
+                (if (eql (numeric-type-low type) 1)
+                    `(and (not (eq ,object 0))
+                          ,mod-p)
+                    mod-p)))
              (t
               `(and (typep ,object ',base)
                     ,(transform-numeric-bound-test object type base)))))
