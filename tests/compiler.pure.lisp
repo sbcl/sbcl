@@ -6294,9 +6294,7 @@
          (logbitp (the (eql 1) p1) (the fixnum p2)))
     ((1 2) t)))
 
-(with-test (:name :reducing-constants
-                  ;; x86 delays FPE signalling
-                  :fails-on :x86)
+(with-test (:name :reducing-constants)
   (checked-compile-and-assert ()
       `(lambda (x) (* 4.457268f31 4 x -46253801283659))
     ((5.0f-9) -4.123312f37))
@@ -6304,9 +6302,7 @@
       `(lambda (x) (* #C(4.457268f31 0.0) 4 x -46253801283659))
     ((5.0f-9) #C(-4.123312f37 -0.0))))
 
-(with-test (:name :reducing-constants.2
-                  ;; x86 delays FPE signalling
-                  :fails-on :x86)
+(with-test (:name :reducing-constants.2)
   (checked-compile-and-assert (:allow-style-warnings t)
       `(lambda () (*  1.0 2 (expt 2 127)))
     (() #-(or arm64 arm) (condition 'floating-point-overflow)
