@@ -11,7 +11,9 @@
 ;;;; absoluely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#-gencgc (sb-ext:exit :code 104)
+#-gencgc
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (sb-ext:exit :code 104))
 
 (defconstant min-code-header-bytes
   (let ((min-header-words (* 2 (ceiling sb-vm:code-constants-offset 2))))
