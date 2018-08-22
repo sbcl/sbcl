@@ -219,6 +219,7 @@
     (assert (= (sb-kernel:get-lisp-obj-address *pin-test-object*)
                *pin-test-object-address*))))
 
+#+gencgc
 (defun ensure-code/data-separation ()
   (let* ((n-bits (+ sb-vm:next-free-page 10))
          (code-bits (make-array n-bits :element-type 'bit))
@@ -245,17 +246,18 @@
      :dynamic)
     (assert (not (find 1 (bit-and code-bits data-bits))))
     (let* ((code-bytes-consumed
-            (* (count 1 code-bits) sb-vm:gencgc-card-bytes))
+             (* (count 1 code-bits) sb-vm:gencgc-card-bytes))
            (waste
-            (- total-code-size code-bytes-consumed)))
+             (- total-code-size code-bytes-consumed)))
       ;; This should be true for all platforms.
       ;; Some have as little as .5% space wasted.
       (assert (<= waste (* 3/100 code-bytes-consumed))))))
 
-(compile 'ensure-code/data-separation)
+
 
 (with-test (:name :code/data-separation
-                  :skipped-on (:not :gencgc))
+            :skipped-on (not :gencgc))
+  (compile 'ensure-code/data-separation)
   (ensure-code/data-separation))
 
 #+immobile-space

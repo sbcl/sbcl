@@ -11,6 +11,7 @@
 ;;;; absoluely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+#-gencgc (sb-ext:exit :code 104)
 
 (defconstant min-code-header-bytes
   (let ((min-header-words (* 2 (ceiling sb-vm:code-constants-offset 2))))
@@ -24,7 +25,6 @@
 ;;; page on which the open flag should be removed.
 ;;; Strangely, the assertion that caught this was far removed from the
 ;;; point of failure, in conservative_root_p()
-#+gencgc
 (with-test (:name :gc-region-pickup :skipped-on (not (or :x86 :x86-64)))
   (flet ((allocate-code-bytes (nbytes)
            ;; Make a code component occupying exactly NBYTES bytes in total.
