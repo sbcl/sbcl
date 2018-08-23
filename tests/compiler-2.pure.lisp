@@ -1552,3 +1552,14 @@
                 r)))))
     (assert (equal (sb-impl::%simple-fun-type f)
                    '(function ((integer 1 2)) (values (integer 16 31) &optional))))))
+
+(with-test (:name :delay-transform-until-constraint-loop)
+  (checked-compile-and-assert
+      ()
+      `(lambda (str)
+         (declare (string str))
+         (when (plusp (length str))
+           (make-array (1- (length str))
+                       :element-type (array-element-type str)
+                       :displaced-to str)))
+    (("abc") "ab" :test #'equal)))

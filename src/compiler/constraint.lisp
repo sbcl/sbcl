@@ -928,8 +928,9 @@
                      (setq not-res (type-union not-res other)))
                  (setq res (type-approx-intersection2 res other))))
             (array-in-bounds-p
-             (pushnew con (ref-constraints ref))
-             (reoptimize-lvar (node-lvar ref)))
+             (unless (eq (ref-constraints ref)
+                         (pushnew con (ref-constraints ref)))
+               (reoptimize-lvar (node-lvar ref))))
             (eql
              (let ((other-type (leaf-type other)))
                (if not-p
