@@ -17,6 +17,21 @@
     (emit-internal-error kind code values)
     (emit-alignment word-shift)))
 
+#|
+If we are doing [reg+offset*n-word-bytes-lowtag+index*scale]
+and
+
+-2^11 ≤ offset*n-word-bytes - lowtag + index*scale < 2^11
+-2^11 ≤ offset*n-word-bytes - lowtag + index*scale ≤ 2^11-1
+-2^11 + lowtag -offset*n-word-bytes ≤ index*scale ≤ 2^11-1 + lowtag - offset*n-word-bytes
+|#
+(deftype load/store-index (scale lowtag offset)
+  (let* ((encodable (list (- (ash 1 11)) (1- (ash 1 11))))
+         (add-lowtag (mapcar (lambda (x) (+ x lowtag)) encodable))
+         (sub-offset (mapcar (lambda (x) (- x (* offset n-word-bytes))) add-lowtag))
+         (truncated (mapcar (lambda (x) (truncate x scale)) sub-offset)))
+    `(integer ,(first truncated) ,(second truncated))))
+
 (defmacro define-full-reffer (name type offset lowtag scs eltype &optional translate)
   `(progn
      (define-vop (,name)
@@ -29,7 +44,19 @@
        (:result-types ,eltype)
        (:generator 5
          (inst add lip object index)
-         (inst lw value lip (- (ash ,offset word-shift) ,lowtag))))))
+         (inst lw value lip (- (ash ,offset word-shift) ,lowtag))))
+     (define-vop (,(symbolicate name "-C"))
+       ,@(when translate `((:translate ,translate)))
+       (:policy :fast-safe)
+       (:args (object :scs (descriptor-reg)))
+       (:info index)
+       (:arg-types ,type
+                   (:constant
+                    (load/store-index #.n-word-bytes ,(eval lowtag) ,(eval offset))))
+       (:results (value :scs ,scs))
+       (:result-types ,eltype)
+       (:generator 4
+         (inst lw value object (- (ash (+ ,offset index) word-shift) ,lowtag))))))
 
 (defmacro define-full-setter (name type offset lowtag scs eltype &optional translate)
   `(progn
