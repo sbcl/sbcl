@@ -269,13 +269,27 @@
                   thereis (and (search "MOV QWORD PTR [" line)
                                (search ":KEY" line))))))
 
+(with-test (:name :aprof-smoketest-struct)
+  (let ((nbytes
+         (let ((*standard-output* (make-broadcast-stream)))
+           (sb-aprof:aprof-run
+            (checked-compile
+             '(sb-int:named-lambda "test" ()
+               (declare (inline sb-thread:make-mutex))
+               (loop repeat 50 collect (sb-thread:make-mutex))))))))
+    (assert (= nbytes
+                (+ (* 51 2 sb-vm:n-word-bytes) ; list (extra for dummy head)
+                   (* 50 (sb-vm::primitive-object-size
+                          (sb-thread:make-mutex))))))))
+
 (with-test (:name :aprof-smoketest-large-vector)
   (let ((nbytes
-          (sb-aprof:aprof-run
-           (checked-compile
-            '(sb-int:named-lambda "test" ()
-              (declare (optimize sb-c::instrument-consing))
-              (make-array 45000))))))
+         (let ((*standard-output* (make-broadcast-stream)))
+           (sb-aprof:aprof-run
+            (checked-compile
+             '(sb-int:named-lambda "test" ()
+               (declare (optimize sb-c::instrument-consing))
+               (make-array 45000)))))))
     (assert (= nbytes (* (+ 45000 sb-vm:vector-data-offset)
                          8)))))
 
@@ -296,11 +310,12 @@ sb-vm::
 
 (with-test (:name :aprof-smoketest-large-vector-to-upper-register)
   (let ((nbytes
-          (sb-aprof:aprof-run
-           (checked-compile
-            '(sb-int:named-lambda "test" ()
-              (declare (optimize sb-c::instrument-consing))
-              (sb-sys:%primitive cl-user::alloc-to-r8)
-              nil)))))
+         (let ((*standard-output* (make-broadcast-stream)))
+           (sb-aprof:aprof-run
+            (checked-compile
+             '(sb-int:named-lambda "test" ()
+               (declare (optimize sb-c::instrument-consing))
+               (sb-sys:%primitive cl-user::alloc-to-r8)
+               nil))))))
     (assert (= nbytes sb-vm:large-object-size))))
 

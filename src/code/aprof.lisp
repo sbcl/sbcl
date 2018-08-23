@@ -79,8 +79,8 @@
                 #:regrm-inst-r/m
                 #:reg-imm-data
                 #:reg/mem-imm-data
-                #:add #:inc #:mov #:lea #:cmp #:jmp
-                #:|push| #:|pop| #:|or| #:|call|))
+                #:add #:inc #:mov #:lea #:cmp #:xor #:jmp
+                #:|push| #:|pop| #:|or| #:|call| #:|break|))
 
 (in-package #:sb-aprof)
 
@@ -128,19 +128,24 @@
 (defun aprof-stop ()
   (alien-funcall (extern-alien "allocation_profiler_stop" (function void))))
 
-(defconstant +state-initial+         1)
-(defconstant +state-profiler+        2)
-(defconstant +state-begin-pa+        3)
-(defconstant +state-loaded-free-ptr+ 4)
-(defconstant +state-bumped-free-ptr+ 5)
-(defconstant +state-tested-free-ptr+ 6)
-(defconstant +state-jumped+          7)
-(defconstant +state-stored-free-ptr+ 8)
-(defconstant +state-descriptorized+  9)
-(defconstant +state-widetagged+     10)
-(defconstant +state-trampoline-arg+ 11)
-(defconstant +state-called+         12)
-(defconstant +state-result-popped+  13)
+(defconstant +state-initial+              1)
+(defconstant +state-profiler+             2)
+(defconstant +state-begin-pa+             3)
+(defconstant +state-loaded-free-ptr+      4)
+(defconstant +state-bumped-free-ptr+      5)
+(defconstant +state-tested-free-ptr+      6)
+(defconstant +state-jumped+               7)
+(defconstant +state-stored-free-ptr+      8)
+(defconstant +state-lowtag-only+          9)
+(defconstant +state-low-then-widetag+    10)
+(defconstant +state-widetag-only+        11)
+(defconstant +state-wide-then-lowtag+    12)
+(defconstant +state-trampoline-arg+      13)
+(defconstant +state-called+              14)
+(defconstant +state-result-popped+       15)
+(defconstant +state-end-pa+              16)
+(defconstant +state-test-interrupted+    17)
+(defconstant +state-pa-trap+             18)
 
 (defglobal *tag-to-type*
   (map 'vector
@@ -174,7 +179,8 @@
          (orig-free-ptr-reg) ; free-pointer before bump up
          (free-ptr-reg)      ; free-pointer aftr bump up
          (target-reg)        ; register holding the new allocation
-         (target-lowtag)
+         (lowtag)
+         (widetag)
          (size)
          (thread-base-reg 13))
     (setf (sb-disassem::seg-object seg) component
@@ -194,187 +200,218 @@
                (advance-if (condition newstate)
                  `(if ,condition (advance ,newstate) (fail))))
       (block fail
-       (sb-disassem::map-segment-instructions
-        (lambda (dchunk inst)
-          (let* ((opcode (sb-disassem::inst-name inst))
-                 (opcode-byte (logand dchunk #xFF))
-                 (ea (case opcode
-                      ;; 64-bit mode 'inc' has reg/mem format,
-                      ;; never the single-byte format
-                      ((add inc mov lea cmp) (regrm-inst-r/m 0 dstate))))
-                 (free-ptr-p
-                  (and (%instancep ea)
-                       (eql (machine-ea-base ea) thread-base-reg)
-                       (eql (machine-ea-disp ea)
-                            (ash sb-vm::thread-alloc-region-slot
-                                 sb-vm:word-shift))
-                       (not (machine-ea-index ea))))
-                 (header-word-p
-                  (and target-reg target-lowtag
-                       (%instancep ea)
-                       (eql (machine-ea-base ea) target-reg)
-                       (eql (machine-ea-disp ea) (- target-lowtag))
-                       (not (machine-ea-index ea)))))
-            (unless (member opcode '(rex lock x66))
-              ;; FIXME: these ignore the direction of load/store/compare
-              (ecase allocator-state
-               (#.+state-initial+
-                (advance-if (and (eq opcode 'inc)
-                                 (eql (machine-ea-base ea) 11)
-                                 (null (machine-ea-index ea)))
-                            +state-profiler+)
-                (setq profiler-index (machine-ea-disp ea)))
-               (#.+state-profiler+
-                (cond
-                 ((and (eq opcode 'add) ; possibly stay in +state-profiler+
-                       (%instancep ea)
-                       (eql (machine-ea-base ea) 11)
-                       (null (machine-ea-index ea))
-                       (eq (machine-ea-disp ea)
-                           (+ profiler-index sb-vm:n-word-bytes))))
-                 (t
-                  (advance-if (and (eq opcode 'mov)
-                                   (let ((rm (regrm-inst-r/m 0 dstate)))
-                                     (eq (machine-ea-base rm) thread-base-reg)
-                                     (eq (machine-ea-disp rm)
-                                         (ash sb-vm::thread-pseudo-atomic-bits-slot
-                                              sb-vm:word-shift))))
-                              +state-begin-pa+))))
-               (#.+state-begin-pa+
-                (cond ((eq opcode '|push|)
-                       ;; Known huge allocation goes straight to C call
-                       (setq size (ldb (byte 32 8) dchunk))
-                       (advance +state-trampoline-arg+))
+        (flet ((pseudoatomic-flag-p ()
+                 (let ((rm (regrm-inst-r/m 0 dstate)))
+                   (eq (machine-ea-base rm) thread-base-reg)
+                   (eq (machine-ea-disp rm)
+                       (ash sb-vm::thread-pseudo-atomic-bits-slot
+                            sb-vm:word-shift))))
+               (infer-layout (opcode ea dchunk)
+                 (cond ((and (eql lowtag sb-vm:instance-pointer-lowtag)
+                             (eq opcode 'mov)
+                             (eq (inst-operand-size dstate) :dword)
+                             (eql (machine-ea-base ea) target-reg)
+                             (not (machine-ea-index ea))
+                             (eql (machine-ea-disp ea) (- 4 lowtag)))
+                        (return-from infer-type
+                          (values (layout-name (reg/mem-imm-data 0 dstate))
+                                  size)))
+                       (t
+                        (fail)))))
+          (sb-disassem::map-segment-instructions
+           (lambda (dchunk inst)
+             (let* ((opcode (sb-disassem::inst-name inst))
+                    (opcode-byte (logand dchunk #xFF))
+                    (ea (case opcode
+                          ;; 64-bit mode 'inc' has reg/mem format,
+                          ;; never the single-byte format
+                          ((add inc mov lea cmp) (regrm-inst-r/m 0 dstate))))
+                    (free-ptr-p
+                     (and (%instancep ea)
+                          (eql (machine-ea-base ea) thread-base-reg)
+                          (eql (machine-ea-disp ea)
+                               (ash sb-vm::thread-alloc-region-slot
+                                    sb-vm:word-shift))
+                          (not (machine-ea-index ea))))
+                    (header-word-p
+                     (and target-reg lowtag
+                          (%instancep ea)
+                          (eql (machine-ea-base ea) target-reg)
+                          (eql (machine-ea-disp ea) (- lowtag))
+                          (not (machine-ea-index ea)))))
+               (unless (member opcode '(rex lock x66))
+                 ;; FIXME: these ignore the direction of load/store/compare
+                 (ecase allocator-state
+                   (#.+state-initial+
+                    (advance-if (and (eq opcode 'inc)
+                                     (eql (machine-ea-base ea) 11)
+                                     (null (machine-ea-index ea)))
+                                +state-profiler+)
+                    (setq profiler-index (machine-ea-disp ea)))
+                   (#.+state-profiler+
+                    (cond
+                      ((and (eq opcode 'add) ; possibly stay in +state-profiler+
+                            (%instancep ea)
+                            (eql (machine-ea-base ea) 11)
+                            (null (machine-ea-index ea))
+                            (eq (machine-ea-disp ea)
+                                (+ profiler-index sb-vm:n-word-bytes))))
                       (t
-                       (advance-if (and (eq opcode 'mov) free-ptr-p)
-                                   +state-loaded-free-ptr+)
-                       (setq orig-free-ptr-reg (regrm-inst-reg dchunk dstate)))))
-               (#.+state-loaded-free-ptr+
-                (case opcode
-                 ;; Variable-size alloc can either use LEA or ADD to compute the
-                 ;; new free ptr depending on whether the alloc-tn and the size
-                 ;; are in the same register (ADD) or different (LEA).
-                 (lea
-                  (advance-if (and (eql (machine-ea-base ea) orig-free-ptr-reg)
-                                   (or (and (not (machine-ea-index ea))
-                                            (plusp (machine-ea-disp ea)))
-                                       (and (machine-ea-index ea)
-                                            (not (machine-ea-disp ea)))))
-                              +state-bumped-free-ptr+)
-                  (setq free-ptr-reg (regrm-inst-reg dchunk dstate)
-                        size (machine-ea-disp ea)))
-                 (add
-                  (advance-if (typep ea '(integer 0 15)) +state-bumped-free-ptr+)
-                  (setq free-ptr-reg ea))
-                 (t (fail))))
-               (#.+state-bumped-free-ptr+
-                (advance-if (and (eq opcode 'cmp)
-                                 (eql (machine-ea-base ea) thread-base-reg)
-                                 (eql (machine-ea-disp ea)
-                                      (ash (1+ sb-vm::thread-alloc-region-slot)
-                                           sb-vm:word-shift))
-                                 (not (machine-ea-index ea))
-                                 (eql (regrm-inst-reg dchunk dstate) free-ptr-reg))
-                            +state-tested-free-ptr+))
-               (#.+state-tested-free-ptr+
-                (advance-if (eq opcode 'jmp) +state-jumped+))
-               (#.+state-jumped+
-                (advance-if (and (eq opcode 'mov) free-ptr-p
-                                 (eql (regrm-inst-reg dchunk dstate) free-ptr-reg))
-                            +state-stored-free-ptr+))
-               (#.+state-stored-free-ptr+
-                ;; See if an unnecessary MOV instruction exists :-(
-                (cond #+nil
-                      ((and (eq opcode 'mov) (integerp ea))
-                       ;; "original" [sic] free ptr reg is the destination of the move
-                       (setq orig-free-ptr-reg (regrm-inst-reg dchunk dstate))
-                       ;; (sb-disassem:disassemble-memory pc 70)
-                       ;; (format t "~&Spurious move into R~D~%" orig-free-ptr-reg)
-                       (advance +state-moved-result+))
-                      (t
-                       (advance-if (and (eq opcode 'lea)
-                                        (eql (machine-ea-base ea) orig-free-ptr-reg)
+                       (advance-if (and (eq opcode 'mov) (pseudoatomic-flag-p))
+                                   +state-begin-pa+))))
+                   (#.+state-begin-pa+
+                    (cond ((eq opcode '|push|)
+                           ;; Known huge allocation goes straight to C call
+                           (setq size (ldb (byte 32 8) dchunk))
+                           (advance +state-trampoline-arg+))
+                          (t
+                           (advance-if (and (eq opcode 'mov) free-ptr-p)
+                                       +state-loaded-free-ptr+)
+                           (setq orig-free-ptr-reg (regrm-inst-reg dchunk dstate)))))
+                   (#.+state-loaded-free-ptr+
+                    (case opcode
+                      ;; Variable-size alloc can either use LEA or ADD to compute the
+                      ;; new free ptr depending on whether the alloc-tn and the size
+                      ;; are in the same register (ADD) or different (LEA).
+                      (lea
+                       (advance-if (and (eql (machine-ea-base ea) orig-free-ptr-reg)
+                                        (or (and (not (machine-ea-index ea))
+                                                 (plusp (machine-ea-disp ea)))
+                                            (and (machine-ea-index ea)
+                                                 (not (machine-ea-disp ea)))))
+                                   +state-bumped-free-ptr+)
+                       (setq free-ptr-reg (regrm-inst-reg dchunk dstate)
+                             size (machine-ea-disp ea)))
+                      (add
+                       (advance-if (typep ea '(integer 0 15)) +state-bumped-free-ptr+)
+                       (setq free-ptr-reg ea))
+                      (t (fail))))
+                   (#.+state-bumped-free-ptr+
+                    (advance-if (and (eq opcode 'cmp)
+                                     (eql (machine-ea-base ea) thread-base-reg)
+                                     (eql (machine-ea-disp ea)
+                                          (ash (1+ sb-vm::thread-alloc-region-slot)
+                                               sb-vm:word-shift))
+                                     (not (machine-ea-index ea))
+                                     (eql (regrm-inst-reg dchunk dstate) free-ptr-reg))
+                                +state-tested-free-ptr+))
+                   (#.+state-tested-free-ptr+
+                    (advance-if (eq opcode 'jmp) +state-jumped+))
+                   (#.+state-jumped+
+                    (advance-if (and (eq opcode 'mov) free-ptr-p
+                                     (eql (regrm-inst-reg dchunk dstate) free-ptr-reg))
+                                +state-stored-free-ptr+))
+                   (#.+state-stored-free-ptr+
+                    ;; lowtag/widetag can be assigned in either order
+                    (case opcode
+                      (lea ; convert to descriptor before writing widetag
+                       (advance-if (and (eql (machine-ea-base ea) orig-free-ptr-reg)
                                         (not (machine-ea-index ea))
                                         (<= 0 (machine-ea-disp ea) sb-vm:lowtag-mask))
-                                   +state-descriptorized+)
+                                   +state-lowtag-only+)
                        (setq target-reg (regrm-inst-reg dchunk dstate)
-                             target-lowtag (machine-ea-disp ea))
-                       (when (= target-lowtag sb-vm:list-pointer-lowtag)
-                         (return-from infer-type (values 'list size))))))
-               (#.+state-descriptorized+
-                (unless (eq opcode 'mov)
-                  (fail))
-                (case target-lowtag
-                 (#.sb-vm:other-pointer-lowtag
-                  (unless header-word-p (fail))
-                  (return-from infer-type
-                   ;; KLUDGE: non-immediate is qword, immediate is anything but that.
-                   (if (member (inst-operand-size dstate) '(:byte :word :dword))
-                       (values (aref *tag-to-type* (logand (reg/mem-imm-data 0 dstate) #xFF))
-                               size)
-                       (values '#:|unknown| nil))))
-                 (#.sb-vm:instance-pointer-lowtag
-                  (unless header-word-p (fail))
-                  ;; META: WTF does this KLUDGE comment mean? We're not computing a length.
-                  ;; KLUDGE: computed length is a :qword (though it should be a :dword),
-                  ;; and immediate is :word or :dword.
-                  (when (eq (inst-operand-size dstate) :qword)
-                    (return-from infer-type (values 'instance nil)))
-                  (advance-if (and (member (inst-operand-size dstate) '(:byte :word :dword))
-                                   (eql (logand (reg/mem-imm-data 0 dstate) #xFF)
-                                        sb-vm:instance-widetag))
-                              +state-widetagged+))
-                 (#.sb-vm:fun-pointer-lowtag
-                  ;; CLOSURE allocation performs a MOV immediate-to-register,
-                  ;; then ORs in the function layout, then stores.
-                  ;; Also note that FIN must use REG/MEM-IMM-DATA to read the
-                  ;; immediate operand where closure uses REG-IMM-DATA.
-                  (when (and (integerp ea)
-                             (eql (logand (reg-imm-data 0 dstate) #xFF)
-                                  sb-vm:closure-widetag))
-                    (return-from infer-type (values 'closure size)))
-                  (unless header-word-p (fail))
-                  (if (and (member (inst-operand-size dstate) '(:word :dword))
-                           (eql (logand (reg/mem-imm-data 0 dstate) #xFF)
-                                sb-vm:funcallable-instance-widetag))
-                      (return-from infer-type (values 'funcallable-instance size))
-                      ;; Not sure the subtype, but it must be a function
-                      (return-from infer-type (values 'function size))))
-                 (t
-                  (fail))))
-               (#.+state-widetagged+
-                (when (and (eql target-lowtag sb-vm:instance-pointer-lowtag)
-                           (eq opcode 'mov)
-                           (eq (inst-operand-size dstate) :dword)
-                           (eql (machine-ea-base ea) target-reg)
-                           (not (machine-ea-index ea))
-                           (eql (machine-ea-disp ea) (- 4 target-lowtag)))
-                  (return-from infer-type
-                   (values (layout-name (reg/mem-imm-data 0 dstate))
-                           size))))
-               (#.+state-trampoline-arg+
-                (advance-if (eq opcode '|call|) +state-called+))
-               (#.+state-called+
-                (cond ((and (eq opcode '|pop|) (<= #x58 opcode-byte #x5F))
-                       (setq target-reg
-                             (+ (if (logtest +rex-b+ (dstate-inst-properties dstate))
-                                    8 0)
-                                (- opcode-byte #x58)))
-                       (advance +state-result-popped+))
+                             lowtag (machine-ea-disp ea))
+                       (when (= lowtag sb-vm:list-pointer-lowtag)
+                         (return-from infer-type (values 'list size))))
+                      (mov ; widetag stored before ORing in lowtag
+                       (advance-if (and (eq (machine-ea-base ea) orig-free-ptr-reg)
+                                        (not (machine-ea-disp ea))
+                                        (not (machine-ea-index ea)))
+                                   +state-widetag-only+)
+                       (setq widetag (if (eq (inst-operand-size dstate) :qword)
+                                         :variable
+                                         (logand (reg/mem-imm-data 0 dstate) #xFF))
+                              target-reg orig-free-ptr-reg))
                       (t
                        (fail))))
-               (#.+state-result-popped+
-                (cond ((eq opcode '|or|)
-                       (if (eql opcode-byte #x0C)
-                           ;; OR AL, $byte (2 byte encoding)
-                           (setq target-lowtag (ldb (byte 8 8) dchunk))
-                           ;; OR other-reg, $byte ; (3 byte encoding)
-                           (setq target-lowtag (ldb (byte 8 16) dchunk)))
-                       (advance +state-descriptorized+))
+                   (#.+state-lowtag-only+
+                    (unless (eq opcode 'mov)
+                      (fail))
+                    (case lowtag
+                      (#.sb-vm:other-pointer-lowtag
+                       (unless header-word-p (fail))
+                       (return-from infer-type
+                         ;; KLUDGE: non-immediate is qword, immediate is anything but that.
+                         (if (member (inst-operand-size dstate) '(:byte :word :dword))
+                             (values (aref *tag-to-type* (logand (reg/mem-imm-data 0 dstate) #xFF))
+                                     size)
+                             (values '#:|unknown| nil))))
+                      (#.sb-vm:instance-pointer-lowtag
+                       (unless header-word-p (fail))
+                       ;; META: WTF does this KLUDGE comment mean? We're not computing a length.
+                       ;; KLUDGE: computed length is a :qword (though it should be a :dword),
+                       ;; and immediate is :word or :dword.
+                       (when (eq (inst-operand-size dstate) :qword)
+                         (return-from infer-type (values 'instance nil)))
+                       (advance-if (and (member (inst-operand-size dstate) '(:byte :word :dword))
+                                        (eql (logand (reg/mem-imm-data 0 dstate) #xFF)
+                                             sb-vm:instance-widetag))
+                                   +state-low-then-widetag+))
+                      (#.sb-vm:fun-pointer-lowtag
+                       ;; CLOSURE allocation performs a MOV immediate-to-register,
+                       ;; then ORs in the function layout, then stores.
+                       ;; Also note that FIN must use REG/MEM-IMM-DATA to read the
+                       ;; immediate operand where closure uses REG-IMM-DATA.
+                       (when (and (integerp ea)
+                                  (eql (logand (reg-imm-data 0 dstate) #xFF)
+                                       sb-vm:closure-widetag))
+                         (return-from infer-type (values 'closure size)))
+                       (unless header-word-p (fail))
+                       (if (and (member (inst-operand-size dstate) '(:word :dword))
+                                (eql (logand (reg/mem-imm-data 0 dstate) #xFF)
+                                     sb-vm:funcallable-instance-widetag))
+                           (return-from infer-type (values 'funcallable-instance size))
+                           ;; Not sure the subtype, but it must be a function
+                           (return-from infer-type (values 'function size))))
                       (t
                        (fail))))
-               ))))
-       seg dstate))))
+                   (#.+state-low-then-widetag+
+                    (infer-layout opcode ea dchunk))
+                   (#.+state-widetag-only+
+                    (advance-if (and (eq opcode '|or|)
+                                     ;; TODO: AVER correct register as well
+                                     (not lowtag))
+                                +state-wide-then-lowtag+)
+                    (setq lowtag (reg/mem-imm-data 0 dstate))
+                    (ecase lowtag
+                      (#.sb-vm:other-pointer-lowtag
+                       (return-from infer-type
+                         (values (aref *tag-to-type* widetag) size)))
+                      (#.sb-vm:instance-pointer-lowtag)
+                      (#.sb-vm:fun-pointer-lowtag
+                       (return-from infer-type (values 'function size)))))
+                   (#.+state-wide-then-lowtag+
+                    (advance-if (and (eq opcode 'xor) (pseudoatomic-flag-p))
+                                +state-end-pa+))
+                   (#.+state-end-pa+
+                    (advance-if (eq opcode 'jmp) +state-test-interrupted+))
+                   (#.+state-test-interrupted+
+                    (advance-if (eq opcode '|break|) +state-pa-trap+))
+                   (#.+state-pa-trap+
+                    (infer-layout opcode ea dchunk))
+                   (#.+state-trampoline-arg+
+                    (advance-if (eq opcode '|call|) +state-called+))
+                   (#.+state-called+
+                    (cond ((and (eq opcode '|pop|) (<= #x58 opcode-byte #x5F))
+                           (setq target-reg
+                                 (+ (if (logtest +rex-b+ (dstate-inst-properties dstate))
+                                        8 0)
+                                    (- opcode-byte #x58)))
+                           (advance +state-result-popped+))
+                          (t
+                           (fail))))
+                   (#.+state-result-popped+
+                    (cond ((eq opcode '|or|)
+                           (if (eql opcode-byte #x0C)
+                               ;; OR AL, $byte (2 byte encoding)
+                               (setq lowtag (ldb (byte 8 8) dchunk))
+                               ;; OR other-reg, $byte ; (3 byte encoding)
+                               (setq lowtag (ldb (byte 8 16) dchunk)))
+                           (advance +state-lowtag-only+))
+                          (t
+                           (fail))))
+                   ))))
+           seg dstate)))))
   (values nil nil))
 
 ;;; Return a name for PC-OFFS in CODE. PC-OFFSET is relative
