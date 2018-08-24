@@ -1563,3 +1563,12 @@
                        :element-type (array-element-type str)
                        :displaced-to str)))
     (("abc") "ab" :test #'equal)))
+
+(with-test (:name :lambda-var-ref-lvar-loop)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (labels ((z (a)
+                    (when (>= 0 (the integer a))
+                      (values #'z a))))))
+    (() nil)))

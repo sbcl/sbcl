@@ -880,7 +880,11 @@
                       (primary (car lambda-refs)))
                  (and (ref-p primary)
                       (not (cdr lambda-refs))
-                      (combination-p (lvar-dest (ref-lvar primary)))))))))))
+                      (let* ((lvar (ref-lvar primary))
+                             (dest (and lvar
+                                        (lvar-dest lvar))))
+                        (and (combination-p dest)
+                             (eq (combination-fun dest) lvar)))))))))))
 
 (defun trivial-lambda-var-ref-lvar (use)
   (let* ((this (ref-leaf use))
@@ -900,12 +904,14 @@
                (not (lambda-var-sets var)))
       (let* ((fun (lambda-var-home var))
              (vars (lambda-vars fun))
-             (lvar (and (lambda-refs fun)
-                        (null (cdr (lambda-refs fun)))
-                        (ref-lvar (car (lambda-refs fun)))))
+             (refs (lambda-refs fun))
+             (lvar (and refs
+                        (null (cdr refs))
+                        (ref-lvar (car refs))))
              (combination (and lvar
                                (lvar-dest lvar))))
-        (when (combination-p combination)
+        (when (and (combination-p combination)
+                   (eq (combination-fun combination) lvar))
           (loop for v in vars
                 for arg in (combination-args combination)
                 when (eq v var)
@@ -2823,9 +2829,13 @@ is :ANY, the function name is not checked."
     (let* ((home (lambda-var-home lambda-var))
            (vars (lambda-vars home)))
       (dolist (ref (lambda-refs home))
-        (let ((combination (node-dest ref)))
+        (let* ((lvar (node-lvar ref))
+               (combination (and lvar
+                                 (lvar-dest lvar))))
           (when (and (combination-p combination)
-                     (eq (combination-kind combination) :local))
+                     (eq (combination-kind combination) :local)
+                     (eq (combination-fun combination)
+                         lvar))
             (loop for v in vars
                   for arg in (combination-args combination)
                   when (eq v lambda-var)
