@@ -275,8 +275,9 @@
            (sb-aprof:aprof-run
             (checked-compile
              '(sb-int:named-lambda "test" ()
-               (declare (inline sb-thread:make-mutex))
-               (loop repeat 50 collect (sb-thread:make-mutex))))))))
+                (declare (inline sb-thread:make-mutex)
+                         (optimize sb-c::instrument-consing))
+                (loop repeat 50 collect (sb-thread:make-mutex))))))))
     (assert (= nbytes
                 (+ (* 51 2 sb-vm:n-word-bytes) ; list (extra for dummy head)
                    (* 50 (sb-vm::primitive-object-size
