@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.4.10:
+changes in sbcl-1.4.11 relative to sbcl-1.4.10:
   * minor incompatible change: changes to the (internal) assembler on x86
     and x86-64 may cause problems to some low-level third-party libraries:
     ** new macro EA for defining an effective address, without size
