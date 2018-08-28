@@ -1,8 +1,24 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.4.10:
+  * minor incompatible change: changes to the (internal) assembler on x86
+    and x86-64 may cause problems to some low-level third-party libraries:
+    ** new macro EA for defining an effective address, without size
+       information;
+    ** an explicit size modifier is now needed for MOVSX and MOVSZ
+       instructions;
+    ** MOVD and MOVQ move a single size of operand by definition.
+  * enhancement: support the latest MinGW (lp#1786731, reported by il71)
+  * enhancement: checks for modifications of constants can now be done in
+    local (FLET/LABELS) functions.
   * optimization: improved type checking routines for various compound types.
   * optimization: array bound checks are elided on vectors when the index is
     known to be less than the length, including LOOP ACROSS.
+  * optimization: the register allocator's use of temporaries is somewhat
+    improved.
+  * optimization: checking widetags involves fewer conditional jumps on x86
+    and x86-64.
+  * bug fix: fix a number of bugs related to constant improper lists as 
+    sequence arguments (lp#1768563, lp#1768568, lp#1768652)
 
 changes in sbcl-1.4.10 relative to sbcl-1.4.9:
   * enhancement: added SB-EXT:MAKE-WEAK-VECTOR.
