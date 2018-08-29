@@ -109,10 +109,6 @@ DRAGONFLY
   Hint: Comment out call to os_invalidate in perform_thread_post_mortem
   and threads will work, but space will not be freed, of course.
 
-UNDEFINED FUNCTION / VARIABLE RESTARTS
-
-  You know, like Allegro is reputed to have.
-
 MISC CLEANUPS
 
   These need to be taken a good look at -- it might be that some of them
@@ -166,11 +162,6 @@ HIGH LEVEL SOCKET INTERFACE
 RPC INTERFACE
 
   For talking with other processes.
-
-CROSS PLATFORM GUI
-
-  Since this is a high priority we're waiting for PHP coders to
-  offer their help to build a website about this.
 
 BLOCK COMPILATION
 
