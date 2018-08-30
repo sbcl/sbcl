@@ -123,8 +123,8 @@
 
 (defstruct (lvar-proper-sequence-annotation
             (:include lvar-annotation))
-  (kind :sequence :type (member proper-list proper-sequence
-                                proper-or-circular-list proper-or-dotted-list)))
+  (kind 'proper-sequence :type (member proper-list proper-sequence
+                                       proper-or-circular-list proper-or-dotted-list)))
 
 (defmethod print-object ((x lvar) stream)
   (print-unreadable-object (x stream :type t :identity t)
