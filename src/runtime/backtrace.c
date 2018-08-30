@@ -114,7 +114,7 @@ debug_function_from_pc (struct code* code, void *pc)
 }
 
 static void
-print_string (struct vector *vector)
+print_string (struct vector *vector, FILE *f)
 {
   int tag = widetag_of(vector->header);
 
@@ -126,8 +126,8 @@ print_string (struct vector *vector)
     for (i = 0; i < n; i++) {                   \
       wchar_t c = (wchar_t) data[i];            \
       if (c == '\\' || c == '"')                \
-        putchar('\\');                          \
-      sbcl_putwc(c, stdout);                    \
+        putc('\\', f);                          \
+      sbcl_putwc(c, f);                         \
     }                                           \
   } while (0)
 
@@ -141,7 +141,7 @@ print_string (struct vector *vector)
     break;
 #endif
   default:
-    printf("<??? type %d>", tag);
+    fprintf(f, "<??? type %d>", tag);
   }
 #undef doit
 }
@@ -154,22 +154,22 @@ static int string_equal (struct vector *vector, char *string)
 }
 
 static void
-print_entry_name (lispobj name)
+print_entry_name (lispobj name, FILE *f)
 {
     if (listp(name)) {
-        putchar('(');
+        putc('(', f);
         while (name != NIL) {
             if (!listp(name)) {
-                printf("%p: unexpected lowtag while printing a cons\n",
+                fprintf(f, "%p: unexpected lowtag while printing a cons\n",
                        (void*)name);
                 return;
             }
-            print_entry_name(CONS(name)->car);
+            print_entry_name(CONS(name)->car, f);
             name = CONS(name)->cdr;
             if (name != NIL)
-                putchar(' ');
+                putc(' ', f);
         }
-        putchar(')');
+        putc(')', f);
     } else if (lowtag_of(name) == OTHER_POINTER_LOWTAG) {
         lispobj *object = native_pointer(name);
         if (widetag_of(*object) == SYMBOL_WIDETAG) {
@@ -181,43 +181,43 @@ print_entry_name (lispobj name)
                 if (string_equal(pkg_name, "COMMON-LISP"))
                     ;
                 else if (string_equal(pkg_name, "COMMON-LISP-USER")) {
-                    fputs("CL-USER::", stdout);
+                    fputs("CL-USER::", f);
                 }
                 else if (string_equal(pkg_name, "KEYWORD")) {
-                    putchar(':');
+                    putc(':', f);
                 } else {
-                    print_string(pkg_name);
-                    fputs("::", stdout);
+                    print_string(pkg_name, f);
+                    fputs("::", f);
                 }
             }
-            print_string(VECTOR(symbol->name));
+            print_string(VECTOR(symbol->name), f);
         } else if (widetag_of(*object) == SIMPLE_BASE_STRING_WIDETAG
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
                    || widetag_of(*object) == SIMPLE_CHARACTER_STRING_WIDETAG
 #endif
             ) {
-            putchar('"');
-            print_string((struct vector*)object);
-            putchar('"');
+            putc('"', f);
+            print_string((struct vector*)object, f);
+            putc('"', f);
         } else {
-            printf("<??? type %d>", (int) widetag_of(*object));
+            fprintf(f, "<??? type %d>", (int) widetag_of(*object));
         }
     } else {
-        printf("<??? lowtag %d>", (int) lowtag_of(name));
+        fprintf(f, "<??? lowtag %d>", (int) lowtag_of(name));
     }
 }
 
 static void
-print_entry_points (struct code *code)
+print_entry_points (struct code *code, FILE *f)
 {
     int n_funs = code_n_funs(code);
     for_each_simple_fun(index, fun, code, 0, {
         if (widetag_of(fun->header) != SIMPLE_FUN_WIDETAG) {
-            printf("%p: bogus function entry", fun);
+            fprintf(f, "%p: bogus function entry", fun);
             return;
         }
-        print_entry_name(fun->name);
-        if ((index + 1) < n_funs) printf (", ");
+        print_entry_name(fun->name, f);
+        if ((index + 1) < n_funs) fprintf(f, ", ");
     });
 }
 
@@ -413,9 +413,9 @@ lisp_backtrace(int nframes)
             struct compiled_debug_fun *df ;
             if (info.lra != NIL &&
                 (df = debug_function_from_pc((struct code *)info.code, (void *)info.lra)))
-                print_entry_name(df->name);
+                print_entry_name(df->name, stdout);
             else
-                print_entry_points((struct code *)info.code);
+                print_entry_points((struct code *)info.code, stdout);
 
             printf(" %p", (void*)((uword_t) info.code | OTHER_POINTER_LOWTAG));
         }
@@ -536,31 +536,31 @@ describe_thread_state(void)
     printf("Pending handler = %p\n", data->pending_handler);
 }
 
-void print_backtrace_frame(void *pc, void *fp, int i) {
+static void print_backtrace_frame(void *pc, void *fp, int i, FILE *f) {
     lispobj *p;
-    printf("%4d: ", i);
+    fprintf(f, "%4d: ", i);
 
-    p = (lispobj *) component_ptr_from_pc((lispobj *) pc);
+    p = component_ptr_from_pc((lispobj *) pc);
 
     if (p) {
         struct code *cp = (struct code *) p;
         struct compiled_debug_fun *df = debug_function_from_pc(cp, pc);
         if (df)
-            print_entry_name(df->name);
+            print_entry_name(df->name, f);
         else
-            print_entry_points(cp);
-        printf(", pc = %p, fp = %p", pc, fp);
+            print_entry_points(cp, f);
+        fprintf(f, ", pc = %p, fp = %p", pc, fp);
     } else {
 #ifdef LISP_FEATURE_OS_PROVIDES_DLADDR
         Dl_info info;
         if (dladdr(pc, &info)) {
-            printf("Foreign function %s, pc = %p, fp = %p", info.dli_sname, pc, fp);
+            fprintf(f, "Foreign function %s, pc = %p, fp = %p", info.dli_sname, pc, fp);
         } else
 #endif
-            printf("Foreign function, pc = %p, fp = %p", pc, fp);
+            fprintf(f, "Foreign function, pc = %p, fp = %p", pc, fp);
     }
 
-    putchar('\n');
+    putc('\n', f);
 }
 
 /* This function has been split from lisp_backtrace() to enable Lisp
@@ -568,7 +568,7 @@ void print_backtrace_frame(void *pc, void *fp, int i) {
  * example when debugging threading deadlocks.
  */
 void
-backtrace_from_fp(void *fp, int nframes, int start)
+log_backtrace_from_fp(void *fp, int nframes, int start, FILE *f)
 {
   int i = start;
 
@@ -578,9 +578,12 @@ backtrace_from_fp(void *fp, int nframes, int start)
 
     if (!x86_call_context(fp, &ra, &next_fp))
       break;
-    print_backtrace_frame(ra, next_fp, i);
+    print_backtrace_frame(ra, next_fp, i, f);
     fp = next_fp;
   }
+}
+void backtrace_from_fp(void *fp, int nframes, int start) {
+    log_backtrace_from_fp(fp, nframes, start, stdout);
 }
 
 void backtrace_from_context(os_context_t *context, int nframes) {
@@ -589,7 +592,7 @@ void backtrace_from_context(os_context_t *context, int nframes) {
 #elif defined (LISP_FEATURE_X86_64)
     void *fp = (void *)*os_context_register_addr(context,reg_RBP);
 #endif
-    print_backtrace_frame((void *)*os_context_pc_addr(context), fp, 0);
+    print_backtrace_frame((void *)*os_context_pc_addr(context), fp, 0, stdout);
     backtrace_from_fp(fp, nframes - 1, 1);
 }
 
