@@ -743,7 +743,8 @@ process_directory(int count, struct ndir_entry *entry,
         gc_assert(varyobj_free_pointer >= (lispobj*)VARYOBJ_SPACE_START);
 #if !ENABLE_PAGE_PROTECTION
         printf("Lisp code present in executable @ %lx:%lx (freeptr=%p)\n",
-               (uword_t)&__lisp_code_start, aligned_end, varyobj_free_pointer);
+               (uword_t)&__lisp_code_start, (uword_t)&__lisp_code_end,
+               varyobj_free_pointer);
 #endif
         // Prefill the Lisp linkage table so that we can (pending some additional work)
         // remove "-ldl" from the linker options when making a shrinkwrapped executable.
