@@ -56,7 +56,7 @@ static int ldb_in_fd = -1;
 typedef void cmd(char **ptr);
 
 static cmd dump_cmd, print_cmd, quit_cmd, help_cmd;
-static cmd flush_cmd, search_cmd, regs_cmd, exit_cmd;
+static cmd flush_cmd, regs_cmd, exit_cmd;
 static cmd print_context_cmd, pte_cmd;
 static cmd backtrace_cmd, purify_cmd, catchers_cmd;
 static cmd grab_sigs_cmd;
@@ -87,8 +87,6 @@ static struct cmd {
     {"pte", "Page table entry for address", pte_cmd},
     {"quit", "Quit.", quit_cmd},
     {"regs", "Display current Lisp registers.", regs_cmd},
-    {"search", "Search for TYPE starting at ADDRESS for a max of COUNT words.", search_cmd},
-    {"s", "(an alias for search)", search_cmd},
     {NULL, NULL, NULL}
 };
 
@@ -273,66 +271,6 @@ regs_cmd(char __attribute__((unused)) **ptr)
 #ifndef LISP_FEATURE_GENCGC
     printf("TRIGGER\t=\t%p\n", (void*)current_auto_gc_trigger);
 #endif
-}
-
-static void
-search_cmd(char **ptr)
-{
-    static int lastval = 0, lastcount = 0;
-    static lispobj *start = 0, *end = 0;
-    int val, count;
-    lispobj *addr, obj;
-
-    if (more_p(ptr)) {
-        val = parse_number(ptr);
-        if (val < 0 || val > 0xff) {
-            printf("can only search for single bytes\n");
-            return;
-        }
-        if (more_p(ptr)) {
-            addr = native_pointer((uword_t)parse_addr(ptr, 1));
-            if (more_p(ptr)) {
-                count = parse_number(ptr);
-            }
-            else {
-                /* Specified value and address, but no count. Only one. */
-                count = -1;
-            }
-        }
-        else {
-            /* Specified a value, but no address, so search same range. */
-            addr = start;
-            count = lastcount;
-        }
-    }
-    else {
-        /* Specified nothing, search again for val. */
-        val = lastval;
-        addr = end;
-        count = lastcount;
-    }
-
-    lastval = val;
-    start = end = addr;
-    lastcount = count;
-
-    printf("searching for 0x%x at %p\n", val, (void*)(uword_t)end);
-
-    while (search_for_type(val, &end, &count)) {
-        printf("found 0x%x at %p:\n", val, (void*)(uword_t)end);
-        obj = *end;
-        addr = end;
-        end += 2;
-        if (widetag_of(obj) == SIMPLE_FUN_WIDETAG) {
-            print((uword_t)addr | FUN_POINTER_LOWTAG);
-        } else if (other_immediate_lowtag_p(obj)) {
-            print((lispobj)addr | OTHER_POINTER_LOWTAG);
-        } else {
-            print((lispobj)addr);
-        } if (count == -1) {
-            return;
-        }
-    }
 }
 
 /* (There used to be call_cmd() here, to call known-at-cold-init-time

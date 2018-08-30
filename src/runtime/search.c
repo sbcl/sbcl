@@ -42,24 +42,6 @@ search_static_space(void *pointer)
     return gc_search_space(start, pointer);
 }
 
-boolean search_for_type(int type, lispobj **start, int *count)
-{
-    lispobj obj;
-
-    while ((*count == -1 || (*count > 0)) &&
-           gc_managed_addr_p((lispobj)*start)) {
-        obj = **start;
-        if (*count != -1)
-            *count -= 2;
-
-        if (widetag_of(obj) == type)
-            return 1;
-
-        (*start) += 2;
-    }
-    return 0;
-}
-
 static int __attribute__((unused)) strcmp_ucs4_ascii(uint32_t* a, char* b)
 {
   int i = 0;
