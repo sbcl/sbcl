@@ -10,6 +10,7 @@
  */
 
 #include <string.h>
+#include <ctype.h>
 
 #include "sbcl.h"
 #include "runtime.h"
@@ -42,22 +43,31 @@ search_static_space(void *pointer)
     return gc_search_space(start, pointer);
 }
 
-static int __attribute__((unused)) strcmp_ucs4_ascii(uint32_t* a, char* b)
+static int __attribute__((unused)) strcmp_ucs4_ascii(uint32_t* a, unsigned char* b,
+                                                     boolean ignore_case)
 {
-  int i = 0;
+    int i = 0;
 
   // Lisp terminates UCS4 strings with NULL bytes - probably to no avail
   // since null-terminated UCS4 isn't a common convention for any foreign ABI -
   // but length has been pre-checked, so hitting an ASCII null is a win.
-  while (a[i] == ((unsigned char*)b)[i])
-    if (b[i] == 0)
-      return 0;
-    else
-      ++i;
-  return a[i] - b[i]; // same return convention as strcmp()
+    if (ignore_case) {
+        while (toupper(a[i]) == toupper(b[i]))
+            if (b[i] == 0)
+                return 0;
+            else
+                ++i;
+    } else {
+        while (a[i] == b[i])
+            if (b[i] == 0)
+                return 0;
+            else
+                ++i;
+    }
+    return a[i] - b[i]; // same return convention as strcmp()
 }
 
-lispobj* search_for_symbol(char *name, lispobj start, lispobj end)
+lispobj* search_for_symbol(char *name, lispobj start, lispobj end, boolean ignore_case)
 {
     lispobj* where = (lispobj*)start;
     lispobj* limit = (lispobj*)end;
@@ -72,11 +82,12 @@ lispobj* search_for_symbol(char *name, lispobj start, lispobj end)
             if (gc_managed_addr_p((lispobj)symbol_name) &&
                 ((widetag_of(symbol_name->header) == SIMPLE_BASE_STRING_WIDETAG
                   && symbol_name->length == namelen
-                  && !strcmp((char *)symbol_name->data, name))
+                  && !(ignore_case ? strcasecmp : strcmp)((char *)symbol_name->data, name))
 #ifdef LISP_FEATURE_SB_UNICODE
                  || (widetag_of(symbol_name->header) == SIMPLE_CHARACTER_STRING_WIDETAG
                      && symbol_name->length == namelen
-                     && !strcmp_ucs4_ascii((uint32_t*)symbol_name->data, name))
+                     && !strcmp_ucs4_ascii((uint32_t*)symbol_name->data,
+                                           (unsigned char*)name, ignore_case))
 #endif
                  ))
                 return where;

@@ -15,6 +15,6 @@
 extern lispobj* find_symbol(char*, char*, unsigned int*); // Find via package
 extern struct symbol* lisp_symbol_from_tls_index(lispobj tls_index);
 // Find via heap scan
-extern lispobj* search_for_symbol(char *name, lispobj start, lispobj end);
+extern lispobj* search_for_symbol(char *name, lispobj start, lispobj end, boolean);
 
 #endif
