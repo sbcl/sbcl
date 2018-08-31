@@ -1540,7 +1540,7 @@ static inline boolean plausible_tag_p(lispobj addr)
     if (listp(addr))
         return is_cons_half(CONS(addr)->car)
             && is_cons_half(CONS(addr)->cdr);
-    unsigned char widetag = widetag_of(*native_pointer(addr));
+    unsigned char widetag = widetag_of(native_pointer(addr));
     return other_immediate_lowtag_p(widetag)
         && lowtag_of(addr) == lowtag_for_widetag[widetag>>2];
 }
@@ -1627,7 +1627,7 @@ maybe_adjust_large_object(page_index_t first_page, sword_t nwords)
     int page_type_flag;
 
     /* Check whether it's a vector or bignum object. */
-    lispobj widetag = widetag_of(where[0]);
+    lispobj widetag = widetag_of(where);
     if (widetag == SIMPLE_VECTOR_WIDETAG)
         page_type_flag = SINGLE_OBJECT_FLAG | BOXED_PAGE_FLAG;
     else if (specialized_vector_widetag_p(widetag) || widetag == BIGNUM_WIDETAG)
@@ -1660,8 +1660,8 @@ scavenge_pinned_ranges()
         // Never invoke scavenger on a simple-fun, just code components.
         if (is_cons_half(header))
             scavenge(obj, 2);
-        else if (widetag_of(header) != SIMPLE_FUN_WIDETAG)
-            scavtab[widetag_of(header)](obj, header);
+        else if (header_widetag(header) != SIMPLE_FUN_WIDETAG)
+            scavtab[header_widetag(header)](obj, header);
     }
 }
 
@@ -1693,7 +1693,7 @@ void visit_freed_objects(char __attribute__((unused)) *start,
                 where += 2;
             } else {
                 // Do something interesting
-                where += sizetab[widetag_of(word)](where);
+                where += sizetab[header_widetag(word)](where);
             }
         }
     }
@@ -1733,7 +1733,7 @@ wipe_nonpinned_words()
             lispobj* obj = native_pointer(key);
             // No need to check for is_cons_half() - it will be false
             // on a simple-fun header, and that's the correct answer.
-            if (widetag_of(*obj) != SIMPLE_FUN_WIDETAG)
+            if (widetag_of(obj) != SIMPLE_FUN_WIDETAG)
                 pinned_objects.keys[n_pins++] = (uword_t)obj;
         }
     }
@@ -1747,7 +1747,7 @@ wipe_nonpinned_words()
     for (i = 0; i < n_pins; ++i) {
       lispobj* obj = (lispobj*)pinned_objects.keys[i];
       lispobj word = *obj;
-      int widetag = widetag_of(word);
+      int widetag = header_widetag(word);
       if (is_cons_half(word))
           fprintf(stderr, "%p: (cons)\n", obj);
       else
@@ -1848,7 +1848,7 @@ pin_object(lispobj* base_addr)
     if (!hopscotch_containsp(&pinned_objects, object)) {
         hopscotch_insert(&pinned_objects, object, 1);
         struct code* maybe_code = (struct code*)native_pointer(object);
-        if (widetag_of(maybe_code->header) == CODE_HEADER_WIDETAG) {
+        if (widetag_of(&maybe_code->header) == CODE_HEADER_WIDETAG) {
           for_each_simple_fun(i, fun, maybe_code, 0, {
               hopscotch_insert(&pinned_objects,
                                make_lispobj(fun, FUN_POINTER_LOWTAG),
@@ -1899,7 +1899,7 @@ preserve_pointer(void *addr)
                              page_table[page].pinned)))
         return;
      object_start = native_pointer((lispobj)addr);
-     switch (widetag_of(*object_start)) {
+     switch (widetag_of(object_start)) {
      case SIMPLE_FUN_WIDETAG:
 #ifdef RETURN_PC_WIDETAG
      case RETURN_PC_WIDETAG:
@@ -2002,8 +2002,8 @@ update_page_write_prot(page_index_t page)
             ptr = (void*)word;
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
         else if (lowtag_of(word>>32)==INSTANCE_POINTER_LOWTAG &&
-                 (widetag_of(word)==INSTANCE_WIDETAG||
-                  widetag_of(word)==FUNCALLABLE_INSTANCE_WIDETAG))
+                 (header_widetag(word)==INSTANCE_WIDETAG||
+                  header_widetag(word)==FUNCALLABLE_INSTANCE_WIDETAG))
             ptr = (void*)(word >> 32);
 #endif
         else
@@ -2034,13 +2034,13 @@ update_page_write_prot(page_index_t page)
             // looks like simple-fun-widetag. We can't naively back up to the
             // underlying code object since the alleged header might not be one.
             int pointee_gen = gen; // Make comparison fail if we fall through
-            if (functionp((lispobj)ptr) && widetag_of(header) == SIMPLE_FUN_WIDETAG) {
+            if (functionp((lispobj)ptr) && header_widetag(header) == SIMPLE_FUN_WIDETAG) {
                 lispobj* code = fun_code_header((lispobj)ptr - FUN_POINTER_LOWTAG);
                 // This is a heuristic, since we're not actually looking for
                 // an object boundary. Precise scanning of 'page' would obviate
                 // the guard conditions here.
                 if (immobile_space_p((lispobj)code)
-                    && widetag_of(*code) == CODE_HEADER_WIDETAG)
+                    && widetag_of(code) == CODE_HEADER_WIDETAG)
                     pointee_gen = __immobile_obj_generation(code);
             } else {
                 pointee_gen = __immobile_obj_generation(native_pointer((lispobj)ptr));
@@ -2067,7 +2067,7 @@ static inline boolean large_simple_vector_p(page_index_t page) {
     if (!page_single_obj_p(page))
         return 0;
     lispobj header = *(lispobj *)page_address(page);
-    return widetag_of(header) == SIMPLE_VECTOR_WIDETAG &&
+    return header_widetag(header) == SIMPLE_VECTOR_WIDETAG &&
         is_vector_subtype(header, VectorNormal);
 }
 
@@ -2085,8 +2085,8 @@ update_code_writeprotection(page_index_t first_page, page_index_t last_page,
         gc_assert((page_table[i].type & PAGE_TYPE_MASK) == CODE_PAGE_TYPE);
 
     lispobj* where = start;
-    for (; where < limit; where += sizetab[widetag_of(*where)](where)) {
-        switch (widetag_of(*where)) {
+    for (; where < limit; where += sizetab[widetag_of(where)](where)) {
+        switch (widetag_of(where)) {
         case CODE_HEADER_WIDETAG:
             if (header_rememberedp(*where)) return;
             break;
@@ -2523,7 +2523,7 @@ struct verify_state {
 // Generalize over INSTANCEish things. (Not general like SB-KERNEL:LAYOUT-OF)
 static inline lispobj layout_of(lispobj* instance) { // native ptr
     // Smart C compilers eliminate the ternary operator if exprs are the same
-    return widetag_of(*instance) == FUNCALLABLE_INSTANCE_WIDETAG
+    return widetag_of(instance) == FUNCALLABLE_INSTANCE_WIDETAG
       ? funinstance_layout(instance) : instance_layout(instance);
 }
 
@@ -2577,12 +2577,12 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
             (state->flags & VERIFYING_HEAP_OBJECTS)) {
             state->object_start = where;
             state->widetag =
-                is_cons_half(*where) ? LIST_POINTER_LOWTAG : widetag_of(*where);
+                is_cons_half(*where) ? LIST_POINTER_LOWTAG : widetag_of(where);
             state->tagged_object_start = compute_lispobj(where);
             state->object_end = where + OBJECT_SIZE(*where, where) - 1;
             state->object_gen = gen_of((lispobj)where);
             // Should not see filler after sweeping all gens
-            /* if (!conservative_stack && widetag_of(*where) == FILLER_WIDETAG)
+            /* if (!conservative_stack && widetag_of(where) == FILLER_WIDETAG)
                  fprintf(stderr, "Note: filler object @ %p\n", where); */
         }
         count = 1;
@@ -2671,7 +2671,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
             }
             continue;
         }
-        int widetag = widetag_of(thing);
+        int widetag = header_widetag(thing);
         if (is_lisp_immediate(thing) || widetag == NO_TLS_VALUE_MARKER_WIDETAG) {
             /* skip immediates */
         } else if (!(other_immediate_lowtag_p(widetag)
@@ -2701,7 +2701,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                     sword_t nslots = instance_length(thing) | 1;
                     lispobj bitmap = layout->bitmap;
                     gc_assert(fixnump(bitmap)
-                              || widetag_of(*native_pointer(bitmap))==BIGNUM_WIDETAG);
+                              || widetag_of(native_pointer(bitmap))==BIGNUM_WIDETAG);
                     instance_scan((void (*)(lispobj*, sword_t, uword_t))verify_range,
                                   where+1, nslots, bitmap, (uintptr_t)state);
                     count = 1 + nslots;

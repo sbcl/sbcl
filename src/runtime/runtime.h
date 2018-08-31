@@ -261,7 +261,16 @@ lowtag_of(lispobj obj)
 }
 
 static inline int
-widetag_of(lispobj obj)
+widetag_of(lispobj* obj)
+{
+#ifdef LISP_FEATURE_LITTLE_ENDIAN
+    return *(unsigned char*)obj;
+#else
+    return *obj & WIDETAG_MASK;
+#endif
+}
+static inline int
+header_widetag(lispobj obj)
 {
     return obj & WIDETAG_MASK;
 }
@@ -283,7 +292,7 @@ static inline int functionp(lispobj obj) {
 }
 static inline int simple_vector_p(lispobj obj) {
     return lowtag_of(obj) == OTHER_POINTER_LOWTAG &&
-           widetag_of(*(lispobj*)(obj-OTHER_POINTER_LOWTAG)) == SIMPLE_VECTOR_WIDETAG;
+           widetag_of((lispobj*)(obj-OTHER_POINTER_LOWTAG)) == SIMPLE_VECTOR_WIDETAG;
 }
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
@@ -325,12 +334,13 @@ is_lisp_pointer(lispobj obj)
 static inline int
 is_lisp_immediate(lispobj obj)
 {
+    int widetag;
     return (fixnump(obj)
-            || (widetag_of(obj) == CHARACTER_WIDETAG)
+            || ((widetag = header_widetag(obj)) == CHARACTER_WIDETAG)
 #if N_WORD_BITS == 64
-            || (widetag_of(obj) == SINGLE_FLOAT_WIDETAG)
+            || (widetag == SINGLE_FLOAT_WIDETAG)
 #endif
-            || (widetag_of(obj) == UNBOUND_MARKER_WIDETAG));
+            || (widetag == UNBOUND_MARKER_WIDETAG));
 }
 
 /* Convert from a lispobj with type bits to a native (ordinary
@@ -415,12 +425,12 @@ is_cons_half(lispobj obj)
      * other_immediate and are Lisp immediates can be half of a cons */
     return !other_immediate_lowtag_p(obj)
 #if N_WORD_BITS == 64
-        || ((uword_t)IMMEDIATE_WIDETAGS_MASK >> (widetag_of(obj) >> 2)) & 1;
+        || ((uword_t)IMMEDIATE_WIDETAGS_MASK >> (header_widetag(obj) >> 2)) & 1;
 #else
       /* The above bit-shifting approach is not applicable
        * since we can't employ a 64-bit unsigned integer constant. */
-      || widetag_of(obj) == CHARACTER_WIDETAG
-      || widetag_of(obj) == UNBOUND_MARKER_WIDETAG;
+      || header_widetag(obj) == CHARACTER_WIDETAG
+      || header_widetag(obj) == UNBOUND_MARKER_WIDETAG;
 #endif
 }
 

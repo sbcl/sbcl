@@ -116,7 +116,7 @@ debug_function_from_pc (struct code* code, void *pc)
 static void
 print_string (struct vector *vector, FILE *f)
 {
-  int tag = widetag_of(vector->header);
+  int tag = widetag_of(&vector->header);
 
 #define doit(TYPE)                              \
   do {                                          \
@@ -148,7 +148,7 @@ print_string (struct vector *vector, FILE *f)
 
 static int string_equal (struct vector *vector, char *string)
 {
-    if (widetag_of(vector->header) != SIMPLE_BASE_STRING_WIDETAG)
+    if (widetag_of(&vector->header) != SIMPLE_BASE_STRING_WIDETAG)
         return 0;
     return !strcmp((char *) vector->data, string);
 }
@@ -172,7 +172,7 @@ print_entry_name (lispobj name, FILE *f)
         putc(')', f);
     } else if (lowtag_of(name) == OTHER_POINTER_LOWTAG) {
         lispobj *object = native_pointer(name);
-        if (widetag_of(*object) == SYMBOL_WIDETAG) {
+        if (widetag_of(object) == SYMBOL_WIDETAG) {
             struct symbol *symbol = (struct symbol *) object;
             if (symbol->package != NIL) {
                 struct package *pkg
@@ -191,16 +191,16 @@ print_entry_name (lispobj name, FILE *f)
                 }
             }
             print_string(VECTOR(symbol->name), f);
-        } else if (widetag_of(*object) == SIMPLE_BASE_STRING_WIDETAG
+        } else if (widetag_of(object) == SIMPLE_BASE_STRING_WIDETAG
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
-                   || widetag_of(*object) == SIMPLE_CHARACTER_STRING_WIDETAG
+                   || widetag_of(object) == SIMPLE_CHARACTER_STRING_WIDETAG
 #endif
             ) {
             putc('"', f);
             print_string((struct vector*)object, f);
             putc('"', f);
         } else {
-            fprintf(f, "<??? type %d>", (int) widetag_of(*object));
+            fprintf(f, "<??? type %d>", widetag_of(object));
         }
     } else {
         fprintf(f, "<??? lowtag %d>", (int) lowtag_of(name));
@@ -212,7 +212,7 @@ print_entry_points (struct code *code, FILE *f)
 {
     int n_funs = code_n_funs(code);
     for_each_simple_fun(index, fun, code, 0, {
-        if (widetag_of(fun->header) != SIMPLE_FUN_WIDETAG) {
+        if (widetag_of(&fun->header) != SIMPLE_FUN_WIDETAG) {
             fprintf(f, "%p: bogus function entry", fun);
             return;
         }
@@ -261,19 +261,14 @@ static int previous_info(struct call_info *info);
 static struct code *
 code_pointer(lispobj object)
 {
-    lispobj *headerp, header;
-    int type, len;
-
-    headerp = native_pointer(object);
-    header = *headerp;
-    type = widetag_of(header);
-
-    switch (type) {
+    lispobj *headerp = native_pointer(object);
+    int len;
+    switch (widetag_of(headerp)) {
         case CODE_HEADER_WIDETAG:
             break;
         case RETURN_PC_WIDETAG:
         case SIMPLE_FUN_WIDETAG:
-            len = HEADER_LENGTH(header);
+            len = HEADER_LENGTH(*headerp);
             if (len == 0)
                 headerp = NULL;
             else

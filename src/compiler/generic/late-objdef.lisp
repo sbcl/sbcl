@@ -146,7 +146,7 @@ static inline lispobj compute_lispobj(lispobj* base_addr) {
   lispobj header = *base_addr;
   return make_lispobj(base_addr,
                       is_cons_half(header) ? LIST_POINTER_LOWTAG :
-                        lowtag_for_widetag[widetag_of(header)>>2]);~%}~%")
+                        lowtag_for_widetag[header_widetag(header)>>2]);~%}~%")
 
   (format stream "~%#ifdef WANT_SCAV_TRANS_SIZE_TABLES~%")
   (let ((a (make-array 64 :initial-element 0)))

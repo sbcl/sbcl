@@ -132,11 +132,11 @@ char* futex_name(int *lock_word)
     // Otherwise return NULL.
     lispobj name = *(lock_word - 1);
     struct vector* v = (struct vector*)native_pointer(name);
-    if (lowtag_of(name) == OTHER_POINTER_LOWTAG && widetag_of(v->header) == SIMPLE_BASE_STRING_WIDETAG)
+    if (lowtag_of(name) == OTHER_POINTER_LOWTAG && widetag_of(&v->header) == SIMPLE_BASE_STRING_WIDETAG)
         return (char*)(v->data);
     name = *(lock_word - 2);
     v = (struct vector*)native_pointer(name);
-    if (lowtag_of(name) == OTHER_POINTER_LOWTAG && widetag_of(v->header) == SIMPLE_BASE_STRING_WIDETAG)
+    if (lowtag_of(name) == OTHER_POINTER_LOWTAG && widetag_of(&v->header) == SIMPLE_BASE_STRING_WIDETAG)
         return (char*)(v->data);
     return 0;
 }

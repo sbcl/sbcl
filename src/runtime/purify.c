@@ -148,7 +148,7 @@ ptrans_boxed(lispobj thing, lispobj header, boolean constant)
 {
     /* Allocate it */
     lispobj *old = native_pointer(thing);
-    long nwords = sizetab[widetag_of(header)](old);
+    long nwords = sizetab[header_widetag(header)](old);
     lispobj *new = newspace_alloc(nwords,constant);
 
     /* Copy it. */
@@ -188,7 +188,7 @@ ptrans_fdefn(lispobj thing, lispobj header)
 {
     /* Allocate it */
     lispobj *old = native_pointer(thing);
-    long nwords = sizetab[widetag_of(header)](old);
+    long nwords = sizetab[header_widetag(header)](old);
     lispobj *new = newspace_alloc(nwords, 0);    /* inconstant */
 
     /* Copy it. */
@@ -213,7 +213,7 @@ ptrans_unboxed(lispobj thing, lispobj header)
 {
     /* Allocate it */
     lispobj *old = native_pointer(thing);
-    long nwords = sizetab[widetag_of(header)](old);
+    long nwords = sizetab[header_widetag(header)](old);
     lispobj *new = newspace_alloc(nwords, 1);     /* always constant */
 
     /* copy it. */
@@ -230,7 +230,7 @@ static lispobj
 ptrans_vector(lispobj thing, boolean boxed, boolean constant)
 {
     struct vector *vector = VECTOR(thing);
-    long nwords = sizetab[widetag_of(vector->header)]((lispobj*)vector);
+    long nwords = sizetab[header_widetag(vector->header)]((lispobj*)vector);
 
     lispobj *new = newspace_alloc(nwords, (constant || !boxed));
     bcopy(vector, new, nwords * sizeof(lispobj));
@@ -296,7 +296,7 @@ ptrans_func(lispobj thing, lispobj header)
      * Otherwise we have to do something strange, 'cause it is buried
      * inside a code object. */
 
-    if (widetag_of(header) == SIMPLE_FUN_WIDETAG) {
+    if (header_widetag(header) == SIMPLE_FUN_WIDETAG) {
 
         /* We can only end up here if the code object has not been
          * scavenged, because if it had been scavenged, forwarding pointers
@@ -316,13 +316,13 @@ ptrans_func(lispobj thing, lispobj header)
     } else {
         /* It's some kind of closure-like thing. */
         lispobj *old = native_pointer(thing);
-        long nwords = sizetab[widetag_of(header)](old);
+        long nwords = sizetab[header_widetag(header)](old);
 
         /* Allocate the new one.  FINs *must* not go in read_only
          * space.  Closures can; they never change */
 
         lispobj *new = newspace_alloc
-            (nwords,(widetag_of(header)!=FUNCALLABLE_INSTANCE_WIDETAG));
+            (nwords,(header_widetag(header)!=FUNCALLABLE_INSTANCE_WIDETAG));
 
         /* Copy it. */
         bcopy(old, new, nwords * sizeof(lispobj));
@@ -391,7 +391,7 @@ ptrans_list(lispobj thing, boolean constant)
 static lispobj
 ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
 {
-    int widetag = widetag_of(header);
+    int widetag = header_widetag(header);
     switch (widetag) {
         /* FIXME: this needs a reindent */
       case BIGNUM_WIDETAG:
@@ -447,7 +447,7 @@ ptrans_otherptr(lispobj thing, lispobj header, boolean constant)
         if (other_immediate_lowtag_p(widetag) &&
             specialized_vector_widetag_p(widetag))
             return ptrans_vector(thing, 0, constant);
-        fprintf(stderr, "Invalid widetag: %d\n", widetag_of(header));
+        fprintf(stderr, "Invalid widetag: %d\n", header_widetag(header));
         /* Should only come across other pointers to the above stuff. */
         gc_abort();
         return NIL;
@@ -475,7 +475,7 @@ pscav(lispobj *addr, long nwords, boolean constant)
 
     while (nwords > 0) {
         thing = *addr;
-        int widetag = widetag_of(thing);
+        int widetag = header_widetag(thing);
         if (is_lisp_pointer(thing)) {
             /* It's a pointer. Is it something we might have to move? */
             if (dynamic_pointer_p(thing)) {
@@ -592,7 +592,7 @@ pscav(lispobj *addr, long nwords, boolean constant)
               default:
                 if (other_immediate_lowtag_p(widetag) &&
                     specialized_vector_widetag_p(widetag))
-                    count = sizetab[widetag_of(thing)](addr);
+                    count = sizetab[header_widetag(thing)](addr);
                 else
                     count = 1;
                 break;

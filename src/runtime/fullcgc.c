@@ -169,9 +169,9 @@ static inline int pointer_survived_gc_yet(lispobj pointer)
     if (listp(pointer))
         return cons_markedp(pointer);
     lispobj header = *native_pointer(pointer);
-    if (widetag_of(header) == BIGNUM_WIDETAG)
+    if (header_widetag(header) == BIGNUM_WIDETAG)
         return (header & BIGNUM_MARK_BIT) != 0;
-    if (embedded_obj_p(widetag_of(header)))
+    if (embedded_obj_p(header_widetag(header)))
         header = *fun_code_header(native_pointer(pointer));
     return (header & MARK_BIT) != 0;
 }
@@ -184,11 +184,11 @@ void __mark_obj(lispobj pointer)
     if (!listp(pointer)) {
         lispobj* base = native_pointer(pointer);
         lispobj header = *base;
-        if (widetag_of(header) == BIGNUM_WIDETAG) {
+        if (header_widetag(header) == BIGNUM_WIDETAG) {
             *base |= BIGNUM_MARK_BIT;
             return; // don't enqueue - no pointers
         } else {
-            if (embedded_obj_p(widetag_of(header))) {
+            if (embedded_obj_p(header_widetag(header))) {
                 base = fun_code_header(base);
                 pointer = make_lispobj(base, OTHER_POINTER_LOWTAG);
                 header = *base;
@@ -202,7 +202,7 @@ void __mark_obj(lispobj pointer)
                 return; // already marked
             *base |= MARK_BIT;
         }
-        if (unboxed_obj_widetag_p(widetag_of(header)))
+        if (unboxed_obj_widetag_p(header_widetag(header)))
             return;
     } else {
         uword_t key = compute_page_key(pointer);
@@ -243,7 +243,7 @@ void gc_mark_range(lispobj* where, long count) {
 static void trace_object(lispobj* where)
 {
     lispobj header = *where;
-    int widetag = widetag_of(header);
+    int widetag = header_widetag(header);
     sword_t scan_from = 1;
     sword_t scan_to = sizetab[widetag](where);
     sword_t i;
@@ -369,7 +369,7 @@ void execute_full_mark_phase()
     while (where < end) {
         lispobj obj = compute_lispobj(where);
         gc_enqueue(obj);
-        where += listp(obj) ? 2 : sizetab[widetag_of(*where)](where);
+        where += listp(obj) ? 2 : sizetab[widetag_of(where)](where);
     }
     do {
         lispobj ptr = gc_dequeue();
@@ -399,7 +399,7 @@ static void smash_weak_pointers()
 {
     struct weak_pointer *wp, *next_wp;
     for (wp = weak_pointer_chain; wp != WEAK_POINTER_CHAIN_END; wp = next_wp) {
-        gc_assert(widetag_of(wp->header) == WEAK_POINTER_WIDETAG);
+        gc_assert(widetag_of(&wp->header) == WEAK_POINTER_WIDETAG);
         next_wp = wp->next;
         wp->next = NULL;
         lispobj pointee = wp->value;
@@ -497,9 +497,9 @@ static uword_t sweep(lispobj* where, lispobj* end, uword_t arg)
                 }
             }
         } else {
-            nwords = sizetab[widetag_of(header)](where);
+            nwords = sizetab[header_widetag(header)](where);
             lispobj markbit =
-              widetag_of(header) != BIGNUM_WIDETAG ? MARK_BIT : BIGNUM_MARK_BIT;
+              header_widetag(header) != BIGNUM_WIDETAG ? MARK_BIT : BIGNUM_MARK_BIT;
             if (header & markbit)
                 *where = header ^ markbit;
             else {

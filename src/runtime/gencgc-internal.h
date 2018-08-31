@@ -216,7 +216,7 @@ static inline boolean pinned_p(lispobj obj, page_index_t page)
         return 0;
 # ifdef RETURN_PC_WIDETAG
     /* Conceivably there could be a precise GC without RETURN-PC objects */
-    if (widetag_of(*native_pointer(obj)) == RETURN_PC_WIDETAG)
+    if (widetag_of(native_pointer(obj)) == RETURN_PC_WIDETAG)
         obj = make_lispobj(fun_code_header(native_pointer(obj)),
                            OTHER_POINTER_LOWTAG);
 # endif

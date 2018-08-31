@@ -87,7 +87,7 @@ lispobj find_code(os_context_t *context)
 
     header = *(lispobj *)(code-OTHER_POINTER_LOWTAG);
 
-    if (widetag_of(header) == CODE_HEADER_WIDETAG)
+    if (header_widetag(header) == CODE_HEADER_WIDETAG)
         return code;
     else
         return code - HeaderValue(header)*sizeof(lispobj);

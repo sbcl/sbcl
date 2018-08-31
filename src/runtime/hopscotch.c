@@ -253,7 +253,7 @@ uword_t sxhash_simple_string(struct vector* string)
     sword_t len = fixnum_value(string->length);
     uword_t result = 0;
     sword_t i;
-    switch (widetag_of(string->header)) {
+    switch (widetag_of(&string->header)) {
 #define MIX(ch) {result += ch; result += result<<10; result ^= (result>>6);}
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
     case SIMPLE_CHARACTER_STRING_WIDETAG:
@@ -274,7 +274,7 @@ uword_t sxhash_simple_string(struct vector* string)
 static uword_t vector_sxhash(lispobj* object)
 {
     lispobj header = *object;
-    int widetag = widetag_of(header);
+    int widetag = header_widetag(header);
     sword_t nwords = sizetab[widetag](object);
     // Mix words. At present this works correctly only for specialized vectors,
     // general vectors with eq-comparable elements,
@@ -301,7 +301,7 @@ static boolean vector_eql(uword_t arg1, uword_t arg2)
     if (((header1 ^ *obj2) & WIDETAG_MASK) != 0)
         return 0; // not eql - different type objects
 
-    int widetag1 = widetag_of(header1);
+    int widetag1 = header_widetag(header1);
     sword_t nwords = sizetab[widetag1](obj1);
     if (widetag1 < SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG)
         // All words must match exactly. Start by comparing the length

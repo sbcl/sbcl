@@ -134,7 +134,7 @@ code_n_funs(struct code* code) {
        struct simple_fun* fun_var                                           \
            = (struct simple_fun*)(_insts_ + _offsets_[-index_var]);         \
        if (assertp)                                                         \
-         gc_assert(widetag_of(fun_var->header)==SIMPLE_FUN_WIDETAG);        \
+         gc_assert(widetag_of(&fun_var->header)==SIMPLE_FUN_WIDETAG);       \
        guts ;                                                               \
       } while (++index_var < _nfuns_);                                      \
   }}
@@ -155,7 +155,7 @@ code_n_funs(struct code* code) {
 
 extern sword_t (*sizetab[256])(lispobj *where);
 #define OBJECT_SIZE(header,where) \
-  (is_cons_half(header)?2:sizetab[widetag_of(header)](where))
+  (is_cons_half(header)?2:sizetab[header_widetag(header)](where))
 
 lispobj *gc_search_space3(void *pointer, lispobj *start, void *limit);
 static inline lispobj *gc_search_space(lispobj *start, void *pointer) {

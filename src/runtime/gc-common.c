@@ -205,7 +205,7 @@ void heap_scavenge(lispobj *start, lispobj *end)
         lispobj object = *object_ptr;
         if (other_immediate_lowtag_p(object))
             /* It's some sort of header object or another. */
-            object_ptr += (scavtab[widetag_of(object)])(object_ptr, object);
+            object_ptr += (scavtab[header_widetag(object)])(object_ptr, object);
         else {  // it's a cons
             gc_scav_pair(object_ptr);
             object_ptr += 2;
@@ -297,7 +297,7 @@ scav_fun_pointer(lispobj *where, lispobj object)
 
     /* must transport object -- object may point to either a function
      * header, a funcallable instance header, or a closure header. */
-    lispobj copy = widetag_of(*first_pointer) == SIMPLE_FUN_WIDETAG
+    lispobj copy = widetag_of(first_pointer) == SIMPLE_FUN_WIDETAG
       ? trans_fun_header(object) : trans_short_boxed(object);
 
     if (copy != object) {
@@ -321,7 +321,7 @@ trans_code(struct code *code)
         return (struct code *)native_pointer(forwarding_pointer_value((lispobj*)code));
     }
 
-    gc_dcheck(widetag_of(code->header) == CODE_HEADER_WIDETAG);
+    gc_dcheck(widetag_of(&code->header) == CODE_HEADER_WIDETAG);
 
     /* prepare to transport the code vector */
     lispobj l_code = (lispobj) LOW_WORD(code) | OTHER_POINTER_LOWTAG;
@@ -552,7 +552,7 @@ scav_other_pointer(lispobj *where, lispobj object)
 
     /* Object is a pointer into from space - not FP. */
     lispobj *first_pointer = (lispobj *)(object - OTHER_POINTER_LOWTAG);
-    int tag = widetag_of(*first_pointer);
+    int tag = widetag_of(first_pointer);
     lispobj copy = transother[other_immediate_lowtag_p(tag)?tag>>2:0](object);
 
     // If the object was large, then instead of transporting it,
@@ -909,7 +909,7 @@ trans_weak_pointer(lispobj object)
 #ifndef LISP_FEATURE_GENCGC
     struct weak_pointer *wp = (struct weak_pointer *) native_pointer(copy);
 
-    gc_dcheck(widetag_of(wp->header)==WEAK_POINTER_WIDETAG);
+    gc_dcheck(widetag_of(&wp->header)==WEAK_POINTER_WIDETAG);
     /* Push the weak pointer onto the list of weak pointers. */
     if (weak_pointer_breakable_p(wp))
         add_to_weak_pointer_chain(wp);
@@ -934,7 +934,7 @@ void scan_weak_pointers(void)
 {
     struct weak_pointer *wp, *next_wp;
     for (wp = weak_pointer_chain; wp != WEAK_POINTER_CHAIN_END; wp = next_wp) {
-        gc_assert(widetag_of(wp->header) == WEAK_POINTER_WIDETAG);
+        gc_assert(widetag_of(&wp->header) == WEAK_POINTER_WIDETAG);
         next_wp = wp->next;
         wp->next = NULL;
 
@@ -1036,7 +1036,7 @@ static inline int pointer_survived_gc_yet(lispobj obj)
 static inline lispobj *
 get_array_data (lispobj array, int widetag, uword_t *length)
 {
-    if (is_lisp_pointer(array) && widetag_of(*native_pointer(array)) == widetag) {
+    if (is_lisp_pointer(array) && widetag_of(native_pointer(array)) == widetag) {
         if (length != NULL)
             *length = fixnum_value(native_pointer(array)[1]);
         return native_pointer(array) + 2;
@@ -1283,7 +1283,7 @@ scav_vector (lispobj *where, lispobj header)
         goto normal;
     }
     struct hash_table *hash_table  = (struct hash_table *)native_pointer(where[2]);
-    if (widetag_of(hash_table->header) != INSTANCE_WIDETAG) {
+    if (widetag_of(&hash_table->header) != INSTANCE_WIDETAG) {
         lose("hash table not instance (%"OBJ_FMTX" at %p)\n",
              hash_table->header,
              hash_table);
@@ -1468,7 +1468,7 @@ static sword_t
 scav_lose(lispobj *where, lispobj object)
 {
     lose("no scavenge function for object %p (widetag %#x)",
-         (void*)object, widetag_of(*where));
+         (void*)object, widetag_of(where));
 
     return 0; /* bogus return value to satisfy static type checking */
 }
@@ -1477,7 +1477,7 @@ static lispobj
 trans_lose(lispobj object)
 {
     lose("no transport function for object %p (widetag %#x)",
-         (void*)object, widetag_of(*native_pointer(object)));
+         (void*)object, widetag_of(native_pointer(object)));
     return NIL; /* bogus return value to satisfy static type checking */
 }
 
@@ -1485,7 +1485,7 @@ static sword_t
 size_lose(lispobj *where)
 {
     lose("no size function for object at %p (widetag %#x)",
-         (void*)where, widetag_of(*where));
+         (void*)where, widetag_of(where));
     return 1; /* bogus return value to satisfy static type checking */
 }
 boolean valid_widetag_p(unsigned char widetag) {
@@ -1520,7 +1520,7 @@ component_ptr_from_pc(lispobj *pc)
 {
     lispobj *object = search_all_gc_spaces(pc);
 
-    if (object != NULL && widetag_of(*object) == CODE_HEADER_WIDETAG)
+    if (object != NULL && widetag_of(object) == CODE_HEADER_WIDETAG)
         return object;
 
     return NULL;
@@ -1588,7 +1588,7 @@ properly_tagged_p_internal(lispobj pointer, lispobj *start_addr)
 
     // The space of potential widetags has 64 elements, not 256,
     // because of the constant low 2 bits.
-    int widetag = widetag_of(header);
+    int widetag = header_widetag(header);
     int lowtag = lowtag_for_widetag[widetag>>2];
     if (lowtag && make_lispobj(start_addr, lowtag) == pointer)
         return 1; // instant win
@@ -1604,7 +1604,7 @@ properly_tagged_p_internal(lispobj pointer, lispobj *start_addr)
          * need to check for it. -- AB, 2010-Jun-04 */
         if (lowtag_of(pointer) == OTHER_POINTER_LOWTAG) {
             lispobj *potential_lra = native_pointer(pointer);
-            if ((widetag_of(potential_lra[0]) == RETURN_PC_WIDETAG) &&
+            if ((widetag_of(potential_lra) == RETURN_PC_WIDETAG) &&
                 ((potential_lra - HeaderValue(potential_lra[0])) == start_addr)) {
                 return 1; /* It's as good as we can verify. */
             }
@@ -1878,10 +1878,10 @@ scavenge_control_stack(struct thread *th)
             } else {
                 /* Scavenge that pointer. */
                 long n_words_scavenged =
-                    (scavtab[widetag_of(object)])(object_ptr, object);
+                    (scavtab[header_widetag(object)])(object_ptr, object);
                 gc_assert(n_words_scavenged == 1);
             }
-        } else if (scavtab[widetag_of(object)] == scav_lose) {
+        } else if (scavtab[header_widetag(object)] == scav_lose) {
             lose("unboxed object in scavenge_control_stack: %p->%x, start=%p, end=%p",
                  object_ptr, object, th->control_stack_start, access_control_stack_pointer(th));
         }

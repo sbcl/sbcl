@@ -371,7 +371,7 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
 
     if (fixnump(fixups) ||
         (lowtag_of(fixups) == OTHER_POINTER_LOWTAG
-         && widetag_of(*native_pointer(fixups)) == BIGNUM_WIDETAG)) {
+         && widetag_of(native_pointer(fixups)) == BIGNUM_WIDETAG)) {
         /* Got the fixups for the code block. Now work through them
            in order, first the absolute ones, then the relative.
            Locations are sorted and delta-encoded for compactness. */
@@ -398,7 +398,7 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
         /* This used to just print a note to stderr, but bogus fixups seem to
          * indicate real heap corruption, so a hard failure is in order. */
         lose("fixup vector %x has a bad widetag: %#x",
-             fixups, widetag_of(*native_pointer(fixups)));
+             fixups, widetag_of(native_pointer(fixups)));
     }
 }
 

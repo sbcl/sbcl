@@ -194,9 +194,9 @@ dump_cmd(char **ptr)
                 // ensure validity of widetag because crashing with
                 // "no size function" would be worse than doing nothing
                 if (word != 0 && !is_lisp_pointer(word)
-                    && valid_widetag_p(widetag_of(word))) {
-                    printf(" %s", widetag_names[widetag_of(word)>>2]);
-                    next_object += sizetab[widetag_of(word)](next_object);
+                    && valid_widetag_p(header_widetag(word))) {
+                    printf(" %s", widetag_names[header_widetag(word)>>2]);
+                    next_object += sizetab[header_widetag(word)](next_object);
                 } else if (is_cons_half(word)) {
                     next_object += 2;
                 } else { // disable decoder if weirdness observed

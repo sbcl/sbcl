@@ -326,7 +326,7 @@ static void brief_otherimm(lispobj obj)
     int type, c;
     char * charname = 0;
 
-    type = widetag_of(obj);
+    type = header_widetag(obj);
     switch (type) {
         case CHARACTER_WIDETAG:
             c = obj>>8; // no mask. show whatever's there
@@ -356,9 +356,9 @@ static void brief_otherimm(lispobj obj)
 
 static void print_otherimm(lispobj obj)
 {
-    printf(", %s", widetag_names[widetag_of(obj) >> 2]);
+    printf(", %s", widetag_names[header_widetag(obj) >> 2]);
 
-    switch (widetag_of(obj)) {
+    switch (header_widetag(obj)) {
     case CHARACTER_WIDETAG:
         printf(": ");
         brief_otherimm(obj);
@@ -418,7 +418,7 @@ static void print_list(lispobj obj)
 // takes native pointer as input
 char * simple_base_stringize(struct vector * string)
 {
-  if (widetag_of(string->header) == SIMPLE_BASE_STRING_WIDETAG)
+  if (widetag_of(&string->header) == SIMPLE_BASE_STRING_WIDETAG)
       return (char*)string->data;
   int length = string->length;
   char * newstring = malloc(length+1);
@@ -483,7 +483,7 @@ void show_lstring(struct vector * string, int quotes, FILE *s)
   int i, len = fixnum_value(string->length);
 
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
-  if (widetag_of(string->header) == SIMPLE_CHARACTER_STRING_WIDETAG) {
+  if (widetag_of(&string->header) == SIMPLE_CHARACTER_STRING_WIDETAG) {
       ucs4_p = 1;
       if (quotes)
           putc('u', s); /* an arbitrary notational convention */
@@ -519,7 +519,7 @@ static void brief_otherptr(lispobj obj)
 
     ptr = native_pointer(obj);
     header = *ptr;
-    type = widetag_of(header);
+    type = header_widetag(header);
     switch (type) {
         case SYMBOL_WIDETAG:
             symbol = (struct symbol *)ptr;
@@ -542,7 +542,7 @@ static void brief_otherptr(lispobj obj)
                 // FIXME: more address validity checks perhaps?
                 lispobj name = ((struct fdefn*)ptr)->name;
                 if (lowtag_of(name) == OTHER_POINTER_LOWTAG
-                    && widetag_of(*native_pointer(name)) == SYMBOL_WIDETAG) {
+                    && widetag_of(native_pointer(name)) == SYMBOL_WIDETAG) {
                   printf(" for ");
                   struct vector* str = symbol_name(native_pointer(name));
                   safely_show_lstring(str, 0, stdout);
@@ -606,7 +606,7 @@ static void print_otherptr(lispobj obj)
     header = *ptr++;
     length = fixnum_value(*ptr);
     count = HeaderValue(header);
-    type = widetag_of(header);
+    type = header_widetag(header);
 
     print_obj("header: ", header);
     if (!other_immediate_lowtag_p(header)) {
@@ -953,11 +953,11 @@ void safely_show_lstring(struct vector * string, int quotes, FILE *s)
       string = (struct vector*)forwarding_pointer_value((lispobj*)string);
   if (
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
-      widetag_of(string->header) == SIMPLE_CHARACTER_STRING_WIDETAG ||
+      header_widetag(string->header) == SIMPLE_CHARACTER_STRING_WIDETAG ||
 #endif
-      widetag_of(string->header) == SIMPLE_BASE_STRING_WIDETAG)
+      header_widetag(string->header) == SIMPLE_BASE_STRING_WIDETAG)
     show_lstring(string, quotes, s);
   else {
-    fprintf(s, "#<[widetag=%02X]>", widetag_of(string->header));
+    fprintf(s, "#<[widetag=%02X]>", header_widetag(string->header));
   }
 }

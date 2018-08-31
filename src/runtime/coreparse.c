@@ -472,7 +472,7 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
             nwords = 2;
             continue;
         }
-        widetag = widetag_of(header_word);
+        widetag = header_widetag(header_word);
         nwords = sizetab[widetag](where);
         switch (widetag) {
         case FUNCALLABLE_INSTANCE_WIDETAG:
@@ -494,7 +494,7 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
 #endif
             bitmap = LAYOUT(adjusted_layout)->bitmap;
             gc_assert(fixnump(bitmap)
-                      || widetag_of(*native_pointer(bitmap))==BIGNUM_WIDETAG);
+                      || widetag_of(native_pointer(bitmap))==BIGNUM_WIDETAG);
             // If the post-adjustment address of 'layout' is higher than 'where',
             // then the layout's pointer slots need adjusting.
             // This is true regardless of whether the core was mapped at a higher
@@ -1087,7 +1087,7 @@ os_vm_address_t get_asm_routine_by_name(const char* name)
         int i;
         for (i=2 ; i < fixnum_value(table->length) ; i += 2)
             if (lowtag_of(sym = table->data[i]) == OTHER_POINTER_LOWTAG
-                && widetag_of(SYMBOL(sym)->header) == SYMBOL_WIDETAG
+                && widetag_of(&SYMBOL(sym)->header) == SYMBOL_WIDETAG
                 && !strcmp(name, (char*)(VECTOR(SYMBOL(sym)->name)->data)))
                 return code_header_words(code->header)*N_WORD_BYTES
                     + fixnum_value(CONS(table->data[i+1])->car) + (os_vm_address_t)code;

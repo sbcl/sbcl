@@ -75,16 +75,16 @@ static const char* classify_obj(lispobj ptr)
     switch(lowtag_of(ptr)) {
     case INSTANCE_POINTER_LOWTAG:
         name = instance_classoid_name(native_pointer(ptr));
-        if (widetag_of(*name) == SIMPLE_BASE_STRING_WIDETAG)
+        if (widetag_of(name) == SIMPLE_BASE_STRING_WIDETAG)
           return (char*)(name + 2);
     case LIST_POINTER_LOWTAG:
         return "cons";
     case FUN_POINTER_LOWTAG:
     case OTHER_POINTER_LOWTAG:
-        return widetag_names[widetag_of(*native_pointer(ptr))>>2];
+        return widetag_names[widetag_of(native_pointer(ptr))>>2];
     }
     static char buf[8];
-    sprintf(buf, "#x%x", widetag_of(*native_pointer(ptr)));
+    sprintf(buf, "#x%x", widetag_of(native_pointer(ptr)));
     return buf;
 }
 
@@ -115,7 +115,7 @@ static void add_to_layer(lispobj* obj, int wordindex,
 /// otherwise return obj directly.
 static lispobj canonical_obj(lispobj obj)
 {
-    if (functionp(obj) && widetag_of(*native_pointer(obj)) == SIMPLE_FUN_WIDETAG)
+    if (functionp(obj) && widetag_of((lispobj*)(obj-FUN_POINTER_LOWTAG)) == SIMPLE_FUN_WIDETAG)
         return make_lispobj(fun_code_header(obj-FUN_POINTER_LOWTAG),
                             OTHER_POINTER_LOWTAG);
     return obj;
@@ -136,7 +136,7 @@ static int find_ref(lispobj* source, lispobj target)
         check_ptr(1, source[1]);
         return -1;
     }
-    int widetag = widetag_of(header);
+    int widetag = widetag_of(source);
     scan_limit = sizetab[widetag](source);
     switch (widetag) {
     case INSTANCE_WIDETAG:
@@ -411,7 +411,7 @@ static void maybe_show_object_name(lispobj obj, FILE* stream)
     extern void safely_show_lstring(lispobj* string, int quotes, FILE *s);
     lispobj package, package_name;
     if (lowtag_of(obj)==OTHER_POINTER_LOWTAG)
-        switch(widetag_of(*native_pointer(obj))) {
+        switch(widetag_of(native_pointer(obj))) {
         case SYMBOL_WIDETAG:
             putc(',', stream);
             if ((package = SYMBOL(obj)->package) == NIL) {
@@ -578,7 +578,7 @@ static void trace1(lispobj object,
             if (fun) {
                 fprintf(file, "fun=%p", (void*)make_lispobj(fun, FUN_POINTER_LOWTAG));
                 if (is_lisp_pointer(fun->name) &&
-                    widetag_of(*native_pointer(fun->name)) == SYMBOL_WIDETAG) {
+                    widetag_of(native_pointer(fun->name)) == SYMBOL_WIDETAG) {
                     fprintf(file, "=");
                     show_lstring(VECTOR(SYMBOL(fun->name)->name), 0, file);
                 }
@@ -611,13 +611,13 @@ static void trace1(lispobj object,
             break;
 #if FUN_SELF_FIXNUM_TAGGED
         case 1:
-            if (functionp(ptr) && widetag_of(*native_pointer(ptr)) == CLOSURE_WIDETAG)
+            if (functionp(ptr) && widetag_of(native_pointer(ptr)) == CLOSURE_WIDETAG)
                 target -= FUN_RAW_ADDR_OFFSET;
             break;
 #endif
         case 3:
             if (lowtag_of(ptr) == OTHER_POINTER_LOWTAG &&
-                widetag_of(FDEFN(ptr)->header) == FDEFN_WIDETAG)
+                widetag_of(&FDEFN(ptr)->header) == FDEFN_WIDETAG)
                 target = fdefn_callee_lispobj((struct fdefn*)native_pointer(ptr));
             break;
         }
@@ -683,7 +683,7 @@ static uword_t build_refs(lispobj* where, lispobj* end,
             check_ptr(where[1]);
             continue;
         }
-        int widetag = widetag_of(header);
+        int widetag = widetag_of(where);
         nwords = scan_limit = sizetab[widetag](where);
         switch (widetag) {
         case INSTANCE_WIDETAG:
@@ -880,7 +880,7 @@ void gc_prove_liveness(void(*context_scanner)(),
         ++n_watched;
         lispobj car = CONS(list)->car;
         if ((lowtag_of(car) != OTHER_POINTER_LOWTAG ||
-             widetag_of(*native_pointer(car)) != WEAK_POINTER_WIDETAG))
+             widetag_of(native_pointer(car)) != WEAK_POINTER_WIDETAG))
             ++n_bad;
         else
             n_live += ((struct weak_pointer*)native_pointer(car))->value

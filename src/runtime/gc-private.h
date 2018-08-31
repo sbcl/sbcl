@@ -105,7 +105,7 @@ lispobj *search_dynamic_space(void *pointer);
 
 static inline int instruction_ptr_p(void *pointer, lispobj *start_addr)
 {
-    return widetag_of(*start_addr) == CODE_HEADER_WIDETAG &&
+    return widetag_of(start_addr) == CODE_HEADER_WIDETAG &&
         pointer >= (void*)(start_addr + code_header_words(*start_addr));
 }
 extern int properly_tagged_p_internal(lispobj pointer, lispobj *start_addr);
@@ -136,7 +136,7 @@ extern void enliven_immobile_obj(lispobj*,int);
 #ifdef LISP_FEATURE_LITTLE_ENDIAN
 static inline int immobile_obj_gen_bits(lispobj* pointer) // native pointer
 {
-  if (widetag_of(*pointer) == SIMPLE_FUN_WIDETAG)
+  if (widetag_of(pointer) == SIMPLE_FUN_WIDETAG)
     pointer = fun_code_header(pointer);
   return ((generation_index_t*)pointer)[3] & 0x3F;
 }

@@ -39,7 +39,7 @@ static boolean gcable_pointer_p(lispobj pointer)
 
 static boolean coalescible_number_p(lispobj* where)
 {
-    int widetag = widetag_of(*where);
+    int widetag = widetag_of(where);
     return widetag == BIGNUM_WIDETAG
         // Ratios and complex integers containing pointers to bignums don't work.
         || ((widetag == RATIO_WIDETAG || widetag == COMPLEX_WIDETAG)
@@ -59,7 +59,7 @@ static boolean eql_comparable_p(lispobj obj)
 {
     if (fixnump(obj) || obj == NIL) return 1;
     if (lowtag_of(obj) != OTHER_POINTER_LOWTAG) return 0;
-    int widetag = widetag_of(*native_pointer(obj));
+    int widetag = widetag_of(native_pointer(obj));
     return widetag == BIGNUM_WIDETAG
         || widetag == SYMBOL_WIDETAG
 #ifdef SIMPLE_CHARACTER_STRING_WIDETAG
@@ -92,7 +92,7 @@ static void coalesce_obj(lispobj* where, struct hopscotch_table* ht)
 
     lispobj* obj = native_pointer(ptr);
     lispobj header = *obj;
-    int widetag = widetag_of(header);
+    int widetag = header_widetag(header);
 
     if ((((header & mask) != 0) // optimistically assume it's a vector
          && ((widetag == SIMPLE_VECTOR_WIDETAG
@@ -153,7 +153,7 @@ static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)
             coalesce_obj(where+1, ht);
             next = where + 2;
         } else {
-            int widetag = widetag_of(header);
+            int widetag = header_widetag(header);
             nwords = sizetab[widetag](where);
             next = where + nwords;
             switch (widetag) {

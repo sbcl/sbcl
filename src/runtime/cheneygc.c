@@ -312,13 +312,13 @@ print_garbage(lispobj *from_space, lispobj *from_space_free_pointer)
             case OTHER_POINTER_LOWTAG:
                 pointer = native_pointer(object);
                 header = *pointer;
-                type = widetag_of(header);
+                type = header_widetag(header);
                 nwords = (sizetab[type])(pointer);
                 break;
             default: nwords=1;  /* shut yer whinging, gcc */
             }
         } else {
-            type = widetag_of(object);
+            type = header_widetag(object);
             nwords = (sizetab[type])(start);
             total_words_not_copied += nwords;
             printf("%4d words not copied at 0x%16lx; ",
