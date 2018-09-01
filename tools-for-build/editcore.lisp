@@ -97,6 +97,34 @@
   (name nil :read-only t)
   (external nil :read-only t))
 
+(defstruct (bounds (:constructor make-bounds (low high)))
+  (low 0 :type word) (high 0 :type word))
+
+(defstruct (core (:predicate nil)
+                 (:copier nil)
+                 (:constructor %make-core))
+  (spaces)
+  (nil-object)
+  ;; mapping from string naming a package to list of symbol names (strings)
+  ;; that are external in the package.
+  (packages (make-hash-table :test 'equal))
+  ;; hashset of symbol names (as strings) that should be package-qualified.
+  ;; (Prefer not to package-qualify unambiguous names)
+  (nonunique-symbol-names)
+  (code-bounds nil :type bounds :read-only t)
+  (fixedobj-bounds nil :type bounds :read-only t)
+  (linkage-bounds nil :type bounds :read-only t)
+  (linkage-symbols nil)
+  (linkage-symbol-usedp nil)
+  (linkage-entry-size nil)
+  (dstate (make-dstate nil) :read-only t)
+  (seg (%make-segment :sap-maker (lambda () (error "Bad sap maker"))
+                      :virtual-location 0) :read-only t)
+  (fixup-addrs nil)
+  (call-inst nil :read-only t)
+  (jmp-inst nil :read-only t)
+  (pop-inst nil :read-only t))
+
 (defun c-name (lispname core pp-state)
   ;; Get rid of junk from LAMBDAs
   (setq lispname
@@ -181,38 +209,11 @@
           (core-sym-external sym)
           (core-sym-name sym)))
 
-(defstruct (bounds (:constructor make-bounds (low high)))
-  (low 0 :type word) (high 0 :type word))
 (defun space-bounds (id spaces)
   (let ((space (get-space id spaces)))
     (make-bounds (space-addr space) (space-end space))))
 (defun in-bounds-p (addr bounds)
   (and (>= addr (bounds-low bounds)) (< addr (bounds-high bounds))))
-
-(defstruct (core (:predicate nil)
-                 (:copier nil)
-                 (:constructor %make-core))
-  (spaces)
-  (nil-object)
-  ;; mapping from string naming a package to list of symbol names (strings)
-  ;; that are external in the package.
-  (packages (make-hash-table :test 'equal))
-  ;; hashset of symbol names (as strings) that should be package-qualified.
-  ;; (Prefer not to package-qualify unambiguous names)
-  (nonunique-symbol-names)
-  (code-bounds nil :type bounds :read-only t)
-  (fixedobj-bounds nil :type bounds :read-only t)
-  (linkage-bounds nil :type bounds :read-only t)
-  (linkage-symbols nil)
-  (linkage-symbol-usedp nil)
-  (linkage-entry-size nil)
-  (dstate (make-dstate nil) :read-only t)
-  (seg (%make-segment :sap-maker (lambda () (error "Bad sap maker"))
-                      :virtual-location 0) :read-only t)
-  (fixup-addrs nil)
-  (call-inst nil :read-only t)
-  (jmp-inst nil :read-only t)
-  (pop-inst nil :read-only t))
 
 (defun make-hashset (contents count)
   (if (<= count 20)
