@@ -325,7 +325,7 @@
 (defun find-target-symbol (package-name symbol-name spaces
                            &optional (address-mode :physical))
   (dolist (id `(,immobile-fixedobj-core-space-id ,static-core-space-id))
-    (let* ((space (find id (cdr spaces) :key #'space-id))
+    (let* ((space (get-space id spaces))
            (start (translate-ptr (space-addr space) spaces))
            (end (+ start (space-size space)))
            (physaddr start))
@@ -955,6 +955,7 @@
     (shentsize (unsigned 16))   ; 40 0
     (shnum     (unsigned 16))   ;  n 0
     (shstrndx  (unsigned 16)))) ;  n 0
+(defconstant ehdr-size (ceiling (alien-type-bits (parse-alien-type 'elf64-ehdr nil)) 8))
 (define-alien-type elf64-shdr
   (struct elf64-shdr
     (name      (unsigned 32))
@@ -967,6 +968,7 @@
     (info      (unsigned 32))
     (addralign (unsigned 64))
     (entsize   (unsigned 64))))
+(defconstant shdr-size (ceiling (alien-type-bits (parse-alien-type 'elf64-shdr nil)) 8))
 (define-alien-type elf64-sym
   (struct elf64-sym
     (name  (unsigned 32))
@@ -1018,12 +1020,54 @@
 ;;; core header should be an array of words in '.rodata', not a 32K page
 (defconstant core-header-size +backend-page-bytes+) ; stupidly large (FIXME)
 
+(defun write-elf-header (shdrs-start sections output)
+  (let ((shnum (1+ (length sections))) ; section 0 is implied
+        (shstrndx (1+ (position :str sections :key #'car)))
+        (ident #.(coerce '(#x7F #x45 #x4C #x46 2 1 1 0 0 0 0 0 0 0 0 0)
+                         '(array (unsigned-byte 8) 1))))
+  (with-alien ((ehdr elf64-ehdr))
+    (dotimes (i (ceiling ehdr-size n-word-bytes))
+      (setf (sap-ref-word (alien-value-sap ehdr) (* i n-word-bytes)) 0))
+    (with-pinned-objects (ident)
+      (%byte-blt (vector-sap ident) 0 (alien-value-sap ehdr) 0 16))
+    (setf (slot ehdr 'type)      1
+          (slot ehdr 'machine)   #x3E
+          (slot ehdr 'version)   1
+          (slot ehdr 'shoff)     shdrs-start
+          (slot ehdr 'ehsize)    ehdr-size
+          (slot ehdr 'shentsize) shdr-size
+          (slot ehdr 'shnum)     shnum
+          (slot ehdr 'shstrndx)  shstrndx)
+    (write-alien ehdr ehdr-size output))))
+
+(defun write-section-headers (placements sections string-table output)
+  (with-alien ((shdr elf64-shdr))
+    (dotimes (i (ceiling shdr-size n-word-bytes)) ; Zero-fill
+      (setf (sap-ref-word (alien-value-sap shdr) (* i n-word-bytes)) 0))
+    (dotimes (i (1+ (length sections)))
+      (when (plusp i) ; Write the zero-filled header as section 0
+        (destructuring-bind (name type flags link info alignment entsize)
+            (cdr (aref sections (1- i)))
+          (destructuring-bind (offset . size)
+              (pop placements)
+            (setf (slot shdr 'name)  (cdr (assoc name (car string-table)))
+                  (slot shdr 'type)  type
+                  (slot shdr 'flags) flags
+                  (slot shdr 'off)   offset
+                  (slot shdr 'size)  size
+                  (slot shdr 'link)  link
+                  (slot shdr 'info)  info
+                  (slot shdr 'addralign) alignment
+                  (slot shdr 'entsize) entsize))))
+      (write-alien shdr shdr-size output))))
+
+(defconstant core-align 4096)
+(defconstant sym-entry-size 24)
+
 ;;; Write everything except for the core file itself into OUTPUT-STREAM
 ;;; and leave the stream padded to a 4K boundary ready to receive data.
 (defun prepare-elf (core-size relocs output)
-  (let* ((sym-entry-size   24)
-         (reloc-entry-size 24)
-         (core-align 4096)
+  (let* ((reloc-entry-size 24)
          (sections
           `#((:core "lisp.core"       ,+sht-progbits+ 0 0 0 ,core-align 0)
              (:sym  ".symtab"         ,+sht-symtab+   0 3 1 8 ,sym-entry-size)
@@ -1036,31 +1080,14 @@
           (string-table (append '("__lisp_code_start") (map 'list #'second sections))))
          (strings (cdr string-table))
          (padded-strings-size (align-up (length strings) 8))
-         (ehdr-size #.(ceiling (alien-type-bits (parse-alien-type 'elf64-ehdr nil)) 8))
-         (shdr-size #.(ceiling (alien-type-bits (parse-alien-type 'elf64-shdr nil)) 8))
          (symbols-size (* 2 sym-entry-size))
          (shdrs-start (+ ehdr-size symbols-size padded-strings-size))
          (shdrs-end (+ shdrs-start (* (1+ (length sections)) shdr-size)))
          (relocs-size (* (length relocs) reloc-entry-size))
          (relocs-end (+ shdrs-end relocs-size))
-         (core-start (align-up relocs-end core-align))
-         (ident #.(coerce '(#x7F #x45 #x4C #x46 2 1 1 0 0 0 0 0 0 0 0 0)
-                          '(array (unsigned-byte 8) 1))))
+         (core-start (align-up relocs-end core-align)))
 
-    (with-alien ((ehdr elf64-ehdr))
-      (dotimes (i (ceiling ehdr-size n-word-bytes))
-        (setf (sap-ref-word (alien-value-sap ehdr) (* i n-word-bytes)) 0))
-      (with-pinned-objects (ident)
-        (%byte-blt (vector-sap ident) 0 (alien-value-sap ehdr) 0 16))
-      (setf (slot ehdr 'type)      1
-            (slot ehdr 'machine)   #x3E
-            (slot ehdr 'version)   1
-            (slot ehdr 'shoff)     shdrs-start
-            (slot ehdr 'ehsize)    ehdr-size
-            (slot ehdr 'shentsize) shdr-size
-            (slot ehdr 'shnum)     (1+ (length sections)) ; section 0 is implied
-            (slot ehdr 'shstrndx)  (1+ (position :str sections :key #'car)))
-      (write-alien ehdr ehdr-size output))
+    (write-elf-header shdrs-start sections output)
 
     ;; Write symbol table
     (aver (eql (file-position output) ehdr-size))
@@ -1079,31 +1106,17 @@
 
     ;; Write section headers
     (aver (eql (file-position output) shdrs-start))
-    (with-alien ((shdr elf64-shdr))
-      (dotimes (i (ceiling shdr-size n-word-bytes)) ; Zero-fill
-        (setf (sap-ref-word (alien-value-sap shdr) (* i n-word-bytes)) 0))
-      (dotimes (i (1+ (length sections)))
-        (when (plusp i) ; Write the zero-filled header as section 0
-          (destructuring-bind (key name type flags link info alignment entsize)
-              (aref sections (1- i))
-            (multiple-value-bind (offset size)
-                (ecase key
-                  (:sym  (values ehdr-size symbols-size))
-                  (:str  (values (+ ehdr-size symbols-size) (length strings)))
-                  (:rel  (values shdrs-end relocs-size))
-                  (:core (values core-start core-size))
-                  (:note (values 0 0)))
-              (let ((name (cdr (assoc name (car string-table) :test #'string=))))
-                (setf (slot shdr 'name)  name
-                      (slot shdr 'type)  type
-                      (slot shdr 'flags) flags
-                      (slot shdr 'off)   offset
-                      (slot shdr 'size)  size
-                      (slot shdr 'link)  link
-                      (slot shdr 'info)  info
-                      (slot shdr 'addralign) alignment
-                      (slot shdr 'entsize) entsize)))))
-        (write-alien shdr shdr-size output)))
+    (write-section-headers
+     (map 'list
+          (lambda (x)
+            (ecase (car x)
+              (:note '(0 . 0))
+              (:sym  (cons ehdr-size symbols-size))
+              (:str  (cons (+ ehdr-size symbols-size) (length strings)))
+              (:rel  (cons shdrs-end relocs-size))
+              (:core (cons core-start core-size))))
+          sections)
+     sections string-table output)
 
     ;; Write relocations
     (aver (eql (file-position output) shdrs-end))
@@ -1299,6 +1312,22 @@
 
 ;;;;
 
+(defun read-core-header (input core-header verbose &aux (core-offset 0))
+  (read-sequence core-header input)
+  (cond ((= (%vector-raw-bits core-header 0) core-magic))
+        (t ; possible embedded core
+         (file-position input (- (file-length input)
+                                 (* 2 n-word-bytes)))
+         (aver (eql (read-sequence core-header input) (* 2 n-word-bytes)))
+         (aver (= (%vector-raw-bits core-header 1) core-magic))
+         (setq core-offset (%vector-raw-bits core-header 0))
+         (when verbose
+           (format t "~&embedded core starts at #x~x into input~%" core-offset))
+         (file-position input core-offset)
+         (read-sequence core-header input)
+         (aver (= (%vector-raw-bits core-header 0) core-magic))))
+  core-offset)
+  
 (macrolet ((do-core-header-entry (((id-var len-var ptr-var) buffer) &body body)
              `(let ((,ptr-var 1))
                 (loop
@@ -1373,20 +1402,8 @@
   (with-open-file (input input-pathname :element-type '(unsigned-byte 8))
     (with-open-file (asm-file asm-pathname :direction :output :if-exists :supersede)
       (with-open-file (split-core split-core-pathname :direction :output
-                                 :element-type '(unsigned-byte 8) :if-exists :supersede)
-        (read-sequence core-header input)
-        (cond ((= (%vector-raw-bits core-header 0) core-magic))
-              (t ; possible embedded core
-               (file-position input (- (file-length input)
-                                       (* 2 n-word-bytes)))
-               (aver (eql (read-sequence core-header input) (* 2 n-word-bytes)))
-               (aver (= (%vector-raw-bits core-header 1) core-magic))
-               (setq core-offset (%vector-raw-bits core-header 0))
-               (when verbose
-                 (format t "~&embedded core starts at #x~x into input~%" core-offset))
-               (file-position input core-offset)
-               (read-sequence core-header input)
-               (aver (= (%vector-raw-bits core-header 0) core-magic))))
+                                  :element-type '(unsigned-byte 8) :if-exists :supersede)
+        (setq core-offset (read-core-header input core-header verbose))
         (do-core-header-entry ((id len ptr) core-header)
           (case id
             (#.build-id-core-entry-type-code
@@ -1531,6 +1548,80 @@
 
       (format asm-file "~% ~A~%" +noexec-stack-note+))))
 
+;;; Copy the input core into an ELF section without splitting into code & data.
+;;; Also force a linker reference to each C symbol that the Lisp core mentions.
+(defun copy-to-elf-obj (input-pathname output-pathname)
+  ;; Remove old files
+  (ignore-errors (delete-file output-pathname))
+  ;; Ensure that all files can be opened
+  (with-open-file (input input-pathname :element-type '(unsigned-byte 8))
+    (with-open-file (output output-pathname :direction :output
+                            :element-type '(unsigned-byte 8) :if-exists :supersede)
+      (let* ((core-header (make-array +backend-page-bytes+
+                                      :element-type '(unsigned-byte 8)))
+             (core-offset (read-core-header input core-header nil))
+             (spaces)
+             (total-npages 0) ; excluding core header page            
+             (core-size 0))
+        (do-core-header-entry ((id len ptr) core-header)
+          (case id
+            (#.directory-core-entry-type-code
+             (do-directory-entry ((index ptr len) core-header)
+               (incf total-npages npages)
+               (when (plusp nwords)
+                 (push (make-space id addr data-page 0 nwords) spaces))))
+            (#.page-table-core-entry-type-code
+             (aver (= len 3))
+             (symbol-macrolet ((nbytes (%vector-raw-bits core-header (1+ ptr)))
+                               (data-page (%vector-raw-bits core-header (+ ptr 2))))
+               (aver (= data-page total-npages))
+               (setq core-size (+ (* total-npages +backend-page-bytes+) nbytes))))))
+        (incf core-size +backend-page-bytes+) ; add in core header page
+        ;; Map the core file to memory
+        (with-mapped-core (sap core-offset total-npages input)
+          (let* ((spaces (cons sap (sort (copy-list spaces) #'> :key #'space-addr)))
+                 (core (make-core spaces
+                                  (space-bounds immobile-varyobj-core-space-id spaces)                                 
+                                  (space-bounds immobile-fixedobj-core-space-id spaces)))
+                 (c-symbols (map 'list (lambda (x) (if (consp x) (car x) x))
+                                 (core-linkage-symbols core)))
+                 (sections `#((:str  ".strtab"         ,+sht-strtab+   0 0 0 1  0)
+                              (:sym  ".symtab"         ,+sht-symtab+   0 1 1 8 ,sym-entry-size)
+                              ;;             section with the strings -- ^ ^ -- 1+ highest local symbol
+                              (:core "lisp.core"       ,+sht-progbits+ 0 0 0 ,core-align 0)
+                              (:note ".note.GNU-stack" ,+sht-null+     0 0 0 1  0)))
+                 (string-table (string-table (append (map 'list #'second sections)
+                                                     c-symbols)))
+                 (packed-strings (cdr string-table))
+                 (strings-start (+ ehdr-size (* (1+ (length sections)) shdr-size)))
+                 (strings-end (+ strings-start (length packed-strings)))
+                 (symbols-start (align-up strings-end 8))
+                 (symbols-size (* (1+ (length c-symbols)) sym-entry-size))
+                 (symbols-end (+ symbols-start symbols-size))
+                 (core-start (align-up symbols-end 4096)))
+            (write-elf-header ehdr-size sections output)
+            (write-section-headers `((,strings-start . ,(length packed-strings))
+                                     (,symbols-start . ,symbols-size)
+                                     (,core-start    . ,core-size)
+                                     (0 . 0))
+                                   sections string-table output)
+            (write-sequence packed-strings output)
+            ;; Write symbol table
+            (file-position output symbols-start)
+            (write-sequence (make-elf64-sym 0 0) output)
+            (dolist (sym c-symbols)
+              (let ((name-ptr (cdr (assoc sym (car string-table)))))
+                (write-sequence (make-elf64-sym name-ptr #x10) output)))
+            ;; Copy core
+            (file-position output core-start)
+            (file-position input core-offset)
+            (let ((remaining core-size))
+              (loop (let ((n (read-sequence core-header input
+                                            :end (min +backend-page-bytes+ remaining))))
+                      (write-sequence core-header output :end n)
+                      (unless (plusp (decf remaining n)) (return))))
+              (aver (zerop remaining)))))))))
+
 ) ; end MACROLET
 
 ;;;;
@@ -1543,6 +1634,8 @@
              (pop args))
            (destructuring-bind (input asm) args
              (split-core input asm :emit-sizes sizes))))
+        ((string= (car args) "copy")
+         (apply #'copy-to-elf-obj (cdr args)))
         #+nil
         ((string= (car args) "relocate")
          (destructuring-bind (input output binary start-sym) (cdr args)
