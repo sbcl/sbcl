@@ -268,14 +268,13 @@
                                nil ,n-words (ash 1 (- word-shift n-fixnum-tag-bits))))
                      (inst and ,result-tn (lognot lowtag-mask))
                      ,result-tn)))
-           (put-header (vector-tn type length zeroed)
+           (put-header (vector-tn lowtag type length zeroed)
              `(progn (storew* (if (sc-is ,type immediate) (tn-value ,type) ,type)
-                              ,vector-tn 0 other-pointer-lowtag ,zeroed)
+                              ,vector-tn 0 ,lowtag ,zeroed)
                      (storew* (if (sc-is ,length immediate)
                                   (fixnumize (tn-value ,length))
                                   ,length)
-                              ,vector-tn vector-length-slot other-pointer-lowtag
-                              ,zeroed))))
+                              ,vector-tn vector-length-slot ,lowtag ,zeroed))))
 
   (define-vop (allocate-vector-on-heap)
     (:args (type :scs (unsigned-reg immediate))
@@ -293,8 +292,9 @@
       (let ((size (calc-size-in-bytes words result)))
         (instrument-alloc size node)
         (pseudo-atomic ()
-         (allocation result size node nil other-pointer-lowtag)
-         (put-header result type length t)))))
+         (allocation result size node nil 0)
+         (put-header result 0 type length t)
+         (inst or :byte result other-pointer-lowtag)))))
 
   (define-vop (allocate-vector-on-stack)
     (:args (type :scs (unsigned-reg immediate))
@@ -312,8 +312,10 @@
     (:generator 100
       (let ((size (calc-size-in-bytes words result))
             (rax-zeroed))
+        ;; Compute tagged pointer sooner than later since access off RSP
+        ;; requires an extra byte in the encoding anyway.
         (stack-allocation result size other-pointer-lowtag)
-        (put-header result type length nil)
+        (put-header result other-pointer-lowtag type length nil)
         ;; FIXME: It would be good to check for stack overflow here.
         ;; It would also be good to skip zero-fill of specialized vectors
         ;; perhaps in a policy-dependent way. At worst you'd see random

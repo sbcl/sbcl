@@ -1327,7 +1327,7 @@
          (read-sequence core-header input)
          (aver (= (%vector-raw-bits core-header 0) core-magic))))
   core-offset)
-  
+
 (macrolet ((do-core-header-entry (((id-var len-var ptr-var) buffer) &body body)
              `(let ((,ptr-var 1))
                 (loop
@@ -1561,7 +1561,7 @@
                                       :element-type '(unsigned-byte 8)))
              (core-offset (read-core-header input core-header nil))
              (spaces)
-             (total-npages 0) ; excluding core header page            
+             (total-npages 0) ; excluding core header page
              (core-size 0))
         (do-core-header-entry ((id len ptr) core-header)
           (case id
@@ -1581,7 +1581,7 @@
         (with-mapped-core (sap core-offset total-npages input)
           (let* ((spaces (cons sap (sort (copy-list spaces) #'> :key #'space-addr)))
                  (core (make-core spaces
-                                  (space-bounds immobile-varyobj-core-space-id spaces)                                 
+                                  (space-bounds immobile-varyobj-core-space-id spaces)
                                   (space-bounds immobile-fixedobj-core-space-id spaces)))
                  (c-symbols (map 'list (lambda (x) (if (consp x) (car x) x))
                                  (core-linkage-symbols core)))
