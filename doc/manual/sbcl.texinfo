@@ -82,6 +82,7 @@ provided with absolutely no warranty. See the @file{COPYING} and
 * Debugger::
 * Efficiency::
 * Beyond the ANSI Standard::
+* External Formats::
 * Foreign Function Interface::
 * Pathnames::
 * Streams::
@@ -108,6 +109,7 @@ provided with absolutely no warranty. See the @file{COPYING} and
 @include debugger.texinfo
 @include efficiency.texinfo
 @include beyond-ansi.texinfo
+@include external-formats.texinfo
 @include ffi.texinfo
 @include pathnames.texinfo
 @include streams.texinfo

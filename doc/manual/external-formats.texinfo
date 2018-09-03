@@ -1,0 +1,177 @@
+@node External Formats
+@comment  node-name,  next,  previous,  up
+@chapter External Formats
+
+External formats determine the coding of characters from/to sequences of
+octets when exchanging data with the outside world.  Examples of such
+exchanges are:
+
+@enumerate
+
+@item
+Character streams associated with files, sockets and process
+input/output (See @ref{Stream External Formats} and @ref{Running
+external programs})
+
+@item
+Names of files
+
+@item
+Foreign strings (See @ref{Foreign Types and Lisp Types})
+
+@item
+Posix interface (See @ref{sb-posix})
+
+@item
+Hostname- and protocol-related functions of the BSD-socket interface
+(See @ref{Networking})
+
+@end enumerate
+
+Technically, external formats in SBCL are named objects describing
+coding of characters as well as policies in case de- or encoding is not
+possible. Each external format has a canonical name and zero or more
+aliases. User code mostly interacts with external formats by supplying
+external format designators to functions that use external formats
+internally.
+
+@menu
+* The Default External Format::
+* External Format Designators::
+* Character Coding Conditions::
+* Converting between Strings and Octet Vectors::
+* Supported External Formats::
+@end menu
+
+@node The Default External Format
+@section The Default External Format
+@cindex The Default External Format
+
+Most functions interacting with external formats use a default external
+format if none is explicitly specified. In some cases, the default
+external format is used unconditionally.
+
+SBCL determines the default external format according to the following
+rules:
+
+@itemize
+
+@item
+On non-Unicode builds, the default external format is @code{:latin-1}.
+
+@item
+On Unicode builds, the default external format is determined using
+@code{nl_langinfo(3)} on UNIX and @code{GetACP} on Windows.
+
+@quotation note
+On UNIX, the values of the @code{LANG} and @code{LC_*} variables in the
+environment of the SBCL process determine the external format (via
+@code{nl_langinfo(3)}).
+@end quotation
+
+@item
+If either mechanism fails, the @code{:latin-1} external format is used
+as a fallback.
+
+@end itemize
+
+Example:
+@example
+$ LANG=C.UTF-8 sbcl --noinform --no-userinit --eval "(print (map 'string #'code-char (list 97 98 246)))" --quit
+"abö"
+$ LANG=C sbcl --noinform --no-userinit --eval "(print (map 'string #'code-char (list 97 98 246)))" --quit
+"ab?"
+@end example
+
+@node External Format Designators
+@section External Format Designators
+@cindex External Format Designators
+
+@findex @cl{open}
+@findex @cl{with-open-file}
+In situations where an external format designator is required, such as
+the @code{:external-format} argument in calls to @code{open} or
+@code{with-open-file}, users may supply the name of an encoding to
+denote the external format which is applying that encoding to Lisp
+characters.
+
+In addition to the basic encoding for an external format, options
+controlling various special cases may be passed, by using a list (whose
+first element must be an encoding name and whose rest is a plist) as an
+external file format designator.
+
+More specifically, external format designators can take the following
+forms:
+
+@table @code
+
+@item :default
+Designates the current default external format (See @ref{The Default
+External Format}).
+
+@item @var{keyword}
+Designates the supported external format that has @var{keyword} as one
+of its names. (See @ref{Supported External Formats}).
+
+@item (@var{keyword} :replacement @var{replacement})
+Designates an external format that is like the one designated by
+@var{keyword} but does not signal an error in case a character or octet
+sequence cannot be en- or decoded. Instead, it inserts @var{replacement}
+at the position in question. @var{replacement} has to be a string
+designator, that is a character or string.
+
+For example:
+@lisp
+(with-open-file (stream pathname :external-format '(:utf-8 :replacement #\?))
+  (read-line stream))
+@end lisp
+will read the first line of @var{pathname}, replacing any octet sequence
+that is not valid in the UTF-8 external format with a question mark
+character.
+
+@end table
+
+@node Character Coding Conditions
+@section Character Coding Conditions
+@cindex Character Coding Conditions
+
+De- or encoding characters using a given external format is not always
+possible:
+
+@itemize
+
+@item
+Decoding an octet vector using a given external format can fail if it
+contains an octet or sequence of octets that does not have an
+interpretation as a character according to the external format.
+
+@item
+Conversely, a string may contain characters that a given external format
+cannot encode. For example, the ASCII external format cannot encode the
+character @code{#\ö}.
+
+@end itemize
+
+Unless the external format governing the coding uses the
+@code{:replacement} keyword, SBCL will signal (continuable) errors under
+the above circumstances. The types of the condition signaled are not
+currently exported or documented but will be in future SBCL versions.
+
+@node Converting between Strings and Octet Vectors
+@section Converting between Strings and Octet Vectors
+@cindex Converting between Strings and Octet Vectors
+
+To encode Lisp strings as octet vectors and decode octet vectors as Lisp
+strings, the following SBCL-specific functions can be used:
+
+@include fun-sb-ext-string-to-octets.texinfo
+@include fun-sb-ext-octets-to-string.texinfo
+
+@node Supported External Formats
+@section Supported External Formats
+@cindex Supported External Formats
+
+The following table lists the external formats supported by SBCL in the
+form of the respective canonical name followed by the list of aliases:
+
+@include encodings.texi-temp

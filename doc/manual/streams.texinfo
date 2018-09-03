@@ -31,46 +31,27 @@ of the Franz Allegro simple-streams proposal.
 @end table
 
 @menu
-* External Formats::
+* Stream External Formats::
 * Bivalent Streams::
 * Gray Streams::
 * Simple Streams::
 @end menu
 
-@node External Formats
-@section External Formats
-@cindex External formats
+@node Stream External Formats
+@section Stream External Formats
+@cindex Stream External formats
 
 @findex @cl{stream-external-format}
-The encodings supported by SBCL as external formats are named by
-keyword.  Each encoding has a canonical name, which will be encoding
-returned by @code{stream-external-format}, and a number of aliases for
-convenience, as shown in the table below:
-
-@include encodings.texi-temp
+The function @code{stream-external-format} returns the canonical name of
+the external format (See @ref{External Formats}) used by the stream for
+character-based input and/or output.
 
 @findex @cl{open}
 @findex @cl{with-open-file}
-In situations where an external file format designator is required, such
-as the @code{:external-format} argument in calls to @code{open} or
-@code{with-open-file}, users may supply the name of an encoding to
-denote the external format which is applying that encoding to Lisp
-characters.
-
-In addition to the basic encoding for an external format, options
-controlling various special cases may be passed, by using a list (whose
-first element must be an encoding name and whose rest is a plist) as an
-external file format designator.  At present, the only supported key in
-the plist is @code{:replacement}, where the corresponding value is a
-string designator which is used as a replacement when an encoding or
-decoding error happens, handling those errors without user intervention;
-for example:
-@lisp
-(with-open-file (i pathname :external-format '(:utf-8 :replacement #\?))
-  (read-line i))
-@end lisp
-will read the first line of @var{pathname}, replacing any invalid utf-8
-sequences with question marks.
+When constructing file streams, for example using @code{open} or
+@code{with-open-file}, the external format to use is specified via the
+@code{:external-format} argument which accepts an external format
+designator (See @ref{External Format Designators}).
 
 @node Bivalent Streams
 @section Bivalent Streams
