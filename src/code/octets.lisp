@@ -404,6 +404,20 @@
                                (simple-array base-char (*))))
                 octets-to-string))
 (defun octets-to-string (vector &key (external-format :default) (start 0) end)
+  "Return a string obtained by decoding VECTOR according to EXTERNAL-FORMAT.
+
+If EXTERNAL-FORMAT is given, it must designate an external format.
+
+If given, START and END must be bounding index designators and
+designate a subsequence of VECTOR that should be decoded.
+
+If some of the octets of VECTOR (or the subsequence bounded by START
+and END) cannot be decoded by EXTERNAL-FORMAT an error of a subtype of
+SB-INT:CHARACTER-DECODING-ERROR is signaled.
+
+Note that for some values of EXTERNAL-FORMAT the length of the
+returned string may be different from the length of VECTOR (or the
+subsequence bounded by START and END)."
   (declare (explicit-check start end :result))
   (with-array-data ((vector vector)
                     (start start)
@@ -421,6 +435,23 @@
                 string-to-octets))
 (defun string-to-octets (string &key (external-format :default)
                          (start 0) end null-terminate)
+  "Return an octet vector that is STRING encoded according to EXTERNAL-FORMAT.
+
+If EXTERNAL-FORMAT is given, it must designate an external format.
+
+If given, START and END must be bounding index designators and
+designate a subsequence of STRING that should be encoded.
+
+If NULL-TERMINATE is true, the returned octet vector ends with an
+additional 0 element that does not correspond to any part of STRING.
+
+If some of the characters of STRING (or the subsequence bounded by
+START and END) cannot be encoded by EXTERNAL-FORMAT an error of a
+subtype of SB-INT:CHARACTER-ENCODING-ERROR is signaled.
+
+Note that for some values of EXTERNAL-FORMAT and NULL-TERMINATE the
+length of the returned vector may be different from the length of
+STRING (or the subsequence bounded by START and END)."
   (declare (explicit-check start end :result))
   (with-array-data ((string string)
                     (start start)
