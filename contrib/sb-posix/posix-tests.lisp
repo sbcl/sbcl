@@ -619,7 +619,7 @@
 #-(or android win32)
 (deftest grent.2
   ;; make sure that we found something
-  (not (sb-posix:getgrnam "sys"))
+  (not (sb-posix:getgrnam (sb-posix:group-name (sb-posix:getgrgid (sb-posix:getgid)))))
   nil)
 
 #-(or android win32)
