@@ -1328,20 +1328,24 @@
   (let ((array-type (lvar-conservative-type vector))
         min-length
         max-length)
-    (when (union-type-p array-type)
-      (when (loop for type in (union-type-types array-type)
-                  always (and (array-type-p type)
-                              (typep (array-type-dimensions type)
-                                     '(cons integer null)))
-                  do (let ((length (car (array-type-dimensions type))))
-                       (when (or (not min-length)
+    (when (and
+           (union-type-p array-type)
+           (loop for type in (union-type-types array-type)
+                 always (and (array-type-p type)
+                             (typep (array-type-dimensions type)
+                                    '(cons integer null)))
+                 do (let ((length (car (array-type-dimensions type))))
+                      (cond ((array-type-complexp type)
+                             ;; fill-pointer can start from 0
+                             (setf min-length 0))
+                            ((or (not min-length)
                                  (< length min-length))
-                         (setf min-length length))
-                       (when (or (not max-length)
-                                 (> length max-length))
-                         (setf max-length length))))
-        (specifier-type `(integer ,min-length
-                                  ,max-length))))))
+                             (setf min-length length)))
+                      (when (or (not max-length)
+                                (> length max-length))
+                        (setf max-length length)))))
+      (specifier-type `(integer ,(or min-length 0)
+                                ,max-length)))))
 
 ;;; Again, if we can tell the results from the type, just use it.
 ;;; Otherwise, if we know the rank, convert into a computation based

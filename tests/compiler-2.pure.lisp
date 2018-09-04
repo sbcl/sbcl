@@ -1572,3 +1572,10 @@
                     (when (>= 0 (the integer a))
                       (values #'z a))))))
     (() nil)))
+
+(with-test (:name :vector-length-fill-pointer-type-derivation)
+  (checked-compile-and-assert
+      ()
+      `(lambda (s)
+         (= (length (the (string 1) s)) 1))
+    (((make-array 1 :element-type 'character :fill-pointer 0)) nil)))

@@ -500,7 +500,7 @@
                      ~/test-util::print-arguments/~
                      returned values~@:_~@:_~
                      ~2@T~<~{~S~^~@:_~}~:>~@:_~@:_~
-                     with is not ~S to~@:_~@:_~
+                     which is not ~S to~@:_~@:_~
                      ~2@T~<~{~S~^~@:_~}~:>~@:_~@:_~
                      .~@:>"
                     (cons form optimize) args
