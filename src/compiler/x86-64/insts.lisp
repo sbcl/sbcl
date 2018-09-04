@@ -480,6 +480,7 @@
   (accum :type 'accum))
 
 ;;; Same as reg-reg/mem, but with a prefix of #b00001111
+(declaim (inline !ext-regrm-inst-reg))
 (define-instruction-format (ext-reg-reg/mem 24
                                         :default-printer
                                         `(:name :tab reg ", " reg/mem))
@@ -487,8 +488,8 @@
   (op      :field (byte 7 9))
   (width   :field (byte 1 8)    :type 'width)
   (reg/mem :fields (list (byte 2 22) (byte 3 16))
-                                :type 'reg/mem)
-  (reg     :field (byte 3 19)   :type 'reg)
+           :type 'reg/mem  :reader ext-regrm-inst-r/m)
+  (reg     :field (byte 3 19)   :type 'reg :reader !ext-regrm-inst-reg)
   ;; optional fields
   (imm))
 

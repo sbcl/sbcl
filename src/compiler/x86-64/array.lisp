@@ -38,8 +38,9 @@
     (inst shr header n-fixnum-tag-bits)
     (instrument-alloc bytes node)
     (pseudo-atomic ()
-     (allocation result bytes node nil other-pointer-lowtag)
-     (storew header result 0 other-pointer-lowtag))))
+     (allocation result bytes node nil 0)
+     (storew header result 0 0)
+     (inst or :byte result other-pointer-lowtag))))
 
 (define-vop (make-array-header/c)
   (:translate make-array-header)
@@ -57,8 +58,9 @@
                            type)))
      (instrument-alloc bytes node)
      (pseudo-atomic ()
-      (allocation result bytes node nil other-pointer-lowtag)
-      (storew header result 0 other-pointer-lowtag)))))
+      (allocation result bytes node nil 0)
+      (storew* header result 0 0 t)
+      (inst or :byte result other-pointer-lowtag)))))
 
 
 ;;;; additional accessors and setters for the array header

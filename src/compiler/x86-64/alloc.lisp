@@ -51,7 +51,6 @@
     (invoke-asm-routine 'call (if to-r11 'alloc-tramp-r11 'alloc-tramp) node)
     (unless to-r11
       (inst pop result-tn)))
-
   (unless (eql lowtag 0)
     (inst or :byte result-tn lowtag))
   (values))
@@ -126,16 +125,26 @@
                (and (integerp size)
                     (>= size large-object-size)))
            (%alloc-tramp node alloc-tn size lowtag))
-          ((and (integerp size) (eql lowtag 0))
-           (inst mov alloc-tn free-pointer)
-           (inst lea temp-reg-tn (ea size alloc-tn))
+          ((eql lowtag 0)
+           (cond ((and (tn-p size) (location= size alloc-tn))
+                  (inst mov temp-reg-tn free-pointer)
+                  ;; alloc-tn <- old free ptr and temp <- new free ptr
+                  (inst xadd temp-reg-tn alloc-tn))
+                 (t
+                  (inst mov alloc-tn free-pointer)
+                  (inst lea temp-reg-tn (ea size alloc-tn))))
            (inst cmp temp-reg-tn end-addr)
            (inst jmp :a NOT-INLINE)
            (inst mov free-pointer temp-reg-tn)
            (emit-label DONE)
            (assemble (:elsewhere)
              (emit-label NOT-INLINE)
-             (%alloc-tramp node alloc-tn size 0)
+             (let ((size (cond ((and (tn-p size) (location= size alloc-tn))
+                                (inst sub temp-reg-tn alloc-tn)
+                                temp-reg-tn)
+                               (t
+                                size))))
+               (%alloc-tramp node alloc-tn size 0))
              (inst jmp DONE)))
           (t
            (inst mov temp-reg-tn free-pointer)

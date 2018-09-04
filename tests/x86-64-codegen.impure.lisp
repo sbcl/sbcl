@@ -283,6 +283,17 @@
                    (* 50 (sb-vm::primitive-object-size
                           (sb-thread:make-mutex))))))))
 
+(with-test (:name :aprof-smoketest-non-constant-size-vector)
+  (let ((nbytes
+         (let ((*standard-output* (make-broadcast-stream)))
+           (sb-aprof:aprof-run
+            (checked-compile
+             '(sb-int:named-lambda "test" (&optional (n 10))
+                (declare (inline sb-thread:make-mutex)
+                         (optimize sb-c::instrument-consing))
+                (make-array (the (mod 64) n))))))))
+    (assert (= nbytes (* 12 sb-vm:n-word-bytes)))))
+
 (with-test (:name :aprof-smoketest-large-vector)
   (let ((nbytes
          (let ((*standard-output* (make-broadcast-stream)))

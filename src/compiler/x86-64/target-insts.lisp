@@ -59,6 +59,9 @@
 (defun regrm-inst-reg (dchunk dstate)
   (logior (if (logtest (sb!disassem::dstate-inst-properties dstate) +rex-r+) 8 0)
           (!regrm-inst-reg dchunk dstate)))
+(defun ext-regrm-inst-reg (dchunk dstate)
+  (logior (if (logtest (sb!disassem::dstate-inst-properties dstate) +rex-r+) 8 0)
+          (!ext-regrm-inst-reg dchunk dstate)))
 
 (defstruct (machine-ea (:include sb!disassem::filtered-arg)
                        (:copier nil)

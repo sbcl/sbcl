@@ -75,11 +75,11 @@
                 #:machine-ea-base
                 #:machine-ea-index
                 #:machine-ea-disp
-                #:regrm-inst-reg
-                #:regrm-inst-r/m
+                #:regrm-inst-reg #:ext-regrm-inst-reg
+                #:regrm-inst-r/m #:ext-regrm-inst-r/m
                 #:reg-imm-data
                 #:reg/mem-imm-data
-                #:add #:inc #:mov #:lea #:cmp #:xor #:jmp
+                #:add #:xadd #:inc #:mov #:lea #:cmp #:xor #:jmp
                 #:|push| #:|pop| #:|or| #:|call| #:|break|))
 
 (in-package #:sb-aprof)
@@ -223,6 +223,7 @@
              (let* ((opcode (sb-disassem::inst-name inst))
                     (opcode-byte (logand dchunk #xFF))
                     (ea (case opcode
+                          (xadd (ext-regrm-inst-r/m 0 dstate))
                           ;; 64-bit mode 'inc' has reg/mem format,
                           ;; never the single-byte format
                           ((add inc mov lea cmp) (regrm-inst-r/m 0 dstate))))
@@ -270,21 +271,26 @@
                            (setq orig-free-ptr-reg (regrm-inst-reg dchunk dstate)))))
                    (#.+state-loaded-free-ptr+
                     (case opcode
-                      ;; Variable-size alloc can either use LEA or ADD to compute the
+                      ;; Variable-size alloc can use LEA, ADD, or XADD to compute the
                       ;; new free ptr depending on whether the alloc-tn and the size
-                      ;; are in the same register (ADD) or different (LEA).
+                      ;; are in the same register (ADD,XADD) or different (LEA).
                       (lea
-                       (advance-if (and (eql (machine-ea-base ea) orig-free-ptr-reg)
-                                        (or (and (not (machine-ea-index ea))
-                                                 (plusp (machine-ea-disp ea)))
-                                            (and (machine-ea-index ea)
-                                                 (not (machine-ea-disp ea)))))
+                       (advance-if (or (and (not (machine-ea-index ea))
+                                            (plusp (machine-ea-disp ea))
+                                            (eql (machine-ea-base ea) orig-free-ptr-reg))
+                                       (and (not (machine-ea-disp ea))
+                                            (or (eql (machine-ea-index ea) orig-free-ptr-reg)
+                                                (eql (machine-ea-base ea) orig-free-ptr-reg))))
                                    +state-bumped-free-ptr+)
                        (setq free-ptr-reg (regrm-inst-reg dchunk dstate)
                              size (machine-ea-disp ea)))
                       (add
                        (advance-if (typep ea '(integer 0 15)) +state-bumped-free-ptr+)
                        (setq free-ptr-reg ea))
+                      (xadd
+                       (advance-if (eql ea orig-free-ptr-reg) +state-bumped-free-ptr+)
+                       (setq target-reg (ext-regrm-inst-reg dchunk dstate)
+                             free-ptr-reg ea))
                       (t (fail))))
                    (#.+state-bumped-free-ptr+
                     (advance-if (and (eq opcode 'cmp)
@@ -314,14 +320,15 @@
                        (when (= lowtag sb-vm:list-pointer-lowtag)
                          (return-from infer-type (values 'list size))))
                       (mov ; widetag stored before ORing in lowtag
-                       (advance-if (and (eq (machine-ea-base ea) orig-free-ptr-reg)
+                       (unless target-reg
+                         (setq target-reg orig-free-ptr-reg))
+                       (advance-if (and (eq (machine-ea-base ea) target-reg)
                                         (not (machine-ea-disp ea))
                                         (not (machine-ea-index ea)))
                                    +state-widetag-only+)
                        (setq widetag (if (eq (inst-operand-size dstate) :qword)
                                          :variable
-                                         (logand (reg/mem-imm-data 0 dstate) #xFF))
-                              target-reg orig-free-ptr-reg))
+                                         (logand (reg/mem-imm-data 0 dstate) #xFF))))
                       (t
                        (fail))))
                    (#.+state-lowtag-only+
@@ -384,7 +391,10 @@
                            (ecase lowtag
                              (#.sb-vm:other-pointer-lowtag
                               (return-from infer-type
-                                (values (aref *tag-to-type* widetag) size)))
+                                (values (if (eq widetag :variable)
+                                            'unknown
+                                            (aref *tag-to-type* widetag))
+                                        size)))
                              (#.sb-vm:instance-pointer-lowtag)
                              (#.sb-vm:fun-pointer-lowtag
                               (return-from infer-type (values 'function size)))))))
