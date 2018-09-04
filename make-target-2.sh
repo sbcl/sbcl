@@ -40,6 +40,10 @@ fi
 # without trying to tell you about what it's doing. So unless it hangs
 # for much longer than that, don't worry, it's likely to be normal.
 if [ "$1" != --load ]; then
+    if [ "x$1" != x ]; then
+        echo Unknown option \'"$1"\' to make-target-2
+        exit 1
+    fi
     echo //doing warm init - compilation phase
     ./src/runtime/sbcl --core output/cold-sbcl.core \
      --lose-on-corruption --no-sysinit --no-userinit \
