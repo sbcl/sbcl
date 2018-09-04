@@ -414,26 +414,22 @@ trans_return_pc_header(lispobj object)
 }
 #endif /* RETURN_PC_WIDETAG */
 
-/* On the 386, closures hold a pointer to the raw address instead of the
- * function object, so we can use CALL [$FDEFN+const] to invoke
- * the function without loading it into a register. Given that code
- * objects don't move, we don't need to update anything, but we do
- * have to figure out that the function is still live. */
-
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
+/* Closures hold a pointer to the raw simple-fun entry address instead of the
+ * tagged object so that CALL [RAX+const] can be used to invoke it. */
 static sword_t
 scav_closure(lispobj *where, lispobj header)
 {
     struct closure *closure = (struct closure *)where;
+    lispobj fun = closure->fun;
+    if (fun) {
+        fun -= FUN_RAW_ADDR_OFFSET;
+        lispobj newfun = fun;
+        scavenge(&newfun, 1);
+        if (newfun != fun) // Don't write unnecessarily
+            closure->fun = ((struct simple_fun*)(newfun - FUN_POINTER_LOWTAG))->self;
+    }
     int payload_words = SHORT_BOXED_NWORDS(header);
-    lispobj fun = closure->fun - FUN_RAW_ADDR_OFFSET;
-    scavenge(&fun, 1);
-#ifdef LISP_FEATURE_GENCGC
-    /* The function may have moved so update the raw address. But
-     * don't write unnecessarily. */
-    if (closure->fun != fun + FUN_RAW_ADDR_OFFSET)
-        closure->fun = fun + FUN_RAW_ADDR_OFFSET;
-#endif
     // Payload includes 'fun' which was just looked at, so subtract it.
     scavenge(closure->info, payload_words - 1);
     return 1 + payload_words;

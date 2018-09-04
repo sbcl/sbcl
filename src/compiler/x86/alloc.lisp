@@ -338,14 +338,11 @@
                    stack-allocate-p
                    fun-pointer-lowtag)
        (storew (logior (ash (1- size) n-widetag-bits) closure-widetag)
-               result 0 fun-pointer-lowtag))
-    ;; These two instructions are within the scope of PSEUDO-ATOMIC.
-    ;; This is due to scav_closure() assuming that it can always subtract
-    ;; FUN_RAW_ADDR_OFFSET from closure->fun to obtain a Lisp object,
-    ;; without any precheck for whether that word is currently 0.
-    (inst lea temp (make-ea-for-object-slot function simple-fun-code-offset
-                                            fun-pointer-lowtag))
-    (storew temp result closure-fun-slot fun-pointer-lowtag))))
+               result 0 fun-pointer-lowtag)))
+   ;; Done with pseudo-atomic
+   (inst lea temp (make-ea-for-object-slot function simple-fun-code-offset
+                                           fun-pointer-lowtag))
+   (storew temp result closure-fun-slot fun-pointer-lowtag)))
 
 ;;; The compiler likes to be able to directly make value cells.
 (define-vop (make-value-cell)

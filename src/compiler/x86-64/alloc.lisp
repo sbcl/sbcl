@@ -494,10 +494,7 @@
                                      (thread-slot-ea thread-function-layout-slot))
                        temp)
                 result 0 fun-pointer-lowtag (not stack-allocate-p)))
-     ;; These two instructions are within the scope of PSEUDO-ATOMIC.
-     ;; This is due to scav_closure() assuming that it can always subtract
-     ;; FUN_RAW_ADDR_OFFSET from closure->fun to obtain a Lisp object,
-     ;; without any precheck for whether that word is currently 0.
+     ;; Done with pseudo-atomic
      (inst lea temp (rip-relative-ea label (ash simple-fun-code-offset word-shift)))
      (storew temp result closure-fun-slot fun-pointer-lowtag))))
 
