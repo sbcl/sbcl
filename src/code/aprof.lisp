@@ -380,7 +380,9 @@
                            ;; and the state is unchanged.
                            (unless (and (null (machine-ea-index ea))
                                         (eql (machine-ea-base ea) target-reg)
-                                        (eql (machine-ea-disp ea) sb-vm:n-word-bytes))
+                                        (typep (machine-ea-disp ea)
+                                               `(integer ,sb-vm:n-word-bytes
+                                                         (,(* sb-vm:n-word-bytes 2)))))
                              (fail)))
                           (t
                            (advance-if (and (eq opcode '|or|)

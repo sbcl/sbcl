@@ -289,10 +289,23 @@
            (sb-aprof:aprof-run
             (checked-compile
              '(sb-int:named-lambda "test" (&optional (n 10))
-                (declare (inline sb-thread:make-mutex)
-                         (optimize sb-c::instrument-consing))
+                (declare (optimize sb-c::instrument-consing))
                 (make-array (the (mod 64) n))))))))
     (assert (= nbytes (* 12 sb-vm:n-word-bytes)))))
+
+;;; The profiler's disassembler expected to see a store at alloc-ptr
+;;; or that + n-word-bytes, when in fact the code might write to 1 byte
+;;; positioned anywhere in the word after the object header.
+(with-test (:name :aprof-smoketest-bit-vector)
+  (let ((nbytes
+         (let ((*standard-output* (make-broadcast-stream)))
+           (sb-aprof:aprof-run
+            (checked-compile
+             '(sb-int:named-lambda "test" ()
+                (declare (optimize sb-c::instrument-consing))
+                (make-array (* 128 16) :element-type 'bit)))))))
+    (assert (= nbytes (sb-vm::primitive-object-size
+                       (make-array (* 128 16) :element-type 'bit))))))
 
 (with-test (:name :aprof-smoketest-large-vector)
   (let ((nbytes
