@@ -52,7 +52,7 @@
     (unless to-r11
       (inst pop result-tn)))
 
-  (when lowtag
+  (unless (eql lowtag 0)
     (inst or :byte result-tn lowtag))
   (values))
 
@@ -135,7 +135,7 @@
            (emit-label DONE)
            (assemble (:elsewhere)
              (emit-label NOT-INLINE)
-             (%alloc-tramp node alloc-tn size nil)
+             (%alloc-tramp node alloc-tn size 0)
              (inst jmp DONE)))
           (t
            (inst mov temp-reg-tn free-pointer)
@@ -154,9 +154,9 @@
              (emit-label NOT-INLINE)
              (cond ((and (tn-p size) (location= size alloc-tn)) ; recover SIZE
                     (inst sub alloc-tn free-pointer)
-                    (%alloc-tramp node temp-reg-tn alloc-tn nil))
+                    (%alloc-tramp node temp-reg-tn alloc-tn 0))
                    (t ; SIZE is intact
-                    (%alloc-tramp node temp-reg-tn size nil)))
+                    (%alloc-tramp node temp-reg-tn size 0)))
              (inst jmp DONE))))
     (values)))
 

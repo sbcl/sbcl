@@ -254,7 +254,7 @@
                             (%instancep ea)
                             (eql (machine-ea-base ea) 11)
                             (null (machine-ea-index ea))
-                            (eq (machine-ea-disp ea)
+                            (eql (machine-ea-disp ea)
                                 (+ profiler-index sb-vm:n-word-bytes))))
                       (t
                        (advance-if (and (eq opcode 'mov) (pseudoatomic-flag-p))
@@ -368,18 +368,26 @@
                    (#.+state-low-then-widetag+
                     (infer-layout opcode ea dchunk))
                    (#.+state-widetag-only+
-                    (advance-if (and (eq opcode '|or|)
-                                     ;; TODO: AVER correct register as well
-                                     (not lowtag))
-                                +state-wide-then-lowtag+)
-                    (setq lowtag (reg/mem-imm-data 0 dstate))
-                    (ecase lowtag
-                      (#.sb-vm:other-pointer-lowtag
-                       (return-from infer-type
-                         (values (aref *tag-to-type* widetag) size)))
-                      (#.sb-vm:instance-pointer-lowtag)
-                      (#.sb-vm:fun-pointer-lowtag
-                       (return-from infer-type (values 'function size)))))
+                    (cond ((eq opcode 'mov)
+                           ;; Storing to the word 1 past the header is ignored
+                           ;; and the state is unchanged.
+                           (unless (and (null (machine-ea-index ea))
+                                        (eql (machine-ea-base ea) target-reg)
+                                        (eql (machine-ea-disp ea) sb-vm:n-word-bytes))
+                             (fail)))
+                          (t
+                           (advance-if (and (eq opcode '|or|)
+                                            ;; TODO: AVER correct register as well
+                                            (not lowtag))
+                                       +state-wide-then-lowtag+)
+                           (setq lowtag (reg/mem-imm-data 0 dstate))
+                           (ecase lowtag
+                             (#.sb-vm:other-pointer-lowtag
+                              (return-from infer-type
+                                (values (aref *tag-to-type* widetag) size)))
+                             (#.sb-vm:instance-pointer-lowtag)
+                             (#.sb-vm:fun-pointer-lowtag
+                              (return-from infer-type (values 'function size)))))))
                    (#.+state-wide-then-lowtag+
                     (advance-if (and (eq opcode 'xor) (pseudoatomic-flag-p))
                                 +state-end-pa+))
@@ -401,16 +409,22 @@
                           (t
                            (fail))))
                    (#.+state-result-popped+
-                    (cond ((eq opcode '|or|)
+                    (case opcode
+                      (mov
+                       (advance-if (and (not (machine-ea-index ea))
+                                        (eq (machine-ea-base ea) target-reg)
+                                        (null (machine-ea-disp ea)))
+                                   +state-widetag-only+)
+                       (setq widetag (logand (reg/mem-imm-data 0 dstate) #xFF)))
+                      (|or|
                            (if (eql opcode-byte #x0C)
                                ;; OR AL, $byte (2 byte encoding)
                                (setq lowtag (ldb (byte 8 8) dchunk))
                                ;; OR other-reg, $byte ; (3 byte encoding)
                                (setq lowtag (ldb (byte 8 16) dchunk)))
                            (advance +state-lowtag-only+))
-                          (t
-                           (fail))))
-                   ))))
+                      (t
+                       (fail))))))))
            seg dstate)))))
   (values nil nil))
 
