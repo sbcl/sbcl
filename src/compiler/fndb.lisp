@@ -537,7 +537,8 @@
   (flushable))
 
 (defknown map (type-specifier (function-designator ((nth-arg 2 :sequence t)
-                                                    (rest-args :sequence t)))
+                                                    (rest-args :sequence t))
+                                                   (nth-arg 0 :sequence-type t))
                               proper-sequence &rest proper-sequence)
   consed-sequence (call)
 ; :DERIVE-TYPE 'TYPE-SPEC-ARG1 ? Nope... (MAP NIL ...) returns NULL, not NIL.

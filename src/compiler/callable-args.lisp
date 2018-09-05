@@ -261,17 +261,16 @@
              (if (lvar-p arg)
                  (lvar-type arg)
                  (leaf-type arg)))
-           (sequence-element-type (lvar)
-             (let ((type (arg-type lvar)))
-               (cond ((array-type-p type)
-                      (let ((elt-type (array-type-element-type type)))
-                        (if (eq elt-type *wild-type*)
-                            *universal-type*
-                            elt-type)))
-                     ((csubtypep type (specifier-type 'string))
-                      (specifier-type 'character))
-                     (t
-                      *universal-type*)))))
+           (sequence-element-type (type)
+             (cond ((array-type-p type)
+                    (let ((elt-type (array-type-element-type type)))
+                      (if (eq elt-type *wild-type*)
+                          *universal-type*
+                          elt-type)))
+                   ((csubtypep type (specifier-type 'string))
+                    (specifier-type 'character))
+                   (t
+                    *universal-type*))))
     (let ((deps (lvar-function-designator-annotation-deps annotation))
           (arg-specs (lvar-function-designator-annotation-arg-specs annotation))
           (result-specs (lvar-function-designator-annotation-result-specs annotation)))
@@ -294,7 +293,18 @@
                                                   *universal-type*))))
                      (cond (key-return-type)
                            ((getf options :sequence)
-                            (sequence-element-type arg))
+                            (sequence-element-type (arg-type arg)))
+                           ((getf options :sequence-type)
+                            (or (let* ((value (cond ((constant-p arg)
+                                                     (constant-value arg))
+                                                    ((and (lvar-p arg)
+                                                          (constant-lvar-p arg))
+                                                     (lvar-value arg))))
+                                       (type (and value
+                                                  (careful-specifier-type value))))
+                                  (and type
+                                       (sequence-element-type type)))
+                                *universal-type*))
                            (t
                             (arg-type arg))))))
                (process-arg (spec)
