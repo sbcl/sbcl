@@ -11,21 +11,31 @@
 
 (in-package "SB!C")
 
-(defun assert-function-designator (caller lvars lvar annotation)
+(defun assert-function-designator (caller lvars lvar annotation policy)
   (destructuring-bind (args &optional results &rest options) annotation
     (declare (ignore options))
     (multiple-value-bind (arg-specs result-specs deps)
         (callable-dependant-lvars caller lvars args results)
-      (assert-function-designator-lvar-type lvar
-                                            (make-fun-type
-                                             :required
-                                             (make-list (+ (length arg-specs)
-                                                           ;; Count ordinary types without annotations
-                                                           (count-if #'atom args))
-                                                        :initial-element *universal-type*)
-                                             :returns *wild-type*
-                                             :designator t)
-                                            caller deps arg-specs result-specs))))
+      (let* ((type (make-fun-type
+                    :required
+                    (make-list (+ (length arg-specs)
+                                  ;; Count ordinary types without annotations
+                                  (count-if #'atom args))
+                               :initial-element *universal-type*)
+                    :returns *wild-type*
+                    :designator t))
+             (annotation (make-lvar-function-designator-annotation
+                          :caller caller
+                          :arg-specs arg-specs
+                          :result-specs result-specs
+                          :deps deps
+                          :type type)))
+        (when (add-annotation lvar annotation)
+          (loop for lvar in deps
+                do (push annotation (lvar-dependent-annotations lvar)))
+          (assert-lvar-type lvar
+                            (specifier-type 'function-designator)
+                            policy))))))
 
 (defun fun-type-positional-count (fun-type)
   (+ (length (fun-type-required fun-type))
@@ -73,33 +83,6 @@
                   (and (consp results)
                        (car (process-arg results)))
                   (lvars)))))))
-
-(defun insert-function-designator-cast-before (next lvar type caller
-                                               deps arg-specs result-specs)
-  (declare (type node next) (type lvar lvar) (type ctype type))
-  (with-ir1-environment-from-node next
-    (let* ((cast (make-function-designator-cast :asserted-type type
-                                                :type-to-check (specifier-type 'function-designator)
-                                                :value lvar
-                                                :derived-type (coerce-to-values type)
-                                                :deps deps
-                                                :arg-specs arg-specs
-                                                :result-specs result-specs
-                                                :caller caller)))
-      (loop for lvar in deps
-            do (push cast (lvar-dependent-casts lvar)))
-      (%insert-cast-before next cast))))
-
-;;; Similar to assert-lvar-type
-(defun assert-function-designator-lvar-type (lvar type caller
-                                             deps arg-specs result-specs)
-  (declare (type lvar lvar) (type ctype type))
-  (let ((internal-lvar (make-lvar))
-        (dest (lvar-dest lvar)))
-    (substitute-lvar internal-lvar lvar)
-    (let ((cast (insert-function-designator-cast-before dest lvar type caller
-                                                        deps arg-specs result-specs)))
-      (use-lvar cast internal-lvar))))
 
 (defun map-key-lvars (function args type)
   (when (fun-type-keyp type)
@@ -273,7 +256,7 @@
           (note-lossage "~s: can't specify both :TEST and :TEST-NOT"
                         comination-name))))))
 
-(defun function-designator-cast-types (cast)
+(defun function-designator-lvar-types (annotation)
   (labels ((arg-type (arg)
              (if (lvar-p arg)
                  (lvar-type arg)
@@ -289,9 +272,9 @@
                       (specifier-type 'character))
                      (t
                       *universal-type*)))))
-    (let ((deps (function-designator-cast-deps cast))
-          (arg-specs (function-designator-cast-arg-specs cast))
-          (result-specs (function-designator-cast-result-specs cast)))
+    (let ((deps (lvar-function-designator-annotation-deps annotation))
+          (arg-specs (lvar-function-designator-annotation-arg-specs annotation))
+          (result-specs (lvar-function-designator-annotation-result-specs annotation)))
       (labels ((%process-arg (spec)
                  (destructuring-bind (nth-arg . options) spec
                    (let* ((arg (nth nth-arg deps))
@@ -322,25 +305,10 @@
          (if arg-specs
              (mapcar #'process-arg arg-specs)
              (fun-type-required
-              (cast-asserted-type cast)))
+              (lvar-function-designator-annotation-type annotation)))
          (if result-specs
              (process-arg result-specs)
-             (fun-type-returns (cast-asserted-type cast))))))))
-
-(defun update-function-designator-cast (cast)
-  (when (function-designator-cast-deps cast)
-    (multiple-value-bind (args results)
-        (function-designator-cast-types cast)
-      (flet ((process-or (specs)
-               (loop for spec in specs
-                     collect (if (typep spec '(cons (eql or)))
-                                 (sb!kernel::%type-union (cdr spec))
-                                 spec))))
-        (setf (cast-asserted-type cast)
-              (make-fun-type
-               :required (process-or args)
-               :returns results
-               :designator t))))))
+             (fun-type-returns (lvar-function-designator-annotation-type annotation))))))))
 
 ;;; Return MIN, MAX, whether it contaions &optional/&key/&rest
 (defun fun-type-arg-limits (type)
@@ -412,98 +380,96 @@
 
 ;;; This can provide better errors and better handle OR types than a
 ;;; simple type intersection.
-(defun check-function-designator-cast (cast)
-  (multiple-value-bind (type name leaf) (lvar-fun-type (cast-value cast))
+(defun check-function-designator-lvar (lvar annotation)
+  (multiple-value-bind (type name leaf) (lvar-fun-type lvar)
     (when (fun-type-p type)
-      (multiple-value-bind (args results)
-          (function-designator-cast-types cast)
-        (let* ((*compiler-error-context* cast)
-               (condition (callable-argument-lossage-kind name
-                                                          leaf
-                                                          'simple-style-warning
-                                                          'simple-warning))
-               (type-condition (case condition
-                                 (simple-style-warning
-                                  'type-style-warning)
-                                 (t
-                                  'type-warning)))
-               (caller (function-designator-cast-caller cast))
-               (arg-count (length args)))
-          (or (report-arg-count-mismatch name caller
-                                         type
-                                         arg-count
-                                         condition)
-              (let ((param-types (fun-type-n-arg-types arg-count type)))
-                (block nil
-                  ;; Need to check each OR seperately, a UNION could
-                  ;; intersect with the function parameters
-                  (labels ((hide-ors (current-or or-part)
-                             (loop for spec in args
-                                   collect (cond ((eq spec current-or)
-                                                  or-part)
-                                                 ((typep spec '(cons (eql or)))
-                                                  (sb!kernel::%type-union (cdr spec)))
-                                                 (t
-                                                  spec))))
-                           (check (arg param &optional
-                                               current-spec)
-                             (when (eq (type-intersection param arg) *empty-type*)
-                               (warn type-condition
-                                     :format-control
-                                     "The function ~S is called by ~S with ~S but it accepts ~S."
-                                     :format-arguments
-                                     (list
-                                      name
-                                      caller
-                                      (mapcar #'type-specifier (hide-ors current-spec arg))
-                                      (mapcar #'type-specifier param-types)))
-                               (return t))))
-                    (loop for arg-type in args
-                          for param-type in param-types
-                          if (typep arg-type '(cons (eql or)))
-                          do (loop for type in (cdr arg-type)
-                                   do (check type param-type arg-type))
-                          else do (check arg-type param-type)))))
-              (let ((returns (single-value-type (fun-type-returns type))))
-                (when (and (neq returns *wild-type*)
-                           (neq results *wild-type*)
-                           (eq (type-intersection returns results) *empty-type*))
-                  (warn type-condition
-                        :format-control
-                        "The function ~S called by ~S returns ~S but ~S is expected"
-                        :format-arguments
-                        (list
-                         name
-                         caller
-                         (type-specifier returns)
-                         (type-specifier results)))))))))))
+      ;; If the destination is a combination-fun that means the function
+      ;; is called here and not passed somewhere else, there's no longer a
+      ;; need to check the function type, the arguments to the call will
+      ;; do the same job.
+      (unless (let* ((dest (and lvar
+                                (lvar-dest lvar))))
+                (and (basic-combination-p dest)
+                     (eq (basic-combination-fun dest) lvar)))
+        (multiple-value-bind (args results)
+            (function-designator-lvar-types annotation)
+          (let* ((condition (callable-argument-lossage-kind name
+                                                            leaf
+                                                            'simple-style-warning
+                                                            'simple-warning))
+                 (type-condition (case condition
+                                   (simple-style-warning
+                                    'type-style-warning)
+                                   (t
+                                    'type-warning)))
+                 (caller (lvar-function-designator-annotation-caller annotation))
+                 (arg-count (length args)))
+            (or (report-arg-count-mismatch name caller
+                                           type
+                                           arg-count
+                                           condition)
+                (let ((param-types (fun-type-n-arg-types arg-count type)))
+                  (block nil
+                    ;; Need to check each OR seperately, a UNION could
+                    ;; intersect with the function parameters
+                    (labels ((hide-ors (current-or or-part)
+                               (loop for spec in args
+                                     collect (cond ((eq spec current-or)
+                                                    or-part)
+                                                   ((typep spec '(cons (eql or)))
+                                                    (sb!kernel::%type-union (cdr spec)))
+                                                   (t
+                                                    spec))))
+                             (check (arg param &optional
+                                                 current-spec)
+                               (when (eq (type-intersection param arg) *empty-type*)
+                                 (warn type-condition
+                                       :format-control
+                                       "The function ~S is called by ~S with ~S but it accepts ~S."
+                                       :format-arguments
+                                       (list
+                                        name
+                                        caller
+                                        (mapcar #'type-specifier (hide-ors current-spec arg))
+                                        (mapcar #'type-specifier param-types)))
+                                 (return t))))
+                      (loop for arg-type in args
+                            for param-type in param-types
+                            if (typep arg-type '(cons (eql or)))
+                            do (loop for type in (cdr arg-type)
+                                     do (check type param-type arg-type))
+                            else do (check arg-type param-type)))))
+                (let ((returns (single-value-type (fun-type-returns type))))
+                  (when (and (neq returns *wild-type*)
+                             (neq results *wild-type*)
+                             (eq (type-intersection returns results) *empty-type*))
+                    (warn type-condition
+                          :format-control
+                          "The function ~S called by ~S returns ~S but ~S is expected"
+                          :format-arguments
+                          (list
+                           name
+                           caller
+                           (type-specifier returns)
+                           (type-specifier results)))))))))
+      t)))
 
-;;; Doing this during IR2 conversion and not in ir1-optimize-cast
-;;; because of possible function redefinition and the need to signal a
-;;; style-warning and not a full warning.
-;;; If the cast is not deleted after a warning is signalled then it
-;;; might get signalled multiple times, and IR2 conversion happens
-;;; only once.
-(defun check-functional-cast (cast)
-  (let ((value (cast-value cast))
-        (atype (cast-asserted-type cast)))
-    (cond ((function-designator-cast-p cast)
-           (check-function-designator-cast cast))
-          ((fun-type-p atype)
-           (multiple-value-bind (type name leaf) (lvar-fun-type value)
-             (when (fun-type-p type)
-               (let ((int (type-intersection type atype)))
-                 (when (or (memq *empty-type* (fun-type-required int))
-                           (and (eq (fun-type-returns int) *empty-type*)
-                                (neq (fun-type-returns type) *empty-type*)
-                                (not (and (eq (fun-type-returns atype) *empty-type*)
-                                          (eq (fun-type-returns type) *wild-type*)))))
-                   (%compile-time-type-error-warn cast
-                                                  (type-specifier atype)
-                                                  (type-specifier type)
-                                                  (list name)
-                                                  :condition
-                                                  (callable-argument-lossage-kind name
-                                                                                  leaf
-                                                                                  'type-style-warning
-                                                                                  'type-warning))))))))))
+(defun check-function-lvar (lvar annotation)
+  (let ((atype (lvar-function-annotation-type annotation)))
+    (multiple-value-bind (type name leaf) (lvar-fun-type lvar)
+      (when (fun-type-p type)
+        (let ((int (type-intersection type atype)))
+          (when (or (memq *empty-type* (fun-type-required int))
+                    (and (eq (fun-type-returns int) *empty-type*)
+                         (neq (fun-type-returns type) *empty-type*)
+                         (not (and (eq (fun-type-returns atype) *empty-type*)
+                                   (eq (fun-type-returns type) *wild-type*)))))
+            (%compile-time-type-error-warn annotation
+                                           (type-specifier atype)
+                                           (type-specifier type)
+                                           (list name)
+                                           :condition
+                                           (callable-argument-lossage-kind name
+                                                                           leaf
+                                                                           'type-style-warning
+                                                                           'type-warning))))))))

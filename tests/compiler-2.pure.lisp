@@ -1579,3 +1579,12 @@
       `(lambda (s)
          (= (length (the (string 1) s)) 1))
     (((make-array 1 :element-type 'character :fill-pointer 0)) nil)))
+
+(with-test (:name :function-designator-loop)
+  (checked-compile-and-assert
+      ()
+      `(lambda (p1 p3 p4)
+         (declare (type (or (eql #.#'oddp)
+                            (satisfies eval)) p1))
+         (find-if-not p1 nil p3 p4))
+       ((#'oddp :from-end t) nil)))

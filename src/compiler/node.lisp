@@ -95,7 +95,8 @@
   ;; something or other that the back end annotates this lvar with
   (info nil)
   (dependent-casts nil)
-  (annotations nil))
+  (annotations nil)
+  (dependent-annotations nil))
 (!set-load-form-method lvar (:xc :target) :ignore-it)
 
 ;;; These are used for annottating a LVAR with information that can't
@@ -111,20 +112,42 @@
   fired)
 
 (defstruct (lvar-modified-annotation
-            (:include lvar-annotation))
+            (:include lvar-annotation)
+            (:copier nil))
   caller)
 
 (defstruct (lvar-hook
-            (:include lvar-annotation))
+            (:include lvar-annotation)
+            (:copier nil))
   (hook #'missing-arg :type function))
 
 (defstruct (lvar-type-spec-annotation
-            (:include lvar-hook)))
+            (:include lvar-hook)
+            (:copier nil)))
 
 (defstruct (lvar-proper-sequence-annotation
-            (:include lvar-annotation))
+            (:include lvar-annotation)
+            (:copier nil))
   (kind 'proper-sequence :type (member proper-list proper-sequence
                                        proper-or-circular-list proper-or-dotted-list)))
+
+(defstruct (lvar-dependent-annotation
+             (:include lvar-annotation)
+             (:copier nil))
+    (deps nil :type list))
+
+(defstruct (lvar-function-designator-annotation
+             (:include lvar-dependent-annotation)
+             (:copier nil))
+  (caller nil :type symbol)
+  (arg-specs nil :type list)
+  (result-specs nil :type list)
+  type)
+
+(defstruct (lvar-function-annotation
+             (:include lvar-annotation)
+             (:copier nil))
+  type)
 
 (defmethod print-object ((x lvar) stream)
   (print-unreadable-object (x stream :type t :identity t)
@@ -1551,24 +1574,6 @@
   (derived nil :type boolean)
   (array (missing-arg) :type lvar)
   (bound (missing-arg) :type lvar))
-
-(def!struct (dependent-cast (:include cast) (:copier nil))
-  ;; Either LVARs or LEAFs
-  (deps nil :type list))
-
-(def!struct (function-designator-cast (:include dependent-cast)
-                                      (:copier nil))
-  (caller nil :type symbol)
-  (arg-specs nil :type list)
-  (result-specs nil :type list))
-(defprinter (function-designator-cast :identity t)
-  %type-check
-  value
-  asserted-type
-  (deps :test deps)
-  (caller :test caller)
-  (arg-specs :test arg-specs)
-  (result-specs :test result-specs))
 
 ;;; Inserted by ARRAY-CALL-TYPE-DERIVER so that it can be later deleted
 (def!struct (array-index-cast (:include cast) (:copier nil)))

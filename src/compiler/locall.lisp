@@ -1208,6 +1208,8 @@
              ((csubtypep (single-value-type (node-derived-type use))
                          (leaf-type var))
               (let ((use-component (node-component use)))
+                (propagate-lvar-annotations-to-refs arg var)
+                (update-lvar-dependencies leaf arg)
                 (substitute-leaf-if
                  (lambda (ref)
                    (when (eq (node-component ref) use-component)

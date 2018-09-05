@@ -275,7 +275,6 @@
      (update-lvar-dependencies new (lambda-var-ref-lvar old)))
     (lvar
      (when (lvar-p new)
-       (propagate-lvar-annotations new old)
        (do-uses (node old)
          (when (exit-p node)
            ;; Inlined functions will try to use the lvar in the lexenv
@@ -283,11 +282,7 @@
                  for block-lvar = (fourth block)
                  when (eq old block-lvar)
                  do (setf (fourth block) new)))))
-     (loop for cast in (lvar-dependent-casts old)
-           do (nsubst new old (dependent-cast-deps cast))
-           when (lvar-p new)
-           do
-           (push cast (lvar-dependent-casts new))))))
+     (propagate-lvar-annotations new old))))
 
 ;;; In OLD's DEST, replace OLD with NEW. NEW's DEST must initially be
 ;;; NIL. We do not flush OLD's DEST.
@@ -1840,12 +1835,6 @@
        (let ((var (set-var node)))
          (setf (basic-var-sets var)
                (delete node (basic-var-sets var)))))
-      (dependent-cast
-       (loop for dep in (dependent-cast-deps node)
-             when (lvar-p dep)
-             do (setf (lvar-dependent-casts dep)
-                      (delq node (lvar-dependent-casts dep))))
-       (flush-dest (cast-value node)))
       (cast
        (flush-dest (cast-value node)))))
 
@@ -2654,6 +2643,12 @@ is :ANY, the function name is not checked."
   (declare (type lvar value)
            (type ctype type)
            (type policy policy))
+  (when (fun-type-p type)
+    ;; FUN-TYPE will be weakined into FUNCTION,
+    ;; but we still want to check the full type at compile time.
+    (add-annotation value
+                    (make-lvar-function-annotation
+                     :type type)))
   (%make-cast :asserted-type type
               :type-to-check (maybe-weaken-check type policy)
               :value value
@@ -2845,31 +2840,39 @@ is :ANY, the function name is not checked."
   (when (lvar-annotations lvar)
     (dolist (ref (leaf-refs var))
       (when (node-lvar ref)
-        (propagate-lvar-annotations (node-lvar ref) lvar)))))
+        (propagate-lvar-annotations (node-lvar ref) lvar
+                                    nil)))))
 
-(defun propagate-lvar-annotations (new old)
-  (setf
-   (lvar-annotations new)
-   (cond ((not (lvar-annotations new))
-          (lvar-annotations old))
-         ((not (lvar-annotations old))
-          (lvar-annotations new))
-         (t
-          ;; Get only the outermost annotation, avoiding multiple
-          ;; warnings coming from source transforms.
-          (let ((all (union (lvar-annotations old) (lvar-annotations new))))
-            (loop for annotation in all
-                  for type = (type-of annotation)
-                  for source-path = (lvar-annotation-source-path annotation)
-                  when (or (eq (car source-path) 'original-source-start)
-                           (loop for other in all
-                                 for other-source-path = (lvar-annotation-source-path other)
-                                 never (and (not (eq annotation other))
-                                            (eq type (type-of other))
-                                            (or (eq (car other-source-path) 'original-source-start)
-                                                (member (car other-source-path)
-                                                        source-path)))))
-                  collect annotation))))))
+(defun propagate-lvar-annotations (new old &optional (propagate-dependencies t))
+  (when propagate-dependencies
+    (loop for dep in (lvar-dependent-annotations old)
+          do (nsubst new old (lvar-function-designator-annotation-deps dep))
+          when (lvar-p new)
+          do
+          (pushnew dep (lvar-dependent-annotations new))))
+  (when (lvar-p new)
+    (setf
+     (lvar-annotations new)
+     (cond ((not (lvar-annotations new))
+            (lvar-annotations old))
+           ((not (lvar-annotations old))
+            (lvar-annotations new))
+           (t
+            ;; Get only the outermost annotation, avoiding multiple
+            ;; warnings coming from source transforms.
+            (let ((all (union (lvar-annotations old) (lvar-annotations new))))
+              (loop for annotation in all
+                    for type = (type-of annotation)
+                    for source-path = (lvar-annotation-source-path annotation)
+                    when (or (eq (car source-path) 'original-source-start)
+                             (loop for other in all
+                                   for other-source-path = (lvar-annotation-source-path other)
+                                   never (and (not (eq annotation other))
+                                              (eq type (type-of other))
+                                              (or (eq (car other-source-path) 'original-source-start)
+                                                  (member (car other-source-path)
+                                                          source-path)))))
+                    collect annotation)))))))
 
 (defun lvar-constants (lvar &optional seen)
   (let* ((uses (lvar-uses lvar))
@@ -2996,18 +2999,26 @@ is :ANY, the function name is not checked."
                     (lvar-proper-sequence-annotation
                      (process-lvar-proper-sequence-annotation lvar annot))
                     (lvar-hook
-                     (process-lvar-hook-annotation lvar annot)))
+                     (process-lvar-hook-annotation lvar annot))
+                    (lvar-function-designator-annotation
+                     (check-function-designator-lvar lvar annot))
+                    (lvar-function-annotation
+                     (check-function-lvar lvar annot)))
               (setf (lvar-annotation-fired annot) t))))))
 
 (defun add-annotation (lvar annotation)
-  (setf (lvar-annotation-source-path annotation)
-        (if (boundp '*current-path*)
-            *current-path*
-            (node-source-path (lvar-dest lvar))))
-  (setf (lvar-annotation-lexenv annotation)
-        (or (and
-             (lvar-dest lvar)
-             (node-lexenv (lvar-dest lvar)))
-            *lexenv*))
-  (pushnew annotation (lvar-annotations lvar)
-           :key #'type-of))
+  (unless (eq (lvar-annotations lvar)
+              (pushnew annotation (lvar-annotations lvar)
+                       :key #'type-of))
+    (unless (lvar-annotation-source-path annotation)
+      (setf (lvar-annotation-source-path annotation)
+            (if (boundp '*current-path*)
+                *current-path*
+                (node-source-path (lvar-dest lvar)))))
+    (unless (lvar-annotation-lexenv annotation)
+      (setf (lvar-annotation-lexenv annotation)
+            (or (and
+                 (lvar-dest lvar)
+                 (node-lexenv (lvar-dest lvar)))
+                *lexenv*)))
+    t))

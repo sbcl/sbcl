@@ -634,38 +634,6 @@ be a lambda expression."
              name)
         fallback)))
 
-(def-ir1-translator global-function-preserve-cast
-    ((name original-lvar) start next result)
-  (let* ((cast (lvar-use original-lvar))
-         (value-ctran (make-ctran))
-         (value-lvar (make-lvar))
-         (new-cast (etypecase cast
-                     (function-designator-cast
-                      (make-function-designator-cast
-                       :%type-check  (cast-%type-check cast)
-                       :asserted-type (cast-asserted-type cast)
-                       :type-to-check (cast-type-to-check cast)
-                       :value value-lvar
-                       :derived-type (values-specifier-type '(values function &optional))
-                       :deps (function-designator-cast-deps cast)
-                       :arg-specs (function-designator-cast-arg-specs cast)
-                       :result-specs (function-designator-cast-result-specs cast)
-                       :caller (function-designator-cast-caller cast)
-                       :source-path (cast-source-path cast)))
-                     (cast
-                      (%make-cast
-                       :%type-check (cast-%type-check cast)
-                       :asserted-type (cast-asserted-type cast)
-                       :type-to-check (cast-type-to-check cast)
-                       :value value-lvar
-                       :derived-type (values-specifier-type '(values function &optional))
-                       :source-path (cast-source-path cast))))))
-    (with-fun-name-leaf (leaf name start :global-function t)
-      (reference-leaf start value-ctran value-lvar leaf))
-    (link-node-to-previous-ctran new-cast value-ctran)
-    (setf (lvar-dest value-lvar) new-cast)
-    (use-continuation new-cast next result)))
-
 (defun ensure-lvar-fun-form (lvar lvar-name &key (coercer '%coerce-callable-to-fun)
                                                  give-up)
   (aver (and lvar-name (symbolp lvar-name)))
@@ -673,10 +641,9 @@ be a lambda expression."
       lvar-name
       (let ((cname (lvar-constant-global-fun-name lvar)))
         (cond (cname
-               ;; Don't lose type restrictions
-               (if (and (cast-p (lvar-uses lvar))
-                        (fun-type-p (cast-asserted-type (lvar-use lvar))))
-                   `(global-function-preserve-cast ,cname ,lvar)
+               (if (lvar-annotations lvar)
+                   `(with-annotations ,(lvar-annotations lvar)
+                      (global-function ,cname))
                    `(global-function ,cname)))
               (give-up
                (give-up-ir1-transform

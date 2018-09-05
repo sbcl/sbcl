@@ -282,7 +282,8 @@
           (setf (block-reoptimize block) t)
           (reoptimize-component component :maybe))
         (loop for cast in (lvar-dependent-casts lvar)
-              unless (node-deleted cast)
+              unless (or (not (node-p cast))
+                         (node-deleted cast))
               do
               (setf (node-reoptimize cast) t)
               (setf (block-reoptimize (node-block cast)) t)
@@ -2347,17 +2348,6 @@
   #+sb-xc-host context
   #-sb-xc-host (source-to-string context))
 
-(defun may-delete-function-designator-cast (cast)
-  ;; If the destination is a combination-fun that means the function
-  ;; is called here and not passed somewhere else, there's no longer a
-  ;; need to check the function type, the arguments to the call will
-  ;; do the same job.
-  (let* ((lvar (cast-lvar cast))
-         (dest (and lvar
-                    (lvar-dest lvar))))
-    (and (basic-combination-p dest)
-         (eq (basic-combination-fun dest) lvar))))
-
 (defun may-delete-bound-cast (cast)
   (when (bound-cast-check cast)
     (when (constant-lvar-p (bound-cast-bound cast))
@@ -2373,8 +2363,6 @@
   (typecase cast
     (vestigial-exit-cast
      nil)
-    (function-designator-cast
-     (may-delete-function-designator-cast cast))
     (bound-cast
      (may-delete-bound-cast cast))
     (t t)))
@@ -2385,12 +2373,8 @@
         (value (cast-value cast)))
     (cond ((not (may-delete-cast cast))
            nil)
-          ((or
-            ;; If it's a call (decided by may-delete-cast), it'll do
-            ;; all the aproriate checking
-            (function-designator-cast-p cast)
-            (values-subtypep (lvar-derived-type value)
-                             (cast-asserted-type cast)))
+          ((values-subtypep (lvar-derived-type value)
+                            (cast-asserted-type cast))
            (delete-cast cast)
            t)
           ((and (listp (lvar-uses value))

@@ -571,7 +571,6 @@
              (2lvar (lvar-info lvar))
              (value (cast-value node))
              (2value (lvar-info value)))
-    (check-functional-cast node)
     (when 2lvar ;; the cast can be unused but not deleted to due vestigial exits
       (ecase (ir2-lvar-kind 2lvar)
         (:unused)
