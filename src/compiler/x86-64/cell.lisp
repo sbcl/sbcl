@@ -228,16 +228,10 @@
     ;; This code is tested by 'codegen.impure.lisp'
     (defun emit-symeval (value symbol symbol-reg check-boundp vop)
       (let* ((known-symbol-p (sc-is symbol constant immediate))
-             (known-symbol (and known-symbol-p (tn-value symbol)))
-             (*lexenv* (sb!c::node-lexenv (sb!c::vop-node vop))))
+             (known-symbol (and known-symbol-p (tn-value symbol))))
         ;; In order from best to worst.
         (cond
-          ((or (symbol-always-has-tls-value-p known-symbol) ; e.g. *HANDLER-CLUSTERS*
-               ;; bound here, has a TLS value
-               (and (symbol-always-has-tls-index-p known-symbol)
-                    (let ((var (lexenv-find known-symbol vars)))
-                      (and (sb!c::global-var-p var)
-                           (eq (sb!c::leaf-where-from var) :assumed)))))
+          ((symbol-always-has-tls-value-p known-symbol)
            (inst mov value (access-wired-tls-val known-symbol)))
           (t
            (cond

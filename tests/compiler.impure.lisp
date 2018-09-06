@@ -2892,3 +2892,16 @@
               (snoop))
             33)))
      ((10 (constantly 131)) 131))))
+
+(defvar *symbol-value-bound-here-escaping* 10)
+
+(with-test (:name :symbol-value-bound-here-escaping)
+  (assert (eql (funcall
+                (funcall
+                 (checked-compile
+                  `(lambda ()
+                     (let (*symbol-value-bound-here-escaping*)
+                       (lambda ()
+                         (let (*symbol-value-bound-here-escaping*))
+                         *symbol-value-bound-here-escaping*))))))
+               10)))
