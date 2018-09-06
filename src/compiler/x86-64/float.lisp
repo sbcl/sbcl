@@ -955,8 +955,7 @@
   (:vop-var vop)
   (:generator 3
     (when (or (location= y xmm)
-              (and (not (xmm-register-p x))
-                   (xmm-register-p y)))
+              (and (not (xmm-tn-p x)) (xmm-tn-p y)))
       (rotatef x y))
     (sc-case x
       (single-reg (setf xmm x))
@@ -988,8 +987,7 @@
   (:vop-var vop)
   (:generator 3
     (when (or (location= y xmm)
-              (and (not (xmm-register-p x))
-                   (xmm-register-p y)))
+              (and (not (xmm-tn-p x)) (xmm-tn-p y)))
       (rotatef x y))
     (sc-case x
       (double-reg

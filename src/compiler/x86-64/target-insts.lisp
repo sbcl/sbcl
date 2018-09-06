@@ -40,13 +40,14 @@
   value)
 
 ;;; A register field that can be extended by REX.R.
+;;; As noted in 'insts', this prefilter (and others) could return a REG.
 (defun prefilter-reg-r (dstate value)
-  (declare (type reg value) (type disassem-state dstate))
+  (declare (type (mod 8) value) (type disassem-state dstate))
   (if (dstate-getprop dstate +rex-r+) (+ value 8) value))
 
 ;;; A register field that can be extended by REX.B.
 (defun prefilter-reg-b (dstate value)
-  (declare (type reg value) (type disassem-state dstate))
+  (declare (type (mod 8) value) (type disassem-state dstate))
   (if (dstate-getprop dstate +rex-b+) (+ value 8) value))
 
 ;; This reader extracts the 'imm' operand in "MOV reg,imm" format.

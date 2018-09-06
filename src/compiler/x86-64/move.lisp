@@ -78,7 +78,7 @@
   ;; is already zeroed. Otherwise a :qword.
   (cond
     ;; If target is a register, we can just mov it there directly
-    ((gpr-p target)
+    ((gpr-tn-p target)
      ;; val can be a fixup for an immobile-space symbol, i.e. not a number,
      ;; hence not acceptable to ZEROP.
      (cond ((and (numberp val) (zerop val)) (zeroize target))

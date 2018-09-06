@@ -1361,11 +1361,19 @@
                     (return-from op))
                    (.comment ; ignore it
                     (return-from op))))
-               (apply mnemonic operands segment operands))))
+               (apply mnemonic operands segment
+                      (perform-operand-lowering operands)))))
           (label (%emit-label segment **current-vop** operation))
           (function (%emit-postit segment operation)))))
     (finalize-segment segment)
     segment))
+
+;;; Most backends do not convert register TNs into a different type of
+;;; internal object prior to handing the operands off to the emitter.
+;;; x86-64 does have a different representation, which makes some of
+;;; the emitter logic easier to understand.
+#!-x86-64
+(defun perform-operand-lowering (operands) operands)
 
 (defun truncate-section-to-length (section)
   (setf (section-last-buf section)
@@ -1454,7 +1462,7 @@
        ;; operands prior to calling any instruction hooks. The spread arguments
        ;; allow the compiler to generate normal &OPTIONAL / &KEY parsing code
        ;; in lieu of our generating a destructuring-bind to achieve the same.
-       (apply mnemonic operands dest operands))))
+       (apply mnemonic operands dest (perform-operand-lowering operands)))))
   (values))
 
 (defun emit-label (label)

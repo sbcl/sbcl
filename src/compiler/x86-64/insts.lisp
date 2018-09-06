@@ -16,17 +16,31 @@
   ;; Imports from this package into SB-VM
   (import '(conditional-opcode
             plausible-signed-imm32-operand-p
-            register-p gpr-p xmm-register-p
             ea-p ea-base ea-index size-nbyte
             ea make-ea ea-disp rip-relative-ea) "SB!VM")
   ;; Imports from SB-VM into this package
   (import '(sb!vm::frame-byte-offset sb!vm::rip-tn sb!vm::rbp-tn
             sb!vm::registers sb!vm::float-registers sb!vm::stack))) ; SB names
 
-;;; This type is used mostly in disassembly and represents legacy
-;;; registers only. R8-R15 are handled separately.
-(deftype reg () '(unsigned-byte 3))
+;;; a REG object discards all information about a TN except its storage base
+;;; (a/k/a register class), size class (for GPRs), and encoding.
+;;; It would also be nice to share this structure with the disasembler
+;;; for a few reasons:
+;;; - there is a handy function for returning the name of a REG as a string.
+;;; - there is no space cost to getting a REG since they are all interned atoms.
+;;;   Using them would be friendlier at the map-segment-instructions interface
+;;;   since the consumer could easily distinguish immediate integers
+;;;   from integers denoting register-direct addressing mode.
+;;; - at some point the JMP instruction printer was called with an integer for
+;;;   either a register number (as in "JMP RAX") or a target address in physical
+;;;   memory when :use-labels is NIL. It would be nice to ensure that doesn't
+;;;   happen. (It may have been resolved differently, I can't recall)
+(defstruct (reg (:predicate register-p)
+                (:copier nil)
+                (:constructor !make-reg (id)))
+  (id 0 :type (unsigned-byte 8)))
 
+;;; FIXME: remove these next two types, they are quite ridiculous.
 ;;; This includes legacy registers and R8-R15.
 (deftype full-reg () '(unsigned-byte 4))
 
@@ -994,31 +1008,10 @@
   (emit-signed-dword segment (fixup-offset fixup)))
 
 
-;;;; the effective-address (ea) structure
-
-(declaim (ftype (sfunction ((or tn (cons tn)) sb!assem:segment) (mod 8)) reg-tn-encoding))
-(defun reg-tn-encoding (tn segment)
-  ;; ea only has space for three bits of register number: regs r8
-  ;; and up are selected by a REX prefix byte which caller is responsible
-  ;; for having emitted where necessary already
-  (if (typep tn '(cons tn (eql :high-byte)))
-      (if (eql (segment-encoder-state segment) +rex+)
-          (error "Can't encode ~S with REX prefix" tn)
-          (+ 4 (ash (tn-offset (car tn)) -1)))
-      (ecase (sb-name (sc-sb (tn-sc tn)))
-        (registers
-         (let ((offset (mod (tn-offset tn) 16)))
-           (logior (ash (logand offset 1) 2)
-                   (ash offset -1))))
-        (float-registers
-         (mod (tn-offset tn) 8)))))
-
 (defmacro emit-bytes (segment &rest bytes)
   `(progn ,@(mapcar (lambda (x) `(emit-byte ,segment ,x)) bytes)))
 (defun opcode+size-bit (opcode size)
   (if (eq size :byte) opcode (logior opcode 1)))
-(defun emit-byte+reg (seg byte reg)
-  (emit-byte seg (+ byte (reg-tn-encoding reg seg))))
 
 ;;; A label can refer to things near enough it using the addend.
 (defstruct (label+addend (:constructor make-label+addend (label addend))
@@ -1028,8 +1021,9 @@
   (label nil :type label)
   (addend 0 :type (signed-byte 32)))
 
-(defstruct (ea (:constructor make-ea (size &key base index scale disp))
-               (:constructor %ea (disp base index scale))
+;;;; the effective-address (ea) structure
+(defstruct (ea (:constructor %ea (disp base index scale))
+               (:constructor %make-ea-dont-use (size disp base index scale))
                (:copier nil))
   ;; FIXME: SIZE is unnecessary, but is here for backward-compatibility
   ;; temporarily anyway. Our code only creates EAs with :unspecific,
@@ -1089,7 +1083,7 @@
 ;;;  SBCL  : (TEST :BYTE (EA RAX-TN) #x40)
 ;;;
 (defun ea (displacement &optional base (index nil indexp) (scale 1 scalep))
-  (when (or (null displacement) (gpr-p displacement))
+  (when (or (null displacement) (tn-p displacement))
     (aver (not scalep))
     (setq scale (if indexp index 1)
           index base
@@ -1115,14 +1109,154 @@
                      (emit-signed-dword segment (- (label-position target)
                                                    (+ 4 posn n-extra))))))
 
+(defconstant +regclass-gpr+ 0)
+(defconstant +regclass-fpr+ 1)
+(defconstant +size-class-qword+ 0)
+(defconstant +size-class-byte+  3)
+
+;;; Size is :BYTE,:WORD,:DWORD,:QWORD
+;;; INDEX is the index in the register file for the class and size.
+;;; Byte registers indices 0 through 15 correspond to the uniform register
+;;; set defined by the AMD64 architecture, and indices 20, 21, 22, 23 are
+;;; for the legacy high byte registers AH,CH,DH,BH respectively.
+;;; (indices 16 through 19 are unused)
+(defun !make-gpr-id (size index)
+  (logior (ash (if (eq size :byte) (the (mod 24) index) (the (mod 16) index)) 3)
+          (ash (position size #(:qword :dword :word :byte)) 1)))
+
+(defun !make-fpr-id (index)
+  (declare (type (mod 16) index))
+  (logior (ash index 3) 1)) ; low bit = FPR, not GPR
+
+(declaim (inline is-gpr-id-p gpr-id-size-class reg-id-num))
+(defun is-gpr-id-p (reg-id)
+  (not (logbitp 0 reg-id)))
+(defun gpr-id-size-class (reg-id) ; an integer 0..3 identifying the size
+  (ldb (byte 2 1) reg-id))
+(defun reg-id-num (reg-id)
+  (ldb (byte 5 3) reg-id))
+
+;;; Note that SB-VM has its own variation on these predicates
+;;; operating on TNs: GPR-TN-P, XMM-TN-P
+
+;;; Return true if THING is a general-purpose register.
+(defun gpr-p (thing)
+  (and (register-p thing) (is-gpr-id-p (reg-id thing))))
+
+;;; Return true if THING is an XMM register.
+(defun xmm-register-p (thing)
+  (and (register-p thing) (not (is-gpr-id-p (reg-id thing)))))
+
+;;; Return true if THING is AL, AX, EAX, or RAX
+(defun accumulator-p (thing)
+  (and (gpr-p thing) (= 0 (reg-id-num (reg-id thing)))))
+
+;;; Any TN that does not reference memory would have already been
+;;; rendered as a REG by the operand lowering pass.
+(defun mem-ref-p (x) (or (ea-p x) (tn-p x)))
+
+(defun reg-name (reg)
+  (let ((id (reg-id reg)))
+    (svref (if (is-gpr-id-p id)
+               (svref (load-time-value
+                       (vector sb!vm::+qword-register-names+
+                               sb!vm::+dword-register-names+
+                               sb!vm::+word-register-names+
+                               (concatenate 'vector
+                                            sb!vm::+byte-register-names+
+                                            #(nil nil nil nil "AH" "CH" "DH" "BH")))
+                       t)
+                      (gpr-id-size-class id))
+               #.(coerce (loop for i below 16 collect (format nil "XMM~D" i))
+                         'vector))
+           (reg-id-num id))))
+
+;;; Return the "lossy" encoding of REG (keeping only the 3 low bits).
+;;; Assume that the caller emitted a REX appropriately if needed for
+;;; this use of REG (we can't actually assert that since we don't know
+;;; which REX bit should have been set, nor which bits were set).
+;;; However, we can assert absence of REX if so called for.
+(declaim (ftype (sfunction (reg sb!assem:segment) (mod 8)) reg-encoding))
+(defun reg-encoding (reg segment &aux (id (reg-id reg)))
+  (when (and (is-gpr-id-p id)
+             (eq (gpr-id-size-class id) +size-class-byte+)
+             (>= (reg-id-num id) 16)
+             (eql (segment-encoder-state segment) +rex+))
+    (error "Can't encode ~A with REX prefix" (reg-name reg)))
+  (logand (reg-id-num id) 7))
+
+(defun emit-byte+reg (seg byte reg)
+  (emit-byte seg (+ byte (reg-encoding reg seg))))
+
+#+nil
+(defmethod print-object ((reg reg) stream)
+  (if *print-readably*
+      (call-next-method)
+      (write-string (reg-name reg) stream)))
+
+;;; The GPR for any size and register number is a unique atom. Return it.
+(defun get-gpr (size encoding)
+  (svref (load-time-value
+          (coerce (append
+                   (loop for i from 0 below 16 collect (!make-reg (!make-gpr-id :qword i)))
+                   (loop for i from 0 below 16 collect (!make-reg (!make-gpr-id :dword i)))
+                   (loop for i from 0 below 16 collect (!make-reg (!make-gpr-id :word i)))
+                   ;; byte reg vector is #(AL CL ... R15B NIL NIL NIL NIL AH CH DH BH)
+                   (loop for i from 0 below 24
+                         collect (unless (<= 16 i 19)
+                                   (!make-reg (!make-gpr-id :byte i)))))
+                  'vector)
+          t)
+         (+ encoding
+            (ecase size
+              (:qword  0)
+              (:dword 16)
+              (:word  32)
+              (:byte  48)))))
+
+;;; Given a TN which maps to a GPR, return the corresponding REG.
+;;; This is called during operand lowering, and also for emitting an EA
+;;; since the EA BASE and INDEX slots reference TNs, not REGs.
+(defun tn-reg (tn)
+  (declare (tn tn))
+  (aver (eq (sb-name (sc-sb (tn-sc tn))) 'registers))
+  (get-gpr (sc-operand-size (tn-sc tn))
+           (ash (tn-offset tn) -1)))
+
+;;; For each TN that maps to a register, replace it with a REG instance.
+;;; This is so that when we resize a register for instructions which specify
+;;; an explicit operand size, we do not construct random TNs. If nothing else,
+;;; this saves some consing, but also allows removal of 2 or 3 storage classes.
+;;; (i.e. We should never need to ask for a vop temporary that is DWORD-REG
+;;; because you can't usefully pack 2 dwords in a qword)
+(defun sb!assem::perform-operand-lowering (operands)
+  (mapcar (lambda (operand)
+            (cond ((typep operand '(cons tn (eql :high-byte)))
+                   (get-gpr :byte (+ 20 (the (mod 4) (ash (tn-offset (car operand)) -1)))))
+                  ((not (typep operand 'tn))
+                   ;; EA, literal, fixup, keyword, or REG if reg-in-size was used
+                   operand)
+                  ((eq (sb-name (sc-sb (tn-sc operand))) 'registers)
+                   (tn-reg operand))
+                  ((eq (sb-name (sc-sb (tn-sc operand))) 'float-registers)
+                   (svref (load-time-value
+                           (coerce (loop for i from 0 below 16
+                                         collect (!make-reg (!make-fpr-id i)))
+                                   'vector)
+                           t)
+                          (tn-offset operand)))
+                  (t ; a stack SC or constant
+                   operand)))
+          operands))
+
 (defun emit-ea (segment thing reg &key allow-constants (remaining-bytes 0))
-  (when (or (tn-p reg) (consp reg))
-    (setq reg (reg-tn-encoding reg segment)))
+  (when (register-p reg)
+    (setq reg (reg-encoding reg segment)))
   (etypecase thing
-    ((or tn (cons tn))
-     (ecase (sb-name (sc-sb (tn-sc (if (listp thing) (car thing) thing))))
-       ((registers float-registers)
-        (emit-mod-reg-r/m-byte segment #b11 reg (reg-tn-encoding thing segment)))
+    (reg
+     (emit-mod-reg-r/m-byte segment #b11 reg (reg-encoding thing segment)))
+    (tn
+     (ecase (sb-name (sc-sb (tn-sc thing)))
        (stack
         ;; Could this be refactored to fall into the EA case below instead
         ;; of consing a new EA? Probably.  Does it matter? Probably not.
@@ -1160,9 +1294,8 @@
             (index (ea-index thing))
             (scale (ea-scale thing))
             (disp (ea-disp thing))
-            (mod (cond ((or (null base)
-                            (and (eql disp 0)
-                                 (not (= (reg-tn-encoding base segment) #b101))))
+            (base-encoding (when base (reg-encoding (tn-reg base) segment)))
+            (mod (cond ((or (null base) (and (eql disp 0) (/= base-encoding #b101)))
                         #b00)
                        ((and (fixnump disp) (<= -128 disp 127))
                         #b01)
@@ -1170,7 +1303,7 @@
                         #b10)))
             (r/m (cond (index #b100)
                        ((null base) #b101)
-                       (t (reg-tn-encoding base segment)))))
+                       (t base-encoding))))
        (when (and (= mod 0) (= r/m #b101))
          ;; this is rip-relative in amd64, so we'll use a sib instead
          (setf r/m #b100 scale 1))
@@ -1181,10 +1314,8 @@
                           #b100
                           (if (location= index sb!vm::rsp-tn)
                               (error "can't index off of RSP")
-                              (reg-tn-encoding index segment))))
-               (base (if (null base)
-                         #b101
-                         (reg-tn-encoding base segment))))
+                              (reg-encoding (tn-reg index) segment))))
+               (base (if (null base) #b101 base-encoding)))
            (emit-sib-byte segment ss index base)))
        (cond ((= mod #b01)
               (emit-byte segment disp))
@@ -1197,73 +1328,7 @@
         (emit-sib-byte segment 0 #b100 #b101)
         (emit-absolute-fixup segment thing))))
 
-(defun dword-reg-p (thing)
-  (and (tn-p thing)
-       (eq (sb-name (sc-sb (tn-sc thing))) 'registers)
-       (eq (sb!c:sc-operand-size (tn-sc thing)) :dword)))
-
-(defun qword-reg-p (thing)
-  (and (tn-p thing)
-       (eq (sb-name (sc-sb (tn-sc thing))) 'registers)
-       (eq (sb!c:sc-operand-size (tn-sc thing)) :qword)))
-
-;;; Return true if THING is a general-purpose register TN.
-(defun gpr-p (thing)
-  (or (and (tn-p thing)
-           (eq (sb-name (sc-sb (tn-sc thing))) 'registers))
-      (typep thing '(cons tn (eql :high-byte)))))
-
-(defun accumulator-p (thing)
-  (and (gpr-p thing)
-       (not (listp thing))
-       (= (tn-offset thing) 0)))
-
-;;; Return true if THING is an XMM register TN.
-(defun xmm-register-p (thing)
-  (and (tn-p thing)
-       (eq (sb-name (sc-sb (tn-sc thing))) 'float-registers)))
-
-(defun register-p (thing)
-  (or (gpr-p thing) (xmm-register-p thing)))
-
 ;;;; utilities
-
-(defconstant +regclass-gpr+ 0)
-(defconstant +regclass-fpr+ 1)
-
-;;; Size is :BYTE,:HIGH-BYTE,:WORD,:DWORD,:QWORD
-;;; INDEX is the index in the register file for the class and size.
-;;; TODO: may want to re-think whether the high byte registers are better
-;;; represented with SIZE = :BYTE using an index number that is in a
-;;; range that does not overlap 0 through 15, rather than a different "size"
-;;; and a range that does overlap the :BYTE registers.
-(defun make-gpr-id (size index)
-  (declare (type (mod 16) index))
-  (when (eq size :high-byte)
-    (aver (<= 0 index 3))) ; only A,C,D,B have a corresponding 'h' register
-  (logior (ash (position size #(:byte :high-byte :word :dword :qword)) 5)
-          (ash index 1)))
-
-(defun make-fpr-id (index)
-  (declare (type (mod 16) index))
-  (logior (ash index 1) 1)) ; low bit = FPR, not GPR
-
-(defun reg-index (register-id)
-  (ldb (byte 4 1) register-id))
-(defun is-gpr-id-p (register-id)
-  (not (logbitp 0 register-id)))
-(defun gpr-size (register-id)
-  (aref #(:byte :high-byte :word :dword :qword) (ldb (byte 3 5) register-id)))
-
-(defun tn-reg-id (tn)
-  (cond ((null tn) nil)
-        ((typep tn '(cons tn (eql :high-byte)))
-         (make-gpr-id :high-byte (ash (tn-offset (car tn)) -1)))
-        ((eq (sb-name (sc-sb (tn-sc tn))) 'float-registers)
-         (make-fpr-id (tn-offset tn)))
-        (t
-         (make-gpr-id (sc-operand-size (tn-sc tn))
-                      (ash (tn-offset tn) -1)))))
 
 ;;; A REX prefix must be emitted if at least one of the following
 ;;; conditions is true:
@@ -1285,12 +1350,12 @@
   (declare (type (member :byte :word :dword :qword :do-not-set) width)
            (type (or null fixnum) r x b))
   (flet ((encoding-bit3-p (reg-id)
-           (and reg-id (logbitp 3 (reg-index reg-id))))
+           (and reg-id (logbitp 3 (reg-id-num reg-id))))
          (spl/bpl/sil/dil-p (reg-id)
            (and reg-id
                 (is-gpr-id-p reg-id)
-                (eq (gpr-size reg-id) :byte)
-                (<= 4 (reg-index reg-id) 7))))
+                (eq (gpr-id-size-class reg-id) +size-class-byte+)
+                (<= 4 (reg-id-num reg-id) 7))))
     (let ((wrxb (logior (if (eq width :qword)   #b1000 0)
                         (if (encoding-bit3-p r) #b0100 0)
                         (if (encoding-bit3-p x) #b0010 0)
@@ -1316,40 +1381,39 @@
 ;;; RIP-plus-displacement (see EMIT-EA), so will not reference an extended
 ;;; register.
 (defun emit-prefixes (segment thing reg operand-size &key lock)
-  (declare (type (or ea tn fixup null (cons tn)) thing)
-           (type (or null tn integer (cons tn)) reg)
+  (declare (type (or tn reg ea fixup null) thing)
+           (type (or tn reg integer null) reg)
            (type (member :byte :word :dword :qword :do-not-set) operand-size))
+  ;; Legacy prefixes are order-insensitive, but let's match the
+  ;; output of the system assembler for consistency's sake.
+  (when (eq operand-size :word)
+    (emit-byte segment #x66))
+  (ecase lock
+    ((nil))
+    (:lock (emit-byte segment #xf0))) ; even if #!-sb-thread
   (let ((ea-p (ea-p thing)))
-    ;; Legacy prefixes are order-insensitive, but let's match the
-    ;; output of the system assembler for consistency's sake.
-    (when (eq operand-size :word)
-      (emit-byte segment #x66))
-    (ecase lock
-      ((nil))
-      (:lock (emit-byte segment #xf0))) ; even if #!+sb-thread
-    (emit-rex-if-needed    segment
-                           operand-size ; REX.W
-                           (when (or (tn-p reg) (consp reg))
-                             (tn-reg-id reg)) ; REX.R
-                           (and ea-p (tn-reg-id (ea-index thing))) ; REX.X
-                           (cond (ea-p ; REX.B
-                                  (let ((base (ea-base thing)))
-                                    (unless (eq base rip-tn)
-                                      (tn-reg-id base))))
-                                 ((or (tn-p thing) (consp thing))
-                                  (let ((tn (if (listp thing) (car thing) thing)))
-                                    (when (member (sb-name (sc-sb (tn-sc tn)))
-                                                  '(float-registers registers))
-                                      (tn-reg-id thing))))
-                                 (t nil)))))
+    (emit-rex-if-needed segment
+                        operand-size ; REX.W
+                        (when (register-p reg)
+                          (reg-id reg)) ; REX.R
+                        (awhen (and ea-p (ea-index thing)) ; REX.X
+                          (reg-id (tn-reg it)))
+                        (cond (ea-p ; REX.B
+                               (let ((base (ea-base thing)))
+                                 (when (and base (neq base rip-tn))
+                                   (reg-id (tn-reg base)))))
+                              ((register-p thing)
+                               (reg-id thing))))))
 
 (defun operand-size (thing)
   (typecase thing
     (tn
      (or (sb!c:sc-operand-size (tn-sc thing))
          (error "can't tell the size of ~S" thing)))
-    ((cons tn (eql :high-byte))
-     :byte)
+    (reg
+     (let ((id (reg-id thing)))
+       (when (is-gpr-id-p id)
+         (aref #(:qword :dword :word :byte) (gpr-id-size-class id)))))
     (ea ; FIXME: remove this case, let EA fall through to returning NIL
      (unless (eq (ea-size thing) :unspecific)
        (ea-size thing)))
@@ -1421,12 +1485,14 @@
 
 ;;; Cast THING into a diferent size so that EMIT-PREFIXES can decide whether
 ;;; it's looking at a :BYTE register that requires a REX prefix.
-;;; Use of REG-IN-SIZE here instead of MAKE-GPR-ID is a temporary kludge.
-;;; EMIT-PREFIXES expects to receive TNs, not reg IDs.
 (defun sized-thing (thing size)
   (if (and (gpr-p thing) (neq (operand-size thing) size))
-      (sb!vm::reg-in-size thing size)
+      (get-gpr size (reg-id-num (reg-id thing)))
       thing))
+
+;;; This function SHOULD NOT BE USED. It is only for compatibility.
+(defun sb!vm::reg-in-size (tn size)
+  (sized-thing (tn-reg tn) size))
 
 (define-instruction mov (segment maybe-size dst &optional src)
   ;; immediate to register
@@ -1476,7 +1542,7 @@
                            ;; Instruction size: 7 bytes.
                            (emit-byte segment #xC7)
                            (emit-mod-reg-r/m-byte segment #b11 #b000
-                                                  (reg-tn-encoding dst segment))
+                                                  (reg-encoding dst segment))
                            (emit-signed-dword segment it))
                           (t
                            ;; 64-bit immediate. Instruction size: 10 bytes.
@@ -1565,8 +1631,7 @@
 (flet ((emit* (segment sizes dst src signed-p)
          (aver (gpr-p dst))
          (let ((dst-size (cadr sizes)) ; DST-SIZE size governs the OPERAND-SIZE
-               (src-size (car sizes))  ; SRC-SIZE is controlled by the opcode
-               (opcode (if signed-p #xBE #xB6)))
+               (src-size (car sizes))) ; SRC-SIZE is controlled by the opcode
            (aver (> (size-nbyte dst-size) (size-nbyte src-size)))
            ;; Zero-extending into a 64-bit register is the same as zero-extending
            ;; into the 32-bit register.
@@ -1583,7 +1648,8 @@
                ;; only 32 bits. That is discouraged, and we don't do it.
                ;; (As checked by the AVER that dst is strictly larger than src)
                (emit-byte segment #x63)
-               (emit-bytes segment #x0F (opcode+size-bit opcode src-size)))
+               (emit-bytes segment #x0F
+                           (opcode+size-bit (if signed-p #xBE #xB6) src-size)))
            (emit-ea segment src dst))))
 
   ;; Mnemonic: Intel specifies [V]PMOV[SZ]sd where 's' and 'd' denote the src
@@ -1683,7 +1749,7 @@
                 (if (and (not (eq size :byte))
                          (gpr-p something)
                          ;; Don't use the short encoding for XCHG EAX, EAX:
-                         (not (and (= (tn-offset something) sb!vm::eax-offset)
+                         (not (and (accumulator-p something)
                                    (eq size :dword))))
                     (progn
                       (emit-prefixes segment something acc size)
@@ -2039,9 +2105,6 @@
     (define shld 0 #b10100000)
     (define shrd 1 #b10101000)))
 
-(defun mem-ref-p (x)
-  (or (ea-p x) (and (tn-p x) (not (gpr-p x)))))
-
 (define-instruction test (segment maybe-size this &optional that)
   (:printer accum-imm ((op #b1010100)))
   (:printer reg/mem-imm ((op '(#b1111011 #b000))))
@@ -2257,7 +2320,7 @@
           (emit-byte segment #xE9)
           (emit-relative-fixup segment where))
          (t
-          (unless (or (ea-p where) (tn-p where))
+          (unless (typep where '(or reg ea))
             (error "don't know what to do with ~A" where))
           ;; near jump defaults to 64 bit
           ;; w-bit in rex prefix is unnecessary
@@ -2490,7 +2553,7 @@
   (emit-byte segment #x0F)
   (emit-byte segment opcode)
   (emit-byte segment (logior (ash (logior #b11000 /i) 3)
-                             (reg-tn-encoding dst/src segment)))
+                             (reg-encoding dst/src segment)))
   (emit-byte segment imm))
 
 (defun emit-sse-inst-2byte (segment dst src prefix op1 op2
@@ -3397,3 +3460,24 @@
 (defun sb!c::replace-coverage-instruction (inst-buffer inst-index label offset)
   (setf (svref inst-buffer inst-index)
         `(mov :byte ,(rip-relative-ea label offset) 1)))
+
+;;; This constructor is for broken 3rd-party library code. It's fine that we have
+;;; some degree of backward-compatibility, but it's another entirely to say that
+;;; we allowed code that SHOULD NOT have been allowed to work.
+;;;
+;;; The problem: MAKE-EA gets called with registers that were resized
+;;; using REG-IN-SIZE. This is sheer madness. The BASE and INDEX parts
+;;; of an EA are *always* qwords, and we should have enforced that.
+;;; Well, it's too late now to start enforcing.
+(defun make-ea (size &key base index (scale 1) (disp 0))
+  (flet ((fix (reg which)
+           (cond ((register-p reg)
+                  (let ((id (reg-id reg)))
+                    (unless (eql (gpr-id-size-class id) +size-class-qword+)
+                      (warn "MAKE-EA should receive :QWORD ~A register" which))
+                    (make-random-tn :kind :normal
+                                    :sc (sc-or-lose 'sb!vm::unsigned-reg)
+                                    :offset (ash (reg-id-num id) 1))))
+                 (t
+                  reg))))
+    (%make-ea-dont-use size disp (fix base "base") (fix index "index") scale)))

@@ -251,12 +251,13 @@
                             sb-vm::map-stack-references
                             sb-vm::thread-profile-data-slot
                             sb-vm::thread-alloc-region-slot
+                            sb-vm::primitive-object-size
                             ;; need this for defining a vop which
                             ;; tests the x86-64 allocation profiler
                             sb-vm::pseudo-atomic
-                            ;; Naughty outside-world code uses this.
-                            sb-vm::thread-control-stack-start-slot
-                            sb-vm::primitive-object-size))
+                            ;; Naughty outside-world code uses these.
+                            #+x86-64 sb-vm::reg-in-size
+                            sb-vm::thread-control-stack-start-slot))
            (search "-OFFSET" (string symbol))
            (search "-TN" (string symbol))))
       ((#.(find-package "SB-C")

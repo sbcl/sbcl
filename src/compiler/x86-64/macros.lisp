@@ -19,21 +19,38 @@
 ;;; bloat is not justifiable.
 (defun move (dst src)
   "Move SRC into DST unless they are location=."
+  ;; The first case is for backward-compatibility. It's not necessary
+  ;; for any of our code, but it is for code that performs
+  ;;   (MOVE (REG-IN-SIZE blah :dword) (REG-IN-SIZE from :dword))
+  ;; Most of this garbage will go away because eventually I'd like to preserve
+  ;; all seemingly redundant moves, and then eliminate them before emission.
+  ;; This way we can track movement of TNs into the same physical reg in a
+  ;; different SC which will give useful information to a peephole optimizer.
+  (when (and (sb!x86-64-asm::register-p dst)
+             (sb!x86-64-asm::register-p src))
+    (let ((dst (sb!x86-64-asm::reg-id dst))
+          (src (sb!x86-64-asm::reg-id src)))
+      (aver (sb!x86-64-asm::is-gpr-id-p dst))
+      (aver (sb!x86-64-asm::is-gpr-id-p src))
+      (unless (= (sb!x86-64-asm::reg-id-num dst)
+                 (sb!x86-64-asm::reg-id-num src))
+        (inst mov dst src)))
+    (return-from move))
   (unless (location= dst src)
     (sc-case dst
       ((single-reg complex-single-reg)
-       (aver (xmm-register-p src))
+       (aver (xmm-tn-p src))
        (inst movaps dst src))
       ((double-reg complex-double-reg)
-       (aver (xmm-register-p src))
+       (aver (xmm-tn-p src))
        (inst movapd dst src))
       #!+sb-simd-pack
       ((int-sse-reg sse-reg)
-       (aver (xmm-register-p src))
+       (aver (xmm-tn-p src))
        (inst movdqa dst src))
       #!+sb-simd-pack
       ((single-sse-reg double-sse-reg)
-       (aver (xmm-register-p src))
+       (aver (xmm-tn-p src))
        (inst movaps dst src))
       (t
        (inst mov dst src)))))

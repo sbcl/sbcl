@@ -380,15 +380,14 @@
       float0 float1 float2 float3 float4 float5 float6 float7
       float8 float9 float10 float11 float12 float13 float14 float15))
 
-(defun reg-in-size (tn size)
-  (make-random-tn :kind :normal
-                  :sc (sc-or-lose
-                       (ecase size
-                         (:byte 'byte-reg)
-                         (:word 'word-reg)
-                         (:dword 'dword-reg)
-                         (:qword 'unsigned-reg)))
-                  :offset (tn-offset tn)))
+;;; Return true if THING is a general-purpose register TN.
+(defun gpr-tn-p (thing)
+  (and (tn-p thing)
+       (eq (sb-name (sc-sb (tn-sc thing))) 'registers)))
+;;; Return true if THING is an XMM register TN.
+(defun xmm-tn-p (thing)
+  (and (tn-p thing)
+       (eq (sb-name (sc-sb (tn-sc thing))) 'float-registers)))
 
 ;; A register that's never used by the code generator, and can therefore
 ;; be used as an assembly temporary in cases where a VOP :TEMPORARY can't

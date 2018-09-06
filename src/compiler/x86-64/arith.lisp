@@ -237,7 +237,7 @@
   (define-binop logior 2 or
     :c/unsigned=>unsigned
     ((let ((y (constantize y)))
-       (cond ((and (register-p r) (eql y -1)) ; special-case "OR reg, all-ones"
+       (cond ((and (gpr-tn-p r) (eql y -1)) ; special-case "OR reg, all-ones"
               ;; I have yet to elicit this case. Can it happen?
               (inst mov r -1))
              (t
@@ -1238,7 +1238,7 @@ constant shift greater than word length")))
                    (inst mov :dword temp-reg-tn y)
                    (return-from ensure-not-mem+mem (values x temp-reg-tn))))
            (setq y (register-inline-constant :qword y)))
-         (cond ((or (gpr-p x) (gpr-p y))
+         (cond ((or (gpr-tn-p x) (gpr-tn-p y))
                 (values x y))
                (t
                 (inst mov temp-reg-tn x)
@@ -1296,7 +1296,7 @@ constant shift greater than word length")))
                (setq size :byte disp (1+ disp) y (ash y -8)))
              (inst test size (ea disp rbp-tn) y)))
           (t
-           (aver (gpr-p x))
+           (aver (gpr-tn-p x))
            (if (and reducible-to-byte-p (<= (tn-offset x) 6)) ; 0, 2, 4, 6
                ;; Use upper byte of word reg (AX -> AH, BX -> BX ...)
                (inst test :byte `(,x . :high-byte) (ash y -8))
@@ -1387,7 +1387,7 @@ constant shift greater than word length")))
     (inst bt x y)))
 
 (defun emit-optimized-cmp (x y)
-  (if (and (gpr-p x) (eql y 0))
+  (if (and (gpr-tn-p x) (eql y 0))
       ;; Amazingly (to me), use of TEST in lieu of CMP produces all the correct
       ;; flag bits for inequality comparison as well as EQL comparison.
       ;; You'd think that the Jxx instruction should examine _only_ the S flag,
