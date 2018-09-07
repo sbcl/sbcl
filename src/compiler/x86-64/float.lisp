@@ -40,9 +40,7 @@
 
 ;;; complex float stack EAs
 (macrolet ((ea-for-cxf-stack (tn kind slot &optional base)
-             `(make-ea
-               :qword :base ,base
-               :disp (frame-byte-offset
+             `(ea (frame-byte-offset
                       (+ (tn-offset ,tn)
                        (cond ((= (tn-offset ,base) rsp-offset)
                               sp->fp-offset)
@@ -55,7 +53,8 @@
                          (:double
                             (ecase ,slot
                               (:real 1)
-                              (:imag 0)))))))))
+                              (:imag 0))))))
+                  ,base)))
   (defun ea-for-csf-data-stack (tn &optional (base rbp-tn))
     (ea-for-cxf-stack tn :single :real base))
   (defun ea-for-csf-real-stack (tn &optional (base rbp-tn))
