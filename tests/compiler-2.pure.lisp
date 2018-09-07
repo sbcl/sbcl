@@ -1588,3 +1588,14 @@
                             (satisfies eval)) p1))
          (find-if-not p1 nil p3 p4))
        ((#'oddp :from-end t) nil)))
+
+(with-test (:name :lvar-constants-nested-funs)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x)
+         (labels ((f (x &optional result)
+                    (if x
+                        (f x result)
+                        (nreverse result))))
+           (f x)))
+      ((nil) nil)))

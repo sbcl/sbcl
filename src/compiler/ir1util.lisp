@@ -2902,8 +2902,11 @@ is :ANY, the function name is not checked."
                       (setf (gethash lvar seen) t)
                       (multiple-value-bind (type values)
                           (lvar-constants lvar seen)
-                        (when type
-                          (push (cons call values) constants)))))
+                        (case type
+                          (:values
+                           (push (cons call values) constants))
+                          (:calls
+                           (setf constants (nconc values constants)))))))
                   leaf)
                  (when constants
                    (values :calls constants)))))))))
