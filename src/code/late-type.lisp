@@ -57,28 +57,42 @@
         (funcall method type2 type1)
         (hierarchical-intersection2 type1 type2))))
 
+(defun map-type (function ctype)
+  (labels ((%map (type)
+             (typecase type
+               (compound-type
+                (mapc #'%map (compound-type-types type)))
+               (negation-type (%map (negation-type-type type)))
+               (cons-type
+                (%map (cons-type-car-type type))
+                (%map (cons-type-cdr-type type)))
+               (array-type
+                (%map (array-type-element-type type)))
+               (args-type
+                (mapc #'%map (args-type-required type))
+                (mapc #'%map (args-type-optional type))
+                (when (args-type-rest type)
+                  (%map (args-type-rest type)))
+                (mapc (lambda (x) (%map (key-info-type x)))
+                      (args-type-keywords type))
+                (when (fun-type-p type)
+                  (%map (fun-type-returns type))))
+               (t
+                (funcall function type)))))
+    (%map ctype)
+    nil))
+
 (defun contains-unknown-type-p (ctype)
-  (typecase ctype
-   (unknown-type t)
-   (compound-type (some #'contains-unknown-type-p (compound-type-types ctype)))
-   (negation-type (contains-unknown-type-p (negation-type-type ctype)))
-   (cons-type (or (contains-unknown-type-p (cons-type-car-type ctype))
-                  (contains-unknown-type-p (cons-type-cdr-type ctype))))
-   (array-type (contains-unknown-type-p (array-type-element-type ctype)))
-   (args-type
-    (or (some #'contains-unknown-type-p (args-type-required ctype))
-        (some #'contains-unknown-type-p (args-type-optional ctype))
-        (acond ((args-type-rest ctype) (contains-unknown-type-p it)))
-        (some (lambda (x) (contains-unknown-type-p (key-info-type x)))
-              (args-type-keywords ctype))
-        (and (fun-type-p ctype)
-             (contains-unknown-type-p (fun-type-returns ctype)))))))
+  (map-type (lambda (type)
+              (when (unknown-type-p type)
+                (return-from contains-unknown-type-p t)))
+            ctype))
 
 (defun contains-hairy-type-p (ctype)
-  (typecase ctype
-    (hairy-type t)
-    (compound-type (some #'contains-hairy-type-p (compound-type-types ctype)))
-    (negation-type (contains-hairy-type-p (negation-type-type ctype)))))
+  (map-type (lambda (type)
+              (when (hairy-type-p type)
+                (return-from contains-hairy-type-p t)))
+            ctype))
 
 (defun replace-hairy-type (type)
   (if (contains-hairy-type-p type)
@@ -98,21 +112,19 @@
 ;; Similar to (NOT CONTAINS-UNKNOWN-TYPE-P), but report that (SATISFIES F)
 ;; is not a testable type unless F is currently bound.
 (defun testable-type-p (ctype)
-  (typecase ctype
-    (unknown-type nil) ; must precede HAIRY because an unknown is HAIRY
-    (hairy-type
-     (let ((spec (hairy-type-specifier ctype)))
-       ;; Anything other than (SATISFIES ...) is testable
-       ;; because there's no reason to suppose that it isn't.
-       (or (neq (car spec) 'satisfies) (fboundp (cadr spec)))))
-    (compound-type (every #'testable-type-p (compound-type-types ctype)))
-    (negation-type (testable-type-p (negation-type-type ctype)))
-    (cons-type (and (testable-type-p (cons-type-car-type ctype))
-                    (testable-type-p (cons-type-cdr-type ctype))))
-    ;; This case could be too strict. I think an array type is testable
-    ;; if the upgraded type is testable. Probably nobody cares though.
-    (array-type (testable-type-p (array-type-element-type ctype)))
-    (t t)))
+  (map-type
+   (lambda (ctype)
+     (typecase ctype
+       (unknown-type
+        (return-from testable-type-p nil)) ; must precede HAIRY because an unknown is HAIRY
+       (hairy-type
+        (let ((spec (hairy-type-specifier ctype)))
+          ;; Anything other than (SATISFIES ...) is testable
+          ;; because there's no reason to suppose that it isn't.
+          (unless (or (neq (car spec) 'satisfies) (fboundp (cadr spec)))
+            (return-from testable-type-p nil))))))
+   ctype)
+  t)
 
 ;;; This is used by !DEFINE-SUPERCLASSES to define the SUBTYPE-ARG1
 ;;; method. INFO is a list of conses
