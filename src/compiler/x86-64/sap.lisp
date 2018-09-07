@@ -367,7 +367,7 @@
          (offset :scs (signed-reg) :to (:eval 0))
          (oldval :scs (signed-reg) :target eax)
          (newval :scs (signed-reg) :to (:eval 0)))
-  (:temporary (:sc dword-reg :offset eax-offset
+  (:temporary (:sc unsigned-reg :offset eax-offset
                    :from (:argument 2) :to (:result 0)) eax)
   (:arg-types system-area-pointer signed-num signed-num signed-num)
   (:results (result :scs (signed-reg)))
@@ -375,5 +375,5 @@
   (:generator 5
     (inst mov :dword eax oldval)
     (inst cmpxchg :dword (ea sap offset) newval :lock)
-    (inst mov :dword result eax)))
+    (inst movsx '(:dword :qword) result eax)))
 
