@@ -969,23 +969,26 @@
            (setf (node-derived-type ref) *wild-type*)
            (change-ref-leaf ref (find-constant t)))
           (t
-           (setf not-res
-                 (type-union not-res (make-member-type not-set not-fpz)))
-           (let ((type (or (type-difference res not-res)
-                           res)))
+           (let ((type (type-difference res
+                                        (type-union not-res
+                                                    (make-member-type not-set not-fpz)))))
              ;; CHANGE-CLASS can change the type, lower down to standard-object,
              ;; type propagation for classes is not as important anyway.
-             (derive-node-type ref
-                               (make-single-value-type
-                                (cond #-sb-xc-host
-                                      ((and
-                                        (eq sb!pcl::**boot-state** 'sb!pcl::complete)
-                                        (let ((standard-object (find-classoid 'standard-object)))
-                                          (and (types-equal-or-intersect type standard-object)
-                                               (type-union type standard-object)))))
-                                      (t
-                                       type)))))
-           (maybe-terminate-block ref nil))))
+             (cond #-sb-xc-host
+                   ((and
+                     (eq sb!pcl::**boot-state** 'sb!pcl::complete)
+                     (block nil
+                       (let ((standard-object (find-classoid 'standard-object)))
+                         (sb!kernel::map-type
+                          (lambda (type)
+                            (when (and (classoid-p type)
+                                       (csubtypep type standard-object))
+                              (return t)))
+                          type)))))
+                   (t
+                    (derive-node-type ref
+                                      (make-single-value-type type))
+                    (maybe-terminate-block ref nil)))))))
   (values))
 
 ;;;; Flow analysis
