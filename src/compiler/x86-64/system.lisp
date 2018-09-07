@@ -126,20 +126,23 @@
     (inst btr :dword res 15) ; Clear the NAMEDP header bit
     (inst shl :dword res n-fixnum-tag-bits)))
 
+;;; This operation is racy with GC and therefore slightly dangerous, especially
+;;; on objects in immobile space which reserve byte 3 of the header for GC.
 (define-vop (set-header-data)
   (:translate set-header-data)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg) :target res :to (:result 0))
-         (data :scs (any-reg) :target eax))
+         (data :scs (any-reg) :target temp))
   (:arg-types * positive-fixnum)
   (:results (res :scs (descriptor-reg)))
-  (:temporary (:sc unsigned-reg :offset eax-offset
-                   :from (:argument 1) :to (:result 0)) eax)
+  (:temporary (:sc unsigned-reg :from (:argument 1) :to (:result 0)) temp)
   (:generator 6
-    (move eax data)
-    (inst shl eax (- n-widetag-bits n-fixnum-tag-bits))
-    (inst mov al-tn (ea (- other-pointer-lowtag) x))
-    (storew eax x 0 other-pointer-lowtag)
+    (move temp data)
+    (inst shl temp (- n-widetag-bits n-fixnum-tag-bits))
+    ;; merge in the widetag. We should really preserve bit 63 as well
+    ;; which could be a GC mark bit, but it's not concurrent at the moment.
+    (inst mov :byte temp (ea (- other-pointer-lowtag) x))
+    (storew temp x 0 other-pointer-lowtag)
     (move res x)))
 
 (define-vop (get-header-data-high)
