@@ -175,21 +175,22 @@
       (string-not-greaterp two-arg-string-not-greaterp)
       (string-not-equal two-arg-string-not-equal)))
 
-(defmacro def-two-arg-fun (function)
+(defmacro def-two-arg-fun (types function)
   (let ((name (symbolicate 'two-arg- function)))
     `(progn
-       (defknown ,name (t t) t ())
+       (defknown ,name ,types boolean ())
        (defun ,name (a b)
          (,function a b))
        (pushnew (list ',function ',name) *two-arg-functions* :key #'car))))
 
-(defmacro def-two-arg-funs (&body functions)
+(defmacro def-two-arg-funs (types &body functions)
   `(progn
      ,@(loop for fun in functions
-             collect `(def-two-arg-fun ,fun))))
+             collect `(def-two-arg-fun ,types ,fun))))
 
-(def-two-arg-funs
-  char= char/= char< char> char<= char>=
+(def-two-arg-funs (character character)
+  char= char/= char< char> char<= char>=)
+(def-two-arg-funs (number number)
   >= <= /=)
 
 ;;; Convert function designators to functions in calls to known functions
