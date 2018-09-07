@@ -971,10 +971,20 @@
           (t
            (setf not-res
                  (type-union not-res (make-member-type not-set not-fpz)))
-           (derive-node-type ref
-                             (make-single-value-type
-                              (or (type-difference res not-res)
-                                  res)))
+           (let ((type (or (type-difference res not-res)
+                           res)))
+             ;; CHANGE-CLASS can change the type, lower down to standard-object,
+             ;; type propagation for classes is not as important anyway.
+             (derive-node-type ref
+                               (make-single-value-type
+                                (cond #-sb-xc-host
+                                      ((and
+                                        (eq sb!pcl::**boot-state** 'sb!pcl::complete)
+                                        (let ((standard-object (find-classoid 'standard-object)))
+                                          (and (types-equal-or-intersect type standard-object)
+                                               (type-union type standard-object)))))
+                                      (t
+                                       type)))))
            (maybe-terminate-block ref nil))))
   (values))
 
