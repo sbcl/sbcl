@@ -3065,14 +3065,16 @@
 ;;; operand. The operand size is calculated from the destination
 ;;; operand.
 
-(macrolet ((define-gpr-destination-sse-inst (name prefix opcode &key reg-only)
+(macrolet ((define-gpr-destination-sse-inst (name prefix opcode
+                                                  &key (size '(operand-size dst))
+                                                       reg-only)
              `(define-instruction ,name (segment dst src)
                 ,@(sse-inst-printer-list 'reg-xmm/mem prefix opcode)
                 (:emitter
                  (aver (gpr-p dst))
                  ,(when reg-only
                     `(aver (xmm-register-p src)))
-                 (let ((dst-size (operand-size dst)))
+                 (let ((dst-size ,size))
                    (aver (or (eq dst-size :qword) (eq dst-size :dword)))
                    (emit-sse-inst segment dst src ,prefix ,opcode
                                   :operand-size dst-size))))))
@@ -3080,8 +3082,12 @@
   (define-gpr-destination-sse-inst cvtss2si  #xf3 #x2d)
   (define-gpr-destination-sse-inst cvttsd2si #xf2 #x2c)
   (define-gpr-destination-sse-inst cvttss2si #xf3 #x2c)
-  (define-gpr-destination-sse-inst movmskpd  #x66 #x50 :reg-only t)
-  (define-gpr-destination-sse-inst movmskps  nil  #x50 :reg-only t)
+  ;; Neither clang nor gcc will emit a REX prefix for "movmskps %xmm0,%rax"
+  ;; (or movmskpd) which makes perfect sense, as at most 4 bits are set in the
+  ;; destination register. In fact, some versions of apple clang disassemble
+  ;; the destination register in its 32-bit size despite a 0x48 prefix.
+  (define-gpr-destination-sse-inst movmskpd  #x66 #x50 :reg-only t :size :dword)
+  (define-gpr-destination-sse-inst movmskps  nil  #x50 :reg-only t :size :dword)
   (define-gpr-destination-sse-inst pmovmskb  #x66 #xd7 :reg-only t))
 
 ;;;; We call these "2byte" instructions due to their two opcode bytes.
