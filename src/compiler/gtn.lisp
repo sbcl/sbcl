@@ -79,22 +79,28 @@
 ;;; environment values and the old-FP/return-PC.)
 (defun assign-ir2-physenv (clambda)
   (declare (type clambda clambda))
-  (let ((lambda-physenv (lambda-physenv clambda))
-        (reversed-ir2-physenv-alist nil))
-    ;; FIXME: should be MAPCAR, not DOLIST
-    (dolist (thing (physenv-closure lambda-physenv))
-      (let ((ptype (etypecase thing
-                     (lambda-var
-                      (if (lambda-var-indirect thing)
-                          *backend-t-primitive-type*
-                          (primitive-type (leaf-type thing))))
-                     (nlx-info *backend-t-primitive-type*)
-                     (clambda *backend-t-primitive-type*))))
-        (push (cons thing (make-normal-tn ptype))
-              reversed-ir2-physenv-alist)))
-
+  (let* ((lambda-physenv (lambda-physenv clambda))
+         (indirect-fp-tn
+           (make-normal-tn *backend-t-primitive-type*))
+         (ir2-physenv-alist
+           (loop for thing in (physenv-closure lambda-physenv)
+                 collect
+                 (cons thing
+                       (etypecase thing
+                         (lambda-var
+                          (cond ((not (lambda-var-indirect thing))
+                                 (make-normal-tn
+                                  (primitive-type (leaf-type thing))))
+                                ((not (lambda-var-explicit-value-cell thing))
+                                 indirect-fp-tn)
+                                (t
+                                 (make-normal-tn *backend-t-primitive-type*))))
+                         (nlx-info
+                          (make-normal-tn *backend-t-primitive-type*))
+                         (clambda
+                          (make-normal-tn *backend-t-primitive-type*)))))))
     (let ((res (make-ir2-physenv
-                :closure (nreverse reversed-ir2-physenv-alist)
+                :closure ir2-physenv-alist
                 :return-pc-pass (make-return-pc-passing-location
                                  (xep-p clambda)))))
       (setf (physenv-info lambda-physenv) res)

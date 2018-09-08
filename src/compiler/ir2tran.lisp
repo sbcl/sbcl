@@ -845,10 +845,16 @@
 
       (when old-fp
         (let ((this-1env (node-physenv node))
-              (called-env (physenv-info (lambda-physenv fun))))
+              (called-env (physenv-info (lambda-physenv fun)))
+              passed)
           (dolist (thing (ir2-physenv-closure called-env))
-            (temps (closure-initial-value (car thing) this-1env closure-fp))
-            (locs (cdr thing)))
+            (let ((value (closure-initial-value (car thing) this-1env closure-fp))
+                  (loc (cdr thing)))
+              ;; Don't pass the FP for indirect variables multiple times
+              (unless (memq loc passed)
+                (push loc passed)
+                (temps value)
+                (locs loc))))
           (temps old-fp)
           (locs (ir2-physenv-old-fp called-env))))
 
