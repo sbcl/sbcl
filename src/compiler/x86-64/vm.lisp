@@ -244,19 +244,6 @@
                 :save-p t
                 :alternate-scs (unsigned-stack))
 
-  ;; miscellaneous objects that must not be seen by GC. Used only as
-  ;; temporaries.
-  (word-reg registers
-            :locations #.*word-regs*
-            :element-size 2)
-  (dword-reg registers
-            :locations #.*dword-regs*
-            :element-size 2)
-  (byte-reg registers
-            :locations #.*byte-regs*)
-
-  ;; that can go in the floating point registers
-
   ;; non-descriptor SINGLE-FLOATs
   (single-reg float-registers
               :locations #.*float-regs*
@@ -311,9 +298,7 @@
   (unwind-block stack :element-size unwind-block-size)))
 
 (defparameter *byte-sc-names*
-  '(#!-sb-unicode character-reg byte-reg #!-sb-unicode character-stack))
-(defparameter *word-sc-names* '(word-reg))
-(defparameter *dword-sc-names* '(dword-reg))
+  '(#!-sb-unicode character-reg #!-sb-unicode character-stack))
 (defparameter *qword-sc-names*
   '(any-reg descriptor-reg sap-reg signed-reg unsigned-reg control-stack
     signed-stack unsigned-stack sap-stack single-stack
@@ -337,8 +322,6 @@
                        (case (car class-spec)
                          (#.*oword-sc-names*   :oword)
                          (#.*qword-sc-names*   :qword)
-                         (#.*dword-sc-names*   :dword)
-                         (#.*word-sc-names*    :word)
                          (#.*byte-sc-names*    :byte)
                          (#.*float-sc-names*   :float)
                          (#.*double-sc-names*  :double)
@@ -367,9 +350,6 @@
                                                :sc (sc-or-lose ',sc-name)
                                                :offset ,offset-name))))))))
   (def-gpr-tns unsigned-reg +qword-register-names+)
-  (def-gpr-tns dword-reg +dword-register-names+)
-  (def-gpr-tns word-reg +word-register-names+)
-  (def-gpr-tns byte-reg +byte-register-names+)
   ;; RIP is not an addressable register, but this global var acts as
   ;; a moniker for it in an effective address so that the EA structure
   ;; does not need to accept a symbol (such as :RIP) for the base reg.

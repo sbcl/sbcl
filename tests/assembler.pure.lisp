@@ -40,6 +40,28 @@
     (error nil)
     (:no-error (x) x (error "Should not assemble"))))
 
+;;; Create some special variables that are needed for tests
+;;; since they no longer exist as part of the vm definition.
+#+x86-64
+(progn
+(defvar al-tn (reg-in-size rax-tn :byte))
+(defvar bl-tn (reg-in-size rbx-tn :byte))
+(defvar cl-tn (reg-in-size rcx-tn :byte))
+(defvar dl-tn (reg-in-size rdx-tn :byte))
+(defvar dil-tn (reg-in-size rdi-tn :byte))
+(defvar r8b-tn (reg-in-size r8-tn :byte))
+(defvar ax-tn (reg-in-size rax-tn :word))
+(defvar bx-tn (reg-in-size rbx-tn :word))
+(defvar cx-tn (reg-in-size rcx-tn :word))
+(defvar r8w-tn (reg-in-size r8-tn :word))
+(defvar eax-tn (reg-in-size rax-tn :dword))
+(defvar ebx-tn (reg-in-size rbx-tn :dword))
+(defvar ecx-tn (reg-in-size rcx-tn :dword))
+(defvar edx-tn (reg-in-size rdx-tn :dword))
+(defvar edi-tn (reg-in-size rdi-tn :dword))
+(defvar r8d-tn (reg-in-size r8-tn :dword))
+(defvar r9d-tn (reg-in-size r9-tn :dword)))
+
 (with-test (:name :assemble-movti-instruction :skipped-on (not :x86-64))
   (flet ((test-movnti (dst src expect)
            (test-assemble `(movnti ,dst ,src) expect)))
@@ -249,7 +271,7 @@
 (with-test (:name :assemble-high-byte-regs :skipped-on (not :x86-64))
   (test-assemble `(cmp (,rdx-tn . :high-byte) 1)
                  "80FE01           CMP DH, 1")
-  (test-assemble `(mov (,edx-tn . :high-byte) (,rcx-tn . :high-byte))
+  (test-assemble `(mov (,rdx-tn . :high-byte) (,rcx-tn . :high-byte))
                  "8AF5             MOV DH, CH")
   ;; can not use legacy high byte reg in a REX-prefixed instruction
   (check-does-not-assemble `(movsx (:byte :qword) ,rax-tn (,rbx-tn . :high-byte))))
