@@ -221,7 +221,7 @@
   (!prepare-for-tail-call-variable fun temp nargs rdx rdi rsi r8 r9 r10 t)
 
   (%lea-for-lowtag-test rbx-tn fun fun-pointer-lowtag)
-  (inst test bl-tn lowtag-mask)
+  (inst test :byte rbx-tn lowtag-mask)
   (inst jmp :nz (make-fixup 'tail-call-symbol :assembly-routine))
   (inst jmp (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag) fun)))
 
@@ -247,9 +247,9 @@
   (inst cmp vector nil-value)
   (inst jmp :e undefined)
 
-  (inst mov r10d-tn (ea (- (* 2 n-word-bytes) other-pointer-lowtag) vector))
-  (inst and r10d-tn (fixnumize (1- (ash 1 (* info-number-bits 2)))))
-  (inst cmp r10d-tn (fixnumize (1+ (ash +fdefn-info-num+ info-number-bits))))
+  (inst mov :dword r10-tn (ea (- (* 2 n-word-bytes) other-pointer-lowtag) vector))
+  (inst and :dword r10-tn (fixnumize (1- (ash 1 (* info-number-bits 2)))))
+  (inst cmp :dword r10-tn (fixnumize (1+ (ash +fdefn-info-num+ info-number-bits))))
   (inst jmp :b undefined)
 
   (loadw length vector 1 other-pointer-lowtag)

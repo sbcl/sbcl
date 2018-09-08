@@ -18,7 +18,7 @@
   (:translate length)
   (:args (object :scs (descriptor-reg control-stack) :target ptr))
   (:arg-types list)
-  (:temporary (:sc dword-reg :offset eax-offset) eax)
+  (:temporary (:sc unsigned-reg :offset rax-offset) rax)
   (:temporary (:sc descriptor-reg :from (:argument 0)) ptr)
   (:results (count :scs (any-reg)))
   (:result-types positive-fixnum)
@@ -43,7 +43,7 @@
     (inst jmp :e DONE)
     ;; Otherwise, check to see whether we hit the end of a dotted list. If
     ;; not, loop back for more.
-    (%test-lowtag ptr eax LOOP nil list-pointer-lowtag)
+    (%test-lowtag ptr rax LOOP nil list-pointer-lowtag)
     ;; It's dotted all right. Flame out.
     (error-call vop 'object-not-list-error ptr)
     ;; We be done.

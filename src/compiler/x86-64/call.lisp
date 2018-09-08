@@ -331,7 +331,9 @@
                 (unless (eq (tn-kind tn) :unused)
                   (let ((default-lab (gen-label)))
                     (defaults (cons default-lab tn))
-                    (inst cmp ecx-tn (fixnumize i))
+                    ;; Note that the max number of values received
+                    ;; is assumed to fit in a :dword register.
+                    (inst cmp :dword rcx-tn (fixnumize i))
                     (inst jmp :be default-lab)
                     (sc-case tn
                       (control-stack
@@ -869,8 +871,8 @@
     (case type
       (:designator
        (assemble ()
-         (%lea-for-lowtag-test ebx-tn fun fun-pointer-lowtag)
-         (inst test bl-tn lowtag-mask)
+         (%lea-for-lowtag-test rbx-tn fun fun-pointer-lowtag)
+         (inst test :byte rbx-tn lowtag-mask)
          (inst jmp :nz (if relative-call
                            (make-fixup 'tail-call-symbol :assembly-routine)
                            not-fun))
@@ -892,8 +894,8 @@
     (t
      (assemble ()
        (when (eq type :designator)
-         (%lea-for-lowtag-test ebx-tn fun fun-pointer-lowtag)
-         (inst test bl-tn lowtag-mask)
+         (%lea-for-lowtag-test rbx-tn fun fun-pointer-lowtag)
+         (inst test :byte rbx-tn lowtag-mask)
          (inst jmp :z call)
          (invoke-asm-routine 'call 'call-symbol vop))
        call
