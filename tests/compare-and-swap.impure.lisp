@@ -554,7 +554,8 @@
       1)))
 
 #+x86-64 ; missing symbol sb-vm::signed-sap-cas-32 otherwise
-(with-test (:name :cas-sap-ref)
+(with-test (:name :cas-sap-ref
+            :skipped-on :interpreter)
   (let ((v (make-array 2 :element-type '(signed-byte 32)
                          :initial-element -1)))
     (let ((old (sb-sys:%primitive sb-vm::signed-sap-cas-32
