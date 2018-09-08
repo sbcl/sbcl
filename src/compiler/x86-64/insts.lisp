@@ -19,7 +19,8 @@
             ea-p ea-base ea-index size-nbyte
             ea make-ea ea-disp rip-relative-ea) "SB!VM")
   ;; Imports from SB-VM into this package
-  (import '(sb!vm::frame-byte-offset sb!vm::rip-tn sb!vm::rbp-tn
+  (import '(sb!vm::tn-reg sb!vm::reg-name
+            sb!vm::frame-byte-offset sb!vm::rip-tn sb!vm::rbp-tn
             sb!vm::registers sb!vm::float-registers sb!vm::stack))) ; SB names
 
 ;;; a REG object discards all information about a TN except its storage base
@@ -1050,13 +1051,13 @@
         (t
          ;; This is ridiculous. READ won't really read an EA in this syntax.
          (format stream "PTR [")
-         (awhen (ea-base ea)
-           (write-string (if (eq it rip-tn) "RIP" (sb!c:location-print-name it))
-                         stream)
-           (when (ea-index ea)
-             (write-string "+" stream)))
-         (when (ea-index ea)
-           (write-string (sb!c:location-print-name (ea-index ea)) stream))
+         (flet ((name (tn) (reg-name (tn-reg tn))))
+           (awhen (ea-base ea)
+             (write-string (if (eq it rip-tn) "RIP" (name it)) stream)
+             (when (ea-index ea)
+               (write-string "+" stream)))
+           (awhen (ea-index ea)
+             (write-string (name it) stream)))
          (unless (= (ea-scale ea) 1)
            (format stream "*~A" (ea-scale ea)))
          (typecase (ea-disp ea)

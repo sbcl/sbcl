@@ -70,23 +70,17 @@
   base disp index scale)
 
 ;;; Print to STREAM the name of the general-purpose register encoded by
-;;; VALUE and of size WIDTH. For robustness, the high byte registers
-;;; (AH, BH, CH, DH) are correctly detected, too, although the compiler
-;;; does not use them.
+;;; VALUE and of size WIDTH.
 (defun print-reg-with-width (value width stream dstate)
   (declare (type full-reg value)
            (type stream stream)
            (type disassem-state dstate))
-  (princ (if (and (eq width :byte)
-                  (<= 4 value 7)
-                  (not (dstate-getprop dstate +rex+)))
-             (aref #("AH" "CH" "DH" "BH") (- value 4))
-             (aref (ecase width
-                     (:byte sb!vm::+byte-register-names+)
-                     (:word sb!vm::+word-register-names+)
-                     (:dword sb!vm::+dword-register-names+)
-                     (:qword sb!vm::+qword-register-names+))
-                   value))
+  (princ (reg-name (get-gpr width
+                            (if (and (eq width :byte)
+                                     (not (dstate-getprop dstate +rex+))
+                                     (<= 4 value 7))
+                                (+ 16 value) ; legacy high-byte register
+                                value)))
          stream)
   ;; XXX plus should do some source-var notes
   )
