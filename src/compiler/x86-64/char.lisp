@@ -129,7 +129,6 @@
     #!+sb-unicode
     (move res ch)))
 
-#!+sb-unicode
 (define-vop (code-char)
   (:translate code-char)
   (:policy :fast-safe)
@@ -138,21 +137,17 @@
   (:results (res :scs (character-reg)))
   (:result-types character)
   (:generator 1
-    (move res code)))
-#!-sb-unicode
-(define-vop (code-char)
-  (:translate code-char)
-  (:policy :fast-safe)
-  (:args (code :scs (unsigned-reg unsigned-stack) :target eax))
-  (:arg-types positive-fixnum)
-  (:temporary (:sc unsigned-reg :offset rax-offset :target res
-                   :from (:argument 0) :to (:result 0))
-              eax)
-  (:results (res :scs (character-reg)))
-  (:result-types character)
-  (:generator 1
-    (move eax code)
-    (move res al-tn)))
+    ;; While we could use a byte-sized move here for non-unicode builds,
+    ;; I think it's better to move 32 bits from source to destination either way.
+    ;; The non-unicode case used to perform two moves - first CODE into EAX and then
+    ;; AL to result. I think it was blindly copied from the 32-bit vm definition.
+    ;; The 32-bit vm could use both the low and high byte subregisters of a word-sized
+    ;; register, thus you had to carefully avoid affecting other bits of the physical
+    ;; destination register. And since not all source registers had an accessible 8-bit
+    ;; subregister, it forced going through one of EAX,EBX,ECX,EDX.
+    ;; Those considerations do not pertain to the 64-bit vm.
+    (unless (location= code res)
+      (inst mov :dword res code))))
 
 ;;; comparison of CHARACTERs
 (define-vop (character-compare)
