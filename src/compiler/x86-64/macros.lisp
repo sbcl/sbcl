@@ -185,8 +185,8 @@
 
 #!+sb-safepoint
 (defun emit-safepoint ()
-  (inst test al-tn (ea (- nil-value n-word-bytes other-pointer-lowtag
-                          gc-safepoint-trap-offset))))
+  (inst test :byte rax-tn (ea (- nil-value n-word-bytes other-pointer-lowtag
+                                 gc-safepoint-trap-offset))))
 
 (defmacro pseudo-atomic ((&key elide-if) &rest forms)
   #!+sb-safepoint-strictly

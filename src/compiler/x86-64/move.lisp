@@ -188,7 +188,7 @@
                :from (:argument 0) :to (:result 0) :target y) rax)
   (:generator 4
     (move rax x)
-    (inst test al-tn fixnum-tag-mask)
+    (inst test :byte rax fixnum-tag-mask)
     (inst jmp :z FIXNUM)
     (loadw y rax bignum-digits-offset other-pointer-lowtag)
     (inst jmp DONE)
