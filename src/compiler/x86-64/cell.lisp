@@ -323,13 +323,13 @@
       (:policy :fast-safe)
       (:args (object :scs (descriptor-reg)))
       (:conditional :ne)
-      (:temporary (:sc dword-reg) temp)
+      (:temporary (:sc unsigned-reg) temp)
       (:generator 9
-        (inst mov temp (tls-index-of object))
-        (inst mov temp (thread-tls-ea temp))
-        (inst cmp temp no-tls-value-marker-widetag)
-        (inst cmov :e temp (symbol-value-slot-ea object))
-        (inst cmp temp unbound-marker-widetag))))
+        (inst mov :dword temp (tls-index-of object))
+        (inst mov :dword temp (thread-tls-ea temp))
+        (inst cmp :dword temp no-tls-value-marker-widetag)
+        (inst cmov :dword :e temp (symbol-value-slot-ea object))
+        (inst cmp :dword temp unbound-marker-widetag))))
 
 ) ; END OF MACROLET
 

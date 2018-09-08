@@ -2363,11 +2363,16 @@
    (emit-byte-displacement-backpatch segment target)))
 
 ;;;; conditional move
-(define-instruction cmov (segment cond dst src)
+(define-instruction cmov (segment maybe-size cond dst &optional src)
   (:printer cond-move ())
   (:emitter
-   (aver (gpr-p dst))
-   (let ((size (matching-operand-size dst src)))
+   (let ((size (cond (src
+                      (aver (is-size-p maybe-size))
+                      maybe-size)
+                     (t
+                      (setq src dst dst cond cond maybe-size)
+                      (matching-operand-size dst src)))))
+     (aver (gpr-p dst))
      (aver (neq size :byte))
      (emit-prefixes segment src dst size))
    (emit-byte segment #x0F)
