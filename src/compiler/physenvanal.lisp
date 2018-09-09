@@ -55,21 +55,6 @@
   (setf (component-nlx-info-generated-p component) t)
   (values))
 
-;;; This is to be called on a COMPONENT with top level LAMBDAs before
-;;; the compilation of the associated non-top-level code to detect
-;;; closed over top level variables. We just do COMPUTE-CLOSURE on all
-;;; the lambdas. This will pre-allocate environments for all the
-;;; functions with closed-over top level variables. The post-pass will
-;;; use the existing structure, rather than allocating a new one. We
-;;; return true if we discover any possible closure vars.
-(defun pre-physenv-analyze-toplevel (component)
-  (declare (type component component))
-  (let ((found-it nil))
-    (dolist (lambda (component-lambdas component))
-      (when (add-lambda-vars-and-let-vars-to-closures lambda)
-        (setq found-it t)))
-    found-it))
-
 ;;; If CLAMBDA has a PHYSENV, return it, otherwise assign an empty one
 ;;; and return that.
 (defun get-lambda-physenv (clambda)

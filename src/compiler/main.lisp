@@ -1614,29 +1614,25 @@ necessary, since type inference may take arbitrarily long to converge.")
   (locall-analyze-clambdas-until-done lambdas)
 
   (maybe-mumble "IDFO ")
-  (multiple-value-bind (components top-components hairy-top)
+  (multiple-value-bind (components top-components)
       (find-initial-dfo lambdas)
-    (let ((all-components (append components top-components)))
-      (when *check-consistency*
-        (maybe-mumble "[check]~%")
-        (check-ir1-consistency all-components))
+    (when *check-consistency*
+      (maybe-mumble "[check]~%")
+      (check-ir1-consistency (append components top-components)))
 
-      (dolist (component (append hairy-top top-components))
-        (pre-physenv-analyze-toplevel component))
+    (dolist (component components)
+      (compile-component component)
+      (replace-toplevel-xeps component))
 
-      (dolist (component components)
-        (compile-component component)
-        (replace-toplevel-xeps component))
+    (when *check-consistency*
+      (maybe-mumble "[check]~%")
+      (check-ir1-consistency (append components top-components)))
 
-      (when *check-consistency*
-        (maybe-mumble "[check]~%")
-        (check-ir1-consistency all-components))
+    (if load-time-value-p
+        (compile-load-time-value-lambda lambdas)
+        (compile-toplevel-lambdas lambdas))
 
-      (if load-time-value-p
-          (compile-load-time-value-lambda lambdas)
-          (compile-toplevel-lambdas lambdas))
-
-      (mapc #'clear-ir1-info components)))
+    (mapc #'clear-ir1-info components))
   (values))
 
 ;;; Actually compile any stuff that has been queued up for block

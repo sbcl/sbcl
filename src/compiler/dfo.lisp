@@ -322,16 +322,15 @@
 ;;; are deleted.
 (defun separate-toplevelish-components (components)
   (declare (list components))
-  (collect ((real)
-            (top)
-            (real-top))
+  (collect ((non-top)
+            (top))
     (dolist (component components)
       (unless (eq (block-next (component-head component))
                   (component-tail component))
         (let* ((funs (component-lambdas component))
                (has-top (find :toplevel funs :key #'functional-kind))
                (has-external-references
-                (some #'functional-has-external-references-p funs)))
+                 (some #'functional-has-external-references-p funs)))
           (cond (;; The FUNCTIONAL-HAS-EXTERNAL-REFERENCES-P concept
                  ;; is newer than the rest of this function, and
                  ;; doesn't really seem to fit into its mindset. Here
@@ -342,33 +341,27 @@
                  ;; references from pure :TOPLEVEL components. -- WHN
                  has-external-references
                  (setf (component-kind component) :complex-toplevel)
-                 (real component)
-                 (real-top component))
+                 (non-top component))
                 ((or (some #'has-xep-or-nlx funs)
                      (and has-top (rest funs)))
                  (setf (component-name component)
                        (possibly-base-stringize
                         (find-component-name component)))
-                 (real component)
+                 (non-top component)
                  (when has-top
-                   (setf (component-kind component) :complex-toplevel)
-                   (real-top component)))
+                   (setf (component-kind component) :complex-toplevel)))
                 (has-top
                  (setf (component-kind component) :toplevel)
                  (setf (component-name component) "top level form")
                  (top component))
                 (t
                  (delete-component component))))))
-
-    (values (real) (top) (real-top))))
+    (values (non-top) (top))))
 
 ;;; Given a list of top level lambdas, return
-;;;   (VALUES NONTOP-COMPONENTS TOP-COMPONENTS HAIRY-TOP-COMPONENTS).
-;;; Each of the three values returned is a list of COMPONENTs:
+;;;   (VALUES NONTOP-COMPONENTS TOP-COMPONENTS):
 ;;;   NONTOP-COMPONENTS = non-top-level-ish COMPONENTs;
 ;;;   TOP-COMPONENTS = top-level-ish COMPONENTs;
-;;;   HAIRY-TOP-COMPONENTS = a subset of NONTOP-COMPONENTS, those
-;;;    elements which include a top-level-ish lambda.
 ;;;
 ;;; We assign the DFO for each component, and delete any unreachable
 ;;; blocks. We assume that the FLAGS have already been cleared.
