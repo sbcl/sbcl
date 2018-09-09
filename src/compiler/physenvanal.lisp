@@ -32,8 +32,6 @@
                  (eq (functional-kind x) :deleted))
                (component-new-functionals component)))
   (setf (component-new-functionals component) ())
-  (dolist (clambda (component-lambdas component))
-    (reinit-lambda-physenv clambda))
   (mapc #'add-lambda-vars-and-let-vars-to-closures
         (component-lambdas component))
 
@@ -72,23 +70,6 @@
             (aver (null (lambda-physenv letlambda)))
             (setf (lambda-physenv letlambda) res))
           res))))
-
-;;; If FUN has no physical environment, assign one, otherwise clean up
-;;; the old physical environment and the INDIRECT flag on LAMBDA-VARs.
-;;; This is necessary because pre-analysis is done before
-;;; optimization.
-(defun reinit-lambda-physenv (fun)
-  (let ((old (lambda-physenv (lambda-home fun))))
-    (cond (old
-           (setf (physenv-closure old) nil)
-           (flet ((clear (fun)
-                    (dolist (var (lambda-vars fun))
-                      (setf (lambda-var-indirect var) nil))))
-             (clear fun)
-             (map nil #'clear (lambda-lets fun))))
-          (t
-           (get-lambda-physenv fun))))
-  (values))
 
 ;;; Get NODE's environment, assigning one if necessary.
 (defun get-node-physenv (node)
