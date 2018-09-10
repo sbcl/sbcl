@@ -3476,15 +3476,13 @@
 ;;; we allowed code that SHOULD NOT have been allowed to work.
 ;;;
 ;;; The problem: MAKE-EA gets called with registers that were resized
-;;; using REG-IN-SIZE. This is sheer madness. The BASE and INDEX parts
-;;; of an EA are *always* qwords, and we should have enforced that.
-;;; Well, it's too late now to start enforcing.
+;;; using REG-IN-SIZE. The BASE and INDEX parts of an EA are *always*
+;;; qwords, and we should have enforced that. Well, it's too late now
+;;; to start enforcing.
 (defun make-ea (size &key base index (scale 1) (disp 0))
   (flet ((fix (reg which)
            (cond ((register-p reg)
                   (let ((id (reg-id reg)))
-                    (unless (eql (gpr-id-size-class id) +size-class-qword+)
-                      (warn "MAKE-EA should receive :QWORD ~A register" which))
                     (make-random-tn :kind :normal
                                     :sc (sc-or-lose 'sb!vm::unsigned-reg)
                                     :offset (reg-id-num id))))
