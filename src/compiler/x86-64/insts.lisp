@@ -3480,12 +3480,10 @@
 ;;; qwords, and we should have enforced that. Well, it's too late now
 ;;; to start enforcing.
 (defun make-ea (size &key base index (scale 1) (disp 0))
-  (flet ((fix (reg which)
-           (cond ((register-p reg)
-                  (let ((id (reg-id reg)))
-                    (make-random-tn :kind :normal
-                                    :sc (sc-or-lose 'sb!vm::unsigned-reg)
-                                    :offset (reg-id-num id))))
-                 (t
-                  reg))))
-    (%make-ea-dont-use size disp (fix base "base") (fix index "index") scale)))
+  (flet ((fix (reg)
+           (if (register-p reg)
+               (make-random-tn :kind :normal
+                               :sc (sc-or-lose 'sb!vm::unsigned-reg)
+                               :offset (reg-id-num (reg-id reg)))
+               reg)))
+    (%make-ea-dont-use size disp (fix base) (fix index) scale)))
