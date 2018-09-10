@@ -1297,8 +1297,8 @@ constant shift greater than word length")))
              (inst test size (ea disp rbp-tn) y)))
           (t
            (aver (gpr-tn-p x))
-           (if (and reducible-to-byte-p (<= (tn-offset x) 6)) ; 0, 2, 4, 6
-               ;; Use upper byte of word reg (AX -> AH, BX -> BX ...)
+           (if (and reducible-to-byte-p (<= (tn-offset x) rbx-offset))
+               ;; Use upper byte of word reg {A,C,D,B}X -> {A,C,D,B}H
                (inst test :byte `(,x . :high-byte) (ash y -8))
                (inst test size x y))))))
 

@@ -1163,9 +1163,7 @@
                        (vector sb!vm::+qword-register-names+
                                sb!vm::+dword-register-names+
                                sb!vm::+word-register-names+
-                               (concatenate 'vector
-                                            sb!vm::+byte-register-names+
-                                            #(nil nil nil nil "AH" "CH" "DH" "BH")))
+                               sb!vm::+byte-register-names+)
                        t)
                       (gpr-id-size-class id))
                #.(coerce (loop for i below 16 collect (format nil "XMM~D" i))
@@ -1179,12 +1177,15 @@
 ;;; However, we can assert absence of REX if so called for.
 (declaim (ftype (sfunction (reg sb!assem:segment) (mod 8)) reg-encoding))
 (defun reg-encoding (reg segment &aux (id (reg-id reg)))
-  (when (and (is-gpr-id-p id)
-             (eq (gpr-id-size-class id) +size-class-byte+)
-             (>= (reg-id-num id) 16)
-             (eql (segment-encoder-state segment) +rex+))
-    (error "Can't encode ~A with REX prefix" (reg-name reg)))
-  (logand (reg-id-num id) 7))
+  (cond ((and (is-gpr-id-p id)
+              (eq (gpr-id-size-class id) +size-class-byte+)
+              (>= (reg-id-num id) 16))
+         (if (eql (segment-encoder-state segment) +rex+)
+             (bug "Can't encode ~A with REX prefix" (reg-name reg))
+             ; number 16 corresponds to AH which is encoded as 4 and so on
+             (+ (reg-id-num id) -16 4)))
+        (t
+         (logand (reg-id-num id) 7))))
 
 (defun emit-byte+reg (seg byte reg)
   (emit-byte seg (+ byte (reg-encoding reg seg))))
@@ -1202,13 +1203,11 @@
                    (loop for i from 0 below 16 collect (!make-reg (!make-gpr-id :qword i)))
                    (loop for i from 0 below 16 collect (!make-reg (!make-gpr-id :dword i)))
                    (loop for i from 0 below 16 collect (!make-reg (!make-gpr-id :word i)))
-                   ;; byte reg vector is #(AL CL ... R15B NIL NIL NIL NIL AH CH DH BH)
-                   (loop for i from 0 below 24
-                         collect (unless (<= 16 i 19)
-                                   (!make-reg (!make-gpr-id :byte i)))))
+                   ;; byte reg vector is #(AL CL ... R15B AH CH DH BH)
+                   (loop for i from 0 below 20 collect (!make-reg (!make-gpr-id :byte i))))
                   'vector)
           t)
-         (+ encoding
+         (+ (if (eq size :byte) (the (mod 20) encoding) (the (mod 16) encoding))
             (ecase size
               (:qword  0)
               (:dword 16)
@@ -1221,8 +1220,7 @@
 (defun tn-reg (tn)
   (declare (tn tn))
   (aver (eq (sb-name (sc-sb (tn-sc tn))) 'registers))
-  (get-gpr (sc-operand-size (tn-sc tn))
-           (ash (tn-offset tn) -1)))
+  (get-gpr (sc-operand-size (tn-sc tn)) (tn-offset tn)))
 
 ;;; For each TN that maps to a register, replace it with a REG instance.
 ;;; This is so that when we resize a register for instructions which specify
@@ -1233,7 +1231,7 @@
 (defun sb!assem::perform-operand-lowering (operands)
   (mapcar (lambda (operand)
             (cond ((typep operand '(cons tn (eql :high-byte)))
-                   (get-gpr :byte (+ 20 (the (mod 4) (ash (tn-offset (car operand)) -1)))))
+                   (get-gpr :byte (+ 16 (the (mod 4) (tn-offset (car operand))))))
                   ((not (typep operand 'tn))
                    ;; EA, literal, fixup, keyword, or REG if reg-in-size was used
                    operand)
@@ -3489,7 +3487,7 @@
                       (warn "MAKE-EA should receive :QWORD ~A register" which))
                     (make-random-tn :kind :normal
                                     :sc (sc-or-lose 'sb!vm::unsigned-reg)
-                                    :offset (ash (reg-id-num id) 1))))
+                                    :offset (reg-id-num id))))
                  (t
                   reg))))
     (%make-ea-dont-use size disp (fix base "base") (fix index "index") scale)))

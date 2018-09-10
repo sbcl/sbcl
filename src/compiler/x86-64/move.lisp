@@ -252,7 +252,7 @@
                     (unless (member x '(rsp rbp) :test 'string=)
                       (symbolicate "ALLOC-" signedp "-BIGNUM-IN-" x)))
                   +qword-register-names+)
-           (ash (tn-offset ,tn) -1))))
+           (tn-offset ,tn))))
 
 ;;; Convert an untagged signed word to a lispobj -- fixnum or bignum
 ;;; as the case may be. Fixnum case inline, bignum case in an assembly

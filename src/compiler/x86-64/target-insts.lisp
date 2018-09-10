@@ -79,7 +79,7 @@
                             (if (and (eq width :byte)
                                      (not (dstate-getprop dstate +rex+))
                                      (<= 4 value 7))
-                                (+ 16 value) ; legacy high-byte register
+                                (+ 16 -4 value) ; legacy high-byte register
                                 value)))
          stream)
   ;; XXX plus should do some source-var notes
@@ -339,7 +339,7 @@
                (when symbol
                  (note (lambda (stream) (format stream "tls_index: ~S" symbol))
                        dstate))))
-            ((and (eql base-reg #.(ash (tn-offset sb!vm::thread-base-tn) -1))
+            ((and (eql base-reg #.(tn-offset sb!vm::thread-base-tn))
                   (not (dstate-getprop dstate +fs-segment+)) ; not system TLS
                   (not index-reg) ; no index
                   (typep disp '(integer 0 *)) ; positive displacement
