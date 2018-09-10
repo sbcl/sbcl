@@ -451,6 +451,7 @@
                             else do (check arg-type param-type)))))
                 (let ((returns (single-value-type (fun-type-returns type))))
                   (when (and (neq returns *wild-type*)
+                             (neq returns *empty-type*)
                              (neq results *wild-type*)
                              (eq (type-intersection returns results) *empty-type*))
                     (warn type-condition

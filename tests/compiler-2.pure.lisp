@@ -1619,4 +1619,10 @@
           (declare (notinline m))
           (m)
           (values x j))))
-   (() (values 65 48))))
+    (() (values 65 48))))
+
+(with-test (:name :non-returning-functions-conflict)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x) (map nil #'error x))
+    ((nil) nil)))
