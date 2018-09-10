@@ -3074,20 +3074,24 @@
                  ,(when reg-only
                     `(aver (xmm-register-p src)))
                  (let ((dst-size ,size))
-                   (aver (or (eq dst-size :qword) (eq dst-size :dword)))
+                   ,@(unless (eq size :do-not-set)
+                      '((aver (or (eq dst-size :qword) (eq dst-size :dword)))))
                    (emit-sse-inst segment dst src ,prefix ,opcode
                                   :operand-size dst-size))))))
   (define-gpr-destination-sse-inst cvtsd2si  #xf2 #x2d)
   (define-gpr-destination-sse-inst cvtss2si  #xf3 #x2d)
   (define-gpr-destination-sse-inst cvttsd2si #xf2 #x2c)
   (define-gpr-destination-sse-inst cvttss2si #xf3 #x2c)
-  ;; Neither clang nor gcc will emit a REX prefix for "movmskps %xmm0,%rax"
-  ;; (or movmskpd) which makes perfect sense, as at most 4 bits are set in the
-  ;; destination register. In fact, some versions of apple clang disassemble
-  ;; the destination register in its 32-bit size despite a 0x48 prefix.
-  (define-gpr-destination-sse-inst movmskpd  #x66 #x50 :reg-only t :size :dword)
-  (define-gpr-destination-sse-inst movmskps  nil  #x50 :reg-only t :size :dword)
-  (define-gpr-destination-sse-inst pmovmskb  #x66 #xd7 :reg-only t))
+  ;; Per the Intel documentation on these instructions:
+  ;;  "The default operand size is 64-bit in 64-bit mode."
+  ;; We disassemble these incorrectly, but it doesn't matter since the
+  ;; result is effectively zero-extended to 64 bits either way.
+  (define-gpr-destination-sse-inst movmskpd  #x66 #x50 :reg-only t
+    :size :do-not-set)
+  (define-gpr-destination-sse-inst movmskps  nil  #x50 :reg-only t
+    :size :do-not-set)
+  (define-gpr-destination-sse-inst pmovmskb  #x66 #xd7 :reg-only t
+    :size :do-not-set))
 
 ;;;; We call these "2byte" instructions due to their two opcode bytes.
 ;;;; Intel and AMD call them three-byte instructions, as they count the
