@@ -80,8 +80,7 @@
 (defun assign-ir2-physenv (clambda)
   (declare (type clambda clambda))
   (let* ((lambda-physenv (lambda-physenv clambda))
-         (indirect-fp-tn
-           (make-normal-tn *backend-t-primitive-type*))
+         (indirect-fp-tns)
          (ir2-physenv-alist
            (loop for thing in (physenv-closure lambda-physenv)
                  collect
@@ -92,7 +91,12 @@
                                  (make-normal-tn
                                   (primitive-type (leaf-type thing))))
                                 ((not (lambda-var-explicit-value-cell thing))
-                                 indirect-fp-tn)
+                                 (let ((physenv (lambda-physenv (lambda-var-home thing))))
+                                   (or (getf indirect-fp-tns physenv)
+                                       (let ((tn (make-normal-tn *backend-t-primitive-type*)))
+                                         (push tn indirect-fp-tns)
+                                         (push physenv indirect-fp-tns)
+                                         tn))))
                                 (t
                                  (make-normal-tn *backend-t-primitive-type*))))
                          (nlx-info
