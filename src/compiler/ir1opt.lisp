@@ -598,7 +598,7 @@
                         (null (leaf-refs var)))
                (flush-dest (set-value node))
                (setf (basic-var-sets var)
-                     (delq node (basic-var-sets var)))
+                     (delq1 node (basic-var-sets var)))
                (unlink-node node))))
           (cast
            (unless (or (cast-type-check node)
@@ -855,7 +855,7 @@
         (entry (exit-entry node)))
     (when (and entry
                (eq (node-home-lambda node) (node-home-lambda entry)))
-      (setf (entry-exits entry) (delq node (entry-exits entry)))
+      (setf (entry-exits entry) (delq1 node (entry-exits entry)))
       (if value
           (delete-filter node (node-lvar node) value)
           (unlink-node node)))))
@@ -1966,7 +1966,7 @@
     (setf (lambda-bind clambda) nil))
   (setf (functional-kind clambda) :zombie)
   (let ((home (lambda-home clambda)))
-    (setf (lambda-lets home) (delete clambda (lambda-lets home))))
+    (setf (lambda-lets home) (delq1 clambda (lambda-lets home))))
   (values))
 
 ;;; This function is called when one of the arguments to a LET

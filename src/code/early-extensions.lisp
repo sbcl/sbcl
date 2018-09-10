@@ -354,6 +354,16 @@
                  (rplacd splice (cdr x))))
             (t (setq splice x)))))) ; Move splice along to include element.
 
+;;; Delete just one item
+(defun delq1 (item list)
+  (do ((prev nil x)
+       (x list (cdr x)))
+      ((null x) list)
+    (when (eq item (car x))
+      (if (null prev)
+          (return (cdr x))
+          (rplacd prev (cdr x)))
+      (return list))))
 
 ;;; like (POSITION .. :TEST #'EQ):
 ;;;   Return the position of the first element EQ to ITEM.

@@ -142,7 +142,7 @@
                         (setf (ref-leaf ref) new)
                         (push ref (leaf-refs new))
                         (setf (leaf-refs lambda)
-                              (delq ref (leaf-refs lambda))))))))))
+                              (delq1 ref (leaf-refs lambda))))))))))
         (:toplevel
          (setq res t))))
     res))

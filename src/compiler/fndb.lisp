@@ -1006,7 +1006,7 @@
     list (foldable flushable call))
 
 (defknown (memq assq) (t proper-list) list (foldable flushable))
-(defknown delq (t (modifying list)) list (flushable))
+(defknown (delq delq1) (t (modifying list)) list (flushable))
 
 ;;;; from the "Hash Tables" chapter:
 

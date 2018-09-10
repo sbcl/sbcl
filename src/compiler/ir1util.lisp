@@ -132,7 +132,7 @@
   (let ((lvar (node-lvar node)))
     (when lvar
       (if (listp (lvar-uses lvar))
-          (let ((new-uses (delq node (lvar-uses lvar))))
+          (let ((new-uses (delq1 node (lvar-uses lvar))))
             (setf (lvar-uses lvar)
                   (if (singleton-p new-uses)
                       (first new-uses)
@@ -1191,7 +1191,7 @@
           (aver succ))))
 
   (setf (block-pred block2)
-        (delq block1 (block-pred block2)))
+        (delq1 block1 (block-pred block2)))
   (values))
 
 ;;; Swing the succ/pred link between BLOCK and OLD to be between BLOCK
@@ -1383,7 +1383,8 @@
         (setf (node-next node) nil)
         (dolist (b succ)
           (setf (block-pred b)
-                (cons new-block (remove block (block-pred b)))))
+                (nsubstitute new-block block (block-pred b)
+                             :count 1)))
         (setf (block-succ block) ())
         (link-blocks block new-block)
         (add-to-dfo new-block block)
@@ -1543,7 +1544,7 @@
                  (delete clambda (tail-set-funs tails)))
            (setf (lambda-tail-set clambda) nil))
          (setf (component-lambdas component)
-               (delq clambda (component-lambdas component))))))
+               (delq1 clambda (component-lambdas component))))))
 
     ;; If the lambda is an XEP, then we null out the ENTRY-FUN in its
     ;; ENTRY-FUN so that people will know that it is not an entry
@@ -1664,7 +1665,7 @@
 (defun delete-ref (ref)
   (declare (type ref ref))
   (let* ((leaf (ref-leaf ref))
-         (refs (delq ref (leaf-refs leaf)))
+         (refs (delq1 ref (leaf-refs leaf)))
          (home (node-home-lambda ref)))
     (setf (leaf-refs leaf) refs)
     (when (and (typep leaf '(or clambda lambda-var))
@@ -1821,12 +1822,12 @@
            (flush-dest value))
          (when entry
            (setf (entry-exits entry)
-                 (delq node (entry-exits entry))))))
+                 (delq1 node (entry-exits entry))))))
       (entry
        (dolist (exit (entry-exits node))
          (mark-for-deletion (node-block exit)))
        (let ((home (node-home-lambda node)))
-         (setf (lambda-entries home) (delq node (lambda-entries home)))))
+         (setf (lambda-entries home) (delq1 node (lambda-entries home)))))
       (creturn
        (flush-dest (return-result node))
        (delete-return node))
@@ -2020,7 +2021,7 @@
                (when (block-delete-p block)
                  (let ((component (block-component block)))
                    (setf (component-delete-blocks component)
-                         (delq block (component-delete-blocks component)))))
+                         (delq1 block (component-delete-blocks component)))))
                (remove-from-dfo block)
                (setf (block-delete-p block) t)
                (setf (node-prev node) nil)
