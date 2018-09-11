@@ -1626,3 +1626,11 @@
    ()
    `(lambda (x) (map nil #'error x))
     ((nil) nil)))
+
+(with-test (:name :array-typep-other-pointer-widetag)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x)
+         (typep x '(and base-string (not simple-array))))
+    ((10) nil)
+    (((make-array 10 :element-type 'base-char :adjustable t)) t)))

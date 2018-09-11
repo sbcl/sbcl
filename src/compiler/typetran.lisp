@@ -696,7 +696,8 @@
                            (listp dims)
                            (cdr dims))))
                 (if complex-tag
-                    `(and (eq (%other-pointer-widetag ,object) ,complex-tag)
+                    `(and (%other-pointer-p ,object)
+                          (eq (%other-pointer-widetag ,object) ,complex-tag)
                           ,@(unless (eq (car dims) '*)
                               `((= (%array-dimension ,object 0) ,(car dims)))))
                     (multiple-value-bind (tests headerp)
