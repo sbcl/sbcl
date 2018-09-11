@@ -213,33 +213,6 @@
  ;;
  ; :float-eql-vops
 
- ;; Enabled automatically for platform that can implement inline constants.
- ;;
- ;; Such platform must implement 5 functions, in SB!VM:
- ;; * canonicalize-inline-constant: converts a constant descriptor (list) into
- ;;    a canonical description, to be used as a key in an EQUAL hash table
- ;;    and to guide the generation of the constant itself.
- ;; * inline-constant-value: given a canonical constant descriptor, computes
- ;;    two values:
- ;;     1. A label that will be used to emit the constant (usually a
- ;;         sb!assem:label)
- ;;     2. A value that will be returned to code generators referring to
- ;;         the constant (on x86oids, an EA object)
- ;; * sort-inline-constants: Receives a vector of unique constants;
- ;;    the car of each entry is the constant descriptor, and the cdr the
- ;;    corresponding label. Destructively returns a vector of constants
- ;;    sorted in emission order. It could actually perform arbitrary
- ;;    modifications to the vector, e.g. to fuse constants of different
- ;;    size.
- ;; * emit-inline-constant: receives a constant descriptor and its associated
- ;;    label. Emits the constant.
- ;;
- ;; Implementing this features lets VOP generators use sb!c:register-inline-constant
- ;; to get handles (as returned by sb!vm:inline-constant-value) from constant
- ;; descriptors.
- ;;
- ; :inline-constants
-
  ;; Peter Van Eynde's increase-bulletproofness code for CMU CL
  ;;
  ;; Some of the code which was #+high-security before the fork has now

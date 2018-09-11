@@ -90,15 +90,54 @@
   (and *compiler-trace-output*
        #'trace-instruction))
 
+;;; Some platforms support unboxed constants immediately following the boxed
+;;; code header. Such platform must implement supporting 4 functions:
+;;; * CANONICALIZE-INLINE-CONSTANT: converts a constant descriptor (list) into
+;;;    a canonical description, to be used as a key in an EQUAL hash table
+;;;    and to guide the generation of the constant itself.
+;;; * INLINE-CONSTANT-VALUE: given a canonical constant descriptor, computes
+;;;    two values:
+;;;     1. A label that will be used to emit the constant (usually a
+;;;         sb!assem:label)
+;;;     2. A value that will be returned to code generators referring to
+;;;         the constant (on x86oids, an EA object)
+;;; * SORT-INLINE-CONSTANTS: Receives a vector of unique constants;
+;;;    the car of each entry is the constant descriptor, and the cdr the
+;;;    corresponding label. Destructively returns a vector of constants
+;;;    sorted in emission order. It could actually perform arbitrary
+;;;    modifications to the vector, e.g. to fuse constants of different
+;;;    size.
+;;; * EMIT-INLINE-CONSTANT: receives a constant descriptor and its associated
+;;;    label. Emits the constant.
+;;;
+;;; Implementing this feature lets VOP generators use sb!c:register-inline-constant
+;;; to get handles (as returned by sb!vm:inline-constant-value) from constant
+;;; descriptors.
+;;;
+#!+(or x86 x86-64 arm64)
+(defun register-inline-constant (&rest constant-descriptor)
+  (declare (dynamic-extent constant-descriptor))
+  (let ((asmstream *asmstream*)
+        (constant (sb!vm:canonicalize-inline-constant constant-descriptor)))
+    (ensure-gethash
+     constant
+     (asmstream-constant-table asmstream)
+     (multiple-value-bind (label value) (sb!vm:inline-constant-value constant)
+       (vector-push-extend (cons constant label)
+                           (asmstream-constant-vector asmstream))
+       value))))
+#!-(or x86 x86-64 arm64)
+(progn (defun sb!vm:sort-inline-constants (constants) constants)
+       (defun sb!vm:emit-inline-constant (&rest args)
+         (error "EMIT-INLINE-CONSTANT called with ~S" args)))
 ;;; Return T if and only if there were any constants emitted.
 (defun emit-inline-constants ()
-  #!+inline-constants
   (let* ((asmstream *asmstream*)
-         (sorted (sb!vm:sort-inline-constants
-                  (asmstream-constant-vector asmstream)))
+         (constants (asmstream-constant-vector asmstream))
          (section (asmstream-data-section asmstream)))
-    (dovector (constant sorted (plusp (length sorted)))
-      (sb!vm:emit-inline-constant section (car constant) (cdr constant)))))
+    (when (plusp (length constants))
+      (dovector (constant (sb!vm:sort-inline-constants constants) t)
+        (sb!vm:emit-inline-constant section (car constant) (cdr constant))))))
 
 ;;; If a constant is already loaded into a register use that register.
 (defun optimize-constant-loads (component)
@@ -330,19 +369,6 @@
         ;; We're interested in what precedes the return, not after
         (< elsewhere label)
         (<= elsewhere label))))
-
-#!+inline-constants
-(defun register-inline-constant (&rest constant-descriptor)
-  (declare (dynamic-extent constant-descriptor))
-  (let ((asmstream *asmstream*)
-        (constant (sb!vm:canonicalize-inline-constant constant-descriptor)))
-    (ensure-gethash
-     constant
-     (asmstream-constant-table asmstream)
-     (multiple-value-bind (label value) (sb!vm:inline-constant-value constant)
-       (vector-push-extend (cons constant label)
-                           (asmstream-constant-vector asmstream))
-       value))))
 
 ;;; Translate .COVERAGE-MARK pseudo-op into machine assembly language,
 ;;; combining any number of consecutive operations with no intervening
