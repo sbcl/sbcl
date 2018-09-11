@@ -1162,3 +1162,16 @@
 (deftransform #!+64-bit unsigned-byte-64-p #!-64-bit unsigned-byte-32-p
   ((value) (fixnum))
   `(>= value 0))
+
+(deftransform %other-pointer-p ((object))
+  (let ((this-type
+          (specifier-type '(or fixnum
+                            #!+64-bit single-float
+                            function
+                            list
+                            instance
+                            character))))
+    (cond ((not (types-equal-or-intersect this-type (lvar-type object))))
+          ((csubtypep (lvar-type object) this-type)
+           nil)
+          ((give-up-ir1-transform)))))
