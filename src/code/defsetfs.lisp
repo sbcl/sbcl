@@ -42,7 +42,8 @@
 (defsetf %instance-ref %instance-set)
 
 (defsetf %raw-instance-ref/word %raw-instance-set/word)
-#!+raw-signed-word
+;; The *FEATURE* formerly known as :RAW-SIGNED-WORD
+#!+(vop-translates sb!kernel:%raw-instance-ref/signed-word)
 (defsetf %raw-instance-ref/signed-word %raw-instance-set/signed-word)
 (defsetf %raw-instance-ref/single %raw-instance-set/single)
 (defsetf %raw-instance-ref/double %raw-instance-set/double)

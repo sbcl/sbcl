@@ -653,7 +653,7 @@ if [ "$sbcl_arch" = "x86" ]; then
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks :cycle-counter' >> $ltf
-    printf ' :fp-and-pc-standard-save :raw-signed-word' >> $ltf
+    printf ' :fp-and-pc-standard-save' >> $ltf
     case "$sbcl_os" in
     linux | freebsd | gnu-kfreebsd | netbsd | openbsd | sunos | darwin | win32 | dragonfly)
         printf ' :linkage-table' >> $ltf
@@ -673,7 +673,7 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :fp-and-pc-standard-save :unbind-n-vop' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
-    printf ' :alien-callbacks :cycle-counter :complex-float-vops :raw-signed-word' >> $ltf
+    printf ' :alien-callbacks :cycle-counter :complex-float-vops' >> $ltf
     printf ' :float-eql-vops :integer-eql-vop' >> $ltf
     printf ' :sb-simd-pack' >> $ltf
     printf ' :undefined-fun-restarts :call-symbol' >> $ltf
@@ -765,7 +765,7 @@ elif [ "$sbcl_arch" = "arm64" ]; then
     printf ' :alien-callbacks' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-closures' >> $ltf
-    printf ' :unbind-n-vop :unwind-to-frame-and-call-vop :raw-signed-word' >> $ltf
+    printf ' :unbind-n-vop :unwind-to-frame-and-call-vop' >> $ltf
     printf ' :compare-and-swap-vops :undefined-fun-restarts' >> $ltf
 else
     # Nothing need be done in this case, but sh syntax wants a placeholder.

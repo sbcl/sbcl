@@ -94,7 +94,9 @@
                            :init-vop 'sb!vm::raw-instance-init/word
                            :n-words 1
                            :comparer (make-comparer %raw-instance-ref/word))
-       #!+raw-signed-word
+       ;; If this list of architectures is changed, then also change the test
+       ;; for :DEFINE-STRUCTURE-SLOT-ADDRESSOR in raw-slots-interleaved.impure
+       #!+(or arm64 x86 x86-64)
        (make-raw-slot-data :raw-type 'sb!vm:signed-word
                            :accessor-name '%raw-instance-ref/signed-word
                            :init-vop 'sb!vm::raw-instance-init/signed-word

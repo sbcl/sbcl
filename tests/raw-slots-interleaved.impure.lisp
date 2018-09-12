@@ -146,24 +146,35 @@
   (w 0 :type sb-ext:word)
   b
   (cdf #c(0d0 0d0) :type (complex double-float))
-  c)
+  c
+  (sword -1 :type (integer #.(1- most-negative-fixnum) 100)))
 (sb-kernel:define-structure-slot-addressor
  foo-w-ptr :structure foo :slot w)
 (sb-kernel:define-structure-slot-addressor
  foo-cdf-ptr :structure foo :slot cdf)
+(sb-kernel:define-structure-slot-addressor
+ foo-sword-ptr :structure foo :slot sword)
 
 (with-test (:name :define-structure-slot-addressor)
   (let* ((word (logand sb-ext:most-positive-word #xfeedbad))
          (re 4.2d58)
          (im 8.93d-10)
-         (thing (make-foo :cdf (complex re im) :w word)))
+         (thing (make-foo :cdf (complex re im) :w word :sword -9)))
      (sb-sys:with-pinned-objects (thing)
       (assert (= word (sb-sys:sap-ref-word
                        (sb-sys:int-sap (foo-w-ptr thing)) 0)))
       (assert (= re (sb-sys:sap-ref-double
                      (sb-sys:int-sap (foo-cdf-ptr thing)) 0)))
       (assert (= im (sb-sys:sap-ref-double
-                     (sb-sys:int-sap (foo-cdf-ptr thing)) 8))))))
+                     (sb-sys:int-sap (foo-cdf-ptr thing)) 8)))
+       (let* ((sap (sb-sys:int-sap (foo-sword-ptr thing)))
+              (slots (sb-kernel:dd-slots (sb-kernel:find-defstruct-description 'foo)))
+              (valtype (sb-kernel:dsd-raw-type
+                        (find 'sword slots :key #'sb-kernel:dsd-name))))
+         #+(or x86 x86-64 arm64) (assert (eq valtype 'sb-vm:signed-word))
+         (assert (= -9 (if (eq valtype 'sb-vm:signed-word)
+                           (sb-sys:signed-sap-ref-word sap 0)
+                           (sb-sys:sap-ref-lispobj sap 0))))))))
 
 (macrolet ((def ()
              `(defstruct foo-lotsaslots
