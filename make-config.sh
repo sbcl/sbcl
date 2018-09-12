@@ -653,7 +653,7 @@ if [ "$sbcl_arch" = "x86" ]; then
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks :cycle-counter' >> $ltf
-    printf ' :memory-barrier-vops :multiply-high-vops' >> $ltf
+    printf ' :memory-barrier-vops' >> $ltf
     printf ' :fp-and-pc-standard-save :raw-signed-word' >> $ltf
     case "$sbcl_os" in
     linux | freebsd | gnu-kfreebsd | netbsd | openbsd | sunos | darwin | win32 | dragonfly)
@@ -676,7 +676,7 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks :cycle-counter :complex-float-vops :raw-signed-word' >> $ltf
     printf ' :float-eql-vops :integer-eql-vop :memory-barrier-vops' >> $ltf
-    printf ' :multiply-high-vops :sb-simd-pack' >> $ltf
+    printf ' :sb-simd-pack' >> $ltf
     printf ' :undefined-fun-restarts :call-symbol' >> $ltf
     case "$sbcl_os" in
     linux | darwin | *bsd)
@@ -691,7 +691,7 @@ elif [ "$sbcl_arch" = "ppc" ]; then
     printf ' :gencgc :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :linkage-table :raw-instance-init-vops :memory-barrier-vops' >> $ltf
-    printf ' :compare-and-swap-vops :multiply-high-vops :alien-callbacks' >> $ltf
+    printf ' :compare-and-swap-vops :alien-callbacks' >> $ltf
     if [ "$sbcl_os" = "linux" ]; then
         # Use a C program to detect which kind of glibc we're building on,
         # to bandage across the break in source compatibility between
@@ -716,7 +716,7 @@ elif [ "$sbcl_arch" = "ppc64" ]; then
     printf ' :gencgc :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :linkage-table :raw-instance-init-vops :memory-barrier-vops' >> $ltf
-    printf ' :compare-and-swap-vops :multiply-high-vops :alien-callbacks' >> $ltf
+    printf ' :compare-and-swap-vops :alien-callbacks' >> $ltf
     # there is no glibc bug that requires the 'where-is-mcontext' hack.
     # (Sufficiently new glibc uses the correct definition, which is the same as
     # 2.3.1, so define our constant for that)
@@ -757,7 +757,6 @@ elif [ "$sbcl_arch" = "arm" ]; then
     # possibly VFPv2 and higher only), but we'll leave the obvious
     # hooks in for someone to add the support later.
     printf ' :arm-vfp :arm-vfpv2' >> $ltf
-    printf ' :multiply-high-vops' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-closures' >> $ltf
     printf ' :unwind-to-frame-and-call-vop' >> $ltf
@@ -765,7 +764,6 @@ elif [ "$sbcl_arch" = "arm" ]; then
 elif [ "$sbcl_arch" = "arm64" ]; then
     printf ' :64-bit :64-bit-registers :gencgc :linkage-table :fp-and-pc-standard-save' >> $ltf
     printf ' :alien-callbacks' >> $ltf
-    printf ' :multiply-high-vops' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-closures' >> $ltf
     printf ' :unbind-n-vop :unwind-to-frame-and-call-vop :raw-signed-word' >> $ltf

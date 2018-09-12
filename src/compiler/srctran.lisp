@@ -3353,7 +3353,7 @@
                `(ash (%multiply-high (logandc2 x ,(1- (ash 1 shift1))) ,m)
                      ,(- (+ shift1 shift2)))))))))
 
-#!-multiply-high-vops
+#!-(vop-translates sb!kernel:%multiply-high)
 (define-source-transform %multiply-high (x y)
   `(values (sb!bignum:%multiply ,x ,y)))
 
