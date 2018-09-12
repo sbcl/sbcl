@@ -2807,34 +2807,6 @@
 ;;;
 ;;; and similar for other arguments.
 
-(defun make-modular-fun-type-deriver (prototype kind width signedp)
-  (declare (ignore kind))
-  #!-sb-fluid
-  (binding* ((info (info :function :info prototype) :exit-if-null)
-             (fun (fun-info-derive-type info) :exit-if-null)
-             (mask-type (specifier-type
-                         (ecase signedp
-                             ((nil) (let ((mask (1- (ash 1 width))))
-                                      `(integer ,mask ,mask)))
-                             ((t) `(signed-byte ,width))))))
-    (lambda (call)
-      (let ((res (funcall fun call)))
-        (when res
-          (if (eq signedp nil)
-              (logand-derive-type-aux res mask-type))))))
-  #!+sb-fluid
-  (lambda (call)
-    (binding* ((info (info :function :info prototype) :exit-if-null)
-               (fun (fun-info-derive-type info) :exit-if-null)
-               (res (funcall fun call) :exit-if-null)
-               (mask-type (specifier-type
-                           (ecase signedp
-                             ((nil) (let ((mask (1- (ash 1 width))))
-                                      `(integer ,mask ,mask)))
-                             ((t) `(signed-byte ,width))))))
-      (if (eq signedp nil)
-          (logand-derive-type-aux res mask-type)))))
-
 ;;; Try to recursively cut all uses of LVAR to WIDTH bits.
 ;;;
 ;;; For good functions, we just recursively cut arguments; their
@@ -4325,6 +4297,7 @@
   (source-transform-transitive 'logxor args 0 'integer))
 (define-source-transform logand (&rest args)
   (source-transform-transitive 'logand args -1 'integer))
+#!-(or arm arm64 hppa mips x86 x86-64) ; defined in compiler/target/arith.lisp
 (define-source-transform logeqv (&rest args)
   (source-transform-transitive 'logeqv args -1 'integer))
 (define-source-transform gcd (&rest args)

@@ -481,7 +481,6 @@
  ("src/compiler/generic/vm-typetran")
  ("src/compiler/float-tran")
  ("src/compiler/saptran")
- ("src/compiler/srctran")
  ("src/compiler/sxhash")
  ("src/code/quantifiers")
  ("src/compiler/bitops-derive-type")
@@ -535,6 +534,10 @@
   ;; x pressing problems. Someday, though, it would be nice to figure out
   ;; x what the problem is and fix it.
   #!+(or ppc ppc64) :ignore-failure-p)
+
+ ;; This is a terrible name for a file that contains type derivers
+ ;; and IR1 transforms. Maybe split it up into more appropriately named pieces.
+ ("src/compiler/srctran")
  ("src/code/cross-modular"  :not-target)
 
  ("src/compiler/generic/late-type-vops") ;; KLUDGE: it's not so late anymore

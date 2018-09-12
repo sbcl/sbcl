@@ -174,6 +174,34 @@
                   ;; We can't tell squat about the result.
                   (specifier-type 'integer)))))))
 
+(defun make-modular-fun-type-deriver (prototype kind width signedp)
+  (declare (ignore kind))
+  #!-sb-fluid
+  (binding* ((info (info :function :info prototype) :exit-if-null)
+             (fun (fun-info-derive-type info) :exit-if-null)
+             (mask-type (specifier-type
+                         (ecase signedp
+                             ((nil) (let ((mask (1- (ash 1 width))))
+                                      `(integer ,mask ,mask)))
+                             ((t) `(signed-byte ,width))))))
+    (lambda (call)
+      (let ((res (funcall fun call)))
+        (when res
+          (if (eq signedp nil)
+              (logand-derive-type-aux res mask-type))))))
+  #!+sb-fluid
+  (lambda (call)
+    (binding* ((info (info :function :info prototype) :exit-if-null)
+               (fun (fun-info-derive-type info) :exit-if-null)
+               (res (funcall fun call) :exit-if-null)
+               (mask-type (specifier-type
+                           (ecase signedp
+                             ((nil) (let ((mask (1- (ash 1 width))))
+                                      `(integer ,mask ,mask)))
+                             ((t) `(signed-byte ,width))))))
+      (if (eq signedp nil)
+          (logand-derive-type-aux res mask-type)))))
+
 (defun logior-derive-unsigned-bounds (x y)
   (let* ((a (numeric-type-low x))
          (b (numeric-type-high x))

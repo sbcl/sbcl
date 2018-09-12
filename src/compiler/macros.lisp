@@ -119,7 +119,7 @@
                    (make-lambda-list llks nil req opt rest keys aux)
                    lambda-list)) ; otherwise use the original list
        (args (make-symbol "ARGS")))
-    `(setf (info :function :source-transform ',fun-name)
+    `(%define-source-transform ',fun-name
            (named-lambda (:source-transform ,fun-name)
                (,lambda-whole ,lambda-env &aux (,args (cdr ,lambda-whole)))
              ,@(if (not env) `((declare (ignore ,lambda-env))))
@@ -134,6 +134,10 @@
                        ,@inner-decls
                        (block ,(fun-name-block-name fun-name) ,@forms))
                    (values call pass)))))))
+(defun %define-source-transform (fun-name lambda)
+  (when (info :function :source-transform fun-name)
+    (warn "Refining source-transform for ~S" fun-name))
+  (setf (info :function :source-transform fun-name) lambda))
 
 ;;;; lambda-list parsing utilities
 ;;;;
