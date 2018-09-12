@@ -2686,7 +2686,7 @@
         *universal-type*)))
 
 ;;; Rightward ASH
-#!+ash-right-vops
+#!+(vop-translates sb!kernel:%ash/right)
 (progn
   (defun %ash/right (integer amount)
     (ash integer (- amount)))

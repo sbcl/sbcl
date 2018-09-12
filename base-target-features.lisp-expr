@@ -350,9 +350,6 @@
  ;; (Replaces use of SIGALRM.)
  ; :sb-wtimer
 
- ;; This platform implements VOPs for %ash/right, variable-width shift right
- ; :ash-right-vops
-
  ;;
  ;; miscellaneous notes on other things which could have special significance
  ;; in the *FEATURES* list

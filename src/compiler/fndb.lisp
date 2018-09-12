@@ -403,7 +403,6 @@
 (defknown logbitp (unsigned-byte integer) boolean (movable foldable flushable))
 (defknown ash (integer integer) integer
   (movable foldable flushable))
-#!+ash-right-vops
 (defknown %ash/right ((or word sb!vm:signed-word) (mod #.sb!vm:n-word-bits))
   (or word sb!vm:signed-word)
   (movable foldable flushable always-translatable))
