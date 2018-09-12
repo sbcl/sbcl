@@ -811,6 +811,8 @@
                               `(let ((object-layout ,layout-getter))
                                  (or (eq object-layout ',layout)
                                      (eq object-layout ',other-layout))))
+                             ;; FIXME: not defined in time for make-host-1,
+                             ;; so the cross-compiler isn't getting this branch.
                              #!+(vop-named sb!vm::layout-eq)
                              ((equal layout-getter '(%instance-layout object))
                               `(sb!vm::layout-eq object ',layout))

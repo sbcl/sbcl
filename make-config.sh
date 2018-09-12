@@ -653,7 +653,6 @@ if [ "$sbcl_arch" = "x86" ]; then
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks :cycle-counter' >> $ltf
-    printf ' :memory-barrier-vops' >> $ltf
     printf ' :fp-and-pc-standard-save :raw-signed-word' >> $ltf
     case "$sbcl_os" in
     linux | freebsd | gnu-kfreebsd | netbsd | openbsd | sunos | darwin | win32 | dragonfly)
@@ -675,7 +674,7 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks :cycle-counter :complex-float-vops :raw-signed-word' >> $ltf
-    printf ' :float-eql-vops :integer-eql-vop :memory-barrier-vops' >> $ltf
+    printf ' :float-eql-vops :integer-eql-vop' >> $ltf
     printf ' :sb-simd-pack' >> $ltf
     printf ' :undefined-fun-restarts :call-symbol' >> $ltf
     case "$sbcl_os" in
@@ -690,7 +689,7 @@ elif [ "$sbcl_arch" = "mips" ]; then
 elif [ "$sbcl_arch" = "ppc" ]; then
     printf ' :gencgc :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
-    printf ' :linkage-table :raw-instance-init-vops :memory-barrier-vops' >> $ltf
+    printf ' :linkage-table :raw-instance-init-vops' >> $ltf
     printf ' :compare-and-swap-vops :alien-callbacks' >> $ltf
     if [ "$sbcl_os" = "linux" ]; then
         # Use a C program to detect which kind of glibc we're building on,
@@ -715,7 +714,7 @@ elif [ "$sbcl_arch" = "ppc64" ]; then
     printf ' :64-bit :64-bit-registers' >> $ltf
     printf ' :gencgc :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
-    printf ' :linkage-table :raw-instance-init-vops :memory-barrier-vops' >> $ltf
+    printf ' :linkage-table :raw-instance-init-vops' >> $ltf
     printf ' :compare-and-swap-vops :alien-callbacks' >> $ltf
     # there is no glibc bug that requires the 'where-is-mcontext' hack.
     # (Sufficiently new glibc uses the correct definition, which is the same as
@@ -767,7 +766,7 @@ elif [ "$sbcl_arch" = "arm64" ]; then
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-closures' >> $ltf
     printf ' :unbind-n-vop :unwind-to-frame-and-call-vop :raw-signed-word' >> $ltf
-    printf ' :compare-and-swap-vops :memory-barrier-vops :undefined-fun-restarts' >> $ltf
+    printf ' :compare-and-swap-vops :undefined-fun-restarts' >> $ltf
 else
     # Nothing need be done in this case, but sh syntax wants a placeholder.
     echo > /dev/null

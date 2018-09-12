@@ -15,9 +15,12 @@
 ;;;; Interpreter stubs for the various barrier functions
 
 #!-(vop-named sb!vm:%memory-barrier)
+(progn
+;;; Assert correctness of build order. (Need not be exhaustive)
+(eval-when (:compile-toplevel) #!+x86-64 (error "Expected %memory-barrier vop"))
 (declaim (inline sb!vm:%compiler-barrier sb!vm:%memory-barrier
                  sb!vm:%read-barrier sb!vm:%write-barrier
-                 sb!vm:%data-dependency-barrier))
+                 sb!vm:%data-dependency-barrier)))
 (macrolet ((def (name)
              `(defun ,name ()
                 #!+(vop-named sb!vm:%memory-barrier) (,name)

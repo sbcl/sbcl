@@ -136,7 +136,7 @@
                    (values call pass)))))))
 (defun %define-source-transform (fun-name lambda)
   (when (info :function :source-transform fun-name)
-    (warn "Refining source-transform for ~S" fun-name))
+    (warn "Redefining source-transform for ~S" fun-name))
   (setf (info :function :source-transform fun-name) lambda))
 
 ;;;; lambda-list parsing utilities

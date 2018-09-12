@@ -2686,6 +2686,11 @@
         *universal-type*)))
 
 ;;; Rightward ASH
+
+;;; Assert correctness of build order. (Need not be exhaustive)
+#!-(vop-translates sb!kernel:%ash/right)
+(eval-when (:compile-toplevel) #!+x86-64 (error "Expected %ASH/RIGHT vop"))
+
 #!+(vop-translates sb!kernel:%ash/right)
 (progn
   (defun %ash/right (integer amount)
@@ -3326,8 +3331,12 @@
                      ,(- (+ shift1 shift2)))))))))
 
 #!-(vop-translates sb!kernel:%multiply-high)
+(progn
+;;; Assert correctness of build order.(Need not be exhaustive)
+(eval-when (:compile-toplevel) #!+x86-64 (error "Expected %MULTIPLY-HIGH vop"))
 (define-source-transform %multiply-high (x y)
   `(values (sb!bignum:%multiply ,x ,y)))
+)
 
 ;;; If the divisor is constant and both args are positive and fit in a
 ;;; machine word, replace the division by a multiplication and possibly
