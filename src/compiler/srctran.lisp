@@ -3332,7 +3332,7 @@
 
 #!-(vop-translates sb!kernel:%multiply-high)
 (progn
-;;; Assert correctness of build order.(Need not be exhaustive)
+;;; Assert correctness of build order. (Need not be exhaustive)
 (eval-when (:compile-toplevel) #!+x86-64 (error "Expected %MULTIPLY-HIGH vop"))
 (define-source-transform %multiply-high (x y)
   `(values (sb!bignum:%multiply ,x ,y)))

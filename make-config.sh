@@ -649,7 +649,7 @@ cd "$original_dir"
 # similar with :STACK-GROWS-FOOWARD, too. -- WHN 2002-03-03
 if [ "$sbcl_arch" = "x86" ]; then
     printf ' :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack' >> $ltf
-    printf ' :compare-and-swap-vops :unwind-to-frame-and-call-vop :raw-instance-init-vops' >> $ltf
+    printf ' :compare-and-swap-vops :unwind-to-frame-and-call-vop' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks :cycle-counter' >> $ltf
@@ -669,7 +669,7 @@ if [ "$sbcl_arch" = "x86" ]; then
     fi
 elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :64-bit :64-bit-registers :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack :linkage-table' >> $ltf
-    printf ' :compare-and-swap-vops :unwind-to-frame-and-call-vop :raw-instance-init-vops' >> $ltf
+    printf ' :compare-and-swap-vops :unwind-to-frame-and-call-vop' >> $ltf
     printf ' :fp-and-pc-standard-save :unbind-n-vop' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
@@ -689,7 +689,7 @@ elif [ "$sbcl_arch" = "mips" ]; then
 elif [ "$sbcl_arch" = "ppc" ]; then
     printf ' :gencgc :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
-    printf ' :linkage-table :raw-instance-init-vops' >> $ltf
+    printf ' :linkage-table' >> $ltf
     printf ' :compare-and-swap-vops :alien-callbacks' >> $ltf
     if [ "$sbcl_os" = "linux" ]; then
         # Use a C program to detect which kind of glibc we're building on,
@@ -714,7 +714,7 @@ elif [ "$sbcl_arch" = "ppc64" ]; then
     printf ' :64-bit :64-bit-registers' >> $ltf
     printf ' :gencgc :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
-    printf ' :linkage-table :raw-instance-init-vops' >> $ltf
+    printf ' :linkage-table' >> $ltf
     printf ' :compare-and-swap-vops :alien-callbacks' >> $ltf
     # there is no glibc bug that requires the 'where-is-mcontext' hack.
     # (Sufficiently new glibc uses the correct definition, which is the same as

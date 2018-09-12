@@ -68,6 +68,11 @@
          res)
     (move-lvar-result node block locs lvar)))
 
+(eval-when (:compile-toplevel)
+  ;; Assert correctness of build order. (Need not be exhaustive)
+  #!+(and x86-64 (not (vop-named sb!vm::raw-instance-init/word)))
+  (error "Expected raw-instance-init vops"))
+
 (defun emit-inits (node block name object lowtag inits args)
   (let ((unbound-marker-tn nil)
         (funcallable-instance-tramp-tn nil)
@@ -106,7 +111,7 @@
                                    (vop ,(sb!kernel::raw-slot-data-init-vop rsd)
                                         node block object arg-tn slot)))
                                (symbol-value rsd-list)))))
-                    (make-case #!+raw-instance-init-vops
+                    (make-case #!+(vop-named sb!vm::raw-instance-init/word)
                                sb!kernel::*raw-slot-data*))))))
            (:dd
             (vop init-slot node block object

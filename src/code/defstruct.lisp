@@ -1517,7 +1517,7 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;;     (there are two variations on this)
 ;;;   * TYPED-CONSTRUCTOR-FORM deal with LIST & VECTOR
 ;;;     which might have "name" symbols stuck in at various weird places.
-(defun instance-constructor-form (dd values)
+(defun instance-constructor-form (dd values &aux (dd-slots (dd-slots dd)))
    ;; The difference between the two implementations here is that on all
    ;; platforms we don't have the appropriate RAW-INSTANCE-INIT VOPS, which
    ;; must be able to deal with immediate values as well -- unlike
@@ -1528,9 +1528,9 @@ or they must be declared locally notinline at each call site.~@:>"
    ;;
    ;; Until someone does that, this means that instances with raw slots can be
    ;; DX allocated only on platforms with those additional VOPs.
-  (let ((dd-slots (dd-slots dd)))
-    (aver (= (length dd-slots) (length values)))
-    #!+raw-instance-init-vops
+  (aver (= (length dd-slots) (length values)))
+  (if (or #!+(or ppc ppc64 x86 x86-64) t)
+    ;; Have raw-instance-init vops
     (collect ((slot-specs) (slot-values))
       (mapc (lambda (dsd value &aux (raw-type (dsd-raw-type dsd))
                                     (spec (list* :slot raw-type (dsd-index dsd))))
@@ -1543,7 +1543,7 @@ or they must be declared locally notinline at each call site.~@:>"
                      (slot-values value))))
             dd-slots values)
       `(%make-structure-instance-macro ,dd ',(slot-specs) ,@(slot-values)))
-    #!-raw-instance-init-vops
+    ;; Don't have raw-instance-init vops
     (collect ((slot-specs) (slot-values) (raw-slots) (raw-values))
       ;; Partition into non-raw and raw
       (mapc (lambda (dsd value &aux (raw-type (dsd-raw-type dsd))
