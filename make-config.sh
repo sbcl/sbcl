@@ -653,7 +653,7 @@ if [ "$sbcl_arch" = "x86" ]; then
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks :cycle-counter' >> $ltf
-    printf ' :memory-barrier-vops :multiply-high-vops :symbol-info-vops' >> $ltf
+    printf ' :memory-barrier-vops :multiply-high-vops' >> $ltf
     printf ' :fp-and-pc-standard-save :raw-signed-word' >> $ltf
     case "$sbcl_os" in
     linux | freebsd | gnu-kfreebsd | netbsd | openbsd | sunos | darwin | win32 | dragonfly)
@@ -676,7 +676,7 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks :cycle-counter :complex-float-vops :raw-signed-word' >> $ltf
     printf ' :float-eql-vops :integer-eql-vop :memory-barrier-vops' >> $ltf
-    printf ' :multiply-high-vops :sb-simd-pack :symbol-info-vops' >> $ltf
+    printf ' :multiply-high-vops :sb-simd-pack' >> $ltf
     printf ' :undefined-fun-restarts :call-symbol' >> $ltf
     case "$sbcl_os" in
     linux | darwin | *bsd)
@@ -757,7 +757,7 @@ elif [ "$sbcl_arch" = "arm" ]; then
     # possibly VFPv2 and higher only), but we'll leave the obvious
     # hooks in for someone to add the support later.
     printf ' :arm-vfp :arm-vfpv2' >> $ltf
-    printf ' :multiply-high-vops :symbol-info-vops' >> $ltf
+    printf ' :multiply-high-vops' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-closures' >> $ltf
     printf ' :unwind-to-frame-and-call-vop' >> $ltf
@@ -765,7 +765,7 @@ elif [ "$sbcl_arch" = "arm" ]; then
 elif [ "$sbcl_arch" = "arm64" ]; then
     printf ' :64-bit :64-bit-registers :gencgc :linkage-table :fp-and-pc-standard-save' >> $ltf
     printf ' :alien-callbacks' >> $ltf
-    printf ' :multiply-high-vops :symbol-info-vops' >> $ltf
+    printf ' :multiply-high-vops' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-closures' >> $ltf
     printf ' :unbind-n-vop :unwind-to-frame-and-call-vop :raw-signed-word' >> $ltf
