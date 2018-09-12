@@ -43,7 +43,11 @@
 
 (defsetf %raw-instance-ref/word %raw-instance-set/word)
 ;; The *FEATURE* formerly known as :RAW-SIGNED-WORD
-#!+(vop-translates sb!kernel:%raw-instance-ref/signed-word)
+;; This condition would be better as
+;;   (vop-translates sb!kernel:%raw-instance-ref/signed-word)
+;; however the defknown is only executed if the raw slot type exists.
+;; (See compiler/generic/vm-fndb where it maps over *raw-slot-data*)
+#!+(vop-named sb!vm::raw-instance-ref/signed-word)
 (defsetf %raw-instance-ref/signed-word %raw-instance-set/signed-word)
 (defsetf %raw-instance-ref/single %raw-instance-set/single)
 (defsetf %raw-instance-ref/double %raw-instance-set/double)
