@@ -166,7 +166,7 @@
   ;; and also remove newlines and non-ASCII.
   (let ((characters
          (mapcan (lambda (char)
-                   (cond ((not (base-char-p char)) (list #\?))
+                   (cond ((not (typep char 'base-char)) (list #\?))
                          ((member char '(#\\ #\")) (list #\\ char))
                          ((eql char #\newline) (list #\_))
                          (t (list char))))
