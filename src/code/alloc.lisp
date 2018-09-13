@@ -51,14 +51,6 @@
   system-area-pointer)
 (define-alien-variable ("fixedobj_free_pointer" *fixedobj-space-free-pointer*)
   system-area-pointer)
-(defun immobile-space-addr-p (addr)
-  (declare (type word addr))
-  (or (let ((start fixedobj-space-start))
-        (<= start addr (truly-the word (+ start (1- fixedobj-space-size)))))
-      (let ((start varyobj-space-start))
-        (<= start addr (truly-the word (+ start (1- varyobj-space-size)))))))
-(defun immobile-space-obj-p (obj)
-  (immobile-space-addr-p (get-lisp-obj-address obj)))
 
 (define-load-time-global *immobile-space-mutex*
     (sb!thread:make-mutex :name "Immobile space"))
@@ -429,6 +421,18 @@
     (>= avail nbytes)))
 ) ; end PROGN
 ) ; end PROGN
+
+(declaim (inline immobile-space-addr-p))
+(defun immobile-space-addr-p (addr)
+  (declare (type word addr) (ignorable addr))
+  #!+immobile-space
+  (or (let ((start fixedobj-space-start))
+        (<= start addr (truly-the word (+ start (1- fixedobj-space-size)))))
+      (let ((start varyobj-space-start))
+        (<= start addr (truly-the word (+ start (1- varyobj-space-size)))))))
+
+(defun immobile-space-obj-p (obj)
+  (immobile-space-addr-p (get-lisp-obj-address obj)))
 
 ;;; Enforce limit on boxed words dependent on how many bits it gets in header.
 ;;; Enforce limit on unboxed size. 22 bits = 4MiB, quite generous for code.
