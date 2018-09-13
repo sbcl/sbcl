@@ -19,7 +19,6 @@
 ;;;; moves and coercions
 
 ;;; Move a tagged char to an untagged representation.
-#!+sb-unicode
 (define-vop (move-to-character)
   (:args (x :scs (any-reg descriptor-reg) :target y
             :load-if (not (location= x y))))
@@ -33,20 +32,11 @@
           (t
            (move y x)))
     (inst shr :dword y n-widetag-bits)))
-#!-sb-unicode
-(define-vop (move-to-character)
-  (:args (x :scs (any-reg control-stack)))
-  (:results (y :scs (character-reg #+nil character-stack)))
-  (:note "character untagging")
-  (:generator 1
-    (inst mov :dword y x)
-    (inst shr :dword y 8)))
 (define-move-vop move-to-character :move
-  (any-reg #!-sb-unicode control-stack)
+  (any-reg)
   (character-reg))
 
 ;;; Move an untagged char to a tagged representation.
-#!+sb-unicode
 (define-vop (move-from-character)
   (:args (x :scs (character-reg) :target y))
   (:results (y :scs (any-reg descriptor-reg)))
@@ -56,18 +46,9 @@
       (inst mov :dword y x))
     (inst shl :dword y n-widetag-bits)
     (inst or :dword y character-widetag)))
-#!-sb-unicode
-(define-vop (move-from-character)
-  (:args (x :scs (character-reg character-stack)))
-  (:results (y :scs (any-reg descriptor-reg #+nil control-stack)))
-  (:note "character tagging")
-  (:generator 1
-    (inst movzx '(:byte :dword) y x)
-    (inst shl :dword y n-widetag-bits)
-    (inst or :dword y character-widetag)))
 (define-move-vop move-from-character :move
   (character-reg)
-  (any-reg descriptor-reg #!-sb-unicode control-stack))
+  (any-reg descriptor-reg))
 
 ;;; Move untagged character values.
 (define-vop (character-move)
@@ -95,13 +76,6 @@
       (character-reg
        (move y x))
       (character-stack
-       #!-sb-unicode
-       (inst mov
-             ;; XXX: If the sb-unicode case needs to handle c-call,
-             ;; why does the non-unicode case not need to?
-             (ea (frame-byte-offset (tn-offset y)) fp)
-             x)
-       #!+sb-unicode
        (if (= (tn-offset fp) esp-offset)
            (storew x fp (tn-offset y))  ; c-call
            (storew x fp (frame-word-offset (tn-offset y))))))))
@@ -118,16 +92,12 @@
 (define-vop (char-code)
   (:translate char-code)
   (:policy :fast-safe)
-  (:args #!-sb-unicode (ch :scs (character-reg character-stack))
-         #!+sb-unicode (ch :scs (character-reg character-stack) :target res))
+  (:args (ch :scs (character-reg character-stack) :target res))
   (:arg-types character)
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 1
-    #!-sb-unicode
-    (inst movzx '(:byte :qword) res ch)
-    #!+sb-unicode
-    (move res ch)))
+    (move res ch))) ; FIXME: shouldn't this be :dword ?
 
 (define-vop (code-char)
   (:translate code-char)

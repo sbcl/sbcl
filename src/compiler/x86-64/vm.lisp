@@ -193,9 +193,7 @@
 
   ;; non-descriptor characters
   (character-reg registers
-                 :locations #!-sb-unicode #.*byte-regs*
-                            #!+sb-unicode #.*qword-regs*
-                 #!+sb-unicode #!+sb-unicode
+                 :locations #.*qword-regs*
                  :constant-scs (immediate)
                  :save-p t
                  :alternate-scs (character-stack))
@@ -272,12 +270,10 @@
   (catch-block stack :element-size catch-block-size)
   (unwind-block stack :element-size unwind-block-size)))
 
-(defparameter *byte-sc-names*
-  '(#!-sb-unicode character-reg #!-sb-unicode character-stack))
 (defparameter *qword-sc-names*
   '(any-reg descriptor-reg sap-reg signed-reg unsigned-reg control-stack
     signed-stack unsigned-stack sap-stack single-stack
-    #!+sb-unicode character-reg #!+sb-unicode character-stack constant))
+    character-reg character-stack constant))
 ;;; added by jrd. I guess the right thing to do is to treat floats
 ;;; as a separate size...
 ;;;
@@ -297,7 +293,6 @@
                        (case (car class-spec)
                          (#.*oword-sc-names*   :oword)
                          (#.*qword-sc-names*   :qword)
-                         (#.*byte-sc-names*    :byte)
                          (#.*float-sc-names*   :float)
                          (#.*double-sc-names*  :double)
                          (#.*complex-sc-names* :complex))))
