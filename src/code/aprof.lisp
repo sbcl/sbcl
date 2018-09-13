@@ -71,6 +71,7 @@
   (:import-from #:sb-x86-64-asm
                 #:lock #:x66 #:rex #:+rex-b+
                 #:inst-operand-size
+                #:register-p #:reg-num
                 #:machine-ea-p
                 #:machine-ea-base
                 #:machine-ea-index
@@ -183,6 +184,7 @@
          (widetag)
          (size)
          (thread-base-reg 13))
+    (declare (type (or null (unsigned-byte 4)) target-reg))
     (setf (sb-disassem::seg-object seg) component
           (sb-disassem:seg-virtual-location seg) pc
           (sb-disassem:seg-length seg) 64 ; arb
@@ -228,7 +230,7 @@
                           ;; never the single-byte format
                           ((add inc mov lea cmp) (regrm-inst-r/m 0 dstate))))
                     (free-ptr-p
-                     (and (%instancep ea)
+                     (and (machine-ea-p ea)
                           (eql (machine-ea-base ea) thread-base-reg)
                           (eql (machine-ea-disp ea)
                                (ash sb-vm::thread-alloc-region-slot
@@ -236,7 +238,7 @@
                           (not (machine-ea-index ea))))
                     (header-word-p
                      (and target-reg lowtag
-                          (%instancep ea)
+                          (machine-ea-p ea)
                           (eql (machine-ea-base ea) target-reg)
                           (eql (machine-ea-disp ea) (- lowtag))
                           (not (machine-ea-index ea)))))
@@ -252,7 +254,7 @@
                    (#.+state-profiler+
                     (cond
                       ((and (eq opcode 'add) ; possibly stay in +state-profiler+
-                            (%instancep ea)
+                            (machine-ea-p ea)
                             (eql (machine-ea-base ea) 11)
                             (null (machine-ea-index ea))
                             (eql (machine-ea-disp ea)
@@ -268,7 +270,7 @@
                           (t
                            (advance-if (and (eq opcode 'mov) free-ptr-p)
                                        +state-loaded-free-ptr+)
-                           (setq orig-free-ptr-reg (regrm-inst-reg dchunk dstate)))))
+                           (setq orig-free-ptr-reg (reg-num (regrm-inst-reg dchunk dstate))))))
                    (#.+state-loaded-free-ptr+
                     (case opcode
                       ;; Variable-size alloc can use LEA, ADD, or XADD to compute the
@@ -285,11 +287,12 @@
                        (setq free-ptr-reg (regrm-inst-reg dchunk dstate)
                              size (machine-ea-disp ea)))
                       (add
-                       (advance-if (typep ea '(integer 0 15)) +state-bumped-free-ptr+)
+                       (advance-if (register-p ea) +state-bumped-free-ptr+)
                        (setq free-ptr-reg ea))
                       (xadd
-                       (advance-if (eql ea orig-free-ptr-reg) +state-bumped-free-ptr+)
-                       (setq target-reg (ext-regrm-inst-reg dchunk dstate)
+                       (advance-if (and (register-p ea) (eql (reg-num ea) orig-free-ptr-reg))
+                                   +state-bumped-free-ptr+)
+                       (setq target-reg (reg-num (ext-regrm-inst-reg dchunk dstate))
                              free-ptr-reg ea))
                       (t (fail))))
                    (#.+state-bumped-free-ptr+
@@ -315,14 +318,14 @@
                                         (not (machine-ea-index ea))
                                         (<= 0 (machine-ea-disp ea) sb-vm:lowtag-mask))
                                    +state-lowtag-only+)
-                       (setq target-reg (regrm-inst-reg dchunk dstate)
+                       (setq target-reg (reg-num (regrm-inst-reg dchunk dstate))
                              lowtag (machine-ea-disp ea))
                        (when (= lowtag sb-vm:list-pointer-lowtag)
                          (return-from infer-type (values 'list size))))
                       (mov ; widetag stored before ORing in lowtag
                        (unless target-reg
                          (setq target-reg orig-free-ptr-reg))
-                       (advance-if (and (eq (machine-ea-base ea) target-reg)
+                       (advance-if (and (eql (machine-ea-base ea) target-reg)
                                         (not (machine-ea-disp ea))
                                         (not (machine-ea-index ea)))
                                    +state-widetag-only+)
@@ -359,7 +362,7 @@
                        ;; then ORs in the function layout, then stores.
                        ;; Also note that FIN must use REG/MEM-IMM-DATA to read the
                        ;; immediate operand where closure uses REG-IMM-DATA.
-                       (when (and (integerp ea)
+                       (when (and (register-p ea)
                                   (eql (logand (reg-imm-data 0 dstate) #xFF)
                                        sb-vm:closure-widetag))
                          (return-from infer-type (values 'closure size)))

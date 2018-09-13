@@ -211,7 +211,7 @@
   (ecase when
     (:compile
      ;; At compile-time we get a restricted view of the DEFINE-ARG-TYPE args,
-     ;; just enough to macroexpand :READER definitions. :TYPE and ::SIGN-EXTEND
+     ;; just enough to macroexpand :READER definitions. :TYPE and :SIGN-EXTEND
      ;; are as specified, but :PREFILTER, :LABELLER, and :PRINTER are not
      ;; compile-time evaluated.
      (loop for (indicator val) on (cdr spec) by #'cddr

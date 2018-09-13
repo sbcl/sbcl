@@ -40,15 +40,16 @@
   value)
 
 ;;; A register field that can be extended by REX.R.
-;;; As noted in 'insts', this prefilter (and others) could return a REG.
 (defun prefilter-reg-r (dstate value)
   (declare (type (mod 8) value) (type disassem-state dstate))
-  (if (dstate-getprop dstate +rex-r+) (+ value 8) value))
+  ;; size is arbitrary here since the printer determines it
+  (get-gpr :qword (if (dstate-getprop dstate +rex-r+) (+ value 8) value)))
 
 ;;; A register field that can be extended by REX.B.
 (defun prefilter-reg-b (dstate value)
   (declare (type (mod 8) value) (type disassem-state dstate))
-  (if (dstate-getprop dstate +rex-b+) (+ value 8) value))
+  ;; size is arbitrary here since the printer determines it
+  (get-gpr :qword (if (dstate-getprop dstate +rex-b+) (+ value 8) value)))
 
 ;; This reader extracts the 'imm' operand in "MOV reg,imm" format.
 ;; KLUDGE: the REG instruction format can not define a reader
@@ -57,31 +58,30 @@
 (defun reg-imm-data (dchunk dstate) dchunk
   (aref (sb!disassem::dstate-filtered-values dstate) 4))
 
-(defun regrm-inst-reg (dchunk dstate)
-  (logior (if (logtest (sb!disassem::dstate-inst-properties dstate) +rex-r+) 8 0)
-          (!regrm-inst-reg dchunk dstate)))
-(defun ext-regrm-inst-reg (dchunk dstate)
-  (logior (if (logtest (sb!disassem::dstate-inst-properties dstate) +rex-r+) 8 0)
-          (!ext-regrm-inst-reg dchunk dstate)))
-
 (defstruct (machine-ea (:include sb!disassem::filtered-arg)
                        (:copier nil)
                        (:constructor %make-machine-ea))
   base disp index scale)
 
+(defun reg-num (reg) (reg-id-num (reg-id reg)))
+
 ;;; Print to STREAM the name of the general-purpose register encoded by
 ;;; VALUE and of size WIDTH.
 (defun print-reg-with-width (value width stream dstate)
-  (declare (type full-reg value)
-           (type stream stream)
+  (declare (type stream stream)
            (type disassem-state dstate))
-  (princ (reg-name (get-gpr width
-                            (if (and (eq width :byte)
-                                     (not (dstate-getprop dstate +rex+))
-                                     (<= 4 value 7))
-                                (+ 16 -4 value) ; legacy high-byte register
-                                value)))
-         stream)
+  (let* ((num (etypecase value
+               ((unsigned-byte 4) value)
+               ;; Decode and re-encode, because the size is always
+               ;; initially :qword.
+               (reg (reg-num value))))
+         (reg (get-gpr width
+                       (if (and (eq width :byte)
+                                (not (dstate-getprop dstate +rex+))
+                                (<= 4 num 7))
+                           (+ 16 -4 num) ; legacy high-byte register
+                           num))))
+    (princ (reg-name reg) stream))
   ;; XXX plus should do some source-var notes
   )
 
@@ -115,12 +115,11 @@
 ;;; If SIZED-P is true, add an explicit size indicator for memory
 ;;; references.
 (defun print-reg/mem-with-width (value width sized-p stream dstate)
-  (declare (type (or machine-ea full-reg) value)
-           (type (member :byte :word :dword :qword) width)
+  (declare (type (member :byte :word :dword :qword) width)
            (type boolean sized-p))
-  (if (typep value 'full-reg)
-      (print-reg-with-width value width stream dstate)
-      (print-mem-ref (if sized-p :sized-ref :ref) value width stream dstate)))
+  (if (machine-ea-p value)
+      (print-mem-ref (if sized-p :sized-ref :ref) value width stream dstate)
+      (print-reg-with-width value width stream dstate)))
 
 ;;; Print a register or a memory reference. The width is determined by
 ;;; calling INST-OPERAND-SIZE.
@@ -157,13 +156,19 @@
   (princ16 value stream))
 
 (defun print-xmmreg (value stream dstate)
-  (declare (type xmmreg value) (type stream stream) (ignore dstate))
-  (format stream "XMM~d" value))
+  (declare (type stream stream) (ignore dstate))
+  (write-string (reg-name (get-fpr
+                           ;; FIXME: why are we seeing a value from the GPR
+                           ;; prefilter instead of XMM prefilter here sometimes?
+                           (etypecase value
+                             ((unsigned-byte 4) value)
+                             (reg (reg-num value)))))
+                stream))
 
 (defun print-xmmreg/mem (value stream dstate)
-  (if (typep value 'xmmreg)
-      (print-xmmreg value stream dstate)
-      (print-mem-ref :ref value nil stream dstate)))
+  (if (machine-ea-p value)
+      (print-mem-ref :ref value nil stream dstate)
+      (print-xmmreg value stream dstate)))
 
 (defun print-imm/asm-routine (value stream dstate)
   (if (or #!+immobile-space (maybe-note-lisp-callee value dstate)
@@ -172,11 +177,11 @@
       (princ16 value stream)
       (princ value stream)))
 
-;;; Return either a MACHINE-EA or a register (a fixnum).
+;;; Return an instance of REG or MACHINE-EA.
 ;;; MOD and R/M are the extracted bits from the instruction's ModRM byte.
 ;;; Depending on MOD and R/M, a SIB byte and/or displacement may be read.
 ;;; The REX.B and REX.X from dstate are appropriately consumed.
-(defun prefilter-reg/mem (dstate mod r/m)
+(defun decode-mod-r/m (dstate mod r/m regclass)
   (declare (type disassem-state dstate)
            (type (unsigned-byte 2) mod)
            (type (unsigned-byte 3) r/m))
@@ -196,7 +201,10 @@
            (logior (if (dstate-getprop dstate bit-name) 8 0) reg)))
     (declare (inline extend))
     (let ((full-reg (extend +rex-b+ r/m)))
-      (cond ((= mod #b11) full-reg) ; register direct mode
+      (cond ((= mod #b11) ; register direct mode
+             (case regclass
+              (gpr (get-gpr :qword full-reg)) ; size is not really known here
+              (fpr (get-fpr full-reg))))
             ((= r/m #b100) ; SIB byte - rex.b is "don't care"
              (let* ((sib (the (unsigned-byte 8) (read-suffix 8 dstate)))
                     (index-reg (extend +rex-x+ (ldb (byte 3 3) sib)))
@@ -212,6 +220,11 @@
             ;; rex.b is not decoded in determining RIP-relative mode
             ((= r/m #b101) (make-machine-ea :rip (read-signed-suffix 32 dstate)))
             (t (make-machine-ea full-reg))))))
+
+(defun prefilter-reg/mem (dstate mod r/m)
+  (decode-mod-r/m dstate mod r/m 'gpr))
+(defun prefilter-xmmreg/mem (dstate mod r/m)
+  (decode-mod-r/m dstate mod r/m 'fpr))
 
 #!+sb-thread
 (defun static-symbol-from-tls-index (index)
@@ -385,11 +398,8 @@
        (when (eq (machine-ea-base value) :rip)
          (setq addr (+ (dstate-next-addr dstate) (machine-ea-disp value)))))
 
-      ;; We're robust in allowing VALUE to be an integer (a register),
-      ;; though LEA Rx,Ry is an illegal instruction.
-      ;; Test this before INTEGER since the types overlap.
-      (full-reg
-       (print-reg-with-width value width stream dstate))
+      ;; LEA Rx,Ry is an illegal encoding, but we'll show it as-is.
+      (reg (print-reg-with-width value width stream dstate))
 
       ((or string integer)
        ;; A label for the EA should not print as itself, but as the decomposed

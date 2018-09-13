@@ -25,28 +25,11 @@
 
 ;;; a REG object discards all information about a TN except its storage base
 ;;; (a/k/a register class), size class (for GPRs), and encoding.
-;;; It would also be nice to share this structure with the disasembler
-;;; for a few reasons:
-;;; - there is a handy function for returning the name of a REG as a string.
-;;; - there is no space cost to getting a REG since they are all interned atoms.
-;;;   Using them would be friendlier at the map-segment-instructions interface
-;;;   since the consumer could easily distinguish immediate integers
-;;;   from integers denoting register-direct addressing mode.
-;;; - at some point the JMP instruction printer was called with an integer for
-;;;   either a register number (as in "JMP RAX") or a target address in physical
-;;;   memory when :use-labels is NIL. It would be nice to ensure that doesn't
-;;;   happen. (It may have been resolved differently, I can't recall)
+;;; The disassembler also uses this structure.
 (defstruct (reg (:predicate register-p)
                 (:copier nil)
                 (:constructor !make-reg (id)))
   (id 0 :type (unsigned-byte 8)))
-
-;;; FIXME: remove these next two types, they are quite ridiculous.
-;;; This includes legacy registers and R8-R15.
-(deftype full-reg () '(unsigned-byte 4))
-
-;;; The XMM registers XMM0 - XMM15.
-(deftype xmmreg () '(unsigned-byte 4))
 
 ;;; Default word size for the chip: if the operand size /= :dword
 ;;; we need to output #x66 (or REX) prefix
@@ -278,7 +261,7 @@
   :printer #'print-xmmreg)
 
 (define-arg-type xmmreg/mem
-  :prefilter #'prefilter-reg/mem
+  :prefilter #'prefilter-xmmreg/mem
   :printer #'print-xmmreg/mem)
 
 (defconstant-eqx +conditions+
@@ -430,7 +413,6 @@
   (accum :type 'accum)
   (imm))
 
-(declaim (inline !regrm-inst-reg))
 (define-instruction-format (reg-reg/mem 16
                                         :default-printer
                                         `(:name :tab reg ", " reg/mem))
@@ -438,17 +420,15 @@
   (width   :field (byte 1 0)    :type 'width)
   (reg/mem :fields (list (byte 2 14) (byte 3 8))
            :type 'reg/mem :reader regrm-inst-r/m)
-  (reg     :field (byte 3 11)   :type 'reg :reader !regrm-inst-reg)
+  (reg     :field (byte 3 11)   :type 'reg :reader regrm-inst-reg)
   ;; optional fields
   (imm))
 
 ;;; same as reg-reg/mem, but with direction bit
 (define-instruction-format (reg-reg/mem-dir 16
-                                        :include reg-reg/mem
-                                        :default-printer
-                                        `(:name
-                                          :tab
-                                          ,(swap-if 'dir 'reg/mem ", " 'reg)))
+                            :include reg-reg/mem
+                            :default-printer
+                            `(:name :tab ,(swap-if 'dir 'reg/mem ", " 'reg)))
   (op  :field (byte 6 2))
   (dir :field (byte 1 1)))
 
@@ -495,7 +475,6 @@
   (accum :type 'accum))
 
 ;;; Same as reg-reg/mem, but with a prefix of #b00001111
-(declaim (inline !ext-regrm-inst-reg))
 (define-instruction-format (ext-reg-reg/mem 24
                                         :default-printer
                                         `(:name :tab reg ", " reg/mem))
@@ -504,7 +483,7 @@
   (width   :field (byte 1 8)    :type 'width)
   (reg/mem :fields (list (byte 2 22) (byte 3 16))
            :type 'reg/mem  :reader ext-regrm-inst-r/m)
-  (reg     :field (byte 3 19)   :type 'reg :reader !ext-regrm-inst-reg)
+  (reg     :field (byte 3 19)   :type 'reg :reader ext-regrm-inst-reg)
   ;; optional fields
   (imm))
 
@@ -1190,14 +1169,11 @@
 (defun emit-byte+reg (seg byte reg)
   (emit-byte seg (+ byte (reg-encoding reg seg))))
 
-#+nil
 (defmethod print-object ((reg reg) stream)
-  (if *print-readably*
-      (call-next-method)
-      (write-string (reg-name reg) stream)))
+  (write-string (reg-name reg) stream))
 
 ;;; The GPR for any size and register number is a unique atom. Return it.
-(defun get-gpr (size encoding)
+(defun get-gpr (size number)
   (svref (load-time-value
           (coerce (append
                    (loop for i from 0 below 16 collect (!make-reg (!make-gpr-id :qword i)))
@@ -1207,12 +1183,20 @@
                    (loop for i from 0 below 20 collect (!make-reg (!make-gpr-id :byte i))))
                   'vector)
           t)
-         (+ (if (eq size :byte) (the (mod 20) encoding) (the (mod 16) encoding))
+         (+ (if (eq size :byte) (the (mod 20) number) (the (mod 16) number))
             (ecase size
               (:qword  0)
               (:dword 16)
               (:word  32)
               (:byte  48)))))
+
+(defun get-fpr (number)
+  (svref (load-time-value
+          (coerce (loop for i from 0 below 16
+                        collect (!make-reg (!make-fpr-id i)))
+                  'vector)
+          t)
+         number))
 
 ;;; Given a TN which maps to a GPR, return the corresponding REG.
 ;;; This is called during operand lowering, and also for emitting an EA
@@ -1238,12 +1222,7 @@
                   ((eq (sb-name (sc-sb (tn-sc operand))) 'registers)
                    (tn-reg operand))
                   ((eq (sb-name (sc-sb (tn-sc operand))) 'float-registers)
-                   (svref (load-time-value
-                           (coerce (loop for i from 0 below 16
-                                         collect (!make-reg (!make-fpr-id i)))
-                                   'vector)
-                           t)
-                          (tn-offset operand)))
+                   (get-fpr (tn-offset operand)))
                   (t ; a stack SC or constant
                    operand)))
           operands))
@@ -1345,8 +1324,8 @@
 ;;; operand size is qword.
 ;;; R, X and B are NIL or REG-IDs specifying registers the encodings of
 ;;; which may be extended with the REX.R, REX.X and REX.B bit, respectively.
-(defun emit-rex-if-needed (segment width r x b)
-  (declare (type (member :byte :word :dword :qword :do-not-set) width)
+(defun emit-rex-if-needed (segment width-qword r x b)
+  (declare (type boolean width-qword)
            (type (or null fixnum) r x b))
   (flet ((encoding-bit3-p (reg-id)
            (and reg-id (logbitp 3 (reg-id-num reg-id))))
@@ -1355,7 +1334,7 @@
                 (is-gpr-id-p reg-id)
                 (eq (gpr-id-size-class reg-id) +size-class-byte+)
                 (<= 4 (reg-id-num reg-id) 7))))
-    (let ((wrxb (logior (if (eq width :qword)   #b1000 0)
+    (let ((wrxb (logior (if width-qword         #b1000 0)
                         (if (encoding-bit3-p r) #b0100 0)
                         (if (encoding-bit3-p x) #b0010 0)
                         (if (encoding-bit3-p b) #b0001 0))))
@@ -1392,7 +1371,7 @@
     (:lock (emit-byte segment #xf0))) ; even if #!-sb-thread
   (let ((ea-p (ea-p thing)))
     (emit-rex-if-needed segment
-                        operand-size ; REX.W
+                        (eq operand-size :qword) ; REX.W
                         (when (register-p reg)
                           (reg-id reg)) ; REX.R
                         (awhen (and ea-p (ea-index thing)) ; REX.X
