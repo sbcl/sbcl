@@ -416,7 +416,6 @@
 ;;; them or flagging them with KLUDGE might be better than nothing.
 ;;;
 ;;; names of these things seem to have changed. these aliases by jrd
-(defconstant lra-save-offset return-pc-save-offset)
 
 (defconstant cfp-offset ebp-offset)    ; pfw - needed by stuff in /code
                                         ; related to signal context stuff

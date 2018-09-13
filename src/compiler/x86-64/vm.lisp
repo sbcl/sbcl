@@ -451,8 +451,6 @@
 (defun frame-byte-offset (index)
   (* (frame-word-offset index) n-word-bytes))
 
-(defconstant lra-save-offset return-pc-save-offset) ; ?
-
 ;;; This is used by the debugger.
 (defconstant single-value-return-byte-offset 3)
 
