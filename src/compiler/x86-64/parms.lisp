@@ -132,9 +132,16 @@
 ;;; would be possible, but probably not worth the time and code bloat
 ;;; it would cause. -- JES, 2005-12-11
 
+#!+linux
+(!gencgc-space-setup #x50000000
+                     :fixedobj-space-size #.(* 30 1024 1024)
+                     :varyobj-space-size #.(* 130 1024 1024)
+                     :dynamic-space-start #x1000000000)
+
 ;;; The default dynamic space size is lower on OpenBSD to allow SBCL to
 ;;; run under the default 512M data size limit.
 
+#!-linux
 (!gencgc-space-setup #x20000000
                      :dynamic-space-start #x1000000000
                      #!+openbsd :dynamic-space-size #!+openbsd #x1bcf0000)
