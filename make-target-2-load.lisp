@@ -299,7 +299,7 @@
   (loop (multiple-value-bind (winp symbol) (iter)
           (if winp (unintern symbol "CL-USER") (return)))))
 
-#+immobile-code (setq sb-c::*compile-to-memory-space* :dynamic)
+#+immobile-code (setq sb-c::*compile-to-memory-space* :auto)
 #+sb-fasteval (setq sb-ext:*evaluator-mode* :interpret)
 ;; See comments in 'readtable.lisp'
 (setf (readtable-base-char-preference *readtable*) :symbols)
