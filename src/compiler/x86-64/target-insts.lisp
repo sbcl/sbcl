@@ -234,15 +234,11 @@
 
 ;;; Return contents of memory if either it refers to an unboxed code constant
 ;;; or is RIP-relative with a displacement of 0.
-(defun unboxed-constant-ref (dstate segment-offset addr disp)
-  ;; FIXME: why in one case do we read via SEGMENT-SAP and the other via ADDR?
-  (cond ((< segment-offset
-            (sb!disassem::seg-initial-raw-bytes (dstate-segment dstate)))
-         (sap-ref-word (dstate-segment-sap dstate) segment-offset))
-        ((eql disp 0)
-            ;; Assume this is safe to read, since we're disassembling
-            ;; from the memory just a few bytes preceding 'addr'.
-         (sap-ref-word (int-sap addr) 0))))
+(defun unboxed-constant-ref (dstate addr disp)
+  (when (and (minusp disp)
+             (awhen (seg-code (dstate-segment dstate))
+               (sb!disassem::points-to-code-constant-p addr it)))
+    (sap-ref-word (int-sap addr) 0)))
 
 (define-load-time-global thread-slot-names
     (let* ((slots (primitive-object-slots
@@ -334,10 +330,7 @@
                             addr
                             (case width
                               (:qword
-                               (unboxed-constant-ref
-                                dstate
-                                (+ (dstate-next-offs dstate) disp)
-                                addr disp))))
+                               (unboxed-constant-ref dstate addr disp))))
                     dstate)))))
     #!+sb-thread
     (flet ((guess-symbol (predicate)

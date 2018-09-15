@@ -23,15 +23,26 @@
   (sap-maker (missing-arg) :type (function () system-area-pointer))
   ;; Length in bytes of the range of memory covered by this segment.
   (length 0 :type disassem-length)
+  ;; This is somewhat bogus if we make more than one segment for a given
+  ;; code object (which always happens) and if the object can move due to GC
+  ;; between calls to the segment constructor. If moved, then segments
+  ;; get different virtual locations despite having the same sap-maker.
+  ;; Depending on whether we are trying to use this address to dereference
+  ;; data (so we want a physical address) versus show the logical address
+  ;; within the code at which instructions occur, as if the code never moved,
+  ;; then we want different things here. In practice, the code probably can't
+  ;; move, so the two possible meanings of the slot are the same in effect.
+  ;; The only way to find a GC-related bug would be to insert some GC calls
+  ;; at several points in the disassembler, while also ensuring no conservative
+  ;; references exist to the code, and seeing what happens with regard to the
+  ;; addresses that are printed and/or the ability to display unboxed constants
+  ;; from the code header; it seems like an exercise in futility.
   (virtual-location 0 :type address)
   (storage-info nil :type (or null storage-info))
   (code nil :type (or null code-component))
   ;; the byte offset beyond CODE-INSTRUCTIONS of CODE which
   ;; corresponds to offset 0 in this segment
   (initial-offset 0 :type index)
-  ;; number of bytes to print as literal data without disassembling.
-  ;; will always be 0 for any segment whose initial-offset is nonzero
-  (initial-raw-bytes 0 :type index)
   (hooks nil :type list))
 
 ;;; All state during disassembly. We store some seemingly redundant
