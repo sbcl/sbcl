@@ -177,7 +177,9 @@
 (sb!xc:defmacro formatter (control-string)
   `#',(%formatter control-string))
 
-(defun %formatter (control-string &optional (arg-count 0) (need-retval t))
+(defun %formatter (control-string &optional (arg-count 0) (need-retval t)
+                                  &aux (lambda-name
+                                        (concatenate 'string "fmt$" control-string)))
   ;; ARG-COUNT is supplied only when the use of this formatter is in a literal
   ;; call to FORMAT, in which case we can possibly elide &optional parsing.
   ;; But we can't in general, because FORMATTER may be called by users
@@ -200,7 +202,7 @@
                  (push `(,(car arg)
                          (args-exhausted ,control-string ,(cdr arg)))
                        optional))))
-        (return `(named-lambda ,control-string
+        (return `(named-lambda ,lambda-name
                          (stream ,@required
                                  ,@(if optional '(&optional)) ,@optional
                                  &rest args)
@@ -209,7 +211,7 @@
                    ,(and need-retval 'args)))))
     (let ((*orig-args-available* t)
           (*only-simple-args* nil))
-      `(lambda (stream &rest orig-args)
+      `(named-lambda ,lambda-name (stream &rest orig-args)
          (declare (ignorable stream))
          (let ((args orig-args))
            ,(expand-control-string control-string)
