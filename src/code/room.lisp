@@ -1287,6 +1287,30 @@ We could try a few things to mitigate this:
 ;;; this is a valid test that genesis separated code and data.
 (!ensure-genesis-code/data-separation)
 
+(defun hexdump (obj &optional (n-words
+                               (if (typep obj 'code-component)
+                                   ;; Display up through the first fun header
+                                   (+ (code-header-words obj)
+                                      (ash (sb-impl::%code-fun-offset obj 0)
+                                           (- word-shift))
+                                      simple-fun-code-offset)
+                                   ;; at most 10 words
+                                   (min 10 (ash (primitive-object-size obj)
+                                                (- word-shift)))))
+                              ;; pass NIL explicitly if T crashes on you
+                              (decode t))
+  (with-pinned-objects (obj)
+    (let ((a (logandc2 (get-lisp-obj-address obj) lowtag-mask)))
+      (dotimes (i n-words)
+        (let ((word (sap-ref-word (int-sap a) (ash i word-shift))))
+          (multiple-value-bind (lispobj ok) (if decode (make-lisp-obj word nil))
+            (let ((*print-lines* 1)
+                  (*print-pretty* t))
+              (format t "~x: ~v,'0x~:[~; = ~S~]~%"
+                      (+ a (ash i word-shift))
+                      (* 2 n-word-bytes)
+                      word ok lispobj))))))))
+
 (in-package "SB-C")
 ;;; As soon as practical in warm build it makes sense to add
 ;;; cold-allocation-point-fixups into the weak hash-table.

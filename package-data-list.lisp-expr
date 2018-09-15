@@ -3144,6 +3144,7 @@ structure representations"
                 "INLINE-CONSTANT-VALUE"
                 "SORT-INLINE-CONSTANTS"
                 "EMIT-INLINE-CONSTANT")
+               "HEXDUMP"
                "INSTANCE-DATA-START"
                "INSTANCE-WIDETAG" "INSTANCE-POINTER-LOWTAG"
                "INSTANCE-SLOTS-OFFSET" "INSTANCE-USAGE"
