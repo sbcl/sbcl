@@ -351,3 +351,14 @@ with bits from the corresponding position in the new value.")
 ;;; Additionally (setf (logbitp N x) t) is extremely stupid- it first clears
 ;;; and then sets the bit, though it does manage to pre-shift the constants.
    (%defsetf 'logbitp (info :setf :expander 'ldb))))
+
+;;; Rather than have a bunch of SB-PCL::FAST-METHOD function names all point
+;;; to one that is randomly chosen - and therefore looks confusing -
+;;; use these trivial do-nothing functions which are compiled asap.
+;;; The selection is deterministic since ties are broken by serial number.
+(export '(0-arg-nop 1-arg-nop 2-arg-nop 3-arg-nop)
+        "SB-IMPL") ; export to prevent death by tree-shaker
+(defun 0-arg-nop () nil)
+(defun 1-arg-nop (a) (declare (ignore a)) nil)
+(defun 2-arg-nop (a b) (declare (ignore a b)) nil)
+(defun 3-arg-nop (a b c) (declare (ignore a b c)) nil)

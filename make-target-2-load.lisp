@@ -301,6 +301,7 @@
 
 #+immobile-code (setq sb-c::*compile-to-memory-space* :auto)
 #+sb-fasteval (setq sb-ext:*evaluator-mode* :interpret)
+(sb-ext:fold-identical-code :print t)
 ;; See comments in 'readtable.lisp'
 (setf (readtable-base-char-preference *readtable*) :symbols)
 

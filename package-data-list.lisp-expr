@@ -825,6 +825,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "DESCRIBE-COMPILER-POLICY"
                "RESTRICT-COMPILER-POLICY"
                "SET-MACRO-POLICY"
+               "FOLD-IDENTICAL-CODE" ; this is a verb, not a compiler policy
 
                ;; a special form for breaking out of our "declarations
                ;; are assertions" default
