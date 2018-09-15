@@ -176,7 +176,7 @@
              ;; avoid direct reference to INITARGS as a list
              ;; so that it is not reified unless we reach here.
              (do-rest-arg ((arg) initargs) (push arg list))
-             (nreverse list))))
+             (list (nreverse list)))))
   ;; I am going to assume that people are not somehow getting to here
   ;; with a CLASSOID, which is not strictly legal as a designator,
   ;; but which is accepted because it is actually the desired thing.
