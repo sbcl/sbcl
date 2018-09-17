@@ -1376,6 +1376,8 @@
                (make-block-key :start start
                                :component (block-component block)
                                :succ succ :last last)))
+        (setf (block-type-check new-block)
+              (block-type-check block))
         (setf (ctran-kind start) :block-start)
         (setf (ctran-use start) nil)
         (setf (block-last block) node)

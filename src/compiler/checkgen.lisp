@@ -470,28 +470,10 @@
 ;;; checks the type(s) of the value(s), then passes them further.
 (defun convert-type-check (cast types)
   (declare (type cast cast) (type list types))
-  (let ((value (cast-value cast))
-        (length (length types)))
-    (filter-lvar value (make-type-check-form types
-                                             (cast-context cast)))
-    (setf (block-type-check (node-block cast)) nil)
-    (setf (cast-type-to-check cast) *wild-type*)
-    (setf (cast-%type-check cast) nil)
-    (let* ((atype (cast-asserted-type cast))
-           (atype (cond ((not (values-type-p atype))
-                         atype)
-                        ((= length 1)
-                         (single-value-type atype))
-                        (t
-                         (make-values-type
-                          :required (values-type-in atype length)))))
-           (dtype (node-derived-type cast))
-           (dtype (make-values-type
-                   :required (values-type-in dtype length))))
-      (setf (cast-asserted-type cast) atype)
-      (setf (node-derived-type cast) dtype)))
-
-  (values))
+  (filter-lvar (cast-value cast)
+               (make-type-check-form types
+                                     (cast-context cast)))
+  (setf (cast-%type-check cast) nil))
 
 ;;; Check all possible arguments of CAST and emit type warnings for
 ;;; those with type errors. If the value of USE is being used for a
