@@ -1927,34 +1927,36 @@
                                                             element
                                                             done-p-expr)
   (with-unique-names (offset block index n-sequence sequence end)
-    `(let* ((,n-sequence ,sequence-arg))
-       (with-array-data ((,sequence ,n-sequence :offset-var ,offset)
-                         (,start ,start)
-                         (,end ,end-arg)
-                         :check-fill-pointer t)
-         (block ,block
-           (macrolet ((maybe-return ()
-                        ;; WITH-ARRAY-DATA has already performed bounds
-                        ;; checking, so we can safely elide the checks
-                        ;; in the inner loop.
-                        '(let ((,element (locally (declare (optimize (insert-array-bounds-checks 0)))
-                                           (aref ,sequence ,index))))
-                          (when ,done-p-expr
-                            (return-from ,block
-                              (values ,element
-                                      (- ,index ,offset)))))))
-             (if ,from-end
-                 (loop for ,index
-                       ;; (If we aren't fastidious about declaring that
-                       ;; INDEX might be -1, then (FIND 1 #() :FROM-END T)
-                       ;; can send us off into never-never land, since
-                       ;; INDEX is initialized to -1.)
-                       of-type index-or-minus-1
-                       from (1- ,end) downto ,start do
-                       (maybe-return))
-                 (loop for ,index of-type index from ,start below ,end do
-                          (maybe-return))))
-           (values nil nil))))))
+    (let ((maybe-return
+            ;; WITH-ARRAY-DATA has already performed bounds
+            ;; checking, so we can safely elide the checks
+            ;; in the inner loop.
+            `(let ((,element (locally (declare (optimize (insert-array-bounds-checks 0)))
+                               (aref ,sequence ,index))))
+               (when ,done-p-expr
+                 (return-from ,block
+                   (values ,element
+                           (- ,index ,offset)))))))
+     `(let* ((,n-sequence ,sequence-arg))
+        (with-array-data ((,sequence ,n-sequence :offset-var ,offset)
+                          (,start ,start)
+                          (,end ,end-arg)
+                          :check-fill-pointer t)
+          (block ,block
+            (if ,from-end
+                (loop for ,index
+                      ;; (If we aren't fastidious about declaring that
+                      ;; INDEX might be -1, then (FIND 1 #() :FROM-END T)
+                      ;; can send us off into never-never land, since
+                      ;; INDEX is initialized to -1.)
+                      of-type index-or-minus-1
+                      from (1- ,end) downto ,start
+                      do
+                      ,maybe-return)
+                (loop for ,index of-type index from ,start below ,end
+                      do
+                      ,maybe-return))
+            (values nil nil)))))))
 
 (sb!xc:defmacro %find-position-vector-macro (item sequence
                                              from-end start end key test)
