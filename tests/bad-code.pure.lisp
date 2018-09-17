@@ -420,3 +420,17 @@
                       '(lambda (x)
                         (search '(a . b) x))
                       :allow-warnings t))))
+
+(with-test (:name :call-nil)
+  (checked-compile-and-assert
+   ()
+   `(lambda ()
+      (funcall nil))
+   (() (condition 'undefined-function)))
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (if x
+          10
+          (funcall x)))
+   ((nil) (condition 'undefined-function))))

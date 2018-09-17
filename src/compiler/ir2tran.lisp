@@ -1291,7 +1291,11 @@
                (eq (lvar-fun-name (combination-fun use) t)
                    '%coerce-callable-for-call))
       (let ((callable (car (combination-args use))))
-        (setf (basic-combination-fun call) callable)))))
+        ;; Everything else can't handle NIL, just don't
+        ;; bother optimizing it.
+        (unless (and (constant-lvar-p callable)
+                     (null (lvar-value callable)))
+          (setf (basic-combination-fun call) callable))))))
 
 ;;; If the call is in a tail recursive position and the return
 ;;; convention is standard, then do a tail full call. If one or fewer
@@ -1768,6 +1772,10 @@ not stack-allocated LVAR ~S." source-lvar)))))
   (let ((dest (node-dest node)))
     (if (and (basic-combination-p dest)
              (eq (basic-combination-kind dest) :full)
+             ;; Everything else can't handle NIL, just don't
+             ;; bother optimizing it.
+             (not (and (constant-lvar-p fun)
+                       (null (lvar-value fun))))
              (let ((dest-fun (basic-combination-fun dest)))
                (or (eq dest-fun fun) ;; already removed
                    (eq (lvar-uses dest-fun) node))))
