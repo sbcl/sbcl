@@ -170,6 +170,16 @@
       (print-mem-ref :ref value nil stream dstate)
       (print-xmmreg value stream dstate)))
 
+;;; Find the Lisp object, if any, called by a "CALL rel32offs"
+;;; instruction format and add it as an end-of-line comment.
+;;; Alternatively, the value might be an immediate operand to MOV,
+;;; which in general decodes as a signed integer. So ignore it
+;;; unless it looks like an address.
+#!+immobile-space
+(defun maybe-note-lisp-callee (value dstate)
+  (awhen (and (typep value 'word) (sb!vm::find-called-object value))
+    (note (lambda (stream) (princ it stream)) dstate)))
+
 (defun print-imm/asm-routine (value stream dstate)
   (if (or #!+immobile-space (maybe-note-lisp-callee value dstate)
           (maybe-note-assembler-routine value nil dstate)

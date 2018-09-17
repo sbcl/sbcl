@@ -249,28 +249,19 @@
 ;;; Find an immobile FDEFN or FUNCTION given an interior pointer to it.
 #!+immobile-space
 (defun find-called-object (address)
-  ;; The ADDRESS [sic] is actually any immediate operand to MOV,
-  ;; which in general decodes as a *signed* integer. So ignore negative values.
-  (let ((obj (if (typep address 'sb!ext:word)
-                 (alien-funcall (extern-alien "search_all_gc_spaces"
-                                              (function unsigned unsigned))
-                                address)
-                 0)))
-      (unless (eql obj 0)
-        (case (sap-ref-8 (int-sap obj) 0)
-         (#.fdefn-widetag
-          (make-lisp-obj (logior obj other-pointer-lowtag)))
-         (#.funcallable-instance-widetag
-          (make-lisp-obj (logior obj fun-pointer-lowtag)))
-         (#.code-header-widetag
-          (let ((code (make-lisp-obj (logior obj other-pointer-lowtag))))
-            (dotimes (i (code-n-entries code))
-              (let ((f (%code-entry-point code i)))
-                (if (= (+ (get-lisp-obj-address f)
-                          (ash simple-fun-code-offset word-shift)
-                          (- fun-pointer-lowtag))
-                       address)
-                    (return f))))))))))
+  (let ((obj (alien-funcall (extern-alien "search_all_gc_spaces"
+                                          (function unsigned unsigned))
+                            address)))
+    (unless (eql obj 0)
+      (case (sap-ref-8 (int-sap obj) 0)
+        (#.code-header-widetag
+         (%simple-fun-from-entrypoint
+          (make-lisp-obj (logior obj other-pointer-lowtag))
+          address))
+        (#.fdefn-widetag
+         (make-lisp-obj (logior obj other-pointer-lowtag)))
+        (#.funcallable-instance-widetag
+         (make-lisp-obj (logior obj fun-pointer-lowtag)))))))
 
 ;;; Compute the PC that FDEFN will jump to when called.
 #!+immobile-code

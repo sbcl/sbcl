@@ -140,14 +140,6 @@
                (declare (ignore junk))
                (dstate-setprop dstate +operand-size-16+)))
 
-;;; Find the Lisp object, if any, called by a "CALL rel32offs"
-;;; instruction format and add it as an end-of-line comment,
-;;; but not on the host, since NOTE is in target-disassem.
-#!+(and immobile-space (not (host-feature sb-xc-host)))
-(defun maybe-note-lisp-callee (value dstate)
-  (awhen (sb!vm::find-called-object value)
-    (note (lambda (stream) (princ it stream)) dstate)))
-
 (define-arg-type displacement
   :sign-extend t
   :use-label (lambda (value dstate) (+ (dstate-next-addr dstate) value))

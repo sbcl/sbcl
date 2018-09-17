@@ -444,6 +444,40 @@
                      (t (return index)))
                (aver (<= min max)))))))))
 
+(declaim (inline fun-entry))
+(defun fun-entry (fun)
+  #!-(or x86 x86-64)
+  (int-sap (+ (get-lisp-obj-address fun)
+              (- sb!vm:fun-pointer-lowtag)
+              (ash sb!vm:simple-fun-code-offset sb!vm:word-shift)))
+  ;; The preceding case would actually work, but I'm anticipating a change
+  ;; in which simple-fun headers are all contiguous in their code component,
+  ;; followed by all the machine instructions for all the simple-funs.
+  ;; If that change is done, then you must indirect through the SELF pointer
+  ;; in order to get the correct starting address.
+  ;; (Such change would probably be confined to x86[-64])
+  #!+(or x86 x86-64)
+  (sap-ref-sap (int-sap (- (get-lisp-obj-address fun) sb!vm:fun-pointer-lowtag))
+               (ash sb!vm:simple-fun-self-slot sb!vm:word-shift)))
+
+;;; Return the simple-fun within CODE whose entrypoint is ADDRESS,
+;;; or NIL if ADDRESS does not point to any function in CODE.
+(defun sb!vm::%simple-fun-from-entrypoint (code address)
+  (let ((min 0) (max (code-n-entries code)) (sap (int-sap address)))
+    (declare ((unsigned-byte 16) min max))
+    (unless (zerop max)
+      (decf max)
+      ;; Don't need to pin CODE here because it must have been pinned
+      ;; by the caller, or else ADDRESS as supplied could be bogus already.
+      (loop
+        (when (< max min) (return nil))
+        (let* ((index (floor (+ min max) 2))
+               (fun (%code-entry-point code index))
+               (guess (fun-entry fun)))
+          (cond ((sap< guess sap) (setq min (1+ index)))
+                ((sap> guess sap) (setq max (1- index)))
+                (t (return fun))))))))
+
 ;;; Return the number of bytes of instructions in SIMPLE-FUN,
 ;;; i.e. to the distance to the next simple-fun or end of code component.
 ;;; If INDEX is specified, it is used to quickly find the next simple-fun.

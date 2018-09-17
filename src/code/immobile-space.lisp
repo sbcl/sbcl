@@ -156,34 +156,41 @@
             (let ((obj (code-header-ref code i)))
               (when (fdefn-p obj)
                 (setf (aref code-header-funs i) (fdefn-fun obj)))))
-          ;; Loop over function's assembly code
-          (map-segment-instructions
-           (lambda (chunk inst)
-             (when (or (eq inst jmp) (eq inst call))
-               (let ((fdefn (sb-vm::find-called-object
-                             (+ (near-jump-displacement chunk dstate)
-                                (dstate-next-addr dstate)))))
-                 (when (and (fdefn-p fdefn)
-                            (let ((callee (fdefn-fun fdefn)))
-                              (and (immobile-space-obj-p callee)
-                                   (not (sb-vm::fun-requires-simplifying-trampoline-p callee))
-                                   (match-p (%fun-name callee)
-                                            callees exclude-callees)
-                                   (not (ambiguous-name-p callee code-header-funs)))))
-                   (let ((entry (sb-vm::fdefn-call-target fdefn)))
-                     (when verbose
-                       (let ((*print-pretty* nil))
-                         (unless printed-fun-name
-                           (format t "#x~X ~S~%" (get-lisp-obj-address fun) fun)
-                           (setq printed-fun-name t))
-                         (format t "  @~x -> ~s [~x]~%"
-                                 (dstate-cur-addr dstate) (fdefn-name fdefn) entry)))
-                     ;; Set the statically-linked flag
-                     (setf (sb-vm::fdefn-has-static-callers fdefn) 1)
-                     ;; Change the machine instruction
-                     (setf (signed-sap-ref-32 (int-sap (dstate-cur-addr dstate)) 1)
-                           (- entry (dstate-next-addr dstate))))))))
-           seg dstate))))))
+          ;; Compute code bounds
+          (let* ((code-begin (- (get-lisp-obj-address code)
+                                sb-vm:other-pointer-lowtag))
+                 (code-end (+ code-begin (sb-vm::code-component-size code))))
+            ;; Loop over function's assembly code
+            (map-segment-instructions
+             (lambda (chunk inst)
+               (when (or (eq inst jmp) (eq inst call))
+                 (let ((target (+ (near-jump-displacement chunk dstate)
+                                  (dstate-next-addr dstate))))
+                   ;; Do not call FIND-CALLED-OBJECT if the target is
+                   ;; within the same code object
+                   (unless (and (<= code-begin target) (< target code-end))
+                     (let ((fdefn (sb-vm::find-called-object target)))
+                       (when (and (fdefn-p fdefn)
+                                  (let ((callee (fdefn-fun fdefn)))
+                                    (and (immobile-space-obj-p callee)
+                                         (not (sb-vm::fun-requires-simplifying-trampoline-p callee))
+                                         (match-p (%fun-name callee)
+                                                  callees exclude-callees)
+                                         (not (ambiguous-name-p callee code-header-funs)))))
+                         (let ((entry (sb-vm::fdefn-call-target fdefn)))
+                           (when verbose
+                             (let ((*print-pretty* nil))
+                               (unless printed-fun-name
+                                 (format t "#x~X ~S~%" (get-lisp-obj-address fun) fun)
+                                 (setq printed-fun-name t))
+                               (format t "  @~x -> ~s [~x]~%"
+                                       (dstate-cur-addr dstate) (fdefn-name fdefn) entry)))
+                           ;; Set the statically-linked flag
+                           (setf (sb-vm::fdefn-has-static-callers fdefn) 1)
+                           ;; Change the machine instruction
+                           (setf (signed-sap-ref-32 (int-sap (dstate-cur-addr dstate)) 1)
+                                 (- entry (dstate-next-addr dstate))))))))))
+             seg dstate)))))))
 
 ;;; While concurrent use of un-statically-link is unlikely, misuse could easily
 ;;; cause heap corruption. It's preventable by ensuring that this is atomic
