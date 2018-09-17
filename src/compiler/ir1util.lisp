@@ -1225,6 +1225,91 @@
 
   (values))
 
+(defun join-blocks-if-possible (component)
+  (do-blocks (block component)
+    (loop while
+          (and (singleton-p (block-succ block))
+               (join-successor-if-possible block)))))
+
+;;; Try to join with a successor block. If we succeed, we return true,
+;;; otherwise false.
+(defun join-successor-if-possible (block)
+  (declare (type cblock block))
+  (let ((next (first (block-succ block))))
+    (when (block-start next)  ; NEXT is not an END-OF-COMPONENT marker
+      (cond ( ;; We cannot combine with a successor block if:
+             (or
+              ;; the successor has more than one predecessor;
+              (rest (block-pred next))
+              ;; the successor is the current block (infinite loop);
+              (eq next block)
+              ;; the next block has a different cleanup, and thus
+              ;; we may want to insert cleanup code between the
+              ;; two blocks at some point;
+              (not (eq (block-end-cleanup block)
+                       (block-start-cleanup next)))
+              ;; the next block has a different home lambda, and
+              ;; thus the control transfer is a non-local exit.
+              (not (eq (block-home-lambda block)
+                       (block-home-lambda next)))
+              ;; Stack analysis phase wants ENTRY to start a block...
+              (entry-p (block-start-node next))
+              (let ((last (block-last block)))
+                (and (valued-node-p last)
+                     (awhen (node-lvar last)
+                       (or
+                        ;; ... and a DX-allocator to end a block.
+                        (lvar-dynamic-extent it)
+                        ;; ... and for there to be no chance of there
+                        ;; being two successive USEs of the same
+                        ;; multi-valued LVAR in the same block (since
+                        ;; we can only insert cleanup code at block
+                        ;; boundaries, but need to discard
+                        ;; multi-valued LVAR contents before they are
+                        ;; overwritten).
+                        (and (consp (lvar-uses it))
+                             (not (lvar-single-value-p it)))))))
+              (neq (block-type-check block)
+                   (block-type-check next)))
+             nil)
+            (t
+             (join-blocks block next)
+             t)))))
+
+;;; Join together two blocks. The code in BLOCK2 is moved into BLOCK1
+;;; and BLOCK2 is deleted from the DFO. We combine the optimize flags
+;;; for the two blocks so that any indicated optimization gets done.
+(defun join-blocks (block1 block2)
+  (declare (type cblock block1 block2))
+  (let* ((last1 (block-last block1))
+         (last2 (block-last block2))
+         (succ (block-succ block2))
+         (start2 (block-start block2)))
+    (do ((ctran start2 (node-next (ctran-next ctran))))
+        ((not ctran))
+      (setf (ctran-block ctran) block1))
+
+    (unlink-blocks block1 block2)
+    (dolist (block succ)
+      (unlink-blocks block2 block)
+      (link-blocks block1 block))
+
+    (setf (ctran-kind start2) :inside-block)
+    (setf (node-next last1) start2)
+    (setf (ctran-use start2) last1)
+    (setf (block-last block1) last2))
+
+  (setf (block-flags block1)
+        (attributes-union (block-flags block1)
+                          (block-flags block2)))
+
+  (let ((next (block-next block2))
+        (prev (block-prev block2)))
+    (setf (block-next prev) next)
+    (setf (block-prev next) prev))
+
+  (values))
+
 ;;; Utility: return T if both argument cblocks are equivalent.  For now,
 ;;; detect only blocks that read the same leaf into the same lvar, and
 ;;; continue to the same block.
