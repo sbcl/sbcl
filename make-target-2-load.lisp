@@ -303,7 +303,7 @@
 #+sb-fasteval (setq sb-ext:*evaluator-mode* :interpret)
 
 ;; code-equivalent-p is incomplete
-;; (sb-ext:fold-identical-code :print t) 
+;; (sb-ext:fold-identical-code :print t)
 
 ;; See comments in 'readtable.lisp'
 (setf (readtable-base-char-preference *readtable*) :symbols)

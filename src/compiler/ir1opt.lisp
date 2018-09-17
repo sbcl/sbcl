@@ -287,9 +287,7 @@
               do
               (setf (node-reoptimize cast) t)
               (setf (block-reoptimize (node-block cast)) t)
-              (reoptimize-component (node-component cast) :maybe))))
-    (do-uses (node lvar)
-      (setf (block-type-check (node-block node)) t)))
+              (reoptimize-component (node-component cast) :maybe)))))
   (values))
 
 ;;; Annotate NODE to indicate that its result has been proven to be
@@ -381,6 +379,7 @@
         for last-block = block
         until (eq block tail)
         do (cond
+             ((not (block-type-check block)))
              ;; We delete blocks when there is either no predecessor or the
              ;; block is in a lambda that has been deleted. These blocks
              ;; would eventually be deleted by DFO recomputation, but doing
@@ -515,7 +514,9 @@
                         ;; multi-valued LVAR contents before they are
                         ;; overwritten).
                         (and (consp (lvar-uses it))
-                             (not (lvar-single-value-p it))))))))
+                             (not (lvar-single-value-p it)))))))
+              (neq (block-type-check block)
+                   (block-type-check next)))
              nil)
             (t
              (join-blocks block next)
@@ -1034,12 +1035,14 @@
                               (and (fun-type-p defined-type)
                                    (not (fun-type-p type))))
                       (validate-call-type node type leaf)))
-                  (binding* ((name (and leaf ;; don't want to transform CASTs
-                                        (lvar-fun-name fun))
-                                   :exit-if-null)
-                             (dxable-args (fun-name-dx-args name) :exit-if-null))
-                    (awhen (dxify-downward-funargs node dxable-args name)
-                      (transform-call node it name)))))))
+                  (if (neq (basic-combination-kind node) kind)
+                      (ir1-optimize-combination node)
+                      (binding* ((name (and leaf ;; don't want to transform CASTs
+                                            (lvar-fun-name fun))
+                                       :exit-if-null)
+                                 (dxable-args (fun-name-dx-args name) :exit-if-null))
+                        (awhen (dxify-downward-funargs node dxable-args name)
+                          (transform-call node it name))))))))
         (:known
          (aver info)
          (clear-reoptimize-args)

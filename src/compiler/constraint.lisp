@@ -1232,11 +1232,12 @@
           (rest-of-blocks ())
           (seen-loop-p ()))
       (do-blocks (block component)
-        (when (and (not seen-loop-p) (loopy-p block))
-          (setq seen-loop-p t))
-        (if seen-loop-p
-            (push block rest-of-blocks)
-            (push block leading-blocks)))
+        (when (block-type-check block)
+          (when (and (not seen-loop-p) (loopy-p block))
+            (setq seen-loop-p t))
+          (if seen-loop-p
+              (push block rest-of-blocks)
+              (push block leading-blocks))))
       (values (nreverse leading-blocks) (nreverse rest-of-blocks)))))
 
 ;;; Append OBJ to the end of LIST as if by NCONC but only if it is not
@@ -1256,7 +1257,8 @@
   (let ((blocks-to-process ()))
     (flet ((enqueue (blocks)
              (dolist (block blocks)
-               (setq blocks-to-process (nconc-new block blocks-to-process)))))
+               (when (block-type-check block)
+                 (setq blocks-to-process (nconc-new block blocks-to-process))))))
       (multiple-value-bind (leading-blocks rest-of-blocks)
           (leading-component-blocks component)
         ;; Update every block once to account for changes in the

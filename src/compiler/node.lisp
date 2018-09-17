@@ -341,13 +341,13 @@
                     (:copier nil)
                     (:conc-name block-)
                     (:predicate block-p))
-  ;; a list of all the blocks that are predecessors/successors of this
-  ;; block. In well-formed IR1, most blocks will have one successor.
-  ;; The only exceptions are:
-  ;;  1. component head blocks (any number)
-  ;;  2. blocks ending in an IF (1 or 2)
-  ;;  3. blocks with DELETE-P set (zero)
-  (pred nil :type list)
+    ;; a list of all the blocks that are predecessors/successors of this
+    ;; block. In well-formed IR1, most blocks will have one successor.
+    ;; The only exceptions are:
+    ;;  1. component head blocks (any number)
+    ;;  2. blocks ending in an IF (1 or 2)
+    ;;  3. blocks with DELETE-P set (zero)
+    (pred nil :type list)
   (succ nil :type list)
   ;; the ctran which heads this block (a :BLOCK-START), or NIL when we
   ;; haven't made the start ctran yet (and in the dummy component head

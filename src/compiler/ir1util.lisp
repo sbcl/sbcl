@@ -530,7 +530,6 @@
     (reoptimize-lvar lvar)
     (when (return-p next)
       (node-ends-block cast))
-    (setf (block-type-check (node-block cast)) t)
     cast))
 
 (defun insert-ref-before (leaf node)

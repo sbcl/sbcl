@@ -474,7 +474,7 @@
         (length (length types)))
     (filter-lvar value (make-type-check-form types
                                              (cast-context cast)))
-    (reoptimize-lvar (cast-value cast))
+    (setf (block-type-check (node-block cast)) nil)
     (setf (cast-type-to-check cast) *wild-type*)
     (setf (cast-%type-check cast) nil)
     (let* ((atype (cast-asserted-type cast))
@@ -566,36 +566,38 @@
 ;;; which may lead to inappropriate template choices due to the
 ;;; modification of argument types.
 (defun generate-type-checks (component)
-  (collect ((casts))
-    (do-blocks (block component)
-      (when (and (block-type-check block)
-                 (not (block-delete-p block)))
-        ;; CAST-EXTERNALLY-CHECKABLE-P wants the backward pass
-        (do-nodes-backwards (node nil block)
-          (when (and (cast-p node)
-                     (cast-type-check node))
-            (cast-check-uses node)
-            (cond ((cast-externally-checkable-p node)
-                   (setf (cast-%type-check node) :external))
-                  (t
-                   ;; it is possible that NODE was marked :EXTERNAL by
-                   ;; the previous pass
-                   (setf (cast-%type-check node) t)
-                   (casts node)))))
-        (setf (block-type-check block) nil)))
-    (dolist (cast (casts))
-      (unless (bound-cast-p cast)
-        (multiple-value-bind (check types) (cast-check-types cast)
-          (ecase check
-            (:simple
-             (convert-type-check cast types))
-            (:too-hairy
-             (let ((*compiler-error-context* cast))
-               (when (policy cast (>= safety inhibit-warnings))
-                 (compiler-notify
-                  "type assertion too complex to check:~%~
+  (let (generated)
+    (collect ((casts))
+      (do-blocks (block component)
+        (when (and (block-type-check block)
+                   (not (block-delete-p block)))
+          ;; CAST-EXTERNALLY-CHECKABLE-P wants the backward pass
+          (do-nodes-backwards (node nil block)
+            (when (and (cast-p node)
+                       (cast-type-check node))
+              (cast-check-uses node)
+              (cond ((cast-externally-checkable-p node)
+                     (setf (cast-%type-check node) :external))
+                    (t
+                     ;; it is possible that NODE was marked :EXTERNAL by
+                     ;; the previous pass
+                     (setf (cast-%type-check node) t)
+                     (casts node)))))
+          (setf (block-type-check block) nil)))
+      (dolist (cast (casts))
+        (unless (bound-cast-p cast)
+          (multiple-value-bind (check types) (cast-check-types cast)
+            (ecase check
+              (:simple
+               (convert-type-check cast types)
+               (setf generated t))
+              (:too-hairy
+               (let ((*compiler-error-context* cast))
+                 (when (policy cast (>= safety inhibit-warnings))
+                   (compiler-notify
+                    "type assertion too complex to check:~%~
                     ~/sb!impl:print-type/."
-                  (coerce-to-values (cast-asserted-type cast)))))
-             (setf (cast-type-to-check cast) *wild-type*)
-             (setf (cast-%type-check cast) nil)))))))
-  (values))
+                    (coerce-to-values (cast-asserted-type cast)))))
+               (setf (cast-type-to-check cast) *wild-type*)
+               (setf (cast-%type-check cast) nil)))))))
+    generated))

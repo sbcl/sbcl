@@ -476,17 +476,6 @@ necessary, since type inference may take arbitrarily long to converge.")
 
 (defparameter *constraint-propagate* t)
 
-;;; KLUDGE: This was bumped from 5 to 10 in a DTC patch ported by MNA
-;;; from CMU CL into sbcl-0.6.11.44, the same one which allowed IR1
-;;; transforms to be delayed. Either DTC or MNA or both didn't explain
-;;; why, and I don't know what the rationale was. -- WHN 2001-04-28
-;;;
-;;; FIXME: It would be good to document why it's important to have a
-;;; large value here, and what the drawbacks of an excessively large
-;;; value are; and it might also be good to make it depend on
-;;; optimization policy.
-(defparameter *reoptimize-after-type-check-max* 10)
-
 (defevent reoptimize-maxed-out
   "*REOPTIMIZE-AFTER-TYPE-CHECK-MAX* exceeded.")
 
@@ -503,48 +492,46 @@ necessary, since type inference may take arbitrarily long to converge.")
       (maybe-mumble ".")))
   (values))
 
+(defparameter *reoptimize-limit* 10)
+
+(defun ir1-optimize-phase-1 (component)
+  (let ((loop-count 0))
+    (loop
+     (ir1-optimize-until-done component)
+     (when (or (component-new-functionals component)
+               (component-reanalyze-functionals component))
+       (maybe-mumble "locall ")
+       (locall-analyze-component component))
+     (dfo-as-needed component)
+     (when *constraint-propagate*
+       (maybe-mumble "constraint ")
+       (constraint-propagate component))
+     (when (retry-delayed-ir1-transforms :constraint)
+       (setf loop-count 0) ;; otherwise nothing may get retried
+       (maybe-mumble "Rtran "))
+     (unless (or (component-reoptimize component)
+                 (component-reanalyze component)
+                 (component-new-functionals component)
+                 (component-reanalyze-functionals component))
+       (return))
+     (when (> loop-count *reoptimize-limit*)
+       (maybe-mumble "[reoptimize limit]")
+       (event reoptimize-maxed-out)
+       (return))
+     (incf loop-count))))
+
 ;;; Do all the IR1 phases for a non-top-level component.
 (defun ir1-phases (component)
   (declare (type component component))
   (aver-live-component component)
-  (let ((*constraint-universe* (make-array 64 ; arbitrary, but don't
-                                              ;make this 0.
+  (let ((*constraint-universe* (make-array 64 ; arbitrary, but don't make this 0
                                            :fill-pointer 0 :adjustable t))
-        (loop-count 1)
         (*delayed-ir1-transforms* nil))
     (declare (special *constraint-universe* *delayed-ir1-transforms*))
-    (loop
-      (ir1-optimize-until-done component)
-      (when (or (component-new-functionals component)
-                (component-reanalyze-functionals component))
-        (maybe-mumble "locall ")
-        (locall-analyze-component component))
-      (dfo-as-needed component)
-      (when *constraint-propagate*
-        (maybe-mumble "constraint ")
-        (constraint-propagate component))
-      (when (retry-delayed-ir1-transforms :constraint)
-        (setf loop-count 0) ;; otherwise nothing may get retried
-        (maybe-mumble "Rtran "))
-      (flet ((want-reoptimization-p ()
-               (or (component-reoptimize component)
-                   (component-reanalyze component)
-                   (component-new-functionals component)
-                   (component-reanalyze-functionals component))))
-        (unless (and (want-reoptimization-p)
-                     ;; We delay the generation of type checks until
-                     ;; the type constraints have had time to
-                     ;; propagate, else the compiler can confuse itself.
-                     (< loop-count (- *reoptimize-after-type-check-max* 4)))
-          (maybe-mumble "type ")
-          (generate-type-checks component)
-          (unless (want-reoptimization-p)
-            (return))))
-      (when (>= loop-count *reoptimize-after-type-check-max*)
-        (maybe-mumble "[reoptimize limit]")
-        (event reoptimize-maxed-out)
-        (return))
-      (incf loop-count)))
+    (ir1-optimize-phase-1 component)
+    (loop while (generate-type-checks component)
+          do
+          (ir1-optimize-phase-1 component)))
 
   (ir1-finalize component)
   (values))

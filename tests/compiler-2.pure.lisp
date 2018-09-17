@@ -1634,3 +1634,16 @@
          (typep x '(and base-string (not simple-array))))
     ((10) nil)
     (((make-array 10 :element-type 'base-char :adjustable t)) t)))
+
+(with-test (:name :constraint-after-checkgen)
+  (let ((v #(10 20)))
+    (checked-compile-and-assert
+        ()
+        `(lambda (p1 p2 p3 p4)
+           (declare (type (satisfies eval) p2)
+                    (type (member :from-end 2) p3))
+           (position p1
+                     (the (member ,v 3) p2)
+                     (the (member 1 :from-end) p3) nil
+                     :test-not p4))
+      ((20 v :from-end #'/=) 1))))
