@@ -1851,22 +1851,13 @@ static int classify_symbol(lispobj* obj)
   return 2;
 }
 
-static char* compute_defrag_start_address()
+static inline char* compute_defrag_start_address()
 {
-    // For technical reasons, objects on the first few pages created by genesis
-    // must never move at all. So figure out where the end of that subspace is.
-    lispobj* obj = (lispobj*)FIXEDOBJ_SPACE_START;
-    gc_assert(widetag_of(obj) == INSTANCE_WIDETAG);
-    while (instance_layout(obj) != LAYOUT_OF_PACKAGE) {
-       obj = (lispobj*)((char*)obj + IMMOBILE_CARD_BYTES);
-       gc_assert(widetag_of(obj) == INSTANCE_WIDETAG);
-    }
-    // Now find a page that does NOT have a package.
-    do {
-        obj = (lispobj*)((char*)obj + IMMOBILE_CARD_BYTES);
-    } while (widetag_of(obj) == INSTANCE_WIDETAG
-             && instance_layout(obj) == LAYOUT_OF_PACKAGE);
-    return (char*)obj;
+    // The first fixedobj page contains some essential layouts,
+    // the addresses of which might be wired in by code generation.
+    // As such they must never move.
+    return (char*)FIXEDOBJ_SPACE_START + IMMOBILE_CARD_BYTES;
+
 }
 
 static int calc_n_pages(int n_objects, int words_per_object)
