@@ -477,6 +477,12 @@
 
   (values))
 
+(defun join-blocks-if-possible (component)
+  (do-blocks (block component)
+    (loop while
+          (and (singleton-p (block-succ block))
+               (join-successor-if-possible block)))))
+
 ;;; Try to join with a successor block. If we succeed, we return true,
 ;;; otherwise false.
 (defun join-successor-if-possible (block)
