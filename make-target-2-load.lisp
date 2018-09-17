@@ -76,7 +76,7 @@
   "about to LOAD warm.lisp (with *compile-files-p* = NIL)")
 
 (progn
-  (load "src/cold/warm.lisp")
+  (load (merge-pathnames "src/cold/warm.lisp" *load-pathname*))
 
   ;;; Remove docstrings that snuck in, as will happen with
   ;;; any file compiled in warm load.
@@ -232,7 +232,7 @@
 (fmakunbound 'sb-c::repack-xref)
 
 (progn
-  (load "src/code/shaketree")
+  (load (merge-pathnames "src/code/shaketree" *load-pathname*))
   (sb-impl::shake-packages
    ;; Retain all symbols satisfying this predicate
    #+sb-devel

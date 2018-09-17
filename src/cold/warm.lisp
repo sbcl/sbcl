@@ -53,7 +53,8 @@
 ;;;     ((:or :macro (:match "$EARLY-") (:match "$BOOT-"))
 ;;;     (declare (optimize (speed 0))))))
 ;;;
-(let ((sources (with-open-file (f "build-order.lisp-expr")
+(let ((sources (with-open-file (f (merge-pathnames "../../build-order.lisp-expr"
+                                                   *load-pathname*))
                  (let ((*features* (cons :warm-build-phase *features*)))
                    (read f))))
       (sb-c::*handled-conditions* sb-c::*handled-conditions*))
