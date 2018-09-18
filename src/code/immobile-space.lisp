@@ -47,62 +47,34 @@
         (relocs
          (make-array 100000 :element-type '(unsigned-byte 32)
                             :fill-pointer 0 :adjustable t))
-        ;; Look for these three instruction formats.
-        (lea-inst (find-inst #x8D (get-inst-space)))
-        (jmp-inst (find-inst #b11101001 (get-inst-space)))
-        (cond-jmp-inst (find-inst #x800f (get-inst-space)))
-        (call-inst (find-inst #b11101000 (get-inst-space)))
         (seg (sb-disassem::%make-segment
               :sap-maker (lambda () (error "Bad sap maker")) :virtual-location 0))
         (dstate (make-dstate nil)))
-    (flet ((scan-function (fun-entry-addr fun-end-addr predicate)
-             (setf (seg-virtual-location seg) fun-entry-addr
-                   (seg-length seg) (- fun-end-addr fun-entry-addr)
-                   (seg-sap-maker seg)
-                   (let ((sap (int-sap fun-entry-addr))) (lambda () sap)))
-             (map-segment-instructions
-              (lambda (dchunk inst)
-                (cond ((or (and (or (eq inst jmp-inst) (eq inst call-inst))
-                                (funcall predicate
-                                         (+ (near-jump-displacement dchunk dstate)
-                                            (dstate-next-addr dstate))))
-                           (and (eq inst cond-jmp-inst)
-                                (funcall predicate
-                                         (+ (near-cond-jump-displacement dchunk dstate)
-                                            (dstate-next-addr dstate)))))
-                       (vector-push-extend (dstate-cur-addr dstate) relocs))
-                      ((eq inst lea-inst)
-                       (let ((sap (funcall (seg-sap-maker seg))))
-                         (aver (eql (sap-ref-8 sap (dstate-cur-offs dstate)) #x8D))
-                         (let ((modrm (sap-ref-8 sap (1+ (dstate-cur-offs dstate)))))
-                           (when (and (= (logand modrm #b11000111) #b00000101) ; RIP-relative mode
-                                      (funcall predicate
-                                               (+ (signed-sap-ref-32
-                                                   sap (+ (dstate-cur-offs dstate) 2))
-                                                  (dstate-next-addr dstate))))
-                             (aver (eql (logand (sap-ref-8 sap (1- (dstate-cur-offs dstate))) #xF0)
-                                        #x40)) ; expect a REX prefix
-                             (vector-push-extend (dstate-cur-addr dstate) relocs)))))))
-              seg dstate nil))
+    (flet ((scan-function (code start-addr length predicate)
+             (sb-x86-64-asm::scan-relative-operands
+              code start-addr length dstate seg
+              (lambda (offset operand inst)
+                (declare (ignore offset operand inst))
+                (vector-push-extend (dstate-cur-addr dstate) relocs))
+               predicate))
            (finish-component (code start-relocs-index)
              (when (> (fill-pointer relocs) start-relocs-index)
                (vector-push-extend (get-lisp-obj-address code) code-components)
                (vector-push-extend start-relocs-index code-components))))
 
       ;; Assembler routines contain jumps to immobile code.
-      (let* ((code sb-fasl:*assembler-routines*)
-             (origin (sap-int (code-instructions code)))
-             (end (+ origin (%code-text-size code)))
-             (relocs-index (fill-pointer relocs)))
+      (let ((code sb-fasl:*assembler-routines*)
+            (relocs-index (fill-pointer relocs)))
         (dolist (range (sort (loop for range being each hash-value
                                    of (car (%code-debug-info code)) collect range)
                              #'< :key #'car))
-          ;; byte range is inclusive bound on both ends
-          (scan-function (+ origin (car range))
-                         (+ origin (cadr range) 1)
-                         (lambda (addr)
-                           (and (not (<= origin addr end))
-                                (immobile-space-addr-p addr)))))
+          ;; byte range in the table is an inclusive bound on both sides
+          (scan-function code
+                         (+ (sap-int (code-instructions code)) (car range))
+                         (- (1+ (cadr range)) (car range))
+                         ;; calls from lisp into C code can be ignored, as
+                         ;; neither the asssembly routines nor C code will move.
+                         #'immobile-space-addr-p))
         (finish-component code relocs-index))
 
       ;; Immobile space - code components can jump to immobile space,
@@ -111,19 +83,13 @@
        (lambda (code type size)
          (declare (ignore size))
          (when (= type code-header-widetag)
-           (let* ((text-origin (sap-int (code-instructions code)))
-                  (text-end (+ text-origin (%code-text-size code)))
-                  (relocs-index (fill-pointer relocs)))
+           (let ((relocs-index (fill-pointer relocs)))
              (dotimes (i (code-n-entries code) (finish-component code relocs-index))
-               (let* ((fun (%code-entry-point code i))
-                      (fun-text (+ (get-lisp-obj-address fun)
-                                   (- fun-pointer-lowtag)
-                                   (ash simple-fun-code-offset word-shift))))
-                 (scan-function
-                  fun-text (+ fun-text (%simple-fun-text-len fun i))
-                  ;; Exclude transfers within this code component
-                  (lambda (jmp-targ-addr)
-                    (not (<= text-origin jmp-targ-addr text-end)))))))))
+               (let ((fun (%code-entry-point code i)))
+                 (scan-function code
+                                (sap-int (simple-fun-entry-sap fun))
+                                (%simple-fun-text-len fun i)
+                                #'constantly-t))))))
        :immobile))
 
     ;; Write a delimiter into the array passed to C

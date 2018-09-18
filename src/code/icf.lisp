@@ -100,7 +100,11 @@
             (let* ((oldval (%closure-fun object))
                    (newval (forward oldval)))
               (unless (eq newval oldval)
-                (warn "Not able to forward a closure function yet: ~S" oldval)))
+                (with-pinned-objects (object newval)
+                  (setf (sap-ref-sap (int-sap (- (get-lisp-obj-address object)
+                                                 fun-pointer-lowtag))
+                                     (ash closure-fun-slot word-shift))
+                        (simple-fun-entry-sap newval)))))
             (dotimes (i (1- (get-closure-length object)))
               (let* ((oldval (%closure-index-ref object i))
                      (newval (forward oldval)))
@@ -122,82 +126,96 @@
                     widetag (get-lisp-obj-address object))))))))
      :all)))
 
-(declaim (inline fun-entry))
-(defun fun-entry (fun)
-  #-(or x86 x86-64)
-  (int-sap (+ (get-lisp-obj-address fun)
-              (- fun-pointer-lowtag)
-              (ash simple-fun-code-offset word-shift)))
-  ;; The preceding case would actually work, but I'm anticipating a change
-  ;; in which simple-fun objects are all contiguous in their code component,
-  ;; followed by all the machine instructions for all the simple-funs.
-  ;; If that change is done, then you must indirect through the SELF pointer
-  ;; in order to get the correct starting address.
-  ;; (Such change would probably be confined to x86[-64])
-  #+(or x86 x86-64)
-  (sap-ref-sap (int-sap (- (get-lisp-obj-address fun) fun-pointer-lowtag))
-               (ash simple-fun-self-slot word-shift)))
+;;; Compare function signatures, which are essentially the raw instruction bytes
+;;; but with encodings of relative operands replaced by constant filler bytes,
+;;; and a list of offset/value pairs corresponding to the smashed bytes
+;;; that can be meaningfully compared (i.e. after un-relativization).
+(defun fun-signature= (signature1 signature2)
+  (let ((v1 (cdr signature1))
+        (v2 (cdr signature2))
+        (words1 (car signature1))
+        (words2 (car signature2)))
+    (declare (type (simple-array word 1) words1 words2)
+             (type simple-vector v1 v2))
+    (and (= (length v1) (length v2))
+         (every #'eql v1 v2)
+         (= (length words1) (length words2))
+         (= 0 (alien-funcall
+               (extern-alien "memcmp"
+                (function int system-area-pointer system-area-pointer long))
+               (vector-sap words1)
+               (vector-sap words2)
+               (* (length words1) n-word-bytes))))))
 
-;;; TODO: code needs to be considered equivalent in the abstract,
-;;; not at the byte level. In particular, operations that encode relative
-;;; jumps and such need to be considered equal if the absolute target
-;;; is the same. This will likely entail running the disassembler.
-(defun code-equivalent-p (obj1 obj2)
+#-x86-64
+(defun compute-code-signature (code dstate)
+  (declare (ignore dstate))
+  code)
+
+(defun code-equivalent-p (obj1 obj2 &aux (code1 (car obj1)) (code2 (car obj2)))
+  (declare (ignorable code1 code2))
+  ;; The comparator is conceptually target-independent, however since
+  ;; COMPUTE-CODE-SIGNATURE is stubbed out for most targets,
+  ;; there is no meaningful way to compare functions.
+  ;; Rather than conditionalize out the entirety of this file,
+  ;; we'll conservatively say that no two blobs of code are equivalent
+  ;; if there is no signature function.
+  #+x86-64
   (with-pinned-objects (obj1 obj2)
-    (and (= (code-header-words obj1) (code-header-words obj2))
-         (= (%code-code-size obj1) (%code-code-size obj2))
-         (= (code-n-unboxed-data-bytes obj1)
-            (code-n-unboxed-data-bytes obj2))
+    (and (= (code-header-words code1) (code-header-words code2))
+         (= (code-n-entries code1) (code-n-entries code2))
+         (= (%code-code-size code1) (%code-code-size code2))
+         (= (code-n-unboxed-data-bytes code1)
+            (code-n-unboxed-data-bytes code2))
          ;; Compare boxed constants. (Ignore debug-info and fixups)
          (loop for i from code-constants-offset
-               below (code-header-words obj1)
-               always (eq (code-header-ref obj1 i) (code-header-ref obj2 i)))
+               below (code-header-words code1)
+               always (eq (code-header-ref code1 i) (code-header-ref code2 i)))
          ;; Compare unboxed constants
-         (let ((nwords (ceiling (code-n-unboxed-data-bytes obj1) n-word-bytes))
-               (sap1 (code-instructions obj1))
-               (sap2 (code-instructions obj2)))
+         (let ((nwords (ceiling (code-n-unboxed-data-bytes code1) n-word-bytes))
+               (sap1 (code-instructions code1))
+               (sap2 (code-instructions code2)))
            (dotimes (i nwords t)
              (unless (= (sap-ref-word sap1 (ash i word-shift))
                         (sap-ref-word sap2 (ash i word-shift)))
                (return nil))))
          ;; Compare instruction bytes
-         (dotimes (i (code-n-entries obj1) t)
-           (let* ((f1 (%code-entry-point obj1 i))
-                  (f2 (%code-entry-point obj2 i))
-                  (l1 (%simple-fun-text-len f1 i))
-                  (l2 (%simple-fun-text-len f2 i)))
-             (unless (and (= l1 l2)
-                          (= 0 (alien-funcall
-                                (extern-alien "memcmp"
-                                              (function int system-area-pointer
-                                                        system-area-pointer long))
-                                (fun-entry f1)
-                                (fun-entry f2)
-                                l1)))
-               (return nil)))))))
+         (every #'fun-signature= (cdr obj1) (cdr obj2)))))
 
 ;;; Compute a key for binning purposes.
 (defun compute-code-hash-key (code)
   (with-pinned-objects (code)
-    (flet ((unboxed-bytes-digest ()
-             ;; Mix at most 20 words of the instructions of each simple-fun.
-             (let ((hash 0))
-               (dotimes (i (code-n-entries code) hash)
-                 (let* ((f (%code-entry-point code i))
-                        (start (fun-entry f))
-                        (len (%simple-fun-text-len f i)))
-                   (dotimes (i (min 20 (ceiling len n-word-bytes)))
-                     (setq hash (mix (logand (sap-ref-word
-                                              start (ash i word-shift))
-                                             most-positive-fixnum)
-                                     hash))))))))
-      (list* (code-header-words code)
-             (unboxed-bytes-digest)
-             (collect ((consts))
-               ;; Ignore the fixups and the debug info
-               (do ((i (1- (code-header-words code)) (1- i)))
-                   ((< i code-constants-offset) (consts))
-                 (consts (code-header-ref code i))))))))
+    (list* (code-header-words code)
+           (collect ((offs))
+             (dotimes (i (code-n-entries code) (offs))
+               (offs (sb-impl::%code-fun-offset code i)
+                     (%simple-fun-text-len (%code-entry-point code i) i))))
+           (collect ((consts))
+             ;; Ignore the fixups and the debug info
+             (do ((i (1- (code-header-words code)) (1- i)))
+                 ((< i code-constants-offset) (consts))
+               (consts (code-header-ref code i)))))))
+
+(declaim (inline default-allow-icf-p))
+(defun default-allow-icf-p (code)
+  (let ((name (sb-c::compiled-debug-info-name
+               (%code-debug-info code))))
+    (or (and (stringp name)
+             (string= name "check-type"))
+        (and (consp name)
+             (member (car name)
+                     ;; Every print-object method which is just a call
+                     ;; to PRINT-UNREADABLE-OBJECT can be folded into one
+                     ;; function (for matching values of :type and :identity).
+                     ;; Perhaps we should recognize certain common idioms
+                     ;; at compile-time, and give back a known function?
+                     '(sb-pcl::fast-method
+                       ;; This next one suggests that PCL isn't doing
+                       ;; a good enough job of using FNGEN.
+                       sb-pcl::emf
+                       sb-c::vop
+                       sb-c::deftransform
+                       :source-transform))))))
 
 (defun fold-identical-code (&key aggressive print)
   #+gencgc (gc :gen 7)
@@ -257,21 +275,26 @@
     (let ((bins (make-hash-table :test 'equal))
           (n 0))
       (dovector (x code-objects)
-        (unless (gethash x referenced-objects)
+        (when (or (not (gethash x referenced-objects))
+                  (default-allow-icf-p x))
           (incf n)
           (push x (gethash (compute-code-hash-key x) bins))))
-      #+nil
-      (format t "~d objects, ~d candidates, ~d bins~%"
-              (length code-objects) n (hash-table-count bins))
+      (when print
+        (format t "ICF: ~d objects, ~d candidates, ~d bins~%"
+                (length code-objects) n (hash-table-count bins)))
       ;; Scan each bin that has more than one object in it
       ;; and check whether any are equivalent to one another.
-      (let ((equiv-map (make-hash-table :test #'eq)))
+      (let ((equiv-map (make-hash-table :test #'eq))
+            (dstate (sb-disassem:make-dstate)))
         (dohash ((key objects) bins)
           (declare (ignore key))
           ;; Skip if there can not possibly be an equivalence class
           ;; with more than one thing in it.
           (when (cdr objects)
             (let (equivalences)
+              (setq objects
+                    (mapcar (lambda (x) (cons x (compute-code-signature x dstate)))
+                            objects))
               (dolist (item objects)
                 (let ((found (assoc item equivalences :test #'code-equivalent-p)))
                   (if found
@@ -279,6 +302,7 @@
                       (push (list item) equivalences))))
               (dolist (set equivalences)
                 (when (cdr set) ; have two or more, so choose one as canonical
+                  (setq set (mapcar #'car set))
                   (let ((winner
                          (labels ((keyfn (x)
                                     #+64-bit

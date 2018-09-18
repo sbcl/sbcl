@@ -444,8 +444,10 @@
                      (t (return index)))
                (aver (<= min max)))))))))
 
-(declaim (inline fun-entry))
-(defun fun-entry (fun)
+;;; Return the starting address of FUN's code as a SAP.
+;;; FUN must be pinned.
+(declaim (inline sb!vm:simple-fun-entry-sap))
+(defun sb!vm:simple-fun-entry-sap (fun)
   #!-(or x86 x86-64)
   (int-sap (+ (get-lisp-obj-address fun)
               (- sb!vm:fun-pointer-lowtag)
@@ -473,7 +475,7 @@
         (when (< max min) (return nil))
         (let* ((index (floor (+ min max) 2))
                (fun (%code-entry-point code index))
-               (guess (fun-entry fun)))
+               (guess (sb!vm:simple-fun-entry-sap fun)))
           (cond ((sap< guess sap) (setq min (1+ index)))
                 ((sap> guess sap) (setq max (1- index)))
                 (t (return fun))))))))

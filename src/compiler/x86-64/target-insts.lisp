@@ -464,3 +464,88 @@
                           (return loc)))))
            locs)
    nil))
+
+;;; Disassemble memory of CODE from START-ADDRESS for LENGTH bytes
+;;; calling FUNCTION on each instruction that has a PC-relative operand.
+;;; If supplied, PREDICATE is used to filter out some function invocations.
+(defun scan-relative-operands
+    (code start-address length dstate segment function
+     &optional (predicate #'constantly-t))
+  (declare (type function function))
+  (let* ((inst-space (get-inst-space))
+         ;; Look for these instruction formats.
+         (call-inst (find-inst #xE8 inst-space))
+         (jmp-inst (find-inst #xE9 inst-space))
+         (cond-jmp-inst (find-inst #x800f inst-space))
+         (lea-inst (find-inst #x8D inst-space))
+         (text-start (sap-int (code-instructions code)))
+         (text-end (+ text-start (%code-text-size code)))
+         (sap (int-sap start-address)))
+    (setf (seg-virtual-location segment) start-address
+          (seg-length segment) length
+          (seg-sap-maker segment) (lambda () sap))
+    (map-segment-instructions
+     (lambda (dchunk inst)
+       (flet ((includep (target)
+                ;; Self-relative (to the code object) operands are ignored.
+                (and (or (< target text-start) (>= target text-end))
+                     (funcall predicate target))))
+         (cond ((or (eq inst jmp-inst) (eq inst call-inst))
+                (let ((operand (+ (near-jump-displacement dchunk dstate)
+                                  (dstate-next-addr dstate))))
+                  (when (includep operand)
+                    (funcall function (+ (dstate-cur-offs dstate) 1)
+                             operand inst))))
+               ((eq inst cond-jmp-inst)
+                ;; TAIL-CALL-SYMBOL is invoked with a conditional jump
+                ;; (but not CALL-SYMBOL because only JMP can be conditional)
+                (let ((operand (+ (near-cond-jump-displacement dchunk dstate)
+                                  (dstate-next-addr dstate))))
+                  (when (includep operand)
+                    (funcall function (+ (dstate-cur-offs dstate) 2)
+                             operand inst))))
+               ((eq inst lea-inst)
+                ;; Computing the address of UNDEFINED-FDEFN and
+                ;; FUNCALLABLE-INSTANCE-TRAMP is done with LEA.
+                (aver (eql (sap-ref-8 sap (dstate-cur-offs dstate)) #x8D))
+                (let ((modrm (sap-ref-8 sap (1+ (dstate-cur-offs dstate)))))
+                  (when (= (logand modrm #b11000111) #b00000101) ; RIP-relative mode
+                    (let ((operand (+ (signed-sap-ref-32
+                                       sap (+ (dstate-cur-offs dstate) 2))
+                                      (dstate-next-addr dstate))))
+                      (when (includep operand)
+                        (aver (eql (logand (sap-ref-8 sap (1- (dstate-cur-offs dstate))) #xF0)
+                                   #x40)) ; expect a REX prefix
+                        (funcall function (+ (dstate-cur-offs dstate) 2)
+                                 operand inst)))))))))
+     segment dstate nil)))
+
+;;; A code signature (for purposes of the ICF pass) is a list of function
+;;; signatures, each of which is cons of a vector of instruction bytes with some
+;;; replaced by 0, plus an opaque set of integers that need to be compared for
+;;; equality to test whether the blobs of code are functionally equivalent.
+(defun sb!vm::compute-code-signature (code dstate &aux result)
+  (dotimes (i (code-n-entries code) result)
+    (let* ((f (%code-entry-point code i))
+           (len (%simple-fun-text-len f i))
+           (buffer (make-array (ceiling len n-word-bytes) :element-type 'word))
+           (operand-values))
+      (with-pinned-objects (code buffer)
+        (let* ((fun-sap (simple-fun-entry-sap f))
+               (fun-sap-int (sap-int fun-sap)))
+          (%byte-blt fun-sap 0 buffer 0 len)
+          ;; Smash each PC-relative operand, and collect the effective value of
+          ;; the operand and its offset in the buffer.  We needn't compute the
+          ;; lisp object referred to by the operand because it can't change.
+          ;; (PC-relative values are used only when the EA is not subject to
+          ;; movement due to GC, except during defrag). More than 32 bits might
+          ;; be needed for the absolute EA, so we don't simply write it back
+          ;; to the buffer, though at present 32 bits would in fact suffice.
+          (scan-relative-operands
+           code fun-sap-int len dstate
+           (make-memory-segment nil fun-sap-int len)
+           (lambda (offset operand inst)
+             (declare (ignore inst))
+             (setf operand-values (list* operand offset operand-values)
+                   (sap-ref-32 (vector-sap buffer) offset) 0)))))
+      (push (cons buffer (coerce operand-values 'simple-vector)) result))))

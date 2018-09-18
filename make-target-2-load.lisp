@@ -301,9 +301,9 @@
 
 #+immobile-code (setq sb-c::*compile-to-memory-space* :auto)
 #+sb-fasteval (setq sb-ext:*evaluator-mode* :interpret)
-
-;; code-equivalent-p is incomplete
-;; (sb-ext:fold-identical-code :print t)
+;; folding doesn't actually do anything unless the backend supports it,
+;; but the interface exists no matter what.
+(sb-ext:fold-identical-code)
 
 ;; See comments in 'readtable.lisp'
 (setf (readtable-base-char-preference *readtable*) :symbols)
