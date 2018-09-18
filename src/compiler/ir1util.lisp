@@ -1793,9 +1793,7 @@
   (let* ((prev (node-prev node))
          (block (ctran-block prev)))
     (reoptimize-component (block-component block) t)
-    (setf (block-attributep (block-flags block)
-                            flush-p type-check)
-          t))
+    (setf (block-flush-p block) t))
   (setf (node-lvar node) nil))
 
 ;;; This function is called by people who delete nodes; it provides a

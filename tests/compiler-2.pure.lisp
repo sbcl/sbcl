@@ -1656,4 +1656,16 @@
               (when x
                 (if (> x 0) 1 2)))
          (the integer x))
-    ((23) 23)))
+    ((23) 23))
+  (checked-compile-and-assert
+      (:allow-style-warnings t)
+      `(lambda (a b)
+         (declare (optimize (debug 1)))
+         (logand
+          (when b
+            (if (> (the integer a) 0) 10 20))
+          0)
+         (the integer b))
+    ((24 23) 23)))
+
+

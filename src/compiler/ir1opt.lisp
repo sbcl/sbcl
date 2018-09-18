@@ -2302,7 +2302,7 @@
            (delete-cast cast)
            t)
           ((listp (lvar-uses value))
-           ;; Turn (the vector (if x y #()) into
+           ;; Turn (the vector (if x y #())) into
            ;; (if x (the vector y) #())
            (let ((atype (cast-asserted-type cast))
                  (ctran (node-next cast))
