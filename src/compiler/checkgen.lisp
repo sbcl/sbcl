@@ -444,25 +444,28 @@
 ;;; unsupplied. Such checking is impossible to efficiently do at the
 ;;; source level because our fixed-values conventions are optimized
 ;;; for the common MV-BIND case.
-(defun make-type-check-form (types &optional context)
+(defun make-type-check-form (types cast)
   (let ((temps (make-gensym-list (length types))))
     `(multiple-value-bind ,temps 'dummy
-       ,@(mapcar (lambda (temp %type)
-                   (destructuring-bind (not type-to-check
-                                        type-to-report) %type
-                    (let* ((spec
-                             (let ((*unparse-fun-type-simplify* t))
-                               (type-specifier type-to-check)))
-                           (test (if not `(not ,spec) spec)))
-                      `(unless (typep ,temp ',test)
-                         ,(internal-type-error-call temp
-                                                    (if (fun-designator-type-p type-to-report)
-                                                        ;; Simplify
-                                                        (specifier-type 'callable)
-                                                        type-to-report)
-                                                    context)))))
-                 temps
-                 types)
+       ,@(mapcar
+          (lambda (temp %type)
+            (destructuring-bind (not type-to-check
+                                 type-to-report) %type
+              (let* ((spec
+                       (let ((*unparse-fun-type-simplify* t))
+                         (type-specifier type-to-check)))
+                     (test (if not `(not ,spec) spec)))
+                `(unless
+                     ,(with-ir1-environment-from-node cast ;; it performs its own inlining of SATISFIES
+                        (%source-transform-typep temp test))
+                   ,(internal-type-error-call temp
+                                              (if (fun-designator-type-p type-to-report)
+                                                  ;; Simplify
+                                                  (specifier-type 'callable)
+                                                  type-to-report)
+                                              (cast-context cast))))))
+          temps
+          types)
        (values ,@temps))))
 
 ;;; Splice in explicit type check code immediately before CAST. This
@@ -471,8 +474,7 @@
 (defun convert-type-check (cast types)
   (declare (type cast cast) (type list types))
   (filter-lvar (cast-value cast)
-               (make-type-check-form types
-                                     (cast-context cast)))
+               (make-type-check-form types cast))
   (setf (cast-%type-check cast) nil))
 
 ;;; Check all possible arguments of CAST and emit type warnings for
