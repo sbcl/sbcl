@@ -1543,29 +1543,6 @@ static lispobj* tempspace_addr(void* address)
     }
 }
 
-/* Search for an object during defragmentation */
-static lispobj* defrag_search_varyobj_subspace(lispobj addr)
-{
-    low_page_index_t page = find_varyobj_page_index((void*)(long)addr);
-    lispobj *where = varyobj_scan_start(page);
-    size_t count;
-    do {
-        if (filler_obj_p(where)) {
-            count = sizetab[widetag_of(where)](where);
-        } else {
-            gc_assert(forwarding_pointer_p(where));
-            lispobj *forwarded_obj = native_pointer(forwarding_pointer_value(where));
-            lispobj *temp_obj = tempspace_addr(forwarded_obj);
-            count = sizetab[widetag_of(temp_obj)](temp_obj);
-            if ((lispobj*)(uword_t)addr < where+count) {
-                gc_assert(widetag_of(temp_obj) == CODE_HEADER_WIDETAG);
-                return where;
-            }
-        }
-    } while ((where += count) <= (lispobj*)(uword_t)addr);
-    lose("Can't find jump target");
-}
-
 static inline boolean tempspace_p(char* addr)
 {
     return (addr >= fixedobj_tempspace.start &&
@@ -2069,8 +2046,10 @@ static void defrag_immobile_space(boolean verbose)
 #ifdef LISP_FEATURE_X86_64
         // Fix displacements in JMP, CALL, and LEA instructions in code objects.
         // There are 2 arrays in use:
-        //  - the relocs[] array contains the address of any machine instruction
-        //    that needs to be altered on account of space relocation.
+        //  - the relocs[] array contains the offset of any machine instruction
+        //    that needs to be altered on account of space relocation. Offsets are
+        //    relative to base address of code, not the code-instructions.
+        //    After the offset is the lisp object referred to by the instruction.
         //  - the reloc_index[] array identifes the code component each reloc belongs to.
         //    It is an array of pairs:
         //      comp_ptr1, index1, comp_ptr2, index2 ... comp_ptrN, indexN, 0, index_max
@@ -2087,42 +2066,28 @@ static void defrag_immobile_space(boolean verbose)
             if (!load_addr) continue;  // Skip code that was dropped by GC
             int reloc_index     = immobile_space_reloc_index[i*2+1];
             int end_reloc_index = immobile_space_reloc_index[i*2+3];
-            for ( ; reloc_index < end_reloc_index ; ++reloc_index ) {
-                unsigned char* inst_addr = (unsigned char*)(long)immobile_space_relocs[reloc_index];
-                int inst_len = 5, // number of bytes in the instruction's encoding
-                    inst_byte_num = 1; // where the displacement operand starts
-                switch (*inst_addr) { // opcode
-                case 0xE8: case 0xE9: break; // JMP or CALL
-                case 0x8D: // LEA
-                case 0x0F: // Jcc
-                  inst_len = 6; inst_byte_num = 2;
-                  break;
-                default: lose("Can't fixup opcode %02x", *inst_addr);
-                }
-                unsigned int target_addr =
-                    (int)(long)inst_addr + inst_len + (int)UNALIGNED_LOAD32(inst_addr+inst_byte_num);
-                int target_adjust = 0;
-                // Both this code and the jumped-to code can move.
+            for ( ; reloc_index < end_reloc_index ; reloc_index += 2) {
+                int offset = immobile_space_relocs[reloc_index];
+                char* inst_addr = (char*)code + offset;
+                // Both this code and the referenced code can move.
                 // For this component, adjust by the displacement by (old - new).
                 // If the jump target moved, also adjust by its (new - old).
-                // The target address can point to one of:
-                //  - an FDEFN raw addr slot (fixedobj subspace)
-                //  - funcallable-instance with self-contained trampoline (ditto)
-                //  - a simple-fun that was statically linked (varyobj subspace)
-                if (immobile_space_p(target_addr)) {
-                    lispobj *obj = find_fixedobj_page_index((void*)(uword_t)target_addr)>=0
-                      ? search_immobile_space((void*)(uword_t)target_addr)
-                      : defrag_search_varyobj_subspace(target_addr);
-                    if (forwarding_pointer_p(obj))
-                        target_adjust = (int)((char*)native_pointer(forwarding_pointer_value(obj))
-                                              - (char*)obj);
+                // The target object can be a simple-fun, funcallable instance,
+                // fdefn, or 0 if it's an assembly routine call.
+                int target_adjust = 0;
+                lispobj obj = immobile_space_relocs[reloc_index+1];
+                if (obj) {
+                    lispobj *npobj = native_pointer(obj);
+                    if (forwarding_pointer_p(npobj))
+                        target_adjust = forwarding_pointer_value(npobj) - obj;
                 }
                 // If the instruction to fix has moved, then adjust for
                 // its new address, and perform the fixup in tempspace.
                 // Otherwise perform the fixup where the instruction is now.
-                char* fixup_loc = (immobile_space_p((lispobj)inst_addr) ?
-                                   (char*)tempspace_addr(inst_addr - code + load_addr) :
-                                   (char*)inst_addr) + inst_byte_num;
+                // (It only wouldn't move if it's asm code in readonly space)
+                char* fixup_loc =
+                    immobile_space_p((lispobj)inst_addr) ?
+                    (char*)tempspace_addr(inst_addr - code + load_addr) : inst_addr;
                 UNALIGNED_STORE32(fixup_loc,
                                   UNALIGNED_LOAD32(fixup_loc)
                                     + target_adjust + (code - load_addr));

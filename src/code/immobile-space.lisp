@@ -50,12 +50,20 @@
         (seg (sb-disassem::%make-segment
               :sap-maker (lambda () (error "Bad sap maker")) :virtual-location 0))
         (dstate (make-dstate nil)))
-    (flet ((scan-function (code start-addr length predicate)
+    (flet ((scan-function (code start-addr length extra-offset predicate)
+             ;; Extra offset is the amount to add to the offset supplied in the
+             ;; lambda to compute the instruction offset relative to the code base.
+             ;; Defrag has already stuffed in forwarding pointers when it reads
+             ;; this data, which makes code_header_words() inconvenient to use.
              (sb-x86-64-asm::scan-relative-operands
               code start-addr length dstate seg
               (lambda (offset operand inst)
-                (declare (ignore offset operand inst))
-                (vector-push-extend (dstate-cur-addr dstate) relocs))
+                (declare (ignore inst))
+                (let ((lispobj (if (immobile-space-addr-p operand)
+                                   (sb-vm::find-called-object operand)
+                                   0)))
+                  (vector-push-extend (+ offset extra-offset) relocs)
+                  (vector-push-extend (get-lisp-obj-address lispobj) relocs)))
                predicate))
            (finish-component (code start-relocs-index)
              (when (> (fill-pointer relocs) start-relocs-index)
@@ -65,13 +73,20 @@
       ;; Assembler routines contain jumps to immobile code.
       (let ((code sb-fasl:*assembler-routines*)
             (relocs-index (fill-pointer relocs)))
-        (dolist (range (sort (loop for range being each hash-value
-                                   of (car (%code-debug-info code)) collect range)
-                             #'< :key #'car))
-          ;; byte range in the table is an inclusive bound on both sides
+        ;; The whole thing can be disassembled in one stroke since inter-routine
+        ;; gaps are encoded as NOPs, but compute the instruction bounds excluding
+        ;; the array of indirect call vectors.
+        (multiple-value-bind (start end)
+            (loop for v being each hash-value of (car (%code-debug-info code))
+                  minimize (car v) into min
+                  maximize (cadr v) into max
+                  finally (return (values min max)))
           (scan-function code
-                         (+ (sap-int (code-instructions code)) (car range))
-                         (- (1+ (cadr range)) (car range))
+                         (+ (sap-int (code-instructions code)) start)
+                         ;; byte range as stored uses inclusive low/high bound
+                         (- (1+ end) start)
+                         ;; extra offset = header words + start
+                         (+ (ash (code-header-words code) word-shift) start)
                          ;; calls from lisp into C code can be ignored, as
                          ;; neither the asssembly routines nor C code will move.
                          #'immobile-space-addr-p))
@@ -82,14 +97,21 @@
       (sb-vm:map-allocated-objects
        (lambda (code type size)
          (declare (ignore size))
-         (when (= type code-header-widetag)
+         (when (and (= type code-header-widetag) (plusp (code-n-entries code)))
            (let ((relocs-index (fill-pointer relocs)))
-             (dotimes (i (code-n-entries code) (finish-component code relocs-index))
-               (let ((fun (%code-entry-point code i)))
+             (dotimes (i (code-n-entries code))
+               ;; simple-funs must be individually scanned so that the
+               ;; embedded boxed words are properly skipped over.
+               (let* ((fun (%code-entry-point code i))
+                      (sap (simple-fun-entry-sap fun)))
                  (scan-function code
-                                (sap-int (simple-fun-entry-sap fun))
+                                (sap-int sap)
                                 (%simple-fun-text-len fun i)
-                                #'constantly-t))))))
+                                ;; Compute the offset from the base of the code
+                                (+ (ash (code-header-words code) word-shift)
+                                   (sap- sap (code-instructions code)))
+                                #'constantly-t)))
+             (finish-component code relocs-index))))
        :immobile))
 
     ;; Write a delimiter into the array passed to C
