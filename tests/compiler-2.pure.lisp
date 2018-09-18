@@ -1647,3 +1647,13 @@
                      (the (member 1 :from-end) p3) nil
                      :test-not p4))
       ((20 v :from-end #'/=) 1))))
+
+(with-test (:name :cast-multiple-uses-no-dest)
+  (checked-compile-and-assert
+      (:allow-style-warnings t)
+      `(lambda (x)
+         (the integer
+              (when x
+                (if (> x 0) 1 2)))
+         (the integer x))
+    ((23) 23)))

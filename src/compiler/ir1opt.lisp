@@ -2301,13 +2301,13 @@
                             (cast-asserted-type cast))
            (delete-cast cast)
            t)
-          ((and (listp (lvar-uses value))
-                lvar)
+          ((listp (lvar-uses value))
            ;; Turn (the vector (if x y #()) into
            ;; (if x (the vector y) #())
            (let ((atype (cast-asserted-type cast))
                  (ctran (node-next cast))
-                 (dest (lvar-dest lvar))
+                 (dest (and lvar
+                            (lvar-dest lvar)))
                  next-block)
              (collect ((merges))
                (do-uses (use value)
