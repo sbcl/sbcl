@@ -929,6 +929,8 @@
   (int-sap (static-foreign-symbol-address name)))
 
 (defun catch-runaway-unwind (block)
+  (declare (ignorable block))
+  #!-(and win32 x86) ;; uses SEH
   (let ((target (sap-ref-sap (descriptor-sap block)
                              (* unwind-block-uwp-slot n-word-bytes))))
     (loop for uwp = (descriptor-sap sb!vm::*current-unwind-protect-block*)
