@@ -241,6 +241,14 @@
 (define-load-time-global *assembler-routines* nil)
 (declaim (code-component *assembler-routines*))
 
+(defun calc-asm-routine-bounds ()
+  (loop for v being each hash-value of (car (%code-debug-info *assembler-routines*))
+        minimize (car v) into min
+        maximize (cadr v) into max
+        ;; min/max are inclusive byte ranges, but return the answer
+        ;; using standard convention of exclusive upper bound.
+        finally (return (values min (1+ max)))))
+
 ;;; how we learn about assembler routines at startup
 (defvar *!initial-assembler-routines*)
 

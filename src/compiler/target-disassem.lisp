@@ -1013,7 +1013,7 @@
       (format stream "#X~2,'0x" (sap-ref-8 sap (+ offs start-offs))))))
 
 (defvar *default-dstate-hooks*
-  (list*  #!-(or x86 x86-64) #'lra-hook nil))
+  (list* #!-(or x86 x86-64) #'lra-hook nil))
 
 ;;; Make a disassembler-state object.
 (defun make-dstate (&optional (fun-hooks *default-dstate-hooks*))

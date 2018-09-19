@@ -50,13 +50,13 @@
         (seg (sb-disassem::%make-segment
               :sap-maker (lambda () (error "Bad sap maker")) :virtual-location 0))
         (dstate (make-dstate nil)))
-    (flet ((scan-function (code start-addr length extra-offset predicate)
+    (flet ((scan-function (code sap length extra-offset predicate)
              ;; Extra offset is the amount to add to the offset supplied in the
              ;; lambda to compute the instruction offset relative to the code base.
              ;; Defrag has already stuffed in forwarding pointers when it reads
              ;; this data, which makes code_header_words() inconvenient to use.
              (sb-x86-64-asm::scan-relative-operands
-              code start-addr length dstate seg
+              code (sap-int sap) length dstate seg
               (lambda (offset operand inst)
                 (declare (ignore inst))
                 (let ((lispobj (if (immobile-space-addr-p operand)
@@ -74,17 +74,11 @@
       (let ((code sb-fasl:*assembler-routines*)
             (relocs-index (fill-pointer relocs)))
         ;; The whole thing can be disassembled in one stroke since inter-routine
-        ;; gaps are encoded as NOPs, but compute the instruction bounds excluding
-        ;; the array of indirect call vectors.
-        (multiple-value-bind (start end)
-            (loop for v being each hash-value of (car (%code-debug-info code))
-                  minimize (car v) into min
-                  maximize (cadr v) into max
-                  finally (return (values min max)))
+        ;; gaps are encoded as NOPs.
+        (multiple-value-bind (start end) (sb-fasl::calc-asm-routine-bounds)
           (scan-function code
-                         (+ (sap-int (code-instructions code)) start)
-                         ;; byte range as stored uses inclusive low/high bound
-                         (- (1+ end) start)
+                         (sap+ (code-instructions code) start)
+                         (- end start)
                          ;; extra offset = header words + start
                          (+ (ash (code-header-words code) word-shift) start)
                          ;; calls from lisp into C code can be ignored, as
@@ -104,8 +98,7 @@
                ;; embedded boxed words are properly skipped over.
                (let* ((fun (%code-entry-point code i))
                       (sap (simple-fun-entry-sap fun)))
-                 (scan-function code
-                                (sap-int sap)
+                 (scan-function code sap
                                 (%simple-fun-text-len fun i)
                                 ;; Compute the offset from the base of the code
                                 (+ (ash (code-header-words code) word-shift)

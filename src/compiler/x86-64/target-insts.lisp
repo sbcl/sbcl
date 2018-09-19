@@ -531,8 +531,7 @@
            (buffer (make-array (ceiling len n-word-bytes) :element-type 'word))
            (operand-values))
       (with-pinned-objects (code buffer)
-        (let* ((fun-sap (simple-fun-entry-sap f))
-               (fun-sap-int (sap-int fun-sap)))
+        (let ((fun-sap (simple-fun-entry-sap f)))
           (%byte-blt fun-sap 0 buffer 0 len)
           ;; Smash each PC-relative operand, and collect the effective value of
           ;; the operand and its offset in the buffer.  We needn't compute the
@@ -542,10 +541,54 @@
           ;; be needed for the absolute EA, so we don't simply write it back
           ;; to the buffer, though at present 32 bits would in fact suffice.
           (scan-relative-operands
-           code fun-sap-int len dstate
-           (make-memory-segment nil fun-sap-int len)
+           code (sap-int fun-sap) len dstate
+           (make-memory-segment nil 0 0) ; will get start/length reassigned anyway
            (lambda (offset operand inst)
              (declare (ignore inst))
              (setf operand-values (list* operand offset operand-values)
                    (sap-ref-32 (vector-sap buffer) offset) 0)))))
       (push (cons buffer (coerce operand-values 'simple-vector)) result))))
+
+;;; Perform ICF on instructions of CODE
+(defun sb!vm::machine-code-icf (code mapper replacements print)
+  (declare (ignorable print))
+  (flet ((scan (sap length dstate segment)
+           (scan-relative-operands
+            code (sap-int sap) length dstate segment
+            (lambda (offset operand inst)
+              (declare (ignorable inst))
+              (let ((lispobj (when (immobile-space-addr-p operand)
+                               (sb!vm::find-called-object operand))))
+                (when (functionp lispobj)
+                  (let ((replacement (funcall mapper lispobj)))
+                    (unless (eq replacement lispobj)
+                      (when print
+                        (format t "ICF: ~S -> ~S~%" lispobj replacement))
+                      (let* ((disp (- (get-lisp-obj-address replacement)
+                                      (get-lisp-obj-address lispobj)))
+                             (old-rel32 (signed-sap-ref-32 sap offset))
+                             (new-rel32 (the (signed-byte 32) (+ old-rel32 disp))))
+                        (setf (signed-sap-ref-32 sap offset) new-rel32))))))))))
+    (if (eq code sb!fasl:*assembler-routines*)
+        (multiple-value-bind (start end) (sb!fasl::calc-asm-routine-bounds)
+          (scan (sap+ (code-instructions code) start)
+                (- end start)
+                (make-dstate)
+                (make-memory-segment nil 0 0)))
+        ;; Pre-scan the code header to determine whether there is
+        ;; a reason to scan the instruction bytes.
+        (when (loop for i from code-constants-offset below (code-header-words code)
+                    thereis (let ((obj (code-header-ref code i)))
+                              (typecase obj
+                                (fdefn (awhen (fdefn-fun obj)
+                                         (gethash (fun-code-header it) replacements)))
+                                (simple-fun
+                                 (gethash (fun-code-header obj) replacements)))))
+          (let ((dstate (make-dstate))
+                (seg (make-memory-segment nil 0 0)))
+            (with-pinned-objects (code)
+              (dotimes (i (code-n-entries code))
+                (let ((f (%code-entry-point code i)))
+                  (scan (simple-fun-entry-sap f)
+                        (%simple-fun-text-len f i)
+                        dstate seg)))))))))

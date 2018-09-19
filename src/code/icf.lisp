@@ -23,7 +23,7 @@
 ;;; [*] https://ai.google/research/pubs/pub36912
 ;;;
 
-(defun apply-forwarding-map (map &optional print)
+(defun apply-forwarding-map (map print)
   (when print
     (let ((*print-pretty* nil))
       (dohash ((k v) map)
@@ -89,6 +89,16 @@
             (when (and (= (get-header-data object) vector-valid-hashing-subtype)
                        touchedp)
               (setf (svref object 1) 1)))
+           (code-component
+            :override
+            ;; We must perform replacements inside the raw bytes, otherwise GC lossage
+            ;; could result. e.g. suppose the header contains #<FDEFN FOO> which points
+            ;; to #<FOO>, and a machine instruction contains "CALL #<FOO>". If the ICF
+            ;; pass replaces #<FOO> with #<BAR>, the instruction needs to change, because
+            ;; if it didn't, there would be no traceable pointer from code to #<FOO>.
+            (machine-code-icf object #'forward map print)
+            (loop for i from code-constants-offset below (code-header-words object)
+                  do (rewrite (code-header-ref object i))))
            (fdefn
             :override
             (let* ((oldval (fdefn-fun object))
@@ -148,9 +158,12 @@
                (* (length words1) n-word-bytes))))))
 
 #-x86-64
+(progn
 (defun compute-code-signature (code dstate)
   (declare (ignore dstate))
   code)
+(defun machine-code-icf (code mapper replacements print)
+  (declare (ignore code mapper replacements print))))
 
 (defun code-equivalent-p (obj1 obj2 &aux (code1 (car obj1)) (code2 (car obj2)))
   (declare (ignorable code1 code2))
@@ -217,6 +230,9 @@
                        sb-c::deftransform
                        :source-transform))))))
 
+;;; TODO: this could theoretically require more than one iteration
+;;; to reach a fixed point. (After performing replacements we should check
+;;; again whether any code objects have become equivalent.)
 (defun fold-identical-code (&key aggressive print)
   #+gencgc (gc :gen 7)
   ;; Pass 1: count code objects.  I'd like to enhance MAP-ALLOCATED-OBJECTS
