@@ -1282,6 +1282,25 @@ due to normal completion or a non-local exit such as THROW)."
             (declare (optimize (insert-debug-catch 0)))
             (,cleanup-fun)
             (%continue-unwind ,next ,start ,count)))))))
+
+(def-ir1-translator inspect-unwinding
+    ((protected inspect-fun) start next result)
+  (ir1-convert
+   start next result
+   (with-unique-names (cleanup-fun drop-thru-tag exit-tag next start count)
+     `(flet ((,cleanup-fun ()))
+        (block ,drop-thru-tag
+          (multiple-value-bind (,next ,start ,count)
+              (block ,exit-tag
+                (%within-cleanup
+                 :unwind-protect
+                 (%unwind-protect (%escape-fun ,exit-tag)
+                                  (%cleanup-fun ,cleanup-fun))
+                 (return-from ,drop-thru-tag ,protected)))
+            (declare (optimize (insert-debug-catch 0)))
+            (funcall ,inspect-fun ,next)
+            (,cleanup-fun)
+            (%continue-unwind ,next ,start ,count)))))))
 
 ;;;; multiple-value stuff
 
