@@ -928,13 +928,37 @@
 (defun static-foreign-symbol-sap (name)
   (int-sap (static-foreign-symbol-address name)))
 
-(defun context-code-pc-offset (context code)
-  (declare (type (sb!alien:alien (* os-context-t)) context)
-           (type code-component code))
+(defun catch-runaway-unwind (block)
+  (let ((target (sap-ref-sap (descriptor-sap block)
+                             (* unwind-block-uwp-slot n-word-bytes))))
+    (loop for uwp = (descriptor-sap sb!vm::*current-unwind-protect-block*)
+          then (sap-ref-sap uwp (* unwind-block-uwp-slot n-word-bytes))
+          until (zerop (sap-int uwp))
+          thereis (sap= target uwp)
+          finally
+          (let* ((pc (sap-ref-sap (descriptor-sap block)
+                                  (* unwind-block-entry-pc-slot n-word-bytes)))
+                 (code (code-header-from-pc pc))
+                 (fun-name
+                   (and code
+                        (or
+                         (multiple-value-bind (offset valid) (code-pc-offset pc code)
+                           (and valid
+                                (let ((debug-fun (debug-fun-from-pc code offset nil)))
+                                  (and (compiled-debug-fun-p debug-fun)
+                                       (debug-fun-name debug-fun)))))
+                         code))))
+            (error 'simple-control-error
+                   :format-control
+                   "Attempt to RETURN-FROM a block or GO to a tag that no longer exists~@[ in ~s~]"
+                   :format-arguments (list fun-name))))))
+
+(defun code-pc-offset (pc code)
+  (declare (type code-component code))
   (let ((code-header-len (* (code-header-words code)
                             n-word-bytes)))
     (with-pinned-objects (code)
-      (let ((pc-offset (- (sap-int (context-pc context))
+      (let ((pc-offset (- (sap-int pc)
                           (- (get-lisp-obj-address code)
                              other-pointer-lowtag)
                           code-header-len))
@@ -942,6 +966,9 @@
         (values pc-offset
                 (<= 0 pc-offset code-size)
                 code-size)))))
+
+(defun context-code-pc-offset (context code)
+  (code-pc-offset (context-pc context) code))
 
 (defun find-escaped-frame (frame-pointer)
   (declare (type system-area-pointer frame-pointer))

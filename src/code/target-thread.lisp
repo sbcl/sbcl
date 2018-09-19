@@ -1505,16 +1505,6 @@ session."
       (make-thread #'thread-repl))))
 
 
-(defun catch-runaway-unwinding (target)
-  (let ((target (sap-ref-sap (descriptor-sap target) 0)))
-    (loop for uwp = (descriptor-sap sb!vm::*current-unwind-protect-block*)
-          then (sap-ref-sap uwp 0)
-          until (zerop (sap-int uwp))
-          thereis (sap= target uwp)
-          finally (error 'simple-control-error
-                         :format-control
-                         "attempt to RETURN-FROM a block or GO to a tag that no longer exists"))))
-
 ;;;; The beef
 
 #!+sb-thread
@@ -1570,7 +1560,7 @@ session."
                                      (catch '%return-from-thread
                                        (sb!c::inspect-unwinding
                                         (apply real-function arguments)
-                                        #'catch-runaway-unwinding))
+                                        #'sb!di::catch-runaway-unwind))
                                   (when *exit-in-process*
                                     (sb!impl::call-exit-hooks))))
                              #!+sb-safepoint
