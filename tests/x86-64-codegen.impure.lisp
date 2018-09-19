@@ -269,7 +269,8 @@
                   thereis (and (search "MOV QWORD PTR [" line)
                                (search ":KEY" line))))))
 
-(with-test (:name :aprof-smoketest-struct)
+(with-test (:name :aprof-smoketest-struct
+            :fails-on :sb-safepoint)
   (let ((nbytes
          (let ((*standard-output* (make-broadcast-stream)))
            (sb-aprof:aprof-run
