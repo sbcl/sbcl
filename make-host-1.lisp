@@ -1,10 +1,3 @@
-;;; (We want to have some limit on print length and print level during
-;;; bootstrapping because PRINT-OBJECT only gets set up rather late,
-;;; and running without PRINT-OBJECT it's easy to fall into printing
-;;; enormous (or infinitely circular) low-level representations of
-;;; things.)
-(setf *print-level* 5 *print-length* 5)
-
 (progn
   (load "src/cold/shared.lisp")
   (load "tools-for-build/ldso-stubs.lisp")
@@ -69,28 +62,26 @@
   (set-dispatch-macro-character #\# #\+ #'she-reader)
   (set-dispatch-macro-character #\# #\- #'she-reader))
 
+;;; Build the unicode database now. It depends on nothing in the cross-compiler
+;;; (and let's keep it that way). This code is slow to run, so compile it.
+(let ((object (compile-file "tools-for-build/ucd.lisp")))
+  (load object :verbose t)
+  (delete-file object))
+(dolist (s '(sb-cold::slurp-ucd sb-cold::slurp-proplist sb-cold::output))
+  (funcall s))
+
 (maybe-with-compilation-unit
  (load-or-cload-xcompiler #'host-cload-stem)
 
-;;; Let's check that the type system, and various other things, are
-;;; reasonably sane. (It's easy to spend a long time wandering around
-;;; confused trying to debug cross-compilation if it isn't.)
+ ;; Let's check that the type system, and various other things, are
+ ;; reasonably sane. (It's easy to spend a long time wandering around
+ ;; confused trying to debug cross-compilation if it isn't.)
  (load "tests/type.before-xc.lisp")
  (load "tests/info.before-xc.lisp")
  (load "tests/vm.before-xc.lisp")
-;; When building on a slow host using a slow Lisp,
-;; the wait time in slurp-ucd seems interminable - over a minute.
-;; Compiling seems to help a bit, but maybe it's my imagination.
- (let ((object (compile-file "tools-for-build/ucd.lisp")))
-   (load object)
-   (delete-file object))
 
-;;; Generate character database tables.
- (dolist (s '(sb-cold::slurp-ucd sb-cold::slurp-proplist sb-cold::output))
-   (funcall s))
-
-;;; propagate structure offset and other information to the C runtime
-;;; support code.
+ ;; propagate structure offset and other information to the C runtime
+ ;; support code.
  (load "tools-for-build/corefile.lisp" :verbose nil)
  (host-cload-stem "src/compiler/generic/genesis" nil)
 ) ; END with-compilation-unit

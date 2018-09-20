@@ -104,7 +104,7 @@
                   (not (gethash spec sb!c::*checkgen-used-types*)))
         do (format t "       ~S~%" spec)))
 
-;; Print some information about how well the function caches performed
+;; Print some information about how well the type operator caches performed
 (when sb!impl::*profile-hash-cache*
   (sb!impl::show-hash-cache-statistics))
 #|
