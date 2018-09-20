@@ -71,7 +71,9 @@
   (funcall s))
 
 (maybe-with-compilation-unit
- (load-or-cload-xcompiler #'host-cload-stem)
+ (let ((*feature-evaluation-results* nil))
+  (load-or-cload-xcompiler #'host-cload-stem)
+  (write-feature-eval-results))
 
  ;; Let's check that the type system, and various other things, are
  ;; reasonably sane. (It's easy to spend a long time wandering around

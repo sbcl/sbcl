@@ -22,7 +22,9 @@
       functions
       types)
   (sb!xc:with-compilation-unit ()
-    (load "src/cold/compile-cold-sbcl.lisp")
+    (let ((*feature-evaluation-results* nil))
+      (load "src/cold/compile-cold-sbcl.lisp")
+      (sanity-check-feature-evaluation))
     ;; Enforce absence of unexpected forward-references to warm loaded code.
     ;; Looking into a hidden detail of this compiler seems fair game.
     #!+(or x86 x86-64 arm64) ; until all the rest are clean

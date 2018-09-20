@@ -83,22 +83,29 @@
 ;; Refer to info-vector.lisp for the meaning of this constant.
 (defconstant +no-auxilliary-key+ 0)
 
-;; Return the globaldb info for SYMBOL. With respect to the state diagram
-;; presented at the definition of SYMBOL-PLIST, if the object in SYMBOL's
-;; info slot is LISTP, it is in state 1 or 3. Either way, take the CDR.
-;; Otherwise, it is in state 2 so return the value as-is.
-;; In terms of this function being named "-vector", implying always a vector,
-;; it is understood that NIL is a proxy for +NIL-PACKED-INFOS+, a vector.
-;;
+;;; Return the globaldb info for SYMBOL. With respect to the state diagram
+;;; presented at the definition of SYMBOL-PLIST, if the object in SYMBOL's
+;;; info slot is LISTP, it is in state 1 or 3. Either way, take the CDR.
+;;; Otherwise, it is in state 2 so return the value as-is.
+;;; In terms of this function being named "-vector", implying always a vector,
+;;; it is understood that NIL is a proxy for +NIL-PACKED-INFOS+, a vector.
+;;;
+;;; Declaim SYMBOL-INFO-VECTOR inline unless a vop translates it.
+;;; (Inlining occurs first, which would cause the vop not to be used.)
+;;; Also note that we have to guard the appearance of VOP-TRANSLATES here
+;;; so that it does not get tested when building the cross-compiler.
+;;; This was the best way I could see to work around a spurious warning
+;;; about a wrongly ordered VM definition in make-host-1.
+;;; The #!+/- reader can't see that a VOP-TRANSLATES term is not for the
+;;; host compiler unless the whole thing is one expression.
+#!-(or (host-feature sb-xc-host)
+       (vop-translates sb!kernel:symbol-info-vector))
+(declaim (inline symbol-info-vector))
 #-sb-xc-host
-(progn
- ;; Don't inline this if a vop translates it. Inlining occurs first,
- ;; causing the vop not to be used.
- #!-(vop-translates sb!kernel:symbol-info-vector) (declaim (inline symbol-info-vector))
- (defun symbol-info-vector (symbol)
+(defun symbol-info-vector (symbol)
   (let ((info-holder (symbol-info symbol)))
     (truly-the (or null simple-vector)
-               (if (listp info-holder) (cdr info-holder) info-holder)))))
+               (if (listp info-holder) (cdr info-holder) info-holder))))
 
 ;;; SYMBOL-INFO is a primitive object accessor defined in 'objdef.lisp'
 ;;; But in the host Lisp, there is no such thing as a symbol-info slot.

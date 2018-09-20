@@ -477,8 +477,6 @@
  ("src/compiler/constraint")
  ("src/compiler/array-tran")
  ("src/compiler/seqtran")
- ("src/compiler/typetran")
- ("src/compiler/generic/vm-typetran")
  ("src/compiler/float-tran")
  ("src/compiler/saptran")
  ("src/compiler/sxhash")
@@ -538,10 +536,11 @@
  ;; This is a terrible name for a file that contains type derivers
  ;; and IR1 transforms. Maybe split it up into more appropriately named pieces.
  ("src/compiler/srctran")
- ("src/code/cross-modular"  :not-target)
-
- ("src/compiler/generic/late-type-vops") ;; KLUDGE: it's not so late anymore
+ ("src/compiler/generic/late-type-vops")
  ("src/compiler/target/type-vops")
+ ("src/compiler/typetran")
+ ("src/compiler/generic/vm-typetran")
+ ("src/code/cross-modular"  :not-target)
 
  ("src/compiler/target/subprim")
  ("src/compiler/target/debug")
