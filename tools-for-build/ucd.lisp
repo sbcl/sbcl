@@ -921,7 +921,7 @@ Used to look up block data.")
     (terpri)
     (prin1 *maximum-variable-key*) (terpri)))
 
-(defun output ()
+(defun output (&optional (*output-directory* *output-directory*))
   (output-misc-data)
   (output-ucd-data)
   (output-decomposition-data)

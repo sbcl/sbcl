@@ -188,11 +188,22 @@
 ;;; In order to refer to target features specifically, we refer to
 ;;; SB!XC:*FEATURES* instead of CL:*FEATURES*, and use the #!+ and #!-
 ;;; readmacros instead of the ordinary #+ and #- readmacros.
+;;;
+;;; To support building in a read-only filesystem, the 'local-target-features'
+;;; file might not be directly located here, since it's a generated file.
+;;; In as much as we use files as the means of passing parameters to
+;;; our Lisp scripts - because we can't in general assume that we can read
+;;; the command-line arguments in any Lisp - it doesn't make sense to have
+;;; another file specifying the name of the local-target-features file.
+;;; The compromise is to examine a variable specifying a path
+;;; (and it can't go in SB-COLD because the package is not made soon enough)
 (setf sb!xc:*features*
-      (let* ((default-features
-               (funcall (compile
-                         nil
-                         (read-from-file "local-target-features.lisp-expr"))
+      (let* ((pathname (let ((var 'cl-user::*sbcl-target-features-file*))
+                         (if (boundp var)
+                             (symbol-value var)
+                             "local-target-features.lisp-expr")))
+             (default-features
+               (funcall (compile nil (read-from-file pathname))
                         (read-from-file "base-target-features.lisp-expr")))
              (customizer-file-name "customize-target-features.lisp")
              (customizer (if (probe-file customizer-file-name)
