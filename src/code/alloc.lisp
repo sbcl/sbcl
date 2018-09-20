@@ -483,3 +483,9 @@
     (ash (%%code-code-size code) (- n-fixnum-tag-bits 32)))
   (defun %code-code-size (code) ; clip to max imposed by allocate-code-object
     (ldb (byte 22 0) (%%code-code-size code))))
+
+;; Placeholder function so that the PRINT-OBJECT method doesn't
+;; have to worry about whether this accessor exists.
+#!-64-bit
+(defun %code-serialno (code)
+  (declare (ignore code)))

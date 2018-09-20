@@ -1622,7 +1622,9 @@ variable: an unreadable object representing the error is printed instead.")
             ((functionp dinfo)
              (format stream "trampoline ~S" dinfo))
             (t
-             (format stream "code object [~D]" (code-n-entries component))
+             (format stream "code~@[ id=~x~] [~D]"
+                     (%code-serialno component)
+                     (code-n-entries component))
              (let ((fun-name (awhen (%code-entry-point component 0)
                                (%simple-fun-name it))))
                (when fun-name
