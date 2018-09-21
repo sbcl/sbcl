@@ -1811,8 +1811,9 @@ not stack-allocated LVAR ~S." source-lvar)))))
 
 (defoptimizer (%special-unbind ir2-convert) ((&rest symbols) node block)
   (declare (ignorable symbols))
-  (vop unbind node block #!+(and sb-thread unbind-n-vop)
-                         (mapcar #'lvar-value symbols)))
+  #!-(vop-named sb!c:unbind-n) (vop unbind node block)
+  #!+(vop-named sb!c:unbind-n) (vop unbind-n node block
+                                    (mapcar #'lvar-value symbols)))
 
 ;;; ### It's not clear that this really belongs in this file, or
 ;;; should really be done this way, but this is the least violation of

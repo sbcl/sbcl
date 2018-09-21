@@ -670,7 +670,7 @@ if [ "$sbcl_arch" = "x86" ]; then
 elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :64-bit :64-bit-registers :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack :linkage-table' >> $ltf
     printf ' :compare-and-swap-vops :unwind-to-frame-and-call-vop' >> $ltf
-    printf ' :fp-and-pc-standard-save :unbind-n-vop' >> $ltf
+    printf ' :fp-and-pc-standard-save' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks :cycle-counter :complex-float-vops' >> $ltf
@@ -765,7 +765,7 @@ elif [ "$sbcl_arch" = "arm64" ]; then
     printf ' :alien-callbacks' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-closures' >> $ltf
-    printf ' :unbind-n-vop :unwind-to-frame-and-call-vop' >> $ltf
+    printf ' :unwind-to-frame-and-call-vop' >> $ltf
     printf ' :compare-and-swap-vops :undefined-fun-restarts' >> $ltf
 else
     # Nothing need be done in this case, but sh syntax wants a placeholder.

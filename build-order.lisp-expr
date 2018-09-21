@@ -487,7 +487,6 @@
  ("src/compiler/dfo")
  ("src/compiler/dce")
  ("src/compiler/checkgen")
- ("src/compiler/physenvanal")
 
  ("src/compiler/tn")
  ("src/compiler/life")
@@ -555,6 +554,7 @@
  ("src/compiler/target/array")
  ("src/compiler/generic/type-error")
  ("src/compiler/target/pred")
+ ("src/compiler/physenvanal")
 
  ;; KLUDGE: The assembly files need to be compiled twice: once as
  ;; normal lisp files, and once by sb-c:assemble-file.  We use a

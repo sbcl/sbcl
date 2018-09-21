@@ -485,7 +485,7 @@
              (code `(%primitive set-nsp ,(ref-leaf node))))))))
     (flet ((coalesce-unbinds (code)
              code
-              #!+(and sb-thread unbind-n-vop)
+              #!+(vop-named sb!c:unbind-n)
               (loop with cleanup
                     while code
                     do (setf cleanup (pop code))

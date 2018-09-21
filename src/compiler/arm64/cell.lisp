@@ -317,7 +317,7 @@
                                                n-word-bytes)))
       (inst str value (@ thread-tn tls-index))))
 
-  (define-vop (unbind)
+  (define-vop (unbind-n)
     (:info symbols)
     (:temporary (:sc descriptor-reg) value)
     (:temporary (:sc any-reg) tls-index bsp)

@@ -500,7 +500,7 @@
     (storew val symbol symbol-value-slot other-pointer-lowtag)))
 
 #!+sb-thread
-(define-vop (unbind)
+(define-vop (unbind-n)
   (:temporary (:sc unsigned-reg) temp bsp)
   (:temporary (:sc complex-double-reg) zero)
   (:info symbols)
