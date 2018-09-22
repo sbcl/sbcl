@@ -314,7 +314,7 @@ normally during operations like SLEEP."
 
 ;;; Return all the data that we want TIME to report.
 (defun time-get-sys-info ()
-  (multiple-value-bind (user sys faults) (sb!sys:get-system-info)
+  (multiple-value-bind (user sys faults) (get-system-info)
     (values user sys faults (get-bytes-consed))))
 
 (defun elapsed-cycles (h0 l0 h1 l1)
