@@ -280,7 +280,8 @@
                           (invoke-restart (find-restart 'sb-kernel::call-form c) 123))))
     (assert (= (eval '(cons 1)) 123))))
 
-(with-test (:name :restart-bogus-arg-to-values-list-error)
+(with-test (:name :restart-bogus-arg-to-values-list-error
+                  :broken-on (not (or :x86 :x86-64 :arm :arm64)))
   (let ((fun (checked-compile `(lambda (x) (values-list x)))))
     (assert (equal (handler-bind ((sb-kernel::values-list-argument-error
                                    #'continue))
