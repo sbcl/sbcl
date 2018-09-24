@@ -271,7 +271,7 @@ code:
                       `("-arch" "x86_64"
                         ,(format nil "-mmacosx-version-min=~A"
                                  (or (sb-ext:posix-getenv "SBCL_MACOSX_VERSION_MIN")
-                                     "10.5"))
+                                     "10.6"))
                         "-D_DARWIN_USE_64_BIT_INODE")
                       #+(and x86-64 darwin (not inode64))
                       '("-arch" "x86_64"
