@@ -1669,3 +1669,29 @@
     ((24 23) 23)))
 
 
+(with-test (:name :maybe-delete-exit-after-let-conversion)
+  (checked-compile-and-assert
+      ()
+      `(lambda (m)
+         (flet ((out ()
+                  (flet ((in (a)
+                           (dotimes (i 3 a)
+                             (if m
+                                 (return-from out)
+                                 (return-from out)))
+                           (labels ((f (&optional (a m))
+                                      a
+                                      m)))))
+                    (in (in 10)))))
+
+           (out)
+           33))
+    ((t) 33))
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (unwind-protect
+              (flet ((f (a b &optional c)
+                       (values a b c)))
+                (f 1 2 (f 0 0)))))
+    (() (values 1 2 0))))

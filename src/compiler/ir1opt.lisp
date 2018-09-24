@@ -290,6 +290,13 @@
               (reoptimize-component (node-component cast) :maybe)))))
   (values))
 
+(defun reoptimize-node (node)
+  (let* ((block (node-block node))
+         (component (block-component block)))
+    (setf (node-reoptimize node) t)
+    (reoptimize-component component t)
+    (setf (block-reoptimize block) t)))
+
 ;;; Annotate NODE to indicate that its result has been proven to be
 ;;; TYPEP to RTYPE. After IR1 conversion has happened, this is the
 ;;; only correct way to supply information discovered about a node's

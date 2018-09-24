@@ -370,20 +370,16 @@
   (values))
 
 ;;; Iterate over the EXITs in COMPONENT, calling NOTE-NON-LOCAL-EXIT
-;;; when we find a block that ends in a non-local EXIT node. We also
-;;; ensure that all EXIT nodes are either non-local or degenerate by
-;;; calling IR1-OPTIMIZE-EXIT on local exits. This makes life simpler
-;;; for later phases.
+;;; when we find a block that ends in a non-local EXIT node.
 (defun find-non-local-exits (component)
   (declare (type component component))
   (let ((*functional-escape-info* nil))
     (dolist (lambda (component-lambdas component))
       (dolist (entry (lambda-entries lambda))
-        (dolist (exit (entry-exits entry))
-          (let ((target-physenv (node-physenv entry)))
-            (if (eq (node-physenv exit) target-physenv)
-                (maybe-delete-exit exit)
-                (note-non-local-exit target-physenv exit)))))))
+        (let ((target-physenv (node-physenv entry)))
+          (dolist (exit (entry-exits entry))
+            (aver (neq (node-physenv exit) target-physenv))
+            (note-non-local-exit target-physenv exit))))))
   (values))
 
 ;;;; final decision on stack allocation of dynamic-extent structures
