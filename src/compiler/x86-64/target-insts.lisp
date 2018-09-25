@@ -551,7 +551,8 @@
 
 ;;; Perform ICF on instructions of CODE
 (defun sb!vm::machine-code-icf (code mapper replacements print)
-  (declare (ignorable print))
+  (declare (ignorable code mapper replacements print))
+  #!+immobile-space
   (flet ((scan (sap length dstate segment)
            (scan-relative-operands
             code (sap-int sap) length dstate segment
