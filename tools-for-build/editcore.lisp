@@ -32,9 +32,9 @@
   (:import-from "SB-DISASSEM" #:get-inst-space #:find-inst
                 #:make-dstate #:%make-segment
                 #:seg-virtual-location #:seg-length #:seg-sap-maker
-                #:map-segment-instructions
+                #:map-segment-instructions #:inst-name
                 #:dstate-next-addr #:dstate-cur-offs)
-  (:import-from "SB-X86-64-ASM" #:near-jump-displacement)
+  (:import-from "SB-X86-64-ASM" #:near-jump-displacement #:mov #:|call|)
   (:import-from "SB-IMPL" #:package-hashtable #:package-%name
                 #:package-hashtable-cells
                 #:hash-table-table #:hash-table-number-entries))
@@ -507,8 +507,22 @@
          ((< next-fixup-addr (dstate-next-addr dstate))
           (let ((operand (sap-ref-32 sap (- next-fixup-addr load-addr))))
             (when (in-bounds-p operand (core-code-bounds core))
-              (aver (eql (sap-ref-8 sap (- next-fixup-addr load-addr 1)) #xB8)) ; mov rax, imm32
-              (push (list* (dstate-cur-offs dstate) 5 "mov" operand) list)))
+              (cond
+                ((and (eq (inst-name inst) 'mov) ; match "mov eax, imm32"
+                      (eql (sap-ref-8 sap (dstate-cur-offs dstate)) #xB8))
+                 (push (list* (dstate-cur-offs dstate) 5 "mov" operand) list))
+                ((and (eq (inst-name inst) '|call|) ; match "call qword ptr [addr]"
+                      (eql (ldb (byte 24 0) (sap-ref-32 sap (dstate-cur-offs dstate)))
+                           #x2514FF)) ; ModRM+SIB encodes disp32, no base, no index
+                 ;; This form of call instruction is employed for asm routines when
+                 ;; compile-to-memory-space is :AUTO.  If the code were to be loaded
+                 ;; into dynamic space, the offset to the called routine isn't
+                 ;; a (signed-byte 32), so we need the indirection.
+                 (push (list* (dstate-cur-offs dstate) 7 "call*" operand) list))
+                (t
+                 (bug "Can't reverse-engineer fixup: ~s ~x"
+                      (inst-name inst)
+                      (sap-ref-32 sap (dstate-cur-offs dstate)))))))
           (pop (core-fixup-addrs core))
           (setq next-fixup-addr (or (car (core-fixup-addrs core)) most-positive-word)))
          ((or (eq inst jmp-inst) (eq inst call-inst))
@@ -633,6 +647,12 @@
                                  (t)))
                           ((string= opcode "mov")
                            (format stream " mov $(__lisp_code_start+0x~x),%eax~%"
+                                   (- operand (bounds-low (core-code-bounds core)))))
+                          ((string= opcode "call*")
+                           ;; Indirect call - since the code is in immobile space,
+                           ;; we could render this as a 2-byte NOP followed by a direct
+                           ;; call. For simplicity I'm leaving it exactly as it was.
+                           (format stream " call *(__lisp_code_start+0x~x)~%"
                                    (- operand (bounds-low (core-code-bounds core)))))
                           (t))
                 (bug "Random annotated opcode ~S" opcode))
