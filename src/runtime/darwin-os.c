@@ -18,6 +18,7 @@
 #include "sbcl.h"
 #include "globals.h"
 #include "runtime.h"
+#include "interr.h"
 #include <signal.h>
 #include <limits.h>
 #include <mach-o/dyld.h>
