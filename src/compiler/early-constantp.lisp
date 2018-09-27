@@ -19,8 +19,8 @@
 (defun sb!xc:constantp (form &optional (environment nil envp))
   "True of any FORM that has a constant value: self-evaluating objects,
 keywords, defined constants, quote forms. Additionally the
-constant-foldability of some function calls special forms is recognized. If
-ENVIRONMENT is provided the FORM is first macroexpanded in it."
+constant-foldability of some function calls and special forms is recognized.
+If ENVIRONMENT is provided, the FORM is first macroexpanded in it."
   (%constantp form environment envp))
 
 #!-sb-fluid (declaim (inline constant-form-value))
