@@ -1420,7 +1420,7 @@ code to be loaded.
       (loop-constant-fold-if-possible val)
     (let ((listvar (gensym "LOOP-LIST-")))
       (loop-make-var var nil data-type)
-      (loop-make-var listvar list 'list)
+      (loop-make-var listvar list t)
       (let ((list-step (loop-list-step listvar)))
         (let* ((first-endtest `(endp ,listvar))
                (other-endtest first-endtest)
