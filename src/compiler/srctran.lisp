@@ -3677,18 +3677,6 @@
 
 ;;;; equality predicate transforms
 
-;;; Return true if X and Y are lvars whose only use is a
-;;; reference to the same leaf, and the value of the leaf cannot
-;;; change.
-(defun same-leaf-ref-p (x y)
-  (declare (type lvar x y))
-  (let ((x-use (principal-lvar-use x))
-        (y-use (principal-lvar-use y)))
-    (and (ref-p x-use)
-         (ref-p y-use)
-         (eq (ref-leaf x-use) (ref-leaf y-use))
-         (constant-reference-p x-use))))
-
 ;;; If X and Y are the same leaf, then the result is true. Otherwise,
 ;;; if there is no intersection between the types of the arguments,
 ;;; then the result is definitely false.

@@ -2393,6 +2393,35 @@ is :ANY, the function name is not checked."
       (if (and (boundp '*constants*) (coalescep object))
           (ensure-gethash object *constants* (make-it))
           (make-it)))))
+
+;;; Return true if X and Y are lvars whose only use is a
+;;; reference to the same leaf, and the value of the leaf cannot
+;;; change.
+(defun same-leaf-ref-p (x y)
+  (declare (type lvar x y))
+  (let ((x-use (principal-lvar-use x))
+        (y-use (principal-lvar-use y)))
+    (and (ref-p x-use)
+         (ref-p y-use)
+         (eq (ref-leaf x-use) (ref-leaf y-use))
+         (or (constant-reference-p x-use)
+             (refs-unchanged-p x-use y-use)))))
+
+(defun refs-unchanged-p (ref1 ref2)
+  (block nil
+    (let ((node ref1))
+      (tagbody
+       :next
+         (let ((ctran (node-next node)))
+           (when ctran
+             (setf node (ctran-next ctran))
+             (if (eq node ref2)
+                 (return t)
+                 (typecase node
+                   (ref
+                    (go :next))
+                   (cast
+                    (go :next))))))))))
 
 ;;; Return true if VAR would have to be closed over if environment
 ;;; analysis ran now (i.e. if there are any uses that have a different
