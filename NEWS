@@ -1,4 +1,21 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.4.11:
+  * minor incompatible change: a number of platform-specific elements of
+    *FEATURES* related to whether the system implements particular strategies
+    have been removed.
+  * minor incompatible change: some changes to the (internal) implementation
+    details of the x86 and x86-64 have necessitated changes to some low-level
+    libraries. 
+  * enhancement: attempting to transfer control through GO or RETURN-FROM to 
+    frames which no longer exist are now caught and handled by the debugger.
+  * enhancement: identical code (at the machine instruction level) can now be
+    shared between functions, if explicitly requested.
+  * enhancement: SB-EXT:STRING-TO-OCTETS and SB-EXT:OCTETS-TO-STRING are now
+    documented.
+  * bug fixes: fix a number of bugs revealed by random testing (lp#1793171,
+    lp#1793150, lp#1791550, lp#1792030, lp#1791059, lp#1790157, lp#1790717,
+    lp#1790703)
+
 changes in sbcl-1.4.11 relative to sbcl-1.4.10:
   * minor incompatible change: changes to the (internal) assembler on x86
     and x86-64 may cause problems to some low-level third-party libraries:
