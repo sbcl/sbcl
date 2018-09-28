@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.4.11:
+changes in sbcl-1.4.12 relative to sbcl-1.4.11:
   * minor incompatible change: a number of platform-specific elements of
     *FEATURES* related to whether the system implements particular strategies
     have been removed.
