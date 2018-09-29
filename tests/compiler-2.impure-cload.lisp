@@ -120,3 +120,11 @@
                                    (let ((uses (zombie-cast-struct-v-uses value)))
                                      (when (zombie-cast-struct-p uses)
                                        (list* uses (l uses)))))))))))
+
+(let ()
+  (define-condition non-top-level-condition (error) ()))
+
+(with-test (:name :non-top-level-condition)
+  (assert
+   (handler-case (signal 'non-top-level-condition)
+     (non-top-level-condition () t))))

@@ -465,12 +465,16 @@
       ;; Maybe kill docstring, but only under the cross-compiler.
       #!+(and (not sb-doc) (host-feature sb-xc-host)) (setq documentation nil)
       `(progn
-         (eval-when (:compile-toplevel)
-           (%compiler-define-condition ',name ',parent-types ',layout
-                                       ',(all-readers) ',(all-writers)))
+         ,@(when *top-level-form-p*
+             ;; Avoid dumping uninitialized layouts, for sb-fasl::dump-layout
+             `((eval-when (:compile-toplevel)
+                 (%compiler-define-condition ',name ',parent-types ,layout
+                                             ',(all-readers) ',(all-writers)))))
          (%define-condition ',name
                             ',parent-types
-                            ',layout
+                            ,(if *top-level-form-p*
+                                 layout
+                                 `(find-condition-layout ',name ',parent-types))
                             (list ,@(slots))
                             (list ,@direct-default-initargs)
                             ',(all-readers)
