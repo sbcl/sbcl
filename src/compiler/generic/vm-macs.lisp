@@ -113,7 +113,7 @@
           (when ref-trans
             (when ref-known-p
               (forms `(defknown ,ref-trans (,type) ,slot-type ,ref-known)))
-            (forms `(def-reffer ,ref-trans ,offset ,lowtag)))
+            (forms `(def-reffer ',ref-trans ,offset ,lowtag)))
           #-c-headers-only
           (when set-trans
             (when set-known-p
@@ -123,7 +123,7 @@
                                      (list type slot-type))
                                 ,slot-type
                         ,set-known)))
-            (forms `(def-setter ,set-trans ,offset ,lowtag)))
+            (forms `(def-setter ',set-trans ,offset ,lowtag)))
           #-c-headers-only
           (when cas-trans
             (when rest-p
@@ -133,7 +133,7 @@
                 (defknown ,cas-trans (,type ,slot-type ,slot-type)
                     ,slot-type ())
                 #!+compare-and-swap-vops
-                (def-casser ,cas-trans ,offset ,lowtag))))
+                (def-casser ',cas-trans ,offset ,lowtag))))
           (when init
             (inits (cons init offset)))
           (when rest-p
@@ -143,7 +143,7 @@
         (constants `(defconstant ,size ,offset)))
       #-c-headers-only
       (when alloc-trans
-        (forms `(def-alloc ,alloc-trans ,offset
+        (forms `(def-alloc ',alloc-trans ,offset
                   ,(if variable-length-p :var-alloc :fixed-alloc)
                   ,widetag
                   ,lowtag ',(inits))))
@@ -206,22 +206,48 @@
 
 (in-package "SB!C")
 
-(defmacro def-reffer (name offset lowtag)
-  `(%def-reffer ',name ,offset ,lowtag))
-(defmacro def-setter (name offset lowtag)
-  `(%def-setter ',name ,offset ,lowtag))
-(defmacro def-alloc (name words alloc-style header lowtag inits)
-  `(%def-alloc ',name ,words ,alloc-style ,header ,lowtag ,inits))
-#!+compare-and-swap-vops
-(defmacro def-casser (name offset lowtag)
-  `(%def-casser ',name ,offset ,lowtag))
-;;; KLUDGE: The %DEF-FOO functions used to implement the macros here
-;;; are defined later in another file, since they use structure slot
-;;; setters defined later, and we can't have physical forward
-;;; references to structure slot setters because ANSI in its wisdom
-;;; allows the xc host CL to implement structure slot setters as SETF
-;;; expanders instead of SETF functions. -- WHN 2002-02-09
-
+(defun def-reffer (name offset lowtag)
+  (let ((fun-info (fun-info-or-lose name)))
+    (setf (fun-info-ir2-convert fun-info)
+          (lambda (node block)
+            (ir2-convert-reffer node block name offset lowtag))))
+  name)
+
+(defun def-setter (name offset lowtag)
+  (let ((fun-info (fun-info-or-lose name)))
+    (setf (fun-info-ir2-convert fun-info)
+          (if (listp name)
+              (lambda (node block)
+                (ir2-convert-setfer node block name offset lowtag))
+              (lambda (node block)
+                (ir2-convert-setter node block name offset lowtag)))))
+  name)
+
+(defun def-alloc (name words allocation-style header lowtag inits)
+  (let ((info (fun-info-or-lose name)))
+    (setf (fun-info-ir2-convert info)
+          (ecase allocation-style
+            (:var-alloc
+             (lambda (node block)
+                (ir2-convert-variable-allocation node block name words header
+                                                 lowtag inits)))
+            (:fixed-alloc
+             (lambda (node block)
+               (ir2-convert-fixed-allocation node block name words header
+                                             lowtag inits)))
+            (:structure-alloc
+             (lambda (node block)
+               (ir2-convert-structure-allocation node block name words header
+                                                 lowtag inits))))))
+  name)
+
+#!+compare-and-swap-vops ; same as IR2-CONVERT-CASSER
+(defun def-casser (name offset lowtag)
+  (let ((fun-info (fun-info-or-lose name)))
+    (setf (fun-info-ir2-convert fun-info)
+          (lambda (node block)
+            (ir2-convert-casser node block name offset lowtag)))))
+
 ;;; Modular functions
 
 ;;; For a documentation, see CUT-TO-WIDTH.

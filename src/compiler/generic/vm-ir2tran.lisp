@@ -9,7 +9,7 @@
 
 (in-package "SB!C")
 
-(def-alloc %make-structure-instance 1 :structure-alloc
+(def-alloc '%make-structure-instance 1 :structure-alloc
            sb!vm:instance-widetag sb!vm:instance-pointer-lowtag
            nil)
 
