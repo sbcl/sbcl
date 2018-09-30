@@ -114,7 +114,7 @@
   (multiple-value-bind (code gensyms) (compute-code lambda code-converter)
     (let ((generator-lambda `(lambda ,gensyms
                                (declare (muffle-conditions compiler-note)
-                                        (optimize (sb-c::eval-store-source-form 0)))
+                                        (optimize (sb-c:store-source-form 0)))
                                (function ,code))))
       (let ((generator (compile nil generator-lambda)))
         (ensure-fgen test gensyms generator generator-lambda nil)

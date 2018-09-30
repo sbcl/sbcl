@@ -385,13 +385,11 @@
   (name "<not computed>" :type (or simple-string list symbol))
   ;; the argument list that the function was defined with.
   (arguments nil :type list)
-  ;; the entire lambda expression defining this function
-  (lexpr nil)
   ;; a function type specifier representing the arguments and results
   ;; of this function
   (type 'function :type (or list (member function)))
-  ;; docstring and/or xref information for the XEP
-  (info nil :type (or null simple-vector string (cons string simple-vector))))
+  ;; source form and/or docstring and/or xref information for the XEP
+  (form/doc/xrefs nil :type (or null simple-vector string cons)))
 
 ;;; An IR2-PHYSENV is used to annotate non-LET LAMBDAs with their
 ;;; passing locations. It is stored in the PHYSENV-INFO.

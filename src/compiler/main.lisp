@@ -1261,27 +1261,9 @@ necessary, since type inference may take arbitrarily long to converge.")
               #-sb-xc-host
               (let ((store-source
                      (policy (lambda-bind fun)
-                             (> eval-store-source-form 0))))
+                             (> store-source-form 0))))
                 (fix-core-source-info *source-info* object
-                                      (and store-source result))
-                ;; FIXME: here on down the logic probably belongs in
-                ;; MAKE-CORE-COMPONENT, but to do that we'd want to pass in
-                ;; the EVAL-STORE-SOURCE policy
-                (when store-source
-                  ;; Store each simple-fun's lambda expression
-                  (dohash ((entry simple-fun) entry-table)
-                    (let ((info (entry-info-info entry)))
-                      (sb!impl::set-simple-fun-info
-                         simple-fun
-                         (entry-info-lexpr entry)
-                         ;; SET-SIMPLE-FUN-INFO expects all 3 thingies that we might
-                         ;; save (any can be NIL) so extract the existing docstring
-                         (cond ((listp info) (car info))
-                               ((stringp info) info))
-                         ;; ... and the existing xrefs
-                         (cond ((listp info) (cdr info))
-                               ((simple-vector-p info) info))))))))
-
+                                      (and store-source result))))
             (mapc #'clear-ir1-info components-from-dfo)
             result))))))
 

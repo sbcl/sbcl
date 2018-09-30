@@ -112,9 +112,9 @@ This option has no effect without COMPUTE-DEBUG-FUN.")
     debug
   ("minimal" "yes" "yes" "yes"))
 
-(define-optimization-quality eval-store-source-form
+(define-optimization-quality store-source-form
     debug
-  ("no" "yes" "yes" "yes"))
+  ("no" "maybe" "yes" "yes"))
 
 (define-optimization-quality preserve-single-use-debug-variables
     (if (and (>= debug 2)

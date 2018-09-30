@@ -143,9 +143,9 @@
       (loop for (fun . unpacked) in all-unpacked do
            (let ((new-xrefs (pack-xref-data unpacked)))
              (incf new-size (xref-size new-xrefs))
-             (sb-impl::set-simple-fun-info
+             (set-simple-fun-info
               fun
-              (sb-impl::%simple-fun-lexpr fun)
+              (%simple-fun-lexpr fun)
               (%simple-fun-doc fun)
               new-xrefs))))
 

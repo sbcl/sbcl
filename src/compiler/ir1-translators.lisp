@@ -334,7 +334,7 @@ Evaluate the FORMS in the specified SITUATIONS (any of :COMPILE-TOPLEVEL,
                             ;; inlined functions closes over this
                             ;; macro.
                             (process-optimize-decl
-                             '(optimize (eval-store-source-form 3))
+                             '(optimize (store-source-form 3))
                              *macro-policy*)))
                       (make-macro-lambda nil arglist body 'macrolet name))
                     lexenv)))))))

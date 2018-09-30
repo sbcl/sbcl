@@ -583,7 +583,7 @@
     (setf (%simple-fun-name fun) name)
     (setf (%simple-fun-arglist fun) arglist)
     (setf (%simple-fun-type fun) type)
-    (setf (%simple-fun-info fun) info)
+    (apply #'set-simple-fun-info fun info)
     fun))
 
 ;;;; Some Dylan FOPs used to live here. By 1 November 1998 the code

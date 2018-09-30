@@ -63,17 +63,48 @@
     (setf (entry-info-offset info) (gen-label))
     (setf (entry-info-name info)
           (leaf-debug-name internal-fun))
-    ;; Though compiling to core may store the source expr into %SIMPLE-FUN-INFO,
-    ;; compilation to file does not, so we don't put it in ENTRY-INFO-INFO
-    ;; because that would be picked up by FASL-DUMP-COMPONENT.
-    ;; (All manner of un-dumpable objects could be present in the form)
-    (setf (entry-info-lexpr info)
-          (functional-inline-expansion internal-fun))
-    (let ((doc (functional-documentation internal-fun))
+    (let ((form (functional-inline-expansion internal-fun))
+          (doc (functional-documentation internal-fun))
           (xrefs (pack-xref-data (functional-xref internal-fun))))
-      (setf (entry-info-info info) (if (and doc xrefs)
-                                       (cons doc xrefs)
-                                       (or doc xrefs))))
+      (setf (entry-info-form/doc/xrefs info)
+            ;; Simpler case for cross-compiler for two reasons:
+            ;; (1) It doesn't make sense to handle the condition
+            ;; that won't ever be signaled.
+            ;; (2) More importantly, I don't want to emulate
+            ;; SET-SIMPLE-FUN-INFO in genesis.
+            #+sb-xc-host
+            (if (and doc xrefs) (cons doc xrefs) (or doc xrefs))
+            #-sb-xc-host
+            (list (if (fasl-output-p *compile-object*)
+                      (and (policy bind (= store-source-form 3))
+                           ;; Downgrade the error to a warning if this was signaled
+                           ;; by SB-PCL::DONT-KNOW-HOW-TO-DUMP.
+                           ;; If not that, let the error propagate.
+                           (block nil
+                             (handler-bind
+                                 ((compiler-error
+                                   ;; Everything about error handling sucks so badly.
+                                   ;; Why turn a perfectly good error into a different
+                                   ;; and not necessarily better error?
+                                   (lambda (e &aux (c (encapsulated-condition e)))
+                                     ;; And why the heck isn't this just NO-APPLICABLE-METHOD
+                                     ;; on MAKE-LOAD-FORM?  Why did we choose to further obfuscate
+                                     ;; a condition that was reflectable and instead turn it
+                                     ;; into a dumb text string?
+                                     (when (and (typep c 'simple-error)
+                                                (search "know how to dump"
+                                                        (simple-condition-format-control c)))
+                                       ;; This might be worth a full warning. Dunno.
+                                       ;; After all, the user asked to do what can't be done.
+                                       (compiler-style-warn
+                                        "Can't preserve function source - ~
+missing MAKE-LOAD-FORM methods?")
+                                       (return nil)))))
+                               (constant-value (find-constant form)))))
+                      (and (policy bind (> store-source-form 0))
+                           form))
+                  doc
+                  xrefs)))
     (when (policy bind (>= debug 1))
       (let ((args (functional-arg-documentation internal-fun)))
         ;; When the component is dumped, the arglists of the entry

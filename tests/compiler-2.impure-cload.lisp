@@ -128,3 +128,22 @@
   (assert
    (handler-case (signal 'non-top-level-condition)
      (non-top-level-condition () t))))
+
+(defun somefun (x)
+  (declare (optimize (sb-c:store-source-form 3)))
+  (+ x 101))
+
+(locally
+    (declare (optimize (sb-c:store-source-form 3)))
+  (defun otherfun (y)
+    (/ y 3)))
+
+(locally
+    (declare (optimize (sb-c:store-source-form 2)))
+  (defun nosourcefun (y)
+    (/ y 3)))
+
+(with-test (:name :store-source-form)
+  (assert (function-lambda-expression #'somefun))
+  (assert (function-lambda-expression #'otherfun))
+  (assert (not (function-lambda-expression #'nosourcefun))))

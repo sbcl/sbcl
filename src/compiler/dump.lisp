@@ -1172,7 +1172,7 @@
       (dump-object (sb!c::entry-info-name entry) file)
       (dump-object (sb!c::entry-info-arguments entry) file)
       (dump-object (sb!c::entry-info-type entry) file)
-      (dump-object (sb!c::entry-info-info entry) file)
+      (dump-object (sb!c::entry-info-form/doc/xrefs entry) file)
       (dump-fop 'fop-fun-entry file (decf fun-index))
       (let ((entry-handle (dump-pop file)))
         (setf (gethash entry (fasl-output-entry-table file)) entry-handle)

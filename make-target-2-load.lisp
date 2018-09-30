@@ -130,8 +130,8 @@
       (#.sb-vm:code-header-widetag
        (dotimes (i (sb-kernel:code-n-entries obj))
          (let ((fun (sb-kernel:%code-entry-point obj i)))
-           (when (sb-impl::%simple-fun-lexpr fun)
-             (sb-impl::set-simple-fun-info
+           (when (sb-kernel:%simple-fun-lexpr fun)
+             (sb-kernel:set-simple-fun-info
               fun nil
               (sb-kernel:%simple-fun-doc fun)
               (sb-kernel:%simple-fun-xrefs fun))))))))

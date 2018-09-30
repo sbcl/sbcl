@@ -2788,9 +2788,7 @@ core and return a descriptor to it."
 
 (define-cold-fop (fop-fun-entry (fun-index))
   (binding* (((info type arglist name code-object)
-              (macrolet ((pop-stack ()
-                           '(pop-fop-stack (%fasl-input-stack (fasl-input)))))
-                (values (pop-stack) (pop-stack) (pop-stack) (pop-stack) (pop-stack))))
+                (values (pop-stack) (pop-stack) (pop-stack) (pop-stack) (pop-stack)))
              (fn (compute-fun code-object fun-index)))
     #!+(or x86 x86-64) ; store a machine-native pointer to the function entry
     ;; note that the bit pattern looks like fixnum due to alignment
@@ -2802,7 +2800,7 @@ core and return a descriptor to it."
     (write-wordindexed fn sb!vm:simple-fun-name-slot name)
     (write-wordindexed fn sb!vm:simple-fun-arglist-slot arglist)
     (write-wordindexed fn sb!vm:simple-fun-type-slot type)
-    (write-wordindexed fn sb!vm::simple-fun-info-slot info)
+    (write-wordindexed fn sb!vm:simple-fun-info-slot info)
     fn))
 
 (define-cold-fop (fop-assembler-code)
