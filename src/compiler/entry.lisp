@@ -63,7 +63,8 @@
     (setf (entry-info-offset info) (gen-label))
     (setf (entry-info-name info)
           (leaf-debug-name internal-fun))
-    (let ((form (functional-inline-expansion internal-fun))
+    (let (#-sb-xc-host
+          (form (functional-inline-expansion internal-fun))
           (doc (functional-documentation internal-fun))
           (xrefs (pack-xref-data (functional-xref internal-fun))))
       (setf (entry-info-form/doc/xrefs info)
