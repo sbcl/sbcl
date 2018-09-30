@@ -958,10 +958,9 @@ core and return a descriptor to it."
 (defvar *cold-symbol-gspace* (or #!+immobile-space '*immobile-fixedobj* '*dynamic*))
 
 ;;; Allocate (and initialize) a symbol.
-(defun allocate-symbol (name &key (gspace (symbol-value *cold-symbol-gspace*)))
+(defun allocate-symbol (size name &key (gspace (symbol-value *cold-symbol-gspace*)))
   (declare (simple-string name))
-  (let ((symbol (allocate-header+object gspace (1- sb!vm:symbol-size)
-                                        sb!vm:symbol-widetag)))
+  (let ((symbol (allocate-header+object gspace (1- size) sb!vm:symbol-widetag)))
     (write-wordindexed symbol sb!vm:symbol-value-slot *unbound-marker*)
     (write-wordindexed symbol sb!vm:symbol-hash-slot (make-fixnum-descriptor 0))
     (write-wordindexed symbol sb!vm:symbol-info-slot *nil-descriptor*)
@@ -1526,7 +1525,8 @@ core and return a descriptor to it."
 ;; There is a subtlety of whether coalescing may occur across files
 ;; - the target compiler doesn't and couldn't - but here it doesn't matter.
 (defun get-uninterned-symbol (name)
-  (ensure-gethash name *uninterned-symbol-table* (allocate-symbol name)))
+  (ensure-gethash name *uninterned-symbol-table*
+                  (allocate-symbol sb!vm:symbol-size name)))
 
 ;;; Dump the target representation of HOST-VALUE,
 ;;; the type of which is in a restrictive set.
@@ -1583,7 +1583,18 @@ core and return a descriptor to it."
       (setf symbol (intern (symbol-name symbol) *cl-package*))))
 
   (or (get symbol 'cold-intern-info)
-      (let ((handle (allocate-symbol (symbol-name symbol) :gspace gspace)))
+      ;; KLUDGE: there is no way to automatically know which macros are handled
+      ;; by sb-fasteval as special forms. An extra slot should be created in
+      ;; any symbol naming such a macro, though things still work if the slot
+      ;; doesn't exist, as long as only a deferred interpreter processor is used
+      ;; and not an immediate processor.
+      (let ((handle (allocate-symbol
+                     (if (or (eq (info :function :kind symbol) :special-form)
+                             (member symbol '(sb!sys:with-pinned-objects)))
+                         sb!vm:extended-symbol-size
+                         sb!vm:symbol-size)
+                     (symbol-name symbol)
+                     :gspace gspace)))
         (setf (get symbol 'cold-intern-info) handle)
         ;; maintain reverse map from target descriptor to host symbol
         (setf (gethash (descriptor-bits handle) *cold-symbols*) symbol)

@@ -9,18 +9,16 @@
 
 (in-package "SB-INTERPRETER")
 
-;;; Special form handlers are stored in the NAME slot of the #<FDEFN>
-;;; of the symbol naming the operator. This is extremely fast to look up.
-;;; It's about 9x faster than a hashtable, and 2x faster than the plist
-;;; even with no other properties on the plist. Moreover, plists can be
-;;; clobbered by users. Since nobody has reason to look at fdefns of
-;;; special forms, it doesn't matter what the name is.
-;;; You'll never see one in a disassembly.
-(defmacro !special-form-handler (fdefn)
-  (let ((thing (make-symbol "DEFN")))
-    `(let ((,thing (fdefn-name ,fdefn)))
-       (when (typep ,thing '(cons function))
-         ,thing))))
+;;; True if the symbol is a special operator, indicating that it MAY
+;;; have an extra slot in the payload. Special operators defined after
+;;; initial build will set this bit, but not have an extra slot.
+(defconstant +special-op-symbol+  (ash 1 11))
+;;; True if the interpreter should handle this special operator even when
+;;; SB-EXT:*EVALUATOR-MODE* is :COMPILE. If true, the operator must preserve
+;;; a perfect correspondence between interpreter ENV instances and compiler
+;;; LEXENV instances so that if a subform is reached having a non-simple
+;;; operator, the compiler can be invoked in the equivalent environment.
+(defconstant +simple-special-op+  (ash 1 10))
 
 ;;; DEFSPECIAL name (destructuring-lambda-list)
 ;;;    [FORMS]*
@@ -44,6 +42,8 @@
   (let* ((specialized-code
           (member-if (lambda (form) (member form '(:immediate :deferred)))
                      body))
+         (simple-p (member name '(quote eval-when if progn setq
+                                  locally macrolet symbol-macrolet)))
          (common-code (ldiff body specialized-code))
          (immediate-code)
          (deferred-code))
@@ -78,19 +78,20 @@
                                       ,@body)))
                         (with-subforms ,macro-lambda-list ,form-var
                                        ,@body)))))))
-        ;; KLUDGE: obfuscated so that this isn't FOPCOMPILEd.
-        ;; I don't want SB-VM::%SET-FDEFN-NAME to be funcallable.
-        `((lambda (name def) (sb-vm::%set-fdefn-name name def))
-          (find-fdefn ',name)
-          ;; If there is no immediate handler, just punt by
-          ;; dispatching an ad-hoc SEXPR. It is somewhat wasteful
-          ;; to cons a handler that is called once and discarded,
-          ;; but probably not too objectionable.
-          (cons ,(if immediate-code
-                     (gen-code :imm immediate-code)
-                     `#'(named-lambda (:imm ,name) (form env)
-                          (dispatch (%sexpr (cons ',name form)) env)))
-                ,(gen-code :def deferred-code)))))))
+        `((lambda (name simple immediate deferred)
+            (setf (info :function :interpreter name) deferred)
+            (when immediate
+              (aver (symbol-extra-slot-p name))
+              (setf (symbol-extra name) immediate))
+            (set-header-data
+             name (logior +special-op-symbol+
+                          (if simple +simple-special-op+ 0)
+                          (get-header-data name))))
+          ',name
+          ',simple-p
+          ,(when immediate-code
+             (gen-code :immediate immediate-code))
+          ,(gen-code :deferred deferred-code))))))
 
 ;;; Create parallel bindings for LET or a LAMBDA's required args.
 ;;; Use of this macro is highly confined, so no bothering with ONCE-ONLY.

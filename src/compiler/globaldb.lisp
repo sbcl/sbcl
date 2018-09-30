@@ -282,6 +282,11 @@
   #+sb-xc-host nil
   #-sb-xc-host (lambda (name) (if (fboundp name) :function nil)))
 
+;;; The deferred mode processor for fasteval special operators.
+;;; Immediate processors are hung directly off symbols in a dedicated slot.
+#!+sb-fasteval
+(define-info-type (:function :interpreter) :type-spec (or function null))
+
 ;;; Indicates whether the function is deprecated.
 (define-info-type (:function :deprecated)
   :type-spec (or null deprecation-info))

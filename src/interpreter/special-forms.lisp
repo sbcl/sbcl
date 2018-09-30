@@ -798,8 +798,6 @@
                                                   special-b)))
          env n-bindings symbols)))))
 
-(defglobal *let-processor* nil)
-
 (macrolet
     ((defspecial* (operator transform-specials)
        `(defspecial ,operator (bindings &body body)
@@ -811,7 +809,8 @@
           ,@(when (eq operator 'let*)
               `((when (singleton-p bindings)
                   (return-from let*
-                   (funcall *let-processor* `(,bindings ,@body) env)))))
+                    (funcall (info :function :interpreter 'let)
+                             `(,bindings ,@body) env)))))
           ;; FIXME: aren't MAKE-LET*-FRAME and MAKE-LET-FRAME essentially
           ;; the same now?
           (let ((frame (parse-let ',(symbolicate "MAKE-" operator "-FRAME")
@@ -881,8 +880,6 @@
               ,eval-body))))
     ;; WITH-LET*-BINDER needs each special in a singleton list
     (defspecial* LET* (lambda (x) (mapcar #'list x)))))
-
-(setq *let-processor* (cdr (!special-form-handler (find-fdefn 'let))))
 
 ;;;; Macrolet
 

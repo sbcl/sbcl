@@ -947,6 +947,14 @@ Experimental: interface subject to change."
          (call (%simple-fun-type object))
          (call (%simple-fun-info object)))
         (symbol
+         ;; We use :override here because (apparently) the intent is
+         ;; to avoid calling FUNCTION on the SYMBOL-PACKAGE
+         ;; when SIMPLE is NIL (the default). And we skip SYMBOL-EXTRA for
+         ;; the same reason that we don't call FUNCTION on SYMBOL-INFO
+         ;; (logically it's "system" data, not for user consumption).
+         ;; Frankly this entire function is a confusing mishmash that is not
+         ;; accurate for computing a true graph of objects starting from a
+         ;; certain point, given all the special cases that it implements.
          :override
          (when ext
            (dolist (thread (sb-thread:list-all-threads))

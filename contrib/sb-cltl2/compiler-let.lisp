@@ -51,7 +51,7 @@
 #+sb-fasteval
 (sb-interpreter::defspecial compiler-let (bindings &body body)
   :deferred (env)
-  (funcall sb-interpreter::*let-processor*
+  (funcall (info :function :interpreter 'let)
            `(,bindings
              (declare (special
                        ,@(mapcar (lambda (binding)

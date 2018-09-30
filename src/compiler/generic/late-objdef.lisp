@@ -15,6 +15,12 @@
              `(progn ,@*!late-primitive-object-forms*)))
   (frob))
 
+(defconstant extended-symbol-size (1+ symbol-size))
+(defknown symbol-extra (t) t (flushable))
+(def-reffer 'symbol-extra sb!vm:symbol-size other-pointer-lowtag)
+(defknown (setf symbol-extra) (t t) t ())
+(def-setter '(setf symbol-extra) sb!vm:symbol-size other-pointer-lowtag)
+
 #!+sb-thread
 (dolist (slot (primitive-object-slots
                (find 'thread *primitive-objects* :key #'primitive-object-name)))

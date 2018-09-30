@@ -3273,6 +3273,7 @@ structure representations"
                "SYMBOL-HASH-SLOT" "SYMBOL-WIDETAG" "SYMBOL-NAME-SLOT"
                "SYMBOL-PACKAGE-SLOT" "SYMBOL-INFO-SLOT"
                "SYMBOL-SIZE" "SYMBOL-VALUE-SLOT" "SYMBOL-TLS-INDEX-SLOT"
+               "EXTENDED-SYMBOL-SIZE"
                "*BINDING-STACK-START*"
                "*CONTROL-STACK-START*" "*CONTROL-STACK-END*"
                "CONTROL-STACK-POINTER-VALID-P"
@@ -3370,6 +3371,7 @@ structure representations"
                      "PARSE-EVAL-WHEN-SITUATIONS"
                      "MAKE-GLOBAL-VAR" "MAKE-LAMBDA-VAR"
                      "*LEXENV*")
+                    ("SB!VM" "SYMBOL-EXTRA-SLOT-P" "SYMBOL-EXTRA")
                     ("SB!ALIEN" "%HEAP-ALIEN" "ALIEN-VALUE")
                     ("SB!KERNEL" "%%TYPEP")))
 

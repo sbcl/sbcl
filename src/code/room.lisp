@@ -32,6 +32,7 @@
         (saetp-primitive-type-name info)
         (room-info-name info)))
 
+(defconstant tiny-boxed-size-mask #xFF)
 (defun !compute-room-infos ()
   (let ((infos (make-array 256 :initial-element nil))
         (default-size-mask (mask-field (byte 23 0) -1)))
@@ -43,7 +44,7 @@
                    (not (member widetag '(t nil))))
           (setf (svref infos (symbol-value widetag))
                 (make-room-info (if (member name '(fdefn symbol))
-                                    #xFF
+                                    tiny-boxed-size-mask
                                     default-size-mask)
                                 name :other)))))
 
@@ -964,6 +965,11 @@ We could try a few things to mitigate this:
     #+stack-grows-downward-not-upward (iter + *control-stack-end* sap>)
     #-stack-grows-downward-not-upward (iter - *control-stack-start* sap<)))
 
+(declaim (inline symbol-extra-slot-p))
+(defun symbol-extra-slot-p (x)
+  (> (logand (get-header-data x) tiny-boxed-size-mask)
+     (1- symbol-size)))
+
 ;;; Invoke FUNCTOID (a macro or function) on OBJ and any values in MORE.
 ;;; Note that neither OBJ nor items in MORE undergo ONCE-ONLY treatment.
 ;;; The fact that FUNCTOID can be a macro allows treatment of its first argument
@@ -1043,11 +1049,13 @@ We could try a few things to mitigate this:
                `(%array-displaced-p ,obj)
                `(%array-displaced-from ,obj))
             ,.(make-case 'array)
-            ,.(make-case 'symbol
-               `(%primitive sb-c:fast-symbol-global-value ,obj)
-               `(symbol-info ,obj)
-               `(symbol-name ,obj)
-               `(symbol-package ,obj))
+            ,.(make-case* 'symbol
+               `(,functoid (%primitive sb-c:fast-symbol-global-value ,obj) ,@more)
+               `(,functoid (symbol-info ,obj) ,@more)
+               `(,functoid (symbol-name ,obj) ,@more)
+               `(,functoid (symbol-package ,obj) ,@more)
+               `(when (symbol-extra-slot-p ,obj)
+                  (,functoid (symbol-extra ,obj) ,@more)))
             ,.(make-case 'fdefn
                `(fdefn-name ,obj)
                `(fdefn-fun ,obj)

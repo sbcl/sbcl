@@ -303,6 +303,7 @@
 
 ;;; This is so that COMPILE-FILE knows that things like :ALLOW-OTHER-KEYS
 ;;; can be immediate constants.
+;;; Note also that sb-fasteval uses 2 bits of the symbol header.
 #!+(and immobile-space (not immobile-symbols))
 (defconstant +initial-core-symbol-bit+ 8) ; bit index, not bit value
 

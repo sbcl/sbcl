@@ -1806,11 +1806,11 @@ static int schar(struct vector* string, int index)
 }
 
 #include "genesis/package.h"
-#define N_SYMBOL_KINDS 4
+#define N_SYMBOL_KINDS 5
 
-// Return an integer 0..3 telling which block of symbols to relocate 'sym' into.
-// This is the same as the "symbol kind" in the allocator.
-//  0 = uninterned, 1 = keyword, 2 = other interned, 3 = special var
+// Return an integer 0..4 telling which block of symbols to relocate 'sym' into.
+//  0=uninterned, 1=keyword, 2=special operator with extra slot,
+//  3=special var, 4=other
 static int classify_symbol(lispobj* obj)
 {
   struct symbol* symbol = (struct symbol*)obj;
@@ -1820,12 +1820,15 @@ static int classify_symbol(lispobj* obj)
   if (widetag_of(&package_name->header) == SIMPLE_BASE_STRING_WIDETAG
       && !strcmp((char*)package_name->data, "KEYWORD"))
       return 1;
+  // Same criterion as SYMBOL-EXTRA-SLOT-P in src/code/room.
+  if ((HeaderValue(*obj) & 0xFF) > (SYMBOL_SIZE-1))
+      return 2;
   struct vector* symbol_name = VECTOR(symbol->name);
   if (symbol_name->length >= make_fixnum(2) &&
       schar(symbol_name, 0) == '*' &&
       schar(symbol_name, fixnum_value(symbol_name->length)-1) == '*')
       return 3;
-  return 2;
+  return 4;
 }
 
 static inline char* compute_defrag_start_address()
@@ -1852,16 +1855,15 @@ static void defrag_immobile_space(boolean verbose)
     int *components = code_component_order;
 
     // Count the number of symbols, fdefns, and layouts that will be relocated
-    unsigned int obj_type_histo[64], sym_kind_histo[4];
+    int obj_type_histo[64];
+    struct { int size, count; } sym_kind_histo[N_SYMBOL_KINDS];
     bzero(obj_type_histo, sizeof obj_type_histo);
     bzero(sym_kind_histo, sizeof sym_kind_histo);
 
 #if DEFRAGMENT_FIXEDOBJ_SUBSPACE
     // Find the starting address of fixed-size objects that will undergo defrag.
-    // Never move the first few pages of LAYOUTs or PACKAGEs created by genesis.
-    // If codegen becomes smarter, things like layout of FUNCTION and some
-    // some others can be used as immediate constants in compiled code.
-    // With initial packages, it's mainly a debugging convenience that they not move.
+    // Never move the first pages of LAYOUTs created by genesis.
+    // so that codegen can wire in layout of function with less pain.
     char* defrag_base = compute_defrag_start_address();
     low_page_index_t page_index = find_fixedobj_page_index(defrag_base);
     low_page_index_t max_used_fixedobj_page = calc_max_used_fixedobj_page();
@@ -1873,10 +1875,16 @@ static void defrag_immobile_space(boolean verbose)
             do {
                 lispobj word = *obj;
                 if (!fixnump(word)) {
-                    if (header_widetag(word) == SYMBOL_WIDETAG)
-                        ++sym_kind_histo[classify_symbol(obj)];
-                    else
-                        ++obj_type_histo[header_widetag(word)/4];
+                    int widetag = header_widetag(word);
+                    ++obj_type_histo[widetag/4];
+                    if (widetag == SYMBOL_WIDETAG) {
+                        int kind = classify_symbol(obj);
+                        int size = sizetab[widetag](obj);
+                        ++sym_kind_histo[kind].count;
+                        if (!sym_kind_histo[kind].size)
+                            sym_kind_histo[kind].size = size;
+                        gc_assert(sym_kind_histo[kind].size == size);
+                    }
                 }
             } while (NEXT_FIXEDOBJ(obj, obj_spacing) <= limit);
         }
@@ -1900,8 +1908,10 @@ static void defrag_immobile_space(boolean verbose)
     char* symbol_alloc_ptr[N_SYMBOL_KINDS+1];
     symbol_alloc_ptr[0]    = fin_alloc_ptr + n_fin_pages * IMMOBILE_CARD_BYTES;
     for (i=0; i<N_SYMBOL_KINDS ; ++i)
-      symbol_alloc_ptr[i+1] = symbol_alloc_ptr[i]
-        + calc_n_pages(sym_kind_histo[i], SYMBOL_SIZE) * IMMOBILE_CARD_BYTES;
+      symbol_alloc_ptr[i+1] =
+          symbol_alloc_ptr[i] + calc_n_pages(sym_kind_histo[i].count,
+                                             sym_kind_histo[i].size)
+                              * IMMOBILE_CARD_BYTES;
     char* ending_alloc_ptr = symbol_alloc_ptr[N_SYMBOL_KINDS];
 
     fixedobj_tempspace.n_bytes = ending_alloc_ptr - (char*)FIXEDOBJ_SPACE_START;
@@ -1935,14 +1945,12 @@ static void defrag_immobile_space(boolean verbose)
     }
 
     if (verbose)
-        printf("%d+%d+%d+%d+%d+%d objects... ",
+        printf("(fin,inst,fdefn,code,sym)=%d+%d+%d+%d+%d... ",
+               obj_type_histo[FUNCALLABLE_INSTANCE_WIDETAG/4],
                obj_type_histo[INSTANCE_WIDETAG/4],
                obj_type_histo[FDEFN_WIDETAG/4],
-               obj_type_histo[CODE_HEADER_WIDETAG/4],
-               obj_type_histo[FUNCALLABLE_INSTANCE_WIDETAG/4],
-               (sym_kind_histo[0]+sym_kind_histo[1]+
-                sym_kind_histo[2]+sym_kind_histo[3]),
-               n_code_components);
+               obj_type_histo[CODE_HEADER_WIDETAG/4] +  n_code_components,
+               obj_type_histo[SYMBOL_WIDETAG/4]);
 
     if (components) {
         // Permute varyobj space into tempspace and deposit forwarding pointers.
