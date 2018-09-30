@@ -192,13 +192,12 @@
           (let ((sap (int-sap pc))) (lambda () sap)))
     (macrolet ((fail ()
                 `(progn
-                   (break "fail ~x: ~x '~s' ~s"
-                          pc (logand dchunk #xFF) opcode component)
+                   (cerror "" "fail ~x: ~x '~s' ~s"
+                           pc (logand dchunk #xFF) opcode component)
                    (return-from fail)))
                (advance (newstate)
 ;                 `(format t "~&advance to ~d~%" (setq allocator-state ,newstate))
-                 `(setq allocator-state ,newstate)
-                 )
+                 `(setq allocator-state ,newstate))
                (advance-if (condition newstate)
                  `(if ,condition (advance ,newstate) (fail))))
       (block fail
