@@ -340,15 +340,9 @@
                ;; general, inefficient case of NUMBER
                (number (sxhash-number x))
                (funcallable-instance
-                (typecase x
-                  #!+sb-fasteval
-                  (sb!interpreter:interpreted-function
-                   9550684)
-                  #!+sb-eval
-                  (sb!eval:interpreted-function
-                   9550684)
-                  (t
-                   (fsc-instance-hash x))))
+                (if (layout-info (layout-of x)) ;; structure, not funcallable-standard-object
+                    9550684
+                    (fsc-instance-hash x)))
                (t 42))))
     (sxhash-recurse x +max-hash-depthoid+)))
 
