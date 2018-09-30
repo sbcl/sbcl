@@ -14,7 +14,13 @@
 
 ;;; various environment inquiries
 
-(!defvar *features* '#.sb!xc:*features*
+(!defvar *features*
+   ;; GCC_TLS is not a Lisp feature- it's just freeloading off the means
+   ;; by which additional #defines get into "genesis/config.h".
+   ;; Literally nothing except C code tests for it.
+   '#.(remove-if (lambda (x)
+                   (member x '(:gcc-tls)))
+                 sb!xc:*features*)
   "a list of symbols that describe features provided by the
    implementation")
 
