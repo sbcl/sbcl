@@ -337,18 +337,38 @@
                   (when (cdr set) ; have two or more, so choose one as canonical
                     (setq set (mapcar #'car set))
                     (let ((winner
-                           (labels ((keyfn (x)
-                                      #+64-bit
-                                      (%code-serialno x)
-                                      ;; Creation time is an estimate of order, but
-                                      ;; frankly we shouldn't be storing times anyway,
-                                      ;; as it causes irreproducible builds.
-                                      ;; But I don't know what else to do.
-                                      #-64-bit
-                                      (sb-c::debug-source-compiled
-                                       (sb-c::compiled-debug-info-source
-                                        (%code-debug-info x))))
-                                    (compare (a b) (if (< (keyfn a) (keyfn b)) a b)))
+                            (labels ((exported-p (x)
+                                       (let* ((entry (%code-entry-point x 0))
+                                              (name (and entry
+                                                         (sb-kernel:%fun-name entry))))
+                                         (and (symbolp name)
+                                              (eq (nth-value 1 (find-symbol (symbol-name name)
+                                                                            (symbol-package name)))
+                                                  :external))))
+                                     (keyfn (x)
+                                       #+64-bit
+                                       (%code-serialno x)
+                                       ;; Creation time is an estimate of order, but
+                                       ;; frankly we shouldn't be storing times anyway,
+                                       ;; as it causes irreproducible builds.
+                                       ;; But I don't know what else to do.
+                                       #-64-bit
+                                       (sb-c::debug-source-compiled
+                                        (sb-c::compiled-debug-info-source
+                                         (%code-debug-info x))))
+                                     (compare (a b)
+                                       (let ((exported-a (exported-p a))
+                                             (exported-b (exported-p b) ))
+                                         (cond ((and exported-a
+                                                     (not exported-b))
+                                                a)
+                                               ((and exported-b
+                                                     (not exported-a))
+                                                b)
+                                               ((< (keyfn a) (keyfn b))
+                                                a)
+                                               (t
+                                                b)))))
                              (reduce #'compare set))))
                       (dolist (obj (delete winner set))
                         (setf (gethash obj equiv-map) winner))))))))
