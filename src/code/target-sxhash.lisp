@@ -340,9 +340,11 @@
                ;; general, inefficient case of NUMBER
                (number (sxhash-number x))
                (funcallable-instance
-                (if (layout-info (layout-of x)) ;; structure, not funcallable-standard-object
-                    9550684
-                    (fsc-instance-hash x)))
+                (if (layout-for-std-class-p
+                     (%funcallable-instance-layout x))
+                    (fsc-instance-hash x)
+                    ;; funcallable structure, not funcallable-standard-object
+                    9550684))
                (t 42))))
     (sxhash-recurse x +max-hash-depthoid+)))
 
