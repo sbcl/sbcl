@@ -243,6 +243,34 @@
     (classoid-typep layout classoid object)))
 
 ;;; Test whether OBJ-LAYOUT is from an instance of CLASSOID.
+
+;;; IMPORTANT: If none of the classes involved (directly or indirectly)
+;;; in a call to CLASSOID-TYPEP gets redefined during execution of the predicate,
+;;; the layout update loop should require at most 2 iterations.
+;;; Theoretically, ensuring validity of the classoid layout and the object layout
+;;; could be done in either order, * HOWEVER * it is less racy to perform
+;;; them in this exact order. Consider the case that OBJ-LAYOUT is T
+;;; for a class that satisfies CLASS-FINALIZED-P and suppose these operations were
+;;; reversed from the order below. UPDATE-OBJECT-LAYOUT-OR-INVALID is going to make
+;;; a new layout, registering it and installing into the classoid.
+;;; Then %ENSURE-CLASSOID-VALID is going to call %FORCE-CACHE-FLUSHES which is going
+;;; to make yet another new layout. The "transitivity of wrapper updates" usually
+;;; causes the first new layout to automatically update to the second new layout,
+;;; except that the other thread has already fetched the old layout.
+;;; But by using the order below, there will not be two new layouts made, only one,
+;;; because UPDATE-OBJECT-LAYOUT-OR-INVALID is able to use the layout
+;;; that was updated into the classoid by %ENSURE-CLASSOID-VALID.
+;;; All other things being equal, one new layout is better than two.
+;;; At least I think that's what happens.
+;;; So consider what happens if two threads are both doing this -
+;;; with the opposite order, there could have been as many as 5 new layouts
+;;; created (empirically observed via instrumentation of MAKE-LAYOUT) -
+;;; two per thread; plus one more, which is the failing one.
+;;; It was even possible to have *BOTH* threads fail the AVER, although more often it
+;;; was just one of them that fails.
+;;; With the order of operations below, I observed no failures in hundreds
+;;; of thousands of iterations of 'classoid-typep.impure.lisp'
+
 (defun classoid-typep (obj-layout classoid object)
   ;; FIXME & KLUDGE: We could like to grab the *WORLD-LOCK* here (to ensure that
   ;; class graph doesn't change while we're doing the typep test), but in
@@ -260,9 +288,9 @@
                 (not (layout-invalid layout)))
            (values obj-layout layout))
         (aver (< i 2))
+        (%ensure-classoid-valid classoid layout "typep")
         (when (layout-invalid obj-layout)
-          (setq obj-layout (update-object-layout-or-invalid object layout)))
-        (%ensure-classoid-valid classoid layout "typep"))
+          (setq obj-layout (update-object-layout-or-invalid object layout))))
     (or (eq obj-layout layout)
         (let ((obj-inherits (layout-inherits obj-layout)))
           (dotimes (i (length obj-inherits) nil)
