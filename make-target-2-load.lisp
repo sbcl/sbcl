@@ -303,7 +303,7 @@
 #+sb-fasteval (setq sb-ext:*evaluator-mode* :interpret)
 ;; folding doesn't actually do anything unless the backend supports it,
 ;; but the interface exists no matter what.
-(sb-ext:fold-identical-code)
+(sb-ext:fold-identical-code :aggressive t)
 
 ;; See comments in 'readtable.lisp'
 (setf (readtable-base-char-preference *readtable*) :symbols)

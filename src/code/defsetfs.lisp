@@ -356,9 +356,13 @@ with bits from the corresponding position in the new value.")
 ;;; to one that is randomly chosen - and therefore looks confusing -
 ;;; use these trivial do-nothing functions which are compiled asap.
 ;;; The selection is deterministic since ties are broken by serial number.
-(export '(0-arg-nop 1-arg-nop 2-arg-nop 3-arg-nop)
+(export '(0-arg-nil 1-arg-nil 2-arg-nil 3-arg-nil n-arg-nil
+          1-arg-t n-arg-t)
         "SB-IMPL") ; export to prevent death by tree-shaker
-(defun 0-arg-nop () nil)
-(defun 1-arg-nop (a) (declare (ignore a)) nil)
-(defun 2-arg-nop (a b) (declare (ignore a b)) nil)
-(defun 3-arg-nop (a b c) (declare (ignore a b c)) nil)
+(defun n-arg-nil () (declare (optimize (sb!c::verify-arg-count 0))) nil)
+(defun n-arg-t   () (declare (optimize (sb!c::verify-arg-count 0))) t)
+(defun 0-arg-nil () nil)
+(defun 1-arg-nil (a) (declare (ignore a)) nil)
+(defun 1-arg-t   (a) (declare (ignore a)) t)
+(defun 2-arg-nil (a b) (declare (ignore a b)) nil)
+(defun 3-arg-nil (a b c) (declare (ignore a b c)) nil)

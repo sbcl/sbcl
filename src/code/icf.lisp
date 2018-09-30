@@ -23,7 +23,8 @@
 ;;; [*] https://ai.google/research/pubs/pub36912
 ;;;
 
-(defun apply-forwarding-map (map print)
+;;; Return T if any pointers were replaced in a code object.
+(defun apply-forwarding-map (map print &aux any-change)
   (when print
     (let ((*print-pretty* nil))
       (dohash ((k v) map)
@@ -82,7 +83,8 @@
                                  (fast-symbol-global-value
                                   `(setf (symbol-global-value ,@(cddr place)) newval))))
                               (t
-                               `(setf ,place newval))))))))
+                               `(setf ,place newval)))
+                           t)))))
          (do-referenced-object (object rewrite)
            (simple-vector
             :extend
@@ -98,7 +100,8 @@
             ;; if it didn't, there would be no traceable pointer from code to #<FOO>.
             (machine-code-icf object #'forward map print)
             (loop for i from code-constants-offset below (code-header-words object)
-                  do (rewrite (code-header-ref object i))))
+                  do (when (rewrite (code-header-ref object i))
+                       (setq any-change t))))
            (fdefn
             :override
             (let* ((oldval (fdefn-fun object))
@@ -123,7 +126,7 @@
                     (setf (sap-ref-lispobj (int-sap (get-lisp-obj-address object))
                                            (- (ash (+ i closure-info-offset) word-shift)
                                               fun-pointer-lowtag))
-                                        newval))))))
+                          newval))))))
            (ratio :override)
            ((complex rational) :override)
            (t
@@ -134,7 +137,8 @@
               (t
                (bug "Unknown object type #x~x addr=~x"
                     widetag (get-lisp-obj-address object))))))))
-     :all)))
+     :all))
+  any-change)
 
 ;;; Compare function signatures, which are essentially the raw instruction bytes
 ;;; but with encodings of relative operands replaced by constant filler bytes,
@@ -193,7 +197,22 @@
                         (sap-ref-word sap2 (ash i word-shift)))
                (return nil))))
          ;; Compare instruction bytes
-         (every #'fun-signature= (cdr obj1) (cdr obj2)))))
+         (every #'fun-signature= (cdr obj1) (cdr obj2))
+         ;; Require that %SIMPLE-FUN-TYPE and %SIMPLE-FUN-LEXPR
+         ;; satisfy EQUAL. The former because the compiler can introspect
+         ;; to determine type in the absence of a proclamation; the latter
+         ;; because FUNCTION-LAMBDA-EXPRESSION might be called by users.
+         ;; Since most functions do not store the lambda expression, that
+         ;; constraint should not impede much folding.
+         ;; We should be able to fold a function that had no expression
+         ;; with one that did, as long as the choice function chooses
+         ;; the one that saved the expression. (Not done yet)
+         (dotimes (i (code-n-entries code1) t)
+           (let ((f1 (%code-entry-point code1 i))
+                 (f2 (%code-entry-point code2 i)))
+           (unless (and (equal (%simple-fun-type f1) (%simple-fun-type f2))
+                        (equal (%simple-fun-lexpr f1) (%simple-fun-lexpr f2)))
+             (return nil)))))))
 
 ;;; Compute a key for binning purposes.
 (defun compute-code-hash-key (code)
@@ -230,109 +249,108 @@
                        sb-c::deftransform
                        :source-transform))))))
 
-;;; TODO: this could theoretically require more than one iteration
-;;; to reach a fixed point. (After performing replacements we should check
-;;; again whether any code objects have become equivalent.)
 (defun fold-identical-code (&key aggressive print)
-  #+gencgc (gc :gen 7)
-  ;; Pass 1: count code objects.  I'd like to enhance MAP-ALLOCATED-OBJECTS
-  ;; to have a mode that scans only GC pages with that can hold code
-  ;; (or any subset of page types). This is fine though.
-  (let ((code-objects
-         (let ((count 0))
-           (map-allocated-objects
-            (lambda (obj widetag size)
-              (declare (ignore size))
-              (when (and (eql widetag code-header-widetag)
-                         (plusp (code-n-entries obj)))
-                (incf count)))
-            :all)
-           (make-weak-vector count)))
-        (referenced-objects
-         (make-hash-table :test #'eq)))
-    ;; Pass 2: collect them.
-    (let ((i 0))
-      (map-allocated-objects
-       (lambda (obj widetag size)
-         (declare (ignore size))
-         (when (and (eql widetag code-header-widetag)
-                    (plusp (code-n-entries obj)))
-           (setf (aref code-objects i) obj)
-           (incf i)))
-       :all))
-    (unless aggressive
-      ;; Figure out which of those are referenced by any object
-      ;; except for an fdefn.
-      (flet ((visit (referent referer)
-               (when (typep referent 'simple-fun)
-                 (setq referent (fun-code-header referent)))
-               (when (and (typep referent 'code-component)
-                          (plusp (code-n-entries referent))
-                          (not (gethash referent referenced-objects)))
-                 (setf (gethash referent referenced-objects) referer))))
-        ;; Scan the whole heap, and look at each object for pointers
-        ;; to any code object.
+  (loop
+    #+gencgc (gc :gen 7)
+    ;; Pass 1: count code objects.  I'd like to enhance MAP-ALLOCATED-OBJECTS
+    ;; to have a mode that scans only GC pages with that can hold code
+    ;; (or any subset of page types). This is fine though.
+    (let ((code-objects
+           (let ((count 0))
+             (map-allocated-objects
+              (lambda (obj widetag size)
+                (declare (ignore size))
+                (when (and (eql widetag code-header-widetag)
+                           (plusp (code-n-entries obj)))
+                  (incf count)))
+              :all)
+             (make-weak-vector count)))
+          (referenced-objects
+           (make-hash-table :test #'eq)))
+      ;; Pass 2: collect them.
+      (let ((i 0))
         (map-allocated-objects
-         (lambda (referer widetag size)
+         (lambda (obj widetag size)
            (declare (ignore size))
-           (unless (or (eql widetag fdefn-widetag)
-                       (weak-vector-p referer))
-             (do-referenced-object (referer visit referer)
-               ;; maybe this should be the default fallback?
-               (t
-                :extend
-                (case (widetag-of referer)
-                  (#.value-cell-widetag
-                   (visit (value-cell-ref referer) referer))
-                  (t
-                   (bug "Unknown object type #x~x ~s" widetag referer)))))))
-         :all)))
-    ;; Now place objects that possibly match into the same bin.
-    (let ((bins (make-hash-table :test 'equal))
-          (n 0))
-      (dovector (x code-objects)
-        (when (or (not (gethash x referenced-objects))
-                  (default-allow-icf-p x))
-          (incf n)
-          (push x (gethash (compute-code-hash-key x) bins))))
-      (when print
-        (format t "ICF: ~d objects, ~d candidates, ~d bins~%"
-                (length code-objects) n (hash-table-count bins)))
-      ;; Scan each bin that has more than one object in it
-      ;; and check whether any are equivalent to one another.
-      (let ((equiv-map (make-hash-table :test #'eq))
-            (dstate (sb-disassem:make-dstate)))
-        (dohash ((key objects) bins)
-          (declare (ignore key))
-          ;; Skip if there can not possibly be an equivalence class
-          ;; with more than one thing in it.
-          (when (cdr objects)
-            (let (equivalences)
-              (setq objects
-                    (mapcar (lambda (x) (cons x (compute-code-signature x dstate)))
-                            objects))
-              (dolist (item objects)
-                (let ((found (assoc item equivalences :test #'code-equivalent-p)))
-                  (if found
-                      (push item (cdr found))
-                      (push (list item) equivalences))))
-              (dolist (set equivalences)
-                (when (cdr set) ; have two or more, so choose one as canonical
-                  (setq set (mapcar #'car set))
-                  (let ((winner
-                         (labels ((keyfn (x)
-                                    #+64-bit
-                                    (%code-serialno x)
-                                    ;; Creation time is an estimate of order, but
-                                    ;; frankly we shouldn't be storing times anyway,
-                                    ;; as it causes irreproducible builds.
-                                    ;; But I don't know what else to do.
-                                    #-64-bit
-                                    (sb-c::debug-source-compiled
-                                     (sb-c::compiled-debug-info-source
-                                      (%code-debug-info x))))
-                                  (compare (a b) (if (< (keyfn a) (keyfn b)) a b)))
-                           (reduce #'compare set))))
-                    (dolist (obj (delete winner set))
-                      (setf (gethash obj equiv-map) winner))))))))
-        (apply-forwarding-map equiv-map print)))))
+           (when (and (eql widetag code-header-widetag)
+                      (plusp (code-n-entries obj)))
+             (setf (aref code-objects i) obj)
+             (incf i)))
+         :all))
+      (unless aggressive
+        ;; Figure out which of those are referenced by any object
+        ;; except for an fdefn.
+        (flet ((visit (referent referer)
+                 (when (typep referent 'simple-fun)
+                   (setq referent (fun-code-header referent)))
+                 (when (and (typep referent 'code-component)
+                            (plusp (code-n-entries referent))
+                            (not (gethash referent referenced-objects)))
+                   (setf (gethash referent referenced-objects) referer))))
+          ;; Scan the whole heap, and look at each object for pointers
+          ;; to any code object.
+          (map-allocated-objects
+           (lambda (referer widetag size)
+             (declare (ignore size))
+             (unless (or (eql widetag fdefn-widetag)
+                         (weak-vector-p referer))
+               (do-referenced-object (referer visit referer)
+                 ;; maybe this should be the default fallback?
+                 (t
+                  :extend
+                  (case (widetag-of referer)
+                    (#.value-cell-widetag
+                     (visit (value-cell-ref referer) referer))
+                    (t
+                     (bug "Unknown object type #x~x ~s" widetag referer)))))))
+           :all)))
+      ;; Now place objects that possibly match into the same bin.
+      (let ((bins (make-hash-table :test 'equal))
+            (n 0))
+        (dovector (x code-objects)
+          (when (or (not (gethash x referenced-objects))
+                    (default-allow-icf-p x))
+            (incf n)
+            (push x (gethash (compute-code-hash-key x) bins))))
+        (when print
+          (format t "ICF: ~d objects, ~d candidates, ~d bins~%"
+                  (length code-objects) n (hash-table-count bins)))
+        ;; Scan each bin that has more than one object in it
+        ;; and check whether any are equivalent to one another.
+        (let ((equiv-map (make-hash-table :test #'eq))
+              (dstate (sb-disassem:make-dstate)))
+          (dohash ((key objects) bins)
+            (declare (ignore key))
+            ;; Skip if there can not possibly be an equivalence class
+            ;; with more than one thing in it.
+            (when (cdr objects)
+              (let (equivalences)
+                (setq objects
+                      (mapcar (lambda (x) (cons x (compute-code-signature x dstate)))
+                              objects))
+                (dolist (item objects)
+                  (let ((found (assoc item equivalences :test #'code-equivalent-p)))
+                    (if found
+                        (push item (cdr found))
+                        (push (list item) equivalences))))
+                (dolist (set equivalences)
+                  (when (cdr set) ; have two or more, so choose one as canonical
+                    (setq set (mapcar #'car set))
+                    (let ((winner
+                           (labels ((keyfn (x)
+                                      #+64-bit
+                                      (%code-serialno x)
+                                      ;; Creation time is an estimate of order, but
+                                      ;; frankly we shouldn't be storing times anyway,
+                                      ;; as it causes irreproducible builds.
+                                      ;; But I don't know what else to do.
+                                      #-64-bit
+                                      (sb-c::debug-source-compiled
+                                       (sb-c::compiled-debug-info-source
+                                        (%code-debug-info x))))
+                                    (compare (a b) (if (< (keyfn a) (keyfn b)) a b)))
+                             (reduce #'compare set))))
+                      (dolist (obj (delete winner set))
+                        (setf (gethash obj equiv-map) winner))))))))
+          (unless (apply-forwarding-map equiv-map print)
+            (return)))))))
