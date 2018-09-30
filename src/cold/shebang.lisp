@@ -47,8 +47,7 @@
       (let ((info (funcall f :function :info fun-name)))
         (if info
             (let ((f (intern "FUN-INFO-TEMPLATES" "SB!C")))
-              (and (fboundp f) (not (null (funcall f info)))))
-            (error "vop-translates: ~s is not a known function." fun-name))))))
+              (and (fboundp f) (not (null (funcall f info))))))))))
 
 (defvar *feature-eval-results-file* "output/feature-tests.lisp-expr")
 (defvar *feature-evaluation-results*)

@@ -492,3 +492,82 @@
                                  (foldable flushable))
 
 (defknown restart-point (t) t ())
+
+;;; formerly in 'float-tran'
+
+(defknown %single-float (real) single-float (movable foldable))
+(defknown %double-float (real) double-float (movable foldable))
+
+(defknown make-single-float ((signed-byte 32)) single-float
+  (movable flushable))
+
+(defknown make-double-float ((signed-byte 32) (unsigned-byte 32)) double-float
+  (movable flushable))
+
+(defknown single-float-bits (single-float) (signed-byte 32)
+  (movable foldable flushable))
+
+(defknown double-float-high-bits (double-float) (signed-byte 32)
+  (movable foldable flushable))
+
+(defknown double-float-low-bits (double-float) (unsigned-byte 32)
+  (movable foldable flushable))
+
+(defknown (%tan %sinh %asinh %atanh %log %logb %log10 %tan-quick)
+          (double-float) double-float
+  (movable foldable flushable))
+
+(defknown (%sin %cos %tanh %sin-quick %cos-quick)
+  (double-float) (double-float -1.0d0 1.0d0)
+  (movable foldable flushable))
+
+(defknown (%asin %atan)
+  (double-float)
+  (double-float #.(coerce (- (/ pi 2)) 'double-float)
+                #.(coerce (/ pi 2) 'double-float))
+  (movable foldable flushable))
+
+(defknown (%acos)
+  (double-float) (double-float 0.0d0 #.(coerce pi 'double-float))
+  (movable foldable flushable))
+
+(defknown (%cosh)
+  (double-float) (double-float 1.0d0)
+  (movable foldable flushable))
+
+(defknown (%acosh %exp %sqrt)
+  (double-float) (double-float 0.0d0)
+  (movable foldable flushable))
+
+(defknown %expm1
+  (double-float) (double-float -1d0)
+  (movable foldable flushable))
+
+(defknown (%hypot)
+  (double-float double-float) (double-float 0d0)
+  (movable foldable flushable))
+
+(defknown (%pow)
+  (double-float double-float) double-float
+  (movable foldable flushable))
+
+(defknown (%atan2)
+  (double-float double-float)
+  (double-float #.(coerce (- pi) 'double-float)
+                #.(coerce pi 'double-float))
+  (movable foldable flushable))
+
+(defknown (%scalb)
+  (double-float double-float) double-float
+  (movable foldable flushable))
+
+(defknown (%scalbn)
+  (double-float (signed-byte 32)) double-float
+  (movable foldable flushable))
+
+(defknown (%log1p)
+  (double-float) double-float
+  (movable foldable flushable))
+
+(defknown (%unary-truncate %unary-round) (real) integer
+  (movable foldable flushable))

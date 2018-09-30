@@ -474,7 +474,6 @@
  ("src/compiler/constraint")
  ("src/compiler/array-tran")
  ("src/compiler/seqtran")
- ("src/compiler/float-tran")
  ("src/compiler/saptran")
  ("src/compiler/sxhash")
  ("src/code/quantifiers")
@@ -529,6 +528,8 @@
   ;; x what the problem is and fix it.
   #!+(or ppc ppc64) :ignore-failure-p)
 
+ ;; this file defines the INTERVAL struct which is also used in 'srctran'
+ ("src/compiler/float-tran")
  ;; This is a terrible name for a file that contains type derivers
  ;; and IR1 transforms. Maybe split it up into more appropriately named pieces.
  ("src/compiler/srctran")

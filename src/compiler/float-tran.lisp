@@ -15,11 +15,6 @@
 
 ;;;; coercions
 
-(defknown %single-float (real) single-float
-    (movable foldable))
-(defknown %double-float (real) double-float
-    (movable foldable))
-
 (deftransform float ((n f) (* single-float) *)
   '(%single-float n))
 
@@ -122,12 +117,6 @@
 
 ;;;; float accessors
 
-(defknown make-single-float ((signed-byte 32)) single-float
-  (movable flushable))
-
-(defknown make-double-float ((signed-byte 32) (unsigned-byte 32)) double-float
-  (movable flushable))
-
 #-sb-xc-host
 (deftransform make-single-float ((bits)
                                  ((signed-byte 32)))
@@ -153,15 +142,6 @@
     (when (float-nan-p float)
       (give-up-ir1-transform))
     float))
-
-(defknown single-float-bits (single-float) (signed-byte 32)
-  (movable foldable flushable))
-
-(defknown double-float-high-bits (double-float) (signed-byte 32)
-  (movable foldable flushable))
-
-(defknown double-float-low-bits (double-float) (unsigned-byte 32)
-  (movable foldable flushable))
 
 (deftransform float-sign ((float &optional float2)
                           (single-float &optional single-float) *)
@@ -521,62 +501,6 @@
     (specifier-type 'float)))
 
 ;;;; irrational transforms
-
-(defknown (%tan %sinh %asinh %atanh %log %logb %log10 %tan-quick)
-          (double-float) double-float
-  (movable foldable flushable))
-
-(defknown (%sin %cos %tanh %sin-quick %cos-quick)
-  (double-float) (double-float -1.0d0 1.0d0)
-  (movable foldable flushable))
-
-(defknown (%asin %atan)
-  (double-float)
-  (double-float #.(coerce (- (/ pi 2)) 'double-float)
-                #.(coerce (/ pi 2) 'double-float))
-  (movable foldable flushable))
-
-(defknown (%acos)
-  (double-float) (double-float 0.0d0 #.(coerce pi 'double-float))
-  (movable foldable flushable))
-
-(defknown (%cosh)
-  (double-float) (double-float 1.0d0)
-  (movable foldable flushable))
-
-(defknown (%acosh %exp %sqrt)
-  (double-float) (double-float 0.0d0)
-  (movable foldable flushable))
-
-(defknown %expm1
-  (double-float) (double-float -1d0)
-  (movable foldable flushable))
-
-(defknown (%hypot)
-  (double-float double-float) (double-float 0d0)
-  (movable foldable flushable))
-
-(defknown (%pow)
-  (double-float double-float) double-float
-  (movable foldable flushable))
-
-(defknown (%atan2)
-  (double-float double-float)
-  (double-float #.(coerce (- pi) 'double-float)
-                #.(coerce pi 'double-float))
-  (movable foldable flushable))
-
-(defknown (%scalb)
-  (double-float double-float) double-float
-  (movable foldable flushable))
-
-(defknown (%scalbn)
-  (double-float (signed-byte 32)) double-float
-  (movable foldable flushable))
-
-(defknown (%log1p)
-  (double-float) double-float
-  (movable foldable flushable))
 
 (macrolet ((def (name prim rtype)
              `(progn
@@ -1332,8 +1256,16 @@
       (two-arg-derive-type re im #'complex-derive-type-aux-2 #'complex)
       (one-arg-derive-type re #'complex-derive-type-aux-1 #'complex)))
 
-;;; Define some transforms for complex operations. We do this in lieu
-;;; of complex operation VOPs.
+;;; Define some transforms for complex operations in lieu of complex operation
+;;; VOPs for most backends. If vops exist, they must support the following
+;;; on complex-single-float and complex-double-float:
+;;;   * real-complex, complex-real and complex-complex addition and subtraction
+;;;   * complex-real and real-complex multiplication
+;;;   * complex-real division
+;;;   * sb!vm::swap-complex, which swaps the real and imaginary parts.
+;;;   * conjugate
+;;;   * complex-real, real-complex and complex-complex CL:=
+;;;     (complex-complex EQL would usually be a good idea).
 (macrolet ((frob (type contagion)
              `(progn
                 (deftransform complex ((r) (,type))
@@ -1346,48 +1278,69 @@
                   (when (csubtypep (lvar-type r) (specifier-type ',type))
                     (give-up-ir1-transform))
                   '(complex (truly-the ,type (coerce r ',type)) i))
+
+                ;; Arbitrarily use %NEGATE/COMPLEX-DOUBLE-FLOAT as an indicator
+                ;; of whether all the operations below are translated by vops.
+                ;; We could be more fine-grained, but it seems reasonable that
+                ;; they be implemented on an all-or-none basis.
+                #!-(vop-named sb!vm::%negate/complex-double-float)
+                (progn
                 ;; negation
-                #!-complex-float-vops
                 (deftransform %negate ((z) ((complex ,type)) *)
                   '(complex (%negate (realpart z)) (%negate (imagpart z))))
                 ;; complex addition and subtraction
-                #!-complex-float-vops
                 (deftransform + ((w z) ((complex ,type) (complex ,type)) *)
                   '(complex (+ (realpart w) (realpart z))
-                    (+ (imagpart w) (imagpart z))))
-                #!-complex-float-vops
+                            (+ (imagpart w) (imagpart z))))
                 (deftransform - ((w z) ((complex ,type) (complex ,type)) *)
                   '(complex (- (realpart w) (realpart z))
-                    (- (imagpart w) (imagpart z))))
+                            (- (imagpart w) (imagpart z))))
                 ;; Add and subtract a complex and a real.
-                #!-complex-float-vops
                 (deftransform + ((w z) ((complex ,type) real) *)
                   `(complex (+ (realpart w) z)
                             (+ (imagpart w) ,(coerce 0 ',type))))
-                #!-complex-float-vops
                 (deftransform + ((z w) (real (complex ,type)) *)
                   `(complex (+ (realpart w) z)
                             (+ (imagpart w) ,(coerce 0 ',type))))
                 ;; Add and subtract a real and a complex number.
-                #!-complex-float-vops
                 (deftransform - ((w z) ((complex ,type) real) *)
                   `(complex (- (realpart w) z)
                             (- (imagpart w) ,(coerce 0 ',type))))
-                #!-complex-float-vops
                 (deftransform - ((z w) (real (complex ,type)) *)
                   `(complex (- z (realpart w))
                             (- ,(coerce 0 ',type) (imagpart w))))
-                ;; Multiply and divide two complex numbers.
-                #!-complex-float-vops
+                ;; Multiply a complex by a real or vice versa.
+                (deftransform * ((w z) ((complex ,type) real) *)
+                  '(complex (* (realpart w) z) (* (imagpart w) z)))
+                (deftransform * ((z w) (real (complex ,type)) *)
+                  '(complex (* (realpart w) z) (* (imagpart w) z)))
+                ;; conjugate of complex number
+                (deftransform conjugate ((z) ((complex ,type)) *)
+                  '(complex (realpart z) (- (imagpart z))))
+                ;; comparison
+                (deftransform = ((w z) ((complex ,type) (complex ,type)) *)
+                  '(and (= (realpart w) (realpart z))
+                    (= (imagpart w) (imagpart z))))
+                (deftransform = ((w z) ((complex ,type) real) *)
+                  '(and (= (realpart w) z) (zerop (imagpart w))))
+                (deftransform = ((w z) (real (complex ,type)) *)
+                  '(and (= (realpart z) w) (zerop (imagpart z))))
+                ;; Multiply two complex numbers.
                 (deftransform * ((x y) ((complex ,type) (complex ,type)) *)
                   '(let* ((rx (realpart x))
                           (ix (imagpart x))
                           (ry (realpart y))
                           (iy (imagpart y)))
                     (complex (- (* rx ry) (* ix iy))
-                     (+ (* rx iy) (* ix ry)))))
+                             (+ (* rx iy) (* ix ry)))))
+                ;; Divide a complex by a real.
+                (deftransform / ((w z) ((complex ,type) real) *)
+                  '(complex (/ (realpart w) z) (/ (imagpart w) z)))
+                )
+
+                ;; Divide two complex numbers.
                 (deftransform / ((x y) ((complex ,type) (complex ,type)) *)
-                  #!-complex-float-vops
+                  #!-(vop-translates sb!vm::swap-complex)
                   '(let* ((rx (realpart x))
                           (ix (imagpart x))
                           (ry (realpart y))
@@ -1401,7 +1354,7 @@
                                (dn (+ iy (* r ry))))
                           (complex (/ (+ (* rx r) ix) dn)
                                    (/ (- (* ix r) rx) dn)))))
-                  #!+complex-float-vops
+                  #!+(vop-translates sb!vm::swap-complex)
                   `(let* ((cs (conjugate (sb!vm::swap-complex x)))
                           (ry (realpart y))
                           (iy (imagpart y)))
@@ -1412,19 +1365,9 @@
                          (let* ((r (/ ry iy))
                                 (dn (+ iy (* r ry))))
                            (/ (+ (* x r) cs) dn)))))
-                ;; Multiply a complex by a real or vice versa.
-                #!-complex-float-vops
-                (deftransform * ((w z) ((complex ,type) real) *)
-                  '(complex (* (realpart w) z) (* (imagpart w) z)))
-                #!-complex-float-vops
-                (deftransform * ((z w) (real (complex ,type)) *)
-                  '(complex (* (realpart w) z) (* (imagpart w) z)))
-                ;; Divide a complex by a real or vice versa.
-                #!-complex-float-vops
-                (deftransform / ((w z) ((complex ,type) real) *)
-                  '(complex (/ (realpart w) z) (/ (imagpart w) z)))
+                ;; Divide a real by a complex.
                 (deftransform / ((x y) (,type (complex ,type)) *)
-                  #!-complex-float-vops
+                  #!-(vop-translates sb!vm::swap-complex)
                   '(let* ((ry (realpart y))
                           (iy (imagpart y)))
                     (if (> (abs ry) (abs iy))
@@ -1436,7 +1379,7 @@
                                (dn (+ iy (* r ry))))
                           (complex (/ (* x r) dn)
                                    (/ (- x) dn)))))
-                  #!+complex-float-vops
+                  #!+(vop-translates sb!vm::swap-complex)
                   '(let* ((ry (realpart y))
                           (iy (imagpart y)))
                     (if (> (abs ry) (abs iy))
@@ -1446,24 +1389,10 @@
                         (let* ((r (/ ry iy))
                                (dn (+ iy (* r ry))))
                           (/ (complex (* x r) (- x)) dn)))))
-                ;; conjugate of complex number
-                #!-complex-float-vops
-                (deftransform conjugate ((z) ((complex ,type)) *)
-                  '(complex (realpart z) (- (imagpart z))))
                 ;; CIS
                 (deftransform cis ((z) ((,type)) *)
                   '(complex (cos z) (sin z)))
-                ;; comparison
-                #!-complex-float-vops
-                (deftransform = ((w z) ((complex ,type) (complex ,type)) *)
-                  '(and (= (realpart w) (realpart z))
-                    (= (imagpart w) (imagpart z))))
-                #!-complex-float-vops
-                (deftransform = ((w z) ((complex ,type) real) *)
-                  '(and (= (realpart w) z) (zerop (imagpart w))))
-                #!-complex-float-vops
-                (deftransform = ((w z) (real (complex ,type)) *)
-                  '(and (= (realpart z) w) (zerop (imagpart z)))))))
+                )))
   (frob single-float (or rational single-float))
   (frob double-float (or rational single-float double-float)))
 
@@ -1581,16 +1510,13 @@
 ;;;; TRUNCATE, FLOOR, CEILING, and ROUND
 
 (macrolet ((define-frobs (fun ufun)
-             `(progn
-                (defknown ,ufun (real) integer (movable foldable flushable))
-                (deftransform ,fun ((x &optional by)
-                                    (* &optional
-                                       (constant-arg (member 1))))
+             `(deftransform ,fun ((x &optional by)
+                                  (* &optional (constant-arg (member 1))))
                   '(let ((res (,ufun x)))
                     (values res (locally
                                     (declare (flushable %single-float
                                                         %double-float))
-                                  (- x res))))))))
+                                  (- x res)))))))
   (define-frobs truncate %unary-truncate)
   (define-frobs round %unary-round))
 
