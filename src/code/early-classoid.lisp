@@ -175,6 +175,10 @@
   (slot-table #(1 nil) :type simple-vector))
 (declaim (freeze-type layout))
 
+(declaim (inline layout-for-std-class-p))
+(defun layout-for-std-class-p (x)
+  (logtest (layout-%flags x) +pcl-object-layout-flag+))
+
 #!+(and immobile-space (host-feature sb-xc))
 (macrolet ((def-layout-maker ()
              (let ((slots (dd-slots (find-defstruct-description 'layout))))

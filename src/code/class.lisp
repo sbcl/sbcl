@@ -55,10 +55,6 @@
 
 ;;; The LAYOUT structure itself is defined in 'early-classoid.lisp'
 
-(declaim (inline layout-for-std-class-p))
-(defun layout-for-std-class-p (x)
-  (logtest (layout-%flags x) +pcl-object-layout-flag+))
-
 (defmethod print-object ((layout layout) stream)
   (print-unreadable-object (layout stream :type t :identity t)
     (format stream
