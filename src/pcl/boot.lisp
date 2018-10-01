@@ -360,9 +360,10 @@ bootstrapping.
           :new-location source-location)
     (let ((fun (fdefinition fun-name)))
       (when (generic-function-p fun)
-        (loop for method in (generic-function-initial-methods fun)
-              do (remove-method fun method))
-        (setf (generic-function-initial-methods fun) '()))))
+        (sb-thread::with-recursive-system-lock ((gf-lock fun))
+          (loop for method in (generic-function-initial-methods fun)
+                do (remove-method fun method))
+          (setf (generic-function-initial-methods fun) '())))))
   (apply #'ensure-generic-function
          fun-name
          :lambda-list lambda-list
