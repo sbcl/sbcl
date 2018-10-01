@@ -422,17 +422,18 @@
         (remhash gf (method-combination-%generic-functions old-mc))
         (setf (gethash gf (method-combination-%generic-functions mc)) t)
         (flush-effective-method-cache gf))
-      (cond
-        ((and lambda-list-p apo-p)
-         (set-arg-info gf
-                       :lambda-list lambda-list
-                       :argument-precedence-order argument-precedence-order))
-        (lambda-list-p (set-arg-info gf :lambda-list lambda-list))
-        (t (set-arg-info gf)))
-      (when (arg-info-valid-p (gf-arg-info gf))
-        (update-dfun gf))
-      (map-dependents gf (lambda (dependent)
-                           (apply #'update-dependent gf dependent args))))))
+      (sb-thread::with-recursive-system-lock ((gf-lock gf))
+        (cond
+          ((and lambda-list-p apo-p)
+           (set-arg-info gf
+                         :lambda-list lambda-list
+                         :argument-precedence-order argument-precedence-order))
+          (lambda-list-p (set-arg-info gf :lambda-list lambda-list))
+          (t (set-arg-info gf)))
+        (when (arg-info-valid-p (gf-arg-info gf))
+          (update-dfun gf))
+        (map-dependents gf (lambda (dependent)
+                             (apply #'update-dependent gf dependent args)))))))
 
 (defun set-methods (gf methods)
   (setf (generic-function-methods gf) nil)

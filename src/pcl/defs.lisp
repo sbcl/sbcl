@@ -401,7 +401,9 @@
                                        method-combination)
   ((type-name :reader method-combination-type-name :initarg :type-name)
    (options :reader method-combination-options :initarg :options)
-   (%generic-functions :initform (make-hash-table :weakness :key) :reader method-combination-%generic-functions)))
+   (%generic-functions :initform (make-hash-table :weakness :key
+                                                   :synchronized t)
+                       :reader method-combination-%generic-functions)))
 
 (defclass long-method-combination (standard-method-combination)
   ((function :initarg :function :reader long-method-combination-function)
