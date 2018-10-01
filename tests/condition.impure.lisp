@@ -559,3 +559,13 @@
     (assert (= (funcall (checked-compile '(lambda (&key abc) (1+ abc)))
                         :bogus 30 :abc 20)
                21))))
+
+(define-condition allocation-class-default-initargs ()
+  ((a :initarg :a :initform :initform :allocation :class))
+  (:default-initargs :a :default-initarg))
+
+(with-test (:name :allocation-class-default-initargs)
+  (assert (eql (slot-value (make-condition 'allocation-class-default-initargs) 'a)
+               :default-initarg))
+  (assert (eql (slot-value (make-condition 'allocation-class-default-initargs :a 10) 'a)
+               10)))

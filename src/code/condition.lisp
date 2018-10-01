@@ -110,24 +110,31 @@
 ;;;; slots of CONDITION objects
 
 (defun find-slot-default (class slot)
-  (let ((initargs (condition-slot-initargs slot))
-        (cpl (condition-classoid-cpl class)))
+  (multiple-value-bind (value found) (find-slot-default-initarg class slot)
     ;; When CLASS or a superclass has a default initarg for SLOT, use
     ;; that.
+    (cond (found
+           value)
+          ;; Otherwise use the initform of SLOT, if there is one.
+          ((condition-slot-initform-p slot)
+           (let ((initfun (condition-slot-initfunction slot)))
+             (aver (functionp initfun))
+             (funcall initfun)))
+          (t
+           (error "unbound condition slot: ~S" (condition-slot-name slot))))))
+
+(defun find-slot-default-initarg (class slot)
+  (let ((initargs (condition-slot-initargs slot))
+        (cpl (condition-classoid-cpl class)))
     (dolist (class cpl)
       (let ((direct-default-initargs
               (condition-classoid-direct-default-initargs class)))
         (dolist (initarg initargs)
           (let ((initfunction (third (assoc initarg direct-default-initargs))))
             (when initfunction
-              (return-from find-slot-default (funcall initfunction)))))))
-
-    ;; Otherwise use the initform of SLOT, if there is one.
-    (if (condition-slot-initform-p slot)
-        (let ((initfun (condition-slot-initfunction slot)))
-          (aver (functionp initfun))
-          (funcall initfun))
-        (error "unbound condition slot: ~S" (condition-slot-name slot)))))
+              (return-from find-slot-default-initarg
+                (values (funcall initfunction) t)))))))
+    (values nil nil)))
 
 (defun find-condition-class-slot (condition-class slot-name)
   (dolist (sclass
@@ -221,10 +228,15 @@
 
     ;; Set any class slots with initargs present in this call.
     (dolist (cslot (condition-classoid-class-slots classoid))
-      (dolist (initarg (condition-slot-initargs cslot))
-        (let ((val (getf initargs initarg sb!pcl:+slot-unbound+)))
-          (unless (unbound-marker-p val)
-            (setf (car (condition-slot-cell cslot)) val)))))
+      (unless (dolist (initarg (condition-slot-initargs cslot))
+                (let ((val (getf initargs initarg sb!pcl:+slot-unbound+)))
+                  (unless (unbound-marker-p val)
+                    (setf (car (condition-slot-cell cslot)) val)
+                    (return t))))
+        (multiple-value-bind (value found)
+            (find-slot-default-initarg classoid cslot)
+            (when found
+              (setf (car (condition-slot-cell cslot)) value)))))
 
     ;; Default any slots with non-constant defaults now.
     (dolist (hslot (condition-classoid-hairy-slots classoid))
