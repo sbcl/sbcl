@@ -569,3 +569,9 @@
                :default-initarg))
   (assert (eql (slot-value (make-condition 'allocation-class-default-initargs :a 10) 'a)
                10)))
+
+(define-condition allocation-class-unbound ()
+  ((a :initarg :a :allocation :class)))
+
+(with-test (:name :allocation-class-unbound)
+  (assert-error (slot-value (make-condition 'allocation-class-unbound) 'a)))

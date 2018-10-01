@@ -121,7 +121,7 @@
              (aver (functionp initfun))
              (funcall initfun)))
           (t
-           (error "unbound condition slot: ~S" (condition-slot-name slot))))))
+           (error "Unbound condition slot: ~S" (condition-slot-name slot))))))
 
 (defun find-slot-default-initarg (class slot)
   (let ((initargs (condition-slot-initargs slot))
@@ -169,7 +169,10 @@
                                              (condition-slot-initargs slot))
                                  (return (%instance-ref condition (1+ i))))))))
             (when (eq (condition-slot-name cslot) name)
-              (return (car (condition-slot-cell cslot))))))
+              (let ((value (car (condition-slot-cell cslot))))
+                (if (unbound-marker-p value)
+                    (error "Unbound condition slot: ~S" (condition-slot-name cslot))
+                    (return value))))))
         val)))
 
 ;;;; MAKE-CONDITION
