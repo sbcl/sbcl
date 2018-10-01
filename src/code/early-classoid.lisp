@@ -379,7 +379,8 @@
 ;;; FUNCALLABLE-STANDARD-CLASS.
 (def!struct (standard-classoid (:include classoid)
                                (:copier nil)
-                               (:constructor make-standard-classoid)))
+                               (:constructor make-standard-classoid))
+  old-layouts)
 ;;; a metaclass for classes which aren't standardlike but will never
 ;;; change either.
 (def!struct (static-classoid (:include classoid)
