@@ -214,6 +214,14 @@
                         (equal (%simple-fun-lexpr f1) (%simple-fun-lexpr f2)))
              (return nil)))))))
 
+(defun code/doc-equivalent-p (obj1 obj2)
+  (and (code-equivalent-p obj1 obj2)
+       (let ((code1 (car obj1)) (code2 (car obj2)))
+         (dotimes (i (code-n-entries code1) t)
+           (unless (equal (%simple-fun-doc (%code-entry-point code1 i))
+                          (%simple-fun-doc (%code-entry-point code2 i)))
+             (return nil))))))
+
 ;;; Compute a key for binning purposes.
 (defun compute-code-hash-key (code)
   (with-pinned-objects (code)
@@ -249,7 +257,7 @@
                        sb-c::deftransform
                        :source-transform))))))
 
-(defun fold-identical-code (&key aggressive print)
+(defun fold-identical-code (&key aggressive preserve-docstrings print)
   (loop
     #+gencgc (gc :gen 7)
     ;; Pass 1: count code objects.  I'd like to enhance MAP-ALLOCATED-OBJECTS
@@ -329,7 +337,10 @@
                       (mapcar (lambda (x) (cons x (compute-code-signature x dstate)))
                               objects))
                 (dolist (item objects)
-                  (let ((found (assoc item equivalences :test #'code-equivalent-p)))
+                  (let ((found (assoc item equivalences
+                                      :test (if preserve-docstrings
+                                                #'code/doc-equivalent-p
+                                                #'code-equivalent-p))))
                     (if found
                         (push item (cdr found))
                         (push (list item) equivalences))))
