@@ -249,36 +249,37 @@
 
 (defun real-get-method (generic-function qualifiers specializers
                         &optional (errorp t)
-                        always-check-specializers)
-  (let ((specializer-count (length specializers))
-        (methods (generic-function-methods generic-function)))
-    (when (or methods always-check-specializers)
-      (let ((required-parameter-count
-             (length (arg-info-metatypes (gf-arg-info generic-function)))))
-        ;; Since we internally bypass FIND-METHOD by using GET-METHOD
-        ;; instead we need to do this here or users may get hit by a
-        ;; failed AVER instead of a sensible error message.
-        (unless (= specializer-count required-parameter-count)
-          (error
-           'find-method-length-mismatch
-           :format-control   "~@<The generic function ~S takes ~D ~
+                                  always-check-specializers)
+  (sb-thread::with-recursive-system-lock ((gf-lock generic-function))
+    (let ((specializer-count (length specializers))
+          (methods (generic-function-methods generic-function)))
+      (when (or methods always-check-specializers)
+        (let ((required-parameter-count
+                (length (arg-info-metatypes (gf-arg-info generic-function)))))
+          ;; Since we internally bypass FIND-METHOD by using GET-METHOD
+          ;; instead we need to do this here or users may get hit by a
+          ;; failed AVER instead of a sensible error message.
+          (unless (= specializer-count required-parameter-count)
+            (error
+             'find-method-length-mismatch
+             :format-control   "~@<The generic function ~S takes ~D ~
                               required argument~:P; was asked to ~
                               find a method with specializers ~:S~@:>"
-           :format-arguments (list generic-function required-parameter-count
-                                   (unparse-specializers generic-function specializers))))))
-    (flet ((congruentp (other-method)
-             (let ((other-specializers (method-specializers other-method)))
-               (aver (= specializer-count (length other-specializers)))
-               (and (equal qualifiers (safe-method-qualifiers other-method))
-                    (every #'same-specializer-p specializers other-specializers)))))
-      (declare (dynamic-extent #'congruentp))
-      (cond ((find-if #'congruentp methods))
-            ((null errorp) nil)
-            (t
-             (error "~@<There is no method on ~S with ~:[no ~
+             :format-arguments (list generic-function required-parameter-count
+                                     (unparse-specializers generic-function specializers))))))
+      (flet ((congruentp (other-method)
+               (let ((other-specializers (method-specializers other-method)))
+                 (aver (= specializer-count (length other-specializers)))
+                 (and (equal qualifiers (safe-method-qualifiers other-method))
+                      (every #'same-specializer-p specializers other-specializers)))))
+        (declare (dynamic-extent #'congruentp))
+        (cond ((find-if #'congruentp methods))
+              ((null errorp) nil)
+              (t
+               (error "~@<There is no method on ~S with ~:[no ~
                      qualifiers~;~:*qualifiers ~:S~] and specializers ~
                      ~:S.~@:>"
-                    generic-function qualifiers specializers))))))
+                      generic-function qualifiers specializers)))))))
 
 (defmethod find-method ((generic-function standard-generic-function)
                         qualifiers specializers &optional (errorp t))
