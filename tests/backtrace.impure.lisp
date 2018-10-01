@@ -141,8 +141,9 @@
                                       (caar expected-frames)))
               (frames (or (find-frame test-function-name backtrace)
                           (fail "~@<~S (expected name ~S) not found in ~
-                                backtrace:~@:_~S~@:>"
-                                test-function test-function-name backtrace))))
+                                backtrace:~@:_~a~@:>"
+                                test-function test-function-name
+                                (princ-to-string backtrace)))))
          ;; Check that we have all the frames we wanted.
          (multiple-value-bind (successp condition)
              (check-backtrace frames expected-frames :details details)
@@ -151,7 +152,7 @@
          ;; (Depends on running in the main thread.) FIXME: On Windows
          ;; we get two extra foreign frames below regular frames.
          (unless (find-frame 'sb-impl::toplevel-init frames)
-           (fail "~@<Backtrace stunted:~@:_~S~@:>" backtrace)))
+           (fail "~@<Backtrace stunted:~@:_~a~@:>" (princ-to-string backtrace))))
        (return-from verify-backtrace t))
      test-function :details details)))
 
