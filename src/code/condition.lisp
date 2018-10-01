@@ -231,15 +231,15 @@
 
     ;; Set any class slots with initargs present in this call.
     (dolist (cslot (condition-classoid-class-slots classoid))
-      (unless (dolist (initarg (condition-slot-initargs cslot))
-                (let ((val (getf initargs initarg sb!pcl:+slot-unbound+)))
-                  (unless (unbound-marker-p val)
-                    (setf (car (condition-slot-cell cslot)) val)
-                    (return t))))
-        (multiple-value-bind (value found)
-            (find-slot-default-initarg classoid cslot)
-            (when found
-              (setf (car (condition-slot-cell cslot)) value)))))
+      (loop for (key value) on initargs by #'cddr
+            when (memq key (condition-slot-initargs cslot))
+            do (setf (car (condition-slot-cell cslot)) value)
+               (return)
+            finally
+            (multiple-value-bind (value found)
+                (find-slot-default-initarg classoid cslot)
+              (when found
+                (setf (car (condition-slot-cell cslot)) value)))))
 
     ;; Default any slots with non-constant defaults now.
     (dolist (hslot (condition-classoid-hairy-slots classoid))

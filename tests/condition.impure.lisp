@@ -575,3 +575,12 @@
 
 (with-test (:name :allocation-class-unbound)
   (assert-error (slot-value (make-condition 'allocation-class-unbound) 'a)))
+
+(define-condition allocation-class-initarg-order ()
+  ((a :initarg :a :initarg :b :allocation :class)))
+
+(with-test (:name :allocation-class-initarg-order)
+  (assert (eql (slot-value (make-condition 'allocation-class-initarg-order :a 10 :b 20) 'a)
+               10))
+  (assert (eql (slot-value (make-condition 'allocation-class-initarg-order :b 10 :a 20) 'a)
+               10)))
