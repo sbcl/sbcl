@@ -228,14 +228,16 @@ See also :POLICY option in WITH-COMPILATION-UNIT."
                                        (policy-dependent-qualities policy))
                                   1))))))
            (define-getter (name &body body)
-             `(defun ,name (policy index)
-                (declare (type policy policy)
+             `(progn
+                (declaim (ftype (sfunction (policy fixnum) (unsigned-byte 2)) ,name))
+                (defun ,name (policy index)
+                  (declare (type policy policy)
                          (type (integer
                                 #.(- n-policy-primary-qualities)
                                 #.(- max-policy-qualities
                                      n-policy-primary-qualities 1))
                                index))
-                ,@body)))
+                  ,@body))))
 
   ;; Return the value for quality INDEX in POLICY, using *POLICY-MIN/MAX*
   ;; Primary qualities are assumed to exist, however policy-restricting functions
