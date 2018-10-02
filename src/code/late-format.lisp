@@ -36,7 +36,8 @@
     (loop
       (let ((next-directive (or (position #\~ string :start index) end)))
         (when (> next-directive index)
-          (push (subseq string index next-directive) result))
+          (push (possibly-base-stringize (subseq string index next-directive))
+                result))
         (when (= next-directive end)
           (return))
         (let* ((directive (parse-directive string next-directive))
@@ -179,7 +180,8 @@
 
 (defun %formatter (control-string &optional (arg-count 0) (need-retval t)
                                   &aux (lambda-name
-                                        (concatenate 'string "fmt$" control-string)))
+                                        (possibly-base-stringize
+                                         (concatenate 'string "fmt$" control-string))))
   ;; ARG-COUNT is supplied only when the use of this formatter is in a literal
   ;; call to FORMAT, in which case we can possibly elide &optional parsing.
   ;; But we can't in general, because FORMATTER may be called by users
@@ -245,9 +247,17 @@
                            (cdr remaining-directives))
        (flet ((merge-string (string)
                 (cond (previous
-                       (let ((concat (concatenate 'string
-                                                  (string previous)
-                                                  (string string))))
+                       ;; It would be nice if (CONCATENTE 'STRING)
+                       ;; could return the "smallest" string type
+                       ;; able to hold the result. Or at least if we
+                       ;; had a better interface than wrapping
+                       ;; it with POSSIBLY-BASE-STRINGIZE since that
+                       ;; conses two new strings usually.
+                       (let ((concat
+                              (possibly-base-stringize
+                               (concatenate 'string
+                                            (string previous)
+                                            (string string)))))
                          (setf previous concat)
                          (setf (car results)
                                `(write-string ,concat stream))))
@@ -256,7 +266,7 @@
                        (push form results)))))
          (cond ((not form))
                ((typep form '(cons (member write-string write-char)
-                              (cons (or string character))))
+                                   (cons (or string character))))
                 (merge-string (second form)))
                ((typep form '(cons (eql terpri)))
                 (merge-string #\Newline))

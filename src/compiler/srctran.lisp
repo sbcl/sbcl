@@ -4670,7 +4670,8 @@
                     when (stringp string)
                     do (setf concat
                              (if concat
-                                 (concatenate 'string concat string)
+                                 (possibly-base-stringize
+                                  (concatenate 'string concat string))
                                  string))
                     else
                     when concat collect (shiftf concat nil) end

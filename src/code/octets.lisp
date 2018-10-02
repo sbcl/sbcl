@@ -120,18 +120,9 @@
     (,definer aref (simple-array (unsigned-byte 8) (*)))
     (,definer sap-ref-8 system-area-pointer)))
 
-;;; FIXME: find out why the comment about SYMBOLICATE below is true
-;;; and fix it, or else replace with SYMBOLICATE.
-;;;
-;;; FIXME: this is cute, but is going to prevent greps for def.*<name>
-;;; from working for (defun ,(make-od-name ...) ...)
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun make-od-name (sym1 sym2)
-    ;; "MAKE-NAME" is too generic, but this doesn't do quite what
-    ;; SYMBOLICATE does; MAKE-OD-NAME ("octets definition") it is
-    ;; then.
-    (intern (concatenate 'string (symbol-name sym1) "-" (symbol-name sym2))
-            (symbol-package sym1))))
+    (package-symbolicate (symbol-package sym1) sym1 "-" sym2)))
 
 ;;;; to-octets conversions
 
