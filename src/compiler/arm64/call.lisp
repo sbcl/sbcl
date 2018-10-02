@@ -455,20 +455,22 @@
 (define-vop (more-arg)
   (:translate %more-arg)
   (:policy :fast-safe)
-  (:args (object :scs (descriptor-reg)) (index :scs (any-reg immediate)))
+  (:args (context :scs (descriptor-reg))
+         (index :scs (any-reg immediate)))
   (:arg-types * tagged-num)
-  (:temporary (:scs (unsigned-reg)) temp)
+  (:temporary (:scs (any-reg)) temp)
   (:results (value :scs (descriptor-reg any-reg)))
   (:result-types *)
   (:generator 5
     (sc-case index
       (immediate
        (inst ldr value
-             (@ object
+             (@ context
                 (load-store-offset
-                 (- (ash (+ 0 (tn-value index)) word-shift) 0)))))
-      (t (inst add temp object (lsl index (- word-shift n-fixnum-tag-bits)))
-         (loadw value temp 0 0)))))
+                 (ash (tn-value index) word-shift)))))
+      (t
+       (inst add temp context (lsl index (- word-shift n-fixnum-tag-bits)))
+       (loadw value temp)))))
 
 ;;; Turn more arg (context, count) into a list.
 (define-vop (listify-rest-args)
