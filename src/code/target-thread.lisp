@@ -1351,6 +1351,7 @@ on this semaphore, then N of them is woken up."
   ;; being spawned, and guarantees that *ALL-THREADS*
   ;; is up to date.
   (with-deadline (:seconds nil :override t)
+    (sb!impl::finalizer-thread-stop)
     (grab-mutex *make-thread-lock*)
     (let ((timeout sb!ext:*exit-timeout*)
           (code *exit-in-process*)
@@ -1362,7 +1363,6 @@ on this semaphore, then N of them is woken up."
             (lambda (c h)
               (sb!debug::debugger-disabled-hook c h :quit nil)
               (abort-thread :allow-exit t)))
-      (sb!impl::finalizer-thread-stop)
       (dolist (thread (list-all-threads))
         (cond ((eq thread current))
               ((main-thread-p thread)
