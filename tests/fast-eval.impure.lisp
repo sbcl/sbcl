@@ -18,6 +18,10 @@
 
 (in-package sb-interpreter)
 
+(test-util:with-test (:name :write-bogus-function-instance)
+  (write-to-string
+   (sb-pcl::class-prototype (find-class 'sb-interpreter:interpreted-function))))
+
 (test-util:with-test (:name :type-checker-for-function)
   ;; The test for (FUNCTION (HAIR) (MORE-HAIR)) is just FUNCTIONP.
   ;; The test for not that is (NOT FUNCTION).

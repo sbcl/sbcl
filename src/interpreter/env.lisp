@@ -466,15 +466,15 @@
 (defmethod print-object ((obj interpreted-function) stream)
   ;; Do not try to directly print 'NAME-FOR-FUN', which returns OBJ
   ;; itself if it has no proper name.
-  (let ((name (fun-name obj)))
-    (if (eql name 0)
-        ;; To avoid an extra space between type and identity, the body must
-        ;; be empty, so we need two cases, because emptiness is compile-time
-        ;; determined, not based on whether the body actually printed anything.
-        (print-unreadable-object (obj stream :type t :identity t))
-        ;; show name whenever NAME it is not 0, even if not OBJ's proper name.
-        (print-unreadable-object (obj stream :type t)
-          (prin1 name stream)))))
+  (if (or (eql (interpreted-function-%proto-fn obj) 0)
+          (eql (fun-name obj) 0))
+      ;; To avoid an extra space between type and identity, the body must
+      ;; be empty, so we need two cases, because emptiness is compile-time
+      ;; determined, not based on whether the body actually printed anything.
+      (print-unreadable-object (obj stream :type t :identity t))
+      ;; show name whenever NAME it is not 0, even if not OBJ's proper name.
+      (print-unreadable-object (obj stream :type t)
+        (prin1 (fun-name obj) stream))))
 
 ;;; Return approximately a type specifier for LAMBDA-LIST.
 ;;; e.g. after doing (DEFUN FOO (A B) ...), you want (FUNCTION (T T) *)
