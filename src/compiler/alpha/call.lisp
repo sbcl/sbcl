@@ -1093,7 +1093,7 @@ default-value-8
   (:results (value :scs (descriptor-reg any-reg)))
   (:result-types *)
   (:generator 4
-    (inst ldl value 0 context)))
+    (inst ldl value (* index n-word-bytes) context)))
 
 ;;; Turn &MORE arg (context, count) into a list.
 (define-vop (listify-rest-args)
