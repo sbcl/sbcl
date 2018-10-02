@@ -5,26 +5,6 @@
   (:generator 1
     (move ptr csp-tn)))
 
-(define-vop (%%pop-dx)
-  (:args (ptr :scs (any-reg)))
-  (:ignore ptr)
-  (:generator 1
-    (bug "VOP %%POP-DX is not implemented.")))
-
-(define-vop (%%nip-dx)
-  (:args (last-nipped-ptr :scs (any-reg) :target dest)
-         (last-preserved-ptr :scs (any-reg) :target src)
-         (moved-ptrs :scs (any-reg) :more t))
-  (:results (r-moved-ptrs :scs (any-reg) :more t))
-  (:temporary (:sc any-reg) src)
-  (:temporary (:sc any-reg) dest)
-  (:temporary (:sc non-descriptor-reg) temp)
-  (:ignore r-moved-ptrs
-           last-nipped-ptr last-preserved-ptr moved-ptrs
-           src dest temp)
-  (:generator 1
-    (bug "VOP %%NIP-DX is not implemented.")))
-
 (define-vop (%%nip-values)
   (:args (last-nipped-ptr :scs (any-reg) :target dest)
          (last-preserved-ptr :scs (any-reg) :target src)
@@ -32,7 +12,7 @@
   (:results (r-moved-ptrs :scs (any-reg) :more t))
   (:temporary (:sc any-reg) src)
   (:temporary (:sc any-reg) dest)
-  (:temporary (:sc non-descriptor-reg) temp)
+  (:temporary (:sc descriptor-reg) temp)
   (:ignore r-moved-ptrs)
   (:generator 1
     (move last-preserved-ptr src)

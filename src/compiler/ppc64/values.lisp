@@ -19,7 +19,7 @@
   (:results (r-moved-ptrs :scs (any-reg) :more t))
   (:temporary (:sc any-reg) src)
   (:temporary (:sc any-reg) dest)
-  (:temporary (:sc non-descriptor-reg) temp)
+  (:temporary (:sc descriptor-reg) temp)
   (:ignore r-moved-ptrs)
   (:generator 1
     (inst mr dest last-nipped-ptr)
