@@ -187,25 +187,38 @@
              (load-arg (x load-tn)
                (sc-case x
                  (null
-                  null-tn)
+                  (lambda () null-tn))
                  ((constant immediate control-stack)
-                  (let ((tn (if (and used-load-tn
-                                     (location= used-load-tn
-                                                load-tn))
-                                tmp-tn
-                                load-tn)))
+                  (let ((load-tn (if (and used-load-tn
+                                          (location= used-load-tn load-tn))
+                                     tmp-tn
+                                     load-tn)))
+                    (setf used-load-tn load-tn)
                     (sc-case x
                       (constant
-                       (load-constant vop1 x tn))
-                      (immediate
-                       (load-immediate vop1 x tn))
+                       (when (eq load-tn tmp-tn)
+                         ;; TMP-TN is not a descriptor
+                         (return-from load-arg))
+                       (lambda ()
+                         (load-constant vop1 x load-tn)
+                         load-tn))
                       (control-stack
-                       (load-stack vop1 x tn)))
-                    (setf used-load-tn tn)
-                    tn))
+                       (when (eq load-tn tmp-tn)
+                         (return-from load-arg))
+                       (lambda ()
+                         (load-stack vop1 x load-tn)
+                         load-tn))
+                      (immediate
+                       (cond ((eql (tn-value x) 0)
+                              (setf used-load-tn nil)
+                              (lambda () zr-tn))
+                             (t
+                              (lambda ()
+                                (load-immediate vop1 x load-tn)
+                                load-tn)))))))
                  (t
                   (setf used-load-tn x)
-                  x)))
+                  (lambda () x))))
              (do-moves (source1 source2 dest1 dest2 &optional (fp cfp-tn)
                                                               fp-load-tn)
                (cond ((and (stack-p dest1)
@@ -216,19 +229,29 @@
                                (and (not (location= dest1 source2))
                                     (not (location= dest2 source1))))
                            (suitable-offsets-p dest1 dest2))
-                      (if (and (stack-p source1)
-                               (stack-p source2)
-                               (do-moves source1 source2
-                                 (load-tn vop1)
-                                 (if (location= (load-tn vop1) (load-tn vop2))
-                                     tmp-tn
-                                     (load-tn vop2))))
-                          (setf source1 (load-tn vop1)
-                                source2 (if (location= (load-tn vop1) (load-tn vop2))
-                                            tmp-tn
-                                            (load-tn vop2)))
-                          (setf source1 (load-arg source1 (load-tn vop1))
-                                source2 (load-arg source2 (load-tn vop2))))
+                      ;; Load the source registers
+                      (let (new-source1 new-source2)
+                        (if (and (stack-p source1)
+                                 (stack-p source2)
+                                 ;; Can load using LDP
+                                 (do-moves source1 source2
+                                   (setf new-source1 (load-tn vop1))
+                                   (setf new-source2
+                                         (cond ((not (location= (load-tn vop1) (load-tn vop2)))
+                                                (load-tn vop2))
+                                               ((sc-is (load-tn vop2) descriptor-reg)
+                                                (return-from do-moves))
+                                               (t
+                                                tmp-tn)))))
+                            (setf source1 new-source1
+                                  source2 new-source2)
+                            ;; Load one by one
+                            (let ((load1 (load-arg source1 (load-tn vop1)))
+                                  (load2 (load-arg source2 (load-tn vop2))))
+                              (unless (and load1 load2)
+                                (return-from do-moves))
+                              (setf source1 (funcall load1)
+                                    source2 (funcall load2)))))
                       (when (> (tn-offset dest1)
                                (tn-offset dest2))
                         (rotatef dest1 dest2)
