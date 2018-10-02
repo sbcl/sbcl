@@ -263,8 +263,7 @@ bootstrapping.
                     (arglist (elt qab arglist-pos))
                     (qualifiers (subseq qab 0 arglist-pos))
                     (body (nthcdr (1+ arglist-pos) qab)))
-               `(push (defmethod ,fun-name ,@qualifiers ,arglist ,@body)
-                      (generic-function-initial-methods (fdefinition ',fun-name))))))
+               `(defmethod ,fun-name ,@qualifiers ,arglist ,@body))))
       (macrolet ((initarg (key) `(getf initargs ,key)))
         (dolist (option options)
           (let ((car-option (car option)))
@@ -338,8 +337,14 @@ bootstrapping.
            (compile-or-load-defgeneric ',fun-name))
          (load-defgeneric ',fun-name ',lambda-list
                           (sb-c:source-location) ,@initargs)
-         ,@(mapcar #'expand-method-definition methods)
+         ,@(when methods
+             `((set-initial-methods (list ,@(mapcar #'expand-method-definition methods))
+                                    (fdefinition ',fun-name))))
          (fdefinition ',fun-name)))))
+
+(defun set-initial-methods (methods gf)
+  (sb-thread::with-recursive-system-lock ((gf-lock gf))
+    (setf (generic-function-initial-methods gf) methods)))
 
 (defun compile-or-load-defgeneric (fun-name)
   (proclaim-as-fun-name fun-name)
