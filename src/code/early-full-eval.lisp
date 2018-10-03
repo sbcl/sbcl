@@ -49,7 +49,7 @@
     (let ((function (%make-interpreted-function
                      name name lambda-list debug-lambda-list env
                      declarations documentation body source-location)))
-      (setf (funcallable-instance-fun function)
+      (setf (%funcallable-instance-fun function)
             #'(lambda (&rest args)
                 (interpreted-apply function args)))
       function))

@@ -77,11 +77,11 @@
 (defun %set-funcallable-instance-info (fin i new-value)
   (%set-funcallable-instance-info fin i new-value))
 
-(defun funcallable-instance-fun (fin)
-  (%funcallable-instance-function fin))
+(defun %funcallable-instance-fun (fin)
+  (%funcallable-instance-fun fin))
 
-(defun (setf funcallable-instance-fun) (new-value fin)
-  (setf (%funcallable-instance-function fin) new-value))
+(defun (setf %funcallable-instance-fun) (new-value fin)
+  (setf (%funcallable-instance-fun fin) new-value))
 
 ;;;; target-only parts of the DEFSTRUCT top level code
 

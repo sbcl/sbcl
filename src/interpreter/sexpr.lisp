@@ -581,7 +581,7 @@
   (setf (values (interpreted-function-frame fun)
                 (interpreted-function-cookie fun))
         (proto-fn-frame (fun-proto-fn fun) (interpreted-function-env fun)))
-  (apply (setf (funcallable-instance-fun fun) (interpreted-applicator fun))
+  (apply (setf (%funcallable-instance-fun fun) (interpreted-applicator fun))
          args))
 
 ;;; The most general case of interpreted function application.

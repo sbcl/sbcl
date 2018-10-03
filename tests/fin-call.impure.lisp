@@ -174,7 +174,7 @@ index 400772889..229eea81c 100644
         (compile nil '(lambda (f) (funcall (truly-the function f) 1 2)))))
 
 ;;; Just set any function that doesn't close over BLUB
-(setf (sb-kernel:funcallable-instance-fun #'blub)
+(setf (sb-kernel:%funcallable-instance-fun #'blub)
       (compile nil '(lambda (&rest args)
                      (format t "Can't call me ~S" args))))
 

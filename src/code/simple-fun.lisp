@@ -19,10 +19,7 @@
     (#.sb!vm:closure-widetag
      (%closure-fun function))
     (#.sb!vm:funcallable-instance-widetag
-     ;; %FUNCALLABLE-INSTANCE-FUNCTION is not known to return a FUNCTION.
-     ;; Is that right? Shouldn't we always initialize to something
-     ;; that is a function, such as an error-signaling trampoline?
-     (%fun-fun (%funcallable-instance-function function)))
+     (%fun-fun (%funcallable-instance-fun function)))
     (t function)))
 
 (define-load-time-global **closure-extra-values**

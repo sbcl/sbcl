@@ -80,7 +80,7 @@
            ;; PCL's internal use of SET-FUNCALLABLE-INSTANCE-FUNCTION
            ;; doesn't obey this restriction.
            (type funcallable-instance fin))
-  (setf (funcallable-instance-fun fin) new-value))
+  (setf (%funcallable-instance-fun fin) new-value))
 
 ;;; FIXME: these macros should just go away.  It's not clear whether
 ;;; the inline functions defined by

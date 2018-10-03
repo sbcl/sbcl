@@ -1019,7 +1019,7 @@ We could try a few things to mitigate this:
                `(let ((.l. (%funcallable-instance-layout ,obj)))
                   ;; As for INSTANCE, allow the functoid to see the access form
                   (,functoid (%funcallable-instance-layout ,obj) ,@more)
-                  (,functoid (%funcallable-instance-function ,obj) ,@more)
+                  (,functoid (%funcallable-instance-fun ,obj) ,@more)
                   (ecase (layout-bitmap .l.)
                     (#.sb-kernel::+layout-all-tagged+
                      (loop for .i. from instance-data-start ; exclude layout

@@ -245,8 +245,9 @@
   ;; the CLOS slot vector will be in the word 5 bytes past the tagged pointer.
   ;; This shouldn't be too hard to arrange, since nothing needs to know where
   ;; the tagged function lives except the funcallable instance trampoline.
-  (function :ref-known (flushable) :ref-trans %funcallable-instance-function
-            :set-known () :set-trans (setf %funcallable-instance-function))
+  (function :type function
+            :ref-known (flushable) :ref-trans %funcallable-instance-fun
+            :set-known () :set-trans (setf %funcallable-instance-fun))
   (info :rest-p t))
 
 (!define-primitive-object (value-cell :lowtag other-pointer-lowtag

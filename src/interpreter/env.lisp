@@ -517,7 +517,7 @@
     ;; Hooking all functions, makes them somewhat slower,
     ;; but allows for really nifty introspection,
     ;; such as discovering what calls are made by read-time evals.
-    (setf (funcallable-instance-fun function)
+    (setf (%funcallable-instance-fun function)
           (if *hook-all-functions-p*
               (lambda (&rest args)
                 (apply #'interpreter-hooked-trampoline function args))

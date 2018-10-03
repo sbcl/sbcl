@@ -110,7 +110,7 @@
   (let* ((slot-vals '("A" "B" "C" "D" "E" "F"))
          (f (apply (compile nil '(lambda (&rest args)
                                   (let ((ctor (apply #'sb-pcl::%make-ctor args)))
-                                    (setf (%funcallable-instance-function ctor) #'error)
+                                    (setf (%funcallable-instance-fun ctor) #'error)
                                     ctor)))
                    slot-vals)))
     (walk-slots-test f `(,(find-layout 'sb-pcl::ctor) ,#'error ,@slot-vals))))

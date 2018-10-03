@@ -238,7 +238,7 @@
                       (if (typep fun 'sb-pcl::%method-function)
                           (setq result
                                 (list* (code-from-fun (sb-pcl::%method-function-fast-function fun))
-                                       (code-from-fun (%funcallable-instance-function fun))
+                                       (code-from-fun (%funcallable-instance-fun fun))
                                        result))
                           (pushnew (code-from-fun fun) result)))))))
              (code-from-fun (fun)
@@ -246,7 +246,7 @@
                  (#.simple-fun-widetag
                   (fun-code-header fun))
                  (#.funcallable-instance-widetag
-                  (code-from-fun (%funcallable-instance-function fun)))
+                  (code-from-fun (%funcallable-instance-fun fun)))
                  (#.closure-widetag
                   (fun-code-header (%closure-fun fun))))))
       (map-allocated-objects

@@ -148,7 +148,7 @@
   (when (or force-p (ctor-class ctor))
     (setf (ctor-class ctor) nil
           (ctor-state ctor) 'initial)
-    (setf (funcallable-instance-fun ctor)
+    (setf (%funcallable-instance-fun ctor)
           (ecase (ctor-type ctor)
             (ctor
              (lambda (&rest args)
@@ -560,7 +560,7 @@
                :test #'eq :key #'weak-pointer-value)
       (multiple-value-bind (form locations names optimizedp)
           (constructor-function-form ctor)
-        (setf (funcallable-instance-fun ctor)
+        (setf (%funcallable-instance-fun ctor)
               (apply
                (let ((*compiling-optimized-constructor* t))
                  (handler-bind ((compiler-note #'muffle-warning))
@@ -588,7 +588,7 @@
                :test #'eq :key #'weak-pointer-value)
       (multiple-value-bind (form optimizedp)
           (allocator-function-form ctor)
-        (setf (funcallable-instance-fun ctor)
+        (setf (%funcallable-instance-fun ctor)
               (let ((*compiling-optimized-constructor* t))
                 (handler-bind ((compiler-note #'muffle-warning))
                   (compile nil form)))
