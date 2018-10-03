@@ -68,9 +68,6 @@
 (defun %make-funcallable-instance (len)
   (%make-funcallable-instance len))
 
-(defun funcallable-instance-p (x)
-  (funcallable-instance-p x))
-
 (defun %funcallable-instance-info (fin i)
   (%funcallable-instance-info fin i))
 

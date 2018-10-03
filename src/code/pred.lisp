@@ -87,13 +87,16 @@
 ;;; All the primitive type predicate wrappers share a parallel form..
 (macrolet ((def-type-predicate-wrapper (pred)
              (let* ((name (symbol-name pred))
+                    (package (package-name (symbol-package pred)))
                     (stem (string-left-trim "%" (string-right-trim "P-" name)))
                     (article (if (position (schar name 0) "AEIOU") "an" "a")))
+               (aver (not (string= package "SB!XC")))
                `(defun ,pred (object)
-                  ,(format nil
-                           "Return true if OBJECT is ~A ~A, and NIL otherwise."
-                           article
-                           stem)
+                  ,@(unless (eql (mismatch package "SB!") 3)
+                      (list (format nil
+                                    "Return true if OBJECT is ~A ~A, and NIL otherwise."
+                                    article
+                                    stem)))
                   ;; (falling through to low-level implementation)
                   (,pred object)))))
   (def-type-predicate-wrapper array-header-p)
@@ -140,6 +143,7 @@
   (def-type-predicate-wrapper single-float-p)
   #!+sb-simd-pack (def-type-predicate-wrapper simd-pack-p)
   (def-type-predicate-wrapper %instancep)
+  (def-type-predicate-wrapper funcallable-instance-p)
   (def-type-predicate-wrapper symbolp)
   ;; The interpreter needs this because it assumes that any type spec
   ;; in SB-C::*BACKEND-TYPE-PREDICATES* has a callable predicate.
