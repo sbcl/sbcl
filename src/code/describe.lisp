@@ -639,6 +639,12 @@
             (describe-lambda-list lambda-list stream)
             (when argument-precedence-order
               (describe-argument-precedence-order argument-precedence-order stream))
+            (awhen (sb-c::fun-name-dx-args name)
+              (let* ((keys (member-if #'symbolp it))
+                     (positional (ldiff it keys)))
+                (format stream "~@:_Dynamic-extent arguments:~
+~@[ positional=~A~]~A~@[ keyword=~S~]"
+                        positional (if (and positional keys) "," "") keys)))
             (when declared-type
               (format stream "~@:_Declared type: ~
                               ~/sb-impl:print-type-specifier/"

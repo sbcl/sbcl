@@ -113,6 +113,18 @@
                   (with-output-to-string (stream)
                     (describe #'add-method stream)))))
 
+(defun lottafun (x y z &rest r &key ((:wat w)) glup)
+  (declare (dynamic-extent glup z r w x))
+  (declare (ignore x y z r w glup))
+  (print 'hi))
+
+(with-test (:name (describe :fun-dx-args))
+  ;; though R is DX, it is not useful information to show,
+  ;; because the caller doesn't decide how to allocate the &rest list.
+  (assert (search "Dynamic-extent arguments: positional=(0 2), keyword=(:WAT :GLUP)"
+                  (with-output-to-string (stream)
+                    (describe #'lottafun stream)))))
+
 (with-test (:name (describe sb-kernel:funcallable-instance))
   (assert (search "Slots with :INSTANCE allocation"
                   (with-output-to-string (stream)
