@@ -2318,15 +2318,16 @@ bootstrapping.
                         argument-precedence-order source
                         documentation))))
 
-(defun make-early-gf (spec &optional lambda-list lambda-list-p
+(defun make-early-gf (name &optional lambda-list lambda-list-p
                       function argument-precedence-order source-location
                       documentation)
-  (let ((fin (allocate-standard-funcallable-instance *sgf-wrapper*)))
+  (let ((fin (allocate-standard-funcallable-instance
+              *sgf-wrapper* name)))
     (replace (fsc-instance-slots fin) *sgf-slots-init*)
     (when function
       (set-funcallable-instance-function fin function))
-    (setf (gdefinition spec) fin)
-    (!bootstrap-set-slot 'standard-generic-function fin 'name spec)
+    (setf (gdefinition name) fin)
+    (!bootstrap-set-slot 'standard-generic-function fin 'name name)
     (!bootstrap-set-slot 'standard-generic-function fin
                          'source source-location)
     (!bootstrap-set-slot 'standard-generic-function fin
@@ -2334,10 +2335,10 @@ bootstrapping.
     (let ((arg-info (make-arg-info)))
       (setf (early-gf-arg-info fin) arg-info)
       (when lambda-list-p
-        (setf (info :function :type spec)
+        (setf (info :function :type name)
               (specifier-type
-               (ftype-declaration-from-lambda-list lambda-list spec))
-              (info :function :where-from spec) :defined-method)
+               (ftype-declaration-from-lambda-list lambda-list name))
+              (info :function :where-from name) :defined-method)
         (if argument-precedence-order
             (set-arg-info fin
                           :lambda-list lambda-list

@@ -44,10 +44,10 @@
 
 (defmethod allocate-instance
            ((class funcallable-standard-class) &rest initargs)
-  (declare (ignore initargs)
-           (inline ensure-class-finalized))
+  (declare (inline ensure-class-finalized))
   (allocate-standard-funcallable-instance
-   (class-wrapper (ensure-class-finalized class))))
+   (class-wrapper (ensure-class-finalized class))
+   (getf initargs :name)))
 
 (defmethod make-reader-method-function ((class funcallable-standard-class)
                                         slot-name)

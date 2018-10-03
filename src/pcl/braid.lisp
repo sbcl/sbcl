@@ -46,9 +46,12 @@
    :references '((:amop :generic-function allocate-instance)
                  (:amop :function set-funcallable-instance-function))))
 
-(defun allocate-standard-funcallable-instance (wrapper)
+(defun allocate-standard-funcallable-instance (wrapper name)
   (declare (layout wrapper))
-  (let* ((slots (make-array (layout-length wrapper) :initial-element +slot-unbound+))
+  (let* ((hash (if name
+                   (mix (sxhash name) (sxhash :generic-function)) ; arb. constant
+                   (sb-impl::new-instance-hash-code)))
+         (slots (make-array (layout-length wrapper) :initial-element +slot-unbound+))
          (fin (cond #+(and compact-instance-header immobile-code)
                     ((not (eql (layout-bitmap wrapper) -1))
                      (truly-the funcallable-instance
@@ -57,12 +60,18 @@
                      (let ((f (truly-the funcallable-instance
                                (%make-standard-funcallable-instance
                                 slots
-                                #-compact-instance-header (sb-impl::new-instance-hash-code)))))
+                                #-compact-instance-header hash))))
                        (setf (%funcallable-instance-layout f) wrapper)
                        f)))))
+    ;; Compact-instance-header uses the high 32 bits of the slot vector's
+    ;; header word. Mix down the full hash, then shift left 24 bits
+    ;; which when shifted by N-WIDETAG-BITS puts it in the upper 32.
+    ;; The contraint on size is that we must not touch the byte for immobile
+    ;; GC's generation. But, you might say, vector's don't go in immobile
+    ;; space. That's true for the time being, but might not be true always.
     #+compact-instance-header
-    (set-header-data slots
-                     (ash (logand (sb-impl::new-instance-hash-code) #xFFFFFFFF) 24))
+    (set-header-data slots (ash (ldb (byte 32 0) (logxor (ash hash -32) hash))
+                                24))
     (set-funcallable-instance-function
      fin
      #'(lambda (&rest args)
@@ -203,7 +212,8 @@
                 (setf (layout-slot-list wrapper) slots))
 
               (setq proto (if (eq meta 'funcallable-standard-class)
-                              (allocate-standard-funcallable-instance wrapper)
+                              (allocate-standard-funcallable-instance
+                               wrapper name)
                               (allocate-standard-instance wrapper)))
 
               (setq direct-slots
