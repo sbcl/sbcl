@@ -5893,7 +5893,7 @@
    (not (funcall (checked-compile
                   '(lambda (x)
                     (eql (car (nreverse (the (cons (eql 10)) x))) 10)))
-                 '(10 20)))))
+                 (list 10 20)))))
 
 (with-test (:name :subseq-derive-type)
   (assert
