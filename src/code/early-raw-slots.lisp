@@ -47,20 +47,30 @@
 
 ;; information about how a slot of a given DSD-RAW-TYPE is to be accessed
 (defstruct (raw-slot-data
+            (:constructor !make-raw-slot-data)
             (:copier nil)
             (:predicate nil))
+  ;; What operator is used to access a slot of this type?
+  ;; On the host this is a symbol, on the target it is a function
+  ;; from which we can extract a name if needed.
+  #+sb-xc-host (accessor-name (missing-arg) :type symbol :read-only t)
+  #-sb-xc-host (accessor-fun (missing-arg) :type function :read-only t)
+  ;; Function to compare slots of this type. Not used on host.
+  #-sb-xc-host (comparator (missing-arg) :type function :read-only t)
   ;; the type specifier, which must specify a numeric type.
   (raw-type (missing-arg) :type symbol :read-only t)
-  ;; What operator is used to access a slot of this type?
-  (accessor-name (missing-arg) :type symbol :read-only t)
   (init-vop (missing-arg) :type symbol :read-only t)
   ;; How many words are each value of this type?
   (n-words (missing-arg) :type (and index (integer 1)) :read-only t)
   ;; Necessary alignment in units of words.  Note that instances
   ;; themselves are aligned by exactly two words, so specifying more
   ;; than two words here would not work.
-  (alignment 1 :type (integer 1 2) :read-only t)
-  (comparer (missing-arg) :type function :read-only t))
+  (alignment 1 :type (integer 1 2) :read-only t))
+
+#-sb-xc-host
+(progn (declaim (inline raw-slot-data-accessor-name))
+       (defun raw-slot-data-accessor-name (rsd)
+         (%simple-fun-name (raw-slot-data-accessor-fun rsd))))
 
 #!-sb-fluid (declaim (freeze-type raw-slot-data))
 
@@ -70,18 +80,22 @@
 ;; By making this a cold-init function, it is possible to use raw slots
 ;; in cold toplevel forms.
 (defun !raw-slot-data-init ()
-  (macrolet ((make-comparer (accessor-name)
+  (macrolet ((make-raw-slot-data (&rest args &key accessor-name &allow-other-keys)
+               (declare (ignorable accessor-name))
                #+sb-xc-host
-               `(lambda (x y)
-                  (declare (ignore x y))
-                  (error "~S comparator called" ',accessor-name))
+               `(!make-raw-slot-data ,@args)
                #-sb-xc-host
-               ;; Not a symbol, because there aren't any so-named functions.
-               `(named-lambda ,(string (symbolicate accessor-name "="))
-                    (index x y)
-                  (declare (optimize speed (safety 0)))
-                  (= (,accessor-name x index)
-                     (,accessor-name y index)))))
+               (let ((access (cadr accessor-name)))
+                 `(!make-raw-slot-data
+                   :accessor-fun #',access
+                   :comparator
+                   ;; Not a symbol, because there aren't any so-named functions.
+                   (named-lambda ,(string (symbolicate access "="))
+                       (index x y)
+                     (declare (optimize speed (safety 0)))
+                     (= (,access x index) (,access y index)))
+                   ;; Ignore the :ACCESSOR-NAME initarg
+                   ,@args :allow-other-keys t))))
     (let ((double-float-alignment
             ;; white list of architectures that can load unaligned doubles:
             #!+(or x86 x86-64 ppc arm64) 1
@@ -92,16 +106,14 @@
        (make-raw-slot-data :raw-type 'sb!vm:word
                            :accessor-name '%raw-instance-ref/word
                            :init-vop 'sb!vm::raw-instance-init/word
-                           :n-words 1
-                           :comparer (make-comparer %raw-instance-ref/word))
+                           :n-words 1)
        ;; If this list of architectures is changed, then also change the test
        ;; for :DEFINE-STRUCTURE-SLOT-ADDRESSOR in raw-slots-interleaved.impure
        #!+(or arm64 x86 x86-64)
        (make-raw-slot-data :raw-type 'sb!vm:signed-word
                            :accessor-name '%raw-instance-ref/signed-word
                            :init-vop 'sb!vm::raw-instance-init/signed-word
-                           :n-words 1
-                           :comparer (make-comparer %raw-instance-ref/signed-word))
+                           :n-words 1)
        (make-raw-slot-data :raw-type 'single-float
                            :accessor-name '%raw-instance-ref/single
                            :init-vop 'sb!vm::raw-instance-init/single
@@ -115,37 +127,31 @@
                            ;; would really benefit is (UNSIGNED-BYTE
                            ;; 32), but that is a subtype of FIXNUM, so
                            ;; we store it unraw anyway.  :-( -- DFL
-                           :n-words 1
-                           :comparer (make-comparer %raw-instance-ref/single))
+                           :n-words 1)
        (make-raw-slot-data :raw-type 'double-float
                            :accessor-name '%raw-instance-ref/double
                            :init-vop 'sb!vm::raw-instance-init/double
                            :alignment double-float-alignment
-                           :n-words (/ 8 sb!vm:n-word-bytes)
-                           :comparer (make-comparer %raw-instance-ref/double))
+                           :n-words (/ 8 sb!vm:n-word-bytes))
        (make-raw-slot-data :raw-type 'complex-single-float
                            :accessor-name '%raw-instance-ref/complex-single
                            :init-vop 'sb!vm::raw-instance-init/complex-single
-                           :n-words (/ 8 sb!vm:n-word-bytes)
-                           :comparer (make-comparer %raw-instance-ref/complex-single))
+                           :n-words (/ 8 sb!vm:n-word-bytes))
        (make-raw-slot-data :raw-type 'complex-double-float
                            :accessor-name '%raw-instance-ref/complex-double
                            :init-vop 'sb!vm::raw-instance-init/complex-double
                            :alignment double-float-alignment
-                           :n-words (/ 16 sb!vm:n-word-bytes)
-                           :comparer (make-comparer %raw-instance-ref/complex-double))
+                           :n-words (/ 16 sb!vm:n-word-bytes))
        #!+long-float
        (make-raw-slot-data :raw-type long-float
                            :accessor-name '%raw-instance-ref/long
                            :init-vop 'sb!vm::raw-instance-init/long
-                           :n-words #!+x86 3 #!+sparc 4
-                           :comparer (make-comparer %raw-instance-ref/long))
+                           :n-words #!+x86 3 #!+sparc 4)
        #!+long-float
        (make-raw-slot-data :raw-type complex-long-float
                            :accessor-name '%raw-instance-ref/complex-long
                            :init-vop 'sb!vm::raw-instance-init/complex-long
-                           :n-words #!+x86 6 #!+sparc 8
-                           :comparer (make-comparer %raw-instance-ref/complex-long)))))))
+                           :n-words #!+x86 6 #!+sparc 8))))))
 
 #+sb-xc-host (!raw-slot-data-init)
 #+sb-xc

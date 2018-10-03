@@ -128,7 +128,7 @@
                         (let ((rsd (dsd-raw-slot-data slot)))
                           (if (not rsd)
                               0 ; means recurse using EQUALP
-                              (raw-slot-data-comparer rsd))))))))
+                              (raw-slot-data-comparator rsd))))))))
 
     (dolist (fun *defstruct-hooks*)
       (funcall fun classoid)))
@@ -182,10 +182,12 @@
 ;;; - it works even if the user clobbered an accessor
 ;;; - it works if the slot fails a type-check and the reader was SAFE-P,
 ;;    i.e. was required to perform a check. This is a feature, not a bug.
-(macrolet ((access-fn (dsd)
-             `(acond ((dsd-raw-slot-data ,dsd)
-                      (symbol-function (raw-slot-data-accessor-name it)))
-                     (t #'%instance-ref))))
+(macrolet ((access (dsd)
+             `(let ((i (dsd-index ,dsd)))
+                (acond ((dsd-raw-slot-data ,dsd)
+                        (funcall (raw-slot-data-accessor-fun it) structure i))
+                       (t
+                        (%instance-ref structure i))))))
 
 (defun %default-structure-pretty-print (structure stream name dd)
   (pprint-logical-block (stream nil :prefix "#S(" :suffix ")")
@@ -201,8 +203,7 @@
                 (output-symbol (dsd-name slot) *keyword-package* stream)
                 (write-char #\space stream)
                 (pprint-newline :miser stream)
-                (output-object (funcall (access-fn slot) structure (dsd-index slot))
-                               stream)
+                (output-object (access slot) stream)
                 (when (null remaining-slots)
                   (return))
                 (write-char #\space stream)
@@ -223,8 +224,7 @@
       (let ((slot (first remaining-slots)))
         (output-symbol (dsd-name slot) *keyword-package* stream)
         (write-char #\space stream)
-        (output-object (funcall (access-fn slot) structure (dsd-index slot))
-                       stream)))))
+        (output-object (access slot) stream)))))
 ) ; end MACROLET
 
 (defun default-structure-print (structure stream depth)
