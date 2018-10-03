@@ -127,7 +127,7 @@
 ;;; Type is either CTOR, for MAKE-INSTANCE, or ALLOCATOR, for ALLOCATE-INSTANCE
 (!defstruct-with-alternate-metaclass ctor
   :slot-names (type class-or-name class initargs state safe-p)
-  :boa-constructor %make-ctor
+  :constructor %make-ctor
   :superclass-name function
   :metaclass-name static-classoid
   :metaclass-constructor make-static-classoid

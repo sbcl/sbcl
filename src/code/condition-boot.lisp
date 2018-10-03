@@ -11,8 +11,7 @@
 
 (!defstruct-with-alternate-metaclass condition
   :slot-names (assigned-slots hash)
-  ;; constructor is never called, but (FIXME) the macro syntax requires it
-  :boa-constructor %make-condition-object
+  :constructor nil
   :superclass-name t
   :metaclass-name condition-classoid
   :metaclass-constructor make-condition-classoid

@@ -1854,7 +1854,7 @@ or they must be declared locally notinline at each call site.~@:>"
 (defmacro !defstruct-with-alternate-metaclass
     (class-name &key
                 (slot-names (missing-arg))
-                (boa-constructor (missing-arg))
+                (constructor (missing-arg))
                 (superclass-name (missing-arg))
                 (metaclass-name (missing-arg))
                 (metaclass-constructor (missing-arg))
@@ -1863,12 +1863,12 @@ or they must be declared locally notinline at each call site.~@:>"
 
   (declare (type (and list (not null)) slot-names))
   (declare (type (and symbol (not null))
-                 boa-constructor
                  superclass-name
                  metaclass-name
                  metaclass-constructor))
+  (declare (symbol constructor)) ; NIL for none
   (declare (type (member structure funcallable-structure) dd-type))
-  (declare (ignore boa-constructor runtime-type-checks-p))
+  (declare (ignore constructor runtime-type-checks-p))
 
   (let* ((dd (make-dd-with-alternate-metaclass
               :class-name class-name
@@ -1885,7 +1885,7 @@ or they must be declared locally notinline at each call site.~@:>"
 (sb!xc:defmacro !defstruct-with-alternate-metaclass
     (class-name &key
                 (slot-names (missing-arg))
-                (boa-constructor (missing-arg))
+                (constructor (missing-arg))
                 (superclass-name (missing-arg))
                 (metaclass-name (missing-arg))
                 (metaclass-constructor (missing-arg))
@@ -1894,10 +1894,10 @@ or they must be declared locally notinline at each call site.~@:>"
 
   (declare (type (and list (not null)) slot-names))
   (declare (type (and symbol (not null))
-                 boa-constructor
                  superclass-name
                  metaclass-name
                  metaclass-constructor))
+  (declare (symbol constructor)) ; NIL for none
   (declare (type (member structure funcallable-structure) dd-type))
 
   (let* ((dd (make-dd-with-alternate-metaclass
@@ -1908,9 +1908,6 @@ or they must be declared locally notinline at each call site.~@:>"
               :metaclass-constructor metaclass-constructor
               :dd-type dd-type))
          (dd-slots (dd-slots dd))
-         (dd-length (dd-length dd))
-         (object-gensym (make-symbol "OBJECT"))
-         (new-value-gensym (make-symbol "NEW-VALUE"))
          (delayed-layout-form `(%delayed-get-compiler-layout ,class-name)))
     (multiple-value-bind (raw-maker-form raw-reffer-operator)
         (ecase dd-type
@@ -1918,14 +1915,14 @@ or they must be declared locally notinline at each call site.~@:>"
            (values `(%make-structure-instance-macro ,dd nil)
                    '%instance-ref))
           (funcallable-structure
-           (values `(let ((,object-gensym
+           (values `(let ((object
                            ;; TRULY-THE should not be needed. But it is, to avoid
                            ;; a type check on the next SETF. Why???
                            (truly-the funcallable-instance
-                            (%make-funcallable-instance ,dd-length))))
-                      (setf (%funcallable-instance-layout ,object-gensym)
+                            (%make-funcallable-instance ,(dd-length dd)))))
+                      (setf (%funcallable-instance-layout object)
                             ,delayed-layout-form)
-                      ,object-gensym)
+                      object)
                    '%funcallable-instance-info)))
       `(progn
 
@@ -1935,36 +1932,28 @@ or they must be declared locally notinline at each call site.~@:>"
          ;; slot readers and writers
          (declaim (inline ,@(mapcar #'dsd-accessor-name dd-slots)))
          ,@(mapcar (lambda (dsd)
-                     `(defun ,(dsd-accessor-name dsd) (,object-gensym)
+                     `(defun ,(dsd-accessor-name dsd) (object)
                         ,@(when runtime-type-checks-p
-                            `((declare (type ,class-name ,object-gensym))))
-                        (,raw-reffer-operator ,object-gensym
-                                              ,(dsd-index dsd))))
+                            `((declare (type ,class-name object))))
+                        (,raw-reffer-operator object ,(dsd-index dsd))))
                    dd-slots)
          (declaim (inline ,@(mapcar (lambda (dsd)
                                       `(setf ,(dsd-accessor-name dsd)))
                                     dd-slots)))
          ,@(mapcar (lambda (dsd)
-                     `(defun (setf ,(dsd-accessor-name dsd)) (,new-value-gensym
-                                                              ,object-gensym)
+                     `(defun (setf ,(dsd-accessor-name dsd)) (newval object)
                         ,@(when runtime-type-checks-p
-                            `((declare (type ,class-name ,object-gensym))))
-                        (setf (,raw-reffer-operator ,object-gensym
-                                                    ,(dsd-index dsd))
-                              ,new-value-gensym)))
+                            `((declare (type ,class-name object))))
+                        (setf (,raw-reffer-operator object ,(dsd-index dsd))
+                              newval)))
                    dd-slots)
 
-         ;; constructor
-         (defun ,boa-constructor ,slot-names
-           (let ((,object-gensym ,raw-maker-form))
-             ,@(mapcar (lambda (slot-name)
-                         (let ((dsd (or (find slot-name dd-slots
-                                              :key #'dsd-name :test #'string=)
-                                        (bug "Bogus alt-metaclass boa ctor"))))
-                           `(setf (,(dsd-accessor-name dsd) ,object-gensym)
-                                  ,slot-name)))
-                       slot-names)
-             ,object-gensym))
+         ,@(when constructor
+             `((defun ,constructor (,@slot-names &aux (object ,raw-maker-form))
+                 ,@(mapcar (lambda (dsd)
+                             `(setf (,(dsd-accessor-name dsd) object) ,(dsd-name dsd)))
+                           (dd-slots dd))
+                 object)))
 
          ;; Usually we AVER instead of ASSERT, but AVER isn't defined yet.
          ;; A naive reading of 'build-order' suggests it is,

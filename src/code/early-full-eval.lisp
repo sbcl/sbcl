@@ -27,7 +27,7 @@
  ;; function -- so DEFMACRO can set them to more informative values.
  :slot-names (name debug-name lambda-list debug-lambda-list env
                    declarations documentation body source-location)
- :boa-constructor %make-interpreted-function
+ :constructor %make-interpreted-function
  :superclass-name function
  :metaclass-name static-classoid
  :metaclass-constructor make-static-classoid

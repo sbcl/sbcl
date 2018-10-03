@@ -126,7 +126,7 @@
 (sb!kernel::!defstruct-with-alternate-metaclass standard-instance
   ;; KLUDGE: arm64 needs to have CAS-HEADER-DATA-HIGH implemented
   :slot-names (slots #!-(and compact-instance-header x86-64) hash-code)
-  :boa-constructor %make-standard-instance
+  :constructor %make-standard-instance
   :superclass-name t
   :metaclass-name static-classoid
   :metaclass-constructor make-static-classoid
@@ -142,7 +142,7 @@
   ;; accessor name as of sbcl-0.pre7.63. Presumably everything works
   ;; by puns based on absolute locations. Fun fun fun.. -- WHN 2001-10-30
   :slot-names (clos-slots #!-compact-instance-header hash-code)
-  :boa-constructor %make-standard-funcallable-instance
+  :constructor %make-standard-funcallable-instance
   :superclass-name function
   :metaclass-name static-classoid
   :metaclass-constructor make-static-classoid
