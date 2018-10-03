@@ -13,23 +13,12 @@
 
 ;;;; structure frobbing primitives
 
-;;; Allocate a new instance with LENGTH data slots.
-(defun %make-instance (length)
-  (declare (type index length))
-  (%make-instance length))
-
-;;; Given an instance, return its length.
-(defun %instance-length (instance)
-  (declare (type instance instance))
-  (%instance-length instance))
-
 ;;; Return the value from the INDEXth slot of INSTANCE. This is SETFable.
+;;; This is used right away in warm compile by MAKE-LOAD-FORM-SAVING-SLOTS,
+;;; so without it already defined, you can't define it, because you can't dump
+;;; debug info structures. Were it not for that, this would go in 'stubs'.
 (defun %instance-ref (instance index)
   (%instance-ref instance index))
-
-;;; Set the INDEXth slot of INSTANCE to NEW-VALUE.
-(defun %instance-set (instance index new-value)
-  (setf (%instance-ref instance index) new-value))
 
 ;;; Normally IR2 converted, definition needed for interpreted structure
 ;;; constructors only.
@@ -59,26 +48,6 @@
                   (incf value-index)
                   (make-case))))))))
 
-(defun %instance-layout (instance)
-  (%instance-layout instance))
-
-(defun %set-instance-layout (instance new-value)
-  (%set-instance-layout instance new-value))
-
-(defun %make-funcallable-instance (len)
-  (%make-funcallable-instance len))
-
-(defun %funcallable-instance-info (fin i)
-  (%funcallable-instance-info fin i))
-
-(defun %set-funcallable-instance-info (fin i new-value)
-  (%set-funcallable-instance-info fin i new-value))
-
-(defun %funcallable-instance-fun (fin)
-  (%funcallable-instance-fun fin))
-
-(defun (setf %funcallable-instance-fun) (new-value fin)
-  (setf (%funcallable-instance-fun fin) new-value))
 
 ;;;; target-only parts of the DEFSTRUCT top level code
 

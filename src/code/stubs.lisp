@@ -85,8 +85,23 @@
   #-64-bit (def %code-code-size)
   (def %code-debug-info)
   #+(or x86 immobile-space) (def sb-vm::%code-fixups)
+
+  ;; instances
+  (def %make-instance) ; Allocate a new instance with X data slots.
+  (def %instance-length) ; Given an instance, return its length.
+  (def %instance-layout)
+  (def %set-instance-layout (instance new-value))
+  ; (def %instance-ref (instance index)) ; defined in 'target-defstruct'
+  (def %instance-set (instance index new-value))
+  ;; funcallable instances
+  (def %make-funcallable-instance)
   (def %funcallable-instance-layout)
-  (def %set-funcallable-instance-layout (x new-value))
+  (def %set-funcallable-instance-layout (fin new-value))
+  (def %funcallable-instance-function)
+  (def (setf %funcallable-instance-function) (fin new-value))
+  (def %funcallable-instance-info (fin i))
+  (def %set-funcallable-instance-info (fin i new-value))
+
   #+sb-simd-pack
   (def* (%make-simd-pack (tag low high))
         (%make-simd-pack-single (x y z w))
