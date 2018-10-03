@@ -11,15 +11,16 @@
 
 (in-package "SB!VM")
 
+#-c-headers-only
 (macrolet ((frob ()
              `(progn ,@*!late-primitive-object-forms*)))
-  (frob))
+  (frob)
+  (defknown symbol-extra (t) t (flushable))
+  (def-reffer 'symbol-extra symbol-size other-pointer-lowtag)
+  (defknown (setf symbol-extra) (t t) t ())
+  (def-setter '(setf symbol-extra) symbol-size other-pointer-lowtag))
 
 (defconstant extended-symbol-size (1+ symbol-size))
-(defknown symbol-extra (t) t (flushable))
-(def-reffer 'symbol-extra sb!vm:symbol-size other-pointer-lowtag)
-(defknown (setf symbol-extra) (t t) t ())
-(def-setter '(setf symbol-extra) sb!vm:symbol-size other-pointer-lowtag)
 
 #!+sb-thread
 (dolist (slot (primitive-object-slots
