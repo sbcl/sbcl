@@ -29,6 +29,10 @@ struct alloc_region {
 
 // One region for each of {BOXED,UNBOXED,CODE}_PAGE_FLAG
 extern struct alloc_region  gc_alloc_region[3];
+#define boxed_region   gc_alloc_region[BOXED_PAGE_FLAG-1]
+#define unboxed_region gc_alloc_region[UNBOXED_PAGE_FLAG-1]
+#define code_region    gc_alloc_region[CODE_PAGE_TYPE-1]
+
 extern generation_index_t from_space, new_space;
 
 #endif /*  _GENCGC_ALLOC_REGION_H_ */

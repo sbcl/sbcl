@@ -684,9 +684,6 @@ void zero_dirty_pages(page_index_t start, page_index_t end) {
 
 /* We use three regions for the current newspace generation. */
 struct alloc_region gc_alloc_region[3];
-#define boxed_region   gc_alloc_region[BOXED_PAGE_FLAG-1]
-#define unboxed_region gc_alloc_region[UNBOXED_PAGE_FLAG-1]
-#define code_region    gc_alloc_region[CODE_PAGE_TYPE-1]
 
 /* The generation currently being allocated to. */
 static generation_index_t gc_alloc_generation;
@@ -3284,8 +3281,6 @@ garbage_collect_generation(generation_index_t generation, int raise)
 
     scan_binding_stack();
     cull_weak_hash_tables(weak_ht_alivep_funs);
-    // Close the region used when pushing items to the finalizer queue
-    ensure_region_closed(&boxed_region, BOXED_PAGE_FLAG);
     scan_weak_pointers();
     wipe_nonpinned_words();
     // Do this last, because until wipe_nonpinned_words() happens,

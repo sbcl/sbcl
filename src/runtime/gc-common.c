@@ -1367,8 +1367,11 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table, lispobj *prev,
                 // compare-and-swap, but C code need not, because GC runs in one
                 // thread and has stopped the Lisp world.
                 cons->cdr = hash_table->culled_values;
-                hash_table->culled_values = make_lispobj(cons, LIST_POINTER_LOWTAG);
                 cons->car = val;
+                lispobj list = make_lispobj(cons, LIST_POINTER_LOWTAG);
+                hash_table->culled_values = list;
+                // ensure this cons doesn't get smashed into (0 . 0) by full gc
+                if (!compacting_p()) gc_mark_obj(list);
             }
             kv_vector[2 * index + 1] = empty_symbol;
             if (hash_vector)
@@ -1453,6 +1456,10 @@ void cull_weak_hash_tables(int (*alivep[5])(lispobj,lispobj))
      * which is what an extra reset would do if it saw no inserts. */
     if (weak_objects.count)
         hopscotch_reset(&weak_objects);
+#ifdef LISP_FEATURE_GENCGC
+    // Close the region used when pushing items to the finalizer queue
+    ensure_region_closed(&boxed_region, BOXED_PAGE_FLAG);
+#endif
 }
 
 
