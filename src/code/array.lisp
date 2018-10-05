@@ -585,10 +585,17 @@ of specialized arrays is supported."
   ;; Allocate and possibly initialize the vector.
   (multiple-value-bind (type n-bits-shift)
       (%vector-widetag-and-n-bits-shift element-type)
-    (let ((vector
-            (allocate-static-vector type length
-                                    (vector-length-in-words length
-                                                            n-bits-shift))))
+    (let* ((full-length
+             (if (or (= type simple-base-string-widetag)
+                     #!+sb-unicode
+                     (= type
+                        simple-character-string-widetag))
+                 (1+ length)
+                 length))
+           (vector
+             (allocate-static-vector type length
+                                     (vector-length-in-words full-length
+                                                             n-bits-shift))))
       (cond (initial-element-p
              (fill vector initial-element))
             (initial-contents-p

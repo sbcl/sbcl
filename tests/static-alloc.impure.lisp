@@ -1,6 +1,7 @@
 
 (dolist (type '(single-float double-float (unsigned-byte 8)
-                (unsigned-byte 32) (signed-byte 32)))
+                (unsigned-byte 32) (signed-byte 32)
+                base-char character))
   (let* ((vectors (loop
                      for i upto 128
                      collect (sb-int:make-static-vector
