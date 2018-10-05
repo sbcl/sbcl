@@ -1350,17 +1350,15 @@ code to be loaded.
            (cadr vector-form)
            'vector))
       (loop-make-var index-var 0 'fixnum)
-      (let* ((length 0)
-             (length-form (cond ((not constantp)
-                                 (let ((v (gensym "LOOP-ACROSS-LIMIT-")))
+      (let* ((length-form (if constantp
+                              (length vector-value)
+                              (let ((v (gensym "LOOP-ACROSS-LIMIT-")))
                                    (push `(let ((,v (length ,vector-var))))
                                          (wrappers *loop*))
-                                   v))
-                                (t (setq length (length vector-value)))))
+                                   v)))
              (test `(>= ,index-var ,length-form))
              (step `(,var (aref ,vector-var ,index-var)))
              (pstep `(,index-var (1+ ,index-var))))
-        (declare (fixnum length))
         `(,test ,step () ,pstep)))))
 
 ;;;; list iteration
