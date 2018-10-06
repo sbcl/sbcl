@@ -1531,21 +1531,20 @@ variable: an unreadable object representing the error is printed instead.")
          (%output-integer-in-base exp 10 stream))))
 
 (defun output-float-infinity (x stream)
-  (declare (float x) (stream stream))
-  (cond (*read-eval*
-         (write-string "#." stream))
-        (*print-readably*
-         (return-from output-float-infinity
-           (print-not-readable-error x stream)))
-        (t
-         (write-string "#<" stream)))
-  (write-string "SB-EXT:" stream)
-  (write-string (symbol-name (float-format-name x)) stream)
-  (write-string (if (plusp x) "-POSITIVE-" "-NEGATIVE-")
-                stream)
-  (write-string "INFINITY" stream)
-  (unless *read-eval*
-    (write-string ">" stream)))
+  (declare (stream stream))
+  (let ((symbol (etypecase x
+                  (single-float (if (minusp x)
+                                    'single-float-negative-infinity
+                                    'single-float-positive-infinity))
+                  (double-float (if (minusp x)
+                                    'double-float-negative-infinity
+                                    'double-float-positive-infinity)))))
+    (cond (*read-eval*
+           (write-string "#." stream)
+           (output-symbol symbol (symbol-package symbol) stream))
+          (t
+           (print-unreadable-object (x stream)
+             (output-symbol symbol (symbol-package symbol) stream))))))
 
 (defun output-float-nan (x stream)
   (print-unreadable-object (x stream)
