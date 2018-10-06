@@ -524,15 +524,18 @@ invoked. In that case it will store into PLACE and start over."
                specs)))
 
 ;; Avoid unknown return values in emitted code for PRINT-UNREADABLE-OBJECT
-(declaim (ftype (sfunction (t t t t &optional t) null)
-                %print-unreadable-object))
+(sb!xc:proclaim '(ftype (sfunction (t t t &optional t) null)
+                        %print-unreadable-object))
 (sb!xc:defmacro print-unreadable-object ((object stream &key type identity)
                                              &body body)
   "Output OBJECT to STREAM with \"#<\" prefix, \">\" suffix, optionally
   with object-type prefix and object-identity suffix, and executing the
   code in BODY to provide possible further output."
   ;; Note: possibly out-of-order keyword argument evaluation.
-  (let ((call `(%print-unreadable-object ,object ,stream ,type ,identity)))
+  ;; But almost always the :TYPE and :IDENTITY are each literal T or NIL,
+  ;; and so the LOGIOR expression reduces to a fixed value from 0 to 3.
+  (let ((call `(%print-unreadable-object
+                ,object ,stream (logior (if ,type 1 0) (if ,identity 2 0)))))
     (if body
         (let ((fun (make-symbol "THUNK")))
           `(dx-flet ((,fun () ,@body)) (,@call #',fun)))

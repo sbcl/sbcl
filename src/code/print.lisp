@@ -248,11 +248,12 @@ variable: an unreadable object representing the error is printed instead.")
       o)))
 
 ;;; guts of PRINT-UNREADABLE-OBJECT
-(defun %print-unreadable-object (object stream type identity &optional body)
+(defun %print-unreadable-object (object stream flags &optional body)
   (declare (type (or null function) body))
   (if *print-readably*
       (print-not-readable-error object stream)
-      (flet ((print-description ()
+      (flet ((print-description (&aux (type (logbitp 0 (truly-the (mod 4) flags)))
+                                      (identity (logbitp 1 flags)))
                (when type
                  (write (type-of object) :stream stream :circle nil
                                          :level nil :length nil)
