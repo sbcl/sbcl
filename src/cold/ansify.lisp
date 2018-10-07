@@ -52,22 +52,6 @@
   (warn "CMU CL doesn't support the :PRINT-OBJECT option to DEFSTRUCT.~%")
   (pushnew :no-ansi-print-object *features*))
 
-;;; KLUDGE: In CMU CL, at least as of 18b, READ-SEQUENCE is somewhat
-;;; dain-bramaged. Running
-;;;   (defvar *buffer* (make-array (expt 10 6) :element-type 'character))
-;;;   (with-open-file (s "/tmp/long-file.tmp")
-;;;     (/show (read-sequence *buffer* s :start 0 :end 3000))
-;;;     (/show (read-sequence *buffer* s :start 0 :end 15000))
-;;;     (/show (read-sequence *buffer* s :start 0 :end 15000)))
-;;; on a large test file gives
-;;; /(READ-SEQUENCE *BUFFER* S :START 0 :END 3000)=3000
-;;; /(READ-SEQUENCE *BUFFER* S :START 0 :END 15000)=1096
-;;; /(READ-SEQUENCE *BUFFER* S :START 0 :END 15000)=0
-#+cmu
-(progn
-  (warn "CMU CL has a broken implementation of READ-SEQUENCE.")
-  (pushnew :no-ansi-read-sequence *features*))
-
 ;;; This is apparently quite old, according to
 ;;; <http://tunes.org/~nef/logs/lisp/03.10.22>:
 ;;;   <dan`b> (error "CMUCL on Alpha can't read floats in the format \"1.0l0\".
