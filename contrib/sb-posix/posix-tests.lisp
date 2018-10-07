@@ -618,9 +618,12 @@
 
 #-(or android win32)
 (deftest grent.2
-  ;; make sure that we found something
-  (not (sb-posix:getgrnam (sb-posix:group-name (sb-posix:getgrgid (sb-posix:getgid)))))
-  nil)
+    ;; make sure that we found something
+    (let* ((gid 0)
+           (group (sb-posix:getgrgid gid)))
+      (eql gid
+           (sb-posix:group-gid (sb-posix:getgrnam (sb-posix:group-name group)))))
+  t)
 
 #-(or android win32)
 (deftest grent.non-existing
