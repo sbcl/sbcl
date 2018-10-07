@@ -105,40 +105,5 @@
              (unless (gethash key host-ht)
                (warn "adding required-by-ANSI export to package CL: ~S" key)
                (munging-cl-package
-                (export (intern key cl) cl)))
-
-             ;; FIXME: My righteous indignation below was misplaced. ANSI sez
-             ;; (in 11.1.2.1, "The COMMON-LISP Package") that it's OK for
-             ;; COMMON-LISP things to have their home packages elsewhere.
-             ;; For now, the hack below works, but it's not good to rely
-             ;; on this nonstandardness. Ergo, I should fix things so that even
-             ;; when the cross-compilation host COMMON-LISP package has
-             ;; symbols with home packages elsewhere, genesis dumps out
-             ;; the correct stuff. (For each symbol dumped, check whether it's
-             ;; exported from COMMON-LISP, and if so, dump it as though its
-             ;; home package is COMMON-LISP regardless of whether it actually
-             ;; is. I think..)
-             ;;
-             ;; X CMU CL, at least the Debian versions ca. 2.4.9 that I'm
-             ;; X using as I write this, plays a sneaky trick on us by
-             ;; X putting DEBUG and FLOATING-POINT-INEXACT in the
-             ;; X EXTENSIONS package, then IMPORTing them into
-             ;; X COMMON-LISP, then reEXPORTing them from COMMON-LISP.
-             ;; X This leaves their home packages bogusly set to
-             ;; X EXTENSIONS, which confuses genesis into thinking that
-             ;; X the CMU CL EXTENSIONS package has to be dumped into the
-             ;; X target SBCL. (perhaps a last-ditch survival strategy
-             ;; X for the CMU CL "nooo! don't bootstrap from scratch!"
-             ;; X meme?) As far as I can see, there's no even slightly
-             ;; X portable way to undo the damage, so we'll play the "one
-             ;; X dirty unportable hack deserves another" game, only even
-             ;; X dirtierly and more unportably than before..
-             #+cmu
-             (let ((symbol (intern key cl)))
-               (unless (eq (symbol-package symbol) cl)
-                 (warn "using low-level hack to move ~S from ~S to ~S"
-                       symbol
-                       (symbol-package symbol)
-                       cl)
-                 (kernel:%set-symbol-package symbol cl))))
+                (export (intern key cl) cl))))
            standard-ht))

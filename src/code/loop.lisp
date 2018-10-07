@@ -272,9 +272,13 @@ code to be loaded.
 ;;; While in theory we might want to include all of them,
 ;;; in practice it seems silly to allow "for x arithmetic-error in ..."
 (defun std-atom-type-specifier-p (symbol)
-  (and (eq (symbol-package symbol) *cl-package*)
-       ;; Check for primitiveness of the type, since some symbols in the CL
-       ;; package are private-use typedefs (e.g. ARRAY-RANK, CHAR-CODE).
+  ;; The check for symbols in CL is an optimization that skips calling INFO on
+  ;; most atoms. The real test is whether type = :PRIMITIVE, as there are CL
+  ;; symbols naming types which are not standard builtin type specifiers, e.g.
+  ;; ARRAY-RANK, CHAR-CODE. (One almost wonders if that is technically wrong).
+  ;; At any rate, in the cross-compiler, we must not rely on the host's idea
+  ;; of SYMBOL-PACKAGE as it does not accurately model the target per se.
+  (and #-sb-xc-host (eq (symbol-package symbol) *cl-package*)
        (or (eq (info :type :kind symbol) :primitive)
            ;; allow certain :instance types, but not all of them
            (member symbol '(hash-table package pathname random-state readtable)))
