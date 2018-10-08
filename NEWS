@@ -1,4 +1,10 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+
+changes relative to sbcl-1.4.12:
+  * minor incompatible change: PRINT-TYPE and PRINT-TYPE-SPECIFIER are not
+    exported from SB-EXT. These were never announced, so this change would
+    only affects users who discovered these undocumented functions.
+
 changes in sbcl-1.4.12 relative to sbcl-1.4.11:
   * minor incompatible change: a number of platform-specific elements of
     *FEATURES* related to whether the system implements particular strategies

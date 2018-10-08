@@ -221,7 +221,7 @@
 
 (defmethod print-object ((type alien-type) stream)
   (print-unreadable-object (type stream :type t)
-    (sb!ext:print-type-specifier stream (unparse-alien-type type))))
+    (sb!impl:print-type-specifier stream (unparse-alien-type type))))
 
 ;;;; the SAP type
 

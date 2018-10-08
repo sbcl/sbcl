@@ -419,7 +419,7 @@
                (error "~@<Compilation of~/test-util::print-form-and-optimize/ ~
                        signaled ~A~P:~/test-util::print-signaled-conditions/~
                        ~@[~@:_~@:_Allowed type is ~
-                      ~/sb-ext:print-type-specifier/.~]~@:>"
+                      ~/sb-impl:print-type-specifier/.~]~@:>"
                       (cons form optimize) kind (length conditions) conditions
                       allowed-type))
              (check-conditions (kind conditions allow)
@@ -484,7 +484,7 @@
                       ~/test-util::print-arguments/~
                       returned normally instead of signaling a ~
                       condition of type ~
-                      ~/sb-ext:print-type-specifier/.~@:>"
+                      ~/sb-impl:print-type-specifier/.~@:>"
                     (cons form optimize) args expected-type))
            (signaled-unexpected (conditions)
              (error "~@<Calling the result of compiling~

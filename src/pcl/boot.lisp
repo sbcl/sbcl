@@ -1034,8 +1034,8 @@ bootstrapping.
                  :format-control
                  "~@<Cannot find type for specializer ~
                   ~/sb-ext:print-symbol-with-prefix/ when executing ~S ~
-                  for a ~/sb-ext:print-type-specifier/ of a ~
-                  ~/sb-ext:print-type-specifier/.~@:>"
+                  for a ~/sb-impl:print-type-specifier/ of a ~
+                  ~/sb-impl:print-type-specifier/.~@:>"
                  :format-arguments
                  (list name 'specializer-type-specifier
                        (class-name (class-of proto-method))
@@ -2443,8 +2443,8 @@ bootstrapping.
                (not (csubtypep gf-type (setf old-type (proclaimed-ftype fun-name)))))
       (style-warn "~@<Generic function ~
                    ~/sb-ext:print-symbol-with-prefix/ clobbers an ~
-                   earlier ~S proclamation ~/sb-ext:print-type/ for ~
-                   the same name with ~/sb-ext:print-type/.~:@>"
+                   earlier ~S proclamation ~/sb-impl:print-type/ for ~
+                   the same name with ~/sb-impl:print-type/.~:@>"
                    fun-name 'ftype old-type gf-type))
     (setf (info :function :type fun-name) gf-type
           (info :function :where-from fun-name) :defined-method)

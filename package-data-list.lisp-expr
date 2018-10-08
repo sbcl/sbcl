@@ -632,6 +632,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
       :doc "private: a grab bag of implementation details"
       :import-from (("SB!KERNEL" "*PACKAGE-NAMES*"))
       :export ("FORMAT-MICROSECONDS" "FORMAT-MILLISECONDS" ; for ~/fmt/
+               "PRINT-TYPE" "PRINT-TYPE-SPECIFIER"
                ;; symbols used by sb-simple-streams
                "ANSI-STREAM-CLEAR-INPUT"
                "ANSI-STREAM-FRESH-LINE" "ANSI-STREAM-LISTEN"
@@ -903,7 +904,6 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "SET-SBCL-SOURCE-LOCATION"
                "*DISASSEMBLE-ANNOTATE*"
                "PRINT-SYMBOL-WITH-PREFIX"
-               "PRINT-TYPE-SPECIFIER" "PRINT-TYPE"
                "*PRINT-VECTOR-LENGTH*"
                "DECIMAL-WITH-GROUPED-DIGITS-WIDTH"
                ;;"OBJECT-SIZE"
