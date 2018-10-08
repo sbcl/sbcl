@@ -1695,3 +1695,10 @@
                        (values a b c)))
                 (f 1 2 (f 0 0)))))
     (() (values 1 2 0))))
+
+(with-test (:name :make-array-hairy-cons)
+  (checked-compile-and-assert
+      ()
+      `(lambda (type)
+         (make-array 4 :element-type type))
+    (('(or (cons (satisfies eval)) atom)) #(0 0 0 0) :test #'equalp)))
