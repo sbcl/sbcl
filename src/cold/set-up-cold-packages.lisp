@@ -195,24 +195,10 @@
       (use-package (package-data-use package-data)
                    (package-data-name package-data))
       (dolist (sublist (package-data-import-from package-data))
-        (let* ((from-package (first sublist))
-               (symbol-names (rest sublist))
-               (symbols (mapcar (lambda (name)
-                                  ;; old way, broke for importing symbols
-                                  ;; like SB!C::DEBUG-SOURCE-FORM into
-                                  ;; SB!DI -- WHN 19990714
-                                  #+nil
-                                  (let ((s (find-symbol name from-package)))
-                                    (unless s
-                                      (error "can't find ~S in ~S"
-                                             name
-                                             from-package))
-                                    s)
-                                  ;; new way, works for SB!DI stuff
-                                  ;; -- WHN 19990714
-                                  (intern name from-package))
-                                (flatten symbol-names))))
-          (import symbols (package-data-name package-data)))))
+        (let ((from-package (first sublist)))
+          (import (mapcar (lambda (name) (intern name from-package))
+                          (rest sublist))
+                  (package-data-name package-data)))))
 
     ;; Now that all package-package references exist, we can handle
     ;; REEXPORT operations. (We have to wait until now because they
