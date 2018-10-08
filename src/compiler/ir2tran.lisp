@@ -2036,14 +2036,17 @@ not stack-allocated LVAR ~S." source-lvar)))))
     (when *collect-dynamic-statistics*
       (vop count-me node block *dynamic-counts-tn*
            (block-number (ir2-block-block block))))
+    ;; Make sure this is done before NSP is reset, as that may leave
+    ;; *free-interrupt-context-index* unprotected below the stack
+    ;; pointer.
+    #!-x86-64
+    (vop unbind-to-here node block
+         (car (ir2-nlx-info-dynamic-state 2info)))
 
     #!-x86-64
     (vop* restore-dynamic-state node block
           ((reference-tn-list (cdr (ir2-nlx-info-dynamic-state 2info)) nil))
-          (nil))
-    #!-x86-64
-    (vop unbind-to-here node block
-         (car (ir2-nlx-info-dynamic-state 2info)))))
+          (nil))))
 
 ;;;; n-argument functions
 
