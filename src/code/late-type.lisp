@@ -106,7 +106,9 @@
          (let ((new (replace-hairy-type (negation-type-type type))))
            (if (eq new *universal-type*)
                new
-               (type-negation new)))))
+               (type-negation new))))
+        (t
+         *universal-type*))
       type))
 
 ;; Similar to (NOT CONTAINS-UNKNOWN-TYPE-P), but report that (SATISFIES F)
