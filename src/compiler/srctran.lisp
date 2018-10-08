@@ -4516,15 +4516,24 @@
 ;;; instance, ~{ ... ~} requires a list argument, so if the lvar-type
 ;;; of a corresponding argument is known and does not intersect the
 ;;; list type, a warning could be signalled.
-(defun check-format-args (string args fun)
-  (declare (type string string))
-  (multiple-value-bind (min max)
-      (handler-case (sb!format:%compiler-walk-format-string string args)
-        (sb!format:format-error (c)
-          (compiler-warn "~A" c)))
-    (when min
-      (let ((nargs (length args)))
-        (cond
+(defun check-format-args (node arg-n fun
+                          &aux (combination-args (basic-combination-args node)))
+  ;; ARG-N is the index into COMBINATION-ARGS of a format control string,
+  ;; usually 0 or 1.
+  (when (list-of-length-at-least-p combination-args (1+ arg-n))
+    (let* ((args (nthcdr arg-n combination-args))
+           (control (pop args)))
+      (when (and (constant-lvar-p control) (stringp (lvar-value control)))
+        (binding* ((string (lvar-value control))
+                   (*compiler-error-context* node)
+                   ((min max)
+                    (handler-case (sb!format:%compiler-walk-format-string
+                                   string args)
+                      (sb!format:format-error (c)
+                        (compiler-warn "~A" c)))
+                    :exit-if-null)
+                   (nargs (length args)))
+         (cond
           ((< nargs min)
            (warn 'format-too-few-args-warning
                  :format-control
@@ -4534,15 +4543,18 @@
            (warn 'format-too-many-args-warning
                  :format-control
                  "Too many arguments (~D) to ~S ~S: uses at most ~D."
-                 :format-arguments (list nargs fun string max))))))))
+                 :format-arguments (list nargs fun string max)))))))))
 
-(defoptimizer (format optimizer) ((dest control &rest args) node)
-  (declare (ignore dest))
-  (when (constant-lvar-p control)
-    (let ((x (lvar-value control)))
-      (when (stringp x)
-        (let ((*compiler-error-context* node))
-         (check-format-args x args 'format))))))
+;;; FORMAT control string best-effort sanity checker
+(dolist (fun (append '(format error warn)
+                     #+sb-xc-host ; No need for these after self-build
+                     '(bug style-warn compiler-mumble compiler-notify
+                       compiler-style-warn compiler-warn compiler-error
+                       maybe-compiler-notify
+                       note-lossage note-unwinnage)))
+  (setf (fun-info-optimizer (fun-info-or-lose fun))
+        (let ((n (if (eq fun 'format) 1 0)))
+          (lambda (node) (check-format-args node n fun)))))
 
 (defoptimizer (format derive-type) ((dest control &rest args))
   (declare (ignore control args))
@@ -4684,26 +4696,6 @@
 
 (deftransform pathname ((pathspec) (string) *)
   '(values (parse-namestring pathspec)))
-
-(macrolet
-    ((def (name)
-         `(defoptimizer (,name optimizer) ((control &rest args) node)
-            (when (constant-lvar-p control)
-              (let ((x (lvar-value control)))
-                (when (stringp x)
-                  (let ((*compiler-error-context* node))
-                    (check-format-args x args ',name))))))))
-  (def error)
-  (def warn)
-  #+sb-xc-host ; Only we should be using these
-  (progn
-    (def style-warn)
-    (def compiler-error)
-    (def compiler-warn)
-    (def compiler-style-warn)
-    (def compiler-notify)
-    (def maybe-compiler-notify)
-    (def bug)))
 
 (defoptimizer (cerror optimizer) ((report control &rest args))
   (when (and (constant-lvar-p control)

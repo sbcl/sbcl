@@ -56,7 +56,6 @@
 (defvar *unwinnage-detected*)
 
 ;;; Signal a warning if appropriate and set *FOO-DETECTED*.
-(declaim (ftype (function (string &rest t) (values)) note-lossage note-unwinnage))
 (defun note-lossage (format-string &rest format-args)
   (setq *lossage-detected* t)
   (when *lossage-fun*

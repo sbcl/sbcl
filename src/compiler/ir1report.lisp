@@ -493,7 +493,6 @@ has written, having proved that it is unreachable."))
 ;;; such like. We clear the current error context so that we know that
 ;;; it needs to be reprinted, and we also FORCE-OUTPUT so that the
 ;;; message gets seen right away.
-(declaim (ftype (function (string &rest t) (values)) compiler-mumble))
 (defun compiler-mumble (control &rest args)
   (let ((stream *standard-output*))
     (note-message-repeats stream)
