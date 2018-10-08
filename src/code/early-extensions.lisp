@@ -1415,7 +1415,7 @@ NOTE: This interface is experimental and subject to change."
 (defun print-deprecation-message (namespace name software version
                                   &optional replacements stream)
   (format stream
-           "The ~(~A~) ~/sb!impl:print-symbol-with-prefix/ has been ~
+           "The ~(~A~) ~/sb!ext:print-symbol-with-prefix/ has been ~
             deprecated as of ~@[~A ~]version ~A.~
             ~@[~2%~/sb!impl::print-deprecation-replacements/~]"
           namespace name software version replacements))

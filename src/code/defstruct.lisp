@@ -1274,9 +1274,9 @@ unless :NAMED is also specified.")))
        'sb!c:inlining-dependency-failure
        ;; This message omits the http://en.wikipedia.org/wiki/Serial_comma
        :format-control "~@<Previously compiled call~P to ~
-~{~/sb!impl:print-symbol-with-prefix/~^~#[~; and~:;,~] ~} ~
+~{~/sb!ext:print-symbol-with-prefix/~^~#[~; and~:;,~] ~} ~
 could not be inlined because the structure definition for ~
-~/sb!impl:print-symbol-with-prefix/ was not yet seen. To avoid this warning, ~
+~/sb!ext:print-symbol-with-prefix/ was not yet seen. To avoid this warning, ~
 DEFSTRUCT should precede references to the affected functions, ~
 or they must be declared locally notinline at each call site.~@:>"
        :format-arguments (list (length it) (nreverse it) (dd-name dd))))))

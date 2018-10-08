@@ -441,7 +441,7 @@ has written, having proved that it is unreachable."))
      ;; Grammar note - starting a sentence with a numeral is wrong.
      (format stream
               "~@<~@(~D~) call~:P to ~
-               ~/sb!impl:print-symbol-with-prefix/ ~
+               ~/sb!ext:print-symbol-with-prefix/ ~
                ~2:*~[~;was~:;were~] compiled before a compiler-macro ~
                was defined for it. A declaration of NOTINLINE at the ~
                call site~:P will eliminate this warning, as will ~
@@ -672,7 +672,7 @@ has written, having proved that it is unreachable."))
         (compiler-warn
          'inlining-dependency-failure
          :format-control
-         "~@<Proclaiming ~/sb!impl:print-symbol-with-prefix/ to be INLINE, but ~D call~:P to it ~
+         "~@<Proclaiming ~/sb!ext:print-symbol-with-prefix/ to be INLINE, but ~D call~:P to it ~
 ~:*~[~;was~:;were~] previously compiled. A declaration of NOTINLINE ~
 at the call site~:P will eliminate this warning, as will proclaiming ~
 and defining the function before its first potential use.~@:>"
@@ -725,14 +725,14 @@ and defining the function before its first potential use.~@:>"
        'inlining-dependency-failure
        :format-control
        (if (info :function :assumed-type name)
-           "~@<Call to ~/sb!impl:print-symbol-with-prefix/ could not be inlined because no definition ~
+           "~@<Call to ~/sb!ext:print-symbol-with-prefix/ could not be inlined because no definition ~
 for it was seen prior to its first use.~:@>"
          ;; This message sort of implies that source form is the
          ;; only reasonable representation in which an inline definition
          ;; could have been saved, which isn't in general true - it could
          ;; be saved as a parsed AST - but I don't really know how else to
          ;; phrase this. And it happens to be true in SBCL, so it's not wrong.
-           "~@<Call to ~/sb!impl:print-symbol-with-prefix/ could not be inlined because its source code ~
+           "~@<Call to ~/sb!ext:print-symbol-with-prefix/ could not be inlined because its source code ~
 was not saved. A global INLINE or SB-EXT:MAYBE-INLINE proclamation must be ~
 in effect to save function definitions for inlining.~:@>")
        :format-arguments (list name)))))

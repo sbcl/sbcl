@@ -1585,7 +1585,7 @@ the usual naming convention (names like *FOO*) for special variables"
    (lambda (condition stream)
      (format stream
              "~@<The new ~A proclamation for~@[ ~A~] ~
-               ~/sb!impl:print-symbol-with-prefix/~
+               ~/sb!ext:print-symbol-with-prefix/~
                ~@:_~2@T~/sb!impl:print-type-specifier/~@:_~
                does not match the old ~4:*~A~3* proclamation~
                ~@:_~2@T~/sb!impl:print-type-specifier/~@:>"

@@ -548,7 +548,7 @@ between the ~A definition and the ~A definition"
                      ~/sb!impl:print-type-specifier/." name))
             (:defined
              (warn "redefining DEFTYPE type to be a class: ~
-                    ~/sb!impl::print-symbol-with-prefix/" name)
+                    ~/sb!ext:print-symbol-with-prefix/" name)
              (clear-info :type :expander name)
              (clear-info :type :source-location name)))
 
