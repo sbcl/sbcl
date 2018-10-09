@@ -838,3 +838,10 @@
         (y (make-array 1 :element-type 'base-char :initial-contents "y")))
     (assert (equal (read-from-string (write-to-string (list x y) :readably t :circle t))
                    '("x" "y")))))
+
+(with-test (:name :format-tilde-at-newline)
+  (let ((control "hi.~@
+  there"))
+    (declare (notinline format))
+    (assert (string= (format nil control) "hi.
+there"))))

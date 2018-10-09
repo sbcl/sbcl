@@ -4623,19 +4623,9 @@
              (and (sb!format::format-directive-p directive)
                   (let ((char (sb!format::format-directive-character directive))
                         (params (sb!format::format-directive-params directive)))
-                    (or
-                     (and
-                      (char-equal char #\a)
-                      (null params)
-                      (pop args))
-                     (and
-                      (or (eql char #\~)
-                          (eql char #\%))
-                      (null (sb!format::format-directive-colonp directive))
-                      (null (sb!format::format-directive-atsignp directive))
-                      (or (null params)
-                          (typep params
-                                 '(cons (cons (eql 1) unsigned-byte) null)))))))))
+                     (and (char-equal char #\a)
+                          (null params)
+                          (pop args))))))
    (null args)))
 
 (deftransform format ((stream control &rest args) (null (constant-arg string) &rest string))
@@ -4652,44 +4642,15 @@
                   (ignorable ,@arg-names))
          (concatenate
           'string
-          ,@(let ((strings
-                    (loop for directive in tokenized
-                          for char = (and (not (stringp directive))
-                                          (sb!format::format-directive-character directive))
-                          when
-                          (cond ((not char)
-                                 directive)
-                                ((char-equal char #\a)
-                                 (let ((arg (pop args))
-                                       (arg-name (pop arg-names)))
-                                   (if
-                                    (constant-lvar-p arg)
-                                    (lvar-value arg)
-                                    arg-name)))
-                                (t
-                                 (let ((n (or (cdar (sb!format::format-directive-params directive))
-                                              1)))
-                                   (and (plusp n)
-                                        (make-string n
-                                                     :initial-element
-                                                     (if (eql char #\%)
-                                                         #\Newline
-                                                         char))))))
-                          collect it)))
-              ;; Join adjacent constant strings
-              (loop with concat
-                    for (string . rest) on strings
-                    when (stringp string)
-                    do (setf concat
-                             (if concat
-                                 (possibly-base-stringize
-                                  (concatenate 'string concat string))
-                                 string))
-                    else
-                    when concat collect (shiftf concat nil) end
-                    and collect string
-                    when (and concat (not rest))
-                    collect concat)))))))
+          ,@(mapcar (lambda (directive)
+                      (if (stringp directive)
+                          directive
+                          (let ((arg (pop args))
+                                (arg-name (pop arg-names)))
+                            (if (constant-lvar-p arg)
+                                (lvar-value arg)
+                                arg-name))))
+                    tokenized))))))
 
 (deftransform pathname ((pathspec) (pathname) *)
   'pathspec)

@@ -14,6 +14,7 @@
 ;;; The case for caching is to speed up out-of-line calls that use a fixed
 ;;; control string in a loop, not to avoid re-tokenizing all strings that
 ;;; happen to be STRING= to that string.
+;;; (Might we want to bypass the cache when compile-time tokenizing?)
 (defun-cached (tokenize-control-string
                :hash-bits 7
                :hash-function #+sb-xc-host
@@ -23,9 +24,16 @@
     ;; even though the hash is address-based.
     ((string string=))
   (declare (simple-string string))
-  (let ((index 0)
-        (end (length string))
-        (result nil)
+  (combine-directives
+   (%tokenize-control-string string 0 (length string))))
+
+;;; If at some point I can figure out how to *CORRECTLY* utilize
+;;; non-simple strings, then the INDEX and END will bound the parse.
+;;; [Tokenization is the easy part, it's the substring extraction
+;;; and processing, and error reporting, that become very complicated]
+(defun %tokenize-control-string (string index end)
+  (declare (simple-string string))
+  (let ((result nil)
         ;; FIXME: consider rewriting this 22.3.5.2-related processing
         ;; using specials to maintain state and doing the logic inside
         ;; the directive expanders themselves.
@@ -34,7 +42,7 @@
         (semicolon)
         (justification-semicolon))
     (loop
-      (let ((next-directive (or (position #\~ string :start index) end)))
+      (let ((next-directive (or (position #\~ string :start index :end end) end)))
         (when (> next-directive index)
           (push (possibly-base-stringize (subseq string index next-directive))
                 result))
@@ -172,6 +180,74 @@
          :character (char-upcase char)
          :colonp colonp :atsignp atsignp
          :params (nreverse params))))))
+
+;;; Make a few simplifications to the directive list in INPUT,
+;;; including translation of ~% to literal newline.
+;;; I think that this does not have implications on conditional newlines
+;;; vis a vis "When a line break is inserted by any type of conditional
+;;; newline, any blanks that immediately precede the conditional newline
+;;; are omitted". i.e. one could argue that nonliteral blanks are not
+;;; quite the same as literal blanks, i.e. not subject to removal,
+;;; but I don't think that's true, and in fact that is the source of
+;;; an extremely subtle bug that writing the #\space character as a
+;;; physical space character followed by a conditional newline is,
+;;; if taken literally, supposed to remove the desired output.
+(defun combine-directives (input)
+  (let (output)
+    (flet ((concat (string)
+             (let ((first (car output)))
+               (cond ((not (stringp first))
+                      (push string output))
+                     ;; STRING was already handed to POSSIBLY-BASE-STRINGIZE
+                     ;; by %TOKENIZE-CONTROL-STRING so we don't need to do that again.
+                     ;; i.e. the result is base-string if and only if
+                     ;; both FIRST and STRING are base-strings.
+                     ((and (typep first 'base-string)
+                           (typep string 'base-string))
+                      (rplaca output (concatenate 'base-string first string)))
+                     (t
+                      (rplaca output (concatenate 'string first string)))))))
+      (loop
+        (unless input (return (nreverse output)))
+        (let ((item (pop input)))
+          (etypecase item
+            (string
+             (concat item))
+            ;;  - Handle tilde-newline immediately
+            ;;  - Turn "~~" into literal tilde (for parameter N <=127)
+            ;;  - Turn "~%" into literal newline (ditto)
+            ;;  - Turn "~|" into literal form-feed (ditto)
+            (format-directive
+             (let ((params (format-directive-params item))
+                   (colon (format-directive-colonp item))
+                   (atsign (format-directive-atsignp item))
+                   (char (format-directive-character item)))
+               (block nil
+                 (case char
+                   (#\Newline
+                    (when (and (not params) (not (and colon atsign)))
+                      (when atsign
+                        (concat #.(make-string 1 :initial-element #\Newline)))
+                      (when (and (not colon) (stringp (car input)))
+                        (concat (string-left-trim
+                                 ;; #\Tab is a nonstandard char
+                                 `(#-sb-xc-host ,(code-char tab-char-code)
+                                   #\space #\newline)
+                                 (pop input))))
+                      (return)))
+                   ((#\% #\~ #-sb-xc-host #\|) ; #\Page is a nonstandard char
+                    (let ((n (or (cdar params) 1)))
+                      (when (and (not (or colon atsign))
+                                 (or (null params) (singleton-p params))
+                                 (typep n '(mod 128)))
+                        (when (plusp n)
+                          (let ((char (case char
+                                        (#\% #\Newline)
+                                        (#\| (code-char form-feed-char-code))
+                                        (t char))))
+                            (concat (make-string n :initial-element char))))
+                        (return)))))
+                 (push item output))))))))))
 
 ;;;; FORMATTER stuff
 
@@ -630,20 +706,12 @@
            (write-char #\~ stream)))
       '(write-char #\~ stream)))
 
+;;; We'll only get here when the directive usage is illegal.
+;;; COMBINE-DIRECTIVES would have handled a legal directive.
 (def-complex-format-directive #\newline (colonp atsignp params directives)
-  ;; FIXME: this is not an error!
   (check-modifier '("colon" "at-sign") (and colonp atsignp))
-  (values (expand-bind-defaults () params
-            (if atsignp
-                '(write-char #\newline stream)
-                nil))
-          (if (and (not colonp)
-                   directives
-                   (simple-string-p (car directives)))
-              (cons (string-left-trim *format-whitespace-chars*
-                                      (car directives))
-                    (cdr directives))
-              directives)))
+  (values (expand-bind-defaults () params)
+          (bug "Unreachable ~S" directives)))
 
 ;;;; format directives for tabs and simple pretty printing
 
@@ -1438,40 +1506,29 @@
   (sb!c:define-source-transform write-to-string (object &rest keys)
     (expand 'write-to-string object keys)))
 
-;;; A long as we're processing ERROR strings to remove "SB!" packages,
-;;; we might as well squash out tilde-newline-whitespace too.
-;;; This might even be robust enough to keep in the target image,
-;;; but, FIXME: this punts on ~newline with {~@,~:,~@:} modifiers
+;;; Process format control strings to remove "SB!" packages.
 #+sb-xc-host
 (defun sb!impl::!xc-preprocess-format-control (string)
-  (let (pieces ltrim)
-    ;; Tokenizing is the correct way to deal with "~~/foo/"
-    ;; without mistaking it for an occurrence of the "~/" directive.
-    (dolist (piece (tokenize-control-string string)
-                   (let ((new (apply 'concatenate 'string (nreverse pieces))))
-                     (if (string/= new string) new string)))
-      (etypecase piece
-        (string
-         (if ltrim
-             (let ((p (position-if
-                       (lambda (x) (and (not (eql x #\Space)) (graphic-char-p x)))
-                       piece)))
-               (when p
-                 (push (subseq piece p) pieces)))
-             (push piece pieces))
-         (setq ltrim nil))
-        (format-directive
-         (setq ltrim nil)
-         (let ((text (subseq string
-                             (format-directive-start piece)
-                             (format-directive-end piece)))
-               (processed nil))
-           (cond ((and (eql (format-directive-character piece) #\Newline)
-                       (not (format-directive-colonp piece))
-                       (not (format-directive-atsignp piece)))
-                  (setq ltrim t processed t))
-                 ((eql (format-directive-character piece) #\/)
-                  (when (string-equal text "~/sb!" :end1 5)
-                    (setq text (concatenate 'string "~/sb-" (subseq text 5))))))
-           (unless processed
-             (push text pieces))))))))
+  (apply #'concatenate
+         'string
+         (mapcar (lambda (piece)
+                   (if (stringp piece)
+                       ;; Unparsing a tokenized format string back to a string
+                       ;; must escape any tildes present in literal pieces.
+                       (with-output-to-string (s)
+                         (dovector (char piece)
+                           (if (char= char #\~)
+                               (write-string "~~" s)
+                               (write-char char s))))
+                       (let ((text (subseq string
+                                           (format-directive-start piece)
+                                           (format-directive-end piece))))
+                         (when (char= (format-directive-character piece) #\/)
+                           ;; FIXME: doesn't handle ~[:@]/" but this is going to be
+                           ;; fixed once and for really soon now. I'm not worried.
+                           (when (string-equal text "~/sb!" :end1 5)
+                             (setq text (concatenate 'string "~/sb-" (subseq text 5)))))
+                         text)))
+                 (tokenize-control-string string))))
+
+

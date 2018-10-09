@@ -523,7 +523,6 @@ SB-INT:*REPL-PROMPT-FUN*
 
 == probably safe (readonly unless indicated)
 
-(defparameter *format-whitespace-chars*
 (defvar *format-directive-expanders*
 (defvar *format-directive-interpreters*
 (defvar *default-format-error-control-string* nil)

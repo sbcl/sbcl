@@ -771,18 +771,12 @@
     (dotimes (i count)
       (write-char #\~ stream))))
 
+;;; We'll only get here when the directive usage is illegal.
+;;; COMBINE-DIRECTIVES would have handled a legal directive.
 (def-complex-format-interpreter #\newline (colonp atsignp params directives)
   (check-modifier '("colon" "at-sign") (and colonp atsignp))
-  (interpret-bind-defaults () params
-    (when atsignp
-      (write-char #\newline stream)))
-  (if (and (not colonp)
-           directives
-           (simple-string-p (car directives)))
-      (cons (string-left-trim *format-whitespace-chars*
-                              (car directives))
-            (cdr directives))
-      directives))
+  (interpret-bind-defaults () params)
+  (bug "Unreachable ~S" directives))
 
 ;;;; format interpreters and support functions for tabs and simple pretty
 ;;;; printing
