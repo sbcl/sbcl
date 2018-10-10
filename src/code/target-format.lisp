@@ -67,31 +67,30 @@
                                     orig-args args)))))
 
 (defun interpret-directive-list (stream directives orig-args args)
-  (if directives
-      (let ((directive (car directives)))
-        (etypecase directive
-          (simple-string
-           (write-string directive stream)
-           (interpret-directive-list stream (cdr directives) orig-args args))
-          (format-directive
-           (multiple-value-bind (new-directives new-args)
-               (let* ((character (format-directive-character directive))
-                      (function
-                       (typecase character
-                         (base-char
-                          (svref *format-directive-interpreters* (char-code character)))))
-                      (*default-format-error-offset*
-                       (1- (format-directive-end directive))))
-                 (unless function
-                   (format-error "Unknown format directive ~@[(character: ~A)~]"
-                                 (char-name character)))
-                 (multiple-value-bind (new-directives new-args)
-                     (funcall function stream directive
-                              (cdr directives) orig-args args)
-                   (values new-directives new-args)))
-             (interpret-directive-list stream new-directives
-                                       orig-args new-args)))))
-      args))
+  (loop
+   (unless directives
+     (return args))
+   (let ((directive (car directives)))
+     (etypecase directive
+      (simple-string
+       (pop directives)
+       (write-string directive stream))
+      (format-directive
+       (let* ((character (format-directive-character directive))
+              (function
+               (typecase character
+                (base-char
+                 (svref *format-directive-interpreters*
+                        (char-code character))))))
+         (multiple-value-setq
+          (directives args)
+          (let ((*default-format-error-offset*
+                 (1- (format-directive-end directive))))
+            (if (functionp function)
+                (funcall function stream directive
+                         (cdr directives) orig-args args)
+                (format-error "Unknown format directive ~@[(character: ~A)~]"
+                              (char-name character)))))))))))
 
 ;;;; FORMAT directive definition macros and runtime support
 

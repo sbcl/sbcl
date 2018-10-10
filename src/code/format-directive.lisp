@@ -54,13 +54,14 @@
 
 
 (defstruct (format-directive (:copier nil))
-  (string (missing-arg) :type simple-string)
-  (start (missing-arg) :type (and unsigned-byte fixnum))
-  (end (missing-arg) :type (and unsigned-byte fixnum))
-  (character (missing-arg) :type character)
-  (colonp nil :type (member t nil))
-  (atsignp nil :type (member t nil))
-  (params nil :type list))
+  (string (missing-arg) :type simple-string :read-only t)
+  (start (missing-arg) :type (and unsigned-byte fixnum) :read-only t)
+  (end (missing-arg) :type (and unsigned-byte fixnum) :read-only t)
+  (character (missing-arg) :type character :read-only t)
+  (colonp nil :type (member t nil) :read-only t)
+  (atsignp nil :type (member t nil) :read-only t)
+  (params nil :type list :read-only t))
+(declaim (freeze-type format-directive))
 (defmethod print-object ((x format-directive) stream)
   (print-unreadable-object (x stream)
     (write-string (format-directive-string x)

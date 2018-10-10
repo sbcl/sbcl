@@ -523,8 +523,6 @@ SB-INT:*REPL-PROMPT-FUN*
 
 == probably safe (readonly unless indicated)
 
-(defvar *format-directive-expanders*
-(defvar *format-directive-interpreters*
 (defvar *default-format-error-control-string* nil)
 (defvar *default-format-error-offset* nil)
 SB-FORMAT::*CARDINAL-ONES* ; readonly
