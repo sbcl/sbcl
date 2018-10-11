@@ -589,7 +589,8 @@
 (declaim (integer *ggg*))
 (defun ggg+1 () (1+ *ggg*))
 
-(with-test (:name :restart-unbound-variable)
+(with-test (:name :restart-unbound-variable
+                  :skipped-on (not :x86-64))
   (let ((success nil))
     (handler-bind
         ((unbound-variable
