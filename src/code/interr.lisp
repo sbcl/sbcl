@@ -212,7 +212,7 @@
                  (if (and defined
                           (not (ctypep value type)))
                      (still-bad "Type mismatch when restarting unbound symbol error:~@
-                                 ~s is not of type ~/sb!impl:print-type/"
+                                 ~s is not of type ~/sb-impl:print-type/"
                                 value type)
                      value)))
              (set-value (value &optional set-symbol)
