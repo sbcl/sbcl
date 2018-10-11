@@ -1298,14 +1298,12 @@
                   ,@(param-names))))))
 
 (defun extract-user-fun-name (string start end)
+  ;; Searching backwards avoids finding the wrong slash in a funky string
+  ;; such as "~'//fun/" which passes #\' to FUN as a parameter.
   (let* ((slash (or (position #\/ string :start start :end (1- end)
                               :from-end t)
                     (format-error "Malformed ~~/ directive")))
-         (name (string-upcase (let ((foo string))
-                                ;; HACK: This is to keep the compiler
-                                ;; quiet about deleting code inside
-                                ;; the subseq expansion.
-                                (subseq foo (1+ slash) (1- end)))))
+         (name (nstring-upcase (subseq string (1+ slash) (1- end))))
          (first-colon (position #\: name))
          (second-colon (if first-colon (position #\: name :start (1+ first-colon))))
          (package
