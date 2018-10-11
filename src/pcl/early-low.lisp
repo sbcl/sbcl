@@ -133,9 +133,9 @@
   :dd-type structure
   :runtime-type-checks-p nil)
 
-;;; TODO: for x8-64 with #!+immobile-code, we would like 2 additional unboxed
-;;; words to hold the trampline instructions to avoid consing a piece of code
-;;; to jump to this function. It should be "as if" a simple-fun, in as much as
+;;; Note: for x8-64 with #!+immobile-code there are 2 additional raw slots which
+;;; hold machine instructions to load the funcallable-instance-fun and jump to
+;;; it, so that funcallable-instances can act like simple-funs, in as much as
 ;;; there's an address you can jump to without loading a register.
 (sb!kernel::!defstruct-with-alternate-metaclass standard-funcallable-instance
   ;; KLUDGE: Note that neither of these slots is ever accessed by its
