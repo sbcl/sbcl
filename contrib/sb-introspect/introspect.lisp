@@ -988,11 +988,9 @@ Experimental: interface subject to change."
   (+ (primitive-object-size object)
      (typecase object
        (sb-mop:funcallable-standard-object
-        (primitive-object-size
-         (sb-pcl::standard-funcallable-instance-clos-slots object)))
+        (primitive-object-size (sb-pcl::fsc-instance-slots object)))
        (standard-object
-        (primitive-object-size
-         (sb-pcl::standard-instance-slots object)))
+        (primitive-object-size (sb-pcl::std-instance-slots object)))
        (t 0))))
 
 ;;; Print a distribution of object sizes in SPACE.

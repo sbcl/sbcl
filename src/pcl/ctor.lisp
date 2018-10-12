@@ -131,8 +131,9 @@
   :superclass-name function
   :metaclass-name static-classoid
   :metaclass-constructor make-static-classoid
-  :dd-type funcallable-structure
-  :runtime-type-checks-p nil)
+  :dd-type funcallable-structure)
+
+(declaim (freeze-type ctor))
 
 ;;; All defined ctors.
 (defglobal *all-ctors* (make-hash-table :test #'equal

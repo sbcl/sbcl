@@ -106,7 +106,8 @@
 ;;; The set of types of which no object can be a member during cross-compilation.
 (dolist (symbol '(alien system-area-pointer sb!alien-internals:alien-value
                   code-component fdefn lra extended-sequence
-                  sb!pcl::%method-function sb!pcl::standard-instance
+                  sb!pcl::%method-function
+                  sb!pcl::standard-instance sb!pcl::standard-funcallable-instance
                   funcallable-instance generic-function
                   #!+sb-eval sb!eval:interpreted-function
                   #!+sb-fasteval sb!interpreter:interpreted-function

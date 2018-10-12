@@ -1048,6 +1048,7 @@ unless :NAMED is also specified.")))
   (let (;; Compute REF even if not using it, as a sanity-check of DD-TYPE.
         (ref (ecase (dd-type dd)
                (structure '%instance-ref)
+               (funcallable-structure '%funcallable-instance-info)
                (list 'nth)
                (vector 'aref)))
         (index (dsd-index dsd))
@@ -1858,8 +1859,7 @@ or they must be declared locally notinline at each call site.~@:>"
                 (superclass-name (missing-arg))
                 (metaclass-name (missing-arg))
                 (metaclass-constructor (missing-arg))
-                (dd-type (missing-arg))
-                (runtime-type-checks-p t))
+                (dd-type (missing-arg)))
 
   (declare (type (and list (not null)) slot-names))
   (declare (type (and symbol (not null))
@@ -1868,7 +1868,7 @@ or they must be declared locally notinline at each call site.~@:>"
                  metaclass-constructor))
   (declare (symbol constructor)) ; NIL for none
   (declare (type (member structure funcallable-structure) dd-type))
-  (declare (ignore constructor runtime-type-checks-p))
+  (declare (ignore constructor))
 
   (let* ((dd (make-dd-with-alternate-metaclass
               :class-name class-name
@@ -1877,10 +1877,11 @@ or they must be declared locally notinline at each call site.~@:>"
               :metaclass-name metaclass-name
               :metaclass-constructor metaclass-constructor
               :dd-type dd-type)))
-    `(progn
-
-      (eval-when (:compile-toplevel :load-toplevel :execute)
-        (%compiler-set-up-layout ',dd ',(!inherits-for-structure dd))))))
+    `(eval-when (:compile-toplevel :load-toplevel :execute)
+       ;; COMPILER-DEFSTRUCT informs the compiler of all the
+       ;; source-transforms for slot access. They can exist
+       ;; despite lack of ftype information.
+       (%compiler-defstruct ',dd ',(!inherits-for-structure dd)))))
 
 (sb!xc:defmacro !defstruct-with-alternate-metaclass
     (class-name &key
@@ -1889,8 +1890,7 @@ or they must be declared locally notinline at each call site.~@:>"
                 (superclass-name (missing-arg))
                 (metaclass-name (missing-arg))
                 (metaclass-constructor (missing-arg))
-                (dd-type (missing-arg))
-                (runtime-type-checks-p t))
+                (dd-type (missing-arg)))
 
   (declare (type (and list (not null)) slot-names))
   (declare (type (and symbol (not null))
@@ -1907,47 +1907,27 @@ or they must be declared locally notinline at each call site.~@:>"
               :metaclass-name metaclass-name
               :metaclass-constructor metaclass-constructor
               :dd-type dd-type))
-         (dd-slots (dd-slots dd))
-         (delayed-layout-form `(%delayed-get-compiler-layout ,class-name)))
-    (multiple-value-bind (raw-maker-form raw-reffer-operator)
-        (ecase dd-type
-          (structure
-           (values `(%make-structure-instance-macro ,dd nil)
-                   '%instance-ref))
+         (delayed-layout-form `(%delayed-get-compiler-layout ,class-name))
+         (raw-maker-form
+          (ecase dd-type
+           (structure `(%make-structure-instance-macro ,dd nil))
           (funcallable-structure
-           (values `(let ((object
+           `(let ((object
                            ;; TRULY-THE should not be needed. But it is, to avoid
                            ;; a type check on the next SETF. Why???
                            (truly-the funcallable-instance
                             (%make-funcallable-instance ,(dd-length dd)))))
                       (setf (%funcallable-instance-layout object)
                             ,delayed-layout-form)
-                      object)
-                   '%funcallable-instance-info)))
-      `(progn
-
+                      object)))))
+    `(progn
          (eval-when (:compile-toplevel :load-toplevel :execute)
-           (%compiler-set-up-layout ',dd ',(!inherits-for-structure dd)))
-
-         ;; slot readers and writers
-         (declaim (inline ,@(mapcar #'dsd-accessor-name dd-slots)))
-         ,@(mapcar (lambda (dsd)
-                     `(defun ,(dsd-accessor-name dsd) (object)
-                        ,@(when runtime-type-checks-p
-                            `((declare (type ,class-name object))))
-                        (,raw-reffer-operator object ,(dsd-index dsd))))
-                   dd-slots)
-         (declaim (inline ,@(mapcar (lambda (dsd)
-                                      `(setf ,(dsd-accessor-name dsd)))
-                                    dd-slots)))
-         ,@(mapcar (lambda (dsd)
-                     `(defun (setf ,(dsd-accessor-name dsd)) (newval object)
-                        ,@(when runtime-type-checks-p
-                            `((declare (type ,class-name object))))
-                        (setf (,raw-reffer-operator object ,(dsd-index dsd))
-                              newval)))
-                   dd-slots)
-
+           (%compiler-defstruct ',dd ',(!inherits-for-structure dd)))
+         ;; None of the alternate-metaclass structures allow specifying a type
+         ;; for any of their slots, so one of the reasons for passing a classoid
+         ;; to ACCESSOR-DEFINITIONS is irrelevant. The other reason, redefinition,
+         ;; is not even possible. But we have to pass something.
+         ,@(accessor-definitions dd (make-undefined-classoid class-name))
          ,@(when constructor
              `((defun ,constructor (,@slot-names &aux (object ,raw-maker-form))
                  ,@(mapcar (lambda (dsd)
@@ -1958,7 +1938,7 @@ or they must be declared locally notinline at each call site.~@:>"
          ;; Usually we AVER instead of ASSERT, but AVER isn't defined yet.
          ;; A naive reading of 'build-order' suggests it is,
          ;; but due to def!struct delay voodoo, it isn't.
-         (assert (null (symbol-value '*defstruct-hooks*)))))))
+         (assert (null (symbol-value '*defstruct-hooks*))))))
 
 ;;;; finalizing bootstrapping
 

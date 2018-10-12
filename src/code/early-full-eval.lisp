@@ -31,8 +31,7 @@
  :superclass-name function
  :metaclass-name static-classoid
  :metaclass-constructor make-static-classoid
- :dd-type funcallable-structure
- :runtime-type-checks-p nil)
+ :dd-type funcallable-structure)
 
 ;; INTERPRETED-FUNCTION can not subclassed at runtime.
 ;; For one, DEFSTRUCT-WITH-ALTERNATE-METACLASS does not exist in the target,

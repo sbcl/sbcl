@@ -48,8 +48,7 @@
  :superclass-name function
  :metaclass-name static-classoid
  :metaclass-constructor make-static-classoid
- :dd-type funcallable-structure
- :runtime-type-checks-p nil)
+ :dd-type funcallable-structure)
 
 (declaim (freeze-type interpreted-function))
 
