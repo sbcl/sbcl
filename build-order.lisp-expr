@@ -591,8 +591,7 @@
  #!+sb-dyncount ("src/compiler/dyncount")
  #!+sb-dyncount ("src/code/dyncount")
 
- ;; needed by OPEN-FASL-OUTPUT, which is called by COMPILE-FILE
- ("src/code/format-time")
+ ("src/code/format-time" :not-host)
 
  ;; needed by various unhappy-path cases in the cross-compiler
  ("src/code/error")

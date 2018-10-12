@@ -1770,11 +1770,12 @@ necessary, since type inference may take arbitrarily long to converge.")
 (defun print-compile-start-note (source-info)
   (declare (type source-info source-info))
   (let ((file-info (source-info-file-info source-info)))
-    (compiler-mumble #+sb-xc-host "~&; ~A file ~S (written ~A):~%"
-                     #+sb-xc-host (if sb-cold::*compile-for-effect-only*
-                                      "preloading"
-                                      "cross-compiling")
-                     #-sb-xc-host "~&; compiling file ~S (written ~A):~%"
+    #+sb-xc-host
+    (compiler-mumble "~&; ~Aing file ~S:~%"
+                     (if sb-cold::*compile-for-effect-only* "load" "x-compil")
+                     (namestring (file-info-name file-info)))
+    #-sb-xc-host
+    (compiler-mumble "~&; compiling file ~S (written ~A):~%"
                      (namestring (file-info-name file-info))
                      (sb!int:format-universal-time nil
                                                    (file-info-write-date
@@ -1918,12 +1919,12 @@ SPEED and COMPILATION-SPEED optimization values, and the
         (setq output-file-name
               (pathname (fasl-output-stream fasl-output)))
         (when (and (not abort-p) sb!xc:*compile-verbose*)
-          (compiler-mumble "~2&; ~A written~%" (namestring output-file-name))))
+          (compiler-mumble "~2&; wrote ~A~%" (namestring output-file-name))))
 
       (when cfasl-output
         (close-fasl-output cfasl-output abort-p)
         (when (and (not abort-p) sb!xc:*compile-verbose*)
-          (compiler-mumble "; ~A written~%" (namestring coutput-file-name))))
+          (compiler-mumble "; wrote ~A~%" (namestring coutput-file-name))))
 
       (when sb!xc:*compile-verbose*
         (print-compile-end-note source-info (not abort-p)))
