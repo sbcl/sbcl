@@ -674,19 +674,6 @@
                                    (cdr buffering)))))))
             bufferings)))
 
-;;; FIXME: is this used anywhere any more?
-(def-output-routines ("OUTPUT-CHAR-~A-BUFFERED"
-                      1
-                      t
-                      (:none character)
-                      (:line character)
-                      (:full character))
-  (if (eql byte #\Newline)
-      (setf (fd-stream-output-column stream) 0)
-      (incf (fd-stream-output-column stream)))
-  (setf (sap-ref-8 (buffer-sap obuf) tail)
-        (char-code byte)))
-
 (def-output-routines ("OUTPUT-UNSIGNED-BYTE-~A-BUFFERED"
                       1
                       nil
