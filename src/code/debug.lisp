@@ -1166,9 +1166,13 @@ and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
   (declare (type stream stream))
   (let* ((eof-marker (cons nil nil))
          (form (read stream nil eof-marker)))
-    (if (eq form eof-marker)
-        (invoke-restart eof-restart)
-        form)))
+    (cond ((eq form eof-marker)
+           ;; So that the REPL starts on a new line, because the
+           ;; debugger is using *DEBUG-IO* and the REPL STDIN/STDOUT.
+           (fresh-line stream) 
+           (invoke-restart eof-restart))
+          (t
+           form))))
 
 (defun debug-loop-fun ()
   (let* ((*debug-command-level* (1+ *debug-command-level*))
