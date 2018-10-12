@@ -1402,14 +1402,15 @@ NOTE: This interface is experimental and subject to change."
 (defun print-deprecation-replacements (stream replacements &optional colonp atp)
   (declare (ignore colonp atp))
   ;; I don't think this is callable during cross-compilation, is it?
+  ;; Anyway, the format string tokenizer can not handle APPLY on its own.
   (apply #'format stream
-         "~#[~;~
+         (sb!format:tokens "~#[~;~
              Use ~/sb-ext:print-symbol-with-prefix/ instead.~;~
              Use ~/sb-ext:print-symbol-with-prefix/ or ~
              ~/sb-ext:print-symbol-with-prefix/ instead.~:;~
              Use~@{~#[~; or~] ~
              ~/sb-ext:print-symbol-with-prefix/~^,~} instead.~
-           ~]"
+           ~]")
          replacements))
 
 (defun print-deprecation-message (namespace name software version

@@ -13,6 +13,55 @@
 
 ;;;; FORMAT
 
+;;; This funcallable instance is used only as plain-old-data (conveying
+;;; just its slots, not the funcallable nature). Being a function, it
+;;; satisfies the type for the format-control argument of FORMAT, ERROR etc.
+;;; Also note that (DEFTYPE FORMAT-CONTROL) = (OR STRING FUNCTION).
+;;; And it's possible that we could decide to install a closure as
+;;; the fin-fun but I don't think that's necessary.
+(sb!kernel::!defstruct-with-alternate-metaclass fmt-control
+  :slot-names (string symbols memo)
+  :constructor %make-fmt-control
+  :superclass-name function
+  :metaclass-name static-classoid
+  :metaclass-constructor make-static-classoid
+  :dd-type funcallable-structure)
+
+(declaim (freeze-type fmt-control))
+
+(defmethod print-object ((self fmt-control) stream)
+  (print-unreadable-object (self stream :type t)
+    (write-string (unparse-fmt-control self) stream)))
+
+(defun dummy (&rest args) (error "Should not be called: ~S~%" args))
+
+(defun make-fmt-control (string symbols)
+  (let ((f (%make-fmt-control string symbols nil)))
+    (setf (%funcallable-instance-fun f) #'dummy)
+    f))
+
+(defun unparse-fmt-control (fmt)
+  (with-simple-output-to-string (s)
+    (write-char #\" s)
+    (let ((symbols (fmt-control-symbols fmt)))
+      (dolist (piece (tokenize-control-string (fmt-control-string fmt)))
+        (cond ((stringp piece)
+               (if (find #\Newline piece)
+                   (dovector (c piece)
+                     (if (char= c #\newline) (write-string "~%" s) (write-char c s)))
+                   (write-string piece s)))
+              (t
+               (let* ((userfun (eql (format-directive-character piece) #\/))
+                      (end (- (format-directive-end piece) (if userfun 1 0))))
+                 (write-string (format-directive-string piece)
+                               s
+                               :start (format-directive-start piece)
+                               :end end)
+                 (when userfun
+                   (print-symbol-with-prefix s (pop symbols))
+                   (write-char #\/ s)))))))
+    (write-char #\" s)))
+
 (defun format (destination control-string &rest format-arguments)
   "Provides various facilities for formatting output.
   CONTROL-STRING contains a string to be output, possibly with embedded
@@ -53,18 +102,28 @@
      nil)))
 
 (defun %format (stream string-or-fun orig-args &optional (args orig-args))
-  (if (functionp string-or-fun)
+  (if (and (functionp string-or-fun) (not (typep string-or-fun 'fmt-control)))
       (apply string-or-fun stream args)
       (catch 'up-and-out
         (let* ((string (etypecase string-or-fun
                          (simple-string
                           string-or-fun)
                          (string
-                          (coerce string-or-fun 'simple-string))))
+                          (coerce string-or-fun 'simple-string))
+                         (fmt-control
+                          (fmt-control-string string-or-fun))))
                (*default-format-error-control-string* string)
-               (*logical-block-popper* nil))
-          (interpret-directive-list stream (tokenize-control-string string)
-                                    orig-args args)))))
+               (*logical-block-popper* nil)
+               (tokens
+                (if (functionp string-or-fun)
+                    (or (fmt-control-memo string-or-fun)
+                        ;; Memoize the parse back into the object
+                        (setf (fmt-control-memo string-or-fun)
+                              (%tokenize-control-string
+                               string 0 (length string)
+                               (fmt-control-symbols string-or-fun))))
+                    (tokenize-control-string string))))
+          (interpret-directive-list stream tokens orig-args args)))))
 
 (defun interpret-directive-list (stream directives orig-args args)
   (loop
@@ -114,7 +173,7 @@
             (intern (format nil
                             "~:@(~:C~)-FORMAT-DIRECTIVE-INTERPRETER"
                             char)))
-        (directive (sb!xc:gensym "DIRECTIVE"))
+        (directive '.directive) ; expose this var to the lambda. it's easiest
         (directives (if lambda-list (car (last lambda-list)) (sb!xc:gensym "DIRECTIVES"))))
     `(progn
        (defun ,defun-name (stream ,directive ,directives orig-args args)
@@ -1156,7 +1215,8 @@
 ;;;; format interpreter and support functions for user-defined method
 
 (def-format-interpreter #\/ (string start end colonp atsignp params)
-  (let ((symbol (the symbol (extract-user-fun-name string start end))))
+  (let ((symbol (or (format-directive-function .directive)
+                    (the symbol (extract-user-fun-name string start end)))))
     (collect ((args))
       (dolist (param-and-offset params)
         (let ((param (cdr param-and-offset)))

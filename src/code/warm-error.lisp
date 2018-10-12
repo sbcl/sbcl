@@ -51,7 +51,9 @@
            'simple-warning arguments))
 
   ;; But we would warn about redefinition of STYLE-WARN.
-  (fmakunbound 'style-warn)
+  ;; Do a "gentle" fmakunbound, because real FMAKUNBOUND removes
+  ;; sb-c:fun-info thus blowing out the control string transformer.
+  (fdefn-makunbound (find-fdefn 'style-warn))
 
   (defun style-warn (datum &rest arguments)
     (declare (explicit-check))

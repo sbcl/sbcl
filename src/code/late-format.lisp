@@ -25,13 +25,14 @@
     ((string string=))
   (declare (simple-string string))
   (combine-directives
-   (%tokenize-control-string string 0 (length string))))
+   (%tokenize-control-string string 0 (length string) nil)
+   t))
 
 ;;; If at some point I can figure out how to *CORRECTLY* utilize
 ;;; non-simple strings, then the INDEX and END will bound the parse.
 ;;; [Tokenization is the easy part, it's the substring extraction
 ;;; and processing, and error reporting, that become very complicated]
-(defun %tokenize-control-string (string index end)
+(defun %tokenize-control-string (string index end symbols)
   (declare (simple-string string))
   (let ((result nil)
         ;; FIXME: consider rewriting this 22.3.5.2-related processing
@@ -48,7 +49,7 @@
                 result))
         (when (= next-directive end)
           (return))
-        (let* ((directive (parse-directive string next-directive))
+        (let* ((directive (parse-directive string next-directive symbols))
                (char (format-directive-character directive)))
           ;; this processing is required by CLHS 22.3.5.2
           (cond
@@ -76,6 +77,8 @@
                                (not pprint))
                       (setf pprint directive))))))
           (push directive result)
+          (when (char= (format-directive-character directive) #\/)
+            (pop symbols))
           (setf index (format-directive-end directive)))))
     (when (and pprint justification-semicolon)
       (let ((pprint-offset (1- (format-directive-end pprint)))
@@ -90,7 +93,7 @@
          :references '((:ansi-cl :section (22 3 5 2))))))
     (nreverse result)))
 
-(defun parse-directive (string start)
+(defun parse-directive (string start symbols)
   (let ((posn (1+ start)) (params nil) (colonp nil) (atsignp nil)
         (end (length string)))
     (flet ((get-char ()
@@ -178,6 +181,7 @@
         (make-format-directive
          :string string :start start :end (1+ posn)
          :character (char-upcase char)
+         :function (when (eql char #\/) (car symbols))
          :colonp colonp :atsignp atsignp
          :params (nreverse params))))))
 
@@ -192,7 +196,7 @@
 ;;; an extremely subtle bug that writing the #\space character as a
 ;;; physical space character followed by a conditional newline is,
 ;;; if taken literally, supposed to remove the desired output.
-(defun combine-directives (input)
+(defun combine-directives (input literalize-tilde)
   (let (output)
     (flet ((concat (string)
              (let ((first (car output)))
@@ -214,9 +218,9 @@
             (string
              (concat item))
             ;;  - Handle tilde-newline immediately
-            ;;  - Turn "~~" into literal tilde (for parameter N <=127)
-            ;;  - Turn "~%" into literal newline (ditto)
-            ;;  - Turn "~|" into literal form-feed (ditto)
+            ;;  - Turn "~%" into literal newline (for parameter N <=127)
+            ;;  - Unless x-compiling, turn "~|" into literal form-feed (ditto)
+            ;;  - Optionally turn "~~" into literal tilde (ditto)
             (format-directive
              (let ((params (format-directive-params item))
                    (colon (format-directive-colonp item))
@@ -225,6 +229,7 @@
                (block nil
                  (case char
                    (#\Newline
+                    ;; tilde newline wants no params, and not both colon+atsign
                     (when (and (not params) (not (and colon atsign)))
                       (when atsign
                         (concat #.(make-string 1 :initial-element #\Newline)))
@@ -239,7 +244,10 @@
                     (let ((n (or (cdar params) 1)))
                       (when (and (not (or colon atsign))
                                  (or (null params) (singleton-p params))
-                                 (typep n '(mod 128)))
+                                 (typep n '(mod 128))
+                                 ;; Don't insert literal tilde when parsing/
+                                 ;; unparsing to create a FMT-CONTROL instance.
+                                 (or (not (eql char #\~)) literalize-tilde))
                         (when (plusp n)
                           (let ((char (case char
                                         (#\% #\Newline)
@@ -1052,7 +1060,7 @@
 ;;;; format directives and support functions for justification
 
 (defparameter *illegal-inside-justification*
-  (mapcar (lambda (x) (parse-directive x 0))
+  (mapcar (lambda (x) (parse-directive x 0 nil))
           '("~W" "~:W" "~@W" "~:@W"
             "~_" "~:_" "~@_" "~:@_"
             "~:>" "~:@>"
@@ -1299,28 +1307,92 @@
 
 (defun extract-user-fun-name (string start end)
   ;; Searching backwards avoids finding the wrong slash in a funky string
-  ;; such as "~'//fun/" which passes #\' to FUN as a parameter.
+  ;; such as "~'/,'//fun/" which passes #\/ twice to FUN as parameters.
   (let* ((slash (or (position #\/ string :start start :end (1- end)
                               :from-end t)
                     (format-error "Malformed ~~/ directive")))
          (name (nstring-upcase (subseq string (1+ slash) (1- end))))
          (first-colon (position #\: name))
          (second-colon (if first-colon (position #\: name :start (1+ first-colon))))
+         (symbol
+          (cond ((and second-colon (= second-colon (1+ first-colon)))
+                 (subseq name (1+ second-colon)))
+                (first-colon
+                 (subseq name (1+ first-colon)))
+                (t name)))
          (package
             (if (not first-colon)
                 (load-time-value (find-package "COMMON-LISP-USER") t)
                 (let ((package-name (subseq name 0 first-colon)))
+
+                  ;; Hack the package-name into a bang package.
+                  ;; This is horrible, but it will go away soon.
+                  #+sb-xc-host
+                  (when (member symbol '("PRINT-SYMBOL-WITH-PREFIX"
+                                         "PRINT-DEPRECATION-REPLACEMENTS"
+                                         "PRINT-TYPE"
+                                         "PRINT-TYPE-SPECIFIER"
+                                         "FORMAT-MILLISECONDS"
+                                         "FORMAT-MICROSECONDS")
+                                :test #'string=)
+                    (setf (char package-name 2) #\!))
+
                   (or (find-package package-name)
                       ;; FIXME: should be PACKAGE-ERROR? Could we just
                       ;; use FIND-UNDELETED-PACKAGE-OR-LOSE?
                       (format-error "No package named ~S" package-name))))))
-    (intern (cond
-              ((and second-colon (= second-colon (1+ first-colon)))
-               (subseq name (1+ second-colon)))
-              (first-colon
-               (subseq name (1+ first-colon)))
-              (t name))
-            package)))
+    (intern symbol package)))
+
+(defun extract-user-fun-directives (string)
+  (let ((new-string (make-array (length string)
+                                :element-type 'character
+                                :fill-pointer 0))
+        (symbols))
+    (dolist (token (handler-case
+                       (combine-directives
+                        (%tokenize-control-string string 0 (length string) nil)
+                        nil)
+                     (error (e)
+                       (declare (ignore e))
+                       (return-from extract-user-fun-directives
+                         (values nil nil)))))
+      (cond ((stringp token)
+             (aver (not (find #\~ token)))
+             (let ((new-start (fill-pointer new-string)))
+               (incf (fill-pointer new-string) (length token))
+               (replace new-string token :start1 new-start)))
+            (t
+             (let* ((start (format-directive-start token))
+                    (end (format-directive-end token))
+                    (len (- end start))
+                    (new-start (fill-pointer new-string)))
+               (cond ((eql (format-directive-character token) #\/)
+                      (push (handler-case (extract-user-fun-name string start end)
+                              (error (e)
+                                (declare (ignore e))
+                                (return-from extract-user-fun-directives
+                                  (values nil nil))))
+                            symbols)
+                      ;; Don't copy past the first slash. Scan backwards for it
+                      ;; exactly as is done in EXTRACT-USER-FUN-NAME above.
+                      (setq end (1+ (position #\/ string :start start :end (1- end)
+                                                         :from-end t)))
+                      ;; compute new length to copy, +1 is for trailing slash
+                      (incf (fill-pointer new-string) (1+ (- end start)))
+                      (setf (char new-string (1- (fill-pointer new-string))) #\/))
+                     (t
+                      (incf (fill-pointer new-string) len)))
+               (replace new-string string :start1 new-start
+                                          :start2 start :end2 end)))))
+    (values (nreverse symbols)
+            (possibly-base-stringize new-string))))
+
+(sb!xc:defmacro tokens (string)
+  (declare (string string))
+  (multiple-value-bind (symbols new-string) (extract-user-fun-directives string)
+    (if symbols
+        `(load-time-value (make-fmt-control ,new-string ',symbols) t)
+        (possibly-base-stringize string))))
 
 ;;; compile-time checking for argument mismatch.  This code is
 ;;; inspired by that of Gerd Moellmann, and comes decorated with
@@ -1503,30 +1575,3 @@
 
   (sb!c:define-source-transform write-to-string (object &rest keys)
     (expand 'write-to-string object keys)))
-
-;;; Process format control strings to remove "SB!" packages.
-#+sb-xc-host
-(defun sb!impl::!xc-preprocess-format-control (string)
-  (apply #'concatenate
-         'string
-         (mapcar (lambda (piece)
-                   (if (stringp piece)
-                       ;; Unparsing a tokenized format string back to a string
-                       ;; must escape any tildes present in literal pieces.
-                       (with-output-to-string (s)
-                         (dovector (char piece)
-                           (if (char= char #\~)
-                               (write-string "~~" s)
-                               (write-char char s))))
-                       (let ((text (subseq string
-                                           (format-directive-start piece)
-                                           (format-directive-end piece))))
-                         (when (char= (format-directive-character piece) #\/)
-                           ;; FIXME: doesn't handle ~[:@]/" but this is going to be
-                           ;; fixed once and for really soon now. I'm not worried.
-                           (when (string-equal text "~/sb!" :end1 5)
-                             (setq text (concatenate 'string "~/sb-" (subseq text 5)))))
-                         text)))
-                 (tokenize-control-string string))))
-
-

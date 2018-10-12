@@ -1969,9 +1969,12 @@ bootstrapping.
 (defun generic-clobbers-function (fun-name)
   (cerror "Replace the function binding"
           'simple-program-error
-          :format-control "~@<~/sb-ext:print-symbol-with-prefix/ ~
+          ;; I'm too lazy to put automatic SB-FORMAT:TOKENS wrapping
+          ;; on CERROR arguments. It's one of a kind
+          :format-control (sb-format:tokens
+                           "~@<~/sb-ext:print-symbol-with-prefix/ ~
                            already names an ordinary function or a ~
-                           macro.~@:>"
+                           macro.~@:>")
           :format-arguments (list fun-name)))
 
 (define-load-time-global *sgf-wrapper*

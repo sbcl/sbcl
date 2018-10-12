@@ -4516,45 +4516,107 @@
 ;;; instance, ~{ ... ~} requires a list argument, so if the lvar-type
 ;;; of a corresponding argument is known and does not intersect the
 ;;; list type, a warning could be signalled.
-(defun check-format-args (node arg-n fun
+(defun check-format-args (node fun arg-n verify-arg-count
                           &aux (combination-args (basic-combination-args node)))
   ;; ARG-N is the index into COMBINATION-ARGS of a format control string,
   ;; usually 0 or 1.
-  (when (list-of-length-at-least-p combination-args (1+ arg-n))
-    (let* ((args (nthcdr arg-n combination-args))
-           (control (pop args)))
-      (when (and (constant-lvar-p control) (stringp (lvar-value control)))
-        (binding* ((string (lvar-value control))
-                   (*compiler-error-context* node)
-                   ((min max)
-                    (handler-case (sb!format:%compiler-walk-format-string
-                                   string args)
-                      (sb!format:format-error (c)
-                        (compiler-warn "~A" c)))
-                    :exit-if-null)
-                   (nargs (length args)))
-         (cond
-          ((< nargs min)
-           (warn 'format-too-few-args-warning
-                 :format-control
-                 "Too few arguments (~D) to ~S ~S: requires at least ~D."
-                 :format-arguments (list nargs fun string min)))
-          ((> nargs max)
-           (warn 'format-too-many-args-warning
-                 :format-control
-                 "Too many arguments (~D) to ~S ~S: uses at most ~D."
-                 :format-arguments (list nargs fun string max)))))))))
+  (flet ((maybe-replace (control)
+           (binding* ((string (lvar-value control))
+                      ((symbols new-string)
+                       (sb!format::extract-user-fun-directives string)))
+             (when (or symbols (and new-string (string/= string new-string)))
+               (change-ref-leaf
+                (lvar-use control)
+                (find-constant
+                 (cond ((not symbols) new-string)
+                       ((fasl-output-p *compile-object*)
+                        (sb!format::make-fmt-control-proxy new-string symbols))
+                       #-sb-xc-host ; no such object as a FMT-CONTROL
+                       (t
+                        (sb!format::make-fmt-control new-string symbols)))))))))
+    (when (list-of-length-at-least-p combination-args (1+ arg-n))
+      (let* ((args (nthcdr arg-n combination-args))
+             (control (pop args)))
+        (when (and (constant-lvar-p control) (stringp (lvar-value control)))
+          (when verify-arg-count
+            (binding* ((string (lvar-value control))
+                       (*compiler-error-context* node)
+                       ((min max)
+                        (handler-case (sb!format:%compiler-walk-format-string
+                                       string args)
+                          (sb!format:format-error (c)
+                            (compiler-warn "~A" c)))
+                        :exit-if-null)
+                       (nargs (length args)))
+             (cond
+              ((< nargs min)
+               (warn 'format-too-few-args-warning
+                     :format-control
+                     "Too few arguments (~D) to ~S ~S: requires at least ~D."
+                     :format-arguments (list nargs fun string min)))
+              ((> nargs max)
+               (warn 'format-too-many-args-warning
+                     :format-control
+                     "Too many arguments (~D) to ~S ~S: uses at most ~D."
+                     :format-arguments (list nargs fun string max))))))
+          ;; Now possibly replace the control string
+          (maybe-replace control)
+          (return-from check-format-args)))
+      ;; Look for a :FORMAT-CONTROL and possibly replace that. Always do that
+      ;; when cross-compiling, but in the target, cautiously skip this step
+      ;; if the first argument is not known to be a symbol. Why?
+      ;; Well if the first argument is a string (or function), then that object
+      ;; is *arbitrary* format-control, and the arguments that follow it do not
+      ;; necessarily comprise a keyword/value pair list as they would for
+      ;; constructing a condition instance. Moreover, in that case you could
+      ;; randomly have a symbol named :FORMAT-CONTROL as an argument, randomly
+      ;; followed by a string that is not actually a format-control!
+      ;; But when the first argument is a symbol, then the following arguments
+      ;; must be a plist passed to MAKE-CONDITION. [See COERCE-TO-CONDITION]
+      ;;
+      ;; In this cross-compiler, this processing is not only always right, but
+      ;; in fact mandatory, to make our format strings agnostic of package names.
+      (when (and (member fun '(error warn style-warn
+                               compiler-warn compiler-style-warn))
+                 ;; Hmm, should we additionally require that this symbol be
+                 ;; known to designate a subtype of SIMPLE-CONDITION? Perhaps.
+                 #-sb-xc-host
+                 (csubtypep (lvar-type (car combination-args))
+                            (specifier-type 'symbol)))
+        (let ((keywords (cdr combination-args)))
+          (loop
+            (unless (and keywords (constant-lvar-p (car keywords))) (return))
+            (when (eq (lvar-value (car keywords)) :format-control)
+              (let ((control (cadr keywords)))
+                (when (and (constant-lvar-p control) (stringp (lvar-value control)))
+                  (maybe-replace control)))
+              (return))
+            (setq keywords (cddr keywords))))))))
 
-;;; FORMAT control string best-effort sanity checker
-(dolist (fun (append '(format error warn)
+;;; FORMAT control string best-effort sanity checker and compactor
+(dolist (fun (append '(format error warn style-warn)
                      #+sb-xc-host ; No need for these after self-build
-                     '(bug style-warn compiler-mumble compiler-notify
+                     '(bug compiler-mumble compiler-notify
                        compiler-style-warn compiler-warn compiler-error
                        maybe-compiler-notify
                        note-lossage note-unwinnage)))
   (setf (fun-info-optimizer (fun-info-or-lose fun))
-        (let ((n (if (eq fun 'format) 1 0)))
-          (lambda (node) (check-format-args node n fun)))))
+        (let ((arg-n (if (eq fun 'format) 1 0))
+              ;; in some Lisps, DOLIST uses SETQ instead of LET on the iteration
+              ;; variable, so the closures would all share one binding of FUN,
+              ;; which is not as intended. An extra LET solves that.
+              (fun fun))
+          (lambda (node) (check-format-args node fun arg-n t)))))
+
+;; Can these appear in the expansion of FORMATTER?
+#+sb-xc-host
+(dolist (fun '(sb!format::format-error
+               sb!format::format-error-at
+               sb!format::format-error-at*))
+  (setf (fun-info-optimizer (fun-info-or-lose fun))
+        (let ((arg-n (if (eq fun 'sb!format::format-error) 0 2))
+              (fun fun))
+          (lambda (node) (check-format-args node fun arg-n nil)))))
 
 (defoptimizer (format derive-type) ((dest control &rest args))
   (declare (ignore control args))

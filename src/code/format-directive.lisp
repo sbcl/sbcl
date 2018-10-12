@@ -57,17 +57,24 @@
   (string (missing-arg) :type simple-string :read-only t)
   (start (missing-arg) :type (and unsigned-byte fixnum) :read-only t)
   (end (missing-arg) :type (and unsigned-byte fixnum) :read-only t)
+  ;; CHARACTER, COLONP, ATSIGNP could be packed into one integer
   (character (missing-arg) :type character :read-only t)
+  ;; for early binding to the function in "~/pkg:fun/" directives
+  (function nil :type symbol :read-only t)
   (colonp nil :type (member t nil) :read-only t)
   (atsignp nil :type (member t nil) :read-only t)
   (params nil :type list :read-only t))
 (declaim (freeze-type format-directive))
 (defmethod print-object ((x format-directive) stream)
   (print-unreadable-object (x stream)
-    (write-string (format-directive-string x)
-                  stream
-                  :start (format-directive-start x)
-                  :end (format-directive-end x))))
+    (let ((fun (format-directive-function x)))
+      (write-string (format-directive-string x)
+                    stream
+                    :start (format-directive-start x)
+                    :end (- (format-directive-end x) (if fun 1 0)))
+      (when fun
+        (print-symbol-with-prefix stream fun)
+        (write-char #\/ stream)))))
 
 (defun check-modifier (modifier-name value)
   (when value
@@ -75,3 +82,15 @@
       (format-error "The ~{~A~^ and the ~} modifier~P cannot be used ~
                      ~:*~[~;~;simultaneously ~]with this directive."
                     modifiers (length modifiers)))))
+
+;;; FMT-CONTROL is a structure with a nonstandard metaclass.
+;;; The compile-time representation of that object is an ordinary defstruct
+;;; which of course works on any cross-compiler host.
+(def!struct (fmt-control-proxy (:constructor make-fmt-control-proxy
+                                   (string symbols)))
+  string symbols)
+(!set-load-form-method fmt-control-proxy (:xc :target)
+  (lambda (self env)
+    (declare (ignore env))
+    `(make-fmt-control ,(fmt-control-proxy-string self)
+                       ',(fmt-control-proxy-symbols self))))

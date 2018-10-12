@@ -71,12 +71,47 @@
     (setf (sb-c::vop-parse-body v) nil))
   result)
 
+;;; Check for potentially bad format-control strings
+(defun !scan-format-control-strings ()
+  (labels ((possibly-ungood-package-reference (string)
+             ;; We want to see nothing SB-package-like at all
+             (or (search "sb-" string :test #'char-equal)
+                 (search "sb!" string :test #'char-equal)))
+           (possibly-format-control (string)
+             (when (find #\~ string)
+               ;; very likely to be a format control if it parses OK.
+               ;; Possibly not, but false positives are acceptable.
+               (when (some (lambda (x)
+                             (and (typep x 'sb-format::format-directive)
+                                  (eql (sb-format::format-directive-character x) #\/)
+                                  (possibly-ungood-package-reference
+                                   (subseq string
+                                           (sb-format::format-directive-start x)
+                                           (sb-format::format-directive-end x)))))
+                           (ignore-errors
+                            (sb-format::%tokenize-control-string
+                             string 0 (length string) nil)))
+                 (format t "Found string ~S~%" string)
+                 t))))
+    (let ((n 0))
+      (sb-vm:map-allocated-objects
+       (lambda (obj type size)
+         (declare(ignore type size))
+         (when (and (stringp obj) (possibly-format-control obj))
+           (incf n)))
+       :all)
+      (when (plusp n)
+        (warn "Potential problem with format-control strings.
+Please check that all strings which were not recognizable to the compiler
+(as the first argument to WARN, etc) are wrapped in SB-FORMAT:TOKENS")))))
+
 (progn
   (defvar *compile-files-p* nil)
   "about to LOAD warm.lisp (with *compile-files-p* = NIL)")
 
 (progn
   (load (merge-pathnames "src/cold/warm.lisp" *load-pathname*))
+  (!scan-format-control-strings)
 
   ;;; Remove docstrings that snuck in, as will happen with
   ;;; any file compiled in warm load.

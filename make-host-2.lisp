@@ -43,6 +43,7 @@
              ~:[~;functions (incomplete SB-COLD::*UNDEFINED-FUN-WHITELIST*?)~]"
             variables types functions)))
 
+#-clisp ; DO-ALL-SYMBOLS seems to kill CLISP at random
 (do-all-symbols (s)
   (when (and (sb!int:info :function :inlinep s)
              (eq (sb!int:info :function :where-from s) :assumed))

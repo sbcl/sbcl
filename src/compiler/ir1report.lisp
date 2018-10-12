@@ -725,14 +725,16 @@ and defining the function before its first potential use.~@:>"
        'inlining-dependency-failure
        :format-control
        (if (info :function :assumed-type name)
-           "~@<Call to ~/sb!ext:print-symbol-with-prefix/ could not be inlined because no definition ~
-for it was seen prior to its first use.~:@>"
+           (sb!format:tokens "~@<Call to ~/sb!ext:print-symbol-with-prefix/ ~
+                              could not be inlined because no definition !
+                              for it was seen prior to its first use.~:@>")
          ;; This message sort of implies that source form is the
          ;; only reasonable representation in which an inline definition
          ;; could have been saved, which isn't in general true - it could
          ;; be saved as a parsed AST - but I don't really know how else to
          ;; phrase this. And it happens to be true in SBCL, so it's not wrong.
-           "~@<Call to ~/sb!ext:print-symbol-with-prefix/ could not be inlined because its source code ~
-was not saved. A global INLINE or SB-EXT:MAYBE-INLINE proclamation must be ~
-in effect to save function definitions for inlining.~:@>")
+           (sb!format:tokens "~@<Call to ~/sb!ext:print-symbol-with-prefix/ could ~
+not be inlined because its source code was not saved. A global INLINE ~
+or SB-EXT:MAYBE-INLINE proclamation must be ~
+in effect to save function definitions for inlining.~:@>"))
        :format-arguments (list name)))))

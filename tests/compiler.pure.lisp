@@ -4762,8 +4762,9 @@
     (assert warnings)
     (assert (notany (lambda (condition)
                       (search "Constant "
-                              (simple-condition-format-control
-                               condition)))
+                              (sb-format::unparse-fmt-control
+                               (simple-condition-format-control
+                                condition))))
                     warnings))))
 
 (with-test (:name (compile :multiple-use-lvar-interpreted-as-NIL catch))

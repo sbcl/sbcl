@@ -246,3 +246,5 @@
 (defun eval-tlf (form index &optional lexenv)
   (declare (ignore index lexenv))
   (eval form))
+
+(defmacro sb!format:tokens (string) string)

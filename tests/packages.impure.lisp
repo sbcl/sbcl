@@ -671,11 +671,14 @@ if a restart was invoked."
 ;; WITH-PACKAGE-ITERATOR isn't well-exercised by tests (though LOOP uses it)
 ;; so here's a basic correctness test with some complications involving
 ;; shadowing symbols.
-(make-package "P1" :use '("SB-FORMAT"))
+(make-package "FOOFORMAT" :use '("CL"))
+(export 'fooformat::format-error 'fooformat)
+(export 'fooformat::%compiler-walk-format-string 'fooformat)
+(make-package "P1" :use '("FOOFORMAT"))
 (make-package "P2")
 (export 'p1::foo 'p1)
 (shadow "FORMAT-ERROR" 'p1)
-(make-package "A" :use '("SB-FORMAT" "P1" "P2"))
+(make-package "A" :use '("FOOFORMAT" "P1" "P2"))
 (shadow '("PROG2" "FOO") 'a)
 (intern "BLAH" "P2")
 (export 'p2::(foo bar baz) 'p2)
@@ -694,12 +697,12 @@ if a restart was invoked."
            (a:goodfun :external "A")
            (p2:bar :inherited "A")
            (p2:baz :inherited "A")
-           (sb-format:%compiler-walk-format-string :inherited "A")
-           (sb-format:format-error :inherited "A")
+           (fooformat:%compiler-walk-format-string :inherited "A")
+           (fooformat:format-error :inherited "A")
            ;; ... P1
            (p1:foo :external "P1")
            (p1::format-error :internal "P1")
-           (sb-format:%compiler-walk-format-string :inherited "P1")
+           (fooformat:%compiler-walk-format-string :inherited "P1")
            ;; ... P2
            (p2::blah :internal "P2")
            (p2:foo :external "P2")

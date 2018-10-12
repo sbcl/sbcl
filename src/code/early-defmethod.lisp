@@ -79,7 +79,9 @@
                 :test (lambda (arg method &aux (guard (car method)))
                         (and (or (functionp guard) (fboundp guard))
                              (funcall guard arg))))))
-    (assert applicable-method)
+    (unless applicable-method
+      (error "No applicable method for ~S on ~S~%" gf-name
+             (type-of specialized-arg)))
     ;; The "method" is a list: (GUARD LAMBDA . OTHER-STUFF)
     ;; Call using no permutation-vector / no precomputed next method.
     (apply (cadr applicable-method) nil nil specialized-arg rest)))

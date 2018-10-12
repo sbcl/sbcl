@@ -109,6 +109,7 @@
                   sb!pcl::%method-function
                   sb!pcl::standard-instance sb!pcl::standard-funcallable-instance
                   funcallable-instance generic-function
+                  sb!format::fmt-control
                   #!+sb-eval sb!eval:interpreted-function
                   #!+sb-fasteval sb!interpreter:interpreted-function
                   weak-pointer simd-pack))
