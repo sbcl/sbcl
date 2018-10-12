@@ -1,7 +1,6 @@
 ;;;; Compile the fundamental system sources (not CLOS, and possibly
 ;;;; not some other warm-load-only stuff like DESCRIBE) to produce
-;;;; object files. Also set *TARGET-OBJECT-FILES* to all of their
-;;;; names.
+;;;; object files.
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -212,12 +211,9 @@
             sb!impl::unencapsulate-generic-function)))
   (setf (gethash sym sb!c::*undefined-fun-whitelist*) t))
 
-(defvar *target-object-file-names*)
-
 #+#.(cl:if (cl:find-package "SB-POSIX") '(and) '(or))
 (defun parallel-make-host-2 (max-jobs)
-  (let ((reversed-target-object-file-names nil)
-        (subprocess-count 0)
+  (let ((subprocess-count 0)
         (subprocess-list nil))
     (flet ((wait ()
              (multiple-value-bind (pid status) (sb-posix:wait)
@@ -238,22 +234,13 @@
           ;; Cause the compile-time effects from this file
           ;; to appear in subsequently forked children.
           (let ((*compile-for-effect-only* t))
-            (target-compile-stem stem flags))
-          (unless (find :not-genesis flags)
-            (push (stem-object-path stem flags :target-compile)
-                  reversed-target-object-file-names))))
+            (target-compile-stem stem flags))))
       (loop (if (plusp subprocess-count) (wait) (return)))
-      (nreverse reversed-target-object-file-names))))
+      (values))))
 
 ;;; Actually compile
-(setf *target-object-file-names*
-      (if (make-host-2-parallelism)
-          (parallel-make-host-2 (make-host-2-parallelism))
-          (let ((reversed-target-object-file-names nil))
-            (do-stems-and-flags (stem flags)
-              (unless (position :not-target flags)
-                (let ((filename (target-compile-stem stem flags)))
-                  (unless (position :not-genesis flags)
-                    (push filename reversed-target-object-file-names)))
-                #!+sb-show (warn-when-cl-snapshot-diff *cl-snapshot*)))
-            (nreverse reversed-target-object-file-names))))
+(if (make-host-2-parallelism)
+    (parallel-make-host-2 (make-host-2-parallelism))
+    (do-stems-and-flags (stem flags)
+      (unless (position :not-target flags)
+        (target-compile-stem stem flags))))

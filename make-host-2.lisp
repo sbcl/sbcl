@@ -133,12 +133,6 @@ Sample output
     10416      9492 ( 91.1%)      668 (  6.4%)  256  100.0% TYPE-NEGATION-CACHE
 |#
 
-;;; miscellaneous tidying up and saving results
-(let ((filename "output/object-filenames-for-genesis.lisp-expr"))
-  (ensure-directories-exist filename :verbose t)
-  (with-open-file (s filename :direction :output :if-exists :supersede)
-    (write *target-object-file-names* :stream s :readably t)))
-
 ;;; Let's check that the type system was reasonably sane. (It's easy
 ;;; to spend a long time wandering around confused trying to debug
 ;;; cold init if it wasn't.)
