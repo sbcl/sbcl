@@ -202,6 +202,9 @@
           stored-hash))))
 
 (defun std-instance-hash (instance)
+  ;; Apparently we care that the object is of primitive type INSTANCE, but not
+  ;; whether it is STANDARD-INSTANCE. It had better be, or we're in trouble.
+  (declare (instance instance))
   #!+(and compact-instance-header x86-64)
   ;; The one logical slot (excluding layout) in the primitive object is index 0.
   ;; That holds a vector of the clos slots, and its header holds the hash.
@@ -212,23 +215,29 @@
     ;; (There are only 32 bits of actual randomness, if even that)
     (logxor (ash hash (- sb!vm:n-positive-fixnum-bits 32)) hash))
   #!-(and compact-instance-header x86-64)
-  (let ((hash (%instance-ref instance sb!pcl::std-instance-hash-slot-index)))
-    (if (not (eql hash 0))
-        hash
-        (let ((new (new-instance-hash-code)))
+  (locally
+   (declare (optimize (sb!c::type-check 0)))
+   (let ((hash (sb!pcl::standard-instance-hash-code instance)))
+     (if (not (eql hash 0))
+         hash
+         (let ((new (new-instance-hash-code)))
           ;; At most one thread will compute a random hash.
-          ;; %INSTANCE-CAS is a full call if there is no vop for it.
-          (let ((old (%instance-cas instance sb!pcl::std-instance-hash-slot-index
-                                    0 new)))
-            (if (eql old 0) new old))))))
+          (let ((old (cas (sb!pcl::standard-instance-hash-code instance) 0 new)))
+            (if (eql old 0) new old)))))))
 
 ;; These are also random numbers, but not lazily computed.
 (declaim (inline fsc-instance-hash))
 (defun fsc-instance-hash (fin)
-  #!+compact-instance-header
-  (sb!vm::get-header-data-high (%funcallable-instance-info fin 0))
-  #!-compact-instance-header
-  (%funcallable-instance-info fin sb!pcl::fsc-instance-hash-slot-index))
+  ;; As above, we care that the object is of primitive type FUNCTION, but not
+  ;; whether it is STANDARD-FUNCALLABLE-INSTANCE. Let's assume it is.
+  (declare (function fin))
+  (locally
+   (declare (optimize (sb!c::type-check 0)))
+   #!+compact-instance-header
+   (sb!vm::get-header-data-high
+    (sb!pcl::standard-funcallable-instance-clos-slots fin))
+   #!-compact-instance-header
+   (sb!pcl::standard-funcallable-instance-hash-code fin)))
 
 (defun sxhash (x)
   ;; profiling SXHASH is hard, but we might as well try to make it go

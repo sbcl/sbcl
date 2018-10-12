@@ -29,13 +29,13 @@
 ;; the root cause of slow instance creation. But that was fixed,
 ;; and we really don't care per se that hashing is lazy.
 #-compact-instance-header ; can't create symbols in SB-PCL
-(with-test (:name :instance-hash-starts-as-0)
+(with-test (:name :instance-hash-starts-as-zero :fails-on :interpreter)
   ;; These first two tests look the same but they aren't:
   ;; the second one uses a CTOR function.
-  (assert (zerop (sb-kernel:%instance-ref (make-instance 'no-slots)
-                                          sb-pcl::std-instance-hash-slot-index)))
-  (assert (zerop (sb-kernel:%instance-ref (make-no-slots)
-                                          sb-pcl::std-instance-hash-slot-index)))
+  (locally
+      (declare (optimize (sb-c::type-check 0))) ; Same as STD-INSTANCE-HASH
+    (assert (zerop (sb-pcl::standard-instance-hash-code (make-instance 'no-slots))))
+    (assert (zerop (sb-pcl::standard-instance-hash-code (make-no-slots)))))
   (assert (not (zerop (sxhash (make-no-slots))))))
 
 (defmethod update-instance-for-redefined-class
