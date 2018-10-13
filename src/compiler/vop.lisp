@@ -78,7 +78,7 @@
                         for ,location
                         from ,start below ,end by ,increment
                         when (logbitp ,location ,locations)
-                        do (locally (declare (sb!vm:finite-sc-offset
+                        do (locally (declare (type sb!vm:finite-sc-offset
                                               ,location))
                              ,@body)))
                (make-guarded-block (start end)

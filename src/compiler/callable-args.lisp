@@ -342,9 +342,9 @@
                    while (plusp (decf n)))))
       (pick (fun-type-required type))
       (pick (fun-type-optional type))
-      (loop repeat n
-            with rest = (or (fun-type-rest type)
+      (loop with rest = (or (fun-type-rest type)
                             *universal-type*)
+            repeat n
             do (push rest result)))
     (nreverse result)))
 

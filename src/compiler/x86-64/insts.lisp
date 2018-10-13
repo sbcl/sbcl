@@ -1194,7 +1194,7 @@
 ;;; This is called during operand lowering, and also for emitting an EA
 ;;; since the EA BASE and INDEX slots reference TNs, not REGs.
 (defun tn-reg (tn)
-  (declare (tn tn))
+  (declare (type tn tn))
   (aver (eq (sb-name (sc-sb (tn-sc tn))) 'registers))
   (get-gpr (sc-operand-size (tn-sc tn)) (tn-offset tn)))
 

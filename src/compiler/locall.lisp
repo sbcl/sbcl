@@ -565,9 +565,9 @@
                      arg
                      (make-short-values-type
                       (and vars
-                       (loop repeat (nth-value 1 (values-types
+                       (loop for var in vars
+                             repeat (nth-value 1 (values-types
                                                   (lvar-derived-type arg)))
-                             for var in vars
                              collect (leaf-type var))))
                      (lexenv-policy (node-lexenv call)))))))))
   (values))

@@ -1245,7 +1245,7 @@ constant shift greater than word length")))
                 (values temp-reg-tn y))))))
 
 (defun immediate-operand-smallest-nbits (x)
-  (declare (word x))
+  (declare (type word x))
   (typecase x
     ((unsigned-byte  8)  8)
     ((unsigned-byte 16) 16)

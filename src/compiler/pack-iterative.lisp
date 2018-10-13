@@ -574,7 +574,7 @@
 (defun iterate-color (vertices component)
   (let ((graph (make-interference-graph vertices component))
         (spilled 0))
-    (declare (index spilled))
+    (declare (type index spilled))
     (labels ((spill-candidates-p (vertex)
                (unless (vertex-color vertex)
                  (aver (eq (vertex-pack-type vertex) :normal))
@@ -587,8 +587,8 @@
                (incf spilled)
                (setf graph (reset-interference-graph-without-vertex
                             graph vertex))))
-      (loop repeat *pack-iterations*
-            for uncolored = (try-color)
+      (loop for uncolored = (try-color)
+            repeat *pack-iterations*
             while uncolored
             do (spill uncolored)))
     (let ((colored (ig-vertices graph)))

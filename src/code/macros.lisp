@@ -203,8 +203,6 @@ invoked. In that case it will store into PLACE and start over."
 
 ;;;; CASE, TYPECASE, and friends
 
-(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-
 ;;; Make this a full warning during SBCL build.
 (define-condition duplicate-case-key-warning (#-sb-xc-host style-warning #+sb-xc-host warning)
   ((key :initarg :key
@@ -235,6 +233,7 @@ invoked. In that case it will store into PLACE and start over."
 ;;; of the ordinary clauses. When PROCEEDP, it is an error to
 ;;; omit ERRORP, and the ERROR form generated is executed within a
 ;;; RESTART-CASE allowing KEYFORM to be set and retested.
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 (defun case-body (name keyform cases multi-p test errorp proceedp needcasesp)
   (unless (or cases (not needcasesp))
     (warn "no clauses in ~S" name))
