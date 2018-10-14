@@ -205,8 +205,7 @@
                                            2 ; ASSIGNED-SLOTS and HASH
                                            (length initargs))))) ; rest
           (setf (%instance-layout instance) (classoid-layout classoid)
-                (condition-assigned-slots instance) nil
-                (condition-hash instance) (sb!impl::new-instance-hash-code))
+                (condition-assigned-slots instance) nil)
           (do-rest-arg ((val index) initargs)
             (setf (%instance-ref instance (+ sb!vm:instance-data-start index 2)) val))
           (values instance classoid))

@@ -189,6 +189,15 @@
        ;; Make sure we never return 0 (almost no chance of that anyway).
        (return answer)))))
 
+(declaim (inline !condition-hash))
+(defun !condition-hash (instance)
+  (let ((hash (sb!kernel::condition-hash instance)))
+    (if (not (eql hash 0))
+        hash
+        (let ((new (new-instance-hash-code)))
+          ;; At most one thread will compute a random hash.
+          (let ((old (cas (sb!kernel::condition-hash instance) 0 new)))
+            (if (eql old 0) new old))))))
 
 #!+(and compact-instance-header x86-64)
 (progn
@@ -326,7 +335,7 @@
                            (sxhash      ; through DEFTRANSFORM
                             (classoid-name
                              (layout-classoid (%instance-layout x))))))
-                  (condition (sb!kernel::condition-hash x))
+                  (condition (!condition-hash x))
                   (t (std-instance-hash x))))
                (symbol (sxhash x))      ; through DEFTRANSFORM
                (array
