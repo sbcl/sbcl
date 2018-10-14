@@ -72,12 +72,10 @@
                 (output
                   (compile-file-pathname stem
                    :output-file
-                   ;; Specifying the directory name for :OUTPUT-FILE is enough.
-                   ;; It does the right thing. (Does it work on Windows? I hope so)
-                   (concatenate
+                   (merge-pathnames
+                    (concatenate
                      'string sb-fasl::*!target-obj-prefix*
-                     ;; OR: (namestring (make-pathname :directory (pathname-directory stem)))
-                     (subseq stem 0 (1+ (position #\/ stem :from-end t)))))))
+                     (subseq stem 0 (1+ (position #\/ stem :from-end t))))))))
            (flet ((report-recompile-restart (stream)
                     (format stream "Recompile file ~S" stem))
                   (report-continue-restart (stream)
