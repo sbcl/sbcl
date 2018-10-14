@@ -438,12 +438,13 @@ static boolean root_p(lispobj ptr, int criterion)
 }
 
 /// Find any shortest path to 'object' starting at a tenured object or a thread stack.
-static void trace1(lispobj object,
-                   struct hopscotch_table* targets,
-                   struct hopscotch_table* visited,
-                   struct hopscotch_table* inverted_heap,
-                   struct scratchpad* scratchpad,
-                   int n_pins, lispobj* pins, void (*context_scanner)(),
+/// Return 1 if a path was found, 0 if not.
+static int trace1(lispobj object,
+                  struct hopscotch_table* targets,
+                  struct hopscotch_table* visited,
+                  struct hopscotch_table* inverted_heap,
+                  struct scratchpad* scratchpad,
+                  int n_pins, lispobj* pins, void (*context_scanner)(),
                    int criterion)
 {
     struct node* anchor = 0;
@@ -518,7 +519,7 @@ static void trace1(lispobj object,
                 fprintf(stderr, "%p ", (void*)target);
             putc('\n', stderr);
             free_graph(top_layer);
-            return;
+            return 0;
         }
         if (heap_trace_verbose>1)
             printf("Found %d object(s)\n", top_layer->count);
@@ -635,6 +636,7 @@ static void trace1(lispobj object,
     }
     fprintf(file, "#x%"OBJ_FMTX".\n", target);
     fflush(file);
+    return 1;
 }
 
 static void record_ptr(lispobj* source, lispobj target,
@@ -828,9 +830,9 @@ static void compute_heap_inverse(struct hopscotch_table* inverted_heap,
 /* Find any shortest path from a thread or tenured object
  * to each of the specified objects.
  */
-static void trace_paths(void (*context_scanner)(),
-                        lispobj weak_pointers, int n_pins, lispobj* pins,
-                        int criterion)
+static int trace_paths(void (*context_scanner)(),
+                       lispobj weak_pointers, int n_pins, lispobj* pins,
+                       int criterion)
 {
     int i;
     struct hopscotch_table inverted_heap;
@@ -839,6 +841,7 @@ static void trace_paths(void (*context_scanner)(),
     struct hopscotch_table visited;  // *Without* lowtag
     // A hashset of objects in the current graph layer
     struct hopscotch_table targets;  // With lowtag
+    int n_found = 0; // how many objects had paths to them
 
     if (heap_trace_verbose) {
         fprintf(stderr, "%d pins:\n", n_pins);
@@ -858,21 +861,24 @@ static void trace_paths(void (*context_scanner)(),
                 fprintf(stderr, "Target=%p (%s)\n", (void*)value, classify_obj(value));
             hopscotch_reset(&visited);
             hopscotch_reset(&targets);
-            trace1(value, &targets, &visited,
-                   &inverted_heap, &scratchpad,
-                   n_pins, pins, context_scanner, criterion);
+            n_found += trace1(value, &targets, &visited,
+                              &inverted_heap, &scratchpad,
+                              n_pins, pins, context_scanner, criterion);
         }
     } while (weak_pointers != NIL);
     os_invalidate(scratchpad.base, scratchpad.end-scratchpad.base);
     hopscotch_destroy(&inverted_heap);
     hopscotch_destroy(&visited);
     hopscotch_destroy(&targets);
+    return n_found;
 }
 
-void gc_prove_liveness(void(*context_scanner)(),
-                       lispobj objects,
-                       int n_pins, uword_t* pins,
-                       int criterion)
+/// Return number of sought objects that had paths to them.
+/// Return -1 for invalid input.
+int gc_prove_liveness(void(*context_scanner)(),
+                      lispobj objects,
+                      int n_pins, uword_t* pins,
+                      int criterion)
 {
     int n_watched = 0, n_live = 0, n_bad = 0;
     lispobj list;
@@ -888,12 +894,12 @@ void gc_prove_liveness(void(*context_scanner)(),
     }
     if (!listp(list) || n_bad) {
         fprintf(stderr, "; Bad value in liveness tracker\n");
-        return;
+        return -1;
     }
     fprintf(stderr, "; Liveness tracking: %d/%d live watched objects\n",
             n_live, n_watched);
     if (!n_live)
-        return;
+        return 0;
     // Put back lowtags on pinned objects, since wipe_nonpinned_words() removed
     // them. But first test whether lowtags were already repaired
     // in case prove_liveness() is called after gc_prove_liveness().
@@ -903,17 +909,17 @@ void gc_prove_liveness(void(*context_scanner)(),
             pins[i] = compute_lispobj((lispobj*)pins[i]);
         }
     }
-    trace_paths(context_scanner, objects, n_pins, (lispobj*)pins, criterion);
+    return trace_paths(context_scanner, objects, n_pins, (lispobj*)pins, criterion);
 }
 
 /* This should be called inside WITHOUT-GCING so that the set
  * of pins does not change out from underneath.
  */
-void prove_liveness(lispobj objects, int criterion)
+int prove_liveness(lispobj objects, int criterion)
 {
     extern struct hopscotch_table pinned_objects;
     extern int gc_n_stack_pins;
-    gc_prove_liveness(0, objects, gc_n_stack_pins, pinned_objects.keys, criterion);
+    return gc_prove_liveness(0, objects, gc_n_stack_pins, pinned_objects.keys, criterion);
 }
 
 // These are slot offsets in (DEFSTRUCT THREAD),

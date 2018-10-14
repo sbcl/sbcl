@@ -41,6 +41,6 @@
 (defun search-roots (wps &optional (criterion :oldest))
   (let ((list (ensure-list wps)))
     (sb-sys:without-gcing
-      (alien-funcall (extern-alien "prove_liveness" (function void unsigned int))
+      (alien-funcall (extern-alien "prove_liveness" (function int unsigned int))
                      (sb-kernel:get-lisp-obj-address list)
                      (criterion-value criterion))))))

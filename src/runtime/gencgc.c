@@ -1740,7 +1740,7 @@ wipe_nonpinned_words()
     // Order by ascending address, stopping short of the sentinel.
     gc_heapsort_uwords(pinned_objects.keys, n_pins);
 #if 0
-    fprintf(stderr, "Sorted pin list:\n");
+    fprintf(stderr, "Sorted pin list (%d):\n", n_pins);
     for (i = 0; i < n_pins; ++i) {
       lispobj* obj = (lispobj*)pinned_objects.keys[i];
       lispobj word = *obj;
@@ -3020,6 +3020,8 @@ garbage_collect_generation(generation_index_t generation, int raise)
 
 #ifdef PIN_GRANULARITY_LISPOBJ
     hopscotch_reset(&pinned_objects);
+    // for traceroot, which reads n_stack_pins from the previous GC cycle
+    gc_n_stack_pins = 0;;
 #endif
 
     /* Set the global src and dest. generations */

@@ -1169,7 +1169,7 @@ and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
     (cond ((eq form eof-marker)
            ;; So that the REPL starts on a new line, because the
            ;; debugger is using *DEBUG-IO* and the REPL STDIN/STDOUT.
-           (fresh-line stream) 
+           (fresh-line stream)
            (invoke-restart eof-restart))
           (t
            form))))
