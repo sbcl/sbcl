@@ -4,6 +4,8 @@ changes relative to sbcl-1.4.12:
   * minor incompatible change: PRINT-TYPE and PRINT-TYPE-SPECIFIER are not
     exported from SB-EXT. These were never announced, so this change would
     only affects users who discovered these undocumented functions.
+  * enhancement: SB-EXT:SEARCH-ROOTS and SB-EXT:GC-AND-SEARCH-ROOTS
+    are supported on all backends that use gencgc.
 
 changes in sbcl-1.4.12 relative to sbcl-1.4.11:
   * minor incompatible change: a number of platform-specific elements of

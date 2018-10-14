@@ -9,6 +9,10 @@
 
 (in-package "SB-EXT")
 
+;;; Not loaded until warm build. package-data-list only affects symbols
+;;; that are visible to genesis.
+(export '(search-roots gc-and-search-roots))
+
 (define-alien-variable  "gc_object_watcher" unsigned)
 (define-alien-variable  "gc_traceroot_criterion" int)
 

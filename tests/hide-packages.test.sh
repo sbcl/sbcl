@@ -31,7 +31,6 @@ run_sbcl <<EOF
    (dolist (package (list-all-packages))
      (let ((name (package-name package)))
        (unless (or (string= name "COMMON-LISP")
-                   (string= name "SB-EVAL")
                    (string= name "KEYWORD"))
          (push (make-weak-pointer name) *weak-ptrs*)
          (rename-package name (concatenate 'string "HIDDEN-" name))))))

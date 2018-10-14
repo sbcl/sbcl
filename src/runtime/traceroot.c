@@ -515,8 +515,13 @@ static int trace1(lispobj object,
         }
         if (!top_layer->count) {
             fprintf(stderr, "Failure tracing from %p. Current targets:\n", (void*)object);
-            for_each_hopscotch_key(i, target, (*targets))
-                fprintf(stderr, "%p ", (void*)target);
+            for_each_hopscotch_key(i, target, (*targets)) {
+                fprintf(stderr, "%p", (void*)target);
+                fprintf(stderr, "(g%d,", traceroot_gen_of(target));
+                fputs(classify_obj(target), stderr);
+                maybe_show_object_name(target, stderr);
+                fprintf(stderr,") ");
+            }
             putc('\n', stderr);
             free_graph(top_layer);
             return 0;

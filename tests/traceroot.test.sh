@@ -37,17 +37,17 @@ run_sbcl <<EOF >$tmpfilename
     (ecase root
       (:tls
        (scrubstack)
-       (sb-ext::gc-and-search-roots wp))
+       (sb-ext:gc-and-search-roots wp))
       (:bindings ; bind *FRED* again so the old value is on the binding stack
        (let ((*fred* 1))
          (scrubstack)
-         (sb-ext::gc-and-search-roots wp)))
+         (sb-ext:gc-and-search-roots wp)))
       (:stack
        ; put the OBJ back on the control stack
        ; and also ensure that *FRED* is not a root.
        (setq obj *fred* *fred* nil)
        (scrubstack)
-       (sb-ext::gc-and-search-roots wp)))))
+       (sb-ext:gc-and-search-roots wp)))))
 
 (let ((wp (make-weak-pointer (list 1 2 3 4))))
   (test1 wp (weak-pointer-value wp) :stack)
@@ -58,7 +58,7 @@ run_sbcl <<EOF >$tmpfilename
 (defun f0 ()
   (let* ((c (cons 1 2))
          (wp (make-weak-pointer c)))
-    (sb-ext::gc-and-search-roots wp :static)
+    (sb-ext:gc-and-search-roots wp :static)
     c))
 (f0)
 EOF
