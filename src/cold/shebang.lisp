@@ -35,7 +35,7 @@
 ;;; but a convenient one, because sb!xc:*features* needs to have been
 ;;; DEFVARed, and because 'chill' loads this and only this file.
 (defun backend-asm-package-name ()
-  (concatenate 'string "SB!" (string (target-platform-keyword)) "-ASM"))
+  (concatenate 'string "SB-" (string (target-platform-keyword)) "-ASM"))
 
 (defun any-vop-named-p (vop-name)
   (let ((ht (symbol-value (find-symbol "*BACKEND-PARSED-VOPS*" "SB!C"))))

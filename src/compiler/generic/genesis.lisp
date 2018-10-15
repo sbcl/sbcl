@@ -1351,6 +1351,8 @@ core and return a descriptor to it."
 
 (setf (get 'find-package :sb-cold-funcall-handler/for-value)
       (lambda (descriptor &aux (name (base-string-from-core descriptor)))
+        (when (= (mismatch name "SB!") 3)
+          (setq name (concatenate 'string "SB-" (subseq name 3))))
         (or (cdr (gethash name *cold-package-symbols*))
             (error "Genesis could not find a target package named ~S" name))))
 
@@ -1389,7 +1391,7 @@ core and return a descriptor to it."
                 ;; in the USE list of COMMON-LISP-USER.
                 (sb-cold:make-package-data
                  :name "COMMON-LISP-USER" :doc nil
-                 :use '("COMMON-LISP" "SB!ALIEN" "SB!DEBUG" "SB!EXT" "SB!GRAY" "SB!PROFILE"))
+                 :use '("COMMON-LISP" "SB-ALIEN" "SB-DEBUG" "SB-EXT" "SB-GRAY" "SB-PROFILE"))
                 (sb-cold::package-list-for-genesis)))
         (package-layout (find-layout 'package))
         (target-pkg-list nil))
@@ -1401,8 +1403,7 @@ core and return a descriptor to it."
                  ;; Initialize string slots
                  (write-slots cold-package package-layout
                               :%name (set-readonly
-                                      (base-string-to-core
-                                       (target-package-name name)))
+                                      (base-string-to-core name))
                               :%nicknames (chill-nicknames name)
                               :doc-string (if docstring
                                               (base-string-to-core docstring)
@@ -1410,10 +1411,6 @@ core and return a descriptor to it."
                               :%use-list *nil-descriptor*)
                  ;; the cddr of this will accumulate the 'used-by' package list
                  (push (list name cold-package) target-pkg-list)))
-             (target-package-name (string)
-               (if (eql (mismatch string "SB!") 3)
-                   (concatenate 'string "SB-" (subseq string 3))
-                   string))
              (chill-nicknames (pkg-name)
                  ;; Make the package nickname lists for the standard packages
                  ;; be the minimum specified by ANSI, regardless of what value
@@ -1430,6 +1427,7 @@ core and return a descriptor to it."
                                 (t
                                  ;; 'package-data-list' contains no nicknames.
                                  ;; (See comment in 'set-up-cold-packages')
+                                 #+nil
                                  (aver (null (package-nicknames
                                               (find-package pkg-name))))
                                  nil)))))
@@ -1477,7 +1475,7 @@ core and return a descriptor to it."
      ;; Cold interning something in one of our target-code packages,
      ;; which are ever-so-rigorously-and-elegantly distinguished by
      ;; this prefix on their names, is OK too.
-     (string= package-name "SB!" :end1 3 :end2 3)
+     (string= package-name "SB-" :end1 3 :end2 3)
      ;; This one is OK too, since it ends up being COMMON-LISP on the
      ;; target.
      (string= package-name "SB!XC")
@@ -1781,7 +1779,7 @@ core and return a descriptor to it."
       (destructuring-bind (pkg-name . pkg-info) pkgcons
         (let ((shadow
                ;; Record shadowing symbols (except from SB!XC) in SB! packages.
-               (when (eql (mismatch pkg-name "SB!") 3)
+               (when (eql (mismatch pkg-name "SB-") 3)
                  ;; Be insensitive to the host's ordering.
                  (sort (remove (find-package "SB!XC")
                                (package-shadowing-symbols (find-package pkg-name))
