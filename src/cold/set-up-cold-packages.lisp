@@ -84,12 +84,6 @@
               (setf (fdefinition (intern symbol-name package-name))
                     original-fun)))))))
 
-  ;; Test print-type
-  (assert (string= (handler-case
-                       (sb-c::proclaim-ftype 'x (sb-kernel:specifier-type 'bit)
-                                             nil nil)
-                     (error (e) (write-to-string e :escape nil)))
-                   "Not a function type: BIT"))
   nil)
 
 #-sbcl
