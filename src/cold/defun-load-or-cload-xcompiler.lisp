@@ -9,12 +9,12 @@
 
 (in-package "SB-COLD")
 
-#+#.(cl:if (cl:find-package "SB-POSIX") '(and) '(or))
+#+#.(cl:if (cl:find-package "HOST-SB-POSIX") '(and) '(or))
 (defun parallel-make-host-1 (max-jobs)
   (let ((subprocess-count 0)
         (subprocess-list nil))
     (flet ((wait ()
-             (multiple-value-bind (pid status) (sb-posix:wait)
+             (multiple-value-bind (pid status) (host-sb-posix:wait)
                (format t "~&; Subprocess ~D exit status ~D~%"  pid status)
                (setq subprocess-list (delete pid subprocess-list)))
              (decf subprocess-count)))
@@ -22,7 +22,7 @@
         (unless (position :not-host flags)
           (when (>= subprocess-count max-jobs)
             (wait))
-          (let ((pid (sb-posix:fork)))
+          (let ((pid (host-sb-posix:fork)))
             (when (zerop pid)
               (in-host-compilation-mode
                (lambda () (compile-stem stem flags :host-compile)))
@@ -33,7 +33,7 @@
             ;; Do not wait for the compile to finish. Just load as source.
             (let ((source (merge-pathnames (stem-remap-target stem)
                                            (make-pathname :type "lisp"))))
-              (let ((sb-ext:*evaluator-mode* :interpret))
+              (let ((host-sb-ext:*evaluator-mode* :interpret))
                 (in-host-compilation-mode
                  (lambda ()
                    (load source :verbose t :print nil))))))))
@@ -59,7 +59,7 @@
   ;; Now it works to load fasls.
   (in-host-compilation-mode
    (lambda ()
-     (handler-bind ((sb-kernel:redefinition-warning #'muffle-warning))
+     (handler-bind ((host-sb-kernel:redefinition-warning #'muffle-warning))
        (do-stems-and-flags (stem flags)
          (unless (position :not-host flags)
            (load (stem-object-path stem flags :host-compile)

@@ -436,7 +436,7 @@
   ;; During make-host-2, the solution to this is the same hack
   ;; as for everything else: use DEF!STRUCT for IR2-COMPONENT.
   #!+(and (host-feature sb-xc-host) (host-feature sbcl))
-  (declare (sb-ext:muffle-conditions style-warning))
+  (declare (host-sb-ext:muffle-conditions style-warning))
 (def!struct (component (:copier nil)
                        (:constructor
                         make-component

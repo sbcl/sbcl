@@ -242,12 +242,12 @@
             sb!impl::unencapsulate-generic-function)))
   (setf (gethash sym sb!c::*undefined-fun-whitelist*) t))
 
-#+#.(cl:if (cl:find-package "SB-POSIX") '(and) '(or))
+#+#.(cl:if (cl:find-package "HOST-SB-POSIX") '(and) '(or))
 (defun parallel-make-host-2 (max-jobs)
   (let ((subprocess-count 0)
         (subprocess-list nil))
     (flet ((wait ()
-             (multiple-value-bind (pid status) (sb-posix:wait)
+             (multiple-value-bind (pid status) (host-sb-posix:wait)
                (format t "~&; Subprocess ~D exit status ~D~%"  pid status)
                (setq subprocess-list (delete pid subprocess-list)))
              (decf subprocess-count)))
@@ -255,7 +255,7 @@
         (unless (position :not-target flags)
           (when (>= subprocess-count max-jobs)
             (wait))
-          (let ((pid (sb-posix:fork)))
+          (let ((pid (host-sb-posix:fork)))
             (when (zerop pid)
               (target-compile-stem stem flags)
               ;; FIXME: convey exit code based on COMPILE result.

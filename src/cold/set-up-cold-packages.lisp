@@ -9,6 +9,107 @@
 
 (in-package "SB-COLD")
 
+;;; The list below contains the name of every symbol whose function might be
+;;; called from a non-compiled format string. This is important only for SBCL
+;;; as host lisp built prior to git revision 6d743d78d9ba840b.
+;;; For such hosts, after giving all host packages a new name, we must ASAP
+;;; reestablish the function bindings of these "missing" symbols.
+;;;
+;;; * PRINT-SYMBOL-WITH-PREFIX was added in rev ff218a24fbd70b2e (2007-04-29)
+;;;   and later exported from SB-EXT with no explanation.
+;;;   It was occasionally invoked via SB-IMPL: which it no longer is.
+;;;
+;;; * SB-IMPL:PRINT-TYPE and SB-IMPL:PRINT-TYPE-SPECIFIER were first added
+;;;   in rev c1b03a36ec4439c8 (2016-01-09). Newer code always uses them
+;;;   from SB-IMPL but older code used them from SB-EXT as well.
+;;;
+;;; The other 3 functions mentioned below have been stable
+;;; in that they are always used from SB-IMPL.
+;;;
+;;; This list must contain names of functions used by *ANY* past revision
+;;; even if such function does not appear in current code.  The list does
+;;; not need additions to it for future changes though. i.e. this is final.
+;;;
+(defparameter *host-format-functions*
+  '("PRINT-SYMBOL-WITH-PREFIX"
+    "PRINT-TYPE"
+    "PRINT-TYPE-SPECIFIER"
+    "FORMAT-MILLISECONDS"
+    "FORMAT-MICROSECONDS"
+    "PRINT-DEPRECATION-REPLACEMENTS"))
+
+;;; Rename all host packages, but unhide the host's format functions
+;;; for hosts that do not support renaming of internal packages.
+;;; Consider all situations in which functions are called via ~// directives:
+;;; - The host calls ~/PRINT-TYPE/ for itself (i.e in its compiler) while
+;;;   running make-host-1 because "our" code (being compiled) is wrong.
+;;;   Barring a host bug (such as was fixed in rev e6fd2a9635e4),
+;;;   the format string referencing this function would spell the name
+;;;   using a "dash" package. We restore the format functions into the
+;;;   expected package below.
+;;; - The cross-compiler wants to call a ~// function while executing,
+;;;   maybe even from a macro. The format control string should spell the
+;;;   function as a "bang" package. If it didn't, the string is wrong.
+;;; - The target wants to call a ~// function.
+;;;   That's conceptually the easiest to deal with - we've already ensured
+;;;   that cross-compiled format strings dump their symbols correctly.
+;;;
+#+sbcl
+(defun hide-host-packages ()
+  ;; Rename
+  (sb-ext:without-package-locks
+   (dolist (pkg (list-all-packages))
+     (let ((name (package-name pkg)))
+       (unless (member name '("KEYWORD" "COMMON-LISP"  "COMMON-LISP-USER"
+                              "SB-COLD" "SB!XC")
+                       :test #'string=)
+         ;; This also removes nicknames SEQUENCE and SB-C-CALL.
+         (rename-package pkg (concatenate 'string "HOST-" name))))))
+
+  ;; Restore operation
+  (unless (find-symbol "FMT-CONTROL" "HOST-SB-FORMAT")
+    (format t "~&; Restoring format control functions~%")
+    ;; Make the packages that hold format functions
+    (make-package "SB-EXT")
+    (make-package "SB-IMPL")
+    ;; Copy the definitions from SB-EXT and SB-IMPL as needed.
+    ;; While these could just be imported for now, that would cease to work
+    ;; after actually renaming all target packages to SB- in cross-compilation,
+    ;; because genesis would then see the wrong package for some SB- symbols.
+    (dolist (symbol-name *host-format-functions*)
+      (dolist (package-name '("SB-EXT" "SB-IMPL"))
+        (multiple-value-bind (host-symbol access)
+            (find-symbol symbol-name (concatenate 'string "HOST-" package-name))
+          (when (and access (fboundp host-symbol))
+            (setf (fdefinition (intern symbol-name package-name))
+                  (fdefinition host-symbol)))))))
+
+  ;; Tests - these are dubious because they examine bits of the host.
+  ;; They should probably be removed soon.
+
+  ;; 1. print-symbol-with-prefix
+  (assert (string= (handler-case
+                       (sb-pcl::check-method-lambda 3 :croak)
+                     (error (e) (write-to-string e :escape nil)))
+                   "The METHOD-LAMBDA argument to :CROAK, 3, is not a lambda form."))
+  ;; 2. print-type-specifier
+  (assert (string= (handler-case
+                       (sb-alien::missing-alien-operation-error
+                        'integer "cry about")
+                     (error (e) (write-to-string e :escape nil)))
+                   "Cannot cry about aliens of type INTEGER."))
+  ;; 3. print-type
+  (assert (string= (handler-case
+                       (sb-c::proclaim-ftype 'x (sb-kernel:specifier-type 'bit)
+                                             nil nil)
+                     (error (e) (write-to-string e :escape nil)))
+                   "Not a function type: BIT"))
+  nil)
+
+#-sbcl (defun hide-host-packages ())
+
+(compile 'hide-host-packages)
+
 ;;; an entry in the table which describes the non-standard part (i.e. not
 ;;; CL/CL-USER/KEYWORD) of the package structure of the SBCL system
 ;;;
@@ -169,6 +270,8 @@
   (labels ((flatten (tree)
              (mapcan (lambda (x) (if (listp x) (flatten x) (list x)))
                      tree)))
+
+    (hide-host-packages)
 
     ;; Build all packages that we need, and initialize them as far as we
     ;; can without referring to any other packages.

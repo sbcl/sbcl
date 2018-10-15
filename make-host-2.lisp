@@ -147,6 +147,6 @@ Sample output
 #+sb-after-xc-core
 (progn
   #+cmu (ext:save-lisp "output/after-xc.core" :load-init-file nil)
-  #+sbcl (sb-ext:save-lisp-and-die "output/after-xc.core")
+  #+sbcl (host-sb-ext:save-lisp-and-die "output/after-xc.core")
   #+openmcl (ccl::save-application "output/after-xc.core")
   #+clisp (ext:saveinitmem "output/after-xc.core"))
