@@ -65,16 +65,6 @@
   (atsignp nil :type (member t nil) :read-only t)
   (params nil :type list :read-only t))
 (declaim (freeze-type format-directive))
-(defmethod print-object ((x format-directive) stream)
-  (print-unreadable-object (x stream)
-    (let ((fun (format-directive-function x)))
-      (write-string (format-directive-string x)
-                    stream
-                    :start (format-directive-start x)
-                    :end (- (format-directive-end x) (if fun 1 0)))
-      (when fun
-        (print-symbol-with-prefix stream fun)
-        (write-char #\/ stream)))))
 
 (defun check-modifier (modifier-name value)
   (when value

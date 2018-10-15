@@ -33,6 +33,17 @@
   (print-unreadable-object (self stream :type t)
     (write-string (unparse-fmt-control self) stream)))
 
+(defmethod print-object ((x format-directive) stream)
+  (print-unreadable-object (x stream)
+    (let ((fun (format-directive-function x)))
+      (write-string (format-directive-string x)
+                    stream
+                    :start (format-directive-start x)
+                    :end (- (format-directive-end x) (if fun 1 0)))
+      (when fun
+        (print-symbol-with-prefix stream fun)
+        (write-char #\/ stream)))))
+
 (defun dummy (&rest args) (error "Should not be called: ~S~%" args))
 
 (defun make-fmt-control (string symbols)
