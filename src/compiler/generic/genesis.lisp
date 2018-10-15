@@ -76,7 +76,7 @@
 ;;; portable, because as of sbcl-0.7.4 we need somewhat more than
 ;;; 16Mbytes to represent a core, and ANSI only guarantees that
 ;;; ARRAY-DIMENSION-LIMIT is not less than 1024. -- WHN 2002-06-13
-(defstruct (bigvec (:constructor %make-bigvec (&optional outer-vector)))
+(defstruct (bigvec (:constructor %make-bigvec ()))
   (outer-vector (vector (make-smallvec)) :type (vector smallvec)))
 (defun make-bigvec (&optional (min-size 0))
   (expand-bigvec (%make-bigvec) min-size))
@@ -3507,12 +3507,12 @@ III. initially undefined function references (alphabetically):
                              :direction :output
                              :element-type '(unsigned-byte 8)
                              :if-exists :rename-and-delete)
-   (let ((bv (%make-bigvec (vector (make-array sb!vm:n-word-bytes
-                                               :element-type '(unsigned-byte 8)))))
+   (let ((bv (%make-bigvec))
          (data-page 0))
     (flet ((write-word (word)
              (setf (bvref-word bv 0) (the sb!vm:word word))
-             (write-sequence (elt (bigvec-outer-vector bv) 0) core-file)))
+             (write-sequence (elt (bigvec-outer-vector bv) 0) core-file
+                             :start 0 :end sb!vm:n-word-bytes)))
       ;; Write the magic number.
       (write-word core-magic)
 
