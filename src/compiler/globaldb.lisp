@@ -143,7 +143,7 @@
                      +fdefn-info-num+)
                 #+sb-xc (meta-info-number (meta-info category kind)))))
 ;; It's an external symbol of SB-INT so wouldn't be removed automatically
-(push '("SB-INT" define-info-type) sb!impl::*!removable-symbols*)
+(push '("SB-INT" define-info-type) *!removable-symbols*)
 
 
 (macrolet ((meta-info-or-lose (category kind)

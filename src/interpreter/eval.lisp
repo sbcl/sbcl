@@ -248,4 +248,4 @@
                        (not (member s '(defspecial with-subforms do-decl-spec)))) ; for SB-CLTL2
               (push s macros)))
           macros)))
-  sb-impl::*!removable-symbols*)
+  *!removable-symbols*)

@@ -25,4 +25,4 @@
 
 (precompile-random-code-segments pcl)
 
-(push '("SB-PCL" *pcl-package*) sb-impl::*!removable-symbols*)
+(push '("SB-PCL" *pcl-package*) *!removable-symbols*)

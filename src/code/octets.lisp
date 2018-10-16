@@ -525,4 +525,4 @@ STRING (or the subsequence bounded by START and END)."
                          (or (ends-with-p name "->STRING")
                              (ends-with-p name "->STRING*")))
                 (push s macros)))))))
-  sb!impl::*!removable-symbols*)
+  *!removable-symbols*)

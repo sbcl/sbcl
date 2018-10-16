@@ -442,8 +442,7 @@
 
 ;;;; format directive machinery
 
-(eval-when (:compile-toplevel :execute)
-(#+sb-xc-host defmacro #-sb-xc-host sb!xc:defmacro def-complex-format-directive (char lambda-list &body body)
+(defmacro def-complex-format-directive (char lambda-list &body body)
   (let ((defun-name (intern (format nil
                                     "~:@(~:C~)-FORMAT-DIRECTIVE-EXPANDER"
                                     char)))
@@ -462,7 +461,7 @@
                  ,@body)))
        (%set-format-directive-expander ,char #',defun-name))))
 
-(#+sb-xc-host defmacro #-sb-xc-host sb!xc:defmacro def-format-directive (char lambda-list &body body)
+(defmacro def-format-directive (char lambda-list &body body)
   (let ((directives (sb!xc:gensym "DIRECTIVES"))
         (declarations nil)
         (body-without-decls body))
@@ -476,18 +475,10 @@
        ,@declarations
        (values (progn ,@body-without-decls)
                ,directives))))
-) ; EVAL-WHEN
-
-(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 
 (defun %set-format-directive-expander (char fn)
   (let ((code (sb!xc:char-code (char-upcase char))))
     (setf (aref *format-directive-expanders* code) fn))
-  char)
-
-(defun %set-format-directive-interpreter (char fn)
-  (let ((code (sb!xc:char-code (char-upcase char))))
-    (setf (aref *format-directive-interpreters* code) fn))
   char)
 
 (defun find-directive (directives kind stop-at-semi)
@@ -512,8 +503,6 @@
                             (t directives))))
                    kind stop-at-semi)))
             (find-directive (cdr directives) kind stop-at-semi)))))
-
-) ; EVAL-WHEN
 
 ;;;; format directives for simple output
 

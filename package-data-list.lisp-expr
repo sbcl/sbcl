@@ -1144,6 +1144,7 @@ possibly temporarily, because it might be used internally."
                "!DEFINE-LOAD-TIME-GLOBAL"
                "!DEFPARAMETER" "!DEFVAR"
                "!DEFINE-THREAD-LOCAL"
+               "*!REMOVABLE-SYMBOLS*"
 
                ;; bootstrapping macro whose effect is to delay until warm load.
                "DEF*METHOD"

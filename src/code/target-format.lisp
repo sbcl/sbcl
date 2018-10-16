@@ -164,11 +164,9 @@
 
 ;;;; FORMAT directive definition macros and runtime support
 
-(eval-when (:compile-toplevel :execute)
-
 ;;; This macro is used to extract the next argument from the current arg list.
 ;;; This is the version used by format directive interpreters.
-(sb!xc:defmacro next-arg (&optional offset)
+(defmacro next-arg (&optional offset)
   `(progn
      (when (null args)
        (,@(if offset
@@ -179,15 +177,16 @@
        (funcall *logical-block-popper*))
      (pop args)))
 
-(sb!xc:defmacro def-complex-format-interpreter (char lambda-list &body body)
+(defmacro def-complex-format-interpreter (char lambda-list &body body)
   (let ((defun-name
             (intern (format nil
                             "~:@(~:C~)-FORMAT-DIRECTIVE-INTERPRETER"
                             char)))
         (directive '.directive) ; expose this var to the lambda. it's easiest
         (directives (if lambda-list (car (last lambda-list)) (sb!xc:gensym "DIRECTIVES"))))
-    `(progn
-       (defun ,defun-name (stream ,directive ,directives orig-args args)
+    `(setf
+       (aref *format-directive-interpreters* (sb!xc:char-code (char-upcase ,char)))
+       (named-lambda ,defun-name (stream ,directive ,directives orig-args args)
          (declare (ignorable stream orig-args args))
          ,@(if lambda-list
                `((let ,(mapcar (lambda (var)
@@ -197,16 +196,15 @@
                                (butlast lambda-list))
                    (values (progn ,@body) args)))
                `((declare (ignore ,directive ,directives))
-                 ,@body)))
-       (%set-format-directive-interpreter ,char #',defun-name))))
+                 ,@body))))))
 
-(sb!xc:defmacro def-format-interpreter (char lambda-list &body body)
+(defmacro def-format-interpreter (char lambda-list &body body)
   (let ((directives (sb!xc:gensym "DIRECTIVES")))
     `(def-complex-format-interpreter ,char (,@lambda-list ,directives)
        ,@body
        ,directives)))
 
-(sb!xc:defmacro interpret-bind-defaults (specs params &body body)
+(defmacro interpret-bind-defaults (specs params &body body)
   (once-only ((params params))
     (collect ((bindings))
       (dolist (spec specs)
@@ -225,8 +223,6 @@
             nil (caar ,params)
             "Too many parameters, expected no more than ~W" ,(length specs)))
          ,@body))))
-
-) ; EVAL-WHEN
 
 ;;;; format interpreters and support functions for simple output
 
@@ -357,8 +353,7 @@
                    :start2 src :end2 (+ src commainterval)))
         new-string))))
 
-(eval-when (:compile-toplevel :execute)
-(sb!xc:defmacro interpret-format-integer (base)
+(defmacro interpret-format-integer (base)
   `(if (or colonp atsignp params)
        (interpret-bind-defaults
            ((mincol 0) (padchar #\space) (commachar #\,) (commainterval 3))
@@ -368,7 +363,6 @@
        (let ((*print-base* ,base)
              (*print-radix* nil))
          (princ (next-arg) stream))))
-) ; EVAL-WHEN
 
 (def-format-interpreter #\D (colonp atsignp params)
   (interpret-format-integer 10))
@@ -1236,3 +1230,10 @@
             (:remaining (args (length args)))
             (t (args param)))))
       (apply symbol stream (next-arg) colonp atsignp (args)))))
+
+(push '("SB-FORMAT"
+        def-format-directive def-complex-format-directive
+        def-format-interpreter def-complex-format-interpreter
+        interpret-bind-defaults interpret-format-integer next-arg
+        %set-format-directive-expander)
+      *!removable-symbols*)

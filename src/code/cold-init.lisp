@@ -447,4 +447,4 @@ process to continue normally."
     #!+sb-show ()
     #!-sb-show (/hexstr /nohexstr /noshow /noshow0 /noxhow
                 /primitive-print /show /show0 /xhow))
-  sb!impl::*!removable-symbols*)
+  *!removable-symbols*)

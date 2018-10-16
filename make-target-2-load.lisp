@@ -13,7 +13,7 @@
   (dolist (package (list-all-packages))
     (sb-int:awhen (find-symbol "!REMOVE-BOOTSTRAP-SYMBOLS" package)
       (funcall sb-int:it)))
-  (dolist (list sb-impl::*!removable-symbols*)
+  (dolist (list sb-int:*!removable-symbols*)
     (let ((package (find-package (car list))))
       (dolist (symbol (cdr list))
         (fmakunbound symbol)

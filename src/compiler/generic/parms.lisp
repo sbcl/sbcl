@@ -243,4 +243,4 @@
   (defconstant +pseudo-static-generation+ 6))
 
 (push '("SB-VM" +c-callable-fdefns+ +common-static-symbols+)
-      sb!impl::*!removable-symbols*)
+      *!removable-symbols*)

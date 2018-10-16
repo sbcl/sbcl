@@ -1153,7 +1153,7 @@
         (error "~S is not a valid L-value." form))))
 
 (push '("SB-ALIEN" define-alien-type-class define-alien-type-method)
-      sb!impl::*!removable-symbols*)
+      *!removable-symbols*)
 
 (in-package "SB!IMPL")
 
