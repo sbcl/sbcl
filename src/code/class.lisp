@@ -37,6 +37,14 @@
 ;;; cdr is the layout itself.
 (defvar *!initial-layouts*)
 
+;;; a generator for random values suitable for the CLOS-HASH slots of
+;;; LAYOUTs. We use our own RANDOM-STATE here because we'd like
+;;; pseudo-random values to come the same way in the target even when
+;;; we make minor changes to the system, in order to reduce the
+;;; mysteriousness of possible CLOS bugs.
+(define-load-time-global *layout-clos-hash-random-state*
+    (make-random-state))
+
 ;;; a table mapping class names to layouts for classes we have
 ;;; referenced but not yet loaded. This is initialized from an alist
 ;;; created by genesis describing the layouts that genesis created at
@@ -47,6 +55,7 @@
   (setq *forward-referenced-layouts* (make-hash-table :test 'equal))
   #-sb-xc-host (progn
                  (/show0 "processing *!INITIAL-LAYOUTS*")
+                 (setq *layout-clos-hash-random-state* (make-random-state))
                  (dovector (x *!initial-layouts*)
                    (setf (layout-clos-hash (cdr x)) (random-layout-clos-hash))
                    (setf (gethash (car x) *forward-referenced-layouts*)
@@ -68,12 +77,6 @@
 
 ;;;; support for the hash values used by CLOS when working with LAYOUTs
 
-;;; a generator for random values suitable for the CLOS-HASH slots of
-;;; LAYOUTs. We use our own RANDOM-STATE here because we'd like
-;;; pseudo-random values to come the same way in the target even when
-;;; we make minor changes to the system, in order to reduce the
-;;; mysteriousness of possible CLOS bugs.
-(defvar *layout-clos-hash-random-state*)
 (defun random-layout-clos-hash ()
   ;; FIXME: I'm not sure why this expression is (1+ (RANDOM FOO)),
   ;; returning a strictly positive value. I copied it verbatim from
@@ -86,10 +89,7 @@
   ;; an explanation is provided in Kiczales and Rodriguez, "Efficient
   ;; Method Dispatch in PCL", 1990.  -- CSR, 2005-11-30
   (1+ (random (1- layout-clos-hash-limit)
-              (if (boundp '*layout-clos-hash-random-state*)
-                  *layout-clos-hash-random-state*
-                  (setf *layout-clos-hash-random-state*
-                        (make-random-state))))))
+              *layout-clos-hash-random-state*)))
 
 ;;; If we can't find any existing layout, then we create a new one
 ;;; storing it in *FORWARD-REFERENCED-LAYOUTS*. In classic CMU CL, we
