@@ -16,11 +16,7 @@
 ;;; listed here and then listed separately (and by now, 2001-06-06,
 ;;; slightly differently) elsewhere. (Maybe this is resolved?)
 (declaim (special *posix-argv*
-                  *core-string*
-                  *stdin*
-                  *stdout*
                   *stderr*
-                  *tty*
                   sb!vm:*current-catch-block*
                   sb!vm::*current-unwind-protect-block*
                   sb!vm::*alien-stack-pointer*

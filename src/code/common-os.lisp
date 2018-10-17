@@ -17,6 +17,7 @@
  os-get-runtime-executable-path sb!alien:c-string (external-path boolean))
 (sb!alien:define-alien-variable
  ("saved_runtime_path" *native-saved-runtime-path*) (* char))
+(define-load-time-global *core-string* "")
 
 (defmacro init-var-ignoring-errors (variable
                                     form
