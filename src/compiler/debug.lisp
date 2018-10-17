@@ -12,19 +12,16 @@
 
 (in-package "SB!C")
 
-(defvar *args* ()
-  "This variable is bound to the format arguments when an error is signalled
-by BARF or BURP.")
-
+;;; FIXME: unsafe if we remove world-lock from around compilation
 (defvar *ignored-errors* (make-hash-table :test 'equal))
 
 ;;; A definite inconsistency has been detected. Signal an error with
 ;;; *args* bound to the list of the format args.
 (declaim (ftype (function (string &rest t) (values)) barf))
-(defun barf (string &rest *args*)
+(defun barf (string &rest args)
   (unless (gethash string *ignored-errors*)
     (restart-case
-        (apply #'error string *args*)
+        (apply #'error string args)
       (continue ()
         :report "Ignore this error.")
       (ignore-all ()
@@ -40,11 +37,11 @@ One of :WARN, :ERROR or :NONE.")
 ;;; Called when something funny but possibly correct is noticed.
 ;;; Otherwise similar to BARF.
 (declaim (ftype (function (string &rest t) (values)) burp))
-(defun burp (string &rest *args*)
+(defun burp (string &rest args)
   (declare (notinline warn)) ; See COMPILER-WARN for rationale
   (ecase *burp-action*
-    (:warn (apply #'warn string *args*))
-    (:error (apply #'cerror "press on anyway." string *args*))
+    (:warn (apply #'warn string args))
+    (:error (apply #'cerror "press on anyway." string args))
     (:none))
   (values))
 
