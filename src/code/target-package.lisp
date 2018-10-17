@@ -160,14 +160,14 @@ of :INHERITED :EXTERNAL :INTERNAL."
               (* 100 (/ n-filled n-cells))))))
 
 ;;; the maximum load factor we allow in a package hashtable
-(!defparameter *package-rehash-threshold* 3/4)
+(defconstant +package-rehash-threshold+ 3/4)
 
 ;;; the load factor desired for a package hashtable when writing a
 ;;; core image
-(!defparameter *package-hashtable-image-load-factor* 1/2)
+(defconstant +package-hashtable-image-load-factor+ 1/2)
 
 ;;; Make a package hashtable having a prime number of entries at least
-;;; as great as (/ SIZE *PACKAGE-REHASH-THRESHOLD*). If RES is supplied,
+;;; as great as (/ SIZE +PACKAGE-REHASH-THRESHOLD+). If RES is supplied,
 ;;; then it is destructively modified to produce the result. This is
 ;;; useful when changing the size, since there are many pointers to
 ;;; the hashtable.
@@ -177,13 +177,13 @@ of :INHERITED :EXTERNAL :INTERNAL."
 (defun make-package-hashtable (size)
   (flet ((actual-package-hashtable-size (size)
            (loop for n of-type fixnum
-              from (logior (ceiling size *package-rehash-threshold*) 1)
+              from (logior (ceiling size +package-rehash-threshold+) 1)
               by 2
               when (positive-primep n) return n)))
     (let* ((n (actual-package-hashtable-size size))
            ;; SIZE is how many symbols we'd like to be able to store,
            ;; but the number of physical cells is N, chosen for its primality.
-           (size (truncate (* n *package-rehash-threshold*)))
+           (size (truncate (* n +package-rehash-threshold+)))
            (table (make-array n :initial-element 0)))
       (%make-package-hashtable table size))))
 
@@ -732,7 +732,7 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
     old))
 
 ;;; Resize the package hashtables of all packages so that their load
-;;; factor is *PACKAGE-HASHTABLE-IMAGE-LOAD-FACTOR*. Called from
+;;; factor is +PACKAGE-HASHTABLE-IMAGE-LOAD-FACTOR+. Called from
 ;;; SAVE-LISP-AND-DIE to optimize space usage in the image.
 (defun tune-hashtable-sizes-of-all-packages ()
   (with-package-names (table)
@@ -741,8 +741,8 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
   (flet ((tune-table-size (table)
            (resize-package-hashtable
             table
-            (round (* (/ *package-rehash-threshold*
-                         *package-hashtable-image-load-factor*)
+            (round (* (/ +package-rehash-threshold+
+                         +package-hashtable-image-load-factor+)
                       (- (package-hashtable-size table)
                          (package-hashtable-free table)
                          (package-hashtable-deleted table)))))))

@@ -633,8 +633,6 @@
 ;;; experimentation, not for ordinary use, so it should probably
 ;;; become conditional on SB-SHOW.
 
-(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-
 (defstruct (event-info (:copier nil))
   ;; The name of this event.
   (name (missing-arg) :type symbol)
@@ -651,7 +649,7 @@
   (action nil :type (or function null)))
 
 ;;; A hashtable from event names to event-info structures.
-(defvar *event-info* (make-hash-table :test 'eq))
+(define-load-time-global *event-info* (make-hash-table :test 'eq))
 
 ;;; Return the event info for Name or die trying.
 (declaim (ftype (function (t) event-info) event-info-or-lose))
@@ -660,8 +658,6 @@
     (unless res
       (error "~S is not the name of an event." name))
     res))
-
-) ; EVAL-WHEN
 
 ;;; Return the number of times that EVENT has happened.
 (declaim (ftype (function (symbol) fixnum) event-count))
@@ -703,7 +699,7 @@
 (defmacro defevent (name description &optional (level 0))
   (let ((var-name (symbolicate "*" name "-EVENT-INFO*")))
     `(eval-when (:compile-toplevel :load-toplevel :execute)
-       (defvar ,var-name
+       (define-load-time-global ,var-name
          (make-event-info :name ',name
                           :description ',description
                           :var ',var-name

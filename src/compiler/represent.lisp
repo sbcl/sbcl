@@ -214,8 +214,8 @@
 ;;; ignore TYPE-CHECK-ERROR because we don't want the possibility of
 ;;; error to bias the result. Notes are suppressed for T-C-E as well,
 ;;; since we don't need to worry about the efficiency of that case.
-(defparameter *ignore-cost-vops* '(set type-check-error))
-(defparameter *suppress-note-vops* '(type-check-error))
+(define-load-time-global *ignore-cost-vops* '(set type-check-error))
+(define-load-time-global *suppress-note-vops* '(type-check-error))
 
 ;;; We special-case the move VOP, since using this costs for the
 ;;; normal MOVE would spuriously encourage descriptor representations.

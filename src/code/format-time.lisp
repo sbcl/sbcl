@@ -11,24 +11,24 @@
 
 (in-package "SB!IMPL")
 
-(defparameter *abbrev-weekday-table*
+(defconstant +abbrev-weekday-table+
   #("Mon" "Tue" "Wed" "Thu" "Fri" "Sat" "Sun"))
 
-(defparameter *long-weekday-table*
+(defconstant +long-weekday-table+
   #("Monday" "Tuesday" "Wednesday" "Thursday" "Friday" "Saturday" "Sunday"))
 
-(defparameter *abbrev-month-table*
+(defconstant +abbrev-month-table+
   #("Jan" "Feb" "Mar" "Apr" "May" "Jun" "Jul" "Aug" "Sep" "Oct" "Nov" "Dec"))
 
-(defparameter *long-month-table*
+(defconstant +long-month-table+
   #("January" "February" "March" "April" "May" "June" "July" "August"
    "September" "October" "November" "December"))
 
 ;;; The timezone table is incomplete but workable.
-(defparameter *timezone-table*
+(defconstant +timezone-table+
   #("GMT" "" "" "" "" "EST" "CST" "MST" "PST"))
 
-(defparameter *daylight-table*
+(defconstant +daylight-table+
   #(nil nil nil nil nil "EDT" "CDT" "MDT" "PDT"))
 
 ;;; VALID-DESTINATION-P ensures the destination stream is okay for the
@@ -101,18 +101,18 @@
                        (:short
                         (list month day year))
                        (:abbreviated
-                        (list (svref *abbrev-month-table* (1- month)) day year))
+                        (list (svref +abbrev-month-table+ (1- month)) day year))
                        (:long
-                        (list (svref *long-month-table* (1- month)) day year))
+                        (list (svref +long-month-table+ (1- month)) day year))
                        (:government
-                        (list day (svref *abbrev-month-table* (1- month))
+                        (list day (svref +abbrev-month-table+ (1- month))
                               year)))))
       (declare (simple-string time-string date-string))
       (when print-weekday
         (push (case style
-                ((:short :long) (svref *long-weekday-table* dow))
-                (:abbreviated (svref *abbrev-weekday-table* dow))
-                (:government (svref *abbrev-weekday-table* dow)))
+                ((:short :long) (svref +long-weekday-table+ dow))
+                (:abbreviated (svref +abbrev-weekday-table+ dow))
+                (:government (svref +abbrev-weekday-table+ dow)))
               date-args)
         (setq date-string
               (concatenate 'simple-string "~A, " date-string)))
@@ -142,7 +142,7 @@
   (if (and (integerp tz)
            (or (and dst (= tz 0))
                (<= 5 tz 8)))
-      (svref (if dst *daylight-table* *timezone-table*) tz)
+      (svref (if dst +daylight-table+ +timezone-table+) tz)
       (multiple-value-bind (rest seconds) (truncate (* tz 60 60) 60)
         (multiple-value-bind (hours minutes) (truncate rest 60)
           (format nil "[~C~D~@[~*:~2,'0D~@[~*:~2,'0D~]~]]"

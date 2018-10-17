@@ -662,7 +662,7 @@
 
 ;; When the larger number is less than this many bignum digits long, revert
 ;; to old algorithm.
-(defparameter *accelerated-gcd-cutoff* 3)
+(define-load-time-global *accelerated-gcd-cutoff* 3)
 
 ;;; Alternate between k-ary reduction with the help of
 ;;; REDUCED-RATIO-MOD and digit modulus reduction via DMOD. Once the

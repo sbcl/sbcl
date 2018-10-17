@@ -1,7 +1,7 @@
 (in-package "SB!IMPL")
 
 ;;;; generalized function names
-(!defvar *valid-fun-names-alist* nil)
+(!define-load-time-global *valid-fun-names-alist* nil)
 
 (defun %define-fun-name-syntax (symbol checker)
   (let ((found (assoc symbol *valid-fun-names-alist* :test #'eq)))

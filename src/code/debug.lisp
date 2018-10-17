@@ -84,7 +84,7 @@ provide bindings for printer control variables.")
           (> *debug-command-level* 1)
           *debug-command-level*))
 
-(defparameter *debug-help-string*
+(define-load-time-global *debug-help-string*
 "The debug prompt is square brackets, with number(s) indicating the current
   control stack level and, if you've entered the debugger recursively, how
   deeply recursed you are.
@@ -1428,7 +1428,7 @@ forms that explicitly control this kind of evaluation.")
 
 ;;;; machinery for definition of debug loop commands
 
-(defvar *debug-commands* nil)
+(define-load-time-global *debug-commands* nil)
 
 ;;; Interface to *DEBUG-COMMANDS*. No required arguments in args are
 ;;; permitted.

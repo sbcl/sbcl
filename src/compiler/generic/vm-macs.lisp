@@ -55,7 +55,7 @@
 
 (declaim (freeze-type prim-object-slot primitive-object))
 
-(defvar *primitive-objects* nil)
+(define-load-time-global *primitive-objects* nil)
 
 (defun !%define-primitive-object (primobj)
   (let ((name (primitive-object-name primobj)))
@@ -258,9 +258,9 @@
   (versions (make-hash-table :test 'eq))
   ;; list of increasing widths + signedps
   (widths nil))
-(defvar *untagged-unsigned-modular-class* (make-modular-class))
-(defvar *untagged-signed-modular-class* (make-modular-class))
-(defvar *tagged-modular-class* (make-modular-class))
+(define-load-time-global *untagged-unsigned-modular-class* (make-modular-class))
+(define-load-time-global *untagged-signed-modular-class* (make-modular-class))
+(define-load-time-global *tagged-modular-class* (make-modular-class))
 (defun find-modular-class (kind signedp)
   (ecase kind
     (:untagged

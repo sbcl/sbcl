@@ -25,7 +25,8 @@
 
 ;;; a hash table that maps each traced function to the TRACE-INFO. The
 ;;; entry for a closure is the shared function entry object.
-(defvar *traced-funs* (make-hash-table :test 'eq :synchronized t))
+(define-load-time-global *traced-funs*
+    (make-hash-table :test 'eq :synchronized t))
 
 (deftype trace-report-type ()
   '(member nil trace))

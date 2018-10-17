@@ -202,10 +202,9 @@
        (sb!assem:assemble ()
          ,@body))))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defparameter *sc-vop-slots*
+(defglobal *sc-vop-slots*
     '((:move . sc-move-vops)
-      (:move-arg . sc-move-arg-vops))))
+      (:move-arg . sc-move-arg-vops)))
 
 ;;;; primitive type definition
 
@@ -1082,18 +1081,20 @@
 
     (values costs load-scs)))
 
-(defparameter *no-costs*
-  (make-array sb!vm:sc-number-limit :initial-element 0))
+(defconstant-eqx +no-costs+
+    (make-array sb!vm:sc-number-limit :initial-element 0)
+  #'equalp)
 
-(defparameter *no-loads*
-  (make-array sb!vm:sc-number-limit :initial-element t))
+(defconstant-eqx +no-loads+
+    (make-array sb!vm:sc-number-limit :initial-element t)
+  #'equalp)
 
 ;;; Pick off the case of operands with no restrictions.
 (defun compute-loading-costs-if-any (op load-p)
   (declare (type operand-parse op))
   (if (operand-parse-scs op)
       (compute-loading-costs op load-p)
-      (values *no-costs* *no-loads*)))
+      (values +no-costs+ +no-loads+)))
 
 (defun compute-costs-and-restrictions-list (ops load-p)
   (declare (list ops))

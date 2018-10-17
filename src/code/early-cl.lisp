@@ -20,7 +20,7 @@
     short-float simple-array simple-bit-vector simple-string simple-vector
     single-float standard-char stream string base-char symbol t vector))
 
-(defvar sb!sys::*software-version* nil)
+(define-load-time-global sb!sys::*software-version* nil)
 
 ;;; The BOOLE function dispaches to any logic operation depending on
 ;;; the value of an argument. Presently, legal selector values are [0..15].

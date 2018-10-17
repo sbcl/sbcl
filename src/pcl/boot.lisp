@@ -1981,7 +1981,7 @@ bootstrapping.
   (!boot-make-wrapper (!early-class-size 'standard-generic-function)
                       'standard-generic-function))
 
-(defvar *sgf-slots-init*
+(define-load-time-global *sgf-slots-init*
   (mapcar (lambda (canonical-slot)
             (if (memq (getf canonical-slot :name) '(arg-info source))
                 +slot-unbound+

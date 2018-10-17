@@ -114,7 +114,6 @@
 #!+sb-dyncount
 (defvar *dynamic-counts-tn*)
 (defvar *elsewhere-label*)
-(defvar *event-info*)
 (defvar *event-note-threshold*)
 (defvar *failure-p*)
 (defvar *source-info*)
@@ -233,8 +232,8 @@ the stack without triggering overflow protection.")
 (defvar *debug-name-level* 4)
 (defvar *debug-name-length* 12)
 (defvar *debug-name-punt*)
-(defvar *debug-name-sharp*)
-(defvar *debug-name-ellipsis*)
+(define-load-time-global *debug-name-sharp* (make-debug-name-marker))
+(define-load-time-global *debug-name-ellipsis* (make-debug-name-marker))
 
 (defmethod make-load-form ((marker debug-name-marker) &optional env)
   (declare (ignore env))
@@ -258,9 +257,6 @@ the stack without triggering overflow protection.")
          (write-string "..." stream))
         (t
          (write-string "???" stream))))
-
-(setf *debug-name-sharp* (make-debug-name-marker)
-      *debug-name-ellipsis* (make-debug-name-marker))
 
 (declaim (ftype (sfunction () list) name-context))
 (defun debug-name (type thing &optional context)

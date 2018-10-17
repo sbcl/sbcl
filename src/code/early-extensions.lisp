@@ -588,7 +588,7 @@ NOTE: This interface is experimental and subject to change."
 ;;;   a fixnum with at least (* 2 <hash-bits>) of information in it.
 ;;; :VALUES <n>
 ;;;   the number of return values cached for each function call
-(defvar *cache-vector-symbols* nil)
+(define-load-time-global *cache-vector-symbols* nil)
 
 (defun drop-all-hash-caches ()
   (dolist (name *cache-vector-symbols*)

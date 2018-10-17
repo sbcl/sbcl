@@ -30,7 +30,7 @@
 (defun inspect (object)
   (funcall *inspect-fun* object *standard-input* *standard-output*))
 
-(defvar *help-for-inspect*
+(defconstant-eqx +help-for-inspect+
   "
 help for INSPECT:
   Q, E        -  Quit the inspector.
@@ -42,7 +42,7 @@ help for INSPECT:
 Within the inspector, the special variable SB-EXT:*INSPECTED* is bound
 to the current inspected object, so that it can be referred to in
 evaluated expressions.
-")
+" #'equal)
 
 (defun %inspect (*inspected* s)
   (named-let redisplay () ; "LAMBDA, the ultimate GOTO":-|
@@ -95,7 +95,7 @@ evaluated expressions.
                (:r
                 (return-from %inspect (redisplay)))
                ((:h :? :help)
-                (write-string *help-for-inspect* s)
+                (write-string +help-for-inspect+ s)
                 (return-from %inspect (reread)))
                (t
                 (eval-for-inspect command s)

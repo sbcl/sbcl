@@ -458,7 +458,7 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; fixnum with bits set corresponding to attributes that the
 ;;; character has. At characters have at least one bit set, so we can
 ;;; search for any character with a positive test.
-(defvar *character-attributes*
+(define-load-time-global *character-attributes*
   (make-array 160 ; FIXME
               :element-type '(unsigned-byte 16)
               :initial-element 0))
@@ -493,7 +493,7 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; lowest base in which that character is a digit.
 (declaim (type (simple-array (unsigned-byte 8) (128)) ; FIXME: range?
                *digit-bases*))
-(defvar *digit-bases*
+(define-load-time-global *digit-bases*
   (make-array 128 ; FIXME
               :element-type '(unsigned-byte 8)))
 

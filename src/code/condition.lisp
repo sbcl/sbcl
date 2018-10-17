@@ -310,7 +310,7 @@
          t
          `(condition-slot-writer ,name))))
 
-(!defvar *define-condition-hooks* nil)
+(!define-load-time-global *define-condition-hooks* nil)
 
 (defun %set-condition-report (name report)
   (setf (condition-classoid-report (find-classoid name))

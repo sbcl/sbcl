@@ -1778,7 +1778,7 @@
 
 ;;; an alist of (SYMBOL-SLOT-OFFSET . ACCESS-FUN-NAME) for slots
 ;;; in a symbol object that we know about
-(defparameter *grokked-symbol-slots*
+(define-load-time-global *grokked-symbol-slots*
   (sort (copy-list `((,sb!vm:symbol-value-slot . symbol-value)
                      (,sb!vm:symbol-info-slot . symbol-info)
                      (,sb!vm:symbol-name-slot . symbol-name)

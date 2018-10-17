@@ -15,8 +15,7 @@
 ;;; FIXME: unsafe if we remove world-lock from around compilation
 (defvar *ignored-errors* (make-hash-table :test 'equal))
 
-;;; A definite inconsistency has been detected. Signal an error with
-;;; *args* bound to the list of the format args.
+;;; A definite inconsistency has been detected. Signal an error.
 (declaim (ftype (function (string &rest t) (values)) barf))
 (defun barf (string &rest args)
   (unless (gethash string *ignored-errors*)

@@ -47,15 +47,16 @@
 
 ;;; our guess for the preferred order in which to do type tests
 ;;; (cheaper and/or more probable first.)
-(defparameter *type-test-ordering*
+(defconstant-eqx +type-test-ordering+
   '(fixnum single-float double-float integer #!+long-float long-float
     sb!vm:signed-word word bignum
-    complex ratio))
+    complex ratio)
+  #'equal)
 
 ;;; Should TYPE1 be tested before TYPE2?
 (defun type-test-order (type1 type2)
-  (let ((o1 (position type1 *type-test-ordering*))
-        (o2 (position type2 *type-test-ordering*)))
+  (let ((o1 (position type1 +type-test-ordering+))
+        (o2 (position type2 +type-test-ordering+)))
     (cond ((not o1) nil)
           ((not o2) t)
           (t

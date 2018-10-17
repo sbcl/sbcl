@@ -267,7 +267,7 @@
 ;; never want this object, but instead the classoid FUNCTION
 ;; if we know nothing about a function's signature.
 ;; Maybe this should not exist unless cltl2 is loaded???
-(defvar *universal-fun-type*
+(define-load-time-global *universal-fun-type*
   (make-fun-type :wild-args t :returns *wild-type*))
 
 ;;; The CONSTANT-TYPE structure represents a use of the CONSTANT-ARG

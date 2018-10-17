@@ -121,8 +121,13 @@
 ;;;     and FOP-MAYBE-COLD-LOAD.
 
 ;;; the conventional file extension for our fasl files
+;;; FIXME this should be (DEFCONSTANT-EQX +FASL-FILE-TYPE+ "fasl" #'EQUAL),
+;;; but renaming the variable would harm 'asdf-dependency-grovel' and other
+;;; random 3rd-party libraries. However, we can't keep the name and make it
+;;; constant, because the compiler warns about asterisks on constants.
+;;; So we keep the asterisks and make it defglobal.
 (declaim (type simple-string *fasl-file-type*))
-(defvar *fasl-file-type* "fasl")
+(defglobal *fasl-file-type* "fasl")
 
 ;;;; the FOP database
 

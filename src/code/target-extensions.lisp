@@ -25,20 +25,20 @@
 
 (declaim (type list *save-hooks* *init-hooks* *exit-hooks*))
 
-(defvar *save-hooks* nil
+(define-load-time-global *save-hooks* nil
   "A list of function designators which are called in an unspecified
 order before creating a saved core image.
 
 Unused by SBCL itself: reserved for user and applications.")
 
-(defvar *init-hooks* nil
+(define-load-time-global *init-hooks* nil
   "A list of function designators which are called in an unspecified
 order when a saved core image starts up, after the system itself has
 been initialized.
 
 Unused by SBCL itself: reserved for user and applications.")
 
-(defvar *exit-hooks* nil
+(define-load-time-global *exit-hooks* nil
   "A list of function designators which are called in an unspecified
 order when SBCL process exits.
 

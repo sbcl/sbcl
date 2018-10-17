@@ -53,7 +53,7 @@
 
 ;;; A list of hooks designating functions of one argument, the
 ;;; classoid, to be called when a defstruct is evaluated.
-(!defvar *defstruct-hooks* nil)
+(!define-load-time-global *defstruct-hooks* nil)
 
 ;;; the part of %DEFSTRUCT which makes sense only on the target SBCL
 ;;;

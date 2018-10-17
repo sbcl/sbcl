@@ -195,7 +195,7 @@
    the elements are visited in the opposite order."))
 
 ;;; magic termination value for list :from-end t
-(defvar *exhausted* (cons nil nil))
+(define-load-time-global *exhausted* (cons nil nil))
 
 (defun make-list-iterator (list from-end start end)
   (multiple-value-bind (iterator limit from-end)

@@ -3226,7 +3226,8 @@ register."
 ;;;; breakpoint handlers (layer between C and exported interface)
 
 ;;; This maps components to a mapping of offsets to BREAKPOINT-DATAs.
-(defvar *component-breakpoint-offsets* (make-hash-table :test 'eq :synchronized t))
+(define-load-time-global *component-breakpoint-offsets*
+    (make-hash-table :test 'eq :synchronized t))
 
 ;;; This returns the BREAKPOINT-DATA object associated with component cross
 ;;; offset. If none exists, this makes one, installs it, and returns it.

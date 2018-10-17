@@ -942,7 +942,7 @@
 ;;; a list of all available input routines. Each element is a list of
 ;;; the element-type input, the function name, and the number of bytes
 ;;; per element.
-(defvar *input-routines* ())
+(define-load-time-global *input-routines* ())
 
 ;;; Return whether a primitive partial read operation on STREAM's FD
 ;;; would (probably) block.  Signal a `simple-stream-error' if the
