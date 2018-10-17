@@ -266,42 +266,50 @@
     (inst unpcklps tmp w)
     (inst unpcklps dst tmp)))
 
+(defknown %simd-pack-single-item
+  (simd-pack (integer 0 3)) single-float (flushable))
+
 (define-vop (%simd-pack-single-item)
   (:args (x :scs (int-sse-reg double-sse-reg single-sse-reg)
             :target tmp))
-  (:arg-types simd-pack)
+  (:translate %simd-pack-single-item)
+  (:arg-types simd-pack (:constant t))
   (:info index)
   (:results (dst :scs (single-reg)))
   (:result-types single-float)
   (:temporary (:sc single-sse-reg :from (:argument 0)) tmp)
   (:policy :fast-safe)
   (:generator 3
-    (cond ((and (zerop index)
-                (not (location= x dst)))
-           (inst xorps dst dst)
-           (inst movss dst x))
-          (t
-           (move tmp x)
-           (when (plusp index)
-             (inst psrldq tmp (* 4 index)))
-           (inst xorps dst dst)
-           (inst movss dst tmp)))))
+              (cond ((and (zerop index)
+                          (not (location= x dst)))
+                     (inst xorps dst dst)
+                     (inst movss dst x))
+                    (t
+                     (move tmp x)
+                     (when (plusp index)
+                       (inst psrldq tmp (* 4 index)))
+                     (inst xorps dst dst)
+                     (inst movss dst tmp)))))
 
 #-sb-xc-host
 (declaim (inline %simd-pack-singles))
 #-sb-xc-host
 (defun %simd-pack-singles (pack)
   (declare (type simd-pack pack))
-  (values (%primitive %simd-pack-single-item pack 0)
-          (%primitive %simd-pack-single-item pack 1)
-          (%primitive %simd-pack-single-item pack 2)
-          (%primitive %simd-pack-single-item pack 3)))
+  (values (%simd-pack-single-item pack 0)
+          (%simd-pack-single-item pack 1)
+          (%simd-pack-single-item pack 2)
+          (%simd-pack-single-item pack 3)))
+
+(defknown %simd-pack-double-item
+  (simd-pack (integer 0 1)) double-float (flushable))
 
 (define-vop (%simd-pack-double-item)
+  (:translate %simd-pack-double-item)
   (:args (x :scs (int-sse-reg double-sse-reg single-sse-reg)
             :target tmp))
   (:info index)
-  (:arg-types simd-pack)
+  (:arg-types simd-pack (:constant t))
   (:results (dst :scs (double-reg)))
   (:result-types double-float)
   (:temporary (:sc double-sse-reg :from (:argument 0)) tmp)
@@ -323,5 +331,5 @@
 #-sb-xc-host
 (defun %simd-pack-doubles (pack)
   (declare (type simd-pack pack))
-  (values (%primitive %simd-pack-double-item pack 0)
-          (%primitive %simd-pack-double-item pack 1)))
+  (values (%simd-pack-double-item pack 0)
+          (%simd-pack-double-item pack 1)))
