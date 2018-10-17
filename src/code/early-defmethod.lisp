@@ -52,7 +52,7 @@
                            '(slot-boundp slot-value %set-slot-value call-next-method))
           (flet (((setf slot-value) (&rest args) `(%set-slot-value ,@args)))
             (declare (inline (setf slot-value)))
-            ,@forms)))
+            (block ,name ,@forms))))
       ;; Why is SOURCE-LOC needed? Lambdas should know their location.
       (sb!c::source-location))))
 

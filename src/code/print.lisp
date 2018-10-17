@@ -1719,44 +1719,38 @@ variable: an unreadable object representing the error is printed instead.")
 (defun lowtag-of (x) (logand (get-lisp-obj-address x) sb!vm:lowtag-mask))
 
 (defmethod print-object ((object t) stream)
-  (flet ((output-it (stream)
-          (when (eq object sb!pcl:+slot-unbound+)
-            (print-unreadable-object (object stream)
-              ;; If specifically the unbound marker with 0 data,
-              ;; as opposed to any other unbound marker.
-              (write-string "unbound" stream))
-            (return-from output-it))
-           (print-unreadable-object (object stream :identity t)
-             (let ((lowtag (lowtag-of object)))
-               (case lowtag
-                 (#.sb!vm:other-pointer-lowtag
-                  (let ((widetag (widetag-of object)))
-                    (case widetag
-                      (#.sb!vm:value-cell-widetag
-                       (write-string "value cell " stream)
-                       (output-object (value-cell-ref object) stream))
-                      (#.sb!vm:filler-widetag
-                       (write-string "pad " stream)
-                       (write (1+ (get-header-data object)) :stream stream)
-                       (write-string "w" stream)) ; words
-                      (t
-                       (write-string "unknown pointer object, widetag=" stream)
-                       (output-integer widetag stream 16 t)))))
-                 ((#.sb!vm:fun-pointer-lowtag
-                   #.sb!vm:instance-pointer-lowtag
-                   #.sb!vm:list-pointer-lowtag)
-                  (write-string "unknown pointer object, lowtag=" stream)
-                  (output-integer lowtag stream 16 t))
-                (t
-                 (case (widetag-of object)
-                   (#.sb!vm:unbound-marker-widetag
-                    (write-string "unbound marker" stream))
-                   (t
-                    (write-string "unknown immediate object, lowtag=" stream)
-                    (output-integer lowtag stream 2 t)
-                    (write-string ", widetag=" stream)
-                    (output-integer (widetag-of object) stream 16 t)))))))))
-    (if *print-pretty*
-      ;; This block might not be necessary. Not sure, probably can't hurt.
-        (pprint-logical-block (stream nil) (output-it stream))
-        (output-it stream))))
+  (when (eq object sb!pcl:+slot-unbound+)
+    ;; If specifically the unbound marker with 0 data,
+    ;; as opposed to any other unbound marker.
+    (print-unreadable-object (object stream) (write-string "unbound" stream))
+    (return-from print-object))
+  (print-unreadable-object (object stream :identity t)
+    (let ((lowtag (lowtag-of object)))
+      (case lowtag
+        (#.sb!vm:other-pointer-lowtag
+         (let ((widetag (widetag-of object)))
+           (case widetag
+             (#.sb!vm:value-cell-widetag
+              (write-string "value cell " stream)
+              (output-object (value-cell-ref object) stream))
+             (#.sb!vm:filler-widetag
+              (write-string "pad " stream)
+              (write (1+ (get-header-data object)) :stream stream)
+              (write-string "w" stream)) ; words
+             (t
+              (write-string "unknown pointer object, widetag=" stream)
+              (output-integer widetag stream 16 t)))))
+        ((#.sb!vm:fun-pointer-lowtag
+          #.sb!vm:instance-pointer-lowtag
+          #.sb!vm:list-pointer-lowtag)
+         (write-string "unknown pointer object, lowtag=" stream)
+         (output-integer lowtag stream 16 t))
+        (t
+         (case (widetag-of object)
+           (#.sb!vm:unbound-marker-widetag
+            (write-string "unbound marker" stream))
+           (t
+            (write-string "unknown immediate object, lowtag=" stream)
+            (output-integer lowtag stream 2 t)
+            (write-string ", widetag=" stream)
+            (output-integer (widetag-of object) stream 16 t))))))))
