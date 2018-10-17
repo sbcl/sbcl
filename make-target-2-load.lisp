@@ -83,11 +83,11 @@
                ;; Possibly not, but false positives are acceptable.
                (when (some (lambda (x)
                              (and (typep x 'sb-format::format-directive)
-                                  (eql (sb-format::format-directive-character x) #\/)
+                                  (eql (sb-format::directive-character x) #\/)
                                   (possibly-ungood-package-reference
                                    (subseq string
-                                           (sb-format::format-directive-start x)
-                                           (sb-format::format-directive-end x)))))
+                                           (sb-format::directive-start x)
+                                           (sb-format::directive-end x)))))
                            (ignore-errors
                             (sb-format::%tokenize-control-string
                              string 0 (length string) nil)))

@@ -50,18 +50,18 @@
         (when (= next-directive end)
           (return))
         (let* ((directive (parse-directive string next-directive symbols))
-               (char (format-directive-character directive)))
+               (char (directive-character directive)))
           ;; this processing is required by CLHS 22.3.5.2
           (cond
             ((char= char #\<) (push directive block))
-            ((and block (char= char #\;) (format-directive-colonp directive))
+            ((and block (char= char #\;) (directive-colonp directive))
              (setf semicolon directive))
             ((char= char #\>)
              (unless block
                (format-error-at string next-directive
                                 "~~> without a matching ~~<"))
              (cond
-               ((format-directive-colonp directive)
+               ((directive-colonp directive)
                 (unless pprint
                   (setf pprint (car block)))
                 (setf semicolon nil))
@@ -73,17 +73,17 @@
             ((not block)
              (case char
                ((#\W #\I #\_) (unless pprint (setf pprint directive)))
-               (#\T (when (and (format-directive-colonp directive)
+               (#\T (when (and (directive-colonp directive)
                                (not pprint))
                       (setf pprint directive))))))
           (push directive result)
-          (when (char= (format-directive-character directive) #\/)
+          (when (char= (directive-character directive) #\/)
             (pop symbols))
-          (setf index (format-directive-end directive)))))
+          (setf index (directive-end directive)))))
     (when (and pprint justification-semicolon)
-      (let ((pprint-offset (1- (format-directive-end pprint)))
+      (let ((pprint-offset (1- (directive-end pprint)))
             (justification-offset
-             (1- (format-directive-end justification-semicolon))))
+             (1- (directive-end justification-semicolon))))
         (format-error-at*
          string (min pprint-offset justification-offset)
          "Misuse of justification and pprint directives" '()
@@ -222,10 +222,10 @@
             ;;  - Unless x-compiling, turn "~|" into literal form-feed (ditto)
             ;;  - Optionally turn "~~" into literal tilde (ditto)
             (format-directive
-             (let ((params (format-directive-params item))
-                   (colon (format-directive-colonp item))
-                   (atsign (format-directive-atsignp item))
-                   (char (format-directive-character item)))
+             (let ((params (directive-params item))
+                   (colon (directive-colonp item))
+                   (atsign (directive-atsignp item))
+                   (char (directive-character item)))
                (block nil
                  (case char
                    (#\Newline
@@ -364,17 +364,17 @@
   (etypecase directive
     (format-directive
      (let ((expander
-            (let ((char (format-directive-character directive)))
+            (let ((char (directive-character directive)))
               (typecase char
                 (base-char
                  (aref *format-directive-expanders* (sb!xc:char-code char))))))
            (*default-format-error-offset*
-            (1- (format-directive-end directive))))
+            (1- (directive-end directive))))
        (declare (type (or null function) expander))
        (if expander
            (funcall expander directive more-directives)
            (format-error "Unknown directive ~@[(character: ~A)~]"
-                         (char-name (format-directive-character directive))))))
+                         (char-name (directive-character directive))))))
     ((simple-string 1)
      (values `(write-char ,(schar directive 0) stream)
              more-directives))
@@ -453,8 +453,7 @@
          ,@(if lambda-list
                `((let ,(mapcar (lambda (var)
                                  `(,var
-                                   (,(symbolicate "FORMAT-DIRECTIVE-" var)
-                                    ,directive)))
+                                   (,(symbolicate "DIRECTIVE-" var) ,directive)))
                                (butlast lambda-list))
                    ,@body))
                `((declare (ignore ,directive ,directives))
@@ -485,7 +484,7 @@
   (if directives
       (let ((next (car directives)))
         (if (format-directive-p next)
-            (let ((char (format-directive-character next)))
+            (let ((char (directive-character next)))
               (if (or (char= kind char)
                       (and stop-at-semi (char= char #\;)))
                   (car directives)
@@ -872,10 +871,10 @@
               (posn (position close-or-semi remaining)))
          (push (subseq remaining 0 posn) sublists)
          (setf remaining (nthcdr (1+ posn) remaining))
-         (when (char= (format-directive-character close-or-semi) #\])
+         (when (char= (directive-character close-or-semi) #\])
            (return))
          (setf last-semi-with-colon-p
-               (format-directive-colonp close-or-semi))))
+               (directive-colonp close-or-semi))))
     (values sublists last-semi-with-colon-p remaining)))
 
 (defun expand-maybe-conditional (sublist)
@@ -973,7 +972,7 @@
 (def-complex-format-directive #\{ (colonp atsignp params string end directives)
   (let* ((close (or (find-directive directives #\} nil)
                     (format-error "No corresponding close brace")))
-         (closed-with-colon (format-directive-colonp close))
+         (closed-with-colon (directive-colonp close))
          (posn (position close directives)))
     (labels
         ((compute-insides ()
@@ -1061,15 +1060,15 @@
           :test (lambda (x y)
                   (and (format-directive-p x)
                        (format-directive-p y)
-                       (eql (format-directive-character x) (format-directive-character y))
-                       (eql (format-directive-colonp x) (format-directive-colonp y))
-                       (eql (format-directive-atsignp x) (format-directive-atsignp y))))))
+                       (eql (directive-character x) (directive-character y))
+                       (eql (directive-colonp x) (directive-colonp y))
+                       (eql (directive-atsignp x) (directive-atsignp y))))))
 
 (def-complex-format-directive #\< (colonp atsignp params string end directives)
   (multiple-value-bind (segments first-semi close remaining)
       (parse-format-justification directives)
     (values
-     (if (format-directive-colonp close) ; logical block vs. justification
+     (if (directive-colonp close) ; logical block vs. justification
          (multiple-value-bind (prefix per-line-p insides suffix)
              (parse-format-logical-block segments colonp first-semi
                                          close params string end)
@@ -1086,9 +1085,9 @@
            ;; ANSI does not explicitly say that an error should be
            ;; signalled, but the @ modifier is not explicitly allowed
            ;; for ~> either.
-           (when (format-directive-atsignp close)
+           (when (directive-atsignp close)
              (format-error-at*
-              nil (1- (format-directive-end close))
+              nil (1- (directive-end close))
               "@ modifier not allowed in close directive of ~
                justification block (i.e. ~~<...~~@>."
               '()
@@ -1112,7 +1111,7 @@
                  (let ((directive (find-if #'format-directive-p list)))
                    (if directive
                        (format-error-at*
-                        nil (1- (format-directive-end directive))
+                        nil (1- (directive-end directive))
                         "Cannot include format directives inside the ~
                          ~:[suffix~;prefix~] segment of ~~<...~~:>"
                         (list prefix-p)
@@ -1128,15 +1127,15 @@
                      (extract-string (caddr segments) nil)))
           (t
            (format-error "Too many segments for ~~<...~~:>")))))
-    (when (format-directive-atsignp close)
+    (when (directive-atsignp close)
       (setf insides
             (add-fill-style-newlines insides
                                      string
                                      (if first-semi
-                                         (format-directive-end first-semi)
+                                         (directive-end first-semi)
                                          end))))
     (values prefix
-            (and first-semi (format-directive-atsignp first-semi))
+            (and first-semi (directive-atsignp first-semi))
             insides
             suffix)))
 
@@ -1149,7 +1148,7 @@
           (let* ((non-space (position #\Space directive :test #'char/=))
                  (newlinep (and last-directive
                                 (char=
-                                 (format-directive-character last-directive)
+                                 (directive-character last-directive)
                                  #\Newline))))
             (cond
               ((and newlinep non-space)
@@ -1171,7 +1170,7 @@
           (cons directive
                 (add-fill-style-newlines
                  (cdr list) string
-                 (format-directive-end directive) directive))))))
+                 (directive-end directive) directive))))))
     (t nil)))
 
 (defun add-fill-style-newlines-aux (literal string offset)
@@ -1207,7 +1206,7 @@
            (let ((posn (position close-or-semi remaining)))
              (segments (subseq remaining 0 posn))
              (setf remaining (nthcdr (1+ posn) remaining)))
-           (when (char= (format-directive-character close-or-semi)
+           (when (char= (directive-character close-or-semi)
                         #\>)
              (setf close close-or-semi)
              (return))
@@ -1245,7 +1244,7 @@
 (defun expand-format-justification (segments colonp atsignp first-semi params)
   (let ((newline-segment-p
          (and first-semi
-              (format-directive-colonp first-semi))))
+              (directive-colonp first-semi))))
     (expand-bind-defaults
         ((mincol 0) (colinc 1) (minpad 0) (padchar #\space))
         params
@@ -1262,7 +1261,7 @@
                  ,(expand-bind-defaults
                       ((extra 0)
                        (line-len '(or (sb!impl::line-length stream) 72)))
-                      (format-directive-params first-semi)
+                      (directive-params first-semi)
                     `(setf extra-space ,extra line-len ,line-len))))
            ,@(mapcar (lambda (segment)
                        `(push (with-simple-output-to-string (stream)
@@ -1351,11 +1350,11 @@
                (incf (fill-pointer new-string) (length token))
                (replace new-string token :start1 new-start)))
             (t
-             (let* ((start (format-directive-start token))
-                    (end (format-directive-end token))
+             (let* ((start (directive-start token))
+                    (end (directive-end token))
                     (len (- end start))
                     (new-start (fill-pointer new-string)))
-               (cond ((eql (format-directive-character token) #\/)
+               (cond ((eql (directive-character token) #\/)
                       (push (handler-case (extract-user-fun-name string start end)
                               (error (e)
                                 (declare (ignore e))
@@ -1411,21 +1410,21 @@
           ((walk-justification (justification directives args)
              (declare (ignore args))
              (let ((*default-format-error-offset*
-                    (1- (format-directive-end justification))))
+                    (1- (directive-end justification))))
                (multiple-value-bind (segments first-semi close remaining)
                    (parse-format-justification directives)
                  (declare (ignore segments first-semi))
                  (cond
-                   ((not (format-directive-colonp close))
+                   ((not (directive-colonp close))
                     (values 0 0 directives))
-                   ((format-directive-atsignp justification)
+                   ((directive-atsignp justification)
                     (values 0 sb!xc:call-arguments-limit directives))
                    ;; FIXME: here we could assert that the
                    ;; corresponding argument was a list.
                    (t (values 1 1 remaining))))))
            (walk-conditional (conditional directives args)
              (let ((*default-format-error-offset*
-                    (1- (format-directive-end conditional))))
+                    (1- (directive-end conditional))))
                (multiple-value-bind (sublists last-semi-with-colon-p remaining)
                    (parse-conditional-directive directives)
                  (declare (ignore last-semi-with-colon-p))
@@ -1434,9 +1433,9 @@
                               maximize (nth-value
                                         1 (walk-directive-list s args)))))
                    (cond
-                     ((format-directive-atsignp conditional)
+                     ((directive-atsignp conditional)
                       (values 1 (max 1 sub-max) remaining))
-                     ((loop for p in (format-directive-params conditional)
+                     ((loop for p in (directive-params conditional)
                             thereis (or (integerp (cdr p))
                                         (memq (cdr p) '(:remaining :arg))))
                       (values 0 sub-max remaining))
@@ -1446,14 +1445,14 @@
            (walk-iteration (iteration directives args)
              (declare (ignore args))
              (let ((*default-format-error-offset*
-                    (1- (format-directive-end iteration))))
+                    (1- (directive-end iteration))))
                (let* ((close (find-directive directives #\} nil))
                       (posn (or (position close directives)
                                 (format-error "No corresponding close brace")))
                       (remaining (nthcdr (1+ posn) directives)))
                  ;; FIXME: if POSN is zero, the next argument must be
                  ;; a format control (either a function or a string).
-                 (if (format-directive-atsignp iteration)
+                 (if (directive-atsignp iteration)
                      (values (if (zerop posn) 1 0)
                              sb!xc:call-arguments-limit
                              remaining)
@@ -1468,14 +1467,14 @@
                   (when (null directive)
                     (return (values min (min max sb!xc:call-arguments-limit))))
                   (when (format-directive-p directive)
-                    (incf-both (count :arg (format-directive-params directive)
+                    (incf-both (count :arg (directive-params directive)
                                       :key #'cdr))
-                    (let ((c (format-directive-character directive)))
+                    (let ((c (directive-character directive)))
                       (cond
                         ((find c "ABCDEFGORSWX$/")
                          (incf-both))
                         ((char= c #\P)
-                         (unless (format-directive-colonp directive)
+                         (unless (directive-colonp directive)
                            (incf-both)))
                         ((or (find c "IT%&|_();>~") (char= c #\Newline)))
                         ;; FIXME: check correspondence of ~( and ~)
@@ -1489,7 +1488,7 @@
                          ;; FIXME: the argument corresponding to this
                          ;; directive must be a format control.
                          (cond
-                           ((format-directive-atsignp directive)
+                           ((directive-atsignp directive)
                             (incf min)
                             (setq max sb!xc:call-arguments-limit))
                            (t (incf-both 2))))

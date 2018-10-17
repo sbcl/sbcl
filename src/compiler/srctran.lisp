@@ -4683,8 +4683,8 @@
          always
          (or (stringp directive)
              (and (sb!format::format-directive-p directive)
-                  (let ((char (sb!format::format-directive-character directive))
-                        (params (sb!format::format-directive-params directive)))
+                  (let ((char (sb!format::directive-character directive))
+                        (params (sb!format::directive-params directive)))
                      (and (char-equal char #\a)
                           (null params)
                           (pop args))))))

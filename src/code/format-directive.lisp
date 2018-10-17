@@ -53,7 +53,8 @@
   (format-error-at* control-string offset complaint args))
 
 
-(defstruct (format-directive (:copier nil))
+(defstruct (format-directive (:copier nil)
+                             (:conc-name directive-))
   (string (missing-arg) :type simple-string :read-only t)
   (start (missing-arg) :type (and unsigned-byte fixnum) :read-only t)
   (end (missing-arg) :type (and unsigned-byte fixnum) :read-only t)

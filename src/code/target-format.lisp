@@ -35,11 +35,11 @@
 
 (defmethod print-object ((x format-directive) stream)
   (print-unreadable-object (x stream)
-    (let ((fun (format-directive-function x)))
-      (write-string (format-directive-string x)
+    (let ((fun (directive-function x)))
+      (write-string (directive-string x)
                     stream
-                    :start (format-directive-start x)
-                    :end (- (format-directive-end x) (if fun 1 0)))
+                    :start (directive-start x)
+                    :end (- (directive-end x) (if fun 1 0)))
       (when fun
         (print-symbol-with-prefix stream fun)
         (write-char #\/ stream)))))
@@ -62,11 +62,11 @@
                      (if (char= c #\newline) (write-string "~%" s) (write-char c s)))
                    (write-string piece s)))
               (t
-               (let* ((userfun (eql (format-directive-character piece) #\/))
-                      (end (- (format-directive-end piece) (if userfun 1 0))))
-                 (write-string (format-directive-string piece)
+               (let* ((userfun (eql (directive-character piece) #\/))
+                      (end (- (directive-end piece) (if userfun 1 0))))
+                 (write-string (directive-string piece)
                                s
-                               :start (format-directive-start piece)
+                               :start (directive-start piece)
                                :end end)
                  (when userfun
                    (print-symbol-with-prefix s (pop symbols))
@@ -146,7 +146,7 @@
        (pop directives)
        (write-string directive stream))
       (format-directive
-       (let* ((character (format-directive-character directive))
+       (let* ((character (directive-character directive))
               (function
                (typecase character
                 (base-char
@@ -155,7 +155,7 @@
          (multiple-value-setq
           (directives args)
           (let ((*default-format-error-offset*
-                 (1- (format-directive-end directive))))
+                 (1- (directive-end directive))))
             (if (functionp function)
                 (funcall function stream directive
                          (cdr directives) orig-args args)
@@ -191,8 +191,7 @@
          ,@(if lambda-list
                `((let ,(mapcar (lambda (var)
                                  `(,var
-                                   (,(symbolicate "FORMAT-DIRECTIVE-" var)
-                                    ,directive)))
+                                   (,(symbolicate "DIRECTIVE-" var) ,directive)))
                                (butlast lambda-list))
                    (values (progn ,@body) args)))
                `((declare (ignore ,directive ,directives))
@@ -1040,7 +1039,7 @@
   (let ((close (or (find-directive directives #\} nil)
                    (format-error "No corresponding close brace"))))
     (interpret-bind-defaults ((max-count nil)) params
-      (let* ((closed-with-colon (format-directive-colonp close))
+      (let* ((closed-with-colon (directive-colonp close))
              (posn (position close directives))
              (insides (if (zerop posn)
                           (next-arg)
@@ -1097,7 +1096,7 @@
   (multiple-value-bind (segments first-semi close remaining)
       (parse-format-justification directives)
     (setf args
-          (if (format-directive-colonp close) ; logical block vs. justification
+          (if (directive-colonp close) ; logical block vs. justification
               (multiple-value-bind (prefix per-line-p insides suffix)
                   (parse-format-logical-block segments colonp first-semi
                                               close params string end)
@@ -1115,9 +1114,9 @@
                 ;; ANSI does not explicitly say that an error should
                 ;; be signalled, but the @ modifier is not explicitly
                 ;; allowed for ~> either.
-                (when (format-directive-atsignp close)
+                (when (directive-atsignp close)
                   (format-error-at*
-                   nil (1- (format-directive-end close))
+                   nil (1- (directive-end close))
                    "@ modifier not allowed in close directive of ~
                     justification block (i.e. ~~<...~~@>."
                    '()
@@ -1138,11 +1137,11 @@
           (line-len 0))
       (setf args
             (catch 'up-and-out
-              (when (and first-semi (format-directive-colonp first-semi))
+              (when (and first-semi (directive-colonp first-semi))
                 (interpret-bind-defaults
                     ((extra 0)
                      (len (or (sb!impl::line-length stream) 72)))
-                    (format-directive-params first-semi)
+                    (directive-params first-semi)
                   (setf newline-string
                         (with-simple-output-to-string (stream)
                           (setf args
@@ -1220,7 +1219,7 @@
 ;;;; format interpreter and support functions for user-defined method
 
 (def-format-interpreter #\/ (string start end colonp atsignp params)
-  (let ((symbol (or (format-directive-function .directive)
+  (let ((symbol (or (directive-function .directive)
                     (the symbol (extract-user-fun-name string start end)))))
     (collect ((args))
       (dolist (param-and-offset params)
