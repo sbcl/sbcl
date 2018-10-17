@@ -13,10 +13,6 @@
 
 (defparameter *inspect-length* 10)
 
-;;; When *INSPECT-UNBOUND-OBJECT-MARKER* occurs in a parts list, it
-;;; indicates that that a slot is unbound.
-(defvar *inspect-unbound-object-marker* (gensym "INSPECT-UNBOUND-OBJECT-"))
-
 (defun inspector (object input-stream output-stream)
   (declare (ignore input-stream))
   (catch 'quit-inspect
@@ -74,7 +70,7 @@ evaluated expressions.
                (cond ((< -1 command elements-length)
                       (let* ((element (nth command elements))
                              (value (if named-p (cdr element) element)))
-                        (cond ((eq value *inspect-unbound-object-marker*)
+                        (cond ((eq value sb-pcl:+slot-unbound+)
                                (format s "~%That slot is unbound.~%")
                                (return-from %inspect (reread)))
                               (t
@@ -129,7 +125,7 @@ evaluated expressions.
                   (values (cdr element) (car element))
                   element)
             (format stream "~W. ~@[~A: ~]~W~%"
-                    index name (if (eq value *inspect-unbound-object-marker*)
+                    index name (if (eq value sb-pcl:+slot-unbound+)
                                    "unbound"
                                    value))))))
 
@@ -161,10 +157,10 @@ evaluated expressions.
                 (cons "Package" (symbol-package object))
                 (cons "Value" (if (boundp object)
                                   (symbol-value object)
-                                  *inspect-unbound-object-marker*))
+                                  sb-pcl:+slot-unbound+))
                 (cons "Function" (if (fboundp object)
                                      (symbol-function object)
-                                     *inspect-unbound-object-marker*))
+                                     sb-pcl:+slot-unbound+))
                 (cons "Plist" (symbol-plist object)))))
 
 (defun inspected-structure-elements (object)
@@ -189,7 +185,7 @@ evaluated expressions.
       (let* ((slot-name (slot-value class-slot 'sb-pcl::name))
              (slot-value (if (slot-boundp object slot-name)
                              (slot-value object slot-name)
-                             *inspect-unbound-object-marker*)))
+                             sb-pcl:+slot-unbound+)))
         (push (cons slot-name slot-value) reversed-elements)))))
 
 (defmethod inspected-parts ((object standard-object))
