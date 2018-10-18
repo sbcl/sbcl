@@ -27,19 +27,6 @@
         (sb!pcl::*dfun-miss-gfs-on-stack* nil))
      ,@body))
 
-;;; Evaluate CLEANUP-FORMS iff PROTECTED-FORM does a non-local exit.
-(defmacro nlx-protect (protected-form &rest cleanup-froms)
-  (with-unique-names (completep)
-    `(let ((,completep nil))
-       (without-interrupts
-         (unwind-protect
-              (progn
-                (allow-with-interrupts
-                  ,protected-form)
-                (setq ,completep t))
-           (unless ,completep
-             ,@cleanup-froms))))))
-
 (declaim (inline %unblock-deferrable-signals %unblock-gc-signals))
 (define-alien-routine ("unblock_deferrable_signals"
                        %unblock-deferrable-signals)
@@ -85,16 +72,18 @@
         (sb!thread::without-thread-waiting-for (:already-without-interrupts t)
           (allow-with-interrupts
             (nlx-protect (funcall function)
-                         ;; We've been running with deferrables
-                         ;; blocked in Lisp called by a C signal
-                         ;; handler. If we return normally the sigmask
-                         ;; in the interrupted context is restored.
-                         ;; However, if we do an nlx the operating
-                         ;; system will not restore it for us.
-                         (when *unblock-deferrables-on-enabling-interrupts-p*
-                           ;; This means that storms of interrupts
-                           ;; doing an nlx can still run out of stack.
-                           (unblock-deferrable-signals)))))))))
+              ;; We've been running with deferrables
+              ;; blocked in Lisp called by a C signal
+              ;; handler. If we return normally the sigmask
+              ;; in the interrupted context is restored.
+              ;; However, if we do an nlx the operating
+              ;; system will not restore it for us.
+              (when *unblock-deferrables-on-enabling-interrupts-p*
+                ;; This means that storms of interrupts
+                ;; doing an nlx can still run out of stack.
+                (unblock-deferrable-signals)))
+            ;; The return value doesn't matter, just return 0
+            0))))))
 
 (defmacro in-interruption ((&key) &body body)
   "Convenience macro on top of INVOKE-INTERRUPTION."

@@ -467,10 +467,11 @@
             (:catch
              (code `(%catch-breakup)))
             (:unwind-protect
-             (code `(%unwind-protect-breakup))
-             (let ((fun (ref-leaf (lvar-uses (second args)))))
-               (reanalyze-funs fun)
-               (code `(%funcall ,fun))))
+              (code `(%unwind-protect-breakup))
+              (let ((fun (ref-leaf (lvar-uses (second args)))))
+                (when (functional-p fun)
+                  (reanalyze-funs fun)
+                  (code `(%funcall ,fun)))))
             ((:block :tagbody)
              (dolist (nlx (cleanup-info cleanup))
                (code `(%lexical-exit-breakup ',nlx))))
