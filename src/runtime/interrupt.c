@@ -1164,17 +1164,6 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
          * be available; should we copy it or was nobody using it anyway?)
          * then we should convert this to return-elsewhere */
 
-        /* CMUCL comment said "Allocate the SAPs while the interrupts
-         * are still disabled.".  I (dan, 2003.08.21) assume this is
-         * because we're not in pseudoatomic and allocation shouldn't
-         * be interrupted.  In which case it's no longer an issue as
-         * all our allocation from C now goes through a PA wrapper,
-         * but still, doesn't hurt.
-         *
-         * Yeah, but non-gencgc platforms don't really wrap allocation
-         * in PA. MG - 2005-08-29  */
-
-
 #ifndef LISP_FEATURE_SB_SAFEPOINT
         /* Leave deferrable signals blocked, the handler itself will
          * allow signals again when it sees fit. */
