@@ -14,6 +14,10 @@
 all: targets tags
 TARGET=sbcl
 
+# Allow using paxctl(8) or similar programs to adjust PaX permissions
+# of src/runtime/sbcl during the build.
+SBCL_PAXCTL ?= :
+
 # Defaults which might be overridden or modified by values in the
 # Config file. Most of them are same on most systems right now.
 # If you need to override one of these, do it in Config.
@@ -79,6 +83,7 @@ targets: $(TARGET) $(OBJTARGET) sbcl.nm sbcl.mk
 
 $(TARGET): $(LIBSBCL)
 	$(CC) ${LINKFLAGS} -o $@ $(USE_LIBSBCL) $(LIBS)
+	$(SBCL_PAXCTL) $@
 
 # Enable compiling gencgc with even more assertions and/or
 # data collection, with COMPILING_TESTS. Not really used yet.
