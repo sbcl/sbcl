@@ -1321,18 +1321,21 @@
     (intern symbol package)))
 
 (defun extract-user-fun-directives (string)
-  (let ((new-string (make-array (length string)
-                                :element-type 'character
-                                :fill-pointer 0))
-        (symbols))
-    (dolist (token (handler-case
-                       (combine-directives
-                        (%tokenize-control-string string 0 (length string) nil)
-                        nil)
-                     (error (e)
-                       (declare (ignore e))
-                       (return-from extract-user-fun-directives
-                         (values nil nil)))))
+  (let* ((tokens (handler-case
+                     (combine-directives
+                      (%tokenize-control-string string 0 (length string) nil)
+                      nil)
+                   (error (e)
+                     (declare (ignore e))
+                     (return-from extract-user-fun-directives (values nil nil)))))
+         (max-len (loop for token in tokens
+                        sum (if (format-directive-p token)
+                                (- (directive-end token) (directive-start token))
+                                (length token))))
+         (new-string
+          (make-array max-len :element-type 'character :fill-pointer 0))
+         (symbols))
+    (dolist (token tokens)
       (cond ((stringp token)
              (aver (not (find #\~ token)))
              (let ((new-start (fill-pointer new-string)))

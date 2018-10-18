@@ -42,6 +42,12 @@
   `(and sb-format:format-error
         (satisfies format-error-format-control-string-p)))
 
+(with-test (:name :combine-directives)
+  ;; The scratch buffer for rematerializing a control string after extracting
+  ;; user-fun directives (~//) needs to account for the expansion of the input
+  ;; if a directive is converted immediately to a run of literal characters.
+  (sb-format::extract-user-fun-directives "Oh hello~10%~/f/"))
+
 (with-test (:name (:[-directive :non-integer-argument))
   (with-compiled-and-interpreted-format ()
     (assert-error (format* "~[~]" 1d0) format-error-with-control-string)))
@@ -88,5 +94,3 @@
         ()
         `(lambda () (error ,control))
       (() (condition 'simple-error)))))
-
-
