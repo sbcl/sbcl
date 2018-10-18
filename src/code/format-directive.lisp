@@ -54,18 +54,40 @@
 
 
 (defstruct (format-directive (:copier nil)
+                             (:constructor %make-directive
+                                           (string start end params bits function))
                              (:conc-name directive-))
   (string (missing-arg) :type simple-string :read-only t)
   (start (missing-arg) :type (and unsigned-byte fixnum) :read-only t)
   (end (missing-arg) :type (and unsigned-byte fixnum) :read-only t)
-  ;; CHARACTER, COLONP, ATSIGNP could be packed into one integer
-  (character (missing-arg) :type character :read-only t)
+  (bits nil :type (unsigned-byte 9) :read-only t) ; colon, atsign, char
   ;; for early binding to the function in "~/pkg:fun/" directives
   (function nil :type symbol :read-only t)
-  (colonp nil :type (member t nil) :read-only t)
-  (atsignp nil :type (member t nil) :read-only t)
   (params nil :type list :read-only t))
 (declaim (freeze-type format-directive))
+
+(defun make-format-directive (string start end params colon atsign char symbol)
+  (let ((code (sb!xc:char-code char)))
+    (%make-directive string start end params
+                     (logior (if colon  #x100 0)
+                             (if atsign #x080 0)
+                             (if (< code 128) code 0))
+                     symbol)))
+
+(declaim (inline directive-colonp directive-atsignp))
+(defun directive-colonp (x) (logbitp 8 (directive-bits x)))
+(defun directive-atsignp (x) (logbitp 7 (directive-bits x)))
+(declaim (inline directive-code directive-character))
+(defun directive-code (x) (logand (directive-bits x) #x7F))
+(defun directive-character (x) (sb!xc:code-char (directive-code x)))
+;;; This works even if directive char is invalid, where -CHARACTER
+;;; would return (code-char 0)
+(defun directive-char-name (x)
+  (let ((byte (directive-code x)))
+    (char-name (if (eql byte 0)
+                   ;; extract the character from the string
+                   (char (directive-string x) (1- (directive-end x)))
+                   (sb!xc:code-char byte)))))
 
 (defun check-modifier (modifier-name value)
   (when value

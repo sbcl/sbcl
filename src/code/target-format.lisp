@@ -146,12 +146,8 @@
        (pop directives)
        (write-string directive stream))
       (format-directive
-       (let* ((character (directive-character directive))
-              (function
-               (typecase character
-                (base-char
-                 (svref *format-directive-interpreters*
-                        (char-code character))))))
+       (let ((function (svref *format-directive-interpreters*
+                              (directive-code directive))))
          (multiple-value-setq
           (directives args)
           (let ((*default-format-error-offset*
@@ -160,7 +156,7 @@
                 (funcall function stream directive
                          (cdr directives) orig-args args)
                 (format-error "Unknown format directive ~@[(character: ~A)~]"
-                              (char-name character)))))))))))
+                              (directive-char-name directive)))))))))))
 
 ;;;; FORMAT directive definition macros and runtime support
 

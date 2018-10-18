@@ -179,11 +179,9 @@
                 (setf posn closing-slash)
                 (format-error-at string posn "No matching closing slash"))))
         (make-format-directive
-         :string string :start start :end (1+ posn)
-         :character (char-upcase char)
-         :function (when (eql char #\/) (car symbols))
-         :colonp colonp :atsignp atsignp
-         :params (nreverse params))))))
+         string start (1+ posn)
+         (nreverse params) colonp atsignp (char-upcase char)
+         (when (eql char #\/) (car symbols)))))))
 
 ;;; Make a few simplifications to the directive list in INPUT,
 ;;; including translation of ~% to literal newline.
@@ -236,7 +234,7 @@
                       (when (and (not colon) (stringp (car input)))
                         (concat (string-left-trim
                                  ;; #\Tab is a nonstandard char
-                                 `(#-sb-xc-host ,(code-char tab-char-code)
+                                 `(#-sb-xc-host ,(sb!xc:code-char tab-char-code)
                                    #\space #\newline)
                                  (pop input))))
                       (return)))
@@ -251,7 +249,7 @@
                         (when (plusp n)
                           (let ((char (case char
                                         (#\% #\Newline)
-                                        (#\| (code-char form-feed-char-code))
+                                        (#\| (sb!xc:code-char form-feed-char-code))
                                         (t char))))
                             (concat (make-string n :initial-element char))))
                         (return)))))
@@ -364,22 +362,16 @@
   (etypecase directive
     (format-directive
      (let ((expander
-            (let ((char (directive-character directive)))
-              (typecase char
-                (base-char
-                 (aref *format-directive-expanders* (sb!xc:char-code char))))))
+            (aref *format-directive-expanders* (directive-code directive)))
            (*default-format-error-offset*
             (1- (directive-end directive))))
-       (declare (type (or null function) expander))
-       (if expander
+       (if (functionp expander)
            (funcall expander directive more-directives)
            (format-error "Unknown directive ~@[(character: ~A)~]"
-                         (char-name (directive-character directive))))))
+                         (directive-char-name directive)))))
     ((simple-string 1)
      (values `(write-char ,(schar directive 0) stream)
              more-directives))
-    ((simple-string 0)
-     (values nil more-directives))
     (simple-string
      (values `(write-string ,directive stream)
              more-directives))))
@@ -1147,9 +1139,8 @@
          ((simple-string-p directive)
           (let* ((non-space (position #\Space directive :test #'char/=))
                  (newlinep (and last-directive
-                                (char=
-                                 (directive-character last-directive)
-                                 #\Newline))))
+                                (char= (directive-character last-directive)
+                                       #\Newline))))
             (cond
               ((and newlinep non-space)
                (nconc
@@ -1187,9 +1178,8 @@
                                end)))
             (results (subseq literal posn non-blank))
             (results (make-format-directive
-                      :string string :character #\_
-                      :start (+ offset non-blank) :end (+ offset non-blank)
-                      :colonp t :atsignp nil :params nil))
+                      string (+ offset non-blank) (+ offset non-blank)
+                      nil t nil #\_ nil)) ; params,colon,atsign,char,symbol
             (setf posn non-blank))
           (when (= posn end)
             (return))))
@@ -1206,8 +1196,7 @@
            (let ((posn (position close-or-semi remaining)))
              (segments (subseq remaining 0 posn))
              (setf remaining (nthcdr (1+ posn) remaining)))
-           (when (char= (directive-character close-or-semi)
-                        #\>)
+           (when (char= (directive-character close-or-semi) #\>)
              (setf close close-or-semi)
              (return))
            (unless first-semi

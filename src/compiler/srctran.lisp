@@ -4685,7 +4685,7 @@
              (and (sb!format::format-directive-p directive)
                   (let ((char (sb!format::directive-character directive))
                         (params (sb!format::directive-params directive)))
-                     (and (char-equal char #\a)
+                     (and (char= char #\A)
                           (null params)
                           (pop args))))))
    (null args)))

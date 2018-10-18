@@ -9,13 +9,12 @@
 
 (in-package "SB!FORMAT")
 
-(declaim (type (simple-vector #.base-char-code-limit)
+(declaim (type (simple-vector 128)
                *format-directive-expanders*
                *format-directive-interpreters*))
-(defglobal *format-directive-expanders*
-  (make-array base-char-code-limit :initial-element nil))
-(defglobal *format-directive-interpreters*
-  (make-array base-char-code-limit :initial-element nil))
+(defglobal *format-directive-expanders* (make-array 128 :initial-element nil))
+(define-load-time-global *format-directive-interpreters*
+  (make-array 128 :initial-element nil))
 
 (defvar *default-format-error-control-string* nil)
 (defvar *default-format-error-offset* nil)
