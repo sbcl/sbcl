@@ -1953,6 +1953,7 @@
 (defknown policy-quality (policy symbol) policy-quality
           (flushable))
 
+(defknown %program-error (&optional t &rest t) nil ())
 (defknown compiler-error (t &rest t) nil ())
 (defknown (compiler-warn compiler-style-warn) (t &rest t) (values) ())
 (defknown (compiler-mumble note-lossage note-unwinnage) (string &rest t) (values) ())

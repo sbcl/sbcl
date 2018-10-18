@@ -4594,7 +4594,7 @@
             (setq keywords (cddr keywords))))))))
 
 ;;; FORMAT control string best-effort sanity checker and compactor
-(dolist (fun (append '(format error warn style-warn)
+(dolist (fun (append '(format error warn style-warn %program-error)
                      #+sb-xc-host ; No need for these after self-build
                      '(bug compiler-mumble compiler-notify
                        compiler-style-warn compiler-warn compiler-error
