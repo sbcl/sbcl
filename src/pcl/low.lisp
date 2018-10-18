@@ -90,7 +90,8 @@
 (defun fsc-instance-p (fin)
   (funcallable-instance-p fin))
 (defmacro fsc-instance-slots (fin)
-  `(%funcallable-instance-info ,fin sb!vm:instance-data-start))
+  `(%funcallable-instance-info
+    ,fin ,(get-dsd-index standard-funcallable-instance clos-slots)))
 
 (declaim (inline clos-slots-ref (setf clos-slots-ref)))
 (declaim (ftype (function (simple-vector index) t) clos-slots-ref))
@@ -177,7 +178,8 @@
 ;;; weakening of STD-INSTANCE-P.
 ;;; FIXME: what does the preceding comment mean? You can't use instance-slots
 ;;; on a structure. (Consider especially a structure of 0 slots.)
-(defmacro std-instance-slots (x) `(%instance-ref ,x sb!vm:instance-data-start))
+(defmacro std-instance-slots (x)
+  `(%instance-ref ,x ,(get-dsd-index standard-instance slots)))
 
 ;;; FIXME: These functions are called every place we do a
 ;;; CALL-NEXT-METHOD, and probably other places too. It's likely worth

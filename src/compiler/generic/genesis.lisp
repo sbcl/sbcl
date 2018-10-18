@@ -1060,12 +1060,9 @@ core and return a descriptor to it."
 ;;; in a cold defstruct-description. INDEX is a DSD-INDEX.
 ;;; Return the host's accessor name for the host image of that slot.
 (defun dsd-accessor-from-cold-slots (cold-dd-slots desired-index)
-  (let* ((dsd-slots (dd-slots
-                     (find-defstruct-description 'defstruct-slot-description)))
-         (bits-slot
-          (dsd-index (find 'sb!kernel::bits dsd-slots :key #'dsd-name)))
+  (let* ((bits-slot (get-dsd-index defstruct-slot-description sb!kernel::bits))
          (accessor-fun-name-slot
-          (dsd-index (find 'sb!kernel::accessor-name dsd-slots :key #'dsd-name))))
+          (get-dsd-index defstruct-slot-description sb!kernel::accessor-name)))
     (do ((list cold-dd-slots (cold-cdr list)))
         ((cold-null list))
       (when (= (ash (descriptor-fixnum

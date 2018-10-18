@@ -364,6 +364,12 @@
                   (cons method more-methods)))
        ',name)))
 
+(defmacro get-dsd-index (type-name slot-name)
+  (declare (notinline dd-slots)) ; forward reference
+  (dsd-index (find slot-name
+                   (dd-slots (find-defstruct-description type-name))
+                   :key #'dsd-name)))
+
 (defmacro !define-type-class (name &key inherits
                                      (enumerable (unless inherits (must-supply-this))
                                                  enumerable-supplied-p)
@@ -398,13 +404,7 @@
     ;; which avoids a bootstrap problem: it's tricky to dump a type-class.
     #+sb-xc
     (let ((type-class-index
-           (position name *type-classes* :key #'type-class-name))
-          (slot-index
-           ;; KLUDGE: silence bogus warning that FIND "certainly" returns NIL
-           (locally (declare (notinline find))
-             (dsd-index (find 'class-info
-                              (dd-slots (find-defstruct-description 'ctype))
-                              :key #'dsd-name)))))
+           (position name *type-classes* :key #'type-class-name)))
       `(!cold-init-forms
         (let* ((backpatch-list (svref *type-classes* ,type-class-index))
                (type-class ,make-it))
@@ -417,7 +417,8 @@
           (dolist (instance backpatch-list)
             ;; Fixup the class first, in case fixing the hash needs the class.
             ;; (It doesn't currently, but just in case it does)
-            (setf (%instance-ref instance ,slot-index) type-class)
+            (setf (%instance-ref instance ,(get-dsd-index ctype class-info))
+                  type-class)
             (!improve-ctype-hash instance ',name)))))))
 
 ;;; Define the translation from a type-specifier to a type structure for

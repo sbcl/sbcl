@@ -125,8 +125,6 @@
 
 (sb!kernel::!defstruct-with-alternate-metaclass standard-instance
   ;; KLUDGE: arm64 needs to have CAS-HEADER-DATA-HIGH implemented
-  ;; [The STD-INSTANCE-SLOTS macro wires in the assumption that SLOTS
-  ;; has DSD-INDEX of instance-data-start + 0]
   :slot-names (slots #!-(and compact-instance-header x86-64) hash-code)
   :constructor %make-standard-instance
   :superclass-name t
@@ -139,11 +137,6 @@
 ;;; it, so that funcallable-instances can act like simple-funs, in as much as
 ;;; there's an address you can jump to without loading a register.
 (sb!kernel::!defstruct-with-alternate-metaclass standard-funcallable-instance
-  ;; KLUDGE: Note that neither of these slots is ever accessed by its
-  ;; accessor name as of sbcl-0.pre7.63. Presumably everything works
-  ;; by puns based on absolute locations. Fun fun fun.. -- WHN 2001-10-30
-  ;; [The FSC-INSTANCE-SLOTS macro wires in the assumption that CLOS-SLOTS
-  ;; has DSD-INDEX of instance-data-start + 0]
   :slot-names (clos-slots #!-compact-instance-header hash-code)
   :constructor %make-standard-funcallable-instance
   :superclass-name function

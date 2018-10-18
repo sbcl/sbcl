@@ -28,13 +28,8 @@
 (defun make-finalizer-store (array-length)
   (let* ((v (make-array (the index array-length)))
          (ht (make-hash-table :test 'eq :weakness :key)))
-    (macrolet ((frob-hash-table-flag-bit (slot-name val)
-                 (let ((dsd (find slot-name
-                                  (dd-slots (find-defstruct-description 'hash-table))
-                                  :key 'dsd-name)))
-                   `(setf (%instance-ref ht ,(dsd-index dsd))
-                          (logior (%instance-ref ht ,(dsd-index dsd)) ,val)))))
-      (frob-hash-table-flag-bit flags 4))
+    (setf (%instance-ref ht (get-dsd-index hash-table flags))
+          (logior (%instance-ref ht (get-dsd-index hash-table flags)) 4))
     ;; The recycle bin has a dummy item in front so that the simple-vector
     ;; is growable without messing up RUN-PENDING-FINALIZERS when it atomically
     ;; pushes items into the recycle bin - it is unaffected by looking at
