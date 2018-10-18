@@ -482,7 +482,7 @@
        :allow-failure t :allow-warnings t)
     (assert failure-p)
     (assert (= 1 (length warnings)))
-    (assert-error (funcall fun) error)))
+    (assert-error (funcall fun 0) error)))
 
 (with-test (:name (adjust-array :element-type))
   (checked-compile-and-assert ()
