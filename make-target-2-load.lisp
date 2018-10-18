@@ -81,29 +81,34 @@
              (when (find #\~ string)
                ;; very likely to be a format control if it parses OK.
                ;; Possibly not, but false positives are acceptable.
-               (when (some (lambda (x)
-                             (and (typep x 'sb-format::format-directive)
-                                  (eql (sb-format::directive-character x) #\/)
-                                  (possibly-ungood-package-reference
-                                   (subseq string
-                                           (sb-format::directive-start x)
-                                           (sb-format::directive-end x)))))
-                           (ignore-errors
-                            (sb-format::%tokenize-control-string
-                             string 0 (length string) nil)))
-                 (format t "Found string ~S~%" string)
-                 t))))
-    (let ((n 0))
+               (some (lambda (x)
+                       (and (typep x 'sb-format::format-directive)
+                            (eql (sb-format::directive-character x) #\/)
+                            (possibly-ungood-package-reference
+                             (subseq string
+                                     (sb-format::directive-start x)
+                                     (sb-format::directive-end x)))))
+                     (ignore-errors
+                      (sb-format::%tokenize-control-string
+                       string 0 (length string) nil))))))
+    (let (wps)
       (sb-vm:map-allocated-objects
        (lambda (obj type size)
          (declare(ignore type size))
          (when (and (stringp obj) (possibly-format-control obj))
-           (incf n)))
+           (push (make-weak-pointer obj) wps)))
        :all)
-      (when (plusp n)
+      (when wps
+        (dolist (wp wps)
+          (format t "Found string ~S~%" (weak-pointer-value wp)))
         (warn "Potential problem with format-control strings.
 Please check that all strings which were not recognizable to the compiler
-(as the first argument to WARN, etc) are wrapped in SB-FORMAT:TOKENS")))))
+(as the first argument to WARN, etc) are wrapped in SB-FORMAT:TOKENS")
+        ;; This is for display only, I don't check the result.
+        ;; NOTE: this symbol doesn't become external until after fasload.
+        #+gencgc (when (fboundp 'sb-ext::search-roots)
+                   (sb-ext::search-roots wps :static)))
+      wps)))
 
 (progn
   (defvar *compile-files-p* nil)
@@ -111,6 +116,9 @@ Please check that all strings which were not recognizable to the compiler
 
 (progn
   (load (merge-pathnames "src/cold/warm.lisp" *load-pathname*))
+  ;; See the giant comment at the bottom of this file
+  ;; concerning the need for this GC.
+  (gc :full t)
   (!scan-format-control-strings)
 
   ;;; Remove docstrings that snuck in, as will happen with
@@ -344,3 +352,60 @@ Please check that all strings which were not recognizable to the compiler
 (setf (readtable-base-char-preference *readtable*) :symbols)
 
 "done with warm.lisp, about to SAVE-LISP-AND-DIE"
+
+#|
+This is the actual "name" of a toplevel code component that gets dumped to fasl
+when compiling src/pcl/boot. Not only does it contain a format control string in
+its raw representation, this is a complete and utter waste of time to dump.
+We really ought to try a LOT harder not to produce such garbage metadata:
+
+* (progn (terpri)
+   (write (sb-c::compiled-debug-fun-toplevel-name
+           (elt (sb-c::compiled-debug-info-fun-map *cdi*) 0))
+          :level nil :length nil))
+
+(SB-C::TOP-LEVEL-FORM
+ (LABELS ((WARN-PARSE (SPECIALIZER &OPTIONAL CONDITION)
+            (STYLE-WARN "~@<Cannot parse specializer ~S in ~S~@[: ~A~].~@:>"
+                        SPECIALIZER # CONDITION))
+          (WARN-FIND (CONDITION NAME PROTO-GENERIC-FUNCTION PROTO-METHOD)
+            (WARN CONDITION :FORMAT-CONTROL
+                  #<(SIMPLE-BASE-STRING
+                     228) ~@<Cannot find type for specializer ~
+                  ~/sb-ext:print-symbol-with-prefix/ when executing ~S ~
+                  for a ~/sb-impl:print-type-specifier/ of a ~
+                  ~/sb-imp... {1003A2BC8F}>
+                  :FORMAT-ARGUMENTS #))
+          (CLASS-NAME-TYPE-SPECIFIER
+              (NAME PROTO-GENERIC-FUNCTION PROTO-METHOD &OPTIONAL #)
+            (LET #
+              #)))
+   (DEFUN REAL-SPECIALIZER-TYPE-SPECIFIER/SYMBOL
+          (PROTO-GENERIC-FUNCTION PROTO-METHOD SPECIALIZER)
+     (LET (#)
+       (WHEN SPECIALIZER #)))
+   (DEFUN REAL-SPECIALIZER-TYPE-SPECIFIER/T
+          (PROTO-GENERIC-FUNCTION PROTO-METHOD SPECIALIZER)
+     (LET (#)
+       (WHEN SPECIALIZER #)))
+   (DEFUN REAL-SPECIALIZER-TYPE-SPECIFIER/CLASS-EQ-SPECIALIZER
+          (PROTO-GENERIC-FUNCTION PROTO-METHOD SPECIALIZER)
+     (SPECIALIZER-TYPE-SPECIFIER PROTO-GENERIC-FUNCTION PROTO-METHOD
+      (SPECIALIZER-CLASS SPECIALIZER)))
+   (DEFUN REAL-SPECIALIZER-TYPE-SPECIFIER/EQL-SPECIALIZER
+          (PROTO-GENERIC-FUNCTION PROTO-METHOD SPECIALIZER)
+     (DECLARE (IGNORE PROTO-GENERIC-FUNCTION PROTO-METHOD))
+     `(EQL SB-IMPL::COMMA))
+   (DEFUN REAL-SPECIALIZER-TYPE-SPECIFIER/STRUCTURE-CLASS
+          (PROTO-GENERIC-FUNCTION PROTO-METHOD SPECIALIZER)
+     (DECLARE (IGNORE PROTO-GENERIC-FUNCTION PROTO-METHOD))
+     (CLASS-NAME SPECIALIZER))
+   (DEFUN REAL-SPECIALIZER-TYPE-SPECIFIER/SYSTEM-CLASS
+          (PROTO-GENERIC-FUNCTION PROTO-METHOD SPECIALIZER)
+     (DECLARE (IGNORE PROTO-GENERIC-FUNCTION PROTO-METHOD))
+     (CLASS-NAME SPECIALIZER))
+   (DEFUN REAL-SPECIALIZER-TYPE-SPECIFIER/CLASS
+          (PROTO-GENERIC-FUNCTION PROTO-METHOD SPECIALIZER)
+     (LET (#)
+       (WHEN # #)))))
+|#

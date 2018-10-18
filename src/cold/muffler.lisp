@@ -19,12 +19,15 @@
 ;; and "SAP to pointer conversion" in case we care.
 (defun unable-to-optimize-note-p (condition)
   (and (string= (type-of condition) "SIMPLE-COMPILER-NOTE")
-       (or (search "unable to" (simple-condition-format-control condition))
-           (let ((args (simple-condition-format-arguments condition)))
-             (and (typep (car args) '(cons string))
-                  (search "forced to do" (caar args)))))))
+       (let ((fc (simple-condition-format-control condition)))
+         (and (stringp fc)
+              (or (search "unable to" fc)
+                  (let ((args (simple-condition-format-arguments condition)))
+                    (and (typep (car args) '(cons string))
+                         (search "forced to do" (caar args)))))))))
 
 (defun optional+key-style-warning-p (condition)
-    (and (typep condition '(and simple-condition style-warning))
-         (search "&OPTIONAL and &KEY found"
-                 (simple-condition-format-control condition))))
+  (and (typep condition '(and simple-condition style-warning))
+       (let ((fc (simple-condition-format-control condition)))
+         (and (stringp fc)
+              (search "&OPTIONAL and &KEY found" fc)))))
