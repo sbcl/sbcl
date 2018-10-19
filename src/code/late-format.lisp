@@ -93,6 +93,7 @@
          :references '((:ansi-cl :section (22 3 5 2))))))
     (nreverse result)))
 
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
 (defun parse-directive (string start symbols)
   (let ((posn (1+ start)) (params nil) (colonp nil) (atsignp nil)
         (end (length string)))
@@ -181,7 +182,7 @@
         (make-format-directive
          string start (1+ posn)
          (nreverse params) colonp atsignp (char-upcase char)
-         (when (eql char #\/) (car symbols)))))))
+         (when (eql char #\/) (car symbols))))))))
 
 ;;; Make a few simplifications to the directive list in INPUT,
 ;;; including translation of ~% to literal newline.
@@ -1039,22 +1040,19 @@
 
 ;;;; format directives and support functions for justification
 
-(defparameter *illegal-inside-justification*
-  (mapcar (lambda (x) (parse-directive x 0 nil))
-          '("~W" "~:W" "~@W" "~:@W"
-            "~_" "~:_" "~@_" "~:@_"
-            "~:>" "~:@>"
-            "~I" "~:I" "~@I" "~:@I"
-            "~:T" "~:@T")))
+(defconstant-eqx !illegal-inside-justification
+  (mapcar (lambda (x) (directive-bits (parse-directive x 0 nil)))
+          '("~:>" "~:@>"
+            "~:T" "~:@T"))
+  #'equal)
 
+;;; Reject ~W, ~_, ~I and certain other specific values of modifier+character.
 (defun illegal-inside-justification-p (directive)
-  (member directive *illegal-inside-justification*
-          :test (lambda (x y)
-                  (and (format-directive-p x)
-                       (format-directive-p y)
-                       (eql (directive-character x) (directive-character y))
-                       (eql (directive-colonp x) (directive-colonp y))
-                       (eql (directive-atsignp x) (directive-atsignp y))))))
+  (and (format-directive-p directive)
+       (if (or (member (directive-bits directive) !illegal-inside-justification)
+               (member (directive-character directive) '(#\W #\I #\_)))
+           t
+           nil)))
 
 (def-complex-format-directive #\< (colonp atsignp params string end directives)
   (multiple-value-bind (segments first-semi close remaining)
@@ -1066,7 +1064,9 @@
                                          close params string end)
            (expand-format-logical-block prefix per-line-p insides
                                         suffix atsignp))
-         (let ((count (reduce #'+ (mapcar (lambda (x) (count-if #'illegal-inside-justification-p x)) segments))))
+         (let ((count (reduce #'+ (mapcar (lambda (x)
+                                            (count-if #'illegal-inside-justification-p x))
+                                          segments))))
            (when (> count 0)
              ;; ANSI specifies that "an error is signalled" in this
              ;; situation.
