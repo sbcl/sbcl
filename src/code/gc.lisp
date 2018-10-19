@@ -87,7 +87,7 @@ and submit it as a patch."
 
 ;;;; GC hooks
 
-(!defvar *after-gc-hooks* nil
+(!define-load-time-global *after-gc-hooks* nil
   "Called after each garbage collection, except for garbage collections
 triggered during thread exits. In a multithreaded environment these hooks may
 run in any thread.")

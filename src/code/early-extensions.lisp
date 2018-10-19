@@ -13,10 +13,10 @@
 
 (in-package "SB!IMPL")
 
-(defvar *core-pathname* nil
+(defglobal *core-pathname* nil
   "The absolute pathname of the running SBCL core.")
 
-(defvar *runtime-pathname* nil
+(defglobal *runtime-pathname* nil
   "The absolute pathname of the running SBCL runtime.")
 
 (eval-when (:compile-toplevel :load-toplevel :execute)

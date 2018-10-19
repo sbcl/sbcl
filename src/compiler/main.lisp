@@ -41,6 +41,7 @@
 
 ;;; The current non-macroexpanded toplevel form as printed when
 ;;; *compile-print* is true.
+;;; FIXME: should probably have no value outside the compiler.
 (defvar *top-level-form-noted* nil)
 
 (defvar sb!xc:*compile-verbose* t

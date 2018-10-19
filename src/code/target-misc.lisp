@@ -46,9 +46,9 @@ are running on, or NIL if we can't find any useful information."
 ;;; for Conforming Implementations" it is kosher to add a SETF function for
 ;;; a symbol in COMMON-LISP..
 (declaim (type (or null string) *short-site-name* *long-site-name*))
-(defvar *short-site-name* nil
+(define-load-time-global *short-site-name* nil
   "The value of SHORT-SITE-NAME.")
-(defvar *long-site-name* nil
+(define-load-time-global *long-site-name* nil
   "The value of LONG-SITE-NAME.")
 (defun short-site-name ()
   "Return a string with the abbreviated site name, or NIL if not known."

@@ -680,7 +680,7 @@ standard Lisp readtable when NIL."
 ;;; On the other hand, it's probably very very seldom a problem in practice.
 ;;; On the third hand, it might be just as easy to use a hash table,
 ;;; so maybe we should. -- WHN 19991202
-(defvar *sharp-equal* ())
+(defvar *sharp-equal*)
 
 (declaim (ftype (sfunction (t t) (values bit t)) read-maybe-nothing))
 
