@@ -365,7 +365,14 @@
        ',name)))
 
 (defmacro get-dsd-index (type-name slot-name)
-  (declare (notinline dd-slots)) ; forward reference
+  ;; Declare DD-SLOTS explicitly notinline, to avoid a warning, as its source
+  ;; appears later, in early-classoid. However CCL would warn that this
+  ;; declaration pertains to an unknown function, so only do this for us.
+  ;; You'd think we should also warn about DSD-INDEX, but the comment near
+  ;; that function says that it can't be inlined due to reasons.
+  ;; In make-host-2 everything is fine, because of DEF!STRUCT magic.
+  ;; And finally, we are prevented from writing "#+sbcl" here, for reasons.
+  #!+(host-feature sbcl) (declare (notinline dd-slots)) ; forward reference
   (dsd-index (find slot-name
                    (dd-slots (find-defstruct-description type-name))
                    :key #'dsd-name)))

@@ -106,6 +106,7 @@
        (restore-host-function ',(string name)))))
 
 (defun restore-host-function (name)
+  (declare (ignorable name))
   #+sbcl
   (let ((host-fun (second (assoc name *host-format-functions* :test #'string=))))
     (when host-fun
