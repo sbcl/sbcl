@@ -1160,16 +1160,32 @@ Test case.
       (let ((f (symbol-function fname)))
         (when (and (interpreted-function-p f)
                    (structure-instance-accessor-p fname))
-          ;: Compile the accessor. If it was defined in a non-null environment,
-          ;; conversion to a lexenv could say "too complex", so we want to
-          ;; force it. Passing two arguments to COMPILE achieves this.
+          ;: Compile the accessor using an explicit call to COMPILE with a
+          ;; lambda expression. Don't simply call (COMPILE FNAME) because
+          ;; if it was defined in a non-null environment, conversion to a
+          ;; lexenv could say "too complex". Additionally the debug source
+          ;; info would be misleading.
           ;; We can be confident that the expression doesn't need a lexenv,
           ;; because if the function were incompatible with the source-transform,
           ;; %DEFUN would have cleared the :source-transform, and fname would not
           ;; satisfy STRUCTURE-INSTANCE-ACCESSOR-P.
           #+nil (format t "~&; Interpreter: Compiling ~S~%" fname)
           ;; FIXME: ensure that the compiled function is safe.
-          (compile fname (function-lambda-expression f)))))
+          (let* ((compiled-fun (compile nil (function-lambda-expression f)))
+                 (code (fun-code-header compiled-fun))
+                 (cdi (%code-debug-info code))
+                 (source (sb-c::compiled-debug-info-source cdi)))
+            ;; Ensure that the debug-source-namestring of the compiled thing
+            ;; reflects the source file of the original interpreted function.
+            (setf (sb-c::core-debug-source-namestring source)
+                  (sb-kernel::function-file-namestring f)
+                  (sb-c::core-debug-source-created source) nil) ; = unknown
+            ;; Clobber the TLF-NUM + OFFSET. We should do better that that,
+            ;; but interpreted functions do not track their file offset,
+            ;; so the conservative thing is to plug in NILs, not bogus values
+            ;; from whatever file (if any) is currently being loaded.
+            (setf (sb-c::compiled-debug-info-tlf-num+offset cdi) 0)
+            (setf (symbol-function fname) compiled-fun)))))
 
     (when (fluid-def-p fname)
       ;; Return a handler that calls FNAME very carefully

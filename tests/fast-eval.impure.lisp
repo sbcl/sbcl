@@ -297,3 +297,18 @@
 (test-util:with-test (:name :typecheck-symbol-not-null)
   (funcall (lambda (x) (the (and symbol (not null)) x))
            'foo))
+
+(defstruct testme x)
+(let ((f #'testme-x))
+  (let ((source-loc (sb-interpreter:fun-source-location f)))
+    (setf (slot-value source-loc 'sb-c::namestring) "myfile.lisp")))
+(defun foo (s) (testme-x s))
+(test-util:with-test (:name :typecheck-symbol-not-null)
+  (assert (string= (sb-kernel::function-file-namestring #'testme-x)
+                   "myfile.lisp"))
+  (foo (make-testme))
+  ;; check that implicit compilation happened
+  (assert (= (sb-kernel:widetag-of #'testme-x) sb-vm:simple-fun-widetag))
+  ;; check that source location namestring was preserved
+  (assert (string= (sb-kernel::function-file-namestring #'testme-x)
+                   "myfile.lisp")))

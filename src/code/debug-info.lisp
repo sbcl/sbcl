@@ -359,7 +359,7 @@
                           (:copier nil))
   ;; When the DEBUG-SOURCE describes a file, the file's namestring.
   ;; Otherwise, NIL.
-  (namestring nil :type (or null string) :read-only t)
+  (namestring nil :type (or null string))
   ;; the universal time that the source was written, or NIL if
   ;; unavailable
   (created nil :type (or unsigned-byte null))
