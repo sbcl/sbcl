@@ -31,22 +31,19 @@
     ;; exit of SUMMARIZE-COMPILATION-UNIT. So we set up a handler for that.
     `(let (in-summary fail)
        (handler-bind (((and simple-warning (not style-warning))
-                       (lambda (c)
+                       (lambda (c &aux (fc (simple-condition-format-control c)))
                          ;; hack for PPC. See 'build-order.lisp-expr'
                          ;; Ignore the warning, and the warning about the warning.
-                         (unless (or (search "not allowed by the operand type"
-                                             (simple-condition-format-control c))
-                                     (search "ignoring FAILURE-P return"
-                                             (simple-condition-format-control c)))
+                         (unless (and (stringp fc)
+                                      (or (search "not allowed by the operand type" fc)
+                                          (search "ignoring FAILURE-P return" fc)))
                            (setq fail 'warning))))
                       ;; Prevent regressions on a couple platforms
                       ;; that are known to build cleanly.
                       #!+(or x86 x86-64 arm64)
                       (sb-int:simple-style-warning
-                       (lambda (c)
-                         (when (and in-summary
-                                    (search "undefined"
-                                            (simple-condition-format-control c)))
+                       (lambda (c &aux (fc (simple-condition-format-control c)))
+                         (when (and in-summary (stringp fc) (search "undefined" fc))
                            (unless (eq fail 'warning)
                              (setq fail 'style-warning))))))
          (with-compilation-unit ()
