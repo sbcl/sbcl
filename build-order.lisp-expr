@@ -527,6 +527,7 @@
   ;; x pressing problems. Someday, though, it would be nice to figure out
   ;; x what the problem is and fix it.
   #!+(or ppc ppc64) :ignore-failure-p)
+ ("src/compiler/target/pred")
 
  ;; this file defines the INTERVAL struct which is also used in 'srctran'
  ("src/compiler/float-tran")
@@ -551,7 +552,6 @@
  ("src/compiler/target/show")
  ("src/compiler/target/array")
  ("src/compiler/generic/type-error")
- ("src/compiler/target/pred")
  ("src/compiler/physenvanal")
 
  ;; KLUDGE: The assembly files need to be compiled twice: once as

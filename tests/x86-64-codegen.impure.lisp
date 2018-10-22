@@ -345,3 +345,17 @@ sb-vm::
                nil))))))
     (assert (= nbytes sb-vm:large-object-size))))
 
+(defstruct thing x)
+(with-test (:name :instance-ref-eq)
+  (let ((lines
+         (split-string
+          (with-output-to-string (s)
+            (disassemble '(lambda (obj)
+                           (if (eq (thing-x (truly-the thing obj)) :yup) 1 2))
+                         :stream s))
+          #\newline)))
+    ;; assert that the comparison instruction performed the memory load
+    (assert (loop for line in lines
+                  thereis
+                  (and (search "CMP QWORD PTR [" line)
+                       (search ":YUP" line))))))

@@ -3682,11 +3682,25 @@
 ;;; then the result is definitely false.
 (deftransforms (eq char=) ((x y) * *)
   "Simple equality transform"
-  (cond
-    ((same-leaf-ref-p x y) t)
-    ((not (types-equal-or-intersect (lvar-type x) (lvar-type y)))
-     nil)
-    (t (give-up-ir1-transform))))
+  (let ((use (lvar-uses x)) arg)
+    (declare (ignorable use arg))
+    (cond
+      ((same-leaf-ref-p x y) t)
+      ((not (types-equal-or-intersect (lvar-type x) (lvar-type y)))
+       nil)
+      #!+(vop-translates sb!kernel:%instance-ref-eq)
+      ;; Reduce (eq (%instance-ref x i) a-constant) to 1 instruction
+      ;; if possible, but do not defer the memory load unless doing
+      ;; so can have no effect, i.e. Y is a constant or provably not
+      ;; effectful. For now, just handle constant Y.
+      ((and (constant-lvar-p y)
+            (combination-p use)
+            (eql '%instance-ref (lvar-fun-name (combination-fun use)))
+            (constant-lvar-p (setf arg (second (combination-args use))))
+            (typep (lvar-value arg) '(unsigned-byte 16)))
+       (splice-fun-args x '%instance-ref 2)
+       `(lambda (obj i val) (%instance-ref-eq obj i val)))
+      (t (give-up-ir1-transform)))))
 
 ;;; Can't use the above thing, since TYPES-EQUAL-OR-INTERSECT is case sensitive.
 (deftransform two-arg-char-equal ((x y) * *)

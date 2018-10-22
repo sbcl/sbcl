@@ -186,6 +186,8 @@
 (defknown %instance-cas (instance index t t) t ())
 (defknown %instance-ref (instance index) t
   (flushable always-translatable))
+(defknown (%instance-ref-eq) (instance index t) boolean
+  (flushable always-translatable))
 (defknown %instance-set (instance index t) t
   (always-translatable)
   :derive-type #'result-type-last-arg)
