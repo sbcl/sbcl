@@ -49,12 +49,15 @@
 ;;; referenced but not yet loaded. This is initialized from an alist
 ;;; created by genesis describing the layouts that genesis created at
 ;;; cold-load time.
-(defvar *forward-referenced-layouts*)
+(define-load-time-global *forward-referenced-layouts*
+    ;; FIXME: why is the test EQUAL and not EQ? Aren't the keys all symbols?
+    (make-hash-table :test 'equal))
 (!cold-init-forms
-  ;; Protected by *WORLD-LOCK*
-  (setq *forward-referenced-layouts* (make-hash-table :test 'equal))
+  ;; *forward-referenced-layouts* is protected by *WORLD-LOCK*
+  ;; so it does not need a :synchronized option.
   #-sb-xc-host (progn
                  (/show0 "processing *!INITIAL-LAYOUTS*")
+                 (setq *forward-referenced-layouts* (make-hash-table :test 'equal))
                  (setq *layout-clos-hash-random-state* (make-random-state))
                  (dovector (x *!initial-layouts*)
                    (setf (layout-clos-hash (cdr x)) (random-layout-clos-hash))

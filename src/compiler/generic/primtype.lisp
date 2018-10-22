@@ -18,7 +18,6 @@
 
 (!def-primitive-type t (descriptor-reg))
 (/show0 "primtype.lisp 20")
-(setf *backend-t-primitive-type* (primitive-type-or-lose t))
 
 ;;; primitive integer types that fit in registers
 (/show0 "primtype.lisp 24")

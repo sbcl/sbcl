@@ -210,4 +210,4 @@
   #'equalp)
 
 #!+sb-simd-pack
-(defvar *simd-pack-element-types* '(integer single-float double-float))
+(defglobal *simd-pack-element-types* '(integer single-float double-float))

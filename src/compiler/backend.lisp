@@ -76,8 +76,8 @@
 ;;; has to be set by the machine-specific VM definition, since the
 ;;; !DEF-PRIMITIVE-TYPE for T must specify the SCs that boxed objects
 ;;; can be allocated in.
-(defvar *backend-t-primitive-type*)
-(declaim (type primitive-type *backend-t-primitive-type*))
+(define-symbol-macro *backend-t-primitive-type*
+    (the primitive-type (load-time-value (primitive-type-or-lose t) t)))
 
 ;;; a hashtable translating from VOP names to the corresponding VOP-PARSE
 ;;; structures. This information is only used at meta-compile time.

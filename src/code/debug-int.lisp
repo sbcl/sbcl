@@ -2985,7 +2985,8 @@ register."
 ;;; This maps bogus-lra-components to cookies, so that
 ;;; HANDLE-FUN-END-BREAKPOINT can find the appropriate cookie for the
 ;;; breakpoint hook.
-(defvar *fun-end-cookies* (make-hash-table :test 'eq :synchronized t))
+(define-load-time-global *fun-end-cookies*
+    (make-hash-table :test 'eq :synchronized t))
 
 ;;; This returns a hook function for the start helper breakpoint
 ;;; associated with a :FUN-END breakpoint. The returned function
