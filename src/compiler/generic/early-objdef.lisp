@@ -320,7 +320,7 @@
   ;; The cross-compiler stores FUNCTION-LAYOUT in a more obvious way.
   #+sb-xc-host
   (defconstant function-layout ; kludge - verified by genesis
-    (logior (+ fixedobj-space-start layout-align) instance-pointer-lowtag)))
+    (logior (+ fixedobj-space-start (* 3 layout-align)) instance-pointer-lowtag)))
 
 #|
 ;; Run this in the SB-VM or SB!VM package once for each target feature combo.

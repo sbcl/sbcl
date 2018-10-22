@@ -1302,11 +1302,6 @@ core and return a descriptor to it."
   ;; Word following the header is the layout
   (write-wordindexed thing sb!vm:instance-slots-offset layout))
 
-(defun layout-assigned-p (cold-struct)
-  (/= 0 (or #!+compact-instance-header
-            (ash (read-bits-wordindexed cold-struct 0) -32)
-            (read-bits-wordindexed cold-struct sb!vm:instance-slots-offset))))
-
 (defun initialize-layouts ()
   (clrhash *cold-layouts*)
   ;; This assertion is due to the fact that MAKE-COLD-LAYOUT does not
@@ -1317,7 +1312,7 @@ core and return a descriptor to it."
   (flet ((chill-layout (name &rest inherits)
            ;; Check that the number of specified INHERITS matches
            ;; the length of the layout's inherits in the cross-compiler.
-           (let ((warm-layout (classoid-layout (find-classoid name))))
+           (let ((warm-layout (info :type :compiler-layout name)))
              (assert (eql (length (layout-inherits warm-layout))
                           (length inherits)))
              (make-cold-layout
@@ -1327,11 +1322,12 @@ core and return a descriptor to it."
               (number-to-core (layout-depthoid warm-layout))
               (number-to-core (layout-bitmap warm-layout))))))
     (let* ((t-layout   (chill-layout 't))
-           (fun-layout (chill-layout 'function t-layout))
            (s-o-layout (chill-layout 'structure-object t-layout)))
       (setf *layout-layout* (chill-layout 'layout t-layout s-o-layout))
-      (dolist (layout (list t-layout fun-layout s-o-layout *layout-layout*))
+      (dolist (layout (list t-layout s-o-layout *layout-layout*))
         (set-instance-layout layout *layout-layout*))
+      (chill-layout 'function t-layout)
+      (chill-layout 'sb!kernel::classoid-cell t-layout s-o-layout)
       (chill-layout 'package t-layout s-o-layout)
       (let* ((sequence (chill-layout 'sequence t-layout))
              (list     (chill-layout 'list t-layout sequence))
@@ -1356,8 +1352,7 @@ core and return a descriptor to it."
 (defun cold-find-classoid-cell (name &key create)
   (aver (eq create t))
   (or (gethash name *classoid-cells*)
-      (let ((layout (or (gethash 'sb!kernel::classoid-cell *cold-layouts*) ; ok if nil
-                        (make-fixnum-descriptor 0)))
+      (let ((layout (gethash 'sb!kernel::classoid-cell *cold-layouts*))
             (host-layout (find-layout 'sb!kernel::classoid-cell)))
         (setf (gethash name *classoid-cells*)
               (write-slots (allocate-struct *dynamic* layout
@@ -1980,14 +1975,6 @@ core and return a descriptor to it."
       (aver layout))
     ;; Iteration order is immaterial. The symbols will get sorted later.
     (maphash (lambda (symbol cold-classoid-cell)
-               ;; Some classoid-cells are dumped before the cold layout
-               ;; of classoid-cell has been made, so fix those cases now.
-               ;; Obviously it would be better if, in general, ALLOCATE-STRUCT
-               ;; knew when something later must backpatch a cold layout
-               ;; so that it could make a note to itself to do those ASAP
-               ;; after the cold layout became known.
-               (unless (layout-assigned-p cold-classoid-cell)
-                 (set-instance-layout cold-classoid-cell layout))
                (setf (gethash symbol hashtable)
                      (packed-info-insert
                       (gethash symbol hashtable +nil-packed-infos+)
