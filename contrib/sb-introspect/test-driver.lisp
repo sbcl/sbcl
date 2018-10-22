@@ -445,7 +445,7 @@
                 (max (* 4 sb-vm:gencgc-card-bytes) #-64-bit 65536))))
       (declare (notinline format))
       (format (make-string-output-stream) "~%")
-      (loop for i from 1 to 5
+      (loop for i from 1 to sb-vm:+highest-normal-generation+
             always (assert-large-page/gen/boxedp '*large-obj* page i t)))
   t)
 (sb-ext:defglobal *b* nil)
@@ -467,7 +467,7 @@
                   (eq (getf props :boxed) t)))
            (multiple-value-bind (page gen) (page-and-gen *b*)
              (format (make-string-output-stream) "~%")
-             (loop for i from 1 to 5
+             (loop for i from 1 to sb-vm:+highest-normal-generation+
                    always
                    (and (assert-large-page/gen/boxedp '*b* page i nil)
                         (let ((props (nth-value 1 (allocation-information *small-bignum*))))
