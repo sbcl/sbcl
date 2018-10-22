@@ -561,7 +561,7 @@
   (let* ((name (class-name class))
          (classoid (find-classoid name))
          (slots (condition-classoid-slots classoid))
-         (source (sb-kernel::layout-source-location (classoid-layout classoid))))
+         (source (sb-kernel::classoid-source-location classoid)))
     ;; to balance the REMOVE-SLOT-ACCESSORS call in
     ;; REINITIALIZE-INSTANCE :BEFORE (SLOT-CLASS).
     (flet ((add-source-location (method)

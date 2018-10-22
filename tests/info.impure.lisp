@@ -60,15 +60,11 @@
 
 (test-util:with-test (:name :bug-458015)
   ;; Make sure layouts have sane source-locations
-  (sb-int:call-with-each-globaldb-name
-   (lambda (info-name)
-     (when (and (symbolp info-name) (info :type :kind info-name))
-        (let* ((classoid (find-classoid info-name nil))
-               (layout (and classoid (classoid-layout classoid)))
-               (srcloc (and layout (sb-kernel::layout-source-location layout))))
-          (when (and layout)
-            (assert (or (sb-c::definition-source-location-p srcloc)
-                        (null srcloc)))))))))
+  (do-all-symbols (symbol)
+    (let ((classoid (find-classoid symbol nil)))
+      (when classoid
+        (assert (typep (sb-kernel::classoid-source-location classoid)
+                       '(or null sb-c::definition-source-location)))))))
 
 (test-util:with-test (:name :find-classoid-signal-error)
   ;; (EVAL ''SILLY) dumbs down the compiler for this test.

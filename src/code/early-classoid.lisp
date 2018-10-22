@@ -164,8 +164,6 @@
   (bitmap +layout-all-tagged+ :type layout-bitmap)
   ;; Per-slot comparator for implementing EQUALP.
   (equalp-tests #() :type simple-vector)
-  ;; Definition location
-  (source-location nil)
   ;; If this layout is for an object of metatype STANDARD-CLASS,
   ;; these are the EFFECTIVE-SLOT-DEFINITION metaobjects.
   (slot-list nil :type list)
@@ -234,6 +232,9 @@
   (state nil :type (member nil :read-only :sealed))
   ;; direct superclasses of this class. Always NIL for CLOS classes.
   (direct-superclasses () :type list)
+  ;; Definition location
+  ;; Not used for standard-classoid, because pcl has its own mechanism.
+  (source-location nil)
   ;; representation of all of the subclasses (direct or indirect) of
   ;; this class. This is NIL if no subclasses or not initalized yet;
   ;; otherwise, it's an EQ hash-table mapping CLASSOID objects to the

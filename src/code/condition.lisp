@@ -323,9 +323,9 @@
    'condition name
    (lambda ()
      (%%compiler-define-condition name parent-types layout all-readers all-writers)
-     (when source-location
-       (setf (layout-source-location layout) source-location))
      (let ((classoid (find-classoid name)))
+       (when source-location
+         (setf (classoid-source-location classoid) source-location))
        (setf (condition-classoid-slots classoid) slots
              (condition-classoid-direct-default-initargs classoid) direct-default-initargs
              (documentation name 'type) documentation)

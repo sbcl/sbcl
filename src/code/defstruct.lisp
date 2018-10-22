@@ -1039,7 +1039,7 @@ unless :NAMED is also specified.")))
     (setf (find-classoid (dd-name dd)) classoid)
 
     (when source-location
-      (setf (layout-source-location layout) source-location))))
+      (setf (classoid-source-location classoid) source-location))))
 
 
 ;;; Return a form accessing the writable place used for the slot

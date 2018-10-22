@@ -402,12 +402,10 @@ If an unsupported TYPE is requested, the function will return NIL.
 (defun find-definition-source (object)
   (typecase object
     ((or sb-pcl::condition-class sb-pcl::structure-class)
-     (let ((classoid (sb-impl::find-classoid (class-name object))))
+     (let ((classoid (sb-pcl::class-classoid object)))
        (when classoid
-         (let ((layout (sb-impl::classoid-layout classoid)))
-           (when layout
-             (translate-source-location
-              (sb-kernel::layout-source-location layout)))))))
+         (translate-source-location
+          (sb-kernel::classoid-source-location classoid)))))
     (method-combination
      (car
       (find-definition-sources-by-name

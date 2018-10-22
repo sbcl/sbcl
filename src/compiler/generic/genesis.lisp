@@ -1165,7 +1165,6 @@ core and return a descriptor to it."
       ;; Nothing in cold-init needs to call EQUALP on a structure with raw slots,
       ;; but for type-correctness this slot needs to be a simple-vector.
      :equalp-tests *simple-vector-0-descriptor*
-     :source-location *nil-descriptor*
      :slot-list *nil-descriptor*
      (if (member name '(null list symbol))
       ;; Assign an empty slot-table.  Why this is done only for three
