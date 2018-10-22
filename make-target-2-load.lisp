@@ -180,6 +180,14 @@ Please check that all strings which were not recognizable to the compiler
               (sb-kernel:%simple-fun-xrefs fun))))))))
    :all)
 
+  ;; Disable the format-control optimizer for ERROR and WARN
+  ;; while preserving the argument-checking logic. Technically the optimizer is
+  ;; probably ok to leave in, but the spec is ambiguous as to whether
+  ;; implicit compile-time transformations on format strings is permitted.
+  ;; http://www.lispworks.com/documentation/HyperSpec/Issues/iss170_w.htm
+  ;; seems to imply that it is, but I would imagine that users don't expect it.
+  (setq sb-c::*optimize-format-strings* nil)
+
   ;; Fix unknown types in globaldb
   (let ((l nil))
     (do-all-symbols (s)

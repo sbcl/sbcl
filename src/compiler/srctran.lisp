@@ -4530,6 +4530,7 @@
 ;;; instance, ~{ ... ~} requires a list argument, so if the lvar-type
 ;;; of a corresponding argument is known and does not intersect the
 ;;; list type, a warning could be signalled.
+(defglobal *optimize-format-strings* t)
 (defun check-format-args (node fun arg-n verify-arg-count
                           &aux (combination-args (basic-combination-args node)))
   ;; ARG-N is the index into COMBINATION-ARGS of a format control string,
@@ -4574,7 +4575,8 @@
                      "Too many arguments (~D) to ~S ~S: uses at most ~D."
                      :format-arguments (list nargs fun string max))))))
           ;; Now possibly replace the control string
-          (maybe-replace control)
+          (when *optimize-format-strings*
+            (maybe-replace control))
           (return-from check-format-args)))
       ;; Look for a :FORMAT-CONTROL and possibly replace that. Always do that
       ;; when cross-compiling, but in the target, cautiously skip this step
@@ -4590,7 +4592,8 @@
       ;;
       ;; In this cross-compiler, this processing is not only always right, but
       ;; in fact mandatory, to make our format strings agnostic of package names.
-      (when (and (member fun '(error warn style-warn
+      (when (and *optimize-format-strings*
+                 (member fun '(error warn style-warn
                                compiler-warn compiler-style-warn))
                  ;; Hmm, should we additionally require that this symbol be
                  ;; known to designate a subtype of SIMPLE-CONDITION? Perhaps.
