@@ -85,3 +85,13 @@
 (with-test (:name (concatenate :result-type class))
   (assert (typep (concatenate (find-class 'extended-sequence) '(1 2) '(3 4))
                  'extended-sequence)))
+
+(with-test (:name :list-iterator-from-end)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (sb-sequence:with-sequence-iterator-functions
+          (next stop value _set _index _copy)
+          (x :from-end t)
+        (loop until (stop) collect (value) do (next))))
+   (('(a b c d)) '(d c b a) :test #'equal)))

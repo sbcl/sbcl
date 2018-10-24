@@ -216,8 +216,7 @@
                   (if (eq iterator list)
                       *exhausted*
                       (do* ((cdr list (cdr cdr)))
-                           ((eq (cdr cdr) iterator) cdr)))
-                  (1+ iterator))
+                           ((eq (cdr cdr) iterator) cdr))))
                 (lambda (list iterator from-end)
                   (declare (ignore list from-end))
                   (cdr iterator)))
