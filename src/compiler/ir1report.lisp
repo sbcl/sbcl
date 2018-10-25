@@ -726,7 +726,7 @@ and defining the function before its first potential use.~@:>"
        :format-control
        (if (info :function :assumed-type name)
            (sb!format:tokens "~@<Call to ~/sb!ext:print-symbol-with-prefix/ ~
-                              could not be inlined because no definition !
+                              could not be inlined because no definition ~
                               for it was seen prior to its first use.~:@>")
          ;; This message sort of implies that source form is the
          ;; only reasonable representation in which an inline definition
