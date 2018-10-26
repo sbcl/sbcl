@@ -116,7 +116,8 @@
     (walk-slots-test f `(,(find-layout 'sb-pcl::ctor) ,#'error ,@slot-vals))))
 
 #+sb-fasteval
-(test-util:with-test (:name :walk-slots-interpreted-fun)
+(test-util:with-test (:name :walk-slots-interpreted-fun
+                      :fails-on :interpreter)
   (let ((f (let ((sb-ext:*evaluator-mode* :interpret))
              (eval '(lambda (x y z))))))
     (funcall f 1 2 3) ; compute the digested slots

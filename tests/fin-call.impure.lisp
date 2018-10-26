@@ -9,6 +9,9 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(when (eq sb-ext:*evaluator-mode* :interpret)
+  (invoke-restart 'run-tests::skip-file))
+
 #|
 This file contains a test of immobile_space_preserve_pointer(),
 but demonstrates just about nothing, as it stands.
