@@ -1067,8 +1067,6 @@ sweep_fixedobj_pages(int raise)
     }
 }
 
-void verify_immobile_page_protection(int,int);
-
 // Scan for freshly trashed objects and turn them into filler.
 // Lisp is responsible for consuming the free space
 // when it next allocates a variable-size object.
@@ -1159,9 +1157,6 @@ sweep_varyobj_pages(int raise)
         if ( mask && wp_it )
             varyobj_page_touched_bits[page/32] &= ~(1U << (page & 31));
     }
-#ifdef DEBUG
-    verify_immobile_page_protection(keep_gen, new_gen);
-#endif
 }
 
 // TODO: (Maybe this won't work. Not sure yet.) rather than use the
@@ -2170,36 +2165,6 @@ static void defrag_immobile_space(boolean verbose)
     free(varyobj_tempspace.start);
 }
 #endif
-
-void verify_immobile_page_protection(int keep_gen, int new_gen)
-{
-  low_page_index_t page;
-  lispobj* end = varyobj_free_pointer;
-  low_page_index_t end_page = find_varyobj_page_index((char*)end-1);
-  lispobj* obj;
-
-  for (page = 0; page <= end_page; ++page) {
-    if (!varyobj_page_touched(page)) {
-      lispobj* page_begin = varyobj_page_address(page);
-      lispobj* page_end = page_begin + WORDS_PER_PAGE;
-      // Assert that there are no old->young pointers.
-      obj = varyobj_scan_start(page);
-      // Never scan past the free pointer.
-      // FIXME: It is is supposed to work to scan past the free pointer
-      // on the last page, but the allocator needs to plop an array header there,
-      // and sometimes it doesn't.
-      lispobj* varyobj_free_ptr = varyobj_free_pointer;
-      if (page_end > varyobj_free_ptr) page_end = varyobj_free_ptr;
-      for ( ; obj < page_end ; obj += sizetab[widetag_of(obj)](obj) ) {
-        if (!filler_obj_p(obj)
-            && varyobj_points_to_younger_p(obj, __immobile_obj_gen_bits(obj),
-                                           keep_gen, new_gen,
-                                           (char*)page_begin, (char*)page_end))
-          lose("page WP bit on page %d is wrong\n", page);
-      }
-    }
-  }
-}
 
 // Fixup immediate values that encode Lisp object addresses
 // in immobile space. Process only the absolute fixups.
