@@ -134,13 +134,21 @@
   (cond ((eq (layout-invalid layout) :uninitialized)
          ;; There was no layout before, we just created one which
          ;; we'll now initialize with our information.
-         (setf (layout-length layout) length
-               (layout-%flags layout) flags
-               (layout-inherits layout) inherits
-               (layout-depthoid layout) depthoid
-               (layout-bitmap layout) bitmap
-               (layout-classoid layout) classoid
-               (layout-invalid layout) nil))
+         (macrolet ((inherit (n) `(if (> struct-depth ,n) (svref inherits ,n) 0)))
+           ;; struct-depth is generally the depthoid when the depthoid is >0,
+           ;; but not for FILE-STREAM which has depthoid=4 but is not a structure.
+           (let ((struct-depth
+                  (if (logtest +structure-layout-flag+ flags) depthoid 0)))
+             (setf (layout-length layout) length
+                   (layout-%flags layout) flags
+                   (layout-inherits layout) inherits
+                   (layout-depthoid layout) depthoid
+                   (layout-depth2-ancestor layout) (inherit 2)
+                   (layout-depth3-ancestor layout) (inherit 3)
+                   (layout-depth4-ancestor layout) (inherit 4)
+                   (layout-bitmap layout) bitmap
+                   (layout-classoid layout) classoid
+                   (layout-invalid layout) nil))))
         ;; FIXME: Now that LAYOUTs are born :UNINITIALIZED, maybe this
         ;; clause is not needed?
         ((not *type-system-initialized*)
@@ -340,13 +348,23 @@ between the ~A definition and the ~A definition"
           (setf (classoid-subclasses classoid) nil)))
 
       (if destruct-layout
-          (setf (layout-invalid destruct-layout) nil
-                (layout-inherits destruct-layout) (layout-inherits layout)
-                (layout-depthoid destruct-layout) (layout-depthoid layout)
-                (layout-length destruct-layout) (layout-length layout)
-                (layout-bitmap destruct-layout) (layout-bitmap layout)
-                (layout-info destruct-layout) (layout-info layout)
-                (classoid-layout classoid) destruct-layout)
+          ;; Destructively modifying a layout is not threadsafe at all.
+          ;; Use at your own risk (interactive use only).
+          (let ((inherits (layout-inherits layout))
+                (depthoid (layout-depthoid layout)))
+            (aver (logtest +structure-layout-flag+ (layout-%flags layout)))
+            (aver (= (length inherits) depthoid))
+            (macrolet ((inherit (n) `(if (> depthoid ,n) (svref inherits ,n) 0)))
+              (setf (layout-invalid destruct-layout) nil
+                    (layout-inherits destruct-layout) inherits
+                    (layout-depthoid destruct-layout) (layout-depthoid layout)
+                    (layout-depth2-ancestor destruct-layout) (inherit 2)
+                    (layout-depth3-ancestor destruct-layout) (inherit 3)
+                    (layout-depth4-ancestor destruct-layout) (inherit 4)
+                    (layout-length destruct-layout) (layout-length layout)
+                    (layout-bitmap destruct-layout) (layout-bitmap layout)
+                    (layout-info destruct-layout) (layout-info layout)
+                    (classoid-layout classoid) destruct-layout)))
           (setf (layout-invalid layout) nil
                 (classoid-layout classoid) layout))
 
@@ -1061,6 +1079,16 @@ between the ~A definition and the ~A definition"
      ;; each have STREAM and T as ancestors, so you'd think they'd be at depth
      ;; 1 greater than STREAM, instead of 2 greater. But changing any of
      ;; these to the "obvious" value makes various type checks go wrong.
+     ;;
+     ;; Essentially the hardwiring corresponds to the indices of the
+     ;; respective types in the inherits vector for FD-STREAM.
+     ;;  * (layout-inherits (find-layout 'fd-stream))
+     ;;  #(#<LAYOUT for T {50300003}>
+     ;;    #<LAYOUT for STRUCTURE-OBJECT {50300103}>
+     ;;    #<LAYOUT for STREAM {50301003}>
+     ;;    #<LAYOUT for ANSI-STREAM {50301183}>
+     ;;    #<LAYOUT for FILE-STREAM {50303303}>)
+
      (stream
       :state :read-only
       :depth 2)

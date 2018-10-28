@@ -857,8 +857,15 @@
                      `(eq ,get-ancestor ,layout))
                    (deeper-p `(> (layout-depthoid ,n-layout) ,depthoid)))
               (aver (equal pred '(%instancep object)))
-              `(and ,pred
-                    (let ((,n-layout ,get-layout))
+              ;; For shallow hierarchies, we can avoid reading the 'inherits'
+              ;; because the layout has the ancestor layouts directly in it.
+              ;; Not even a depthoid check is needed.
+              ;; Since only layouts for structure types will have ancestors
+              ;; populated, and this transform case is only for structures,
+              ;; there can be no false positives. STREAM and CONDITION types
+              ;; have a depthoid>0, but are not structure-classoid-p.
+              `(and (%instancep object)
+                    (let ((,n-layout (%instance-layout object)))
                       ;; we used to check for invalid layouts here,
                       ;; but in fact that's both unnecessary and
                       ;; wrong; it's unnecessary because structure
@@ -866,10 +873,22 @@
                       ;; because it is quite legitimate to pass an
                       ;; object with an invalid layout to a structure
                       ;; type test.
-                      ,(if abstract-base-p
-                           `(eq (if ,deeper-p ,get-ancestor ,n-layout) ,layout)
-                           `(cond ((eq ,n-layout ,layout) t)
-                                  (,deeper-p ,ancestor-layout-eq)))))))
+                      ,(let ((ancestor-slot (case depthoid
+                                             (2 'sb!kernel::layout-depth2-ancestor)
+                                             (3 'sb!kernel::layout-depth3-ancestor)
+                                             (4 'sb!kernel::layout-depth4-ancestor))))
+                         (if ancestor-slot
+                             (if abstract-base-p
+                                 `(or (eq (,ancestor-slot ,n-layout) ,layout)
+                                      (eq ,n-layout ,layout)) ; not likely
+                                 ;; Indifferent to order here. Might as well test
+                                 ;; for an exact match first.
+                                 `(or (eq ,n-layout ,layout)
+                                      (eq (,ancestor-slot ,n-layout) ,layout)))
+                             (if abstract-base-p
+                                 `(eq (if ,deeper-p ,get-ancestor ,n-layout) ,layout)
+                                 `(cond ((eq ,n-layout ,layout) t)
+                                        (,deeper-p ,ancestor-layout-eq)))))))))
            ((and layout (>= (layout-depthoid layout) 0))
             ;; hierarchical layout depths for other things (e.g.
             ;; CONDITION, STREAM)

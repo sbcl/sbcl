@@ -170,7 +170,16 @@
   ;; Information about slots in the class to PCL: this provides fast
   ;; access to slot-definitions and locations by name, etc.
   ;; See MAKE-SLOT-TABLE in pcl/slots-boot.lisp for further details.
-  (slot-table #(1 nil) :type simple-vector))
+  (slot-table #(1 nil) :type simple-vector)
+  ;; inherited layouts or 0, only pertinent to structure classoids.
+  ;; There is no need to store the layout at depths 0 or 1
+  ;; since they're predetermined to be T and STRUCTURE-OBJECT.
+  ;; These 3 slots cause the length of a layout to be exactly 16 words
+  ;; with compact-instance-header, which avoids having to change some
+  ;; logic in 'immobile-space' that assumes this alignment constraint.
+  (depth2-ancestor 0)
+  (depth3-ancestor 0)
+  (depth4-ancestor 0))
 (declaim (freeze-type layout))
 
 (declaim (inline layout-for-std-class-p))

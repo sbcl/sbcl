@@ -1137,7 +1137,16 @@ core and return a descriptor to it."
                           descriptor)
                 make-cold-layout))
 (defun make-cold-layout (name length inherits depthoid bitmap)
-  (let ((result (allocate-struct (symbol-value *cold-layout-gspace*) *layout-layout*
+  (let ((flags (let* ((inherit-names (listify-cold-inherits inherits))
+                      (second (second inherit-names)))
+                 ;; Note similarity to FOP-LAYOUT here, but with extra
+                 ;; test for the subtree roots.
+                 (cond ((or (eq second 'structure-object) (eq name 'structure-object))
+                        +structure-layout-flag+)
+                       ((or (eq second 'condition) (eq name 'condition))
+                        +condition-layout-flag+)
+                       (t 0))))
+        (result (allocate-struct (symbol-value *cold-layout-gspace*) *layout-layout*
                                  target-layout-length t)))
     ;; Don't set the CLOS hash value: done in cold-init instead.
     ;;
@@ -1150,16 +1159,7 @@ core and return a descriptor to it."
      :inherits inherits
      :depthoid depthoid
      :length length
-     :%flags (let* ((inherit-names (listify-cold-inherits inherits))
-                    (second (second inherit-names)))
-               (make-fixnum-descriptor
-                 ;; Note similarity to FOP-LAYOUT here, but with extra
-                 ;; test for the subtree roots.
-                 (cond ((or (eq second 'structure-object) (eq name 'structure-object))
-                        +structure-layout-flag+)
-                       ((or (eq second 'condition) (eq name 'condition))
-                        +condition-layout-flag+)
-                       (t 0))))
+     :%flags (make-fixnum-descriptor flags)
      :info *nil-descriptor*
      :bitmap bitmap
       ;; Nothing in cold-init needs to call EQUALP on a structure with raw slots,
@@ -1176,6 +1176,14 @@ core and return a descriptor to it."
                                  (setq *vacuous-slot-table*
                                        (host-constant-to-core '#(1 nil)))))
          (values)))
+    (when (and (logtest flags +structure-layout-flag+)
+               (> (descriptor-fixnum depthoid) 2))
+      (loop with dsd-index = (get-dsd-index sb!kernel::layout sb!kernel::depth2-ancestor)
+            for i from 2 to (min (1- (descriptor-fixnum depthoid)) 4)
+            do (write-wordindexed result
+                                  (+ sb!vm:instance-slots-offset dsd-index)
+                                  (cold-svref inherits i))
+               (incf dsd-index)))
 
     (setf (gethash (descriptor-bits result) *cold-layout-names*) name
           (gethash name *cold-layouts*) result)))

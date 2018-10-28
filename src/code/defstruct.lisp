@@ -1444,13 +1444,18 @@ or they must be declared locally notinline at each call site.~@:>"
            (flags (if (dd-alternate-metaclass info) 0 +structure-layout-flag+))
            (new-layout
             (when (or (not old-layout) *type-system-initialized*)
-              (make-layout :classoid classoid
-                           :%flags flags
-                           :inherits inherits
-                           :depthoid (length inherits)
-                           :length (dd-length info)
-                           :info info
-                           :bitmap (dd-bitmap info)))))
+              (macrolet ((inherit (n) `(if (> depthoid ,n) (svref inherits ,n) 0)))
+                (let ((depthoid (length inherits)))
+                  (make-layout :classoid classoid
+                               :%flags flags
+                               :inherits inherits
+                               :depthoid depthoid
+                               :depth2-ancestor (inherit 2)
+                               :depth3-ancestor (inherit 3)
+                               :depth4-ancestor (inherit 4)
+                               :length (dd-length info)
+                               :info info
+                               :bitmap (dd-bitmap info)))))))
       (cond
        ((not old-layout)
         (values classoid new-layout nil))
