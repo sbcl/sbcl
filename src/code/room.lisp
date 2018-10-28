@@ -1300,14 +1300,15 @@ We could try a few things to mitigate this:
 (!ensure-genesis-code/data-separation)
 
 (defun hexdump (obj &optional (n-words
-                               (if (typep obj 'code-component)
+                               (if (and (typep obj 'code-component)
+                                        (plusp (code-n-entries obj)))
                                    ;; Display up through the first fun header
                                    (+ (code-header-words obj)
                                       (ash (sb-impl::%code-fun-offset obj 0)
                                            (- word-shift))
                                       simple-fun-code-offset)
-                                   ;; at most 10 words
-                                   (min 10 (ash (primitive-object-size obj)
+                                   ;; at most 16 words
+                                   (min 16 (ash (primitive-object-size obj)
                                                 (- word-shift)))))
                               ;; pass NIL explicitly if T crashes on you
                               (decode t))
