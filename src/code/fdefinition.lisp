@@ -32,25 +32,12 @@
     ;; that FDEFN-MAKUNBOUND did that, would cause a redundant register move.
     (truly-the fdefn (fdefn-makunbound fdefn))))
 
-(defun fdefn-name (fdefn)
-  (declare (type fdefn fdefn))
-  (fdefn-name fdefn))
-
-(defun fdefn-fun (fdefn)
-  (declare (type fdefn fdefn)
-           (values (or function null)))
-  (fdefn-fun fdefn))
-
 (defun (setf fdefn-fun) (fun fdefn)
   (declare (type function fun)
            (type fdefn fdefn)
            (values function))
   #!+immobile-code (sb!vm::%set-fdefn-fun fdefn fun)
   #!-immobile-code (setf (fdefn-fun fdefn) fun))
-
-(defun fdefn-makunbound (fdefn)
-  (declare (type fdefn fdefn))
-  (fdefn-makunbound fdefn))
 
 #!-sb-fluid (declaim (inline symbol-fdefn))
 ;; Return SYMBOL's fdefinition, if any, or NIL. SYMBOL must already
