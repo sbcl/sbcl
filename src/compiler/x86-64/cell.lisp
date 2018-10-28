@@ -30,7 +30,7 @@
   (:results)
   (:vop-var vop)
   (:generator 1
-    (cond ((emit-gc-barrier-store-p name)
+    (cond ((emit-code-page-write-barrier-p name)
            ;; Don't assume that the immediate is acceptable to 'push'
            ;; (only MOV can take a 64-bit immediate)
            (inst mov temp-reg-tn (encode-value-if-immediate value))

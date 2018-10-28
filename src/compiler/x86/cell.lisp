@@ -27,7 +27,7 @@
   (:info name offset lowtag)
   (:results)
   (:generator 1
-    (cond ((emit-gc-barrier-store-p name)
+    (cond ((emit-code-page-write-barrier-p name)
            (inst push (encode-value-if-immediate value))
            (inst push offset)
            (inst push object)

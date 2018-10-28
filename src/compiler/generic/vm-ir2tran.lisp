@@ -432,7 +432,7 @@
                '(fill-pointer fill-pointer-p elements data
                  displacement displaced-p displaced-from dimensions)))
 
-(defun emit-gc-barrier-store-p (fun-name)
+(defun emit-code-page-write-barrier-p (fun-name)
   (and (listp fun-name)
        (eq (car fun-name) 'setf)
        (member (cadr fun-name)
@@ -441,4 +441,5 @@
                  %simple-fun-name
                  %simple-fun-arglist
                  %simple-fun-type
-                 %simple-fun-info))))
+                 %simple-fun-info))
+       t))
