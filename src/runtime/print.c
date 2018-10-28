@@ -556,10 +556,15 @@ static void print_slots(char **slots, int count, lispobj *ptr)
 {
     while (count-- > 0) {
         if (*slots) {
-            print_obj(*slots++, *ptr++);
+            // kludge for half-lispword sized slot
+            print_obj(*slots,
+                      (N_WORD_BYTES == 8 && !strcmp(*slots, "code_size: "))
+                      ? *ptr & 0xFFFFFFFF : *ptr);
+            slots++;
         } else {
-            print_obj("???: ", *ptr++);
+            print_obj("???: ", *ptr);
         }
+        ptr++;
     }
 }
 
@@ -734,6 +739,9 @@ static void print_otherptr(lispobj obj)
 
     case CODE_HEADER_WIDETAG:
         // ptr was already bumped up
+#if N_WORD_BYTES == 8
+        print_obj("serial#: ", (*ptr>>32));
+#endif
         count = code_header_words(((struct code*)(ptr-1))->header);
         for_each_simple_fun(fun_index, fun, (struct code*)(ptr-1), 0, {
             sprintf(buffer, "f[%d]: ", fun_index);
