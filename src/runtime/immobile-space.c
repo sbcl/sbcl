@@ -83,7 +83,7 @@ uword_t immobile_space_lower_bound, immobile_space_max_offset;
 unsigned int immobile_range_1_max_offset, immobile_range_2_min_offset;
 unsigned int varyobj_space_size = VARYOBJ_SPACE_SIZE;
 
-unsigned asm_routines_end;
+uword_t asm_routines_start, asm_routines_end;
 
 // This table is for objects fixed in size, as opposed to variable-sized.
 // (Immobile objects are naturally fixed in placement)
@@ -1296,10 +1296,10 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
         for (page = 0 ; page <= last_page ; ++page)
             varyobj_page_touched_bits[page/32] &= ~(1U<<(page & 31));
     }
-    lispobj* code = (lispobj*)address;
-    while (widetag_of(code) == CODE_HEADER_WIDETAG && !code_n_funs((struct code*)code))
-        code += sizetab[CODE_HEADER_WIDETAG](code);
-    asm_routines_end = (unsigned)(uword_t)code;
+    lispobj* code = (lispobj*)VARYOBJ_SPACE_START;
+    asm_routines_start = VARYOBJ_SPACE_START;
+    asm_routines_end   = asm_routines_start +
+                         (sizetab[CODE_HEADER_WIDETAG](code) << WORD_SHIFT);
     page_attributes_valid = 1;
 }
 
@@ -1576,7 +1576,8 @@ static lispobj adjust_fun_entrypoint(lispobj raw_addr)
     // Do not examine the word where the header would be,
     // since it could confuse adjust_words() by having a bit pattern
     // resembling a FP. (It doesn't, but better safe than sorry)
-    if (raw_addr < asm_routines_end) return raw_addr;
+    if (asm_routines_start <= raw_addr && raw_addr < asm_routines_end)
+        return raw_addr;
     lispobj simple_fun = raw_addr - FUN_RAW_ADDR_OFFSET;
     adjust_words(&simple_fun, 1, 0);
     return simple_fun + FUN_RAW_ADDR_OFFSET;
@@ -2168,8 +2169,6 @@ static void defrag_immobile_space(boolean verbose)
 
 // Fixup immediate values that encode Lisp object addresses
 // in immobile space. Process only the absolute fixups.
-// TODO: remove the fixup_lispobj function; this doesn't generalize
-// as originally thought. coreparse has its own way of doing things.
 #include "forwarding-ptr.h"
 #ifdef LISP_FEATURE_X86_64
 static void fixup_immobile_refs(lispobj fixups, struct code* code)
@@ -2192,7 +2191,14 @@ static void fixup_immobile_refs(lispobj fixups, struct code* code)
             lispobj fixed = follow_fp(ptr);
             if (fixed != ptr)
                 UNALIGNED_STORE32(fixup_where, fixed);
-        } else if (find_fixedobj_page_index((void*)ptr) >= 0) {
+            continue;
+        }
+        if (asm_routines_start <= ptr && ptr < asm_routines_end) {
+            // Call to asm routine using "CALL [#xNNNN]" form.
+            // This fixup is only for whole-heap relocation on startup.
+            continue;
+        }
+        if (find_fixedobj_page_index((void*)ptr) >= 0) {
             header_addr = search_immobile_space((void*)ptr);
             gc_assert(header_addr);
             if (forwarding_pointer_p(header_addr)) {
@@ -2207,8 +2213,6 @@ static void fixup_immobile_refs(lispobj fixups, struct code* code)
                                   (int)(long)native_pointer(fpval)
                                   + (ptr - (lispobj)header_addr));
             }
-        } else if (ptr < asm_routines_end) {
-            // Call to asm routine using "CALL [#xNNNN]" form
         } else {
             /* Depending on things, a call to immobile code from dynamic space
              * might be emitted as "MOV RAX, #x{addr} ; CALL RAX" where {addr}

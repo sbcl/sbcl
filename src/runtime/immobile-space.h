@@ -29,6 +29,7 @@ extern unsigned int immobile_scav_queue_count;
 typedef int low_page_index_t;
 
 extern unsigned int* varyobj_page_touched_bits;
+extern uword_t asm_routines_start, asm_routines_end;
 
 static inline void *
 fixedobj_page_address(low_page_index_t page_num)
