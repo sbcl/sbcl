@@ -27,6 +27,15 @@ run_sbcl_with_core "$tmpcore" --no-userinit --no-sysinit \
     --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})"
 check_status_maybe_lose "SAVE-LISP-AND-DIE :TOPLEVEL" $? 0 "(saved core ran)"
 
+run_sbcl <<EOF
+  (require :asdf)
+  (require :sb-bsd-sockets)
+  (save-lisp-and-die "$tmpcore")
+EOF
+run_sbcl_with_core "$tmpcore" --no-userinit --no-sysinit \
+    --eval "(require :sb-posix)" --quit
+check_status_maybe_lose "SAVE-LISP-AND-DIE" $? 0 "(saved core ran)"
+
 # In sbcl-0.7.7 SAVE-LISP-AND-DIE didn't work at all because of
 # flakiness caused by consing/GC/purify twice-and-at-least-twice
 # mismatch grot.

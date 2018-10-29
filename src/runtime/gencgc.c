@@ -4251,7 +4251,9 @@ void gc_show_pte(lispobj obj)
     page = find_varyobj_page_index((void*)obj);
     if (page>=0) {
         extern unsigned char* varyobj_page_gens;
-        printf("page %ld (v) gens %x%s\n", page, varyobj_page_gens[page],
+        printf("page %ld (v) ss=%p gens %x%s\n", page,
+               varyobj_scan_start(page),
+               varyobj_page_gens[page],
                card_protected_p((void*)obj)? " WP":"");
         return;
     }

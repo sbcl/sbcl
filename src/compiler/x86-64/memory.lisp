@@ -18,7 +18,15 @@
                  (+ nil-value (static-symbol-offset symbol) offset)
                  (make-fixup symbol :immobile-object offset)))))
 
-(defun gen-cell-set (ea value result)
+(defun gen-cell-set (ea value result &optional vop pseudo-atomic)
+  (when pseudo-atomic
+    ;; (SETF %FUNCALLABLE-INSTANCE-FUN) and (SETF %FUNCALLABLE-INSTANCE-INFO)
+    ;; pass in pseudo-atomic = T.
+    (pseudo-atomic ()
+     (inst push (ea-base ea))
+     (invoke-asm-routine 'call 'touch-gc-card vop)
+     (gen-cell-set ea value result))
+    (return-from gen-cell-set))
   (when (sc-is value immediate)
     (let ((bits (encode-value-if-immediate value)))
       (cond ((not result)

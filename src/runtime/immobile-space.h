@@ -42,6 +42,20 @@ varyobj_page_address(low_page_index_t page_num)
     return (void*)(VARYOBJ_SPACE_START + (page_num * IMMOBILE_CARD_BYTES));
 }
 
+// Array of offsets backwards in double-lispwords from the page end
+// to the lowest-addressed object touching the page. This offset can
+// point to a hole, but we prefer that it not. If the offset is zero,
+// the page has no object other than possibly a hole resulting
+// from a freed object.
+extern unsigned short* varyobj_page_scan_start_offset;
+/* Calculate the address where the first object touching this page starts. */
+static inline lispobj*
+varyobj_scan_start(low_page_index_t page_index)
+{
+    return (lispobj*)((char*)varyobj_page_address(page_index+1)
+                      - varyobj_page_scan_start_offset[page_index] * (2 * N_WORD_BYTES));
+}
+
 static inline low_page_index_t find_fixedobj_page_index(void *addr)
 {
   if (addr >= (void*)FIXEDOBJ_SPACE_START) {
