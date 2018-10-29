@@ -231,7 +231,10 @@
     (assert (search "LOCK OR FS:[#x20100400], R8B"
                     (get-output-stream-string s)))))
 
-(with-test (:name :disassemble-static-fdefn :skipped-on (not :x86-64))
+;;; This seems to be testing that we can find fdefns in static space
+;;; which I guess was broken.  immobile-code has no fdefns in static space.
+(with-test (:name :disassemble-static-fdefn
+            :skipped-on (or (not :x86-64) :immobile-code))
   (assert (< (get-lisp-obj-address (sb-kernel::find-fdefn 'sb-impl::sub-gc))
              sb-vm:static-space-end))
   ;; Cause SUB-GC to become un-statically-linked

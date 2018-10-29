@@ -145,6 +145,10 @@ SetSymbolValue(lispobj tagged_symbol_pointer,lispobj val, void *thread)
 # define read_TLS(sym, thread) SYMBOL(sym)->value
 #endif
 
+#ifdef LISP_FEATURE_IMMOBILE_CODE
+# include "genesis/vector.h"
+#endif
+// FIXME: very random that this is defined in 'thread.h'
 #define StaticSymbolFunction(x) FdefnFun(x##_FDEFN)
 /* Return 'fun' given a tagged pointer to an fdefn. */
 static inline lispobj FdefnFun(lispobj fdefn)

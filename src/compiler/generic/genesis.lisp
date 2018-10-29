@@ -551,6 +551,7 @@
 
 ;;; a handle on the NIL object
 (defvar *nil-descriptor*)
+(defvar *c-callable-fdefn-vector*)
 
 ;;; the head of a list of TOPLEVEL-THINGs describing stuff to be done
 ;;; when the target Lisp starts up
@@ -1689,6 +1690,19 @@ core and return a descriptor to it."
                            sb!vm:symbol-value-slot
                            (ash address-bits 32)))
 
+  ;; Immobile code prefers all FDEFNs adjacent so that code can be located
+  ;; anywhere in the addressable memory allowed by the OS, as long as all
+  ;; FDEFNs are near enough all code (i.e. within a 32-bit jmp offset).
+  ;; That fails if static fdefns are wired to an address below 4GB
+  ;; and code resides above 4GB. But as the Fundamental Theorem says:
+  ;;   any problem can be solved by adding another indirection.
+  #!+immobile-code
+  (setf *c-callable-fdefn-vector*
+        (vector-in-core (make-list (length sb!vm::+c-callable-fdefns+)
+                                   :initial-element *nil-descriptor*)
+                        *static*))
+
+  #!-immobile-code
   (dolist (sym sb!vm::+c-callable-fdefns+)
     (cold-fdefinition-object (cold-intern sym) nil *static*))
 
@@ -1750,6 +1764,12 @@ core and return a descriptor to it."
 
   (dolist (symbol sb!impl::*cache-vector-symbols*)
     (cold-set symbol *nil-descriptor*))
+
+  ;; Put the C-callable fdefns into the static-fdefn vector if #!+immobile-code.
+  #!+immobile-code
+  (loop for i from 0 for sym in sb!vm::+c-callable-fdefns+
+        do (cold-svset *c-callable-fdefn-vector* i
+                       (cold-fdefinition-object sym)))
 
   ;; Symbols for which no call to COLD-INTERN would occur - due to not being
   ;; referenced until warm init - must be artificially cold-interned.
@@ -3293,6 +3313,20 @@ core and return a descriptor to it."
         (format stream "#define ~A (*)~%" c-symbol))
       (format stream "#define ~A_tlsindex 0x~X~%"
               c-symbol (ensure-symbol-tls-index symbol))))
+
+  ;; For immobile code, define a constant for the address of the vector of
+  ;; C-callable fdefns, and then fdefns in terms of indices to that vector.
+  #!+immobile-code
+  (progn
+    (format stream "#define STATIC_FDEFNS LISPOBJ(0x~X)~%"
+            (descriptor-bits *c-callable-fdefn-vector*))
+    (loop for symbol in sb!vm::+c-callable-fdefns+
+          for index from 0
+          do (format stream "#define ~A_fdefn ~d~0@*
+#define ~A_FDEFN (VECTOR(STATIC_FDEFNS)->data[~d])~%"
+                     (c-symbol-name symbol) index)))
+  ;; Everybody else can address each fdefn directly.
+  #!-immobile-code
   (loop for symbol in sb!vm::+c-callable-fdefns+
         for index from 0
         do
@@ -3641,6 +3675,7 @@ III. initially undefined function references (alphabetically):
                                      #!-gencgc sb!vm:dynamic-0-space-start))
            (*nil-descriptor*)
            (*simple-vector-0-descriptor*)
+           (*c-callable-fdefn-vector*)
            (*known-structure-classoids* nil)
            (*classoid-cells* (make-hash-table :test 'eq))
            (*ctype-cache* (make-hash-table :test 'equal))
