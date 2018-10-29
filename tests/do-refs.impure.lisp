@@ -105,8 +105,7 @@
                        ,(sxhash instance)
                        :a  ay :b bee :format-arguments "wat"))))
 
-(test-util:with-test (:name :walk-slots-pcl-ctor
-                      :fails-on :interpreter)
+(test-util:with-test (:name :walk-slots-pcl-ctor)
   (let* ((slot-vals '("A" "B" "C" "D" "E" "F"))
          (f (apply (compile nil '(lambda (&rest args)
                                   (let ((ctor (apply #'sb-pcl::%make-ctor args)))
@@ -116,8 +115,7 @@
     (walk-slots-test f `(,(find-layout 'sb-pcl::ctor) ,#'error ,@slot-vals))))
 
 #+sb-fasteval
-(test-util:with-test (:name :walk-slots-interpreted-fun
-                      :fails-on :interpreter)
+(test-util:with-test (:name :walk-slots-interpreted-fun)
   (let ((f (let ((sb-ext:*evaluator-mode* :interpret))
              (eval '(lambda (x y z))))))
     (funcall f 1 2 3) ; compute the digested slots

@@ -100,8 +100,8 @@
   (def %make-funcallable-instance)
   (def %funcallable-instance-layout)
   (def %set-funcallable-instance-layout (fin new-value))
-  (def %funcallable-instance-function)
-  (def (setf %funcallable-instance-function) (fin new-value))
+  (def %funcallable-instance-fun)
+  (def (setf %funcallable-instance-fun) (fin new-value))
   (def %funcallable-instance-info (fin i))
   (def %set-funcallable-instance-info (fin i new-value))
 

@@ -1308,10 +1308,10 @@
   ;; (because the code and lexenv were set separately).
   (let ((fun (sb-kernel:%make-funcallable-instance 0))
         (condition nil))
-    (sb-pcl:set-funcallable-instance-function fun #'closure-one)
+    (setf (sb-kernel:%funcallable-instance-fun fun) #'closure-one)
     (flet ((changer ()
-             (loop (sb-pcl:set-funcallable-instance-function fun #'closure-one)
-                   (sb-pcl:set-funcallable-instance-function fun #'closure-two)))
+             (loop (setf (sb-kernel:%funcallable-instance-fun fun) #'closure-one)
+                   (setf (sb-kernel:%funcallable-instance-fun fun) #'closure-two)))
            (test ()
              (handler-case (loop (funcall fun))
                (serious-condition (c) (setf condition c)))))
