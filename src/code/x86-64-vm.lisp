@@ -236,15 +236,14 @@
              (jmp-origin ; 5 = instruction length
               (+ fdefn-addr (ash fdefn-raw-addr-slot word-shift) 5))
              (jmp-operand
-              (ldb (byte 32 0) (the (signed-byte 32) (- jmp-target jmp-origin))))
-             (instruction
+              (ldb (byte 32 0) (the (signed-byte 32) (- jmp-target jmp-origin)))))
+        (setf (sap-ref-word (int-sap fdefn-addr) (ash fdefn-raw-addr-slot word-shift))
               (logior #xE9 ; JMP opcode
                       (ash jmp-operand 8)
                       (ash #xA890 40) ; "NOP ; TEST %AL, #xNN"
-                      (ash tagged-ptr-bias 56))))
-        (%primitive sb!vm::set-fdefn-fun fdefn fun instruction))))
-  fun)
-
+                      (ash tagged-ptr-bias 56))
+              (sap-ref-lispobj (int-sap fdefn-addr) (ash fdefn-fun-slot word-shift))
+              fun)))))
 ) ; end PROGN
 
 ;;; Find an immobile FDEFN or FUNCTION given an interior pointer to it.

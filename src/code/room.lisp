@@ -1241,7 +1241,7 @@ We could try a few things to mitigate this:
   (values))
 
 #+nil ; for debugging
-(defun show-dynamic-space-code (&optional (stream *standard-output*)
+(defun dump-dynamic-space-code (&optional (stream *standard-output*)
                                 &aux (n-code-bytes 0)
                                      (total-pages next-free-page)
                                      (pages
@@ -1284,23 +1284,6 @@ We could try a few things to mitigate this:
       (format t "~&Used-bytes=~D Pages=~D Waste=~D (~F%)~%"
               n-code-bytes n-pages waste
               (* 100 (/ waste tot))))))
-
-#+nil ; for debugging
-(defun show-immobile-spaces (which)
-  (flet ((show (obj type size)
-           (declare (ignore type size))
-           (let ((*print-pretty* nil))
-             (format t "~x: ~s~%" (get-lisp-obj-address obj) obj))))
-    (when (or (eq which :fixed) (eq which :both))
-      (format t "Fixedobj space~%==============~%")
-      (map-objects-in-range #'show
-        (%make-lisp-obj fixedobj-space-start)
-        (%make-lisp-obj (sap-int *fixedobj-space-free-pointer*))))
-    (when (or (eq which :variable) (eq which :both))
-      (format t "Varyobj space~%=============~%")
-      (map-objects-in-range #'show
-        (%make-lisp-obj varyobj-space-start)
-        (%make-lisp-obj (sap-int *varyobj-space-free-pointer*))))))
 
 #+gencgc
 (defun generation-of (object)

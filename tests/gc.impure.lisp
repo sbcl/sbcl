@@ -86,7 +86,7 @@
     n))
 (defun make-one-cons () (cons 'x 'y))
 
-;;; While this does not directly test LIST-ALLOCATED-OBJECTS,
+;;; While this does not directly tests LIST-ALLOCATED-OBJECTS,
 ;;; it checks that L-A-O would potentially (probably) include in its
 ;;; output each new object allocated, barring any intervening GC.
 ;;; It is all but impossible to actually test L-A-O in an A/B scenario
