@@ -53,6 +53,9 @@
                   (inst push offset)
                   (inst push object)))
            (invoke-asm-routine 'call 'code-header-set vop))
+          ((equal name '(setf %funcallable-instance-fun))
+           (gen-cell-set (make-ea-for-object-slot object offset lowtag)
+                         value nil vop t))
           (t
            (gen-cell-set (make-ea-for-object-slot object offset lowtag)
                          value nil)))))
@@ -402,6 +405,20 @@
     (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
     (storew raw fdefn fdefn-raw-addr-slot other-pointer-lowtag)
     (move result function)))
+#!+immobile-code
+(define-vop (set-fdefn-fun)
+  (:args (fdefn :scs (descriptor-reg))
+         (function :scs (descriptor-reg))
+         (raw-word :scs (unsigned-reg)))
+  (:vop-var vop)
+  (:generator 38
+    (pseudo-atomic ()
+      (inst push fdefn)
+      (invoke-asm-routine 'call 'touch-gc-card vop)
+      (inst mov (ea (- (ash fdefn-fun-slot word-shift) other-pointer-lowtag) fdefn)
+            function)
+      (inst mov (ea (- (ash fdefn-raw-addr-slot word-shift) other-pointer-lowtag) fdefn)
+            raw-word))))
 
 (define-vop (fdefn-makunbound)
   (:policy :fast-safe)

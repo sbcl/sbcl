@@ -447,3 +447,28 @@
   (inst pop rdi-tn) ; restore
   (inst pop rax-tn)
   (inst ret 24)) ; remove 3 stack args
+
+#+sb-assembling
+(define-assembly-routine (touch-gc-card (:return-style :none)) ()
+  ;; stack: ret-pc, object
+  #!-sb-thread
+  (progn
+    #!+sb-dynamic-core
+    (progn
+      (inst mov thread-base-tn (ea (make-fixup "all_threads" :foreign-dataref)))
+      (inst mov thread-base-tn (ea thread-base-tn)))
+    #!-sb-dynamic-core
+    (inst mov thread-base-tn (ea (make-fixup "all_threads" :foreign))))
+  (inst mov temp-reg-tn (ea 8 rsp-tn))
+  (inst sub temp-reg-tn (thread-slot-ea thread-varyobj-space-addr-slot))
+  (inst shr temp-reg-tn (integer-length (1- immobile-card-bytes)))
+  (inst cmp temp-reg-tn (thread-slot-ea thread-varyobj-card-count-slot))
+  (inst jmp :ae DONE)
+
+  (inst push rax-tn)
+  (inst mov rax-tn (thread-slot-ea thread-varyobj-card-marks-slot))
+  (inst bts (ea rax-tn) temp-reg-tn :lock)
+  (inst pop rax-tn)
+
+  DONE
+  (inst ret 8)) ; remove 1 stack arg

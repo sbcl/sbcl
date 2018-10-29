@@ -125,7 +125,7 @@
   (jmp-inst nil :read-only t)
   (pop-inst nil :read-only t))
 
-(defun c-name (lispname core pp-state)
+(defun c-name (lispname core pp-state &optional (prefix ""))
   ;; Get rid of junk from LAMBDAs
   (setq lispname
         (named-let recurse ((x lispname))
@@ -185,7 +185,7 @@
                               :case :downcase :gensym nil
                               :right-margin 10000)))
                          'list))))
-    (let ((string (coerce characters 'string)))
+    (let ((string (concatenate 'string prefix characters)))
       ;; If the string appears in the linker symbols, then string-upcase it
       ;; so that it looks like a conventional Lisp symbol.
       (cond ((find-if (lambda (x) (string= string (if (consp x) (car x) x)))
@@ -245,7 +245,7 @@
                                           (packages (core-packages core))
                                           (core-nil (core-nil-object core)))
   (named-let recurse ((depth 0) (x name))
-    (unless (= (logand (get-lisp-obj-address x) 3) 3)
+    (unless (is-lisp-pointer (get-lisp-obj-address x))
       (return-from recurse x)) ; immediate object
     (when (eq x core-nil)
       (return-from recurse nil))
@@ -780,9 +780,9 @@
                            (* (code-header-words code) n-word-bytes))
                   collect (sap-ref-8 text-sap i)))))
 
+(defconstant +gf-name-slot+ 5)
+
 ;;; Convert immobile varyobj space to an assembly file in OUTPUT.
-;;; TODO: relocate fdefns and instances of standard-generic-function
-;;; into the space that is dumped into an ELF section.
 (defun write-assembler-text
     (spaces output
      &optional emit-sizes (emit-cfi t)
@@ -796,6 +796,9 @@
                           (sb-pretty::make-pprint-dispatch-table)))
           (prev-namestring "")
           (n-linker-relocs 0)
+          (seen-fdefns nil)
+          (seen-trampolines nil)
+          (seen-gfs nil)
           end-loc)
   (set-pprint-dispatch 'string
                        ;; Write strings without string quotes
@@ -881,46 +884,103 @@
         (setf total-code-size size)))
     (loop
       (when (>= code-addr (bounds-high code-bounds)) (return))
-      (let* ((code (make-code-obj code-addr))
-             (objsize (code-component-size code)))
-        (setq end-loc (+ code-addr objsize))
-        (incf total-code-size objsize)
-        (cond
-          ((< (code-header-words code) 4) ; filler object
-           ;; ** THIS CASE IS UNTESTED **
-           ;; Shouldn't occur unless defrag was not performed
-           (format output "#x~x:~% .quad 0x~X, 0x~X~% .fill ~D~%"
-                   code-addr
-                   simple-array-unsigned-byte-8-widetag
-                   (ash (- objsize (* 2 n-word-bytes))
-                        n-fixnum-tag-bits)
-                   (- objsize (* 2 n-word-bytes))))
-          ((%instancep (%code-debug-info code)) ; assume it's a COMPILED-DEBUG-INFO
-           (aver (plusp (code-n-entries code)))
-           (let* ((source
-                   (sb-c::compiled-debug-info-source
-                    (truly-the sb-c::compiled-debug-info
-                               (translate (%code-debug-info code) spaces))))
-                  (namestring
-                   (sb-c::debug-source-namestring
-                    (truly-the sb-c::debug-source (translate source spaces)))))
-             (setq namestring (if (eq namestring (core-nil-object core))
-                                  "sbcl.core"
-                                  (translate namestring spaces)))
-             (unless (string= namestring prev-namestring)
-               (format output " .file \"~a\"~%" namestring)
-               (setq prev-namestring namestring)))
-           (setf (core-fixup-addrs core)
-                 (mapcar (lambda (x)
-                           (+ code-addr (ash (code-header-words code) word-shift) x))
-                         (code-fixup-locs code spaces)))
-           (let ((code-physaddr (logandc2 (get-lisp-obj-address code) lowtag-mask)))
-             (format output "#x~x:~%" code-addr)
-             (dumpwords code-physaddr (code-header-words code) output #() code-addr)
-             (emit-funs code code-addr core pp-state #'dumpwords output emit-cfi)))
-          (t
-           (error "Strange code component: ~S" code)))
-        (incf code-addr objsize))))
+      (ecase (%widetag-of (sap-ref-word (int-sap (translate-ptr code-addr spaces)) 0))
+        (#.code-header-widetag
+         (let* ((code (make-code-obj code-addr))
+                (objsize (code-component-size code)))
+           (setq end-loc (+ code-addr objsize))
+           (incf total-code-size objsize)
+           (cond
+             ((< (code-header-words code) 4) ; filler object
+              (let ((nbytes (code-component-size code)))
+                (format output " .quad 0x~x, 0x~x~% .fill 0x~x~%# ~x:~%"
+                        code-header-widetag (ash nbytes n-fixnum-tag-bits)
+                        (- nbytes (* 2 n-word-bytes))
+                        (+ code-addr nbytes))))
+             ((%instancep (%code-debug-info code)) ; assume it's a COMPILED-DEBUG-INFO
+              (aver (plusp (code-n-entries code)))
+              (let* ((source
+                      (sb-c::compiled-debug-info-source
+                       (truly-the sb-c::compiled-debug-info
+                                  (translate (%code-debug-info code) spaces))))
+                     (namestring
+                      (sb-c::debug-source-namestring
+                       (truly-the sb-c::debug-source (translate source spaces)))))
+                (setq namestring (if (eq namestring (core-nil-object core))
+                                     "sbcl.core"
+                                     (translate namestring spaces)))
+                (unless (string= namestring prev-namestring)
+                  (format output " .file \"~a\"~%" namestring)
+                  (setq prev-namestring namestring)))
+              (setf (core-fixup-addrs core)
+                    (mapcar (lambda (x)
+                              (+ code-addr (ash (code-header-words code) word-shift) x))
+                            (code-fixup-locs code spaces)))
+              (let ((code-physaddr (logandc2 (get-lisp-obj-address code) lowtag-mask)))
+                (format output "#x~x:~%" code-addr)
+                (dumpwords code-physaddr (code-header-words code) output #() code-addr)
+                (emit-funs code code-addr core pp-state #'dumpwords output emit-cfi)))
+             ((functionp (%code-debug-info code))
+              (unless seen-trampolines
+                (setq seen-trampolines t)
+                (format output "lisp_trampolines:~%"))
+              (let* ((sap (int-sap (translate-ptr code-addr spaces)))
+                     (tramp-fun (sap-ref-word sap (ash 2 word-shift))))
+                (aver (not (in-bounds-p tramp-fun code-bounds)))
+                (format output " .quad ~{0x~x~^,~}~%"
+                        (loop for i from 0 by n-word-bytes repeat 6
+                              collect (sap-ref-word sap i)))))
+             (t
+              (error "Strange code component: ~S" code)))
+           (incf code-addr objsize)))
+        (#.fdefn-widetag
+         (unless seen-fdefns
+           (format output "~%# FDEFNs~%")
+           (setq seen-fdefns t))
+         (let* ((ptr (translate-ptr code-addr spaces))
+                (fdefn (%make-lisp-obj (logior ptr other-pointer-lowtag)))
+                (name (fun-name-from-core (fdefn-name fdefn) core))
+                (fun (get-lisp-obj-address (fdefn-fun fdefn)))
+                (code-space-p (in-bounds-p fun code-bounds))
+                (raw-fun (sap-ref-word (int-sap ptr)
+                                       (ash fdefn-raw-addr-slot word-shift)))
+                (c-name (c-name name core pp-state "f_")))
+           (format output "~a: # ~x~%~@[ .size ~:*~a, ~d~%~]"
+                     (c-symbol-quote c-name)
+                     (logior code-addr other-pointer-lowtag)
+                     (if emit-sizes 32))
+           (format output " .quad 0x~x, 0x~x, ~:[~;__lisp_code_start+~]0x~x, 0x~x~%"
+                   (sap-ref-word (int-sap ptr) 0)
+                   (sap-ref-word (int-sap ptr) 8)
+                   code-space-p (if code-space-p (- fun (bounds-low code-bounds)) fun)
+                   raw-fun)
+           (incf code-addr (* 4 n-word-bytes))))
+        (#.funcallable-instance-widetag
+         (unless seen-gfs
+           (setq seen-gfs t)
+           (format output " .size lisp_trampolines, .-lisp_trampolines~%"))
+         (let* ((sap (int-sap (translate-ptr code-addr spaces)))
+                (fin-fun (sap-ref-word sap (ash 2 word-shift)))
+                (code-space-p (in-bounds-p fin-fun code-bounds))
+                (slots (translate (sap-ref-lispobj sap (ash 3 word-shift)) spaces))
+                (name (and (> (length (the simple-vector slots)) +gf-name-slot+)
+                           (svref slots +gf-name-slot+)))
+                (c-name
+                 (c-name
+                  (if (or (not name)
+                          (eql (get-lisp-obj-address name) sb-vm:unbound-marker-widetag))
+                      "unnamed"
+                      (fun-name-from-core name core))
+                  core pp-state "gf_")))
+           (format output "~a:~%~@[ .size ~:*~a, ~d~%~]"
+                   (c-symbol-quote c-name) (if emit-sizes 48))
+           (format output " .quad 0x~x, .+24, ~:[~;__lisp_code_start+~]0x~x~{, 0x~x~}~%"
+                   (sap-ref-word sap 0)
+                   code-space-p
+                   (if code-space-p (- fin-fun (bounds-low code-bounds)) fin-fun)
+                   (loop for i from (ash 3 word-shift) by n-word-bytes repeat 3
+                         collect (sap-ref-word sap i))))
+         (incf code-addr (* 6 n-word-bytes))))))
 
   ;; coreparse uses the 'lisp_jit_code' symbol to set varyobj_free_pointer
   ;; The intent is that compilation to memory can use this reserved area

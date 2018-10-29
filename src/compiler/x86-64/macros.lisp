@@ -341,7 +341,8 @@
                `((gen-cell-set
                    (ea (- (* ,offset n-word-bytes) ,lowtag)
                        object index (ash 1 (- word-shift n-fixnum-tag-bits)))
-                   value result)))))
+                   value result vop
+                   ,(eq name 'set-funcallable-instance-info))))))
      ,@(when want-both-variants
          `((define-vop (,(symbolicate name "-C"))
             ,@(when translate
@@ -356,11 +357,13 @@
                         ,el-type)
             (:results (result :scs ,scs))
             (:result-types ,el-type)
+            (:vop-var vop)
             (:generator 3                    ; was 5
               (gen-cell-set
                    (ea (- (* (+ ,offset index) n-word-bytes) ,lowtag)
                        object)
-                   value result))))))))
+                   value result vop
+                   ,(eq name 'set-funcallable-instance-info)))))))))
 
 (defmacro define-full-setter+offset (name type offset lowtag scs el-type &optional translate)
   `(progn
