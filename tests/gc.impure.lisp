@@ -76,6 +76,49 @@
         (sb-vm:map-allocated-objects #'countit :all)
         (assert (equal (map 'list #'- after before) '(0 1 1 1)))))))
 
+(defun count-dynamic-space-objects ()
+  (let ((n 0))
+    (sb-vm:map-allocated-objects
+     (lambda (obj widetag size)
+       (declare (ignore obj widetag size))
+       (incf n))
+     :dynamic)
+    n))
+(defun make-one-cons () (cons 'x 'y))
+
+;;; While this does not directly tests LIST-ALLOCATED-OBJECTS,
+;;; it checks that L-A-O would potentially (probably) include in its
+;;; output each new object allocated, barring any intervening GC.
+;;; It is all but impossible to actually test L-A-O in an A/B scenario
+;;; because it conses as many new cells as there were objects to begin
+;;; with, plus a vector. i.e. you can't easily perform "list the objects,
+;;; create one cons, list the objects, assert that there is that one
+;;; cons plus exactly the previous list of objects"
+;;; Counting and getting the right answer should be somewhat reassuring.
+;;; This test needs dynamic-extent to work properly.
+;;; (I don't know what platforms it passes on, but at least these two it does)
+#+(or x86 x86-64)
+(with-test (:name :repeatably-count-allocated-objects)
+  (let ((a (make-array 5)))
+    (dotimes (i (length a))
+      (setf (aref a i) (count-dynamic-space-objects))
+      (make-one-cons))
+    (dotimes (i (1- (length a)))
+      (assert (= (aref a (1+ i)) (1+ (aref a i)))))))
+
+(with-test (:name :list-allocated-objects)
+  ;; Assert that if :COUNT is supplied as a higher number
+  ;; than number of objects that exists, the output is
+  ;; not COUNT many items long.
+  (let ((l (sb-vm:list-allocated-objects :dynamic
+                                         :count 1000
+                                         :type sb-vm:weak-pointer-widetag)))
+    ;; This is a change-detector unfortunately,
+    ;; but seems like it'll be OK for a while.
+    ;; I see only 4 weak pointers in the baseline image.
+    ;; Really we could just assert /= 1000.
+    (assert (< (length l) 15))))
+
 (defparameter *x* ())
 
 (defun cons-madly ()
@@ -83,7 +126,7 @@
         (setq *x* (make-string 100000))))
 
 ;; check that WITHOUT-INTERRUPTS doesn't block the gc trigger
-(with-test (:name :cons-madily-without-interrupts)
+(with-test (:name :cons-madly-without-interrupts)
   (sb-sys:without-interrupts (cons-madly)))
 
 ;; check that WITHOUT-INTERRUPTS doesn't block SIG_STOP_FOR_GC

@@ -822,6 +822,9 @@ We could try a few things to mitigate this:
 ;;; (2) sb-sprof deciding how many regions [sic] were made if #+cheneygc
 (defun get-page-size () sb-c:+backend-page-bytes+)
 
+;;; This function is sheer madness.  You're better off using
+;;; LIST-ALLOCATED-OBJECTS and then iterating over that, to avoid
+;;; seeing all the junk created while doing this thing.
 (defun print-allocated-objects (space &key (percent 0) (pages 5)
                                       type larger smaller count
                                       (stream *standard-output*))
@@ -918,24 +921,59 @@ We could try a few things to mitigate this:
 (defun list-allocated-objects (space &key type larger smaller count
                                      test)
   (declare (type (or (eql :all) spaces) space)
-           (type (or index null) larger smaller type count)
+           (type (or (unsigned-byte 8) null) type)
+           (type (or index null) larger smaller count)
            (type (or function null) test))
   (declare (dynamic-extent test))
-  (unless *ignore-after*
-    (setq *ignore-after* (cons 1 2)))
-  (collect ((counted 0 1+))
-    (let ((res ()))
-      (map-allocated-objects
-       (lambda (obj obj-type size)
-         (when (and (or (not type) (eql obj-type type))
-                    (or (not smaller) (<= size smaller))
-                    (or (not larger) (>= size larger))
-                    (or (not test) (funcall test obj)))
-           (setq res (maybe-cons space obj res))
-           (when (and count (>= (counted) count))
-             (return-from list-allocated-objects res))))
-       space)
-      res)))
+  (when (eql count 0)
+    (return-from list-allocated-objects nil))
+  ;; This function was pretty much random as to what subset of the heap it
+  ;; visited- it might see half the heap, 1/10th of the heap, who knows, because
+  ;; it stopped based on hitting a sentinel cons cell made just prior to the loop.
+  ;; That stopping condition was totally wrong because allocation does not occur
+  ;; linearly.  Taking 2 passes (first count, then store) stands a chance of
+  ;; getting a reasonable point-in-time view as long as other threads are not consing
+  ;; like crazy. If the user-supplied TEST function conses at all, then the result is
+  ;; still very arbitrary - including possible duplication of objects if we visit
+  ;; something and then see it again after GC transports it higher. The only way to
+  ;; allow consing in the predicate would be to use dedicated "arenas" for new
+  ;; allocations, that being a concept which we do not now - and may never - support.
+  (sb-int:dx-flet ((wantp (obj widetag size)
+                     (and (or (not type) (eql widetag type))
+                          (or (not smaller) (<= size smaller))
+                          (or (not larger) (>= size larger))
+                          (or (not test) (funcall test obj)))))
+    ;; Unless COUNT is smallish, always start by counting. Don't just trust the user
+    ;; because s/he might specify :COUNT huge-num which is acceptable provided that
+    ;; huge-num is an INDEX which could either exhaust the heap, or at least be
+    ;; wasteful if but a tiny handful of objects would actually satisfy WANTP.
+    (let* ((output (make-array
+                    (if (typep count '(integer 0 100000))
+                        count
+                        (let ((n 0))
+                          (map-allocated-objects
+                           (lambda (obj widetag size)
+                             (when (wantp obj widetag size) (incf n)))
+                           space)
+                          n))))
+           (index 0))
+      (block done
+       (map-allocated-objects
+        (lambda (obj widetag size)
+          (when (wantp obj widetag size)
+            (setf (aref output index) obj)
+            (when (= (incf index) (length output))
+              (return-from done))))
+        space))
+      (let ((list
+             (cond ((= index (length output)) ; easy case
+                    (coerce output 'list))
+                   (t ; didn't fill the array
+                    (collect ((res))
+                      (dotimes (i index (res))
+                        (res (svref output i))))))))
+        (fill output 0) ; assist GC a bit
+        list))))
 
 ;;; Calls FUNCTION with all objects that have (possibly conservative)
 ;;; references to them on current stack.
