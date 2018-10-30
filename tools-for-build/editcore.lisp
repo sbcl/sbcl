@@ -117,6 +117,7 @@
   (linkage-symbols nil)
   (linkage-symbol-usedp nil)
   (linkage-entry-size nil)
+  (enable-pie nil)
   (dstate (make-dstate nil) :read-only t)
   (seg (%make-segment :sap-maker (lambda () (error "Bad sap maker"))
                       :virtual-location 0) :read-only t)
@@ -367,7 +368,7 @@
         (setf (aref vector entry-index)
               (if (consp key) (list string) string))))))
 
-(defun make-core (spaces code-bounds fixedobj-bounds)
+(defun make-core (spaces code-bounds fixedobj-bounds &optional enable-pie)
   (let* ((linkage-bounds
           (make-bounds
            (symbol-global-value
@@ -393,6 +394,7 @@
            :linkage-entry-size linkage-entry-size
            :linkage-symbols linkage-symbols
            :linkage-symbol-usedp (make-array (length linkage-symbols) :element-type 'bit)
+           :enable-pie enable-pie
            :call-inst (find-inst #b11101000 inst-space)
            :jmp-inst (find-inst #b11101001 inst-space)
            :pop-inst (find-inst #x5d inst-space))))
@@ -635,8 +637,9 @@
                                        (core-linkage-entry-size core))))
                                (setf (bit (core-linkage-symbol-usedp core) entry-index) 1
                                      operand (aref (core-linkage-symbols core) entry-index))))
-                           (format stream " ~A ~:[0x~X~;~a~]~%"
-                                   opcode (stringp operand) operand))
+                           (format stream " ~A ~:[0x~X~;~a~:[~;@PLT~]~]~%"
+                                   opcode (stringp operand) operand
+                                   (core-enable-pie core)))
                           ((string= opcode "pop")
                            (format stream " ~A ~A~%" opcode operand)
                            (cond ((string= operand "8(%rbp)")
@@ -785,10 +788,10 @@
 ;;; Convert immobile varyobj space to an assembly file in OUTPUT.
 (defun write-assembler-text
     (spaces output
-     &optional emit-sizes (emit-cfi t)
+     &optional emit-sizes enable-pie (emit-cfi t)
      &aux (code-bounds (space-bounds immobile-varyobj-core-space-id spaces))
           (fixedobj-bounds (space-bounds immobile-fixedobj-core-space-id spaces))
-          (core (make-core spaces code-bounds fixedobj-bounds))
+          (core (make-core spaces code-bounds fixedobj-bounds enable-pie))
           (code-addr (bounds-low code-bounds))
           (total-code-size 0)
           (pp-state (cons (make-hash-table :test 'equal)
@@ -904,7 +907,7 @@
                        (truly-the sb-c::compiled-debug-info
                                   (translate (%code-debug-info code) spaces))))
                      (namestring
-                      (debug-source-namestring
+                      (sb-c::debug-source-namestring
                        (truly-the sb-c::debug-source (translate source spaces)))))
                 (setq namestring (if (eq namestring (core-nil-object core))
                                      "sbcl.core"
@@ -945,10 +948,10 @@
                 (raw-fun (sap-ref-word (int-sap ptr)
                                        (ash fdefn-raw-addr-slot word-shift)))
                 (c-name (c-name name core pp-state "f_")))
-           (format output "~a: # ~x~%~@[ .size ~:*~a, ~d~%~]"
+           (format output "~a: # ~x~%~@[ .size ~0@*~a, 32~%~]"
                      (c-symbol-quote c-name)
                      (logior code-addr other-pointer-lowtag)
-                     (if emit-sizes 32))
+                     emit-sizes)
            (format output " .quad 0x~x, 0x~x, ~:[~;__lisp_code_start+~]0x~x, 0x~x~%"
                    (sap-ref-word (int-sap ptr) 0)
                    (sap-ref-word (int-sap ptr) 8)
@@ -972,8 +975,8 @@
                       "unnamed"
                       (fun-name-from-core name core))
                   core pp-state "gf_")))
-           (format output "~a:~%~@[ .size ~:*~a, ~d~%~]"
-                   (c-symbol-quote c-name) (if emit-sizes 48))
+           (format output "~a:~%~@[ .size ~0@*~a, 48~%~]"
+                   (c-symbol-quote c-name) emit-sizes)
            (format output " .quad 0x~x, .+24, ~:[~;__lisp_code_start+~]0x~x~{, 0x~x~}~%"
                    (sap-ref-word sap 0)
                    code-space-p
@@ -1456,7 +1459,7 @@
 ;;; is for linking in to a binary that needs no "--core" argument.
 (defun split-core
     (input-pathname asm-pathname
-     &key emit-sizes (verbose nil)
+     &key emit-sizes enable-pie (verbose nil)
      &aux (split-core-pathname
            (merge-pathnames (make-pathname :type "core") asm-pathname))
           (elf-core-pathname
@@ -1607,7 +1610,7 @@
               (format t "Copying ~d bytes (#x~x) from ptes = ~d PTEs~%"
                       pte-nbytes pte-nbytes (floor pte-nbytes 10)))
             (copy-bytes input output pte-nbytes)) ; Copy PTEs from input
-          (let ((core (write-assembler-text map asm-file emit-sizes))
+          (let ((core (write-assembler-text map asm-file emit-sizes enable-pie))
                 (emit-all-c-symbols t))
             ;; There's no relation between emit-sizes and which section to put
             ;; C symbol references in, however it's a safe bet that if sizes
@@ -1709,11 +1712,17 @@
 (defun cl-user::elfinate (&optional (args (cdr sb-ext:*posix-argv*)))
   (cond ((string= (car args) "split")
          (pop args)
-         (let ((sizes (string= (car args) "--sizes")))
-           (when sizes
-             (pop args))
+         (let (pie sizes)
+           (loop (cond ((string= (car args) "--sizes")
+                        (setq sizes t)
+                        (pop args))
+                       ((string= (car args) "--pie")
+                        (setq pie t)
+                        (pop args))
+                       (t
+                        (return))))
            (destructuring-bind (input asm) args
-             (split-core input asm :emit-sizes sizes))))
+             (split-core input asm :enable-pie pie :emit-sizes sizes))))
         ((string= (car args) "copy")
          (apply #'copy-to-elf-obj (cdr args)))
         #+nil
