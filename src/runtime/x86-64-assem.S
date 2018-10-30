@@ -233,7 +233,6 @@ LsingleValue:
 	.cfi_endproc
 	SIZE(GNAME(call_into_lisp))
 
-#ifdef LISP_FEATURE_SB_THREAD
 	.text	
 	.globl  GNAME(funcall_alien_callback)
 	TYPE(GNAME(funcall_alien_callback))
@@ -243,7 +242,7 @@ GNAME(funcall_alien_callback):
    rdi arg1
    rsi arg2
    rdx arg0
-   rcx thread
+   rcx thread #+sb-thread
 */
         
 	push	%rbp		# Save old frame pointer.
@@ -254,8 +253,9 @@ GNAME(funcall_alien_callback):
 	push	%r13    # the lisp function returns
 	push	%r14    #
 	push	%r15    #
-
+#ifdef LISP_FEATURE_SB_THREAD
         mov     %rcx, THREAD_BASE_REG
+#endif LISP_FEATURE_SB_THREAD        
         mov     $(3 << N_FIXNUM_TAG_BITS),%rcx
 
 	/* Alloc new frame. */
@@ -283,7 +283,6 @@ GNAME(funcall_alien_callback):
 
 	ret
 	SIZE(GNAME(funcall_alien_callback))
-#endif
 
 /*
  * fun-end breakpoint magic

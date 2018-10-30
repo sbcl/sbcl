@@ -385,7 +385,7 @@
                                :offset offset))))
     (let* ((segment (make-segment))
            (rax rax-tn)
-           #!+(or win32 (not sb-thread)) (rcx rcx-tn)
+           #!+win32 (rcx rcx-tn)
            #!-(and win32 sb-thread) (rdi rdi-tn)
            #!-(and win32 sb-thread) (rsi rsi-tn)
            (rdx rdx-tn)
@@ -450,25 +450,23 @@
 
         #!-sb-thread
         (progn
-          ;; arg0 to FUNCALL3 (function)
-          (inst mov rdi (ea (static-fdefn-fun-addr 'enter-alien-callback)))
           ;; arg0 to ENTER-ALIEN-CALLBACK (trampoline index)
-          (inst mov rsi (fixnumize index))
+          (inst mov rdx (fixnumize index))
           ;; arg1 to ENTER-ALIEN-CALLBACK (pointer to argument vector)
-          (inst mov rdx rsp)
+          (inst mov rdi rsp)
           ;; add room on stack for return value
           (inst sub rsp (if (evenp arg-count)
                             (* n-word-bytes 2)
                             n-word-bytes))
           ;; arg2 to ENTER-ALIEN-CALLBACK (pointer to return value)
-          (inst mov rcx rsp)
+          (inst mov rsi rsp)
 
           ;; Make new frame
           (inst push rbp)
           (inst mov  rbp rsp)
 
           ;; Call
-          (inst mov  rax (foreign-symbol-address "funcall3"))
+          (inst mov  rax (foreign-symbol-address "funcall_alien_callback"))
           (inst call rax)
 
           ;; Back! Restore frame
