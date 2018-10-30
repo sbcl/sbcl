@@ -2319,18 +2319,14 @@ static void apply_absolute_fixups(lispobj fixups, struct code* code)
         if (find_fixedobj_page_index((void*)ptr) >= 0) {
             header_addr = search_immobile_space((void*)ptr);
             gc_assert(header_addr);
-            if (forwarding_pointer_p(header_addr)) {
-                fpval = forwarding_pointer_value(header_addr);
-                int __attribute__((unused)) widetag =
-                    widetag_of(tempspace_addr(native_pointer(fpval)));
-                // Must be an interior pointer to a symbol value slot
-                // or fdefn raw addr slow
-                gc_assert(widetag == SYMBOL_WIDETAG
-                          || widetag == FDEFN_WIDETAG);
-                UNALIGNED_STORE32(fixup_where,
-                                  (int)(long)native_pointer(fpval)
-                                  + (ptr - (lispobj)header_addr));
-            }
+            if (!forwarding_pointer_p(header_addr))
+                continue;
+            fpval = forwarding_pointer_value(header_addr);
+            int widetag = widetag_of(tempspace_addr(native_pointer(fpval)));
+            // Must be an interior pointer to a symbol value slot
+            // or fdefn raw addr slot
+            if (!(widetag == SYMBOL_WIDETAG || widetag == FDEFN_WIDETAG))
+                lose("Expected symbol or fdefn @ %p", header_addr);
         } else {
             /* Dynamic space functions can call immobile space functions
              * and fdefns using the two-instruction sequence:
@@ -2341,7 +2337,6 @@ static void apply_absolute_fixups(lispobj fixups, struct code* code)
              * If we started by assuming that it's a simple-fun then
              * we might go astray if it's an fdefn because we can't
              * correctly look backwards 6 words. */
-            int delta;
             header_addr = (lispobj*)(ptr - offsetof(struct fdefn, raw_addr));
             if (forwarding_pointer_p(header_addr)) {
                 fpval = forwarding_pointer_value(header_addr);
@@ -2357,10 +2352,9 @@ static void apply_absolute_fixups(lispobj fixups, struct code* code)
                 lose("Expected simple-fun @ %p", header_addr);
             }
             lose("Can't determine referent of absolute fixup");
-       fix:
-            delta = (lispobj)native_pointer(fpval) - (lispobj)header_addr;
-            UNALIGNED_STORE32(fixup_where, ptr + delta);
         }
+  fix:  UNALIGNED_STORE32(fixup_where,
+                          ptr - (lispobj)header_addr + (lispobj)native_pointer(fpval));
     }
 }
 #endif
