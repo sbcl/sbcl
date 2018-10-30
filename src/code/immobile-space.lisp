@@ -316,7 +316,7 @@
                           (and (typep di 'sb-c::compiled-debug-info)
                                (let ((src (sb-c::compiled-debug-info-source di)))
                                  (and (typep src 'sb-c::debug-source)
-                                      (let ((str (sb-c::debug-source-namestring src)))
+                                      (let ((str (debug-source-namestring src)))
                                         (if (= (mismatch str "SYS:") 4) 1))))))
                         0))
                    ;; cap the popularity index to 255 and negate so that higher

@@ -106,7 +106,7 @@ image."
     (do-instrumented-code (code)
       (sb-int:binding* ((map (%find-coverage-map code) :exit-if-null)
                         (namestring
-                         (sb-c::debug-source-namestring
+                         (sb-int:debug-source-namestring
                           (sb-c::debug-info-source (sb-kernel:%code-debug-info code)))
                          :exit-if-null)
                         (legacy-coverage-marks

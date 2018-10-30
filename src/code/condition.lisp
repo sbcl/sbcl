@@ -1392,7 +1392,7 @@ handled by any other handler, it will be muffled.")
          (debug-source (when debug-info
                          (sb!c::debug-info-source debug-info)))
          (namestring (when debug-source
-                       (sb!c::debug-source-namestring debug-source))))
+                       (debug-source-namestring debug-source))))
     namestring))
 
 (defun interesting-function-redefinition-warning-p (warning old)

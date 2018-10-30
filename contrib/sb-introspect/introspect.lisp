@@ -461,13 +461,13 @@ If an unsupported TYPE is requested, the function will return NIL.
          (tlf (sb-c::compiled-debug-info-tlf-number debug-info)))
     (make-definition-source
      :pathname
-     (when (stringp (sb-c::debug-source-namestring debug-source))
-       (parse-namestring (sb-c::debug-source-namestring debug-source)))
+     (when (stringp (debug-source-namestring debug-source))
+       (parse-namestring (debug-source-namestring debug-source)))
      :character-offset
      (sb-c::compiled-debug-info-char-offset debug-info)
      :form-path (if tlf (list tlf))
      :form-number (sb-c::compiled-debug-fun-form-number debug-fun)
-     :file-write-date (sb-c::debug-source-created debug-source)
+     :file-write-date (debug-source-created debug-source)
      :plist (sb-c::debug-source-plist debug-source))))
 
 (defun translate-source-location (location)

@@ -904,7 +904,7 @@
                        (truly-the sb-c::compiled-debug-info
                                   (translate (%code-debug-info code) spaces))))
                      (namestring
-                      (sb-c::debug-source-namestring
+                      (debug-source-namestring
                        (truly-the sb-c::debug-source (translate source spaces)))))
                 (setq namestring (if (eq namestring (core-nil-object core))
                                      "sbcl.core"

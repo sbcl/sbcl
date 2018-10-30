@@ -1177,9 +1177,9 @@ Test case.
                  (source (sb-c::compiled-debug-info-source cdi)))
             ;; Ensure that the debug-source-namestring of the compiled thing
             ;; reflects the source file of the original interpreted function.
-            (setf (sb-c::core-debug-source-namestring source)
+            (setf (debug-source-namestring source)
                   (sb-kernel::function-file-namestring f)
-                  (sb-c::core-debug-source-created source) nil) ; = unknown
+                  (debug-source-created source) nil) ; = unknown
             ;; Clobber the TLF-NUM + OFFSET. We should do better that that,
             ;; but interpreted functions do not track their file offset,
             ;; so the conservative thing is to plug in NILs, not bogus values
