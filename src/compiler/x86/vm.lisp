@@ -417,6 +417,7 @@
 ;;;
 ;;; names of these things seem to have changed. these aliases by jrd
 
+(defconstant nargs-offset ecx-offset)
 (defconstant cfp-offset ebp-offset)    ; pfw - needed by stuff in /code
                                         ; related to signal context stuff
 

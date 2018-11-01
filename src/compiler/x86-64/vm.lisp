@@ -469,6 +469,7 @@
       (immediate-constant "Immed")
       (noise (symbol-name (sc-name sc))))))
 
+(defconstant nargs-offset rcx-offset)
 (defconstant cfp-offset rbp-offset) ; pfw - needed by stuff in /code
 
 (defun combination-implementation-style (node)

@@ -589,8 +589,6 @@
          ;;(format t "c-lra-fpc ~A ~A ~A~%" pc code pc-offset)
          (values pc-offset code)))))
 
-(defconstant sb!vm::nargs-offset #.sb!vm::ecx-offset)
-
 ;;; Check for a valid return address - it could be any valid C/Lisp
 ;;; address.
 ;;;

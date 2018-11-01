@@ -211,10 +211,6 @@
 
 ;;; Size of one linkage-table entry in bytes.
 (defconstant linkage-table-entry-size 8)
-
-;;; Given that NIL is the first thing allocated in static space, we
-;;; know its value at compile time:
-(defconstant nil-value (+ static-space-start #xb))
 
 
 (defenum (:start 8)

@@ -17,7 +17,11 @@
 (progn
 (define-vop (type-predicate)
   (:args (value :scs (any-reg descriptor-reg)))
-  (:temporary (:sc unsigned-reg :offset eax-offset) temp)
+  ;; x86 code has to avoid 'esi' and 'edi' for the temp
+  ;; since they can't be accessed as an 8-bit byte.
+  ;; x86-64 being more regular, any reg can serve as the temp.
+  ;; In all likelihood, it'll get rax anyway just because.
+  (:temporary (:sc unsigned-reg #!+x86 :offset #!+x86 eax-offset) temp)
   (:conditional)
   (:info target not-p)
   (:args-var args)
