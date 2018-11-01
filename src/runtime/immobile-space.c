@@ -80,7 +80,7 @@ static void defrag_immobile_space(boolean verbose);
 
 uword_t FIXEDOBJ_SPACE_START, VARYOBJ_SPACE_START;
 uword_t immobile_space_lower_bound, immobile_space_max_offset;
-unsigned int immobile_range_1_max_offset, immobile_range_2_min_offset;
+uword_t immobile_range_1_max_offset, immobile_range_2_min_offset;
 unsigned int varyobj_space_size = VARYOBJ_SPACE_SIZE;
 
 uword_t asm_routines_start, asm_routines_end;
@@ -88,12 +88,12 @@ uword_t asm_routines_start, asm_routines_end;
 // This table is for objects fixed in size, as opposed to variable-sized.
 // (Immobile objects are naturally fixed in placement)
 struct fixedobj_page *fixedobj_pages;
-unsigned int* immobile_scav_queue;
+lispobj* immobile_scav_queue;
 int immobile_scav_queue_head;
 // Number of items enqueued; can exceed QCAPACITY on overflow.
 // If overflowed, the queue is unusable until reset.
 unsigned int immobile_scav_queue_count;
-#define QCAPACITY (IMMOBILE_CARD_BYTES/sizeof(int))
+#define QCAPACITY 1024
 
 #define gens attr.parts.gens_
 
@@ -485,8 +485,7 @@ enliven_immobile_obj(lispobj *ptr, int rescan) // a native pointer
     // count is either less than or equal to QCAPACITY.
     // If equal, just bump the count to signify overflow.
     if (immobile_scav_queue_count < QCAPACITY) {
-        immobile_scav_queue[immobile_scav_queue_head] =
-            (uword_t)ptr & 0xFFFFFFFF; // Drop the high bits
+        immobile_scav_queue[immobile_scav_queue_head] = (lispobj)ptr;
         immobile_scav_queue_head = (immobile_scav_queue_head + 1) & (QCAPACITY - 1);
     }
     ++immobile_scav_queue_count;
@@ -1190,7 +1189,7 @@ static void gc_init_immobile()
     varyobj_page_scan_start_offset = (unsigned short*)(varyobj_page_touched_bits + n_bitmap_elts);
     varyobj_page_gens = (unsigned char*)(varyobj_page_scan_start_offset + n_varyobj_pages);
     // Scav queue is arbitrarily located.
-    immobile_scav_queue = malloc(IMMOBILE_CARD_BYTES);
+    immobile_scav_queue = malloc(QCAPACITY * sizeof(lispobj));
 }
 
 /* Because the immobile page table is not dumped into a core image,

@@ -45,7 +45,7 @@ extern uword_t DYNAMIC_SPACE_START;
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
 extern uword_t FIXEDOBJ_SPACE_START, VARYOBJ_SPACE_START;
 extern uword_t immobile_space_lower_bound, immobile_space_max_offset;
-extern unsigned int immobile_range_1_max_offset, immobile_range_2_min_offset;
+extern uword_t immobile_range_1_max_offset, immobile_range_2_min_offset;
 extern unsigned int varyobj_space_size;
 #endif
 

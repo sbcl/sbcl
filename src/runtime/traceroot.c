@@ -373,23 +373,39 @@ static struct node* find_node(struct layer* layer, lispobj ptr)
 static inline uint32_t encode_pointer(lispobj pointer)
 {
     uword_t encoding;
-    if (pointer >= DYNAMIC_SPACE_START) {
+    if (find_page_index((void*)pointer) >= 0) {
         // A dynamic space pointer is stored as a count in doublewords
         // from the heap base address. A 32GB range is representable.
         encoding = (pointer - DYNAMIC_SPACE_START) / (2*N_WORD_BYTES);
         gc_assert(encoding <= 0x7FFFFFFF);
-        return (encoding<<1) | 1; // Low bit signifies compressed ptr.
-    } else {
-        // Non-dynamic-space pointers are stored as-is.
-        gc_assert(pointer <= 0xFFFFFFFF && !(pointer & 1));
-        return pointer; // Low bit 0 signifies literal pointer
+        // Low bit of 1 signifies dynamic space compressed ptr.
+        return (encoding<<1) | 1;
+    } else
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    if (find_varyobj_page_index((void*)pointer) >= 0) {
+        // A varyobj space pointer is stored as a count in doublewords
+        // from the base address.
+        encoding = (pointer - VARYOBJ_SPACE_START) / (2*N_WORD_BYTES);
+        gc_assert(encoding <= 0x3FFFFFFF);
+        // bit pattern #b10 signifies varyobj space compressed ptr.
+        return (encoding<<2) | 2;
+    } else
+#endif
+    {
+        // Everything else is stored as-is.
+        gc_assert(pointer <= 0xFFFFFFFF && !(pointer & 3));
+        return pointer; // bit pattern #b00 signifies uncompressed ptr
     }
 }
 
 static inline lispobj decode_pointer(uint32_t encoding)
 {
-    if (encoding & 1)  // Compressed ptr
+    if (encoding & 1)  // Compressed ptr to dynamic space
         return (encoding>>1)*(2*N_WORD_BYTES) + DYNAMIC_SPACE_START;
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    else if ((encoding & 3) == 2) // Compressed ptr to varyobj space
+        return (encoding>>2)*(2*N_WORD_BYTES) + VARYOBJ_SPACE_START;
+#endif
     else
         return encoding; // Literal pointer
 }

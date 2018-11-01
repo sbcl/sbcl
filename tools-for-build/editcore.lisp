@@ -52,6 +52,11 @@
           (ash (char-code #\C) 8)
           (char-code #\L)))
 
+;;; Some high address that won't conflict with any of the ordinary spaces
+;;; It's more-or-less arbitrary, but we must be able to discern whether a
+;;; pointer looks like it points to code in case coreparse has to walk the heap.
+(defconstant +code-space-nominal-address+ #x550000000000)
+
 (defglobal +noexec-stack-note+ ".section .note.GNU-stack, \"\", @progbits")
 
 (defstruct (core-space ; "space" is a CL symbol
@@ -483,7 +488,8 @@
 
 ;;; Disassemble the function pointed to by SAP for LENGTH bytes, returning
 ;;; all instructions that should be emitted using assembly language
-;;; instead of assembler pseudo-ops. This includes two sets of instructions:
+;;; instead of .quad and/or .byte directives.
+;;; This includes (at least) two categories of instructions:
 ;;; - function prologue instructions that setup the call frame
 ;;; - jmp/call instructions that transfer control to the fixedoj space
 ;;;    delimited by bounds in STATE.
@@ -844,7 +850,7 @@
       ;; Write the code component header
       (emit-asm-directives :qword
                            (int-sap (- (get-lisp-obj-address code-component)
-                                       sb-vm:other-pointer-lowtag))
+                                       other-pointer-lowtag))
                            header-len output #())
       (let ((name->addr
              ;; the CDR of each alist item is a target cons (needing translation)
@@ -861,13 +867,13 @@
               #'< :key #'cadr)))
         (let* ((n-entrypoints (length name->addr))
                (min-entry-offs (cadar name->addr))
-               (n-words (/ min-entry-offs sb-vm:n-word-bytes)))
+               (n-words (/ min-entry-offs n-word-bytes)))
           ;; Write a table of N-WORDS in length containing the entrypoints
           ;; Not all words in the jump table will necessarily be used.
           (dotimes (i n-words)
             (format output " .quad ~:[0~;__lisp_code_start+0x~:*~x~]~%"
                     (when (< i n-entrypoints)
-                      (+ (ash header-len sb-vm:word-shift)
+                      (+ (ash header-len word-shift)
                          (cadr (nth i name->addr)))))))
         ;; Loop over the embedded routines
         (dolist (entry name->addr)
@@ -878,7 +884,7 @@
               (emit-lisp-function (+ (sap-int (code-instructions code-component))
                                      start-offs)
                                   (+ code-addr
-                                     (ash (code-header-words code-component) sb-vm:word-shift)
+                                     (ash (code-header-words code-component) word-shift)
                                      start-offs)
                                   nbytes nil output nil core)))))
       (format output " .quad 0, 0~%") ; trailer with SIMPLE-FUN count of 0
@@ -907,7 +913,7 @@
                        (truly-the sb-c::compiled-debug-info
                                   (translate (%code-debug-info code) spaces))))
                      (namestring
-                      (sb-c::debug-source-namestring
+                      (debug-source-namestring
                        (truly-the sb-c::debug-source (translate source spaces)))))
                 (setq namestring (if (eq namestring (core-nil-object core))
                                      "sbcl.core"
@@ -971,7 +977,7 @@
                 (c-name
                  (c-name
                   (if (or (not name)
-                          (eql (get-lisp-obj-address name) sb-vm:unbound-marker-widetag))
+                          (eql (get-lisp-obj-address name) unbound-marker-widetag))
                       "unnamed"
                       (fun-name-from-core name core))
                   core pp-state "gf_")))
@@ -1149,14 +1155,26 @@
 
 ;;; Write everything except for the core file itself into OUTPUT-STREAM
 ;;; and leave the stream padded to a 4K boundary ready to receive data.
-(defun prepare-elf (core-size relocs output)
-  (let* ((reloc-entry-size 24)
+(defun prepare-elf (core-size relocs output pie)
+  ;; PIE uses coreparse relocs which are 8 bytes each, and no linker relocs.
+  ;; Otherwise, linker relocs are 24 bytes each.
+  (let* ((reloc-entry-size (if pie 8 24))
          (sections
+          ;;        name | type | flags | link | info | alignment | entry size
           `#((:core "lisp.core"       ,+sht-progbits+ 0 0 0 ,core-align 0)
              (:sym  ".symtab"         ,+sht-symtab+   0 3 1 8 ,sym-entry-size)
                           ; section with the strings -- ^ ^ -- 1+ highest local symbol
              (:str  ".strtab"         ,+sht-strtab+   0 0 0 1  0)
-             (:rel  ".relalisp.core"  ,+sht-rela+     0 2 1 8 ,reloc-entry-size)
+             (:rel
+              ,@(if pie
+              ;; Don't bother with an ELF reloc section; it won't do any good.
+              ;; It would apply at executable link time, which is without purpose,
+              ;; it just offsets the numbers based on however far the lisp.core
+              ;; section is into the physical file. Non-loaded sections don't get
+              ;; further relocated on execution, so 'coreparse' has to fix the
+              ;; entire dynamic space at execution time anyway.
+                  `("lisp.rel"        ,+sht-progbits+ 0 0 0 8 8)
+                  `(".relalisp.core"  ,+sht-rela+     0 2 1 8 ,reloc-entry-size)))
                                       ; symbol table -- ^ ^ -- for which section
              (:note ".note.GNU-stack" ,+sht-null+     0 0 0 1  0)))
          (string-table
@@ -1205,16 +1223,20 @@
     (aver (eql (file-position output) shdrs-end))
     (let ((buf (make-array relocs-size :element-type '(unsigned-byte 8)))
           (ptr 0))
-      (with-alien ((rela elf64-rela))
-        (dovector (reloc relocs)
-          (destructuring-bind (place addend . kind) reloc
-            (setf (slot rela 'offset) place
-                  (slot rela 'info)   (logior (ash 1 32) kind) ; 1 = symbol index
-                  (slot rela 'addend) addend))
-          (setf (%vector-raw-bits buf (+ ptr 0)) (sap-ref-word (alien-value-sap rela) 0)
-                (%vector-raw-bits buf (+ ptr 1)) (sap-ref-word (alien-value-sap rela) 8)
-                (%vector-raw-bits buf (+ ptr 2)) (sap-ref-word (alien-value-sap rela) 16))
-          (incf ptr 3)))
+      (if pie
+          (dovector (reloc relocs)
+            (setf (%vector-raw-bits buf ptr) reloc)
+            (incf ptr))
+          (with-alien ((rela elf64-rela))
+            (dovector (reloc relocs)
+              (destructuring-bind (place addend . kind) reloc
+                (setf (slot rela 'offset) place
+                      (slot rela 'info)   (logior (ash 1 32) kind) ; 1 = symbol index
+                      (slot rela 'addend) addend))
+              (setf (%vector-raw-bits buf (+ ptr 0)) (sap-ref-word (alien-value-sap rela) 0)
+                    (%vector-raw-bits buf (+ ptr 1)) (sap-ref-word (alien-value-sap rela) 8)
+                    (%vector-raw-bits buf (+ ptr 2)) (sap-ref-word (alien-value-sap rela) 16))
+              (incf ptr 3))))
       (write-sequence buf output))
 
     ;; Write padding
@@ -1227,44 +1249,81 @@
 (defconstant R_X86_64_32   10) ; /* Direct 32 bit zero extended */
 (defconstant R_X86_64_32S  11) ; /* Direct 32 bit sign extended */
 
-;;; Return a list of fixups (FIXUP-WHERE ADDEND . KIND) to peform in a foreign core
-;;; whose code space is subject to link-time relocation.
-(defun collect-relocations (spaces fixups &aux (print nil))
+;;; Fill in the FIXUPS vector with a list of places to fixup.
+;;; For PIE-enabled cores, each place is just a virtual address.
+;;; For non-PIE-enabled, the fixup corresponds to an ELF relocation which will be
+;;; applied at link time of the excutable.
+;;; Note that while this "works" for PIE, it is fairly inefficient because
+;;; fundamentally Lisp objects contain absolute pointers, and there may be
+;;; millions of words that need fixing at load (execution) time.
+;;; Several techniques can mitigate this:
+;;; * for funcallable-instances, put a second copy of funcallable-instance-tramp
+;;;   in dynamic space so that funcallable-instances can jump to a known address.
+;;; * for each closure, create a one-instruction trampoline in dynamic space,
+;;;   - embedded in a (simple-array word) perhaps - which jumps to the correct
+;;;   place in the text section. Point all closures over the same function
+;;;   to the new closure stub. The trampoline, being pseudostatic, is effectively
+;;;   immovable. (And you can't re-save from an ELF core)
+;;; * for arbitrary pointers to simple-funs, create a proxy simple-fun in dynamic
+;;;   space whose entry point is the real function in the ELF text section.
+;;;   The GC might have to learn how to handle simple-funs that point externally
+;;;   to themselves. Also there's a minor problem of hash-table test functions
+;;; The above techniques will reduce by a huge factor the number of fixups
+;;; that need to be applied on startup of a position-independent executable.
+;;;
+(defun collect-relocations (spaces fixups pie &key (verbose nil) (print nil))
   (let* ((code-bounds (space-bounds immobile-varyobj-core-space-id spaces))
          (code-start (bounds-low code-bounds))
          (n-abs 0)
-         (n-rel 0))
+         (n-rel 0)
+         (affected-pages (make-hash-table)))
     (labels
-        ((abs-fixup (core-offs referent)
+        ((abs-fixup (vaddr core-offs referent)
            (incf n-abs)
            (when print
-              (format t "~x = 0x~(~x~): (a)~%" core-offs (core-to-logical core-offs) #+nil referent))
-           (setf (sap-ref-word (car spaces) core-offs) 0)
-           (vector-push-extend `(,(+ core-header-size core-offs)
-                                 ,(- referent code-start) . ,R_X86_64_64)
-                               fixups))
+              (format t "~x = 0x~(~x~): (a)~%" core-offs vaddr #+nil referent))
+           (touch-core-page core-offs)
+           ;; PIE relocations are output as a file section that is
+           ;; interpreted by 'coreparse'. The addend is implicit.
+           (setf (sap-ref-word (car spaces) core-offs)
+                 (if pie
+                     (+ (- referent code-start) +code-space-nominal-address+)
+                     0))
+           (if pie
+               (vector-push-extend vaddr fixups)
+               (vector-push-extend `(,(+ core-header-size core-offs)
+                                     ,(- referent code-start) . ,R_X86_64_64)
+                                   fixups)))
          (abs32-fixup (core-offs referent)
+           (aver (not pie))
            (incf n-abs)
            (when print
               (format t "~x = 0x~(~x~): (a)~%" core-offs (core-to-logical core-offs) #+nil referent))
+           (touch-core-page core-offs)
            (setf (sap-ref-32 (car spaces) core-offs) 0)
            (vector-push-extend `(,(+ core-header-size core-offs)
                                  ,(- referent code-start) . ,R_X86_64_32)
                                fixups))
          (rel-fixup (core-offs referent addend)
+           (aver (not pie))
            (incf n-rel)
            (when print
              (format t "~x = 0x~(~x~): (r)~%" core-offs (core-to-logical core-offs) #+nil referent))
+           (touch-core-page core-offs)
            (setf (sap-ref-32 (car spaces) core-offs) 0)
            (vector-push-extend `(,(+ core-header-size core-offs)
                                  ;; Emitted as signed absolute plus addend,
                                  ;; since the originating PC is known.
                                  ,(+ (- referent code-start) addend) . ,R_X86_64_32S)
                                fixups))
+         (touch-core-page (core-offs)
+           ;; use the OS page size, not +backend-page-bytes+
+           (setf (gethash (floor core-offs 4096) affected-pages) t))
          ;; Given a address which is an offset into the data pages of the target core,
          ;; compute the logical address which that offset would be mapped to.
          ;; For example core address 0 is the virtual address of static space.
          (core-to-logical (core-offs &aux (page (floor core-offs +backend-page-bytes+)))
+           (setf (gethash page affected-pages) t)
            (dolist (space (cdr spaces)
                           (bug "Can't translate core offset ~x using ~x"
                                core-offs spaces))
@@ -1277,25 +1336,26 @@
                  (return (+ (space-addr space)
                             (* (- page page0) +backend-page-bytes+)
                             (logand core-offs (1- +backend-page-bytes+))))))))
-         (scanptrs (obj wordindex-min wordindex-max &aux (n-fixups 0))
+         (scanptrs (vaddr obj wordindex-min wordindex-max &aux (n-fixups 0))
            (do* ((base-addr (logandc2 (get-lisp-obj-address obj) lowtag-mask))
                  (sap (int-sap base-addr))
                  ;; core-offs is the offset in the lisp.core ELF section.
                  (core-offs (- base-addr (sap-int (car spaces))))
                  (i wordindex-min (1+ i)))
                 ((> i wordindex-max) n-fixups)
-             (let ((ptr (sap-ref-word sap (ash i word-shift))))
-               (when (and (= (logand ptr 3) 3) (in-bounds-p ptr code-bounds))
-                 (abs-fixup (+ core-offs (ash i word-shift)) ptr)
+             (let* ((byte-offs (ash i word-shift))
+                    (ptr (sap-ref-word sap byte-offs)))
+               (when (and (is-lisp-pointer ptr) (in-bounds-p ptr code-bounds))
+                 (abs-fixup (+ vaddr byte-offs) (+ core-offs byte-offs) ptr)
                  (incf n-fixups)))))
-         (scanptr (obj wordindex)
-           (plusp (scanptrs obj wordindex wordindex))) ; trivial wrapper
-         (scan-obj (obj widetag size vaddr
+         (scanptr (vaddr obj wordindex)
+           (plusp (scanptrs vaddr obj wordindex wordindex))) ; trivial wrapper
+         (scan-obj (vaddr obj widetag size
                     &aux (core-offs (- (logandc2 (get-lisp-obj-address obj) lowtag-mask)
                                        (sap-int (car spaces))))
                          (nwords (ceiling size n-word-bytes)))
            (when (listp obj)
-             (scanptrs obj 0 1)
+             (scanptrs vaddr obj 0 1)
              (return-from scan-obj))
            (case widetag
              (#.instance-widetag
@@ -1305,7 +1365,7 @@
                      (translated
                       (if (fixnump bitmap) bitmap (translate bitmap spaces))))
                 (do-instance-tagged-slot (i obj :bitmap translated)
-                  (scanptr obj (1+ i))))
+                  (scanptr vaddr obj (1+ i))))
               (return-from scan-obj))
              (#.simple-vector-widetag
               (let ((len (length (the simple-vector obj))))
@@ -1318,13 +1378,13 @@
                     ;; or code-component might need the 'rehash' flag set.
                     ;; In practice, it is likely already set, because any object that
                     ;; could move in the final GC probably did move.
-                    (when (scanptr obj (+ vector-data-offset i))
+                    (when (scanptr vaddr obj (+ vector-data-offset i))
                       (setq needs-rehash t))
-                    (scanptr obj (+ vector-data-offset i 1)))
+                    (scanptr vaddr obj (+ vector-data-offset i 1)))
                   (return-from scan-obj))
                 (setq nwords (+ len 2))))
              (#.fdefn-widetag
-              (scanptrs obj 1 2)
+              (scanptrs vaddr obj 1 2)
               (let* ((fdefn-pc-sap ; where to read to access the rel32 operand
                       (int-sap (+ (- (get-lisp-obj-address obj) other-pointer-lowtag)
                                   (ash fdefn-raw-addr-slot word-shift))))
@@ -1340,10 +1400,13 @@
                              target (- next-pc))))
               (return-from scan-obj))
              ((#.closure-widetag #.funcallable-instance-widetag)
+              ;; read the trampoline slot
               (let ((word (sap-ref-word (int-sap (get-lisp-obj-address obj))
                                         (- n-word-bytes fun-pointer-lowtag))))
                 (when (in-bounds-p word code-bounds)
-                  (abs-fixup (+ core-offs (ash 1 word-shift)) word)))
+                  (abs-fixup (+ vaddr n-word-bytes)
+                             (+ core-offs n-word-bytes)
+                             word)))
               (when (eq widetag funcallable-instance-widetag)
                 (let ((layout (truly-the layout
                                (translate (%funcallable-instance-layout obj) spaces))))
@@ -1356,41 +1419,50 @@
                       (setq nwords (1+ (integer-length bitmap))))))))
              ;; mixed boxed/unboxed objects
              (#.code-header-widetag
+              (aver (not pie))
               (dolist (loc (code-fixup-locs obj spaces))
                 (let ((val (sap-ref-32 (code-instructions obj) loc)))
                   (when (in-bounds-p val code-bounds)
                     (abs32-fixup (sap- (sap+ (code-instructions obj) loc) (car spaces))
                                  val))))
               (dotimes (i (code-n-entries obj))
-                (scanptrs (%code-entry-point obj i) 2 5))
+                ;; I'm being lazy and not computing vaddr, which is wrong,
+                ;; but does not matter if non-pie; and if PIE, we can't get here.
+                ;; [PIE requires all code in immobile space, and this reloc
+                ;; is for a dynamic space object]
+                (scanptrs 0 (%code-entry-point obj i) 2 5))
               (setq nwords (code-header-words obj)))
              ;; boxed objects that can reference code/simple-funs
              ((#.value-cell-widetag #.symbol-widetag #.weak-pointer-widetag))
              (t
               (return-from scan-obj)))
-           (scanptrs obj 1 (1- nwords))))
-      (dolist (space (reverse (cdr spaces)))
-        (let* ((logical-addr (space-addr space))
-               (size (space-size space))
-               (physical-addr (space-physaddr space spaces))
-               (physical-end (sap+ physical-addr size))
-               (vaddr-translation (+ (- (sap-int physical-addr)) logical-addr)))
-          (unless (= (space-id space) immobile-varyobj-core-space-id)
+           (scanptrs vaddr obj 1 (1- nwords))))
+      (dolist (space (cdr spaces))
+        (unless (= (space-id space) immobile-varyobj-core-space-id)
+          (let* ((logical-addr (space-addr space))
+                 (size (space-size space))
+                 (physical-addr (space-physaddr space spaces))
+                 (physical-end (sap+ physical-addr size))
+                 (vaddr-translation (+ (- (sap-int physical-addr)) logical-addr)))
             (dx-flet ((visit (obj widetag size)
                         ;; Compute the object's intended virtual address
-                        (let ((vaddr (+ (logandc2 (get-lisp-obj-address obj) lowtag-mask)
-                                        vaddr-translation)))
-                          (scan-obj obj widetag size vaddr))))
+                        (scan-obj (+ (logandc2 (get-lisp-obj-address obj) lowtag-mask)
+                                     vaddr-translation)
+                                  obj widetag size)))
               (map-objects-in-range
                #'visit
                (ash (sap-int physical-addr) (- n-fixnum-tag-bits))
                (ash (sap-int physical-end) (- n-fixnum-tag-bits))))
-            (when (and (plusp (logior n-abs n-rel)) print)
-              (format t "space @ ~x: ~d absolute + ~d relative fixups~%"
+            (when (and (plusp (logior n-abs n-rel)) verbose)
+              (format t "space @ ~10x: ~6d absolute + ~4d relative fixups~%"
                       logical-addr n-abs n-rel))
-            (setq n-abs 0 n-rel 0))))))
-  (when print
-    (format t "total of ~D linker fixups~%" (length fixups)))
+            (setq n-abs 0 n-rel 0)))))
+    (when verbose
+      (format t "total of ~D linker fixups affecting ~D/~D pages~%"
+              (length fixups)
+              (hash-table-count affected-pages)
+              (/ (reduce #'+ (cdr spaces) :key #'space-nbytes-aligned)
+                 4096))))
   fixups)
 
 ;;;;
@@ -1475,7 +1547,7 @@
           (spaces)
           (copy-actions)
           (fixedobj-range) ; = (START . SIZE-IN-BYTES)
-          (relocs (make-array 100000 :adjustable t :fill-pointer 0)))
+          (relocs (make-array 100000 :adjustable t :fill-pointer 1)))
 
   ;; Remove old files
   (ignore-errors (delete-file asm-pathname))
@@ -1576,17 +1648,23 @@
                         :key #'space-id))
                (map (cons sap (sort (copy-list spaces) #'> :key #'space-addr)))
                (pte-nbytes (cdar copy-actions)))
-          (collect-relocations map relocs)
+          (collect-relocations map relocs enable-pie)
           (with-open-file (output elf-core-pathname
                                   :direction :output :if-exists :supersede
                                   :element-type '(unsigned-byte 8))
-            (vector-push-extend
-             `(,(ash code-start-fixup-ofs word-shift) 0 . ,R_X86_64_64) relocs)
+            (unless enable-pie
+              ;; This fixup sets the 'address' field of the core directory entry
+              ;; for code space. If PIE-enabled, we'll figure it out in the C code
+              ;; because space relocation is going to happen no matter what.
+              (setf (aref relocs 0)
+                    `(,(ash code-start-fixup-ofs word-shift) 0 . ,R_X86_64_64)))
             (prepare-elf (+ (apply #'+ (mapcar #'space-nbytes-aligned data-spaces))
                             +backend-page-bytes+ ; core header
                             pte-nbytes)
-                         relocs output)
-            (setf (%vector-raw-bits core-header code-start-fixup-ofs) 0)
+                         relocs output enable-pie)
+            ;; This word will be fixed up by the system linker for non-PIE.
+            (setf (%vector-raw-bits core-header code-start-fixup-ofs)
+                  (if enable-pie +code-space-nominal-address+ 0))
             (write-sequence core-header output) ; Copy prepared header
             (force-output output)
             ;; Change SB-C::*COMPILE-FILE-TO-MEMORY-SPACE* to :DYNAMIC

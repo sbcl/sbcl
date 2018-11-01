@@ -100,22 +100,30 @@ sbcl.o: $(OBJS)
 libsbcl.a: $(OBJS)
 	rm -f $@ ; ar rcs $@ $^
 
-libsbcl.so: $(subst .o,.pic.o,$(filter-out ldso-stubs.o,$(OBJS)))
+PIC_OBJS = $(subst .o,.pic.o,$(filter-out ldso-stubs.o,$(OBJS)))
+libsbcl.so: $(PIC_OBJS)
 	cc -shared -o $@ $^ -ldl -lpthread -lm
+# for this to work, you must have with-gcc-tls in your build features already.
+# can't define it here because then it conflicts if you have it in both places.
 %.pic.o: %.c
-	$(CC) -DLISP_FEATURE_GCC_TLS -fPIC -c $(CFLAGS) $< -o $@
+	$(CC) -fPIC -c $(filter-out -fno-pie,$(CFLAGS)) $< -o $@
 %.pic.o: %.S # (-fPIC doesn't affect hand-written assembly source)
-	$(CC) -DLISP_FEATURE_GCC_TLS -DPOSITION_INDEPENDENT_ASM -c $(CFLAGS) $< -o $@
+	$(CC) -DPOSITION_INDEPENDENT_ASM -c $(CFLAGS) $< -o $@
 testmain: testmain.c libsbcl.so -ldl
 
-shrinkwrap-sbcl.s shrinkwrap-sbcl-core.o: ../../output/sbcl.core \
- ../../tools-for-build/editcore.lisp
+SHRINKWRAP_DEPS = ../../output/sbcl.core ../../tools-for-build/editcore.lisp
+shrinkwrap-sbcl.s shrinkwrap-sbcl-core.o: $(SHRINKWRAP_DEPS)
 	../../run-sbcl.sh --script ../../tools-for-build/editcore.lisp split \
 		../../output/sbcl.core shrinkwrap-sbcl.s
+pie-shrinkwrap-sbcl.s pie-shrinkwrap-sbcl-core.o: $(SHRINKWRAP_DEPS)
+	../../run-sbcl.sh --script ../../tools-for-build/editcore.lisp split --pie \
+		../../output/sbcl.core pie-shrinkwrap-sbcl.s
 comma := , # "Commas ... cannot appear in the text of an argument as written"
 shrinkwrap-sbcl: shrinkwrap-sbcl.s shrinkwrap-sbcl-core.o $(LIBSBCL)
 	$(CC) $(filter-out -Wl$(comma)--export-dynamic, $(LINKFLAGS)) \
  $(CFLAGS) -o $@ $(filter-out ldso-stubs.o, $^) $(LIBS)
+pie-shrinkwrap-sbcl: pie-shrinkwrap-sbcl.s pie-shrinkwrap-sbcl-core.o $(PIC_OBJS)
+	$(CC) -pie -o $@ $^ $(LIBS)
 semiwrap-sbcl: shrinkwrap-sbcl.s $(LIBSBCL)
 	$(CC) $(LINKFLAGS) $(CFLAGS) -o $@ $^ $(LIBS)
 
