@@ -52,7 +52,6 @@ run_sbcl <<EOF
 ;;; It would be nice to get this test to pass on all backends.
 ;;; That it doesn't pass doesn't mean the packages aren't hidden correctly.
 ;;; It just means the test is inadequate.
-;;; One possible failure reason is that DX strings didn't go on the stack.
 #-(or x86 x86-64) (exit)
 #-sb-thread (exit) ;; doesn't pass for some reason
 #+sb-devel (exit)
@@ -88,40 +87,37 @@ run_sbcl <<EOF
 ;;; 'packages' to be one that we're not interested in for purposes of the test.
 ;;; The final iteration of RECURSE seems to pin the string naming the package,
 ;;; which produces a reference to a string that we may want not to see.
-(named-let recurse ((packages
-                     (append (remove *cl-package* (list-all-packages))
-                             (list *cl-package*)))
-                    (strings nil))
-  (cond ((null packages)
-         ;; Do not remove the CL-USER package qualifier here - it's actually
-         ;; a trick that gets this test to pass. Essentially we need to ensure
-         ;; that the reader's package token buffer contains any string other
-         ;; than one of the packages under test.
-         (CL-USER::rename-all-packages)
-         #+nil
-         (format t "Scanning for ~D strings: ~S~%" (length strings) strings)
-         (gc :gen 7)
+(defglobal *undesired-strings*
+  (mapcan (lambda (x)
+	    (let ((s (package-name x)))
+	      (unless (member s '("COMMON-LISP" "COMMON-LISP-USER" "KEYWORD")
+			      :test #'string=)
+		(list (coerce s 'simple-vector)))))
+	  (list-all-packages)))
+
+(flet ((collect-strings (print)
          (let (found-strings)
            (map-allocated-objects
             (lambda (obj type size)
               (declare (ignore type size))
-              (when (and (stringp obj) (find obj strings :test #'string-equal))
-                (format t "Found string in g~d @ ~x ~S~%"
-                        (generation-of obj) (get-lisp-obj-address obj) obj)
+              (when (and (stringp obj) (find obj *undesired-strings* :test #'equalp))
+                (when print
+                  (format t "Found string in g~d @ ~x ~S~%"
+                            (generation-of obj) (get-lisp-obj-address obj) obj))
                 (push (make-weak-pointer obj) found-strings)))
             :all)
-           (assert (not found-strings))
-           (format t "Package hiding test 2: PASS~%")))
-        (t
-         (dx-let ((s (make-array (the (mod 64)
-                                      (length (package-name (car packages))))
-                                 :element-type 'base-char)))
-           (replace s (package-name (car packages)))
-           (recurse (cdr packages)
-                    (if (member s '("COMMON-LISP" "COMMON-LISP-USER" "KEYWORD")
-                                :test #'string=)
-                        strings
-                        (cons s strings)))))))
+           found-strings)))
+  ;; First we expect to see a bunch of strings.
+  (assert (collect-strings nil))
+  ;; Do not remove the CL-USER package qualifier here - it's a trick to store
+  ;; an allowed string into the reader's token buffer. Otherwise it would hold
+  ;; "sb-kernel" which is the most recent package name read (above).
+  ;; [Recall, it makes separate strings for the pieces before and after a ":"]
+  (CL-USER::rename-all-packages)
+  (gc :gen 7)
+  ;; Then we expect NOT to see any matching strings.
+  (assert (not (collect-strings t)))
+  (format t "Package hiding test 2: PASS~%"))
 EOF
 
 exit $EXIT_TEST_WIN
