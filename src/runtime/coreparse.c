@@ -750,7 +750,9 @@ process_directory(int count, struct ndir_entry *entry,
         varyobj_free_pointer = &lisp_jit_code;
         varyobj_space_size = (uword_t)&__lisp_code_end - VARYOBJ_SPACE_START;
         spaces[IMMOBILE_VARYOBJ_CORE_SPACE_ID].len = varyobj_space_size;
-        gc_assert(varyobj_free_pointer >= (lispobj*)VARYOBJ_SPACE_START);
+        if (varyobj_free_pointer < (lispobj*)VARYOBJ_SPACE_START
+            || !PTR_IS_ALIGNED(&__lisp_code_end, 4096))
+            lose("ELF core alignment bug. Check for proper padding in 'editcore'");
 #if !ENABLE_PAGE_PROTECTION
         printf("Lisp code present in executable @ %lx:%lx (freeptr=%p)\n",
                (uword_t)&__lisp_code_start, (uword_t)&__lisp_code_end,

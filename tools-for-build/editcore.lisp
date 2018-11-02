@@ -892,12 +892,13 @@
         (incf code-addr size)
         (setf total-code-size size)))
     (loop
-      (when (>= code-addr (bounds-high code-bounds)) (return))
+      (when (>= code-addr (bounds-high code-bounds))
+        (setq end-loc code-addr)
+        (return))
       (ecase (%widetag-of (sap-ref-word (int-sap (translate-ptr code-addr spaces)) 0))
         (#.code-header-widetag
          (let* ((code (make-code-obj code-addr))
                 (objsize (code-component-size code)))
-           (setq end-loc (+ code-addr objsize))
            (incf total-code-size objsize)
            (cond
              ((< (code-header-words code) 4) ; filler object
@@ -1006,7 +1007,7 @@
         (aver (>= nwords 2))
         (aver (zerop remainder))
         (decf nwords 2)
-        (format output " .quad ~d, ~d # (simple-array fixnum (~d))~%"
+        (format output " .quad 0x~x, ~d # (simple-array fixnum (~d))~%"
                 simple-array-fixnum-widetag
                 (ash nwords n-fixnum-tag-bits)
                 nwords)
