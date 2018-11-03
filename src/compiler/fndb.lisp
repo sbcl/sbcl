@@ -748,6 +748,13 @@
   (or (mod #.(1- sb!xc:array-dimension-limit)) null)
   (foldable flushable call))
 
+(defknown (%bit-position/0 %bit-position/1) (simple-bit-vector t index index)
+  (or (mod #.(1- sb!xc:array-dimension-limit)) null)
+  (foldable flushable))
+(defknown %bit-position (t simple-bit-vector t index index)
+  (or (mod #.(1- sb!xc:array-dimension-limit)) null)
+  (foldable flushable))
+
 (defknown count
   (t proper-sequence &rest t &key
      (:test (function-designator ((nth-arg 0) (nth-arg 1 :sequence t :key :key))))
