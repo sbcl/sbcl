@@ -2158,66 +2158,66 @@
 ;;;    (let ((x xx)
 ;;;       (y yy))
 ;;;      ...)
-;;;
-;;; What we actually do is convert the VALUES combination into a
-;;; normal LET combination calling the original :MV-LET lambda. If
-;;; there are extra args to VALUES, discard the corresponding
-;;; lvars. If there are insufficient args, insert references to NIL.
 (defun convert-mv-bind-to-let (call)
   (declare (type mv-combination call))
   (let* ((args (basic-combination-args call))
-         (use (lvar-uses (first args))))
+         (uses (ensure-list (lvar-uses (first args)))))
     (when (and (singleton-p args)
-               (combination-p use)
-               (eq (lvar-fun-name (combination-fun use))
-                   'values))
-      (setf (lvar-reoptimize (car args)) nil)
-      (let* ((fun (combination-lambda call))
-             (vars (lambda-vars fun))
-             (vals (combination-args use))
-             (nvars (length vars))
-             (nvals (length vals)))
-        (cond ((> nvals nvars)
-               (mapc #'flush-dest (subseq vals nvars))
-               (setq vals (subseq vals 0 nvars)))
-              ((< nvals nvars)
-               (with-ir1-environment-from-node use
-                 (let ((node-prev (node-prev use)))
-                   (setf (node-prev use) nil)
-                   (setf (ctran-next node-prev) nil)
-                   (collect ((res vals))
-                     (loop for count below (- nvars nvals)
-                           for prev = node-prev then ctran
-                           for ctran = (make-ctran)
-                           and lvar = (make-lvar use)
-                           do (reference-constant prev ctran lvar nil)
-                              (res lvar)
-                           finally (link-node-to-previous-ctran
-                                    use ctran))
-                     (setq vals (res)))))))
-        (setf (combination-args use) vals)
-        (flush-dest (combination-fun use))
-        (let ((fun-lvar (basic-combination-fun call)))
-          (setf (lvar-dest fun-lvar) use)
-          (setf (combination-fun use) fun-lvar)
-          (flush-lvar-externally-checkable-type fun-lvar))
-        (setf (combination-kind use) :local)
-        (setf (functional-kind fun) :let)
-        (flush-dest (first (basic-combination-args call)))
-        (unlink-node call)
-        (when vals
-          (reoptimize-lvar (first vals)))
-        ;; Propagate derived types from the VALUES call to its args:
-        ;; transforms can leave the VALUES call with a better type
-        ;; than its args have, so make sure not to throw that away.
-        (let ((types (values-type-types (node-derived-type use))))
-          (dolist (val vals)
-            (when types
-              (let ((type (pop types)))
-                (assert-lvar-type val type **zero-typecheck-policy**)))))
-        ;; Propagate declared types of MV-BIND variables.
-        (propagate-to-args use fun)
-        (reoptimize-call use))
+               (loop for use in uses
+                     always (and (combination-p use)
+                                 (eq (lvar-fun-name (combination-fun use))
+                                     'values))))
+      (with-ir1-environment-from-node call
+        (let* ((fun-lvar (mv-combination-fun call))
+               (fun (ref-leaf (lvar-uses fun-lvar)))
+               (vars (lambda-vars fun))
+               (nvars (length vars))
+               (new-call (make-combination fun-lvar))
+               (new-lvars (loop repeat nvars
+                                collect (make-lvar new-call))))
+          (setf (functional-kind fun) :let)
+          (setf (combination-kind new-call) :local)
+          (setf (combination-args new-call) new-lvars)
+          (setf (lvar-dest fun-lvar) new-call)
+          (insert-node-before call new-call)
+          (unlink-node call)
+          (loop for use in uses
+                for args = (combination-args use)
+                for types = (values-type-types (node-derived-type use))
+                for lvars = new-lvars
+                do
+                (loop while (and args lvars)
+                      do
+                      (let ((arg (pop args))
+                            (new-lvar (pop lvars))
+                            (type (pop types)))
+                        (if (and type
+                                 (not (type-asserted-p arg type)))
+                            ;; Propagate derived types from the VALUES call to its args:
+                            ;; transforms can leave the VALUES call with a better type
+                            ;; than its args have, so make sure not to throw that away.
+                            (use-lvar (insert-cast-before use arg type **zero-typecheck-policy**)
+                                      new-lvar)
+                            (substitute-lvar-uses new-lvar arg nil))))
+                ;; Discard unused arguments
+                (loop for arg in args
+                      do (flush-dest arg))
+                ;; Reference NIL for unsupplied arguments
+                (when lvars
+                  (let ((node-prev (node-prev use)))
+                    (setf (node-prev use) nil)
+                    (setf (ctran-next node-prev) nil)
+                    (loop for lvar in lvars
+                          for prev = node-prev then ctran
+                          for ctran = (make-ctran)
+                          do
+                          (reference-constant prev ctran lvar nil)
+                          finally
+                          (link-node-to-previous-ctran use ctran))))
+                (flush-dest (combination-fun use))
+                (unlink-node use))
+          (propagate-to-args new-call fun)
+          (reoptimize-call new-call)))
       t)))
 
 ;;; If we see:
