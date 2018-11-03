@@ -1849,10 +1849,8 @@
                   (and (eq (basic-combination-kind dest) :local)
                        (type-single-value-p (lvar-derived-type arg)))))
              ((or creturn exit)
-              ;; While CRETURN and EXIT nodes may be known-values,
-              ;; they have their own complications, such as
-              ;; substitution into CRETURN may create new tail calls.
-              nil)
+              (eql (nth-value 1 (values-types (lvar-derived-type arg)))
+                   1))
              (t
               (aver (lvar-single-value-p lvar))
               t))
@@ -1879,6 +1877,11 @@
       (change-ref-leaf ref (find-constant nil))
       (delete-ref ref)
       (unlink-node ref)
+      (when (return-p dest)
+        (do-uses (use lvar)
+          (when (and (basic-combination-p use)
+                     (eq (basic-combination-kind use) :local))
+            (merge-tail-sets use))))
       (reoptimize-lvar lvar)
       t)))
 
