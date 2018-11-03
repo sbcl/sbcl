@@ -117,6 +117,15 @@
                         dest)))))
     (pld lvar)))
 
+(defun principal-lvar-dest-and-lvar (lvar)
+  (labels ((pld (lvar)
+             (and lvar
+                  (let ((dest (lvar-dest lvar)))
+                    (if (cast-p dest)
+                        (pld (cast-lvar dest))
+                        (values dest lvar))))))
+    (pld lvar)))
+
 ;;; Update lvar use information so that NODE is no longer a use of its
 ;;; LVAR.
 ;;;
@@ -2901,8 +2910,37 @@ is :ANY, the function name is not checked."
                                   (funcall function singleton-arg
                                            (pop vars) type))
                             (setf vars (nthcdr length vars))))))))))
-
 
+(defun lvar-lambda-var (lvar)
+  (let* ((let (lvar-dest lvar))
+         (fun (combination-lambda let)))
+    (loop for arg in (combination-args let)
+          for var in (lambda-vars fun)
+          when (eq arg lvar)
+          return var)))
+
+;;; If the dest is a LET variable use the variable refs.
+(defun map-all-lvar-dests (lvar fun)
+  (let ((dest (principal-lvar-dest lvar)))
+    (if (and (combination-p dest)
+             (eq (combination-kind dest) :local))
+        (let ((var (lvar-lambda-var lvar)))
+          ;; Will PROPAGATE-LET-ARGS substitute the references?
+          (if (preserve-single-use-debug-var-p dest var)
+              (funcall fun lvar dest)
+              (loop for ref in (lambda-var-refs var)
+                    do (multiple-value-bind (dest lvar)
+                           (principal-lvar-dest (node-lvar ref))
+                         (funcall fun lvar dest)))))
+        (funcall fun lvar dest))))
+
+(defun lvar-called-by-node-p (lvar node)
+  (and (basic-combination-p node)
+       (let ((fun (basic-combination-fun node)))
+         (or (eq fun lvar)
+             (lvar-fun-is fun '(%coerce-callable-for-call))))))
+
+
 (defun proper-or-circular-list-p (x)
   (if (consp x)
       (let ((rabbit (cdr x))
