@@ -423,7 +423,15 @@
               (remove-equivalent-blocks block)
               (when (and (not fastp) (block-reoptimize block) (block-component block))
                 (aver (not (block-delete-p block)))
-                (ir1-optimize-block block))
+                (ir1-optimize-block block)
+                ;; Force any preceding IFs to get reoptimized, since
+                ;; some optimizations depend on the shape of the
+                ;; consequent blocks, not just IF-TEST.
+                (loop for pred in (block-pred block)
+                      for last = (block-last pred)
+                      when (and (block-type-check pred)
+                                (if-p last))
+                      do (reoptimize-node last)))
 
               (cond ((and (block-delete-p block) (block-component block))
                      (setq block (clean-component component block)))
@@ -642,7 +650,8 @@
                    ((type= type (specifier-type 'null))
                     consequent)
                    ((or (eq consequent alternative)
-                        (blocks-equivalent-p alternative consequent))
+                        (blocks-equivalent-p alternative consequent)
+                        (if-test-redundant-p test consequent alternative))
                     ;; Even if the references are the same they can have
                     ;; different derived types based on the TEST
                     ;; Don't lose the second type when killing it.

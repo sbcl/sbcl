@@ -1342,6 +1342,22 @@
              (eq (block-last block) node)
              node)))))
 
+;;; (if x x nil)
+(defun if-test-redundant-p (test con alt)
+  (let ((ref-alt (single-ref-block-p alt))
+        (ref-con (single-ref-block-p con))
+        (ref-test (lvar-uses test)))
+    (and (ref-p ref-test)
+         ref-alt
+         ref-con
+         (equal (block-succ alt) (block-succ con))
+         (eq (ref-lvar ref-alt) (ref-lvar ref-con))
+         (eq (ref-leaf ref-con) (ref-leaf ref-test))
+         (and (constant-p (ref-leaf ref-alt))
+              (null (constant-value (ref-leaf ref-alt))))
+         (eq (node-enclosing-cleanup ref-alt)
+             (node-enclosing-cleanup ref-con)))))
+
 ;;; If a block consisting of a single ref is equivalent to another
 ;;; block with the same ref and the have the same successor it can be
 ;;; removed.
