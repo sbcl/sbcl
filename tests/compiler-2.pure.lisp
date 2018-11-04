@@ -1702,3 +1702,12 @@
       `(lambda (type)
          (make-array 4 :element-type type))
     (('(or (cons (satisfies eval)) atom)) #(0 0 0 0) :test #'equalp)))
+
+(with-test (:name :substitute-single-use-lvar-exit-cleanups)
+  (checked-compile-and-assert
+      ()
+      `(lambda (z)
+         (block nil
+           (let ((b (1+ (funcall z))))
+             (catch 'c (return b)))))
+    (((constantly 33)) 34)))

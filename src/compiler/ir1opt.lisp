@@ -1858,8 +1858,14 @@
                   (and (eq (basic-combination-kind dest) :local)
                        (type-single-value-p (lvar-derived-type arg)))))
              ((or creturn exit)
-              (eql (nth-value 1 (values-types (lvar-derived-type arg)))
-                   1))
+              (and
+               (eql (nth-value 1 (values-types (lvar-derived-type arg)))
+                    1)
+               (let ((block (node-block ref)))
+                 (do-uses (use arg t)
+                   (unless (only-harmless-cleanups block
+                                                   (node-block use))
+                     (return))))))
              (t
               (aver (lvar-single-value-p lvar))
               t))
