@@ -94,3 +94,24 @@
         ()
         `(lambda () (error ,control))
       (() (condition 'simple-error)))))
+
+(with-test (:name :tokenize-curly-brace-nonliteral-empty)
+  (flet ((try (string)
+           (let ((tokens (sb-format::tokenize-control-string string)))
+             (assert (and (= (length tokens) 3)
+                          (string= (second tokens) ""))))))
+    ;; Each of these curly-brace-wrapped expressions needs to preserve
+    ;; the insides as an empty string so that it does not degenerate
+    ;; to the control string "~{~}".
+    (try "~{~
+~}")
+    (try "~{~0|~}")
+    (try "~{~0~~}")
+    (try "~{~0%~}")
+    ;; these are also each three parsed tokens:
+    ;; 0 newlines plus an ignored newline
+    (try "~{~0%~
+~}")
+    ;; 0 newlines, an ignored newline, and 0 tildes
+    (try "~{~0%~
+~0|~0~~}")))

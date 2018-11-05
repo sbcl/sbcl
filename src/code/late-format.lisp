@@ -197,25 +197,42 @@
 ;;; if taken literally, supposed to remove the desired output.
 (defun combine-directives (input literalize-tilde)
   (let (output)
-    (flet ((concat (string)
-             (let ((first (car output)))
-               (cond ((not (stringp first))
-                      (push string output))
-                     ;; STRING was already handed to POSSIBLY-BASE-STRINGIZE
-                     ;; by %TOKENIZE-CONTROL-STRING so we don't need to do that again.
-                     ;; i.e. the result is base-string if and only if
-                     ;; both FIRST and STRING are base-strings.
-                     ((and (typep first 'base-string)
-                           (typep string 'base-string))
-                      (rplaca output (concatenate 'base-string first string)))
+    (labels ((emit-string (string)
+               (if (stringp (car output))
+                   (rplaca output (concat (car output) string))
+                   (push string output)))
+             (emit-placeholder-p ()
+               ;; Return T if an otherwise empty string inside ~{ ... ~} must be
+               ;; kept in order to avoid turning "~{~0|~}" (etc) into "~{~}".
+               ;; The latter control string means something completely different.
+               (and (format-directive-p (car output))
+                    (eql #\{ (directive-character (car output)))))
+             (emit-directive (directive)
+               ;; If the head of output is the empty string and DIRECTIVE is
+               ;; NOT a closing curly brace, we can reuse the first cons cell.
+               (if (and (typep (car output) '(string 0))
+                        (char/= (directive-character directive) #\}))
+                   (rplaca output directive)
+                   (push directive output)))
+             (concat (first second)
+               ;; The result is a base-string iff both inputs are base-string.
+               ;; %TOKENIZE-CONTROL-STRING calls POSSIBLY-BASE-STRINGIZE
+               ;; on all pieces of the input.
+               ;; I suspect that this may be permissible for CONCATENATE generally
+               ;; when given 'STRING as its output type with base-string as inputs.
+               ;; But as with all things string, the spec is unclear as usual imho.
+               (cond ((and (typep first 'base-string)
+                           (typep second 'base-string))
+                      (concatenate 'base-string first second))
                      (t
-                      (rplaca output (concatenate 'string first string)))))))
+                      (concatenate 'string first second)))))
       (loop
         (unless input (return (nreverse output)))
         (let ((item (pop input)))
           (etypecase item
             (string
-             (concat item))
+             (aver (plusp (length item)))
+             (emit-string item))
             ;;  - Handle tilde-newline immediately
             ;;  - Turn "~%" into literal newline (for parameter N <=127)
             ;;  - Unless x-compiling, turn "~|" into literal form-feed (ditto)
@@ -230,15 +247,22 @@
                    (#\Newline
                     ;; tilde newline wants no params, and not both colon+atsign
                     (when (and (not params) (not (and colon atsign)))
-                      (when atsign
-                        (concat #.(make-string 1 :initial-element #\Newline)))
-                      (when (and (not colon) (stringp (car input)))
-                        (concat (string-left-trim
-                                 ;; #\Tab is a nonstandard char
-                                 `(#-sb-xc-host ,(sb!xc:code-char tab-char-code)
-                                   #\space #\newline)
-                                 (pop input))))
+                      ;; atsign = preserve newline / colon = preserve whitespace
+                      (let ((s (concat (if atsign
+                                           #.(make-string 1 :initial-element #\Newline)
+                                           "")
+                                       (if (and (not colon) (stringp (car input)))
+                                           (string-left-trim
+                                            ;; #\Tab is a nonstandard char
+                                            `(#-sb-xc-host ,(sb!xc:code-char tab-char-code)
+                                              #\space #\newline)
+                                            (pop input))
+                                           ""))))
+                        (when (or (plusp (length s)) (emit-placeholder-p))
+                          (emit-string s)))
                       (return)))
+                   ;; TODO: #\& with a literal parameter of 0 is equivalent
+                   ;; to the empty string.
                    ((#\% #\~ #-sb-xc-host #\|) ; #\Page is a nonstandard char
                     (let ((n (or (cdar params) 1)))
                       (when (and (not (or colon atsign))
@@ -247,14 +271,14 @@
                                  ;; Don't insert literal tilde when parsing/
                                  ;; unparsing to create a FMT-CONTROL instance.
                                  (or (not (eql char #\~)) literalize-tilde))
-                        (when (plusp n)
+                        (when (or (plusp n) (emit-placeholder-p))
                           (let ((char (case char
                                         (#\% #\Newline)
                                         (#\| (sb!xc:code-char form-feed-char-code))
                                         (t char))))
-                            (concat (make-string n :initial-element char))))
+                            (emit-string (make-string n :initial-element char))))
                         (return)))))
-                 (push item output))))))))))
+                 (emit-directive item))))))))))
 
 ;;;; FORMATTER stuff
 

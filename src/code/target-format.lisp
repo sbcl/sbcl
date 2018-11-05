@@ -540,6 +540,11 @@
 (defun decimal-string (n)
   (write-to-string n :base 10 :radix nil :escape nil))
 
+;;; TODO: many of the the CHECK-MODIFIER calls in the directive interpreters
+;;; can be checked at tokenization time, which benefits from the fact that
+;;; a string is only tokenized once (unless evicted from cache).
+;;; Repeated calls using the same format control need not repeatedly check
+;;; for correctness of the string.
 (def-format-interpreter #\F (colonp atsignp params)
   (check-modifier "colon" colonp)
   (interpret-bind-defaults ((w nil) (d nil) (k nil) (ovf nil) (pad #\space))
