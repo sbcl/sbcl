@@ -1711,3 +1711,15 @@
            (let ((b (1+ (funcall z))))
              (catch 'c (return b)))))
     (((constantly 33)) 34)))
+
+(with-test (:name :substitute-single-use-lvar-unknown-exits)
+  (checked-compile-and-assert
+      ()
+      `(lambda (f)
+         (block nil
+           (let ((x (evenp (funcall f)))
+                 (y (catch 'c
+                      (return (catch 'c (block nil 11))))))
+             (declare (ignore y))
+             x)))
+    (((constantly 33)) 11)))

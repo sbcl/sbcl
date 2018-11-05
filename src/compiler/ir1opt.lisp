@@ -1865,7 +1865,11 @@
                  (do-uses (use arg t)
                    (unless (only-harmless-cleanups block
                                                    (node-block use))
-                     (return))))))
+                     (return))))
+               (do-uses (use lvar t)
+                 ;; EXITs may generate unknown values
+                 (when (exit-p use)
+                   (return)))))
              (t
               (aver (lvar-single-value-p lvar))
               t))
