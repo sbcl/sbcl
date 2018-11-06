@@ -1857,15 +1857,14 @@
               (or (eq (basic-combination-fun dest) lvar)
                   (and (eq (basic-combination-kind dest) :local)
                        (type-single-value-p (lvar-derived-type arg)))))
-             ((or creturn exit)
+             (exit
+              ;; EXITs may generate unknown values and reordering
+              ;; breaks stack-analyze
+              nil)
+             (creturn
               (and
                (eql (nth-value 1 (values-types (lvar-derived-type arg)))
                     1)
-               (let ((block (node-block ref)))
-                 (do-uses (use arg t)
-                   (unless (only-harmless-cleanups block
-                                                   (node-block use))
-                     (return))))
                (do-uses (use lvar t)
                  ;; EXITs may generate unknown values
                  (when (exit-p use)

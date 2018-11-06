@@ -1723,3 +1723,20 @@
              (declare (ignore y))
              x)))
     (((constantly 33)) 11)))
+
+(with-test (:name :substitute-single-use-lvar-unknown-exits.2)
+  (checked-compile-and-assert
+      ()
+      `(lambda (b)
+         (block nil
+           (if (catch 'c 0)
+               (return
+                 (let ((x (the real b)))
+                   (let ((* (list 1)))
+                     (declare (dynamic-extent *))
+                     (catch 'ct5
+                       (if t (return 34))))
+                   x))
+               (catch 'c 0))))
+    ((1) 34)))
+
