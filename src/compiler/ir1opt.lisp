@@ -1862,13 +1862,17 @@
               ;; breaks stack-analyze
               nil)
              (creturn
-              (and
-               (eql (nth-value 1 (values-types (lvar-derived-type arg)))
-                    1)
-               (do-uses (use lvar t)
-                 ;; EXITs may generate unknown values
-                 (when (exit-p use)
-                   (return)))))
+              ;; This use has to produce a single value,
+              ;; because binding a variable is how multiple values are
+              ;; turned into a single value.
+              (and (eql (nth-value 1 (values-types (lvar-derived-type arg)))
+                        1)
+                   ;; And all other uses have to be the same, or it'll go
+                   ;; through unknown values.
+                   (do-uses (use lvar t)
+                     (unless (eql (nth-value 1 (values-types (node-derived-type use)))
+                                  1)
+                       (return)))))
              (t
               (aver (lvar-single-value-p lvar))
               t))

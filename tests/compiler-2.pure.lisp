@@ -1740,3 +1740,21 @@
                (catch 'c 0))))
     ((1) 34)))
 
+(with-test (:name :substitute-single-use-lvar-unknown-exits.3)
+  (checked-compile-and-assert
+      ()
+      `(lambda (b)
+         (let ((a b))
+           (block nil
+             (let ((* (list 1)))
+               (declare (dynamic-extent *))
+               (if b
+                   (let ((j a))
+                     (let ((* (list 1)))
+                       (declare (dynamic-extent *))
+                       (if b (return 44))
+                       (setf a nil))
+                     (let ((z j)) z))
+                   (eval 2))))))
+    ((33) 44)))
+
