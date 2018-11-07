@@ -19,12 +19,12 @@
 (defstruct (room-info (:constructor make-room-info (mask name kind))
                       (:copier nil))
     ;; the mask applied to HeaderValue to compute object size
-    (mask 0 :type (and fixnum unsigned-byte))
+    (mask 0 :type (and fixnum unsigned-byte) :read-only t)
     ;; the name of this type
     (name nil :type symbol :read-only t)
     ;; kind of type (how to reconstitute an object)
     (kind nil
-          :type (member :other :closure :instance :list :code :vector-nil)
+          :type (member :other :closure :instance :list :code)
           :read-only t))
 
 (defun room-info-type-name (info)
@@ -48,12 +48,12 @@
                                     default-size-mask)
                                 name :other)))))
 
-    (dolist (code (list #+sb-unicode complex-character-string-widetag
-                        complex-base-string-widetag simple-array-widetag
-                        complex-bit-vector-widetag complex-vector-widetag
-                        complex-array-widetag complex-vector-nil-widetag))
-      (setf (svref infos code)
-            (make-room-info default-size-mask 'array-header :other)))
+    (let ((info (make-room-info default-size-mask 'array-header :other)))
+      (dolist (code (list #+sb-unicode complex-character-string-widetag
+                          complex-base-string-widetag simple-array-widetag
+                          complex-bit-vector-widetag complex-vector-widetag
+                          complex-array-widetag complex-vector-nil-widetag))
+        (setf (svref infos code) info)))
 
     (setf (svref infos bignum-widetag)
           ;; Lose 1 more bit than n-widetag-bits because fullcgc robs 1 bit,
@@ -70,7 +70,7 @@
           (setf (svref infos (saetp-typecode saetp)) saetp))))
 
     (setf (svref infos simple-array-nil-widetag)
-          (make-room-info 0 'simple-array-nil :vector-nil))
+          (make-room-info 0 'simple-array-nil :other))
 
     (setf (svref infos code-header-widetag)
           (make-room-info 0 'code :code))
@@ -276,31 +276,26 @@
                    list-pointer-lowtag
                    (* 2 n-word-bytes)))
 
-          (:closure ; also funcallable-instance
-           (values (tagged-object fun-pointer-lowtag)
-                   widetag
-                   (boxed-size (logand header-value short-header-max-words))))
-
           (:instance
            (values (tagged-object instance-pointer-lowtag)
                    widetag
                    (boxed-size (logand header-value short-header-max-words))))
 
-          (:other
-           (values (tagged-object other-pointer-lowtag)
+          (:closure ; also funcallable-instance
+           (values (tagged-object fun-pointer-lowtag)
                    widetag
-                   (boxed-size (logand header-value (room-info-mask info)))))
-
-          (:vector-nil
-           (values (tagged-object other-pointer-lowtag)
-                   simple-array-nil-widetag
-                   (* 2 n-word-bytes)))
+                   (boxed-size (logand header-value short-header-max-words))))
 
           (:code
            (let ((c (tagged-object other-pointer-lowtag)))
              (values c
                      code-header-widetag
-                     (code-component-size c))))))))))
+                     (code-component-size c))))
+
+          (:other
+           (values (tagged-object other-pointer-lowtag)
+                   widetag
+                   (boxed-size (logand header-value (room-info-mask info)))))))))))
 
 ;;; Iterate over all the objects in the contiguous block of memory
 ;;; with the low address at START and the high address just before
@@ -467,7 +462,7 @@ We could try a few things to mitigate this:
        ;; in fixedobj subspace, or code without enough header words
        ;; in varyobj subspace. (cf 'filler_obj_p' in gc-internal.h)
        (dx-flet ((filter (obj type size)
-                   (unless (consp obj)
+                   (unless (= type list-pointer-lowtag)
                      (funcall fun obj type size))))
          (map-immobile-objects #'filter :fixed))
        (dx-flet ((filter (obj type size)
@@ -585,10 +580,9 @@ We could try a few things to mitigate this:
              (hole-bytes 0))
     (map-immobile-objects
      (lambda (obj type size)
-       (declare (ignore type))
        (let ((address (logandc2 (get-lisp-obj-address obj) lowtag-mask)))
          (when (case subspace
-                 (:fixed (consp obj))
+                 (:fixed (= type list-pointer-lowtag))
                  (:variable (hole-p address)))
            (push (cons address size) holes)
            (incf hole-bytes size))))
