@@ -2211,17 +2211,43 @@ register."
 ;;; GC, and might also arise in debug variable locations when
 ;;; those variables are invalid.)
 ;;;
-;;; NOTE: this function is not GC-safe in the slightest when creating
+;;; NOTE for precisely GC'd platforms:
+;;; this function is not GC-safe in the slightest when creating
 ;;; a pointer to an object in dynamic space.  If a GC occurs between
 ;;; the start of the call to VALID-LISP-POINTER-P and the end of
 ;;; %MAKE-LISP-OBJ then the object could move before the boxed pointer
 ;;; is constructed.  This can happen on CHENEYGC if an asynchronous
 ;;; interrupt occurs within the window.  This can happen on GENCGC
 ;;; under the same circumstances, but is more likely due to all GENCGC
-;;; platforms supporting threaded operation.  This is somewhat
-;;; mitigated on x86oids due to the conservative stack and interrupt
-;;; context "scavenging" on such platforms, but there still may be a
-;;; vulnerable window.
+;;; platforms supporting threaded operation.
+
+;;; On x86oids we are able to eliminate the vulnerable window
+;;; by conservatively pinning an object (i.e. storing a bit pattern
+;;; that would be the address of an object, assuming it is an object)
+;;; whether or not there is actually an object to pin.
+;;; To see the GC-safeness problem without WITH-PINNED-OBJECTS, consider
+;;; the following sequence of events, and suppose for the sake of argument
+;;; that tagged pointer #x104003 is valid at the moment of call.
+;;; Assume 1 low zero bit in a fixnum, so the register contains #x208006.
+;;; 1. move-to-word: arg-passing-reg <- #x104003 ; implicit pin
+;;;    /* at this point the fixnum whose representation is #x208006
+;;;       was spilled to stack prior to call, *and* the descriptor bits
+;;;       are also in a register. The fixnum pins nothing as it does not
+;;;       have Lisp pointer nature. The passing reg pins something */
+;;; 2. call C : will return true, and assume that the arg-passing-reg
+;;;             gets clobbered.  The return-reg contains 1 for true.
+;;; 3. -- GC triggered by other thread
+;;;       transport the object that was #x104003 to somewhere new
+;;; 4. now %MAKE-LISP-OBJ creates a bogus pointer.
+;;; By preemptively using (WITH-PINNED-OBJECTS ((%MAKE-LISP-OBJ)))
+;;; we ensure that the bit pattern #x104003 is on the stack for root scan.
+;;; Unfortunately, WITH-PINNED-OBJECTS can not be used with precise GC
+;;; because random trash is not allowed in a descriptor register.
+;;; If we really wanted to make this safe for precise GC, we could use a
+;;; new special binding, something like *PINNED-WORDS* which would be a list
+;;; of INTEGERs, each of which, _if_ its bit pattern is that of an object
+;;; descriptor, would pin the corresponding object. On the lisp side
+;;; the cons cell in the list would hold the supplied VAL directly.
 (defun make-lisp-obj (val &optional (errorp t))
   (if (or
        ;; fixnum
@@ -2233,15 +2259,30 @@ register."
        (and (zerop (logandc2 val #x1fffffff)) ; Top bits zero
             (= (logand val #xff) sb!vm:character-widetag)) ; char tag
        ;; unbound marker
-       (= val sb!vm:unbound-marker-widetag)
-       ;; pointer
-       (not (zerop (valid-lisp-pointer-p (int-sap val)))))
+       (= val sb!vm:unbound-marker-widetag))
       (values (%make-lisp-obj val) t)
-      (if errorp
-          (error "~S is not a valid argument to ~S"
-                 val 'make-lisp-obj)
-          (values (make-unprintable-object (format nil "invalid object #x~X" val))
-                  nil))))
+      ;; To mitigate the danger of GC running in between testing pointer
+      ;; validity and returning the object, we must pin a potentially
+      ;; non-object which is harmless on the conservative backends
+      ;; but harmful on precise GC.
+      (macrolet ((possibly-pin (form)
+                   #!+(or x86 x86-64)
+                   `(with-pinned-objects ((%make-lisp-obj val)) ,form)
+                   #!-(or x86 x86-64) form))
+        (let ((obj (if (and (typep val 'word) (is-lisp-pointer val))
+                       (possibly-pin
+                        (if (= (valid-lisp-pointer-p (int-sap val)) 0)
+                            0
+                            (%make-lisp-obj val)))
+                       0)))
+          (cond ((not (eql obj 0)) (values obj t))
+                (errorp
+                 (error "~S is not a valid argument to ~S"
+                        val 'make-lisp-obj))
+                (t
+                 (values (make-unprintable-object
+                          (format nil "invalid object #x~X" val))
+                         nil)))))))
 
 (defun sub-access-debug-var-slot (fp sc+offset &optional escaped)
   ;; NOTE: The long-float support in here is obviously decayed.  When
