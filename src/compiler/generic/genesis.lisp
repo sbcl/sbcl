@@ -1406,7 +1406,8 @@ core and return a descriptor to it."
                                       (base-string-to-core name))
                               :%nicknames (chill-nicknames name)
                               :doc-string (if docstring
-                                              (base-string-to-core docstring)
+                                              (set-readonly
+                                               (base-string-to-core docstring))
                                               *nil-descriptor*)
                               :%use-list *nil-descriptor*)
                  ;; the cddr of this will accumulate the 'used-by' package list

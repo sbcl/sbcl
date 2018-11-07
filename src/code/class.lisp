@@ -1113,7 +1113,9 @@ between the ~A definition and the ~A definition"
                :codes (,(sb!vm::saetp-typecode x))
                :direct-superclasses (vector simple-array)
                :inherits (vector simple-array array sequence)
-               :prototype-form (make-array 0 :element-type ',(sb!vm::saetp-specifier x))))))
+               :prototype-form
+               (logically-readonlyize
+                (make-array 0 :element-type ',(sb!vm::saetp-specifier x)))))))
 
 ;;; See also src/code/class-init.lisp where we finish setting up the
 ;;; translations for built-in types.
