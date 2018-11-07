@@ -124,6 +124,9 @@
      ;; each time this macro is used when no error is actually happening.
      #| #!+sb-show (sb!debug:print-backtrace :count 8) ; arbitrary truncation |#
      ,@forms))
+;;; This symbol isn't removed automatically because it's exported,
+;;; but nothing can use it after the build is complete.
+(push '("SB-KERNEL" infinite-error-protect) *!removable-symbols*)
 
 ;;; a helper function for INFINITE-ERROR-PROTECT
 (defun infinite-error-protector ()

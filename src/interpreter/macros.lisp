@@ -157,6 +157,11 @@
               (progn ,@finally))))
      ,initially))
 
+;;; These symbols aren't removed automatically,
+;;; but nothing can use them after the build is complete.
+(push '("SB-KERNEL" with-let-bindings with-let*-binder apply-lambda)
+      *!removable-symbols*)
+
 ;;; Bind VAR to each declaration-specifier in INPUT, which is a list of
 ;;; subexpresssions whose head was DECLARE in a form accepting declarations.
 ;;; The list as stored is doubly-nested because each DECLARE expression

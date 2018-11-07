@@ -903,7 +903,7 @@ between the ~A definition and the ~A definition"
      (code-component :codes (#.sb!vm:code-header-widetag))
      #!-(or x86 x86-64) (lra :codes (#.sb!vm:return-pc-widetag))
      (fdefn :codes (#.sb!vm:fdefn-widetag)
-            :prototype-form (make-fdefn "42"))
+            :prototype-form (make-fdefn nil))
      (random-class) ; used for unknown type codes
 
      (function
