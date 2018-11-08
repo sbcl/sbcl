@@ -443,6 +443,21 @@ else
     esac
 fi
 
+case "$sbcl_os" in
+    openbsd)
+        # openbsd 6.0 and newer restrict mmap of RWX pages
+        if [ $(uname -r | tr -d .) -gt 60 ]; then
+            rm -f tools-for-build/mmap-rwx
+            LDFLAGS="$LDFLAGS -Wl,-zwxneeded" $GNUMAKE -C tools-for-build mmap-rwx -I ../src/runtime
+            if ! ./tools-for-build/mmap-rwx; then
+                echo "Can't mmap() RWX pages!"
+                echo "Is the current filesystem mounted with wxallowed?"
+                exit 1
+            fi
+        fi
+    ;;
+esac
+
 bf=`pwd`/build-features.lisp-expr
 echo //initializing $bf
 echo ';;;; This is a machine-generated file.' > $bf
