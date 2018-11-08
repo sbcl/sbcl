@@ -9,7 +9,7 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-LINKFLAGS += -export-dynamic -Wl,-z,wxneeded
+LINKFLAGS += -Wl,-z,wxneeded
 OS_LIBS += -lutil
 
 ifdef LISP_FEATURE_SB_THREAD
