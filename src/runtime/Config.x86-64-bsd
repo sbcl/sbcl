@@ -23,7 +23,7 @@ CFLAGS += -fno-omit-frame-pointer
 LINKFLAGS += -Wl,--export-dynamic
 
 ifdef LISP_FEATURE_IMMOBILE_SPACE
-  GC_SRC = fullcgc.c gencgc.c traceroot.c immobile-space.c
+  GC_SRC = fullcgc.c gencgc.c traceroot.c immobile-space.c elf.c
 else
   GC_SRC = fullcgc.c gencgc.c traceroot.c
 endif
