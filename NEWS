@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-1.4.13:
+  * enhancement: attempting to build on openbsd 6.0 or newer without
+    the wxallowed mount option now results in a more useful error message.
+
 changes in sbcl-1.4.13 relative to sbcl-1.4.12:
   * minor incompatible change: PRINT-TYPE and PRINT-TYPE-SPECIFIER are not
     exported from SB-EXT. These were never announced, so this change would
