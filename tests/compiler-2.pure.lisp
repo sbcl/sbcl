@@ -1756,5 +1756,22 @@
                        (setf a nil))
                      (let ((z j)) z))
                    (eval 2))))))
-    ((33) 44)))
+      ((33) 44)))
+
+(with-test (:name :substitute-single-use-lvar-unknown-exits.4)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (block nil
+        (flet ((f ()
+                 (let ((p (1+ a)))
+                   (let ((* (list 1)))
+                     (declare (dynamic-extent *))
+                     (if a
+                         (return 45)))
+                   p)))
+          (let ((* (lambda ()
+                     (return (eval a)))))
+            (f)))))
+   ((33) 45)))
 

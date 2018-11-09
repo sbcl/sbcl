@@ -214,7 +214,8 @@
 (defun almost-immediately-used-p (lvar node)
   (declare (type lvar lvar)
            (type node node))
-  (aver (eq (node-lvar node) lvar))
+  (unless (bind-p node)
+    (aver (eq (node-lvar node) lvar)))
   (let ((dest (lvar-dest lvar)))
     (tagbody
      :next

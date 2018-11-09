@@ -1857,22 +1857,17 @@
               (or (eq (basic-combination-fun dest) lvar)
                   (and (eq (basic-combination-kind dest) :local)
                        (type-single-value-p (lvar-derived-type arg)))))
-             (exit
-              ;; EXITs may generate unknown values and reordering
-              ;; breaks stack-analyze
-              nil)
-             (creturn
+             ((or creturn exit)
               ;; This use has to produce a single value,
               ;; because binding a variable is how multiple values are
               ;; turned into a single value.
               (and (eql (nth-value 1 (values-types (lvar-derived-type arg)))
                         1)
-                   ;; And all other uses have to be the same, or it'll go
-                   ;; through unknown values.
-                   (do-uses (use lvar t)
-                     (unless (eql (nth-value 1 (values-types (node-derived-type use)))
-                                  1)
-                       (return)))))
+                   ;; Intervening nodes may produces non local exits with the same destination,
+                   ;; generating unknown values or otherwise complicating stack-analyze
+                   (almost-immediately-used-p lvar (lambda-bind (lambda-var-home var)))
+                   ;; Nothing else exits from here
+                   (singleton-p (block-pred (node-block dest)))))
              (t
               (aver (lvar-single-value-p lvar))
               t))
