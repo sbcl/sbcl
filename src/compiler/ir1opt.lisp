@@ -1865,9 +1865,23 @@
                         1)
                    ;; Intervening nodes may produces non local exits with the same destination,
                    ;; generating unknown values or otherwise complicating stack-analyze
+                   ;; Due to inlining and other substitutions
+                   ;; only (let ((x non-inlinable-call)) x) can be transformed
                    (almost-immediately-used-p lvar (lambda-bind (lambda-var-home var)))
                    ;; Nothing else exits from here
-                   (singleton-p (block-pred (node-block dest)))))
+                   (singleton-p (block-pred (node-block dest)))
+                   ;; Nothing happens between the call and the return
+                   (do-uses (use arg t)
+                     (unless (and (or (ref-p use)
+                                      (and
+                                       (combination-p use)
+                                       (case (combination-kind use)
+                                         ;;(:full t) let's be really conservative, :full may yet turn into something else
+                                         (:known
+                                          (not (fun-info-may-be-inlined
+                                                (combination-fun-info use)))))))
+                                  (almost-immediately-used-p arg use))
+                       (return)))))
              (t
               (aver (lvar-single-value-p lvar))
               t))

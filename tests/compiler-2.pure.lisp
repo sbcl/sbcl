@@ -1775,3 +1775,20 @@
             (f)))))
    ((33) 45)))
 
+(with-test (:name :substitute-single-use-lvar-unknown-exits.5)
+  (checked-compile-and-assert
+   ()
+   `(lambda (b c)
+      (block nil
+        (flet ((f ()
+                 (return (catch 'c (block b b)))))
+          (return
+            (block b5
+              (let ((o c))
+                (setf c
+                      (catch 'c
+                        (flet ((g ()
+                                 (return)))
+                          (f))))
+                (let ((x o)) x)))))))
+   ((10 20) 10)))
