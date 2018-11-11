@@ -212,16 +212,10 @@ sufficiently motivated to do lengthy fixes."
         ;; SAVE-LISP-AND-DIE.)
         #+gencgc
         (progn
-          #+immobile-code
-          (progn
-            ;; Perform static linkage. There seems to be no reason to have users
-            ;; decide whether they want this. Functions become un-statically-linked
-            ;; on demand, for TRACE, redefinition, etc.
-            (sb-vm::statically-link-core)
-            ;; Scan roots as close as possible to GC-AND-SAVE, in case anything
-            ;; prior causes compilation to occur into immobile space.
-            ;; Failing to see all immobile code would miss some relocs.
-            (sb-vm::choose-code-component-order root-structures))
+          ;; Scan roots as close as possible to GC-AND-SAVE, in case anything
+          ;; prior causes compilation to occur into immobile space.
+          ;; Failing to see all immobile code would miss some relocs.
+          #+immobile-code (sb-vm::choose-code-component-order root-structures)
           ;; Save the restart function. Logically a passed argument, but can't be,
           ;; as it would require pinning around the whole save operation.
           (with-pinned-objects (#'restart-lisp)
@@ -326,6 +320,9 @@ sufficiently motivated to do lengthy fixes."
   ;; Must clear this cache if asm routines are movable.
   (setq sb-disassem::*assembler-routines-by-addr* nil)
   (os-deinit)
+  ;; Perform static linkage. Functions become un-statically-linked
+  ;; on demand, for TRACE, redefinition, etc.
+  #+immobile-code (sb-vm::statically-link-core)
   ;; Do this last, to have some hope of printing if we need to.
   (stream-deinit)
   (setf * nil ** nil *** nil
