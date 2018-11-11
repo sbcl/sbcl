@@ -581,7 +581,7 @@
          (let* ((bytes-remaining (- (seg-length (dstate-segment dstate))
                                     (dstate-cur-offs dstate)))
                 (chunk
-                 (multiple-value-bind (sap offset)
+                 (if (= sb!assem:+inst-alignment-bytes+ 1)
                      ;; Don't read beyond the segment. This can occur with DISASSEMBLE-MEMORY
                      ;; on a function whose code ends in pad bytes that are not an integral
                      ;; number of instructions, and maybe you're so unlucky as to be
@@ -590,28 +590,19 @@
                      ;; 8 bytes, so make sure the number of bytes to go is 8,
                      ;; never mind that dchunk-bits is less.
                      (if (< bytes-remaining sb!vm:n-word-bytes)
-                         (let ((sap (vector-sap (dstate-scratch-buf dstate))))
-                           (setf (sap-ref-word sap 0) 0)
-                           (system-area-ub8-copy (dstate-segment-sap dstate)
-                                                 (dstate-cur-offs dstate)
-                                                 sap 0 bytes-remaining)
-                           (values sap 0))
-                         (values (dstate-segment-sap dstate)
-                                 (dstate-cur-offs dstate)))
-                   #!+x86-64 ; a dchunk is 56 bits, making it a fixnum.
-                   ;; No instruction needs more bits than that to locate it
-                   ;; in the inst-space. An optional displacement and/or immediate
-                   ;; operand can extend the overall length, but those aren't
-                   ;; part of the dchunk. We can't use SAP-REF-INT because that
-                   ;; would return a word-sized bignum which is the very thing
-                   ;; this special case tries to avoid.
-                   (logand (sap-ref-word sap offset) dchunk-one)
-
-                   #!-x86-64
-                   (the dchunk
-                     (sap-ref-int sap offset
-                                  (ecase dchunk-bits (32 4) (64 8))
-                                  (dstate-byte-order dstate)))))
+                         (let ((temp (dstate-scratch-buf dstate)))
+                           (setf (%vector-raw-bits temp 0) 0)
+                           (%byte-blt (dstate-segment-sap dstate) (dstate-cur-offs dstate)
+                                      temp 0 bytes-remaining)
+                           (sap-ref-word (vector-sap temp) 0))
+                         (logand (sap-ref-word (dstate-segment-sap dstate)
+                                               (dstate-cur-offs dstate))
+                                 dchunk-one))
+                     (the dchunk
+                          (sap-ref-int (dstate-segment-sap dstate)
+                                       (dstate-cur-offs dstate)
+                                       (ecase dchunk-bits (32 4) (64 8))
+                                       (dstate-byte-order dstate)))))
 
                 (fun-prefix-p (call-fun-hooks chunk stream dstate)))
            (if (> (dstate-next-offs dstate) (dstate-cur-offs dstate))
