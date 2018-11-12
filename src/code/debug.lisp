@@ -670,7 +670,13 @@ the current thread are replaced with dummy objects which can safely escape."
         object)
     (error (cond)
       (declare (ignore cond))
-      (make-unprintable-object "error printing object"))))
+      (multiple-value-bind (type address)
+          (ignore-errors (values (type-of object)
+                                 (get-lisp-obj-address object)))
+        (make-unprintable-object
+         (if type
+             (format nil "error printing ~a {~x}" type address)
+             "error printing object"))))))
 
 (defun frame-call-arg (var location frame)
   (lambda-var-dispatch var location
@@ -713,9 +719,12 @@ the current thread are replaced with dummy objects which can safely escape."
         ;; possible, punting the loop over lambda-list variables since
         ;; any other arguments will be in the &REST arg's list of
         ;; values.
-        (let ((args (if emergency-best-effort
-                        (ensure-printable-object args)
-                        args)))
+        (let ((args (cond ((not emergency-best-effort)
+                           args)
+                          ((consp args)
+                           (mapcar #'ensure-printable-object args))
+                          (t
+                           (ensure-printable-object args)))))
           (cond ((not (listp args))
                  (format stream " ~S" args))
                 (t
