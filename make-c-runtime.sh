@@ -3,6 +3,13 @@
 # Load our build configuration
 . output/build-config
 
+# This script is supposed to be host-agnostic, but unfortunately in testing
+# I have found it to be sensitive to the host in the following ways:
+#  -  using CCL it gets "Error: Incorrect keyword arguments in (:TEST EQ T)."
+#  -  using CLISP it prints "WARNING: cross-compiler type ambiguity" 540 times.
+# We could make this use the target SBCL as the new host,
+# but that somewhat defeats the purpose.
+
 time $SBCL_XC_HOST <<EOF
 (load "src/cold/shared.lisp")
 (load "src/cold/set-up-cold-packages.lisp")

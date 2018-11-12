@@ -142,6 +142,7 @@ the stack without triggering overflow protection.")
  (setf **world-lock** (sb!thread:make-mutex :name "World Lock")))
 (!defun-from-collected-cold-init-forms !world-lock-cold-init)
 
+#-sb-xc-host
 (define-load-time-global *static-linker-lock*
     (sb!thread:make-mutex :name "static linker"))
 
