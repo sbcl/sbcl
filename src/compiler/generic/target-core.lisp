@@ -22,10 +22,15 @@
   (make-hash-table :test 'eq :weakness :key :synchronized t))
 
 #!-x86-64
+(progn
 (defun convert-alloc-point-fixups (dummy1 dummy2)
   (declare (ignore dummy1 dummy2)))
+(defun sb!vm::statically-link-code-obj (code fixups)
+  (declare (ignore code fixups))))
 
-(flet ((fixup (code-obj offset sym kind flavor layout-finder preserved-lists)
+(flet ((fixup (code-obj offset sym kind flavor layout-finder
+               preserved-lists statically-link-p)
+         (declare (ignorable statically-link-p))
          ;; PRESERVED-LISTS is a vector of lists of locations (by kind)
          ;; at which fixup must be re-applied after code movement.
          ;; CODE-OBJ must already be pinned in order to legally call this.
@@ -43,7 +48,11 @@
                    (:symbol-tls-index (ensure-symbol-tls-index sym))
                    (:layout (get-lisp-obj-address (funcall layout-finder sym)))
                    (:immobile-object (get-lisp-obj-address sym))
-                   #!+immobile-code (:named-call (sb!vm::fdefn-entry-address sym))
+                   #!+immobile-code
+                   (:named-call
+                    (when statically-link-p
+                      (push (cons offset sym) (elt preserved-lists 3)))
+                    (sb!vm::fdefn-entry-address sym))
                    #!+immobile-code (:static-call (sb!vm::function-raw-address sym)))
                  kind flavor)
            (ecase kind
@@ -65,6 +74,8 @@
          (awhen (elt preserved-lists 2)
            (setf (gethash code-obj *allocation-point-fixups*)
                  (convert-alloc-point-fixups code-obj it)))
+         (awhen (aref preserved-lists 3)
+           (sb!vm::statically-link-code-obj code-obj it))
          ;; Assign all SIMPLE-FUN-SELF slots
          (dotimes (i (code-n-entries code-obj))
            (let ((fun (%code-entry-point code-obj i)))
@@ -88,18 +99,18 @@
          (sb!vm:sanctify-for-execution code-obj)))
 
   (defun apply-fasl-fixups (fop-stack code-obj &aux (top (svref fop-stack 0)))
-    (dx-let ((preserved (vector nil nil nil)))
+    (dx-let ((preserved (make-array 4 :initial-element nil)))
       (macrolet ((pop-fop-stack () `(prog1 (svref fop-stack top) (decf top))))
         (dotimes (i (pop-fop-stack) (setf (svref fop-stack 0) top))
           (multiple-value-bind (offset kind flavor)
               (sb!fasl::!unpack-fixup-info (pop-fop-stack))
             (fixup code-obj offset (pop-fop-stack) kind flavor
-                   #'find-layout preserved))))
+                   #'find-layout preserved nil))))
       (finish-fixups code-obj preserved)))
 
   (defun apply-core-fixups (fixup-notes code-obj)
     (declare (list fixup-notes))
-    (dx-let ((preserved (vector nil nil nil)))
+    (dx-let ((preserved (make-array 4 :initial-element nil)))
       (dolist (note fixup-notes)
         (let ((fixup (fixup-note-fixup note))
               (offset (fixup-note-position note)))
@@ -112,7 +123,7 @@
                ;; :IMMOBILE-OBJECT fixups. But since they're not, inform the
                ;; fixupper not to call find-layout on them.
                  #'identity
-                 preserved)))
+                 preserved t)))
       (finish-fixups code-obj preserved))))
 
 ;;; Note the existence of FUNCTION.

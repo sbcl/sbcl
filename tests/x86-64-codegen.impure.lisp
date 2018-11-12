@@ -130,6 +130,23 @@
                                  ;; and verify disassembly
                                  (search (car testcase) line)))))))
 
+#+immobile-code ; uses SB-C::*COMPILE-TO-MEMORY-SPACE*
+(with-test (:name :static-link-compile-to-memory)
+  (let* ((string
+          (with-output-to-string (stream)
+            (disassemble
+             (let ((sb-c::*compile-to-memory-space* :immobile))
+               (compile nil '(lambda () (print (gensym)))))
+             :stream stream)))
+         (lines (split-string string #\newline)))
+    (flet ((find-line (mnemonic operand)
+             (find-if (lambda (line)
+                        (and (search mnemonic line)
+                             (search operand line)))
+                      lines)))
+    (assert (find-line "CALL" "FUNCTION GENSYM"))
+    (assert (find-line "JMP" "FUNCTION PRINT")))))
+
 #+immobile-code
 (with-test (:name :static-unlinker)
   (let ((sb-c::*compile-to-memory-space* :immobile))

@@ -117,33 +117,28 @@
                                          verbose)
   (flet ((match-p (name include exclude)
            (and (not (member name exclude :test 'equal))
-                (or (not include) (member name include :test 'equal))))
-         (ambiguous-name-p (fun funs)
-           ;; Return T if FUN occurs more than once in FUNS
-           (declare (simple-vector funs))
-           (dotimes (i (length funs))
-             (when (eq (svref funs i) fun)
-               (loop (cond ((>= (incf i) (length funs))
-                            (return-from ambiguous-name-p nil))
-                           ((eq (svref funs i) fun)
-                            (return-from ambiguous-name-p t))))))))
+                (or (not include) (member name include :test 'equal)))))
     (do-immobile-functions (code fun addr)
       (when (match-p (%simple-fun-name fun) callers exclude-callers)
         (dx-let ((printed-fun-name nil)
+                 ;; The length of CODE-HEADER-FUNS is an upper-bound on the
+                 ;; number of fdefns referenced.
                  (code-header-funs (make-array (code-header-words code))))
           ;; Collect the called functions
-          (do ((i code-constants-offset (1+ i)))
-              ((= i (length code-header-funs)))
+          (do ((n 0)
+               (i (1- (length code-header-funs)) (1- i)))
+              ((< i sb-vm:code-constants-offset)
+               (setf (%array-fill-pointer code-header-funs) n))
             (let ((obj (code-header-ref code i)))
               (when (fdefn-p obj)
-                (setf (aref code-header-funs i) (fdefn-fun obj)))))
+                (setf (svref code-header-funs n) (fdefn-fun obj))
+                (incf n))))
           ;; Compute code bounds
           (let* ((code-begin (- (get-lisp-obj-address code)
                                 sb-vm:other-pointer-lowtag))
                  (code-end (+ code-begin (sb-vm::code-component-size code))))
             ;; Loop over function's assembly code
-            (map-segment-instructions
-             (lambda (chunk inst)
+            (dx-flet ((process-inst (chunk inst)
                (when (or (eq inst jmp) (eq inst call))
                  (let ((target (+ (near-jump-displacement chunk dstate)
                                   (dstate-next-addr dstate))))
@@ -153,11 +148,9 @@
                      (let ((fdefn (sb-vm::find-called-object target)))
                        (when (and (fdefn-p fdefn)
                                   (let ((callee (fdefn-fun fdefn)))
-                                    (and (immobile-space-obj-p callee)
-                                         (not (sb-vm::fun-requires-simplifying-trampoline-p callee))
+                                    (and (sb-vm::call-direct-p callee code-header-funs)
                                          (match-p (%fun-name callee)
-                                                  callees exclude-callees)
-                                         (not (ambiguous-name-p callee code-header-funs)))))
+                                                  callees exclude-callees))))
                          (let ((entry (sb-vm::fdefn-call-target fdefn)))
                            (when verbose
                              (let ((*print-pretty* nil))
@@ -170,8 +163,9 @@
                            (setf (sb-vm::fdefn-has-static-callers fdefn) 1)
                            ;; Change the machine instruction
                            (setf (signed-sap-ref-32 (int-sap (dstate-cur-addr dstate)) 1)
-                                 (- entry (dstate-next-addr dstate))))))))))
-             seg dstate)))))))
+                                 (- entry (dstate-next-addr dstate)))))))))))
+              (map-segment-instructions #'process-inst
+                                        seg dstate))))))))
 
 ;;; While concurrent use of un-statically-link is unlikely, misuse could easily
 ;;; cause heap corruption. It's preventable by ensuring that this is atomic
@@ -182,11 +176,11 @@
 ;;; The only way to detect the current set of references is to find uses of the
 ;;; current jump address, which means we need to fix them *all* before anyone
 ;;; else gets an opportunity to change the fdefn-fun of this same fdefn again.
-(define-load-time-global *static-linker-lock*
-    (sb-thread:make-mutex :name "static linker"))
 (defun sb-vm::remove-static-links (fdefn)
-  ; (warn "undoing static linkage of ~S" (fdefn-name fdefn))
-  (sb-thread::with-system-mutex (*static-linker-lock* :without-gcing t)
+  ;; FIXME: a comment about why this uses :WITHOUT-GCING would be nice.
+  ;; Is the code merely paranoid, i.e. the author was too lazy to think about
+  ;; correctness in the face of GC, or is there actually a good reason?
+  (sb-thread::with-system-mutex (sb-c::*static-linker-lock* :without-gcing t)
     ;; If the jump is to FUN-ENTRY, change it back to FDEFN-ENTRY
     (let ((fun-entry (sb-vm::fdefn-call-target fdefn))
           (fdefn-entry (+ (get-lisp-obj-address fdefn)

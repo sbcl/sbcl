@@ -142,6 +142,9 @@ the stack without triggering overflow protection.")
  (setf **world-lock** (sb!thread:make-mutex :name "World Lock")))
 (!defun-from-collected-cold-init-forms !world-lock-cold-init)
 
+(define-load-time-global *static-linker-lock*
+    (sb!thread:make-mutex :name "static linker"))
+
 (defmacro with-world-lock (() &body body)
   `(sb!thread:with-recursive-lock (**world-lock**)
      ,@body))

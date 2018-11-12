@@ -288,3 +288,61 @@
       (set-context-pc context (sap-ref-word (int-sap fun-addr)
                                             (- (ash simple-fun-self-slot word-shift)
                                                fun-pointer-lowtag))))))
+
+;;; CALL-DIRECT-P when true indicates that at the instruction level
+;;; it is fine to change the JMP or CALL instruction - i.e. the offset is
+;;; a (SIGNED-BYTE 32), and the function can be called without loading
+;;; its address into RAX, *and* there is a 1:1 relation between the fdefns
+;;; and fdefn-funs for all callees of the code that contains FUN.
+;;; The 1:1 constraint is due to a design limit - when removing static links,
+;;; it is impossible to distinguish fdefns that point to the same called function.
+;;; FIXME: It would be a nice to remove the uniqueness constraint, either
+;;; by recording ay ambiguous fdefns, or just recording all replacements.
+;;; Perhaps we could remove the static linker mutex as well?
+(defun call-direct-p (fun code-header-funs)
+  (flet ((singly-occurs-p (thing things &aux (len (length things)))
+           ;; Return T if THING occurs exactly once in vector THINGS.
+           (declare (simple-vector things))
+           (dotimes (i len)
+             (when (eq (svref things i) thing)
+               ;; re-using I as the index is OK because we leave the outer loop
+               ;; after this.
+               (return (loop (cond ((>= (incf i) len) (return t))
+                                   ((eq thing (svref things i)) (return nil)))))))))
+    (and (immobile-space-obj-p fun)
+         (not (fun-requires-simplifying-trampoline-p fun))
+         (singly-occurs-p fun code-header-funs))))
+
+;;; Remove calls via fdefns from CODE when compiling into memory.
+(defun statically-link-code-obj (code fixups)
+  (unless (and (immobile-space-obj-p code)
+               (fboundp 'sb-vm::remove-static-links))
+    (return-from statically-link-code-obj))
+  (let ((insts (code-instructions code))
+        (fdefns)) ; group by fdefn
+    (loop for (offset . name) in fixups
+          do (binding* ((fdefn (find-fdefn name) :exit-if-null)
+                        (cell (assq fdefn fdefns)))
+               (if cell
+                   (push offset (cdr cell))
+                   (push (list fdefn offset) fdefns))))
+    (let ((funs (make-array (length fdefns))))
+      (sb-thread::with-system-mutex (sb-c::*static-linker-lock*)
+        (loop for i from 0 for (fdefn) in fdefns
+              do (setf (aref funs i) (fdefn-fun fdefn)))
+        (dolist (fdefn-use fdefns)
+          (let* ((fdefn (car fdefn-use))
+                 (callee (fdefn-fun fdefn)))
+            ;; Because we're holding the static linker lock, the elements of
+            ;; FUNS can not change while this test is performed.
+            (when (call-direct-p callee funs)
+              (let ((entry (sb-vm::fdefn-call-target fdefn)))
+                (dolist (offset (cdr fdefn-use))
+                  ;; Only a CALL or JMP will get statically linked.
+                  ;; A MOV will always load the address of the fdefn.
+                  (when (eql (logior (sap-ref-8 insts (1- offset)) 1) #xE9)
+                    ;; Set the statically-linked flag
+                    (setf (sb-vm::fdefn-has-static-callers fdefn) 1)
+                    ;; Change the machine instruction
+                    (setf (signed-sap-ref-32 insts offset)
+                          (- entry (+ (sap-int (sap+ insts offset)) 4)))))))))))))
