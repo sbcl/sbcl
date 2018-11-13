@@ -1459,11 +1459,35 @@
 
 (defoptimizer (position derive-type) ((item sequence
                                             &key start end
+                                            key test test-not
                                             &allow-other-keys))
-  (declare (ignore item))
   (multiple-value-bind (min max)
       (index-into-sequence-derive-type sequence start end :inclusive nil)
-    (specifier-type `(or (integer ,min ,max) null))))
+    (let ((integer-range `(integer ,min ,max))
+          (definitely-foundp nil))
+      ;; Figure out whether this call will not return NIL.
+      ;; This could be smarter about the keywords args, but the primary intent
+      ;; is to avoid a style-warning about arithmetic in such forms such as
+      ;;  (1+ (position (the (member :x :y) item) #(:foo :bar :x :y))).
+      ;; In that example, a more exact bound could be determined too.
+      (cond ((or (not (constant-lvar-p sequence))
+                 start end key test test-not))
+            (t
+             (let ((const-seq (lvar-value sequence))
+                   (item-type (lvar-type item)))
+               (when (and (or (vectorp const-seq) (proper-list-p const-seq))
+                          (member-type-p item-type))
+                 (setq definitely-foundp t) ; assume best case
+                 (block nil
+                   (mapc-member-type-members
+                    (lambda (possibility)
+                      (unless (find possibility const-seq)
+                        (setq definitely-foundp nil)
+                        (return)))
+                    item-type))))))
+      (specifier-type (if definitely-foundp
+                          integer-range
+                          `(or ,integer-range null))))))
 
 (defoptimizer (position-if derive-type) ((function sequence
                                                    &key start end
@@ -2098,20 +2122,59 @@
          (%coerce-callable-to-fun ,key)
          #'identity)))
 
-(macrolet ((define-find-position (fun-name values-index)
+(macrolet ((define-find-position (fun-name values-index &optional preamble)
              `(deftransform ,fun-name ((item sequence &key
                                              from-end (start 0) end
                                              key test test-not)
                                        (t (or list vector) &rest t))
-                '(nth-value ,values-index
-                            (%find-position item sequence
-                                            from-end start
-                                            end
-                                            (effective-find-position-key key)
-                                            (effective-find-position-test
-                                             test test-not))))))
+                (let ((effective-test
+                       (unless test-not
+                         (if test (lvar-fun-name* test) 'eql)))
+                      (test-form '(effective-find-position-test test test-not))
+                      (const-seq (when (constant-lvar-p sequence)
+                                   (lvar-value sequence))))
+                  ,@preamble
+                  ;; For both FIND and POSITION, try to optimize EQL into EQ.
+                  (when (and (eq effective-test 'eql)
+                             const-seq
+                             (or (vectorp const-seq) (proper-list-p const-seq))
+                             (every (lambda (x) (typep x 'eq-comparable-type))
+                                    const-seq))
+                    (setq test-form '#'eq))
+                  `(nth-value ,',values-index
+                              (%find-position item sequence
+                                              from-end start
+                                              end
+                                              (effective-find-position-key key)
+                                              ,test-form))))))
   (define-find-position find 0)
-  (define-find-position position 1))
+  (define-find-position position 1
+   ((let ((max-inline 10))
+      ;; Destructive modification of constants is illegal.
+      ;; Therefore if this sequence would have been output as a code header
+      ;; constant, its contents can't change. We don't need to reference
+      ;; the sequence itself to compare elements.
+      ;; Later transforms will change EQL to EQ if appropriate.
+      (when (and const-seq
+                 (member effective-test '(eql eq))
+                 (not start) (not end) (not key)
+                 (or (not from-end) (constant-lvar-p from-end))
+                 (cond ((listp const-seq)
+                        (not (nthcdr max-inline const-seq)))
+                       ((vectorp const-seq)
+                        (<= (length const-seq) max-inline))))
+        (let ((clauses (loop for x in (coerce const-seq 'list)
+                             for i from 0
+                             collect `((,effective-test item ',x) ,i))))
+          ;; It seems silly to use :from-end and a constant list
+          ;; in a way where it actually matters (duplicate elements),
+          ;; but we either have to do it right or not do it.
+          (when (and from-end (lvar-value from-end))
+            (setq clauses (nreverse clauses)))
+          (return-from position
+                       `(lambda (item sequence &rest junk)
+                          (declare (ignore sequence junk))
+                          (cond ,@clauses)))))))))
 
 (macrolet ((define-find-position-if (fun-name values-index)
              `(deftransform ,fun-name ((predicate sequence &key

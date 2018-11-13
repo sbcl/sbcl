@@ -304,14 +304,15 @@
                   ;; What purpose does it serve to allow the transform's body
                   ;; to return decls as a second value? They would go in the
                   ;; right place if simply returned as part of the expression.
-                  (multiple-value-bind (,n-lambda ,n-decls)
+                  (block ,(fun-name-block-name name)
+                   (multiple-value-bind (,n-lambda ,n-decls)
                       (progn ,@body)
                     (if (and (consp ,n-lambda) (eq (car ,n-lambda) 'lambda))
                         ,n-lambda
                         `(lambda ,',lambda-list
                            (declare (ignorable ,@',vars))
                            ,@,n-decls
-                           ,,n-lambda))))))
+                           ,,n-lambda)))))))
           (if defun-only
               `(defun ,name ,@stuff)
               `(%deftransform

@@ -26,6 +26,23 @@
 (defun compiles-with-warning (lambda)
   (assert (nth-value 2 (checked-compile lambda :allow-warnings t))))
 
+(with-test (:name :position-derive-type)
+  (checked-compile '(lambda (x)
+                      (ash 1 (position (the (member a b c) x) #(a b c )))))
+  (checked-compile '(lambda (x)
+                      (ash 1 (position x #(a b c ))))
+                   :allow-style-warnings t)
+  (let ((f (compile nil '(lambda (x) (position x '(a b c d e f g h i j k l m))))))
+    ;; test should be EQ, not EQL
+    (assert (or (find (symbol-function 'eq)
+                      (ctu:find-code-constants f :type 'sb-kernel:simple-fun))
+                (ctu:find-named-callees f :name 'eq))))
+  (let ((f (compile nil
+                    '(lambda (x)
+                       (position x '(a b c d e d c b a) :from-end t)))))
+    (assert (= (funcall f 'a) 8))
+    (assert (= (funcall f 'b) 7))))
+
 (with-test (:name (ldb :recognize-local-macros))
   ;; Should not call %LDB
   (assert (not (ctu:find-named-callees
