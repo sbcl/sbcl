@@ -1839,9 +1839,8 @@ wipe_nonpinned_words()
  * the number of keys in the hashtable.
  */
 static void
-pin_object(lispobj* base_addr)
+pin_object(lispobj object)
 {
-    lispobj object = compute_lispobj(base_addr);
     if (!hopscotch_containsp(&pinned_objects, object)) {
         hopscotch_insert(&pinned_objects, object, 1);
         struct code* maybe_code = (struct code*)native_pointer(object);
@@ -1885,6 +1884,7 @@ preserve_pointer(void *addr)
         return;
     }
     lispobj *object_start;
+    lispobj descriptor;
 
 #if GENCGC_IS_PRECISE
     /* If we're in precise gencgc (non-x86oid as of this writing) then
@@ -1895,22 +1895,24 @@ preserve_pointer(void *addr)
                             (page_single_obj_p(page) &&
                              page_table[page].pinned)))
         return;
-     object_start = native_pointer((lispobj)addr);
-     switch (widetag_of(object_start)) {
-     case SIMPLE_FUN_WIDETAG:
+    descriptor = (lispobj)addr;
+    object_start = native_pointer(descriptor);
+    switch (widetag_of(object_start)) {
+    case SIMPLE_FUN_WIDETAG:
 #ifdef RETURN_PC_WIDETAG
-     case RETURN_PC_WIDETAG:
+    case RETURN_PC_WIDETAG:
 #endif
-         object_start = fun_code_header(object_start);
-     }
+        object_start = fun_code_header(object_start);
+    }
 #else
     if ((object_start = conservative_root_p((lispobj)addr, page)) == NULL)
         return;
+    descriptor = compute_lispobj(object_start);
 #endif
 
     if (!compacting_p()) {
         /* Just mark it.  No distinction between large and small objects. */
-        gc_mark_obj(compute_lispobj(object_start));
+        gc_mark_obj(descriptor);
         return;
     }
 
@@ -1931,7 +1933,7 @@ preserve_pointer(void *addr)
     if (page_single_obj_p(first_page))
         maybe_adjust_large_object(first_page, nwords);
     else
-        pin_object(object_start);
+        pin_object(descriptor);
 }
 
 
