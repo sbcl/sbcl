@@ -1464,3 +1464,28 @@
      test key
      1)
    :allow-notes nil))
+
+(with-test (:name :stack-alloc-p
+            :skipped-on (or (not :stack-allocatable-lists)
+                            (not :sb-thread)))
+  (let* ((sem1 (sb-thread:make-semaphore))
+         (sem2 (sb-thread:make-semaphore))
+         (blah nil)
+         (thread
+          (sb-thread:make-thread
+           (lambda ()
+             (sb-int:dx-let ((a (cons 1 2)))
+               (setq blah a)
+               (sb-thread:signal-semaphore sem1)
+               (sb-thread:wait-on-semaphore sem2))
+             'yay))))
+    ;; thread1 will assign something on its stack into BLAH
+    (sb-thread:wait-on-semaphore sem1)
+    (assert blah)
+    ;; not on my stack
+    (assert (not (sb-thread:stack-allocated-p blah)))
+    ;; but on their stack
+    (assert (eq (sb-thread:stack-allocated-p blah t) thread))
+    (setq blah nil) ; be safe, don't look at other stacks
+    (sb-thread:signal-semaphore sem2)
+    (sb-thread:join-thread thread)))

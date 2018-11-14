@@ -108,7 +108,10 @@
                                          (if rest-p "-OFFSET" "-SLOT"))))
             (constants `(defconstant ,offset-sym ,offset))
             (when special
-              (specials `(defvar ,special))))
+              (specials `(progn
+                           (defvar ,special)
+                           (setf (info :variable :always-bound ',special)
+                                 :always-bound)))))
           (when ref-trans
             (when ref-known-p
               (forms `(defknown ,ref-trans (,type) ,slot-type ,ref-known)))

@@ -202,12 +202,6 @@ arbitrary printable objects, and need not be unique.")
 (defmethod print-object ((mutex mutex) stream)
   (print-lock mutex (mutex-name mutex) (mutex-owner mutex) stream))
 
-(defun thread-alive-p (thread)
-  "Return T if THREAD is still alive. Note that the return value is
-potentially stale even before the function returns, as the thread may exit at
-any time."
-  (thread-%alive-p thread))
-
 ;; NB: ephemeral threads must terminate strictly before the test of NTHREADS>1
 ;; in DEINIT, i.e. this is not a promise that the thread will terminate
 ;; just-in-time for the final call out to save, but rather by an earlier time.
@@ -273,6 +267,10 @@ created and old ones may exit at any time."
           (thread-primitive-thread thread) (sap-int (current-thread-sap))
           *initial-thread* thread
           *current-thread* thread)
+    (setf (thread-control-stack-start thread)
+          (get-lisp-obj-address sb!vm:*control-stack-start*)
+          (thread-control-stack-end thread)
+          (get-lisp-obj-address sb!vm:*control-stack-end*))
     (grab-mutex (thread-result-lock *initial-thread*))
     ;; Either *all-threads* is empty or it contains exactly one thread
     ;; in case we are in reinit since saving core with multiple
@@ -1331,7 +1329,7 @@ on this semaphore, then N of them is woken up."
     (setf (thread-%alive-p thread) nil)
     (setf (thread-os-thread thread)
           (ldb (byte sb!vm:n-word-bits 0) -1))
-    (setq *all-threads* (delq thread *all-threads*))
+    (setq *all-threads* (delq1 thread *all-threads*))
     (when *session*
       (%delete-thread-from-session thread *session*))))
 
@@ -1507,6 +1505,12 @@ session."
 
 ;;;; The beef
 
+;;; One must parse this name carefully: it is the initial "thread function trampoline",
+;;; and not the "initial thread" "function trampoline".
+;;; i.e. there is an initial thread, which DOES NOT start via this function.
+;;; All threads other than the initial thread DO start via this function.
+;;; The initial thread has its own way of doing things, which ends up calling
+;;; INIT-INITIAL-THREAD.  It might be nice to come up with some better naming.
 #!+sb-thread
 (defun initial-thread-function-trampoline (thread setup-sem real-function arguments)
   ;; Can't initiate GC before *current-thread* is set, otherwise the
@@ -1515,6 +1519,10 @@ session."
   (setf *current-thread* thread ; is thread-local already
         (thread-os-thread thread) (current-thread-os-thread)
         (thread-primitive-thread thread) (sap-int (current-thread-sap)))
+  (setf (thread-control-stack-start thread)
+        (get-lisp-obj-address sb!vm:*control-stack-start*)
+        (thread-control-stack-end thread)
+        (get-lisp-obj-address sb!vm:*control-stack-end*))
   ;; *ALLOC-SIGNAL* is made thread-local by create_thread_struct()
   ;; so this assigns into TLS, not the global value.
   (setf sb!vm:*alloc-signal* *default-alloc-signal*)

@@ -775,29 +775,11 @@ Experimental: interface subject to change."
   ;; for mapping over parts of arbitrary objects so users can get "deep sizes"
   ;; as well if they want to.
   ;;
-  ;; FIXME: For the memoization use-case possibly we should also provide a
-  ;; simpler HEAP-ALLOCATED-P, since that doesn't require disabling the GC
-  ;; scanning threads for negative answers? Similarly, STACK-ALLOCATED-P for
-  ;; checking if an object has been stack-allocated by a given thread for
-  ;; testing purposes might not come amiss.
   (if (not (sb-vm:is-lisp-pointer (get-lisp-obj-address object)))
       (values :immediate nil)
       (let ((plist
              (sb-sys:with-pinned-objects (object)
-               (let* ((addr (get-lisp-obj-address object))
-                      (space
-                       (cond ((< (current-dynamic-space-start) addr
-                                 (sb-sys:sap-int (dynamic-space-free-pointer)))
-                              :dynamic)
-                             #+immobile-space
-                             ((immobile-space-addr-p addr)
-                              :immobile)
-                             ((< sb-vm:read-only-space-start addr
-                                 (sb-sys:sap-int sb-vm:*read-only-space-free-pointer*))
-                              :read-only)
-                             ((< sb-vm:static-space-start addr
-                                 (sb-sys:sap-int sb-vm:*static-space-free-pointer*))
-                              :static))))
+               (let ((space (sb-thread:heap-allocated-p object)))
                  (when space
                    #+gencgc
                    (if (eq :dynamic space)
@@ -806,7 +788,8 @@ Experimental: interface subject to change."
                          ;; bits are packed in the opposite order. And thankfully,
                          ;; this fix seems not to depend on whether the numbering
                          ;; scheme is MSB 0 or LSB 0, afaict.
-                         (let* ((index (sb-vm:find-page-index addr))
+                         (let* ((index (sb-vm:find-page-index
+                                        (get-lisp-obj-address object)))
                                 (flags (sb-alien:slot page 'sb-vm::flags))
                                 .
                                 ;; The unused WP-CLR is for ease of counting
@@ -834,27 +817,16 @@ Experimental: interface subject to change."
         (cond (plist
                (values :heap plist))
               (t
-               (let ((sap (sb-sys:int-sap (get-lisp-obj-address object))))
-                 ;; FIXME: Check other stacks as well.
-                 #+sb-thread
-                 (dolist (thread (sb-thread:list-all-threads))
-                   (let ((c-start (descriptor-sap
-                                   (sb-thread::%symbol-value-in-thread
-                                    'sb-vm:*control-stack-start*
-                                    thread)))
-                         (c-end (descriptor-sap
-                                 (sb-thread::%symbol-value-in-thread
-                                  'sb-vm:*control-stack-end*
-                                  thread))))
-                     (when (and c-start c-end)
-                       (when (and (sb-sys:sap<= c-start sap)
-                                  (sb-sys:sap< sap c-end))
-                         (return-from allocation-information
-                           (values :stack thread))))))
-                 #-sb-thread
-                 (when (sb-vm:control-stack-pointer-valid-p sap nil)
+               #+sb-thread
+               (let ((thread (sb-thread:stack-allocated-p object t)))
+                 (when thread
                    (return-from allocation-information
-                     (values :stack sb-thread::*current-thread*))))
+                     (values :stack thread))))
+               #-sb-thread
+               (when (sb-vm:control-stack-pointer-valid-p
+                      (sb-sys:int-sap (get-lisp-obj-address object)) nil)
+                 (return-from allocation-information
+                   (values :stack sb-thread::*current-thread*)))
                :foreign)))))
 
 (defun map-root (function object &key simple (ext t))
