@@ -1186,9 +1186,7 @@
           (return))
 
         ;; Don't deposit any more than there are.
-        (if (zerop i)
-            (inst test rcx-tn rcx-tn)
-            (inst cmp rcx-tn (fixnumize i)))
+        (inst cmp :dword rcx-tn (fixnumize i))
         (inst jmp :eq DONE)))
 
     (inst jmp DONE)
