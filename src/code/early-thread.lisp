@@ -34,12 +34,6 @@ in future versions."
   (result-lock
    (make-mutex :name "thread result lock")
    :type mutex)
-  ;; Arguably these are redundant, since the C code can, in theory,
-  ;; look at *CURRENT-THREAD* in any 'struct thread' to get the Lisp
-  ;; structure, and then read slots of that structure.
-  ;; However, there's a chicken-and-egg problem there.
-  (control-stack-start 0 :type sb!vm:word)
-  (control-stack-end 0 :type sb!vm:word)
   waiting-for)
 
 (declaim (inline thread-alive-p))

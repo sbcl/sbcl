@@ -779,7 +779,7 @@ Experimental: interface subject to change."
       (values :immediate nil)
       (let ((plist
              (sb-sys:with-pinned-objects (object)
-               (let ((space (sb-thread:heap-allocated-p object)))
+               (let ((space (sb-ext:heap-allocated-p object)))
                  (when space
                    #+gencgc
                    (if (eq :dynamic space)
@@ -818,7 +818,7 @@ Experimental: interface subject to change."
                (values :heap plist))
               (t
                #+sb-thread
-               (let ((thread (sb-thread:stack-allocated-p object t)))
+               (let ((thread (sb-ext:stack-allocated-p object t)))
                  (when thread
                    (return-from allocation-information
                      (values :stack thread))))

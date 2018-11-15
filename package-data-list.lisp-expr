@@ -682,6 +682,8 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "GET-TIME-OF-DAY"
 
                ;; People have various good reasons to mess with the GC.
+               "HEAP-ALLOCATED-P"
+               "STACK-ALLOCATED-P"
                "*AFTER-GC-HOOKS*"
                "BYTES-CONSED-BETWEEN-GCS"
                "GC" "GET-BYTES-CONSED"
@@ -1028,6 +1030,13 @@ possibly temporarily, because it might be used internally."
                "SSET" "SSET-ELEMENT"
                "SSET-ADJOIN" "SSET-DELETE" "SSET-EMPTY" "SSET-COUNT"
                "SSET-MEMBER"
+
+               ;; Treaps
+               ;; the finders/accesors are for a generic binary-search-tree
+               ;; (in the event that we have more than one), but the mutators
+               ;; refer specifically to what flavor of tree it is.
+               "BST-FIND" "BST-FIND<=" "BST-NODE-DATA"
+               "TREAP-INSERT" "TREAP-DELETE"
 
                ;; communication between the runtime and Lisp
                "*CORE-STRING*"

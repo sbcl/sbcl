@@ -456,12 +456,23 @@ information."
            "error printing dynamic-extent object")))
       obj))
 
-(defun stack-allocated-p (obj)
-  "Returns T if OBJ is allocated on the stack of the current
-thread, NIL otherwise."
-  (let ((sap (int-sap (get-lisp-obj-address obj))))
-    (when (sb!vm:control-stack-pointer-valid-p sap nil)
-      t)))
+;;; If X is stack-allocated and on the current thread's stack, then return
+;;; the value of *current-thread*. Otherwise, if ALL-THREADS is T, then
+;;; look for X on any stack, returning the thread that contains it.
+;;; If X is not stack-allocated, or allocated on a different thread's stack
+;;; when ALL-THREADS is NIL, then return NIL.
+(defun stack-allocated-p (x &optional all-threads)
+  (let ((a (get-lisp-obj-address x)))
+    (and (sb!vm:is-lisp-pointer a)
+         (cond ((and (<= (get-lisp-obj-address sb!vm:*control-stack-start*) a)
+                     (< a (get-lisp-obj-address sb!vm:*control-stack-end*)))
+                sb!thread:*current-thread*)
+               (all-threads
+                ;; find a stack whose base is nearest and below A.
+                (binding* ((node (bst-find<= a sb!thread::*stack-addr-table*) :exit-if-null)
+                           (data (bst-node-data node)))
+                  (when (< a (car data))
+                    (cdr data))))))))
 
 ;;;; frame printing
 

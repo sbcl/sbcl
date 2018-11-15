@@ -99,6 +99,12 @@
   ;; And be extra paranoid - ensure that it really gets called.
   (locally (declare (notinline fboundp)) (fboundp '(setf !zzzzzz)))
 
+  ;; Anyone might call RANDOM to initialize a hash value or something;
+  ;; and there's nothing which needs to be initialized in order for
+  ;; this to be initialized, so we initialize it right away.
+  ;; Indeed, INIT-INITIAL-THREAD needs a random number.
+  (show-and-call !random-cold-init)
+
   ;; Ensure that *CURRENT-THREAD* and *HANDLER-CLUSTERS* have sane values.
   ;; create_thread_struct() assigned NIL/unbound-marker respectively.
   (sb!thread::init-initial-thread)
@@ -122,11 +128,6 @@
   ;; *RAW-SLOT-DATA* is essentially a compile-time constant
   ;; but isn't dumpable as such because it has functions in it.
   (show-and-call sb!kernel::!raw-slot-data-init)
-
-  ;; Anyone might call RANDOM to initialize a hash value or something;
-  ;; and there's nothing which needs to be initialized in order for
-  ;; this to be initialized, so we initialize it right away.
-  (show-and-call !random-cold-init)
 
   ;; Must be done before any non-opencoded array references are made.
   (show-and-call sb!vm::!hairy-data-vector-reffer-init)

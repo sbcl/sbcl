@@ -468,3 +468,27 @@ Experimental: interface subject to change."
 (defun sb!vm:is-lisp-pointer (addr) ; Same as is_lisp_pointer() in C
   #!-64-bit (oddp addr)
   #!+64-bit (not (logtest (logxor addr 3) 3)))
+
+;;; Return true if X is in any non-stack GC-managed space.
+;;; (Non-stack implies not TLS nor binding stack)
+;;; This assumes a single contiguous dynamic space, which is of course a
+;;; bad assumption, but nonetheless one that has been true for, say, ~20 years.
+;;; Also note, we don't have to pin X - an object can not move between spaces,
+;;; so a non-nil answer is the definite answer. As to whether the object could
+;;; have moved, or worse, died - by say reusing the same register as held X for
+;;; the value that is (get-lisp-obj-address X), with no surrounding pin or even
+;;; reference to X - then that's your problem.
+;;; If you wanted the object not to die or move, you should have held on tighter!
+(defun heap-allocated-p (x)
+  (let ((addr (get-lisp-obj-address x)))
+    (and (sb!vm:is-lisp-pointer addr)
+         (cond ((< (current-dynamic-space-start) addr
+                   (sap-int (dynamic-space-free-pointer)))
+                :dynamic)
+               ((immobile-space-addr-p addr) :immobile)
+               ((< sb!vm:read-only-space-start addr
+                   (sap-int sb!vm:*read-only-space-free-pointer*))
+                :read-only)
+               ((< sb!vm:static-space-start addr
+                   (sap-int sb!vm:*static-space-free-pointer*))
+                :static)))))

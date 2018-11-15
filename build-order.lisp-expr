@@ -631,7 +631,8 @@
 
  ("src/code/early-step")                  ; target-thread needs *STEP-OUT*
 
- ("src/code/gc"     :not-host)
+ ("src/code/gc"                :not-host)
+ ("src/code/target-bst"        :not-host)
  ("src/code/target-thread"     :not-host)
  ("src/code/timer" :not-host)
 
