@@ -1483,9 +1483,9 @@
     (sb-thread:wait-on-semaphore sem1)
     (assert blah)
     ;; not on my stack
-    (assert (not (sb-thread:stack-allocated-p blah)))
+    (assert (not (sb-ext:stack-allocated-p blah)))
     ;; but on their stack
-    (assert (eq (sb-thread:stack-allocated-p blah t) thread))
+    (assert (eq (sb-ext:stack-allocated-p blah t) thread))
     (setq blah nil) ; be safe, don't look at other stacks
     (sb-thread:signal-semaphore sem2)
     (sb-thread:join-thread thread)))
