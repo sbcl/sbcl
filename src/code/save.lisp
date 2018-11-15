@@ -204,7 +204,6 @@ sufficiently motivated to do lengthy fixes."
                (if value 1 0)))
       (let ((name (native-namestring (physicalize-pathname core-file-name)
                                      :as-file t)))
-        (tune-image-for-dump)
         (deinit)
         ;; FIXME: Would it be possible to unmix the PURIFY logic from this
         ;; function, and just do a GC :FULL T here? (Then if the user wanted
@@ -286,7 +285,7 @@ sufficiently motivated to do lengthy fixes."
              (setf (sb-kernel:%simple-fun-type fun)
                    (ensure-gethash type type-hash type))))))
      :all))
-  (sb-c::coalesce-debug-sources)
+  (sb-c::coalesce-debug-info)
   #+sb-fasteval (sb-interpreter::flush-everything)
   (tune-hashtable-sizes-of-all-packages))
 
@@ -305,6 +304,7 @@ sufficiently motivated to do lengthy fixes."
         (error 'save-with-multiple-threads-error
                :interactive-threads interactive
                :other-threads other))))
+  (tune-image-for-dump)
   (float-deinit)
   (profile-deinit)
   (foreign-deinit)
@@ -437,12 +437,13 @@ sufficiently motivated to do lengthy fixes."
                  (setf (svref obj 1) 1)))))))))) ; set need-to-rehash
 
 sb-c::
-(defun coalesce-debug-sources ()
+(defun coalesce-debug-info ()
   (flet ((debug-source= (a b)
            (and (equal (debug-source-plist a) (debug-source-plist b))
                 (eql (debug-source-created a) (debug-source-created b))
                 (eql (debug-source-compiled a) (debug-source-compiled b)))))
-    (let ((ht (make-hash-table :test 'equal)))
+    (let ((source-ht (make-hash-table :test 'equal))
+          (name-ht (make-hash-table :test 'equal)))
       (sb-vm:map-allocated-objects
        (lambda (obj type size)
          (declare (ignore type size))
@@ -451,12 +452,24 @@ sb-c::
              (typecase source
                (core-debug-source) ; skip
                (debug-source
-                (let ((canonical-repr
-                       (find-if (lambda (x) (debug-source= x source))
-                                (gethash (debug-source-namestring source) ht))))
+                (let* ((namestring (debug-source-namestring source))
+                       (canonical-repr
+                        (find-if (lambda (x) (debug-source= x source))
+                                 (gethash namestring source-ht))))
                   (cond ((not canonical-repr)
-                         (push source (gethash (debug-source-namestring source) ht)))
+                         (push source (gethash namestring source-ht)))
                         ((neq source canonical-repr)
                          (setf (compiled-debug-info-source obj)
-                               canonical-repr)))))))))
+                               canonical-repr)))))))
+           (let ((fun-map (compiled-debug-info-fun-map obj)))
+             (loop for i from 0 below (length fun-map) by 2
+                   do (binding* ((debug-fun (svref fun-map i))
+                                 (name (compiled-debug-fun-name debug-fun))
+                                 ((new foundp) (gethash name name-ht)))
+                        (cond ((not foundp)
+                               (setf (gethash name name-ht) name))
+                              ((neq name new)
+                               (setf (%instance-ref debug-fun
+                                      (get-dsd-index compiled-debug-fun name))
+                                     new))))))))
        :all))))
