@@ -98,8 +98,9 @@
 ;;; This test needs dynamic-extent to work properly.
 ;;; (I don't know what platforms it passes on, but at least these two it does)
 (with-test (:name :repeatably-count-allocated-objects
-            :skipped-on (not (or :x86 :x86-64))
-            :fails-on (or :interpreter (not :sb-thread)))
+            :skipped-on (or (not (or :x86 :x86-64))
+                            :interpreter)
+            :fails-on (not :sb-thread))
   (let ((a (make-array 5)))
     (dotimes (i (length a))
       (setf (aref a i) (count-dynamic-space-objects))
