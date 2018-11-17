@@ -147,7 +147,8 @@
 (defstruct (lvar-function-annotation
              (:include lvar-annotation)
              (:copier nil))
-  type)
+  type
+  context)
 
 (defmethod print-object ((x lvar) stream)
   (print-unreadable-object (x stream :type t :identity t)

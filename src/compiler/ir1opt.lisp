@@ -2116,20 +2116,21 @@
         sum nvals))
 
 (defun check-mv-call-arguments (call)
-  (let ((*compiler-error-context* call)
-        (max-accepted (nth-value 1 (fun-type-nargs
-                                    (lvar-fun-type
-                                     (basic-combination-fun call)))))
-        (min-args (count-values call t)))
-    (cond ((not min-args))
-          ((and max-accepted (> min-args max-accepted))
-           (compiler-warn
-            "MULTIPLE-VALUE-CALL with at least ~R values when the function expects ~
-              at most ~R."
-            min-args max-accepted)
-           (setf (basic-combination-kind call) :error)
-           nil)
-          (t))))
+  (let* ((*compiler-error-context* call)
+         (fun (basic-combination-fun call))
+         (min-args (count-values call t)))
+    (when min-args
+      (multiple-value-bind (min-accepted max-accepted) (fun-type-nargs (lvar-fun-type fun))
+        (when (or (not min-accepted)
+                  (and max-accepted
+                       (> min-args max-accepted)))
+          (assert-lvar-type fun
+                            (specifier-type (list 'function
+                                                  (append (make-list min-args :initial-element 't)
+                                                          '(&rest t))))
+                            (lexenv-policy (node-lexenv call))
+                            :mv-call))))))
+
 
 (defun ir1-optimize-mv-call (node)
   (let* ((fun (basic-combination-fun node))

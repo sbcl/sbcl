@@ -477,18 +477,30 @@
   (let ((atype (lvar-function-annotation-type annotation)))
     (multiple-value-bind (type name leaf) (lvar-fun-type lvar)
       (when (fun-type-p type)
-        (let ((int (type-intersection type atype)))
-          (when (or (memq *empty-type* (fun-type-required int))
-                    (and (eq (fun-type-returns int) *empty-type*)
-                         (neq (fun-type-returns type) *empty-type*)
-                         (not (and (eq (fun-type-returns atype) *empty-type*)
-                                   (eq (fun-type-returns type) *wild-type*)))))
-            (%compile-time-type-error-warn annotation
-                                           (type-specifier atype)
-                                           (type-specifier type)
-                                           (list name)
-                                           :condition
-                                           (callable-argument-lossage-kind name
-                                                                           leaf
-                                                                           'type-style-warning
-                                                                           'type-warning))))))))
+        (let ((condition (callable-argument-lossage-kind name
+                                                         leaf
+                                                         'type-style-warning
+                                                         'type-warning)))
+          (if (eq (lvar-function-annotation-context annotation) :mv-call)
+              (let* ((*compiler-error-context* annotation)
+                     (max-accepted (nth-value 1 (fun-type-nargs (lvar-fun-type lvar))))
+                     (min-args (fun-type-nargs atype)))
+                (when (and max-accepted
+                           (> min-args max-accepted))
+                  (warn condition
+                        :format-control
+                        "~@<MULTIPLE-VALUE-CALL calls ~a with with at least ~R ~
+                              values when it expects at most ~R.~@:>"
+                        :format-arguments (list name min-args
+                                                max-accepted))))
+              (let ((int (type-intersection type atype)))
+                (when (or (memq *empty-type* (fun-type-required int))
+                          (and (eq (fun-type-returns int) *empty-type*)
+                               (neq (fun-type-returns type) *empty-type*)
+                               (not (and (eq (fun-type-returns atype) *empty-type*)
+                                         (eq (fun-type-returns type) *wild-type*)))))
+                  (%compile-time-type-error-warn annotation
+                                                 (type-specifier atype)
+                                                 (type-specifier type)
+                                                 (list name)
+                                                 :condition condition)))))))))

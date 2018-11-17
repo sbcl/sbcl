@@ -2788,7 +2788,8 @@ is :ANY, the function name is not checked."
     ;; but we still want to check the full type at compile time.
     (add-annotation value
                     (make-lvar-function-annotation
-                     :type type)))
+                     :type type
+                     :context (shiftf context nil))))
   (%make-cast :asserted-type type
               :type-to-check (maybe-weaken-check type policy)
               :value value

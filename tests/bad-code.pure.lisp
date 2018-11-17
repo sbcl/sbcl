@@ -89,12 +89,13 @@
                     (apply #'%f1 a 2 (list 0))))
                :allow-warnings t))))
 
-(with-test (:name :mv-call-too-many-values)
+(with-test (:name :mv-call-too-many-values.closure)
   (assert
    (nth-value 1
               (checked-compile
-               `(lambda ()
-                  (make-array (list 'x)))
+               `(lambda (a b)
+                  (flet ((%f1 () b))
+                    (apply #'%f1 a 2 (list 0))))
                :allow-warnings t))))
 
 (with-test (:name (map :values-type))
@@ -144,6 +145,14 @@
                   (make-array '(0 . 2)
                               :element-type 'fixnum
                               :adjustable t))
+               :allow-warnings t))))
+
+(with-test (:name (make-array :bad-dimensions.4))
+  (assert
+   (nth-value 1
+              (checked-compile
+               `(lambda ()
+                  (make-array (list 'x)))
                :allow-warnings t))))
 
 (with-test (:name (make-array :initial-contents :bad-macro))
