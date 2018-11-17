@@ -434,3 +434,17 @@
           10
           (funcall x)))
    ((nil) (condition 'undefined-function))))
+
+(with-test (:name (:valid-callable-argument :toplevel-xep))
+  (assert (nth-value 2 (checked-compile `(lambda (l) (find-if (lambda ()) l))
+                                        :allow-warnings t))))
+
+(with-test (:name (:valid-callable-argument :handler-bind))
+  (assert (nth-value 2 (checked-compile
+                        `(lambda (l) (handler-bind ((error (lambda ()))) (funcall l)))
+                        :allow-warnings t))))
+
+(with-test (:name (:valid-callable-argument :closure))
+  (assert (nth-value 2 (checked-compile
+                        `(lambda (l) (the (function (t)) (lambda () l)))
+                        :allow-warnings t))))
