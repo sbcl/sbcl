@@ -1819,3 +1819,11 @@
                           (f))))
                 (let ((x o)) x)))))))
    ((10 20) 10)))
+
+(with-test (:name :lambda-let-inline)
+  (let ((fun (checked-compile
+              `(lambda ()
+                 (let ((x (lambda () 1)))
+                   (funcall x))))))
+    (assert (null (ctu:find-anonymous-callees fun)))
+    (assert (= (funcall fun) 1))))

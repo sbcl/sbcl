@@ -526,7 +526,7 @@
 
 (with-test (:name (make-array :erroneous-type-specifiers))
   (dolist (atom '(signed-byte unsigned-byte))
-    (assert (handler-case (make-array 10 :element-type `(,atom "oops"))
+    (assert (handler-case (eval `(make-array 10 :element-type '(,atom "oops")))
               (error (c) (search (format nil "bad size specified for ~A" atom)
                                  (princ-to-string c)))
               (:no-error (obj) obj nil)))))
