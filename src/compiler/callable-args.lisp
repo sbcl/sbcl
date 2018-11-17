@@ -164,10 +164,6 @@
                                 (node-source-form use))
                                (t
                                 '.anonymous.))))))
-         (leaf (if (and (functional-p leaf)
-                        (eq (functional-kind leaf) :external))
-                   (functional-entry-fun leaf)
-                   leaf))
          (defined-type (and (global-var-p leaf)
                             (case (leaf-where-from leaf)
                               (:declared
@@ -183,12 +179,22 @@
                                    (proclaimed-ftype (leaf-%source-name leaf))))
                               (t
                                (global-var-defined-type leaf)))))
+         (entry-fun (if (and (functional-p leaf)
+                             (eq (functional-kind leaf) :external))
+                        (functional-entry-fun leaf)
+                        leaf))
          (lvar-type (cond ((and defined-type
                                 (neq defined-type *universal-type*))
                            defined-type)
-                          ((and (functional-p leaf)
-                                (fun-type-p (leaf-type leaf)))
-                           (leaf-type leaf))
+                          ((and (functional-p entry-fun)
+                                (fun-type-p (functional-type entry-fun)))
+                           (functional-type entry-fun))
+                          ((and (not (fun-type-p lvar-type))
+                                (lambda-p entry-fun)
+                                (lambda-tail-set entry-fun))
+                           (make-fun-type :wild-args t
+                                          :returns
+                                          (tail-set-type (lambda-tail-set entry-fun))))
                           (t
                            lvar-type)))
          (fun-name (cond ((or (fun-type-p lvar-type)

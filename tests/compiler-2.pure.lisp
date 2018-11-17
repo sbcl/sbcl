@@ -1245,6 +1245,16 @@
                 (funcall x)))))
           '(function (t) (values (integer 133 133) &optional)))))
 
+(with-test (:name :mv-call-lambda-type-derivation.closure)
+  (assert
+   (equal (sb-kernel:%simple-fun-type
+           (checked-compile
+            '(lambda (x)
+              (multiple-value-call
+                  (lambda () (print x) 133)
+                (funcall x)))))
+          '(function (t) (values (integer 133 133) &optional)))))
+
 (with-test (:name :constant-folding-and-hairy-types)
   (checked-compile-and-assert
       ()
