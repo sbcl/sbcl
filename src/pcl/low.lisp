@@ -90,14 +90,15 @@
 (defun fsc-instance-p (fin)
   (funcallable-instance-p fin))
 (defmacro fsc-instance-slots (fin)
-  `(%funcallable-instance-info
-    ,fin ,(get-dsd-index standard-funcallable-instance clos-slots)))
+  `(truly-the simple-vector
+              (%funcallable-instance-info
+               ,fin ,(get-dsd-index standard-funcallable-instance clos-slots))))
 
 (declaim (inline clos-slots-ref (setf clos-slots-ref)))
-(declaim (ftype (function (simple-vector index) t) clos-slots-ref))
+(declaim (ftype (function (simple-vector t) t) clos-slots-ref))
 (defun clos-slots-ref (slots index)
   (svref slots index))
-(declaim (ftype (function (t simple-vector index) t) (setf clos-slots-ref)))
+(declaim (ftype (function (t simple-vector t) t) (setf clos-slots-ref)))
 (defun (setf clos-slots-ref) (new-value slots index)
   (setf (svref slots index) new-value))
 
@@ -179,7 +180,7 @@
 ;;; FIXME: what does the preceding comment mean? You can't use instance-slots
 ;;; on a structure. (Consider especially a structure of 0 slots.)
 (defmacro std-instance-slots (x)
-  `(%instance-ref ,x ,(get-dsd-index standard-instance slots)))
+  `(truly-the simple-vector (%instance-ref ,x ,(get-dsd-index standard-instance slots))))
 
 ;;; FIXME: These functions are called every place we do a
 ;;; CALL-NEXT-METHOD, and probably other places too. It's likely worth
