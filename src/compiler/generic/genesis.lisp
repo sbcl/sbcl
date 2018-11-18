@@ -1455,7 +1455,12 @@ core and return a descriptor to it."
       ;; pass 3: set the 'used-by' lists
       (dolist (cell target-pkg-list)
         (write-slots (cadr cell) package-layout
-                     :%used-by-list (list-to-core (cddr cell)))))))
+                     :%used-by-list (list-to-core (cddr cell))))
+      ;; finally, assign *PACKAGE* since it supposed to be always-bound
+      ;; and various things assume that it is. e.g. FIND-PACKAGE has an
+      ;; (IF (BOUNDP '*PACKAGE*)) test which the compiler could elide as
+      ;; tautologically true if it wanted to.
+      (cold-set '*package* (find-cold-package "COMMON-LISP-USER")))))
 
 ;;; sanity check for a symbol we're about to create on the target
 ;;;

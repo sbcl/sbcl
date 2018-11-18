@@ -41,11 +41,8 @@
   (let ((fun (if (functionp hook)
                  hook
                  ;; We need to get the function named by the designator.
-                 ;; The type proclamation in 'cl-specials' seems to think
-                 ;; that SETF functions are permitted here, though that
-                 ;; really seems like a bug. If it is permitted,
-                 ;; we can't use SYMBOL-FUNCTION. But using FDEFINITION
-                 ;; would strip encapsulations, so use %COERCE-NAME-TO-FUN.
+                 ;; Use %COERCE-NAME-TO-FUN instead of FDEFINITION here
+                 ;; to avoid stripping off an encapsulation.
                  ;; (This allows tracing the macroexpand-hook, e.g.)
                  (and (fboundp hook)
                       #+sb-xc-host (fdefinition hook)

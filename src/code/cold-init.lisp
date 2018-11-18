@@ -184,7 +184,8 @@
   (setq sb!impl::*default-external-format* :latin-1)
 
   (!with-init-wrappers
-    (loop for index-in-cold-toplevels from 0
+    (loop with *package* = *package* ; rebind to self, as if by LOAD
+          for index-in-cold-toplevels from 0
           for toplevel-thing in (prog1 *!cold-toplevels*
                                  (makunbound '*!cold-toplevels*))
         do
@@ -269,9 +270,6 @@
   (setf sb!debug:*debug-readtable* (copy-readtable *standard-readtable*))
   (sb!pretty:!pprint-cold-init)
   (setq *print-level* nil *print-length* nil) ; restore defaults
-
-  ;; the ANSI-specified initial value of *PACKAGE*
-  (setf *package* (find-package "COMMON-LISP-USER"))
 
   ;; Enable normal (post-cold-init) behavior of INFINITE-ERROR-PROTECT.
   (setf sb!kernel::*maximum-error-depth* 10)

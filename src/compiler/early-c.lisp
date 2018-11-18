@@ -230,8 +230,8 @@ the stack without triggering overflow protection.")
                 :format-arguments (list symbol)))
   (values))
 
-(def!struct (debug-name-marker (:print-function print-debug-name-marker)
-                               (:copier nil)))
+(defstruct (debug-name-marker (:print-function print-debug-name-marker)
+                              (:copier nil)))
 
 (defvar *debug-name-level* 4)
 (defvar *debug-name-length* 12)
