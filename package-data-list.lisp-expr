@@ -1074,6 +1074,7 @@ possibly temporarily, because it might be used internally."
                "SHOW-INFO"
                "UPDATE-SYMBOL-INFO"
                "WITH-GLOBALDB-NAME"
+               "%BOUNDP"
 
                ;; Calling a list of hook functions, plus error handling.
                "CALL-HOOKS"

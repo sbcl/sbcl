@@ -286,7 +286,7 @@ evaluated as a PROGN."
      (%defvar ',var
               (sb!c:source-location)
               ,@(and valp
-                     `((unless (boundp ',var) ,val)))
+                     `((unless (%boundp ',var) ,val)))
               ,@(and docp
                      `(',doc)))))
 

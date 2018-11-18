@@ -241,14 +241,8 @@ the stack without triggering overflow protection.")
 
 (defmethod make-load-form ((marker debug-name-marker) &optional env)
   (declare (ignore env))
-  (cond ((eq marker *debug-name-sharp*)
-         `(if (boundp '*debug-name-sharp*)
-              *debug-name-sharp*
-              (make-debug-name-marker)))
-        ((eq marker *debug-name-ellipsis*)
-         `(if (boundp '*debug-name-ellipsis*)
-              *debug-name-ellipsis*
-              (make-debug-name-marker)))
+  (cond ((eq marker *debug-name-sharp*) '*debug-name-sharp*)
+        ((eq marker *debug-name-ellipsis*) '*debug-name-ellipsis*)
         (t
          (warn "Dumping unknown debug-name marker.")
          '(make-debug-name-marker))))

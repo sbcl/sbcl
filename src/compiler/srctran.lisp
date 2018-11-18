@@ -5116,6 +5116,15 @@
         symbol
         (give-up-ir1-transform))))
 
+(deftransform boundp ((symbol) ((constant-arg symbol)))
+  (let* ((symbol (lvar-value symbol))
+         (kind (info :variable :kind symbol)))
+    (if (or (always-boundp symbol)
+            (and (eq kind :constant)
+                 (or (boundp symbol) (producing-fasl-file))))
+        t
+        (give-up-ir1-transform))))
+
 (flet ((xform (symbol match-kind)
          (let* ((symbol (lvar-value symbol))
                 (kind (info :variable :kind symbol)))

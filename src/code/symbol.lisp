@@ -26,6 +26,11 @@
   "Return non-NIL if SYMBOL is bound to a value."
   (boundp symbol))
 
+;;; Same as BOUNDP but without a transform. Used for initialization forms
+;;; to avoid a local notinline decl on BOUNDP in the expansion of DEFVAR etc.
+(defun %boundp (symbol)
+  (boundp symbol))
+
 (defun set (symbol new-value)
   "Set SYMBOL's value cell to NEW-VALUE."
   (declare (type symbol symbol))

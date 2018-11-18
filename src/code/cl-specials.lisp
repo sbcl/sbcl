@@ -158,7 +158,7 @@ See also the declarations SB-EXT:GLOBAL and SB-EXT:ALWAYS-BOUND."
          (let ((,boundp (boundp ',name)))
            (%compiler-defglobal ',name :always-bound
                                 (unless ,boundp ,value) (not ,boundp))))
-       (let ((,boundp (boundp ',name)))
+       (let ((,boundp (%boundp ',name)))
          (%defglobal ',name (unless ,boundp ,value) ,boundp ',doc ,docp
                      (sb!c:source-location))))))
 
@@ -174,6 +174,6 @@ See also DEFGLOBAL which assigns the VALUE at compile-time too."
     `(progn
        (eval-when (:compile-toplevel)
          (%compiler-defglobal ',name :eventually nil nil))
-       (let ((,boundp (boundp ',name)))
+       (let ((,boundp (%boundp ',name)))
          (%defglobal ',name (unless ,boundp ,value) ,boundp ',doc ,docp
                      (sb!c:source-location))))))

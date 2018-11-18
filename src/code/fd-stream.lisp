@@ -2548,6 +2548,8 @@
   (setq *tty* nil *stdin* nil *stdout* nil *stderr* nil)
   ;; Unbind to make sure we're not accidently dealing with it
   ;; before we're ready (or after we think it's been deinitialized).
+  ;; This uses the internal %MAKUNBOUND because the CL: function would
+  ;; rightly complain that *AVAILABLE-BUFFERS* is proclaimed always bound.
   (%makunbound '*available-buffers*))
 
 (defun stdstream-external-format (fd)
@@ -2564,7 +2566,9 @@
 ;;; This is called whenever a saved core is restarted.
 (defun stream-reinit (&optional init-buffers-p)
   (when init-buffers-p
-    (aver (not (boundp '*available-buffers*)))
+    ;; Use the internal %BOUNDP for similar reason to that cited above-
+    ;; BOUNDP on a known global transforms to the constant T.
+    (aver (not (%boundp '*available-buffers*)))
     (setf *available-buffers* nil))
   (with-simple-output-to-string (*error-output*)
     (multiple-value-bind (in out err)
