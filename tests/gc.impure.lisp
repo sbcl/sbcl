@@ -359,3 +359,7 @@
            (assert (zerop (aref a serial)))
            (setf (aref a serial) 1))))
      :all)))
+
+#+gencgc
+(with-test (:name :traceroot-ignore-immediate)
+  (gc-and-search-roots (make-weak-pointer 48)))

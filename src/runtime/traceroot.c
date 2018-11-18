@@ -877,7 +877,7 @@ static int trace_paths(void (*context_scanner)(),
         lispobj car = CONS(weak_pointers)->car;
         lispobj value = ((struct weak_pointer*)native_pointer(car))->value;
         weak_pointers = CONS(weak_pointers)->cdr;
-        if (value != UNBOUND_MARKER_WIDETAG) {
+        if (is_lisp_pointer(value)) {
             if (heap_trace_verbose)
                 fprintf(stderr, "Target=%p (%s)\n", (void*)value, classify_obj(value));
             hopscotch_reset(&visited);
@@ -901,24 +901,31 @@ int gc_prove_liveness(void(*context_scanner)(),
                       int n_pins, uword_t* pins,
                       int criterion)
 {
-    int n_watched = 0, n_live = 0, n_bad = 0;
+    int n_watched = 0, n_live = 0, n_bad = 0, n_imm = 0;
     lispobj list;
     for (list = objects ; list != NIL && listp(list) ; list = CONS(list)->cdr) {
         ++n_watched;
         lispobj car = CONS(list)->car;
         if ((lowtag_of(car) != OTHER_POINTER_LOWTAG ||
-             widetag_of(native_pointer(car)) != WEAK_POINTER_WIDETAG))
+             widetag_of(native_pointer(car)) != WEAK_POINTER_WIDETAG)) {
             ++n_bad;
-        else
-            n_live += ((struct weak_pointer*)native_pointer(car))->value
-                != UNBOUND_MARKER_WIDETAG;
+            continue;
+        }
+        lispobj wpval = ((struct weak_pointer*)native_pointer(car))->value;
+        if (is_lisp_pointer(wpval))
+            ++n_live;
+        else if (wpval != UNBOUND_MARKER_WIDETAG)
+            ++n_imm;
     }
     if (!listp(list) || n_bad) {
         fprintf(stderr, "; Bad value in liveness tracker\n");
         return -1;
     }
-    fprintf(stderr, "; Liveness tracking: %d/%d live watched objects\n",
+    fprintf(stderr, "; Liveness tracking: %d/%d live watched objects",
             n_live, n_watched);
+    if (n_imm)
+        fprintf(stderr, " (ignored %d non-pointers)", n_imm);
+    putc('\n', stderr);
     if (!n_live)
         return 0;
     // Put back lowtags on pinned objects, since wipe_nonpinned_words() removed
