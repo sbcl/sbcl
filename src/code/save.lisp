@@ -267,6 +267,12 @@ sufficiently motivated to do lengthy fixes."
          (if shared-info
              (setf (info :function :info name) shared-info)
              (setf (gethash info ht) info))))))
+  ;; FIXME: we end up calling MAP-ALLOCATED-OBJECTS >= 3 times on save.
+  ;; It might be faster to have just one scan of the heap, with code
+  ;; that we can inject for each visited object.
+  ;; On the other hand, it does not seem important to change
+  ;; what is currently a reasonable factoring of the work.
+  ;;
   ;; Share similar simple-fun arglists and types
   ;; EQUALISH considers any two identically-spelled gensyms as EQ
   (let ((arglist-hash (make-hash-table :hash-function 'equal-hash
@@ -351,17 +357,12 @@ sufficiently motivated to do lengthy fixes."
          (table (make-hash-table :test 'equal))
          interned-ctypes
          referencing-objects)
-    (labels ((in-dynamic-space-p (obj)
-               (let ((a (get-lisp-obj-address obj)))
-                 (and (sb-vm:is-lisp-pointer a)
-                      (>= a dynspace-start)
-                      (< a dynspace-end))))
-             (interesting-subpart-p (part)
+    (labels ((interesting-subpart-p (part)
                ;; Heap objects can point to "dead" stack objects - those
                ;; from a no-longer-existing stack frame - so only examine
                ;; outgoing references within the dynamic space.
                ;; As to why the pointing object didn't die - who knows?
-               (and (in-dynamic-space-p part)
+               (and (heap-allocated-p part)
                     (typep part 'ctype)
                     ;; PART is not interesting if it points to an interned
                     ;; ctype, because that's already a canonical object.
