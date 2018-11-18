@@ -59,6 +59,17 @@ os_vm_size_t dynamic_space_size = DEFAULT_DYNAMIC_SPACE_SIZE;
 os_vm_size_t thread_control_stack_size = DEFAULT_CONTROL_STACK_SIZE;
 
 sword_t (*scavtab[256])(lispobj *where, lispobj object);
+
+// "Transport" functions are responsible for deciding where to copy an object
+// and how many bytes to copy (usually the sizing function is inlined into the
+// trans function, so we don't call a sizetab[] entry), allocating memory,
+// and calling memcpy. These functions generally do not deposit forwarding
+// pointers into the original object - that would be up to the scav_x_pointer
+// function - however, there are some exceptions:
+//  - trans_list() is responsible for leaving FPs for all cons cells that
+//    it copied while laying out a chain of consecutive conses.
+//  - trans_code() is responsible for leaving FPs for both the code object
+//    AND all embedded functions.
 static lispobj (*transother[64])(lispobj object);
 sword_t (*sizetab[256])(lispobj *where);
 struct weak_pointer *weak_pointer_chain = WEAK_POINTER_CHAIN_END;

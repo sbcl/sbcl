@@ -295,16 +295,11 @@ static inline int simple_vector_p(lispobj obj) {
            widetag_of((lispobj*)(obj-OTHER_POINTER_LOWTAG)) == SIMPLE_VECTOR_WIDETAG;
 }
 
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-#define HEADER_VALUE_MASKED(x) (HeaderValue(x) & SHORT_HEADER_MAX_WORDS)
-#else
-#define HEADER_VALUE_MASKED(x) HeaderValue(x)
-#endif
 static inline uword_t instance_length(lispobj header)
 {
-  return HEADER_VALUE_MASKED(header);
+  return HeaderValue(header) & SHORT_HEADER_MAX_WORDS;
 }
-#undef HEADER_VALUE_MASKED
+
 /* Define an assignable instance_layout() macro taking a native pointer */
 #ifndef LISP_FEATURE_COMPACT_INSTANCE_HEADER
 # define instance_layout(instance_ptr) (instance_ptr)[1]

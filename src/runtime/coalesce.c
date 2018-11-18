@@ -76,6 +76,13 @@ static boolean vector_isevery(boolean (*pred)(lispobj), struct vector* v)
     return 1;
 }
 
+/* FIXME: we should actually be even more careful about coalescing objects
+ * that appear as keys in hash-tables.  While we do take the precaution of
+ * updating the need-to-rehash indicator, we might create keys that compare
+ * the same under the table's comparator.  It seems like doing that could
+ * cause various kinds of weirdness in some applications. Nobody has reported
+ * misbehavior in the 10 months or so that coalescing has been the default,
+ * so it doesn't seem horribly bad, but does seem a bit broken */
 static void coalesce_obj(lispobj* where, struct hopscotch_table* ht)
 {
     lispobj ptr = *where;

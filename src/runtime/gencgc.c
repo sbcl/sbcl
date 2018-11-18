@@ -1841,6 +1841,33 @@ wipe_nonpinned_words()
 static void
 pin_object(lispobj object)
 {
+    if (!compacting_p()) {
+        gc_mark_obj(object);
+        return;
+    }
+
+    lispobj* object_start = native_pointer(object);
+    page_index_t first_page = find_page_index(object_start);
+    size_t nwords = OBJECT_SIZE(*object_start, object_start);
+    page_index_t last_page = find_page_index(object_start + nwords - 1);
+    page_index_t page;
+    // It would be better if it were possible to touch only the PTE for the
+    // first page of a large object instead of touching N page table entries.
+    // I'm not sure how well the rest of GC would handle that.
+    for (page = first_page; page <= last_page; ++page) {
+        /* Oldspace pages were unprotected at start of GC.
+         * Assert this here, because the previous logic used to,
+         * and page protection bugs are scary */
+        gc_assert(!page_table[page].write_protected);
+        /* Mark the page immovable. */
+        page_table[page].pinned = 1;
+    }
+
+    if (page_single_obj_p(first_page)) {
+        maybe_adjust_large_object(first_page, nwords);
+        return;
+    }
+
     if (!hopscotch_containsp(&pinned_objects, object)) {
         hopscotch_insert(&pinned_objects, object, 1);
         struct code* maybe_code = (struct code*)native_pointer(object);
@@ -1884,7 +1911,6 @@ preserve_pointer(void *addr)
         return;
     }
     lispobj *object_start;
-    lispobj descriptor;
 
 #if GENCGC_IS_PRECISE
     /* If we're in precise gencgc (non-x86oid as of this writing) then
@@ -1895,8 +1921,7 @@ preserve_pointer(void *addr)
                             (page_single_obj_p(page) &&
                              page_table[page].pinned)))
         return;
-    descriptor = (lispobj)addr;
-    object_start = native_pointer(descriptor);
+    object_start = native_pointer(addr);
     switch (widetag_of(object_start)) {
     case SIMPLE_FUN_WIDETAG:
 #ifdef RETURN_PC_WIDETAG
@@ -1907,33 +1932,8 @@ preserve_pointer(void *addr)
 #else
     if ((object_start = conservative_root_p((lispobj)addr, page)) == NULL)
         return;
-    descriptor = compute_lispobj(object_start);
 #endif
-
-    if (!compacting_p()) {
-        /* Just mark it.  No distinction between large and small objects. */
-        gc_mark_obj(descriptor);
-        return;
-    }
-
-    page_index_t first_page = find_page_index(object_start);
-    size_t nwords = OBJECT_SIZE(*object_start, object_start);
-    page_index_t last_page = find_page_index(object_start + nwords - 1);
-
-    for (page = first_page; page <= last_page; ++page) {
-        /* Oldspace pages were unprotected at start of GC.
-         * Assert this here, because the previous logic used to,
-         * and page protection bugs are scary */
-        gc_assert(!page_table[page].write_protected);
-
-        /* Mark the page immovable. */
-        page_table[page].pinned = 1;
-    }
-
-    if (page_single_obj_p(first_page))
-        maybe_adjust_large_object(first_page, nwords);
-    else
-        pin_object(descriptor);
+    pin_object(compute_lispobj(object_start));
 }
 
 
@@ -2079,6 +2079,7 @@ static void
 update_code_writeprotection(page_index_t first_page, page_index_t last_page,
                             lispobj* start, lispobj* limit)
 {
+    if (!ENABLE_PAGE_PROTECTION) return;
     page_index_t i;
     for (i=first_page+1; i <= last_page; ++i) // last_page is inclusive
         gc_assert((page_table[i].type & PAGE_TYPE_MASK) == CODE_PAGE_TYPE);
