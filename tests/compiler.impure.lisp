@@ -2905,3 +2905,16 @@
                          (let (*symbol-value-bound-here-escaping*))
                          *symbol-value-bound-here-escaping*))))))
                10)))
+
+(with-test (:name :+constant-boundp+)
+  (let* ((package-name (gensym "CONSTANT-BOUNDP-TEST"))
+         (*package* (make-package package-name :use '(cl))))
+    (ctu:file-compile
+     "(defconstant +constant-boundp+
+        (if (boundp '+constant-boundp+)
+            (symbol-value '+constant-boundp+)
+            (let (*) (make-hash-table))))"
+     :load t
+     :before-load (lambda ()
+                    (delete-package *package*)
+                    (setf *package* (make-package package-name :use '(cl)))))))

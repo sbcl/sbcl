@@ -101,7 +101,8 @@
 (defmacro assert-consing (form &optional (times '+times+))
   `(check-consing t ',form (lambda () ,form) ,times))
 
-(defun file-compile (toplevel-forms &key load)
+(defun file-compile (toplevel-forms &key load
+                                         before-load)
   (let* ((lisp (merge-pathnames "file-compile-tmp.lisp"))
          (fasl (compile-file-pathname lisp))
          (error-stream (make-string-output-stream)))
@@ -116,6 +117,8 @@
                (let ((*error-output* error-stream))
                  (compile-file lisp :print nil :verbose nil))
              (when load
+               (when before-load
+                 (funcall before-load))
                (let ((*error-output* error-stream))
                  (load fasl :print nil :verbose nil)))
              (values warn fail error-stream)))
