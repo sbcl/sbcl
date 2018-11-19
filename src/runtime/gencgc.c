@@ -1921,7 +1921,7 @@ preserve_pointer(void *addr)
                             (page_single_obj_p(page) &&
                              page_table[page].pinned)))
         return;
-    object_start = native_pointer(addr);
+    object_start = native_pointer((lispobj)addr);
     switch (widetag_of(object_start)) {
     case SIMPLE_FUN_WIDETAG:
 #ifdef RETURN_PC_WIDETAG
