@@ -154,4 +154,5 @@
 (test-util:with-test (:name :lockfree-list-performance)
   (assert (> (primitive-benchmark)
              ;; should be able to get at least 2x speedup over lock-based code
-             2)))
+             #-win32 2
+             #+win32 1.5)))
