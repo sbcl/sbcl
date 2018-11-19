@@ -16,6 +16,7 @@
 #include "genesis/gc-tables.h"
 #include "genesis/closure.h"
 #include "genesis/cons.h"
+#include "genesis/instance.h"
 #include "genesis/vector.h"
 #include "genesis/layout.h"
 #include "genesis/hash-table.h"
@@ -269,7 +270,16 @@ static void trace_object(lispobj* where)
         // mixed boxed/unboxed objects
         bitmap = ((struct layout*)native_pointer(layout))->bitmap;
         // If no raw slots, just scan without use of the bitmap.
+        // A bitmap of -1 implies that not only are all slots tagged,
+        // there is no special GC method for any slot.
         if (bitmap == make_fixnum(-1)) break;
+        // Otherwise, the first slot might merit special treatment.
+        if (*where & CUSTOM_GC_SCAVENGE_FLAG) {
+            struct instance* node = (struct instance*)where;
+            lispobj next = node->slots[INSTANCE_DATA_START];
+            if (fixnump(next) && next) // ignore initially 0 heap words
+                __mark_obj(next|INSTANCE_POINTER_LOWTAG);
+        }
         for(i=1; i<scan_to; ++i)
             if (layout_bitmap_logbitp(i-1, bitmap) && is_lisp_pointer(where[i]))
                 __mark_obj(where[i]);

@@ -1879,6 +1879,23 @@ pin_object(lispobj object)
           })
         }
     }
+    if (lowtag_of(object) == INSTANCE_POINTER_LOWTAG
+        && (*(lispobj*)(object - INSTANCE_POINTER_LOWTAG)
+            & CUSTOM_GC_SCAVENGE_FLAG)) {
+        struct instance* instance = (struct instance*)(object - INSTANCE_POINTER_LOWTAG);
+        // When pinning a logically deleted lockfree list node, always pin the
+        // successor too, since the Lisp code will reconstruct the next node's tagged
+        // pointer from the native pointer. Since we're still in the object pinning phase
+        // of GC, layouts can't have been forwarded yet. In fact we don't use bits
+        // from the layout, but it's worth noting, in case we needed to.
+        // Note also that this 'pin' does not need to happen for mark-only GC.
+        // The pin is from an address perspective, not a liveness perspective,
+        // because the instance scavenger would correctly trace this reference.
+        lispobj next = instance->slots[INSTANCE_DATA_START];
+        // Be sure to ignore 0 words.
+        if (fixnump(next) && next && from_space_p(next | INSTANCE_POINTER_LOWTAG))
+            pin_object(next | INSTANCE_POINTER_LOWTAG);
+    }
 }
 #else
 #  define scavenge_pinned_ranges()
@@ -2697,6 +2714,16 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                     lispobj bitmap = layout->bitmap;
                     gc_assert(fixnump(bitmap)
                               || widetag_of(native_pointer(bitmap))==BIGNUM_WIDETAG);
+                    if (*where & CUSTOM_GC_SCAVENGE_FLAG) {
+                        struct instance* node = (struct instance*)where;
+                        lispobj next = node->slots[INSTANCE_DATA_START];
+                        if (fixnump(next) && next) {
+                            state->vaddr = &node->slots[INSTANCE_DATA_START];
+                            next |= INSTANCE_POINTER_LOWTAG;
+                            verify_range(&next, 1, state);
+                            state->vaddr = 0;
+                        }
+                    }
                     instance_scan((void (*)(lispobj*, sword_t, uword_t))verify_range,
                                   where+1, nslots, bitmap, (uintptr_t)state);
                     count = 1 + nslots;

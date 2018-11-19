@@ -646,6 +646,7 @@
   (:result-types positive-fixnum)
   (:generator 4
     (inst movzx '(:word :dword) res (ea (1+ (- instance-pointer-lowtag)) struct))
+    (inst and :dword res short-header-max-words) ; clear special GC bit
     (inst shl :dword res n-fixnum-tag-bits)))
 
 #!+compact-instance-header

@@ -105,7 +105,8 @@ os_vm_size_t bytes_consed_between_gcs = 12*1024*1024;
 
 /* Medium-sized payload count is expressed in 15 bits. Objects in this category
  * may reside in immobile space: CLOSURE, INSTANCE, FUNCALLABLE-INSTANCE.
- * The single data bit is used as a closure's NAMED flag.
+ * The single data bit is used as a closure's NAMED flag,
+ * or an instance's "special GC strategy" flag.
  *
  * Header:  gen# |  data |     size |    tag
  *         -----   -----    -------   ------
@@ -476,18 +477,35 @@ trans_fun_header(lispobj object)
  * instances
  */
 
+static inline lispobj copy_instance(lispobj object)
+{
+    // Object is an un-forwarded object in from_space
+    lispobj header = *(lispobj*)(object - INSTANCE_POINTER_LOWTAG);
+    lispobj copy = copy_object(object, 1 + (instance_length(header)|1));
+    set_forwarding_pointer(native_pointer(object), copy);
+    return copy;
+}
+
 static sword_t
 scav_instance_pointer(lispobj *where, lispobj object)
 {
     gc_dcheck(instancep(object));
-    lispobj header = *(lispobj*)(object - INSTANCE_POINTER_LOWTAG);
-    /* Object is a pointer into from space - not a FP. */
-    lispobj copy = copy_object(object, 1 + (instance_length(header)|1));
-
-    gc_dcheck(copy != object);
-
-    set_forwarding_pointer(native_pointer(object), copy);
+    lispobj copy = copy_instance(object);
     *where = copy;
+
+    struct instance* node = (struct instance*)(copy - INSTANCE_POINTER_LOWTAG);
+    // Copy chain of lockfree list nodes to consecutive memory addresses,
+    // just like trans_list does.  A logically deleted node will break the chain,
+    // as its 'next' will not satisfy instancep(), but that's ok.
+    if (node->header & CUSTOM_GC_SCAVENGE_FLAG) {
+        while (instancep(object = node->slots[INSTANCE_DATA_START]) // node.next
+               && from_space_p(object)
+               && !forwarding_pointer_p(native_pointer(object))) {
+            copy = copy_instance(object);
+            node->slots[INSTANCE_DATA_START] = copy;
+            node = (struct instance*)(copy - INSTANCE_POINTER_LOWTAG);
+        }
+    }
 
     return 1;
 }
@@ -691,9 +709,28 @@ scav_instance(lispobj *where, lispobj header)
         lbitmap = ((struct layout*)layout)->bitmap;
     }
     sword_t nslots = instance_length(header) | 1;
-    if (lbitmap == make_fixnum(-1))
+    if (lbitmap == make_fixnum(-1)) {
         scavenge(where+1, nslots);
-    else if (!fixnump(lbitmap)) {
+        return 1 + nslots;
+    }
+    // Specially scavenge the 'next' slot of a lockfree list node. If the node is
+    // pending deletion, 'next' will satisfy fixnump() but is in fact a pointer.
+    // GC doesn't care too much about the deletion algorithm, but does have to
+    // ensure liveness of the pointee, which may move unless pinned.
+    // One could imagine that the strategy is further determind by layout->_flags.
+    // A single bit suffices for now, but more generality is certainly possible.
+    if (header & CUSTOM_GC_SCAVENGE_FLAG) {
+        struct instance* node = (struct instance*)where;
+        lispobj next = node->slots[INSTANCE_DATA_START];
+        if (fixnump(next) && next) { // ignore initially 0 heap words
+            lispobj descriptor = next | INSTANCE_POINTER_LOWTAG;
+            scav1(&descriptor, descriptor);
+            // Fix the pointer but of course leave it in mid-deletion (untagged) state.
+            if (descriptor != (next | INSTANCE_POINTER_LOWTAG))
+                node->slots[INSTANCE_DATA_START] = descriptor & ~LOWTAG_MASK;
+        }
+    }
+    if (!fixnump(lbitmap)) {
         /* It is conceivable that 'lbitmap' points to from_space, AND that it
          * is stored in one of the slots of the instance about to be scanned.
          * If so, then forwarding it will deposit new bits into its first

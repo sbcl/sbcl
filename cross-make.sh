@@ -30,7 +30,7 @@ case $1 in
    checkout="echo not syncing remote"
    ;;
   *)
-   echo "Usage error: cross-make.sh {sync|head|nosync} host port [env]"
+   echo "Usage error: cross-make.sh {sync|head|nosync} host dir [env]"
    exit 1
 esac
 shift

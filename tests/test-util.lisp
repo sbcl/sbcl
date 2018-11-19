@@ -16,7 +16,7 @@
            #:checked-compile-capturing-source-paths
            #:checked-compile-condition-source-paths
 
-           #:runtime #:split-string #:shuffle))
+           #:runtime #:split-string #:integer-sequence #:shuffle))
 
 (in-package :test-util)
 
@@ -694,6 +694,9 @@
         for end = (position delimiter string) then (position delimiter string :start begin)
         collect (subseq string begin end)
         while end))
+
+(defun integer-sequence (n)
+  (loop for i below n collect i))
 
 (defun shuffle (sequence)
   (typecase sequence

@@ -465,5 +465,7 @@ sb-c::
                                 ((neq name new)
                                  (setf (%instance-ref debug-fun
                                         (get-dsd-index compiled-debug-fun name))
-                                       new)))))))))))
+                                       new)))))))
+            (sb-lfl::linked-list
+             (sb-lfl::finalize-deletion obj))))))
        :all))))

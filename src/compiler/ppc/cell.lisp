@@ -472,7 +472,9 @@
   (:result-types positive-fixnum)
   (:generator 4
     (loadw temp struct 0 instance-pointer-lowtag)
-    (inst srwi res temp n-widetag-bits)))
+    ;; shift right 8 and mask 15 low bits =
+    ;; rotate left 24, take bit indices 17 through 31.
+    (inst rlwinm res temp (- 32 n-widetag-bits) 17 31)))
 
 (define-vop (instance-index-ref word-index-ref)
   (:policy :fast-safe)

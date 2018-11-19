@@ -704,6 +704,7 @@
   ;; It could be done in genesis, but not earlier,
   ;; since the host has a package of that name.
   "src/code/defpackage"
+  "src/code/target-lflist"
   "src/pcl/walk") ; needs DEFPACKAGE
 
  #+sb-fasteval

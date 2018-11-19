@@ -152,6 +152,7 @@ static int find_ref(lispobj* source, lispobj target)
         bitmap = layout ? LAYOUT(layout)->bitmap : make_fixnum(-1);
         for(i=1; i<scan_limit; ++i)
             if (layout_bitmap_logbitp(i-1, bitmap)) check_ptr(i, source[i]);
+        // FIXME: check CUSTOM_GC_SCAVENGE in the header
         return -1;
 #if FUN_SELF_FIXNUM_TAGGED
     case CLOSURE_WIDETAG:
@@ -718,6 +719,7 @@ static uword_t build_refs(lispobj* where, lispobj* end,
             check_ptr(layout);
             // Partially initialized instance can't have nonzero words yet
             bitmap = layout ? LAYOUT(layout)->bitmap : make_fixnum(-1);
+            // FIXME: check CUSTOM_GC_SCAVENGE in the header
             // If no raw slots, just scan without use of the bitmap.
             if (bitmap == make_fixnum(-1)) break;
             for(i=1; i<scan_limit; ++i)
