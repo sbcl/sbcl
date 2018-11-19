@@ -702,7 +702,8 @@
   (let ((home (lambda-var-home leaf)))
     (if (eq :external (functional-kind home))
         (let* ((entry (functional-entry-fun home))
-               (p (1- (position leaf (lambda-vars home)))))
+               (p (1- (or (position leaf (lambda-vars home))
+                          (bug "can't find leaf")))))
           (leaf-debug-name
            (if (optional-dispatch-p entry)
                (elt (optional-dispatch-arglist entry) p)

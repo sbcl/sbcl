@@ -998,8 +998,11 @@
 (defun !pack-fixup-info (offset kind flavor)
   ;; ARM gets "error during constant folding"
   #!+arm (declare (notinline position))
-  (logior (ash (the (mod 16) (position flavor +fixup-flavors+)) 3)
-          (the (mod 8) (position kind +fixup-kinds+))
+  (logior (ash (the (mod 16) (or (position flavor +fixup-flavors+)
+                                 (error "Bad fixup flavor ~s" flavor)))
+               3)
+          (the (mod 8) (or (position kind +fixup-kinds+)
+                           (error "Bad fixup kind ~s" kind)))
           (ash offset 7)))
 
 ;;; Unpack an integer from DUMP-FIXUPs. Shared by genesis and target fasloader

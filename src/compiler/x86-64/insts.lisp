@@ -1094,7 +1094,9 @@
 ;;; (indices 16 through 19 are unused)
 (defun !make-gpr-id (size index)
   (logior (ash (if (eq size :byte) (the (mod 24) index) (the (mod 16) index)) 3)
-          (ash (position size #(:qword :dword :word :byte)) 1)))
+          (ash (or (position size #(:qword :dword :word :byte))
+                   (error "Bad register size ~s" size))
+               1)))
 
 (defun !make-fpr-id (index)
   (declare (type (mod 16) index))

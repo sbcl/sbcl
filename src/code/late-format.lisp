@@ -1379,8 +1379,12 @@
                             symbols)
                       ;; Don't copy past the first slash. Scan backwards for it
                       ;; exactly as is done in EXTRACT-USER-FUN-NAME above.
-                      (setq end (1+ (position #\/ string :start start :end (1- end)
-                                                         :from-end t)))
+                      ;; This error can't really happen (as we've already produced
+                      ;; a valid tokenization), but the error check avoids
+                      ;; a warning about adding 1 to NIL.
+                      (setq end (1+ (or (position #\/ string :start start :end (1- end)
+                                                  :from-end t)
+                                        (error "Malformed ~~/ directive"))))
                       ;; compute new length to copy, +1 is for trailing slash
                       (incf (fill-pointer new-string) (1+ (- end start)))
                       (setf (char new-string (1- (fill-pointer new-string))) #\/))
