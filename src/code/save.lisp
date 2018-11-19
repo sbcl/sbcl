@@ -267,31 +267,7 @@ sufficiently motivated to do lengthy fixes."
          (if shared-info
              (setf (info :function :info name) shared-info)
              (setf (gethash info ht) info))))))
-  ;; FIXME: we end up calling MAP-ALLOCATED-OBJECTS >= 3 times on save.
-  ;; It might be faster to have just one scan of the heap, with code
-  ;; that we can inject for each visited object.
-  ;; On the other hand, it does not seem important to change
-  ;; what is currently a reasonable factoring of the work.
-  ;;
-  ;; Share similar simple-fun arglists and types
-  ;; EQUALISH considers any two identically-spelled gensyms as EQ
-  (let ((arglist-hash (make-hash-table :hash-function 'equal-hash
-                                       :test 'fun-names-equalish))
-        (type-hash (make-hash-table :test 'equal)))
-    (sb-vm:map-allocated-objects
-     (lambda (object widetag size)
-       (declare (ignore size))
-       (when (= widetag sb-vm:code-header-widetag)
-         (dotimes (i (sb-kernel:code-n-entries object))
-           (let* ((fun (sb-kernel:%code-entry-point object i))
-                  (arglist (%simple-fun-arglist fun))
-                  (type (sb-vm::%%simple-fun-type fun)))
-             (setf (%simple-fun-arglist fun)
-                   (ensure-gethash arglist arglist-hash arglist))
-             (setf (sb-kernel:%simple-fun-type fun)
-                   (ensure-gethash type type-hash type))))))
-     :all))
-  (sb-c::coalesce-debug-info)
+  (sb-c::coalesce-debug-info) ; Share even more things
   #+sb-fasteval (sb-interpreter::flush-everything)
   (tune-hashtable-sizes-of-all-packages))
 
@@ -352,9 +328,7 @@ sufficiently motivated to do lengthy fixes."
 ;;; Doing too much consing within MAP-ALLOCATED-OBJECTS can lead to heap
 ;;; exhaustion (due to inhibited GC), so this takes several passes.
 (defun coalesce-ctypes (&optional verbose)
-  (let* ((dynspace-start (current-dynamic-space-start))
-         (dynspace-end (+ dynspace-start (dynamic-space-size)))
-         (table (make-hash-table :test 'equal))
+  (let* ((table (make-hash-table :test 'equal))
          interned-ctypes
          referencing-objects)
     (labels ((interesting-subpart-p (part)
@@ -443,34 +417,53 @@ sb-c::
            (and (equal (debug-source-plist a) (debug-source-plist b))
                 (eql (debug-source-created a) (debug-source-created b))
                 (eql (debug-source-compiled a) (debug-source-compiled b)))))
+    ;; Coalesce the following:
+    ;;  DEBUG-INFO-SOURCE, DEBUG-FUN-NAME
+    ;;  SIMPLE-FUN-ARGLIST, SIMPLE-FUN-TYPE
+    ;; FUN-NAMES-EQUALISH considers any two string= gensyms as EQ.
     (let ((source-ht (make-hash-table :test 'equal))
-          (name-ht (make-hash-table :test 'equal)))
+          (name-ht (make-hash-table :test 'equal))
+          (arglist-hash (make-hash-table :hash-function 'sb-impl::equal-hash
+                                         :test 'sb-impl::fun-names-equalish))
+          (type-hash (make-hash-table :test 'equal)))
       (sb-vm:map-allocated-objects
-       (lambda (obj type size)
-         (declare (ignore type size))
-         (when (typep obj 'compiled-debug-info)
-           (let ((source (compiled-debug-info-source obj)))
-             (typecase source
-               (core-debug-source) ; skip
-               (debug-source
-                (let* ((namestring (debug-source-namestring source))
-                       (canonical-repr
-                        (find-if (lambda (x) (debug-source= x source))
-                                 (gethash namestring source-ht))))
-                  (cond ((not canonical-repr)
-                         (push source (gethash namestring source-ht)))
-                        ((neq source canonical-repr)
-                         (setf (compiled-debug-info-source obj)
-                               canonical-repr)))))))
-           (let ((fun-map (compiled-debug-info-fun-map obj)))
-             (loop for i from 0 below (length fun-map) by 2
-                   do (binding* ((debug-fun (svref fun-map i))
-                                 (name (compiled-debug-fun-name debug-fun))
-                                 ((new foundp) (gethash name name-ht)))
-                        (cond ((not foundp)
-                               (setf (gethash name name-ht) name))
-                              ((neq name new)
-                               (setf (%instance-ref debug-fun
-                                      (get-dsd-index compiled-debug-fun name))
-                                     new))))))))
+       (lambda (obj widetag size)
+         (declare (ignore size))
+         (case widetag
+          (#.sb-vm:code-header-widetag
+           (dotimes (i (sb-kernel:code-n-entries obj))
+             (let* ((fun (sb-kernel:%code-entry-point obj i))
+                    (arglist (%simple-fun-arglist fun))
+                    (type (sb-vm::%%simple-fun-type fun)))
+               (setf (%simple-fun-arglist fun)
+                     (ensure-gethash arglist arglist-hash arglist))
+               (setf (sb-kernel:%simple-fun-type fun)
+                     (ensure-gethash type type-hash type)))))
+          (#.sb-vm:instance-widetag
+           (typecase obj
+            (compiled-debug-info
+             (let ((source (compiled-debug-info-source obj)))
+               (typecase source
+                 (core-debug-source) ; skip
+                 (debug-source
+                  (let* ((namestring (debug-source-namestring source))
+                         (canonical-repr
+                          (find-if (lambda (x) (debug-source= x source))
+                                   (gethash namestring source-ht))))
+                    (cond ((not canonical-repr)
+                           (push source (gethash namestring source-ht)))
+                          ((neq source canonical-repr)
+                           (setf (compiled-debug-info-source obj)
+                                 canonical-repr)))))))
+             (let ((fun-map (compiled-debug-info-fun-map obj)))
+               (loop for i from 0 below (length fun-map) by 2
+                     do (binding* ((debug-fun (svref fun-map i))
+                                   (name (compiled-debug-fun-name debug-fun))
+                                   ((new foundp) (gethash name name-ht)))
+                          (cond ((not foundp)
+                                 (setf (gethash name name-ht) name))
+                                ((neq name new)
+                                 (setf (%instance-ref debug-fun
+                                        (get-dsd-index compiled-debug-fun name))
+                                       new)))))))))))
        :all))))
