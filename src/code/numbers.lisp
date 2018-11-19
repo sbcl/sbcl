@@ -1034,12 +1034,15 @@ and the number of 0 bits if INTEGER is negative."
   (declare (explicit-check))
   (etypecase integer
     (fixnum
-     (logcount (truly-the (integer 0
+     (logcount #!-x86-64
+               (truly-the (integer 0
                                    #.(max sb!xc:most-positive-fixnum
                                           (lognot sb!xc:most-negative-fixnum)))
                           (if (minusp (truly-the fixnum integer))
                               (lognot (truly-the fixnum integer))
-                              integer))))
+                              integer))
+               ;; The VOP handles that case better
+               #!+x86-64 integer))
     (bignum
      (bignum-logcount integer))))
 
