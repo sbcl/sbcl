@@ -317,25 +317,28 @@
            ,@(when signed
                `((move rdx arg)
                  (setf arg rdx)
-                 (inst test rdx rdx)
+                 ,(if (eq arg-type 'fixnum)
+                      `(inst sar rdx n-fixnum-tag-bits)
+                      `(inst test rdx rdx))
                  (inst jmp :ge POSITIVE)
                  (inst not rdx)
                  POSITIVE))
-           ;; POPCNT = ECX bit 23
-           (multiple-value-bind (bytes bits) (floor (+ 23 n-fixnum-tag-bits)
-                                                    n-byte-bits)
-             ;; FIXME: should be
-             ;;    (INST TEST :BYTE (STATIC-SYMBOL-VALUE-EA '*BLAH*) CONST)
-             ;; but can't do that until sizes are removed from EAs
-             ;; because STATIC-SYMBOL-VALUE-EA returns a :QWORD ea for now.
-             (inst test :byte
-                   (ea (+ nil-value
-                          (static-symbol-offset '*cpuid-fn1-ecx*)
-                          (ash symbol-value-slot word-shift)
-                          (- other-pointer-lowtag)
-                          bytes))
-                   (ash 1 bits)))
-           (inst jmp :z slow)
+           (unless (memq :popcnt *backend-subfeatures*)
+             ;; POPCNT = ECX bit 23
+             (multiple-value-bind (bytes bits) (floor (+ 23 n-fixnum-tag-bits)
+                                                      n-byte-bits)
+               ;; FIXME: should be
+               ;;    (INST TEST :BYTE (STATIC-SYMBOL-VALUE-EA '*BLAH*) CONST)
+               ;; but can't do that until sizes are removed from EAs
+               ;; because STATIC-SYMBOL-VALUE-EA returns a :QWORD ea for now.
+               (inst test :byte
+                     (ea (+ nil-value
+                            (static-symbol-offset '*cpuid-fn1-ecx*)
+                            (ash symbol-value-slot word-shift)
+                            (- other-pointer-lowtag)
+                            bytes))
+                     (ash 1 bits)))
+             (inst jmp :z slow))
            ;; Intel's implementation of POPCNT on some models treats it as
            ;; a 2-operand ALU op in the manner of ADD,SUB,etc which means that
            ;; it falsely appears to need data from the destination register.
@@ -348,13 +351,15 @@
            (inst popcnt result arg)
            (inst jmp done)
          slow
-           (move rdx arg)
-           (invoke-asm-routine 'call 'logcount vop)
-           (move result rdx)
+           (unless (memq :popcnt *backend-subfeatures*)
+             (move rdx arg)
+             (invoke-asm-routine 'call 'logcount vop)
+             (move result rdx))
          done))))
   (def-it unsigned-byte-64-count 14 unsigned-reg unsigned-num)
   (def-it signed-byte-64-count 15 signed-reg signed-num :signed t)
-  (def-it positive-fixnum-count 13 any-reg positive-fixnum))
+  (def-it positive-fixnum-count 12 any-reg positive-fixnum)
+  (def-it positive-fixnum-count 13 any-reg fixnum :signed t))
 
 ;;; EQL for integers that are either fixnum or bignum
 
