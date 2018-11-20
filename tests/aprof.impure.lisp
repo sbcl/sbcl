@@ -28,7 +28,7 @@
                           (sb-thread:make-mutex))))))))
 
 (with-test (:name :aprof-smoketest-non-constant-size-vector
-            :fails-on :win32)
+            :broken-on :win32)
   (let ((nbytes
          (let ((*standard-output* (make-broadcast-stream)))
            (sb-aprof:aprof-run
@@ -80,7 +80,7 @@ sb-vm::
                 other-pointer-lowtag t)))))
 
 (with-test (:name :aprof-smoketest-large-vector-to-upper-register
-            :broken-on :win32)
+            :fails-on :win32)
   (let ((nbytes
           (let ((*standard-output* (make-broadcast-stream)))
             (sb-aprof:aprof-run
