@@ -702,7 +702,7 @@
        (multiple-value-bind (definition index)
            (%find-position fname (the simple-vector (env-payload env))
                            nil 0 nil #'fname test)
-         (when definition
+         (when index
            (return (values (if (macro-env-p env) :macro :function)
                            definition (make-frame-ptr index level)))))))))
 
