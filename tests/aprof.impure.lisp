@@ -27,7 +27,8 @@
                    (* 50 (sb-vm::primitive-object-size
                           (sb-thread:make-mutex))))))))
 
-(with-test (:name :aprof-smoketest-non-constant-size-vector)
+(with-test (:name :aprof-smoketest-non-constant-size-vector
+            :fails-on :win32)
   (let ((nbytes
          (let ((*standard-output* (make-broadcast-stream)))
            (sb-aprof:aprof-run
@@ -40,7 +41,8 @@
 ;;; The profiler's disassembler expected to see a store at alloc-ptr
 ;;; or that + n-word-bytes, when in fact the code might write to 1 byte
 ;;; positioned anywhere in the word after the object header.
-(with-test (:name :aprof-smoketest-bit-vector)
+(with-test (:name :aprof-smoketest-bit-vector
+            :fails-on :win32)
   (let ((nbytes
          (let ((*standard-output* (make-broadcast-stream)))
            (sb-aprof:aprof-run
@@ -51,14 +53,15 @@
     (assert (= nbytes (sb-vm::primitive-object-size
                        (make-array (* 128 16) :element-type 'bit))))))
 
-(with-test (:name :aprof-smoketest-large-vector)
+(with-test (:name :aprof-smoketest-large-vector
+            :fails-on :win32)
   (let ((nbytes
-         (let ((*standard-output* (make-broadcast-stream)))
-           (sb-aprof:aprof-run
-            (checked-compile
-             '(sb-int:named-lambda "test" ()
-               (declare (optimize sb-c::instrument-consing))
-               (make-array 45000)))))))
+          (let ((*standard-output* (make-broadcast-stream)))
+            (sb-aprof:aprof-run
+             (checked-compile
+              '(sb-int:named-lambda "test" ()
+                (declare (optimize sb-c::instrument-consing))
+                (make-array 45000)))))))
     (assert (= nbytes (* (+ 45000 sb-vm:vector-data-offset)
                          8)))))
 sb-vm::
@@ -76,7 +79,8 @@ sb-vm::
        (storew* (fixnumize words) result vector-length-slot
                 other-pointer-lowtag t)))))
 
-(with-test (:name :aprof-smoketest-large-vector-to-upper-register)
+(with-test (:name :aprof-smoketest-large-vector-to-upper-register
+            :fails-on :win32)
   (let ((nbytes
           (let ((*standard-output* (make-broadcast-stream)))
             (sb-aprof:aprof-run
