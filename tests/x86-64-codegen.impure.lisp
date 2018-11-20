@@ -9,6 +9,8 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+#-x86-64 (sb-ext:exit :code 104)
+
 (defun disasm (safety expr &optional (remove-epilogue t))
   ;; This lambda has a name because if it doesn't, then the name
   ;; is something stupid like (lambda () in ...) which pretty-prints
@@ -21,13 +23,13 @@
     (sb-int:encapsulate 'sb-disassem::add-debugging-hooks 'test
                         (lambda (f &rest args) (declare (ignore f args))))
     (let ((lines
-           (split-string
-            (with-output-to-string (s)
-              (let ((sb-disassem:*disassem-location-column-width* 0))
-                (disassemble fun :stream s)))
-            #\newline)))
+            (split-string
+             (with-output-to-string (s)
+               (let ((sb-disassem:*disassem-location-column-width* 0))
+                 (disassemble fun :stream s)))
+             #\newline)))
       (sb-int:unencapsulate 'sb-disassem::add-debugging-hooks 'test)
-      (setq lines (cddr lines)) ; remove "Disassembly for"
+      (setq lines (cddr lines))         ; remove "Disassembly for"
       ;; For human-readability, kill the whitespace
       (setq lines (mapcar (lambda (x) (string-left-trim " ;" x)) lines))
       (when (string= (car (last lines)) "")
