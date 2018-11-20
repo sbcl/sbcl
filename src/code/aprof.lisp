@@ -95,8 +95,9 @@
 
 (define-alien-variable alloc-profile-buffer system-area-pointer)
 (defun aprof-reset ()
-  (alien-funcall (extern-alien "bzero" (function void system-area-pointer unsigned))
+  (alien-funcall (extern-alien "memset" (function void system-area-pointer int size-t))
                  alloc-profile-buffer
+                 0
                  (* (/ (length *allocation-profile-metadata*) 2)
                     sb-vm:n-word-bytes)))
 
