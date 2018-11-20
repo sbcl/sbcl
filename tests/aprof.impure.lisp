@@ -80,7 +80,7 @@ sb-vm::
                 other-pointer-lowtag t)))))
 
 (with-test (:name :aprof-smoketest-large-vector-to-upper-register
-            :fails-on :win32)
+            :broken-on :win32)
   (let ((nbytes
           (let ((*standard-output* (make-broadcast-stream)))
             (sb-aprof:aprof-run
