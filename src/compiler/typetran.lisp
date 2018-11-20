@@ -86,6 +86,29 @@
                       ;; If it's a lisp-rep-type, the CTYPE should be one already.
                       (aver (not (compute-lisp-rep-type alien-type)))
                       `(sb!alien::alien-value-typep object ',alien-type)))
+                   #!+(vop-translates sb!int:fixnump-instance-ref)
+                   ((and (type= type (specifier-type 'fixnum))
+                         (let ((use (lvar-uses object)) index)
+                           (and (combination-p use)
+                                (or (and (eq (lvar-fun-name (combination-fun use))
+                                             '%instance-ref)
+                                         (constant-lvar-p
+                                          (setf index (second (combination-args use)))))
+                                    (member (lvar-fun-name (combination-fun use))
+                                            '(car cdr))))))
+                    ;; This is a disturbing trend, but it's the best way to
+                    ;; combine instructions in the compiler as it is
+                    ;; (as opposed to the compiler as we wish it would be).
+                    (case (lvar-fun-name (combination-fun (lvar-uses object)))
+                     (%instance-ref
+                      (splice-fun-args object '%instance-ref 2)
+                      `(lambda (obj i) (fixnump-instance-ref obj i)))
+                     (car
+                      (splice-fun-args object 'car 1)
+                      `(lambda (obj) (fixnump-car obj)))
+                     (cdr
+                      (splice-fun-args object 'cdr 1)
+                      `(lambda (obj) (fixnump-cdr obj)))))
                    (t
                     (give-up-ir1-transform)))))
       (cond ((not (types-equal-or-intersect otype type))

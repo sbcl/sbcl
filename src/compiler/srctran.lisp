@@ -3700,7 +3700,7 @@
       ((not (types-equal-or-intersect (lvar-type x) (lvar-type y)))
        nil)
       #!+(vop-translates sb!kernel:%instance-ref-eq)
-      ;; Reduce (eq (%instance-ref x i) a-constant) to 1 instruction
+      ;; Reduce (eq (%instance-ref x i) Y) to 1 instruction
       ;; if possible, but do not defer the memory load unless doing
       ;; so can have no effect, i.e. Y is a constant or provably not
       ;; effectful. For now, just handle constant Y.

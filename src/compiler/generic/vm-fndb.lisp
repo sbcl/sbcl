@@ -72,6 +72,11 @@
            non-null-symbol-p)
     (t) boolean (movable foldable flushable))
 
+(defknown (fixnump-instance-ref) (instance index) boolean
+  (flushable always-translatable))
+(defknown (fixnump-car fixnump-cdr) (list) boolean
+  (flushable always-translatable))
+
 (defknown #.(loop for (name) in *vector-without-complex-typecode-infos*
                   collect name)
     (t) boolean (movable foldable flushable))

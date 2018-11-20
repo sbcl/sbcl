@@ -9,8 +9,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#-(and x86-64 immobile-space sb-thread) (sb-ext:exit :code 104) ; can't run these tests
-
 (defun disasm (safety expr &optional (remove-epilogue t))
   ;; This lambda has a name because if it doesn't, then the name
   ;; is something stupid like (lambda () in ...) which pretty-prints
@@ -61,7 +59,8 @@
 ;; DO NOT REMOVE!
 (compile nil '(lambda (foo) (eval 'frob)))
 
-(with-test (:name :symeval-known-tls-index :skipped-on :immobile-symbols)
+(with-test (:name :symeval-known-tls-index
+                  :skipped-on (or (not :immobile-space) :immobile-symbols))
   ;; When symbol SC is IMMEDIATE:
   ;;    498B9578210000     MOV RDX, [R13+disp]       ; tls: *PRINT-BASE*
   ;;    83FA61             CMP EDX, 97
@@ -78,10 +77,11 @@
 
 (defvar *blub*) ; immobile space
 (defvar blub)   ; dynamic space
-(assert (sb-kernel:immobile-space-obj-p '*blub*))
+#+immobile-space (assert (sb-kernel:immobile-space-obj-p '*blub*))
 #-immobile-symbols (assert (not (sb-kernel:immobile-space-obj-p 'blub)))
 
-(with-test (:name :symeval-unknown-tls-index :skipped-on :immobile-symbols)
+(with-test (:name :symeval-unknown-tls-index
+                  :skipped-on (or (not :immobile-space) :immobile-symbols))
   ;; When symbol SC is immediate:
   ;;    8B142514A24C20     MOV EDX, [#x204CA214]    ; tls_index: *BLUB*
   ;;    4A8B142A           MOV RDX, [RDX+R13]
@@ -205,7 +205,8 @@
     (assert success)))
 
 (defglobal *avar* nil)
-(with-test (:name :set-symbol-value-imm-2)
+(with-test (:name :set-symbol-value-imm-2
+                  :skipped-on (not :immobile-space))
   (let (success)
     (dolist (line (split-string
                    (with-output-to-string (s)
@@ -275,7 +276,8 @@
         (setq success t)))
     (assert success)))
 
-(with-test (:name :list-vop-immediate-to-mem)
+(with-test (:name :list-vop-immediate-to-mem
+                  :skipped-on (not :immobile-space))
   (let ((lines
          (split-string
           (with-output-to-string (s)
@@ -287,7 +289,8 @@
                                (search ":KEY" line))))))
 
 (with-test (:name :aprof-smoketest-struct
-            :fails-on :sb-safepoint)
+            ;; reverse-engineering the allocation instructions fails but should not
+            :fails-on (not :immobile-space))
   (let ((nbytes
          (let ((*standard-output* (make-broadcast-stream)))
            (sb-aprof:aprof-run
@@ -363,7 +366,8 @@ sb-vm::
     (assert (= nbytes sb-vm:large-object-size))))
 
 (defstruct thing x)
-(with-test (:name :instance-ref-eq)
+(with-test (:name :instance-ref-eq
+                  :skipped-on (not :immobile-space))
   (let ((lines
          (split-string
           (with-output-to-string (s)
@@ -376,3 +380,23 @@ sb-vm::
                   thereis
                   (and (search "CMP QWORD PTR [" line)
                        (search ":YUP" line))))))
+
+(with-test (:name :fixnump-thing-ref)
+  (flet ((try (access-form true false)
+           (let* ((f (compile nil `(lambda (obj) (typep ,access-form 'fixnum))))
+                  (lines
+                   (split-string
+                    (with-output-to-string (s) (disassemble f :stream s))
+                    #\newline)))
+             (assert (funcall f true))
+             (assert (not (funcall f false)))
+             ;; assert that the TEST instruction dereferenced OBJ and performed the test
+             (assert (loop for line in lines
+                           thereis
+                           (and (search "TEST BYTE PTR [" line)
+                                (search (format nil ", ~D" sb-vm:fixnum-tag-mask)
+                                        line)))))))
+    (try '(thing-x (truly-the thing obj))
+         (make-thing :x 1) (make-thing :x "hi"))
+    (try '(car obj) '(1) '("hi"))
+    (try '(cdr obj) '("hi" . 1) '("hi"))))
