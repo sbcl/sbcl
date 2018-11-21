@@ -298,8 +298,7 @@
           ":IMMOBILE-SYMBOLS requires :IMMOBILE-SPACE feature")
          ;; There is still hope to make multithreading on DragonFly x86-64
          ("(and sb-thread x86 dragonfly)"
-          ":SB-THREAD not supported on selected architecture")
-         ("(and sb-thread openbsd)" ":SB-THREAD not supported on selected OS")))
+          ":SB-THREAD not supported on selected architecture")))
       (failed-test-descriptions nil))
   (dolist (test feature-compatibility-tests)
     (let ((cl:*features* sb!xc:*features*))

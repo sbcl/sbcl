@@ -95,7 +95,22 @@
 #endif
 
 #define THREAD_BASE_REG %r13
-        
+        .text
+	.globl  GNAME(funcall1_switching_stack)
+	TYPE(GNAME(funcall1_switching_stack))
+	.align	align_16byte,0x90
+GNAME(funcall1_switching_stack):
+        push    %rbp
+        mov     %rsp,%rbp
+
+        mov     THREAD_CONTROL_STACK_END_OFFSET(%rdi),%rsp
+        call    *%rsi
+
+        mov     %rbp, %rsp
+        pop     %rbp
+        ret
+        SIZE(GNAME(funcall1_switching_stack))
+
 	.text	
 	.globl  GNAME(call_into_lisp_first_time)
 	TYPE(GNAME(call_into_lisp_first_time))
