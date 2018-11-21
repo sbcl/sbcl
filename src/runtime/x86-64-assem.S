@@ -100,6 +100,9 @@
 	TYPE(GNAME(funcall1_switching_stack))
 	.align	align_16byte,0x90
 GNAME(funcall1_switching_stack):
+        /* The arguments are switched, funcall1_switching_stack(arg, function)
+           to avoid shuffling registers.
+        */
         push    %rbp
         mov     %rsp,%rbp
 

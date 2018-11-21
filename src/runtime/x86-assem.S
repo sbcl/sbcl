@@ -335,6 +335,30 @@ Lfp_rtn_value:
 	SIZE(GNAME(call_into_c))
 
 
+        .text
+	.globl  GNAME(funcall1_switching_stack)
+	TYPE(GNAME(funcall1_switching_stack))
+	.align	align_16byte,0x90
+GNAME(funcall1_switching_stack):
+        /* The arguments are switched, funcall1_switching_stack(arg, function)
+           to avoid shuffling registers on x86-64
+        */
+        push    %ebp
+        mov     %esp,%ebp
+
+        movl	8(%ebp),%eax	# arg
+	movl	12(%ebp),%edx	# function
+
+        mov     THREAD_CONTROL_STACK_END_OFFSET(%eax),%esp
+        push    %edx
+        push    %eax
+        call    *%edx
+        
+        mov     %ebp, %esp
+        pop     %ebp
+        ret
+        SIZE(GNAME(funcall1_switching_stack))
+        
 	.text	
 	.globl GNAME(call_into_lisp_first_time)
 	TYPE(GNAME(call_into_lisp_first_time))
