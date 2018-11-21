@@ -1827,3 +1827,17 @@
                    (funcall x))))))
     (assert (null (ctu:find-anonymous-callees fun)))
     (assert (= (funcall fun) 1))))
+
+(with-test (:name :external-cast-deletion)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a c)
+      (declare (notinline elt logior))
+      (logior
+       (if c
+           (the integer (elt '(10 20) a))
+           (let ((v1 (loop repeat 3 count t)))
+             (declare (dynamic-extent v1))
+             v1))))
+   ((0 t) 10)
+   ((1 nil) 3)))

@@ -119,7 +119,7 @@
 ;;; Merge CASTs with preceding/following nodes.
 (defun ir1-merge-casts (component)
   (do-blocks-backwards (block component)
-    (do-nodes-backwards (node lvar block)
+    (do-nodes-backwards (node lvar block :restart-p t)
       (let ((dest (when lvar (lvar-dest lvar))))
         (cond ((and (cast-p dest)
                     (not (cast-type-check dest))
