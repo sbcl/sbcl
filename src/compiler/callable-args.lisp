@@ -363,44 +363,44 @@
     (nreverse result)))
 
 (defun report-arg-count-mismatch (callee caller type arg-count
-                                  condition-type)
-  (multiple-value-bind (min max optional) (fun-type-arg-limits type)
-    (cond
-      ((and (not min) (not max))
-       nil)
-      ((not optional)
-       (when (/= arg-count min)
-         (warn condition-type
-               :format-control
-               "The function ~S is called by ~S with ~R argument~:P, but wants exactly ~R."
-               :format-arguments
-               (list
-                callee
-                caller
-                arg-count min))
-         t))
-      ((< arg-count min)
-       (warn condition-type
-             :format-control
-             "The function ~S is called by ~S with ~R argument~:P, but wants at least ~R."
-             :format-arguments
-             (list
-              callee
-              caller
-              arg-count min))
-       t)
-      ((not max)
-       nil)
-      ((> arg-count max)
-       (warn condition-type
-             :format-control
-             "The function ~S called by ~S with ~R argument~:P, but wants at most ~R."
-             :format-arguments
-             (list
-              callee
-              caller
-              arg-count max))
-       t))))
+                                  condition-type
+                                  &key lossage-fun)
+  (flet ((lose (format-control &rest format-args)
+           (if lossage-fun
+               (apply lossage-fun format-control format-args)
+               (warn condition-type :format-control format-control
+                                    :format-arguments format-args))
+           t))
+    (multiple-value-bind (min max optional) (fun-type-arg-limits type)
+      (or
+       (cond
+         ((and (not min) (not max))
+          nil)
+         ((not optional)
+          (when (/= arg-count min)
+            (lose
+             "The function ~S is called~@[ by ~S~] with ~R argument~:P, but wants exactly ~R."
+             callee caller
+             arg-count min)))
+         ((< arg-count min)
+          (lose
+           "The function ~S is called~@[ by ~S~] with ~R argument~:P, but wants at least ~R."
+           callee caller
+           arg-count min))
+         ((not max)
+          nil)
+         ((> arg-count max)
+          (lose
+           "The function ~S called~@[ by ~S~] with ~R argument~:P, but wants at most ~R."
+           callee caller
+           arg-count max)))
+       (let ((positional (fun-type-positional-count type)))
+         (when (and (fun-type-keyp type)
+                    (> arg-count positional)
+                    (oddp (- arg-count positional)))
+           (lose
+            "The function ~s is called with odd number of keyword arguments."
+            callee)))))))
 
 ;;; This can provide better errors and better handle OR types than a
 ;;; simple type intersection.

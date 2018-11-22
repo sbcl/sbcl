@@ -120,31 +120,16 @@
                (optional (fun-type-optional type))
                (max-args (+ min-args (length optional)))
                (rest (fun-type-rest type))
-               (keyp (fun-type-keyp type)))
+               (keyp (fun-type-keyp type))
+               (fun (combination-fun call))
+               (caller (loop for annotation in (lvar-annotations fun)
+                         when (typep annotation 'lvar-function-designator-annotation)
+                         do (setf *compiler-error-context* annotation)
+                         return (lvar-function-designator-annotation-caller annotation))))
           (cond
-            ((fun-type-wild-args type)
-             (loop for arg in args
-                   and i from 1
-                   do (check-arg-type arg *universal-type* i)))
-            ((not (or optional keyp rest))
-             (if (/= nargs min-args)
-                 (note-lossage
-                  "The function was called with ~R argument~:P, but wants exactly ~R."
-                  nargs min-args)
-                 (check-fixed-and-rest args required nil)))
-            ((< nargs min-args)
-             (note-lossage
-              "The function was called with ~R argument~:P, but wants at least ~R."
-              nargs min-args))
-            ((<= nargs max-args)
-             (check-fixed-and-rest args (append required optional) rest))
-            ((not (or keyp rest))
-             (note-lossage
-              "The function was called with ~R argument~:P, but wants at most ~R."
-              nargs max-args))
-            ((and keyp (oddp (- nargs max-args)))
-             (note-lossage
-              "The function has an odd number of arguments in the keyword portion."))
+            ((report-arg-count-mismatch (nth-value 1 (lvar-fun-type fun))
+                                        caller type nargs nil
+                                        :lossage-fun #'note-lossage))
             (t
              (check-fixed-and-rest args (append required optional) rest)
              (when (and keyp
