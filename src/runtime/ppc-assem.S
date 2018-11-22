@@ -292,6 +292,30 @@ x:
 
 	.text
 
+	GFUNCDEF(funcall1_switching_stack)
+        /* The arguments are switched, funcall1_switching_stack(arg, function)
+           to avoid shuffling registers
+        */
+	/* save LR on old stack */
+	mflr	REG(0)
+	stw	REG(0),4(REG(1))
+
+	/* store old SP and switch to new stack */
+	lwz	REG(10),THREAD_CONTROL_STACK_END_OFFSET(REG(3))
+	stwu	REG(1),-16(REG(10))
+	mr	REG(1),REG(10)
+
+	/* call function */
+	mtctr	REG(4)
+	bctrl
+
+	/* restore old SP and LR then return */
+	lwz	REG(1),0(REG(1))
+	lwz	REG(0),4(REG(1))
+	mtlr	REG(0)
+	blr
+	SET_SIZE(funcall1_switching_stack)
+
 /*
  * Function to transfer control into lisp.  The lisp object to invoke is
  * passed as the first argument, which puts it in NL0
