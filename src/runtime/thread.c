@@ -460,7 +460,7 @@ undo_init_new_thread(struct thread *th,
  * lisp function after doing arch_os_thread_init and whatever other
  * bookkeeping needs to be done
  */
-void* AMD64_SYSV_ABI new_thread_trampoline(void* arg)
+void* new_thread_trampoline(void* arg)
 {
     struct thread *th = (struct thread *)arg;
     int result;
