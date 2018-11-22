@@ -228,7 +228,7 @@
     (list* (code-header-words code)
            (collect ((offs))
              (dotimes (i (code-n-entries code) (offs))
-               (offs (sb-impl::%code-fun-offset code i)
+               (offs (%code-fun-offset code i)
                      (%simple-fun-text-len (%code-entry-point code i) i))))
            (collect ((consts))
              ;; Ignore the fixups and the debug info

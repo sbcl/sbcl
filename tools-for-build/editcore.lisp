@@ -132,18 +132,6 @@
   (pop-inst nil :read-only t))
 
 (defun c-name (lispname core pp-state &optional (prefix ""))
-  ;; Get rid of junk from LAMBDAs
-  (setq lispname
-        (named-let recurse ((x lispname))
-                   (cond ((typep x '(cons (eql lambda)))
-                          (let ((args (second x)))
-                            `(lambda ,(if args sb-c::*debug-name-sharp* "()")
-                               ,@(recurse (cddr x)))))
-                         ((eq x :in) "in")
-                         ((consp x)
-                          (recons x (recurse (car x)) (recurse (cdr x))))
-                         (t x))))
-
   (when (typep lispname '(string 0))
     (setq lispname "anonymous"))
 
@@ -304,6 +292,55 @@
                               name
                               (hashset-find name externals))))))
         (t "?"))))))
+
+(defun remove-name-junk (name)
+  (named-let recurse ((x name))
+    (cond ((typep x '(cons (eql lambda)))
+           (let ((args (second x)))
+             `(lambda ,(if args sb-c::*debug-name-sharp* "()")
+                ,@(recurse (cddr x)))))
+          ((eq x :in) "in")
+          ((and (typep x '(or string symbol))
+                (= (mismatch (string x) "CLEANUP-FUN-")
+                   (length "CLEANUP-FUN-")))
+           '#:cleanup-fun)
+          ((consp x) (recons x (recurse (car x)) (recurse (cdr x))))
+          (t x))))
+
+;;; Return a list of ((NAME START . END) ...)
+;;; for each C symbol that should be emitted for this code object.
+;;; Start and and are relative to the object's base address,
+;;; not the start of its instructions.
+(defun code-symbols (code core &aux (spaces (core-spaces core)))
+  (let ((fun-map (translate
+                  (sb-c::compiled-debug-info-fun-map
+                   (truly-the sb-c::compiled-debug-info
+                              (translate (sb-kernel:%code-debug-info code) spaces)))
+                  spaces))
+        (header-bytes (* (sb-kernel:code-header-words code) sb-vm:n-word-bytes))
+        (blobs))
+    (do ((i 0 (+ i 2)))
+        ((>= i (length fun-map)))
+      (let ((name
+             (remove-name-junk
+              (fun-name-from-core
+               (sb-c::compiled-debug-fun-name
+                (truly-the sb-c::compiled-debug-fun
+                           (translate (aref fun-map i) spaces)))
+               core)))
+            (start-pc (if (= i 0)
+                          0
+                          (+ header-bytes (aref fun-map (1- i)))))
+            (end-pc (if (< (1+ i) (length fun-map))
+                        (+ header-bytes (aref fun-map (1+ i)))
+                        (sb-vm::code-component-size code))))
+        ;; Collapse adjacent address ranges named the same.
+        ;; Use EQUALP instead of EQUAL to compare names
+        ;; because instances of CORE-SYMBOL are not interned objects.
+        (if (and blobs (equalp (caar blobs) name))
+            (setf (cddr (car blobs)) end-pc)
+            (push (list* name start-pc end-pc) blobs))))
+    (nreverse blobs)))
 
 (defstruct (descriptor (:constructor make-descriptor (bits)))
   (bits 0 :type sb-ext:word))
@@ -581,7 +618,7 @@
 ;;; This is tricky to fix because while we can relativize the CFA to the
 ;;; known frame size, we can't do that based only on a disassembly.
 
-(defun emit-lisp-function (paddr vaddr count labels stream emit-cfi core)
+(defun emit-lisp-function (paddr vaddr count stream emit-cfi core &optional labels)
   (when emit-cfi
     (format stream " .cfi_startproc~%"))
   ;; Any byte offset that appears as a key in the INSTRUCTIONS causes the indicated
@@ -621,7 +658,7 @@
           ;; A label and a textual instruction could co-occur.
           ;; If so, the label must be emitted first.
           (when (eq (cadar instructions) :label)
-            (destructuring-bind (globalp c-symbol) (cddr (pop instructions))
+            (destructuring-bind (c-symbol globalp) (cddr (pop instructions))
               ;; The C symbol is global only if the Lisp name is a legal function
               ;; designator and not random noise.
               ;; This is a technique to try to avoid appending a uniquifying suffix
@@ -655,13 +692,13 @@
                                   nil)
                                  (t)))
                           ((string= opcode "mov")
-                           (format stream " mov $(__lisp_code_start+0x~x),%eax~%"
+                           (format stream " mov $(CS+0x~x),%eax~%"
                                    (- operand (bounds-low (core-code-bounds core)))))
                           ((string= opcode "call*")
                            ;; Indirect call - since the code is in immobile space,
                            ;; we could render this as a 2-byte NOP followed by a direct
                            ;; call. For simplicity I'm leaving it exactly as it was.
-                           (format stream " call *(__lisp_code_start+0x~x)~%"
+                           (format stream " call *(CS+0x~x)~%"
                                    (- operand (bounds-low (core-code-bounds core)))))
                           (t))
                 (bug "Random annotated opcode ~S" opcode))
@@ -672,17 +709,13 @@
 
 ;;; Examine CODE, returning a list of lists describing how to emit
 ;;; the contents into the assembly file.
-;;;   ({:data | :padding} . N) | ((start-pc . end-pc) (pc-offset . name) ...)
+;;;   ({:data | :padding} . N) | (start-pc . end-pc)
 (defun get-text-ranges (code spaces)
-  (flet ((fun-pc-offs (index)
-           (- (get-lisp-obj-address (%code-entry-point code index))
-              fun-pointer-lowtag
-              (sap-int (code-instructions code)))))
     (let ((map (translate (sb-c::compiled-debug-info-fun-map
                            (truly-the sb-c::compiled-debug-info
                                       (translate (%code-debug-info code) spaces)))
                           spaces))
-          (next-simple-fun-pc-offs (fun-pc-offs 0))
+          (next-simple-fun-pc-offs (%code-fun-offset code 0))
           (start-pc (code-n-unboxed-data-bytes code))
           (simple-fun-index -1)
           (simple-fun)
@@ -692,14 +725,9 @@
         (push `(:data . ,(ash start-pc (- word-shift))) blobs))
       (do ((i 0 (+ i 2)))
           ((>= i (length map)) (nreverse blobs))
-        (let* ((cdf (translate (aref map i) spaces))
-               (end-pc (if (< (1+ i) (length map))
-                           (svref map (1+ i))
-                           (%code-text-size code)))
-               (name (get-lisp-obj-address
-                      (sb-c::compiled-debug-fun-name
-                       (truly-the sb-c::compiled-debug-fun cdf)))))
-          ;; (format t "range=~D .. ~D ~X~%" start-pc end-pc name)
+        (let ((end-pc (if (< (1+ i) (length map))
+                          (svref map (1+ i))
+                          (%code-text-size code))))
           (cond
             ((= start-pc end-pc)) ; crazy shiat. do not add to blobs
             ((<= start-pc next-simple-fun-pc-offs (1- end-pc))
@@ -717,23 +745,27 @@
                         (aver (< padding (* 2 n-word-bytes)))))
                  (push `(:pad . ,padding) blobs)
                  (incf start-pc padding)))
-             (let ((skip (* simple-fun-code-offset n-word-bytes)))
-               (push `((,start-pc . ,end-pc) (,(+ start-pc skip) . ,name)) blobs))
-             (setq next-simple-fun-pc-offs (fun-pc-offs (1+ simple-fun-index))))
+             (push `(,start-pc . ,end-pc) blobs)
+             (setq next-simple-fun-pc-offs
+                   (if (< (1+ simple-fun-index ) (code-n-entries code))
+                       (%code-fun-offset code (1+ simple-fun-index))
+                       -1)))
             (t
              (let ((current-blob (car blobs)))
-               (setf (cdar current-blob) end-pc) ; extend this blob
-               ;; Assuming that the compiler properly coalesced EQUAL names
-               ;; when dumping fun-map names, = is valid as a comparator
-               ;; to determine that we're in the same sub-function.
-               (unless (= name (cdadr current-blob))
-                 (push `(,start-pc . ,name) (cdr current-blob))))))
-          (setq start-pc end-pc))))))
+               (setf (cdr current-blob) end-pc)))) ; extend this blob
+          (setq start-pc end-pc)))))
 
 (defun c-symbol-quote (name)
   (concatenate 'string '(#\") name '(#\")))
 
-(defun emit-funs (code vaddr core pp-state dumpwords output emit-cfi)
+(defun emit-symbols (blobs core pp-state output)
+  (dolist (blob blobs)
+    (destructuring-bind (name start . end) blob
+      (let ((c-name (c-name (or name "anonymous") core pp-state)))
+        (format output " lsym \"~a\", 0x~x, 0x~x~%"
+                c-name start (- end start))))))
+
+(defun emit-funs (code vaddr core dumpwords output emit-cfi)
   (let* ((spaces (core-spaces core))
          (ranges (get-text-ranges code spaces))
          (text-sap (code-instructions code))
@@ -743,35 +775,17 @@
     (when (eq (caar ranges) :data) ; Unboxed data and/or padding
       (funcall dumpwords text (cdr (pop ranges)) output))
     (loop
-      (destructuring-bind ((start . end) . symbol-table) (pop ranges)
+      (destructuring-bind (start . end) (pop ranges)
         (setq max-end end)
         (funcall dumpwords (+ text start) simple-fun-code-offset output
                  #(nil #.(format nil ".+~D" (* (1- simple-fun-code-offset)
                                              n-word-bytes))))
         (incf start (* simple-fun-code-offset n-word-bytes))
-        ;; Compute assembler labels. DWARF info can represent discontiguous PC ranges
-        ;; belonging to a single function. e.g. in CL:COMPLEX we have:
-        ;;  range   0 .. 715 = COMPLEX
-        ;;  range 715 .. 964 = (FLET SB-KERNEL::%%MAKE-COMPLEX :IN COMPLEX)
-        ;;  range 964 .. end = COMPLEX
-        ;; You have to explicitly write your own DWARF info to represent that-
-        ;; the assembler won't do it. To avoid that complication for now,
-        ;; we append a uniquifying suffix to the the second and later occurrence.
-        (let ((labels
-               (mapcar (lambda (x)
-                         (binding* ((lispname
-                                     (fun-name-from-core (%make-lisp-obj (cdr x)) core))
-                                    ((c-name globalp)
-                                     (c-name (or lispname "anonymous") core pp-state))
-                                    (quoted-name
-                                     (c-symbol-quote c-name)))
-                           (list (- (car x) start) :label globalp quoted-name)))
-                       (nreverse symbol-table))))
-          ;; Pass the current physical address at which to disassemble,
-          ;; the notional core address (which changes after linker relocation),
-          ;; and the list of locations at which to attach linker symbols.
-          (emit-lisp-function (+ text start) (+ text-vaddr start) (- end start)
-                              labels output emit-cfi core))
+        ;; Pass the current physical address at which to disassemble,
+        ;; the notional core address (which changes after linker relocation),
+        ;; and the length.
+        (emit-lisp-function (+ text start) (+ text-vaddr start) (- end start)
+                            output emit-cfi core)
         (cond ((not ranges) (return))
               ((eq (caar ranges) :pad)
                (format output " .byte ~{0x~x~^,~}~%"
@@ -790,6 +804,21 @@
                   collect (sap-ref-8 text-sap i)))))
 
 (defconstant +gf-name-slot+ 5)
+
+(defun write-preamble (output)
+  (format output " .text~% .file \"sbcl.core\"
+ .macro lasmsym name size
+ .set \"\\name\", .
+ .size \"\\name\", \\size
+ .type \"\\name\", function
+ .endm
+ .macro lsym name start size
+ .set \"\\name\", . + \\start
+ .size \"\\name\", \\size
+ .type \"\\name\", function
+ .endm
+ .globl __lisp_code_start, lisp_jit_code, __lisp_code_end
+ .balign 4096~%__lisp_code_start:~%CS: # code space~%"))
 
 ;;; Convert immobile varyobj space to an assembly file in OUTPUT.
 (defun write-assembler-text
@@ -830,7 +859,7 @@
                        (setf exceptions (adjust-array exceptions (max (length exceptions) (1+ i))
                                                       :initial-element nil)
                              (svref exceptions i)
-                             (format nil "__lisp_code_start+0x~x"
+                             (format nil "CS+0x~x"
                                      (- word (bounds-low code-bounds))))))))
                (emit-asm-directives :qword sap count stream exceptions)))
            (make-code-obj (addr)
@@ -840,9 +869,8 @@
                (%make-lisp-obj (logior translation other-pointer-lowtag))))
            (%widetag-of (word)
              (logand word widetag-mask)))
-    (format output " .text~% .file \"sbcl.core\"
- .globl __lisp_code_start, lisp_jit_code, __lisp_code_end
- .balign 4096~%__lisp_code_start:~%")
+
+    (write-preamble output)
 
     ;; Scan the assembly routines.
     (let* ((code-component (make-code-obj code-addr))
@@ -871,26 +899,29 @@
           ;; Write a table of N-WORDS in length containing the entrypoints
           ;; Not all words in the jump table will necessarily be used.
           (dotimes (i n-words)
-            (format output " .quad ~:[0~;__lisp_code_start+0x~:*~x~]~%"
+            (format output "~A ~:[0~;CS+0x~:*~x~]"
+                    (if (= i 0) " .quad" ",")
                     (when (< i n-entrypoints)
                       (+ (ash header-len word-shift)
                          (cadr (nth i name->addr)))))))
+        (terpri output)
         ;; Loop over the embedded routines
         (dolist (entry name->addr)
           (destructuring-bind (name start-offs . end-offs) entry
             (let ((nbytes (- (1+ end-offs) start-offs)))
-              (format output " .set ~a, .~%~@[ .size ~:*~a, ~d~%~]"
-                      (format nil "~(\"~a\"~)" name) (if emit-sizes nbytes))
+              (format output " lasmsym ~(\"~a\"~), ~d~%" name nbytes)
               (emit-lisp-function (+ (sap-int (code-instructions code-component))
                                      start-offs)
                                   (+ code-addr
                                      (ash (code-header-words code-component) word-shift)
                                      start-offs)
-                                  nbytes nil output nil core)))))
+                                  nbytes output nil core)))))
       (format output " .quad 0, 0~%") ; trailer with SIMPLE-FUN count of 0
       (let ((size (code-component-size code-component))) ; No need to pin
         (incf code-addr size)
         (setf total-code-size size)))
+    (format output "~%# end of lisp asm routines~2%")
+
     (loop
       (when (>= code-addr (bounds-high code-bounds))
         (setq end-loc code-addr)
@@ -928,8 +959,11 @@
                             (code-fixup-locs code spaces)))
               (let ((code-physaddr (logandc2 (get-lisp-obj-address code) lowtag-mask)))
                 (format output "#x~x:~%" code-addr)
+                ;; Emit symbols before the code header data, because the symbols
+                ;; refer to "." (the current PC) which is the base of the object.
+                (emit-symbols (code-symbols code core) core pp-state output)
                 (dumpwords code-physaddr (code-header-words code) output #() code-addr)
-                (emit-funs code code-addr core pp-state #'dumpwords output emit-cfi)))
+                (emit-funs code code-addr core #'dumpwords output emit-cfi)))
              ((functionp (%code-debug-info code))
               (unless seen-trampolines
                 (setq seen-trampolines t)
@@ -959,7 +993,7 @@
                      (c-symbol-quote c-name)
                      (logior code-addr other-pointer-lowtag)
                      emit-sizes)
-           (format output " .quad 0x~x, 0x~x, ~:[~;__lisp_code_start+~]0x~x, 0x~x~%"
+           (format output " .quad 0x~x, 0x~x, ~:[~;CS+~]0x~x, 0x~x~%"
                    (sap-ref-word (int-sap ptr) 0)
                    (sap-ref-word (int-sap ptr) 8)
                    code-space-p (if code-space-p (- fun (bounds-low code-bounds)) fun)
@@ -984,7 +1018,7 @@
                   core pp-state "gf_")))
            (format output "~a:~%~@[ .size ~0@*~a, 48~%~]"
                    (c-symbol-quote c-name) emit-sizes)
-           (format output " .quad 0x~x, .+24, ~:[~;__lisp_code_start+~]0x~x~{, 0x~x~}~%"
+           (format output " .quad 0x~x, .+24, ~:[~;CS+~]0x~x~{, 0x~x~}~%"
                    (sap-ref-word sap 0)
                    code-space-p
                    (if code-space-p (- fin-fun (bounds-low code-bounds)) fin-fun)

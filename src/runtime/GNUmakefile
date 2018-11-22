@@ -113,7 +113,7 @@ testmain: testmain.c libsbcl.so -ldl
 
 SHRINKWRAP_DEPS = ../../output/sbcl.core ../../tools-for-build/editcore.lisp
 shrinkwrap-sbcl.s shrinkwrap-sbcl-core.o: $(SHRINKWRAP_DEPS)
-	../../run-sbcl.sh --script ../../tools-for-build/editcore.lisp split \
+	../../run-sbcl.sh --script ../../tools-for-build/editcore.lisp split --sizes \
 		../../output/sbcl.core shrinkwrap-sbcl.s
 pie-shrinkwrap-sbcl.s pie-shrinkwrap-sbcl-core.o: $(SHRINKWRAP_DEPS)
 	../../run-sbcl.sh --script ../../tools-for-build/editcore.lisp split --pie \

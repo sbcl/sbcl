@@ -2170,6 +2170,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "%NUMERATOR" "CLASSOID-TYPEP" "DSD-READ-ONLY"
                "DSD-DEFAULT" "LAYOUT-INHERITS" "DD-LENGTH"
                "%CODE-ENTRY-POINT"
+               "%CODE-FUN-OFFSET"
                "CODE-ENTRY-POINTS" ; new accessor - returns a vector
                "CODE-N-ENTRIES"
                "CODE-OBJ-IS-FILLER-P"

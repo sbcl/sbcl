@@ -1353,8 +1353,7 @@ We could try a few things to mitigate this:
                                         (plusp (code-n-entries obj)))
                                    ;; Display up through the first fun header
                                    (+ (code-header-words obj)
-                                      (ash (sb-impl::%code-fun-offset obj 0)
-                                           (- word-shift))
+                                      (ash (%code-fun-offset obj 0) (- word-shift))
                                       simple-fun-code-offset)
                                    ;; at most 16 words
                                    (min 16 (ash (primitive-object-size obj)
