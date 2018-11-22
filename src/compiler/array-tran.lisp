@@ -680,7 +680,8 @@
                          (declare (type index n-elements-per-word)) ; i.e., not RATIO
                          `(ceiling (truly-the index ,padded-length-form)
                                    ,n-elements-per-word))))))
-                 ((fixnump c-length)
+                 ((and (fixnump c-length)
+                       (>= c-length 0))
                   (ceiling (* (+ c-length n-pad-elements) n-bits)
                            sb!vm:n-word-bits))
                  (t
