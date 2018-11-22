@@ -23,9 +23,6 @@
             ;; TNs and offsets
             sb!vm::zero-tn
             sb!vm::zero-offset sb!vm::null-offset sb!vm::alloc-offset)))
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (setf *assem-max-locations* 100))
 
 ;;; Constants, types, conversion functions, some disassembler stuff.
 (defun reg-tn-encoding (tn)

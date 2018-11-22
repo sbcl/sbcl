@@ -20,8 +20,6 @@
             sb!vm::registers sb!vm::float-registers
             sb!vm::zero
             sb!vm::lip-tn sb!vm::zero-tn)))
-
-(setf *assem-max-locations* 68)
 
 ;;;; Constants, types, conversion functions, some disassembler stuff.
 

@@ -22,8 +22,6 @@
             sb!vm::zero-tn
             sb!vm::null-offset sb!vm::code-offset sb!vm::zero-offset)))
 
-(setf *assem-max-locations* 68) ; see number-location
-
 
 ;;;; Utility functions.
 
@@ -142,7 +140,7 @@
 ;  src, dst and temp is passed each in loc, and can be a register
 ;  immediate or anything else.
 ; this routine will return an location-number
-; this number must be less than *assem-max-locations*
+; this number must be less than +assem-max-locations+
 (defun location-number (loc)
   (etypecase loc
     (null)

@@ -17,6 +17,11 @@
 ; because of "needs a little more work in the assembler"
 (defconstant sb!assem:assem-scheduler-p nil)
 (defconstant sb!assem:+inst-alignment-bytes+ 4)
+;;; needs a little more work in the assembler, to realise that the
+;;; delays requested here are not mandatory, so that the assembler
+;;; shouldn't fill gaps with NOPs but with real instructions.  -- CSR,
+;;; 2003-09-08
+#+nil (defconstant sb!assem:+assem-max-locations+ 70)
 
 (defconstant +backend-fasl-file-implementation+ :ppc)
   ;; On Linux, the ABI specifies the page size to be 4k-64k, use the

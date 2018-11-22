@@ -13,8 +13,14 @@
 
 ;;;; assembly control parameters
 
-(defvar *assem-max-locations* 0)
-(declaim (type index *assem-max-locations*))
+;;; Only the scheduling assembler cares about this constant,
+;;; but it has to be defined. If ASSEM-SCHEDULER-P is true and it hasn't
+;;; been assigned, we'll get an error. It's OK if ASSEM-SCHEDULER-P is NIL
+;;; and the constant _has_ already been defined. (This is weird but harmless)
+(defconstant +assem-max-locations+
+  (if (boundp '+assem-max-locations+)
+      (symbol-value '+assem-max-locations+)
+      0))
 
 ;;;; the SEGMENT structure
 
@@ -72,9 +78,9 @@
   (inst-number 0 :type index)
   ;; SIMPLE-VECTORs mapping locations to the instruction that reads them and
   ;; instructions that write them
-  (readers (make-array *assem-max-locations* :initial-element nil)
+  (readers (make-array +assem-max-locations+ :initial-element nil)
            :type simple-vector)
-  (writers (make-array *assem-max-locations* :initial-element nil)
+  (writers (make-array +assem-max-locations+ :initial-element nil)
            :type simple-vector)
   ;; The number of additional cycles before the next control transfer,
   ;; or NIL if a control transfer hasn't been queued. When a delayed

@@ -11,6 +11,7 @@
 
 (defconstant sb!assem:assem-scheduler-p t)
 (defconstant sb!assem:+inst-alignment-bytes+ 4)
+(defconstant sb!assem:+assem-max-locations+ 68)
 
 (defconstant +backend-fasl-file-implementation+ :mips)
 
