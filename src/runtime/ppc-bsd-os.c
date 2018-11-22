@@ -90,6 +90,10 @@ int arch_os_thread_init(struct thread *thread) {
     sigaltstack(&sigstack,0);
 #endif
 
+#if defined(LISP_FEATURE_SB_THREAD)
+    pthread_setspecific(specials,thread);
+#endif
+
     return 1;                  /* success */
 }
 
