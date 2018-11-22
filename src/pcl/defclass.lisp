@@ -25,6 +25,34 @@
 
 ;;;; DEFCLASS macro and close personal friends
 
+(declaim (global  *the-class-t*
+                  *the-class-slot-object*
+                  *the-class-structure-object*
+                  *the-class-standard-object*
+                  *the-class-function*
+                  *the-class-funcallable-standard-object*
+                  *the-class-system-class*
+                  *the-class-slot-class*
+                  *the-class-condition-class*
+                  *the-class-structure-class*
+                  *the-class-standard-class*
+                  *the-class-funcallable-standard-class*
+                  *the-class-forward-referenced-class*
+                  *the-class-method*
+                  *the-class-standard-method*
+                  *the-class-standard-reader-method*
+                  *the-class-standard-writer-method*
+                  *the-class-standard-boundp-method*
+                  *the-class-global-reader-method*
+                  *the-class-global-writer-method*
+                  *the-class-global-boundp-method*
+                  *the-class-standard-generic-function*
+                  *the-class-standard-direct-slot-definition*
+                  *the-class-standard-effective-slot-definition*
+
+                  *the-eslotd-standard-class-slots*
+                  *the-eslotd-funcallable-standard-class-slots*))
+
 ;;; state for the current DEFCLASS expansion
 (defvar *initfunctions-for-this-defclass*)
 (defvar *readers-for-this-defclass*)

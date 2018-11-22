@@ -167,8 +167,6 @@
   (declare (ignore slot-names method-cell))
   (initialize-method-function initargs method))
 
-(define-load-time-global *the-class-generic-function*
-  (find-class 'generic-function))
 (define-load-time-global *the-class-standard-generic-function*
   (find-class 'standard-generic-function))
 

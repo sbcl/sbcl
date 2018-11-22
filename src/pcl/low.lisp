@@ -37,11 +37,6 @@
 
 (in-package "SB!PCL")
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-(defvar *optimize-speed*
-  '(optimize (speed 3) (safety 0) (sb!ext:inhibit-warnings 3) (debug 0)))
-) ; EVAL-WHEN
-
 (defmacro dotimes-fixnum ((var count &optional (result nil)) &body body)
   `(dotimes (,var (the fixnum ,count) ,result)
      (declare (fixnum ,var))

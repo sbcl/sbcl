@@ -202,7 +202,9 @@
                                   (t
                                    (!boot-make-wrapper (length slots) name))))
                    (proto nil))
-              (set (make-class-symbol name) class)
+              (let ((symbol (make-class-symbol name)))
+                (when (eq (info :variable :kind symbol) :global)
+                  (set symbol class)))
               (dolist (slot slots)
                 (unless (eq (getf slot :allocation :instance) :instance)
                   (error "Slot allocation ~S is not supported in bootstrap."
@@ -560,7 +562,6 @@
         (let* ((class (find-class name))
                (lclass (find-classoid name))
                (wrapper (classoid-layout lclass)))
-          (set (get-built-in-class-symbol name) class)
           (setf (classoid-pcl-class lclass) class)
 
           (!bootstrap-initialize-class 'built-in-class class

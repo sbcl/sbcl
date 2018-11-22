@@ -178,15 +178,11 @@
               (t
                (subtypep (convert-to-system-type type1)
                          (convert-to-system-type type2))))))))
-
-(define-load-time-global *built-in-class-symbols* ())
 
-(defun get-built-in-class-symbol (class-name)
-  (or (cadr (assq class-name *built-in-class-symbols*))
-      (let ((symbol (make-class-symbol class-name)))
-        (push (list class-name symbol) *built-in-class-symbols*)
-        symbol)))
-
+(defun make-class-symbol (class-name)
+  (format-symbol (load-time-value (find-package "SB-PCL") t)
+                 "*THE-CLASS-~A*" (symbol-name class-name)))
+
 (defvar *standard-method-combination*)
 (defvar *or-method-combination*)
 
