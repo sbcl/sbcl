@@ -913,17 +913,14 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
             pthread_attr_setstacksize(&attr, PTHREAD_STACK_MIN) ||
             (retcode = pthread_create(kid_tid, &attr, new_thread_trampoline_switch_stack, th))
 #else
-#if defined(LISP_FEATURE_WIN32)
+
+# if defined(LISP_FEATURE_WIN32)
             pthread_attr_setstacksize(&attr, thread_control_stack_size) ||
-#else
-# if defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
-            pthread_attr_setstack(&attr, th->control_stack_start,
-                                  thread_control_stack_size) ||
+# elif defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
+            pthread_attr_setstack(&attr, th->control_stack_start, thread_control_stack_size) ||
 # else
-            pthread_attr_setstack(&attr, th->alien_stack_start,
-                                  ALIEN_STACK_SIZE) ||
+            pthread_attr_setstack(&attr, th->alien_stack_start, ALIEN_STACK_SIZE) ||
 # endif
-#endif
             (retcode = pthread_create(kid_tid, &attr, new_thread_trampoline, th))
 #endif
             ) {
