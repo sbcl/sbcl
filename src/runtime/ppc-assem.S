@@ -8,15 +8,14 @@
 #include "sbcl.h"
 #include "lispregs.h"
 #include "globals.h"
+#include "validate.h"
 
 #include "genesis/simple-fun.h"
 #include "genesis/fdefn.h"
 #include "genesis/closure.h"
 #include "genesis/funcallable-instance.h"
 #include "genesis/static-symbols.h"
-#ifdef LISP_FEATURE_SB_THREAD
 #include "genesis/thread.h"
-#endif
 
 #ifdef LISP_FEATURE_DARWIN
 #define CSYMBOL(x) _ ## x
@@ -57,11 +56,16 @@ x:
 #define store(reg,temp,global) \
 	lis temp,ha16(global) @\
 	stw reg,lo16(global)(temp) ; Comment
+#define loadaddr(reg,addr) \
+	lis reg,ha16(addr) @ \
+	ori reg,reg,lo16(addr)
 #else
 #define load(reg,global) \
 	lis reg,global@ha; lwz reg,global@l(reg)
 #define store(reg,temp,global) \
 	lis temp,global@ha; stw reg,global@l(temp)
+#define loadaddr(reg,addr) \
+	lis reg,addr@ha; ori reg,reg,addr@l
 #endif
 
 #define	FIRST_SAVE_FPR	14	/* lowest-numbered non-volatile FPR */
@@ -301,7 +305,9 @@ x:
 	stw	REG(0),4(REG(1))
 
 	/* store old SP and switch to new stack */
-	lwz	REG(10),THREAD_CONTROL_STACK_END_OFFSET(REG(3))
+	loadaddr(REG(9), ALIEN_STACK_SIZE)
+	lwz	REG(10),THREAD_ALIEN_STACK_START_OFFSET(REG(3))
+	add	REG(10),REG(10),REG(9)
 	stwu	REG(1),-16(REG(10))
 	mr	REG(1),REG(10)
 
