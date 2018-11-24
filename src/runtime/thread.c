@@ -58,10 +58,6 @@
 #include <thread.h>
 #endif
 
-#ifdef LISP_FEATURE_OPENBSD
-#define OS_THREAD_STACK
-#endif
-
 #if defined(LISP_FEATURE_WIN32) || defined(OS_THREAD_STACK)
 # define IMMEDIATE_POST_MORTEM
 #else

@@ -95,6 +95,8 @@
 #endif
 
 #define THREAD_BASE_REG %r13
+
+#ifdef OS_THREAD_STACK
         .text
 	.globl  GNAME(funcall1_switching_stack)
 	TYPE(GNAME(funcall1_switching_stack))
@@ -113,6 +115,7 @@ GNAME(funcall1_switching_stack):
         pop     %rbp
         ret
         SIZE(GNAME(funcall1_switching_stack))
+#endif
 
 	.text	
 	.globl  GNAME(call_into_lisp_first_time)

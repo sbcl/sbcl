@@ -293,9 +293,9 @@ x:
 /* the CSP page sits right before the thread */
 # define THREAD_SAVED_CSP_OFFSET (-N_WORD_BYTES)
 #endif
-
 	.text
 
+#ifdef OS_THREAD_STACK
 	GFUNCDEF(funcall1_switching_stack)
         /* The arguments are switched, funcall1_switching_stack(arg, function)
            to avoid shuffling registers
@@ -321,7 +321,7 @@ x:
 	mtlr	REG(0)
 	blr
 	SET_SIZE(funcall1_switching_stack)
-
+#endif
 /*
  * Function to transfer control into lisp.  The lisp object to invoke is
  * passed as the first argument, which puts it in NL0

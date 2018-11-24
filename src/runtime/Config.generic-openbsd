@@ -13,7 +13,7 @@ LINKFLAGS += -Wl,-z,wxneeded
 OS_LIBS += -lutil
 
 ifdef LISP_FEATURE_SB_THREAD
-CFLAGS += -pthread
+CFLAGS += -pthread -DOS_THREAD_STACK
 OS_LIBS += -pthread
 endif
 
