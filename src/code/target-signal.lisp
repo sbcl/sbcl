@@ -38,14 +38,12 @@
 ;;; down to C wrapper functions.)
 
 #!-sb-safepoint
-(define-alien-routine ("unblock_gc_signals" %unblock-gc-signals)
-    void
-  (where unsigned-long)
-  (old unsigned-long))
-
-#!-sb-safepoint
 (defun unblock-gc-signals ()
-  (%unblock-gc-signals 0 0))
+  (with-alien ((%unblock-gc-signals
+                (function void unsigned-long unsigned-long) :extern
+                "unblock_gc_signals"))
+    (alien-funcall %unblock-gc-signals 0 0)
+    nil))
 
 
 ;;;; C routines that actually do all the work of establishing signal handlers
@@ -75,6 +73,8 @@
   (/show0 "enable-interrupt")
   (flet ((run-handler (&rest args)
            (declare (truly-dynamic-extent args))
+           #!-(or c-stack-is-control-stack sb-safepoint) ;; able to do that in interrupt_handle_now()
+           (unblock-gc-signals)
            (in-interruption ()
              (apply handler args))))
     (without-gcing

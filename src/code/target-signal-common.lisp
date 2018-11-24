@@ -27,15 +27,12 @@
         (sb!pcl::*dfun-miss-gfs-on-stack* nil))
      ,@body))
 
-(declaim (inline %unblock-deferrable-signals %unblock-gc-signals))
-(define-alien-routine ("unblock_deferrable_signals"
-                       %unblock-deferrable-signals)
-  void
-  (where unsigned-long)
-  (old unsigned-long))
-
 (defun unblock-deferrable-signals ()
-  (%unblock-deferrable-signals 0 0))
+  (with-alien ((%unblock-deferrable-signals
+                (function void unsigned-long unsigned-long) :extern
+                "unblock_deferrable_signals"))
+    (alien-funcall %unblock-deferrable-signals 0 0)
+    nil))
 
 (defun with-deferrable-signals-unblocked (enable-interrupts function)
   (cond ((and enable-interrupts

@@ -1167,7 +1167,11 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
 #ifndef LISP_FEATURE_SB_SAFEPOINT
         /* Leave deferrable signals blocked, the handler itself will
          * allow signals again when it sees fit. */
+#ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+        /* handler.lisp will hide from the GC, will be enabled in the handler itself.
+         * Not a problem for the conservative GC. */
         unblock_gc_signals(0, 0);
+#endif
 #else
         WITH_GC_AT_SAFEPOINTS_ONLY()
 #endif
