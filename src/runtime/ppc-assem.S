@@ -305,9 +305,11 @@ x:
 	stw	REG(0),4(REG(1))
 
 	/* store old SP and switch to new stack */
-	loadaddr(REG(9), ALIEN_STACK_SIZE)
-	lwz	REG(10),THREAD_ALIEN_STACK_START_OFFSET(REG(3))
-	add	REG(10),REG(10),REG(9)
+        lwz     REG(10),THREAD_ALIEN_STACK_START_OFFSET(REG(3))
+        addis   REG(10),REG(10),ALIEN_STACK_SIZE@ha
+#if ALIEN_STACK_SIZE % 65536 != 0
+        addi    REG(10),REG(10),ALIEN_STACK_SIZE@l
+#endif
 	stwu	REG(1),-16(REG(10))
 	mr	REG(1),REG(10)
 
