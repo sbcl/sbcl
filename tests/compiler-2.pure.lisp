@@ -1849,17 +1849,17 @@
       (let (z)
         (and
          (typep
-          (let ((y (let ((s (cons b c)))
+          (let ((y (let ((s (cons a b)))
                      (declare (dynamic-extent s))
                      (cdr s))))
             (unwind-protect
-                 (let ((s (list a)))
+                 (let ((s (list c)))
                    (declare (dynamic-extent s))
                    (setf z (car s))))
             y)
           'fixnum)
          z)))
-   (('a 1 2) 'a)))
+   ((1 2 'a) 'a)))
 
 (with-test (:name :fixnump-instance-ref-immediately-used.2)
   (checked-compile-and-assert
@@ -1869,4 +1869,4 @@
              (cdr (cdr l)))
         (setf (cdr l) c)
         (typep cdr 'fixnum)))
-   (('a 1 2) t)))
+   ((1 2 'a) t)))
