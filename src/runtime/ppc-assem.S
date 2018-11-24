@@ -56,16 +56,11 @@ x:
 #define store(reg,temp,global) \
 	lis temp,ha16(global) @\
 	stw reg,lo16(global)(temp) ; Comment
-#define loadaddr(reg,addr) \
-	lis reg,ha16(addr) @ \
-	ori reg,reg,lo16(addr)
 #else
 #define load(reg,global) \
 	lis reg,global@ha; lwz reg,global@l(reg)
 #define store(reg,temp,global) \
 	lis temp,global@ha; stw reg,global@l(temp)
-#define loadaddr(reg,addr) \
-	lis reg,addr@ha; ori reg,reg,addr@l
 #endif
 
 #define	FIRST_SAVE_FPR	14	/* lowest-numbered non-volatile FPR */
