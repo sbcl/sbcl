@@ -90,6 +90,7 @@
                    ((and (type= type (specifier-type 'fixnum))
                          (let ((use (lvar-uses object)) index)
                            (and (combination-p use)
+                                (almost-immediately-used-p object use)
                                 (or (and (eq (lvar-fun-name (combination-fun use))
                                              '%instance-ref)
                                          (constant-lvar-p

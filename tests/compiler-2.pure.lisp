@@ -1841,3 +1841,32 @@
              v1))))
    ((0 t) 10)
    ((1 nil) 3)))
+
+(with-test (:name :fixnump-instance-ref-immediately-used)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a b c)
+      (let (z)
+        (and
+         (typep
+          (let ((y (let ((s (cons b c)))
+                     (declare (dynamic-extent s))
+                     (cdr s))))
+            (unwind-protect
+                 (let ((s (list a)))
+                   (declare (dynamic-extent s))
+                   (setf z (car s))))
+            y)
+          'fixnum)
+         z)))
+   (('a 1 2) 'a)))
+
+(with-test (:name :fixnump-instance-ref-immediately-used.2)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a b c)
+      (let* ((l (cons a b))
+             (cdr (cdr l)))
+        (setf (cdr l) c)
+        (typep cdr 'fixnum)))
+   (('a 1 2) t)))
