@@ -264,21 +264,16 @@
             (when (location= x y)
               (delete-vop vop)))))))))
 
+;;; Unchain BRANCHes that jump to a BRANCH.
 ;;; Remove BRANCHes that are jumped over by BRANCH-IF
 ;;; Should be run after DELETE-NO-OP-VOPS, otherwise the empty moves
 ;;; will interfere.
-;;; This usally comes from optional dispatch.
 (defun ir2-optimize-jumps (component)
-  (delete-fall-through-jumps component)
-  (flet ((next-vop (block)
-           (do ((block (ir2-block-next block)
-                  (ir2-block-next block)))
+  (flet ((start-vop (block)
+           (do ((block block (ir2-block-next block)))
                ((null block) nil)
-             (cond ((or (ir2-block-%trampoline-label block)
-                        (ir2-block-%label block))
-                    (return nil))
-                   ((ir2-block-start-vop block)
-                    (return (ir2-block-start-vop block))))))
+             (when (ir2-block-start-vop block)
+               (return (ir2-block-start-vop block)))))
          (next-label (block)
            (do ((block (ir2-block-next block)
                   (ir2-block-next block)))
@@ -289,23 +284,80 @@
                       (return label))
                      ((ir2-block-start-vop block)
                       (return nil)))))))
-    (do-ir2-blocks (block component)
-      (let ((branch-if (ir2-block-last-vop block)))
-        (when (and branch-if
-                   (eq (vop-name branch-if) 'branch-if))
-          (let ((branch (next-vop block)))
-            (when (and branch
-                       (eq (vop-name branch) 'branch))
-              (let* ((branch-if-info (vop-codegen-info branch-if))
-                     (branch-if-target (first branch-if-info))
-                     (branch-target (first (vop-codegen-info branch)))
-                     (next (next-label (vop-block branch))))
-                (when (eq branch-if-target next)
-                  (setf (first branch-if-info) branch-target
-                        ;; Reverse the condition
-                        (second branch-if-info) (not (second branch-if-info)))
-                  (delete-vop branch))))))))))
-
+    (let ((label-block-map (make-hash-table :test #'eq)))
+      (do-ir2-blocks (block component)
+        (setf (gethash (ir2-block-%trampoline-label block) label-block-map)
+              block)
+        (setf (gethash (ir2-block-%label block) label-block-map)
+              block))
+      (labels ((unchain-jumps (vop)
+                 (let* ((target (first (vop-codegen-info vop)))
+                        (target-block (gethash target label-block-map))
+                        (target-vop (start-vop target-block)))
+                   (when (and (eq (vop-name target-vop) 'branch)
+                              (neq target
+                                   (first (vop-codegen-info target-vop))))
+                     (setf (first (vop-codegen-info vop))
+                           (first (vop-codegen-info target-vop)))
+                     ;; What if it jumps to a jump too?
+                     (unchain-jumps vop))))
+               (remove-jump-overs (branch-if branch)
+                 ;; Turn BRANCH-IF L1 BRANCH L2 L1: into BRANCH-IF[NOT] L2
+                 (when (and branch
+                            (eq (vop-name branch) 'branch))
+                   (let* ((branch-if-info (vop-codegen-info branch-if))
+                          (branch-if-target (first branch-if-info))
+                          (branch-target (first (vop-codegen-info branch)))
+                          (next (next-label (vop-block branch))))
+                     (when (eq branch-if-target next)
+                       (setf (first branch-if-info) branch-target)
+                       ;; Reverse the condition
+                       (setf (second branch-if-info) (not (second branch-if-info)))
+                       (delete-vop branch)))))
+               (conditional-p (vop)
+                 (let ((info (vop-info vop)))
+                   (eq (vop-info-result-types info) :conditional))))
+        (do-ir2-blocks (block component)
+          (let ((last (ir2-block-last-vop block)))
+            (case (and last
+                       (vop-name last))
+              (branch
+               (unchain-jumps last)
+               ;; A block may end up having BRANCH-IF BRANCH after coverting an IF
+               (let ((prev (vop-prev last)))
+                 (when (and prev
+                            (or (eq (vop-name prev) 'branch-if)
+                                (conditional-p prev)))
+                   (unchain-jumps prev))))
+              (branch-if
+               (unchain-jumps last))
+              (t
+               (when (and last
+                          (conditional-p last))
+                 (unchain-jumps last))))))
+        ;; Need to unchain the jumps before handling jump-overs,
+        ;; otherwise the BRANCH over which BRANCH-IF jumps may be a
+        ;; target of some other BRANCH
+        (do-ir2-blocks (block component)
+          (let ((last (ir2-block-last-vop block)))
+            (case (and last
+                       (vop-name last))
+              (branch-if
+               (remove-jump-overs last
+                                  (start-vop (ir2-block-next block))))
+              (branch
+               ;; A block may end up having BRANCH-IF BRANCH after coverting an IF
+               (let ((prev (vop-prev last)))
+                 (when (and prev
+                            (or (eq (vop-name prev) 'branch-if)
+                                (conditional-p prev)))
+                   (remove-jump-overs prev last))))
+              (t
+               (when (and last
+                          (conditional-p last))
+                 (remove-jump-overs last
+                                    (start-vop (ir2-block-next block))))))))
+        (delete-fall-through-jumps component)))))
 
 (defun ir2-optimize (component)
   (let ((*2block-info*  (make-hash-table :test #'eq)))
