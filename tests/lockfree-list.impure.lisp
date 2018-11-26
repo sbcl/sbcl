@@ -152,7 +152,11 @@
           (setq best (max ratio best))))))))
 
 (test-util:with-test (:name :lockfree-list-performance)
-  (assert (> (primitive-benchmark)
-             ;; should be able to get at least 2x speedup over lock-based code
-             #-win32 2
-             #+win32 1.5)))
+  (let ((cpus
+         (max 1
+              #-win32 (sb-alien:alien-funcall
+                       (sb-alien:extern-alien "sysconf"
+                                              (function sb-alien:long sb-alien:int))
+                       sb-unix::sc-nprocessors-onln)
+              #+win32 (sb-alien:extern-alien "os_number_of_processors" sb-alien:int))))
+    (assert (> (primitive-benchmark) (log cpus 2)))))
