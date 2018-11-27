@@ -6,7 +6,7 @@ SBCL supports a system-wide event scheduler implemented on top of
 @code{setitimer} that also works with threads but does not require a
 separate scheduler thread.
 
-The following example schedules a timer that writes ``Hello, word'' after
+The following example schedules a timer that writes ``Hello, world'' after
 two seconds.
 
 @lisp
