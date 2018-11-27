@@ -134,26 +134,6 @@
 (defun c-name (lispname core pp-state &optional (prefix ""))
   (when (typep lispname '(string 0))
     (setq lispname "anonymous"))
-
-  ;; Shorten obnoxiously long printed representations of methods
-  ;; by changing FAST-METHOD to METHOD (because who cares?)
-  ;; and shorten
-  ;;   (method my-long-package-name:my-method-name (my-long-package-name:type-name))
-  ;; to
-  ;;   (method my-method-name (type-name))
-  ;; I suspect that can use DWARF info to provide even more description,
-  ;; though I also suspect it's relatively unambiguous anyway
-  ;; especially given that file information is available separately.
-  (flet ((unpackageize (thing)
-           (when (typep thing 'core-sym)
-             (setf (core-sym-package thing) nil))
-           thing))
-    (when (typep lispname '(cons (eql sb-pcl::fast-method)))
-      (setq lispname `(method ,@(cdr lispname)))
-      (setf (second lispname) (unpackageize (second lispname)))
-        (dolist (qual (car (last lispname)))
-          (unpackageize qual))))
-
   ;; Perform backslash escaping on the exploded string
   ;; Strings were stringified without surrounding quotes,
   ;; but there might be quotes embedded anywhere, so escape them,
@@ -235,9 +215,9 @@
                      (translate (symbol-name (translate x spaces)) spaces))
                  x)))))
 
-(defun fun-name-from-core (name core &aux (spaces (core-spaces core))
-                                          (packages (core-packages core))
-                                          (core-nil (core-nil-object core)))
+(defun %fun-name-from-core (name core &aux (spaces (core-spaces core))
+                                           (packages (core-packages core))
+                                           (core-nil (core-nil-object core)))
   (named-let recurse ((depth 0) (x name))
     (unless (is-lisp-pointer (get-lisp-obj-address x))
       (return-from recurse x)) ; immediate object
@@ -294,18 +274,40 @@
         (t "?"))))))
 
 (defun remove-name-junk (name)
-  (named-let recurse ((x name))
-    (cond ((typep x '(cons (eql lambda)))
-           (let ((args (second x)))
-             `(lambda ,(if args sb-c::*debug-name-sharp* "()")
-                ,@(recurse (cddr x)))))
-          ((eq x :in) "in")
-          ((and (typep x '(or string symbol))
-                (= (mismatch (string x) "CLEANUP-FUN-")
-                   (length "CLEANUP-FUN-")))
-           '#:cleanup-fun)
-          ((consp x) (recons x (recurse (car x)) (recurse (cdr x))))
-          (t x))))
+  (setq name
+        (named-let recurse ((x name))
+          (cond ((typep x '(cons (eql lambda)))
+                 (let ((args (second x)))
+                   `(lambda ,(if args sb-c::*debug-name-sharp* "()")
+                      ,@(recurse (cddr x)))))
+                ((eq x :in) "in")
+                ((and (typep x '(or string symbol))
+                      (= (mismatch (string x) "CLEANUP-FUN-")
+                         (length "CLEANUP-FUN-")))
+                 '#:cleanup-fun)
+                ((consp x) (recons x (recurse (car x)) (recurse (cdr x))))
+                (t x))))
+  ;; Shorten obnoxiously long printed representations of methods.
+  (flet ((unpackageize (thing)
+           (when (typep thing 'core-sym)
+             (setf (core-sym-package thing) nil))
+           thing))
+    (when (typep name '(cons (member sb-pcl::slow-method sb-pcl::fast-method
+                                     sb-pcl::slot-accessor)))
+      (setq name `(,(case (car name)
+                      (sb-pcl::fast-method "method")
+                      (sb-pcl::slow-method "Method") ; something visually distinct
+                      (sb-pcl::slot-accessor "accessor"))
+                   ,@(cdr name)))
+      (setf (second name) (unpackageize (second name)))
+      (let ((last (car (last name))))
+        (when (listp last)
+          (dolist (qual last)
+            (unpackageize qual))))))
+  name)
+
+(defun fun-name-from-core (name core)
+  (remove-name-junk (%fun-name-from-core name core)))
 
 ;;; Return a list of ((NAME START . END) ...)
 ;;; for each C symbol that should be emitted for this code object.
@@ -321,25 +323,24 @@
         (blobs))
     (do ((i 0 (+ i 2)))
         ((>= i (length fun-map)))
-      (let ((name
-             (remove-name-junk
-              (fun-name-from-core
-               (sb-c::compiled-debug-fun-name
-                (truly-the sb-c::compiled-debug-fun
-                           (translate (aref fun-map i) spaces)))
-               core)))
+      (let ((name (fun-name-from-core
+                   (sb-c::compiled-debug-fun-name
+                    (truly-the sb-c::compiled-debug-fun
+                               (translate (aref fun-map i) spaces)))
+                   core))
             (start-pc (if (= i 0)
                           0
                           (+ header-bytes (aref fun-map (1- i)))))
             (end-pc (if (< (1+ i) (length fun-map))
                         (+ header-bytes (aref fun-map (1+ i)))
                         (sb-vm::code-component-size code))))
-        ;; Collapse adjacent address ranges named the same.
-        ;; Use EQUALP instead of EQUAL to compare names
-        ;; because instances of CORE-SYMBOL are not interned objects.
-        (if (and blobs (equalp (caar blobs) name))
-            (setf (cddr (car blobs)) end-pc)
-            (push (list* name start-pc end-pc) blobs))))
+        (unless (= end-pc start-pc)
+          ;; Collapse adjacent address ranges named the same.
+          ;; Use EQUALP instead of EQUAL to compare names
+          ;; because instances of CORE-SYMBOL are not interned objects.
+          (if (and blobs (equalp (caar blobs) name))
+              (setf (cddr (car blobs)) end-pc)
+              (push (list* name start-pc end-pc) blobs)))))
     (nreverse blobs)))
 
 (defstruct (descriptor (:constructor make-descriptor (bits)))
@@ -988,7 +989,7 @@
                 (code-space-p (in-bounds-p fun code-bounds))
                 (raw-fun (sap-ref-word (int-sap ptr)
                                        (ash fdefn-raw-addr-slot word-shift)))
-                (c-name (c-name name core pp-state "f_")))
+                (c-name (c-name name core pp-state "F")))
            (format output "~a: # ~x~%~@[ .size ~0@*~a, 32~%~]"
                      (c-symbol-quote c-name)
                      (logior code-addr other-pointer-lowtag)
@@ -1015,7 +1016,7 @@
                           (eql (get-lisp-obj-address name) unbound-marker-widetag))
                       "unnamed"
                       (fun-name-from-core name core))
-                  core pp-state "gf_")))
+                  core pp-state "G")))
            (format output "~a:~%~@[ .size ~0@*~a, 48~%~]"
                    (c-symbol-quote c-name) emit-sizes)
            (format output " .quad 0x~x, .+24, ~:[~;CS+~]0x~x~{, 0x~x~}~%"
