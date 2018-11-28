@@ -119,10 +119,10 @@ RETURN-FROM can be used to exit the form."
       (ir1-convert-progn-body dummy next result forms))))
 
 (def-ir1-translator return-from ((name &optional value) start next result)
-  "RETURN-FROM block-name value-form
+  "RETURN-FROM name value
 
-Evaluate the VALUE-FORM, returning its values from the lexically enclosing
-block BLOCK-NAME. This is constrained to be used only within the dynamic
+Evaluate the VALUE, returning its values from the lexically enclosing
+block NAME. This is constrained to be used only within the dynamic
 extent of the block."
   ;; old comment:
   ;;   We make NEXT start a block just so that it will have a block
