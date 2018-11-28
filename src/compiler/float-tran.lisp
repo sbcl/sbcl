@@ -607,14 +607,6 @@
   (and (numeric-type-p type)
        (eq (numeric-type-complexp type) :real)))
 
-;;; Coerce a numeric type bound to the given type while handling
-;;; exclusive bounds.
-(defun coerce-numeric-bound (bound type)
-  (when bound
-    (if (consp bound)
-        (list (coerce (car bound) type))
-        (coerce bound type))))
-
 #-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (progn
 
@@ -1237,17 +1229,23 @@
       ;; arguments are rational, we make it a union type of (or
       ;; rational (complex rational)).
       (let* ((element-type (numeric-contagion re-type im-type))
-             (rat-result-p (csubtypep element-type
-                                      (specifier-type 'rational))))
-        (if rat-result-p
-            (type-union element-type
-                        (specifier-type
-                         `(complex ,(numeric-type-class element-type))))
-            (make-numeric-type :class (numeric-type-class element-type)
-                               :format (numeric-type-format element-type)
-                               :complexp (if rat-result-p
-                                             :real
-                                             :complex))))
+             (maybe-rat-result-p (types-equal-or-intersect
+                                  element-type (specifier-type 'rational)))
+             (definitely-rat-result-p (csubtypep element-type (specifier-type 'rational)))
+             (real-result-p (and definitely-rat-result-p
+                                 (csubtypep im-type (specifier-type '(eql 0))))))
+        (cond
+          (real-result-p re-type)
+          (maybe-rat-result-p
+           (type-union element-type
+                       (specifier-type
+                        `(complex ,(numeric-type-class element-type)))))
+          (t
+           (make-numeric-type :class (numeric-type-class element-type)
+                              :format (numeric-type-format element-type)
+                              :complexp (if definitely-rat-result-p
+                                            :real
+                                            :complex)))))
       (specifier-type 'complex)))
 
 #-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)

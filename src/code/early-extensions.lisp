@@ -1020,6 +1020,18 @@ NOTE: This interface is experimental and subject to change."
       (destructuring-bind (result) x result)
       x))
 
+;;; Coerce a numeric type bound to the given type while handling
+;;; exclusive bounds.
+(defun coerce-numeric-bound (bound type)
+  (flet ((c (thing)
+           (case type
+             (rational (rational thing))
+             (t (coerce thing type)))))
+    (when bound
+      (if (consp bound)
+          (list (c (car bound)))
+          (c bound)))))
+
 ;;; some commonly-occurring CONSTANTLY forms
 (macrolet ((def-constantly-fun (name constant-expr)
              `(progn

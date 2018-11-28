@@ -1774,34 +1774,32 @@
    t))
 
 (!define-type-method (number :negate) (type)
-  (if (and (null (numeric-type-low type)) (null (numeric-type-high type)))
-      (make-negation-type type)
-      (type-union
-       (make-negation-type (modified-numeric-type type :low nil :high nil))
-       (cond
-         ((null (numeric-type-low type))
-          (modified-numeric-type
-           type
-           :low (let ((h (numeric-type-high type)))
-                  (if (consp h) (car h) (list h)))
-           :high nil))
-         ((null (numeric-type-high type))
-          (modified-numeric-type
-           type
-           :low nil
-           :high (let ((l (numeric-type-low type)))
-                   (if (consp l) (car l) (list l)))))
-         (t (type-union
-             (modified-numeric-type
-              type
-              :low nil
-              :high (let ((l (numeric-type-low type)))
-                      (if (consp l) (car l) (list l))))
-             (modified-numeric-type
-              type
-              :low (let ((h (numeric-type-high type)))
-                     (if (consp h) (car h) (list h)))
-              :high nil)))))))
+  (let ((low (numeric-type-low type))
+        (high (numeric-type-high type)))
+    (if (bounds-unbounded-p low high)
+        (make-negation-type type)
+        (type-union
+         (make-negation-type (modified-numeric-type type :low nil :high nil))
+         (cond
+           ((null low)
+            (modified-numeric-type
+             type
+             :low (if (consp high) (car high) (list high))
+             :high nil))
+           ((null high)
+            (modified-numeric-type
+             type
+             :low nil
+             :high (if (consp low) (car low) (list low))))
+           (t (type-union
+               (modified-numeric-type
+                type
+                :low nil
+                :high (if (consp low) (car low) (list low)))
+               (modified-numeric-type
+                type
+                :low (if (consp high) (car high) (list high))
+                :high nil))))))))
 
 (!define-type-method (number :unparse) (type)
   (let* ((complexp (numeric-type-complexp type))
@@ -1841,9 +1839,10 @@
                  (t base))))
       (ecase complexp
         (:real
+         (aver (neq base 'real))
          base+bounds)
         (:complex
-         (aver (neq base+bounds 'real))
+         (aver (neq base 'real))
          `(complex ,base+bounds))
         ((nil)
          (aver (eq base+bounds 'real))

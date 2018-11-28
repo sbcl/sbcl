@@ -319,9 +319,14 @@
               (let ((spec (if (= i 1) 'bit `(unsigned-byte ,i))))
                 (setf (svref v i) (int-type 0 (1- (ash 1 i))))))))))
 
+(declaim (inline bounds-unbounded-p))
+(defun bounds-unbounded-p (low high)
+  (and (null low) (eq high low)))
+
 ;;; Impose canonicalization rules for NUMERIC-TYPE. Note that in some
-;;; cases, despite the name, we return *EMPTY-TYPE* instead of a
+;;; cases, despite the name, we return *EMPTY-TYPE* or a UNION-TYPE instead of a
 ;;; NUMERIC-TYPE.
+;;;
 ;;; FIXME: The ENUMERABLE flag is unexpectedly NIL for types that
 ;;; come from parsing MEMBER. But bounded integer ranges,
 ;;; however large, are enumerable:
@@ -333,16 +338,36 @@
 ;;; Moreover, it seems like this function should be responsible
 ;;; for figuring out the right value so that callers don't have to.
 (defun make-numeric-type (&key class format (complexp :real) low high
-                               enumerable)
+                            enumerable)
+  (macrolet ((unionize (things initargs)
+               `(let (types)
+                  (dolist (thing ',things (apply #'type-union types))
+                    (let ((low (coerce-numeric-bound low thing))
+                          (high (coerce-numeric-bound high thing)))
+                      (push (make-numeric-type
+                             ,@initargs
+                             :complexp complexp :low low :high high :enumerable enumerable)
+                            types))))))
+    (when (and (null class) (member complexp '(:real :complex)))
+      (return-from make-numeric-type
+        (if (bounds-unbounded-p low high)
+            (specifier-type 'real)
+            (unionize (rational float) (:class thing :format format)))))
+    (when (and (eql class 'float) (member complexp '(:complex :real)) (eql format nil))
+      (return-from make-numeric-type
+        (if (bounds-unbounded-p low high)
+            (specifier-type 'float)
+            (unionize (single-float double-float #!+long-float (error "long-float"))
+                      (:class 'float :format thing))))))
   (multiple-value-bind (low high)
       (case class
         (integer
-             ;; INTEGER types always have their LOW and HIGH bounds
-             ;; represented as inclusive, not exclusive values.
+         ;; INTEGER types always have their LOW and HIGH bounds
+         ;; represented as inclusive, not exclusive values.
          (values (if (consp low) (1+ (type-bound-number low)) low)
                  (if (consp high) (1- (type-bound-number high)) high)))
         (t
-             ;; no canonicalization necessary
+         ;; no canonicalization necessary
          (values low high)))
     ;; if interval is empty
     (when (and low high
@@ -352,19 +377,19 @@
       (return-from make-numeric-type *empty-type*))
     (when (and (eq class 'rational) (integerp low) (eql low high))
       (setf class 'integer))
-        ;; Either lookup the canonical interned object for
-        ;; a point in the type lattice, or construct a new one.
+    ;; Either lookup the canonical interned object for
+    ;; a point in the type lattice, or construct a new one.
     (or (case class
           (float
            (macrolet ((float-type (fmt complexp
-                                   &aux (spec (if (eq complexp :complex)
-                                                  `(complex ,fmt) fmt)))
+                                       &aux (spec (if (eq complexp :complex)
+                                                      `(complex ,fmt) fmt)))
                         `(literal-ctype (interned-numeric-type ',spec
-                                              :class 'float :complexp ,complexp
-                                              :format ',fmt :enumerable nil)
+                                                               :class 'float :complexp ,complexp
+                                                               :format ',fmt :enumerable nil)
                                         ,spec)))
-             (when (and (null low) (null high))
-               (case format
+             (when (bounds-unbounded-p low high)
+               (ecase format
                  (single-float
                   (case complexp
                     (:real    (float-type single-float :real))
@@ -377,8 +402,8 @@
            (macrolet ((int-type (low high)
                         `(literal-ctype
                           (interned-numeric-type nil
-                                              :class 'integer :low ,low :high ,high
-                                              :enumerable (if (and ,low ,high) t nil))
+                                                 :class 'integer :low ,low :high ,high
+                                                 :enumerable (if (and ,low ,high) t nil))
                           (integer ,(or low '*) ,(or high '*)))))
              (cond ((neq complexp :real) nil)
                    ((and (eql low 0) (eql high (1- sb!xc:array-dimension-limit)))
@@ -402,7 +427,7 @@
                     ;; negative bignum
                     (int-type nil #.(1- sb!xc:most-negative-fixnum))))))
           (rational
-           (when (and (eq complexp :real) (null low) (eq high low))
+           (when (and (eq complexp :real) (bounds-unbounded-p low high))
              (literal-ctype (interned-numeric-type nil :class 'rational)
                             rational))))
         (%make-numeric-type :class class :format format :complexp complexp
