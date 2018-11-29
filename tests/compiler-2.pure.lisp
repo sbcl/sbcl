@@ -1870,3 +1870,21 @@
         (setf (cdr l) c)
         (typep cdr 'fixnum)))
    ((1 2 'a) t)))
+
+(with-test (:name :fixnump-instance-ref-immediately-used.2)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a b c)
+      (let* ((l (cons a b))
+             (cdr (cdr l)))
+        (setf (cdr l) c)
+        (typep cdr 'fixnum)))
+   ((1 2 'a) t)))
+(with-test (:name :round-numeric-bound)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a c f)
+      (declare (type (integer -1111868182375 1874303539234) a))
+      (- (rem (funcall f) (max 23 (* 45092832376540563 a -4469591966)))
+         (signum c)))
+   ((1874303539234 2 (constantly 123)) 7)))

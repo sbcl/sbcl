@@ -9,7 +9,7 @@
 
 (in-package "SB!KERNEL")
 
-(eval-when (:compile-toplevel #+sb-xc-host :load-toplevel :execute)
+(eval-when (:compile-toplevel :load-toplevel :execute)
   ;; The following macros expand into either constructor calls,
   ;; if building the cross-compiler, or forms which reference
   ;; previously constructed objects, if running the cross-compiler.

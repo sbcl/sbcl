@@ -2382,17 +2382,19 @@ used for a COMPLEX component.~:@>"
                (if up-p (ceiling cx) (floor cx))))
           (float
            (let ((res
-                  (cond
-                    ((and format (subtypep format 'double-float))
-                     (if (<= most-negative-double-float cx most-positive-double-float)
-                         (coerce cx format)
-                         nil))
-                    (t
-                     (if (<= most-negative-single-float cx most-positive-single-float)
-                         ;; FIXME: bug #389
-                         (coerce cx (or format 'single-float))
-                         nil)))))
-             (if (consp x) (list res) res)))))
+                   (cond
+                     ((and format (subtypep format 'double-float))
+                      (if (<= most-negative-double-float cx most-positive-double-float)
+                          (coerce cx format)
+                          nil))
+                     (t
+                      (if (<= most-negative-single-float cx most-positive-single-float)
+                          ;; FIXME: bug #389
+                          (coerce cx (or format 'single-float))
+                          nil)))))
+             (if (and (consp x) res)
+                 (list res)
+                 res)))))
       nil))
 
 ;;; Handle the case of type intersection on two numeric types. We use
