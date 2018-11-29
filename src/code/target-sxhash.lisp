@@ -112,26 +112,30 @@
 ;;;; <http://burtleburtle.net/bob/hash/doobs.html> for some more
 ;;;; information).
 
-(declaim (inline %sxhash-substring))
-(defun %sxhash-substring (string &optional (count (length string)))
+(declaim (inline %sxhash-simple-substring))
+(defun %sxhash-simple-substring (string start end)
   ;; FIXME: As in MIX above, we wouldn't need (SAFETY 0) here if the
   ;; cross-compiler were smarter about ASH, but we need it for
   ;; sbcl-0.5.0m.  (probably no longer true?  We might need SAFETY 0
   ;; to elide some type checks, but then again if this is inlined in
   ;; all the critical places, we might not -- CSR, 2004-03-10)
   (declare (optimize (speed 3) (safety 0)))
-  (declare (type string string))
-  (declare (type index count))
-  (macrolet ((set-result (form)
+  (macrolet ((guts ()
+               `(loop for i of-type index from start below end do
+                  (set-result (+ result (char-code (aref string i))))
+                  (set-result (+ result (ash result 10)))
+                  (set-result (logxor result (ash result -6)))))
+             (set-result (form)
                `(setf result (ldb (byte #.sb!vm:n-word-bits 0) ,form))))
     (let ((result 0))
       (declare (type (unsigned-byte #.sb!vm:n-word-bits) result))
-      (unless (typep string '(vector nil))
-        (dotimes (i count)
-          (declare (type index i))
-          (set-result (+ result (char-code (aref string i))))
-          (set-result (+ result (ash result 10)))
-          (set-result (logxor result (ash result -6)))))
+      ;; Avoid accessing elements of a (simple-array nil (*)).
+      ;; The expansion of STRING-DISPATCH involves ETYPECASE,
+      ;; so we can't simply omit one case. Therefore that macro
+      ;; is unusable here.
+      (typecase string
+        (simple-base-string (guts))
+        ((simple-array character (*)) (guts)))
       (set-result (+ result (ash result 3)))
       (set-result (logxor result (ash result -11)))
       (set-result (logxor result (ash result 15)))
@@ -154,19 +158,23 @@
   ;; of let conversion in the cross compiler, which otherwise causes
   ;; strongly suboptimal register allocation.
   (flet ((trick (x)
-           (%sxhash-substring x)))
+           (%sxhash-simple-substring x 0 (length x))))
     (declare (notinline trick))
     (trick x)))
 
-(defun %sxhash-simple-substring (x count)
-  (declare (optimize speed))
-  (declare (type simple-string x))
-  (declare (type index count))
-  ;; see comment in %SXHASH-SIMPLE-STRING
-  (flet ((trick (x count)
-           (%sxhash-substring x count)))
-    (declare (notinline trick))
-    (trick x count)))
+;;; This is an out-of-line callable entrypoint that the compiler can
+;;; transform SXHASH into when hashing a non-simple string.
+(defun %sxhash-string (x)
+  (declare (optimize speed) (type string x))
+  (multiple-value-bind (string start end)
+      (if (array-header-p x)
+          (with-array-data ((string x) (start) (end) :check-fill-pointer t)
+            (values string start end))
+          (values x 0 (length x)))
+    ;; I'm not sure I believe the comment about FLET TRICK being needed.
+    ;; The generated code seems tight enough, and the comment is, after all,
+    ;; >14 years old.
+    (%sxhash-simple-substring string start end)))
 
 ;;;; the SXHASH function
 
@@ -340,8 +348,15 @@
                (symbol (sxhash x))      ; through DEFTRANSFORM
                (array
                 (typecase x
-                  (simple-string (sxhash x)) ; through DEFTRANSFORM
-                  (string (%sxhash-substring x))
+                  ;; If we could do something smart for widetag-based jump tables,
+                  ;; then we wouldn't have to think so much about whether to test
+                  ;; STRING and BIT-VECTOR inside or outside of the ARRAY stanza.
+                  ;; The code is structured now to narrow down in broad strokes with
+                  ;; the outer typecase, and then refines the type further.
+                  ;; We could equally well move the STRING test into the outer
+                  ;; typecase, but that would impart one more test in front of
+                  ;; all remaining stanzas.
+                  (string (%sxhash-string x))
                   (simple-bit-vector (sxhash x)) ; through DEFTRANSFORM
                   (bit-vector
                    ;; FIXME: It must surely be possible to do better
@@ -578,3 +593,6 @@
                      (t (mix (recurse (car x) (1- depthoid))
                              (recurse (cdr x) (1- depthoid)))))))
       (traverse 0 name 10))))
+
+;;; Not needed post-build
+(clear-info :function :inlining-data '%sxhash-simple-substring)

@@ -245,6 +245,8 @@
 ;;; filesystem root- every directory in your work space might hash to the same
 ;;; value under SXHASH. Mixing in all pieces of the directory path solves that.
 (defun pathname-dir-hash (directory)
+  ;; FIXME: all instances of PATTERN hash to the same thing.
+  ;; We should probably hash the pattern pieces. (Same for stem-hash)
   (let ((hash (sxhash (car directory))))
     (dolist (piece (cdr directory) hash)
       (mixf hash (sxhash piece)))))

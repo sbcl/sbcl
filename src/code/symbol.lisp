@@ -87,7 +87,7 @@ distinct from the global value. Can also be SETF."
                    (char= (schar string 2) #\L)))))
       (return-from compute-symbol-hash (sxhash nil)))
   ;; And make a symbol's hash not the same as (sxhash name) in general.
-  (let ((sxhash (logand (lognot (%sxhash-simple-substring string length))
+  (let ((sxhash (logand (lognot (%sxhash-simple-substring string 0 length))
                         sb!xc:most-positive-fixnum)))
     (if (zerop sxhash) #x55AA sxhash))) ; arbitrary substitute for 0
 

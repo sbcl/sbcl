@@ -95,9 +95,12 @@
 (macrolet ((compiler-sxhash (x)
              #+sb-xc-host `(error "Compiler wanted to eval (SXHASH '~S)" (lvar-value ,x))
              #-sb-xc-host `(sxhash (lvar-value ,x))))
-(deftransform sxhash ((x) (simple-string))
+(deftransform sxhash ((x) (string))
   (cond ((constant-lvar-p x) (compiler-sxhash x))
-        (t '(%sxhash-simple-string x))))
+        ((csubtypep (lvar-type x) (specifier-type 'simple-string))
+         '(%sxhash-simple-string x))
+        (t
+         '(%sxhash-string x))))
 (deftransform sxhash ((x) (symbol))
   (cond ((csubtypep (lvar-type x) (specifier-type 'null))
          ;; Test this before CONSTANT-LVAR-P because it does happen
