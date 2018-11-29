@@ -21,6 +21,7 @@
     ;; an instance of FOO whose LAYOUT-INVALID slot is T.
     ;; There may be other ways that this happens,
     ;; but exactly how it happens is irrelevant.
+    (proclaim (list 'special (intern "*THING*")))
     (eval
      (read-from-string
       "(progn
