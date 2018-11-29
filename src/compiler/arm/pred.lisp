@@ -28,7 +28,7 @@
 ;;; The generic conditional branch, emitted immediately after test
 ;;; VOPs that only set flags.
 (define-vop (branch-if)
-  (:info dest flags not-p)
+  (:info dest not-p flags)
   (:generator 0
     (flet ((negate-condition (name)
              (let ((code (logxor 1 (conditional-opcode name))))

@@ -35,7 +35,7 @@
 ;;; false. Otherwise, the code must branch to dest if the test was true.
 
 (define-vop (branch-if)
-  (:info dest flags not-p)
+  (:info dest not-p flags)
   (:generator 0
      (flet ((negate-condition (name)
               (let ((code (logxor 1 (conditional-opcode name))))

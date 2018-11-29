@@ -657,7 +657,7 @@
                (vop branch node block (block-label alternative))))
           (t
            (emit-template node block template args nil info-args)
-           (vop branch-if if block (block-label consequent) flags not-p)
+           (vop branch-if if block (block-label consequent) not-p flags)
            (if (drop-thru-p if alternative)
                (register-drop-thru alternative)
                (vop branch if block (block-label alternative)))))))

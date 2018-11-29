@@ -179,7 +179,7 @@
            (a    (first succ))
            (b    (second succ)))
 
-      (destructuring-bind (jump-target flags not-p) (vop-codegen-info vop)
+      (destructuring-bind (jump-target not-p flags) (vop-codegen-info vop)
         (multiple-value-bind (label target value-a value-b)
             (cmovp jump-target a b)
           (unless label
@@ -303,7 +303,7 @@
                 (when (eq branch-if-target next)
                   (setf (first branch-if-info) branch-target
                         ;; Reverse the condition
-                        (third branch-if-info) (not (third branch-if-info)))
+                        (second branch-if-info) (not (second branch-if-info)))
                   (delete-vop branch))))))))))
 
 

@@ -29,8 +29,8 @@
 ;;; VOPs that only set flags.
 
 (define-vop (branch-if)
-  (:info dest flags not-p)
-  (:ignore dest flags not-p)
+  (:info dest not-p flags)
+  (:ignore dest not-p flags)
   (:generator 0
      (error "BRANCH-IF not yet implemented")))
 
