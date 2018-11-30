@@ -135,8 +135,9 @@
 ;;; (It works, but might reach the entire heap)
 ;;; To turn this into an actual thing, we'd want to reduce the consing.
 (defun deep-size (obj &optional (leafp (lambda (x)
-                                         (typep x '(or symbol layout fdefn
-                                                       classoid)))))
+                                         (typep x '(or package symbol fdefn
+                                                       function code-component
+                                                       layout classoid)))))
   (let ((worklist (list obj))
         (seen (make-hash-table :test 'eq))
         (tot-bytes 0))

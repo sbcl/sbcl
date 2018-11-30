@@ -13,6 +13,8 @@
 
 (in-package :cl-user)
 
+(enable-test-parallelism)
+
 ;;; Since *another* BUTLAST problem was reported (anonymously!) on the
 ;;; SourceForge summary page magical bugs web interface 2001-09-01, it
 ;;; looks as though it's past time to start accumulating regression
@@ -210,7 +212,7 @@
                   (,function ,needle list ,@args)))
            (() expected))))
 
-  (with-test (:name assoc)
+  (with-test (:name assoc :serial t)
     (let ((numbers '((1 a) (2 b)))
           (tricky '(nil (a . b) nil (nil . c) (c . d))))
       (test 'assoc 1    numbers '()                    '(1 a))
@@ -240,7 +242,7 @@
       ;; in a alist
       (test 'assoc nil tricky  '(:test #'eq)      '(nil . c))))
 
-  (with-test (:name rassoc)
+  (with-test (:name rassoc :serial t)
     (let ((numbers '((a . 1) (b . 2)))
           (tricky '(nil (b . a) nil (c . nil) (d . c))))
       (test 'rassoc 1    numbers '()                    '(a . 1))
@@ -269,7 +271,7 @@
       (test 'rassoc nil  tricky  '(:test #'eq)          '(c . nil)))))
 
 ;;;; member-if & assoc-if & rassoc-if
-(with-test (:name (member-if assoc-if rassoc-if))
+(with-test (:name (member-if assoc-if rassoc-if) :slow t)
   (macrolet ((test (value form)
                `(let ((* ,value))
                   (assert (eval ,form))
@@ -296,7 +298,7 @@
           (equal (cons 2 'b) (assoc-if 'evenp *)))))
 
 ;;;; member-if-not & assoc-if-not
-(with-test (:name (member-if-not assoc-if-not))
+(with-test (:name (member-if-not assoc-if-not) :slow t)
   (macrolet ((test (value form)
                `(let ((* ,value))
                   (assert (eval ,form))

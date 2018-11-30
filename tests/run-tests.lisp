@@ -43,11 +43,14 @@
            (t
             (push (truename (parse-namestring arg)) *explicit-test-files*))))
   (setf *explicit-test-files* (nreverse *explicit-test-files*))
-  (pure-runner (pure-load-files) 'load-test)
-  (pure-runner (pure-cload-files) 'cload-test)
-  (impure-runner (impure-load-files) 'load-test)
-  (impure-runner (impure-cload-files) 'cload-test)
-  #-win32 (impure-runner (sh-files) 'sh-test)
+  (with-open-file (log "test.log" :direction :output
+                       :if-exists :overwrite
+                       :if-does-not-exist :create)
+    (pure-runner (pure-load-files) 'load-test log)
+    (pure-runner (pure-cload-files) 'cload-test log)
+    (impure-runner (impure-load-files) 'load-test log)
+    (impure-runner (impure-cload-files) 'cload-test log)
+    #-win32 (impure-runner (sh-files) 'sh-test log))
   (report)
   (sb-ext:exit :code (if (unexpected-failures)
                          1
@@ -97,7 +100,7 @@
           (t
            (format t "All tests succeeded~%")))))
 
-(defun pure-runner (files test-fun)
+(defun pure-runner (files test-fun log)
   (when files
     (format t "// Running pure tests (~a)~%" test-fun)
     (let ((*package* (find-package :cl-user))
@@ -113,7 +116,11 @@
                        (if (eq sb-ext:*evaluator-mode* :interpret)
                            (cons :interpreter *features*)
                            *features*)))
-                (funcall test-fun file)))
+                (let ((start (get-internal-real-time)))
+                  (funcall test-fun file)
+                  (let ((end (get-internal-real-time)))
+                    (format log "~5d - ~a~%" (- end start) file)
+                    (force-output log)))))
           (skip-file ())))
       (append-failures))))
 
@@ -145,7 +152,8 @@
      ,*break-on-error*
      ,(eq *test-evaluator-mode* :interpret))))
 
-(defun impure-runner (files test-fun)
+(defun impure-runner (files test-fun log)
+  (declare (ignore log))
   (when files
     (format t "// Running impure tests (~a)~%" test-fun)
     (dolist (file files)

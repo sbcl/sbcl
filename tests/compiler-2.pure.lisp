@@ -23,6 +23,8 @@
 
 (cl:in-package :cl-user)
 
+(enable-test-parallelism)
+
 (defun compiles-with-warning (lambda)
   (assert (nth-value 2 (checked-compile lambda :allow-warnings t))))
 
@@ -157,14 +159,16 @@
     (assert (ctu:find-named-callees f :name 'princ-to-string))))
 
 (with-test (:name :space-bounds-no-consing
-                  :skipped-on :interpreter)
+            :serial t
+            :skipped-on :interpreter)
   ;; Asking for the size of a heap space should not cost anything!
   (ctu:assert-no-consing (sb-vm:%space-bounds :static))
   (ctu:assert-no-consing (sb-vm:space-bytes :static)))
 
 (with-test (:name (sb-vm:map-allocated-objects :no-consing)
-                  :fails-on :cheneygc
-                  :skipped-on :interpreter)
+            :serial t
+            :fails-on :cheneygc
+            :skipped-on :interpreter)
   (let ((n 0))
     (sb-int:dx-flet ((f (obj type size)
                        (declare (ignore obj type size))
@@ -1562,6 +1566,7 @@
     (('list) nil)))
 
 (with-test (:name :copyprop-sc-mismatch-between-moves
+            :serial t
             :skipped-on :interpreter)
   (let ((f (checked-compile
             '(lambda (f x)

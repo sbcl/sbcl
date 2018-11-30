@@ -14,6 +14,8 @@
 
 ;;;; properties of symbols, e.g. presence of doc strings for public symbols
 
+(enable-test-parallelism)
+
 (with-test (:name (documentation :cl) :skipped-on (:not :sb-doc))
   (let ((n 0))
     (do-symbols (s 'cl)
@@ -66,7 +68,7 @@
   (assert (not (special-operator-p 'declare))))
 
 ;;; WITH-TIMEOUT should accept more than one form in its body.
-(with-test (:name (sb-ext:with-timeout :forms))
+(with-test (:name (sb-ext:with-timeout :forms) :slow t)
   (handler-bind ((sb-ext:timeout #'continue))
     (sb-ext:with-timeout 3
       (sleep 2)
@@ -75,7 +77,7 @@
 ;;; SLEEP should not cons except on 32-bit platforms when
 ;;; (> (mod seconds 1) (* most-positive-fixnum 1e-9))
 (with-test (:name (sleep :non-consing)
-                  :skipped-on :interpreter)
+            :serial t :skipped-on :interpreter)
   (handler-case (sb-ext:with-timeout 5
                   (ctu:assert-no-consing (sleep 0.00001s0))
                   (locally (declare (notinline sleep))

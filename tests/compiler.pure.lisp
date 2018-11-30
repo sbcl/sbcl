@@ -18,6 +18,8 @@
            (not (member :sb-fasteval *features*)))
   (invoke-restart 'run-tests::skip-file))
 
+(enable-test-parallelism)
+
 ;;; Exercise a compiler bug (by crashing the compiler).
 ;;;
 ;;; This test code is from Douglas Crosher's simplified TICKLE-BUG
@@ -3490,7 +3492,8 @@
                             :allow-style-warnings t)))
     (assert (null (funcall f)))))
 
-(with-test (:name :flush-vector-creation :skipped-on :interpreter)
+(with-test (:name :flush-vector-creation :skipped-on :interpreter
+            :serial t)
   (let ((f (checked-compile `(lambda ()
                                (dotimes (i 1024)
                                  (vector i i i))
@@ -4543,6 +4546,7 @@
   (search "Allocating a value-cell at runtime for"
           (princ-to-string condition)))
 (with-test (:name (compile :escape-analysis-for-nlxs)
+            :serial t
             :skipped-on :interpreter)
   (flet ((test (check lambda &rest args)
            (multiple-value-bind (fun failure-p warnings style-warnings notes)
@@ -4972,7 +4976,10 @@
 
 ;; win32 is very specific about the order in which catch blocks
 ;; must be allocated on the stack
-(with-test (:name (compile :bug-1072739))
+;;
+;; This test is on the critical path. When started as the very first test,
+;; it finishes as the last.
+(with-test (:name (compile :bug-1072739) :slow t)
   (checked-compile-and-assert (:optimize :safe)
       `(lambda ()
          (STRING=
@@ -5106,6 +5113,7 @@
 
 ;; quantifiers shouldn't cons themselves.
 (with-test (:name :quantifiers-no-consing
+            :serial t
             :skipped-on (or :interpreter
                              (not :stack-allocatable-closures)))
   (let ((constantly-t (lambda (x) x t))
@@ -5427,7 +5435,8 @@
    `(lambda (a &optional (b (error "nope")) (c (error "nope")))
       (values c b a))))
 
-(with-test (:name :nth-value-of-non-constant-N :skipped-on :interpreter)
+(with-test (:name :nth-value-of-non-constant-N :skipped-on :interpreter
+            :serial t)
   (labels ((foo (n f) (nth-value n (funcall f)))
            (bar () (values 0 1 2 3 4 5 6 7 8 9)))
     (assert (= (foo 5 #'bar) 5)) ; basic correctness
@@ -5578,7 +5587,8 @@
     ;; The function can not return YIKES
     (assert (not (ctu:find-code-constants f :type '(eql yikes))))))
 
-(with-test (:name :compile-file-error-position-reporting)
+(with-test (:name :compile-file-error-position-reporting
+            :serial t)
   (dolist (input '("data/wonky1.lisp" "data/wonky2.lisp" "data/wonky3.lisp"))
     (let ((expect (with-open-file (f input) (read f))))
       (assert (stringp expect))
@@ -5682,13 +5692,13 @@
            (assert failurep)
            (assert-error (funcall fun) sb-int:compiled-program-error))))
 
-  (with-test (:name (compile macrolet :malformed))
+  (with-test (:name (compile macrolet :malformed) :serial t)
     (test '(macrolet (foo () 'bar)))
     (test '(macrolet x))
     (test '(symbol-macrolet x))
     (test '(symbol-macrolet (x))))
 
-  (with-test (:name (compile flet :malformed))
+  (with-test (:name (compile flet :malformed) :serial t)
     (test '(flet (foo () 'bar)))
     (test '(flet x))
     (test '(labels (foo () 'bar)))
@@ -5737,20 +5747,20 @@
     ((#\a #\A) t)))
 
 (with-test (:name (oddp fixnum :no-consing)
-            :skipped-on :interpreter)
+            :serial t :skipped-on :interpreter)
   (let ((f (checked-compile '(lambda (x) (oddp x)))))
     (ctu:assert-no-consing (funcall f most-positive-fixnum))))
 (with-test (:name (oddp bignum :no-consing)
-            :skipped-on :interpreter)
+            :serial t :skipped-on :interpreter)
   (let ((f (checked-compile '(lambda (x) (oddp x))))
         (x (* most-positive-fixnum most-positive-fixnum 3)))
     (ctu:assert-no-consing (funcall f x))))
 (with-test (:name (logtest fixnum :no-consing :bug-1277690)
-            :skipped-on :interpreter)
+            :serial t :skipped-on :interpreter)
   (let ((f (checked-compile '(lambda (x) (logtest x most-positive-fixnum)))))
     (ctu:assert-no-consing (funcall f 1))))
 (with-test (:name (logtest bignum :no-consing)
-            :skipped-on :interpreter)
+            :serial t :skipped-on :interpreter)
   (let ((f (checked-compile '(lambda (x) (logtest x 1))))
         (x (* most-positive-fixnum most-positive-fixnum 3)))
     (ctu:assert-no-consing (funcall f x))))

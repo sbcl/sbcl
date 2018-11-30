@@ -13,6 +13,8 @@
 
 (cl:in-package :cl-user)
 
+(enable-test-parallelism)
+
 ;;; Once upon a time, in the process of porting CMUCL's SPARC backend
 ;;; to SBCL, multiplications were excitingly broken.  While it's
 ;;; unlikely that anything with such fundamental arithmetic errors as

@@ -12,6 +12,8 @@
 
 ;;;; Utilities
 
+(enable-test-parallelism)
+
 (defun ctype= (left right)
   (let ((a (sb-kernel:specifier-type left)))
     ;; SPECIFIER-TYPE is a memoized function, and TYPE= is a trivial
@@ -274,7 +276,7 @@
 ;;; (In fact, this is such a fearsome loop that executing it with the
 ;;; evaluator would take ages... Disable it under those circumstances.)
 #+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
-(with-test (:name (:type-derivation :logical-operations :correctness))
+(with-test (:name (:type-derivation :logical-operations :correctness) :slow t)
   (let* ((n-bits 5)
          (size (ash 1 n-bits)))
     (labels ((brute-force (a b c d op)
@@ -310,7 +312,7 @@
                             (loop for d from c below size do
                                   (test a b c d op deriver))))))))))
 
-(with-test (:name (:type-derivation :logical-operations :scaling))
+(with-test (:name (:type-derivation :logical-operations :scaling) :slow t)
   (let ((type-x1 (sb-c::specifier-type `(integer ,(expt 2 10000)
                                                  ,(expt 2 10000))))
         (type-x2 (sb-c::specifier-type `(integer ,(expt 2 100000)

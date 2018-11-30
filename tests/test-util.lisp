@@ -6,6 +6,8 @@
 
            ;; thread tools
            #:make-kill-thread #:make-join-thread
+           ;; cause tests to run in multiple threads
+           #:enable-test-parallelism
 
            ;; MAP-OPTIMIZATION-*
            #:map-optimization-quality-combinations
@@ -50,13 +52,13 @@
       (push thread *threads-to-join*))
     thread))
 
-(defun log-msg (&rest args)
-  (apply #'format *trace-output* "~&::: ~@?~%" args)
-  (force-output *trace-output*))
+(defun log-msg (stream &rest args)
+  (prog1 (apply #'format stream "~&::: ~@?~%" args)
+    (force-output stream)))
 
-(defun log-msg/non-pretty (&rest args)
+(defun log-msg/non-pretty (stream &rest args)
   (let ((*print-pretty* nil))
-    (apply #'log-msg args)))
+    (apply #'log-msg stream args)))
 
 (defun run-test (test-function name fails-on)
   (start-test)
@@ -69,7 +71,7 @@
                                 (fail-test :unexpected-failure name error))
                             (return-from run-test))))
       ;; Non-pretty is for cases like (with-test (:name (let ...)) ...
-      (log-msg/non-pretty "Running ~S" name)
+      (log-msg/non-pretty *trace-output* "Running ~S" name)
       (funcall test-function)
       #+sb-thread
       (let ((any-leftover nil))
@@ -99,9 +101,40 @@
       (if (expected-failure-p fails-on)
           (fail-test :unexpected-success name nil)
           ;; Non-pretty is for cases like (with-test (:name (let ...)) ...
-          (log-msg/non-pretty "Success ~S" name)))))
+          (log-msg/non-pretty *trace-output* "Success ~S" name)))))
 
-(defmacro with-test ((&key fails-on broken-on skipped-on name)
+;;; Like RUN-TEST but do not perform any of the automated thread management.
+;;; Since multiple threads are executing tests, there is no reason to kill
+;;; unrecognized threads.
+(sb-ext:define-load-time-global *output-mutex* (sb-thread:make-mutex))
+(defun run-test-concurrently (test-spec)
+  (destructuring-bind (test-body . name) test-spec
+    (sb-thread:with-mutex (*output-mutex*)
+      (log-msg/non-pretty *trace-output* "Running ~S" name))
+    (let ((stream (make-string-output-stream)))
+      (let ((*standard-output* stream)
+            (*error-output* stream))
+        (let ((f (compile nil `(lambda () ,@test-body))))
+          (funcall f))
+        (let ((string (get-output-stream-string stream)))
+          (sb-thread:with-mutex (*output-mutex*)
+            (when (plusp (length string))
+              (log-msg/non-pretty *trace-output* "Output from ~S" name)
+              (write-string string *trace-output*))
+            (log-msg/non-pretty *trace-output* "Success ~S" name)))))))
+
+(defvar *deferred-test-forms*)
+(defun enable-test-parallelism ()
+  (let ((n (sb-ext:posix-getenv "SBCL_TEST_PARALLEL")))
+    (when n
+      (setq *deferred-test-forms* (vector (parse-integer n) nil nil)))))
+
+;;; Tests which are not broken in any way and do not mandate sequential
+;;; execution are pushed on a worklist to execute in multiple threads.
+;;; The purpose of running tests in parallel is to exercise the compiler
+;;; to show that it works without acquiring the world lock,
+;;; but the nice side effect is that the tests finish quicker.
+(defmacro with-test ((&key fails-on broken-on skipped-on name serial slow)
                      &body body)
   (flet ((name-ok (x y)
            (declare (ignore y))
@@ -123,9 +156,14 @@
      `(progn
         (start-test)
         (fail-test :skipped-disabled ',name "Test disabled for this combination of platform and features")))
+    ((and (boundp '*deferred-test-forms*) (not fails-on) (not serial))
+     ;; To effectively parallelize calls to COMPILE, we must defer compilation
+     ;; until a worker thread has picked off the test from shared worklist.
+     ;; Thus we push only the form to be compiled, not a lambda.
+     `(push (cons ',body ',name)
+            (elt *deferred-test-forms* ,(if slow 1 2))))
     (t
-     `(run-test (lambda ()
-                  ,@body)
+     `(run-test (lambda () ,@body)
                 ',name
                 ',fails-on))))
 
@@ -150,9 +188,9 @@
 
 (defun fail-test (type test-name condition)
   (if (stringp condition)
-      (log-msg "~@<~A ~S ~:_~A~:>"
+      (log-msg *trace-output* "~@<~A ~S ~:_~A~:>"
                type test-name condition)
-      (log-msg "~@<~A ~S ~:_due to ~S: ~4I~:_\"~A\"~:>"
+      (log-msg *trace-output* "~@<~A ~S ~:_due to ~S: ~4I~:_\"~A\"~:>"
                type test-name (type-of condition) condition))
   (push (list type *test-file* (or test-name *test-count*))
         *failures*)
