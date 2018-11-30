@@ -1969,9 +1969,6 @@ static void defrag_immobile_space(boolean verbose)
     int n_layout_pages = calc_n_fixedobj_pages(
         obj_type_histo[INSTANCE_WIDETAG/4],
         LAYOUT_ALIGN / N_WORD_BYTES);
-#if !(defined(LISP_FEATURE_IMMOBILE_CODE) && defined(LISP_FEATURE_COMPACT_INSTANCE_HEADER))
-    gc_assert(n_fin_pages == 0);
-#endif
     char* layout_alloc_ptr = defrag_base;
     char* symbol_alloc_ptrs[N_SYMBOL_KINDS+1];
     symbol_alloc_ptrs[0]    = layout_alloc_ptr + n_layout_pages * IMMOBILE_CARD_BYTES;

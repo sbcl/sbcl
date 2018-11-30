@@ -236,6 +236,7 @@ extern lispobj virtual_fdefn_callee_lispobj(struct fdefn *fdefn,uword_t);
 
 static inline lispobj points_to_asm_routine_p(uword_t ptr) {
 # if defined(LISP_FEATURE_IMMOBILE_SPACE)
+    extern uword_t asm_routines_start, asm_routines_end;
     // Lisp assembly routines are in varyobj space, not readonly space
     return asm_routines_start <= ptr && ptr < asm_routines_end;
 # else

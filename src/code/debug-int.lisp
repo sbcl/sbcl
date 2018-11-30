@@ -561,16 +561,46 @@
 ;;; implement page-wide hazard pointers informing GC not to do anything
 ;;; to any object on a specified page.
 ;;;
+;;; On top of the considerations about dynamic space, there is a further issue
+;;; with allocatin of immobile code. The allocator creates transient inconsistent
+;;; states when it reuses holes. Even if the header could be written atomically,
+;;; there can be junk in the remaining bytes of the hole that gets rewritten as
+;;; a smaller hole. It's evident that acquiring the allocator mutex works around
+;;; that glitch, as without such precaution, 'compiler.pure.lisp' would routinely
+;;; crash when run in multiple threads. A better fix would be to preseve invariants
+;;; at all times when allocating, both for the new hole that results from the hole
+;;; that gets cut down to size, and for the new object per se. Example:
+;;;    | hole ............................ |  1 Kb
+;;;      ^ new-object here  ^ smaller hole starts here
+;;;        (512 bytes)
+;;;
+;;; We first need to atomically write the header of the smaller hole
+;;; (which can't even be seen until the new object header is written).
+;;; This establishes that there won't be an inconsistent state.
+;;; Then we need to atomically write the new object header.
+;;; I suspect that both atomic writes should use double-wide CAS,
+;;; because if the object header is written using lispword-sized writes,
+;;; then the object can be sized wrong, and in this case it does cause problems
+;;; because the remaining bytes are not zero-filled. The allocator is similar
+;;; to malloc() in that regard.
+
 (defun code-header-from-pc (pc)
   (declare (system-area-pointer pc))
-  (without-gcing
-   (let ((component-ptr
-          (sb!alien:alien-funcall (sb!alien:extern-alien
-                                   "component_ptr_from_pc"
-                                   (function system-area-pointer system-area-pointer))
-                                  pc)))
-     (unless (sap= component-ptr (int-sap #x0))
-       (%make-lisp-obj (logior (sap-int component-ptr) sb!vm:other-pointer-lowtag))))))
+  (macrolet ((heap-scan ()
+               `(let ((component-ptr
+                       (sb!alien:alien-funcall
+                        (sb!alien:extern-alien
+                         "component_ptr_from_pc"
+                         (function system-area-pointer system-area-pointer))
+                        pc)))
+                  (unless (sap= component-ptr (int-sap 0))
+                    (%make-lisp-obj
+                     (logior (sap-int component-ptr) sb!vm:other-pointer-lowtag))))))
+    #!+immobile-space
+    (sb!thread::with-system-mutex (sb!vm::*immobile-space-mutex* :without-gcing t)
+      (heap-scan))
+    #!-immobile-space
+    (without-gcing (heap-scan))))
 
 ;;;; (OR X86 X86-64) support
 
@@ -1562,6 +1592,10 @@ register."
 ;;; (VALUES NIL T) means there were no arguments, but (VALUES NIL NIL)
 ;;; means there was no argument information.
 (defun parse-compiled-debug-fun-lambda-list (debug-fun)
+  ;; workaround type inference bogosity that made this file not recompilable.
+  ;; debug-fun-debug-vars was getting derived as returning :unparsed which is not
+  ;; a sequence which causes compilation of COERCE to warn.
+  (declare (notinline debug-fun-debug-vars))
   (let ((args (sb!c::compiled-debug-fun-arguments
                (compiled-debug-fun-compiler-debug-fun debug-fun))))
     (cond
