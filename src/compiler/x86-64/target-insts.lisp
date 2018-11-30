@@ -271,7 +271,7 @@
 ;;; but in other cases would only add clutter, since a source/destination
 ;;; register implies a size.
 ;;;
-(defun print-mem-ref (mode value width stream dstate)
+(defun print-mem-ref (mode value width stream dstate &key (index-reg-printer #'print-addr-reg))
   ;; :COMPUTE is used for the LEA instruction - it informs this function
   ;; that we're not loading from the address and that the contents should not
   ;; be printed. It'll usually be a reference to code within the disasembly
@@ -298,7 +298,7 @@
       (setq firstp nil))
     (when index-reg
       (unless firstp (write-char #\+ stream))
-      (print-addr-reg index-reg stream dstate)
+      (funcall index-reg-printer index-reg stream dstate)
       (let ((scale (machine-ea-scale value)))
         (unless (= scale 1)
           (write-char #\* stream)

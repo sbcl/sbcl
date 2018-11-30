@@ -851,6 +851,8 @@
           ((eq key :negative)
            `(< ,(arg-value-form (arg-or-lose subj funstate) funstate :numeric)
                0))
+          ((eq key :test)
+           `(,@body ,(arg-value-form (arg-or-lose subj funstate) funstate :numeric)))
           ((eq key :same-as)
            (let ((arg1 (arg-or-lose subj funstate))
                  (arg2 (arg-or-lose (car body) funstate)))

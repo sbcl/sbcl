@@ -266,6 +266,9 @@
                   :constant-scs (single-sse-immediate)
                   :save-p t
                   :alternate-scs (single-sse-stack))
+  #!+avx2
+  (avx2-reg float-registers
+   :locations #.*float-regs*)
 
   (catch-block stack :element-size catch-block-size)
   (unwind-block stack :element-size unwind-block-size)))

@@ -1,4 +1,4 @@
-;;;; that part of the description of the x86-64 instruction set
+;;; that part of the description of the x86-64 instruction set
 ;;;; which can live on the cross-compilation host
 
 ;;;; This software is part of the SBCL system. See the README file for
@@ -21,6 +21,7 @@
   ;; Imports from SB-VM into this package
   (import '(sb!vm::tn-reg sb!vm::reg-name
             sb!vm::frame-byte-offset sb!vm::rip-tn sb!vm::rbp-tn
+            #!+avx2 sb!vm::avx2-reg
             sb!vm::registers sb!vm::float-registers sb!vm::stack))) ; SB names
 
 ;;; a REG object discards all information about a TN except its storage base
@@ -1131,16 +1132,21 @@
 
 (defun reg-name (reg)
   (let ((id (reg-id reg)))
-    (svref (if (is-gpr-id-p id)
-               (svref (load-time-value
-                       (vector sb!vm::+qword-register-names+
-                               sb!vm::+dword-register-names+
-                               sb!vm::+word-register-names+
-                               sb!vm::+byte-register-names+)
-                       t)
-                      (gpr-id-size-class id))
-               #.(coerce (loop for i below 16 collect (format nil "XMM~D" i))
-                         'vector))
+    (svref (cond ((is-gpr-id-p id)
+                  (svref (load-time-value
+                          (vector sb!vm::+qword-register-names+
+                                  sb!vm::+dword-register-names+
+                                  sb!vm::+word-register-names+
+                                  sb!vm::+byte-register-names+)
+                          t)
+                         (gpr-id-size-class id)))
+                 #!+avx2
+                 ((is-avx2-id-p id)
+                  #.(coerce (loop for i below 16 collect (format nil "YMM~D" i))
+                            'vector))
+                 (t
+                  #.(coerce (loop for i below 16 collect (format nil "XMM~D" i))
+                            'vector)))
            (reg-id-num id))))
 
 ;;; Return the "lossy" encoding of REG (keeping only the 3 low bits).
@@ -1215,13 +1221,17 @@
                    operand)
                   ((eq (sb-name (sc-sb (tn-sc operand))) 'registers)
                    (tn-reg operand))
+                  #!+avx2
+                  ((eq (sc-name (tn-sc operand)) 'avx2-reg)
+                   (get-avx2 (tn-offset operand)))
                   ((eq (sb-name (sc-sb (tn-sc operand))) 'float-registers)
                    (get-fpr (tn-offset operand)))
                   (t ; a stack SC or constant
                    operand)))
           operands))
 
-(defun emit-ea (segment thing reg &key allow-constants (remaining-bytes 0))
+(defun emit-ea (segment thing reg &key allow-constants (remaining-bytes 0)
+                                       xmm-index)
   (when (register-p reg)
     (setq reg (reg-encoding reg segment)))
   (etypecase thing
@@ -1286,7 +1296,10 @@
                           #b100
                           (if (location= index sb!vm::rsp-tn)
                               (error "can't index off of RSP")
-                              (reg-encoding (tn-reg index) segment))))
+                              (reg-encoding (if xmm-index
+                                                (get-fpr (tn-offset index))
+                                                (tn-reg index))
+                                            segment))))
                (base (if (null base) #b101 base-encoding)))
            (emit-sib-byte segment ss index base)))
        (cond ((= mod #b01)
@@ -2479,7 +2492,7 @@
 ;; The one-element list is used in the cases where the REX prefix is
 ;; really a prefix and thus automatically supported, the two-element
 ;; list is used when the REX prefix is used in an infix position.
-(eval-when (:compile-toplevel :execute)
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun sse-inst-printer-list (inst-format-stem prefix opcode
                                 &key more-fields printer)
     (let ((fields `(,@(when prefix
@@ -2494,7 +2507,7 @@
                 `(:printer ,inst-format ,fields ,@(if printer `(',printer))))
               inst-formats)))
   (defun 2byte-sse-inst-printer-list (inst-format-stem prefix op1 op2
-                                       &key more-fields printer)
+                                      &key more-fields printer)
     (let ((fields `(,@(when prefix
                         `((prefix, prefix)))
                     (op1 ,op1)
@@ -2986,7 +2999,7 @@
                  (emit-byte segment imm)))))
 
 
-  ;; pinsrq not encodable in 64-bit mode
+  ;; pinsrq not encodable in 64-bit mode ;; FIXME: that's not true
   (define-insert-sse-instruction pinsrb #x66 #x3a #x20)
   (define-insert-sse-instruction pinsrw #x66 #xc4 nil)
   (define-insert-sse-instruction pinsrd #x66 #x3a #x22)
@@ -3002,10 +3015,10 @@
 (define-instruction pextrw (segment dst src imm)
   (:emitter
    (aver (xmm-register-p src))
-   (if (not (gpr-p dst))
-       (emit-sse-inst-2byte segment dst src #x66 #x3a #x15
-                            :operand-size :do-not-set :remaining-bytes 1)
+   (if (gpr-p dst)
        (emit-sse-inst segment dst src #x66 #xc5
+                            :operand-size :do-not-set :remaining-bytes 1)
+       (emit-sse-inst-2byte segment dst src #x66 #x3a #x15
                             :operand-size :do-not-set :remaining-bytes 1))
    (emit-byte segment imm))
   . #.(append

@@ -688,7 +688,7 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks :cycle-counter' >> $ltf
     printf ' :float-eql-vops :integer-eql-vop' >> $ltf
-    printf ' :sb-simd-pack' >> $ltf
+    printf ' :sb-simd-pack :avx2' >> $ltf
     printf ' :undefined-fun-restarts :call-symbol' >> $ltf
     case "$sbcl_os" in
     linux | darwin | *bsd)

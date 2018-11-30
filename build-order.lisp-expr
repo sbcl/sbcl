@@ -495,6 +495,8 @@
 
  ("src/compiler/target-dstate" :not-host)
  ("src/compiler/target/insts")
+ #!+avx2
+ ("src/compiler/target/avx2-insts")
  ("src/compiler/target/macros")
  ("src/compiler/generic/early-type-vops")
 
@@ -645,6 +647,7 @@
  ;; target-only assemblerish stuff
  ("src/compiler/target-disassem"     :not-host)
  ("src/compiler/target/target-insts" :not-host)
+ ("src/compiler/target/target-avx2-insts" :not-host)
 
  ("src/code/debug" :not-host)
 
