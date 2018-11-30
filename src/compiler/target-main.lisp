@@ -81,10 +81,9 @@
                          ;; the error came from, not how the compiler got there.
                          (go :error))))
                  (return
-                   (with-world-lock ()
                      (%compile form (make-core-object)
                                :name name
-                               :path `(original-source-start 0 ,tlf))))))
+                               :path `(original-source-start 0 ,tlf)))))
            :error
              ;; Either signal the error right away, or return a function that
              ;; will signal the corresponding COMPILED-PROGRAM-ERROR. This is so
