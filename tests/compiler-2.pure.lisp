@@ -1876,15 +1876,6 @@
         (typep cdr 'fixnum)))
    ((1 2 'a) t)))
 
-(with-test (:name :fixnump-instance-ref-immediately-used.2)
-  (checked-compile-and-assert
-   ()
-   `(lambda (a b c)
-      (let* ((l (cons a b))
-             (cdr (cdr l)))
-        (setf (cdr l) c)
-        (typep cdr 'fixnum)))
-   ((1 2 'a) t)))
 (with-test (:name :round-numeric-bound)
   (checked-compile-and-assert
    ()
