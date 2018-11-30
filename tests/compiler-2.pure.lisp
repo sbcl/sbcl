@@ -1884,3 +1884,13 @@
       (- (rem (funcall f) (max 23 (* 45092832376540563 a -4469591966)))
          (signum c)))
    ((1874303539234 2 (constantly 123)) 7)))
+
+(with-test (:name :ir2-optimize-jumps-to-nowhere)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (declare (type fixnum a))
+      (if (< a 0 a)
+          (block a (shiftf a 1))
+          0))
+   ((0) 0)))

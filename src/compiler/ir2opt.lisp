@@ -294,7 +294,8 @@
                  (let* ((target (first (vop-codegen-info vop)))
                         (target-block (gethash target label-block-map))
                         (target-vop (start-vop target-block)))
-                   (when (and (eq (vop-name target-vop) 'branch)
+                   (when (and target-vop
+                              (eq (vop-name target-vop) 'branch)
                               (neq target
                                    (first (vop-codegen-info target-vop))))
                      (setf (first (vop-codegen-info vop))
@@ -322,13 +323,13 @@
             (case (and last
                        (vop-name last))
               (branch
-               (unchain-jumps last)
-               ;; A block may end up having BRANCH-IF BRANCH after coverting an IF
-               (let ((prev (vop-prev last)))
-                 (when (and prev
-                            (or (eq (vop-name prev) 'branch-if)
-                                (conditional-p prev)))
-                   (unchain-jumps prev))))
+                  (unchain-jumps last)
+                ;; A block may end up having BRANCH-IF BRANCH after coverting an IF
+                (let ((prev (vop-prev last)))
+                  (when (and prev
+                             (or (eq (vop-name prev) 'branch-if)
+                                 (conditional-p prev)))
+                    (unchain-jumps prev))))
               (branch-if
                (unchain-jumps last))
               (t
@@ -346,12 +347,12 @@
                (remove-jump-overs last
                                   (start-vop (ir2-block-next block))))
               (branch
-               ;; A block may end up having BRANCH-IF BRANCH after coverting an IF
-               (let ((prev (vop-prev last)))
-                 (when (and prev
-                            (or (eq (vop-name prev) 'branch-if)
-                                (conditional-p prev)))
-                   (remove-jump-overs prev last))))
+                  ;; A block may end up having BRANCH-IF BRANCH after coverting an IF
+                  (let ((prev (vop-prev last)))
+                    (when (and prev
+                               (or (eq (vop-name prev) 'branch-if)
+                                   (conditional-p prev)))
+                      (remove-jump-overs prev last))))
               (t
                (when (and last
                           (conditional-p last))
