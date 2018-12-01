@@ -159,4 +159,4 @@
                                               (function sb-alien:long sb-alien:int))
                        sb-unix::sc-nprocessors-onln)
               #+win32 (sb-alien:extern-alien "os_number_of_processors" sb-alien:int))))
-    (assert (> (primitive-benchmark) (log cpus 2)))))
+    (assert (> (primitive-benchmark) (min 2 (log cpus 2))))))
