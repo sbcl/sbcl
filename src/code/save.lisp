@@ -466,6 +466,12 @@ sb-c::
                                  (setf (%instance-ref debug-fun
                                         (get-dsd-index compiled-debug-fun name))
                                        new)))))))
-            (sb-lfl::linked-list
-             (sb-lfl::finalize-deletion obj))))))
+            (sb-lockless::linked-list
+             ;; In the normal course of execution, incompletely deleted nodes
+             ;; exist only for a brief moment, as the next operation on the list by
+             ;; any thread that touches the logically deleted node can fully delete it.
+             ;; If somehow we get here and there are in fact pending deletions,
+             ;; they must be finished or else bad things can happen, since 'coreparse'
+             ;; can not deal with the untagged pointer convention.
+             (sb-lockless::finish-incomplete-deletions obj))))))
        :all))))

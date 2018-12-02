@@ -15,10 +15,11 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(defpackage "SB-LFL"
-  (:use "CL" "SB-EXT" "SB-INT" "SB-SYS" "SB-KERNEL"))
+(defpackage "SB-LOCKLESS"
+  (:use "CL" "SB-EXT" "SB-INT" "SB-SYS" "SB-KERNEL")
+  (:shadow "ENDP"))
 
-(in-package "SB-LFL")
+(in-package "SB-LOCKLESS")
 
 ;;; The changes to GC to support this code were as follows:
 ;;; * One bit of the payload length in an instance header is reserved to signify
@@ -43,58 +44,101 @@
 ;;; DO-REFERENCED-OBJECT can follow untagged pointers.
 ;;; This is potentially more of an annoyance than it is a bug.
 
-(defstruct (node (:conc-name nil)
-                 (:constructor %make-node (node-key node-data)))
-  ;; Using either 0 or NIL as the 'next' would make sense for the final cell.
-  ;; 0 makes things easier for C, but NIL makes things easier for Lisp.
-  ;; Using NIL simplifies the test in MARKEDP+NEXT so that the condition
-  ;; for ORing in tag bits is simply whether 'next' is a fixnum.
-  ;; Using 0 would require checking for fixnum and non-zero.
-  (%node-next nil)
-  (node-data)
-  (node-key 0 :read-only t))
-;;; Change the layout bitmap from -1 to a bitmap with 1s for each tagged slot.
-;;; These are essentially equivalent, however -1 indicates that all slots are
-;;; tagged *and* that there is no special scavenge method.
-;;; A positive number _may_ indicate that all slots are tagged, but also
-;;; informs the scavenge that there may be a custom action as well.
-(let ((layout (sb-kernel:find-layout 'node)))
-  (setf (layout-bitmap layout)
-        ;; Round to odd, make any padding slot tagged.
-        ;; If we allow subtypes of NODE, then the bitmap will have to
-        ;; be fixed up as well.
-        (1- (ash 1 (logior (layout-length layout) 1)))))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (import 'sb-kernel::list-node))
+
+(defstruct (list-node
+            (:conc-name nil)
+            (:constructor %make-sentinel-node ())
+            (:copier nil))
+  (%node-next nil))
+
+(defstruct (keyed-node
+            (:conc-name nil)
+            (:include list-node)
+            (:constructor %make-node (node-key node-data)))
+  (node-key 0 :read-only t)
+  (node-data))
 
 (defconstant special-gc-strategy-flag #x800000)
-(declaim (ftype (sfunction (t t) node) make-node))
+(declaim (ftype (sfunction (t t) list-node) make-node))
 (defun make-node (key data)
   (declare (inline %make-node))
-  (let ((n (%make-node key data)))
-    ;; FIXME: this bit needs to be frobbed with a vop, or better yet,
-    ;; just set in the allocator; and should (ideally) be made atomic.
+  (let ((node (%make-node key data)))
+    #-x86-64
     ;; Note that SET-HEADER-DATA only works on OTHER-POINTER-LOWTAG.
-    (with-pinned-objects (n)
-      (let ((sap (int-sap (get-lisp-obj-address n))))
+    (with-pinned-objects (node)
+      (let ((sap (int-sap (get-lisp-obj-address node))))
         (setf (sap-ref-word sap (- sb-vm:instance-pointer-lowtag))
               (logior special-gc-strategy-flag
                       (sap-ref-word sap (- sb-vm:instance-pointer-lowtag))))))
-    n))
+    #+x86-64
+    (sb-sys:%primitive sb-vm::set-custom-gc-scavenge-bit node)
+    node))
 
-(define-load-time-global *tail-atom* (make-node nil :tail))
+(declaim (inline ptr-markedp node-markedp))
+(defun ptr-markedp (bits) (fixnump bits))
+(defun node-markedp (node) (fixnump (%node-next node)))
+
+;;; Lockless lists should be terminated by *tail-atom*.
+;;; The value of %NODE-NEXT of the tail atom is chosen such that we will never
+;;; violate the type assertion in GET-NEXT if pointer is inadvertently
+;;; followed out of the tail atom. It would mostly work to use NIL as the %NEXT,
+;;; but just in terms of whether the %MAKE-LISP-OBJ expression is correct.
+;;; (ORing in instance-pointer-lowtag does not change NIL's representation.)
+;;; However, using NIL would violates the type assertion.
+(define-load-time-global *tail-atom*
+  (let ((node (%make-sentinel-node)))
+    (setf (%node-next node) node)))
+
+(defmacro endp (node) `(eq ,node (load-time-value *tail-atom*)))
 
 ;;; Specialized list variants will be created for
 ;;;  fixnum, integer, real, string, generic "comparable"
 ;;; but the node type and list type is the same regardless of key type.
-(defstruct (linked-list (:constructor %make-lfl)
-                        (:conc-name list-))
-  (head nil :type node)
-  (tail nil :type node))
+(defstruct (linked-list
+            (:constructor %make-lfl
+                          (head inserter deleter finder inequality equality))
+            (:conc-name list-))
+  (head       nil :type list-node :read-only t)
+  (inserter   nil :type function :read-only t)
+  (deleter    nil :type function :read-only t)
+  (finder     nil :type function :read-only t)
+  (inequality nil :type function :read-only t)
+  (equality   nil :type function :read-only t))
 
-(defun new-lockfree-list ()
-  (let ((head (make-node nil :head))
-        (tail *tail-atom*))
-    (setf (%node-next head) tail)
-    (%make-lfl :head head :tail tail)))
+(defconstant-eqx +predefined-key-types+
+  #((fixnum  lfl-insert/fixnum  lfl-delete/fixnum  lfl-find/fixnum < =)
+    (integer lfl-insert/integer lfl-delete/integer lfl-find/integer < =)
+    (real    lfl-insert/real    lfl-delete/real    lfl-find/real < =)
+    (string  lfl-insert/string  lfl-delete/string  lfl-find/string
+             string< string=))
+  #'equalp)
+
+(defun make-ordered-list (&key (constructor '%make-lfl) key-type sort test)
+  (multiple-value-bind (insert delete find inequality equality)
+      (cond (key-type
+             (when (or sort test)
+               (error "Must not specify :SORT or :TEST with :KEY-TYPE"))
+             (let ((operations (find key-type +predefined-key-types+ :key #'car)))
+               (unless operations
+                 (error ":TYPE must be one of ~S"
+                        '#.(map 'list (lambda (x) (elt x 0)) +predefined-key-types+)))
+               (values (symbol-function (elt operations 1))
+                       (symbol-function (elt operations 2))
+                       (symbol-function (elt operations 3))
+                       (symbol-function (elt operations 4))
+                       (symbol-function (elt operations 5)))))
+            (t
+             (if (and sort test)
+                 (values #'lfl-insert/t #'lfl-delete/t #'lfl-find/t
+                         (coerce sort 'function)
+                         (coerce test 'function))
+                 (error "Must specify both :SORT and :TEST"))))
+    (let ((head (%make-sentinel-node)))
+      (setf (%node-next head) *tail-atom*)
+      (funcall constructor
+               head insert delete find inequality equality))))
 
 ;;; "Marked" in the reference algorithm means ORing in a 1 to the low bit.
 ;;; For us it means *removal* of tag bits.
@@ -113,102 +157,117 @@
 (defun make-marked-ref (x)
   (%make-lisp-obj (logandc2 (get-lisp-obj-address x) sb-vm:lowtag-mask)))
 
-(declaim (inline markedp markedp+next))
-(defun markedp (node) (fixnump (%node-next node)))
-(defun markedp+next (node)
+(declaim (inline get-next))
+(defun get-next (node)
   (with-pinned-objects (node) ; pinning a node also pins its 'next'
-    (let ((next (%node-next node)))
-      (if (fixnump next)
-          (values t (truly-the node
-                     (%make-lisp-obj (logior (get-lisp-obj-address next)
-                                             sb-vm:instance-pointer-lowtag))))
-          (values nil (truly-the node next))))))
-
-(defun node-next (node)
-  (nth-value 1 (markedp+next node)))
+    (let ((%next (%node-next node)))
+      (values (truly-the list-node
+               (%make-lisp-obj (logior (get-lisp-obj-address %next)
+                                       sb-vm:instance-pointer-lowtag)))
+              %next))))
 
 (defmethod print-object ((list linked-list) stream)
   (print-unreadable-object (list stream :type t)
     (write-char #\{ stream)
     (let ((node (%node-next (list-head list))))
-      (unless (eq node (list-tail list))
-        (loop (multiple-value-bind (deleted next) (markedp+next node)
-                (when deleted
+      (unless (endp node)
+        (loop (multiple-value-bind (next ptr-bits) (get-next node)
+                (when (ptr-markedp ptr-bits)
                   (write-char #\* stream))
                 (write (node-key node) :stream stream)
                 (setq node next)
-                (when (eq node (list-tail list)) (return))
+                (when (endp node) (return))
                 (write-char #\space stream)))))
     (write-char #\} stream)))
 
-(defmethod print-object ((node node) stream)
-  (print-unreadable-object (node stream :type t)
-    (format stream "(~:[~;*~]~D ~S)"
-            (markedp node)
-            (node-key node)
-            (node-data node))))
+(defmethod print-object ((node list-node) stream)
+  (cond ((typep node 'keyed-node)
+         (print-unreadable-object (node stream :type t)
+           (format stream "(~:[~;*~]~S ~S)"
+                   (node-markedp node) (node-key node) (node-data node))))
+        ((eq node *tail-atom*)
+         (print-unreadable-object (node stream :type t)
+           (write '*tail-atom* :stream stream)))
+        (t
+         (print-unreadable-object (node stream :type t :identity t)))))
 
 (defmacro do-lockfree-list ((var list &optional result) &body body)
   `(let* ((.list. ,list)
-          (.end. (list-tail .list.))
           (,var (%node-next (list-head .list.))))
      (loop
-      (when (eq ,var .end.) (return ,result))
-      (multiple-value-bind (.mark. .next.) (markedp+next (truly-the node ,var))
-        (unless .mark. (let ((,var ,var)) (declare (ignorable ,var)) ,@body))
+      (when (endp ,var) (return ,result))
+      (multiple-value-bind (.next. .ptr-bits.) (get-next (truly-the list-node ,var))
+        (unless (ptr-markedp .ptr-bits.)
+          (let ((,var ,var))
+            (declare (ignorable ,var))
+            ,@body))
         (setq ,var .next.)))))
-
-(defun lfl-length (list) ; a snapshot at a point in time
-  (let ((n 0))
-    (do-lockfree-list (x list) (incf n))
-    n))
 
 ;;; SEARCH returns a pair of nodes satisfying the following constraints:
 ;;;  - key(left) < search-key and key(right) >= search-key
 ;;;  - neither left nor right is marked for deletion
 ;;;  - right is the immediate successor of left
 ;;; Any logically deleted nodes in between left and right will be removed.
+;;; Note that the predicate here is exactly as for #'SORT -
+;;; it should return T if and only if strictly less than.
 (defmacro lfl-search-macro (compare< type)
-  `(block search
-    (let (left left-node-next right (tail (list-tail list)))
-      (tagbody
-       again
-       ;; 1. Find left and right nodes
-       (binding* ((this (list-head list))
-                  ((markedp next) (markedp+next this)))
-         (loop (unless markedp
-                 (setq left this left-node-next next))
-               (when (eq (setq this next) tail)
-                 (return))
-               (multiple-value-setq (markedp next) (markedp+next this))
-               (unless (or markedp (,compare< (truly-the ,type (node-key this))
-                                              key))
-                 (return)))
-         (setq right this))
-       ;; 2. Check adjacency
-       (when (eq left-node-next right)
-         (if (and (neq right tail) (markedp right))
-             (go again)
-             (return-from search (values right left))))
-       ;; 3. Remove intervening marked nodes
-       (when (eq (cas (%node-next (truly-the node left)) left-node-next right)
-                 left-node-next)
-         (unless (and (neq right tail) (markedp right))
-           (return-from search (values right left))))
-       (go again)))))
+  `(prog ((left 0) (left-node-next 0) (right 0))
+     search-again
+     ;; 1. Find left and right nodes
+     (binding* ((this head)
+                ((next bits) (get-next this)))
+       ;; There *must* be some node to the left of the key you've supplied.
+       ;; It's the head node if nothing else. The head can't be marked for deletion.
+       ;; So if this node is marked, you're using this function wrongly.
+       ;; There ought to have been some unmarked node to the left.
+       (aver (not (ptr-markedp bits)))
+       (tagbody
+        advance
+            (setq left this left-node-next next)
+        end-test
+            (when (endp (setq this next))
+              (go out))
+            (multiple-value-setq (next bits) (get-next this))
+            (when (ptr-markedp bits)
+              (go end-test))
+            (when (,compare< (truly-the ,type (node-key (truly-the keyed-node this)))
+                             key)
+              (go advance))
+        out)
+       (setq right this))
+     ;; 2. Check adjacency
+     (when (eq left-node-next right)
+       ;; the reference algorithm has:
+       ;;   "if ((right_node != tail) && is_marked_reference(right_node.next))"
+       ;; but the first test is redundant, because right_node.next
+       ;; can always be dereferenced. Skipping the test seems better than
+       ;; doing it, as skipping it avoids a conditional branch.
+       (if (node-markedp right)
+           (go search-again)
+           (return (values right (truly-the list-node left)))))
+     ;; 3. Remove intervening marked nodes
+     (when (eq (cas (%node-next (truly-the list-node left)) left-node-next right)
+               left-node-next)
+       ;; as above, the reference algorithm had "right_node != tail && ..." here
+       (unless (node-markedp right)
+         (return (values right left))))
+     (go search-again)))
 
 ;;; This is pretty much the standard CAS-based atomic list insert algorithm.
 (defmacro lfl-insert-macro (search compare= type)
-  `(let ((new (make-node key data)))
+  `(let ((new 0))
      (loop
       ;; LEFT and RIGHT are the nodes bracketing the insertion point.
-      (multiple-value-bind (right left) (,search list key)
-        (when (and (neq right (list-tail list))
+      ;; In the case of a found key, RIGHT is the node with that key.
+      (multiple-value-bind (right left) (,search ,@(if (eq type 't) '(list)) head key)
+        (when (and (not (endp right))
                    (,compare= key (truly-the ,type (node-key right))))
-         (return nil))
-       (setf (%node-next new) right)
-       (when (eq (cas (%node-next left) right new) right)
-         (return new))))))
+          (return (values right t))) ; 2nd value = T for "existed"
+        (when (eql new 0)
+          (setq new (make-node key data)))
+        (setf (%node-next new) right)
+        (when (eq (cas (%node-next left) right new) right)
+          (return (values new nil))))))) ; didn't exist
 
 ;;; Deletion
 ;;; Step 1: find the node to be deleted
@@ -226,8 +285,9 @@
 (defmacro lfl-delete-macro (search compare= type)
   `(loop
     ;; Step 1: find
-    (multiple-value-bind (this predecessor) (,search list key)
-      (when (or (eql this (list-tail list))
+    (multiple-value-bind (this predecessor)
+        (,search ,@(if (eq type 't) '(list)) (list-head list) key)
+      (when (or (endp this)
                 (not (,compare= key (truly-the ,type (node-key this)))))
         (return nil))
       (let ((succ (%node-next this)))
@@ -240,18 +300,27 @@
               ;; Step 3: physically delete by swinging the predecessor's successor
               (unless (eq succ (cas (%node-next predecessor) this succ))
                 ;; Call SEARCH again which will perform physical deletion.
-                (,search list key))
+                (,search ,@(if (eq type 't) '(list)) (list-head list) key))
               (return t))))))))
 
 (defmacro define-variation (type compare< compare=)
   (let ((search (symbolicate "LFL-SEARCH/" type)))
     `(progn
-       (declaim (ftype (sfunction (linked-list ,type) (values node node))
+       (declaim (ftype (sfunction (,@(if (eq type 't) '(linked-list)) list-node ,type)
+                                  (values list-node list-node))
                        ,search))
-       (defun ,search (list key) (lfl-search-macro ,compare< ,type))
+       (defun ,search (,@(if (eq type 't) '(list)) head key)
+         (declare (optimize (debug 0)))
+         (lfl-search-macro ,compare< ,type))
 
        (defun ,(symbolicate "LFL-INSERT/"type) (list key data)
          (declare (linked-list list) (,type key))
+         (let ((head (list-head list)))
+           (lfl-insert-macro ,search ,compare= ,type)))
+
+       ;; same as INSERT, but starting from any node
+       (defun ,(symbolicate "LFL-INSERT*/"type) (list head key data)
+         (declare (linked-list list) (ignorable list) (,type key))
          (lfl-insert-macro ,search ,compare= ,type))
 
        (defun ,(symbolicate "LFL-DELETE/"type) (list key)
@@ -260,8 +329,8 @@
 
        (defun ,(symbolicate "LFL-FIND/"type) (list key)
          (declare (linked-list list) (,type key))
-         (let ((node (,search list key)))
-           (when (and (neq node (list-tail list))
+         (let ((node (,search ,@(if (eq type 't) '(list)) (list-head list) key)))
+           (when (and (not (endp node))
                       (,compare= key (truly-the ,type (node-key node))))
              node))))))
 
@@ -270,6 +339,16 @@
 (define-variation integer < =) ; comparator= reduces to INTEGER-EQL
 (define-variation fixnum < =)
 (define-variation string string< string=)
+(define-variation t
+  (lambda (a b) (funcall (list-inequality list) a b))
+  (lambda (a b) (funcall (list-equality list) a b)))
+
+(defun lfl-insert (list key data)
+  (funcall (list-inserter list) list key data))
+(defun lfl-delete (list key)
+  (funcall (list-deleter list) list key))
+(defun lfl-find (list key)
+  (funcall (list-finder list) list key))
 
 ;;; SAVE-LISP-AND-DIE must unlink logically deleted nodes, because coreparse
 ;;; would not understand how to followed untagged pointers in the event that
@@ -277,13 +356,42 @@
 ;;; a logically deleted node here is if a deleting thread died a horrible
 ;;; sudden death.
 ;;; Each list will be processed exactly once.
-(defun finalize-deletion (list)
+(defun finish-incomplete-deletions (list)
   (let* ((pred (list-head list))
-         (node (node-next pred)))
+         (node (get-next pred)))
     (loop
-      (when (eq node (list-tail list))
+      (when (endp node)
         (return))
-      (multiple-value-bind (markedp next) (markedp+next node)
-        (if markedp
+      (multiple-value-bind (next bits) (get-next node)
+        (if (ptr-markedp bits)
             (setf node next (%node-next pred) node)
             (setf pred node node next))))))
+
+;;; The following functions are for examining state while debugging.
+;;; Not properly concurrent, but no worries.
+(defun lfl-keys (list)
+  (collect ((copy))
+    (do-lockfree-list (item list) (copy (node-key item)))
+    (copy)))
+
+(defun lfl-length (list) ; a snapshot at a point in time
+  (let ((n 0))
+    (do-lockfree-list (x list) (incf n))
+    n))
+
+(defun copy-lfl (lfl)
+  (labels ((copy-chain (node)
+             (if (eq node *tail-atom*)
+                 node
+                 (let ((copy (copy-structure node))
+                       (copy-of-next (copy-chain (get-next node))))
+                   (with-pinned-objects (copy-of-next)
+                     (setf (%node-next copy)
+                           (if (fixnump (%node-next node))
+                               (make-marked-ref copy-of-next)
+                               copy-of-next)))
+                   copy))))
+    (let ((new (copy-structure lfl)))
+      (setf (%instance-ref new (get-dsd-index linked-list head))
+            (copy-chain (list-head new)))
+      new)))

@@ -1400,7 +1400,16 @@ or they must be declared locally notinline at each call site.~@:>"
            (n-bits (logior length 1)))
       (when (evenp length) ; Add padding word if necessary.
         (setq bitmap (logior bitmap (ash 1 length))))
-      (when (logbitp (1- n-bits) bitmap)
+      (when (and (logbitp (1- n-bits) bitmap)
+                 ;; Bitmap of -1 implies that all slots are tagged,
+                 ;; and no extraordinary GC treatment is needed.
+                 ;; If all are tagged but any special treatment is required,
+                 ;; then the bitmap can't be -1.
+                 (named-let admits-bitmap-optimization ((dd dd))
+                   (cond ((eq (dd-name dd) 'list-node) nil)
+                         ((not (dd-include dd)) t)
+                         ((admits-bitmap-optimization
+                           (find-defstruct-description (car (dd-include dd))))))))
         (let ((sign-ext (logior (ash -1 n-bits) bitmap)))
           (when (or (and (fixnump sign-ext) (sb!xc:typep bitmap 'bignum))
                     (eql sign-ext -1))

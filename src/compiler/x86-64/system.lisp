@@ -144,6 +144,12 @@
     (inst mov :byte temp (ea (- other-pointer-lowtag) x))
     (storew temp x 0 other-pointer-lowtag)
     (move res x)))
+;;; Set the bit indicating that instances of this type require
+;;; special treatment of slot index 0.
+(define-vop (set-custom-gc-scavenge-bit)
+  (:args (x :scs (descriptor-reg)))
+  (:generator 1
+    (inst or :byte (ea (- 3 instance-pointer-lowtag) x) #x80)))
 
 (define-vop (get-header-data-high)
   (:translate get-header-data-high)
