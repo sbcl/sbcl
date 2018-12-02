@@ -127,7 +127,7 @@
                   (set-result (logxor result (ash result -6)))))
              (set-result (form)
                `(setf result (ldb (byte #.sb!vm:n-word-bits 0) ,form))))
-    (let ((result 0))
+    (let ((result 238625159)) ; (logandc2 most-positive-fixnum (sxhash #\S)) on 32 bits
       (declare (type (unsigned-byte #.sb!vm:n-word-bits) result))
       ;; Avoid accessing elements of a (simple-array nil (*)).
       ;; The expansion of STRING-DISPATCH involves ETYPECASE,
@@ -259,6 +259,27 @@
 (defun sxhash (x)
   ;; profiling SXHASH is hard, but we might as well try to make it go
   ;; fast, in case it is the bottleneck somewhere.  -- CSR, 2003-03-14
+  ;; So, yes, profiling is a little tough but not impossible with some added
+  ;; instrumentation in each stanza of the COND, either manually or
+  ;; automagically. Based on a manual approach, the order of the tests below
+  ;; are now better arranged by approximate descending frequency in terms
+  ;; of calls observed in certain test. Regardless of the fact that applications
+  ;; will vary by use-cases, this seems like a good order because:
+  ;;  * despite that INSTANCE is often the 2nd-most common object type in the heap
+  ;;    (right behind CONS), there are probably at least as many heap words
+  ;;    that are FIXNUM as instance pointers. So it stands to reason that
+  ;;    SXHASH-RECURSE is invoked very often on FIXNUM.
+  ;;  * SYMBOLs are extremely common as table keys, more so than INSTANCE,
+  ;;    so we should pick off SYMBOL sooner than INSTANCE as well.
+  ;;  * INSTANCE (except for PATHNAME) doesn't recurse anyway - in fact
+  ;;    it is particularly dumb (by design), so performing that test later
+  ;;    doesn't incur much of a penalty. And our users probably know thatb
+  ;;    SXHASH on instance doesn't really do anything.
+  ;; Anyway, afaiu, the code below was previously ordered by gut feeling
+  ;; rather than than actual measurement, so having any rationale for ordering
+  ;; is better than having no rationale. And as a further comment observes,
+  ;; we could do away with the question of order if only we had jump tables.
+  ;; (Also, could somebody perhaps explain how these magic numbers were chosen?)
   (declare (optimize speed))
   (labels ((sxhash-number (x)
              (macrolet ((hash-complex-float ()
@@ -268,6 +289,8 @@
                              (mixf result (sxhash (imagpart x)))
                              result)))
                (etypecase x
+                 ;; FIXNUM is handled in the outer typecase, but we also see it
+                 ;; in SXHASH-NUMBER because of RATIONAL and (COMPLEX RATIONAL).
                  (fixnum (sxhash x))    ; through DEFTRANSFORM
                  (integer (sb!bignum:sxhash-bignum x))
                  (single-float (sxhash x)) ; through DEFTRANSFORM
@@ -313,6 +336,8 @@
                         (mix (sxhash-recurse (car x) (1- depthoid))
                              (sxhash-recurse (cdr x) (1- depthoid)))
                         261835505)))
+               (symbol (sxhash x)) ; through DEFTRANSFORM
+               (fixnum (sxhash x)) ; through DEFTRANSFORM
                (instance
                 (typecase x
                   (pathname
@@ -345,7 +370,6 @@
                              (layout-classoid (%instance-layout x))))))
                   (condition (!condition-hash x))
                   (t (std-instance-hash x))))
-               (symbol (sxhash x))      ; through DEFTRANSFORM
                (array
                 (typecase x
                   ;; If we could do something smart for widetag-based jump tables,
@@ -367,11 +391,15 @@
                    ;; approach.  This will probably do for now.
                    (sxhash-recurse (copy-seq x) depthoid))
                   (t (logxor 191020317 (sxhash (array-rank x))))))
+               ;; general, inefficient case of NUMBER
+               ;; There's a spurious FIXNUMP test here, as we've already picked it off.
+               ;; Maybe the NUMBERP emitter could be informed that X can't be a fixnum,
+               ;; because writing this case as (OR BIGNUM RATIO FLOAT COMPLEX)
+               ;; produces far worse code.
+               (number (sxhash-number x))
                (character
                 (logxor 72185131
                         (sxhash (char-code x)))) ; through DEFTRANSFORM
-               ;; general, inefficient case of NUMBER
-               (number (sxhash-number x))
                (funcallable-instance
                 (if (layout-for-std-class-p
                      (%funcallable-instance-layout x))

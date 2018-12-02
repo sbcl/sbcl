@@ -1294,6 +1294,25 @@
         (move bits float)
         (inst sar bits 32)))))
 
+(define-vop (double-float-bits)
+  (:args (float :scs (double-reg descriptor-reg)
+                :load-if (not (sc-is float double-stack))))
+  (:results (bits :scs (signed-reg)))
+  (:arg-types double-float)
+  (:result-types signed-num)
+  (:translate double-float-bits)
+  (:policy :fast-safe)
+  (:generator 5
+     (sc-case float
+       (double-reg
+        (inst movq bits float))
+       (double-stack
+        (inst mov bits (ea (frame-byte-offset (tn-offset float)) rbp-tn)))
+       (descriptor-reg
+        (inst mov bits (ea (- (ash double-float-value-slot word-shift)
+                              other-pointer-lowtag)
+                           float))))))
+
 (define-vop (double-float-high-bits)
   (:args (float :scs (double-reg descriptor-reg)
                 :load-if (not (sc-is float double-stack))))
@@ -1302,7 +1321,6 @@
   (:result-types signed-num)
   (:translate double-float-high-bits)
   (:policy :fast-safe)
-  (:vop-var vop)
   (:generator 5
      (sc-case float
        (double-reg
@@ -1325,7 +1343,6 @@
   (:result-types unsigned-num)
   (:translate double-float-low-bits)
   (:policy :fast-safe)
-  (:vop-var vop)
   (:generator 5
      (sc-case float
         (double-reg

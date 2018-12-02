@@ -515,6 +515,10 @@
 (defknown single-float-bits (single-float) (signed-byte 32)
   (movable foldable flushable))
 
+#!+64-bit
+(defknown double-float-bits (double-float) (signed-byte 64)
+  (movable foldable flushable))
+
 (defknown double-float-high-bits (double-float) (signed-byte 32)
   (movable foldable flushable))
 

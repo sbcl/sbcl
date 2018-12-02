@@ -22,6 +22,7 @@
                           (logand most-positive-fixnum
                                   (logxor bits
                                           (ash bits -7))))))))
+#!-64-bit
 (deftransform sxhash ((x) (double-float))
   '(let* ((val (+ 0.0d0 x))
           (hi (logand (double-float-high-bits val) #.(1- (ash 1 32))))
@@ -39,6 +40,19 @@
   (let ((c (logand 1193941380939624010 sb!xc:most-positive-fixnum)))
     ;; shift by -1 to get sign bit into hash
     `(logand (logxor (ash x 4) (ash x -1) ,c) sb!xc:most-positive-fixnum)))
+
+;;; Treat double-float essentially the same as a fixnum if words are 64 bits.
+#!+64-bit
+(deftransform sxhash ((x) (double-float))
+  ;; logical negation of magic constant ensures that 0.0d0 hashes to something
+  ;; other than what the fixnum 0 hashes to (as tested in hash.impure.lisp)
+  (let ((c (logandc1 1193941380939624010 sb!xc:most-positive-fixnum)))
+    `(let ((x (double-float-bits x)))
+       ;; shift by -2 to get sign bit into hash.
+       ;; shifting by -1 isn't enough, for lack of significant bits in a fixnum.
+       ;; This would need to shift more if N-FIXNUM-TAG-BITS > 1,
+       ;; but seriously, who changes that parameter?
+       (logand (logxor (ash x 4) (ash x -2) ,c) sb!xc:most-positive-fixnum))))
 
 ;;; SXHASH of SIMPLE-BIT-VECTOR values is defined as a DEFTRANSFORM
 ;;; because it is endian-dependent.
