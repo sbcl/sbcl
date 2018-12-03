@@ -143,8 +143,20 @@
       (give-up-ir1-transform))
     float))
 
+;;; On the face of it, these transforms are ridiculous because if we're going
+;;; to express (MINUSP X) as (MINUSP (foo-FLOAT-BITS X)), then why not _always_
+;;; transform MINUSP of a float into an integer comparison instead of a
+;;; floating-point comparison, and then express this as (if (minusp float) ...)
+;;; rather than (if (minusp (bits float)) ...) ?
+;;; I suspect that the difference is that FLOAT-SIGN must remain silent
+;;; when given a signaling NaN.
 (deftransform float-sign ((float &optional float2)
                           (single-float &optional single-float) *)
+  #!+(vop-translates sb!kernel:single-float-copysign)
+  (if float2
+      `(single-float-copysign float float2)
+      `(single-float-sign float))
+  #!-(vop-translates sb!kernel:single-float-copysign)
   (if float2
       (let ((temp (gensym)))
         `(let ((,temp (abs float2)))
@@ -153,11 +165,15 @@
 
 (deftransform float-sign ((float &optional float2)
                           (double-float &optional double-float) *)
-  (if float2
-      (let ((temp (gensym)))
-        `(let ((,temp (abs float2)))
-          (if (minusp (double-float-high-bits float)) (- ,temp) ,temp)))
-      '(if (minusp (double-float-high-bits float)) -1d0 1d0)))
+  ;; If words are 64 bits, then it's actually simpler to  extract _all_ bits
+  ;; instead of only the upper bits.
+  (let ((bits #!+64-bit '(double-float-bits float)
+              #!-64-bit '(double-float-high-bits float)))
+    (if float2
+        (let ((temp (gensym)))
+          `(let ((,temp (abs float2)))
+            (if (minusp ,bits) (- ,temp) ,temp)))
+        `(if (minusp ,bits) -1d0 1d0))))
 
 ;;;; DECODE-FLOAT, INTEGER-DECODE-FLOAT, and SCALE-FLOAT
 

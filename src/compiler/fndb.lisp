@@ -375,6 +375,13 @@
   (movable foldable unsafely-flushable))
 (defknown float-radix (float) float-radix
   (movable foldable unsafely-flushable))
+;;; This says "unsafely flushable" as if to imply that there is a possibility
+;;; of signaling a condition in safe code, but in practice we can never trap
+;;; on a NaN because the implementation uses foo-FLOAT-BITS instead of
+;;; performing a floating-point comparison. I think that is done on purpose,
+;;; so at best the "unsafely-" is disingenuous, and at worst our code is wrong.
+;;; e.g. the behavior if the first arg is a NaN is well-defined as we have it,
+;;; but what about the second arg? We need some test cases around this.
 (defknown float-sign (float &optional float) float
   (movable foldable unsafely-flushable))
 (defknown (float-digits float-precision) (float) float-digits
@@ -382,6 +389,10 @@
 (defknown integer-decode-float (float)
     (values integer float-int-exponent (member -1 1))
     (movable foldable unsafely-flushable))
+
+(defknown single-float-sign (single-float) single-float (movable foldable flushable))
+(defknown single-float-copysign (single-float single-float)
+  single-float (movable foldable flushable))
 
 (defknown complex (real &optional real) number
   (movable foldable flushable))

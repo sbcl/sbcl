@@ -1294,6 +1294,36 @@
         (move bits float)
         (inst sar bits 32)))))
 
+(define-vop (single-float-sign)
+  (:translate single-float-sign)
+  (:args (float :scs (descriptor-reg)))
+  (:arg-types single-float)
+  (:results (res :scs (descriptor-reg)))
+  (:policy :fast-safe)
+  (:generator 3
+    (move res float)
+    ;; preserve only the sign bit and widetag
+    (inst and res (constantize (ash #x80000000 32)))
+    ;; set the bits of corresponding to 1.0f0
+    (inst or  res (constantize (logior (ash #x3F800000 32)
+                                       single-float-widetag)))))
+;;; Return Y with its sign changed to that of X.
+;;; The arguments match FLOAT-SIGN which is the opposite of C's copysign().
+(define-vop (single-float-copysign)
+  (:translate single-float-copysign)
+  (:args (x :scs (descriptor-reg))
+         (y :scs (descriptor-reg)))
+  (:arg-types single-float single-float)
+  (:results (res :scs (descriptor-reg)))
+  (:temporary (:sc unsigned-reg :from (:argument 0)) temp)
+  (:policy :fast-safe)
+  (:generator 3
+    (move temp x)
+    (move res y)
+    (inst shl res 1)   ; discard result's sign bit
+    (inst shl temp 1)  ; copy X's sign bit into the carry flag
+    (inst rcr res 1))) ; rotate carry into the result
+
 (define-vop (double-float-bits)
   (:args (float :scs (double-reg descriptor-reg)
                 :load-if (not (sc-is float double-stack))))
