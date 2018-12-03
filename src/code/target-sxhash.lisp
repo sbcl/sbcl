@@ -273,7 +273,7 @@
   ;;    so we should pick off SYMBOL sooner than INSTANCE as well.
   ;;  * INSTANCE (except for PATHNAME) doesn't recurse anyway - in fact
   ;;    it is particularly dumb (by design), so performing that test later
-  ;;    doesn't incur much of a penalty. And our users probably know thatb
+  ;;    doesn't incur much of a penalty. And our users probably know that
   ;;    SXHASH on instance doesn't really do anything.
   ;; Anyway, afaiu, the code below was previously ordered by gut feeling
   ;; rather than than actual measurement, so having any rationale for ordering
