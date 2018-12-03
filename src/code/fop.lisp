@@ -78,10 +78,13 @@
           (sbit (cdr **fop-signatures**) opcode) pushp))
   name)
 
-;;; a helper function for reading string values from FASL files: sort
+;;; helper functions for reading string values from FASL files: sort
 ;;; of like READ-SEQUENCE specialized for files of (UNSIGNED-BYTE 8),
 ;;; with an automatic conversion from (UNSIGNED-BYTE 8) into CHARACTER
 ;;; for each element read
+
+;;; Variation 1: character string, transfer elements of type (unsigned-byte 8)
+;;: [Can we eliminate this one?]
 (defun read-string-as-bytes (stream string &optional (length (length string)))
   (declare (type (simple-array character (*)) string)
            (type index length)
@@ -91,6 +94,7 @@
       (setf (aref string i)
             (sb!xc:code-char (fast-read-byte)))))
   string)
+;;; Variation 2: base-string, transfer elements of type (unsigned-byte 8)
 (defun read-base-string-as-bytes (stream string &optional (length (length string)))
   (declare (type (simple-array base-char (*)) string)
            (type index length)
@@ -100,16 +104,28 @@
       (setf (aref string i)
             (sb!xc:code-char (fast-read-byte)))))
   string)
-#!+(and sb-unicode (host-feature sb-xc))
-(defun read-string-as-unsigned-byte-32
+;;; Variation 3: character-string, transfer elements of type varint
+(defun read-char-string-as-varints
     (stream string &optional (length (length string)))
   (declare (type (simple-array character (*)) string)
            (type index length)
            (optimize speed))
   (with-fast-read-byte ((unsigned-byte 8) stream)
-    (dotimes (i length)
-      (setf (aref string i)
-            (sb!xc:code-char (fast-read-u-integer 4)))))
+    ;; OAOO violation- This repeats code in DEFINE-READ-VAR-INTEGER in 'debug-var-io'
+    ;; but there isn't a good expansion of that macro that would operate on a stream
+    ;; (which is ok in itself) but also that would entail only a single wrapping of
+    ;; WITH-FAST-READ-BYTE for all work.
+    ;; i.e. we don't want to update the stream slots after each varint.
+    (flet ((read-varint ()
+             (loop for shift :of-type (integer 0 28) from 0 by 7 ; position in integer
+                   for octet = (fast-read-byte)
+                   for accum :of-type (mod #.sb!xc:char-code-limit)
+                     = (logand octet #x7F)
+                     then (logior (ash (logand octet #x7F) shift) accum)
+                   unless (logbitp 7 octet) return accum)))
+      (dotimes (i length)
+        (setf (aref string i)
+              (sb!xc:code-char (read-varint))))))
   string)
 
 ;;;; miscellaneous fops
@@ -221,7 +237,7 @@
                      (svref buffer base-p) string))
              (funcall (if (eql base-p 1)
                           'read-base-string-as-bytes
-                          'read-string-as-unsigned-byte-32)
+                          'read-char-string-as-varints)
                       (%fasl-input-stream fasl-input) string namelen)
              (values string namelen elt-type)))
          (aux-fop-intern (length+flag package fasl-input)
@@ -269,8 +285,7 @@
 
 (!define-fop 156 :not-host (fop-named-package-save ((:operands length)) nil)
   (let ((package-name (make-string length)))
-    #!-sb-unicode (read-string-as-bytes (fasl-input-stream) package-name)
-    #!+sb-unicode (read-string-as-unsigned-byte-32 (fasl-input-stream) package-name)
+    (read-char-string-as-varints (fasl-input-stream) package-name)
     (push-fop-table
      (handler-case (find-undeleted-package-or-lose package-name)
        (simple-package-error (c)
@@ -400,13 +415,9 @@
    (read-base-string-as-bytes (fasl-input-stream)
                               (make-string length :element-type 'base-char))))
 
-;; FIXME: can save space by UTF-8 encoding, or use 1 bit to indicate pure ASCII
-;; in the fasl even though the result will be a non-base string.
-#!+sb-unicode
 (!define-fop 160 :not-host (fop-character-string ((:operands length)))
   (logically-readonlyize
-   (read-string-as-unsigned-byte-32 (fasl-input-stream)
-                                    (make-string length))))
+   (read-char-string-as-varints (fasl-input-stream) (make-string length))))
 
 (!define-fop 92 (fop-vector ((:operands size)))
   (if (zerop size)

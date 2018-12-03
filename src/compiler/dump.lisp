@@ -596,12 +596,9 @@
         (t
          (let ((s (package-name pkg)))
            (dump-fop 'fop-named-package-save file (length s))
-           #+sb-xc-host
-           (dump-base-chars-of-string (coerce s 'simple-base-string) file)
-           #-sb-xc-host
-           (#!+sb-unicode dump-characters-of-string
-            #!-sb-unicode dump-base-chars-of-string
-            (coerce s '(simple-array character (*))) file))
+           ;; Package names are always dumped as varint-encoded character strings
+           ;; except on non-unicode builds.
+           (dump-chars (coerce s '(simple-array character (*))) file nil))
          (let ((entry (fasl-output-table-free file)))
            (incf (fasl-output-table-free file))
            (push (cons pkg entry) (fasl-output-packages file))
@@ -746,24 +743,20 @@
                                         (*)))
                             x)))
     (typecase simple-version
-      #+sb-xc-host
-      (simple-string
+      ;; On the host, take all strings to be simple-base-string.
+      ;; In the target, really test for simple-base-string.
+      (#+sb-xc-host simple-string #-sb-xc-host simple-base-string
        (unless (string-check-table x file)
-         (dump-simple-base-string simple-version file)
-         (string-save-object x file)))
-      #-sb-xc-host
-      (simple-base-string
-       (unless (string-check-table x file)
-         (dump-simple-base-string simple-version file)
+         (dump-fop 'fop-base-string file (length simple-version))
+         (dump-chars simple-version file t)
          (string-save-object x file)))
       #-sb-xc-host
       ((simple-array character (*))
-       #!+sb-unicode
+       #!-sb-unicode (bug "how did we get here?")
        (unless (string-check-table x file)
-         (dump-simple-character-string simple-version file)
-         (string-save-object x file))
-       #!-sb-unicode
-       (bug "how did we get here?"))
+         (dump-fop 'fop-character-string file (length simple-version))
+         (dump-chars simple-version file nil)
+         (string-save-object x file)))
       (simple-vector
        ;; xc-host may upgrade anything to T, so pre-check that it
        ;; wasn't actually supposed to be a specialized array,
@@ -895,22 +888,14 @@
 (defun dump-character (char file)
   (dump-fop 'fop-character file (sb!xc:char-code char)))
 
-(defun dump-base-chars-of-string (s fasl-output)
-  (declare #+sb-xc-host (type simple-string s)
-           #-sb-xc-host (type simple-base-string s)
-           (type fasl-output fasl-output))
-  (dovector (c s)
-    (dump-byte (sb!xc:char-code c) fasl-output))
-  (values))
-
-
-;;; Dump a SIMPLE-BASE-STRING.
-(defun dump-simple-base-string (s file)
-  #+sb-xc-host (declare (type simple-string s))
-  #-sb-xc-host (declare (type simple-base-string s))
-  (dump-fop 'fop-base-string file (length s))
-  (dump-base-chars-of-string s file)
-  (values))
+;;; Dump a SIMPLE-STRING.
+(defun dump-chars (s fasl-output base-string-p)
+  (declare (type simple-string s))
+  (if (or base-string-p #!-sb-unicode t) ; if non-unicode, every char is 1 byte
+      (dovector (c s)
+        (dump-byte (sb!xc:char-code c) fasl-output))
+      (dovector (c s) ; varint (a/k/a LEB128) is better for this than UTF-8.
+        (dump-varint (sb!xc:char-code c) fasl-output))))
 
 ;;; If we get here, it is assumed that the symbol isn't in the table,
 ;;; but we are responsible for putting it there when appropriate.
@@ -918,7 +903,9 @@
   (declare (type fasl-output file))
   (let* ((pname (symbol-name s))
          (pname-length (length pname))
-         (base-string-p (typep pname (or #-sb-xc-host 'base-string t)))
+         ;; If no unicode, then all strings are base-string-p.
+         ;; On the host, everything is base-string-p.
+         (base-string-p (and #-sb-xc-host (typep pname 'base-string)))
          (length+flag (logior (ash pname-length 1) (if base-string-p 1 0)))
          (dumped-as-copy nil)
          (pkg (symbol-package s)))
@@ -940,8 +927,7 @@
                ;; Find the right kind of lookalike symbol.
                ;; [what about a symbol whose name is a (simple-array nil (0))?]
                (let ((that-base-p
-                      #+sb-xc-host t
-                      #-sb-xc-host (typep (symbol-name lookalike) 'base-string)))
+                      (and #-sb-xc-host (typep (symbol-name lookalike) 'base-string))))
                  (when (or (and this-base-p that-base-p)
                            (and (not this-base-p) (not that-base-p)))
                    (dump-fop 'fop-copy-symbol-save file
@@ -957,10 +943,7 @@
                        length+flag pkg-index))))
 
     (unless dumped-as-copy
-      (funcall (if base-string-p
-                   'dump-base-chars-of-string
-                   'dump-characters-of-string)
-               pname file)
+      (dump-chars pname file base-string-p)
       (push s (gethash (symbol-name s) (fasl-output-string=-table file))))
 
     (setf (gethash s (fasl-output-eq-table file))
