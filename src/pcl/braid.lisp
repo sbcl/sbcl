@@ -46,21 +46,28 @@
    :references '((:amop :generic-function allocate-instance)
                  (:amop :function set-funcallable-instance-function))))
 
-(defun allocate-standard-funcallable-instance (wrapper name)
+(defun allocate-standard-funcallable-instance-immobile (wrapper name)
+  (allocate-standard-funcallable-instance wrapper name
+                                          #+(and compact-instance-header immobile-code) t))
+
+(defun allocate-standard-funcallable-instance (wrapper name &optional
+                                                              #+(and compact-instance-header immobile-code)
+                                                              immobile)
   (declare (layout wrapper))
   (let* ((hash (if name
                    (mix (sxhash name) (sxhash :generic-function)) ; arb. constant
                    (sb-impl::new-instance-hash-code)))
          (slots (make-array (layout-length wrapper) :initial-element +slot-unbound+))
          (fin (cond #+(and compact-instance-header immobile-code)
-                    ((not (eql (layout-bitmap wrapper) -1))
+                    ((and immobile
+                          (not (eql (layout-bitmap wrapper) -1)))
                      (truly-the funcallable-instance
                                 (sb-vm::make-immobile-gf wrapper slots)))
                     (t
                      (let ((f (truly-the funcallable-instance
-                               (%make-standard-funcallable-instance
-                                slots
-                                #-compact-instance-header hash))))
+                                         (%make-standard-funcallable-instance
+                                          slots
+                                          #-compact-instance-header hash))))
                        (setf (%funcallable-instance-layout f) wrapper)
                        f)))))
     ;; Compact-instance-header uses the high 32 bits of the slot vector's
@@ -214,8 +221,7 @@
                 (setf (layout-slot-list wrapper) slots))
 
               (setq proto (if (eq meta 'funcallable-standard-class)
-                              (allocate-standard-funcallable-instance
-                               wrapper name)
+                              (allocate-standard-funcallable-instance wrapper name)
                               (allocate-standard-instance wrapper)))
 
               (setq direct-slots

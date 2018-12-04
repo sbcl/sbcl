@@ -194,11 +194,6 @@
 ;;; This is true of any funcallable instance which is not a GF, and closures.
 (defun fun-requires-simplifying-trampoline-p (fun)
   (cond ((not (immobile-space-obj-p fun)) t) ; always
-        ((funcallable-instance-p fun)
-         ;; A funcallable-instance with no raw slots has no machine
-         ;; code within it, and thus requires an external trampoline.
-         (eql (layout-bitmap (%funcallable-instance-layout fun))
-              sb!kernel::+layout-all-tagged+))
         (t
          (closurep fun))))
 

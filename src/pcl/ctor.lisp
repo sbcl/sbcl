@@ -804,7 +804,8 @@
            ,body
            .instance.)
         (let ((more
-               (when (eq allocation-function 'allocate-standard-funcallable-instance)
+               (when (memq allocation-function '(allocate-standard-funcallable-instance
+                                                 allocate-standard-funcallable-instance-immobile))
                  '(nil))))
           `(let* ((.instance. (,allocation-function ,wrapper ,@more))
                   (.slots. (,slots-fetcher .instance.)))

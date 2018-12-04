@@ -2324,7 +2324,7 @@ bootstrapping.
 (defun make-early-gf (name &optional lambda-list lambda-list-p
                       function argument-precedence-order source-location
                       documentation)
-  (let ((fin (allocate-standard-funcallable-instance
+  (let ((fin (allocate-standard-funcallable-instance-immobile
               *sgf-wrapper* name)))
     (replace (fsc-instance-slots fin) *sgf-slots-init*)
     (when function
