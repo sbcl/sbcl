@@ -80,7 +80,7 @@
   (def %set-vector-raw-bits (object offset value))
   (def single-float-bits)
   (def double-float-high-bits)
-  #!+64-bit
+  #+64-bit
   (def double-float-bits)
   (def double-float-low-bits)
   (def value-cell-ref)
