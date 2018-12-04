@@ -12,37 +12,10 @@
 
 (in-package "SB!C")
 
-;;; FIXME: unsafe if we remove world-lock from around compilation
-(defvar *ignored-errors* (make-hash-table :test 'equal))
-
 ;;; A definite inconsistency has been detected. Signal an error.
 (declaim (ftype (function (string &rest t) (values)) barf))
 (defun barf (string &rest args)
-  (unless (gethash string *ignored-errors*)
-    (restart-case
-        (apply #'error string args)
-      (continue ()
-        :report "Ignore this error.")
-      (ignore-all ()
-        :report "Ignore this and all future occurrences of this error."
-        (setf (gethash string *ignored-errors*) t))))
-  (values))
-
-(defvar *burp-action* :warn
-  "Action taken by the BURP function when a possible compiler bug is detected.
-One of :WARN, :ERROR or :NONE.")
-(declaim (type (member :warn :error :none) *burp-action*))
-
-;;; Called when something funny but possibly correct is noticed.
-;;; Otherwise similar to BARF.
-(declaim (ftype (function (string &rest t) (values)) burp))
-(defun burp (string &rest args)
-  (declare (notinline warn)) ; See COMPILER-WARN for rationale
-  (ecase *burp-action*
-    (:warn (apply #'warn string args))
-    (:error (apply #'cerror "press on anyway." string args))
-    (:none))
-  (values))
+  (apply #'bug string args))
 
 ;;; *SEEN-BLOCKS* is a hashtable with true values for all blocks which
 ;;; appear in the DFO for one of the specified components.
@@ -63,8 +36,8 @@ One of :WARN, :ERROR or :NONE.")
   (values))
 
 ;;; Check everything that we can think of for consistency. When a
-;;; definite inconsistency is detected, we BARF. Possible problems
-;;; just cause us to BURP. Our argument is a list of components, but
+;;; definite inconsistency is detected, we BARF.
+;;; Our argument is a list of components, but
 ;;; we also look at the *FREE-VARS*, *FREE-FUNS* and *CONSTANTS*.
 ;;;
 ;;; First we do a pre-pass which finds all the CBLOCKs and CLAMBDAs,
