@@ -647,6 +647,7 @@
  ;; target-only assemblerish stuff
  ("src/compiler/target-disassem"     :not-host)
  ("src/compiler/target/target-insts" :not-host)
+ #!+avx2
  ("src/compiler/target/target-avx2-insts" :not-host)
 
  ("src/code/debug" :not-host)
