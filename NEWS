@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-1.4.14:
+changes in sbcl-1.4.15 relative to sbcl-1.4.14:
   * enhancement: added AVX2 instructions on x86-64, which can be used with
     SB-SIMD-PACK.
   * enhancement: specializer name parsing is less lenient and signals a
