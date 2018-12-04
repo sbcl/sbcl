@@ -502,7 +502,7 @@
                                unless (eq ind :type)
                                nconc (list ind val)))))
     `(progn
-       (eval-when (:compile-toplevel)
+       (eval-when (:compile-toplevel :execute)
          (%def-arg-type ',name ,inherit ,@(massage-arg pair :compile)))
        #-sb-xc-host ; Host doesn't need the real definition.
        (%def-arg-type ',name ,inherit ,@(massage-arg pair :eval)))))
