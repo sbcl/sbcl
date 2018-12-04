@@ -1894,3 +1894,10 @@
           (block a (shiftf a 1))
           0))
    ((0) 0)))
+
+(with-test (:name :double-float-bits-stub)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+     (float-sign 5.0d0 (the double-float x)))
+   ((3d0) 3d0)))
