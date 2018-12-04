@@ -123,9 +123,9 @@
                (keyp (fun-type-keyp type))
                (fun (combination-fun call))
                (caller (loop for annotation in (lvar-annotations fun)
-                         when (typep annotation 'lvar-function-designator-annotation)
-                         do (setf *compiler-error-context* annotation)
-                         return (lvar-function-designator-annotation-caller annotation))))
+                             when (typep annotation 'lvar-function-designator-annotation)
+                             do (setf *compiler-error-context* annotation)
+                                (return (lvar-function-designator-annotation-caller annotation)))))
           (cond
             ((report-arg-count-mismatch (nth-value 1 (lvar-fun-type fun))
                                         caller type nargs nil
