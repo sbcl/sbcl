@@ -10,6 +10,16 @@ changes relative to sbcl-1.4.14:
     (fixes most occurrences of lp#308959)
   * bug fix: RUN-PROGRAM is more responsive and less likely to deadlock
     (lp#1702178, lp#1808641)
+  * bug fix: traceroot can search for simple-fun targets (lp#1808659, reported
+    by Michal Herda)
+  * compiler bug fixes:
+    ** related to code generation: lp#1805899, lp#1806982, lp#1807455
+    ** related to interpreting and constant-folding: lp#1806513
+    ** related to the type system: lp#1804759, lp#1804796
+    ** related to eq-testing of structure slots: lp#1809582, lp#1808273
+    ** related to dynamic-extent: lp#1809565, lp#1809253, lp#1809485, 
+       lp#1739652
+    ** related to GC safety: lp#308949
 
 changes in sbcl-1.4.14 relative to sbcl-1.4.13:
   * enhancement: attempting to build on openbsd 6.0 or newer without
