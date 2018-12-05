@@ -106,8 +106,8 @@
 ;;; The set of types of which no object can be a member during cross-compilation.
 (dolist (symbol '(alien system-area-pointer sb-alien-internals:alien-value
                   code-component fdefn lra extended-sequence
-                  sb!pcl::%method-function
-                  sb!pcl::standard-instance sb!pcl::standard-funcallable-instance
+                  sb-pcl::%method-function
+                  sb-pcl::standard-instance sb-pcl::standard-funcallable-instance
                   funcallable-instance generic-function
                   sb!format::fmt-control
                   #!+sb-eval sb!eval:interpreted-function
@@ -131,7 +131,7 @@
 (dolist (symbol '(lexenv sb-c::abstract-lexenv
                   sb-assem:label
                   condition restart style-warning step-condition
-                  class sb!pcl::condition-class error
+                  class sb-pcl::condition-class error
                   hash-table sb-thread:mutex
                   sb!pretty:pprint-dispatch-table
                   compiler-note
@@ -565,5 +565,5 @@
      ;; they can also add new cases here to handle it. -- WHN 2000-11-11
      (error "can't handle ~S in cross CTYPE-OF" x))))
 
-(defun sb!pcl::class-has-a-forward-referenced-superclass-p (x)
+(defun sb-pcl::class-has-a-forward-referenced-superclass-p (x)
   (bug "CLASS-HAS-A-FORWARD-REFERENCED-SUPERCLASS-P reached: ~S" x))

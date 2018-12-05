@@ -54,9 +54,9 @@
                        (let ((name (funcall key slot)))
                          (proclaim-ftype-for-name kind name type)))
                      slots)))
-        (inform slots #'sb!pcl::slot-reader-name reader-function-type)
-        (inform slots #'sb!pcl::slot-boundp-name reader-function-type)
-        (inform slots #'sb!pcl::slot-writer-name writer-function-type)))))
+        (inform slots #'sb-pcl::slot-reader-name reader-function-type)
+        (inform slots #'sb-pcl::slot-boundp-name reader-function-type)
+        (inform slots #'sb-pcl::slot-writer-name writer-function-type)))))
 
 (defun %%compiler-defclass (name readers writers slots)
   ;; ANSI says (Macro DEFCLASS, section 7.7) that DEFCLASS, if it

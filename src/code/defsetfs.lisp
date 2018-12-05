@@ -190,7 +190,7 @@
 (defsetf code-header-ref code-header-set)
 
 ;;; from pcl
-(defsetf slot-value sb!pcl::set-slot-value)
+(defsetf slot-value sb-pcl::set-slot-value)
 
 ;;; from sxhash.lisp
 (define-modify-macro mixf (y) mix)

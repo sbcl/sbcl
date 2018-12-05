@@ -122,7 +122,7 @@
   (let ((where (info :function :where-from name)))
     (when (and (eq where :assumed)
                ;; Slot accessors are defined just-in-time, if not already.
-               (not (typep name '(cons (eql sb!pcl::slot-accessor))))
+               (not (typep name '(cons (eql sb-pcl::slot-accessor))))
                ;; In the ordinary target Lisp, it's silly to report
                ;; undefinedness when the function is defined in the
                ;; running Lisp. But at cross-compile time, the current
@@ -1021,7 +1021,7 @@
                               ;; KLUDGE: packages we're not interested in
                               ;; stepping.
                               (mapcar #'find-package '(sb-c sb!int sb-impl
-                                                       sb-kernel sb!pcl))
+                                                       sb-kernel sb-pcl))
                              t))))))
     (and *allow-instrumenting*
          (policy *lexenv* (= insert-step-conditions 3))

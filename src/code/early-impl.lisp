@@ -34,8 +34,8 @@
                   #!-gencgc
                   sb-vm::*allocation-pointer*
                   sb-vm::*binding-stack-pointer*
-                  sb!pcl::*cache-miss-values-stack*
-                  sb!pcl::*dfun-miss-gfs-on-stack*))
+                  sb-pcl::*cache-miss-values-stack*
+                  sb-pcl::*dfun-miss-gfs-on-stack*))
 (defvar sb-vm:*alloc-signal*) ; initialized by create_thread_struct()
 ;;; This is a slot of 'struct thread' if multithreaded,
 ;;; and the symbol-global-value should never be used.

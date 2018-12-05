@@ -1623,11 +1623,11 @@
      (compiled-funs-or-lose (or (and (symbolp thing) (macro-function thing))
                                 (fdefinition thing))
                             thing))
-    (sb!pcl::%method-function
+    (sb-pcl::%method-function
          ;; in a %METHOD-FUNCTION, the user code is in the fast function, so
          ;; we to disassemble both.
          ;; FIXME: interpreted methods need to be compiled as above.
-         (list thing (sb!pcl::%method-function-fast-function thing)))
+         (list thing (sb-pcl::%method-function-fast-function thing)))
     ((or (cons (eql lambda))
          #!+sb-fasteval sb!interpreter:interpreted-function
          #!+sb-eval sb!eval:interpreted-function)

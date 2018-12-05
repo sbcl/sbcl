@@ -976,7 +976,7 @@
              ;; type propagation for classes is not as important anyway.
              (cond #-sb-xc-host
                    ((and
-                     (eq sb!pcl::**boot-state** 'sb!pcl::complete)
+                     (eq sb-pcl::**boot-state** 'sb-pcl::complete)
                      (block nil
                        (let ((standard-object (find-classoid 'standard-object)))
                          (sb-kernel::map-type

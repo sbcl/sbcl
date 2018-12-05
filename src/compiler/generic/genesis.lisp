@@ -1783,7 +1783,7 @@ core and return a descriptor to it."
   ;; and not cold-init, I think we should use an ordinary DEFPACKAGE for
   ;; the added-on bits. What I've done is somewhat of a fragile kludge.
   (let (syms)
-    (with-package-iterator (iter '("SB!PCL" "SB!MOP" "SB!GRAY" "SB-SEQUENCE"
+    (with-package-iterator (iter '("SB-PCL" "SB-MOP" "SB!GRAY" "SB-SEQUENCE"
                                    "SB!PROFILE" "SB!EXT" "SB-VM"
                                    "SB-C" "SB!FASL" "SB-DEBUG")
                                  :external)
@@ -2662,7 +2662,7 @@ core and return a descriptor to it."
           (push fun *!cold-toplevels*)
           (case fun
             (sb-impl::%defun (apply #'cold-fset args))
-            (sb!pcl::!trivial-defmethod (apply #'cold-defmethod args))
+            (sb-pcl::!trivial-defmethod (apply #'cold-defmethod args))
             (sb-kernel::%defstruct
              (push args *known-structure-classoids*)
              (push (apply #'cold-list (cold-intern 'defstruct) args)
@@ -3766,7 +3766,7 @@ III. initially undefined function references (alphabetically):
         (makunbound symbol)) ; so no further PUSHes can be done
 
       (cold-set
-       'sb!pcl::*!trivial-methods*
+       'sb-pcl::*!trivial-methods*
        (list-to-core
         (loop for (gf-name . methods) in *cold-methods*
               collect

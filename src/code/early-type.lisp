@@ -802,21 +802,21 @@
                                (built-in-classoid-translation classoid))
                           classoid)))
                (cond ((classoid-p x) (translate x))
-                     ;; Avoid TYPEP on SB!MOP:EQL-SPECIALIZER and CLASS because
+                     ;; Avoid TYPEP on SB-MOP:EQL-SPECIALIZER and CLASS because
                      ;; the fake metaobjects do not allow type analysis, and
                      ;; would cause a compiler error as it tries to decide
                      ;; whether any clause of this COND subsumes another.
                      ;; Moreover, we don't require the host to support MOP.
                      #-sb-xc-host
-                     ((sb!pcl::classp x) (translate (sb!pcl::class-classoid x)))
+                     ((sb-pcl::classp x) (translate (sb-pcl::class-classoid x)))
                      #-sb-xc-host
-                     ((sb!pcl::eql-specializer-p type-specifier)
+                     ((sb-pcl::eql-specializer-p type-specifier)
                       ;; FIXME: these aren't always cached. Should they be?
                       ;; It seems so, as "parsing" constructs a new object.
                       ;; Perhaps better, the EQL specializer itself could store
                       ;; (by memoizing, if not precomputing) a CTYPE
                       (make-eql-type
-                       (sb!mop:eql-specializer-object type-specifier)))
+                       (sb-mop:eql-specializer-object type-specifier)))
                      (t (fail x))))))
     (when (typep type-specifier 'instance)
       (return-from values-specifier-type-r (instance-to-ctype type-specifier)))

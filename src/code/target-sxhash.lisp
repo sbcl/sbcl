@@ -234,12 +234,12 @@
   #!-(and compact-instance-header x86-64)
   (locally
    (declare (optimize (sb-c::type-check 0)))
-   (let ((hash (sb!pcl::standard-instance-hash-code instance)))
+   (let ((hash (sb-pcl::standard-instance-hash-code instance)))
      (if (not (eql hash 0))
          hash
          (let ((new (new-instance-hash-code)))
           ;; At most one thread will compute a random hash.
-          (let ((old (cas (sb!pcl::standard-instance-hash-code instance) 0 new)))
+          (let ((old (cas (sb-pcl::standard-instance-hash-code instance) 0 new)))
             (if (eql old 0) new old)))))))
 
 ;; These are also random numbers, but not lazily computed.
@@ -252,9 +252,9 @@
    (declare (optimize (sb-c::type-check 0)))
    #!+compact-instance-header
    (sb-vm::get-header-data-high
-    (sb!pcl::standard-funcallable-instance-clos-slots fin))
+    (sb-pcl::standard-funcallable-instance-clos-slots fin))
    #!-compact-instance-header
-   (sb!pcl::standard-funcallable-instance-hash-code fin)))
+   (sb-pcl::standard-funcallable-instance-hash-code fin)))
 
 (defun sxhash (x)
   ;; profiling SXHASH is hard, but we might as well try to make it go

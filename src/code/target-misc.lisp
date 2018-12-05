@@ -247,8 +247,8 @@ version 1[.0.0...] or greater."
               (lisp-implementation-version)
               subversions))))
 
-(!defvar sb!pcl::*!docstrings* nil)
+(!defvar sb-pcl::*!docstrings* nil)
 (defun (setf documentation) (string name doc-type)
   (declare (type (or null string) string))
-  (push (list string name doc-type) sb!pcl::*!docstrings*)
+  (push (list string name doc-type) sb-pcl::*!docstrings*)
   string)

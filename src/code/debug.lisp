@@ -639,7 +639,7 @@ information."
 
 (defun clean-frame-call (frame name method-frame-style info)
   (let ((args (frame-args-as-list frame)))
-    (cond ((typep name '(cons (eql sb!pcl::fast-method)))
+    (cond ((typep name '(cons (eql sb-pcl::fast-method)))
            (clean-fast-method name args method-frame-style info))
           ((memq :external info)
            (clean-xep frame name args info))

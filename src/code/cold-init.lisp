@@ -249,7 +249,7 @@
 
   ;; Install closures as guards on some early PRINT-OBJECT methods so that
   ;; THREAD and RESTART print nicely prior to the real methods being installed.
-  (dovector (method (cdr (assoc 'print-object sb!pcl::*!trivial-methods*)))
+  (dovector (method (cdr (assoc 'print-object sb-pcl::*!trivial-methods*)))
     (unless (car method)
       (let ((classoid (find-classoid (third method))))
         (rplaca method

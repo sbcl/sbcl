@@ -154,7 +154,7 @@
       (return (setf (car (condition-slot-cell cslot)) new-value)))))
 
 (defun condition-slot-value (condition name)
-  (let ((val (getf (condition-assigned-slots condition) name sb!pcl:+slot-unbound+)))
+  (let ((val (getf (condition-assigned-slots condition) name sb-pcl:+slot-unbound+)))
     (if (unbound-marker-p val)
         (let ((class (layout-classoid (%instance-layout condition))))
           (dolist (cslot
@@ -243,7 +243,7 @@
     ;; Default any slots with non-constant defaults now.
     (dolist (hslot (condition-classoid-hairy-slots classoid))
       (when (dolist (initarg (condition-slot-initargs hslot) t)
-              (unless (unbound-marker-p (getf initargs initarg sb!pcl:+slot-unbound+))
+              (unless (unbound-marker-p (getf initargs initarg sb-pcl:+slot-unbound+))
                 (return nil)))
         (setf (getf (condition-assigned-slots condition)
                     (condition-slot-name hslot))
@@ -356,7 +356,7 @@
                                 (let ((initfun (condition-slot-initfunction slot)))
                                   (aver (functionp initfun))
                                   (funcall initfun))
-                                sb!pcl:+slot-unbound+))))
+                                sb-pcl:+slot-unbound+))))
               (push slot (condition-classoid-class-slots classoid)))
              ((:instance nil)
               (setf (condition-slot-allocation slot) :instance)
@@ -1443,7 +1443,7 @@ handled by any other handler, it will be muffled.")
    (let* ((name (redefinition-warning-name warning))
           (old (fdefinition name))
           (old-location (when (typep old 'generic-function)
-                          (sb!pcl::definition-source old)))
+                          (sb-pcl::definition-source old)))
           (old-namestring (when old-location
                             (sb-c:definition-source-location-namestring old-location)))
           (new-location (redefinition-warning-new-location warning))
@@ -1461,7 +1461,7 @@ handled by any other handler, it will be muffled.")
    ;; Can't use the shared logic above, since GF's don't get a "new"
    ;; definition -- rather the FIN-FUNCTION is set.
    (let* ((old-method (redefinition-with-defmethod-old-method warning))
-          (old-location (sb!pcl::definition-source old-method))
+          (old-location (sb-pcl::definition-source old-method))
           (old-namestring (when old-location
                             (sb-c:definition-source-location-namestring old-location)))
           (new-location (redefinition-warning-new-location warning))

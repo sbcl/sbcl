@@ -24,7 +24,7 @@
 ;;;; warranty about the software, its performance or its conformity to any
 ;;;; specification.
 
-(in-package "SB!PCL")
+(in-package "SB-PCL")
 
 (declaim (type (member nil early braid complete) **boot-state**))
 (define-load-time-global **boot-state** nil)
@@ -33,9 +33,6 @@
 ;;; The PCL package is internal and is used by code in potential
 ;;; bottlenecks. And since it's internal, no one should be
 ;;; doing things like deleting and recreating it in a running target Lisp.
-;;; By the time we get to compiling the rest of PCL,
-;;; the package will have been renamed,
-;;; so subsequently compiled code should refer to "SB-PCL", not "SB!PCL".
 (define-symbol-macro *pcl-package* (load-time-value (find-package "SB-PCL") t))
 
 (declaim (inline class-classoid))

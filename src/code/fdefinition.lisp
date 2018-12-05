@@ -89,8 +89,8 @@
       ;; We won't reach here if the name was not legal
       (let ((fdefn (get-info-value-initializing :function :definition name
                                                 (make-fdefn name))))
-        (when (typep name '(cons (eql sb!pcl::slot-accessor)))
-          (sb!pcl::ensure-accessor name))
+        (when (typep name '(cons (eql sb-pcl::slot-accessor)))
+          (sb-pcl::ensure-accessor name))
         fdefn)))
 
 ;;; Return T if FUNCTION is the error-signaling trampoline for a macro or a

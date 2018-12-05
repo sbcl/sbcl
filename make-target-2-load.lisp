@@ -24,7 +24,7 @@
              (or (and (>= (length name) 1) (char= (char name 0) #\!))
                  (and (>= (length name) 2) (string= name "*!" :end1 2))
                  (memq symbol
-                       '(sb-c::sb!pcl sb-c::sb-impl sb-c::sb-kernel
+                       '(sb-c::sb-pcl sb-c::sb-impl sb-c::sb-kernel
                          sb-c::sb-c sb-c::sb-int))))))
     ;; A structure constructor name, in particular !MAKE-SAETP,
     ;; can't be uninterned if referenced by a defstruct-description.

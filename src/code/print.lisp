@@ -1720,7 +1720,7 @@ variable: an unreadable object representing the error is printed instead.")
 (defun lowtag-of (x) (logand (get-lisp-obj-address x) sb-vm:lowtag-mask))
 
 (defmethod print-object ((object t) stream)
-  (when (eq object sb!pcl:+slot-unbound+)
+  (when (eq object sb-pcl:+slot-unbound+)
     ;; If specifically the unbound marker with 0 data,
     ;; as opposed to any other unbound marker.
     (print-unreadable-object (object stream) (write-string "unbound" stream))

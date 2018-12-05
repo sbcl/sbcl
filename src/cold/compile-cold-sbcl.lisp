@@ -130,23 +130,23 @@
             sb!ext:run-program
             sb-vm::remove-static-links)
           ;; CLOS implementation
-          '(sb!mop:class-finalized-p
-            sb!mop:class-prototype
-            sb!mop:class-slots
-            sb!mop:eql-specializer-object
-            sb!mop:finalize-inheritance
-            sb!mop:generic-function-name
-            (setf sb!mop:generic-function-name)
-            sb!mop:slot-definition-allocation
-            sb!mop:slot-definition-name
-            sb!pcl::%force-cache-flushes
-            sb!pcl::check-wrapper-validity
-            sb!pcl::class-has-a-forward-referenced-superclass-p
-            sb!pcl::class-wrapper
-            sb!pcl::compute-gf-ftype
-            sb!pcl::definition-source
-            sb!pcl::ensure-accessor
-            sb!pcl:ensure-class-finalized)
+          '(sb-mop:class-finalized-p
+            sb-mop:class-prototype
+            sb-mop:class-slots
+            sb-mop:eql-specializer-object
+            sb-mop:finalize-inheritance
+            sb-mop:generic-function-name
+            (setf sb-mop:generic-function-name)
+            sb-mop:slot-definition-allocation
+            sb-mop:slot-definition-name
+            sb-pcl::%force-cache-flushes
+            sb-pcl::check-wrapper-validity
+            sb-pcl::class-has-a-forward-referenced-superclass-p
+            sb-pcl::class-wrapper
+            sb-pcl::compute-gf-ftype
+            sb-pcl::definition-source
+            sb-pcl::ensure-accessor
+            sb-pcl:ensure-class-finalized)
           ;; CLOS-based packages
           '(sb!gray:stream-clear-input
             sb!gray:stream-clear-output

@@ -91,7 +91,7 @@
                ;; &OPTIONAL/&KEY message randomly repeated, especially if it's
                ;; someone else's code. Fwiw, 'full-eval' muffles warnings during
                ;; all calls to this parser anyway.
-               (silent (typep list '(cons (eql sb!pcl::.pv.))))
+               (silent (typep list '(cons (eql sb-pcl::.pv.))))
           &aux (seen 0) required optional rest more keys aux env whole tail
                (rest-bits 0))
   (declare (optimize speed))

@@ -249,8 +249,8 @@
             (coerce-error))))
         ((and (csubtypep type (specifier-type 'sequence))
               (find-class output-type-spec nil))
-         (let ((prototype (sb!mop:class-prototype
-                           (sb!pcl:ensure-class-finalized
+         (let ((prototype (sb-mop:class-prototype
+                           (sb-pcl:ensure-class-finalized
                             (find-class output-type-spec)))))
            (sb-sequence:make-sequence-like
             prototype (length object) :initial-contents object)))

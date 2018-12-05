@@ -1686,7 +1686,7 @@ or they must be declared locally notinline at each call site.~@:>"
     (values (cond ((defstruct-description-p info)
                    (specifier-type (struct-ctor-ftype info name)))
                   #-sb-xc-host ; PCL doesn't exist
-                  ((eq info :generic-function) (sb!pcl::compute-gf-ftype name))
+                  ((eq info :generic-function) (sb-pcl::compute-gf-ftype name))
                   (t info))
             foundp)))
 
@@ -2066,8 +2066,8 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;; It's easier for the compiler to recognize the output of M-L-F-S-S
 ;;; without extraneous QUOTE forms, so we define some trivial wrapper macros.
 (defmacro new-instance (type) `(allocate-instance (find-class ',type)))
-(defmacro sb!pcl::set-slots (instance name-list &rest values)
-  `(sb!pcl::%set-slots ,instance ',name-list ,@values))
+(defmacro sb-pcl::set-slots (instance name-list &rest values)
+  `(sb-pcl::%set-slots ,instance ',name-list ,@values))
 
 ;;; We require that MAKE-LOAD-FORM-SAVING-SLOTS produce deterministic output
 ;;; and that its output take a particular recognizable form so that it can
@@ -2135,18 +2135,18 @@ or they must be declared locally notinline at each call site.~@:>"
                                       (if (quote-p val) `',val val)))))
                           (dd-slots (layout-info (%instance-layout object)))))
                 #-sb-xc-host
-                (loop for slot in (sb!mop:class-slots (class-of object))
-                      for name = (sb!mop:slot-definition-name slot)
+                (loop for slot in (sb-mop:class-slots (class-of object))
+                      for name = (sb-mop:slot-definition-name slot)
                       when (if slot-names-p
                                (memq name slot-names)
-                               (eq (sb!mop:slot-definition-allocation slot) :instance))
+                               (eq (sb-mop:slot-definition-allocation slot) :instance))
                       collect name into names
                       and
                       collect (if (slot-boundp object name)
                                   (let ((val (slot-value object name)))
                                     (if (quote-p val) `',val val))
-                                  'sb!pcl:+slot-unbound+) into vals
-                      finally (return `(sb!pcl::set-slots ,object ,names ,@vals))))))
+                                  'sb-pcl:+slot-unbound+) into vals
+                      finally (return `(sb-pcl::set-slots ,object ,names ,@vals))))))
 
   ;; Call MAKE-LOAD-FORM inside a condition handler in case the method fails.
   ;  If the resulting CREATION-FORM and INIT-FORM are equivalent to those

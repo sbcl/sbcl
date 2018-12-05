@@ -251,8 +251,8 @@
                               ,expanded
                               (find-class ,expanded nil))
                           :exit-if-null)
-                  (,prototype (sb!mop:class-prototype
-                               (sb!pcl:ensure-class-finalized ,class))))
+                  (,prototype (sb-mop:class-prototype
+                               (sb-pcl:ensure-class-finalized ,class))))
          ,@(unless prototypep `((ignore ,prototype)))
          ,@body))))
 

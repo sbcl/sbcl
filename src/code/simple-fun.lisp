@@ -182,7 +182,7 @@
      (typecase (truly-the funcallable-instance function)
        (generic-function
         (return-from %fun-name
-          (sb!mop:generic-function-name function)))
+          (sb-mop:generic-function-name function)))
        #!+sb-eval
        (sb!eval:interpreted-function
         (return-from %fun-name (sb!eval:interpreted-function-debug-name function)))
@@ -203,7 +203,7 @@
     (t
      (typecase (truly-the funcallable-instance function)
        (generic-function
-        (setf (sb!mop:generic-function-name function) new-value))
+        (setf (sb-mop:generic-function-name function) new-value))
        #!+sb-eval
        (sb!eval:interpreted-function
         (setf (sb!eval:interpreted-function-debug-name function) new-value))

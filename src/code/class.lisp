@@ -699,19 +699,19 @@ between the ~A definition and the ~A definition"
       (if (typep classoid 'standard-classoid)
           (let ((class (classoid-pcl-class classoid)))
             (cond
-              ((sb!pcl:class-finalized-p class)
-               (sb!pcl::%force-cache-flushes class)
+              ((sb-pcl:class-finalized-p class)
+               (sb-pcl::%force-cache-flushes class)
                t)
-              ((sb!pcl::class-has-a-forward-referenced-superclass-p class)
+              ((sb-pcl::class-has-a-forward-referenced-superclass-p class)
                (when error-context
                  (bug "~@<Invalid class ~S with forward-referenced superclass ~
                        ~S in ~A.~%~:@>"
                       class
-                      (sb!pcl::class-has-a-forward-referenced-superclass-p class)
+                      (sb-pcl::class-has-a-forward-referenced-superclass-p class)
                       error-context))
                nil)
               (t
-               (sb!pcl:finalize-inheritance class)
+               (sb-pcl:finalize-inheritance class)
                t)))
           (bug "~@<Don't know how to ensure validity of ~S (not a STANDARD-CLASSOID) ~
                 for ~A.~%~:@>"
@@ -732,7 +732,7 @@ between the ~A definition and the ~A definition"
 (defun update-object-layout-or-invalid (object layout)
   ;; FIXME: explain why this isn't (LAYOUT-FOR-STD-CLASS-P LAYOUT).
   (if (layout-for-std-class-p (layout-of object))
-      (sb!pcl::check-wrapper-validity object)
+      (sb-pcl::check-wrapper-validity object)
       (sb-c::%layout-invalid-error object layout)))
 
 ;;; Simple methods for TYPE= and SUBTYPEP should never be called when
@@ -751,9 +751,9 @@ between the ~A definition and the ~A definition"
               (values t t)
               (if (and (typep class1 'standard-classoid)
                        (typep class2 'standard-classoid)
-                       (or (sb!pcl::class-has-a-forward-referenced-superclass-p
+                       (or (sb-pcl::class-has-a-forward-referenced-superclass-p
                             (classoid-pcl-class class1))
-                           (sb!pcl::class-has-a-forward-referenced-superclass-p
+                           (sb-pcl::class-has-a-forward-referenced-superclass-p
                             (classoid-pcl-class class2))))
                   ;; If there's a forward-referenced class involved we don't know for sure.
                   ;; (There are cases which we /could/ figure out, but that doesn't seem
