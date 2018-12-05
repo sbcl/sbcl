@@ -298,7 +298,6 @@ corresponds to NAME, or NIL if there is none."
 ;;; and store them into the buffer. It returns the actual number of
 ;;; bytes read.
 
-#!-sb!fluid
 (declaim (maybe-inline unix-read))
 
 (defun unix-read (fd buf len)
