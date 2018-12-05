@@ -1104,7 +1104,6 @@ possibly temporarily, because it might be used internally."
                "COMPILED-PROGRAM-ERROR"
                "COMPILER-MACRO-KEYWORD-PROBLEM"
                "ENCAPSULATED-CONDITION"
-               "INTERPRETED-PROGRAM-ERROR"
                "INVALID-ARRAY-ERROR"
                "INVALID-ARRAY-INDEX-ERROR"
                "INVALID-ARRAY-P"
@@ -3336,7 +3335,7 @@ structure representations"
    #s(sb-cold:package-data
       :name "SB-EVAL"
       :doc "internal: the evaluator implementation used to execute code without compiling it."
-      :use ("CL" "SB-KERNEL" "SB-EXT")
+      :use ("CL" "SB-KERNEL" "SB-EXT" "SB-INT")
       :reexport ("*EVAL-CALLS*")
       :export ("INTERPRETED-FUNCTION"
                "INTERPRETED-FUNCTION-P"

@@ -1623,7 +1623,7 @@
 ;;; and analogous SBCL extension:
 (defknown sb!impl::%failed-aver (t) nil)
 (defknown bug (t &rest t) nil) ; never returns
-(defknown sb!int:simple-reader-error (stream string &rest t) nil)
+(defknown simple-reader-error (stream string &rest t) nil)
 (defknown sb!kernel:reader-eof-error (stream string) nil)
 
 

@@ -128,9 +128,24 @@
   (signal 'eval-error :condition condition)
   (bug "Unhandled EVAL-ERROR"))
 
+#!-sb-fasteval
+(progn
+;; See comment in 'full-eval' at its definition of INTERPRETED-PROGRAM-ERROR
+;; which is not the same as this one. Since neither is more globally used
+;; or appropriate per se, neither is exported from SB-KERNEL or SB-INT.
+(define-condition interpreted-program-error
+    (program-error encapsulated-condition)
+  ;; Unlike COMPILED-PROGRAM-ERROR, we don't need to dump these, so
+  ;; storing the original condition and form is OK.
+  ((form :initarg :form :reader program-error-form))
+  (:report (lambda (condition stream)
+             (format stream "~&Evaluation of~%  ~S~%~
+                             caused error:~%  ~A~%"
+                     (program-error-form condition)
+                     (encapsulated-condition condition)))))
+
 ;;; Pick off a few easy cases, and the various top level EVAL-WHEN
 ;;; magical cases, and call %SIMPLE-EVAL for the rest.
-#!-sb-fasteval
 (defun simple-eval-in-lexenv (original-exp lexenv)
   (declare (optimize (safety 1)))
   ;; (aver (lexenv-simple-p lexenv))
@@ -269,6 +284,7 @@
                     (%simple-eval exp lexenv))))))
           (t
            exp))))))
+) ; end PROGN
 
 ;;; This definition will be replaced after the interpreter is compiled.
 ;;; Until then we just always compile.

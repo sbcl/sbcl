@@ -19,7 +19,7 @@
 ;; but this is possibly a mistake! Ordinary DEFMACRO supplies the location
 ;; to %DEFMACRO. Compiler macros should too. This extra form will be needed:
 (eval-when (#+sb-xc :compile-toplevel)
-  (setf (sb!int:info :function :compiler-macro-function 'source-location)
+  (setf (info :function :compiler-macro-function 'source-location)
         (lambda (form env)
           (declare (ignore form env))
           (make-definition-source-location)))) |#

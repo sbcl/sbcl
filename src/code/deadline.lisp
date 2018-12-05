@@ -143,7 +143,7 @@ for calling this when a deadline is reached."
           (defer-deadline (&optional (seconds seconds))
             :report "Defer the deadline for SECONDS more."
             :interactive (lambda ()
-                           (sb!int:read-evaluated-form
+                           (read-evaluated-form
                             "By how many seconds shall the deadline ~
                              be deferred?: "))
             (setf *deadline*

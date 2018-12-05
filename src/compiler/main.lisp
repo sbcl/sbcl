@@ -1778,12 +1778,11 @@ necessary, since type inference may take arbitrarily long to converge.")
     #-sb-xc-host
     (compiler-mumble "~&; compiling file ~S (written ~A):~%"
                      (namestring (file-info-name file-info))
-                     (sb!int:format-universal-time nil
-                                                   (file-info-write-date
-                                                    file-info)
-                                                   :style :government
-                                                   :print-weekday nil
-                                                   :print-timezone nil)))
+                     (format-universal-time nil
+                                            (file-info-write-date file-info)
+                                            :style :government
+                                            :print-weekday nil
+                                            :print-timezone nil)))
   (values))
 
 (defun print-compile-end-note (source-info won)
