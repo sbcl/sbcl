@@ -1,3 +1,3 @@
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 

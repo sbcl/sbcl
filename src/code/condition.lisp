@@ -163,7 +163,7 @@
                          (slot (or (find-condition-class-slot class name)
                                    (error "missing slot ~S of ~S" name condition))))
                      (setf (getf (condition-assigned-slots condition) name)
-                           (do ((i (+ sb!vm:instance-data-start 2) (+ i 2)))
+                           (do ((i (+ sb-vm:instance-data-start 2) (+ i 2)))
                                ((>= i instance-length) (find-slot-default class slot))
                                (when (member (%instance-ref condition i)
                                              (condition-slot-initargs slot))
@@ -201,13 +201,13 @@
         ;; Interestingly we fail to validate the actual-initargs,
         ;; allowing any random initarg names.  Is this permissible?
         ;; And why is lazily filling in ASSIGNED-SLOTS beneficial anyway?
-        (let ((instance (%make-instance (+ sb!vm:instance-data-start
+        (let ((instance (%make-instance (+ sb-vm:instance-data-start
                                            2 ; ASSIGNED-SLOTS and HASH
                                            (length initargs))))) ; rest
           (setf (%instance-layout instance) (classoid-layout classoid)
                 (condition-assigned-slots instance) nil)
           (do-rest-arg ((val index) initargs)
-            (setf (%instance-ref instance (+ sb!vm:instance-data-start index 2)) val))
+            (setf (%instance-ref instance (+ sb-vm:instance-data-start index 2)) val))
           (values instance classoid))
         (error 'simple-type-error
                :datum designator

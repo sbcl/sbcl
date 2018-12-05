@@ -66,7 +66,7 @@
       (t
        (mixf result (sxhash length))
        (multiple-value-bind (n-full-words n-bits-remaining)
-           (floor length sb!vm:n-word-bits)
+           (floor length sb-vm:n-word-bits)
          (flet ((mix-into-result (num)
                   (mixf result
                         ,(ecase sb!c:*backend-byte-order*
@@ -76,10 +76,10 @@
                                 ;; N-LOWTAG-BITS is the clearest way of
                                 ;; expressing this: it's essentially the
                                 ;; difference between `(UNSIGNED-BYTE
-                                ;; ,SB!VM:N-WORD-BITS) and (AND FIXNUM
+                                ;; ,SB-VM:N-WORD-BITS) and (AND FIXNUM
                                 ;; UNSIGNED-BYTE).
                                 (:big-endian
-                                 '(ash num (- sb!vm:n-lowtag-bits)))))))
+                                 '(ash num (- sb-vm:n-lowtag-bits)))))))
            (declare (inline mix-into-result))
            ;; FIXME: should we respect DEPTHOID?  SXHASH on strings
            ;; doesn't seem to...
@@ -92,7 +92,7 @@
                              ,(ecase sb!c:*backend-byte-order*
                                      (:little-endian 0)
                                      (:big-endian
-                                      '(- sb!vm:n-word-bits
+                                      '(- sb-vm:n-word-bits
                                         n-bits-remaining))))
                         (%vector-raw-bits x n-full-words))))))))))
 
@@ -119,7 +119,7 @@
   (cond ((csubtypep (lvar-type x) (specifier-type 'null))
          ;; Test this before CONSTANT-LVAR-P because it does happen
          ;; during cross-compilation, and we want to win, not lose.
-         (ash sb!vm::nil-value (- sb!vm:n-fixnum-tag-bits)))
+         (ash sb-vm::nil-value (- sb-vm:n-fixnum-tag-bits)))
         ((constant-lvar-p x) (compiler-sxhash x))
         ((csubtypep (lvar-type x) (specifier-type 'keyword))
          ;; All interned symbols have a precomputed hash.

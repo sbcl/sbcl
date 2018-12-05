@@ -22,39 +22,39 @@
 (def!type local-tn-bit-vector () `(simple-bit-vector ,local-tn-limit))
 
 ;;; vectors indexed by SC numbers
-(def!type sc-vector () `(simple-vector ,sb!vm:sc-number-limit))
-(deftype sc-bit-vector () `(simple-bit-vector ,sb!vm:sc-number-limit))
+(def!type sc-vector () `(simple-vector ,sb-vm:sc-number-limit))
+(deftype sc-bit-vector () `(simple-bit-vector ,sb-vm:sc-number-limit))
 
 ;;; Bitset representation of a set of locations in a finite SC.
 (def!type sc-locations ()
-  `(unsigned-byte ,sb!vm:finite-sc-offset-limit))
+  `(unsigned-byte ,sb-vm:finite-sc-offset-limit))
 
 (defun make-sc-locations (locations)
   (reduce (lambda (value location)
-            (check-type location sb!vm:finite-sc-offset)
+            (check-type location sb-vm:finite-sc-offset)
             (dpb 1 (byte 1 location) value))
           locations :initial-value 0))
 
 (declaim (inline sc-offset-to-sc-locations)
-         (ftype (sfunction (sb!vm:finite-sc-offset) sc-locations)
+         (ftype (sfunction (sb-vm:finite-sc-offset) sc-locations)
                 sc-offset-to-sc-locations))
 (defun sc-offset-to-sc-locations (offset)
   (dpb 1 (byte 1 offset) 0))
 
 (declaim (inline sc-locations-count)
-         (ftype (sfunction (sc-locations) (integer 0 #.sb!vm:finite-sc-offset-limit))
+         (ftype (sfunction (sc-locations) (integer 0 #.sb-vm:finite-sc-offset-limit))
                 sc-locations-count))
 (defun sc-locations-count (locations)
   (logcount locations))
 
 (declaim (inline sc-locations-first)
-         (ftype (sfunction (sc-locations) sb!vm:finite-sc-offset)
+         (ftype (sfunction (sc-locations) sb-vm:finite-sc-offset)
                 sc-locations-first))
 (defun sc-locations-first (locations)
   (1- (integer-length (logxor locations (1- locations)))))
 
 (declaim (inline sc-locations-member)
-         (ftype (sfunction (sb!vm:finite-sc-offset sc-locations) boolean)
+         (ftype (sfunction (sb-vm:finite-sc-offset sc-locations) boolean)
                 sc-locations-member))
 (defun sc-locations-member (location locations)
   (logbitp location locations))
@@ -64,21 +64,21 @@
                            &body body)
   (let* ((limit (cond
                   ((not limitp)
-                   sb!vm:finite-sc-offset-limit)
+                   sb-vm:finite-sc-offset-limit)
                   ((not (constantp limit))
                    limit)
                   ((eval limit))
                   (t
-                   sb!vm:finite-sc-offset-limit)))
-         (mid   (floor sb!vm:finite-sc-offset-limit 2)))
+                   sb-vm:finite-sc-offset-limit)))
+         (mid   (floor sb-vm:finite-sc-offset-limit 2)))
     (once-only ((locations locations)
-                (increment `(the sb!vm:finite-sc-offset ,(or increment 1))))
+                (increment `(the sb-vm:finite-sc-offset ,(or increment 1))))
       (labels ((make-block (start end)
                  `(loop named #:noname
                         for ,location
                         from ,start below ,end by ,increment
                         when (logbitp ,location ,locations)
-                        do (locally (declare (type sb!vm:finite-sc-offset
+                        do (locally (declare (type sb-vm:finite-sc-offset
                                               ,location))
                              ,@body)))
                (make-guarded-block (start end)
@@ -820,7 +820,7 @@
   ;; starts. Less then the length of those vectors when not all of the
   ;; length was used on the previously packed component.
   (last-block-count 0 :type index)
-  (wired-map 0 :type sb!vm:finite-sc-offset-map))
+  (wired-map 0 :type sb-vm:finite-sc-offset-map))
 (declaim (freeze-type storage-base finite-sb-template finite-sb))
 
 ;;; Give this a toplevel value so that it can be declaimed ALWAYS-BOUND.
@@ -879,9 +879,9 @@
   ;; of the corresponding move functions. If loading is impossible,
   ;; then the entries are NIL. LOAD-COSTS is initialized to have a 0
   ;; for this SC.
-  (move-funs (make-array sb!vm:sc-number-limit :initial-element nil)
+  (move-funs (make-array sb-vm:sc-number-limit :initial-element nil)
              :type sc-vector)
-  (load-costs (make-array sb!vm:sc-number-limit :initial-element nil)
+  (load-costs (make-array sb-vm:sc-number-limit :initial-element nil)
               :type sc-vector)
   ;; a vector mapping from SC numbers to possibly
   ;; representation-specific move and coerce VOPs. Each entry is a
@@ -901,18 +901,18 @@
   ;; TNs wired in the standard argument registers, since there may
   ;; already be live TNs wired in those locations holding the values
   ;; that we are setting up for unknown-values return.
-  (move-vops (make-array sb!vm:sc-number-limit :initial-element nil)
+  (move-vops (make-array sb-vm:sc-number-limit :initial-element nil)
              :type sc-vector)
   ;; the costs corresponding to the MOVE-VOPS. Separate because this
   ;; info is needed at meta-compile time, while the MOVE-VOPs don't
   ;; exist till load time. If no move is defined, then the entry is
   ;; NIL.
-  (move-costs (make-array sb!vm:sc-number-limit :initial-element nil)
+  (move-costs (make-array sb-vm:sc-number-limit :initial-element nil)
               :type sc-vector)
   ;; similar to Move-VOPs, except that we only ever use the entries
   ;; for this SC and its alternates, since we never combine complex
   ;; representation conversion with argument passing.
-  (move-arg-vops (make-array sb!vm:sc-number-limit :initial-element nil)
+  (move-arg-vops (make-array sb-vm:sc-number-limit :initial-element nil)
                  :type sc-vector)
   ;; true if this SC or one of its alternates in in the NUMBER-STACK SB.
   (number-stack-p nil :type boolean)

@@ -1,4 +1,4 @@
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 #!+sb-thread
 (define-assembly-routine (alloc-tls-index

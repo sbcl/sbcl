@@ -12,7 +12,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 ;;; Do whatever is necessary to make the given code component
 ;;; executable.  This isn't always strictly necessary (some ARM

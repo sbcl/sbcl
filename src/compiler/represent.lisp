@@ -80,7 +80,7 @@
 (defun listify-restrictions (restr)
   (declare (type sc-vector restr))
   (collect ((res))
-    (dotimes (i sb!vm:sc-number-limit)
+    (dotimes (i sb-vm:sc-number-limit)
       (when (eq (svref restr i) t)
         (res (svref *backend-sc-numbers* i))))
     (res)))
@@ -132,7 +132,7 @@
       (collect ((load-lose)
                 (no-move-scs)
                 (move-lose))
-        (dotimes (i sb!vm:sc-number-limit)
+        (dotimes (i sb-vm:sc-number-limit)
           (let ((i-sc (svref *backend-sc-numbers* i)))
             (when (eq (svref load-scs i) t)
               (cond ((not (sc-allowed-by-primitive-type i-sc ptype))
@@ -187,7 +187,7 @@
 
 ;;; FIXME: should probably be conditional on #!+SB-SHOW
 (defun check-move-fun-consistency ()
-  (dotimes (i sb!vm:sc-number-limit)
+  (dotimes (i sb-vm:sc-number-limit)
     (let ((sc (svref *backend-sc-numbers* i)))
       (when sc
         (let ((moves (sc-move-funs sc)))
@@ -474,14 +474,14 @@
                                      temp op-tn))))
                      t)))))
       ;; Search the non-stack load SCs first.
-      (dotimes (scn sb!vm:sc-number-limit)
+      (dotimes (scn sb-vm:sc-number-limit)
         (let ((sc (svref *backend-sc-numbers* scn)))
           (when (and (eq (svref scs scn) t)
                      (not (eq (sb-kind (sc-sb sc)) :unbounded))
                      (check-sc scn sc))
             (return-from emit-coerce-vop))))
       ;; Search the stack SCs if the above failed.
-      (dotimes (scn sb!vm:sc-number-limit (bad-coerce-error op))
+      (dotimes (scn sb-vm:sc-number-limit (bad-coerce-error op))
         (let ((sc (svref *backend-sc-numbers* scn)))
           (when (and (eq (svref scs scn) t)
                      (eq (sb-kind (sc-sb sc)) :unbounded)
@@ -582,19 +582,19 @@
   (values))
 
 (defun maybe-move-from-fixnum+-1 (x y &optional x-tn-ref)
-  (when (and (sc-is y sb!vm::descriptor-reg)
-             (sc-is x sb!vm::signed-reg sb!vm::unsigned-reg))
+  (when (and (sc-is y sb-vm::descriptor-reg)
+             (sc-is x sb-vm::signed-reg sb-vm::unsigned-reg))
     (let ((type (tn-ref-type x-tn-ref)))
       (cond ((not type)
              nil)
             ((csubtypep type
                         (specifier-type `(integer ,sb!xc:most-negative-fixnum
                                                   ,(1+ sb!xc:most-positive-fixnum))))
-             (template-or-lose 'sb!vm::move-from-fixnum+1))
+             (template-or-lose 'sb-vm::move-from-fixnum+1))
             ((csubtypep type
                         (specifier-type `(integer ,(1- sb!xc:most-negative-fixnum)
                                                   ,sb!xc:most-positive-fixnum)))
-             (template-or-lose 'sb!vm::move-from-fixnum-1))))))
+             (template-or-lose 'sb-vm::move-from-fixnum-1))))))
 
 ;;; Scan the IR2 looking for move operations that need to be replaced
 ;;; with special-case VOPs and emitting coercion VOPs for operands of
@@ -663,7 +663,7 @@
 ;;; allocated. This must be done last, since references in new
 ;;; environments may be introduced by MOVE-ARG insertion.
 (defun select-representations (component)
-  (let ((costs (make-array sb!vm:sc-number-limit))
+  (let ((costs (make-array sb-vm:sc-number-limit))
         (2comp (component-info component)))
     (labels ((assign-constant-offset (tn)
                (when (sc-is tn constant)
@@ -674,7 +674,7 @@
                                                (ir2-component-constants 2comp))))))
              (possible-scs (tn)
                (if (eq (tn-kind tn) :constant)
-                   (list sb!vm:constant-sc-number
+                   (list sb-vm:constant-sc-number
                          (immediate-constant-sc (constant-value (tn-leaf tn))))
                    (primitive-type-scs (tn-primitive-type tn))))
              (pass (tn &key unique)

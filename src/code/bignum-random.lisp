@@ -137,7 +137,7 @@
            (type random-state state)
            (inline bignum-lower-bits-zero-p))
   (let ((n-bits (bignum-integer-length arg)))
-    (declare (type (integer #.sb!vm:n-fixnum-bits) n-bits))
+    (declare (type (integer #.sb-vm:n-fixnum-bits) n-bits))
     ;; Don't use (ZEROP (LOGAND ARG (1- ARG))) to test if ARG is a power
     ;; of two as that would cons.
     (cond ((bignum-lower-bits-zero-p arg (1- n-bits))

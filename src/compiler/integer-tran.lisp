@@ -15,7 +15,7 @@
 ;;;; RANDOM in various integer cases
 
 (deftransform random ((limit &optional state)
-                      ((integer 1 #.(ash 1 sb!vm:n-word-bits)) &optional *))
+                      ((integer 1 #.(ash 1 sb-vm:n-word-bits)) &optional *))
   "transform to a sample no wider than CPU word"
   (let ((type (lvar-type limit)))
     (if (numeric-type-p type)

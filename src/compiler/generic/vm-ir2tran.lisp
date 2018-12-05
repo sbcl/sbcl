@@ -10,7 +10,7 @@
 (in-package "SB!C")
 
 (def-alloc '%make-structure-instance 1 :structure-alloc
-           sb!vm:instance-widetag sb!vm:instance-pointer-lowtag
+           sb-vm:instance-widetag sb-vm:instance-pointer-lowtag
            nil)
 
 #!+stack-allocatable-fixed-objects
@@ -70,7 +70,7 @@
 
 (eval-when (:compile-toplevel)
   ;; Assert correctness of build order. (Need not be exhaustive)
-  #!+(and x86-64 (not (vop-named sb!vm::raw-instance-init/word)))
+  #!+(and x86-64 (not (vop-named sb-vm::raw-instance-init/word)))
   (error "Expected raw-instance-init vops"))
 
 (defun emit-inits (node block name object lowtag inits args)
@@ -104,21 +104,21 @@
                          `(ecase raw-type
                             ((t)
                              (vop init-slot node block object arg-tn
-                                  name dx-p (+ sb!vm:instance-slots-offset slot) lowtag))
+                                  name dx-p (+ sb-vm:instance-slots-offset slot) lowtag))
                             ,@(map 'list
                                (lambda (rsd)
                                  `(,(sb!kernel::raw-slot-data-raw-type rsd)
                                    (vop ,(sb!kernel::raw-slot-data-init-vop rsd)
                                         node block object arg-tn slot)))
                                (symbol-value rsd-list)))))
-                    (make-case #!+(vop-named sb!vm::raw-instance-init/word)
+                    (make-case #!+(vop-named sb-vm::raw-instance-init/word)
                                sb!kernel::*raw-slot-data*))))))
            (:dd
             (vop init-slot node block object
                  (emit-constant (sb!kernel::dd-layout-or-lose slot))
                  name dx-p
                  ;; Layout has no index if compact headers.
-                 (or #!+compact-instance-header :layout sb!vm:instance-slots-offset)
+                 (or #!+compact-instance-header :layout sb-vm:instance-slots-offset)
                  lowtag))
            (otherwise
             (if (and (eq kind :arg)
@@ -135,11 +135,11 @@
                         ;; since BOXED-COMBINATION-REF-P expects that #'cddr is the
                         ;; slot index.
                         (when (listp slot)
-                          (setq slot (+ (cdr slot) sb!vm:instance-slots-offset)))
+                          (setq slot (+ (cdr slot) sb-vm:instance-slots-offset)))
                         (or unbound-marker-tn
                             (setf unbound-marker-tn
                                   (let ((tn (make-restricted-tn
-                                             nil sb!vm:any-reg-sc-number)))
+                                             nil sb-vm:any-reg-sc-number)))
                                     (vop make-unbound-marker node block tn)
                                     tn))))
                        (:null
@@ -148,7 +148,7 @@
                         (or funcallable-instance-tramp-tn
                             (setf funcallable-instance-tramp-tn
                                   (let ((tn (make-restricted-tn
-                                             nil sb!vm:any-reg-sc-number)))
+                                             nil sb-vm:any-reg-sc-number)))
                                     (vop make-funcallable-instance-tramp node block tn)
                                     tn)))))
                      name dx-p slot lowtag))))))))
@@ -195,7 +195,7 @@
            (c-slot-specs (lvar-value slot-specs))
            (words (+ (dd-length c-dd) words)))
       #!+compact-instance-header
-      (progn (aver (= type sb!vm:instance-widetag))
+      (progn (aver (= type sb-vm:instance-widetag))
              (emit-constant (setq type (sb!kernel::dd-layout-or-lose c-dd))))
       (emit-fixed-alloc node block name words type lowtag result lvar)
       (emit-inits node block name result lowtag
@@ -219,29 +219,29 @@
     (flet ((compute-setter ()
              (macrolet
                  ((frob ()
-                    (let ((*package* (find-package :sb!vm))
+                    (let ((*package* (find-package :sb-vm))
                           (clauses nil))
                       (map nil (lambda (s)
-                                 (when (sb!vm:saetp-specifier s)
+                                 (when (sb-vm:saetp-specifier s)
                                    (push
-                                    `(,(sb!vm:saetp-typecode s)
+                                    `(,(sb-vm:saetp-typecode s)
                                        (lambda (index tn)
                                          #!+x86-64
                                          (vop ,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/"
-                                                            (sb!vm:saetp-primitive-type-name s)
+                                                            (sb-vm:saetp-primitive-type-name s)
                                                             "-C")
                                               node block result tn index 0 tn)
                                          #!+x86
                                          (vop ,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/"
-                                                            (sb!vm:saetp-primitive-type-name s))
+                                                            (sb-vm:saetp-primitive-type-name s))
                                               node block result index tn 0 tn)
                                          #!-(or x86 x86-64)
                                          (vop ,(symbolicate "DATA-VECTOR-SET/"
-                                                            (sb!vm:saetp-primitive-type-name s))
+                                                            (sb-vm:saetp-primitive-type-name s))
                                               node block result index tn tn)))
                                     clauses)))
-                           sb!vm:*specialized-array-element-type-properties*)
-                      `(ecase (sb!vm:saetp-typecode saetp)
+                           sb-vm:*specialized-array-element-type-properties*)
+                      `(ecase (sb-vm:saetp-typecode saetp)
                          ,@(nreverse clauses)))))
                (frob)))
            (tnify (index)
@@ -287,7 +287,7 @@
      ;; Add one word for the primitive object's header word.
      (1+ n-args)
      (lvar-value widetag)
-     sb!vm:other-pointer-lowtag
+     sb-vm:other-pointer-lowtag
      (loop for i from 1 to n-args collect `(:arg . ,i)))))
 
 ;;; :SET-TRANS (in objdef.lisp !DEFINE-PRIMITIVE-OBJECT) doesn't quite
@@ -322,22 +322,22 @@
      (constant-lvar-p type)
      #!-c-stack-is-control-stack
      (member (lvar-value type)
-             '#.(list (sb!vm:saetp-typecode (find-saetp 't))
-                      (sb!vm:saetp-typecode (find-saetp 'fixnum))))
+             '#.(list (sb-vm:saetp-typecode (find-saetp 't))
+                      (sb-vm:saetp-typecode (find-saetp 'fixnum))))
      (or (eq dx :always-dynamic)
          (zerop (policy node safety))
          ;; a vector object should fit in one page -- otherwise it might go past
          ;; stack guard pages.
          (values-subtypep (lvar-derived-type words)
                           (specifier-type
-                           `(integer 0 ,(- (/ +backend-page-bytes+ sb!vm:n-word-bytes)
-                                           sb!vm:vector-data-offset)))))))
+                           `(integer 0 ,(- (/ +backend-page-bytes+ sb-vm:n-word-bytes)
+                                           sb-vm:vector-data-offset)))))))
 
   (defoptimizer (allocate-vector ltn-annotate) ((type length words) call ltn-policy)
     (declare (ignore type length words))
     (vectorish-ltn-annotate-helper call ltn-policy
-                                   'sb!vm::allocate-vector-on-stack
-                                   'sb!vm::allocate-vector-on-heap))
+                                   'sb-vm::allocate-vector-on-stack
+                                   'sb-vm::allocate-vector-on-heap))
 
   (defun vectorish-ltn-annotate-helper (call ltn-policy dx-template &optional not-dx-template)
     (let* ((args (basic-combination-args call))
@@ -396,19 +396,19 @@
         ;; if it tries to consume too much stack space.
         (values-subtypep (lvar-derived-type length)
                          (specifier-type
-                          `(integer 0 ,(/ +backend-page-bytes+ sb!vm:n-word-bytes 2))))))
+                          `(integer 0 ,(/ +backend-page-bytes+ sb-vm:n-word-bytes 2))))))
   (defoptimizer (%make-list ltn-annotate) ((length element) call ltn-policy)
     (declare (ignore length element))
     (vectorish-ltn-annotate-helper call ltn-policy
-                                   'sb!vm::allocate-list-on-stack)))
+                                   'sb-vm::allocate-list-on-stack)))
 
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 ;;; Return a list of parameters with which to call MAKE-ARRAY-HEADER*
 ;;; given the mandatory slots for a simple array of rank 0 or > 1.
 (defun make-array-header-inits (storage n-elements dimensions)
   (macrolet ((expand ()
-               `(list* sb!vm:simple-array-widetag
+               `(list* sb-vm:simple-array-widetag
                        ,@(mapcar (lambda (slot)
                                    (ecase (slot-name slot)
                                      (data           'storage)

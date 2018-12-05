@@ -890,25 +890,25 @@ between the ~A definition and the ~A definition"
 (!defvar *!built-in-classes*
    ;; To me these data would look nicer with commas instead of "#."
    '((t :state :read-only :translation t)
-     (character :codes (#.sb!vm:character-widetag)
+     (character :codes (#.sb-vm:character-widetag)
                 :translation (character-set)
                 :prototype-form (code-char 42))
-     (symbol :codes (#.sb!vm:symbol-widetag)
+     (symbol :codes (#.sb-vm:symbol-widetag)
              :prototype-form '#:mu)
 
-     (system-area-pointer :codes (#.sb!vm:sap-widetag)
+     (system-area-pointer :codes (#.sb-vm:sap-widetag)
                           :prototype-form (int-sap 42))
-     (weak-pointer :codes (#.sb!vm:weak-pointer-widetag)
+     (weak-pointer :codes (#.sb-vm:weak-pointer-widetag)
       :prototype-form (make-weak-pointer (find-package "CL")))
-     (code-component :codes (#.sb!vm:code-header-widetag))
-     #!-(or x86 x86-64) (lra :codes (#.sb!vm:return-pc-widetag))
-     (fdefn :codes (#.sb!vm:fdefn-widetag)
+     (code-component :codes (#.sb-vm:code-header-widetag))
+     #!-(or x86 x86-64) (lra :codes (#.sb-vm:return-pc-widetag))
+     (fdefn :codes (#.sb-vm:fdefn-widetag)
             :prototype-form (make-fdefn nil))
      (random-class) ; used for unknown type codes
 
      (function
-      :codes (#.sb!vm:closure-widetag
-              #.sb!vm:simple-fun-widetag)
+      :codes (#.sb-vm:closure-widetag
+              #.sb-vm:simple-fun-widetag)
       :state :read-only
       :prototype-form (function (lambda () 42)))
 
@@ -916,28 +916,28 @@ between the ~A definition and the ~A definition"
      (complex
       :translation complex
       :inherits (number)
-      :codes (#.sb!vm:complex-widetag)
+      :codes (#.sb-vm:complex-widetag)
       :prototype-form (complex 42 42))
      (complex-single-float
       :translation (complex single-float)
       :inherits (complex number)
-      :codes (#.sb!vm:complex-single-float-widetag)
+      :codes (#.sb-vm:complex-single-float-widetag)
       :prototype-form (complex 42f0 42f0))
      (complex-double-float
       :translation (complex double-float)
       :inherits (complex number)
-      :codes (#.sb!vm:complex-double-float-widetag)
+      :codes (#.sb-vm:complex-double-float-widetag)
       :prototype-form (complex 42d0 42d0))
      #!+long-float
      (complex-long-float
       :translation (complex long-float)
       :inherits (complex number)
-      :codes (#.sb!vm:complex-long-float-widetag)
+      :codes (#.sb-vm:complex-long-float-widetag)
       :prototype-form (complex 42l0 42l0))
      #!+sb-simd-pack
      (simd-pack
       :translation simd-pack
-      :codes (#.sb!vm:simd-pack-widetag)
+      :codes (#.sb-vm:simd-pack-widetag)
       :prototype-form (%make-simd-pack-ub64 42 42))
      (real :translation real :inherits (number))
      (float
@@ -946,18 +946,18 @@ between the ~A definition and the ~A definition"
      (single-float
       :translation single-float
       :inherits (float real number)
-      :codes (#.sb!vm:single-float-widetag)
+      :codes (#.sb-vm:single-float-widetag)
       :prototype-form 42f0)
      (double-float
       :translation double-float
       :inherits (float real number)
-      :codes (#.sb!vm:double-float-widetag)
+      :codes (#.sb-vm:double-float-widetag)
       :prototype-form 42d0)
      #!+long-float
      (long-float
       :translation long-float
       :inherits (float real number)
-      :codes (#.sb!vm:long-float-widetag)
+      :codes (#.sb-vm:long-float-widetag)
       :prototype-form 42l0)
      (rational
       :translation rational
@@ -965,7 +965,7 @@ between the ~A definition and the ~A definition"
      (ratio
       :translation (and rational (not integer))
       :inherits (rational real number)
-      :codes (#.sb!vm:ratio-widetag)
+      :codes (#.sb-vm:ratio-widetag)
       :prototype-form 1/42)
      (integer
       :translation integer
@@ -974,19 +974,19 @@ between the ~A definition and the ~A definition"
       :translation (integer #.sb!xc:most-negative-fixnum
                     #.sb!xc:most-positive-fixnum)
       :inherits (integer rational real number)
-      :codes #.(mapcar #'symbol-value sb!vm::fixnum-lowtags)
+      :codes #.(mapcar #'symbol-value sb-vm::fixnum-lowtags)
       :prototype-form 42)
      (bignum
       :translation (and integer (not fixnum))
       :inherits (integer rational real number)
-      :codes (#.sb!vm:bignum-widetag)
-      :prototype-form (expt 2 #.(* sb!vm:n-word-bits (/ 3 2))))
+      :codes (#.sb-vm:bignum-widetag)
+      :prototype-form (expt 2 #.(* sb-vm:n-word-bits (/ 3 2))))
 
-     (array :translation array :codes (#.sb!vm:complex-array-widetag)
+     (array :translation array :codes (#.sb-vm:complex-array-widetag)
             :hierarchical-p nil
             :prototype-form (make-array nil :adjustable t))
      (simple-array
-      :translation simple-array :codes (#.sb!vm:simple-array-widetag)
+      :translation simple-array :codes (#.sb-vm:simple-array-widetag)
       :inherits (array)
       :prototype-form (make-array nil))
      (sequence
@@ -994,20 +994,20 @@ between the ~A definition and the ~A definition"
       :state :read-only
       :depth 1)
      (vector
-      :translation vector :codes (#.sb!vm:complex-vector-widetag)
+      :translation vector :codes (#.sb-vm:complex-vector-widetag)
       :direct-superclasses (array sequence)
       :inherits (array sequence))
      (simple-vector
-      :translation simple-vector :codes (#.sb!vm:simple-vector-widetag)
+      :translation simple-vector :codes (#.sb-vm:simple-vector-widetag)
       :direct-superclasses (vector simple-array)
       :inherits (vector simple-array array sequence)
       :prototype-form (make-array 0))
      (bit-vector
-      :translation bit-vector :codes (#.sb!vm:complex-bit-vector-widetag)
+      :translation bit-vector :codes (#.sb-vm:complex-bit-vector-widetag)
       :inherits (vector array sequence)
       :prototype-form (make-array 0 :element-type 'bit :fill-pointer t))
      (simple-bit-vector
-      :translation simple-bit-vector :codes (#.sb!vm:simple-bit-vector-widetag)
+      :translation simple-bit-vector :codes (#.sb-vm:simple-bit-vector-widetag)
       :direct-superclasses (bit-vector simple-array)
       :inherits (bit-vector vector simple-array
                  array sequence)
@@ -1022,26 +1022,26 @@ between the ~A definition and the ~A definition"
       :inherits (string vector simple-array array sequence))
      (vector-nil
       :translation (vector nil)
-      :codes (#.sb!vm:complex-vector-nil-widetag)
+      :codes (#.sb-vm:complex-vector-nil-widetag)
       :direct-superclasses (string)
       :inherits (string vector array sequence)
       :prototype-form (make-array 0 :element-type 'nil :fill-pointer t))
      (simple-array-nil
       :translation (simple-array nil (*))
-      :codes (#.sb!vm:simple-array-nil-widetag)
+      :codes (#.sb-vm:simple-array-nil-widetag)
       :direct-superclasses (vector-nil simple-string)
       :inherits (vector-nil simple-string string vector simple-array
                  array sequence)
       :prototype-form (make-array 0 :element-type 'nil))
      (base-string
       :translation base-string
-      :codes (#.sb!vm:complex-base-string-widetag)
+      :codes (#.sb-vm:complex-base-string-widetag)
       :direct-superclasses (string)
       :inherits (string vector array sequence)
       :prototype-form (make-array 0 :element-type 'base-char :fill-pointer t))
      (simple-base-string
       :translation simple-base-string
-      :codes (#.sb!vm:simple-base-string-widetag)
+      :codes (#.sb-vm:simple-base-string-widetag)
       :direct-superclasses (base-string simple-string)
       :inherits (base-string simple-string string vector simple-array
                  array sequence)
@@ -1049,14 +1049,14 @@ between the ~A definition and the ~A definition"
      #!+sb-unicode
      (character-string
       :translation (vector character)
-      :codes (#.sb!vm:complex-character-string-widetag)
+      :codes (#.sb-vm:complex-character-string-widetag)
       :direct-superclasses (string)
       :inherits (string vector array sequence)
       :prototype-form (make-array 0 :element-type 'character :fill-pointer t))
      #!+sb-unicode
      (simple-character-string
       :translation (simple-array character (*))
-      :codes (#.sb!vm:simple-character-string-widetag)
+      :codes (#.sb-vm:simple-character-string-widetag)
       :direct-superclasses (character-string simple-string)
       :inherits (character-string simple-string string vector simple-array
                  array sequence)
@@ -1065,7 +1065,7 @@ between the ~A definition and the ~A definition"
       :translation (or cons (member nil))
       :inherits (sequence))
      (cons
-      :codes (#.sb!vm:list-pointer-lowtag)
+      :codes (#.sb-vm:list-pointer-lowtag)
       :translation cons
       :inherits (list sequence)
       :prototype-form (cons nil nil))
@@ -1101,21 +1101,21 @@ between the ~A definition and the ~A definition"
       :depth 4
       :inherits (stream))
      .
-     #.(loop for x across sb!vm:*specialized-array-element-type-properties*
-             unless (member (sb!vm::saetp-specifier x) '(t character base-char nil bit))
+     #.(loop for x across sb-vm:*specialized-array-element-type-properties*
+             unless (member (sb-vm::saetp-specifier x) '(t character base-char nil bit))
              collect
              ;; I'm not sure if it's an accident that there are distinct SB!KERNEL
-             ;; versus SB!VM symbols for the specialized arrays. The former are types
+             ;; versus SB-VM symbols for the specialized arrays. The former are types
              ;; in the language, and the latter are primitive object types,
              ;; but istm they should be designated by the same symbols.
-             `(,(intern (string (sb!vm::saetp-primitive-type-name x)) *package*)
-               :translation (simple-array ,(sb!vm::saetp-specifier x) (*))
-               :codes (,(sb!vm::saetp-typecode x))
+             `(,(intern (string (sb-vm::saetp-primitive-type-name x)) *package*)
+               :translation (simple-array ,(sb-vm::saetp-specifier x) (*))
+               :codes (,(sb-vm::saetp-typecode x))
                :direct-superclasses (vector simple-array)
                :inherits (vector simple-array array sequence)
                :prototype-form
                (logically-readonlyize
-                (make-array 0 :element-type ',(sb!vm::saetp-specifier x)))))))
+                (make-array 0 :element-type ',(sb-vm::saetp-specifier x)))))))
 
 ;;; See also src/code/class-init.lisp where we finish setting up the
 ;;; translations for built-in types.
@@ -1251,12 +1251,12 @@ between the ~A definition and the ~A definition"
               (let ((layout (classoid-layout (find-classoid name))))
                 (dolist (code codes)
                   (setf (svref table code) layout)))))
-          (loop with layout = (aref table sb!vm:list-pointer-lowtag)
-                for i from sb!vm:list-pointer-lowtag by (* 2 sb!vm:n-word-bytes)
+          (loop with layout = (aref table sb-vm:list-pointer-lowtag)
+                for i from sb-vm:list-pointer-lowtag by (* 2 sb-vm:n-word-bytes)
                 below 256
                 do (setf (aref table i) layout))
-          (loop with layout = (aref table sb!vm:even-fixnum-lowtag)
-                for i from sb!vm:even-fixnum-lowtag by (ash 1 sb!vm:n-fixnum-tag-bits)
+          (loop with layout = (aref table sb-vm:even-fixnum-lowtag)
+                for i from sb-vm:even-fixnum-lowtag by (ash 1 sb-vm:n-fixnum-tag-bits)
                 below 256
                 do (setf (aref table i) layout))
           table)))

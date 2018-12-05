@@ -587,12 +587,12 @@
                 do (setf pointer (cdr (rplaca pointer item)))))))
   sequence)
 
-(define-load-time-global %%fill-bashers%% (make-array (1+ sb!vm:widetag-mask)))
+(define-load-time-global %%fill-bashers%% (make-array (1+ sb-vm:widetag-mask)))
 #.`(progn
-   ,@(loop for saetp across sb!vm:*specialized-array-element-type-properties*
-           for et = (sb!vm:saetp-specifier saetp)
+   ,@(loop for saetp across sb-vm:*specialized-array-element-type-properties*
+           for et = (sb-vm:saetp-specifier saetp)
            if (or (null et)
-                  (sb!vm:valid-bit-bash-saetp-p saetp))
+                  (sb-vm:valid-bit-bash-saetp-p saetp))
            collect
            (multiple-value-bind (basher value-transform)
                (if et
@@ -601,7 +601,7 @@
                      (declare (ignore item start length))
                      (data-nil-vector-ref (truly-the (simple-array nil (*)) vector) 0)))
              `(setf
-               (aref %%fill-bashers%% ,(sb!vm:saetp-typecode saetp))
+               (aref %%fill-bashers%% ,(sb-vm:saetp-typecode saetp))
                (cons #',basher
                      ,(if et
                           `(lambda (sb!c::item)
@@ -645,10 +645,10 @@
                             (funcall (truly-the function (cdr bashers)) item)
                             vector start (- end start)))
                   #!-64-bit
-                  ((eq widetag sb!vm:simple-array-double-float-widetag)
+                  ((eq widetag sb-vm:simple-array-double-float-widetag)
                    (fill-float double-float))
                   #!-64-bit
-                  ((eq widetag sb!vm:simple-array-complex-single-float-widetag)
+                  ((eq widetag sb-vm:simple-array-complex-single-float-widetag)
                    (fill-float (complex single-float)))
                   (t
                    (fill-float (complex double-float))))))))
@@ -687,10 +687,10 @@
 
 (defmacro word-specialized-vector-tag-p (tag)
   `(or
-    ,@(loop for saetp across sb!vm:*specialized-array-element-type-properties*
-            when (and (eq (sb!vm:saetp-n-bits saetp) sb!vm:n-word-bits)
-                      (not (eq (sb!vm:saetp-specifier saetp) t)))
-            collect `(eq ,tag ,(sb!vm:saetp-typecode saetp)))))
+    ,@(loop for saetp across sb-vm:*specialized-array-element-type-properties*
+            when (and (eq (sb-vm:saetp-n-bits saetp) sb-vm:n-word-bits)
+                      (not (eq (sb-vm:saetp-specifier saetp) t)))
+            collect `(eq ,tag ,(sb-vm:saetp-typecode saetp)))))
 
 ;;;; REPLACE
 (defun vector-replace (vector1 vector2 start1 start2 end1 diff)
@@ -705,7 +705,7 @@
                       ((= index1 end1))
                     (declare (fixnum index1 index2))
                     ,@body)))
-      (cond ((= tag1 tag2 sb!vm:simple-vector-widetag)
+      (cond ((= tag1 tag2 sb-vm:simple-vector-widetag)
              (copy
               (setf (svref vector1 index1) (svref vector2 index2))))
             ;; TODO: can do the same with small specialized arrays
@@ -910,8 +910,8 @@ many elements are copied."
                       :check-fill-pointer t)
       (declare (ignore start))
       (let* ((tag (%other-pointer-widetag vector))
-             (new-vector (sb!vm::allocate-vector-with-widetag tag length nil)))
-        (cond ((= tag sb!vm:simple-vector-widetag)
+             (new-vector (sb-vm::allocate-vector-with-widetag tag length nil)))
+        (cond ((= tag sb-vm:simple-vector-widetag)
                (do ((left-index 0 (1+ left-index))
                     (right-index end))
                    ((= left-index length))
@@ -959,7 +959,7 @@ many elements are copied."
     (with-array-data ((vector vector) (start) (end)
                       :check-fill-pointer t)
       (let ((tag (%other-pointer-widetag vector)))
-        (cond ((= tag sb!vm:simple-vector-widetag)
+        (cond ((= tag sb-vm:simple-vector-widetag)
                (do ((left-index start (1+ left-index))
                     (right-index (1- end) (1- right-index)))
                    ((<= right-index left-index))
@@ -1137,7 +1137,7 @@ many elements are copied."
     (declare (index length))
     (do-rest-arg ((seq) sequences)
       (incf length (length seq)))
-    (let ((result (sb!vm::allocate-vector-with-widetag widetag length nil))
+    (let ((result (sb-vm::allocate-vector-with-widetag widetag length nil))
           (setter (the function (svref %%data-vector-setters%% widetag)))
           (index 0))
       (declare (index index))

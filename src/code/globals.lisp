@@ -23,5 +23,5 @@
 ;;; (To prove that it isn't used, it's not a toplevel form)
 #!+(and sb-dynamic-core (host-feature sb-xc))
 (let ()
-  (defconstant sb!vm::+required-foreign-symbols+
-    (symbol-value 'sb!vm::+required-foreign-symbols+)))
+  (defconstant sb-vm::+required-foreign-symbols+
+    (symbol-value 'sb-vm::+required-foreign-symbols+)))

@@ -123,7 +123,7 @@
 
 (defun read-word-arg (stream)
   (declare (optimize (speed 0)))
-  (read-arg #.sb!vm:n-word-bytes stream))
+  (read-arg #.sb-vm:n-word-bytes stream))
 
 (defun read-unsigned-byte-32-arg (stream)
   (declare (optimize (speed 0)))

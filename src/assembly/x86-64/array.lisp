@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 ;;; Fill 'vector' with 'item', unrolling the loop, and taking care
 ;;; to deal with pre- and post-loop pieces for proper alignment.

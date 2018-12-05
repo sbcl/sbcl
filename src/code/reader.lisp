@@ -1613,9 +1613,9 @@ extended <package-name>::<form-in-package> syntax."
            (d (char (write-to-string (1- base) :base base) 0))
            (string (make-string (1+ n-digits) :initial-element d))) ; 1 extra
       (assert (not (typep (parse-integer string :radix base)
-                          `(unsigned-byte ,sb!vm:n-positive-fixnum-bits))))
+                          `(unsigned-byte ,sb-vm:n-positive-fixnum-bits))))
       (assert (typep (parse-integer string :end n-digits :radix base)
-                     `(unsigned-byte ,sb!vm:n-positive-fixnum-bits))))))
+                     `(unsigned-byte ,sb-vm:n-positive-fixnum-bits))))))
 
 (defmacro !setq-optional-leading-sign (sign-flag token-buf rewind)
   ;; guaranteed to have at least one character in buffer at the start
@@ -1676,7 +1676,7 @@ extended <package-name>::<form-in-package> syntax."
   ;; can be larger than normalized.
   (let* ((max-exponent
           #!-long-float
-          (+ sb!vm:double-float-digits sb!vm:double-float-bias))
+          (+ sb-vm:double-float-digits sb-vm:double-float-bias))
          (number-magnitude (integer-length number))
          (divisor-magnitude (1- (integer-length divisor)))
          (magnitude (- number-magnitude divisor-magnitude)))

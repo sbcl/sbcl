@@ -1,4 +1,4 @@
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 #-sb-xc-host
 (defun machine-type ()

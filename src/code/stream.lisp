@@ -627,10 +627,10 @@
           (t
            (when (/= start +ansi-stream-in-buffer-extra+)
              (#.(let* ((n-character-array-bits
-                        (sb!vm:saetp-n-bits
+                        (sb-vm:saetp-n-bits
                          (find 'character
-                               sb!vm:*specialized-array-element-type-properties*
-                               :key #'sb!vm:saetp-specifier)))
+                               sb-vm:*specialized-array-element-type-properties*
+                               :key #'sb-vm:saetp-specifier)))
                        (bash-function (intern (format nil "UB~D-BASH-COPY" n-character-array-bits)
                                               (find-package "SB!KERNEL"))))
                   bash-function)

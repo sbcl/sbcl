@@ -1,4 +1,4 @@
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 (define-vop (debug-cur-sp)
   (:translate sb!di::current-sp)

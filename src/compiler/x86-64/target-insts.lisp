@@ -177,7 +177,7 @@
 ;;; unless it looks like an address.
 #!+immobile-space
 (defun maybe-note-lisp-callee (value dstate)
-  (awhen (and (typep value 'word) (sb!vm::find-called-object value))
+  (awhen (and (typep value 'word) (sb-vm::find-called-object value))
     (note (lambda (stream) (princ it stream)) dstate)))
 
 (defun print-imm/asm-routine (value stream dstate)
@@ -252,7 +252,7 @@
 
 (define-load-time-global thread-slot-names
     (let* ((slots (primitive-object-slots
-                   (find 'sb!vm::thread *primitive-objects*
+                   (find 'sb-vm::thread *primitive-objects*
                          :key #'primitive-object-name)))
            (a (make-array (1+ (slot-offset (car (last slots))))
                           :initial-element nil)))
@@ -352,15 +352,15 @@
                      do (return obj)))))
       ;; Try to reverse-engineer which thread-local binding this is
       (cond ((and disp ; Test whether disp looks aligned to an object header
-                  (not (logtest (- disp 4) sb!vm:lowtag-mask))
+                  (not (logtest (- disp 4) sb-vm:lowtag-mask))
                   (not base-reg) (not index-reg))
-             (let* ((addr (+ disp (- 4) sb!vm:other-pointer-lowtag))
+             (let* ((addr (+ disp (- 4) sb-vm:other-pointer-lowtag))
                     (symbol
                      (guess-symbol (lambda (s) (= (get-lisp-obj-address s) addr)))))
                (when symbol
                  (note (lambda (stream) (format stream "tls_index: ~S" symbol))
                        dstate))))
-            ((and (eql base-reg #.(tn-offset sb!vm::thread-base-tn))
+            ((and (eql base-reg #.(tn-offset sb-vm::thread-base-tn))
                   (not (dstate-getprop dstate +fs-segment+)) ; not system TLS
                   (not index-reg) ; no index
                   (typep disp '(integer 0 *)) ; positive displacement
@@ -524,7 +524,7 @@
 ;;; signatures, each of which is cons of a vector of instruction bytes with some
 ;;; replaced by 0, plus an opaque set of integers that need to be compared for
 ;;; equality to test whether the blobs of code are functionally equivalent.
-(defun sb!vm::compute-code-signature (code dstate &aux result)
+(defun sb-vm::compute-code-signature (code dstate &aux result)
   (dotimes (i (code-n-entries code) result)
     (let* ((f (%code-entry-point code i))
            (len (%simple-fun-text-len f i))
@@ -550,7 +550,7 @@
       (push (cons buffer (coerce operand-values 'simple-vector)) result))))
 
 ;;; Perform ICF on instructions of CODE
-(defun sb!vm::machine-code-icf (code mapper replacements print)
+(defun sb-vm::machine-code-icf (code mapper replacements print)
   (declare (ignorable code mapper replacements print))
   #!+immobile-space
   (flet ((scan (sap length dstate segment)
@@ -559,7 +559,7 @@
             (lambda (offset operand inst)
               (declare (ignorable inst))
               (let ((lispobj (when (immobile-space-addr-p operand)
-                               (sb!vm::find-called-object operand))))
+                               (sb-vm::find-called-object operand))))
                 (when (functionp lispobj)
                   (let ((replacement (funcall mapper lispobj)))
                     (unless (eq replacement lispobj)

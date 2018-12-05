@@ -12,7 +12,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 (/show "beginning tests/vm.before-xc.lisp")
 
@@ -39,7 +39,7 @@
 (dotimes (i (ash 1 6))
   (labels ((make-tns (n)
              (mapcar 'copy-structure
-                     (subseq `(,sb!vm::rax-tn ,sb!vm::rbx-tn ,sb!vm::rcx-tn) 0 n)))
+                     (subseq `(,sb-vm::rax-tn ,sb-vm::rbx-tn ,sb-vm::rcx-tn) 0 n)))
            (link (list)
              (when list
                (setf (sb!c::tn-next (car list)) (link (cdr list)))

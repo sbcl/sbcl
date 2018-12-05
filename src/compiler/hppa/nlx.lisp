@@ -1,4 +1,4 @@
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 ;;; Make a TN for the argument count passing location for a
 ;;; non-local entry.

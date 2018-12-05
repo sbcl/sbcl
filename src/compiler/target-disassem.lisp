@@ -293,7 +293,7 @@
   ;;; Convert a word-offset NUM to a byte-offset.
   (defun words-to-bytes (num)
     (declare (type offset num))
-    (ash num sb!vm:word-shift))
+    (ash num sb-vm:word-shift))
   ) ; EVAL-WHEN
 
 
@@ -318,7 +318,7 @@
 (defun fun-insts-offset (simple-fun) ; FUNCTION *must* be pinned
   (declare (type simple-fun simple-fun))
   (- (get-lisp-obj-address simple-fun)
-     sb!vm:fun-pointer-lowtag
+     sb-vm:fun-pointer-lowtag
      (sap-int (code-instructions (fun-code-header simple-fun)))))
 
 ;;;; operations on code-components (which hold the instructions for
@@ -337,13 +337,13 @@
 ;;; Compute X - A given X - C
 (defun segment-offs-to-code-offs (offset segment)
   (+ offset
-     (ash (code-header-words (seg-code segment)) sb!vm:word-shift)
+     (ash (code-header-words (seg-code segment)) sb-vm:word-shift)
      (seg-initial-offset segment)))
 
 ;;; Compute X - C given X - A
 (defun code-offs-to-segment-offs (offset segment)
   (- offset
-     (ash (code-header-words (seg-code segment)) sb!vm:word-shift)
+     (ash (code-header-words (seg-code segment)) sb-vm:word-shift)
      (seg-initial-offset segment)))
 
 ;;; Compute X - C given X - B
@@ -368,7 +368,7 @@
            (type disassem-state dstate))
   (when (and (aligned-p (+ (seg-virtual-location (dstate-segment dstate))
                            (dstate-cur-offs dstate))
-                        (* 2 sb!vm:n-word-bytes))
+                        (* 2 sb-vm:n-word-bytes))
              ;; Check type.
              (= (sap-ref-8 (dstate-segment-sap dstate)
                                   (if (eq (dstate-byte-order dstate)
@@ -376,7 +376,7 @@
                                       (dstate-cur-offs dstate)
                                       (+ (dstate-cur-offs dstate)
                                          (1- lra-size))))
-                sb!vm:return-pc-widetag))
+                sb-vm:return-pc-widetag))
     (unless (null stream)
       (note "possible LRA header" dstate)))
   nil))
@@ -390,10 +390,10 @@
     (let* ((seg (dstate-segment dstate))
            (code (seg-code seg))
            (woffs (ash (segment-offs-to-code-offs (dstate-cur-offs dstate) seg)
-                       (- sb!vm:word-shift))) ; bytes -> words
-           (name (code-header-ref code (+ woffs sb!vm:simple-fun-name-slot)))
-           (args (code-header-ref code (+ woffs sb!vm:simple-fun-arglist-slot)))
-           (type (code-header-ref code (+ woffs sb!vm:simple-fun-type-slot))))
+                       (- sb-vm:word-shift))) ; bytes -> words
+           (name (code-header-ref code (+ woffs sb-vm:simple-fun-name-slot)))
+           (args (code-header-ref code (+ woffs sb-vm:simple-fun-arglist-slot)))
+           (type (code-header-ref code (+ woffs sb-vm:simple-fun-type-slot))))
       ;; if the function's name conveys its args, don't show ARGS too
       (format stream ".~A ~S~:[~:A~;~]" 'entry name
               (and (typep name '(cons (eql lambda) (cons list)))
@@ -403,7 +403,7 @@
               (format stream "~:S" type)) ; use format to print NIL as ()
             dstate)))
   (incf (dstate-next-offs dstate)
-        (words-to-bytes sb!vm:simple-fun-code-offset)))
+        (words-to-bytes sb-vm:simple-fun-code-offset)))
 
 ;;; Return ADDRESS aligned *upward* to a SIZE byte boundary.
 ;;; KLUDGE: should be ALIGN-UP but old Slime uses it
@@ -493,9 +493,9 @@
   (let ((alignment (dstate-alignment dstate)))
     (unless (null stream)
       (multiple-value-bind (words bytes)
-          (truncate alignment sb!vm:n-word-bytes)
+          (truncate alignment sb-vm:n-word-bytes)
         (when (> words 0)
-          (print-inst (* words sb!vm:n-word-bytes) stream dstate
+          (print-inst (* words sb-vm:n-word-bytes) stream dstate
                       :trailing-space nil))
         (when (> bytes 0)
           (print-inst bytes stream dstate :trailing-space nil)))
@@ -589,7 +589,7 @@
                      ;; For 8-byte words and 7-byte dchunks, we use SAP-REF-WORD, which reads
                      ;; 8 bytes, so make sure the number of bytes to go is 8,
                      ;; never mind that dchunk-bits is less.
-                     (if (< bytes-remaining sb!vm:n-word-bytes)
+                     (if (< bytes-remaining sb-vm:n-word-bytes)
                          (let ((temp (dstate-scratch-buf dstate)))
                            (setf (%vector-raw-bits temp 0) 0)
                            (%byte-blt (dstate-segment-sap dstate) (dstate-cur-offs dstate)
@@ -1041,7 +1041,7 @@
         ;; Up to 2 words (less a byte) of padding might be present to align the
         ;; next simple-fun. Limit on OFFSET is to avoid incorrect triggering
         ;; in case of unexpected weirdness.
-        (when (< 0 offset (* sb!vm:n-word-bytes 2))
+        (when (< 0 offset (* sb-vm:n-word-bytes 2))
           (push (make-offs-hook
                  :fun (lambda (stream dstate)
                          (when stream
@@ -1742,10 +1742,10 @@
     (loop (when (>= (dstate-cur-offs dstate) raw-data-end) (return))
           (print-current-address stream dstate)
           (format stream "~A  #x~v,'0x~%"
-                  '.word (* 2 sb!vm:n-word-bytes)
+                  '.word (* 2 sb-vm:n-word-bytes)
                   (sap-ref-word (dstate-segment-sap dstate)
                                 (dstate-cur-offs dstate)))
-          (incf (dstate-cur-offs dstate) sb!vm:n-word-bytes))
+          (incf (dstate-cur-offs dstate) sb-vm:n-word-bytes))
 |#
     (disassemble-segments segments stream dstate)))
 
@@ -1770,10 +1770,10 @@
 ;;; an alist of (SYMBOL-SLOT-OFFSET . ACCESS-FUN-NAME) for slots
 ;;; in a symbol object that we know about
 (define-load-time-global *grokked-symbol-slots*
-  (sort (copy-list `((,sb!vm:symbol-value-slot . symbol-value)
-                     (,sb!vm:symbol-info-slot . symbol-info)
-                     (,sb!vm:symbol-name-slot . symbol-name)
-                     (,sb!vm:symbol-package-slot . symbol-package)))
+  (sort (copy-list `((,sb-vm:symbol-value-slot . symbol-value)
+                     (,sb-vm:symbol-info-slot . symbol-info)
+                     (,sb-vm:symbol-name-slot . symbol-name)
+                     (,sb-vm:symbol-package-slot . symbol-package)))
         #'<
         :key #'car))
 
@@ -1783,7 +1783,7 @@
 ;;; access function of the slot.
 (defun grok-symbol-slot-ref (address)
   (declare (type address address))
-  (if (not (aligned-p address sb!vm:n-word-bytes))
+  (if (not (aligned-p address sb-vm:n-word-bytes))
       (values nil nil)
       (do ((slots-tail *grokked-symbol-slots* (cdr slots-tail)))
           ((null slots-tail)
@@ -1792,7 +1792,7 @@
                (slot-offset (words-to-bytes (car field)))
                (maybe-symbol-addr (- address slot-offset))
                (maybe-symbol
-                (make-lisp-obj (+ maybe-symbol-addr sb!vm:other-pointer-lowtag)
+                (make-lisp-obj (+ maybe-symbol-addr sb-vm:other-pointer-lowtag)
                                nil)))
           (when (symbolp maybe-symbol)
             (return (values maybe-symbol (cdr field))))))))
@@ -1803,12 +1803,12 @@
 ;;; access function.
 (defun grok-nil-indexed-symbol-slot-ref (byte-offset)
   (declare (type offset byte-offset))
-  (grok-symbol-slot-ref (+ sb!vm::nil-value byte-offset)))
+  (grok-symbol-slot-ref (+ sb-vm::nil-value byte-offset)))
 
 ;;; Return the Lisp object located BYTE-OFFSET from NIL.
 (defun get-nil-indexed-object (byte-offset)
   (declare (type offset byte-offset))
-  (make-lisp-obj (+ sb!vm::nil-value byte-offset)))
+  (make-lisp-obj (+ sb-vm::nil-value byte-offset)))
 
 ;;; Return two values; the Lisp object located at BYTE-OFFSET in the
 ;;; constant area of the code-object in the current segment and T, or
@@ -1819,8 +1819,8 @@
   (let ((code (seg-code (dstate-segment dstate))))
     (if code
         (values (code-header-ref code
-                                 (ash (+ byte-offset sb!vm:other-pointer-lowtag)
-                                      (- sb!vm:word-shift)))
+                                 (ash (+ byte-offset sb-vm:other-pointer-lowtag)
+                                      (- sb-vm:word-shift)))
                 t)
         (values nil nil))))
 
@@ -1835,9 +1835,9 @@
   (declare (ignore width))
   (if (null code)
      (values nil nil)
-     (let* ((n-header-bytes (* (code-header-words code) sb!vm:n-word-bytes))
+     (let* ((n-header-bytes (* (code-header-words code) sb-vm:n-word-bytes))
             (header-addr (- (get-lisp-obj-address code)
-                            sb!vm:other-pointer-lowtag))
+                            sb-vm:other-pointer-lowtag))
             (code-start (+ header-addr n-header-bytes)))
          (cond ((< header-addr addr code-start)
                 (values (sap-ref-lispobj (int-sap addr) 0) t))
@@ -1863,16 +1863,16 @@
                 (lambda (x) (sap-int (sap+ (code-instructions code) (car x))))))
     #!-sb-dynamic-core
        (invert *static-foreign-symbols* #'identity))
-    (loop for name across sb!vm::+all-static-fdefns+
+    (loop for name across sb-vm::+all-static-fdefns+
           for address =
-          #!+immobile-code (sb!vm::function-raw-address name)
-          #!-immobile-code (+ sb!vm::nil-value (sb!vm::static-fun-offset name))
+          #!+immobile-code (sb-vm::function-raw-address name)
+          #!-immobile-code (+ sb-vm::nil-value (sb-vm::static-fun-offset name))
           do (setf (gethash address addr->name) name))
     ;; Not really a routine, but it uses the similar logic for annotations
     #!+sb-safepoint
-    (setf (gethash (+ sb!vm:gc-safepoint-page-addr
+    (setf (gethash (+ sb-vm:gc-safepoint-page-addr
                       sb!c:+backend-page-bytes+
-                      (- sb!vm:gc-safepoint-trap-offset)) addr->name)
+                      (- sb-vm:gc-safepoint-trap-offset)) addr->name)
           "safepoint"))
   (let ((found (gethash address addr->name)))
     (cond (found
@@ -1884,8 +1884,8 @@
                   (end (+ start (1- (%code-text-size code)))))
              (when (<= start address end) ; it has to be an asm routine
                (let* ((offset (- address start))
-                      (index (unless (logtest address (1- sb!vm:n-word-bytes))
-                               (floor offset sb!vm:n-word-bytes))))
+                      (index (unless (logtest address (1- sb-vm:n-word-bytes))
+                               (floor offset sb-vm:n-word-bytes))))
                  (declare (ignorable index))
                  (dohash ((name locs) hashtable)
                    (when (<= (car locs) offset (cadr locs))
@@ -2080,15 +2080,15 @@
 
 (defun maybe-note-static-symbol (address dstate)
   (declare (type disassem-state dstate))
-  (when (or (not (typep address `(unsigned-byte ,sb!vm:n-machine-word-bits)))
+  (when (or (not (typep address `(unsigned-byte ,sb-vm:n-machine-word-bits)))
             (eql address 0))
     (return-from maybe-note-static-symbol))
   (let ((symbol
          (block found
-           (when (eq address sb!vm::nil-value)
+           (when (eq address sb-vm::nil-value)
              (return-from found nil))
-           (when (< address (sap-int sb!vm:*static-space-free-pointer*))
-             (dovector (symbol sb!vm:+static-symbols+)
+           (when (< address (sap-int sb-vm:*static-space-free-pointer*))
+             (dovector (symbol sb-vm:+static-symbols+)
                (when (= (get-lisp-obj-address symbol) address)
                  (return-from found symbol))))
            ;; Guess whether 'address' is an immobile-space symbol by looking at
@@ -2101,7 +2101,7 @@
            (let ((code (seg-code (dstate-segment dstate))))
              (when code
                (loop for i downfrom (1- (code-header-words code))
-                     to sb!vm:code-constants-offset
+                     to sb-vm:code-constants-offset
                      for const = (code-header-ref code i)
                      when (eql (get-lisp-obj-address const) address)
                      do (return-from found const))))
@@ -2114,7 +2114,7 @@
 (defun get-random-tn-name (sc+offset)
   (let ((sc (sb!c:sc+offset-scn sc+offset))
         (offset (sb!c:sc+offset-offset sc+offset)))
-    (if (= sc sb!vm:immediate-sc-number)
+    (if (= sc sb-vm:immediate-sc-number)
         (princ-to-string offset)
         (sb!c:location-print-name
          (sb!c:make-random-tn :kind :normal
@@ -2139,8 +2139,8 @@
   (declare (type function error-parse-fun)
            (type (or null stream) stream)
            (type disassem-state dstate))
-  (when (or (= trap-number sb!vm:cerror-trap)
-            (>= trap-number sb!vm:error-trap))
+  (when (or (= trap-number sb-vm:cerror-trap)
+            (>= trap-number sb-vm:error-trap))
    (multiple-value-bind (errnum adjust sc+offsets lengths error-byte)
        (funcall error-parse-fun
                 (dstate-segment-sap dstate)
@@ -2166,9 +2166,9 @@
          (dolist (sc+offset sc+offsets)
            (emit-err-arg)
            (if (= (sb!c:sc+offset-scn sc+offset)
-                  sb!vm:constant-sc-number)
+                  sb-vm:constant-sc-number)
                (note-code-constant (* (1- (sb!c:sc+offset-offset sc+offset))
-                                      sb!vm:n-word-bytes)
+                                      sb-vm:n-word-bytes)
                                    dstate)
                (emit-note (get-random-tn-name sc+offset))))))
      (incf (dstate-next-offs dstate) adjust))))
@@ -2181,9 +2181,9 @@
   (let* ((index offset)
          (error-byte t)
          (error-number (cond ((and compact-error-trap
-                                   (>= trap-number sb!vm:error-trap))
+                                   (>= trap-number sb-vm:error-trap))
                               (setf error-byte nil)
-                              (- trap-number sb!vm:error-trap))
+                              (- trap-number sb-vm:error-trap))
                              (t
                               (incf index)
                               (sap-ref-8 sap offset))))

@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 (defun machine-type ()
   "Return a string describing the type of the local machine."
   "X86-64")
@@ -163,7 +163,7 @@
 (progn
 (defun fun-immobilize (fun)
   (let ((code (truly-the (values code-component &optional)
-                         (sb!vm::alloc-immobile-trampoline))))
+                         (sb-vm::alloc-immobile-trampoline))))
     (setf (%code-debug-info code) fun)
     (let ((sap (code-instructions code))
           (ea (+ (logandc2 (get-lisp-obj-address code) lowtag-mask)
@@ -207,8 +207,8 @@
 (defun %set-fdefn-fun (fdefn fun)
   (declare (type fdefn fdefn) (type function fun)
            (values function))
-  (unless (eql (sb!vm::fdefn-has-static-callers fdefn) 0)
-    (sb!vm::remove-static-links fdefn))
+  (unless (eql (sb-vm::fdefn-has-static-callers fdefn) 0)
+    (sb-vm::remove-static-links fdefn))
   (let ((trampoline (when (fun-requires-simplifying-trampoline-p fun)
                       (fun-immobilize fun)))) ; a newly made CODE object
     (with-pinned-objects (fdefn trampoline fun)
@@ -237,7 +237,7 @@
                       (ash jmp-operand 8)
                       (ash #xA890 40) ; "NOP ; TEST %AL, #xNN"
                       (ash tagged-ptr-bias 56))))
-        (%primitive sb!vm::set-fdefn-fun fdefn fun instruction))))
+        (%primitive sb-vm::set-fdefn-fun fdefn fun instruction))))
   fun)
 
 ) ; end PROGN

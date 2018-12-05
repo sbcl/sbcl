@@ -348,13 +348,13 @@
   ;;
   ;; Motivated by an attempt to get LOG to work better on bignums.
   (let ((n (integer-length x)))
-    (if (< n sb!vm:double-float-digits)
+    (if (< n sb-vm:double-float-digits)
         (log (coerce x 'double-float) 2.0d0)
-        (let ((f (ldb (byte sb!vm:double-float-digits
-                            (- n sb!vm:double-float-digits))
+        (let ((f (ldb (byte sb-vm:double-float-digits
+                            (- n sb-vm:double-float-digits))
                       x)))
           (+ n (log (scale-float (coerce f 'double-float)
-                                 (- sb!vm:double-float-digits))
+                                 (- sb-vm:double-float-digits))
                     2.0d0))))))
 
 (defun log (number &optional (base nil base-p))
@@ -764,7 +764,7 @@
          x)
         ((float-infinity-p x)
          ;; DOUBLE-FLOAT-POSITIVE-INFINITY
-         (double-from-bits 0 (1+ sb!vm:double-float-normal-exponent-max) 0))
+         (double-from-bits 0 (1+ sb-vm:double-float-normal-exponent-max) 0))
         ((zerop x)
          ;; The answer is negative infinity, but we are supposed to
           ;; signal divide-by-zero, so do the actual division
@@ -813,7 +813,7 @@
                       (float-infinity-p (abs y))))
              ;; DOUBLE-FLOAT-POSITIVE-INFINITY
              (values
-              (double-from-bits 0 (1+ sb!vm:double-float-normal-exponent-max) 0)
+              (double-from-bits 0 (1+ sb-vm:double-float-normal-exponent-max) 0)
               0))
             ((let ((threshold
                     ;; (/ least-positive-double-float double-float-epsilon)
@@ -822,12 +822,12 @@
                      (make-double-float #x1fffff #xfffffffe)
                      #!+long-float
                      (error "(/ least-positive-long-float long-float-epsilon)")))
-                   (traps (ldb sb!vm:float-sticky-bits
-                               (sb!vm:floating-point-modes))))
+                   (traps (ldb sb-vm:float-sticky-bits
+                               (sb-vm:floating-point-modes))))
                 ;; Overflow raised or (underflow raised and rho <
                 ;; lambda/eps)
-               (or (not (zerop (logand sb!vm:float-overflow-trap-bit traps)))
-                   (and (not (zerop (logand sb!vm:float-underflow-trap-bit
+               (or (not (zerop (logand sb-vm:float-overflow-trap-bit traps)))
+                   (and (not (zerop (logand sb-vm:float-underflow-trap-bit
                                             traps)))
                         (< rho threshold))))
               ;; If we're here, neither x nor y are infinity and at

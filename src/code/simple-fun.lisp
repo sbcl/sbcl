@@ -16,9 +16,9 @@
   (declare (function function))
   ;; It's too bad that TYPECASE isn't able to generate equivalent code.
   (case (fun-subtype function)
-    (#.sb!vm:closure-widetag
+    (#.sb-vm:closure-widetag
      (%closure-fun function))
-    (#.sb!vm:funcallable-instance-widetag
+    (#.sb-vm:funcallable-instance-widetag
      (%fun-fun (%funcallable-instance-fun function)))
     (t function)))
 
@@ -31,13 +31,13 @@
              ;; There are no closure slot setters, and in fact SLOT-SET
              ;; does not exist in a variant that takes a non-constant index.
              `(setf (sap-ref-lispobj (int-sap (get-lisp-obj-address ,closure))
-                                     (+ (ash sb!vm:closure-info-offset sb!vm:word-shift)
-                                        (ash ,index sb!vm:word-shift)
-                                        (- sb!vm:fun-pointer-lowtag)))
+                                     (+ (ash sb-vm:closure-info-offset sb-vm:word-shift)
+                                        (ash ,index sb-vm:word-shift)
+                                        (- sb-vm:fun-pointer-lowtag)))
                     ,val))
            (closure-header-word (closure)
              `(sap-ref-word (int-sap (get-lisp-obj-address ,closure))
-                            (- sb!vm:fun-pointer-lowtag))))
+                            (- sb-vm:fun-pointer-lowtag))))
 
   ;;; Assign CLOSURE a new name and/or docstring in VALUES, and return the
   ;;; closure. If PERMIT-COPY is true, this function may return a copy of CLOSURE
@@ -59,27 +59,27 @@
         ;; the fact that we actually want to create 1 additional slot.
         ;; So in effect, asking for PAYLOAD-LEN does exactly the right thing.
         (let ((copy #!-(or x86 x86-64)
-                    (sb!vm::%copy-closure payload-len (%closure-fun closure))
+                    (sb-vm::%copy-closure payload-len (%closure-fun closure))
                     #!+(or x86 x86-64)
                     (with-pinned-objects ((%closure-fun closure))
                       ;; %CLOSURE-CALLEE manifests as a fixnum which remains
                       ;; valid across GC due to %CLOSURE-FUN being pinned
                       ;; until after the new closure is made.
-                      (sb!vm::%copy-closure payload-len
-                                            (sb!vm::%closure-callee closure)))))
+                      (sb-vm::%copy-closure payload-len
+                                            (sb-vm::%closure-callee closure)))))
           (with-pinned-objects (copy)
             (loop with sap = (int-sap (get-lisp-obj-address copy))
                   for i from 0 below (1- payload-len)
-                  for ofs from (- (ash 2 sb!vm:word-shift) sb!vm:fun-pointer-lowtag)
-                  by sb!vm:n-word-bytes
+                  for ofs from (- (ash 2 sb-vm:word-shift) sb-vm:fun-pointer-lowtag)
+                  by sb-vm:n-word-bytes
                   do (setf (sap-ref-lispobj sap ofs) (%closure-index-ref closure i)))
             (setf (closure-header-word copy) ; Update the header
                   ;; Closure copy lost its high header bits, so OR them in again.
                   (logior #!+(and immobile-space 64-bit sb-thread)
-                          (sap-int (sb!vm::current-thread-offset-sap
-                                    sb!vm::thread-function-layout-slot))
+                          (sap-int (sb-vm::current-thread-offset-sap
+                                    sb-vm::thread-function-layout-slot))
                           #!+(and immobile-space 64-bit (not sb-thread))
-                          (get-lisp-obj-address sb!vm:function-layout)
+                          (get-lisp-obj-address sb-vm:function-layout)
                           (extendedp-bit)
                           (closure-header-word copy)))
             ;; We copy only if there was no padding, which means that adding 1 slot
@@ -174,11 +174,11 @@
 ;;; or NIL if there's none
 (defun %fun-name (function)
   (case (fun-subtype function)
-    (#.sb!vm:closure-widetag
+    (#.sb-vm:closure-widetag
      (let ((val (nth-value +closure-name-index+ (closure-extra-values function))))
        (unless (unbound-marker-p val)
          (return-from %fun-name val))))
-    (#.sb!vm:funcallable-instance-widetag
+    (#.sb-vm:funcallable-instance-widetag
      (typecase (truly-the funcallable-instance function)
        (generic-function
         (return-from %fun-name
@@ -196,9 +196,9 @@
 
 (defun (setf %fun-name) (new-value function)
   (case (fun-subtype function)
-    (#.sb!vm:closure-widetag
+    (#.sb-vm:closure-widetag
      (set-closure-name (truly-the closure function) nil new-value))
-    (#.sb!vm:simple-fun-widetag
+    (#.sb-vm:simple-fun-widetag
      (setf (%simple-fun-name function) new-value))
     (t
      (typecase (truly-the funcallable-instance function)
@@ -241,7 +241,7 @@
 
 ;;; Extract the type from the function header FUNC.
 (defun %simple-fun-type (func)
-  (let ((internal-type (sb!vm::%%simple-fun-type func)))
+  (let ((internal-type (sb-vm::%%simple-fun-type func)))
     ;; For backward-compatibility we expand SFUNCTION -> FUNCTION.
     (if (and (listp internal-type) (eq (car internal-type) 'sfunction))
         (sb!ext:typexpand-1 internal-type)
@@ -344,9 +344,9 @@
   (declare (type simple-fun simple-fun))
   (ash (ash (with-pinned-objects (simple-fun)
               (sap-ref-32 (int-sap (get-lisp-obj-address simple-fun))
-                          (- sb!vm:fun-pointer-lowtag)))
-            (- sb!vm:n-widetag-bits))
-       sb!vm:word-shift))
+                          (- sb-vm:fun-pointer-lowtag)))
+            (- sb-vm:n-widetag-bits))
+       sb-vm:word-shift))
 
 ;;;; CODE-COMPONENT
 
@@ -428,7 +428,7 @@
         0
         (let* ((offset (the (unsigned-byte 24)
                             (- (%fun-code-offset simple-fun)
-                               (ash (code-header-words code) sb!vm:word-shift))))
+                               (ash (code-header-words code) sb-vm:word-shift))))
                (min 0)
                (max (1- n-entries)))
           (declare ((unsigned-byte 16) min max))
@@ -443,12 +443,12 @@
 
 ;;; Return the starting address of FUN's code as a SAP.
 ;;; FUN must be pinned.
-(declaim (inline sb!vm:simple-fun-entry-sap))
-(defun sb!vm:simple-fun-entry-sap (fun)
+(declaim (inline sb-vm:simple-fun-entry-sap))
+(defun sb-vm:simple-fun-entry-sap (fun)
   #!-(or x86 x86-64)
   (int-sap (+ (get-lisp-obj-address fun)
-              (- sb!vm:fun-pointer-lowtag)
-              (ash sb!vm:simple-fun-code-offset sb!vm:word-shift)))
+              (- sb-vm:fun-pointer-lowtag)
+              (ash sb-vm:simple-fun-code-offset sb-vm:word-shift)))
   ;; The preceding case would actually work, but I'm anticipating a change
   ;; in which simple-fun headers are all contiguous in their code component,
   ;; followed by all the machine instructions for all the simple-funs.
@@ -456,12 +456,12 @@
   ;; in order to get the correct starting address.
   ;; (Such change would probably be confined to x86[-64])
   #!+(or x86 x86-64)
-  (sap-ref-sap (int-sap (- (get-lisp-obj-address fun) sb!vm:fun-pointer-lowtag))
-               (ash sb!vm:simple-fun-self-slot sb!vm:word-shift)))
+  (sap-ref-sap (int-sap (- (get-lisp-obj-address fun) sb-vm:fun-pointer-lowtag))
+               (ash sb-vm:simple-fun-self-slot sb-vm:word-shift)))
 
 ;;; Return the simple-fun within CODE whose entrypoint is ADDRESS,
 ;;; or NIL if ADDRESS does not point to any function in CODE.
-(defun sb!vm::%simple-fun-from-entrypoint (code address)
+(defun sb-vm::%simple-fun-from-entrypoint (code address)
   (let ((min 0) (max (code-n-entries code)) (sap (int-sap address)))
     (declare ((unsigned-byte 16) min max))
     (unless (zerop max)
@@ -472,7 +472,7 @@
         (when (< max min) (return nil))
         (let* ((index (floor (+ min max) 2))
                (fun (%code-entry-point code index))
-               (guess (sb!vm:simple-fun-entry-sap fun)))
+               (guess (sb-vm:simple-fun-entry-sap fun)))
           (cond ((sap< guess sap) (setq min (1+ index)))
                 ((sap> guess sap) (setq max (1- index)))
                 (t (return fun))))))))
@@ -497,7 +497,7 @@
                     (setq index (%simple-fun-index simple-fun)))
                 (%code-fun-offset code (1+ index))))
          (%code-fun-offset code index)
-         (ash sb!vm:simple-fun-code-offset sb!vm:word-shift)))))
+         (ash sb-vm:simple-fun-code-offset sb-vm:word-shift)))))
 
 (defun code-n-unboxed-data-bytes (code-obj)
   ;; If the number of boxed words (from the header) is not the same as
@@ -507,7 +507,7 @@
   (let ((f (%code-entry-point code-obj 0)))
     (or (and f
              (- (%fun-code-offset f)
-                (ash (code-header-words code-obj) sb!vm:word-shift)))
+                (ash (code-header-words code-obj) sb-vm:word-shift)))
         0)))
 
 ;;; Set (SYMBOL-FUNCTION SYMBOL) to a closure that signals an error,
@@ -536,8 +536,8 @@
            ;; There is no :SET-TRANS for the primitive object's fdefn-fun slot,
            ;; nor do we desire the full effect of %SET-FDEFN-FUN.
            (setf (sap-ref-lispobj (int-sap (get-lisp-obj-address fdefn))
-                                  (- (ash sb!vm:fdefn-fun-slot sb!vm:word-shift)
-                                     sb!vm:other-pointer-lowtag))
+                                  (- (ash sb-vm:fdefn-fun-slot sb-vm:word-shift)
+                                     sb-vm:other-pointer-lowtag))
                  closure))
     ;; The above would work, but there's no overhead when installing a closure
     ;; the regular way, so just do that.
@@ -556,7 +556,7 @@
                                  `((if (closure-has-extra-values-slot-p ,nclosure)
                                        1
                                        0))))
-                       sb!vm:closure-info-offset))
+                       sb-vm:closure-info-offset))
          (let ((,value (%closure-index-ref ,nclosure ,i)))
            ,@body)))))
 

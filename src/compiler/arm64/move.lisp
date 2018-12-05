@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 (defun load-immediate-word (y val)
   (cond ((typep val '(unsigned-byte 16))
@@ -161,7 +161,7 @@
 
 ;;; Use LDP/STP when possible
 (defun load-store-two-words (vop1 vop2)
-  (let ((register-sb (sb-or-lose 'sb!vm::registers))
+  (let ((register-sb (sb-or-lose 'sb-vm::registers))
         used-load-tn)
     (declare (notinline sb!c::vop-name)) ; too late
     (labels ((register-p (tn)

@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 ;;; Make a fixnum out of NUM. (I.e. shift by two bits if it will fit.)
 (defun fixnumize (num)

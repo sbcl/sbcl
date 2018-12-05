@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 ;;; Return a list of TNs that can be used to snapshot the dynamic
 ;;; state for use with the SAVE- and RESTORE-DYNAMIC-ENVIRONMENT VOPs.

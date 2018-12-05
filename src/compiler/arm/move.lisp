@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 (defun repeating-pattern-p (val)
   (declare (type (unsigned-byte 32) val))

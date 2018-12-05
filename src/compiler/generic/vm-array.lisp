@@ -11,7 +11,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 (defstruct (specialized-array-element-type-properties
             (:conc-name saetp-)
@@ -187,16 +187,16 @@
        0)) ;; because of NIL
 
 (defun saetp-index-or-lose (element-type)
-  (or (position element-type sb!vm:*specialized-array-element-type-properties*
-                :key #'sb!vm:saetp-specifier :test #'equal)
+  (or (position element-type sb-vm:*specialized-array-element-type-properties*
+                :key #'sb-vm:saetp-specifier :test #'equal)
       (error "No saetp for ~S" element-type)))
 
 (in-package "SB!C")
 
 (defun find-saetp (element-type)
-  (find element-type sb!vm:*specialized-array-element-type-properties*
-        :key #'sb!vm:saetp-specifier :test #'equal))
+  (find element-type sb-vm:*specialized-array-element-type-properties*
+        :key #'sb-vm:saetp-specifier :test #'equal))
 
 (defun find-saetp-by-ctype (ctype)
-  (find ctype sb!vm:*specialized-array-element-type-properties*
-        :key #'sb!vm:saetp-ctype :test #'csubtypep))
+  (find ctype sb-vm:*specialized-array-element-type-properties*
+        :key #'sb-vm:saetp-ctype :test #'csubtypep))

@@ -88,12 +88,12 @@
               (let ((comparators
                      ;; If data-start is 1, subtract 1 because we don't need
                      ;; a comparator for the LAYOUT slot.
-                     (make-array (- (dd-length dd) sb!vm:instance-data-start)
+                     (make-array (- (dd-length dd) sb-vm:instance-data-start)
                                  :initial-element nil)))
                 (dolist (slot (dd-slots dd) comparators)
                   ;; -1 because LAYOUT (slot index 0) has no comparator stored.
                   (setf (aref comparators
-                              (- (dsd-index slot) sb!vm:instance-data-start))
+                              (- (dsd-index slot) sb-vm:instance-data-start))
                         (let ((rsd (dsd-raw-slot-data slot)))
                           (if (not rsd)
                               0 ; means recurse using EQUALP
@@ -126,7 +126,7 @@
         ;; On backends which don't segregate descriptor vs. non-descriptor
         ;; registers, we could speed up this code in an obvious way.
         (macrolet ((copy-loop (tagged-p &optional step)
-                     `(do ((i sb!vm:instance-data-start (1+ i)))
+                     `(do ((i sb-vm:instance-data-start (1+ i)))
                           ((>= i len))
                         (declare (index i))
                         (if ,tagged-p
@@ -244,9 +244,9 @@
          (truly-the
           word
           (+ (get-lisp-obj-address instance)
-             ,(+ (- sb!vm:instance-pointer-lowtag)
-                 (* (+ sb!vm:instance-slots-offset index)
-                    sb!vm:n-word-bytes))))))))
+             ,(+ (- sb-vm:instance-pointer-lowtag)
+                 (* (+ sb-vm:instance-slots-offset index)
+                    sb-vm:n-word-bytes))))))))
 
 
 (/show0 "target-defstruct.lisp end of file")

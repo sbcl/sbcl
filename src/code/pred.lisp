@@ -166,8 +166,8 @@
                   ,@(map 'list
                          (lambda (saetp)
                            `(def-type-predicate-wrapper
-                                ,(symbolicate (sb!vm:saetp-primitive-type-name saetp) "-P")))
-                         sb!vm:*specialized-array-element-type-properties*))))
+                                ,(symbolicate (sb-vm:saetp-primitive-type-name saetp) "-P")))
+                         sb-vm:*specialized-array-element-type-properties*))))
     (saetp-defs))
   ;; Other array types
   (def-type-predicate-wrapper simple-array-p)
@@ -412,19 +412,19 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
                          (y-el (%instance-ref y i)))
                      (or (eq x-el y-el) (equalp x-el y-el)))))
          (if (eql (layout-bitmap layout-x) sb!kernel::+layout-all-tagged+)
-             (loop for i of-type index from sb!vm:instance-data-start
+             (loop for i of-type index from sb-vm:instance-data-start
                    below (layout-length layout-x)
                    always (slot-ref-equalp))
              (let ((comparators (layout-equalp-tests layout-x)))
                (unless (= (length comparators)
-                          (- (layout-length layout-x) sb!vm:instance-data-start))
+                          (- (layout-length layout-x) sb-vm:instance-data-start))
                  (bug "EQUALP got incomplete instance layout"))
                ;; See remark at the source code for %TARGET-DEFSTRUCT
                ;; explaining how to use the vector of comparators.
-               (loop for i of-type index from sb!vm:instance-data-start
+               (loop for i of-type index from sb-vm:instance-data-start
                      below (layout-length layout-x)
                      for test = (data-vector-ref
-                                 comparators (- i sb!vm:instance-data-start))
+                                 comparators (- i sb-vm:instance-data-start))
                      always (cond ((eql test 0) (slot-ref-equalp))
                                   ((functionp test)
                                    (funcall test i x y))

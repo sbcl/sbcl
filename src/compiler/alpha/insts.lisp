@@ -13,12 +13,12 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; Imports from this package into SB-VM
-  (import '(reg-tn-encoding) "SB!VM")
+  (import '(reg-tn-encoding) "SB-VM")
   ;; Imports from SB-VM into this package
-  (import '(sb!vm::zero sb!vm::fp-single-zero sb!vm::fp-double-zero
-            sb!vm::registers sb!vm::float-registers
-            sb!vm::zero-tn sb!vm::fp-single-zero-tn sb!vm::fp-double-zero-tn
-            sb!vm::zero-offset sb!vm::null-offset sb!vm::code-offset)))
+  (import '(sb-vm::zero sb-vm::fp-single-zero sb-vm::fp-double-zero
+            sb-vm::registers sb-vm::float-registers
+            sb-vm::zero-tn sb-vm::fp-single-zero-tn sb-vm::fp-double-zero-tn
+            sb-vm::zero-offset sb-vm::null-offset sb-vm::code-offset)))
 
 
 ;;;; utility functions
@@ -52,7 +52,7 @@
        (lambda (name)
          (cond ((null name) nil)
                (t (make-symbol (concatenate 'string "$" name)))))
-       sb!vm::*register-names*))
+       sb-vm::*register-names*))
 
 (define-arg-type reg
   :printer (lambda (value stream dstate)

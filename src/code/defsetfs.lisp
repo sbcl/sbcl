@@ -20,7 +20,7 @@
 (defsetf %heap-alien %set-heap-alien)
 
 ;;; from arch-vm.lisp
-(in-package "SB!VM")
+(in-package "SB-VM")
 (defsetf context-register %set-context-register)
 (defsetf boxed-context-register %set-boxed-context-register)
 (defsetf context-float-register %set-context-float-register)
@@ -47,7 +47,7 @@
 ;;   (vop-translates sb!kernel:%raw-instance-ref/signed-word)
 ;; however the defknown is only executed if the raw slot type exists.
 ;; (See compiler/generic/vm-fndb where it maps over *raw-slot-data*)
-#!+(vop-named sb!vm::raw-instance-ref/signed-word)
+#!+(vop-named sb-vm::raw-instance-ref/signed-word)
 (defsetf %raw-instance-ref/signed-word %raw-instance-set/signed-word)
 (defsetf %raw-instance-ref/single %raw-instance-set/single)
 (defsetf %raw-instance-ref/double %raw-instance-set/double)

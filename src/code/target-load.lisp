@@ -257,7 +257,7 @@
     (sap-int (sap+ (code-instructions code)
                    (if indirect
                        ;; Return the address containing the routine address
-                       (ash (cddr it) sb!vm:word-shift)
+                       (ash (cddr it) sb-vm:word-shift)
                        ;; Return the routine address itself
                        (car it))))))
 
@@ -267,7 +267,7 @@
          ;; CODE-SIZE minus 2 includes the trailing NOP filler but excludes
          ;; the two trailer words, so it's the most consistent choice.
          ;; (all routines are padded to a multiple of 2 words)
-         (size (- (%code-code-size code) (* 2 sb!vm:n-word-bytes)))
+         (size (- (%code-code-size code) (* 2 sb-vm:n-word-bytes)))
          (vector (the simple-vector *!initial-assembler-routines*))
          (count (length vector))
          (ht (make-hash-table :test 'eq)))

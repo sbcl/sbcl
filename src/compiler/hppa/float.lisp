@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 ;;;; Move functions.
 (define-move-fun (load-fp-zero 1) (vop x y)

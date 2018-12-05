@@ -150,13 +150,13 @@
 (!define-fop 48 :not-host (fop-struct ((:operands size) layout))
   (let ((res (%make-instance size)) ; number of words excluding header
         ;; Discount the layout from number of user-visible words.
-        (n-data-words (- size sb!vm:instance-data-start)))
+        (n-data-words (- size sb-vm:instance-data-start)))
     (setf (%instance-layout res) layout)
     (with-fop-stack ((stack (operand-stack)) ptr n-data-words)
       (declare (type index ptr))
       (let ((bitmap (layout-bitmap layout)))
         ;; Values on the stack are in the same order as in the structure itself.
-        (do ((i sb!vm:instance-data-start (1+ i)))
+        (do ((i sb-vm:instance-data-start (1+ i)))
             ((>= i size))
           (declare (type index i))
           (let ((val (fop-stack-ref ptr)))
@@ -315,7 +315,7 @@
 
 (!define-fop 34 (fop-word-integer)
   (with-fast-read-byte ((unsigned-byte 8) (fasl-input-stream))
-    (fast-read-s-integer #.sb!vm:n-word-bytes)))
+    (fast-read-s-integer #.sb-vm:n-word-bytes)))
 
 (!define-fop 35 (fop-byte-integer)
   ;; FIXME: WITH-FAST-READ-BYTE for exactly 1 byte is not really faster/better
@@ -433,25 +433,25 @@
 (!define-fop 89 :not-host (fop-array (vec))
   (let* ((rank (read-word-arg (fasl-input-stream)))
          (length (length vec))
-         (res (make-array-header sb!vm:simple-array-widetag rank)))
+         (res (make-array-header sb-vm:simple-array-widetag rank)))
     (declare (simple-array vec)
-             (type (unsigned-byte #.(- sb!vm:n-word-bits sb!vm:n-widetag-bits)) rank))
+             (type (unsigned-byte #.(- sb-vm:n-word-bits sb-vm:n-widetag-bits)) rank))
     (set-array-header res vec length nil 0
                       (fop-list-from-stack (operand-stack) rank)
                       nil t)
     res))
 
 (defglobal **saetp-bits-per-length**
-    (let ((array (make-array (1+ sb!vm:widetag-mask)
+    (let ((array (make-array (1+ sb-vm:widetag-mask)
                              :element-type '(unsigned-byte 8)
                              :initial-element 255)))
-      (loop for saetp across sb!vm:*specialized-array-element-type-properties*
+      (loop for saetp across sb-vm:*specialized-array-element-type-properties*
             do
-            (setf (aref array (sb!vm:saetp-typecode saetp))
-                  (sb!vm:saetp-n-bits saetp)))
+            (setf (aref array (sb-vm:saetp-typecode saetp))
+                  (sb-vm:saetp-n-bits saetp)))
       array)
     "255 means bad entry.")
-(declaim (type (simple-array (unsigned-byte 8) (#.(1+ sb!vm:widetag-mask)))
+(declaim (type (simple-array (unsigned-byte 8) (#.(1+ sb-vm:widetag-mask)))
                **saetp-bits-per-length**))
 
 ;; No ALLOCATE-VECTOR on host (nor READ-N-BYTES)
@@ -461,9 +461,9 @@
          (bits-per-length (aref **saetp-bits-per-length** widetag))
          (bits (progn (aver (< bits-per-length 255))
                       (* length bits-per-length)))
-         (bytes (ceiling bits sb!vm:n-byte-bits))
-         (words (ceiling bytes sb!vm:n-word-bytes))
-         (vector (if (and (= widetag sb!vm:simple-vector-widetag)
+         (bytes (ceiling bits sb-vm:n-byte-bits))
+         (words (ceiling bytes sb-vm:n-word-bytes))
+         (vector (if (and (= widetag sb-vm:simple-vector-widetag)
                           (= words 0))
                      #()
                      (logically-readonlyize
@@ -549,17 +549,17 @@
 (!define-fop #xE0 :not-host (fop-load-code ((:operands immobile-p
                                                        n-boxed-words
                                                        n-code-bytes)))
-  (let ((n-constants (- n-boxed-words sb!vm:code-constants-offset)))
+  (let ((n-constants (- n-boxed-words sb-vm:code-constants-offset)))
     ;; stack has (at least) N-CONSTANTS words plus debug-info
     (with-fop-stack ((stack (operand-stack)) ptr (1+ n-constants))
       (let* ((debug-info-index (+ ptr n-constants))
-             (n-boxed-words (+ sb!vm:code-constants-offset n-constants))
+             (n-boxed-words (+ sb-vm:code-constants-offset n-constants))
              (code (sb!c:allocate-code-object
                     (if (eql immobile-p 1) :immobile :dynamic)
                     (align-up n-boxed-words sb!c::code-boxed-words-align)
                     n-code-bytes)))
         (setf (%code-debug-info code) (svref stack debug-info-index))
-        (loop for i of-type index from sb!vm:code-constants-offset
+        (loop for i of-type index from sb-vm:code-constants-offset
               for j of-type index from ptr below debug-info-index
               do (setf (code-header-ref code i) (svref stack j)))
         (with-pinned-objects (code)

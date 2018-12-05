@@ -30,7 +30,7 @@
 ;;; which must not be moved during GC.  It is frobbed by the code for
 ;;; with-pinned-objects in src/compiler/target/macros.lisp.
 #!+(and gencgc (not (or x86 x86-64)))
-(defvar sb!vm::*pinned-objects*)
+(defvar sb-vm::*pinned-objects*)
 
 (defmacro without-gcing (&body body)
   "Executes the forms in the body without doing a garbage collection. It

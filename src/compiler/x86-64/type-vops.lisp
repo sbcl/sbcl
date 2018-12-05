@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 ;;;; test generation utilities
 
@@ -204,7 +204,7 @@
     (move tmp value)
     (inst shr tmp n-positive-fixnum-bits)))
 
-#-#.(cl:if (cl:= sb!vm:n-fixnum-tag-bits 1) '(:and) '(:or))
+#-#.(cl:if (cl:= sb-vm:n-fixnum-tag-bits 1) '(:and) '(:or))
 (define-vop (fixnump/signed-byte-64 simple-type-predicate)
   (:args (value :scs (signed-reg)))
   (:info)
@@ -221,7 +221,7 @@
     (inst add temp value)
     (inst shr temp n-fixnum-bits)))
 
-#+#.(cl:if (cl:= sb!vm:n-fixnum-tag-bits 1) '(:and) '(:or))
+#+#.(cl:if (cl:= sb-vm:n-fixnum-tag-bits 1) '(:and) '(:or))
 (define-vop (fixnump/signed-byte-64 simple-type-predicate)
   (:args (value :scs (signed-reg) :target temp))
   (:info)

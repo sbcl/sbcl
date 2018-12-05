@@ -13,9 +13,9 @@
 
 ;;; Declare each of the free space pointers (except dynamic) as an alien var
 (define-alien-variable ("read_only_space_free_pointer"
-                        sb!vm:*read-only-space-free-pointer*)
+                        sb-vm:*read-only-space-free-pointer*)
     system-area-pointer)
-(define-alien-variable ("static_space_free_pointer" sb!vm:*static-space-free-pointer*)
+(define-alien-variable ("static_space_free_pointer" sb-vm:*static-space-free-pointer*)
   system-area-pointer)
 
 (declaim (inline memmove))

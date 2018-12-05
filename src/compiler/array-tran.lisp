@@ -349,10 +349,10 @@
   (declare (ignore n-bits))
   (let ((saetp (and (constant-lvar-p widetag)
                     (find (lvar-value widetag)
-                          sb!vm:*specialized-array-element-type-properties*
-                          :key #'sb!vm:saetp-typecode))))
+                          sb-vm:*specialized-array-element-type-properties*
+                          :key #'sb-vm:saetp-typecode))))
     (derive-make-array-type dims (if saetp
-                                     (sb!vm:saetp-ctype saetp)
+                                     (sb-vm:saetp-ctype saetp)
                                      *wild-type*)
                             adjustable fill-pointer displaced-to
                             node)))
@@ -574,7 +574,7 @@
                                 (t '*))
                          ,(if dims-constp dims (length dims)))
               (make-array-header*
-               ,@(sb!vm::make-array-header-inits
+               ,@(sb-vm::make-array-header-inits
                   `(make-array ,size ,@keys) size dims)))))
       `(let* (,@axis-bindings ,@et-binding (,size (the index (* ,@dims))))
          ,(cond ((or (not contents) (and dims-constp (equal dims data-dims)))
@@ -660,10 +660,10 @@
                        (give-up-ir1-transform))
                       (t
                        (find-saetp-by-ctype elt-ctype))))
-         (default-initial-element (sb!vm:saetp-initial-element-default saetp))
-         (n-bits (sb!vm:saetp-n-bits saetp))
-         (typecode (sb!vm:saetp-typecode saetp))
-         (n-pad-elements (sb!vm:saetp-n-pad-elements saetp))
+         (default-initial-element (sb-vm:saetp-initial-element-default saetp))
+         (n-bits (sb-vm:saetp-n-bits saetp))
+         (typecode (sb-vm:saetp-typecode saetp))
+         (n-pad-elements (sb-vm:saetp-n-pad-elements saetp))
          (n-words-form
            (cond ((not c-length)
                   (let ((padded-length-form (if (zerop n-pad-elements)
@@ -671,29 +671,29 @@
                                                 `(+ length ,n-pad-elements))))
                     (cond
                       ((= n-bits 0) 0)
-                      ((>= n-bits sb!vm:n-word-bits)
+                      ((>= n-bits sb-vm:n-word-bits)
                        `(* ,padded-length-form
                            ;; i.e., not RATIO
-                           ,(the fixnum (/ n-bits sb!vm:n-word-bits))))
+                           ,(the fixnum (/ n-bits sb-vm:n-word-bits))))
                       (t
-                       (let ((n-elements-per-word (/ sb!vm:n-word-bits n-bits)))
+                       (let ((n-elements-per-word (/ sb-vm:n-word-bits n-bits)))
                          (declare (type index n-elements-per-word)) ; i.e., not RATIO
                          `(ceiling (truly-the index ,padded-length-form)
                                    ,n-elements-per-word))))))
                  ((and (fixnump c-length)
                        (>= c-length 0))
                   (ceiling (* (+ c-length n-pad-elements) n-bits)
-                           sb!vm:n-word-bits))
+                           sb-vm:n-word-bits))
                  (t
                   (give-up-ir1-transform))))
          (data-result-spec
-           `(simple-array ,(sb!vm:saetp-specifier saetp) (,(or c-length '*))))
+           `(simple-array ,(sb-vm:saetp-specifier saetp) (,(or c-length '*))))
          (result-spec
            (if complex
-               `(and (array ,(sb!vm:saetp-specifier saetp) (*))
+               `(and (array ,(sb-vm:saetp-specifier saetp) (*))
                      (not simple-array))
                `(simple-array
-                 ,(sb!vm:saetp-specifier saetp) (,(or c-length '*)))))
+                 ,(sb-vm:saetp-specifier saetp) (,(or c-length '*)))))
          (data-alloc-form
            `(truly-the ,data-result-spec
                        (allocate-vector ,typecode
@@ -726,8 +726,8 @@
                       `(let ((%length (the index ,(or c-length 'length))))
                          (truly-the
                           ,result-spec
-                          (make-array-header* ,(or (sb!vm:saetp-complex-typecode saetp)
-                                                   sb!vm:complex-vector-widetag)
+                          (make-array-header* ,(or (sb-vm:saetp-complex-typecode saetp)
+                                                   sb-vm:complex-vector-widetag)
                                               ;; fill-pointer
                                               ,(cond ((eq fill-pointer-value t)
                                                       '%length)
@@ -930,15 +930,15 @@
                        "ELEMENT-TYPE ~s is not a known type"
                        eltype-type)
                       (find eltype-type
-                            sb!vm:*specialized-array-element-type-properties*
-                            :key #'sb!vm:saetp-ctype
+                            sb-vm:*specialized-array-element-type-properties*
+                            :key #'sb-vm:saetp-ctype
                             :test #'csubtypep)))
            (creation-form `(%make-array
                             dims
                             ,(if saetp
-                                 (sb!vm:saetp-typecode saetp)
+                                 (sb-vm:saetp-typecode saetp)
                                  (give-up-ir1-transform))
-                            ,(sb!vm:saetp-n-bits-shift saetp)
+                            ,(sb-vm:saetp-n-bits-shift saetp)
                             ,@(maybe-arg initial-contents)
                             ,@(maybe-arg adjustable)
                             ,@(maybe-arg fill-pointer)
@@ -947,7 +947,7 @@
       (cond ((or (not initial-element)
                  (and (constant-lvar-p initial-element)
                       (eql (lvar-value initial-element)
-                           (sb!vm:saetp-initial-element-default saetp))))
+                           (sb-vm:saetp-initial-element-default saetp))))
              creation-form)
             (t
              ;; error checking for target, disabled on the host because
@@ -956,7 +956,7 @@
              (when (constant-lvar-p initial-element)
                (let ((value (lvar-value initial-element)))
                  (cond
-                   ((not (ctypep value (sb!vm:saetp-ctype saetp)))
+                   ((not (ctypep value (sb-vm:saetp-ctype saetp)))
                     ;; this case will cause an error at runtime, so we'd
                     ;; better WARN about it now.
                     (warn 'array-initial-element-mismatch
@@ -965,7 +965,7 @@
                           :format-arguments
                           (list
                            value
-                           (type-specifier (sb!vm:saetp-ctype saetp))
+                           (type-specifier (sb-vm:saetp-ctype saetp))
                            'upgraded-array-element-type
                            eltype)))
                    ((not (ctypep value eltype-type))
@@ -976,7 +976,7 @@
              `(let ((array ,creation-form))
                 (multiple-value-bind (vector)
                     (%data-vector-and-index array 0)
-                  (fill vector (the ,(sb!vm:saetp-specifier saetp) initial-element)))
+                  (fill vector (the ,(sb-vm:saetp-specifier saetp) initial-element)))
                 array))))))
 
 ;;; The list type restriction does not ensure that the result will be a
@@ -1057,8 +1057,8 @@
                             ,(make-list rank :initial-element '*))))
                `(truly-the ,spec
                            (make-array-header* ,(if complex
-                                                    sb!vm:complex-array-widetag
-                                                    sb!vm:simple-array-widetag)
+                                                    sb-vm:complex-array-widetag
+                                                    sb-vm:simple-array-widetag)
                                                ;; fill-pointer
                                                ,total-size
                                                ;; fill-pointer-p

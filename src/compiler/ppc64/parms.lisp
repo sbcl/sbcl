@@ -11,7 +11,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 ; ok, so we're supposed to use our instruction scheduler, but we don't,
 ; because of "needs a little more work in the assembler"

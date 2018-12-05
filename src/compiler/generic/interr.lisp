@@ -45,18 +45,18 @@
                      (list
                       (type-specifier
                        (specifier-type
-                        `(simple-array ,(sb!vm:saetp-specifier saetp) (*))))
+                        `(simple-array ,(sb-vm:saetp-specifier saetp) (*))))
                       (symbolicate "OBJECT-NOT-"
-                                   (sb!vm:saetp-primitive-type-name saetp))))
-                   sb!vm:*specialized-array-element-type-properties*)
+                                   (sb-vm:saetp-primitive-type-name saetp))))
+                   sb-vm:*specialized-array-element-type-properties*)
               (let ((unboxed-vectors
                      (map 'list
                           (lambda (saetp)
                             (type-specifier
                              (specifier-type
-                              `(simple-array ,(sb!vm:saetp-specifier saetp) (*)))))
-                          (remove t sb!vm:*specialized-array-element-type-properties*
-                                  :key 'sb!vm:saetp-specifier))))
+                              `(simple-array ,(sb-vm:saetp-specifier saetp) (*)))))
+                          (remove t sb-vm:*specialized-array-element-type-properties*
+                                  :key 'sb-vm:saetp-specifier))))
                 `(((integer 0 ,sb!xc:array-dimension-limit)
                    object-not-array-dimension)
                   ;; Union of all unboxed array specializations,
@@ -166,7 +166,7 @@
   ;; rather than using the strange type name. The INTERNAL-ERROR function
   ;; receives the trap number as if it were a type error,
   ;; but prints a better message than "is not a (not satisfies)"
-  ((not (satisfies sb!vm::unbound-marker-p)) slot-not-initialized)
+  ((not (satisfies sb-vm::unbound-marker-p)) slot-not-initialized)
 
   ;; Now, in approximate order of descending popularity.
   ;; If we exceed 255 error numbers, trailing ones can be deleted arbitrarily.
@@ -228,10 +228,10 @@
 #-sb-xc-host ; no SB!C:SAP-READ-VAR-INTEGERF
 (defun decode-internal-error-args (sap trap-number &optional error-number)
   (let ((error-number (cond (error-number)
-                            ((>= trap-number sb!vm:error-trap)
+                            ((>= trap-number sb-vm:error-trap)
                              (prog1
-                                 (- trap-number sb!vm:error-trap)
-                               (setf trap-number sb!vm:error-trap)))
+                                 (- trap-number sb-vm:error-trap)
+                               (setf trap-number sb-vm:error-trap)))
                             (t
                              (prog1 (sap-ref-8 sap 0)
                                (setf sap (sap+ sap 1)))))))

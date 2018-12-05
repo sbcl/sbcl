@@ -28,8 +28,8 @@
   #!-long-float 'double-float-exponent
   #!+long-float 'long-float-exponent)
 (sb!xc:deftype float-digits ()
-  #!-long-float `(integer 0 ,sb!vm:double-float-digits)
-  #!+long-float `(integer 0 ,sb!vm:long-float-digits))
+  #!-long-float `(integer 0 ,sb-vm:double-float-digits)
+  #!+long-float `(integer 0 ,sb-vm:long-float-digits))
 (sb!xc:deftype float-radix () '(integer 2 2))
 (sb!xc:deftype float-int-exponent ()
   #!-long-float 'double-float-int-exponent
@@ -59,14 +59,14 @@
     (floor (ash 1 internal-time-bits) sb!xc:internal-time-units-per-second))
 (sb!xc:deftype internal-seconds () `(integer 0 ,internal-seconds-limit))
 
-(sb!xc:deftype bignum-element-type () 'sb!vm:word)
+(sb!xc:deftype bignum-element-type () 'sb-vm:word)
 (sb!xc:deftype bignum-index () `(mod ,maximum-bignum-length))
 (sb!xc:deftype bignum-length () `(mod ,(1+ maximum-bignum-length)))
 
 ;;; an index into an integer
 (sb!xc:deftype bit-index ()
-  `(integer 0 #.(* (1- (ash 1 (- sb!vm:n-word-bits sb!vm:n-widetag-bits)))
-                   sb!vm:n-word-bits)))
+  `(integer 0 #.(* (1- (ash 1 (- sb-vm:n-word-bits sb-vm:n-widetag-bits)))
+                   sb-vm:n-word-bits)))
 
 
 ;;;; hooks into the type system
@@ -142,8 +142,8 @@
 ;;; includes the given type.
 (defun containing-integer-type (subtype)
   (dolist (type `(fixnum
-                  (signed-byte ,sb!vm:n-word-bits)
-                  (unsigned-byte ,sb!vm:n-word-bits)
+                  (signed-byte ,sb-vm:n-word-bits)
+                  (unsigned-byte ,sb-vm:n-word-bits)
                   integer)
                 (error "~S isn't an integer type?" subtype))
     (when (csubtypep subtype (specifier-type type))
@@ -175,7 +175,7 @@
 ;; because it always better to use %OTHER-POINTER-SUBTYPE-P in that case.
 
 (defun simplify-array-unions (input &optional for-typep)
-  (let* ((array-props sb!vm:*specialized-array-element-type-properties*)
+  (let* ((array-props sb-vm:*specialized-array-element-type-properties*)
          (types (if (listp input) input (union-type-types input)))
          (full-mask (1- (ash 1 (length array-props))))
          buckets output)
@@ -201,7 +201,7 @@
              (and (array-type-p type)
                   (neq (array-type-specialized-element-type type) *wild-type*)
                   (position (array-type-specialized-element-type type) array-props
-                            :key #'sb!vm:saetp-ctype :test #'type=)))
+                            :key #'sb-vm:saetp-ctype :test #'type=)))
            (wild (type)
              (make-array-type (array-type-dimensions type)
                               :element-type *wild-type*
@@ -241,7 +241,7 @@
                           (let (exclude)
                             (dotimes (i (length array-props))
                               (when (logbitp i (cdr bucket)) ; exclude it
-                                (push (sb!vm:saetp-specifier
+                                (push (sb-vm:saetp-specifier
                                        (svref array-props i)) exclude)))
                             (setf (cdr bucket) -1) ; mark as generated
                             (specifier-type
@@ -292,7 +292,7 @@
           (pos-bignum (specifier-type `(integer (,most-positive-fixnum) *))))
       (when (and (member neg-bignum types :test #'type=)
                  (member pos-bignum types :test #'type=))
-        (push sb!vm:bignum-widetag widetags)
+        (push sb-vm:bignum-widetag widetags)
         (setf types (remove-if (lambda (x) (or (type= x neg-bignum) (type= x pos-bignum)))
                                types))))
     (dolist (x types)
@@ -306,28 +306,28 @@
                     ;; could be done, but probably no merit to implementing
                     ;; maybe/definitely-complex wild-type.
                     (unless (array-type-complexp x)
-                      (map 'list #'sb!vm::saetp-typecode
-                           sb!vm:*specialized-array-element-type-properties*))
+                      (map 'list #'sb-vm::saetp-typecode
+                           sb-vm:*specialized-array-element-type-properties*))
                     (let ((saetp
                            (find
                             (array-type-element-type x)
-                            sb!vm:*specialized-array-element-type-properties*
-                            :key #'sb!vm:saetp-ctype :test #'type=)))
+                            sb-vm:*specialized-array-element-type-properties*
+                            :key #'sb-vm:saetp-ctype :test #'type=)))
                       (cond ((not (array-type-complexp x))
-                             (sb!vm:saetp-typecode saetp))
-                            ((sb!vm:saetp-complex-typecode saetp)
-                             (list* (sb!vm:saetp-complex-typecode saetp)
+                             (sb-vm:saetp-typecode saetp))
+                            ((sb-vm:saetp-complex-typecode saetp)
+                             (list* (sb-vm:saetp-complex-typecode saetp)
                                     (when (eq (array-type-complexp x) :maybe)
-                                      (list (sb!vm:saetp-typecode saetp)))))))))
+                                      (list (sb-vm:saetp-typecode saetp)))))))))
                ((classoid-p x)
                 (case (classoid-name x)
-                  (symbol sb!vm:symbol-widetag) ; plus a hack for nil
-                  (system-area-pointer sb!vm:sap-widetag))))))
+                  (symbol sb-vm:symbol-widetag) ; plus a hack for nil
+                  (system-area-pointer sb-vm:sap-widetag))))))
         (cond ((not adjunct) (push x remainder))
               ((listp adjunct) (setq widetags (nconc adjunct widetags)))
               (t (push adjunct widetags)))))
     (let ((remainder (nreverse remainder)))
-      (when (member sb!vm:symbol-widetag widetags)
+      (when (member sb-vm:symbol-widetag widetags)
         ;; If symbol is the only widetag-testable type, it's better
         ;; to just use symbolp. e.g. (OR SYMBOL CHARACTER) should not
         ;; become (OR (%OTHER-POINTER-SUBTYPE-P ...)
@@ -344,14 +344,14 @@
 ;; True of all specials exported from CL:, all which expose slots of the thread
 ;; structure, and any symbol that the compiler decides will eventually have a
 ;; nonzero TLS index due to compiling a dynamic binding of it.
-(defun sb!vm::symbol-always-has-tls-index-p (symbol)
+(defun sb-vm::symbol-always-has-tls-index-p (symbol)
   (not (null (info :variable :wired-tls symbol))))
 
 ;; Return T if SYMBOL will always have a thread-local value.
 ;; True of variables defined by !DEFINE-THREAD-LOCAL and thread slots.
 ;; As an optimization, set and ref are permitted (but not required)
 ;; to avoid checking for no-tls-value.
-(defun sb!vm::symbol-always-has-tls-value-p (symbol)
+(defun sb-vm::symbol-always-has-tls-value-p (symbol)
   (let ((where (info :variable :wired-tls symbol)))
     (or (fixnump where) ; thread slots
         (eq where :always-thread-local)))) ; everything else

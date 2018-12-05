@@ -65,7 +65,7 @@
            #!+64-bit
            signed-byte-64-p
            weak-pointer-p code-component-p lra-p
-           sb!vm::unbound-marker-p
+           sb-vm::unbound-marker-p
            simple-fun-p
            closurep
            funcallable-instance-p
@@ -137,26 +137,26 @@
 ;;; When dealing with known other-pointers (dispatching on array
 ;;; element type for example), %OTHER-POINTER-WIDETAG is faster.
 (defknown (widetag-of %other-pointer-widetag) (t)
-  (unsigned-byte #.sb!vm:n-widetag-bits)
+  (unsigned-byte #.sb-vm:n-widetag-bits)
   (flushable movable))
 
 ;;; Return the data from the header of object, which for GET-HEADER-DATA
 ;;; must be an other-pointer, and for GET-CLOSURE-LENGTH a fun-pointer.
 (defknown (get-header-data) (t)
-    (unsigned-byte #.(- sb!vm:n-word-bits sb!vm:n-widetag-bits))
+    (unsigned-byte #.(- sb-vm:n-word-bits sb-vm:n-widetag-bits))
   (flushable))
 ;;; Closures have at least a trampoline word (length can't be 0),
 ;;; and only 15 bits in which to express the payload size.
-(defknown (get-closure-length) (t) (integer 1 #.sb!vm:short-header-max-words)
+(defknown (get-closure-length) (t) (integer 1 #.sb-vm:short-header-max-words)
   (flushable))
 
 ;;; This unconventional setter returns its first arg, not the newval.
 (defknown set-header-data
-    (t (unsigned-byte #.(- sb!vm:n-word-bits sb!vm:n-widetag-bits))) t)
+    (t (unsigned-byte #.(- sb-vm:n-word-bits sb-vm:n-widetag-bits))) t)
 #!+64-bit
 (progn
-(defknown sb!vm::get-header-data-high (t) (unsigned-byte 32) (flushable))
-(defknown sb!vm::cas-header-data-high
+(defknown sb-vm::get-header-data-high (t) (unsigned-byte 32) (flushable))
+(defknown sb-vm::cas-header-data-high
     (t (unsigned-byte 32) (unsigned-byte 32)) (unsigned-byte 32)))
 
 (defknown %array-dimension (array index) index
@@ -200,8 +200,8 @@
 (defknown %layout-invalid-error (t layout) nil)
 
 #!+(or x86 x86-64)
-(defknown %raw-instance-cas/word (instance index sb!vm:word sb!vm:word)
-  sb!vm:word ())
+(defknown %raw-instance-cas/word (instance index sb-vm:word sb-vm:word)
+  sb-vm:word ())
 #.`(progn
      ,@(map 'list
             (lambda (rsd)
@@ -224,16 +224,16 @@
             sb!kernel::*raw-slot-data*))
 
 #!+compare-and-swap-vops
-(defknown %raw-instance-atomic-incf/word (instance index sb!vm:word) sb!vm:word
+(defknown %raw-instance-atomic-incf/word (instance index sb-vm:word) sb-vm:word
     (always-translatable))
 #!+compare-and-swap-vops
-(defknown %array-atomic-incf/word (t index sb!vm:word) sb!vm:word
+(defknown %array-atomic-incf/word (t index sb-vm:word) sb-vm:word
   (always-translatable))
 
 ;;; These two are mostly used for bit-bashing operations.
-(defknown %vector-raw-bits (t index) sb!vm:word
+(defknown %vector-raw-bits (t index) sb-vm:word
   (flushable))
-(defknown (%set-vector-raw-bits) (t index sb!vm:word) sb!vm:word
+(defknown (%set-vector-raw-bits) (t index sb-vm:word) sb-vm:word
   ())
 
 
@@ -245,8 +245,8 @@
                            ;; to bytes, make sure it fits.
                            (and index
                                 (mod #.(- (expt 2
-                                                (- sb!vm:n-word-bits
-                                                   sb!vm:word-shift
+                                                (- sb-vm:n-word-bits
+                                                   sb-vm:word-shift
                                                    ;; all the allocation routines expect a signed word
                                                    1))
                                           ;; The size is double-word aligned, which is done by adding
@@ -322,7 +322,7 @@
 
 ;;;; debugger support
 
-(defknown sb!vm::current-thread-offset-sap (fixnum)
+(defknown sb-vm::current-thread-offset-sap (fixnum)
   system-area-pointer (flushable))
 (defknown (current-sp current-fp) () system-area-pointer (movable flushable))
 (defknown current-fp-fixnum () fixnum (movable flushable))
@@ -330,12 +330,12 @@
 (defknown %set-stack-ref (system-area-pointer index t) t ())
 (defknown lra-code-header (t) t (movable flushable))
 (defknown fun-code-header (t) t (movable flushable))
-(defknown %make-lisp-obj (sb!vm:word) t (movable flushable))
-(defknown get-lisp-obj-address (t) sb!vm:word (movable flushable))
+(defknown %make-lisp-obj (sb-vm:word) t (movable flushable))
+(defknown get-lisp-obj-address (t) sb-vm:word (movable flushable))
 
 ;;;; 32-bit logical operations
 
-(defknown word-logical-not (sb!vm:word) sb!vm:word
+(defknown word-logical-not (sb-vm:word) sb-vm:word
   (foldable flushable movable))
 
 (defknown (word-logical-and word-logical-nand
@@ -343,11 +343,11 @@
            word-logical-xor word-logical-eqv
            word-logical-andc1 word-logical-andc2
            word-logical-orc1 word-logical-orc2)
-          (sb!vm:word sb!vm:word) sb!vm:word
+          (sb-vm:word sb-vm:word) sb-vm:word
   (foldable flushable movable))
 
-(defknown (shift-towards-start shift-towards-end) (sb!vm:word fixnum)
-  sb!vm:word
+(defknown (shift-towards-start shift-towards-end) (sb-vm:word fixnum)
+  sb-vm:word
   (foldable flushable movable))
 
 ;;;; bignum operations
@@ -404,11 +404,11 @@
   (foldable flushable movable))
 
 (defknown %fixnum-digit-with-correct-sign (bignum-element-type)
-  (signed-byte #.sb!vm:n-word-bits)
+  (signed-byte #.sb-vm:n-word-bits)
   (foldable flushable movable))
 
 (defknown (%ashl %ashr %digit-logical-shift-right)
-          (bignum-element-type (mod #.sb!vm:n-word-bits)) bignum-element-type
+          (bignum-element-type (mod #.sb-vm:n-word-bits)) bignum-element-type
   (foldable flushable movable))
 
 ;;;; bit-bashing routines
@@ -439,7 +439,7 @@
                                 (system-area-pointer index (simple-unboxed-array (*)) index index)
                                 (values)
                                 ())
-                      until (= i sb!vm:n-word-bits)))))
+                      until (= i sb-vm:n-word-bits)))))
   (define-known-copiers))
 
 ;;; (not really a bit-bashing routine, but starting to take over from
@@ -459,7 +459,7 @@
 (defknown code-header-ref (t index) t (flushable))
 (defknown code-header-set (t index t) t ())
 
-(defknown fun-subtype (function) (member . #.sb!vm::+function-widetags+)
+(defknown fun-subtype (function) (member . #.sb-vm::+function-widetags+)
   (flushable))
 
 (defknown make-fdefn (t) fdefn (flushable movable))
@@ -473,14 +473,14 @@
 
 (defknown %simple-fun-type (function) t (flushable))
 
-#!+(or x86 x86-64) (defknown sb!vm::%closure-callee (function) fixnum (flushable))
+#!+(or x86 x86-64) (defknown sb-vm::%closure-callee (function) fixnum (flushable))
 (defknown %closure-fun (function) function (flushable))
 
 (defknown %closure-index-ref (function index) t
   (flushable))
 
 ;; T argument is for the 'fun' slot.
-(defknown sb!vm::%copy-closure (index t) function (flushable))
+(defknown sb-vm::%copy-closure (index t) function (flushable))
 
 (defknown %fun-fun (function) function (flushable recursive))
 

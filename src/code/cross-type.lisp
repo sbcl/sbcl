@@ -100,8 +100,8 @@
        (or (in-cl-package-p symbol)
            ;; KLUDGE: rather than extensible list of predicates that match
            ;; in behavior between the host and target lisp, hardcode a few.
-           (memq symbol '(sb!vm::symbol-always-has-tls-index-p
-                          sb!vm:static-symbol-p)))))
+           (memq symbol '(sb-vm::symbol-always-has-tls-index-p
+                          sb-vm:static-symbol-p)))))
 
 ;;; The set of types of which no object can be a member during cross-compilation.
 (dolist (symbol '(alien system-area-pointer sb!alien-internals:alien-value

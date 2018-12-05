@@ -141,7 +141,7 @@
     (setf (tn-offset res) offset)
     (push-in tn-next res (ir2-component-wired-tns component))
     res))
-(defun sb!vm::make-wired-tn* (prim-type-name scn offset)
+(defun sb-vm::make-wired-tn* (prim-type-name scn offset)
   (make-wired-tn (primitive-type-or-lose prim-type-name) scn offset))
 
 ;;; Create a packed TN restricted to the SC with number SCN. Ptype is as
@@ -226,7 +226,7 @@
                      (or (not immed)
                          #!+immobile-space
                          (let ((val (constant-value constant)))
-                           (or (and (symbolp val) (not (sb!vm:static-symbol-p val)))
+                           (or (and (symbolp val) (not (sb-vm:static-symbol-p val)))
                                (typep val 'layout)))))
             (let ((constants (ir2-component-constants component)))
               (setf (tn-offset res)
@@ -240,7 +240,7 @@
 (defun make-load-time-value-tn (handle type)
   (let* ((component (component-info *component-being-compiled*))
          (sc (svref *backend-sc-numbers*
-                    sb!vm:constant-sc-number))
+                    sb-vm:constant-sc-number))
          (res (make-tn 0 :constant (primitive-type type) sc))
          (constants (ir2-component-constants component)))
     (setf (tn-offset res) (fill-pointer constants))
@@ -268,7 +268,7 @@
          (res (make-tn 0
                        :constant
                        *backend-t-primitive-type*
-                       (svref *backend-sc-numbers* sb!vm:constant-sc-number)))
+                       (svref *backend-sc-numbers* sb-vm:constant-sc-number)))
          (constants (ir2-component-constants component)))
 
     (do ((i 0 (1+ i)))

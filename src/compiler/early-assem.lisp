@@ -11,13 +11,13 @@
 
 (in-package "SB!ASSEM")
 
-;;; FIXME: It might make sense to use SB!VM:BYTE-FOO values here
+;;; FIXME: It might make sense to use SB-VM:BYTE-FOO values here
 ;;; instead of the various ASSEMBLY-UNIT-FOO things, and then define a
 ;;; BYTE type. One problem: BYTE is exported from the CL package, so
 ;;; ANSI says that we're not supposed to be attaching any new meanings
-;;; to it. Perhaps rename SB!VM:BYTE-FOO to SB!VM:VMBYTE-FOO or
-;;; SB!VM:VM-BYTE-FOO, and then define the SB!VM:VMBYTE or
-;;; SB!VM:VM-BYTE types?
+;;; to it. Perhaps rename SB-VM:BYTE-FOO to SB-VM:VMBYTE-FOO or
+;;; SB-VM:VM-BYTE-FOO, and then define the SB-VM:VMBYTE or
+;;; SB-VM:VM-BYTE types?
 ;;;
 ;;; If this was done, some of this file could go away, and the rest
 ;;; could probably be merged back into assem.lisp. (This file was
@@ -45,7 +45,7 @@
 ;;; the maximum alignment we can guarantee given the object format. If
 ;;; the loader only loads objects 8-byte aligned, we can't do any
 ;;; better then that ourselves.
-(defconstant max-alignment sb!vm:n-lowtag-bits)
+(defconstant max-alignment sb-vm:n-lowtag-bits)
 
 (deftype alignment ()
   `(integer 0 ,max-alignment))
@@ -79,7 +79,7 @@
 ;;; that are called within, and therefore would issue "unknown function"
 ;;; warnings. So we avoid letting it see a load-time definition of the macro.
 (eval-when (:compile-toplevel #-sb-xc :load-toplevel :execute)
-(#-sb-xc defmacro #+sb-xc sb!xc:defmacro sb!vm::define-assembly-routine
+(#-sb-xc defmacro #+sb-xc sb!xc:defmacro sb-vm::define-assembly-routine
     (name&options vars &body code)
   (multiple-value-bind (name options)
       (if (atom name&options)

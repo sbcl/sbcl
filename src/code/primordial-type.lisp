@@ -20,7 +20,7 @@
                         (!make-named-type (interned-type-hash ',type 'named
                                              ,(case type
                                                 ((nil t)
-                                                 `(sb!vm::saetp-index-or-lose ',type))
+                                                 `(sb-vm::saetp-index-or-lose ',type))
                                                 (* 31)))
                                           ',type))
                       ;; Make it known as a constant in the cross-compiler.

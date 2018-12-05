@@ -360,4 +360,4 @@ the stack without triggering overflow protection.")
 ;; from 'llvm/projects/compiler-rt/lib/msan/msan.h':
 ;;  "#define MEM_TO_SHADOW(mem) (((uptr)(mem)) ^ 0x500000000000ULL)"
 #!+linux ; shadow space differs by OS
-(defconstant sb!vm::msan-mem-to-shadow-xor-const #x500000000000)
+(defconstant sb-vm::msan-mem-to-shadow-xor-const #x500000000000)

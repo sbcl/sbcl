@@ -663,8 +663,8 @@ necessary, since type inference may take arbitrarily long to converge.")
                 (let ((ranges
                         (maplist (lambda (list)
                                    (cons (+ (car list)
-                                            (ash sb!vm:simple-fun-code-offset
-                                                 sb!vm:word-shift))
+                                            (ash sb-vm:simple-fun-code-offset
+                                                 sb-vm:word-shift))
                                          (or (cadr list) text-length)))
                                  fun-table)))
                   (declare (ignorable ranges))

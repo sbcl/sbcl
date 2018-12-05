@@ -128,7 +128,7 @@
             slot-makunbound
             make-load-form-saving-slots
             sb!ext:run-program
-            sb!vm::remove-static-links)
+            sb-vm::remove-static-links)
           ;; CLOS implementation
           '(sb!mop:class-finalized-p
             sb!mop:class-prototype

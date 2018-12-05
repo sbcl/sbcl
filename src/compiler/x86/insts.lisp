@@ -16,10 +16,10 @@
   ;; Imports from this package into SB-VM
   (import '(conditional-opcode
             register-p ; FIXME: rename to GPR-P
-            make-ea ea-disp width-bits) "SB!VM")
+            make-ea ea-disp width-bits) "SB-VM")
   ;; Imports from SB-VM into this package
-  (import '(sb!vm::frame-byte-offset sb!vm::ebp-tn
-            sb!vm::registers sb!vm::float-registers sb!vm::stack))) ; SB names
+  (import '(sb-vm::frame-byte-offset sb-vm::ebp-tn
+            sb-vm::registers sb-vm::float-registers sb-vm::stack))) ; SB names
 
 (deftype reg () '(unsigned-byte 3))
 
@@ -172,14 +172,14 @@
     (:le . 14) (:ng . 14)
     (:nle . 15) (:g . 15))
   #'equal)
-(defconstant-eqx sb!vm::+condition-name-vec+
+(defconstant-eqx sb-vm::+condition-name-vec+
   #.(let ((vec (make-array 16 :initial-element nil)))
       (dolist (cond +conditions+ vec)
         (when (null (aref vec (cdr cond)))
           (setf (aref vec (cdr cond)) (car cond)))))
   #'equalp)
 
-(define-arg-type condition-code :printer sb!vm::+condition-name-vec+)
+(define-arg-type condition-code :printer sb-vm::+condition-name-vec+)
 
 (defun conditional-opcode (condition)
   (cdr (assoc condition +conditions+ :test #'eq)))

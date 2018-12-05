@@ -325,7 +325,7 @@ normally during operations like SLEEP."
 (declaim (inline read-cycle-counter))
 (defun read-cycle-counter ()
   #!+cycle-counter
-  (sb!vm::%read-cycle-counter)
+  (sb-vm::%read-cycle-counter)
   #!-cycle-counter
   (values 0 0))
 

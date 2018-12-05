@@ -199,10 +199,10 @@
                   ;; and don't rely on Lisp to write the slots of the layout.
                   (dx-let ((data (vector ,@(mapcar #'dsd-name slots))))
                     (truly-the layout
-                     (values (%primitive sb!vm::alloc-immobile-layout data))))))))
-   (assert (<= (* sb!vm:n-word-bytes
+                     (values (%primitive sb-vm::alloc-immobile-layout data))))))))
+   (assert (<= (* sb-vm:n-word-bytes
                  (1+ (dd-length (find-defstruct-description 'layout))))
-              sb!vm::layout-align))
+              sb-vm::layout-align))
   (def-layout-maker))
 
 ;;; The CLASSOID structure is a supertype of all classoid types.  A

@@ -300,7 +300,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 #!+x86
 (defun random-chunk (state)
   (declare (type random-state state))
-  (sb!vm::random-mt19937 (random-state-state state)))
+  (sb-vm::random-mt19937 (random-state-state state)))
 
 #!-sb-fluid (declaim (inline big-random-chunk))
 (defun big-random-chunk (state)
@@ -322,8 +322,8 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
   (* arg
      (- (make-single-float
          (dpb (ash (random-chunk state)
-                   (- sb!vm:single-float-digits n-random-chunk-bits))
-              sb!vm:single-float-significand-byte
+                   (- sb-vm:single-float-digits n-random-chunk-bits))
+              sb-vm:single-float-significand-byte
               (single-float-bits 1.0)))
         1.0)))
 (declaim (ftype (function ((double-float (0d0)) random-state)
@@ -345,8 +345,8 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
   (* arg
      (- (sb!impl::make-double-float
          (dpb (ash (random-chunk state)
-                   (- sb!vm:double-float-digits n-random-chunk-bits 32))
-              sb!vm:double-float-significand-byte
+                   (- sb-vm:double-float-digits n-random-chunk-bits 32))
+              sb-vm:double-float-significand-byte
               (sb!impl::double-float-high-bits 1d0))
          (random-chunk state))
         1d0)))
@@ -359,12 +359,12 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
   (let ((state-vector (random-state-state state)))
     (* arg
        (- (sb!impl::make-double-float
-           (dpb (ash (sb!vm::random-mt19937 state-vector)
-                     (- sb!vm:double-float-digits n-random-chunk-bits
-                        sb!vm:n-word-bits))
-                sb!vm:double-float-significand-byte
+           (dpb (ash (sb-vm::random-mt19937 state-vector)
+                     (- sb-vm:double-float-digits n-random-chunk-bits
+                        sb-vm:n-word-bits))
+                sb-vm:double-float-significand-byte
                 (sb!impl::double-float-high-bits 1d0))
-           (sb!vm::random-mt19937 state-vector))
+           (sb-vm::random-mt19937 state-vector))
           1d0))))
 
 

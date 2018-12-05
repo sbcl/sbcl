@@ -12,7 +12,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 (defun sanctify-for-execution (component)
   (alien-funcall (extern-alien "os_flush_icache"

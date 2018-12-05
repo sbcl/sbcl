@@ -25,7 +25,7 @@
 (progn
 (defun convert-alloc-point-fixups (dummy1 dummy2)
   (declare (ignore dummy1 dummy2)))
-(defun sb!vm::statically-link-code-obj (code fixups)
+(defun sb-vm::statically-link-code-obj (code fixups)
   (declare (ignore code fixups))))
 
 (flet ((fixup (code-obj offset sym kind flavor layout-finder
@@ -36,7 +36,7 @@
          ;; CODE-OBJ must already be pinned in order to legally call this.
          ;; One call site that reaches here is below at MAKE-CORE-COMPONENT
          ;; and the other is LOAD-CODE, both of which pin the code.
-         (when (sb!vm:fixup-code-object
+         (when (sb-vm:fixup-code-object
                  code-obj offset
                  (ecase flavor
                    ((:assembly-routine :assembly-routine*)
@@ -52,15 +52,15 @@
                    (:named-call
                     (when statically-link-p
                       (push (cons offset sym) (elt preserved-lists 3)))
-                    (sb!vm::fdefn-entry-address sym))
-                   #!+immobile-code (:static-call (sb!vm::function-raw-address sym)))
+                    (sb-vm::fdefn-entry-address sym))
+                   #!+immobile-code (:static-call (sb-vm::function-raw-address sym)))
                  kind flavor)
            (ecase kind
              (:relative (push offset (elt preserved-lists 0)))
              (:absolute (push offset (elt preserved-lists 1)))))
          ;; These won't exist except for x86-64, but it doesn't matter.
-         (when (member sym '(sb!vm::enable-alloc-counter
-                             sb!vm::enable-sized-alloc-counter))
+         (when (member sym '(sb-vm::enable-alloc-counter
+                             sb-vm::enable-sized-alloc-counter))
            (push offset (elt preserved-lists 2))))
 
        (finish-fixups (code-obj preserved-lists)
@@ -69,13 +69,13 @@
          (let ((rel-fixups (elt preserved-lists 0))
                (abs-fixups (elt preserved-lists 1)))
            (when (or abs-fixups rel-fixups)
-             (setf (sb!vm::%code-fixups code-obj)
+             (setf (sb-vm::%code-fixups code-obj)
                    (sb!c::pack-code-fixup-locs abs-fixups rel-fixups))))
          (awhen (elt preserved-lists 2)
            (setf (gethash code-obj *allocation-point-fixups*)
                  (convert-alloc-point-fixups code-obj it)))
          (awhen (aref preserved-lists 3)
-           (sb!vm::statically-link-code-obj code-obj it))
+           (sb-vm::statically-link-code-obj code-obj it))
          ;; Assign all SIMPLE-FUN-SELF slots
          (dotimes (i (code-n-entries code-obj))
            (let ((fun (%code-entry-point code-obj i)))
@@ -84,19 +84,19 @@
                    #!+(or x86 x86-64)
                    (%make-lisp-obj
                     (truly-the word (+ (get-lisp-obj-address fun)
-                                       (ash sb!vm:simple-fun-code-offset sb!vm:word-shift)
-                                       (- sb!vm:fun-pointer-lowtag))))
+                                       (ash sb-vm:simple-fun-code-offset sb-vm:word-shift)
+                                       (- sb-vm:fun-pointer-lowtag))))
                    ;; non-x86 backends store the function itself (what else?) in 'self'
                    #!-(or x86 x86-64) fun)
              ;; And maybe store the layout in the high half of the header
              #!+(and compact-instance-header x86-64)
              (setf (sap-ref-32 (int-sap (get-lisp-obj-address fun))
-                               (- 4 sb!vm:fun-pointer-lowtag))
+                               (- 4 sb-vm:fun-pointer-lowtag))
                    (truly-the (unsigned-byte 32)
                      (get-lisp-obj-address #.(find-layout 'function))))))
          ;; And finally, make the memory range executable
          #!-(or x86 x86-64)
-         (sb!vm:sanctify-for-execution code-obj)))
+         (sb-vm:sanctify-for-execution code-obj)))
 
   (defun apply-fasl-fixups (fop-stack code-obj &aux (top (svref fop-stack 0)))
     (dx-let ((preserved (make-array 4 :initial-element nil)))
@@ -191,7 +191,7 @@
       (push debug-info (core-object-debug-info object))
       (setf (%code-debug-info code-obj) debug-info)
 
-      (do ((index sb!vm:code-constants-offset (1+ index)))
+      (do ((index sb-vm:code-constants-offset (1+ index)))
           ((>= index (length constants)))
         (let ((const (aref constants index)))
             (etypecase const

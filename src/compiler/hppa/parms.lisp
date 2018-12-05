@@ -1,4 +1,4 @@
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 ; normally assem-scheduler-p is t, and nil if debugging the assembler
 ; but apparently we don't trust any of the instruction definitions.

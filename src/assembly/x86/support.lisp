@@ -7,7 +7,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 ;;; The :full-call assembly-routines must use the same full-call
 ;;; unknown-values return convention as a normal call, as some

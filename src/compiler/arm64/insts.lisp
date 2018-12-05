@@ -19,13 +19,13 @@
             negative-add-sub-immediate-p
             encode-logical-immediate fixnum-encode-logical-immediate
             ldr-str-offset-encodable ldp-stp-offset-p
-            bic-mask extend lsl lsr asr ror @) "SB!VM")
+            bic-mask extend lsl lsr asr ror @) "SB-VM")
   ;; Imports from SB-VM into this package
-  (import '(sb!vm::*register-names*
-            sb!vm::add-sub-immediate
-            sb!vm::32-bit-reg sb!vm::single-reg sb!vm::double-reg
-            sb!vm::complex-single-reg sb!vm::complex-double-reg
-            sb!vm::tmp-tn sb!vm::zr-tn sb!vm::nsp-offset)))
+  (import '(sb-vm::*register-names*
+            sb-vm::add-sub-immediate
+            sb-vm::32-bit-reg sb-vm::single-reg sb-vm::double-reg
+            sb-vm::complex-single-reg sb-vm::complex-double-reg
+            sb-vm::tmp-tn sb-vm::zr-tn sb-vm::nsp-offset)))
 
 
 
@@ -47,7 +47,7 @@
     (:al . 14))
   #'equal)
 
-(defconstant-eqx sb!vm::+condition-name-vec+
+(defconstant-eqx sb-vm::+condition-name-vec+
   #.(let ((vec (make-array 16 :initial-element nil)))
       (dolist (cond +conditions+ vec)
         (when (null (aref vec (cdr cond)))
@@ -58,7 +58,7 @@
   (cdr (assoc condition +conditions+ :test #'eq)))
 
 (defun invert-condition (condition)
-  (aref sb!vm::+condition-name-vec+
+  (aref sb-vm::+condition-name-vec+
         (logxor 1 (conditional-opcode condition))))
 
 ;;;; disassembler field definitions
@@ -129,11 +129,11 @@
 
 (defun register-p (thing)
   (and (tn-p thing)
-       (eq (sb-name (sc-sb (tn-sc thing))) 'sb!vm::registers)))
+       (eq (sb-name (sc-sb (tn-sc thing))) 'sb-vm::registers)))
 
 (defun fp-register-p (thing)
   (and (tn-p thing)
-       (eq (sb-name (sc-sb (tn-sc thing))) 'sb!vm::float-registers)))
+       (eq (sb-name (sc-sb (tn-sc thing))) 'sb-vm::float-registers)))
 
 (defun reg-size (tn)
   (if (sc-is tn 32-bit-reg)
@@ -965,7 +965,7 @@
 (defmacro process-null-sc (reg)
   `(setf ,reg (if (and (tn-p ,reg)
                        (eq 'null (sc-name (tn-sc ,reg))))
-                  sb!vm::null-tn
+                  sb-vm::null-tn
                   ,reg)))
 
 (define-instruction-macro mov-sp (rd rm)
@@ -976,7 +976,7 @@
          (rm ,rm))
      (process-null-sc rm)
      (if (integerp rm)
-         (sb!vm::load-immediate-word rd rm)
+         (sb-vm::load-immediate-word rd rm)
          (inst orr rd zr-tn rm))))
 
 (define-instruction movn (segment rd imm &optional (shift 0))
@@ -1658,9 +1658,9 @@
   (:emitter
    (emit-uncond-branch-reg segment 1 (tn-offset register))))
 
-(define-instruction ret (segment &optional (register sb!vm::lr-tn))
+(define-instruction ret (segment &optional (register sb-vm::lr-tn))
   (:printer uncond-branch-reg ((op #b10)))
-  (:printer uncond-branch-reg ((op #b10) (rn sb!vm::lr-offset))
+  (:printer uncond-branch-reg ((op #b10) (rn sb-vm::lr-offset))
             '(:name))
   (:emitter
    (emit-uncond-branch-reg segment #b10 (tn-offset register))))

@@ -738,7 +738,7 @@
               (vop current-stack-pointer call block
                    (ir2-lvar-stack-pointer (lvar-info lvar))))
             (when (emit-step-p call)
-              (vop sb!vm::step-instrument-before-vop call block))
+              (vop sb-vm::step-instrument-before-vop call block))
             (if info-args
                 (emit-template call block template args r-refs info-args)
                 (emit-template call block template args r-refs))
@@ -1019,7 +1019,7 @@
              (values loc nil)))
           ((lvar-fun-name lvar t)
            (let ((name (lvar-fun-name lvar t)))
-             (values (cond ((sb!vm::static-fdefn-offset name)
+             (values (cond ((sb-vm::static-fdefn-offset name)
                             name)
                            (t
                             ;; Named call to an immobile fdefn from an immobile component
@@ -1101,7 +1101,7 @@
       (let ((last nil)
             (first nil))
         (dotimes (num nargs)
-          (locs (sb!vm::standard-call-arg-location num))
+          (locs (sb-vm::standard-call-arg-location num))
           (let ((ref (reference-tn (lvar-tn node block (elt args num))
                                    nil)))
             (if last
@@ -1125,7 +1125,7 @@
                             collect (cond ((eql (tn-kind loc) :unused)
                                            loc)
                                           #!+(or x86-64 arm64) ;; needs default-unknown-values support
-                                          ((>= i sb!vm::register-arg-count)
+                                          ((>= i sb-vm::register-arg-count)
                                            (make-normal-tn *backend-t-primitive-type*))
                                           (t
                                            (standard-arg-location i))))))
@@ -1377,7 +1377,7 @@
             ;; Save the closure pointer on the stack.
             (let ((closure-save
                    (make-representation-tn *backend-t-primitive-type*
-                                           sb!vm:control-stack-sc-number)))
+                                           sb-vm:control-stack-sc-number)))
               (vop setup-closure-environment node block start-label
                    closure-save)
               (setf (ir2-physenv-closure-save-tn env) closure-save)
@@ -1430,7 +1430,7 @@
   ;; external and internal entry points, so it will be saved twice.
   (let ((temp (make-normal-tn *backend-t-primitive-type*))
         (bsp-save-tn (make-representation-tn *backend-t-primitive-type*
-                                             sb!vm:control-stack-sc-number)))
+                                             sb-vm:control-stack-sc-number)))
     (vop current-binding-pointer node block temp)
     (emit-move node block temp bsp-save-tn)
     (setf (ir2-physenv-bsp-save-tn env) bsp-save-tn)
@@ -1488,7 +1488,7 @@
       (vop note-environment-start node block lab)
       #!+sb-safepoint
       (unless (policy fun (>= inhibit-safepoints 2))
-        (vop sb!vm::insert-safepoint node block))))
+        (vop sb-vm::insert-safepoint node block))))
 
   (values))
 
@@ -1753,7 +1753,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
        ;;  -PK
        (loop for loc in (ir2-lvar-locs 2lvar)
              for idx upfrom 0
-             do (vop sb!vm::more-arg node block
+             do (vop sb-vm::more-arg node block
                      (lvar-tn node block context)
                      (emit-constant idx)
                      loc)))
@@ -2054,8 +2054,8 @@ not stack-allocated LVAR ~S." source-lvar)))))
              `(defoptimizer (,name ir2-convert) ((&rest args) node block)
                 (cond #!+gencgc
                       ((>= (length args)
-                           (/ sb!vm:large-object-size
-                              (* sb!vm:n-word-bytes 2)))
+                           (/ sb-vm:large-object-size
+                              (* sb-vm:n-word-bytes 2)))
                        ;; The VOPs will try to allocate all space at once
                        ;; And it'll end up in large objects, and no conses
                        ;; are welcome there.
@@ -2068,8 +2068,8 @@ not stack-allocated LVAR ~S." source-lvar)))))
                               (allow-const
                                ;; Make sure the backend allows both of IMMEDIATE
                                ;; and CONSTANT since MAKE-CONSTANT-TN could produce either.
-                               (and (member 'sb!vm::constant scs)
-                                    (member 'sb!vm::immediate scs)
+                               (and (member 'sb-vm::constant scs)
+                                    (member 'sb-vm::immediate scs)
                                     ;; FIXME: this is terribly wrong that in high debug
                                     ;; settings we can't allow constants at the IR2 level.
                                     ;; But two UNWIND-TO-FRAME-AND-CALL tests fail when
@@ -2104,11 +2104,11 @@ not stack-allocated LVAR ~S." source-lvar)))))
   (block nil
     (when (constant-lvar-p width)
       (case (lvar-value width)
-        (#.(- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits)
+        (#.(- sb-vm:n-word-bits sb-vm:n-fixnum-tag-bits)
          (when (or (csubtypep (lvar-type x)
                               (specifier-type 'word))
                    (csubtypep (lvar-type x)
-                              (specifier-type 'sb!vm:signed-word)))
+                              (specifier-type 'sb-vm:signed-word)))
            (let* ((lvar (node-lvar node))
                   (temp (make-normal-tn
                          (if (csubtypep (lvar-type x)
@@ -2120,11 +2120,11 @@ not stack-allocated LVAR ~S." source-lvar)))))
                             lvar
                             (list (primitive-type-or-lose 'fixnum)))))
              (emit-move node block (lvar-tn node block x) temp)
-             (vop sb!vm::move-from-word/fixnum node block
+             (vop sb-vm::move-from-word/fixnum node block
                   temp (first results))
              (move-lvar-result node block results lvar)
              (return))))
-        (#.sb!vm:n-word-bits
+        (#.sb-vm:n-word-bits
          (when (csubtypep (lvar-type x) (specifier-type 'word))
            (let* ((lvar (node-lvar node))
                   (temp (make-normal-tn
@@ -2132,9 +2132,9 @@ not stack-allocated LVAR ~S." source-lvar)))))
                   (results (lvar-result-tns
                             lvar
                             (list (primitive-type
-                                   (specifier-type 'sb!vm:signed-word))))))
+                                   (specifier-type 'sb-vm:signed-word))))))
              (emit-move node block (lvar-tn node block x) temp)
-             (vop sb!vm::word-move node block
+             (vop sb-vm::word-move node block
                   temp (first results))
              (move-lvar-result node block results lvar)
              (return))))))
@@ -2222,7 +2222,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
                                      '(:natural :strange))
                              (eq block (loop-head (block-loop block)))
                              (policy first-node (< inhibit-safepoints 2)))
-                    (vop sb!vm::insert-safepoint first-node 2block))))
+                    (vop sb-vm::insert-safepoint first-node 2block))))
             (ir2-convert-block block)
             (incf num))))))
   (values))

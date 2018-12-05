@@ -17,13 +17,13 @@
 ;;; slightly differently) elsewhere. (Maybe this is resolved?)
 (declaim (special *posix-argv*
                   *stderr*
-                  sb!vm:*current-catch-block*
-                  sb!vm::*current-unwind-protect-block*
-                  sb!vm::*alien-stack-pointer*
-                  sb!vm:*control-stack-start*
-                  sb!vm:*control-stack-end*
-                  sb!vm:*binding-stack-start*
-                  #!+(or hpux) sb!vm::*c-lra*
+                  sb-vm:*current-catch-block*
+                  sb-vm::*current-unwind-protect-block*
+                  sb-vm::*alien-stack-pointer*
+                  sb-vm:*control-stack-start*
+                  sb-vm:*control-stack-end*
+                  sb-vm:*binding-stack-start*
+                  #!+(or hpux) sb-vm::*c-lra*
                   *allow-with-interrupts*
                   sb!unix::*unblock-deferrables-on-enabling-interrupts-p*
                   *interrupts-enabled*
@@ -32,11 +32,11 @@
                   #!+sb-safepoint *in-safepoint*
                   *free-interrupt-context-index*
                   #!-gencgc
-                  sb!vm::*allocation-pointer*
-                  sb!vm::*binding-stack-pointer*
+                  sb-vm::*allocation-pointer*
+                  sb-vm::*binding-stack-pointer*
                   sb!pcl::*cache-miss-values-stack*
                   sb!pcl::*dfun-miss-gfs-on-stack*))
-(defvar sb!vm:*alloc-signal*) ; initialized by create_thread_struct()
+(defvar sb-vm:*alloc-signal*) ; initialized by create_thread_struct()
 ;;; This is a slot of 'struct thread' if multithreaded,
 ;;; and the symbol-global-value should never be used.
 ;;; (And in any case it is not really a special var)

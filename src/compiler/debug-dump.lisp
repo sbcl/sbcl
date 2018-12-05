@@ -144,7 +144,7 @@
      (let ((offset (- (label-position (restart-location-label x))
                       location))
            (tn (restart-location-tn x))
-           (registers-size #.(integer-length (sb-size (sb-or-lose 'sb!vm::registers)))))
+           (registers-size #.(integer-length (sb-size (sb-or-lose 'sb-vm::registers)))))
        (if tn
            (the fixnum (logior (ash offset registers-size)
                                (tn-offset tn)))
@@ -154,8 +154,8 @@
 
 (defun decode-restart-location (x)
   (declare (fixnum x))
-  (let ((registers-size #.(integer-length (sb-size (sb-or-lose 'sb!vm::registers)))))
-    (values (make-sc+offset sb!vm:descriptor-reg-sc-number
+  (let ((registers-size #.(integer-length (sb-size (sb-or-lose 'sb-vm::registers)))))
+    (values (make-sc+offset sb-vm:descriptor-reg-sc-number
                             (ldb (byte registers-size 0) x))
             (ash x (- registers-size)))))
 

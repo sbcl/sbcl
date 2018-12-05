@@ -1031,7 +1031,7 @@
       (let* ((tn (tn-ref-tn target))
              (loc (tn-offset tn)))
         (if (and (eq (tn-sc tn) sc)
-                 (sc-locations-member (the sb!vm:finite-sc-offset loc)
+                 (sc-locations-member (the sb-vm:finite-sc-offset loc)
                                       (sc-locations sc))
                  (not (load-tn-conflicts-in-sc op sc loc nil)))
             loc
@@ -1049,7 +1049,7 @@
       (let* ((tn (tn-ref-tn target))
              (loc (tn-offset tn)))
         (when (and (eq (sc-sb sc) (sc-sb (tn-sc tn)))
-                   (sc-locations-member (the sb!vm:finite-sc-offset loc)
+                   (sc-locations-member (the sb-vm:finite-sc-offset loc)
                                         (sc-locations sc))
                    (not (load-tn-conflicts-in-sc op sc loc nil)))
               (return-from select-load-tn-location loc)))))
@@ -1506,7 +1506,7 @@
              tn offset sc (tn-kind tn)))
 
     (unless (eq (sb-kind sb) :unbounded)
-      (setf (ldb (byte 1 (truly-the sb!vm:finite-sc-offset offset))
+      (setf (ldb (byte 1 (truly-the sb-vm:finite-sc-offset offset))
                  (finite-sb-wired-map sb))
             1))
     (add-location-conflicts original sc offset)))

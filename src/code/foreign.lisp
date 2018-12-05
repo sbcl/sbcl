@@ -92,13 +92,13 @@ if the symbol isn't found."
   (let ((addr (sap-int sap)))
     (declare (ignorable addr))
     #!+linkage-table
-    (when (<= sb!vm:linkage-table-space-start
+    (when (<= sb-vm:linkage-table-space-start
               addr
-              sb!vm:linkage-table-space-end)
+              sb-vm:linkage-table-space-end)
       (dohash ((key table-offset) *linkage-info* :locked t)
-        (let ((table-addr (+ table-offset sb!vm:linkage-table-space-start))
+        (let ((table-addr (+ table-offset sb-vm:linkage-table-space-start))
               (datap (listp key)))
-          (when (<= table-addr addr (+ table-addr (1- sb!vm:linkage-table-entry-size)))
+          (when (<= table-addr addr (+ table-addr (1- sb-vm:linkage-table-entry-size)))
             (return-from sap-foreign-symbol (if datap (car key) key))))))
     #!+os-provides-dladdr
     (with-alien ((info (struct dl-info
@@ -128,8 +128,8 @@ if the symbol isn't found."
   (dovector (symbol *!initial-foreign-symbols*)
     (setf (gethash (car symbol) *static-foreign-symbols*) (cdr symbol)))
   #!+sb-dynamic-core
-  (loop for table-offset from 0 by sb!vm::linkage-table-entry-size
-        and reference across (symbol-value 'sb!vm::+required-foreign-symbols+)
+  (loop for table-offset from 0 by sb-vm::linkage-table-entry-size
+        and reference across (symbol-value 'sb-vm::+required-foreign-symbols+)
         do (setf (gethash reference *linkage-info*) table-offset))
   #!+os-provides-dlopen
   (setf *runtime-dlhandle* (dlopen-or-lose))

@@ -99,7 +99,7 @@
                               :interactive read-evaluated-form
                               (set-value value retrying)))
                         (unless retrying
-                          (sb!vm::incf-context-pc *current-internal-error-context*
+                          (sb-vm::incf-context-pc *current-internal-error-context*
                                                   pc-offset))))
                      (t
                       (restart-case (error condition)
@@ -147,7 +147,7 @@
          #!+undefined-fun-restarts
          context)
     (cond #!+undefined-fun-restarts
-          ((or (= *current-internal-trap-number* sb!vm:cerror-trap)
+          ((or (= *current-internal-trap-number* sb-vm:cerror-trap)
                (integerp (setf context (sb!di:error-context))))
            (restart-undefined name condition fdefn-or-symbol context))
           (t
@@ -178,14 +178,14 @@
       :report (lambda (stream)
                 (format stream "Call a different function with the same arguments"))
       :interactive read-evaluated-form
-      (sb!vm::context-call-function *current-internal-error-context*
+      (sb-vm::context-call-function *current-internal-error-context*
                                     (fdefinition value)))
     #!+(or x86-64 arm64)
     (call-form (form)
       :report (lambda (stream)
                 (format stream "Call a different form"))
       :interactive read-evaluated-form
-      (sb!vm::context-call-function *current-internal-error-context*
+      (sb-vm::context-call-function *current-internal-error-context*
                                     (lambda ()
                                       ;; Don't invoke the compiler in
                                       ;; case it's dealing with an
@@ -220,7 +220,7 @@
                (sb!di::sub-set-debug-var-slot
                 nil tn-offset (retry-value value)
                 *current-internal-error-context*)
-               (sb!vm::incf-context-pc *current-internal-error-context*
+               (sb-vm::incf-context-pc *current-internal-error-context*
                                        pc-offset)
                (when set-symbol
                  (set symbol value))
@@ -337,7 +337,7 @@
           (continue ()
             :report (lambda (stream)
                       (format stream "Ignore all unknown keywords"))
-            (sb!vm::incf-context-pc *current-internal-error-context*
+            (sb-vm::incf-context-pc *current-internal-error-context*
                                     context)))
         (error 'unknown-keyword-argument :name key-name))))
 
@@ -377,15 +377,15 @@
      (let ((alien-context (sap-alien context (* os-context-t))))
        (multiple-value-bind (error-number arguments
                              *current-internal-trap-number*)
-           (sb!vm::with-pinned-context-code-object (alien-context)
-             (sb!vm:internal-error-args alien-context))
+           (sb-vm::with-pinned-context-code-object (alien-context)
+             (sb-vm:internal-error-args alien-context))
          (with-interrupt-bindings
            (let ((sb!debug:*stack-top-hint* (find-interrupted-frame))
                  (*current-internal-error* error-number)
                  (*current-internal-error-args* arguments)
                  (*current-internal-error-context* alien-context)
-                 (fp (int-sap (sb!vm:context-register alien-context
-                                                      sb!vm::cfp-offset))))
+                 (fp (int-sap (sb-vm:context-register alien-context
+                                                      sb-vm::cfp-offset))))
              (if (and (>= error-number (length **internal-error-handlers**))
                       (< error-number (length sb!c:+backend-internal-errors+)))
                  (let ((context (sb!di:error-context)))
@@ -485,9 +485,9 @@
   (declare (fixnum available requested))
   (infinite-error-protect
    (let ((*heap-exhausted-error-available-bytes*
-           (ash available sb!vm:n-fixnum-tag-bits))
+           (ash available sb-vm:n-fixnum-tag-bits))
          (*heap-exhausted-error-requested-bytes*
-           (ash requested sb!vm:n-fixnum-tag-bits)))
+           (ash requested sb-vm:n-fixnum-tag-bits)))
      (error *heap-exhausted-error-condition*))))
 
 (defun undefined-alien-variable-error ()
@@ -510,4 +510,4 @@
    (let ((context (sap-alien context-sap (* os-context-t))))
      (error 'breakpoint-error
             :context context
-            :address (sap-int (sb!vm:context-pc context))))))
+            :address (sap-int (sb-vm:context-pc context))))))

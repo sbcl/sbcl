@@ -39,7 +39,7 @@
 
 #-sb-xc-host
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (dolist (entry '#.sb!vm::!per-thread-c-interface-symbols)
+  (dolist (entry '#.sb-vm::!per-thread-c-interface-symbols)
     (let ((symbol (if (consp entry) (car entry) entry)))
       (declare (notinline info (setf info)))
       ;; CURRENT-{CATCH/UWP}-BLOCK are thread slots,

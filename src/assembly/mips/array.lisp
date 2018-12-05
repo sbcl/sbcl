@@ -10,6 +10,6 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 ;;;; Note: ALLOCATE-VECTOR is now implemented as a VOP.

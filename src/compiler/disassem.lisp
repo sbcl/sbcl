@@ -82,7 +82,7 @@
 ;;; but there's really no easy way to do that at present.
 (defconstant dchunk-bits
   #!+x86-64 56
-  #!-x86-64 sb!vm:n-word-bits)
+  #!-x86-64 sb-vm:n-word-bits)
 
 (deftype dchunk ()
   `(unsigned-byte ,dchunk-bits))
@@ -884,12 +884,12 @@
 
 (defun bytes-to-bits (bytes)
   (declare (type disassem-length bytes))
-  (* bytes sb!vm:n-byte-bits))
+  (* bytes sb-vm:n-byte-bits))
 
 (defun bits-to-bytes (bits)
   (declare (type disassem-length bits))
   (multiple-value-bind (bytes rbits)
-      (truncate bits sb!vm:n-byte-bits)
+      (truncate bits sb-vm:n-byte-bits)
     (when (not (zerop rbits))
       (error "~W bits is not a byte-multiple." bits))
     bytes))

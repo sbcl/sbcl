@@ -58,7 +58,7 @@
   ;; number of bytes to subtract from all finalized positions such that
   ;; position 0 corresponds to CODE-INSTRUCTIONS of the code component
   ;; being assembled.
-  (header-skew 0 :type (member 0 #.sb!vm:n-word-bytes))
+  (header-skew 0 :type (member 0 #.sb-vm:n-word-bytes))
   ;; the position the last time we synchronized
   (sync-posn 0 :type index)
   ;; a label at position 0
@@ -888,7 +888,7 @@
     ;; Better to get an ECASE error than undefined-function.
     #!+x86-64
     ((eql :long-nop)
-     (sb!vm:emit-long-nop segment amount)))
+     (sb-vm:emit-long-nop segment amount)))
   (values))
 
 ;;; This is used to handle the common parts of annotation emission. We

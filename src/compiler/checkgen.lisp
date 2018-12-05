@@ -375,9 +375,9 @@
 (defun %interr-symbol-for-union-type-spec (spec)
   (let* ((spec (cdr spec))
          (length (length spec))
-         (bit-map (if (> length sb!vm:n-fixnum-bits)
+         (bit-map (if (> length sb-vm:n-fixnum-bits)
                       (return-from %interr-symbol-for-union-type-spec)
-                      (1- (ash 1 (truly-the (integer 1 #.sb!vm:n-fixnum-bits)
+                      (1- (ash 1 (truly-the (integer 1 #.sb-vm:n-fixnum-bits)
                                             length))))))
     (declare (list spec))
     (loop for entry across **type-spec-unions-interr-symbols**
@@ -390,7 +390,7 @@
                   for position = (position element spec :test #'equal)
                   always position
                   do
-                  (setf (ldb (byte 1 (truly-the (integer 0 (#.sb!vm:n-fixnum-bits))
+                  (setf (ldb (byte 1 (truly-the (integer 0 (#.sb-vm:n-fixnum-bits))
                                                 position))
                              current-map)
                         0))

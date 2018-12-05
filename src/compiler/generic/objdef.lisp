@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 ;;;; KLUDGE: The primitive objects here may look like self-contained
 ;;;; definitions, but in general they're not. In particular, if you

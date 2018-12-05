@@ -95,10 +95,10 @@
 ;; or 10 in a fixnum on 64-bit machines (regardless of n-fixnum-tag-bits).
 ;; The eval-when seems to be necessary for building with CCL as host.
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant +infos-per-word+ (floor sb!vm:n-fixnum-bits info-number-bits)))
+  (defconstant +infos-per-word+ (floor sb-vm:n-fixnum-bits info-number-bits)))
 
 ;; Descriptors are target fixnums
-(deftype info-descriptor () `(signed-byte ,sb!vm:n-fixnum-bits))
+(deftype info-descriptor () `(signed-byte ,sb-vm:n-fixnum-bits))
 
 ;; An empty info-vector. Its 0th field describes that there are no more fields.
 (defconstant-eqx +nil-packed-infos+ #(0) #'equalp)
@@ -148,7 +148,7 @@
 ;; conditionalized out for platforms other than x86[-64].
 ;; It looks like it ought to work whether or not there are vops.
 (defmacro make-info-descriptor (val shift)
-  (if (> sb!vm:n-fixnum-bits 30)
+  (if (> sb-vm:n-fixnum-bits 30)
       `(ash ,val ,shift)
       `(logior (if (logbitp (- 29 ,shift) ,val) sb!xc:most-negative-fixnum 0)
                (ash ,val ,shift))))

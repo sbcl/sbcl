@@ -84,11 +84,11 @@
 (def!type load/store-index (scale lowtag min-offset
                                  &optional (max-offset min-offset))
   `(integer ,(- (truncate (+ (ash 1 16)
-                             (* min-offset sb!vm:n-word-bytes)
+                             (* min-offset sb-vm:n-word-bytes)
                              (- lowtag))
                           scale))
             ,(truncate (- (+ (1- (ash 1 16)) lowtag)
-                          (* max-offset sb!vm:n-word-bytes))
+                          (* max-offset sb-vm:n-word-bytes))
                        scale)))
 
 (declaim (inline align-up))
@@ -97,11 +97,11 @@
 
 #!+(or x86 x86-64)
 (defun displacement-bounds (lowtag element-size data-offset)
-  (let* ((adjustment (- (* data-offset sb!vm:n-word-bytes) lowtag))
-         (bytes-per-element (ceiling element-size sb!vm:n-byte-bits))
-         (min (truncate (+ sb!vm::minimum-immediate-offset adjustment)
+  (let* ((adjustment (- (* data-offset sb-vm:n-word-bytes) lowtag))
+         (bytes-per-element (ceiling element-size sb-vm:n-byte-bits))
+         (min (truncate (+ sb-vm::minimum-immediate-offset adjustment)
                         bytes-per-element))
-         (max (truncate (+ sb!vm::maximum-immediate-offset adjustment)
+         (max (truncate (+ sb-vm::maximum-immediate-offset adjustment)
                         bytes-per-element)))
     (values min max)))
 
@@ -694,7 +694,7 @@ NOTE: This interface is experimental and subject to change."
          (line-type (let ((n (+ nargs nvalues)))
                       (if (<= n 3) 'cons `(simple-vector ,n))))
          (bind-hashval
-          `((,hashval (the (signed-byte #.sb!vm:n-fixnum-bits)
+          `((,hashval (the (signed-byte #.sb-vm:n-fixnum-bits)
                            (funcall ,hash-function ,@arg-vars)))
             (,cache ,var-name)))
          (probe-it
@@ -703,7 +703,7 @@ NOTE: This interface is experimental and subject to change."
                (let ((,hashval ,hashval) ; gets clobbered in probe loop
                      (,cache (truly-the ,cache-type ,cache)))
                  ;; FIXME: redundant?
-                 (declare (type (signed-byte #.sb!vm:n-fixnum-bits) ,hashval))
+                 (declare (type (signed-byte #.sb-vm:n-fixnum-bits) ,hashval))
                  (loop repeat 2
                     do (let ((,entry
                               (svref ,cache

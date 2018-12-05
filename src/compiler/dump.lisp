@@ -110,15 +110,15 @@
 
 ;; Dump a word-sized integer.
 (defun dump-word (num fasl-output)
-  (declare (type sb!vm:word num))
+  (declare (type sb-vm:word num))
   (declare (type fasl-output fasl-output))
   (let ((stream (fasl-output-stream fasl-output)))
-    (dotimes (i sb!vm:n-word-bytes)
+    (dotimes (i sb-vm:n-word-bytes)
       (write-byte (ldb (byte 8 (* 8 i)) num) stream))))
 
 ;; Dump a 32-bit integer.
 (defun dump-unsigned-byte-32 (num fasl-output)
-  (declare (type sb!vm:word num))
+  (declare (type sb-vm:word num))
   (declare (type fasl-output fasl-output))
   (let ((stream (fasl-output-stream fasl-output)))
     (dotimes (i 4)
@@ -502,12 +502,12 @@
     ((signed-byte 8)
      (dump-fop 'fop-byte-integer file)
      (dump-byte (logand #xFF n) file))
-    ((unsigned-byte #.(1- sb!vm:n-word-bits))
+    ((unsigned-byte #.(1- sb-vm:n-word-bits))
      (dump-fop 'fop-word-integer file)
      (dump-word n file))
-    ((signed-byte #.sb!vm:n-word-bits)
+    ((signed-byte #.sb-vm:n-word-bits)
      (dump-fop 'fop-word-integer file)
-     (dump-integer-as-n-bytes n #.sb!vm:n-word-bytes file))
+     (dump-integer-as-n-bytes n #.sb-vm:n-word-bytes file))
     (t
      (let ((bytes (ceiling (1+ (integer-length n)) 8)))
        (dump-fop 'fop-integer file bytes)
@@ -838,31 +838,31 @@
             (ecase type-id
               (signed-byte
                (ecase bits
-                 (8  sb!vm:simple-array-signed-byte-8-widetag)
-                 (16 sb!vm:simple-array-signed-byte-16-widetag)
-                 (32 sb!vm:simple-array-signed-byte-32-widetag)
+                 (8  sb-vm:simple-array-signed-byte-8-widetag)
+                 (16 sb-vm:simple-array-signed-byte-16-widetag)
+                 (32 sb-vm:simple-array-signed-byte-32-widetag)
                  #!+64-bit
-                 (64 sb!vm:simple-array-signed-byte-64-widetag)))
+                 (64 sb-vm:simple-array-signed-byte-64-widetag)))
               (unsigned-byte
                (ecase bits
-                 (8  sb!vm:simple-array-unsigned-byte-8-widetag)
-                 (16 sb!vm:simple-array-unsigned-byte-16-widetag)
-                 (32 sb!vm:simple-array-unsigned-byte-32-widetag)
+                 (8  sb-vm:simple-array-unsigned-byte-8-widetag)
+                 (16 sb-vm:simple-array-unsigned-byte-16-widetag)
+                 (32 sb-vm:simple-array-unsigned-byte-32-widetag)
                  #!+64-bit
-                 (64 sb!vm:simple-array-unsigned-byte-64-widetag))))
-            (/ bits sb!vm:n-byte-bits)
+                 (64 sb-vm:simple-array-unsigned-byte-64-widetag))))
+            (/ bits sb-vm:n-byte-bits)
             bits)))
         ((typep vector '(simple-bit-vector 0))
          ;; NIL bits+bytes are ok- DUMP-INTEGER-AS-N-BYTES is unreachable.
          ;; Otherwise we'd need to fill up octets using an ash/logior loop.
-         (dump-unsigned-vector sb!vm:simple-bit-vector-widetag nil nil))
+         (dump-unsigned-vector sb-vm:simple-bit-vector-widetag nil nil))
         ((and (typep vector '(vector * 0)) data-only)
          nil) ; empty vector and data-only => nothing to do
         ((typep vector '(vector (unsigned-byte 8)))
          ;; FIXME: eliminate this case, falling through to ERROR.
          (compiler-style-warn
           "Unportably dumping (ARRAY (UNSIGNED-BYTE 8)) ~S" vector)
-         (dump-unsigned-vector sb!vm:simple-array-unsigned-byte-8-widetag 1 8))
+         (dump-unsigned-vector sb-vm:simple-array-unsigned-byte-8-widetag 1 8))
         (t
          (error "Won't dump specialized array ~S" vector)))))
 
@@ -880,7 +880,7 @@
       (dump-word length file)
       (dump-byte widetag file))
     (dump-raw-bytes vector
-                    (ceiling (* length bits-per-length) sb!vm:n-byte-bits)
+                    (ceiling (* length bits-per-length) sb-vm:n-byte-bits)
                     file)))
 
 ;;; Dump characters and string-ish things.
@@ -1047,7 +1047,7 @@
     (collect ((patches))
       ;; Dump the constants, noting any :ENTRY constants that have to
       ;; be patched.
-      (loop for i from sb!vm:code-constants-offset below header-length do
+      (loop for i from sb-vm:code-constants-offset below header-length do
         (let ((entry (aref constants i)))
           (etypecase entry
             (constant
@@ -1205,7 +1205,7 @@
         (layout (%instance-layout struct))
         (bitmap (layout-bitmap layout))
         (circ (fasl-output-circularity-table file))
-        (index sb!vm:instance-data-start (1+ index)))
+        (index sb-vm:instance-data-start (1+ index)))
       ((>= index length)
        (dump-non-immediate-object layout file)
        (dump-fop 'fop-struct file length))

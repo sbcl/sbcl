@@ -9,13 +9,13 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 ;;; Return the number of bytes needed for the current non-descriptor
 ;;; stack frame.  Non-descriptor stack frames must be multiples of 16
 ;;; bytes under the PPC SVr4 ABI (though the EABI may be less
 ;;; restrictive).  On linux, two words are reserved for the stack
-;;; backlink and saved LR (see SB!VM::NUMBER-STACK-DISPLACEMENT).
+;;; backlink and saved LR (see SB-VM::NUMBER-STACK-DISPLACEMENT).
 
 (defconstant +stack-alignment-bytes+
   ;; Duh.  PPC Linux (and VxWorks) adhere to the EABI.

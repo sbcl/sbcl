@@ -184,7 +184,7 @@
 ;; is %%make-symbol, because when immobile space feature is present,
 ;; we dispatch to either the C allocator or the Lisp allocator.
 (defknown %make-symbol (fixnum simple-string) symbol (flushable))
-(defknown sb!vm::%%make-symbol (simple-string) symbol (flushable))
+(defknown sb-vm::%%make-symbol (simple-string) symbol (flushable))
 (defknown copy-symbol (symbol &optional t) symbol (flushable))
 (defknown gensym (&optional (or string unsigned-byte)) symbol ())
 (defknown symbol-package (symbol) (or package null) (flushable))
@@ -414,8 +414,8 @@
 (defknown logbitp (unsigned-byte integer) boolean (movable foldable flushable))
 (defknown ash (integer integer) integer
   (movable foldable flushable))
-(defknown %ash/right ((or word sb!vm:signed-word) (mod #.sb!vm:n-word-bits))
-  (or word sb!vm:signed-word)
+(defknown %ash/right ((or word sb-vm:signed-word) (mod #.sb-vm:n-word-bits))
+  (or word sb-vm:signed-word)
   (movable foldable flushable always-translatable))
 (defknown (logcount integer-length) (integer) bit-index
   (movable foldable flushable))
@@ -542,7 +542,7 @@
     (flushable))
 (defknown %concatenate-to-simple-vector (&rest sequence) simple-vector
   (flushable))
-(defknown %concatenate-to-vector ((unsigned-byte #.sb!vm:n-widetag-bits) &rest sequence)
+(defknown %concatenate-to-vector ((unsigned-byte #.sb-vm:n-widetag-bits) &rest sequence)
     vector
   (flushable))
 
@@ -567,10 +567,10 @@
   (call)
   :derive-type #'result-type-first-arg)
 
-(defknown #.(loop for info across sb!vm:*specialized-array-element-type-properties*
+(defknown #.(loop for info across sb-vm:*specialized-array-element-type-properties*
                   collect
                   (intern (concatenate 'string "VECTOR-MAP-INTO/"
-                                       (string (sb!vm:saetp-primitive-type-name info)))
+                                       (string (sb-vm:saetp-primitive-type-name info)))
                           :sb!impl))
     (simple-array index index function list)
     index
@@ -1071,8 +1071,8 @@
   array (flushable))
 
 (defknown %make-array ((or index list)
-                       (unsigned-byte #.sb!vm:n-widetag-bits)
-                       (mod #.sb!vm:n-word-bits)
+                       (unsigned-byte #.sb-vm:n-widetag-bits)
+                       (mod #.sb-vm:n-word-bits)
                        &key
                        (:element-type type-specifier)
                        (:initial-element t)
@@ -1947,7 +1947,7 @@
 
 ;; Used by WITH-PINNED-OBJECTS
 #!+(or x86 x86-64)
-(defknown sb!vm::touch-object (t) (values)
+(defknown sb-vm::touch-object (t) (values)
   (always-translatable))
 
 #!+linkage-table
@@ -1997,11 +1997,11 @@
 
 ;;;; memory barriers
 
-(defknown sb!vm:%compiler-barrier () (values) ())
-(defknown sb!vm:%memory-barrier () (values) ())
-(defknown sb!vm:%read-barrier () (values) ())
-(defknown sb!vm:%write-barrier () (values) ())
-(defknown sb!vm:%data-dependency-barrier () (values) ())
+(defknown sb-vm:%compiler-barrier () (values) ())
+(defknown sb-vm:%memory-barrier () (values) ())
+(defknown sb-vm:%read-barrier () (values) ())
+(defknown sb-vm:%write-barrier () (values) ())
+(defknown sb-vm:%data-dependency-barrier () (values) ())
 
 #!+sb-safepoint
 ;;; Note: This known function does not have an out-of-line definition;

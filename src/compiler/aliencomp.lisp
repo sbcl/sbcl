@@ -155,7 +155,7 @@
   (multiple-value-bind (slot-offset slot-type)
       (find-slot-offset-and-type alien slot)
     (/noshow "in DEFTRANSFORM %SLOT-ADDR, creating %SAP-ALIEN")
-    `(%sap-alien (sap+ (alien-sap alien) (/ ,slot-offset sb!vm:n-byte-bits))
+    `(%sap-alien (sap+ (alien-sap alien) (/ ,slot-offset sb-vm:n-byte-bits))
                  ',(make-alien-pointer-type :to slot-type))))
 
 ;;;; DEREF support
@@ -280,7 +280,7 @@
       (compute-deref-guts alien indices)
     (/noshow "in DEFTRANSFORM %DEREF-ADDR, creating (LAMBDA .. %SAP-ALIEN)")
     `(lambda (alien ,@indices-args)
-       (%sap-alien (sap+ (alien-sap alien) (/ ,offset-expr sb!vm:n-byte-bits))
+       (%sap-alien (sap+ (alien-sap alien) (/ ,offset-expr sb-vm:n-byte-bits))
                    ',(make-alien-pointer-type :to element-type)))))
 
 ;;;; support for aliens on the heap
@@ -354,11 +354,11 @@
         #!+(or x86 x86-64)
         `(%primitive alloc-alien-stack-space
                      ,(ceiling (alien-type-bits alien-type)
-                               sb!vm:n-byte-bits))
+                               sb-vm:n-byte-bits))
         #!-(or x86 x86-64)
         `(%primitive alloc-number-stack-space
                      ,(ceiling (alien-type-bits alien-type)
-                               sb!vm:n-byte-bits))
+                               sb-vm:n-byte-bits))
         (let* ((alien-rep-type-spec (compute-alien-rep-type alien-type))
                (alien-rep-type (specifier-type alien-rep-type-spec)))
           (cond ((csubtypep (specifier-type 'system-area-pointer)
@@ -782,9 +782,9 @@
             (destructuring-bind (float-tn i1-tn &optional i2-tn)
                 tn
               (if i2-tn
-                  (vop sb!vm::move-double-to-int-arg call block
+                  (vop sb-vm::move-double-to-int-arg call block
                        float-tn i1-tn i2-tn)
-                  (vop sb!vm::move-single-to-int-arg call block
+                  (vop sb-vm::move-single-to-int-arg call block
                        float-tn i1-tn))))))
       (aver (null args))
       (let* ((result-tns (ensure-list result-tns))
@@ -792,7 +792,7 @@
               (reference-tn-list (remove-if-not #'tn-p (flatten-list arg-tns)) nil))
              (result-operands
               (reference-tn-list (remove-if-not #'tn-p result-tns) t)))
-        (cond #!+(vop-named sb!vm::call-out-named)
+        (cond #!+(vop-named sb-vm::call-out-named)
               ((and (constant-lvar-p function) (stringp (lvar-value function)))
                (vop* call-out-named call block (arg-operands) (result-operands)
                      (lvar-value function)

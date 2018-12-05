@@ -159,7 +159,7 @@
            (,acc 0)
            (,prev 0))
        #-sb-xc-host (declare (notinline sb!kernel:%ldb)) ; lp#1573398
-       (declare (type (mod ,sb!vm:n-word-bits) ,shift)
+       (declare (type (mod ,sb-vm:n-word-bits) ,shift)
                 (type word ,acc ,prev))
        (loop
         (let ((,byte (ldb (byte 8 ,bytepos) ,integer)))

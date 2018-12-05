@@ -1,4 +1,4 @@
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 
 (define-move-fun (load-immediate 1) (vop x y)

@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 #-c-headers-only
 (macrolet ((frob ()
@@ -187,7 +187,7 @@ static inline lispobj compute_lispobj(lispobj* base_addr) {
                                    (#.fun-pointer-lowtag      "fun")
                                    (#.other-pointer-lowtag    "other"))))
                (when pointer-kind
-                 (setf (svref ptrtab (ldb (byte 2 (- sb!vm:n-lowtag-bits 2)) i))
+                 (setf (svref ptrtab (ldb (byte 2 (- sb-vm:n-lowtag-bits 2)) i))
                        pointer-kind)
                  (setf (svref scavtab i) (format nil "~A_pointer" pointer-kind)
                        (svref sizetab i) "pointer"))))))

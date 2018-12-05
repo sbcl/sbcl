@@ -44,7 +44,7 @@
 ;;; Return an expression to generate an integer of N-BITS many random
 ;;; bits, using the minimal number of random chunks possible.
 (defun generate-random-expr-for-power-of-2 (n-bits state)
-  (declare (type (integer 1 #.sb!vm:n-word-bits) n-bits))
+  (declare (type (integer 1 #.sb-vm:n-word-bits) n-bits))
   (multiple-value-bind (n-chunk-bits chunk-expr)
       (cond ((<= n-bits n-random-chunk-bits)
              (values n-random-chunk-bits `(random-chunk ,state)))
@@ -66,7 +66,7 @@
 ;;; multiple of the limit that fits into one or two chunks and and doing
 ;;; a division to get the random value into the desired range.
 (deftransform random ((num &optional state)
-                      ((constant-arg (integer 1 #.(expt 2 sb!vm:n-word-bits)))
+                      ((constant-arg (integer 1 #.(expt 2 sb-vm:n-word-bits)))
                        &optional *)
                       *
                       :policy (and (> speed compilation-speed)
@@ -1276,7 +1276,7 @@
 ;;;   * real-complex, complex-real and complex-complex addition and subtraction
 ;;;   * complex-real and real-complex multiplication
 ;;;   * complex-real division
-;;;   * sb!vm::swap-complex, which swaps the real and imaginary parts.
+;;;   * sb-vm::swap-complex, which swaps the real and imaginary parts.
 ;;;   * conjugate
 ;;;   * complex-real, real-complex and complex-complex CL:=
 ;;;     (complex-complex EQL would usually be a good idea).
@@ -1297,7 +1297,7 @@
                 ;; of whether all the operations below are translated by vops.
                 ;; We could be more fine-grained, but it seems reasonable that
                 ;; they be implemented on an all-or-none basis.
-                #!-(vop-named sb!vm::%negate/complex-double-float)
+                #!-(vop-named sb-vm::%negate/complex-double-float)
                 (progn
                 ;; negation
                 (deftransform %negate ((z) ((complex ,type)) *)
@@ -1354,7 +1354,7 @@
 
                 ;; Divide two complex numbers.
                 (deftransform / ((x y) ((complex ,type) (complex ,type)) *)
-                  #!-(vop-translates sb!vm::swap-complex)
+                  #!-(vop-translates sb-vm::swap-complex)
                   '(let* ((rx (realpart x))
                           (ix (imagpart x))
                           (ry (realpart y))
@@ -1368,8 +1368,8 @@
                                (dn (+ iy (* r ry))))
                           (complex (/ (+ (* rx r) ix) dn)
                                    (/ (- (* ix r) rx) dn)))))
-                  #!+(vop-translates sb!vm::swap-complex)
-                  `(let* ((cs (conjugate (sb!vm::swap-complex x)))
+                  #!+(vop-translates sb-vm::swap-complex)
+                  `(let* ((cs (conjugate (sb-vm::swap-complex x)))
                           (ry (realpart y))
                           (iy (imagpart y)))
                      (if (> (abs ry) (abs iy))
@@ -1381,7 +1381,7 @@
                            (/ (+ (* x r) cs) dn)))))
                 ;; Divide a real by a complex.
                 (deftransform / ((x y) (,type (complex ,type)) *)
-                  #!-(vop-translates sb!vm::swap-complex)
+                  #!-(vop-translates sb-vm::swap-complex)
                   '(let* ((ry (realpart y))
                           (iy (imagpart y)))
                     (if (> (abs ry) (abs iy))
@@ -1393,7 +1393,7 @@
                                (dn (+ iy (* r ry))))
                           (complex (/ (* x r) dn)
                                    (/ (- x) dn)))))
-                  #!+(vop-translates sb!vm::swap-complex)
+                  #!+(vop-translates sb-vm::swap-complex)
                   '(let* ((ry (realpart y))
                           (iy (imagpart y)))
                     (if (> (abs ry) (abs iy))
@@ -1597,12 +1597,12 @@
   (declare (type single-float x))
   (declare (optimize speed (safety 0)))
   (let* ((bits (single-float-bits x))
-         (exp (ldb sb!vm:single-float-exponent-byte bits))
+         (exp (ldb sb-vm:single-float-exponent-byte bits))
          (biased (the single-float-exponent
-                   (- exp sb!vm:single-float-bias))))
+                   (- exp sb-vm:single-float-bias))))
     (declare (type (signed-byte 32) bits))
     (cond
-      ((= exp sb!vm:single-float-normal-exponent-max) x)
+      ((= exp sb-vm:single-float-normal-exponent-max) x)
       ((<= biased 0) (* x 0f0))
       ((>= biased (float-digits x)) x)
       (t
@@ -1617,13 +1617,13 @@
   (declare (optimize speed (safety 0)))
   (let* ((high (double-float-high-bits x))
          (low (double-float-low-bits x))
-         (exp (ldb sb!vm:double-float-exponent-byte high))
+         (exp (ldb sb-vm:double-float-exponent-byte high))
          (biased (the double-float-exponent
-                   (- exp sb!vm:double-float-bias))))
+                   (- exp sb-vm:double-float-bias))))
     (declare (type (signed-byte 32) high)
              (type (unsigned-byte 32) low))
     (cond
-      ((= exp sb!vm:double-float-normal-exponent-max) x)
+      ((= exp sb-vm:double-float-normal-exponent-max) x)
       ((<= biased 0) (* x 0d0))
       ((>= biased (float-digits x)) x)
       (t

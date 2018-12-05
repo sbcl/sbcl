@@ -14,11 +14,11 @@
 ;;;; DYNAMIC-USAGE and friends
 
 #!+(and relocatable-heap gencgc)
-(define-alien-variable ("DYNAMIC_SPACE_START" sb!vm:dynamic-space-start) unsigned-long)
+(define-alien-variable ("DYNAMIC_SPACE_START" sb-vm:dynamic-space-start) unsigned-long)
 #!-sb-fluid
 (declaim (inline current-dynamic-space-start))
 (defun current-dynamic-space-start ()
-  #!+gencgc sb!vm:dynamic-space-start
+  #!+gencgc sb-vm:dynamic-space-start
   #!-gencgc (extern-alien "current_dynamic_space" unsigned-long))
 
 #!+(or x86 x86-64)
@@ -39,10 +39,10 @@
                 (current-dynamic-space-start))))
 
 (defun static-space-usage ()
-  (- (sap-int sb!vm:*static-space-free-pointer*) sb!vm:static-space-start))
+  (- (sap-int sb-vm:*static-space-free-pointer*) sb-vm:static-space-start))
 
 (defun read-only-space-usage ()
-  (- (sap-int sb!vm:*read-only-space-free-pointer*) sb!vm:read-only-space-start))
+  (- (sap-int sb-vm:*read-only-space-free-pointer*) sb-vm:read-only-space-start))
 
 ;;; Convert the descriptor into a SAP. The bits all stay the same, we just
 ;;; change our notion of what we think they are.
@@ -51,12 +51,12 @@
 
 (defun control-stack-usage ()
   #!-stack-grows-downward-not-upward
-  (sap- (control-stack-pointer-sap) (descriptor-sap sb!vm:*control-stack-start*))
+  (sap- (control-stack-pointer-sap) (descriptor-sap sb-vm:*control-stack-start*))
   #!+stack-grows-downward-not-upward
-  (sap- (descriptor-sap sb!vm:*control-stack-end*) (control-stack-pointer-sap)))
+  (sap- (descriptor-sap sb-vm:*control-stack-end*) (control-stack-pointer-sap)))
 
 (defun binding-stack-usage ()
-  (sap- (binding-stack-pointer-sap) (descriptor-sap sb!vm:*binding-stack-start*)))
+  (sap- (binding-stack-pointer-sap) (descriptor-sap sb-vm:*binding-stack-start*)))
 
 ;;;; GET-BYTES-CONSED
 
@@ -134,8 +134,8 @@ statistics are appended to it."
   "Size of the dynamic space in bytes."
   (extern-alien "dynamic_space_size" os-vm-size-t))
 #!+gencgc
-(define-symbol-macro sb!vm:dynamic-space-end
-  (+ (dynamic-space-size) sb!vm:dynamic-space-start))
+(define-symbol-macro sb-vm:dynamic-space-end
+  (+ (dynamic-space-size) sb-vm:dynamic-space-start))
 
 ;;;; SUB-GC
 
@@ -310,7 +310,7 @@ generations as well. If FULL is true, all generations are collected.
 If GEN is provided, it can be used to specify the oldest generation
 guaranteed to be collected."
   #!-gencgc (declare (ignore full))
-  (let (#!+gencgc (gen (if full sb!vm:+pseudo-static-generation+ gen)))
+  (let (#!+gencgc (gen (if full sb-vm:+pseudo-static-generation+ gen)))
     (when (eq t (sub-gc gen))
       (post-gc))))
 
@@ -369,7 +369,7 @@ Note: currently changes to this value are lost when saving core."
 ;;;; as well.
 #!+gencgc
 (deftype generation-index ()
-  '(integer 0 #.sb!vm:+pseudo-static-generation+))
+  '(integer 0 #.sb-vm:+pseudo-static-generation+))
 
 ;;; FIXME: GENERATION (and PAGE, as seen in room.lisp) should probably be
 ;;; defined in Lisp, and written to header files by genesis, instead of this
@@ -387,7 +387,7 @@ Note: currently changes to this value are lost when saving core."
 
 #!+gencgc
 (define-alien-variable generations
-    (array generation #.(1+ sb!vm:+pseudo-static-generation+)))
+    (array generation #.(1+ sb-vm:+pseudo-static-generation+)))
 
 (macrolet ((def (slot doc &optional setfp)
              `(progn
@@ -464,8 +464,8 @@ Experimental: interface subject to change."
                                  (function double generation-index-t))
                    generation))
 
-(declaim (inline sb!vm:is-lisp-pointer))
-(defun sb!vm:is-lisp-pointer (addr) ; Same as is_lisp_pointer() in C
+(declaim (inline sb-vm:is-lisp-pointer))
+(defun sb-vm:is-lisp-pointer (addr) ; Same as is_lisp_pointer() in C
   #!-64-bit (oddp addr)
   #!+64-bit (not (logtest (logxor addr 3) 3)))
 
@@ -481,14 +481,14 @@ Experimental: interface subject to change."
 ;;; If you wanted the object not to die or move, you should have held on tighter!
 (defun heap-allocated-p (x)
   (let ((addr (get-lisp-obj-address x)))
-    (and (sb!vm:is-lisp-pointer addr)
+    (and (sb-vm:is-lisp-pointer addr)
          (cond ((< (current-dynamic-space-start) addr
                    (sap-int (dynamic-space-free-pointer)))
                 :dynamic)
                ((immobile-space-addr-p addr) :immobile)
-               ((< sb!vm:read-only-space-start addr
-                   (sap-int sb!vm:*read-only-space-free-pointer*))
+               ((< sb-vm:read-only-space-start addr
+                   (sap-int sb-vm:*read-only-space-free-pointer*))
                 :read-only)
-               ((< sb!vm:static-space-start addr
-                   (sap-int sb!vm:*static-space-free-pointer*))
+               ((< sb-vm:static-space-start addr
+                   (sap-int sb-vm:*static-space-free-pointer*))
                 :static)))))

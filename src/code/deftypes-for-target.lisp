@@ -213,32 +213,32 @@
 
 ;;; decomposing floats into integers
 (sb!xc:deftype single-float-exponent ()
-  `(integer ,(- sb!vm:single-float-normal-exponent-min
-                sb!vm:single-float-bias
-                sb!vm:single-float-digits)
-            ,(- sb!vm:single-float-normal-exponent-max
-                sb!vm:single-float-bias)))
+  `(integer ,(- sb-vm:single-float-normal-exponent-min
+                sb-vm:single-float-bias
+                sb-vm:single-float-digits)
+            ,(- sb-vm:single-float-normal-exponent-max
+                sb-vm:single-float-bias)))
 (sb!xc:deftype double-float-exponent ()
-  `(integer ,(- sb!vm:double-float-normal-exponent-min
-                sb!vm:double-float-bias
-                sb!vm:double-float-digits)
-            ,(- sb!vm:double-float-normal-exponent-max
-                sb!vm:double-float-bias)))
+  `(integer ,(- sb-vm:double-float-normal-exponent-min
+                sb-vm:double-float-bias
+                sb-vm:double-float-digits)
+            ,(- sb-vm:double-float-normal-exponent-max
+                sb-vm:double-float-bias)))
 (sb!xc:deftype single-float-int-exponent ()
-  `(integer ,(- sb!vm:single-float-normal-exponent-min
-                sb!vm:single-float-bias
-                (* sb!vm:single-float-digits 2))
-            ,(- sb!vm:single-float-normal-exponent-max
-                sb!vm:single-float-bias
-                sb!vm:single-float-digits)))
+  `(integer ,(- sb-vm:single-float-normal-exponent-min
+                sb-vm:single-float-bias
+                (* sb-vm:single-float-digits 2))
+            ,(- sb-vm:single-float-normal-exponent-max
+                sb-vm:single-float-bias
+                sb-vm:single-float-digits)))
 (sb!xc:deftype double-float-int-exponent ()
-  `(integer ,(- sb!vm:double-float-normal-exponent-min sb!vm:double-float-bias
-                (* sb!vm:double-float-digits 2))
-            ,(- sb!vm:double-float-normal-exponent-max sb!vm:double-float-bias
-                sb!vm:double-float-digits)))
+  `(integer ,(- sb-vm:double-float-normal-exponent-min sb-vm:double-float-bias
+                (* sb-vm:double-float-digits 2))
+            ,(- sb-vm:double-float-normal-exponent-max sb-vm:double-float-bias
+                sb-vm:double-float-digits)))
 (sb!xc:deftype single-float-significand ()
-  `(integer 0 (,(ash 1 sb!vm:single-float-digits))))
+  `(integer 0 (,(ash 1 sb-vm:single-float-digits))))
 (sb!xc:deftype double-float-significand ()
-  `(integer 0 (,(ash 1 sb!vm:double-float-digits))))
+  `(integer 0 (,(ash 1 sb-vm:double-float-digits))))
 
 (/show0 "deftypes-for-target.lisp end of file")

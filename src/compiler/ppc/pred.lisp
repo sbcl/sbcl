@@ -2,7 +2,7 @@
 ;;; Converted by William Lott.
 ;;;
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 
 ;;;; The Branch VOP.

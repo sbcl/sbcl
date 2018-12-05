@@ -235,22 +235,22 @@ created and old ones may exit at any time."
 
 #!-sb-thread
 (progn
-  (declaim (inline sb!vm::current-thread-offset-sap))
-  (defun sb!vm::current-thread-offset-sap (n)
+  (declaim (inline sb-vm::current-thread-offset-sap))
+  (defun sb-vm::current-thread-offset-sap (n)
     (sap-ref-sap (alien-sap (extern-alien "all_threads" (* t)))
-                 (* n sb!vm:n-word-bytes))))
+                 (* n sb-vm:n-word-bytes))))
 
 (declaim (inline current-thread-sap))
 (defun current-thread-sap ()
   #!+sb-thread
-  (sb!vm::current-thread-offset-sap sb!vm::thread-this-slot)
+  (sb-vm::current-thread-offset-sap sb-vm::thread-this-slot)
   #!-sb-thread
   (int-sap 0))
 
 (declaim (inline current-thread-os-thread))
 (defun current-thread-os-thread ()
   #!+sb-thread
-  (sap-int (sb!vm::current-thread-offset-sap sb!vm::thread-os-thread-slot))
+  (sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-os-thread-slot))
   #!-sb-thread
   0)
 
@@ -259,8 +259,8 @@ created and old ones may exit at any time."
 (sb!ext:define-load-time-global *make-thread-lock* nil)
 
 (defun note-stack-range (thread table)
-  (let ((start (get-lisp-obj-address sb!vm:*control-stack-start*))
-        (end (get-lisp-obj-address sb!vm:*control-stack-end*)))
+  (let ((start (get-lisp-obj-address sb-vm:*control-stack-start*))
+        (end (get-lisp-obj-address sb-vm:*control-stack-end*)))
     (multiple-value-bind (new-tree insertedp)
         ;; We're within the scope of all-threads-lock here.
         (treap-insert table start (cons end thread))
@@ -1113,7 +1113,7 @@ should be considered an implementation detail, and may change in the
 future."
   (name    nil :type (or null thread-name) :read-only t)
   (%count    0 :type (integer 0))
-  (waitcount 0 :type sb!vm:word)
+  (waitcount 0 :type sb-vm:word)
   (mutex (make-mutex :name "semaphore lock") :read-only t)
   (queue (make-waitqueue) :read-only t))
 
@@ -1337,7 +1337,7 @@ on this semaphore, then N of them is woken up."
     (setq *stack-addr-table* (treap-delete control-stack-start *stack-addr-table*))
     (setf (thread-%alive-p thread) nil)
     (setf (thread-os-thread thread)
-          (ldb (byte sb!vm:n-word-bits 0) -1))
+          (ldb (byte sb-vm:n-word-bits 0) -1))
     (setq *all-threads* (delq1 thread *all-threads*))
     (when *session*
       (%delete-thread-from-session thread *session*))))
@@ -1530,7 +1530,7 @@ session."
         (thread-primitive-thread thread) (sap-int (current-thread-sap)))
   ;; *ALLOC-SIGNAL* is made thread-local by create_thread_struct()
   ;; so this assigns into TLS, not the global value.
-  (setf sb!vm:*alloc-signal* *default-alloc-signal*)
+  (setf sb-vm:*alloc-signal* *default-alloc-signal*)
   (with-mutex ((thread-result-lock thread))
     (let* ((thread-list (list thread thread))
            (session-cons (cdr thread-list)))
@@ -1592,7 +1592,7 @@ session."
                 (setq *thruption-pending* nil)
                 (handle-thread-exit thread
                                     (get-lisp-obj-address
-                                     sb!vm:*control-stack-start*)))))))))
+                                     sb-vm:*control-stack-start*)))))))))
   (values))
 
 (defun make-thread (function &key name arguments ephemeral)
@@ -1621,13 +1621,13 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
            (real-function (coerce function 'function))
            (arguments     (ensure-list arguments))
            #!+(or win32 darwin)
-           (fp-modes (dpb 0 sb!vm:float-sticky-bits ;; clear accrued bits
-                          (sb!vm:floating-point-modes))))
+           (fp-modes (dpb 0 sb-vm:float-sticky-bits ;; clear accrued bits
+                          (sb-vm:floating-point-modes))))
       (declare (dynamic-extent setup-sem))
       (dx-flet ((initial-thread-function ()
                   ;; Inherit parent thread's FP modes
                   #!+(or win32 darwin)
-                  (setf (sb!vm:floating-point-modes) fp-modes)
+                  (setf (sb-vm:floating-point-modes) fp-modes)
                   ;; As it is, this lambda must not cons until we are
                   ;; ready to run GC. Be careful.
                   (initial-thread-function-trampoline thread setup-sem
@@ -1807,7 +1807,7 @@ Short version: be careful out there."
     (with-interrupts (funcall function)))
   #!-(and (not sb-thread) win32)
   (let ((os-thread (thread-os-thread thread)))
-    (cond ((= os-thread (ldb (byte sb!vm:n-word-bits 0) -1))
+    (cond ((= os-thread (ldb (byte sb-vm:n-word-bits 0) -1))
            (error 'interrupt-thread-error :thread thread))
           (t
            (let (invoked)
@@ -1882,10 +1882,10 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
 #!+sb-thread
 (progn
 
-  (sb!ext:define-load-time-global sb!vm::*free-tls-index* 0)
+  (sb!ext:define-load-time-global sb-vm::*free-tls-index* 0)
   ;; Keep in sync with 'compiler/generic/parms.lisp'
   #!+ppc ; only PPC uses a separate symbol for the TLS index lock
-  (!define-load-time-global sb!vm::*tls-index-lock* 0)
+  (!define-load-time-global sb-vm::*tls-index-lock* 0)
 
   (defun %symbol-value-in-thread (symbol thread)
     ;; Prevent the thread from dying completely while we look for the TLS
@@ -1895,8 +1895,8 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
           (let ((val (sap-ref-lispobj (int-sap (thread-primitive-thread thread))
                                       (get-lisp-obj-address (symbol-tls-index symbol)))))
             (case (get-lisp-obj-address val)
-              (#.sb!vm:no-tls-value-marker-widetag (values nil :no-tls-value))
-              (#.sb!vm:unbound-marker-widetag (values nil :unbound-in-thread))
+              (#.sb-vm:no-tls-value-marker-widetag (values nil :no-tls-value))
+              (#.sb-vm:unbound-marker-widetag (values nil :unbound-in-thread))
               (t (values val :ok))))
           (values nil :thread-dead))))
 
@@ -1922,19 +1922,19 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
     ;; *FREE-TLS-INDEX* - which is only manipulated by machine code  - is an
     ;; offset from thread base to the next usable TLS cell as a byte offset
     ;; (raw value) manifesting in Lisp as a fixnum.
-    ;; The sign bit of sb!vm::*free-tls-index* is a semaphore,
+    ;; The sign bit of sb-vm::*free-tls-index* is a semaphore,
     ;; except on PPC where it isn't, but masking is fine in any case.
-    (do ((index (- (ash (logand sb!vm::*free-tls-index* most-positive-fixnum)
-                        sb!vm:n-fixnum-tag-bits)
-                   sb!vm:n-word-bytes)
-                (- index sb!vm:n-word-bytes))
+    (do ((index (- (ash (logand sb-vm::*free-tls-index* most-positive-fixnum)
+                        sb-vm:n-fixnum-tag-bits)
+                   sb-vm:n-word-bytes)
+                (- index sb-vm:n-word-bytes))
          ;; (There's no reason this couldn't work on any thread now.)
          (sap (int-sap (thread-primitive-thread *current-thread*)))
          (list))
-        ((< index (ash tls-index-start sb!vm:word-shift)) list)
+        ((< index (ash tls-index-start sb-vm:word-shift)) list)
       (let ((obj (sap-ref-lispobj sap index)))
         (when (and obj ; don't bother returning NIL
-                   (sb!vm:is-lisp-pointer (get-lisp-obj-address obj))
+                   (sb-vm:is-lisp-pointer (get-lisp-obj-address obj))
                    (not (memq obj list)))
           (push obj list))))))
 
@@ -2000,9 +2000,9 @@ mechanism for inter-thread communication."
 
 (defun thread-stepping ()
   (sap-ref-lispobj (current-thread-sap)
-                   (* sb!vm::thread-stepping-slot sb!vm:n-word-bytes)))
+                   (* sb-vm::thread-stepping-slot sb-vm:n-word-bytes)))
 
 (defun (setf thread-stepping) (value)
   (setf (sap-ref-lispobj (current-thread-sap)
-                         (* sb!vm::thread-stepping-slot sb!vm:n-word-bytes))
+                         (* sb-vm::thread-stepping-slot sb-vm:n-word-bytes))
         value))

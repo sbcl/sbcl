@@ -3,7 +3,7 @@
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 (define-assembly-routine (alloc-tramp (:return-style :none))
     ((:temp nl0 unsigned-reg nl0-offset)

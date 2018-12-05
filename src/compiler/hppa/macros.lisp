@@ -8,7 +8,7 @@
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 
 

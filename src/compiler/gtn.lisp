@@ -63,7 +63,7 @@
            ;; live over the dynamic contour of the physenv.
            (setf (tn-sc res) (if ptype-info
                                  (second ptype-info)
-                                 (sc-or-lose 'sb!vm::control-stack)))
+                                 (sc-or-lose 'sb-vm::control-stack)))
            (physenv-live-tn res (lambda-physenv fun)))
 
           (debug-variable-p

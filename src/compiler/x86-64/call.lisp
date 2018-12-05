@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 (defconstant arg-count-sc (make-sc+offset any-reg-sc-number rcx-offset))
 (defconstant closure-sc (make-sc+offset any-reg-sc-number rax-offset))
@@ -395,9 +395,9 @@
               register-arg-count)
       (inst cmp nargs (fixnumize register-arg-count))
       (inst jmp :g stack-values)
-      #!+#.(cl:if (cl:= sb!vm:word-shift sb!vm:n-fixnum-tag-bits) '(and) '(or))
+      #!+#.(cl:if (cl:= sb-vm:word-shift sb-vm:n-fixnum-tag-bits) '(and) '(or))
       (inst sub rsp-tn nargs)
-      #!-#.(cl:if (cl:= sb!vm:word-shift sb!vm:n-fixnum-tag-bits) '(and) '(or))
+      #!-#.(cl:if (cl:= sb-vm:word-shift sb-vm:n-fixnum-tag-bits) '(and) '(or))
       (progn
         ;; FIXME: This can't be efficient, but LEA (my first choice)
         ;; doesn't do subtraction.

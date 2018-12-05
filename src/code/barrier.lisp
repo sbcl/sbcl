@@ -14,22 +14,22 @@
 
 ;;;; Interpreter stubs for the various barrier functions
 
-#!-(vop-named sb!vm:%memory-barrier)
+#!-(vop-named sb-vm:%memory-barrier)
 (progn
 ;;; Assert correctness of build order. (Need not be exhaustive)
 (eval-when (:compile-toplevel) #!+x86-64 (error "Expected %memory-barrier vop"))
-(declaim (inline sb!vm:%compiler-barrier sb!vm:%memory-barrier
-                 sb!vm:%read-barrier sb!vm:%write-barrier
-                 sb!vm:%data-dependency-barrier)))
+(declaim (inline sb-vm:%compiler-barrier sb-vm:%memory-barrier
+                 sb-vm:%read-barrier sb-vm:%write-barrier
+                 sb-vm:%data-dependency-barrier)))
 (macrolet ((def (name)
              `(defun ,name ()
-                #!+(vop-named sb!vm:%memory-barrier) (,name)
+                #!+(vop-named sb-vm:%memory-barrier) (,name)
                 (values))))
-  (def sb!vm:%compiler-barrier)
-  (def sb!vm:%memory-barrier)
-  (def sb!vm:%read-barrier)
-  (def sb!vm:%write-barrier)
-  (def sb!vm:%data-dependency-barrier))
+  (def sb-vm:%compiler-barrier)
+  (def sb-vm:%memory-barrier)
+  (def sb-vm:%read-barrier)
+  (def sb-vm:%write-barrier)
+  (def sb-vm:%data-dependency-barrier))
 
 ;;;; The actual barrier macro and support
 (defmacro barrier ((kind) &body forms)
@@ -63,10 +63,10 @@ The file \"memory-barriers.txt\" in the Linux kernel documentation is
 highly recommended reading for anyone programming at this level."
   `(multiple-value-prog1
     (progn ,@forms)
-    (,(or (getf '(:compiler        sb!vm:%compiler-barrier
-                  :memory          sb!vm:%memory-barrier
-                  :read            sb!vm:%read-barrier
-                  :write           sb!vm:%write-barrier
-                  :data-dependency sb!vm:%data-dependency-barrier)
+    (,(or (getf '(:compiler        sb-vm:%compiler-barrier
+                  :memory          sb-vm:%memory-barrier
+                  :read            sb-vm:%read-barrier
+                  :write           sb-vm:%write-barrier
+                  :data-dependency sb-vm:%data-dependency-barrier)
                 kind)
           (error "Unknown barrier kind ~S" kind)))))

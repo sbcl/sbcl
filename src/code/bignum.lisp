@@ -105,9 +105,9 @@
 
 ;;;; What's a bignum?
 
-(defconstant digit-size sb!vm:n-word-bits)
+(defconstant digit-size sb-vm:n-word-bits)
 
-(defconstant all-ones-digit (1- (ash 1 sb!vm:n-word-bits)))
+(defconstant all-ones-digit (1- (ash 1 sb-vm:n-word-bits)))
 
 ;;;; internal inline routines
 
@@ -228,20 +228,20 @@
 ;;; unsigned.
 (defun %ashr (data count)
   (declare (type bignum-element-type data)
-           (type (mod #.sb!vm:n-word-bits) count))
+           (type (mod #.sb-vm:n-word-bits) count))
   (%ashr data count))
 
 ;;; This takes a digit-size quantity and shifts it to the left,
 ;;; returning a digit-size quantity.
 (defun %ashl (data count)
   (declare (type bignum-element-type data)
-           (type (mod #.sb!vm:n-word-bits) count))
+           (type (mod #.sb-vm:n-word-bits) count))
   (%ashl data count))
 
 ;;; Do an unsigned (logical) right shift of a digit by Count.
 (defun %digit-logical-shift-right (data count)
   (declare (type bignum-element-type data)
-           (type (mod #.sb!vm:n-word-bits) count))
+           (type (mod #.sb-vm:n-word-bits) count))
   (%digit-logical-shift-right data count))
 
 ;;; Change the length of bignum to be newlen. Newlen must be the same or
@@ -437,7 +437,7 @@
       (declare (type bignum-element-type high low))
       (if (and (zerop high)
                (%digit-0-or-plusp low))
-          (let ((low (truly-the (unsigned-byte #.(1- sb!vm:n-word-bits))
+          (let ((low (truly-the (unsigned-byte #.(1- sb-vm:n-word-bits))
                                 (%fixnum-digit-with-correct-sign low))))
             (if (eq a-minusp b-minusp)
                 low
@@ -528,7 +528,7 @@
         (return (do ((j 0 (1+ j))
                      (or-digits or-digits (%ashr or-digits 1)))
                     ((oddp or-digits) (+ (* i digit-size) j))
-                  (declare (type (mod #.sb!vm:n-word-bits) j))))))))
+                  (declare (type (mod #.sb-vm:n-word-bits) j))))))))
 
 ;;; Multiply a bignum buffer with a fixnum or a digit, storing the
 ;;; result in another bignum buffer, and without using any
@@ -575,7 +575,7 @@
         (umask 0)
         (imask 1)
         (m 0))
-    (declare (type (unsigned-byte #.sb!vm:n-word-bits) ud vd umask imask m))
+    (declare (type (unsigned-byte #.sb-vm:n-word-bits) ud vd umask imask m))
     (dotimes (i digit-size)
       (setf umask (logior umask imask))
       (when (logtest ud umask)
@@ -604,8 +604,8 @@
   (let* ((d (+ 1 (- (bignum-buffer-integer-length u u-len)
                     (bignum-buffer-integer-length v v-len))))
          (n (1- (ash 1 d))))
-    (declare (type (unsigned-byte #.(integer-length #.sb!vm:n-word-bits)) d)
-             (type (unsigned-byte #.sb!vm:n-word-bits) n))
+    (declare (type (unsigned-byte #.(integer-length #.sb-vm:n-word-bits)) d)
+             (type (unsigned-byte #.sb-vm:n-word-bits) n))
     (gcd-assert (>= d 0))
     (when (logtest (%bignum-ref u 0) n)
       (let ((tmp1-len
@@ -619,7 +619,7 @@
         (bignum-abs-buffer u u-len)))
     u-len))
 
-(defconstant lower-ones-digit (1- (ash 1 (truncate sb!vm:n-word-bits 2))))
+(defconstant lower-ones-digit (1- (ash 1 (truncate sb-vm:n-word-bits 2))))
 
 ;;; Find D and N such that (LOGAND ALL-ONES-DIGIT (- (* D X) (* N Y))) is 0,
 ;;; (< 0 N LOWER-ONES-DIGIT) and (< 0 (ABS D) LOWER-ONES-DIGIT).
@@ -629,9 +629,9 @@
          (d1 1)
          (n2 (modularly (1+ (modularly (lognot n1)))))
          (d2 (modularly -1)))
-    (declare (type (unsigned-byte #.sb!vm:n-word-bits) n1 d1 n2 d2))
+    (declare (type (unsigned-byte #.sb-vm:n-word-bits) n1 d1 n2 d2))
     (loop while (> n2 (expt 2 (truncate digit-size 2))) do
-          (loop for i of-type (mod #.sb!vm:n-word-bits)
+          (loop for i of-type (mod #.sb-vm:n-word-bits)
                 downfrom (- (integer-length n1) (integer-length n2))
                 while (>= n1 n2) do
                 (when (>= n1 (modularly (ash n2 i)))
@@ -726,7 +726,7 @@
                        (%bignum-length tmp1)
                        (%bignum-length tmp2)))
         (if (> (bignum-buffer-integer-length u u-len)
-               (+ #.(truncate sb!vm:n-word-bits 4)
+               (+ #.(truncate sb-vm:n-word-bits 4)
                   (bignum-buffer-integer-length v v-len)))
             (setf u-len (dmod u u-len
                               v v-len
@@ -860,7 +860,7 @@
     (do ((digit (%bignum-ref a index) (%ashr digit 1))
          (increment 0 (1+ increment)))
         ((zerop digit))
-      (declare (type (mod #.sb!vm:n-word-bits) increment))
+      (declare (type (mod #.sb-vm:n-word-bits) increment))
       (when (oddp digit)
         (return-from make-gcd-bignum-odd
                      (bignum-buffer-ashift-right a len-a
@@ -1165,28 +1165,28 @@
   ;; "float to pointer coercion -> return value"
   (declare (muffle-conditions compiler-note))
   (let ((res (dpb exp
-                  sb!vm:single-float-exponent-byte
+                  sb-vm:single-float-exponent-byte
                   (logandc2 (logand #xffffffff
                                     (%bignum-ref bits 1))
-                            sb!vm:single-float-hidden-bit))))
+                            sb-vm:single-float-hidden-bit))))
     (make-single-float
      (if plusp
          res
-         (logior res (ash -1 sb!vm:float-sign-shift))))))
+         (logior res (ash -1 sb-vm:float-sign-shift))))))
 (defun double-float-from-bits (bits exp plusp)
   (declare (fixnum exp))
   ;; "float to pointer coercion -> return value"
   (declare (muffle-conditions compiler-note))
   (let ((hi (dpb exp
-                 sb!vm:double-float-exponent-byte
-                 (logandc2 (ecase sb!vm::n-word-bits
+                 sb-vm:double-float-exponent-byte
+                 (logandc2 (ecase sb-vm::n-word-bits
                              (32 (%bignum-ref bits 2))
                              (64 (ash (%bignum-ref bits 1) -32)))
-                           sb!vm:double-float-hidden-bit)))
+                           sb-vm:double-float-hidden-bit)))
         (lo (logand #xffffffff (%bignum-ref bits 1))))
     (make-double-float (if plusp
                            hi
-                           (logior hi (ash -1 sb!vm:float-sign-shift)))
+                           (logior hi (ash -1 sb-vm:float-sign-shift)))
                        lo)))
 #!+(and long-float x86)
 (defun long-float-from-bits (bits exp plusp)
@@ -1225,21 +1225,21 @@
                  (single-float
                   (single-float-from-bits
                    bits
-                   (check-exponent len sb!vm:single-float-bias
-                                   sb!vm:single-float-normal-exponent-max)
+                   (check-exponent len sb-vm:single-float-bias
+                                   sb-vm:single-float-normal-exponent-max)
                    plusp))
                  (double-float
                   (double-float-from-bits
                    bits
-                   (check-exponent len sb!vm:double-float-bias
-                                   sb!vm:double-float-normal-exponent-max)
+                   (check-exponent len sb-vm:double-float-bias
+                                   sb-vm:double-float-normal-exponent-max)
                    plusp))
                  #!+long-float
                  (long-float
                   (long-float-from-bits
                    bits
-                   (check-exponent len sb!vm:long-float-bias
-                                   sb!vm:long-float-normal-exponent-max)
+                   (check-exponent len sb-vm:long-float-bias
+                                   sb-vm:long-float-normal-exponent-max)
                    plusp))))
              (check-exponent (exp bias max)
                (declare (type bignum-length len))
@@ -1459,7 +1459,7 @@
 ;; This could be used by way of a transform, though for now it's specifically
 ;; a helper for %LDB in the limited case that it recognizes as non-consing.
 (defun ldb-bignum=>fixnum (byte-size byte-pos bignum)
-  (declare (type (integer 0 #.sb!vm:n-positive-fixnum-bits) byte-size)
+  (declare (type (integer 0 #.sb-vm:n-positive-fixnum-bits) byte-size)
            (type bit-index byte-pos))
   (multiple-value-bind (word-index bit-index) (floor byte-pos digit-size)
     (let ((n-digits (%bignum-length bignum)))
@@ -1472,10 +1472,10 @@
              ;; At least one bit is obtained from each of two words,
              ;; and not more than two words.
              (let* ((low-part-size
-                     (truly-the (integer 1 #.(1- sb!vm:n-positive-fixnum-bits))
+                     (truly-the (integer 1 #.(1- sb-vm:n-positive-fixnum-bits))
                                 (- digit-size bit-index)))
                     (high-part-size
-                     (truly-the (integer 1 #.(1- sb!vm:n-positive-fixnum-bits))
+                     (truly-the (integer 1 #.(1- sb-vm:n-positive-fixnum-bits))
                                 (- byte-size low-part-size))))
                (logior (truly-the (and fixnum unsigned-byte) ; high part
                          (let ((word-index (1+ word-index)))
@@ -1921,7 +1921,7 @@
       (%bignum-set-length result newlen))
     (if (= newlen 1)
         (let ((digit (%bignum-ref result 0)))
-          (if (= (%ashr digit sb!vm:n-positive-fixnum-bits)
+          (if (= (%ashr digit sb-vm:n-positive-fixnum-bits)
                  (%ashr digit (1- digit-size)))
               (%fixnum-digit-with-correct-sign digit)
               result))

@@ -4,7 +4,7 @@
 ;;; Converted for SPARC by William Lott.
 ;;;
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 (define-vop (reset-stack-pointer)
   (:args (ptr :scs (any-reg)))

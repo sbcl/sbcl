@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 ;;; We can load/store into fp registers through the top of stack
 ;;; %st(0) (fr0 here). Loads imply a push to an empty register which
@@ -99,7 +99,7 @@
 #!+sb-thread
 (progn
 (defmacro tls-index-of (symbol)
-  `(make-ea-for-object-slot ,symbol ,sb!vm:symbol-tls-index-slot
+  `(make-ea-for-object-slot ,symbol ,sb-vm:symbol-tls-index-slot
                             ,other-pointer-lowtag))
 (defmacro make-ea-for-symbol-tls-index (symbol)
   (declare (type symbol symbol))

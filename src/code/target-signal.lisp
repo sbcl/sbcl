@@ -116,7 +116,7 @@
                         (sb!thread::make-signal-handling-thread :name "signal handler"
                                                                 :signal-number signal))))
         (info (sap-ref-sap args 0))
-        (context (sap-ref-sap args sb!vm:n-word-bytes)))
+        (context (sap-ref-sap args sb-vm:n-word-bytes)))
     (dx-flet ((callback ()
                 (funcall run-handler signal info context)))
       (sb!thread::initial-thread-function-trampoline thread nil
@@ -141,7 +141,7 @@
        (with-interrupts
          (,function ,(concatenate 'simple-string what " at #X~X")
                     (with-alien ((context (* os-context-t) context))
-                      (sap-int (sb!vm:context-pc context))))))))
+                      (sap-int (sb-vm:context-pc context))))))))
 
 (define-signal-handler sigill-handler "illegal instruction")
 #!-(or linux android)
@@ -163,7 +163,7 @@
              (with-interrupts
                (let ((int (make-condition 'interactive-interrupt
                                           :context context
-                                          :address (sap-int (sb!vm:context-pc context)))))
+                                          :address (sap-int (sb-vm:context-pc context)))))
                  ;; First SIGNAL, so that handlers can run.
                  (signal int)
                  ;; Then enter the debugger like BREAK.
@@ -219,7 +219,7 @@
   (enable-interrupt sigill #'sigill-handler :synchronous t)
   #!-(or linux android)
   (enable-interrupt sigemt #'sigemt-handler)
-  (enable-interrupt sigfpe #'sb!vm:sigfpe-handler :synchronous t)
+  (enable-interrupt sigfpe #'sb-vm:sigfpe-handler :synchronous t)
   (if (/= (extern-alien "install_sig_memory_fault_handler" int) 0)
       (enable-interrupt sigbus #'sigbus-handler :synchronous t)
       (write-string ";;;; SIGBUS handler not installed

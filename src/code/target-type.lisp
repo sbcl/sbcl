@@ -203,7 +203,7 @@
           (simple-p (if (simple-array-p array) 1 0))
           (header-p (array-header-p array)) ; non-simple or rank <> 1 or both
           (cookie (the fixnum (logior (ash (logior (ash rank 1) simple-p)
-                                           sb!vm:n-widetag-bits)
+                                           sb-vm:n-widetag-bits)
                                       (array-underlying-widetag array)))))
   ;; The value computed on cache miss.
   (let ((etype (specifier-type (array-element-type array))))

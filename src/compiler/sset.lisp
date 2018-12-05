@@ -66,10 +66,10 @@
                         (the fixnum (ash result -5)))))
   #-sb-xc-host
   (let ((result (sset-element-number element)))
-    (declare (type sb!vm:word result))
+    (declare (type sb-vm:word result))
     ;; We only use the low-order bits.
     (macrolet ((set-result (form)
-                 `(setf result (ldb (byte #.sb!vm:n-word-bits 0) ,form))))
+                 `(setf result (ldb (byte #.sb-vm:n-word-bits 0) ,form))))
       (set-result (+ result (ash result -19)))
       (set-result (logxor result (ash result -13)))
       (set-result (+ result (ash result -9)))

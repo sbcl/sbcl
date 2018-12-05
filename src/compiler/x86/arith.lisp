@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 ;;;; unary operations
 
@@ -957,7 +957,7 @@ constant shift greater than word length")))
 (defun %lea (base index scale disp)
   (+ base (* index scale) disp))
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 (define-vop (%lea/unsigned=>unsigned)
   (:translate %lea)
@@ -1495,10 +1495,10 @@ constant shift greater than word length")))
 
 (in-package "SB!C")
 
-(defknown sb!vm::%lea-mod32 (integer integer (member 1 2 4 8) (signed-byte 32))
+(defknown sb-vm::%lea-mod32 (integer integer (member 1 2 4 8) (signed-byte 32))
   (unsigned-byte 32)
   (foldable flushable movable))
-(defknown sb!vm::%lea-modfx (integer integer (member 1 2 4 8) (signed-byte 32))
+(defknown sb-vm::%lea-modfx (integer integer (member 1 2 4 8) (signed-byte 32))
   fixnum
   (foldable flushable movable))
 
@@ -1508,38 +1508,38 @@ constant shift greater than word length")))
              (constant-lvar-p disp))
     (cut-to-width base :untagged width nil)
     (cut-to-width index :untagged width nil)
-    'sb!vm::%lea-mod32))
+    'sb-vm::%lea-mod32))
 (define-modular-fun-optimizer %lea ((base index scale disp) :tagged t :width width)
-  (when (and (<= width (- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits))
+  (when (and (<= width (- sb-vm:n-word-bits sb-vm:n-fixnum-tag-bits))
              (constant-lvar-p scale)
              (constant-lvar-p disp))
     (cut-to-width base :tagged width t)
     (cut-to-width index :tagged width t)
-    'sb!vm::%lea-modfx))
+    'sb-vm::%lea-modfx))
 
 #+sb-xc-host
 (progn
-  (defun sb!vm::%lea-mod32 (base index scale disp)
+  (defun sb-vm::%lea-mod32 (base index scale disp)
     (ldb (byte 32 0) (%lea base index scale disp)))
-  (defun sb!vm::%lea-modfx (base index scale disp)
-    (mask-signed-field (- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits)
+  (defun sb-vm::%lea-modfx (base index scale disp)
+    (mask-signed-field (- sb-vm:n-word-bits sb-vm:n-fixnum-tag-bits)
                        (%lea base index scale disp))))
 #-sb-xc-host
 (progn
-  (defun sb!vm::%lea-mod32 (base index scale disp)
+  (defun sb-vm::%lea-mod32 (base index scale disp)
     (let ((base (logand base #xffffffff))
           (index (logand index #xffffffff)))
       ;; can't use modular version of %LEA, as we only have VOPs for
       ;; constant SCALE and DISP.
       (ldb (byte 32 0) (+ base (* index scale) disp))))
-  (defun sb!vm::%lea-modfx (base index scale disp)
-    (let ((base (mask-signed-field sb!vm:n-fixnum-bits base))
-          (index (mask-signed-field sb!vm:n-fixnum-bits index)))
+  (defun sb-vm::%lea-modfx (base index scale disp)
+    (let ((base (mask-signed-field sb-vm:n-fixnum-bits base))
+          (index (mask-signed-field sb-vm:n-fixnum-bits index)))
       ;; can't use modular version of %LEA, as we only have VOPs for
       ;; constant SCALE and DISP.
-      (mask-signed-field sb!vm:n-fixnum-bits (+ base (* index scale) disp)))))
+      (mask-signed-field sb-vm:n-fixnum-bits (+ base (* index scale) disp)))))
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 (define-vop (%lea-mod32/unsigned=>unsigned
              %lea/unsigned=>unsigned)
@@ -2019,7 +2019,7 @@ constant shift greater than word length")))
   "recode as leas, shifts and adds"
   (let ((y (lvar-value y)))
     (*-transformer :unsigned 32 y)))
-(deftransform sb!vm::*-mod32
+(deftransform sb-vm::*-mod32
     ((x y) ((unsigned-byte 32) (constant-arg (unsigned-byte 32)))
      (unsigned-byte 32))
   "recode as leas, shifts and adds"
@@ -2031,13 +2031,13 @@ constant shift greater than word length")))
                  fixnum)
   "recode as leas, shifts and adds"
   (let ((y (lvar-value y)))
-    (*-transformer :signed (- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits) y)))
-(deftransform sb!vm::*-modfx
+    (*-transformer :signed (- sb-vm:n-word-bits sb-vm:n-fixnum-tag-bits) y)))
+(deftransform sb-vm::*-modfx
     ((x y) (fixnum (constant-arg (unsigned-byte 32)))
      fixnum)
   "recode as leas, shifts and adds"
   (let ((y (lvar-value y)))
-    (*-transformer :signed (- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits) y)))
+    (*-transformer :signed (- sb-vm:n-word-bits sb-vm:n-fixnum-tag-bits) y)))
 
 ;;; FIXME: we should also be able to write an optimizer or two to
 ;;; convert (+ (* x 2) 17), (- (* x 9) 5) to a %LEA.

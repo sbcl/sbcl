@@ -258,7 +258,7 @@
       (let ((args (vop-args vop))
             (results (vop-results vop)))
        (case (vop-name vop)
-         ((move sb!vm::sap-move)
+         ((move sb-vm::sap-move)
           (let ((x (tn-ref-tn args))
                 (y (tn-ref-tn results)))
             (when (location= x y)

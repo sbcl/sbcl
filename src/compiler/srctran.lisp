@@ -343,13 +343,13 @@
           ((eql integer-value -1)
            t)
           ((csubtypep integer-type (specifier-type '(or word
-                                                     sb!vm:signed-word)))
-           `(if (>= index #.sb!vm:n-word-bits)
+                                                     sb-vm:signed-word)))
+           `(if (>= index #.sb-vm:n-word-bits)
                 (minusp integer)
                 (not (zerop (logand integer (ash 1 index))))))
           ((csubtypep integer-type (specifier-type 'bignum))
            (if (csubtypep (lvar-type index)
-                          (specifier-type '(mod #.sb!vm:n-word-bits))) ; word-index
+                          (specifier-type '(mod #.sb-vm:n-word-bits))) ; word-index
                `(logbitp index (%bignum-ref integer 0))
                `(bignum-logbitp index integer)))
           (t
@@ -2563,7 +2563,7 @@
     (if (and (numeric-type-p size)
              (csubtypep size (specifier-type 'integer)))
         (let ((size-high (numeric-type-high size)))
-          (if (and size-high (<= size-high sb!vm:n-word-bits))
+          (if (and size-high (<= size-high sb-vm:n-word-bits))
               (specifier-type `(unsigned-byte* ,size-high))
               (specifier-type 'unsigned-byte)))
         *universal-type*)))
@@ -2579,7 +2579,7 @@
         (let ((size-high (numeric-type-high size))
               (posn-high (numeric-type-high posn)))
           (if (and size-high posn-high
-                   (<= (+ size-high posn-high) sb!vm:n-word-bits))
+                   (<= (+ size-high posn-high) sb-vm:n-word-bits))
               (specifier-type `(unsigned-byte* ,(+ size-high posn-high)))
               (specifier-type 'unsigned-byte)))
         *universal-type*)))
@@ -2601,12 +2601,12 @@
                    ;; (UNSIGNED-BYTE 1073741822), and then attempt to
                    ;; canonicalize this type to (INTEGER 0 (1- (ASH 1
                    ;; 1073741822))), with hilarious consequences.  We
-                   ;; cutoff at 4*SB!VM:N-WORD-BITS to allow inference
+                   ;; cutoff at 4*SB-VM:N-WORD-BITS to allow inference
                    ;; over a reasonable amount of shifting, even on
                    ;; the alpha/32 port, where N-WORD-BITS is 32 but
                    ;; machine integers are 64-bits.  -- CSR,
                    ;; 2003-09-12
-                   (<= (+ size-high posn-high) (* 4 sb!vm:n-word-bits)))
+                   (<= (+ size-high posn-high) (* 4 sb-vm:n-word-bits)))
           (let ((raw-bit-count (max (integer-length high)
                                     (integer-length low)
                                     (+ size-high posn-high))))
@@ -2625,27 +2625,27 @@
 
 (deftransform %ldb ((size posn int)
                     (fixnum fixnum integer)
-                    (unsigned-byte #.sb!vm:n-word-bits))
+                    (unsigned-byte #.sb-vm:n-word-bits))
   "convert to inline logical operations"
   (if (and (constant-lvar-p size)
            (constant-lvar-p posn)
-           (<= (+ (lvar-value size) (lvar-value posn)) sb!vm:n-fixnum-bits))
+           (<= (+ (lvar-value size) (lvar-value posn)) sb-vm:n-fixnum-bits))
       (let ((size (lvar-value size))
             (posn (lvar-value posn)))
-        `(logand (ash (mask-signed-field sb!vm:n-fixnum-bits int) ,(- posn))
-                 ,(ash (1- (ash 1 sb!vm:n-word-bits))
-                       (- size sb!vm:n-word-bits))))
+        `(logand (ash (mask-signed-field sb-vm:n-fixnum-bits int) ,(- posn))
+                 ,(ash (1- (ash 1 sb-vm:n-word-bits))
+                       (- size sb-vm:n-word-bits))))
       `(logand (ash int (- posn))
-               (ash ,(1- (ash 1 sb!vm:n-word-bits))
-                    (- size ,sb!vm:n-word-bits)))))
+               (ash ,(1- (ash 1 sb-vm:n-word-bits))
+                    (- size ,sb-vm:n-word-bits)))))
 
 (deftransform %mask-field ((size posn int)
                            (fixnum fixnum integer)
-                           (unsigned-byte #.sb!vm:n-word-bits))
+                           (unsigned-byte #.sb-vm:n-word-bits))
   "convert to inline logical operations"
   `(logand int
-           (ash (ash ,(1- (ash 1 sb!vm:n-word-bits))
-                     (- size ,sb!vm:n-word-bits))
+           (ash (ash ,(1- (ash 1 sb-vm:n-word-bits))
+                     (- size ,sb-vm:n-word-bits))
                 posn)))
 
 ;;; Note: for %DPB and %DEPOSIT-FIELD, we can't use
@@ -2656,7 +2656,7 @@
 
 (deftransform %dpb ((new size posn int)
                     *
-                    (unsigned-byte #.sb!vm:n-word-bits))
+                    (unsigned-byte #.sb-vm:n-word-bits))
   "convert to inline logical operations"
   `(let ((mask (ldb (byte size 0) -1)))
      (logior (ash (logand new mask) posn)
@@ -2664,7 +2664,7 @@
 
 (deftransform %dpb ((new size posn int)
                     *
-                    (signed-byte #.sb!vm:n-word-bits))
+                    (signed-byte #.sb-vm:n-word-bits))
   "convert to inline logical operations"
   `(let ((mask (ldb (byte size 0) -1)))
      (logior (ash (logand new mask) posn)
@@ -2672,7 +2672,7 @@
 
 (deftransform %deposit-field ((new size posn int)
                               *
-                              (unsigned-byte #.sb!vm:n-word-bits))
+                              (unsigned-byte #.sb-vm:n-word-bits))
   "convert to inline logical operations"
   `(let ((mask (ash (ldb (byte size 0) -1) posn)))
      (logior (logand new mask)
@@ -2680,7 +2680,7 @@
 
 (deftransform %deposit-field ((new size posn int)
                               *
-                              (signed-byte #.sb!vm:n-word-bits))
+                              (signed-byte #.sb-vm:n-word-bits))
   "convert to inline logical operations"
   `(let ((mask (ash (ldb (byte size 0) -1) posn)))
      (logior (logand new mask)
@@ -2691,7 +2691,7 @@
   (let ((size (lvar-type size)))
     (if (numeric-type-p size)
         (let ((size-high (numeric-type-high size)))
-          (if (and size-high (<= 1 size-high sb!vm:n-word-bits))
+          (if (and size-high (<= 1 size-high sb-vm:n-word-bits))
               (specifier-type `(signed-byte ,size-high))
               *universal-type*))
         *universal-type*)))
@@ -2707,7 +2707,7 @@
   (defun %ash/right (integer amount)
     (ash integer (- amount)))
 
-  (deftransform ash ((integer amount) (sb!vm:signed-word (integer * 0)) *
+  (deftransform ash ((integer amount) (sb-vm:signed-word (integer * 0)) *
                      :important nil)
     "Convert ASH of signed word to %ASH/RIGHT"
     (when (constant-lvar-p amount)
@@ -2718,12 +2718,12 @@
              (splice-fun-args amount '%negate 1)
              `(lambda (integer amount)
                 (declare (type unsigned-byte amount))
-                (%ash/right integer (if (>= amount ,sb!vm:n-word-bits)
-                                        ,(1- sb!vm:n-word-bits)
+                (%ash/right integer (if (>= amount ,sb-vm:n-word-bits)
+                                        ,(1- sb-vm:n-word-bits)
                                         amount))))
             (t
-             `(%ash/right integer (if (<= amount ,(- sb!vm:n-word-bits))
-                                      ,(1- sb!vm:n-word-bits)
+             `(%ash/right integer (if (<= amount ,(- sb-vm:n-word-bits))
+                                      ,(1- sb-vm:n-word-bits)
                                       (- amount)))))))
 
   (deftransform ash ((integer amount) (word (integer * 0)) *
@@ -2737,11 +2737,11 @@
              (splice-fun-args amount '%negate 1)
              `(lambda (integer amount)
                 (declare (type unsigned-byte amount))
-                (if (>= amount ,sb!vm:n-word-bits)
+                (if (>= amount ,sb-vm:n-word-bits)
                     0
                     (%ash/right integer amount))))
             (t
-             `(if (<= amount ,(- sb!vm:n-word-bits))
+             `(if (<= amount ,(- sb-vm:n-word-bits))
                   0
                   (%ash/right integer (- amount)))))))
 
@@ -2757,15 +2757,15 @@
             ((type= return-type (specifier-type '(eql -1)))
              -1)
             ((csubtypep return-type (specifier-type '(member -1 0)))
-             `(ash integer ,(- sb!vm:n-word-bits)))
+             `(ash integer ,(- sb-vm:n-word-bits)))
             (t
              (give-up-ir1-transform)))))
 
   (defun %ash/right-derive-type-aux (n-type shift same-arg)
     (declare (ignore same-arg))
-    (or (and (or (csubtypep n-type (specifier-type 'sb!vm:signed-word))
+    (or (and (or (csubtypep n-type (specifier-type 'sb-vm:signed-word))
                  (csubtypep n-type (specifier-type 'word)))
-             (csubtypep shift (specifier-type `(mod ,sb!vm:n-word-bits)))
+             (csubtypep shift (specifier-type `(mod ,sb-vm:n-word-bits)))
              (let ((n-low (numeric-type-low n-type))
                    (n-high (numeric-type-high n-type))
                    (s-low (numeric-type-low shift))
@@ -3304,7 +3304,7 @@
            (choose-multiplier (y precision)
              (do* ((l (ld y))
                    (shift l (1- shift))
-                   (expt-2-n+l (expt 2 (+ sb!vm:n-word-bits l)))
+                   (expt-2-n+l (expt 2 (+ sb-vm:n-word-bits l)))
                    (m-low (truncate expt-2-n+l y) (ash m-low -1))
                    (m-high (truncate (+ expt-2-n+l
                                         (ash expt-2-n+l (- precision)))
@@ -3313,7 +3313,7 @@
                   ((not (and (< (ash m-low -1) (ash m-high -1))
                              (> shift 0)))
                    (values m-high shift)))))
-    (let ((n (expt 2 sb!vm:n-word-bits))
+    (let ((n (expt 2 sb-vm:n-word-bits))
           (precision (integer-length max-x))
           (shift1 0))
       (multiple-value-bind (m shift2)
@@ -3372,7 +3372,7 @@
     (when (zerop (logand y (1- y)))
       (give-up-ir1-transform))
     `(let* ((quot ,(gen-unsigned-div-by-constant-expr y max-x))
-            (rem (ldb (byte #.sb!vm:n-word-bits 0)
+            (rem (ldb (byte #.sb-vm:n-word-bits 0)
                       (- x (* quot ,y)))))
        (values quot rem))))
 
@@ -3954,10 +3954,10 @@
                     (csubtypep y-type (specifier-type 'float)))
                (and (csubtypep x-type (specifier-type '(complex float)))
                     (csubtypep y-type (specifier-type '(complex float))))
-               #!+(vop-named sb!vm::=/complex-single-float)
+               #!+(vop-named sb-vm::=/complex-single-float)
                (and (csubtypep x-type (specifier-type '(or single-float (complex single-float))))
                     (csubtypep y-type (specifier-type '(or single-float (complex single-float)))))
-               #!+(vop-named sb!vm::=/complex-double-float)
+               #!+(vop-named sb-vm::=/complex-double-float)
                (and (csubtypep x-type (specifier-type '(or double-float (complex double-float))))
                     (csubtypep y-type (specifier-type '(or double-float (complex double-float))))))
            ;; They are both floats. Leave as = so that -0.0 is
@@ -5055,8 +5055,8 @@
 #!+(and 64-bit sb-thread)
 (define-source-transform symbol-tls-index (sym)
   `(ash (sap-ref-32 (int-sap (get-lisp-obj-address (the symbol ,sym)))
-                    (- 4 sb!vm:other-pointer-lowtag))
-        (- sb!vm:n-fixnum-tag-bits)))
+                    (- 4 sb-vm:other-pointer-lowtag))
+        (- sb-vm:n-fixnum-tag-bits)))
 
 (deftransform make-string-output-stream ((&key element-type))
   (let ((element-type (cond ((not element-type)

@@ -80,8 +80,8 @@ is used by SB-POSIX.)
 
 Find a memory area for the linkage-table, and add it for the OS in
 @file{src/compiler/target/parms.lisp} by defining
-@code{SB!VM:LINKAGE-TABLE-SPACE-START} and
-@code{SB!VM:LINKAGE-TABLE-SPACE-END}. See existing ports and CMUCL for
+@code{SB-VM:LINKAGE-TABLE-SPACE-START} and
+@code{SB-VM:LINKAGE-TABLE-SPACE-END}. See existing ports and CMUCL for
 examples.
 
 @subsubsection Porting to new architectures
@@ -90,7 +90,7 @@ Write @code{arch_write_linkage_table_entry}.
 
 Write @code{FOREIGN-SYMBOL-DATAREF} VOP.
 
-Define correct @code{SB!VM:LINKAGE-TABLE-ENTRY-SIZE} in
+Define correct @code{SB-VM:LINKAGE-TABLE-ENTRY-SIZE} in
 @file{src/compiler/target/parms.lisp}.
 
 @page

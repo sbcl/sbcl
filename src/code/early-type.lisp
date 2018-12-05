@@ -290,7 +290,7 @@
          :hash-value (interned-type-hash
                       nil nil
                       (when specifier
-                        (sb!vm::saetp-index-or-lose specifier)))
+                        (sb-vm::saetp-index-or-lose specifier)))
          args))
 
 #+sb-xc-host
@@ -304,17 +304,17 @@
                                        :class 'integer :enumerable t
                                        :low ,low :high ,high)))
     (setq *interned-signed-byte-types*
-          (do ((v (make-array sb!vm:n-word-bits))
+          (do ((v (make-array sb-vm:n-word-bits))
                (i 1 (1+ i))
                (j -1))
-              ((> i sb!vm:n-word-bits) v)
-            (let ((spec (if (= i sb!vm:n-fixnum-bits)
+              ((> i sb-vm:n-word-bits) v)
+            (let ((spec (if (= i sb-vm:n-fixnum-bits)
                             'fixnum
                             `(signed-byte ,i))))
               (setf (svref v (1- i)) (int-type j (lognot j))
                     j (ash j 1)))))
     (setq *interned-unsigned-byte-types*
-          (let ((v (make-array (1+ sb!vm:n-word-bits))))
+          (let ((v (make-array (1+ sb-vm:n-word-bits))))
             (dotimes (i (length v) v)
               (let ((spec (if (= i 1) 'bit `(unsigned-byte ,i))))
                 (setf (svref v i) (int-type 0 (1- (ash 1 i))))))))))
@@ -486,7 +486,7 @@
           (cond ((eql high (1- sb!xc:char-code-limit))
                  (cond ((eql low 0)
                         (range 0 #.(1- sb!xc:char-code-limit)
-                               (sb!vm::saetp-index-or-lose 'character)))
+                               (sb-vm::saetp-index-or-lose 'character)))
                        #!+sb-unicode
                        ((eql low base-char-code-limit)
                         (range #.base-char-code-limit
@@ -494,7 +494,7 @@
                 #!+sb-unicode
                 ((and (eql low 0) (eql high (1- base-char-code-limit)))
                  (range 0 #.(1- base-char-code-limit)
-                        (sb!vm::saetp-index-or-lose 'base-char)))))))
+                        (sb-vm::saetp-index-or-lose 'base-char)))))))
     (%make-character-set-type pairs)))
 
 (!define-type-class array :enumerable nil

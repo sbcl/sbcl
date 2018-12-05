@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 (define-vop (reset-stack-pointer)
   (:args (ptr :scs (any-reg)))
@@ -97,7 +97,7 @@
     (unless (eq (tn-kind count) :unused)
       (inst mov count start)            ; start is high address
       (inst sub count rsp-tn)           ; stackp is low address
-      #!-#.(cl:if (cl:= sb!vm:word-shift sb!vm:n-fixnum-tag-bits) '(and) '(or))
+      #!-#.(cl:if (cl:= sb-vm:word-shift sb-vm:n-fixnum-tag-bits) '(and) '(or))
       (inst shr count (- word-shift n-fixnum-tag-bits)))))
 
 ;;; Copy the more arg block to the top of the stack so we can use them

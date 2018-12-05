@@ -20,21 +20,21 @@
 ;;;; genesis for use by the runtime.
 
 (def!type sc+offset ()
-  `(unsigned-byte ,(+ sb!vm:sc-number-bits sb!vm:sc-offset-bits)))
+  `(unsigned-byte ,(+ sb-vm:sc-number-bits sb-vm:sc-offset-bits)))
 
 (defconstant-eqx +sc+offset-scn-bytes+
     `(,(byte 2 0) ,(byte 4 23))
   #'equalp)
 (assert (= (reduce #'+ +sc+offset-scn-bytes+ :key #'byte-size)
-           sb!vm:sc-number-bits))
+           sb-vm:sc-number-bits))
 
 (defconstant-eqx +sc+offset-offset-bytes+
     `(,(byte 21 2))
   #'equalp)
 (assert (= (reduce #'+ +sc+offset-offset-bytes+ :key #'byte-size)
-           sb!vm:sc-offset-bits))
+           sb-vm:sc-offset-bits))
 
-(declaim (ftype (sfunction (sc-number sb!vm:sc-offset) sc+offset)
+(declaim (ftype (sfunction (sc-number sb-vm:sc-offset) sc+offset)
                 make-sc+offset))
 (defun make-sc+offset (sc-number offset)
   (let ((result 0))
@@ -51,7 +51,7 @@
 
 (declaim (ftype (sfunction (sc+offset) sc-number)
                 sc+offset-scn)
-         (ftype (sfunction (sc+offset) sb!vm:sc-offset)
+         (ftype (sfunction (sc+offset) sb-vm:sc-offset)
                 sc+offset-offset))
 (flet ((extract-bits (bytes source)
          (loop with result = 0

@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 
 (defconstant arg-count-sc (make-sc+offset immediate-arg-scn nargs-offset))

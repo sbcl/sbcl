@@ -670,7 +670,7 @@
         (eltype (array-type-specialized-element-type type)))
     (unless (or (type= eltype (array-type-specialized-element-type stype))
                 (eq eltype *wild-type*))
-      (let ((typecode (sb!vm:saetp-typecode (find-saetp-by-ctype eltype))))
+      (let ((typecode (sb-vm:saetp-typecode (find-saetp-by-ctype eltype))))
         (with-unique-names (data)
          (if (and headerp (not (array-type-complexp stype)))
              ;; If we know OBJ is an array header, and that the array is
@@ -713,7 +713,7 @@
                                   (eql (array-type-complexp type) t)
                                   (singleton-p dims)
                                   (and (neq et *wild-type*)
-                                       (sb!vm:saetp-complex-typecode
+                                       (sb-vm:saetp-complex-typecode
                                         (find-saetp-by-ctype (array-type-element-type type))))))
                     (simple-array-header-p
                       (and (null (array-type-complexp stype))
@@ -837,9 +837,9 @@
                                      (eq object-layout ',other-layout))))
                              ;; FIXME: not defined in time for make-host-1,
                              ;; so the cross-compiler isn't getting this branch.
-                             #!+(vop-named sb!vm::layout-eq)
+                             #!+(vop-named sb-vm::layout-eq)
                              ((equal layout-getter '(%instance-layout object))
-                              `(sb!vm::layout-eq object ',layout))
+                              `(sb-vm::layout-eq object ',layout))
                              (t
                               `(eq ,layout-getter ',layout)))))
                 (if pred
@@ -875,7 +875,7 @@
                      ;; but lacking that, force it into a single call
                      ;; that a vop can translate.
                      #!+(and immobile-space x86-64)
-                     `(sb!vm::layout-inherits-ref-eq ; only implemented on x86-64
+                     `(sb-vm::layout-inherits-ref-eq ; only implemented on x86-64
                        (layout-inherits ,n-layout) ,depthoid ,layout)
                      #!-(and immobile-space x86-64)
                      `(eq ,get-ancestor ,layout))

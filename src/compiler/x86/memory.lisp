@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 ;;; CELL-REF and CELL-SET are used to define VOPs like CAR, where the
 ;;; offset to be read or written is a property of the VOP used.

@@ -46,12 +46,12 @@
   `(progn ,@(forms)))
 
 #.`
-(defun ,(intern (format nil "ASH-LEFT-MOD~D" sb!vm:n-machine-word-bits)
-                "SB!VM")
+(defun ,(intern (format nil "ASH-LEFT-MOD~D" sb-vm:n-machine-word-bits)
+                "SB-VM")
     (integer amount)
-  (ldb (byte ,sb!vm:n-machine-word-bits 0) (ash integer amount)))
+  (ldb (byte ,sb-vm:n-machine-word-bits 0) (ash integer amount)))
 
 #!+(or x86 x86-64 arm arm64)
-(defun sb!vm::ash-left-modfx (integer amount)
-  (mask-signed-field (- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits)
+(defun sb-vm::ash-left-modfx (integer amount)
+  (mask-signed-field (- sb-vm:n-word-bits sb-vm:n-fixnum-tag-bits)
                      (ash integer amount)))

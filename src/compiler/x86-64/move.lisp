@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 (defun zeroize (tn)
   (inst xor :dword tn tn))
@@ -176,7 +176,7 @@
 
 
 ;;; Arg is a fixnum or bignum, figure out which and load if necessary.
-#-#.(cl:if (cl:= sb!vm:n-fixnum-tag-bits 1) '(:and) '(:or))
+#-#.(cl:if (cl:= sb-vm:n-fixnum-tag-bits 1) '(:and) '(:or))
 (define-vop (move-to-word/integer)
   (:args (x :scs (descriptor-reg) :target rax))
   (:results (y :scs (signed-reg unsigned-reg)))
@@ -197,7 +197,7 @@
     (move y rax)
     DONE))
 
-#+#.(cl:if (cl:= sb!vm:n-fixnum-tag-bits 1) '(:and) '(:or))
+#+#.(cl:if (cl:= sb-vm:n-fixnum-tag-bits 1) '(:and) '(:or))
 (define-vop (move-to-word/integer)
   (:args (x :scs (descriptor-reg) :target y))
   (:results (y :scs (signed-reg unsigned-reg)))

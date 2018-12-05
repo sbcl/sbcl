@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 (macrolet ((ea-for-xf-desc (tn slot)
              `(make-ea-for-object-slot ,tn ,slot other-pointer-lowtag)))

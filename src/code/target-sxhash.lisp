@@ -77,17 +77,17 @@
 (declaim (inline address-based-counter-val))
 (defun address-based-counter-val ()
   #!+(and (not sb-thread) cheneygc)
-  (ash (sap-int (dynamic-space-free-pointer)) (- (1+ sb!vm:word-shift)))
+  (ash (sap-int (dynamic-space-free-pointer)) (- (1+ sb-vm:word-shift)))
   ;; dynamic-space-free-pointer increments only when a page is full.
   ;; Using boxed_region directly is finer-grained.
   #!+(and (not sb-thread) gencgc)
   (ash (extern-alien "gc_alloc_region" unsigned-long)
-       (- (1+ sb!vm:word-shift)))
+       (- (1+ sb-vm:word-shift)))
   ;; threads imply gencgc. use the per-thread alloc region pointer
   #!+sb-thread
-  (ash (sap-int (sb!vm::current-thread-offset-sap
-                 #.sb!vm::thread-alloc-region-slot))
-       (- (1+ sb!vm:word-shift))))
+  (ash (sap-int (sb-vm::current-thread-offset-sap
+                 #.sb-vm::thread-alloc-region-slot))
+       (- (1+ sb-vm:word-shift))))
 
 ;; Return some bits that are dependent on the next address that will be
 ;; allocated, mixed with the previous state (in case addresses get recycled).
@@ -126,9 +126,9 @@
                   (set-result (+ result (ash result 10)))
                   (set-result (logxor result (ash result -6)))))
              (set-result (form)
-               `(setf result (ldb (byte #.sb!vm:n-word-bits 0) ,form))))
+               `(setf result (ldb (byte #.sb-vm:n-word-bits 0) ,form))))
     (let ((result 238625159)) ; (logandc2 most-positive-fixnum (sxhash #\S)) on 32 bits
-      (declare (type (unsigned-byte #.sb!vm:n-word-bits) result))
+      (declare (type (unsigned-byte #.sb-vm:n-word-bits) result))
       ;; Avoid accessing elements of a (simple-array nil (*)).
       ;; The expansion of STRING-DISPATCH involves ETYPECASE,
       ;; so we can't simply omit one case. Therefore that macro
@@ -211,10 +211,10 @@
 (progn
   (declaim (inline %std-instance-hash))
   (defun %std-instance-hash (slots) ; return or compute the 32-bit hash
-    (let ((stored-hash (sb!vm::get-header-data-high slots)))
+    (let ((stored-hash (sb-vm::get-header-data-high slots)))
       (if (eql stored-hash 0)
           (let ((new (logand (new-instance-hash-code) #xFFFFFFFF)))
-            (let ((old (sb!vm::cas-header-data-high slots 0 new)))
+            (let ((old (sb-vm::cas-header-data-high slots 0 new)))
               (if (eql old 0) new old)))
           stored-hash))))
 
@@ -230,7 +230,7 @@
     ;; Simulate N-POSITIVE-FIXNUM-BITS of output for backward-compatibility,
     ;; in case people use the high order bits.
     ;; (There are only 32 bits of actual randomness, if even that)
-    (logxor (ash hash (- sb!vm:n-positive-fixnum-bits 32)) hash))
+    (logxor (ash hash (- sb-vm:n-positive-fixnum-bits 32)) hash))
   #!-(and compact-instance-header x86-64)
   (locally
    (declare (optimize (sb!c::type-check 0)))
@@ -251,7 +251,7 @@
   (locally
    (declare (optimize (sb!c::type-check 0)))
    #!+compact-instance-header
-   (sb!vm::get-header-data-high
+   (sb-vm::get-header-data-high
     (sb!pcl::standard-funcallable-instance-clos-slots fin))
    #!-compact-instance-header
    (sb!pcl::standard-funcallable-instance-hash-code fin)))

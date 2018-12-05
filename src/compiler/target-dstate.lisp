@@ -64,7 +64,7 @@
   ;; here first because sap-ref-dchunk reads a fixed length.
   (scratch-buf (make-array 8 :element-type '(unsigned-byte 8)))
   ;; what to align to in most cases
-  (alignment sb!vm:n-word-bytes :type alignment)
+  (alignment sb-vm:n-word-bytes :type alignment)
   (byte-order sb!c:*backend-byte-order*
               :type (member :big-endian :little-endian))
   ;; for user code to track decoded bits, cleared each time after a

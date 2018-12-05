@@ -229,7 +229,7 @@
 
 (define-alien-type-translator system-area-pointer ()
   (make-alien-system-area-pointer-type
-   :bits sb!vm:n-machine-word-bits))
+   :bits sb-vm:n-machine-word-bits))
 
 (define-alien-type-method (system-area-pointer :unparse) (type)
   (declare (ignore type))
@@ -254,7 +254,7 @@
 
 (define-alien-type-method (system-area-pointer :extract-gen) (type sap offset)
   (declare (ignore type))
-  `(sap-ref-sap ,sap (/ ,offset sb!vm:n-byte-bits)))
+  `(sap-ref-sap ,sap (/ ,offset sb-vm:n-byte-bits)))
 
 ;;;; the ALIEN-VALUE type
 
@@ -433,13 +433,13 @@
 (define-alien-type-class (integer)
   (signed t :type (member t nil)))
 
-(define-alien-type-translator signed (&optional (bits sb!vm:n-word-bits))
+(define-alien-type-translator signed (&optional (bits sb-vm:n-word-bits))
   (make-alien-integer-type :bits bits))
 
-(define-alien-type-translator integer (&optional (bits sb!vm:n-word-bits))
+(define-alien-type-translator integer (&optional (bits sb-vm:n-word-bits))
   (make-alien-integer-type :bits bits))
 
-(define-alien-type-translator unsigned (&optional (bits sb!vm:n-word-bits))
+(define-alien-type-translator unsigned (&optional (bits sb-vm:n-word-bits))
   (make-alien-integer-type :bits bits :signed nil))
 
 (define-alien-type-method (integer :unparse) (type)
@@ -471,7 +471,7 @@
     (:result
      (list (if (alien-integer-type-signed type) 'signed-byte 'unsigned-byte)
            (max (alien-integer-type-bits type)
-                sb!vm:n-machine-word-bits)))))
+                sb-vm:n-machine-word-bits)))))
 
 ;;; As per the comment in the :ALIEN-REP method above, this is defined
 ;;; elsewhere for alpha and x86oids.
@@ -499,7 +499,7 @@
             (32 'sap-ref-32)
             (64 'sap-ref-64)))))
     (if ref-fun
-        `(,ref-fun ,sap (/ ,offset sb!vm:n-byte-bits))
+        `(,ref-fun ,sap (/ ,offset sb-vm:n-byte-bits))
         (error "cannot extract ~W-bit integers"
                (alien-integer-type-bits type)))))
 
@@ -509,7 +509,7 @@
 
 ;;; FIXME: Check to make sure that we aren't attaching user-readable
 ;;; stuff to CL:BOOLEAN in any way which impairs ANSI compliance.
-(define-alien-type-translator boolean (&optional (bits sb!vm:n-word-bits))
+(define-alien-type-translator boolean (&optional (bits sb-vm:n-word-bits))
   (make-alien-boolean-type :bits bits :signed nil))
 
 (define-alien-type-method (boolean :unparse) (type)
@@ -521,7 +521,7 @@
 
 (define-alien-type-method (boolean :naturalize-gen) (type alien)
   (let ((bits (alien-boolean-type-bits type)))
-    (if (= bits sb!vm:n-word-bits)
+    (if (= bits sb-vm:n-word-bits)
         `(not (zerop ,alien))
         `(logtest ,alien ,(ldb (byte bits 0) -1)))))
 
@@ -693,7 +693,7 @@
 
 (define-alien-type-method (single-float :extract-gen) (type sap offset)
   (declare (ignore type))
-  `(sap-ref-single ,sap (/ ,offset sb!vm:n-byte-bits)))
+  `(sap-ref-single ,sap (/ ,offset sb-vm:n-byte-bits)))
 
 (define-alien-type-class (double-float :include (float (bits 64))
                                        :include-args (type)))
@@ -703,13 +703,13 @@
 
 (define-alien-type-method (double-float :extract-gen) (type sap offset)
   (declare (ignore type))
-  `(sap-ref-double ,sap (/ ,offset sb!vm:n-byte-bits)))
+  `(sap-ref-double ,sap (/ ,offset sb-vm:n-byte-bits)))
 
 
 ;;;; the POINTER type
 
 (define-alien-type-class (pointer :include (alien-value (bits
-                                                         sb!vm:n-machine-word-bits)))
+                                                         sb-vm:n-machine-word-bits)))
   (to nil :type (or alien-type null)))
 
 (define-alien-type-translator * (to &environment env)
@@ -768,15 +768,15 @@
 
 (define-alien-type-method (mem-block :extract-gen) (type sap offset)
   (declare (ignore type))
-  `(sap+ ,sap (truncate ,offset sb!vm:n-byte-bits)))
+  `(sap+ ,sap (truncate ,offset sb-vm:n-byte-bits)))
 
 (define-alien-type-method (mem-block :deposit-gen) (type sap offset value)
   (let ((bits (alien-mem-block-type-bits type)))
     (unless bits
       (error "can't deposit aliens of type ~S (unknown size)" type))
     `(sb!kernel:system-area-ub8-copy ,value 0 ,sap
-      (truncate ,offset sb!vm:n-byte-bits)
-      ',(truncate bits sb!vm:n-byte-bits))))
+      (truncate ,offset sb-vm:n-byte-bits)
+      ',(truncate bits sb-vm:n-byte-bits))))
 
 ;;;; the ARRAY type
 

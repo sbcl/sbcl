@@ -54,15 +54,15 @@
 (defmacro randomly-punting-lambda (lambda-list &body body)
   (with-unique-names (drops drop-pos)
     `(let ((,drops (random-fixnum)) ; means a POSITIVE fixnum
-           (,drop-pos sb!vm:n-positive-fixnum-bits))
+           (,drop-pos sb-vm:n-positive-fixnum-bits))
        (declare (fixnum ,drops)
-                (type (mod #.sb!vm:n-fixnum-bits) ,drop-pos))
+                (type (mod #.sb-vm:n-fixnum-bits) ,drop-pos))
        (lambda ,lambda-list
          (when (logbitp (the unsigned-byte (decf ,drop-pos)) ,drops)
            (locally ,@body))
          (when (zerop ,drop-pos)
            (setf ,drops (random-fixnum)
-                 ,drop-pos sb!vm:n-positive-fixnum-bits))))))
+                 ,drop-pos sb-vm:n-positive-fixnum-bits))))))
 
 (import 'sb!kernel:funcallable-instance-p) ; why?
 

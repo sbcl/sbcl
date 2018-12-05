@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 (defun machine-type ()
   "Return a string describing the type of the local machine."
@@ -23,7 +23,7 @@
 (defun fixup-code-object (code offset fixup kind flavor)
   (declare (type index offset))
   (declare (ignore flavor))
-  (let* ((obj-start-addr (logandc2 (get-lisp-obj-address code) sb!vm:lowtag-mask))
+  (let* ((obj-start-addr (logandc2 (get-lisp-obj-address code) sb-vm:lowtag-mask))
          (sap (code-instructions code))
          (code-end-addr (+ (sap-int sap) (%code-code-size code))))
     (ecase kind

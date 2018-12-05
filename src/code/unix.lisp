@@ -140,7 +140,7 @@ corresponds to NAME, or NIL if there is none."
 (define-alien-type nil
   (struct fd-set
           (fds-bits (array fd-mask #.(/ fd-setsize
-                                        sb!vm:n-machine-word-bits)))))
+                                        sb-vm:n-machine-word-bits)))))
 
 (/show0 "unix.lisp 304")
 
@@ -696,23 +696,23 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
     (fixnum
      (setf (deref (slot fdset 'fds-bits) 0) num)
      (loop for index from 1 below (/ fd-setsize
-                                     sb!vm:n-machine-word-bits)
+                                     sb-vm:n-machine-word-bits)
            do (setf (deref (slot fdset 'fds-bits) index) 0)))
     (t
      (loop for index from 0 below (/ fd-setsize
-                                     sb!vm:n-machine-word-bits)
+                                     sb-vm:n-machine-word-bits)
            do (setf (deref (slot fdset 'fds-bits) index)
-                    (ldb (byte sb!vm:n-machine-word-bits
-                               (* index sb!vm:n-machine-word-bits))
+                    (ldb (byte sb-vm:n-machine-word-bits
+                               (* index sb-vm:n-machine-word-bits))
                          num))))))
 
 (defun fd-set-to-num (nfds fdset)
-  (if (<= nfds sb!vm:n-machine-word-bits)
+  (if (<= nfds sb-vm:n-machine-word-bits)
       (deref (slot fdset 'fds-bits) 0)
       (loop for index below (/ fd-setsize
-                               sb!vm:n-machine-word-bits)
+                               sb-vm:n-machine-word-bits)
             sum (ash (deref (slot fdset 'fds-bits) index)
-                     (* index sb!vm:n-machine-word-bits)))))
+                     (* index sb-vm:n-machine-word-bits)))))
 
 ;;; Examine the sets of descriptors passed as arguments to see whether
 ;;; they are ready for reading and writing. See the UNIX Programmer's
@@ -754,28 +754,28 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 (declaim (inline fd-set fd-clr fd-isset fd-zero))
 (defun fd-set (offset fd-set)
   (multiple-value-bind (word bit) (floor offset
-                                            sb!vm:n-machine-word-bits)
+                                            sb-vm:n-machine-word-bits)
      (setf (deref (slot fd-set 'fds-bits) word)
-           (logior (truly-the (unsigned-byte #.sb!vm:n-machine-word-bits)
+           (logior (truly-the (unsigned-byte #.sb-vm:n-machine-word-bits)
                               (ash 1 bit))
                    (deref (slot fd-set 'fds-bits) word)))))
 
 (defun fd-clr (offset fd-set)
   (multiple-value-bind (word bit) (floor offset
-                                         sb!vm:n-machine-word-bits)
+                                         sb-vm:n-machine-word-bits)
     (setf (deref (slot fd-set 'fds-bits) word)
           (logand (deref (slot fd-set 'fds-bits) word)
                   (sb!kernel:word-logical-not
-                   (truly-the (unsigned-byte #.sb!vm:n-machine-word-bits)
+                   (truly-the (unsigned-byte #.sb-vm:n-machine-word-bits)
                               (ash 1 bit)))))))
 
 (defun fd-isset (offset fd-set)
   (multiple-value-bind (word bit) (floor offset
-                                         sb!vm:n-machine-word-bits)
+                                         sb-vm:n-machine-word-bits)
      (logbitp bit (deref (slot fd-set 'fds-bits) word))))
 
 (defun fd-zero (fd-set)
-  (loop for index below (/ fd-setsize sb!vm:n-machine-word-bits)
+  (loop for index below (/ fd-setsize sb-vm:n-machine-word-bits)
         do (setf (deref (slot fd-set 'fds-bits) index) 0)))
 
 #!-os-provides-poll

@@ -13,21 +13,21 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; Imports from this package into SB-VM
-  (import '(reg-tn-encoding) "SB!VM")
+  (import '(reg-tn-encoding) "SB-VM")
   ;; Imports from SB-VM into this package
   (import '(;; SBs, SCs, and TNs
-            sb!vm::immediate-constant
-            sb!vm::registers sb!vm::float-registers
-            sb!vm::zero
-            sb!vm::lip-tn sb!vm::zero-tn)))
+            sb-vm::immediate-constant
+            sb-vm::registers sb-vm::float-registers
+            sb-vm::zero
+            sb-vm::lip-tn sb-vm::zero-tn)))
 
 ;;;; Constants, types, conversion functions, some disassembler stuff.
 
 (defun reg-tn-encoding (tn)
   (declare (type tn tn))
   (sc-case tn
-    (zero sb!vm::zero-offset)
-    (null sb!vm::null-offset)
+    (zero sb-vm::zero-offset)
+    (null sb-vm::null-offset)
     (t
      (if (eq (sb-name (sc-sb (tn-sc tn))) 'registers)
          (tn-offset tn)
@@ -70,7 +70,7 @@
        (lambda (name)
          (and name
               (make-symbol (concatenate 'string "$" name))))
-       sb!vm::*register-names*))
+       sb-vm::*register-names*))
 
 (define-arg-type reg
   :printer #'(lambda (value stream dstate)
@@ -84,7 +84,7 @@
   :printer (lambda (value stream dstate)
              (declare (ignore stream))
              (destructuring-bind (reg offset) value
-               (when (= reg sb!vm::code-offset)
+               (when (= reg sb-vm::code-offset)
                  (note-code-constant offset dstate)))))
 
 (defparameter *float-reg-symbols*

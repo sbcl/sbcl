@@ -225,7 +225,7 @@ variable: an unreadable object representing the error is printed instead.")
     (+ (if (minusp object) 1 0) ; leading sign
        (if *print-radix* 4 0) ; #rNN or trailing decimal
        (ceiling (if (fixnump object)
-                    sb!vm:n-positive-fixnum-bits
+                    sb-vm:n-positive-fixnum-bits
                     (* (%bignum-length object) sb!bignum::digit-size))
                 bits-per-char))))
 
@@ -1095,7 +1095,7 @@ variable: an unreadable object representing the error is printed instead.")
   ;; certainly quite platform dependent: this gives 87 for 32 bit
   ;; SBCL, which is about right at least for x86/Darwin.
   (if (or (fixnump integer)
-          (< (integer-length integer) (* 3 sb!vm:n-positive-fixnum-bits)))
+          (< (integer-length integer) (* 3 sb-vm:n-positive-fixnum-bits)))
       (%output-reasonable-integer-in-base integer base stream)
       (%output-huge-integer-in-base integer base stream)))
 
@@ -1257,9 +1257,9 @@ variable: an unreadable object representing the error is printed instead.")
 ;;; possible extension for the enthusiastic: printing floats in bases
 ;;; other than base 10.
 (defconstant single-float-min-e
-  (- 2 sb!vm:single-float-bias sb!vm:single-float-digits))
+  (- 2 sb-vm:single-float-bias sb-vm:single-float-digits))
 (defconstant double-float-min-e
-  (- 2 sb!vm:double-float-bias sb!vm:double-float-digits))
+  (- 2 sb-vm:double-float-bias sb-vm:double-float-digits))
 #!+long-float
 (defconstant long-float-min-e
   (nth-value 1 (decode-float least-positive-long-float)))
@@ -1617,7 +1617,7 @@ variable: an unreadable object representing the error is printed instead.")
     (let (dinfo)
       (cond ((code-obj-is-filler-p component)
              (format stream "filler ~dw"
-                     (ash (%code-code-size component) (- sb!vm:word-shift))))
+                     (ash (%code-code-size component) (- sb-vm:word-shift))))
             ((eq (setq dinfo (%code-debug-info component)) :bogus-lra)
              (write-string "bogus code object" stream))
             ((functionp dinfo)
@@ -1717,7 +1717,7 @@ variable: an unreadable object representing the error is printed instead.")
 ;;;; catch-all for unknown things
 
 (declaim (inline lowtag-of))
-(defun lowtag-of (x) (logand (get-lisp-obj-address x) sb!vm:lowtag-mask))
+(defun lowtag-of (x) (logand (get-lisp-obj-address x) sb-vm:lowtag-mask))
 
 (defmethod print-object ((object t) stream)
   (when (eq object sb!pcl:+slot-unbound+)
@@ -1728,27 +1728,27 @@ variable: an unreadable object representing the error is printed instead.")
   (print-unreadable-object (object stream :identity t)
     (let ((lowtag (lowtag-of object)))
       (case lowtag
-        (#.sb!vm:other-pointer-lowtag
+        (#.sb-vm:other-pointer-lowtag
          (let ((widetag (widetag-of object)))
            (case widetag
-             (#.sb!vm:value-cell-widetag
+             (#.sb-vm:value-cell-widetag
               (write-string "value cell " stream)
               (output-object (value-cell-ref object) stream))
-             (#.sb!vm:filler-widetag
+             (#.sb-vm:filler-widetag
               (write-string "pad " stream)
               (write (1+ (get-header-data object)) :stream stream)
               (write-string "w" stream)) ; words
              (t
               (write-string "unknown pointer object, widetag=" stream)
               (output-integer widetag stream 16 t)))))
-        ((#.sb!vm:fun-pointer-lowtag
-          #.sb!vm:instance-pointer-lowtag
-          #.sb!vm:list-pointer-lowtag)
+        ((#.sb-vm:fun-pointer-lowtag
+          #.sb-vm:instance-pointer-lowtag
+          #.sb-vm:list-pointer-lowtag)
          (write-string "unknown pointer object, lowtag=" stream)
          (output-integer lowtag stream 16 t))
         (t
          (case (widetag-of object)
-           (#.sb!vm:unbound-marker-widetag
+           (#.sb-vm:unbound-marker-widetag
             (write-string "unbound marker" stream))
            (t
             (write-string "unknown immediate object, lowtag=" stream)

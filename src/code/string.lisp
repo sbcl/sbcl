@@ -116,8 +116,8 @@
                        (>= len #!+x86 16
                                #!+x86-64 8))
                   (case widetag1
-                    (#.sb!vm:simple-base-string-widetag 0)
-                    (#.sb!vm:simple-character-string-widetag 2)))))
+                    (#.sb-vm:simple-base-string-widetag 0)
+                    (#.sb-vm:simple-character-string-widetag 2)))))
         (when char-shift
           (return-from string=*
             ;; Efficiently compute byte indices. Derive-type on ASH isn't
@@ -129,7 +129,7 @@
                          `(sap+ (vector-sap (truly-the string ,string))
                                 (scale ,start)))
                        (scale (index)
-                         `(truly-the sb!vm:signed-word
+                         `(truly-the sb-vm:signed-word
                            (ash (truly-the index ,index) char-shift))))
               (declare (optimize (sb!c:alien-funcall-saves-fp-and-pc 0)))
               (with-pinned-objects (string1 string2)
@@ -162,14 +162,14 @@
           (cond #!-x86-64
                 ((= widetag1 widetag2)
                  (case widetag1
-                   (#.sb!vm:simple-base-string-widetag
+                   (#.sb-vm:simple-base-string-widetag
                     (char-loop base-char base-char))
-                   (#.sb!vm:simple-character-string-widetag
+                   (#.sb-vm:simple-character-string-widetag
                     (char-loop character character))))
-                ((or (and (= widetag1 sb!vm:simple-character-string-widetag)
-                          (= widetag2 sb!vm:simple-base-string-widetag))
-                     (and (= widetag2 sb!vm:simple-character-string-widetag)
-                          (= widetag1 sb!vm:simple-base-string-widetag)
+                ((or (and (= widetag1 sb-vm:simple-character-string-widetag)
+                          (= widetag2 sb-vm:simple-base-string-widetag))
+                     (and (= widetag2 sb-vm:simple-character-string-widetag)
+                          (= widetag1 sb-vm:simple-base-string-widetag)
                           (progn (rotatef start1 start2)
                                  (rotatef end1 end2)
                                  (rotatef string1 string2)
@@ -585,5 +585,5 @@ new string COUNT long filled with the fill character."
   ;;  #b10_ ; literal compiled to core
   (set-header-data (the (simple-array * 1) vector)
                    (if always-shareable
-                       sb!vm:+vector-shareable+
-                       sb!vm:+vector-shareable-nonstd+)))
+                       sb-vm:+vector-shareable+
+                       sb-vm:+vector-shareable-nonstd+)))

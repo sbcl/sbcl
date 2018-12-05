@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 ;;; Instruction-like macros.
 
@@ -42,7 +42,7 @@
                                           "SYMBOL-"
                                           (string slot)
                                           "-SLOT")
-                             (find-package "SB!VM"))))
+                             (find-package "SB-VM"))))
          `(progn
             (defmacro ,loader (reg symbol)
               `(inst ld ,reg null-tn
@@ -165,8 +165,8 @@
       ;; For the benefit of future historians, this is how CMUCL does the
       ;; align-csp (I think their version is branch free only because
       ;; they simply don't worry about zeroing the pad word):
-      #+nil (inst add ,temp-tn csp-tn sb!vm:lowtag-mask)
-      #+nil (inst andn ,temp-tn sb!vm:lowtag-mask)
+      #+nil (inst add ,temp-tn csp-tn sb-vm:lowtag-mask)
+      #+nil (inst andn ,temp-tn sb-vm:lowtag-mask)
 
       ;; Set the result to temp-tn, with appropriate lowtag
       (inst or ,result-tn csp-tn ,lowtag)

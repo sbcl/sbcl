@@ -29,15 +29,15 @@
 ;;; in the linkage table.
 (defun ensure-foreign-symbol-linkage (name datap)
   (let ((key (if datap (list name) name))
-        (table-base sb!vm:linkage-table-space-start)
+        (table-base sb-vm:linkage-table-space-start)
         (ht *linkage-info*))
     (or (awhen (with-locked-system-table (ht)
                  (or (gethash key ht)
                      (let* ((table-offset
-                             (* (hash-table-count ht) sb!vm:linkage-table-entry-size))
+                             (* (hash-table-count ht) sb-vm:linkage-table-entry-size))
                             (table-address (+ table-base table-offset)))
-                       (when (<= (+ table-address sb!vm:linkage-table-entry-size)
-                                 sb!vm:linkage-table-space-end)
+                       (when (<= (+ table-address sb-vm:linkage-table-entry-size)
+                                 sb-vm:linkage-table-space-end)
                          (let ((real-address
                                 (ensure-dynamic-foreign-symbol-address name datap)))
                            (aver real-address)
@@ -60,10 +60,10 @@
   (let ((n-prelinked (extern-alien "lisp_linkage_table_n_prelinked" int)))
     (dohash ((key table-offset) *linkage-info* :locked t)
       (let* ((datap (listp key))
-             (table-address (+ table-offset sb!vm:linkage-table-space-start))
+             (table-address (+ table-offset sb-vm:linkage-table-space-start))
              (name (if datap (car key) key))
-             (index (floor (- table-address sb!vm:linkage-table-space-start)
-                           sb!vm:linkage-table-entry-size)))
+             (index (floor (- table-address sb-vm:linkage-table-space-start)
+                           sb-vm:linkage-table-entry-size)))
         ;; Partial fix to the above: Symbols required for Lisp startup
         ;; will not be re-pointed to a different address ever.
         ;; Nor will those referenced by ELF core.

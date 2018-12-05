@@ -251,7 +251,7 @@
 
 (defun print-cond (value stream dstate)
   (declare (ignore dstate))
-  (princ (svref sb!vm::+condition-name-vec+ value) stream))
+  (princ (svref sb-vm::+condition-name-vec+ value) stream))
 
 (defun use-label (value dstate)
   (let* ((value (if (consp value)
@@ -267,19 +267,19 @@
 
 (defun annotate-ldr-str (register offset dstate)
   (case register
-    (#.sb!vm::code-offset
+    (#.sb-vm::code-offset
      (note-code-constant offset dstate))
-    (#.sb!vm::null-offset
-     (let ((offset (+ sb!vm::nil-value offset)))
+    (#.sb-vm::null-offset
+     (let ((offset (+ sb-vm::nil-value offset)))
        (maybe-note-assembler-routine offset nil dstate)
        (maybe-note-static-symbol (logior offset other-pointer-lowtag)
                                               dstate)))
     #!+sb-thread
-    (#.sb!vm::thread-offset
+    (#.sb-vm::thread-offset
      (let* ((thread-slots
              (load-time-value
               (primitive-object-slots
-               (find 'sb!vm::thread *primitive-objects*
+               (find 'sb-vm::thread *primitive-objects*
                      :key #'primitive-object-name)) t))
             (slot (find (ash offset (- word-shift)) thread-slots
                         :key #'slot-offset)))

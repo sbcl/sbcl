@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 (defun ea-for-sse-stack (tn &optional (base rbp-tn))
   (ea (frame-byte-offset (1+ (tn-offset tn))) base))

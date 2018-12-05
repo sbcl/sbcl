@@ -25,8 +25,8 @@
   #!-immobile-space (make-fdefn name)
   #!+immobile-space
   (let ((fdefn (truly-the (values fdefn &optional)
-                          (sb!vm::alloc-immobile-fdefn))))
-    (sb!vm::%set-fdefn-name fdefn name)
+                          (sb-vm::alloc-immobile-fdefn))))
+    (sb-vm::%set-fdefn-name fdefn name)
     ;; Return the result of FDEFN-MAKUNBOUND because it (strangely) returns its
     ;; argument. Using FDEFN as the value of this function, as if we didn't know
     ;; that FDEFN-MAKUNBOUND did that, would cause a redundant register move.
@@ -36,7 +36,7 @@
   (declare (type function fun)
            (type fdefn fdefn)
            (values function))
-  #!+immobile-code (sb!vm::%set-fdefn-fun fdefn fun)
+  #!+immobile-code (sb-vm::%set-fdefn-fun fdefn fun)
   #!-immobile-code (setf (fdefn-fun fdefn) fun))
 
 #!-sb-fluid (declaim (inline symbol-fdefn))
@@ -102,7 +102,7 @@
   ;; if we already know that FUNCTION is a function.
   ;; It will signal a type error if not, which is the right thing to do anyway.
   ;; (this isn't quite a true predicate)
-  (and (= (fun-subtype function) sb!vm:closure-widetag)
+  (and (= (fun-subtype function) sb-vm:closure-widetag)
        ;; This test needs to reference the name of any macro, but in order for
        ;; cold-init to work, the macro has to be defined first.
        ;; So pick DX-LET, as it's in primordial-extensions.
@@ -403,9 +403,9 @@
 
 ;; Byte index 2 of the fdefn's header is the statically-linked flag
 #!+immobile-code
-(defmacro sb!vm::fdefn-has-static-callers (fdefn)
+(defmacro sb-vm::fdefn-has-static-callers (fdefn)
   `(sap-ref-8 (int-sap (get-lisp-obj-address ,fdefn))
-              (- 2 sb!vm::other-pointer-lowtag)))
+              (- 2 sb-vm::other-pointer-lowtag)))
 
 (defun fmakunbound (name)
   "Make NAME have no global function definition."
@@ -415,8 +415,8 @@
     (let ((fdefn (find-fdefn name)))
       (when fdefn
         #!+immobile-code
-        (unless (eql (sb!vm::fdefn-has-static-callers fdefn) 0)
-          (sb!vm::remove-static-links fdefn))
+        (unless (eql (sb-vm::fdefn-has-static-callers fdefn) 0)
+          (sb-vm::remove-static-links fdefn))
         (fdefn-makunbound fdefn)))
     (undefine-fun-name name)
     name))

@@ -9,12 +9,12 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 ;;;; types
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (deftype bit-offset () '(integer 0 (#.sb!vm:n-word-bits))))
+  (deftype bit-offset () '(integer 0 (#.sb-vm:n-word-bits))))
 
 ;;;; support routines
 
@@ -42,14 +42,14 @@
 ;;; is a right-shift.
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun shift-towards-start (number countoid)
-    (declare (type sb!vm:word number) (fixnum countoid))
-    (let ((count (ldb (byte (1- (integer-length sb!vm:n-word-bits)) 0) countoid)))
+    (declare (type sb-vm:word number) (fixnum countoid))
+    (let ((count (ldb (byte (1- (integer-length sb-vm:n-word-bits)) 0) countoid)))
       (declare (type bit-offset count))
       (if (zerop count)
           number
           (ecase sb!c:*backend-byte-order*
             (:big-endian
-               (ash (ldb (byte (- sb!vm:n-word-bits count) 0) number) count))
+               (ash (ldb (byte (- sb-vm:n-word-bits count) 0) number) count))
             (:little-endian
                (ash number (- count))))))))
 
@@ -58,8 +58,8 @@
 ;;; right-shift and on little-endian machines this is a left-shift.
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun shift-towards-end (number count)
-    (declare (type sb!vm:word number) (fixnum count))
-    (let ((count (ldb (byte (1- (integer-length sb!vm:n-word-bits)) 0) count)))
+    (declare (type sb-vm:word number) (fixnum count))
+    (let ((count (ldb (byte (1- (integer-length sb-vm:n-word-bits)) 0) count)))
       (declare (type bit-offset count))
       (if (zerop count)
           number
@@ -67,7 +67,7 @@
             (:big-endian
                (ash number (- count)))
             (:little-endian
-               (ash (ldb (byte (- sb!vm:n-word-bits count) 0) number) count)))))))
+               (ash (ldb (byte (- sb-vm:n-word-bits count) 0) number) count)))))))
 
 #!-sb-fluid (declaim (inline start-mask end-mask))
 
@@ -77,7 +77,7 @@
 ;;; on 32-bit word size -- WHN 2001-03-19).
 (defun start-mask (count)
   (declare (fixnum count))
-  (shift-towards-start (1- (ash 1 sb!vm:n-word-bits)) (- count)))
+  (shift-towards-start (1- (ash 1 sb-vm:n-word-bits)) (- count)))
 
 ;;; Produce a mask that contains 1's for the COUNT "end" bits and 0's
 ;;; for the remaining "start" bits. Only the lower 5 bits of COUNT are
@@ -85,24 +85,24 @@
 ;;; 32-bit word size -- WHN 2001-03-19).
 (defun end-mask (count)
   (declare (fixnum count))
-  (shift-towards-end (1- (ash 1 sb!vm:n-word-bits)) (- count)))
+  (shift-towards-end (1- (ash 1 sb-vm:n-word-bits)) (- count)))
 
 #!-sb-fluid (declaim (inline word-sap-ref %set-word-sap-ref))
 (defun word-sap-ref (sap offset)
   (declare (type system-area-pointer sap)
            (type index offset)
-           (values sb!vm:word)
+           (values sb-vm:word)
            (muffle-conditions compiler-note) ; "unsigned word to integer coercion"
            (optimize (speed 3) (safety 0)))
-  (sap-ref-word sap (the index (ash offset sb!vm:word-shift))))
+  (sap-ref-word sap (the index (ash offset sb-vm:word-shift))))
 (defun %set-word-sap-ref (sap offset value)
   (declare (type system-area-pointer sap)
            (type index offset)
-           (type sb!vm:word value)
-           (values sb!vm:word)
+           (type sb-vm:word value)
+           (values sb-vm:word)
            (muffle-conditions compiler-note) ; "unsigned word to integer coercion"
            (optimize (speed 3) (safety 0)))
-  (setf (sap-ref-word sap (the index (ash offset sb!vm:word-shift)))
+  (setf (sap-ref-word sap (the index (ash offset sb-vm:word-shift)))
         value))
 
 
@@ -150,7 +150,7 @@
 
 ;;; We cheat a little bit by using TRULY-THE in the copying function to
 ;;; force the compiler to generate good code in the (= BITSIZE
-;;; SB!VM:N-WORD-BITS) case.  We don't use TRULY-THE in the other cases
+;;; SB-VM:N-WORD-BITS) case.  We don't use TRULY-THE in the other cases
 ;;; to give the compiler freedom to generate better code.
 (defmacro !define-byte-bashers (bitsize)
   (let* ((bytes-per-word (/ n-word-bits bitsize))
@@ -577,7 +577,7 @@
 #.(loop for i = 1 then (* i 2)
         collect `(!define-sap-fixer ,i) into fixers
         collect `(!define-byte-bashers ,i) into bashers
-        until (= i sb!vm:n-word-bits)
+        until (= i sb-vm:n-word-bits)
         ;; FIXERS must come first so their inline expansions are available
         ;; for the bashers.
         finally (return `(progn ,@fixers ,@bashers)))
@@ -620,9 +620,9 @@
                          (first-bits (logand start +bit-position-base-mask+))
                          ;; These mask out everything but the interesting parts.
                          (end-mask #!+little-endian (lognot (ash -1 last-bits))
-                                   #!+big-endian (ash -1 (- sb!vm:n-word-bits last-bits)))
+                                   #!+big-endian (ash -1 (- sb-vm:n-word-bits last-bits)))
                          (start-mask #!+little-endian (ash -1 first-bits)
-                                     #!+big-endian (lognot (ash -1 (- sb!vm:n-word-bits first-bits)))))
+                                     #!+big-endian (lognot (ash -1 (- sb-vm:n-word-bits first-bits)))))
                     (declare (index last-word first-word))
                     (flet ((#!+little-endian start-bit
                             #!+big-endian end-bit (x)
@@ -631,13 +631,13 @@
                              (truly-the (mod #.n-word-bits)
                                  (%primitive unsigned-word-find-first-bit x))
                              #!-(or x86-64 x86)
-                             (- #!+big-endian sb!vm:n-word-bits
+                             (- #!+big-endian sb-vm:n-word-bits
                                 (integer-length (logand x (- x)))
                                 #!+little-endian 1))
                            (#!+little-endian end-bit
                             #!+big-endian start-bit (x)
                              (declare (word x))
-                             (- #!+big-endian sb!vm:n-word-bits
+                             (- #!+big-endian sb-vm:n-word-bits
                                 (integer-length x)
                                 #!+little-endian 1))
                            (found (i word-offset)

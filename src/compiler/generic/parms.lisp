@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 ;;; When building the cross-compiler (and called by the host), read the
 ;;; dynamic-space-size file.

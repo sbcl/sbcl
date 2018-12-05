@@ -268,11 +268,11 @@ been defined. (See SB-EXT:CAS for more information.)
            (error "Invalid first argument to ~S: ~S" name specified-place))
          (compute-newval (old) ; used only if no atomic inc vop
            `(logand (,(case name (atomic-incf '+) (atomic-decf '-)) ,old
-                     (the sb!vm:signed-word ,diff)) sb!ext:most-positive-word))
+                     (the sb-vm:signed-word ,diff)) sb!ext:most-positive-word))
          (compute-delta () ; used only with atomic inc vop
            `(logand ,(case name
-                       (atomic-incf `(the sb!vm:signed-word ,diff))
-                       (atomic-decf `(- (the sb!vm:signed-word ,diff))))
+                       (atomic-incf `(the sb-vm:signed-word ,diff))
+                       (atomic-decf `(- (the sb-vm:signed-word ,diff))))
                     sb!ext:most-positive-word)))
     (declare (ignorable #'compute-newval #'compute-delta))
     (when (and (symbolp place)
@@ -330,15 +330,15 @@ been defined. (See SB-EXT:CAS for more information.)
          (let* ((accessor-info (structure-instance-accessor-p op))
                 (slotd (cdr accessor-info))
                 (type (dsd-type slotd)))
-           (unless (and (eq 'sb!vm:word (dsd-raw-type slotd))
-                        (type= (specifier-type type) (specifier-type 'sb!vm:word)))
+           (unless (and (eq 'sb-vm:word (dsd-raw-type slotd))
+                        (type= (specifier-type type) (specifier-type 'sb-vm:word)))
              (error "~S requires a slot of type (UNSIGNED-BYTE ~S), not ~S: ~S"
-                    name sb!vm:n-word-bits type place))
+                    name sb-vm:n-word-bits type place))
            (when (dsd-read-only slotd)
              (error "Cannot use ~S with structure accessor for a read-only slot: ~S"
                     name place))
            #!+compare-and-swap-vops
-           `(truly-the sb!vm:word
+           `(truly-the sb-vm:word
              (%raw-instance-atomic-incf/word
               (the ,(dd-name (car accessor-info)) ,@args)
               ,(dsd-index slotd)
@@ -376,7 +376,7 @@ which is well-defined over two different domains:
 DIFF defaults to 1.
 
 EXPERIMENTAL: Interface subject to change."
-  sb!vm:n-word-bits most-positive-word
+  sb-vm:n-word-bits most-positive-word
   sb!xc:most-positive-fixnum sb!xc:most-negative-fixnum)
   (expand-atomic-frob 'atomic-incf place diff env))
 
@@ -405,7 +405,7 @@ which is well-defined over two different domains:
 DIFF defaults to 1.
 
 EXPERIMENTAL: Interface subject to change."
-  sb!vm:n-word-bits most-positive-word
+  sb-vm:n-word-bits most-positive-word
   sb!xc:most-negative-fixnum sb!xc:most-positive-fixnum)
   (expand-atomic-frob 'atomic-decf place diff env))
 

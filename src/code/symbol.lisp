@@ -196,10 +196,10 @@ distinct from the global value. Can also be SETF."
   ;; gets the fixnum which is the VECTOR-LENGTH of the info vector.
   ;; So all we have to do is turn any fixnum to NIL, and we have a plist.
   ;; Ensure that this pun stays working.
-  (assert (= (- (* sb!vm:n-word-bytes sb!vm:cons-car-slot)
-                sb!vm:list-pointer-lowtag)
-             (- (* sb!vm:n-word-bytes sb!vm:vector-length-slot)
-                sb!vm:other-pointer-lowtag))))
+  (assert (= (- (* sb-vm:n-word-bytes sb-vm:cons-car-slot)
+                sb-vm:list-pointer-lowtag)
+             (- (* sb-vm:n-word-bytes sb-vm:vector-length-slot)
+                sb-vm:other-pointer-lowtag))))
 
 (defun symbol-plist (symbol)
   "Return SYMBOL's property list."
@@ -329,7 +329,7 @@ distinct from the global value. Can also be SETF."
 #!+immobile-space
 (defun %make-symbol (kind name)
   (declare (ignorable kind) (type simple-string name))
-  (set-header-data name sb!vm:+vector-shareable+) ; Set "logically read-only" bit
+  (set-header-data name sb-vm:+vector-shareable+) ; Set "logically read-only" bit
   (if #!-immobile-symbols
       (or (eql kind 1) ; keyword
           (and (eql kind 2) ; random interned symbol
@@ -337,8 +337,8 @@ distinct from the global value. Can also be SETF."
                (char= (char name 0) #\*)
                (char= (char name (1- (length name))) #\*)))
       #!+immobile-symbols t ; always place them there
-      (truly-the (values symbol) (sb!vm::make-immobile-symbol name))
-      (sb!vm::%%make-symbol name)))
+      (truly-the (values symbol) (sb-vm::make-immobile-symbol name))
+      (sb-vm::%%make-symbol name)))
 
 (defun get (symbol indicator &optional (default nil))
   "Look on the property list of SYMBOL for the specified INDICATOR. If this

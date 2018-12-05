@@ -1,7 +1,7 @@
 ;;;
 ;;; Written by William Lott.
 ;;;
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 
 

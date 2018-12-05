@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 ;;;; primitive type definitions
 
@@ -22,7 +22,7 @@
 ;;; primitive integer types that fit in registers
 (/show0 "primtype.lisp 24")
 (!def-primitive-type positive-fixnum (any-reg signed-reg unsigned-reg)
-  :type (unsigned-byte #.sb!vm:n-positive-fixnum-bits))
+  :type (unsigned-byte #.sb-vm:n-positive-fixnum-bits))
 (/show0 "primtype.lisp 27")
 #!-64-bit-registers
 (!def-primitive-type unsigned-byte-31 (signed-reg unsigned-reg descriptor-reg)
@@ -52,7 +52,7 @@
 (/show0 "primtype.lisp 53")
 (!def-primitive-type-alias tagged-num '(:or positive-fixnum fixnum))
 (multiple-value-bind (unsigned signed)
-    (case sb!vm::n-machine-word-bits
+    (case sb-vm::n-machine-word-bits
       (64 (values '(unsigned-byte-64 unsigned-byte-63 positive-fixnum)
                   '(signed-byte-64 fixnum unsigned-byte-63 positive-fixnum)))
       (32 (values '(unsigned-byte-32 unsigned-byte-31 positive-fixnum)

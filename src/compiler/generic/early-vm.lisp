@@ -7,7 +7,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 ;;; the number of bits per byte, where a byte is the smallest
 ;;; addressable object

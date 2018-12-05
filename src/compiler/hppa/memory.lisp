@@ -1,4 +1,4 @@
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 ;;; Cell-Ref and Cell-Set are used to define VOPs like CAR, where the offset to
 ;;; be read or written is a property of the VOP used.  Cell-Setf is similar to

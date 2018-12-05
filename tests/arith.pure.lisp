@@ -558,7 +558,7 @@
                              (list fun dividend divisor)
                              dividend-type))))))))))))
 
-;; The fast path for logbitp underestimated sb!vm:n-positive-fixnum-bits
+;; The fast path for logbitp underestimated sb-vm:n-positive-fixnum-bits
 ;; for > 61 bit fixnums.
 (with-test (:name (logbitp :wide fixnum))
   (assert (not (logbitp (1- (integer-length most-positive-fixnum))

@@ -13,14 +13,14 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; Imports from this package into SB-VM
-  (import '(reg-tn-encoding) "SB!VM")
+  (import '(reg-tn-encoding) "SB-VM")
   ;; Imports from SB-VM into this package
   (import '(;; SBs and SCs
-            sb!vm::zero sb!vm::immediate-constant
-            sb!vm::registers sb!vm::float-registers
+            sb-vm::zero sb-vm::immediate-constant
+            sb-vm::registers sb-vm::float-registers
             ;; TNs and offsets
-            sb!vm::zero-tn sb!vm::lip-tn
-            sb!vm::zero-offset sb!vm::null-offset)))
+            sb-vm::zero-tn sb-vm::lip-tn
+            sb-vm::zero-offset sb-vm::null-offset)))
 
 ;;;; Constants, types, conversion functions, some disassembler stuff.
 
@@ -72,7 +72,7 @@
        #'(lambda (name)
            (cond ((null name) nil)
                  (t (make-symbol (concatenate 'string "$" name)))))
-       sb!vm::*register-names*))
+       sb-vm::*register-names*))
 
 (define-arg-type reg
   :printer

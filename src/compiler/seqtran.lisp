@@ -320,10 +320,10 @@
 (defmacro mapper-from-typecode (typecode)
   #+sb-xc-host
   `(svref ,(let ((a (make-array 256)))
-             (dovector (info sb!vm:*specialized-array-element-type-properties* a)
-               (setf (aref a (sb!vm:saetp-typecode info))
+             (dovector (info sb-vm:*specialized-array-element-type-properties* a)
+               (setf (aref a (sb-vm:saetp-typecode info))
                      (package-symbolicate "SB!IMPL" "VECTOR-MAP-INTO/"
-                                          (sb!vm:saetp-primitive-type-name info)))))
+                                          (sb-vm:saetp-primitive-type-name info)))))
           ,typecode)
   #-sb-xc-host
   `(%fun-name (svref sb!impl::%%vector-map-into-funs%% ,typecode)))
@@ -371,7 +371,7 @@
              (let ((saetp (find-saetp-by-ctype (array-type-specialized-element-type result-type))))
                (unless saetp
                  (give-up-ir1-transform "Uknown upgraded array element type of the result"))
-               `(progn (,(mapper-from-typecode (sb!vm:saetp-typecode saetp))
+               `(progn (,(mapper-from-typecode (sb-vm:saetp-typecode saetp))
                         result 0 (length result) (%coerce-callable-to-fun fun) seqs)
                        result)))
             (t
@@ -625,9 +625,9 @@
   '(list-fill* seq item start end))
 
 (defun find-basher (saetp &optional item node)
-  (let* ((element-type (sb!vm:saetp-specifier saetp))
-         (element-ctype (sb!vm:saetp-ctype saetp))
-         (n-bits (sb!vm:saetp-n-bits saetp))
+  (let* ((element-type (sb-vm:saetp-specifier saetp))
+         (element-ctype (sb-vm:saetp-ctype saetp))
+         (n-bits (sb-vm:saetp-n-bits saetp))
          (basher-name (format nil "UB~D-BASH-FILL" n-bits))
          (basher (or (find-symbol basher-name
                                   (load-time-value
@@ -635,7 +635,7 @@
                      (abort-ir1-transform
                       "Unknown fill basher, please report to sbcl-devel: ~A"
                       basher-name)))
-         (kind (cond ((sb!vm:saetp-fixnum-p saetp) :tagged)
+         (kind (cond ((sb-vm:saetp-fixnum-p saetp) :tagged)
                      ((member element-type '(character base-char)) :char)
                      ((eq element-type 'single-float) :single-float)
                      #!+64-bit
@@ -658,7 +658,7 @@
                           (ldb (byte n-bits 0)
                                (ecase kind
                                  (:tagged
-                                  (ash tmp sb!vm:n-fixnum-tag-bits))
+                                  (ash tmp sb-vm:n-fixnum-tag-bits))
                                  (:char
                                   (char-code tmp))
                                  (:bits
@@ -675,9 +675,9 @@
                                           (ldb (byte 32 0)
                                                (single-float-bits (realpart tmp))))))))
                         (res bits))
-                   (loop for i of-type sb!vm:word from n-bits by n-bits
-                         until (= i sb!vm:n-word-bits)
-                         do (setf res (ldb (byte sb!vm:n-word-bits 0)
+                   (loop for i of-type sb-vm:word from n-bits by n-bits
+                         until (= i sb-vm:n-word-bits)
+                         do (setf res (ldb (byte sb-vm:n-word-bits 0)
                                            (logior res (ash bits i)))))
                    res))
                (progn
@@ -685,11 +685,11 @@
                    (delay-ir1-transform node :constraint))
                  (if (and (eq kind :bits)
                           (= n-bits 1))
-                     `(ldb (byte ,sb!vm:n-word-bits 0) (- item))
+                     `(ldb (byte ,sb-vm:n-word-bits 0) (- item))
                      `(let ((res (ldb (byte ,n-bits 0)
                                       ,(ecase kind
                                          (:tagged
-                                          `(ash item ,sb!vm:n-fixnum-tag-bits))
+                                          `(ash item ,sb-vm:n-fixnum-tag-bits))
                                          (:char
                                           `(char-code item))
                                          (:bits
@@ -705,9 +705,9 @@
                                           `(logior (ash (single-float-bits (imagpart item)) 32)
                                                    (ldb (byte 32 0)
                                                         (single-float-bits (realpart item)))))))))
-                        (declare (type sb!vm:word res))
-                        ,@(loop for i of-type sb!vm:word = n-bits then (* 2 i)
-                                until (= i sb!vm:n-word-bits)
+                        (declare (type sb-vm:word res))
+                        ,@(loop for i of-type sb-vm:word = n-bits then (* 2 i)
+                                until (= i sb-vm:n-word-bits)
                                 collect
                                 `(setf res (dpb res (byte ,i ,i) res)))
                         res))))))
@@ -725,7 +725,7 @@
     (cond ((eq *wild-type* element-ctype)
            (delay-ir1-transform node :constraint)
            `(vector-fill* seq item start end))
-          ((and saetp (sb!vm:valid-bit-bash-saetp-p saetp))
+          ((and saetp (sb-vm:valid-bit-bash-saetp-p saetp))
            (multiple-value-bind (basher bash-value) (find-basher saetp item node)
              (values
               ;; KLUDGE: WITH-ARRAY data in its full glory is going to mess up
@@ -958,8 +958,8 @@
                 (unless (<= 0 start2 end2 len2)
                   (sequence-bounding-indices-bad-error seq2 start2 end2))))
           ,',(cond
-               ((and saetp (sb!vm:valid-bit-bash-saetp-p saetp))
-                (let* ((n-element-bits (sb!vm:saetp-n-bits saetp))
+               ((and saetp (sb-vm:valid-bit-bash-saetp-p saetp))
+                (let* ((n-element-bits (sb-vm:saetp-n-bits saetp))
                        (bash-function (intern (format nil "UB~D-BASH-COPY"
                                                       n-element-bits)
                                               (find-package "SB!KERNEL"))))
@@ -988,9 +988,9 @@
 
 (macrolet
     ((define-replace-transforms ()
-       (loop for saetp across sb!vm:*specialized-array-element-type-properties*
-             for sequence-type = `(simple-array ,(sb!vm:saetp-specifier saetp) (*))
-             unless (= (sb!vm:saetp-typecode saetp) sb!vm::simple-array-nil-widetag)
+       (loop for saetp across sb-vm:*specialized-array-element-type-properties*
+             for sequence-type = `(simple-array ,(sb-vm:saetp-specifier saetp) (*))
+             unless (= (sb-vm:saetp-typecode saetp) sb-vm::simple-array-nil-widetag)
              collect (!make-replace-transform saetp sequence-type sequence-type)
              into forms
              finally (return `(progn ,@forms))))
@@ -1016,7 +1016,7 @@
                             dst dst-offset
                             length n-elems-per-word)
   (declare (ignore src dst length))
-  (let ((n-bits-per-elem (truncate sb!vm:n-word-bits n-elems-per-word)))
+  (let ((n-bits-per-elem (truncate sb-vm:n-word-bits n-elems-per-word)))
     (multiple-value-bind (src-word src-elt)
         (truncate (lvar-value src-offset) n-elems-per-word)
       (multiple-value-bind (dst-word dst-elt)
@@ -1044,7 +1044,7 @@
                     ;; sign of the shift count prior to shifting when
                     ;; all we need is a simple negate and shift
                     ;; right.  Yuck.
-                    (mask (ash #.(1- (ash 1 sb!vm:n-word-bits))
+                    (mask (ash #.(1- (ash 1 sb-vm:n-word-bits))
                                (* (- extra ,n-elems-per-word)
                                   ,n-bits-per-elem))))
                (setf (%vector-raw-bits dst end)
@@ -1079,8 +1079,8 @@
      collect `(deftransform ,name ,arglist
                 (frob-bash-transform src src-offset
                                      dst dst-offset length
-                                     ,(truncate sb!vm:n-word-bits i))) into forms
-     until (= i sb!vm:n-word-bits)
+                                     ,(truncate sb-vm:n-word-bits i))) into forms
+     until (= i sb-vm:n-word-bits)
      finally (return `(progn ,@forms))))
 
 ;;; We expand copy loops inline in SUBSEQ and COPY-SEQ if we're copying
@@ -1117,7 +1117,7 @@
                                       element-type)
   (let ((saetp (find-saetp element-type)))
     (aver saetp)
-    (if (>= (sb!vm:saetp-n-bits saetp) sb!vm:n-word-bits)
+    (if (>= (sb-vm:saetp-n-bits saetp) sb-vm:n-word-bits)
         (expand-aref-copy-loop src src-offset dst dst-offset length)
         `(locally (declare (optimize (safety 0)))
            (replace ,dst ,src :start1 ,dst-offset :start2 ,src-offset :end1 ,length)))))
@@ -1200,7 +1200,7 @@
                           (saetp (find-saetp-by-ctype elt-ctype)))
                      (cond ((not initial-element)
                             (let ((default-initial-element
-                                    (sb!vm:saetp-initial-element-default saetp)))
+                                    (sb-vm:saetp-initial-element-default saetp)))
                               (unless (ctypep default-initial-element elt-ctype)
                                 ;; As with MAKE-ARRAY, this is merely undefined
                                 ;; behavior, not an error.
@@ -1720,16 +1720,16 @@
                               el-ctype))
                 (saetp (find-saetp-by-ctype el-ctype)))
            (when saetp
-             (sb!vm:saetp-typecode saetp))))
+             (sb-vm:saetp-typecode saetp))))
         ((and (union-type-p type)
               (csubtypep type (specifier-type 'string))
               (loop for type in (union-type-types type)
                     always (and (array-type-p type)
                                 (equal (array-type-dimensions type) '(*)))))
          #!+sb-unicode
-         sb!vm:simple-character-string-widetag
+         sb-vm:simple-character-string-widetag
          #!-sb-unicode
-         sb!vm:simple-base-string-widetag)))
+         sb-vm:simple-base-string-widetag)))
 
 (deftransform concatenate ((result-type &rest lvars)
                            ((constant-arg t)
@@ -1756,10 +1756,10 @@
                   (%concatenate-to-list ,@(coerce-constants vars 'list)))))
             ((not vector-widetag)
              (give-up-ir1-transform))
-            ((= vector-widetag sb!vm:simple-base-string-widetag)
+            ((= vector-widetag sb-vm:simple-base-string-widetag)
              (string-concatenate-transform node 'simple-base-string lvars))
             #!+sb-unicode
-            ((= vector-widetag sb!vm:simple-character-string-widetag)
+            ((= vector-widetag sb-vm:simple-character-string-widetag)
              (string-concatenate-transform node 'string lvars))
             ;; FIXME: other vectors may use inlined expansion from
             ;; STRING-CONCATENATE-TRANSFORM as well.
@@ -1768,7 +1768,7 @@
                `(lambda (type ,@vars)
                   (declare (ignore type)
                            (ignorable ,@vars))
-                  ,(if (= vector-widetag sb!vm:simple-vector-widetag)
+                  ,(if (= vector-widetag sb-vm:simple-vector-widetag)
                        `(%concatenate-to-simple-vector
                          ,@(coerce-constants vars 'vector))
                        `(%concatenate-to-vector

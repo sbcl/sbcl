@@ -115,7 +115,7 @@
   ;; STREAM-ELEMENT-MODE type.
   (element-mode :bivalent :type stream-element-mode)
   ;; the Unix file descriptor
-  (fd -1 :type #!-win32 fixnum #!+win32 sb!vm:signed-word)
+  (fd -1 :type #!-win32 fixnum #!+win32 sb-vm:signed-word)
   ;; What do we know about the FD?
   (fd-type :unknown :type keyword)
   ;; controls when the output buffer is flushed

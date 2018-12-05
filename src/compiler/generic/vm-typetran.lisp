@@ -50,7 +50,7 @@
 
 (define-type-predicate simple-array-unsigned-fixnum-p
     (simple-array
-     (unsigned-byte #.sb!vm:n-positive-fixnum-bits) (*)))
+     (unsigned-byte #.sb-vm:n-positive-fixnum-bits) (*)))
 
 (define-type-predicate simple-array-unsigned-byte-31-p
     (simple-array (unsigned-byte 31) (*)))
@@ -69,7 +69,7 @@
                        (simple-array (signed-byte 16) (*)))
 
 (define-type-predicate simple-array-fixnum-p
-    (simple-array (signed-byte #.sb!vm:n-fixnum-bits)
+    (simple-array (signed-byte #.sb-vm:n-fixnum-bits)
                   (*)))
 
 (define-type-predicate simple-array-signed-byte-32-p

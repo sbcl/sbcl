@@ -63,7 +63,7 @@
   )
 
 (declaim (ftype (sfunction (unsigned-byte)
-                           (unsigned-byte #.sb!vm:n-positive-fixnum-bits))
+                           (unsigned-byte #.sb-vm:n-positive-fixnum-bits))
                 primify))
 (defun make-info-storage (n-cells-min &optional (load-factor .7))
   ;; If you ask for 40 entries at 50% load, you get (PRIMIFY 80) entries.
@@ -79,7 +79,7 @@
     (fill a nil :start end)
     a))
 
-(declaim (ftype (sfunction (t) (unsigned-byte #.sb!vm:n-positive-fixnum-bits))
+(declaim (ftype (sfunction (t) (unsigned-byte #.sb-vm:n-positive-fixnum-bits))
                 globaldb-sxhashoid))
 
 (defstruct (info-hashtable (:conc-name info-env-) (:copier nil))
@@ -125,12 +125,12 @@
 ;; transported value cells. Use unbound markers for that.
 (defun make-info-forwarding-pointer (index)
   (declare (type info-cell-index index) (optimize (safety 0)))
-  (%make-lisp-obj (+ (ash index 8) sb!vm:unbound-marker-widetag)))
+  (%make-lisp-obj (+ (ash index 8) sb-vm:unbound-marker-widetag)))
 (defun info-forwarding-pointer-target (marker)
   (ash (get-lisp-obj-address marker) -8))
 (defun info-value-moved-p (x)
   (eq (logand (get-lisp-obj-address x) #xff)
-      sb!vm:unbound-marker-widetag))
+      sb-vm:unbound-marker-widetag))
 
 ;; The common skeleton of {Get, Put, Rehash} operations. Probe key cells until
 ;; either a hit occurs, in which case the :HIT form is executed and looping

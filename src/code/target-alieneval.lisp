@@ -424,7 +424,7 @@ null byte."
        (let* ((field (slot-or-lose type slot))
               (offset (alien-record-field-offset field))
               (field-type (alien-record-field-type field)))
-         (%sap-alien (sap+ (alien-sap alien) (/ offset sb!vm:n-byte-bits))
+         (%sap-alien (sap+ (alien-sap alien) (/ offset sb-vm:n-byte-bits))
                      (make-alien-pointer-type :to field-type)))))))
 
 ;;;; the DEREF operator
@@ -494,7 +494,7 @@ null byte."
   (declare (type alien-value alien)
            (type list indices))
   (multiple-value-bind (target-type offset) (deref-guts alien indices)
-    (%sap-alien (sap+ (alien-value-sap alien) (/ offset sb!vm:n-byte-bits))
+    (%sap-alien (sap+ (alien-value-sap alien) (/ offset sb-vm:n-byte-bits))
                 (make-alien-pointer-type :to target-type))))
 
 ;;;; accessing heap alien variables
@@ -605,8 +605,8 @@ null byte."
         (values (ceiling bits
                          (ecase units
                            (:bits 1)
-                           (:bytes sb!vm:n-byte-bits)
-                           (:words sb!vm:n-word-bits))))
+                           (:bytes sb-vm:n-byte-bits)
+                           (:words sb-vm:n-word-bits))))
         (error "unknown size for alien type ~S"
                (unparse-alien-type alien-type)))))
 

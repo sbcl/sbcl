@@ -156,7 +156,7 @@ of :INHERITED :EXTERNAL :INTERNAL."
               "(~D+~D)/~D [~@[~,3f words/sym,~]load=~,1f%]"
               n-live n-deleted n-cells
               (unless (zerop n-live)
-                (/ (* (1+ (/ sb!vm:n-word-bytes)) n-cells) n-live))
+                (/ (* (1+ (/ sb-vm:n-word-bytes)) n-cells) n-live))
               (* 100 (/ n-filled n-cells))))))
 
 ;;; the maximum load factor we allow in a package hashtable

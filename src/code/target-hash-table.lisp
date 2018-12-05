@@ -122,9 +122,9 @@
   (declare (values hash (member t nil)))
   (if (%other-pointer-subtype-p
        key
-       '#.(list sb!vm:bignum-widetag sb!vm:ratio-widetag sb!vm:double-float-widetag
-                sb!vm:single-float-widetag
-                sb!vm:complex-widetag sb!vm:complex-single-float-widetag sb!vm:complex-double-float-widetag))
+       '#.(list sb-vm:bignum-widetag sb-vm:ratio-widetag sb-vm:double-float-widetag
+                sb-vm:single-float-widetag
+                sb-vm:complex-widetag sb-vm:complex-single-float-widetag sb-vm:complex-double-float-widetag))
       (values (sxhash key) nil)
       (eq-hash key)))
 
@@ -411,14 +411,14 @@ Examples:
            ;; Reducing this to (unsigned-byte 32) would save memory.
            (index-vector (make-array length
                                      :element-type
-                                     '(unsigned-byte #.sb!vm:n-word-bits)
+                                     '(unsigned-byte #.sb-vm:n-word-bits)
                                      :initial-element 0))
            ;; Needs to be the half the length of the KV vector to link
            ;; KV entries - mapped to indeces at 2i and 2i+1 -
            ;; together.
            (next-vector (make-array size+1
                                     :element-type
-                                    '(unsigned-byte #.sb!vm:n-word-bits)))
+                                    '(unsigned-byte #.sb-vm:n-word-bits)))
            (kv-vector (make-array (* 2 size+1)
                                   :initial-element +empty-ht-slot+))
            (weakness (if weakness
@@ -441,7 +441,7 @@ Examples:
                      ;; See FIXME at INDEX-VECTOR. Same concern.
                      (make-array size+1
                                  :element-type '(unsigned-byte
-                                                 #.sb!vm:n-word-bits)
+                                                 #.sb-vm:n-word-bits)
                                  :initial-element +magic-hash-vector-value+))
                    (logior (if synchronized 2 0) weakness))))
       (declare (type index size+1 scaled-size length))
@@ -533,7 +533,7 @@ multiple threads accessing the same hash-table without locking."
          (old-size (length old-next-vector)))
 
     ;; Disable GC tricks on the OLD-KV-VECTOR.
-    (set-header-data old-kv-vector sb!vm:vector-normal-subtype)
+    (set-header-data old-kv-vector sb-vm:vector-normal-subtype)
 
     ;; GC must never observe a value other than 0 or 1 in the 1st element
     ;; of a vector marked as valid-hashing. The vector is initially filled
@@ -543,7 +543,7 @@ multiple threads accessing the same hash-table without locking."
 
     ;; Non-empty weak hash tables always need GC support.
     (when (and (hash-table-weak-p table) (plusp (hash-table-count table)))
-      (set-header-data new-kv-vector sb!vm:vector-valid-hashing-subtype))
+      (set-header-data new-kv-vector sb-vm:vector-valid-hashing-subtype))
 
     ;; FIXME: here and in several other places in the hash table code,
     ;; loops like this one are used when FILL or REPLACE would be
@@ -590,7 +590,7 @@ multiple threads accessing the same hash-table without locking."
                ;; EQ-based hash.
                ;; Enable GC tricks.
                (set-header-data new-kv-vector
-                                sb!vm:vector-valid-hashing-subtype)
+                                sb-vm:vector-valid-hashing-subtype)
                (let* ((hashing (pointer-hash key))
                       (index (index-for-hashing hashing new-size))
                       (next (aref new-index-vector index)))
@@ -626,7 +626,7 @@ multiple threads accessing the same hash-table without locking."
     (unless (and (hash-table-weak-p table) (plusp (hash-table-count table)))
       ;; Disable GC tricks, they will be re-enabled during the re-hash
       ;; if necessary.
-      (set-header-data kv-vector sb!vm:vector-normal-subtype))
+      (set-header-data kv-vector sb-vm:vector-normal-subtype))
 
     ;; Rehash all the entries.
     (setf (hash-table-next-free-kv table) 0)
@@ -656,7 +656,7 @@ multiple threads accessing the same hash-table without locking."
               (t
                ;; EQ-based hash.
                ;; Enable GC tricks.
-               (set-header-data kv-vector sb!vm:vector-valid-hashing-subtype)
+               (set-header-data kv-vector sb-vm:vector-valid-hashing-subtype)
                (let* ((hashing (pointer-hash key))
                       (index (index-for-hashing hashing length))
                       (next (aref index-vector index)))
@@ -852,11 +852,11 @@ if there is no such entry. Entries can be added using SETF."
            (test-fun (hash-table-test-fun hash-table)))
       (declare (type index index next))
       (when (hash-table-weak-p hash-table)
-        (set-header-data kv-vector sb!vm:vector-valid-hashing-subtype))
+        (set-header-data kv-vector sb-vm:vector-valid-hashing-subtype))
       (cond ((or eq-based (not hash-vector))
              (when eq-based
                (set-header-data kv-vector
-                                sb!vm:vector-valid-hashing-subtype))
+                                sb-vm:vector-valid-hashing-subtype))
              ;; Search next-vector chain for a matching key.
              (do ((next next (aref next-vector next))
                   (i 0 (1+ i)))
@@ -1028,7 +1028,7 @@ table itself."
              (size (length next-vector))
              (index-vector (hash-table-index-vector hash-table)))
         ;; Disable GC tricks.
-        (set-header-data kv-vector sb!vm:vector-normal-subtype)
+        (set-header-data kv-vector sb-vm:vector-normal-subtype)
         ;; Mark all slots as empty by setting all keys and values to magic
         ;; tag.
         (aver (eq (aref kv-vector 0) hash-table))

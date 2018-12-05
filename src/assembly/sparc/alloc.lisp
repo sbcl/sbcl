@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 ;;; (Given that the pseudo-atomic sequence is so short, there is
 ;;; nothing that qualifies.  But we want to keep the file around

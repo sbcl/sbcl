@@ -130,7 +130,7 @@
   (show-and-call sb!kernel::!raw-slot-data-init)
 
   ;; Must be done before any non-opencoded array references are made.
-  (show-and-call sb!vm::!hairy-data-vector-reffer-init)
+  (show-and-call sb-vm::!hairy-data-vector-reffer-init)
 
   (show-and-call !character-database-cold-init)
   (show-and-call !character-name-database-cold-init)
@@ -146,7 +146,7 @@
   (show-and-call !type-class-cold-init)
   ;; cold-init-wrappers are closures. Installing a closure as a
   ;; named function requires consing immobile space code.
-  #!+immobile-code (setq sb!vm::*immobile-space-mutex*
+  #!+immobile-code (setq sb-vm::*immobile-space-mutex*
                          (sb!thread:make-mutex :name "Immobile space"))
   (!with-init-wrappers (show-and-call sb!kernel::!primordial-type-cold-init))
   (show-and-call !world-lock-cold-init)
@@ -287,7 +287,7 @@
       (logically-readonlyize (sb!c::sc-move-costs sc))))
 
   ; hppa heap is segmented, lisp and c uses a stub to call eachother
-  #!+hpux (%primitive sb!vm::setup-return-from-lisp-stub)
+  #!+hpux (%primitive sb-vm::setup-return-from-lisp-stub)
   ;; The system is finally ready for GC.
   (/show0 "enabling GC")
   (setq *gc-inhibit* nil)
@@ -401,7 +401,7 @@ process to continue normally."
 (defun hexstr (thing)
   (/noshow0 "entering HEXSTR")
   (let* ((addr (get-lisp-obj-address thing))
-         (nchars (* sb!vm:n-word-bytes 2))
+         (nchars (* sb-vm:n-word-bytes 2))
          (str (make-string (+ nchars 2) :element-type 'base-char)))
     (/noshow0 "ADDR and STR calculated")
     (setf (char str 0) #\0

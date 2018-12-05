@@ -1,6 +1,6 @@
 ;;; This file contains the PPC specific runtime stuff.
 ;;;
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 #-sb-xc-host
 (defun machine-type ()

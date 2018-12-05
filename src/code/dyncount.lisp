@@ -161,7 +161,7 @@ comments from CMU CL:
   (dohash ((k v) *backend-template-names* :locked t)
     (declare (ignore v))
     (remprop k 'vop-stats))
-  (sb!vm::map-allocated-objects
+  (sb-vm::map-allocated-objects
          (lambda (object type-code size)
            (declare (ignore type-code size))
            (when (dyncount-info-p object)
@@ -176,7 +176,7 @@ comments from CMU CL:
   "Return a hash-table mapping string VOP names to VOP-STATS structures
    describing the VOPs executed. If clear is true, then reset all counts to
    zero as a side effect."
-  (sb!vm::map-allocated-objects
+  (sb-vm::map-allocated-objects
          (lambda (object type-code size)
            (declare (ignore type-code size))
            (when (dyncount-info-p object)
@@ -201,7 +201,7 @@ comments from CMU CL:
   (let* ((function (%primitive closure-fun function))
          (component (sb!di::fun-code-header function)))
     (do ((end (code-header-words component))
-         (i sb!vm:code-constants-offset (1+ i)))
+         (i sb-vm:code-constants-offset (1+ i)))
         ((= end i))
       (let ((constant (code-header-ref component i)))
         (when (dyncount-info-p constant)

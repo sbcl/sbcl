@@ -1086,7 +1086,7 @@ unless :NAMED is also specified.")))
                    `(the ,type-spec ,place))
                   (t
                    (unless (dsd-always-boundp dsd)
-                     (setf place `(the* ((not (satisfies sb!vm::unbound-marker-p))
+                     (setf place `(the* ((not (satisfies sb-vm::unbound-marker-p))
                                          :context (:struct-read ,(dd-name dd) . ,(dsd-name dsd)))
                                          ,place)))
                    (if (eq type-spec t) place `(truly-the ,type-spec ,place)))))
@@ -1392,7 +1392,7 @@ or they must be declared locally notinline at each call site.~@:>"
   ;; With compact instances, LAYOUT is not reflected in the bitmap.
   ;; Without compact instances, the 0th bitmap bit (for the LAYOUT) is always 1.
   ;; In neither case is the place for the layout represented in in DD-SLOTS.
-  (let ((bitmap sb!vm:instance-data-start))
+  (let ((bitmap sb-vm:instance-data-start))
     (dolist (slot (dd-slots dd))
       (when (eql t (dsd-raw-type slot))
         (setf bitmap (logior bitmap (ash 1 (dsd-index slot))))))
@@ -1832,7 +1832,7 @@ or they must be declared locally notinline at each call site.~@:>"
          ;; This is the same in ordinary structures too: see (INCF DD-LENGTH)
          ;; in PARSE-DEFSTRUCT-NAME-AND-OPTIONS.
          ;; With compact instance headers, slot 0 is a data slot.
-         (slot-index sb!vm:instance-data-start))
+         (slot-index sb-vm:instance-data-start))
     ;; We do *not* fill in the COPIER-NAME and PREDICATE-NAME
     ;; because alternate-metaclass structures can not have either.
     (case dd-type
@@ -1967,7 +1967,7 @@ or they must be declared locally notinline at each call site.~@:>"
   (let ((dd (make-defstruct-description t 'structure-object)))
     (setf
      (dd-slots dd) nil
-     (dd-length dd) sb!vm:instance-data-start
+     (dd-length dd) sb-vm:instance-data-start
      (dd-type dd) 'structure)
     (%compiler-set-up-layout dd)))
 #+sb-xc-host(!set-up-structure-object-class)
@@ -2008,13 +2008,13 @@ or they must be declared locally notinline at each call site.~@:>"
     (let ((layout (%instance-layout instance)))
       ;; with compact headers, 0 is an ordinary slot index.
       ;; without, it's the layout.
-      (if (eql index (1- sb!vm:instance-data-start))
+      (if (eql index (1- sb-vm:instance-data-start))
           (error "XC Host should use %INSTANCE-LAYOUT, not %INSTANCE-REF 0")
           (let* ((dd (layout-info layout))
                  ;; If data starts at 1, then subtract 1 from index.
                  ;; otherwise use the index as-is.
                  (dsd (elt (dd-slots dd)
-                           (- index sb!vm:instance-data-start)))
+                           (- index sb-vm:instance-data-start)))
                  (accessor-name (dsd-accessor-name dsd)))
             ;; Why AVER these: because it is slightly abstraction-breaking
             ;; to assume that the slot-index N is the NTH item in the DSDs.

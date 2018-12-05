@@ -43,7 +43,7 @@
            (error "A size specification is meaningless in a ~S SB." kind)))
         ((:finite :unbounded)
          (unless size (error "Size is not specified in a ~S SB." kind))
-         (aver (<= size sb!vm:finite-sc-offset-limit))
+         (aver (<= size sb-vm:finite-sc-offset-limit))
          (aver (= 1 (logcount size-alignment)))
          (aver (not (logtest size (1- size-alignment))))
          (aver (not (logtest size-increment (1- size-alignment))))))
@@ -522,7 +522,7 @@
             (aver sc)
             (setf (aref results index)
                   (if offset
-                      (+ (ash offset (1+ sb!vm:sc-number-bits))
+                      (+ (ash offset (1+ sb-vm:sc-number-bits))
                          (ash (sc-number-or-lose sc) 1)
                          1)
                       (ash (sc-number-or-lose sc) 1))))
@@ -1042,8 +1042,8 @@
 (defun compute-loading-costs (op load-p)
   (declare (type operand-parse op))
   (let ((scs (operand-parse-scs op))
-        (costs (make-array sb!vm:sc-number-limit :initial-element nil))
-        (load-scs (make-array sb!vm:sc-number-limit :initial-element nil)))
+        (costs (make-array sb-vm:sc-number-limit :initial-element nil))
+        (load-scs (make-array sb-vm:sc-number-limit :initial-element nil)))
     (dolist (sc-name (reverse scs))
       (let* ((load-sc (sc-or-lose sc-name))
              (load-scn (sc-number load-sc)))
@@ -1069,7 +1069,7 @@
               (unless (eq op-load t)
                 (pushnew load-scn (svref load-scs op-scn))))))
 
-        (dotimes (i sb!vm:sc-number-limit)
+        (dotimes (i sb-vm:sc-number-limit)
           (unless (svref costs i)
             (let ((op-sc (svref *backend-sc-numbers* i)))
               (when op-sc
@@ -1082,11 +1082,11 @@
     (values costs load-scs)))
 
 (defconstant-eqx +no-costs+
-    (make-array sb!vm:sc-number-limit :initial-element 0)
+    (make-array sb-vm:sc-number-limit :initial-element 0)
   #'equalp)
 
 (defconstant-eqx +no-loads+
-    (make-array sb!vm:sc-number-limit :initial-element t)
+    (make-array sb-vm:sc-number-limit :initial-element t)
   #'equalp)
 
 ;;; Pick off the case of operands with no restrictions.

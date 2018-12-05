@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 ;;; Tags for the main low-level types are stored in the low n (usually three)
 ;;; bits to identify the type of a machine word.  Certain constraints
@@ -90,7 +90,7 @@
 
 (defconstant-eqx fixnum-lowtags
     #.(let ((fixtags nil))
-        (do-external-symbols (sym "SB!VM")
+        (do-external-symbols (sym "SB-VM")
           (let* ((name (symbol-name sym))
                  (len (length name)))
             (when (and (boundp sym)
@@ -166,7 +166,7 @@
 ;; SIMPLE-VECTOR means the latter doesn't make it right for SBCL internals.
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-(defenum (;; The first widetag must be greater than SB!VM:LOWTAG-LIMIT
+(defenum (;; The first widetag must be greater than SB-VM:LOWTAG-LIMIT
           ;; otherwise code in generic/early-type-vops will suffer
           ;; a long, horrible death.  --njf, 2004-08-09
           :start #.(+ (ash 1 n-lowtag-bits) other-immediate-0-lowtag)
@@ -323,7 +323,7 @@
     (logior (+ fixedobj-space-start (* 3 layout-align)) instance-pointer-lowtag)))
 
 #|
-;; Run this in the SB-VM or SB!VM package once for each target feature combo.
+;; Run this in the SB-VM or SB-VM package once for each target feature combo.
 (defun rewrite-widetag-comments ()
   (rename-file "src/compiler/generic/early-objdef.lisp" "early-objdef.old")
   (with-open-file (in "src/compiler/generic/early-objdef.old")

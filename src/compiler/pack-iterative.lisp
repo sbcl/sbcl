@@ -55,7 +55,7 @@
   ;; membership test.
   (full-incidence  (make-sset) :type sset :read-only t)
   ;; A mask of the colors of the neighbors
-  (neighbor-colors 0 :type sb!vm:finite-sc-offset-map)
+  (neighbor-colors 0 :type sb-vm:finite-sc-offset-map)
   ;; For each bit of the NEIGHBOR-COLORS mask this maintains the
   ;; number of neighbors that share that color. Needed to recolor the vertex.
   (neighbor-color-counts (load-time-value
@@ -65,7 +65,7 @@
   ;; vertex, taking into account reserve locations and preallocated
   ;; TNs.
   (initial-domain 0 :type sc-locations)
-  (initial-domain-size 0 :type #.`(integer 0 ,sb!vm:finite-sc-offset-limit))
+  (initial-domain-size 0 :type #.`(integer 0 ,sb-vm:finite-sc-offset-limit))
   ;; TN this is a vertex for.
   (tn           nil :type tn :read-only t)
   (element-size nil :type (integer 1 8) :read-only t)
@@ -333,7 +333,7 @@
 ;; Take into account element sizes of the respective SCs.
 (declaim (inline color-no-conflicts-p))
 (defun color-no-conflicts-p (color vertex)
-  (declare (type sb!vm:finite-sc-offset color)
+  (declare (type sb-vm:finite-sc-offset color)
            (type vertex vertex)
            (optimize speed (safety 0)))
   (not (logtest (ash (vertex-size-mask vertex) color)
@@ -382,7 +382,7 @@
 ;;; many of these vertices simultaneously take that color, and those
 ;;; that can't have a low spill cost.
 (declaim (ftype (sfunction (list sc-locations)
-                           (values sb!vm:finite-sc-offset list))
+                           (values sb-vm:finite-sc-offset list))
                 vertices-best-color/single-color))
 (defun vertices-best-color/single-color (vertices color)
   (let ((compatible '()))
@@ -396,7 +396,7 @@
     (values color compatible)))
 
 (declaim (ftype (sfunction (vertex sc-locations)
-                           (values sb!vm:finite-sc-offset list))
+                           (values sb-vm:finite-sc-offset list))
                 vertices-best-color/single-vertex))
 (defun vertices-best-color/single-vertex (vertex colors)
   (do-sc-locations (color colors nil (vertex-element-size vertex))
@@ -406,7 +406,7 @@
   (values (sc-locations-first colors) '()))
 
 (declaim (ftype (sfunction (cons sc-locations)
-                           (values sb!vm:finite-sc-offset list))
+                           (values sb-vm:finite-sc-offset list))
                 vertices-best-color/general))
 (defun vertices-best-color/general (vertices colors)
   (let* ((best-color      (sc-locations-first colors))
@@ -472,7 +472,7 @@
           color)))))
 
 (defun recolor-vertex (vertex new-color)
-  (declare (type sb!vm:finite-sc-offset new-color)
+  (declare (type sb-vm:finite-sc-offset new-color)
            (optimize (safety 0)))
   (let* ((size (vertex-element-size vertex))
          (color (vertex-color vertex))
@@ -482,12 +482,12 @@
     (do-sset-elements (neighbor (vertex-full-incidence vertex) vertex)
       (let ((map (logior (vertex-neighbor-colors neighbor) new-mask))
             (neighbor-color-counts (vertex-neighbor-color-counts neighbor)))
-        (declare (type sb!vm:finite-sc-offset-map map))
+        (declare (type sb-vm:finite-sc-offset-map map))
         (loop for old from color below (+ color size)
               for new from new-color
               do (when (zerop (decf (aref neighbor-color-counts old)))
                    (setf map (logxor map
-                                     (truly-the sb!vm:finite-sc-offset-map (ash 1 old)))))
+                                     (truly-the sb-vm:finite-sc-offset-map (ash 1 old)))))
                  (incf (aref neighbor-color-counts new)))
         (setf (vertex-neighbor-colors neighbor) map)))))
 
@@ -515,7 +515,7 @@
 
 (defun color-vertex (vertex color)
   (declare (type vertex vertex)
-           (type sb!vm:finite-sc-offset color)
+           (type sb-vm:finite-sc-offset color)
            (optimize speed (safety 0)))
   (setf (vertex-color vertex) color)
   (let* ((size (vertex-element-size vertex))

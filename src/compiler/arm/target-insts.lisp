@@ -46,13 +46,13 @@
            (fixnum value)
            (ignore dstate))
   (unless (= value 14) ;; Don't print :al
-    (princ (aref sb!vm::+condition-name-vec+ value) stream)))
+    (princ (aref sb-vm::+condition-name-vec+ value) stream)))
 
 (defun print-reg (value stream dstate)
   (declare (type stream stream)
            (fixnum value)
            (ignore dstate))
-  (princ (aref sb!vm::*register-names* value) stream))
+  (princ (aref sb-vm::*register-names* value) stream))
 
 (defun print-float-reg (value stream dstate)
   (declare (type stream stream)

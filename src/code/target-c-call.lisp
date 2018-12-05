@@ -23,7 +23,7 @@
 (define-alien-type short (integer 16))
 (define-alien-type int (integer 32))
 #!-(and win32 x86-64)
-(define-alien-type long (integer #.sb!vm::n-machine-word-bits))
+(define-alien-type long (integer #.sb-vm::n-machine-word-bits))
 #!+(and win32 x86-64)
 (define-alien-type long (integer 32))
 
@@ -33,7 +33,7 @@
 (define-alien-type unsigned-short (unsigned 16))
 (define-alien-type unsigned-int (unsigned 32))
 #!-(and win32 x86-64)
-(define-alien-type unsigned-long (unsigned #.sb!vm::n-machine-word-bits))
+(define-alien-type unsigned-long (unsigned #.sb-vm::n-machine-word-bits))
 #!+(and win32 x86-64)
 (define-alien-type unsigned-long (unsigned 32))
 (define-alien-type unsigned-long-long (unsigned 64))

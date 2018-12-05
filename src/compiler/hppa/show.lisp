@@ -1,4 +1,4 @@
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 (define-vop (print)
   (:args (object :scs (descriptor-reg any-reg) :target nl0))

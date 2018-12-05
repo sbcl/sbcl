@@ -98,10 +98,10 @@
   (declare (ignore dstate))
   (princ (aref (ecase width
                  ;; Notice that the this array is not the same
-                 ;; as SB!VM::+BYTE-REGISTER-NAMES+
+                 ;; as SB-VM::+BYTE-REGISTER-NAMES+
                  (:byte #(al cl dl bl ah ch dh bh))
-                 (:word sb!vm::+word-register-names+)
-                 (:dword sb!vm::+dword-register-names+))
+                 (:word sb-vm::+word-register-names+)
+                 (:dword sb-vm::+dword-register-names+))
                (if (eq width :byte) value (ash value 1)))
          stream)
   ;; XXX plus should do some source-var notes

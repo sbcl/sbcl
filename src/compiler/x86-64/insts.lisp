@@ -17,12 +17,12 @@
   (import '(conditional-opcode
             plausible-signed-imm32-operand-p
             ea-p ea-base ea-index size-nbyte
-            ea make-ea ea-disp rip-relative-ea) "SB!VM")
+            ea make-ea ea-disp rip-relative-ea) "SB-VM")
   ;; Imports from SB-VM into this package
-  (import '(sb!vm::tn-reg sb!vm::reg-name
-            sb!vm::frame-byte-offset sb!vm::rip-tn sb!vm::rbp-tn
-            #!+avx2 sb!vm::avx2-reg
-            sb!vm::registers sb!vm::float-registers sb!vm::stack))) ; SB names
+  (import '(sb-vm::tn-reg sb-vm::reg-name
+            sb-vm::frame-byte-offset sb-vm::rip-tn sb-vm::rbp-tn
+            #!+avx2 sb-vm::avx2-reg
+            sb-vm::registers sb-vm::float-registers sb-vm::stack))) ; SB names
 
 ;;; a REG object discards all information about a TN except its storage base
 ;;; (a/k/a register class), size class (for GPRs), and encoding.
@@ -275,7 +275,7 @@
     (:le . 14) (:ng . 14)
     (:nle . 15) (:g . 15))
   #'equal)
-(defconstant-eqx sb!vm::+condition-name-vec+
+(defconstant-eqx sb-vm::+condition-name-vec+
   #.(let ((vec (make-array 16 :initial-element nil)))
       (dolist (cond +conditions+ vec)
         (when (null (aref vec (cdr cond)))
@@ -296,7 +296,7 @@
   (define-sse-shuffle-arg-type sse-shuffle-pattern-2-2 "#b~2,'0B")
   (define-sse-shuffle-arg-type sse-shuffle-pattern-8-4 "#4r~4,4,'0R"))
 
-(define-arg-type condition-code :printer sb!vm::+condition-name-vec+)
+(define-arg-type condition-code :printer sb-vm::+condition-name-vec+)
 
 (defun conditional-opcode (condition)
   (cdr (assoc condition +conditions+ :test #'eq)))
@@ -1134,10 +1134,10 @@
   (let ((id (reg-id reg)))
     (svref (cond ((is-gpr-id-p id)
                   (svref (load-time-value
-                          (vector sb!vm::+qword-register-names+
-                                  sb!vm::+dword-register-names+
-                                  sb!vm::+word-register-names+
-                                  sb!vm::+byte-register-names+)
+                          (vector sb-vm::+qword-register-names+
+                                  sb-vm::+dword-register-names+
+                                  sb-vm::+word-register-names+
+                                  sb-vm::+byte-register-names+)
                           t)
                          (gpr-id-size-class id)))
                  #!+avx2
@@ -1294,7 +1294,7 @@
          (let ((ss (1- (integer-length scale)))
                (index (if (null index)
                           #b100
-                          (if (location= index sb!vm::rsp-tn)
+                          (if (location= index sb-vm::rsp-tn)
                               (error "can't index off of RSP")
                               (reg-encoding (if xmm-index
                                                 (get-fpr (tn-offset index))
@@ -1476,7 +1476,7 @@
       thing))
 
 ;;; This function SHOULD NOT BE USED. It is only for compatibility.
-(defun sb!vm::reg-in-size (tn size)
+(defun sb-vm::reg-in-size (tn size)
   (sized-thing (tn-reg tn) size))
 
 (define-instruction mov (segment maybe-size dst &optional src)
@@ -3473,7 +3473,7 @@
   (flet ((fix (reg)
            (if (register-p reg)
                (make-random-tn :kind :normal
-                               :sc (sc-or-lose 'sb!vm::unsigned-reg)
+                               :sc (sc-or-lose 'sb-vm::unsigned-reg)
                                :offset (reg-id-num (reg-id reg)))
                reg)))
     (%make-ea-dont-use size disp (fix base) (fix index) scale)))

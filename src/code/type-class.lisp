@@ -28,7 +28,7 @@
        (defvar *type-classes* (make-array 20 :fill-pointer 0)))
 #+sb-xc
 (macrolet ((def ()
-             (let* ((state-type `(unsigned-byte ,sb!vm:n-positive-fixnum-bits))
+             (let* ((state-type `(unsigned-byte ,sb-vm:n-positive-fixnum-bits))
                     (initform `(make-array 1 :element-type ',state-type))
                     (n (length *type-classes*)))
              `(progn
@@ -208,12 +208,12 @@
 ;; Complicated types don't admit the quick failure check.
 ;; At any rate, the totally opaque pseudo-random bits are under this mask.
 (defconstant +ctype-hash-mask+
-  (ldb (byte (1- sb!vm:n-positive-fixnum-bits) 0) -1))
+  (ldb (byte (1- sb-vm:n-positive-fixnum-bits) 0) -1))
 
 ;;; When comparing two ctypes, if this bit is 1 in each and they are not EQ,
 ;;; and at least one is interned, then they are not TYPE=.
 (defconstant +type-admits-type=-optimization+
-  (ash 1 (- sb!vm:n-positive-fixnum-bits 1)))
+  (ash 1 (- sb-vm:n-positive-fixnum-bits 1)))
 
 ;;; Represent an index into *SPECIALIZED-ARRAY-ELEMENT-TYPE-PROPERTIES*
 ;;; if applicable. For types which are not array specializations,
@@ -221,7 +221,7 @@
 (defconstant +ctype-saetp-index-bits+ 5)
 (defmacro !ctype-saetp-index (x)
   `(ldb (byte +ctype-saetp-index-bits+
-              ,(- sb!vm:n-positive-fixnum-bits (1+ +ctype-saetp-index-bits+)))
+              ,(- sb-vm:n-positive-fixnum-bits (1+ +ctype-saetp-index-bits+)))
         (type-hash-value ,x)))
 
 ;;; Generate a random hash value for use in memoization
@@ -255,7 +255,7 @@
   ;; - in the target, use scrambled bits from the allocation pointer
   ;;   instead.
   (hash-value (new-type-hash)
-              :type (signed-byte #.sb!vm:n-fixnum-bits)
+              :type (signed-byte #.sb-vm:n-fixnum-bits)
               ;; This is logically read-only, but because the host can not
               ;; calculate target hash values - it would need the identical
               ;; string hash algorithm and some other things - the hash is
@@ -292,7 +292,7 @@
               *ctype-hash-state* +ctype-hash-mask+))))
     (when saetp-index
       (setf (ldb (byte +ctype-saetp-index-bits+
-                       (- sb!vm:n-positive-fixnum-bits (1+ +ctype-saetp-index-bits+)))
+                       (- sb-vm:n-positive-fixnum-bits (1+ +ctype-saetp-index-bits+)))
                  hash)
             saetp-index))
     (logior sb!xc:most-negative-fixnum       ; "interned" bit
@@ -542,16 +542,16 @@
 ;;; it important for it to be INLINE, or could be become an ordinary
 ;;; function without significant loss? -- WHN 19990413
 #!-sb-fluid (declaim (inline type-cache-hash))
-(declaim (ftype (function (ctype ctype) (signed-byte #.sb!vm:n-fixnum-bits))
+(declaim (ftype (function (ctype ctype) (signed-byte #.sb-vm:n-fixnum-bits))
                 type-cache-hash))
 (defun type-cache-hash (type1 type2)
   (logxor (ash (type-hash-value type1) -3) (type-hash-value type2)))
 
 #!-sb-fluid (declaim (inline type-list-cache-hash))
-(declaim (ftype (function (list) (signed-byte #.sb!vm:n-fixnum-bits))
+(declaim (ftype (function (list) (signed-byte #.sb-vm:n-fixnum-bits))
                 type-list-cache-hash))
 (defun type-list-cache-hash (types)
-  (loop with res of-type (signed-byte #.sb!vm:n-fixnum-bits) = 0
+  (loop with res of-type (signed-byte #.sb-vm:n-fixnum-bits) = 0
         for type in types
         do (setq res (logxor (ash res -1) (type-hash-value type)))
         finally (return res)))

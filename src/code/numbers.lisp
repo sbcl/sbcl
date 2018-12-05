@@ -49,7 +49,7 @@
 ;;; (cheaper and/or more probable first.)
 (defconstant-eqx +type-test-ordering+
   '(fixnum single-float double-float integer #!+long-float long-float
-    sb!vm:signed-word word bignum
+    sb-vm:signed-word word bignum
     complex ratio)
   #'equal)
 
@@ -1053,7 +1053,7 @@ and the number of 0 bits if INTEGER is negative."
 (defun logbitp (index integer)
   "Predicate returns T if bit index of integer is a 1."
   (number-dispatch ((index integer) (integer integer))
-    ((fixnum fixnum) (if (< index sb!vm:n-positive-fixnum-bits)
+    ((fixnum fixnum) (if (< index sb-vm:n-positive-fixnum-bits)
                          (not (zerop (logand integer (ash 1 index))))
                          (minusp integer)))
     ((fixnum bignum) (bignum-logbitp index integer))
@@ -1072,10 +1072,10 @@ and the number of 0 bits if INTEGER is negative."
               (declare (fixnum length count))
               (cond ((and (plusp count)
                           (>= (+ length count)
-                              sb!vm:n-word-bits))
+                              sb-vm:n-word-bits))
                      (bignum-ashift-left-fixnum integer count))
                     (t
-                     (truly-the (signed-byte #.sb!vm:n-word-bits)
+                     (truly-the (signed-byte #.sb-vm:n-word-bits)
                                 (ash (truly-the fixnum integer) count))))))
            ((minusp count)
             (if (minusp integer) -1 0))
@@ -1136,7 +1136,7 @@ and the number of 0 bits if INTEGER is negative."
   ;; The naive algorithm is horrible in the general case.
   ;; Consider (LDB (BYTE 1 2) (SOME-GIANT-BIGNUM)) which has to shift the
   ;; input rightward 2 bits, consing a new bignum just to read 1 bit.
-  (if (and (<= 0 size sb!vm:n-positive-fixnum-bits)
+  (if (and (<= 0 size sb-vm:n-positive-fixnum-bits)
            (typep integer 'bignum))
       (sb!bignum::ldb-bignum=>fixnum size posn integer)
       (logand (ash integer (- posn))
@@ -1167,18 +1167,18 @@ and the number of 0 bits if INTEGER is negative."
                     (ldb (byte (1- ,size) 0) ,integer))))
     (typecase size
       ((eql 0) 0)
-      ((integer 1 #.sb!vm:n-fixnum-bits)
+      ((integer 1 #.sb-vm:n-fixnum-bits)
        (number-dispatch ((integer integer))
          ((fixnum) (msf size integer))
-         ((bignum) (let ((fix (sb!c::mask-signed-field #.sb!vm:n-fixnum-bits (%bignum-ref integer 0))))
-                     (if (= size #.sb!vm:n-fixnum-bits)
+         ((bignum) (let ((fix (sb!c::mask-signed-field #.sb-vm:n-fixnum-bits (%bignum-ref integer 0))))
+                     (if (= size #.sb-vm:n-fixnum-bits)
                          fix
                          (msf size fix))))))
-      ((integer (#.sb!vm:n-fixnum-bits) #.sb!vm:n-word-bits)
+      ((integer (#.sb-vm:n-fixnum-bits) #.sb-vm:n-word-bits)
        (number-dispatch ((integer integer))
          ((fixnum) integer)
-         ((bignum) (let ((word (sb!c::mask-signed-field #.sb!vm:n-word-bits (%bignum-ref integer 0))))
-                     (if (= size #.sb!vm:n-word-bits)
+         ((bignum) (let ((word (sb!c::mask-signed-field #.sb-vm:n-word-bits (%bignum-ref integer 0))))
+                     (if (= size #.sb-vm:n-word-bits)
                          word
                          (msf size word))))))
       ((unsigned-byte) (msf size integer)))))
@@ -1308,12 +1308,12 @@ and the number of 0 bits if INTEGER is negative."
                        (setq temp (- u v))
                        (when (zerop temp)
                          (let ((res (ash u k)))
-                           (declare (type sb!vm:signed-word res))
+                           (declare (type sb-vm:signed-word res))
                            ;; signed word to integer coercion -> return value
                            (declare (muffle-conditions compiler-note))
                            (return res))))))
-                (declare (type (mod #.sb!vm:n-word-bits) k)
-                         (type sb!vm:signed-word u v)))))
+                (declare (type (mod #.sb-vm:n-word-bits) k)
+                         (type sb-vm:signed-word u v)))))
            ((bignum bignum)
             (bignum-gcd u v))
            ((bignum fixnum)
@@ -1440,13 +1440,13 @@ and the number of 0 bits if INTEGER is negative."
 ;;; shifts.  See also the comment in (LOGAND OPTIMIZER) for more
 ;;; discussion of this hack.  -- CSR, 2003-10-09
 #!-64-bit-registers
-(defun sb!vm::ash-left-mod32 (integer amount)
+(defun sb-vm::ash-left-mod32 (integer amount)
   (etypecase integer
     ((unsigned-byte 32) (ldb (byte 32 0) (ash integer amount)))
     (fixnum (ldb (byte 32 0) (ash (logand integer #xffffffff) amount)))
     (bignum (ldb (byte 32 0) (ash (logand integer #xffffffff) amount)))))
 #!+64-bit-registers
-(defun sb!vm::ash-left-mod64 (integer amount)
+(defun sb-vm::ash-left-mod64 (integer amount)
   (etypecase integer
     ((unsigned-byte 64) (ldb (byte 64 0) (ash integer amount)))
     (fixnum (ldb (byte 64 0) (ash (logand integer #xffffffffffffffff) amount)))
@@ -1454,8 +1454,8 @@ and the number of 0 bits if INTEGER is negative."
                  (ash (logand integer #xffffffffffffffff) amount)))))
 
 #!+(or x86 x86-64 arm arm64)
-(defun sb!vm::ash-left-modfx (integer amount)
-  (let ((fixnum-width (- sb!vm:n-word-bits sb!vm:n-fixnum-tag-bits)))
+(defun sb-vm::ash-left-modfx (integer amount)
+  (let ((fixnum-width (- sb-vm:n-word-bits sb-vm:n-fixnum-tag-bits)))
     (etypecase integer
       (fixnum (sb!c::mask-signed-field fixnum-width (ash integer amount)))
       (integer (sb!c::mask-signed-field fixnum-width (ash (sb!c::mask-signed-field fixnum-width integer) amount))))))

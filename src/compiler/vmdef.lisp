@@ -141,8 +141,8 @@
                  (tn (if (logbitp 0 temp)
                          (make-wired-tn
                           nil
-                          (ldb (byte sb!vm:sc-number-bits 1) temp)
-                          (ash temp (- (1+ sb!vm:sc-number-bits))))
+                          (ldb (byte sb-vm:sc-number-bits 1) temp)
+                          (ash temp (- (1+ sb-vm:sc-number-bits))))
                          (make-restricted-tn nil (ash temp -1))))
                  (write-ref (reference-tn tn t)))
                      ;; KLUDGE: These formulas must be consistent with

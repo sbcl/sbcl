@@ -65,18 +65,18 @@
   (cache nil :type (or null index))
   ;; The index vector. This may be larger than the hash size to help
   ;; reduce collisions.
-  (index-vector nil :type (simple-array sb!vm:word (*)))
+  (index-vector nil :type (simple-array sb-vm:word (*)))
   ;; This table parallels the KV vector, and is used to chain together
   ;; the hash buckets and the free list. A slot will only ever be in
   ;; one of these lists.
-  (next-vector nil :type (simple-array sb!vm:word (*)))
+  (next-vector nil :type (simple-array sb-vm:word (*)))
   ;; This table parallels the KV table, and can be used to store the
   ;; hash associated with the key, saving recalculation. Could be
   ;; useful for EQL, and EQUAL hash tables. This table is not needed
   ;; for EQ hash tables, and when present the value of
   ;; +MAGIC-HASH-VECTOR-VALUE+ represents EQ-based hashing on the
   ;; respective key.
-  (hash-vector nil :type (or null (simple-array sb!vm:word (*))))
+  (hash-vector nil :type (or null (simple-array sb-vm:word (*))))
   ;; Used for locking GETHASH/(SETF GETHASH)/REMHASH
   (lock (sb!thread:make-mutex :name "hash-table lock")
         :type sb!thread:mutex :read-only t)
@@ -96,7 +96,7 @@
 ;; The previous sentence was written when SBCL was 32-bit only. The value
 ;; now depends on the word size. It is propagated to C in genesis because
 ;; the generational garbage collector needs to know it.
-(defconstant +magic-hash-vector-value+ (ash 1 (1- sb!vm:n-word-bits)))
+(defconstant +magic-hash-vector-value+ (ash 1 (1- sb-vm:n-word-bits)))
 
 ;;; Return an association list representing the same data as HASH-TABLE.
 (defun %hash-table-alist (hash-table)

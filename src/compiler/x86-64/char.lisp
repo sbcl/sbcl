@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!VM")
+(in-package "SB-VM")
 
 ;;; Space optimization: As the upper 32 bits of (tagged or untagged)
 ;;; characters are always zero many operations can be done on 32-bit
