@@ -148,27 +148,27 @@
             sb-pcl::ensure-accessor
             sb-pcl:ensure-class-finalized)
           ;; CLOS-based packages
-          '(sb!gray:stream-clear-input
-            sb!gray:stream-clear-output
-            sb!gray:stream-file-position
-            sb!gray:stream-finish-output
-            sb!gray:stream-force-output
-            sb!gray:stream-fresh-line
-            sb!gray:stream-line-column
-            sb!gray:stream-line-length
-            sb!gray:stream-listen
-            sb!gray:stream-peek-char
-            sb!gray:stream-read-byte
-            sb!gray:stream-read-char
-            sb!gray:stream-read-char-no-hang
-            sb!gray:stream-read-line
-            sb!gray:stream-read-sequence
-            sb!gray:stream-terpri
-            sb!gray:stream-unread-char
-            sb!gray:stream-write-byte
-            sb!gray:stream-write-char
-            sb!gray:stream-write-sequence
-            sb!gray:stream-write-string
+          '(sb-gray:stream-clear-input
+            sb-gray:stream-clear-output
+            sb-gray:stream-file-position
+            sb-gray:stream-finish-output
+            sb-gray:stream-force-output
+            sb-gray:stream-fresh-line
+            sb-gray:stream-line-column
+            sb-gray:stream-line-length
+            sb-gray:stream-listen
+            sb-gray:stream-peek-char
+            sb-gray:stream-read-byte
+            sb-gray:stream-read-char
+            sb-gray:stream-read-char-no-hang
+            sb-gray:stream-read-line
+            sb-gray:stream-read-sequence
+            sb-gray:stream-terpri
+            sb-gray:stream-unread-char
+            sb-gray:stream-write-byte
+            sb-gray:stream-write-char
+            sb-gray:stream-write-sequence
+            sb-gray:stream-write-string
             sb-sequence:concatenate
             sb-sequence:copy-seq
             sb-sequence:count
