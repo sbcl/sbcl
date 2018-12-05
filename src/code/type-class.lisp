@@ -295,7 +295,7 @@
                        (- sb-vm:n-positive-fixnum-bits (1+ +ctype-saetp-index-bits+)))
                  hash)
             saetp-index))
-    (logior sb!xc:most-negative-fixnum       ; "interned" bit
+    (logior sb-xc:most-negative-fixnum       ; "interned" bit
             ;; All metatypes of interned ctypes except for ARRAY allow
             ;; the TYPE= optimization that two instances of the type
             ;; which are not EQ are not TYPE=. With arrays it is possible

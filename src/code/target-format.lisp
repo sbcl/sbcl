@@ -179,9 +179,9 @@
                             "~:@(~:C~)-FORMAT-DIRECTIVE-INTERPRETER"
                             char)))
         (directive '.directive) ; expose this var to the lambda. it's easiest
-        (directives (if lambda-list (car (last lambda-list)) (sb!xc:gensym "DIRECTIVES"))))
+        (directives (if lambda-list (car (last lambda-list)) (sb-xc:gensym "DIRECTIVES"))))
     `(setf
-       (aref *format-directive-interpreters* (sb!xc:char-code (char-upcase ,char)))
+       (aref *format-directive-interpreters* (sb-xc:char-code (char-upcase ,char)))
        (named-lambda ,defun-name (stream ,directive ,directives orig-args args)
          (declare (ignorable stream orig-args args))
          ,@(if lambda-list
@@ -194,7 +194,7 @@
                  ,@body))))))
 
 (defmacro def-format-interpreter (char lambda-list &body body)
-  (let ((directives (sb!xc:gensym "DIRECTIVES")))
+  (let ((directives (sb-xc:gensym "DIRECTIVES")))
     `(def-complex-format-interpreter ,char (,@lambda-list ,directives)
        ,@body
        ,directives)))

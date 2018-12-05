@@ -12,7 +12,7 @@
 (in-package "SB!IMPL")
 
 (let ()
-  (defmacro sb!xc:defmacro (name lambda-list &body body)
+  (defmacro sb-xc:defmacro (name lambda-list &body body)
     (unless (symbolp name)
       (error "The macro name ~S is not a symbol." name))
     ;; When we are building the cross-compiler, we could be in a host
@@ -63,13 +63,13 @@
                   ;; and comparing it with the new one.
         (warn 'redefinition-with-defmacro :name name
               :new-function definition :new-location source-location))
-      (setf (sb!xc:macro-function name) definition)))
+      (setf (sb-xc:macro-function name) definition)))
   name)
 
 #+sb-xc-host
-(let ((real-expander (macro-function 'sb!xc:defmacro)))
-  ;; Inform the cross-compiler how to expand SB!XC:DEFMACRO (= DEFMACRO).
-  (setf (sb!xc:macro-function 'sb!xc:defmacro)
+(let ((real-expander (macro-function 'sb-xc:defmacro)))
+  ;; Inform the cross-compiler how to expand SB-XC:DEFMACRO (= DEFMACRO).
+  (setf (sb-xc:macro-function 'sb-xc:defmacro)
         (lambda (form env)
           (declare (ignore env))
           ;; Since SB!KERNEL:LEXENV isn't compatible with the host,
@@ -77,6 +77,6 @@
           ;; environment, but the expander doesn't need it.
           (funcall real-expander form nil)))
   ;; Building the cross-compiler should skip the compile-time-too
-  ;; processing SB!XC:DEFMACRO.
-  (setf (macro-function 'sb!xc:defmacro)
+  ;; processing SB-XC:DEFMACRO.
+  (setf (macro-function 'sb-xc:defmacro)
         (lambda (form env) `(let () ,(funcall real-expander form env)))))

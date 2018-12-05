@@ -573,11 +573,11 @@
                #!+(and sb-unicode (or x86-64 arm64))
                ((= (cdar pairs) (1- base-char-code-limit))
                 `(base-char-p ,object))
-               ((= (cdar pairs) (1- sb!xc:char-code-limit))
+               ((= (cdar pairs) (1- sb-xc:char-code-limit))
                 `(characterp ,object))))
         (let ((n-code (gensym "CODE")))
           `(and (characterp ,object)
-                (let ((,n-code (sb!xc:char-code ,object)))
+                (let ((,n-code (sb-xc:char-code ,object)))
                   (or
                    ,@(loop for pair in pairs
                            collect

@@ -332,7 +332,7 @@
   (check-type kind (member :untagged :tagged))
   (when lambda-list-p
     (dolist (arg lambda-list)
-      (when (member arg sb!xc:lambda-list-keywords)
+      (when (member arg sb-xc:lambda-list-keywords)
         (error "Lambda list keyword ~S is not supported for modular ~
                 function lambda lists." arg)))))
 

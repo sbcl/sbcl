@@ -15,9 +15,9 @@
 ;;; build-the-cross-compiler time defines its macro both in the
 ;;; cross-compilation host Lisp and in the target Lisp. Basically,
 ;;; DEF!TYPE does something like
-;;;   (DEFTYPE SB!XC:FOO ..)
-;;;   #+SB-XC-HOST (SB!XC:DEFTYPE FOO ..)
-;;; except that it also automatically delays the SB!XC:DEFTYPE call,
+;;;   (DEFTYPE SB-XC:FOO ..)
+;;;   #+SB-XC-HOST (SB-XC:DEFTYPE FOO ..)
+;;; except that it also automatically delays the SB-XC:DEFTYPE call,
 ;;; if necessary, until the cross-compiler's DEFTYPE machinery has been
 ;;; set up.
 
@@ -32,7 +32,7 @@
   `(progn
      (deftype ,name ,@rest)
      #+sb-xc-host
-     ,(let ((form `(sb!xc:deftype ,(uncross name) ,@rest)))
+     ,(let ((form `(sb-xc:deftype ,(uncross name) ,@rest)))
         (if (boundp '*delayed-def!types*)
             `(push ',form *delayed-def!types*)
             form))))

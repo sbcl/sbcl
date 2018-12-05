@@ -66,10 +66,10 @@
   ;; search starting from 2^60*pi.  The multiplication should be
   ;; efficient no matter what the platform thanks to modular
   ;; arithmetic.
-  (let* ((mul (logand 3622009729038463111 sb!xc:most-positive-fixnum))
-         (xor (logand 608948948376289905 sb!xc:most-positive-fixnum))
-         (xy (logand (+ (* x mul) y) sb!xc:most-positive-fixnum)))
-    (logand (logxor xor xy (ash xy -5)) sb!xc:most-positive-fixnum)))
+  (let* ((mul (logand 3622009729038463111 sb-xc:most-positive-fixnum))
+         (xor (logand 608948948376289905 sb-xc:most-positive-fixnum))
+         (xy (logand (+ (* x mul) y) sb-xc:most-positive-fixnum)))
+    (logand (logxor xor xy (ash xy -5)) sb-xc:most-positive-fixnum)))
 
 ;; Return a number that increments by 1 for each word-pair allocation,
 ;; barring complications such as exhaustion of the current page.
@@ -541,8 +541,8 @@
            ;; it didn't.)
            (sxhash val)))
     (macrolet ((hash-float (type key)
-                 (let ((lo (coerce sb!xc:most-negative-fixnum type))
-                       (hi (coerce sb!xc:most-positive-fixnum type)))
+                 (let ((lo (coerce sb-xc:most-negative-fixnum type))
+                       (hi (coerce sb-xc:most-positive-fixnum type)))
                    `(let ((key ,key))
                       (cond ( ;; This clause allows FIXNUM-sized integer
                              ;; values to be handled without consing.
@@ -617,7 +617,7 @@
                (declare (fixnum depthoid))
                (cond ((atom x) (sxhash x))
                      ((zerop depthoid)
-                      #.(logand sb!xc:most-positive-fixnum #36Rglobaldbsxhashoid))
+                      #.(logand sb-xc:most-positive-fixnum #36Rglobaldbsxhashoid))
                      (t (mix (recurse (car x) (1- depthoid))
                              (recurse (cdr x) (1- depthoid)))))))
       (traverse 0 name 10))))

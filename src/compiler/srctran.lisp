@@ -155,7 +155,7 @@
       ;; Something fishy here- If THE is removed, OPERAND-RESTRICTION-OK
       ;; returns NIL because type inference on MAKE-LIST never happens.
       ;; But the fndb entry for %MAKE-LIST is right, so I'm slightly bewildered.
-      `(%make-list (the (integer 0 (,(1- sb!xc:array-dimension-limit))) ,length)
+      `(%make-list (the (integer 0 (,(1- sb-xc:array-dimension-limit))) ,length)
                    ,(second rest))
       (values nil t))) ; give up
 
@@ -1520,14 +1520,14 @@
   (flet ((ash-outer (n s)
            (when (and (fixnump s)
                       (<= s 64)
-                      (> s sb!xc:most-negative-fixnum))
+                      (> s sb-xc:most-negative-fixnum))
              (ash n s)))
          ;; KLUDGE: The bare 64's here should be related to
          ;; symbolic machine word size values somehow.
 
          (ash-inner (n s)
            (if (and (fixnump s)
-                    (> s sb!xc:most-negative-fixnum))
+                    (> s sb-xc:most-negative-fixnum))
              (ash n (min s 64))
              (if (minusp n) -1 0))))
     (or (and (csubtypep n-type (specifier-type 'integer))
@@ -2442,7 +2442,7 @@
             `(mod ,base-char-code-limit)))
           (t
            (specifier-type
-            `(mod ,sb!xc:char-code-limit))))))
+            `(mod ,sb-xc:char-code-limit))))))
 
 (defoptimizer (code-char derive-type) ((code))
   (let ((type (lvar-type code)))
@@ -3120,22 +3120,22 @@
     (give-up-ir1-transform "BOOLE code is not a constant."))
   (let ((control (lvar-value op)))
     (case control
-      (#.sb!xc:boole-clr 0)
-      (#.sb!xc:boole-set -1)
-      (#.sb!xc:boole-1 'x)
-      (#.sb!xc:boole-2 'y)
-      (#.sb!xc:boole-c1 '(lognot x))
-      (#.sb!xc:boole-c2 '(lognot y))
-      (#.sb!xc:boole-and '(logand x y))
-      (#.sb!xc:boole-ior '(logior x y))
-      (#.sb!xc:boole-xor '(logxor x y))
-      (#.sb!xc:boole-eqv '(logeqv x y))
-      (#.sb!xc:boole-nand '(lognand x y))
-      (#.sb!xc:boole-nor '(lognor x y))
-      (#.sb!xc:boole-andc1 '(logandc1 x y))
-      (#.sb!xc:boole-andc2 '(logandc2 x y))
-      (#.sb!xc:boole-orc1 '(logorc1 x y))
-      (#.sb!xc:boole-orc2 '(logorc2 x y))
+      (#.sb-xc:boole-clr 0)
+      (#.sb-xc:boole-set -1)
+      (#.sb-xc:boole-1 'x)
+      (#.sb-xc:boole-2 'y)
+      (#.sb-xc:boole-c1 '(lognot x))
+      (#.sb-xc:boole-c2 '(lognot y))
+      (#.sb-xc:boole-and '(logand x y))
+      (#.sb-xc:boole-ior '(logior x y))
+      (#.sb-xc:boole-xor '(logxor x y))
+      (#.sb-xc:boole-eqv '(logeqv x y))
+      (#.sb-xc:boole-nand '(lognand x y))
+      (#.sb-xc:boole-nor '(lognor x y))
+      (#.sb-xc:boole-andc1 '(logandc1 x y))
+      (#.sb-xc:boole-andc2 '(logandc2 x y))
+      (#.sb-xc:boole-orc1 '(logorc1 x y))
+      (#.sb-xc:boole-orc2 '(logorc2 x y))
       (t
        (abort-ir1-transform "~S is an illegal control arg to BOOLE."
                             control)))))
@@ -4935,7 +4935,7 @@
                        (start-1 (1- ,',start))
                        (current-heap-size (- ,',end ,',start))
                        (keyfun ,keyfun))
-                   (declare (type (integer -1 #.(1- sb!xc:most-positive-fixnum))
+                   (declare (type (integer -1 #.(1- sb-xc:most-positive-fixnum))
                                   start-1))
                    (declare (type index current-heap-size))
                    (declare (type function keyfun))

@@ -44,25 +44,25 @@
 ;;; FIXME: should probably have no value outside the compiler.
 (defvar *top-level-form-noted* nil)
 
-(defvar sb!xc:*compile-verbose* t
+(defvar sb-xc:*compile-verbose* t
   "The default for the :VERBOSE argument to COMPILE-FILE.")
-(defvar sb!xc:*compile-print* t
+(defvar sb-xc:*compile-print* t
   "The default for the :PRINT argument to COMPILE-FILE.")
 (defvar *compile-progress* nil
   "When this is true, the compiler prints to *STANDARD-OUTPUT* progress
   information about the phases of compilation of each function. (This
   is useful mainly in large block compilations.)")
 
-(defvar sb!xc:*compile-file-pathname* nil
+(defvar sb-xc:*compile-file-pathname* nil
   "The defaulted pathname of the file currently being compiled, or NIL if not
   compiling.")
-(defvar sb!xc:*compile-file-truename* nil
+(defvar sb-xc:*compile-file-truename* nil
   "The TRUENAME of the file currently being compiled, or NIL if not
   compiling.")
 
 (declaim (type (or pathname null)
-               sb!xc:*compile-file-pathname*
-               sb!xc:*compile-file-truename*))
+               sb-xc:*compile-file-pathname*
+               sb-xc:*compile-file-truename*))
 
 ;;; the SOURCE-INFO structure for the current compilation. This is
 ;;; null globally to indicate that we aren't currently in any
@@ -105,7 +105,7 @@
 
 ;;;; WITH-COMPILATION-UNIT and WITH-COMPILATION-VALUES
 
-(defmacro sb!xc:with-compilation-unit (options &body body)
+(defmacro sb-xc:with-compilation-unit (options &body body)
   "Affects compilations that take place within its dynamic extent. It is
 intended to be eg. wrapped around the compilation of all files in the same system.
 
@@ -887,8 +887,8 @@ necessary, since type inference may take arbitrarily long to converge.")
       (let* ((file-info (source-info-file-info info))
              (name (file-info-name file-info))
              (external-format (file-info-external-format file-info)))
-        (setf sb!xc:*compile-file-truename* name
-              sb!xc:*compile-file-pathname* (file-info-untruename file-info)
+        (setf sb-xc:*compile-file-truename* name
+              sb-xc:*compile-file-pathname* (file-info-untruename file-info)
               (source-info-stream info)
               (let ((stream
                      (open name
@@ -990,7 +990,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                        'input-error-in-compile-file)
     (with-source-paths
       (find-source-paths form current-index)
-      (let ((sb!xc:*gensym-counter* 0))
+      (let ((sb-xc:*gensym-counter* 0))
         (process-toplevel-form
          form `(original-source-start 0 ,current-index) nil))))
   ;; It's easy to get into a situation where cold-init crashes and the only
@@ -1351,9 +1351,9 @@ necessary, since type inference may take arbitrarily long to converge.")
                  ;; here, before we macroexpand.
                  ;;
                  ;; Then things get even dicier with something like
-                 ;;   (DEFCONSTANT-EQX SB!XC:LAMBDA-LIST-KEYWORDS ..)
+                 ;;   (DEFCONSTANT-EQX SB-XC:LAMBDA-LIST-KEYWORDS ..)
                  ;; where we have to make sure that we don't uncross
-                 ;; the SB!XC: prefix before we do EVAL, because otherwise
+                 ;; the SB-XC: prefix before we do EVAL, because otherwise
                  ;; we'd be trying to redefine the cross-compilation host's
                  ;; constants.
                  ;;
@@ -1364,7 +1364,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                      (let ((*compile-time-eval* t))
                       (eval form))) ; letting xc host EVAL do its own macroexpansion
                    (let* (;; (We uncross the operator name because things
-                          ;; like SB!XC:DEFCONSTANT and SB!XC:DEFTYPE
+                          ;; like SB-XC:DEFCONSTANT and SB-XC:DEFTYPE
                           ;; should be equivalent to their CL: counterparts
                           ;; when being compiled as target code. We leave
                           ;; the rest of the form uncrossed because macros
@@ -1488,7 +1488,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                               ;; +SLOT-UNBOUND+ is not a constant,
                               ;; but is trivially dumpable.
                               (or (eql x 'sb!pcl:+slot-unbound+)
-                                  (sb!xc:constantp x)))
+                                  (sb-xc:constantp x)))
                             value-forms))
             (dolist (form value-forms)
               (unless (eq form 'sb!pcl:+slot-unbound+)
@@ -1679,8 +1679,8 @@ necessary, since type inference may take arbitrarily long to converge.")
   (declare (type source-info info))
   (let ((*package* (sane-package))
         (*readtable* *readtable*)
-        (sb!xc:*compile-file-pathname* nil) ; really bound in
-        (sb!xc:*compile-file-truename* nil) ; SUB-SUB-COMPILE-FILE
+        (sb-xc:*compile-file-pathname* nil) ; really bound in
+        (sb-xc:*compile-file-truename* nil) ; SUB-SUB-COMPILE-FILE
         (*policy* *policy*)
         (*macro-policy* *macro-policy*)
         (*compiler-coverage-metadata* (cons (make-hash-table :test 'equal)
@@ -1690,7 +1690,7 @@ necessary, since type inference may take arbitrarily long to converge.")
         ;; compiler to compile code for itself which isn't sanitized,
         ;; *or* code for another image which is sanitized.
         ;; And we can also cross-compile assuming msan.
-        (*msan-unpoison* (member :msan sb!xc:*features*))
+        (*msan-unpoison* (member :msan sb-xc:*features*))
         (*handled-conditions* *handled-conditions*)
         (*disabled-package-locks* *disabled-package-locks*)
         (*lexenv* (make-null-lexenv))
@@ -1704,11 +1704,11 @@ necessary, since type inference may take arbitrarily long to converge.")
            (return-from sub-compile-file (values t t t))))
         (*current-path* nil)
         (*compiler-sset-counter* 1)
-        (sb!xc:*gensym-counter* 0))
+        (sb-xc:*gensym-counter* 0))
     (handler-case
         (handler-bind (((satisfies handle-condition-p) #'handle-condition-handler))
           (with-compilation-values
-            (sb!xc:with-compilation-unit ()
+            (sb-xc:with-compilation-unit ()
               (with-world-lock ()
                 (setf (sb!fasl::fasl-output-source-info *compile-object*)
                       (debug-source-for-info info))
@@ -1718,7 +1718,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                   ;; Dump the code coverage records into the fasl.
                    (with-source-paths
                     (fopcompile `(record-code-coverage
-                                  ',(namestring sb!xc:*compile-file-pathname*)
+                                  ',(namestring sb-xc:*compile-file-pathname*)
                                   ',(let (list)
                                       (maphash (lambda (k v)
                                                  (declare (ignore k))
@@ -1797,7 +1797,7 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;; Open some files and call SUB-COMPILE-FILE. If something unwinds
 ;;; out of the compile, then abort the writing of the output file, so
 ;;; that we don't overwrite it with known garbage.
-(defun sb!xc:compile-file
+(defun sb-xc:compile-file
     (input-file
      &key
 
@@ -1806,8 +1806,8 @@ necessary, since type inference may take arbitrarily long to converge.")
      ;; FIXME: ANSI doesn't seem to say anything about
      ;; *COMPILE-VERBOSE* and *COMPILE-PRINT* being rebound by this
      ;; function..
-     ((:verbose sb!xc:*compile-verbose*) sb!xc:*compile-verbose*)
-     ((:print sb!xc:*compile-print*) sb!xc:*compile-print*)
+     ((:verbose sb-xc:*compile-verbose*) sb-xc:*compile-verbose*)
+     ((:print sb-xc:*compile-print*) sb-xc:*compile-print*)
      (external-format :default)
 
      ;; extensions
@@ -1877,7 +1877,7 @@ SPEED and COMPILATION-SPEED optimization values, and the
         (progn
           (when output-file
             (setq output-file-name
-                  (sb!xc:compile-file-pathname input-file
+                  (sb-xc:compile-file-pathname input-file
                                                :output-file output-file))
             (setq fasl-output
                   (open-fasl-output output-file-name
@@ -1904,7 +1904,7 @@ SPEED and COMPILATION-SPEED optimization values, and the
                               :if-exists :supersede
                               :direction :output)))))
 
-          (when sb!xc:*compile-verbose*
+          (when sb-xc:*compile-verbose*
             (print-compile-start-note source-info))
 
           (let ((*compile-object* fasl-output)
@@ -1918,15 +1918,15 @@ SPEED and COMPILATION-SPEED optimization values, and the
         (close-fasl-output fasl-output abort-p)
         (setq output-file-name
               (pathname (fasl-output-stream fasl-output)))
-        (when (and (not abort-p) sb!xc:*compile-verbose*)
+        (when (and (not abort-p) sb-xc:*compile-verbose*)
           (compiler-mumble "~2&; wrote ~A~%" (namestring output-file-name))))
 
       (when cfasl-output
         (close-fasl-output cfasl-output abort-p)
-        (when (and (not abort-p) sb!xc:*compile-verbose*)
+        (when (and (not abort-p) sb-xc:*compile-verbose*)
           (compiler-mumble "; wrote ~A~%" (namestring coutput-file-name))))
 
-      (when sb!xc:*compile-verbose*
+      (when sb-xc:*compile-verbose*
         (print-compile-end-note source-info (not abort-p)))
 
       (when *compiler-trace-output*
@@ -1965,7 +1965,7 @@ SPEED and COMPILATION-SPEED optimization values, and the
 ;;; at the level of e.g. whether it returns logical pathname or a
 ;;; physical pathname. Patches to make it more correct are welcome.
 ;;; -- WHN 2000-12-09
-(defun sb!xc:compile-file-pathname (input-file
+(defun sb-xc:compile-file-pathname (input-file
                                     &key
                                     (output-file nil output-file-p)
                                     &allow-other-keys)

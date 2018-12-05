@@ -11,7 +11,7 @@
 
 (in-package "SB!IMPL")
 
-(sb!xc:deftype attribute-table ()
+(sb-xc:deftype attribute-table ()
   '(simple-array (unsigned-byte 8) (#.base-char-code-limit)))
 
 ;;; constants for readtable character attributes. These are all as in
@@ -45,7 +45,7 @@
 ;; Meta: there is no such function as READ-UNQUALIFIED-TOKEN. No biggie.
 (defconstant +char-attr-delimiter+ 14) ; (a fake for READ-UNQUALIFIED-TOKEN)
 
-(sb!xc:defstruct (readtable (:conc-name nil)
+(sb-xc:defstruct (readtable (:conc-name nil)
                             (:constructor make-readtable ())
                             (:predicate readtablep)
                             ;; ANSI requires a CL:COPY-READTABLE to do

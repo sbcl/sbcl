@@ -284,8 +284,8 @@
                     compiled from ~S~%  ~
                     using ~A version ~A~%"
                    where
-                   (sb!xc:lisp-implementation-type)
-                   (sb!xc:lisp-implementation-version))))
+                   (sb-xc:lisp-implementation-type)
+                   (sb-xc:lisp-implementation-version))))
        stream)
       (dump-byte +fasl-header-string-stop-char-code+ res)
       ;; Finish the header by outputting fasl file implementation,
@@ -301,7 +301,7 @@
                  (dump-byte (char-code (aref string i)) res))))
         (dump-counted-string (symbol-name +backend-fasl-file-implementation+))
         (dump-word +fasl-file-version+ res)
-        (dump-counted-string (sb!xc:lisp-implementation-version))
+        (dump-counted-string (sb-xc:lisp-implementation-version))
         (dump-counted-string (compute-features-affecting-fasl-format)))
       res)))
 
@@ -886,16 +886,16 @@
 ;;; Dump characters and string-ish things.
 
 (defun dump-character (char file)
-  (dump-fop 'fop-character file (sb!xc:char-code char)))
+  (dump-fop 'fop-character file (sb-xc:char-code char)))
 
 ;;; Dump a SIMPLE-STRING.
 (defun dump-chars (s fasl-output base-string-p)
   (declare (type simple-string s))
   (if (or base-string-p #!-sb-unicode t) ; if non-unicode, every char is 1 byte
       (dovector (c s)
-        (dump-byte (sb!xc:char-code c) fasl-output))
+        (dump-byte (sb-xc:char-code c) fasl-output))
       (dovector (c s) ; varint (a/k/a LEB128) is better for this than UTF-8.
-        (dump-varint (sb!xc:char-code c) fasl-output))))
+        (dump-varint (sb-xc:char-code c) fasl-output))))
 
 ;;; If we get here, it is assumed that the symbol isn't in the table,
 ;;; but we are responsible for putting it there when appropriate.

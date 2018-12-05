@@ -37,7 +37,7 @@
   (foldable flushable))
 
 ;;; These can be affected by type definitions, so they're not FOLDABLE.
-(defknown (sb!xc:upgraded-complex-part-type sb!xc:upgraded-array-element-type)
+(defknown (sb-xc:upgraded-complex-part-type sb-xc:upgraded-array-element-type)
     (type-specifier &optional lexenv-designator) (or list symbol)
     (unsafely-flushable))
 
@@ -94,7 +94,7 @@
 
 ;;;; classes
 
-(sb!xc:deftype name-for-class () t) ; FIXME: disagrees w/ LEGAL-CLASS-NAME-P
+(sb-xc:deftype name-for-class () t) ; FIXME: disagrees w/ LEGAL-CLASS-NAME-P
 (defknown find-classoid (name-for-class &optional t)
   (or classoid null) ())
 (defknown classoid-of (t) classoid (flushable))
@@ -747,7 +747,7 @@
     (:end (inhibit-flushing sequence-end nil))
     (:from-end t)
     (:key (function-designator ((nth-arg 1 :sequence t)))))
-  (or (mod #.(1- sb!xc:array-dimension-limit)) null)
+  (or (mod #.(1- sb-xc:array-dimension-limit)) null)
   (foldable flushable call))
 
 (defknown (position-if position-if-not)
@@ -756,14 +756,14 @@
    (:start (inhibit-flushing index 0))
     (:end (inhibit-flushing sequence-end nil))
    (:key (function-designator ((nth-arg 1 :sequence t)))))
-  (or (mod #.(1- sb!xc:array-dimension-limit)) null)
+  (or (mod #.(1- sb-xc:array-dimension-limit)) null)
   (foldable flushable call))
 
 (defknown (%bit-position/0 %bit-position/1) (simple-bit-vector t index index)
-  (or (mod #.(1- sb!xc:array-dimension-limit)) null)
+  (or (mod #.(1- sb-xc:array-dimension-limit)) null)
   (foldable flushable))
 (defknown %bit-position (t simple-bit-vector t index index)
-  (or (mod #.(1- sb!xc:array-dimension-limit)) null)
+  (or (mod #.(1- sb-xc:array-dimension-limit)) null)
   (foldable flushable))
 
 (defknown count

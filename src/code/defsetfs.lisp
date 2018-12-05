@@ -204,14 +204,14 @@
 ;; it. In particular, this must fail: (SETF (GET 'SYM 'IND (ERROR "Foo")) 3).
 
 (defsetf get (symbol indicator &optional default &environment e) (newval)
-  (let ((constp (sb!xc:constantp default e)))
+  (let ((constp (sb-xc:constantp default e)))
     ;; always reference default's temp var to "use" it
     `(%put ,symbol ,indicator ,(if constp newval `(progn ,default ,newval)))))
 
 ;; A possible optimization for read/modify/write of GETHASH
 ;; would be to predetermine the vector element where the key/value pair goes.
 (defsetf gethash (key hashtable &optional default &environment e) (newval)
-  (let ((constp (sb!xc:constantp default e)))
+  (let ((constp (sb-xc:constantp default e)))
     ;; always reference default's temp var to "use" it
     `(%puthash ,key ,hashtable ,(if constp newval `(progn ,default ,newval)))))
 
@@ -220,7 +220,7 @@
 (define-setf-expander the (&whole form type place &environment env)
   (binding* ((op (car form))
              ((temps subforms store-vars setter getter)
-              (sb!xc:get-setf-expansion place env)))
+              (sb-xc:get-setf-expansion place env)))
     (values temps subforms store-vars
             `(multiple-value-bind ,store-vars (,op ,type (values ,@store-vars))
                ,setter)
@@ -228,7 +228,7 @@
 
 (define-setf-expander getf (place prop &optional default &environment env)
   (binding* (((place-tempvars place-tempvals stores set get)
-              (sb!xc:get-setf-expansion place env))
+              (sb-xc:get-setf-expansion place env))
              ((call-tempvars call-tempvals call-args bitmask)
               (collect-setf-temps (list prop default) env '(indicator default)))
              (newval (gensym "NEW")))
@@ -250,7 +250,7 @@
   (let (all-dummies all-vals newvals setters getters)
     (dolist (place places)
       (multiple-value-bind (dummies vals newval setter getter)
-          (sb!xc:get-setf-expansion place env)
+          (sb-xc:get-setf-expansion place env)
         ;; ANSI 5.1.2.3 explains this logic quite precisely.  --
         ;; CSR, 2004-06-29
         (setq all-dummies (append all-dummies dummies (cdr newval))
@@ -312,8 +312,8 @@ place with bits from the low-order end of the new value."
                   (collect-setf-temps (list spec) env '(bytespec))))
              (byte (if (cdr byte-args) (cons 'byte byte-args) (car byte-args)))
              ((place-tempvars place-tempvals stores setter getter)
-              (sb!xc:get-setf-expansion place env))
-             (newval (sb!xc:gensym "NEW"))
+              (sb-xc:get-setf-expansion place env))
+             (newval (sb-xc:gensym "NEW"))
              (new-int `(,store-fun
                         ,(if (eq load-fun 'logbitp) `(if ,newval 1 0) newval)
                         ,byte ,getter)))

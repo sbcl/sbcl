@@ -323,7 +323,7 @@
                 ,(if (and (integer-type-p index-type)
                           (numeric-type-low index-type))
                      `(integer ,(numeric-type-low index-type)
-                               (,sb!xc:array-dimension-limit))
+                               (,sb-xc:array-dimension-limit))
                      `index))))))
 
 (deftransform %data-vector-and-index ((%array %index)
@@ -552,11 +552,11 @@
                     :policy (>= speed space))
   (let ((value (if (constant-lvar-p item)
                    (let* ((char (lvar-value item))
-                          (code (sb!xc:char-code char))
+                          (code (sb-xc:char-code char))
                           (accum 0))
                      (dotimes (i sb-vm:n-word-bytes accum)
                        (setf accum (logior accum (ash code (* 8 i))))))
-                   `(let ((code (sb!xc:char-code item)))
+                   `(let ((code (sb-xc:char-code item)))
                      (logior ,@(loop for i from 0 below sb-vm:n-word-bytes
                                      collect `(ash code ,(* 8 i))))))))
     `(let ((length (length sequence))

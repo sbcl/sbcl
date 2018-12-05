@@ -155,8 +155,8 @@ This is SETFable."
                                  (foreign-symbol-sap ,initial-value ,datap) 0 ,alien-type)))
                            ,@body)))
                       (:local
-                       (let* ((var (sb!xc:gensym "VAR"))
-                              (initval (if initial-value (sb!xc:gensym "INITVAL")))
+                       (let* ((var (sb-xc:gensym "VAR"))
+                              (initval (if initial-value (sb-xc:gensym "INITVAL")))
                               (info (make-local-alien-info :type alien-type))
                               (inner-body
                                 `((note-local-alien-type ',info ,var)
@@ -680,7 +680,7 @@ type specifies the argument and result types."
        (let ((stub (alien-fun-type-stub type)))
          (unless stub
            (setf stub
-                 (let ((fun (sb!xc:gensym "FUN"))
+                 (let ((fun (sb-xc:gensym "FUN"))
                        (parms (make-gensym-list (length args))))
                    (compile nil
                             `(lambda (,fun ,@parms)

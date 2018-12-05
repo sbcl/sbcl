@@ -21,7 +21,7 @@
       variables
       functions
       types)
-  (sb!xc:with-compilation-unit ()
+  (sb-xc:with-compilation-unit ()
     (let ((*feature-evaluation-results* nil))
       (load "src/cold/compile-cold-sbcl.lisp")
       (sanity-check-feature-evaluation))

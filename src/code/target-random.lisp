@@ -386,7 +386,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 ;;; the multiplier and one to bring the result into the correct range).
 #!-sb-fluid (declaim (inline %random-fixnum))
 (defun %random-fixnum (arg state)
-  (declare (type (integer 1 #.sb!xc:most-positive-fixnum) arg)
+  (declare (type (integer 1 #.sb-xc:most-positive-fixnum) arg)
            (type random-state state))
   (if (= arg 1)
       0

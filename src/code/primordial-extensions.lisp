@@ -61,7 +61,7 @@
                           (stem (if (every #'alpha-char-p symbol-name)
                                     symbol-name
                                     (string (gensymify* symbol-name "-")))))
-                     `(,symbol (sb!xc:gensym ,stem))))
+                     `(,symbol (sb-xc:gensym ,stem))))
                  symbols)
      ,@body))
 
@@ -69,7 +69,7 @@
 ;;; macros and other code-manipulating code.)
 (defun make-gensym-list (n &optional name)
   (let ((arg (if name (string name) "G")))
-    (loop repeat n collect (sb!xc:gensym arg))))
+    (loop repeat n collect (sb-xc:gensym arg))))
 
 ;;;; miscellany
 
@@ -94,8 +94,8 @@
 
 (defun gensymify (x)
   (if (symbolp x)
-      (sb!xc:gensym (symbol-name x))
-      (sb!xc:gensym)))
+      (sb-xc:gensym (symbol-name x))
+      (sb-xc:gensym)))
 
 (labels ((symbol-concat (package &rest things)
            (dx-let ((strings (make-array (length things)))
@@ -266,7 +266,7 @@
                  (acond ,@rest)))))))
 
 ;; This is not an 'extension', but is needed super early, so ....
-(defmacro sb!xc:defconstant (name value &optional (doc nil docp))
+(defmacro sb-xc:defconstant (name value &optional (doc nil docp))
   "Define a global constant, saying that the value is constant and may be
   compiled into code. If the variable already has a value, and this is not
   EQL to the new value, the code is not portable (undefined behavior). The
@@ -319,11 +319,11 @@
 (defvar sb-c::*!const-value-deferred* '())
 #-sb-xc-host
 (eval-when (:compile-toplevel)
-  (sb!xc:defmacro defconstant-eqx (symbol expr eqx &optional doc)
-    (let ((constp (sb!xc:constantp expr)))
+  (sb-xc:defmacro defconstant-eqx (symbol expr eqx &optional doc)
+    (let ((constp (sb-xc:constantp expr)))
       `(progn
          (eval-when (:compile-toplevel)
-           (sb!xc:defconstant ,symbol (%defconstant-eqx-value ',symbol ,expr ,eqx))
+           (sb-xc:defconstant ,symbol (%defconstant-eqx-value ',symbol ,expr ,eqx))
            ,@(unless constp
                `((push ',symbol sb-c::*!const-value-deferred*))))
          (eval-when (:load-toplevel)

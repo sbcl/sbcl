@@ -20,7 +20,7 @@
    ;; Literally nothing except C code tests for it.
    '#.(remove-if (lambda (x)
                    (member x '(:gcc-tls)))
-                 sb!xc:*features*)
+                 sb-xc:*features*)
   "a list of symbols that describe features provided by the
    implementation")
 

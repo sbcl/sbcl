@@ -32,7 +32,7 @@
 (declaim (inline seconds-to-internal-time))
 (defun seconds-to-internal-time (seconds)
   (the internal-time
-       (values (truncate (* seconds sb!xc:internal-time-units-per-second)))))
+       (values (truncate (* seconds sb-xc:internal-time-units-per-second)))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute) ; for "#."
 (defconstant safe-internal-seconds-limit
@@ -44,7 +44,7 @@
     ;; doesn't go beyond the INTERNAL-TIME range due to rounding
     ;; errors.
     (floor (ash 1 (1- sb!kernel::internal-time-bits))
-           sb!xc:internal-time-units-per-second)))
+           sb-xc:internal-time-units-per-second)))
 
 (declaim (inline seconds-to-maybe-internal-time))
 (defun seconds-to-maybe-internal-time (seconds)
@@ -113,7 +113,7 @@ Experimental."
   "Returns internal time value TIME decoded into seconds and microseconds."
   (declare (type sb!kernel:internal-time time))
   (multiple-value-bind (sec frac)
-      (truncate time sb!xc:internal-time-units-per-second)
+      (truncate time sb-xc:internal-time-units-per-second)
     (values sec (* frac sb!unix::micro-seconds-per-internal-time-unit))))
 
 (defun signal-timeout (datum &rest arguments)

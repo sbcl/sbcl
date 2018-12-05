@@ -90,13 +90,13 @@
 
 ;;;; list collection macrology
 
-(sb!xc:defmacro with-loop-list-collection-head
+(sb-xc:defmacro with-loop-list-collection-head
     ((head-var tail-var &optional user-head-var) &body body)
   (let ((l (and user-head-var (list (list user-head-var nil)))))
     `(let* ((,head-var (list nil)) (,tail-var ,head-var) ,@l)
        ,@body)))
 
-(sb!xc:defmacro loop-collect-rplacd
+(sb-xc:defmacro loop-collect-rplacd
     (&environment env (head-var tail-var &optional user-head-var) form)
   (setq form (%macroexpand form env))
   (flet ((cdr-wrap (form n)
@@ -142,7 +142,7 @@
                         (setq ,user-head-var (cdr ,head-var)))))
         answer))))
 
-(sb!xc:defmacro loop-collect-answer (head-var
+(sb-xc:defmacro loop-collect-answer (head-var
                                                    &optional user-head-var)
   (or user-head-var
       `(cdr ,head-var)))
@@ -183,7 +183,7 @@ constructed.
 (defun make-loop-minimax (answer-variable type)
   (let ((infinity-data (cdr (assoc type
                                    +loop-minimax-type-infinities-alist+
-                                   :test #'sb!xc:subtypep))))
+                                   :test #'sb-xc:subtypep))))
     (make-loop-minimax-internal
       :answer-variable answer-variable
       :type type
@@ -201,7 +201,7 @@ constructed.
           (gensym "LOOP-MAXMIN-FLAG-")))
   operation)
 
-(sb!xc:defmacro with-minimax-value (lm &body body)
+(sb-xc:defmacro with-minimax-value (lm &body body)
   (let ((init (loop-typed-init (loop-minimax-type lm)))
         (which (car (loop-minimax-operations lm)))
         (infinity-data (loop-minimax-infinity-data lm))
@@ -220,7 +220,7 @@ constructed.
            (declare (type ,type ,answer-var ,temp-var))
            ,@body))))
 
-(sb!xc:defmacro loop-accumulate-minimax-value (lm operation form)
+(sb-xc:defmacro loop-accumulate-minimax-value (lm operation form)
   (let* ((answer-var (loop-minimax-answer-variable lm))
          (temp-var (loop-minimax-temp-variable lm))
          (flag-var (loop-minimax-flag-variable lm))
@@ -265,7 +265,7 @@ code to be loaded.
   (and (symbolp loop-token)
        (values (gethash (symbol-name loop-token) table))))
 
-(sb!xc:defmacro loop-store-table-data (symbol table datum)
+(sb-xc:defmacro loop-store-table-data (symbol table datum)
   `(setf (gethash (symbol-name ,symbol) ,table) ,datum))
 
 ;;; "4.2.3 Type Specifiers" lists the standardized atomic type specifiers.
@@ -326,7 +326,7 @@ code to be loaded.
 (sb!ext:defglobal *loop-desetq-temporary*
         (make-symbol "LOOP-DESETQ-TEMP"))
 
-(sb!xc:defmacro loop-desetq (&environment env &rest var-val-pairs)
+(sb-xc:defmacro loop-desetq (&environment env &rest var-val-pairs)
   (labels ((find-non-null (var)
              ;; See whether there's any non-null thing here. Recurse
              ;; if the list element is itself a list.
@@ -519,10 +519,10 @@ code to be loaded.
 ;;;; code analysis stuff
 
 (defun loop-constant-fold-if-possible (form &optional expected-type)
-  (let* ((constantp (sb!xc:constantp form))
+  (let* ((constantp (sb-xc:constantp form))
          (value (and constantp (constant-form-value form))))
     (when (and constantp expected-type)
-      (unless (sb!xc:typep value expected-type)
+      (unless (sb-xc:typep value expected-type)
         (loop-warn "~@<The form ~S evaluated to ~S, which was not of ~
                     the anticipated type ~S.~:@>"
                    form value expected-type)
@@ -574,7 +574,7 @@ code to be loaded.
                              &optional (default-type required-type))
   (if (null specified-type)
       default-type
-      (multiple-value-bind (a b) (sb!xc:subtypep specified-type required-type)
+      (multiple-value-bind (a b) (sb-xc:subtypep specified-type required-type)
         (cond ((not b)
                (loop-warn "LOOP couldn't verify that ~S is a subtype of the required type ~S."
                           specified-type required-type))
@@ -607,7 +607,7 @@ code to be loaded.
                         (push (car cdr) result))))))
       (values (transform tree) ignores))))
 
-(sb!xc:defmacro loop-destructuring-bind
+(sb-xc:defmacro loop-destructuring-bind
     (lambda-list args &rest body)
   (multiple-value-bind (d-lambda-list ignores)
       (transform-destructuring lambda-list)
@@ -741,16 +741,16 @@ code to be loaded.
      ;; that it's parsed.
      (cond ((eql ctype *empty-type*)
             (values nil t))
-           ((sb!xc:subtypep data-type 'number)
+           ((sb-xc:subtypep data-type 'number)
             (let ((init (if step-var-p 1 0)))
               (flet ((like (&rest types)
                        (coerce init (find-if (lambda (type)
-                                               (sb!xc:subtypep data-type type))
+                                               (sb-xc:subtypep data-type type))
                                              types))))
-                (cond ((sb!xc:subtypep data-type 'float)
+                (cond ((sb-xc:subtypep data-type 'float)
                        (like 'single-float 'double-float
                              'short-float 'long-float 'float))
-                      ((sb!xc:subtypep data-type '(complex float))
+                      ((sb-xc:subtypep data-type '(complex float))
                        (like '(complex single-float)
                              '(complex double-float)
                              '(complex short-float)
@@ -758,15 +758,15 @@ code to be loaded.
                              '(complex float)))
                       (t
                        init)))))
-           ((sb!xc:subtypep data-type 'vector)
+           ((sb-xc:subtypep data-type 'vector)
             (when (array-type-p ctype)
               (let ((etype (type-*-to-t
                             (array-type-specialized-element-type ctype))))
                 (make-array 0 :element-type (type-specifier etype)))))
            #!+sb-unicode
-           ((sb!xc:subtypep data-type 'extended-char)
+           ((sb-xc:subtypep data-type 'extended-char)
             (code-char base-char-code-limit))
-           ((sb!xc:subtypep data-type 'character)
+           ((sb-xc:subtypep data-type 'character)
             #\x)
            (t
             nil)))))
@@ -932,20 +932,20 @@ code to be loaded.
             ;; longer be empty and the compiler won't produce
             ;; warnings.
             type)
-           ((sb!xc:typep init type)
+           ((sb-xc:typep init type)
             type)
-           ((sb!xc:typep init '(simple-array * (*)))
+           ((sb-xc:typep init '(simple-array * (*)))
             ;; type-of lets the size in
             `(or (simple-array ,(array-element-type init) (*)) ,type))
            (t
-            `(or ,(sb!xc:type-of init) ,type)))
+            `(or ,(sb-xc:type-of init) ,type)))
      init)))
 
 (defun loop-declare-var (name dtype &key step-var-p initialization
                                          desetq &aux (loop *loop*))
   (cond ((or (null name) (null dtype) (eq dtype t)) nil)
         ((symbolp name)
-         (unless (or (sb!xc:subtypep t dtype)
+         (unless (or (sb-xc:subtypep t dtype)
                      (and (eq (find-package :cl) (symbol-package name))
                           (eq :special (info :variable :kind name))))
            (let ((dtype `(type ,(if initialization
@@ -1058,7 +1058,7 @@ code to be loaded.
   dtype
   (data nil)) ;collector-specific data
 
-(sb!xc:defmacro with-sum-count (lc &body body)
+(sb-xc:defmacro with-sum-count (lc &body body)
   (let* ((type (loop-collector-dtype lc))
          (temp-var (car (loop-collector-tempvars lc))))
     (multiple-value-bind (type init)
@@ -1923,12 +1923,12 @@ code to be loaded.
       (let ((tag (gensym)))
         `(block nil (tagbody ,tag (progn ,@keywords-and-forms) (go ,tag))))))
 
-(sb!xc:defmacro loop (&environment env &rest keywords-and-forms)
+(sb-xc:defmacro loop (&environment env &rest keywords-and-forms)
   (loop-standard-expansion keywords-and-forms
                            env
                            *loop-ansi-universe*))
 
-(sb!xc:defmacro loop-finish ()
+(sb-xc:defmacro loop-finish ()
   "Cause the iteration to terminate \"normally\", the same as implicit
 termination by an iteration driving clause, or by use of WHILE or
 UNTIL -- the epilogue code (if any) will be run, and any implicitly

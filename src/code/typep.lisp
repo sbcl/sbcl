@@ -9,7 +9,7 @@
 
 (in-package "SB!KERNEL")
 
-;;; (Note that when cross-compiling, SB!XC:TYPEP is interpreted as a
+;;; (Note that when cross-compiling, SB-XC:TYPEP is interpreted as a
 ;;; test that the host Lisp object OBJECT translates to a target SBCL
 ;;; type TYPE. This behavior is needed e.g. to test for the validity
 ;;; of numeric subtype bounds read when cross-compiling.)

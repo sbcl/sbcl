@@ -369,7 +369,7 @@
                (sbcl-version (if (<= fasl-version 76)
                                  "1.0.11.18"
                                  (string-from-stream)))
-               (expected-version (sb!xc:lisp-implementation-version)))
+               (expected-version (sb-xc:lisp-implementation-version)))
           (unless (string= expected-version sbcl-version)
             (restart-case
                 (error 'invalid-fasl-version

@@ -12,11 +12,11 @@
 
 (in-package "SB!IMPL")
 
-(defun sb!xc:lisp-implementation-type ()
+(defun sb-xc:lisp-implementation-type ()
   "SBCL")
 
-(defun sb!xc:lisp-implementation-version ()
+(defun sb-xc:lisp-implementation-version ()
   ;; Read the version file once and once only
   #+sb-xc-host #.(sb-cold:read-from-file "version.lisp-expr")
-  #-sb-xc-host #.(sb!xc:lisp-implementation-version))
+  #-sb-xc-host #.(sb-xc:lisp-implementation-version))
 

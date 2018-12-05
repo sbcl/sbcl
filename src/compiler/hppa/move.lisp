@@ -212,7 +212,7 @@
     ;; the bignum-construction, doing the shift in the delay slot.
     (inst comb := temp zero-tn done)
     (inst sll x n-fixnum-tag-bits y)
-    (load-constant vop (emit-constant (1+ sb!xc:most-positive-fixnum))
+    (load-constant vop (emit-constant (1+ sb-xc:most-positive-fixnum))
                    y)
     DONE))
 
@@ -226,7 +226,7 @@
     ;; the bignum-construction, doing the shift in the delay slot.
     (inst comb := temp zero-tn done)
     (inst sll x n-fixnum-tag-bits y)
-    (load-constant vop (emit-constant (1- sb!xc:most-negative-fixnum))
+    (load-constant vop (emit-constant (1- sb-xc:most-negative-fixnum))
                    y)
     DONE))
 

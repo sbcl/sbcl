@@ -52,7 +52,7 @@ any time."
   (state    0 :type fixnum))
 
 ;; The host has a stub for this macro. The cross-compiler doesn't use
-;; it until it's seen. So no SB!XC:DEFMACRO needed
+;; it until it's seen. So no SB-XC:DEFMACRO needed
 #-sb-xc-host
 (defmacro with-system-mutex ((mutex &key without-gcing allow-with-interrupts)
                                     &body body)

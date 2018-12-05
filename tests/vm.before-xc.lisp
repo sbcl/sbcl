@@ -25,10 +25,10 @@
           (not (immediate-constant-sc x)))))
   ;; target fixnums can be dealt with as immediates; target bignums
   ;; can not.
-  (yes #.sb!xc:most-positive-fixnum)
-  (yes #.sb!xc:most-negative-fixnum)
-  (no #.(1+ sb!xc:most-positive-fixnum))
-  (no #.(1- sb!xc:most-negative-fixnum)))
+  (yes #.sb-xc:most-positive-fixnum)
+  (yes #.sb-xc:most-negative-fixnum)
+  (no #.(1+ sb-xc:most-positive-fixnum))
+  (no #.(1- sb-xc:most-negative-fixnum)))
 
 ;; Assert that DO-PACKED-TNS has unsurprising behavior if the body RETURNs.
 ;; This isn't a test in the problem domain of CL - it's of an internal macro,

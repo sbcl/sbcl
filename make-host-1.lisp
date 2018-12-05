@@ -3,7 +3,7 @@
   (load "tools-for-build/ldso-stubs.lisp")
   (let ((*print-pretty* nil)
         (*print-length* nil))
-    (dolist (thing '(("SB!XC" "*FEATURES*")
+    (dolist (thing '(("SB-XC" "*FEATURES*")
                      ("SB-COLD" "*SHEBANG-BACKEND-SUBFEATURES*")))
       (let* ((sym (intern (cadr thing) (car thing)))
              (val (symbol-value sym)))

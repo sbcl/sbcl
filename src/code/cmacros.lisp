@@ -64,7 +64,7 @@
                           (:preserve-whitespace 2)
                           (otherwise (return-from read-from-string form))))
                  (var (if (logbitp index seen)
-                          (let ((x (sb!xc:gensym "IGNORE")))
+                          (let ((x (sb-xc:gensym "IGNORE")))
                             (push x ignore)
                             x)
                           (setf seen (logior (ash 1 index) seen)

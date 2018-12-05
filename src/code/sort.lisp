@@ -61,7 +61,7 @@
 
 ;;; FUNCALL-USING-KEY saves us a function call sometimes.
 (eval-when (:compile-toplevel :execute)
-  (sb!xc:defmacro funcall2-using-key (pred key one two)
+  (sb-xc:defmacro funcall2-using-key (pred key one two)
     `(if ,key
          (funcall ,pred (funcall ,key ,one)
                   (funcall ,key  ,two))
@@ -218,7 +218,7 @@
 ;;;    end-1 (inclusive) ... end-2 (exclusive),
 ;;; and merges them into a target vector starting at index start-1.
 
-(sb!xc:defmacro stable-sort-merge-vectors* (source target start-1 end-1 end-2
+(sb-xc:defmacro stable-sort-merge-vectors* (source target start-1 end-1 end-2
                                                      pred key source-ref
                                                      target-ref)
   (let ((i (gensym))
@@ -258,7 +258,7 @@
 ;;; but it uses a temporary vector. DIRECTION determines whether we
 ;;; are merging into the temporary (T) or back into the given vector
 ;;; (NIL).
-(sb!xc:defmacro vector-merge-sort (vector pred key vector-ref)
+(sb-xc:defmacro vector-merge-sort (vector pred key vector-ref)
   (with-unique-names
       (vector-len n direction unsorted start-1 end-1 end-2 temp i)
     `(let* ((,vector-len (length (the vector ,vector)))
@@ -342,7 +342,7 @@
 ;;; of the elements of VECTOR-1 and VECTOR-2. Elements from VECTOR-2
 ;;; are chosen only if they are strictly less than elements of
 ;;; VECTOR-1, (PRED ELT-2 ELT-1), as specified in the manual.
-(sb!xc:defmacro merge-vectors (vector-1 length-1 vector-2 length-2
+(sb-xc:defmacro merge-vectors (vector-1 length-1 vector-2 length-2
                                result-vector pred key access)
   (let ((result-i (gensym))
         (i (gensym))

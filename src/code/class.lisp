@@ -971,8 +971,8 @@ between the ~A definition and the ~A definition"
       :translation integer
       :inherits (rational real number))
      (fixnum
-      :translation (integer #.sb!xc:most-negative-fixnum
-                    #.sb!xc:most-positive-fixnum)
+      :translation (integer #.sb-xc:most-negative-fixnum
+                    #.sb-xc:most-positive-fixnum)
       :inherits (integer rational real number)
       :codes #.(mapcar #'symbol-value sb-vm::fixnum-lowtags)
       :prototype-form 42)

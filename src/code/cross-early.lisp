@@ -32,4 +32,4 @@
 
 (declaim (declaration explicit-check always-bound))
 
-(defgeneric sb!xc:make-load-form (obj &optional env))
+(defgeneric sb-xc:make-load-form (obj &optional env))

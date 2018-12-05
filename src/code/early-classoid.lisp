@@ -89,7 +89,7 @@
 ;;; Note: This bound is set somewhat less than MOST-POSITIVE-FIXNUM
 ;;; in order to guarantee that several hash values can be added without
 ;;; overflowing into a bignum.
-(defconstant layout-clos-hash-limit (1+ (ash sb!xc:most-positive-fixnum -3))
+(defconstant layout-clos-hash-limit (1+ (ash sb-xc:most-positive-fixnum -3))
   "the exclusive upper bound on LAYOUT-CLOS-HASH values")
 ;; This must be DEF!TYPE and not just DEFTYPE because access to slots
 ;; of a layout occur "before" the structure definition is made in the

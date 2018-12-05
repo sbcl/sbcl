@@ -31,7 +31,7 @@
     ;; can be unparsed - some unparsers may be confused if called on a
     ;; non-canonical object, such as an instance of (CONS T T) that is
     ;; not EQ to the interned instance.
-    (sb!xc:defmacro literal-ctype (constructor
+    (sb-xc:defmacro literal-ctype (constructor
                                    &optional (specifier nil specifier-p))
       ;; The source-transform for SPECIFIER-TYPE turns this call into
       ;; (LOAD-TIME-VALUE (!SPECIFIER-TYPE ',specifier)).
@@ -42,7 +42,7 @@
                              specifier
                              (type-specifier (symbol-value constructor)))))
 
-    (sb!xc:defmacro literal-ctype-vector (var &aux (vector (symbol-value var)))
+    (sb-xc:defmacro literal-ctype-vector (var &aux (vector (symbol-value var)))
       `(truly-the (simple-vector ,(length vector))
          (load-time-value
            (vector ,@(map 'list
@@ -406,14 +406,14 @@
                                                  :enumerable (if (and ,low ,high) t nil))
                           (integer ,(or low '*) ,(or high '*)))))
              (cond ((neq complexp :real) nil)
-                   ((and (eql low 0) (eql high (1- sb!xc:array-dimension-limit)))
-                    (int-type 0 #.(1- sb!xc:array-dimension-limit))) ; INDEX type
+                   ((and (eql low 0) (eql high (1- sb-xc:array-dimension-limit)))
+                    (int-type 0 #.(1- sb-xc:array-dimension-limit))) ; INDEX type
                    ((null high)
                     (cond ((not low) (int-type nil nil))
                           ((eql low 0) (int-type 0 nil))
-                          ((eql low (1+ sb!xc:most-positive-fixnum))
+                          ((eql low (1+ sb-xc:most-positive-fixnum))
                            ;; positive bignum
-                           (int-type #.(1+ sb!xc:most-positive-fixnum) nil))))
+                           (int-type #.(1+ sb-xc:most-positive-fixnum) nil))))
                    ((or (eql high most-positive-word)
                         ;; is (1+ high) a power-of-2 ?
                         (and (typep high 'word) (zerop (logand (1+ high) high))))
@@ -423,9 +423,9 @@
                           ((and (< high most-positive-word) (eql low (lognot high)))
                            (svref (literal-ctype-vector *interned-signed-byte-types*)
                                   (integer-length (truly-the word high))))))
-                   ((and (not low) (eql high (1- sb!xc:most-negative-fixnum)))
+                   ((and (not low) (eql high (1- sb-xc:most-negative-fixnum)))
                     ;; negative bignum
-                    (int-type nil #.(1- sb!xc:most-negative-fixnum))))))
+                    (int-type nil #.(1- sb-xc:most-negative-fixnum))))))
           (rational
            (when (and (eq complexp :real) (bounds-unbounded-p low high))
              (literal-ctype (interned-numeric-type nil :class 'rational)
@@ -466,10 +466,10 @@
                                     (setf pairs (cdr pairs)))
                           else do (return nil))
                     (cond
-                      ((>= low sb!xc:char-code-limit))
+                      ((>= low sb-xc:char-code-limit))
                       ((< high 0))
                       (t (push (cons (max 0 low)
-                                     (min high (1- sb!xc:char-code-limit)))
+                                     (min high (1- sb-xc:char-code-limit)))
                                result))))))))
     (unless pairs
       (return-from make-character-set-type *empty-type*))
@@ -483,14 +483,14 @@
         (let* ((pair (car pairs))
                (low (car pair))
                (high (cdr pair)))
-          (cond ((eql high (1- sb!xc:char-code-limit))
+          (cond ((eql high (1- sb-xc:char-code-limit))
                  (cond ((eql low 0)
-                        (range 0 #.(1- sb!xc:char-code-limit)
+                        (range 0 #.(1- sb-xc:char-code-limit)
                                (sb-vm::saetp-index-or-lose 'character)))
                        #!+sb-unicode
                        ((eql low base-char-code-limit)
                         (range #.base-char-code-limit
-                               #.(1- sb!xc:char-code-limit)))))
+                               #.(1- sb-xc:char-code-limit)))))
                 #!+sb-unicode
                 ((and (eql low 0) (eql high (1- base-char-code-limit)))
                  (range 0 #.(1- base-char-code-limit)
@@ -544,15 +544,15 @@
            ;; FIXNUM is its own thing, why? See comment in vm-array
            ;; saying to "See the comment in PRIMITIVE-TYPE-AUX"
            ((eql fixnum) ; One good kludge deserves another.
-            (integer-range sb!xc:most-negative-fixnum
-                           sb!xc:most-positive-fixnum))
+            (integer-range sb-xc:most-negative-fixnum
+                           sb-xc:most-positive-fixnum))
            ((member single-float double-float)
             (make-numeric-type :class 'float :format x :complexp :real))
            ((cons (eql complex))
             (make-numeric-type :class 'float :format (cadr x)
                                :complexp :complex))
            ((eql character)
-            (make-character-set-type `((0 . ,(1- sb!xc:char-code-limit)))))
+            (make-character-set-type `((0 . ,(1- sb-xc:char-code-limit)))))
            #!+sb-unicode
            ((eql base-char)
             (make-character-set-type `((0 . ,(1- base-char-code-limit)))))
@@ -976,7 +976,7 @@ expansion happened."
 #+sb-xc-host
 (progn
 (sb-c::define-source-transform specifier-type (type-spec &environment env)
-  (or (and (sb!xc:constantp type-spec env)
+  (or (and (sb-xc:constantp type-spec env)
            (let ((parse (specifier-type (constant-form-value type-spec env))))
              (cond
               ((contains-unknown-type-p parse)

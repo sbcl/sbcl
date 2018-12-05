@@ -118,7 +118,7 @@
 (declaim (inline char-len-as-utf8))
 (defun char-len-as-utf8 (code)
   (declare (optimize speed (safety 0))
-           (type (integer 0 (#.sb!xc:char-code-limit)) code))
+           (type (integer 0 (#.sb-xc:char-code-limit)) code))
   (cond ((< code 0) (bug "can't happen"))
         ((< code #x80) 1)
         ((< code #x800) 2)
@@ -218,7 +218,7 @@
     `(progn
       ;;(declaim (inline ,name))
       (let ((lexically-max
-             (string->utf8 (string (code-char ,(1- sb!xc:char-code-limit)))
+             (string->utf8 (string (code-char ,(1- sb-xc:char-code-limit)))
                            0 1 0)))
         (declare (type (simple-array (unsigned-byte 8) (#!+sb-unicode 4 #!-sb-unicode 2)) lexically-max))
         (defun ,name (array pos end)

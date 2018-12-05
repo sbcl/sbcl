@@ -213,8 +213,8 @@
                                   (dsd-default slot))))
                 ;; Return T if value-form definitely does not satisfy
                 ;; the type-check for DSD. Return NIL if we can't decide.
-                (when (if (sb!xc:constantp initform)
-                          (not (sb!xc:typep (constant-form-value initform)
+                (when (if (sb-xc:constantp initform)
+                          (not (sb-xc:typep (constant-form-value initform)
                                             (dsd-type slot)))
                           ;; Find uses of nil-returning functions as defaults,
                           ;; like ERROR and MISSING-ARG.
@@ -396,10 +396,10 @@ and no value was provided for it." name))))))))))
 (defstruct (approximate-fun-type (:copier nil))
   ;; the smallest and largest numbers of arguments that this function
   ;; has been called with.
-  (min-args sb!xc:call-arguments-limit
-            :type (integer 0 #.sb!xc:call-arguments-limit))
+  (min-args sb-xc:call-arguments-limit
+            :type (integer 0 #.sb-xc:call-arguments-limit))
   (max-args 0
-            :type (integer 0 #.sb!xc:call-arguments-limit))
+            :type (integer 0 #.sb-xc:call-arguments-limit))
   ;; a list of lists of the all the types that have been used in each
   ;; argument position
   (types () :type list)
@@ -417,7 +417,7 @@ and no value was provided for it." name))))))))))
   ;; The position at which this keyword appeared. 0 if it appeared as the
   ;; first argument, etc.
   (position (missing-arg)
-            :type (integer 0 #.sb!xc:call-arguments-limit))
+            :type (integer 0 #.sb-xc:call-arguments-limit))
   ;; a list of all the argument types that have been used with this keyword
   (types nil :type list)
   ;; true if this keyword has appeared only in calls with an obvious
@@ -717,7 +717,7 @@ and no value was provided for it." name))))))))))
            ((lambda-var-arg-info arg)
             (let* ((info (lambda-var-arg-info arg))
                    (default (arg-info-default info))
-                   (def-type (when (sb!xc:constantp default)
+                   (def-type (when (sb-xc:constantp default)
                                (ctype-of (constant-form-value default)))))
               (ecase (arg-info-kind info)
                 (:keyword

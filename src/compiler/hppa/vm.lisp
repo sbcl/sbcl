@@ -299,7 +299,7 @@
      zero-sc-number)
     (null
      null-sc-number)
-    ((or (integer #.sb!xc:most-negative-fixnum #.sb!xc:most-positive-fixnum)
+    ((or (integer #.sb-xc:most-negative-fixnum #.sb-xc:most-positive-fixnum)
          #-sb-xc-host system-area-pointer ; no object can be a SAP in the host
          character)
      immediate-sc-number)

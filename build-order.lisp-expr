@@ -99,14 +99,14 @@
  ("src/code/defbangtype" :c-headers)
  ("src/code/early-constants" :c-headers)
 
- ("src/compiler/deftype" :c-headers)     ; on host for SB!XC:DEFTYPE
+ ("src/compiler/deftype" :c-headers)     ; on host for SB-XC:DEFTYPE
  ("src/compiler/early-lexenv" :c-headers)
  ("src/compiler/early-globaldb" :c-headers)
 
  ;; comes early so that stuff can reason about function names
  ("src/code/function-names" :c-headers)
 
- ;; for various constants e.g. SB!XC:MOST-POSITIVE-FIXNUM and
+ ;; for various constants e.g. SB-XC:MOST-POSITIVE-FIXNUM and
  ;; SB-VM:N-LOWTAG-BITS, needed by "early-objdef" and others
  ("src/compiler/generic/parms" :c-headers)
  ("src/compiler/target/parms" :c-headers)
@@ -371,7 +371,7 @@
  ;; host-alieneval.lisp
  ("src/code/host-c-call")
 
- ;; SB!XC:DEFTYPE is needed in order to compile late-type
+ ;; SB-XC:DEFTYPE is needed in order to compile late-type
  ;; in the host Common Lisp, and in order to run, it needs
  ;; %COMPILER-DEFTYPE.
  ("src/compiler/compiler-deftype" :c-headers)
@@ -397,10 +397,10 @@
 
  ("src/code/class-init" :c-headers)
 
- ;; The DEFSTRUCT machinery needs SB!XC:SUBTYPEP, defined in
- ;; "code/late-type", and SB!XC:TYPEP, defined in "code/cross-type",
+ ;; The DEFSTRUCT machinery needs SB-XC:SUBTYPEP, defined in
+ ;; "code/late-type", and SB-XC:TYPEP, defined in "code/cross-type",
  ;; and SPECIALIZE-ARRAY-TYPE, defined in "compiler/generic/vm-type",
- ;; and SB!XC:PROCLAIM, defined in "src/compiler/proclaim"
+ ;; and SB-XC:PROCLAIM, defined in "src/compiler/proclaim"
  ;; FIXME: #+ should be (and sb-xc-host) but it isn't set yet.
  ("src/code/defstruct"  :c-headers #+cmucl :ignore-failure-p)
  ("src/code/target-defstruct" :not-host)
@@ -409,7 +409,7 @@
  ;; machinery) before we can set its superclasses here.
  ("src/code/alien-type")
 
- ;; This needs not just the SB!XC:DEFSTRUCT machinery, but also
+ ;; This needs not just the SB-XC:DEFSTRUCT machinery, but also
  ;; the TYPE= stuff defined in late-type.lisp, and the
  ;; CHECK-FUN-NAME defined in proclaim.lisp.
  ("src/code/force-delayed-defbangstructs" :c-headers)
@@ -686,9 +686,9 @@
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;; other target-code-building stuff which can't be processed until
- ;; machinery like SB!XC:DEFMACRO exists
+ ;; machinery like SB-XC:DEFMACRO exists
 
- ("src/code/late-format") ; needs SB!XC:DEFMACRO
+ ("src/code/late-format") ; needs SB-XC:DEFMACRO
 
  ("src/code/late-globaldb" :not-host)
  )

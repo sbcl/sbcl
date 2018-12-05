@@ -429,7 +429,7 @@
 
 ;;; FIXME: The various FOO-SYSCALL-BAR macros, and perhaps some other
 ;;; macros in this file, are only used in this file, and could be
-;;; implemented using SB!XC:DEFMACRO wrapped in EVAL-WHEN.
+;;; implemented using SB-XC:DEFMACRO wrapped in EVAL-WHEN.
 
 (defmacro syscall ((name ret-type &rest arg-types) success-form &rest args)
   (with-funcname (sname name)
@@ -548,7 +548,7 @@
 ;;;; Process time information
 
 (defconstant 100ns-per-internal-time-unit
-  (/ 10000000 sb!xc:internal-time-units-per-second))
+  (/ 10000000 sb-xc:internal-time-units-per-second))
 
 ;; FILETIME
 ;; The FILETIME structure is a 64-bit value representing the number of

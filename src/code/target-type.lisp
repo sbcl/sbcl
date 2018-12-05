@@ -56,7 +56,7 @@
              (%instancep obj))
          (if (eq (classoid-layout type)
                  (info :type :compiler-layout (classoid-name type)))
-             (values (sb!xc:typep obj type) t)
+             (values (sb-xc:typep obj type) t)
              (values nil nil))
          (values nil t)))
     (compound-type

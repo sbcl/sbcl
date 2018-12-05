@@ -1435,7 +1435,7 @@
                 (null sym))
            (warn "Undefined instruction: ~s in~% ~s" instruction whole)
            `(error "Undefined instruction: ~s in~% ~s" ',instruction ',whole))
-          ((#-sb-xc macro-function #+sb-xc sb!xc:macro-function sym env)
+          ((#-sb-xc macro-function #+sb-xc sb-xc:macro-function sym env)
            `(,sym ,@args))
           (t
            `(%inst ,(if stringablep `',sym `(op-encoder-name ,instruction))
@@ -1553,12 +1553,12 @@
                                  total-bits assembly-unit-bits))
                         quo))
            (bytes (make-array num-bytes :initial-element nil))
-           (segment-arg (sb!xc:gensym "SEGMENT-")))
+           (segment-arg (sb-xc:gensym "SEGMENT-")))
       (dolist (byte-spec-expr byte-specs)
         (let* ((byte-spec (eval byte-spec-expr))
                (byte-size (byte-size byte-spec))
                (byte-posn (byte-position byte-spec))
-               (arg (sb!xc:gensym (format nil "~:@(ARG-FOR-~S-~)" byte-spec-expr))))
+               (arg (sb-xc:gensym (format nil "~:@(ARG-FOR-~S-~)" byte-spec-expr))))
           (when (ldb-test (byte byte-size byte-posn) overall-mask)
             (error "The byte spec ~S either overlaps another byte spec, or ~
                     extends past the end."

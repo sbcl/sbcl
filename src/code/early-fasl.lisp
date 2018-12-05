@@ -33,7 +33,7 @@
 ;;;   against.
 (defglobal *fasl-header-string-start-string* "# FASL")
 
-;;; a list of SB!XC:*FEATURES* flags which affect binary compatibility,
+;;; a list of SB-XC:*FEATURES* flags which affect binary compatibility,
 ;;; i.e. which must be the same between the SBCL which compiled the code
 ;;; and the SBCL which executes the code. This is a property of SBCL executables
 ;;; in the abstract, not of this particular SBCL executable,
@@ -49,7 +49,7 @@
 ;;; which are present in a particular compilation.
 (defun compute-features-affecting-fasl-format ()
   (let ((list (sort (copy-list (intersection *features-potentially-affecting-fasl-format*
-                                             sb!xc:*features*))
+                                             sb-xc:*features*))
                     #'string< :key #'symbol-name)))
     ;; Stringify the subset of *FEATURES* that affect fasl format.
     ;; A list would be the natural representation choice for this, but a string

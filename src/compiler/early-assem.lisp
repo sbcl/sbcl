@@ -79,7 +79,7 @@
 ;;; that are called within, and therefore would issue "unknown function"
 ;;; warnings. So we avoid letting it see a load-time definition of the macro.
 (eval-when (:compile-toplevel #-sb-xc :load-toplevel :execute)
-(#-sb-xc defmacro #+sb-xc sb!xc:defmacro sb-vm::define-assembly-routine
+(#-sb-xc defmacro #+sb-xc sb-xc:defmacro sb-vm::define-assembly-routine
     (name&options vars &body code)
   (multiple-value-bind (name options)
       (if (atom name&options)

@@ -290,14 +290,14 @@
     #.(aver (= n-fixnum-tag-bits 1))
     (move y x)
     (inst shl y 1)
-    (inst cmov :o y (emit-constant (1+ sb!xc:most-positive-fixnum)))))
+    (inst cmov :o y (emit-constant (1+ sb-xc:most-positive-fixnum)))))
 
 (define-vop (move-from-fixnum-1 move-from-fixnum+1)
   (:generator 4
     #.(aver (= n-fixnum-tag-bits 1))
     (move y x)
     (inst shl y 1)
-    (inst cmov :o y (emit-constant (1- sb!xc:most-negative-fixnum)))))
+    (inst cmov :o y (emit-constant (1- sb-xc:most-negative-fixnum)))))
 
 ;;; Convert an untagged unsigned word to a lispobj -- fixnum or bignum
 ;;; as the case may be. Fixnum case inline, bignum case in an assembly

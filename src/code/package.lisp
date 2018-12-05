@@ -36,7 +36,7 @@
 ;;;       symbol whose name is spelled "NIL" have the identical strange hash
 ;;;       so that the hash is a pure function of the name's characters.
 
-(sb!xc:defstruct (package-hashtable
+(sb-xc:defstruct (package-hashtable
                   (:constructor %make-package-hashtable
                                 (cells size &aux (free size)))
                   (:copier nil))
@@ -55,7 +55,7 @@
 
 ;;;; the PACKAGE structure
 
-(sb!xc:defstruct (package
+(sb-xc:defstruct (package
                   (:constructor %make-package
                                 (%name internal-symbols external-symbols))
                   (:copier nil)

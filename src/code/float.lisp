@@ -776,8 +776,8 @@
 ;;; Specialized versions for floats.
 (macrolet ((def (type name)
              `(defun ,name (number)
-                (if (and (<= ,(coerce sb!xc:most-negative-fixnum type) number)
-                         (< number ,(coerce sb!xc:most-positive-fixnum type)))
+                (if (and (<= ,(coerce sb-xc:most-negative-fixnum type) number)
+                         (< number ,(coerce sb-xc:most-positive-fixnum type)))
                     (truly-the fixnum (,name number))
                     ;; General -- slow -- case.
                     (multiple-value-bind (bits exp) (integer-decode-float number)

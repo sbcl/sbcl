@@ -74,7 +74,7 @@
 
 ;; Just transform to make-array for normal target code.  This macro does not
 ;; persist into the target as there is no use of it after cross-compilation.
-(setf (sb!xc:compiler-macro-function '!make-specialized-array)
+(setf (sb-xc:compiler-macro-function '!make-specialized-array)
       (lambda (form env)
         (declare (ignore env))
         (destructuring-bind (length element-type &optional contents) (cdr form)

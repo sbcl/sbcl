@@ -53,7 +53,7 @@
                                               #'(lambda (item)
                                                   (every
                                                    #'(lambda (x)
-                                                       (< x sb!xc:char-code-limit))
+                                                       (< x sb-xc:char-code-limit))
                                                    item)) set))
                          do (dolist (i items)
                               (setf (gethash (logically-readonlyize (possibly-base-stringize i))

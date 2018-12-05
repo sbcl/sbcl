@@ -11,7 +11,7 @@
 
 ;;;; Rudimentary DEFMETHOD
 
-(sb!xc:defmacro defmethod (&whole form name lambda-list &rest body
+(sb-xc:defmacro defmethod (&whole form name lambda-list &rest body
                            &aux qualifier)
   (when (member name '((setf documentation) documentation) :test 'equal)
     (return-from defmethod `(push ',form *!documentation-methods*)))

@@ -588,12 +588,12 @@
       (cond ((not type)
              nil)
             ((csubtypep type
-                        (specifier-type `(integer ,sb!xc:most-negative-fixnum
-                                                  ,(1+ sb!xc:most-positive-fixnum))))
+                        (specifier-type `(integer ,sb-xc:most-negative-fixnum
+                                                  ,(1+ sb-xc:most-positive-fixnum))))
              (template-or-lose 'sb-vm::move-from-fixnum+1))
             ((csubtypep type
-                        (specifier-type `(integer ,(1- sb!xc:most-negative-fixnum)
-                                                  ,sb!xc:most-positive-fixnum)))
+                        (specifier-type `(integer ,(1- sb-xc:most-negative-fixnum)
+                                                  ,sb-xc:most-positive-fixnum)))
              (template-or-lose 'sb-vm::move-from-fixnum-1))))))
 
 ;;; Scan the IR2 looking for move operations that need to be replaced

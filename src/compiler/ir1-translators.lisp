@@ -528,8 +528,8 @@ Return VALUE without evaluating it."
                             (lexenv-blocks *lexenv*) :from-end t))
               *source-namestring*
               (awhen (case *name-context-file-path-selector*
-                       (pathname (or sb!xc:*compile-file-pathname* *load-pathname*))
-                       (truename (or sb!xc:*compile-file-truename* *load-truename*)))
+                       (pathname (or sb-xc:*compile-file-pathname* *load-pathname*))
+                       (truename (or sb-xc:*compile-file-truename* *load-truename*)))
                 (namestring it)))))
     (when context
       (list :in context))))
@@ -600,7 +600,7 @@ be a lambda expression."
     (reference-leaf start next result leaf)))
 
 (defun constant-global-fun-name (thing)
-  (let ((constantp (sb!xc:constantp thing)))
+  (let ((constantp (sb-xc:constantp thing)))
     (when constantp
       (let ((name (constant-form-value thing)))
         (when (legal-fun-name-p name)
@@ -958,7 +958,7 @@ other."
                     (values-subtypep (make-single-value-type (leaf-type value))
                                      type))
                (and (not (fun-designator-type-p type))
-                    (sb!xc:constantp value)
+                    (sb-xc:constantp value)
                     (or (not (values-type-p type))
                         (values-type-may-be-single-value-p type))
                     (ctypep (constant-form-value value)

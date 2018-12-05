@@ -19,9 +19,9 @@
            (return-from expand (values nil t))) ; give up
          (binding* ((elements (make-gensym-list (length sequences)))
                     ((bind-fun call-it) (funarg-bind/call-forms pred elements))
-                    (blockname (sb!xc:gensym "BLOCK"))
-                    (wrapper (sb!xc:gensym "WRAPPER"))
-                    (value (sb!xc:gensym "VAL")))
+                    (blockname (sb-xc:gensym "BLOCK"))
+                    (wrapper (sb-xc:gensym "WRAPPER"))
+                    (value (sb-xc:gensym "VAL")))
              (let ((form
                     `(block ,blockname
                        ;; Does DX actually help? INLINE should win anyway.

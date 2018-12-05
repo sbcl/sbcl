@@ -42,7 +42,7 @@
 ;;;; Lisp types used by syscalls
 
 (deftype unix-pathname () 'simple-string)
-(deftype unix-fd () `(integer 0 ,sb!xc:most-positive-fixnum))
+(deftype unix-fd () `(integer 0 ,sb-xc:most-positive-fixnum))
 
 (deftype unix-file-mode () '(unsigned-byte 32))
 (deftype unix-pid () '(unsigned-byte 32))
@@ -55,7 +55,7 @@
 
 ;;; FIXME: The various FOO-SYSCALL-BAR macros, and perhaps some other
 ;;; macros in this file, are only used in this file, and could be
-;;; implemented using SB!XC:DEFMACRO wrapped in EVAL-WHEN.
+;;; implemented using SB-XC:DEFMACRO wrapped in EVAL-WHEN.
 ;;;
 ;;; SB-EXECUTABLE, at least, uses one of these macros; other libraries
 ;;; and programs have been known to use them as well.  Perhaps they
@@ -1045,7 +1045,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 ;;; removed by hand.
 
 (defconstant micro-seconds-per-internal-time-unit
-  (/ 1000000 sb!xc:internal-time-units-per-second))
+  (/ 1000000 sb-xc:internal-time-units-per-second))
 
 ;;; UNIX specific code, that has been cleanly separated from the
 ;;; Windows build.
@@ -1136,7 +1136,7 @@ the UNIX epoch (January 1st 1970.)"
       (multiple-value-bind (sec msec) (system-real-time-values)
         (unless (and (= msec c-msec) (= sec c-sec))
           (setf now (+ (* (- sec e-sec)
-                          sb!xc:internal-time-units-per-second)
+                          sb-xc:internal-time-units-per-second)
                        (- msec e-msec))
                 c-msec msec
                 c-sec sec))
@@ -1153,7 +1153,7 @@ the UNIX epoch (January 1st 1970.)"
                ;; to sometimes return 1000000 exactly.)
                (type fixnum utime-usec stime-usec))
       (let ((result (+ (* (+ utime-sec stime-sec)
-                          sb!xc:internal-time-units-per-second)
+                          sb-xc:internal-time-units-per-second)
                        (floor (+ utime-usec
                                  stime-usec
                                  (floor micro-seconds-per-internal-time-unit 2))

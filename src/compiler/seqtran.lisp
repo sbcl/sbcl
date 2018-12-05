@@ -1136,7 +1136,7 @@
             (j (+ ,dst-offset ,length) (1- j)))
            ((<= i ,src-offset))
          (declare (optimize (insert-array-bounds-checks 0))
-                  (type (integer 0 #.sb!xc:array-dimension-limit) j i))
+                  (type (integer 0 #.sb-xc:array-dimension-limit) j i))
          (setf (aref ,dst (1- j)) (aref ,src (1- i))))))
 
 ;;; MAKE-SEQUENCE, SUBSEQ, COPY-SEQ
@@ -1406,7 +1406,7 @@
          (constant-end2 (and (constant-lvar-p end2)
                              (lvar-value end2)))
          (min-result (or constant-start2 0))
-         (max-result (or constant-end2 (1- sb!xc:array-dimension-limit)))
+         (max-result (or constant-end2 (1- sb-xc:array-dimension-limit)))
          (max2 (sequence-lvar-dimensions sequence2))
          (max-result (if (integerp max2)
                          (min max-result max2)
@@ -1440,7 +1440,7 @@
          (constant-end (and (constant-lvar-p end)
                             (lvar-value end)))
          (min-result (or constant-start 0))
-         (max-result (or constant-end (1- sb!xc:array-dimension-limit)))
+         (max-result (or constant-end (1- sb-xc:array-dimension-limit)))
          (max (sequence-lvar-dimensions sequence))
          (max-result (if (integerp max)
                          (min max-result max)
@@ -1982,7 +1982,7 @@
                       ,maybe-return))
             (values nil nil)))))))
 
-(sb!xc:defmacro %find-position-vector-macro (item sequence
+(sb-xc:defmacro %find-position-vector-macro (item sequence
                                              from-end start end key test)
   (with-unique-names (element)
     (%find-position-or-find-position-if-vector-expansion
@@ -1996,7 +1996,7 @@
      ;; or after the checked sequence element.)
      `(funcall ,test ,item (funcall ,key ,element)))))
 
-(sb!xc:defmacro %find-position-if-vector-macro (predicate sequence
+(sb-xc:defmacro %find-position-if-vector-macro (predicate sequence
                                                      from-end start end key)
   (with-unique-names (element)
     (%find-position-or-find-position-if-vector-expansion
@@ -2007,7 +2007,7 @@
      element
      `(funcall ,predicate (funcall ,key ,element)))))
 
-(sb!xc:defmacro %find-position-if-not-vector-macro (predicate sequence
+(sb-xc:defmacro %find-position-if-not-vector-macro (predicate sequence
                                                          from-end start end key)
   (with-unique-names (element)
     (%find-position-or-find-position-if-vector-expansion

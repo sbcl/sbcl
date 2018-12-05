@@ -1600,7 +1600,7 @@ extended <package-name>::<form-in-package> syntax."
         ((> base 36) a)
       (do ((total (1- base) (+ (* total base) (1- base)))
            (n-digits 0 (1+ n-digits)))
-          ((sb!xc:typep total 'bignum)
+          ((sb-xc:typep total 'bignum)
            (setf (aref a (- base 2)) n-digits))
         ;; empty DO body
         )))

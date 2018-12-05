@@ -21,7 +21,7 @@
 
 (sb-ext:unlock-package "CL")
 (rename-package "COMMON-LISP" "COMMON-LISP"
-                (cons "SB!XC" (package-nicknames "CL")))
+                (cons "SB-XC" (package-nicknames "CL")))
 ;;; We need the #! readtable modifications.
 (load (merge-pathnames "shebang.lisp" *load-truename*))
 

@@ -16,7 +16,7 @@
 ;;; The HOST structure holds the functions that both parse the
 ;;; pathname information into structure slot entries, and after
 ;;; translation the inverse (unparse) functions.
-(sb!xc:defstruct (host (:constructor nil)
+(sb-xc:defstruct (host (:constructor nil)
                        (:copier nil)
                        (:print-object
                         (lambda (host stream)
@@ -36,17 +36,17 @@
 
 ;;; A PATTERN is a list of entries and wildcards used for pattern
 ;;; matches of translations.
-(sb!xc:defstruct (pattern (:constructor make-pattern (pieces)) (:copier nil))
+(sb-xc:defstruct (pattern (:constructor make-pattern (pieces)) (:copier nil))
   (pieces nil :type list))
 
 ;;;; PATHNAME structures
 
 ;;; the various magic tokens that are allowed to appear in pretty much
 ;;; all pathname components
-(sb!xc:deftype pathname-component-tokens ()
+(sb-xc:deftype pathname-component-tokens ()
   '(member nil :unspecific :wild :unc))
 
-(sb!xc:defstruct (pathname (:conc-name %pathname-)
+(sb-xc:defstruct (pathname (:conc-name %pathname-)
                            (:copier nil)
                            (:constructor %%make-pathname
                                (host device directory name type version

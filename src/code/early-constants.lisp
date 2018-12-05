@@ -9,7 +9,7 @@
 
 (in-package "SB!IMPL")
 
-(defconstant-eqx sb!xc:lambda-list-keywords
+(defconstant-eqx sb-xc:lambda-list-keywords
       '(&allow-other-keys
         &aux
         &body

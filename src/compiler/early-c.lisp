@@ -16,24 +16,24 @@
 (in-package "SB-C")
 
 ;;; ANSI limits on compilation
-(defconstant sb!xc:call-arguments-limit sb!xc:most-positive-fixnum
+(defconstant sb-xc:call-arguments-limit sb-xc:most-positive-fixnum
   "The exclusive upper bound on the number of arguments which may be passed
   to a function, including &REST args.")
-(defconstant sb!xc:lambda-parameters-limit sb!xc:most-positive-fixnum
+(defconstant sb-xc:lambda-parameters-limit sb-xc:most-positive-fixnum
   "The exclusive upper bound on the number of parameters which may be specified
   in a given lambda list. This is actually the limit on required and &OPTIONAL
   parameters. With &KEY and &AUX you can get more.")
-(defconstant sb!xc:multiple-values-limit sb!xc:most-positive-fixnum
+(defconstant sb-xc:multiple-values-limit sb-xc:most-positive-fixnum
   "The exclusive upper bound on the number of multiple VALUES that you can
   return.")
 
 ;;;; cross-compiler-only versions of CL special variables, so that we
 ;;;; don't have weird interactions with the host compiler
 
-(defvar sb!xc:*compile-file-pathname*)
-(defvar sb!xc:*compile-file-truename*)
-(defvar sb!xc:*compile-print*)
-(defvar sb!xc:*compile-verbose*)
+(defvar sb-xc:*compile-file-pathname*)
+(defvar sb-xc:*compile-file-truename*)
+(defvar sb-xc:*compile-print*)
+(defvar sb-xc:*compile-verbose*)
 
 ;;;; miscellaneous types used both in the cross-compiler and on the target
 

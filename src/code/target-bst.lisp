@@ -17,7 +17,7 @@
             (:conc-name node-)
             (:constructor make-node
              (key data &aux (priority
-                             (random sb!xc:most-positive-fixnum
+                             (random sb-xc:most-positive-fixnum
                                      *treap-random-state*)))))
   key data
   left right

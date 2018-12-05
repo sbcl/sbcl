@@ -54,12 +54,12 @@
             (subtypep 'double-float 'single-float))
     (warn "possible floating point information loss in ~S" call)))
 
-(defun sb!xc:type-of (object)
+(defun sb-xc:type-of (object)
   (let ((raw-result (type-of object)))
     (cond ((or (subtypep raw-result 'float)
                (subtypep raw-result 'complex))
            (warn-possible-cross-type-float-info-loss
-            `(sb!xc:type-of ,object))
+            `(sb-xc:type-of ,object))
            raw-result)
           ((subtypep raw-result 'integer)
            (cond ((<= 0 object 1)
@@ -179,7 +179,7 @@
             ((and (symbolp target-type)
                   (or (eq hint :instance)
                       (and (find-classoid target-type nil)
-                           (sb!xc:subtypep target-type 'cl:structure-object)))
+                           (sb-xc:subtypep target-type 'cl:structure-object)))
                   (typep host-object '(or symbol number list character)))
              (values nil t))
             ((and (symbolp target-type)
@@ -214,7 +214,7 @@
                      (values nil t))))
             (;; general cases of vectors
              (and (not (hairy-type-p (values-specifier-type target-type)))
-                  (sb!xc:subtypep target-type 'cl:vector))
+                  (sb-xc:subtypep target-type 'cl:vector))
              (if (not (vectorp host-object))
                  (values nil t) ; certainly not a vector
                  ;; If our type machinery determined that TARGET-TYPE is a
@@ -236,7 +236,7 @@
                                t)))))
             (;; general cases of arrays
              (and (not (hairy-type-p (values-specifier-type target-type)))
-                  (sb!xc:subtypep target-type 'cl:array))
+                  (sb-xc:subtypep target-type 'cl:array))
              (if (arrayp host-object)
                  (warn-and-give-up) ; general-case arrays being way too hard
                  (values nil t))) ; but "obviously not an array" being easy
@@ -258,7 +258,7 @@
              ;; Our dumping logic is based on contents, however, so
              ;; reasoning about them should be safe
              (and (not (hairy-type-p (values-specifier-type target-type)))
-                  (sb!xc:subtypep target-type 'cl:complex))
+                  (sb-xc:subtypep target-type 'cl:complex))
              (if (complexp host-object)
                  (let ((re (realpart host-object))
                        (im (imagpart host-object)))
@@ -463,7 +463,7 @@
 ;;; to completeness, since it need only handle the cases which arise
 ;;; when building SBCL itself, e.g. testing that range limits FOO and
 ;;; BAR in (INTEGER FOO BAR) are INTEGERs.
-(defun sb!xc:typep (host-object target-type-spec &optional (env nil env-p))
+(defun sb-xc:typep (host-object target-type-spec &optional (env nil env-p))
   (declare (ignore env))
   (aver (null env-p)) ; 'cause we're too lazy to think about it
   (multiple-value-bind (opinion certain-p)
@@ -472,7 +472,7 @@
     ;; probably can't handle it.
     (if certain-p
         opinion
-        (error "uncertain in SB!XC:TYPEP ~S ~S"
+        (error "uncertain in SB-XC:TYPEP ~S ~S"
                host-object
                target-type-spec))))
 

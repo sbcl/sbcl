@@ -90,7 +90,7 @@
                     (package (package-name (symbol-package pred)))
                     (stem (string-left-trim "%" (string-right-trim "P-" name)))
                     (article (if (position (schar name 0) "AEIOU") "an" "a")))
-               (aver (not (string= package "SB!XC")))
+               (aver (not (string= package "SB-XC")))
                `(defun ,pred (object)
                   ,@(unless (eql (mismatch package "SB!") 3)
                       (list (format nil
@@ -229,10 +229,10 @@
      (cond
        ((<= 0 object 1) 'bit)
        ((< object 0) 'fixnum)
-       (t '(integer 0 #.sb!xc:most-positive-fixnum))))
+       (t '(integer 0 #.sb-xc:most-positive-fixnum))))
     (integer
      (if (>= object 0)
-         '(integer #.(1+ sb!xc:most-positive-fixnum))
+         '(integer #.(1+ sb-xc:most-positive-fixnum))
          'bignum))
     (character
      (typecase object

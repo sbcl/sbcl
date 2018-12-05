@@ -257,7 +257,7 @@
     (flushable movable))
 
 ;;; Allocate an array header with type code TYPE and rank RANK.
-(defknown make-array-header ((unsigned-byte 8) (mod #.sb!xc:array-rank-limit)) array
+(defknown make-array-header ((unsigned-byte 8) (mod #.sb-xc:array-rank-limit)) array
   (flushable movable))
 
 (defknown make-array-header* (&rest t) array (flushable movable))

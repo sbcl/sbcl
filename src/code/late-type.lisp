@@ -146,7 +146,7 @@
          (values
           ;; FIXME: This old CMU CL code probably deserves a comment
           ;; explaining to us mere mortals how it works...
-          (and (sb!xc:typep type2 'classoid)
+          (and (sb-xc:typep type2 'classoid)
                (dolist (x info nil)
                  (let ((guard (cdr x)))
                    (when (or (not guard)
@@ -924,7 +924,7 @@
 ;;;    type specifiers (or their expansions) are EQUAL."
 ;;; i.e. though it is not longer technically a MUST, it suggests that EQUAL is
 ;;; in fact a valid implementation, at least where it computes T.
-(defun sb!xc:subtypep (type1 type2 &optional environment)
+(defun sb-xc:subtypep (type1 type2 &optional environment)
   "Return two values indicating the relationship between type1 and type2.
   If values are T and T, type1 definitely is a subtype of type2.
   If values are NIL and T, type1 definitely is not a subtype of type2.
@@ -1822,8 +1822,8 @@
                                   `(unsigned-byte ,high-length))
                                  (t
                                   `(mod ,(1+ high)))))
-                          ((and (= low sb!xc:most-negative-fixnum)
-                                (= high sb!xc:most-positive-fixnum))
+                          ((and (= low sb-xc:most-negative-fixnum)
+                                (= high sb-xc:most-positive-fixnum))
                            'fixnum)
                           ((and (= low (lognot high))
                                 (= high-count high-length)
@@ -2168,7 +2168,7 @@ used for a COMPLEX component.~:@>"
 #!-sb-fluid (declaim (inline valid-bound))
 (defun valid-bound (bound type)
   (cond ((eq bound '*) nil)
-        ((sb!xc:typep (if (singleton-p bound) (car bound) bound) type) bound)
+        ((sb-xc:typep (if (singleton-p bound) (car bound) bound) type) bound)
         (t
          (error "Bound is not * or ~A ~S or list of one ~:*~S: ~S"
                 (if (eq type 'integer) "an" "a") type bound))))
@@ -2227,8 +2227,8 @@ used for a COMPLEX component.~:@>"
 (defun inner-coerce-real-bound (bound type upperp)
   #+sb-xc-host (declare (ignore upperp))
   (let #+sb-xc-host ()
-       #-sb-xc-host ((nl (fp-const sb!xc:most-negative-long-float))
-                     (pl (fp-const sb!xc:most-positive-long-float)))
+       #-sb-xc-host ((nl (fp-const sb-xc:most-negative-long-float))
+                     (pl (fp-const sb-xc:most-positive-long-float)))
     (let ((nbound (if (consp bound) (car bound) bound))
           (consp (consp bound)))
       (ecase type
@@ -2256,10 +2256,10 @@ used for a COMPLEX component.~:@>"
 (defun inner-coerce-float-bound (bound type upperp)
   #+sb-xc-host (declare (ignore upperp))
   (let #+sb-xc-host ()
-       #-sb-xc-host ((nd (fp-const sb!xc:most-negative-double-float))
-                     (pd (fp-const sb!xc:most-positive-double-float))
-                     (ns (fp-const sb!xc:most-negative-single-float))
-                     (ps (fp-const sb!xc:most-positive-single-float)))
+       #-sb-xc-host ((nd (fp-const sb-xc:most-negative-double-float))
+                     (pd (fp-const sb-xc:most-positive-double-float))
+                     (ns (fp-const sb-xc:most-negative-single-float))
+                     (ps (fp-const sb-xc:most-positive-single-float)))
     (let ((nbound (if (consp bound) (car bound) bound))
           (consp (consp bound)))
       (ecase type
@@ -2859,17 +2859,17 @@ used for a COMPLEX component.~:@>"
     (integer
      (when (minusp dims)
        (error "Arrays can't have a negative number of dimensions: ~S" dims))
-     (when (>= dims sb!xc:array-rank-limit)
+     (when (>= dims sb-xc:array-rank-limit)
        (error "array type with too many dimensions: ~S" dims))
      (make-list dims :initial-element '*))
     (list
-     (when (>= (length dims) sb!xc:array-rank-limit)
+     (when (>= (length dims) sb-xc:array-rank-limit)
        (error "array type with too many dimensions: ~S" dims))
      (dolist (dim dims)
        (unless (eq dim '*)
          (unless (and (integerp dim)
                       (>= dim 0)
-                      (< dim sb!xc:array-dimension-limit))
+                      (< dim sb-xc:array-dimension-limit))
            (error "bad dimension in array type: ~S" dim))))
      dims)
     (t
@@ -2997,7 +2997,7 @@ used for a COMPLEX component.~:@>"
       (let (ms numbers char-codes)
         (dolist (m (remove-duplicates members))
           (typecase m
-            (character (push (sb!xc:char-code m) char-codes))
+            (character (push (sb-xc:char-code m) char-codes))
             (real (if (and (floatp m) (zerop m))
                       (push m ms)
                       (push (ctype-of m) numbers)))
@@ -3577,19 +3577,19 @@ used for a COMPLEX component.~:@>"
 ;;;; CHARACTER-SET types
 
 (!def-type-translator character-set
-    (&optional (pairs '((0 . #.(1- sb!xc:char-code-limit)))))
+    (&optional (pairs '((0 . #.(1- sb-xc:char-code-limit)))))
   (make-character-set-type pairs))
 
 (!define-type-method (character-set :negate) (type)
   (let ((pairs (character-set-type-pairs type)))
     (if (and (= (length pairs) 1)
              (= (caar pairs) 0)
-             (= (cdar pairs) (1- sb!xc:char-code-limit)))
+             (= (cdar pairs) (1- sb-xc:char-code-limit)))
         (make-negation-type type)
         (let ((not-character
                (make-negation-type
                 (make-character-set-type
-                 '((0 . #.(1- sb!xc:char-code-limit)))))))
+                 '((0 . #.(1- sb-xc:char-code-limit)))))))
           (type-union
            not-character
            (make-character-set-type
@@ -3600,9 +3600,9 @@ used for a COMPLEX component.~:@>"
                            (high1 (cdar tail) (cdar tail))
                            (low2 (caadr tail) (caadr tail)))
                           ((null (cdr tail))
-                           (when (< (cdar tail) (1- sb!xc:char-code-limit))
+                           (when (< (cdar tail) (1- sb-xc:char-code-limit))
                              (push (cons (1+ (cdar tail))
-                                         (1- sb!xc:char-code-limit))
+                                         (1- sb-xc:char-code-limit))
                                    not-pairs))
                            (nreverse not-pairs))
                        (push (cons (1+ high1) (1- low2)) not-pairs)))))))))
@@ -3623,7 +3623,7 @@ used for a COMPLEX component.~:@>"
             (chars (loop named outer
                          for (low . high) in pairs
                          nconc (loop for code from low upto high
-                                     collect (sb!xc:code-char code)
+                                     collect (sb-xc:code-char code)
                                      when (minusp (decf count))
                                      do (return-from outer t)))))
        (if (eq chars t)

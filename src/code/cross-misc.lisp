@@ -88,14 +88,14 @@
        (or (not (typep x 'simple-array))
            (/= (array-rank x) 1))))
 
-(defvar sb!xc:*gensym-counter* 0)
+(defvar sb-xc:*gensym-counter* 0)
 
-(defun sb!xc:gensym (&optional (thing "G"))
+(defun sb-xc:gensym (&optional (thing "G"))
   (declare (type string thing))
-  (let ((n sb!xc:*gensym-counter*))
+  (let ((n sb-xc:*gensym-counter*))
     (prog1
         (make-symbol (concatenate 'string thing (write-to-string n :base 10 :radix nil :pretty nil)))
-      (incf sb!xc:*gensym-counter*))))
+      (incf sb-xc:*gensym-counter*))))
 
 ;;; These functions are needed for constant-folding.
 (defun simple-array-nil-p (object)
@@ -232,9 +232,9 @@
   (let* ((n (length string))
          (a (make-array n :element-type '(unsigned-byte 8))))
     (dotimes (i n a)
-      (let ((code (sb!xc:char-code (char string i))))
+      (let ((code (sb-xc:char-code (char string i))))
         (unless (<= 0 code 127)
-          (setf code (sb!xc:char-code #\?)))
+          (setf code (sb-xc:char-code #\?)))
         (setf (aref a i) code)))))
 
 ;;;; Stubs for host

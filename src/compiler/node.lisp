@@ -1648,7 +1648,7 @@
 ;; FIXME: the frozen-ness can't actually help optimize anything
 ;; until this file is compiled by the cross-compiler.
 ;; Anything compiled prior to then uses the non-frozen classoid as existed
-;; at load-time of the cross-compiler. SB!XC:PROCLAIM would likely work here.
+;; at load-time of the cross-compiler. SB-XC:PROCLAIM would likely work here.
 #!-sb-fluid
 (declaim (freeze-type node lexenv ctran lvar cblock component cleanup
                       physenv tail-set nlx-info))

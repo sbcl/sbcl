@@ -79,7 +79,7 @@
       (case method
         ((nil) ; default
          (values '(cl:make-load-form-saving-slots obj :environment env)
-                 '(sb!xc:make-load-form-saving-slots obj :environment env)))
+                 '(sb-xc:make-load-form-saving-slots obj :environment env)))
         (:ignore-it
          (values '(bug "Can't :ignore-it for host") :ignore-it))
         (t
@@ -91,7 +91,7 @@
                ,host-expr)))
        ,@(when (or #+sb-xc-host (member :xc usable-by))
            ;; Use the host's CLOS implementation to select the target's method.
-           `((defmethod sb!xc:make-load-form ((obj ,class-name) &optional env)
+           `((defmethod sb-xc:make-load-form ((obj ,class-name) &optional env)
                (declare (ignorable obj env))
                ,target-expr)))
        ,@(when (or #-sb-xc-host (member :target usable-by))

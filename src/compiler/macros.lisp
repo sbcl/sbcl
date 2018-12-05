@@ -286,8 +286,8 @@
     (error "can't specify both DEFUN-ONLY and EVAL-NAME"))
   (multiple-value-bind (body decls doc) (parse-body body-decls-doc t)
     (let ((n-node (or node (make-symbol "NODE")))
-          (n-decls (sb!xc:gensym))
-          (n-lambda (sb!xc:gensym)))
+          (n-decls (sb-xc:gensym))
+          (n-lambda (sb-xc:gensym)))
       (multiple-value-bind (bindings vars)
           (parse-deftransform lambda-list n-node
                               '(give-up-ir1-transform))
@@ -375,7 +375,7 @@
 ;;; methods are passed an additional POLICY argument, and IR2-CONVERT
 ;;; methods are passed an additional IR2-BLOCK argument.
 (defmacro defoptimizer (what (lambda-list
-                              &optional (node (sb!xc:gensym) node-p)
+                              &optional (node (sb-xc:gensym) node-p)
                               &rest vars)
                         &body body)
   (binding* ((name
@@ -783,7 +783,7 @@
 
 (defmacro deletef-in (next place item &environment env)
   (multiple-value-bind (temps vals stores store access)
-      (#+sb-xc sb!xc:get-setf-expansion #-sb-xc get-setf-expansion place env)
+      (#+sb-xc sb-xc:get-setf-expansion #-sb-xc get-setf-expansion place env)
     (when (cdr stores)
       (error "multiple store variables for ~S" place))
     (let ((n-item (gensym))
@@ -809,7 +809,7 @@
 ;;;
 (defmacro push-in (next item place &environment env)
   (multiple-value-bind (temps vals stores store access)
-      (#+sb-xc sb!xc:get-setf-expansion #-sb-xc get-setf-expansion place env)
+      (#+sb-xc sb-xc:get-setf-expansion #-sb-xc get-setf-expansion place env)
     (when (cdr stores)
       (error "multiple store variables for ~S" place))
     `(let (,@(mapcar #'list temps vals)

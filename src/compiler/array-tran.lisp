@@ -309,7 +309,7 @@
                                        (lvar-value element-type))))
                            (cond
                              ((or (null ctype) (contains-unknown-type-p ctype)) '*)
-                             (t (sb!xc:upgraded-array-element-type
+                             (t (sb-xc:upgraded-array-element-type
                                  (lvar-value element-type))))))
                         (t
                          '*))
@@ -390,7 +390,7 @@
   ;; optimizing `#(#(foo bar) #(,x ,y)) we convert the whole expression
   ;; into (VECTOR 'FOO 'BAR X Y), whereas in the unidimensional case
   ;; it never makes sense to turn #(FOO BAR) into (VECTOR 'FOO 'BAR).
-  (when (or (and (= rank 1) (sb!xc:constantp initial-contents env))
+  (when (or (and (= rank 1) (sb-xc:constantp initial-contents env))
             ;; If you inhibit inlining these - game over.
             (fun-lexically-notinline-p 'vector env)
             (fun-lexically-notinline-p 'list env)
@@ -398,12 +398,12 @@
     (return-from rewrite-initial-contents (values nil nil)))
   (let ((dimensions (make-array rank :initial-element nil))
         (output))
-    (named-let recurse ((form (handler-case (sb!xc:macroexpand initial-contents env)
+    (named-let recurse ((form (handler-case (sb-xc:macroexpand initial-contents env)
                                 (error ()
                                   (return-from rewrite-initial-contents))))
                         (axis 0))
       (flet ((make-list-ctor (tail &optional (prefix nil prefixp) &aux val)
-               (when (and (sb!xc:constantp tail)
+               (when (and (sb-xc:constantp tail)
                           (or (proper-list-p (setq val (constant-form-value tail env)))
                               (and (vectorp val) (not prefixp))))
                  (setq form
@@ -443,16 +443,16 @@
      ;; If the unaltered INITIAL-CONTENTS were constant, then the flattened
      ;; form must be too. Turning it back to a self-evaluating object
      ;; is essential to avoid compile-time blow-up on huge vectors.
-     (if (sb!xc:constantp initial-contents env)
+     (if (sb-xc:constantp initial-contents env)
          (map 'vector (lambda (x) (constant-form-value x env)) output)
          (let ((f (if (singleton-p output) 'list 'vector)))
            `(locally (declare (notinline ,f))
              (,f ,@(mapcar (lambda (x)
                              (cond ((and (symbolp x)
                                          (not (nth-value
-                                               1 (sb!xc:macroexpand-1 x env))))
+                                               1 (sb-xc:macroexpand-1 x env))))
                                     x)
-                                   ((sb!xc:constantp x env)
+                                   ((sb-xc:constantp x env)
                                     `',(constant-form-value x env))
                                    (t
                                     `(locally (declare (inline ,f)) ,x))))
@@ -469,13 +469,13 @@
 ;;; in this path, mainly due to complications in picking the right widetag.
 (define-source-transform make-array (dims-form &rest rest &environment env
                                                &aux dims dims-constp)
-  (cond ((and (sb!xc:constantp dims-form env)
+  (cond ((and (sb-xc:constantp dims-form env)
               (proper-list-p (setq dims (constant-form-value dims-form env)))
               (not (singleton-p dims))
               (every (lambda (x) (typep x 'index)) dims))
          (setq dims-constp t))
         ((and (cond ((typep (setq dims (handler-case
-                                           (sb!xc:macroexpand dims-form env)
+                                           (sb-xc:macroexpand dims-form env)
                                          (error ()
                                            (return-from make-array (values nil t)))))
                             '(cons (eql list)))
@@ -484,7 +484,7 @@
                     ;; `(,X 2 1) -> (LIST* X '(2 1)) for example
                     ((typep dims '(cons (eql list*) cons))
                      (let ((last (car (last dims))))
-                       (when (sb!xc:constantp last env)
+                       (when (sb-xc:constantp last env)
                          (let ((lastval (constant-form-value last env)))
                            (when (listp lastval)
                              (setq dims (append (butlast (cdr dims)) lastval))
@@ -492,7 +492,7 @@
               (proper-list-p dims)
               (not (singleton-p dims)))
          ;; If you spell '(2 2) as (LIST 2 2), it is constant for purposes of MAKE-ARRAY.
-         (when (every (lambda (x) (sb!xc:constantp x env)) dims)
+         (when (every (lambda (x) (sb-xc:constantp x env)) dims)
            (let ((values (mapcar (lambda (x) (constant-form-value x env)) dims)))
              (when (every (lambda (x) (typep x 'index)) values)
                (setq dims values dims-constp t)))))
@@ -524,7 +524,7 @@
                     (case k
                       (:element-type
                        (unless (eq et unsupplied) (return nil))
-                       (setq et (car v) et-constp (sb!xc:constantp et env)))
+                       (setq et (car v) et-constp (sb-xc:constantp et env)))
                       (:initial-element
                        (when (or contents element) (return nil))
                        (setq element v))
@@ -593,7 +593,7 @@
                  `(fill-array ,(car contents) ,alloc-form)))))))
 
 (define-source-transform coerce (x type &environment env)
-  (if (and (sb!xc:constantp type env)
+  (if (and (sb-xc:constantp type env)
            (proper-list-p x)
            (memq (car x) '(sb!impl::|List| list
                            sb!impl::|Vector| vector)))
@@ -1051,7 +1051,7 @@
                                  'simple-array)
                             ,(cond ((null element-type) t)
                                    (element-type-ctype
-                                    (sb!xc:upgraded-array-element-type
+                                    (sb-xc:upgraded-array-element-type
                                      (lvar-value element-type)))
                                    (t '*))
                             ,(make-list rank :initial-element '*))))
@@ -1433,7 +1433,7 @@
 ;;; do type testing inside %WITH-ARRAY-DATA instead of outside, and
 ;;; the DEFTRANSFORM can't tell that that's going on, so it can make
 ;;; sense to use FORCE-INLINE option in that case.
-(sb!xc:defmacro with-array-data (((data-var array &key offset-var)
+(sb-xc:defmacro with-array-data (((data-var array &key offset-var)
                                   (start-var &optional (svalue 0))
                                   (end-var &optional (evalue nil))
                                   &key force-inline check-fill-pointer
@@ -1477,7 +1477,7 @@
 
 ;;; This is the fundamental definition of %WITH-ARRAY-DATA, for use in
 ;;; DEFTRANSFORMs and DEFUNs.
-(sb!xc:defmacro %with-array-data-macro
+(sb-xc:defmacro %with-array-data-macro
     (array start end &key (element-type '*) check-bounds check-fill-pointer
                           array-header-p)
   (with-unique-names (size defaulted-end data cumulative-offset)

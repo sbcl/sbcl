@@ -46,14 +46,14 @@
 ;;; of value forms, a list of the single store-value form, a storing function,
 ;;; and an accessing function.
 (declaim (ftype (function (t &optional lexenv-designator))
-                sb!xc:get-setf-expansion))
-(defun sb!xc:get-setf-expansion (form &optional environment)
+                sb-xc:get-setf-expansion))
+(defun sb-xc:get-setf-expansion (form &optional environment)
   "Return five values needed by the SETF machinery: a list of temporary
    variables, a list of values with which to fill them, a list of temporaries
    for the new values, the setting function, and the accessing function."
   (named-let retry ((form form))
     (labels ((newvals (count)
-               (let ((sb!xc:*gensym-counter* 1))
+               (let ((sb-xc:*gensym-counter* 1))
                  (make-gensym-list count "NEW")))
              ;; Produce the expansion of a SETF form that calls either
              ;; #'(SETF name) or an inverse given by short form DEFSETF.
@@ -68,7 +68,7 @@
           (multiple-value-bind (expansion expanded)
               ;; Previously this called %MACROEXPAND, but the two operations
               ;; are equivalent on atoms, so do the one that is "less".
-              (sb!xc:macroexpand-1 form environment)
+              (sb-xc:macroexpand-1 form environment)
             (if expanded
                 (retry expansion)
                 (let ((vals (newvals 1)))
@@ -157,7 +157,7 @@
                          (list form)))
                    forms)))
 
-  (sb!xc:defmacro setf (&whole form &rest args &environment env)
+  (sb-xc:defmacro setf (&whole form &rest args &environment env)
   "Takes pairs of arguments like SETQ. The first is a place and the second
   is the value that is supposed to go into that place. Returns the last
   value. The place argument may be any of the access forms for which SETF
@@ -186,13 +186,13 @@
                :setf (list (cadr place) value-form) it)))))
 
       (multiple-value-bind (temps vals newval setter)
-          (sb!xc:get-setf-expansion place env)
+          (sb-xc:get-setf-expansion place env)
         (car (gen-let* (mapcar #'list temps vals)
                        (gen-mv-bind newval value-form (forms-list setter)))))))
 
   ;; various SETF-related macros
 
-  (sb!xc:defmacro shiftf (&whole form &rest args &environment env)
+  (sb-xc:defmacro shiftf (&whole form &rest args &environment env)
   "One or more SETF-style place expressions, followed by a single
    value expression. Evaluates all of the expressions in turn, then
    assigns the value of each expression to the place on its left,
@@ -202,7 +202,7 @@
   (collect ((let*-bindings) (mv-bindings) (setters) (getters))
     (dolist (arg (butlast args))
       (multiple-value-bind (temps subforms store-vars setter getter)
-          (sb!xc:get-setf-expansion arg env)
+          (sb-xc:get-setf-expansion arg env)
         (let*-bindings (mapcar #'list  temps subforms))
         (mv-bindings store-vars)
         (setters setter)
@@ -216,7 +216,7 @@
                                 (thunk (cdr mv-bindings) (cdr getters) setters))
                    setters)))
       (let ((outputs (loop for i below (length (car (mv-bindings)))
-                           collect (sb!xc:gensym "OUT"))))
+                           collect (sb-xc:gensym "OUT"))))
         (car (gen-let* (reduce #'nconc (let*-bindings))
                        (gen-mv-bind outputs (car (getters))
                                     (thunk (mv-bindings) (cdr (getters))
@@ -239,7 +239,7 @@
                (when (and (not (symbolp place)) (eq operator 'psetq))
                  (%program-error "Place ~S in PSETQ is not a SYMBOL" place))
                (multiple-value-bind (temps vals stores setter)
-                   (sb!xc:get-setf-expansion place env)
+                   (sb-xc:get-setf-expansion place env)
                  (let*-bindings (mapcar #'list temps vals))
                  (mv-bindings (cons stores value-form))
                  (setters setter))))
@@ -253,21 +253,21 @@
                                            setters)))
              `(,@setters nil))))
 
-  (sb!xc:defmacro psetf (&rest pairs &environment env)
+  (sb-xc:defmacro psetf (&rest pairs &environment env)
   "This is to SETF as PSETQ is to SETQ. Args are alternating place
   expressions and values to go into those places. All of the subforms and
   values are determined, left to right, and only then are the locations
   updated. Returns NIL."
     (expand pairs env 'psetf 'setf))
 
-  (sb!xc:defmacro psetq (&rest pairs &environment env)
+  (sb-xc:defmacro psetq (&rest pairs &environment env)
   "PSETQ {var value}*
    Set the variables to the values, like SETQ, except that assignments
    happen in parallel, i.e. no assignments take place until all the
    forms have been evaluated."
     (expand pairs env 'psetq 'setq))))
 
-(sb!xc:defmacro rotatef (&rest args &environment env)
+(sb-xc:defmacro rotatef (&rest args &environment env)
   "Takes any number of SETF-style place expressions. Evaluates all of the
    expressions in turn, then assigns to each place the value of the form to
    its right. The rightmost form gets the value of the leftmost.
@@ -276,7 +276,7 @@
     (collect ((let*-bindings) (mv-bindings) (setters) (getters))
       (dolist (arg args)
         (multiple-value-bind (temps subforms store-vars setter getter)
-            (sb!xc:get-setf-expansion arg env)
+            (sb-xc:get-setf-expansion arg env)
           (let*-bindings (mapcar #'list temps subforms))
           (mv-bindings store-vars)
           (setters setter)
@@ -291,7 +291,7 @@
         `(let* ,(reduce #'append (let*-bindings))
            ,@(thunk (mv-bindings) (cdr (getters))))))))
 
-(sb!xc:defmacro push (obj place &environment env)
+(sb-xc:defmacro push (obj place &environment env)
   "Takes an object and a location holding a list. Conses the object onto
   the list, returning the modified list. OBJ is evaluated before PLACE."
   ;; If PLACE has multiple store locations, what should we do?
@@ -301,7 +301,7 @@
   ;; - At least two produce an incorrect expansion that doesn't even work.
   (expand-rmw-macro 'cons (list obj) place '() nil env '(item)))
 
-(sb!xc:defmacro pushnew (obj place &rest keys &environment env)
+(sb-xc:defmacro pushnew (obj place &rest keys &environment env)
   "Takes an object and a location holding a list. If the object is
   already in the list, does nothing; otherwise, conses the object onto
   the list. Keyword arguments are accepted as per the ADJOIN function."
@@ -315,13 +315,13 @@
   ;; The spec only mentions that ITEM is eval'd before PLACE.
   (expand-rmw-macro 'adjoin (list obj) place keys nil env '(item)))
 
-(sb!xc:defmacro pop (place &environment env)
+(sb-xc:defmacro pop (place &environment env)
   "The argument is a location holding a list. Pops one item off the front
   of the list and returns it."
   (if (symbolp (setq place (macroexpand-for-setf place env)))
       `(prog1 (car ,place) (setq ,place (cdr ,place)))
       (multiple-value-bind (temps vals stores setter getter)
-          (sb!xc:get-setf-expansion place env)
+          (sb-xc:get-setf-expansion place env)
         (let ((list (copy-symbol 'list))
               (ret (copy-symbol 'car)))
           `(let* (,@(mapcar #'list temps vals)
@@ -332,13 +332,13 @@
              ,setter
              ,ret)))))
 
-(sb!xc:defmacro remf (place indicator &environment env)
+(sb-xc:defmacro remf (place indicator &environment env)
   "Place may be any place expression acceptable to SETF, and is expected
   to hold a property list or (). This list is destructively altered to
   remove the property specified by the indicator. Returns T if such a
   property was present, NIL if not."
   (multiple-value-bind (temps vals newval setter getter)
-      (sb!xc:get-setf-expansion place env)
+      (sb-xc:get-setf-expansion place env)
     (let* ((flag (make-symbol "FLAG"))
            (body `(multiple-value-bind (,(car newval) ,flag)
               ;; See ANSI 5.1.3 for why we do out-of-order evaluation
@@ -380,24 +380,24 @@
          (if (symbolp (setq place (macroexpand-for-setf place env)))
              `(setq ,place (,operator ,delta ,place))
              (multiple-value-bind (dummies vals newval setter getter)
-                 (sb!xc:get-setf-expansion place env)
+                 (sb-xc:get-setf-expansion place env)
                `(let* (,@(mapcar #'list dummies vals)
                        (,(car newval) (,operator ,delta ,getter))
                        ,@(cdr newval))
                   ,setter)))))
-  (sb!xc:defmacro incf (place &optional (delta 1) &environment env)
+  (sb-xc:defmacro incf (place &optional (delta 1) &environment env)
   "The first argument is some location holding a number. This number is
   incremented by the second argument, DELTA, which defaults to 1."
     (expand place delta env '+))
 
-  (sb!xc:defmacro decf (place &optional (delta 1) &environment env)
+  (sb-xc:defmacro decf (place &optional (delta 1) &environment env)
   "The first argument is some location holding a number. This number is
   decremented by the second argument, DELTA, which defaults to 1."
     (expand place delta env 'xsubtract)))
 
 ;;;; DEFINE-MODIFY-MACRO stuff
 
-(sb!xc:defmacro sb!xc:define-modify-macro (name lambda-list function &optional doc-string)
+(sb-xc:defmacro sb-xc:define-modify-macro (name lambda-list function &optional doc-string)
   "Creates a new read-modify-write macro like PUSH or INCF."
   (binding* (((nil required optional rest)
               (parse-lambda-list
@@ -409,7 +409,7 @@
                                    optional)))
              (place (make-symbol "PLACE"))
              (env (make-symbol "ENV")))
-    `(sb!xc:defmacro ,name (,place ,@lambda-list &environment ,env)
+    `(sb-xc:defmacro ,name (,place ,@lambda-list &environment ,env)
        ,@(when doc-string (list (the string doc-string)))
        (expand-rmw-macro ',function '() ,place
                          (list* ,@args ,(car rest)) t ,env ',args))))
@@ -457,12 +457,12 @@
 ;;; This is pretty broken if there are keyword arguments (lp#1452947)
 ;;; but the bug seems to be due to irreconcilable problems in the spec.
 ;;; Everybody seems to interpret the spec the way we do though.
-(sb!xc:defmacro sb!xc:defsetf (access-fn &rest rest)
+(sb-xc:defmacro sb-xc:defsetf (access-fn &rest rest)
   "Associates a SETF update function or macro with the specified access
   function or macro. The format is complex. See the manual for details."
   (unless (symbolp access-fn)
     (error "~S access-function name ~S is not a symbol."
-           'sb!xc:defsetf access-fn))
+           'sb-xc:defsetf access-fn))
   (typecase rest
     ((cons (and symbol (not null)) (or null (cons string null)))
      `(eval-when (:load-toplevel :compile-toplevel :execute)
@@ -521,7 +521,7 @@
       (let ((mask 0) (bit 1))
         (dolist (form sexprs (values (temp-vars) (temp-vals) (call-arguments)
                                      mask))
-          (call-arguments (if (sb!xc:constantp form environment)
+          (call-arguments (if (sb-xc:constantp form environment)
                               (progn (next-name-hint) form) ; Skip one hint.
                               (let ((temp (nice-tempname form)))
                                 (setq mask (logior mask bit))
@@ -543,7 +543,7 @@
      (binding* (((before-temps before-vals before-args)
                  (collect-setf-temps before-arg-forms environment name-hints))
                 ((place-temps place-subforms stores setter getter)
-                 (sb!xc:get-setf-expansion place environment))
+                 (sb-xc:get-setf-expansion place environment))
                 ((after-temps after-vals after-args)
                  (if after-args-bindp
                      (collect-setf-temps after-arg-forms environment name-hints)
@@ -560,7 +560,7 @@
                            (every (lambda (x)
                                     (or (member x place-temps)
                                         (eq x newval-temp)
-                                        (sb!xc:constantp x environment)))
+                                        (sb-xc:constantp x environment)))
                                   (cdr setter)))))
          (setq newval-binding nil
                setter (substitute compute newval-temp setter)))
@@ -576,17 +576,17 @@
 ;;;; DEFMACRO DEFINE-SETF-EXPANDER and various DEFINE-SETF-EXPANDERs
 
 ;;; DEFINE-SETF-EXPANDER is a lot like DEFMACRO.
-(sb!xc:defmacro sb!xc:define-setf-expander (access-fn lambda-list &body body)
+(sb-xc:defmacro sb-xc:define-setf-expander (access-fn lambda-list &body body)
   "Syntax like DEFMACRO, but creates a setf expander function. The body
   of the definition must be a form that returns five appropriate values."
   (unless (symbolp access-fn)
     (error "~S access-function name ~S is not a symbol."
-           'sb!xc:define-setf-expander access-fn))
+           'sb-xc:define-setf-expander access-fn))
   (multiple-value-bind (def doc)
       ;; Perhaps it would be more elegant to keep the docstring attached
       ;; to the expander function, as for CAS?
       (make-macro-lambda `(setf-expander ,access-fn) lambda-list body
-                         'sb!xc:define-setf-expander access-fn
+                         'sb-xc:define-setf-expander access-fn
                          :doc-string-allowed :external)
     ;; Maybe kill docstring, but only under the cross-compiler.
     #!+(and (not sb-doc) (host-feature sb-xc-host)) (setq doc nil)

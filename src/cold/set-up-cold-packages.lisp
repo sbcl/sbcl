@@ -62,7 +62,7 @@
    (dolist (pkg (list-all-packages))
      (let ((name (package-name pkg)))
        (unless (member name '("KEYWORD" "COMMON-LISP"  "COMMON-LISP-USER"
-                              "SB-COLD" "SB!XC")
+                              "SB-COLD" "SB-XC")
                        :test #'string=)
          ;; This also removes nicknames SEQUENCE and SB-C-CALL.
          (rename-package pkg (concatenate 'string "HOST-" name)))))))
@@ -176,7 +176,7 @@
 ;; FIXME: this package should have only one name, not two,
 ;; and its one name should be SBCL, but changing it to that
 ;; would entail touching about 900 lines.
-(let ((package-name "SB!XC"))
+(let ((package-name "SB-XC"))
   (dolist (name '(;; the constants (except for T and NIL which have
                   ;; a specially hacked correspondence between
                   ;; cross-compilation host Lisp and target Lisp)
@@ -279,7 +279,7 @@
 
 ;; Symbols that we want never to accidentally see the host's definition of.
 (defparameter *shadowing-imports*
-  (mapcar (lambda (name) (find-symbol name "SB!XC"))
+  (mapcar (lambda (name) (find-symbol name "SB-XC"))
           '("BYTE" "BYTE-POSITION" "BYTE-SIZE"
             "DPB" "LDB" "LDB-TEST"
             "DEPOSIT-FIELD" "MASK-FIELD")))

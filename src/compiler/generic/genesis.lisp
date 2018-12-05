@@ -32,10 +32,10 @@
   (use-package "SB-COREFILE")) ; not SB-COREFILE
 
 (defconstant core-magic
-  (logior (ash (sb!xc:char-code #\S) 24)
-          (ash (sb!xc:char-code #\B) 16)
-          (ash (sb!xc:char-code #\C) 8)
-          (sb!xc:char-code #\L)))
+  (logior (ash (sb-xc:char-code #\S) 24)
+          (ash (sb-xc:char-code #\B) 16)
+          (ash (sb-xc:char-code #\C) 8)
+          (sb-xc:char-code #\L)))
 
 (defun round-up (number size)
   "Round NUMBER up to be an integral multiple of SIZE."
@@ -724,7 +724,7 @@ core and return a descriptor to it."
                        (make-fixnum-descriptor length))
     (dotimes (i length)
       (setf (bvref bytes (+ offset i))
-            (sb!xc:char-code (aref string i))))
+            (sb-xc:char-code (aref string i))))
     (setf (bvref bytes (+ offset length))
           0) ; null string-termination character for C
     des))
@@ -1484,7 +1484,7 @@ core and return a descriptor to it."
      (string= package-name "SB-" :end1 3 :end2 3)
      ;; This one is OK too, since it ends up being COMMON-LISP on the
      ;; target.
-     (string= package-name "SB!XC")
+     (string= package-name "SB-XC")
      ;; Anything else looks bad. (maybe COMMON-LISP-USER? maybe an extension
      ;; package in the xc host? something we can't think of
      ;; a valid reason to cold intern, anyway...)
@@ -1577,10 +1577,10 @@ core and return a descriptor to it."
 
   (declare (symbol symbol))
   ;; Anything on the cross-compilation host which refers to the target
-  ;; machinery through the host SB!XC package should be translated to
+  ;; machinery through the host SB-XC package should be translated to
   ;; something on the target which refers to the same machinery
   ;; through the target COMMON-LISP package.
-  (let ((p (find-package "SB!XC")))
+  (let ((p (find-package "SB-XC")))
     (when (eq package p)
       (setf package *cl-package*))
     (when (eq (symbol-package symbol) p)
@@ -1803,10 +1803,10 @@ core and return a descriptor to it."
      (lambda (pkgcons)
       (destructuring-bind (pkg-name . pkg-info) pkgcons
         (let ((shadow
-               ;; Record shadowing symbols (except from SB!XC) in SB! packages.
+               ;; Record shadowing symbols (except from SB-XC) in SB! packages.
                (when (eql (mismatch pkg-name "SB-") 3)
                  ;; Be insensitive to the host's ordering.
-                 (sort (remove (find-package "SB!XC")
+                 (sort (remove (find-package "SB-XC")
                                (package-shadowing-symbols (find-package pkg-name))
                                :key #'symbol-package) #'string<))))
           (write-slots (cdr pkg-info) ; package
@@ -1815,7 +1815,7 @@ core and return a descriptor to it."
                                             (mapcar 'cold-intern shadow))))
         (unless (member pkg-name '("COMMON-LISP" "KEYWORD") :test 'string=)
           (let ((host-pkg (find-package pkg-name))
-                (sb-xc-pkg (find-package "SB!XC"))
+                (sb-xc-pkg (find-package "SB-XC"))
                 syms)
             ;; Now for each symbol directly present in this host-pkg,
             ;; i.e. accessible but not :INHERITED, figure out if the symbol
@@ -1892,8 +1892,8 @@ core and return a descriptor to it."
   (let ((result
          (if (symbolp des)
              ;; This parallels the logic at the start of COLD-INTERN
-             ;; which re-homes symbols in SB!XC to COMMON-LISP.
-             (if (eq (symbol-package des) (find-package "SB!XC"))
+             ;; which re-homes symbols in SB-XC to COMMON-LISP.
+             (if (eq (symbol-package des) (find-package "SB-XC"))
                  (intern (symbol-name des) *cl-package*)
                  des)
              (ecase (descriptor-lowtag des)
@@ -2968,20 +2968,20 @@ core and return a descriptor to it."
   (c-name (symbol-name symbol) strip))
 
 (defun write-makefile-features (*standard-output*)
-  ;; propagating SB!XC:*FEATURES* into the Makefiles
-  (dolist (target-feature-name (sort (mapcar #'c-symbol-name sb!xc:*features*)
+  ;; propagating SB-XC:*FEATURES* into the Makefiles
+  (dolist (target-feature-name (sort (mapcar #'c-symbol-name sb-xc:*features*)
                                      #'string<))
     (format t "LISP_FEATURE_~A=1~%" target-feature-name)))
 
 (defun write-config-h (*standard-output*)
-  ;; propagating SB!XC:*FEATURES* into C-level #define's
-  (dolist (target-feature-name (sort (mapcar #'c-symbol-name sb!xc:*features*)
+  ;; propagating SB-XC:*FEATURES* into C-level #define's
+  (dolist (target-feature-name (sort (mapcar #'c-symbol-name sb-xc:*features*)
                                      #'string<))
     (format t "#define LISP_FEATURE_~A~%" target-feature-name))
   (terpri)
   ;; and miscellaneous constants
   (format t "#define SBCL_VERSION_STRING ~S~%"
-            (sb!xc:lisp-implementation-version))
+            (sb-xc:lisp-implementation-version))
   (format t "#define CORE_MAGIC 0x~X~%" core-magic)
   (format t "#ifndef LANGUAGE_ASSEMBLY~2%")
   (format t "#define LISPOBJ(x) ((lispobj)x)~2%")
@@ -3162,10 +3162,10 @@ core and return a descriptor to it."
                     sb-vm::float-rounding-mode))
     (format t "#define ~A_POSITION ~A /* ~:*0x~X */~%"
             (c-symbol-name symbol)
-            (sb!xc:byte-position (symbol-value symbol)))
+            (sb-xc:byte-position (symbol-value symbol)))
     (format t "#define ~A_MASK 0x~X /* ~:*~A */~%"
             (c-symbol-name symbol)
-            (sb!xc:mask-field (symbol-value symbol) -1))))
+            (sb-xc:mask-field (symbol-value symbol) -1))))
 
 (defun write-errnames-h (stream)
   ;; C code needs strings for describe_internal_error()
@@ -3552,7 +3552,7 @@ III. initially undefined function references (alphabetically):
       (binding* ((build-id (concatenate
                             'string
                             (with-open-file (s "output/build-id.inc") (read s))
-                            (if (member :msan sb!xc:*features*) "-msan" "")))
+                            (if (member :msan sb-xc:*features*) "-msan" "")))
                  ((nwords padding) (ceiling (length build-id) sb-vm:n-word-bytes)))
         (declare (type simple-string build-id))
         ;; Write BUILD-ID-CORE-ENTRY-TYPE-CODE, the length of the header,
@@ -3560,7 +3560,7 @@ III. initially undefined function references (alphabetically):
         (write-word build-id-core-entry-type-code)
         (write-word (+ 3 nwords)) ; 3 = fixed overhead including this word
         (write-word (length build-id))
-        (dovector (char build-id) (write-byte (sb!xc:char-code char) core-file))
+        (dovector (char build-id) (write-byte (sb-xc:char-code char) core-file))
         (dotimes (j (- padding)) (write-byte #xff core-file)))
 
       ;; Write the Directory entry header.

@@ -496,7 +496,7 @@
          (flet ((type-p (value type)
                   (if (typep type '(cons (eql satisfies)))
                       (funcall (second type) value)
-                      (sb!xc:typep value type))))
+                      (sb-xc:typep value type))))
           (cond (lvar
                  (and (constant-lvar-p lvar)
                       (type-p (lvar-value lvar) (cdr restr))))

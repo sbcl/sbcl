@@ -291,7 +291,7 @@
      (if (static-symbol-p value)
          immediate-sc-number
          nil))
-    ((or (integer #.sb!xc:most-negative-fixnum #.sb!xc:most-positive-fixnum)
+    ((or (integer #.sb-xc:most-negative-fixnum #.sb-xc:most-positive-fixnum)
          character)
      immediate-sc-number)
     #-sb-xc-host ; There is no such object type in the host

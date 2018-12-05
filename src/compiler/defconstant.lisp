@@ -99,13 +99,13 @@
     ;; in and of itself, since it makes it too easy for cases of using the
     ;; cross-compilation host Lisp's CL constant values in the target Lisp to
     ;; slip by. I got backed into this because the cross-compiler translates
-    ;; DEFCONSTANT SB!XC:FOO into DEFCONSTANT CL:FOO. It would be good to
+    ;; DEFCONSTANT SB-XC:FOO into DEFCONSTANT CL:FOO. It would be good to
     ;; unscrew the cross-compilation package hacks so that that translation
     ;; doesn't happen. Perhaps: * Replace SB-XC with SB-CL. SB-CL exports all
     ;; the symbols which ANSI requires to be exported from CL. * Make a
-    ;; nickname SB-CL which behaves like SB!XC. * Go through the
+    ;; nickname SB-CL which behaves like SB-XC. * Go through the
     ;; loaded-on-the-host code making every target definition be in SB-CL.
-    ;; E.g. SB!XC:DEFMACRO DEFCONSTANT becomes SB!XC:DEFMACRO SB-CL:DEFCONSTANT.
+    ;; E.g. SB-XC:DEFMACRO DEFCONSTANT becomes SB-XC:DEFMACRO SB-CL:DEFCONSTANT.
     ;; * Make IN-TARGET-COMPILATION-MODE do UNUSE-PACKAGE CL and
     ;; USE-PACKAGE SB-CL in each of the target packages (then undo it
     ;; on exit). * Make the cross-compiler's implementation of EVAL-WHEN

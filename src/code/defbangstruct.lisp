@@ -34,9 +34,9 @@
   (defvar *delayed-def!structs* nil))
 
 ;;; a helper function for DEF!STRUCT in the #+SB-XC-HOST case: Return
-;;; DEFSTRUCT-style arguments with any class names in the SB!XC
+;;; DEFSTRUCT-style arguments with any class names in the SB-XC
 ;;; package (i.e. the name of the class being defined, and/or the
-;;; names of classes in :INCLUDE clauses) converted from SB!XC::FOO to
+;;; names of classes in :INCLUDE clauses) converted from SB-XC::FOO to
 ;;; CL::FOO.
 #+sb-xc-host
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -88,13 +88,13 @@
           (if (boundp '*delayed-def!structs*)
               `(push (make-delayed-def!struct :args ',u)
                      *delayed-def!structs*)
-              `(sb!xc:defstruct ,@u)))
+              `(sb-xc:defstruct ,@u)))
        ',name)))
 #-sb-xc-host
 (defmacro def!struct (&rest args) `(defstruct ,@args))
 
 ;;; When building the cross-compiler, this function has to be called
-;;; some time after SB!XC:DEFSTRUCT is set up, in order to take care
+;;; some time after SB-XC:DEFSTRUCT is set up, in order to take care
 ;;; of any processing which had to be delayed until then.
 #+sb-xc-host
 (defun force-delayed-def!structs ()
@@ -108,7 +108,7 @@
                     ;; functional primitives corresponding to the
                     ;; DEFSTRUCT macro, it seems to me that EVAL is
                     ;; required in there somewhere..
-                    (eval `(sb!xc:defstruct ,@(delayed-def!struct-args x)))))
+                    (eval `(sb-xc:defstruct ,@(delayed-def!struct-args x)))))
                 (reverse *delayed-def!structs*))
         ;; We shouldn't need this list any more. Making it unbound
         ;; serves as a signal to DEF!STRUCT that it needn't delay

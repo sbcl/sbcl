@@ -21,7 +21,7 @@
                       ((or (atom result)
                            (not (eq (car result) 'values)))
                        `(values ,result &optional))
-                      ((intersection (cdr result) sb!xc:lambda-list-keywords)
+                      ((intersection (cdr result) sb-xc:lambda-list-keywords)
                        result)
                       (t `(values ,@(cdr result) &optional)))))
     `(function ,args ,result)))
@@ -196,7 +196,7 @@
                 (get-info-value ,name ,(meta-info-number meta-info))))
 
   (def (setf info) (new-value category kind name)
-    (let* (#+sb-xc-host (sb!xc:*gensym-counter* sb!xc:*gensym-counter*)
+    (let* (#+sb-xc-host (sb-xc:*gensym-counter* sb-xc:*gensym-counter*)
            (tin (meta-info-number meta-info)) ; info-type id number
            (type-spec (meta-info-type-spec meta-info))
            (new (make-symbol "NEW"))
@@ -311,11 +311,11 @@
  !DEF-BOOLEAN-ATTRIBUTE."
          (multiple-value-bind (temps values stores setter getter)
              (#+sb-xc-host get-setf-expansion
-              #-sb-xc-host sb!xc:get-setf-expansion place env)
+              #-sb-xc-host sb-xc:get-setf-expansion place env)
            (when (cdr stores)
              (error "multiple store variables for ~S" place))
-           (let ((newval (sb!xc:gensym))
-                 (n-place (sb!xc:gensym))
+           (let ((newval (sb-xc:gensym))
+                 (n-place (sb-xc:gensym))
                  (mask (encode-attribute-mask attributes ,vector)))
              (values `(,@temps ,n-place)
                      `(,@values ,getter)

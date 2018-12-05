@@ -156,7 +156,7 @@
   (let* ((bytes-per-word (/ n-word-bits bitsize))
          (byte-offset `(integer 0 (,bytes-per-word)))
          (byte-count `(integer 1 (,bytes-per-word)))
-         (max-bytes sb!xc:most-positive-fixnum)
+         (max-bytes sb-xc:most-positive-fixnum)
          (offset `(integer 0 ,max-bytes))
          (max-word-offset (ceiling max-bytes bytes-per-word))
          (word-offset `(integer 0 ,max-word-offset))
@@ -570,7 +570,7 @@
 ) ; EVAL-WHEN
 
 (eval-when (:compile-toplevel)
-  (sb!xc:proclaim '(muffle-conditions compiler-note)))
+  (sb-xc:proclaim '(muffle-conditions compiler-note)))
 ;;; We would normally do this with a MACROLET, but then we run into
 ;;; problems with the lexical environment being too hairy for the
 ;;; cross-compiler and it cannot inline the basic basher functions.

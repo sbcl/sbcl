@@ -37,7 +37,7 @@
                (integer (if (minusp count)
                             0
                             (1- most-positive-fixnum))))
-             (mod #.sb!xc:most-positive-fixnum))
+             (mod #.sb-xc:most-positive-fixnum))
       ;; Entries for {start,end}{,1,2}
       ,@(mapcan (lambda (names)
                   (destructuring-bind (start end length sequence) names

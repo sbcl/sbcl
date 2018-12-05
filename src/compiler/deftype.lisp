@@ -40,7 +40,7 @@
          :format-control control
          :format-arguments arguments))
 
-(defmacro sb!xc:deftype (&whole form name lambda-list &body body
+(defmacro sb-xc:deftype (&whole form name lambda-list &body body
                          &environment env)
   "Define a new type, with syntax like DEFMACRO."
   (declare (ignore env))
@@ -53,7 +53,7 @@
                     (let ((expr `(progn ,@forms)))
                       ;; While CONSTANTP works early, %MACROEXPAND does not,
                       ;; so we can't pass ENV because it'd try to macroexpand.
-                      (if (sb!xc:constantp expr) expr)))
+                      (if (sb-xc:constantp expr) expr)))
                 #-sb-xc-host
                 (check-deprecated-type (constant-form-value it))
                 (values `(constant-type-expander ',name ,it) doc

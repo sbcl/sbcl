@@ -30,8 +30,8 @@
 
 (defun proclaim-target-optimization ()
   (sb-c::init-xc-policy #+cons-profiling '((sb-c::instrument-consing 2)))
-  (let ((debug (if (position :sb-show sb!xc:*features*) 2 1)))
-    (sb!xc:proclaim
+  (let ((debug (if (position :sb-show sb-xc:*features*) 2 1)))
+    (sb-xc:proclaim
      `(optimize
        (compilation-speed 1) (debug ,debug)
        ;; CLISP's pretty-printer is fragile and tends to cause stack
@@ -106,13 +106,13 @@
     (progn
       (funcall fun))))
 
-(setf *target-compile-file* #'sb!xc:compile-file)
+(setf *target-compile-file* #'sb-xc:compile-file)
 (setf *target-assemble-file* #'sb-c:assemble-file)
 (setf *in-target-compilation-mode-fn* #'in-target-cross-compilation-mode)
 
 ;; ... and since the cross-compiler hasn't seen a DEFMACRO for QUASIQUOTE,
 ;; make it think it has, otherwise it fails more-or-less immediately.
-(setf (sb!xc:macro-function 'sb!int:quasiquote)
+(setf (sb-xc:macro-function 'sb!int:quasiquote)
       (lambda (form env)
         (the sb!kernel:lexenv-designator env)
         (sb!impl::expand-quasiquote (second form) t)))
@@ -276,7 +276,7 @@
            (count-if (lambda (x) (not (find :not-target (cdr x))))
                      (get-stems-and-flags)))
           (n 0)
-          (sb!xc:*compile-verbose* nil))
+          (sb-xc:*compile-verbose* nil))
       (do-stems-and-flags (stem flags)
         (unless (position :not-target flags)
           (format t "~&[~D/~D] ~A" (incf n) total (stem-remap-target stem))

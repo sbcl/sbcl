@@ -75,7 +75,7 @@
       (set-result (+ result (ash result -9)))
       (set-result (logxor result (ash result -5)))
       (set-result (+ result (ash result -2)))
-      (logand sb!xc:most-positive-fixnum result))))
+      (logand sb-xc:most-positive-fixnum result))))
 
 ;;; Secondary hash (for double hash probing). Needs to return an odd
 ;;; number.

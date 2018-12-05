@@ -1208,7 +1208,7 @@
 (defstruct (location-group (:copier nil) (:predicate nil))
   ;; This was (VECTOR (OR LIST FIXNUM)) but that doesn't have any
   ;; specialization other than T, and the cross-compiler has trouble
-  ;; with (SB!XC:TYPEP #() '(VECTOR (OR LIST FIXNUM)))
+  ;; with (SB-XC:TYPEP #() '(VECTOR (OR LIST FIXNUM)))
   (locations #() :type simple-vector))
 
 ;;; Return the vector of DEBUG-VARs currently associated with DSTATE.

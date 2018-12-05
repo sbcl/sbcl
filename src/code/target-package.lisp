@@ -639,7 +639,7 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
                  (restart-case
                      (signal 'bootstrap-package-not-found :name string)
                    (debootstrap-package ()
-                     (if (string= string "SB!XC")
+                     (if (string= string "SB-XC")
                          *cl-package*
                          (find-package
                           (substitute #\- #\! string :count 1)))))

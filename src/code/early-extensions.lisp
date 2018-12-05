@@ -20,7 +20,7 @@
   "The absolute pathname of the running SBCL runtime.")
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant max-hash sb!xc:most-positive-fixnum))
+  (defconstant max-hash sb-xc:most-positive-fixnum))
 
 (def!type hash ()
   `(integer 0 ,max-hash))
@@ -28,7 +28,7 @@
 ;;; A number that can represent an index into a vector, including
 ;;; one-past-the-end
 (deftype array-range ()
-  '(integer 0 #.sb!xc:array-dimension-limit))
+  '(integer 0 #.sb-xc:array-dimension-limit))
 
 ;;; a type used for indexing into sequences, and for related
 ;;; quantities like lengths of lists and other sequences.
@@ -47,17 +47,17 @@
 ;;; MOST-POSITIVE-FIXNUM lets the system know it can increment a value
 ;;; of type INDEX without having to worry about using a bignum to
 ;;; represent the result.
-(def!type index () `(integer 0 (,sb!xc:array-dimension-limit)))
+(def!type index () `(integer 0 (,sb-xc:array-dimension-limit)))
 
 ;;; like INDEX, but only up to half the maximum. Used by hash-table
 ;;; code that does plenty to (aref v (* 2 i)) and (aref v (1+ (* 2 i))).
-(def!type index/2 () `(integer 0 (,(floor sb!xc:array-dimension-limit 2))))
+(def!type index/2 () `(integer 0 (,(floor sb-xc:array-dimension-limit 2))))
 
 ;;; like INDEX, but augmented with -1 (useful when using the index
 ;;; to count downwards to 0, e.g. LOOP FOR I FROM N DOWNTO 0, with
 ;;; an implementation which terminates the loop by testing for the
 ;;; index leaving the loop range)
-(def!type index-or-minus-1 () `(integer -1 (,sb!xc:array-dimension-limit)))
+(def!type index-or-minus-1 () `(integer -1 (,sb-xc:array-dimension-limit)))
 
 ;;; A couple of VM-related types that are currently used only on the
 ;;; alpha and mips platforms. -- CSR, 2002-06-24
@@ -717,7 +717,7 @@ NOTE: This interface is experimental and subject to change."
                              (let* ,(case (length temps)
                                      (2 `((,(first temps) (car ,entry))
                                           (,(second temps) (cdr ,entry))))
-                                     (3 (let ((arg-temp (sb!xc:gensym "ARGS")))
+                                     (3 (let ((arg-temp (sb-xc:gensym "ARGS")))
                                           `((,arg-temp (cdr ,entry))
                                             (,(first temps) (car ,entry))
                                             (,(second temps)
@@ -960,7 +960,7 @@ NOTE: This interface is experimental and subject to change."
           (let* ((name (first spec))
                  (exp-temp (gensym "ONCE-ONLY")))
             `(let ((,exp-temp ,(second spec))
-                   (,name (sb!xc:gensym ,(symbol-name name))))
+                   (,name (sb-xc:gensym ,(symbol-name name))))
                `(let ((,,name ,,exp-temp))
                   ,,(frob (rest specs) body))))))))
 
@@ -1198,7 +1198,7 @@ NOTE: This interface is experimental and subject to change."
 ;;; so just remove the decoration.
 #-sb-xc-host
 (eval-when (:compile-toplevel)
-  (sb!xc:defmacro sb-cold:preserving-host-function (form) form))
+  (sb-xc:defmacro sb-cold:preserving-host-function (form) form))
 
 (sb-cold:preserving-host-function
 (defun print-symbol-with-prefix (stream symbol &optional colon at)

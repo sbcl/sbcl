@@ -2042,7 +2042,7 @@
 
 ;;;; float mode hackery
 
-(sb!xc:deftype float-modes () '(unsigned-byte 32)) ; really only 16
+(sb-xc:deftype float-modes () '(unsigned-byte 32)) ; really only 16
 (defknown floating-point-modes () float-modes (flushable))
 (defknown ((setf floating-point-modes)) (float-modes)
   float-modes)

@@ -9,7 +9,7 @@
 
 (in-package "SB!KERNEL")
 
-(sb!xc:defstruct (random-state (:constructor %make-random-state
+(sb-xc:defstruct (random-state (:constructor %make-random-state
                                    (state))
                                ;; Needed for reading #S(random-state)
                                (:constructor %%make-random-state)

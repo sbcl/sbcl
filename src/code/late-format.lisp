@@ -254,7 +254,7 @@
                                        (if (and (not colon) (stringp (car input)))
                                            (string-left-trim
                                             ;; #\Tab is a nonstandard char
-                                            `(#-sb-xc-host ,(sb!xc:code-char tab-char-code)
+                                            `(#-sb-xc-host ,(sb-xc:code-char tab-char-code)
                                               #\space #\newline)
                                             (pop input))
                                            ""))))
@@ -274,7 +274,7 @@
                         (when (or (plusp n) (emit-placeholder-p))
                           (let ((char (case char
                                         (#\% #\Newline)
-                                        (#\| (sb!xc:code-char form-feed-char-code))
+                                        (#\| (sb-xc:code-char form-feed-char-code))
                                         (t char))))
                             (emit-string (make-string n :initial-element char))))
                         (return)))))
@@ -282,7 +282,7 @@
 
 ;;;; FORMATTER stuff
 
-(sb!xc:defmacro formatter (control-string)
+(sb-xc:defmacro formatter (control-string)
   `#',(%formatter control-string))
 
 (defun %formatter (control-string &optional (arg-count 0) (need-retval t)
@@ -401,7 +401,7 @@
      (values `(write-string ,directive stream)
              more-directives))))
 
-(sb!xc:defmacro expander-next-arg (string offset)
+(sb-xc:defmacro expander-next-arg (string offset)
   `(if args
        (pop args)
        (format-error-at ,string ,offset "No more arguments")))
@@ -428,7 +428,7 @@
         (collect ((expander-bindings) (runtime-bindings))
           (dolist (spec specs)
             (destructuring-bind (var default) spec
-              (let ((symbol (sb!xc:gensym "FVAR")))
+              (let ((symbol (sb-xc:gensym "FVAR")))
                 (expander-bindings
                  `(,var ',symbol))
                 (runtime-bindings
@@ -463,8 +463,8 @@
   (let ((defun-name (intern (format nil
                                     "~:@(~:C~)-FORMAT-DIRECTIVE-EXPANDER"
                                     char)))
-        (directive (sb!xc:gensym "DIRECTIVE"))
-        (directives (if lambda-list (car (last lambda-list)) (sb!xc:gensym "DIRECTIVES"))))
+        (directive (sb-xc:gensym "DIRECTIVE"))
+        (directives (if lambda-list (car (last lambda-list)) (sb-xc:gensym "DIRECTIVES"))))
     `(progn
        (defun ,defun-name (,directive ,directives)
          ,@(if lambda-list
@@ -478,7 +478,7 @@
        (%set-format-directive-expander ,char #',defun-name))))
 
 (defmacro def-format-directive (char lambda-list &body body)
-  (let ((directives (sb!xc:gensym "DIRECTIVES"))
+  (let ((directives (sb-xc:gensym "DIRECTIVES"))
         (declarations nil)
         (body-without-decls body))
     (loop
@@ -493,7 +493,7 @@
                ,directives))))
 
 (defun %set-format-directive-expander (char fn)
-  (let ((code (sb!xc:char-code (char-upcase char))))
+  (let ((code (sb-xc:char-code (char-upcase char))))
     (setf (aref *format-directive-expanders* code) fn))
   char)
 
@@ -551,7 +551,7 @@
 
 (def-format-directive #\C (colonp atsignp params string end)
   (expand-bind-defaults () params
-    (let ((n-arg (sb!xc:gensym "ARG")))
+    (let ((n-arg (sb-xc:gensym "ARG")))
       `(let ((,n-arg ,(expand-next-arg)))
          (unless (typep ,n-arg 'character)
            (format-error-at ,string ,(1- end)
@@ -605,7 +605,7 @@
       ((base nil) (mincol 0) (padchar #\space) (commachar #\,)
        (commainterval 3))
       params
-    (let ((n-arg (sb!xc:gensym "ARG")))
+    (let ((n-arg (sb-xc:gensym "ARG")))
       `(let ((,n-arg ,(expand-next-arg)))
          (unless (or ,base
                      (integerp ,n-arg))
@@ -1227,7 +1227,7 @@
              (setf first-semi close-or-semi))))
       (values (segments) first-semi close remaining))))
 
-(sb!xc:defmacro expander-pprint-next-arg (string offset)
+(sb-xc:defmacro expander-pprint-next-arg (string offset)
   `(progn
      (when (null args)
        (format-error-at ,string ,offset "No more arguments"))
@@ -1295,7 +1295,7 @@
     (collect ((param-names) (bindings))
       (dolist (param-and-offset params)
         (let ((param (cdr param-and-offset)))
-          (let ((param-name (sb!xc:gensym "PARAM")))
+          (let ((param-name (sb-xc:gensym "PARAM")))
             (param-names param-name)
             (bindings `(,param-name
                         ,(case param
@@ -1395,7 +1395,7 @@
     (values (nreverse symbols)
             (possibly-base-stringize new-string))))
 
-(sb!xc:defmacro tokens (string)
+(sb-xc:defmacro tokens (string)
   (declare (string string))
   (multiple-value-bind (symbols new-string) (extract-user-fun-directives string)
     (if symbols
@@ -1438,7 +1438,7 @@
                    ((not (directive-colonp close))
                     (values 0 0 directives))
                    ((directive-atsignp justification)
-                    (values 0 sb!xc:call-arguments-limit directives))
+                    (values 0 sb-xc:call-arguments-limit directives))
                    ;; FIXME: here we could assert that the
                    ;; corresponding argument was a list.
                    (t (values 1 1 remaining))))))
@@ -1474,7 +1474,7 @@
                  ;; a format control (either a function or a string).
                  (if (directive-atsignp iteration)
                      (values (if (zerop posn) 1 0)
-                             sb!xc:call-arguments-limit
+                             sb-xc:call-arguments-limit
                              remaining)
                      ;; FIXME: the argument corresponding to this
                      ;; directive must be a list.
@@ -1485,7 +1485,7 @@
                (loop
                 (let ((directive (pop directives)))
                   (when (null directive)
-                    (return (values min (min max sb!xc:call-arguments-limit))))
+                    (return (values min (min max sb-xc:call-arguments-limit))))
                   (when (format-directive-p directive)
                     (incf-both (count :arg (directive-params directive)
                                       :key #'cdr))
@@ -1510,7 +1510,7 @@
                          (cond
                            ((directive-atsignp directive)
                             (incf min)
-                            (setq max sb!xc:call-arguments-limit))
+                            (setq max sb-xc:call-arguments-limit))
                            (t (incf-both 2))))
                         (t (throw 'give-up-format-string-walk nil))))))))))
         (catch 'give-up-format-string-walk

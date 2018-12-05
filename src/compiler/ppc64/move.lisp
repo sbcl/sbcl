@@ -201,7 +201,7 @@
     (inst addo. temp temp temp)       ; set CR0 SO if any top three bits differ
     (inst slwi y x n-fixnum-tag-bits) ; assume fixnum (tagged ok, maybe lost some high bits)
     (inst bns done)
-    (load-constant vop (emit-constant (1+ sb!xc:most-positive-fixnum))
+    (load-constant vop (emit-constant (1+ sb-xc:most-positive-fixnum))
                    y)
     DONE))
 
@@ -213,7 +213,7 @@
     (inst addo. temp temp temp)       ; set CR0 SO if any top three bits differ
     (inst slwi y x n-fixnum-tag-bits) ; assume fixnum (tagged ok, maybe lost some high bits)
     (inst bns done)
-    (load-constant vop (emit-constant (1- sb!xc:most-negative-fixnum))
+    (load-constant vop (emit-constant (1- sb-xc:most-negative-fixnum))
                    y)
     DONE))
 

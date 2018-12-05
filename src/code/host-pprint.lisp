@@ -14,7 +14,7 @@
 
 ;; This comes early so that fndb can use PPRINT-DISPATCH-TABLE as
 ;; a type-specifier.
-(sb!xc:defstruct (pprint-dispatch-table
+(sb-xc:defstruct (pprint-dispatch-table
                   (:conc-name pp-dispatch-)
                   (:constructor make-pprint-dispatch-table (&optional entries))
                   (:copier nil) ; needs a deep copy
@@ -40,23 +40,23 @@
 ;;; type-checks efficiently. Essentially the way to do that is define
 ;;; each structure during both make-host passes. This is a KLUDGE.
 
-(sb!xc:deftype posn () 'fixnum)
+(sb-xc:deftype posn () 'fixnum)
 
-(sb!xc:defstruct (queued-op (:constructor nil)
+(sb-xc:defstruct (queued-op (:constructor nil)
                             (:copier nil))
   (posn 0 :type posn))
 
-(sb!xc:defstruct (block-end (:include queued-op)
+(sb-xc:defstruct (block-end (:include queued-op)
                             (:copier nil))
   (suffix nil :type (or null simple-string)))
 
-(sb!xc:defstruct (section-start (:include queued-op)
+(sb-xc:defstruct (section-start (:include queued-op)
                                 (:constructor nil)
                                 (:copier nil))
   (depth 0 :type index)
   (section-end nil :type (or null newline block-end)))
 
-(sb!xc:defstruct (newline (:include section-start)
+(sb-xc:defstruct (newline (:include section-start)
                           (:copier nil))
   (kind (missing-arg)
         :type (member :linear :fill :miser :literal :mandatory)))

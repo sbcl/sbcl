@@ -910,7 +910,7 @@
   ()
   (:default-initargs
       :references '((:ansi-cl :function make-array)
-                    (:ansi-cl :function sb!xc:upgraded-array-element-type))))
+                    (:ansi-cl :function sb-xc:upgraded-array-element-type))))
 
 (define-condition type-warning (reference-condition simple-warning)
   ()
@@ -1124,7 +1124,7 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
                      "An attempt to access an array of element-type ~
                       NIL was made.  Congratulations!")))
   (:default-initargs
-      :references '((:ansi-cl :function sb!xc:upgraded-array-element-type)
+      :references '((:ansi-cl :function sb-xc:upgraded-array-element-type)
                     (:ansi-cl :section (15 1 2 1))
                     (:ansi-cl :section (15 1 2 2)))))
 

@@ -150,7 +150,7 @@ Other commands:
     deeply nested input syntax, and now the reader is confused.)")
 
 (defmacro with-debug-io-syntax (() &body body)
-  (let ((thunk (sb!xc:gensym "THUNK")))
+  (let ((thunk (sb-xc:gensym "THUNK")))
     `(dx-flet ((,thunk ()
                        ,@body))
        (funcall-with-debug-io-syntax #',thunk))))
@@ -483,7 +483,7 @@ information."
 
 ;;; This is a convenient way to express what to do for each type of
 ;;; lambda-list element.
-(sb!xc:defmacro lambda-list-element-dispatch (element
+(sb-xc:defmacro lambda-list-element-dispatch (element
                                               &key
                                               required
                                               optional
@@ -504,7 +504,7 @@ information."
       (aver (eq ,element :deleted))
       ,@deleted)))
 
-(sb!xc:defmacro lambda-var-dispatch (variable location deleted valid other)
+(sb-xc:defmacro lambda-var-dispatch (variable location deleted valid other)
   (let ((var (gensym)))
     `(let ((,var ,variable))
        (cond ((eq ,var :deleted) ,deleted)
@@ -1288,7 +1288,7 @@ forms that explicitly control this kind of evaluation.")
 
 (eval-when (:execute :compile-toplevel)
 
-(sb!xc:defmacro define-var-operation (ref-or-set &optional value-var)
+(sb-xc:defmacro define-var-operation (ref-or-set &optional value-var)
   `(let* ((temp (etypecase name
                   (symbol (debug-fun-symbol-vars
                            (frame-debug-fun *current-frame*)

@@ -13,12 +13,12 @@
 (in-package "SB!IMPL")
 
 (let ((ascii-standard-chars " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"))
-  (defun sb!xc:code-char (x)
+  (defun sb-xc:code-char (x)
     (declare (type (or (integer 10 10) (integer 32 126)) x))
     (if (= x 10)
         #\Newline
         (char ascii-standard-chars (- x 32))))
-  (defun sb!xc:char-code (character)
+  (defun sb-xc:char-code (character)
     (declare (type standard-char character))
     (if (char= character #\Newline)
         10

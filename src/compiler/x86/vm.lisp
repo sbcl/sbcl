@@ -347,7 +347,7 @@
 ;;; the appropriate SC number, otherwise return NIL.
 (defun immediate-constant-sc (value)
   (typecase value
-    ((or (integer #.sb!xc:most-negative-fixnum #.sb!xc:most-positive-fixnum)
+    ((or (integer #.sb-xc:most-negative-fixnum #.sb-xc:most-positive-fixnum)
          character)
      immediate-sc-number)
     (symbol
