@@ -174,7 +174,7 @@
     defconstant("still-active", STILL_ACTIVE);
 
     /* FIXME: SB-UNIX and SB-WIN32 really need to be untangled. */
-    printf("(in-package \"SB!UNIX\")\n\n");
+    printf("(in-package \"SB-UNIX\")\n\n");
     printf(";;; Unix-like constants and types on Windows\n");
     defconstant("o_rdonly", _O_RDONLY);
     defconstant("o_wronly", _O_WRONLY);

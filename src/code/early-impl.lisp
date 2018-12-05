@@ -25,7 +25,7 @@
                   sb-vm:*binding-stack-start*
                   #!+(or hpux) sb-vm::*c-lra*
                   *allow-with-interrupts*
-                  sb!unix::*unblock-deferrables-on-enabling-interrupts-p*
+                  sb-unix::*unblock-deferrables-on-enabling-interrupts-p*
                   *interrupts-enabled*
                   *interrupt-pending*
                   #!+sb-thruption *thruption-pending*

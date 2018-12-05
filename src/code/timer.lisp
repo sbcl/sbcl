@@ -412,10 +412,10 @@ triggers."
 #!-(or sb-wtimer win32)
 (progn
   (defun %set-system-timer (sec nsec)
-    (sb!unix:unix-setitimer :real 0 0 sec (ceiling nsec 1000)))
+    (sb-unix:unix-setitimer :real 0 0 sec (ceiling nsec 1000)))
 
   (defun %clear-system-timer ()
-    (sb!unix:unix-setitimer :real 0 0 0 0)))
+    (sb-unix:unix-setitimer :real 0 0 0 0)))
 
 (defun set-system-timer ()
   (aver (under-scheduler-lock-p))

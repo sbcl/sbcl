@@ -23,7 +23,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!UNIX")
+(in-package "SB-UNIX")
 
 (/show0 "unix.lisp 21")
 

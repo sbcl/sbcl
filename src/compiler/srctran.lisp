@@ -5028,7 +5028,7 @@
 (deftransform sleep ((seconds) ((integer 0 #.(expt 10 8))))
   `(if sb-impl::*deadline*
        (locally (declare (notinline sleep)) (sleep seconds))
-       (sb!unix:nanosleep seconds 0)))
+       (sb-unix:nanosleep seconds 0)))
 
 #!-(and win32 (not sb-thread))
 (deftransform sleep ((seconds)
@@ -5041,7 +5041,7 @@
           (give-up-ir1-transform)
           `(if sb-impl::*deadline*
                (locally (declare (notinline sleep)) (sleep seconds))
-               (sb!unix:nanosleep ,seconds ,nano))))))
+               (sb-unix:nanosleep ,seconds ,nano))))))
 
 ;; On 64-bit architectures the TLS index is in the symbol header,
 ;; !DEFINE-PRIMITIVE-OBJECT doesn't define an accessor for it.

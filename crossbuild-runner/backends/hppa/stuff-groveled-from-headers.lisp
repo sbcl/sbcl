@@ -7,7 +7,7 @@
 (defconstant rtld-lazy 1) ; #x1
 (defconstant rtld-now 2) ; #x2
 (defconstant rtld-global 4) ; #x4
-(in-package "SB!UNIX")
+(in-package "SB-UNIX")
 
 ;;; select()
 (defconstant fd-setsize 1024) ; #x400

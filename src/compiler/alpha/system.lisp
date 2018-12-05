@@ -186,10 +186,10 @@
 
 ;;;; other random VOPs.
 
-(defknown sb!unix::receive-pending-interrupt () (values))
-(define-vop (sb!unix::receive-pending-interrupt)
+(defknown sb-unix::receive-pending-interrupt () (values))
+(define-vop (sb-unix::receive-pending-interrupt)
   (:policy :fast-safe)
-  (:translate sb!unix::receive-pending-interrupt)
+  (:translate sb-unix::receive-pending-interrupt)
   (:generator 1
     (inst gentrap pending-interrupt-trap)))
 

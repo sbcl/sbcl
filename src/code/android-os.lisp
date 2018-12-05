@@ -41,7 +41,7 @@
 (defun get-system-info ()
   (multiple-value-bind
       (err? utime stime maxrss ixrss idrss isrss minflt majflt)
-      (sb!unix:unix-getrusage sb!unix:rusage_self)
+      (sb-unix:unix-getrusage sb-unix:rusage_self)
     (declare (ignore maxrss ixrss idrss isrss minflt))
     (unless err? ; FIXME: nonmnemonic (reversed) name for ERR?
       (error "Unix system call getrusage failed: ~A." (strerror utime)))

@@ -759,11 +759,11 @@ only characters for which it returns T are collected."
     (setf result (nreverse result))
     (coerce result 'string)))
 
-(declaim (type function sb!unix::posix-getenv))
+(declaim (type function sb-unix::posix-getenv))
 (defun get-user-locale ()
   (let ((raw-locale
-         #!+(or win32 unix) (or (sb!unix::posix-getenv "LC_ALL")
-                                (sb!unix::posix-getenv "LANG"))
+         #!+(or win32 unix) (or (sb-unix::posix-getenv "LC_ALL")
+                                (sb-unix::posix-getenv "LANG"))
          #!-(or win32 unix) nil))
     (when raw-locale
       (let ((lang-code (string-upcase

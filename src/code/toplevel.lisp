@@ -137,17 +137,17 @@ means to wait indefinitely.")
   ;; can actually have a reason to sleep for over 3 years?
   (loop while (> sec (expt 10 8))
      do (decf sec (expt 10 8))
-       (sb!unix:nanosleep (expt 10 8) 0))
-  (sb!unix:nanosleep sec nsec))
+       (sb-unix:nanosleep (expt 10 8) 0))
+  (sb-unix:nanosleep sec nsec))
 
 (declaim (inline %sleep))
 #!-win32
 (defun %sleep (seconds)
   (typecase seconds
     (double-float
-     (sb!unix::nanosleep-double seconds))
+     (sb-unix::nanosleep-double seconds))
     (single-float
-     (sb!unix::nanosleep-float seconds))
+     (sb-unix::nanosleep-float seconds))
     (integer
      (%nanosleep seconds 0))
     (t

@@ -147,7 +147,7 @@
     enter-alien-callback
     #!+sb-thread sb!thread::enter-foreign-callback
     #!+(and sb-safepoint-strictly (not win32))
-    sb!unix::signal-handler-callback)
+    sb-unix::signal-handler-callback)
   #'equal)
 
 ;;; Static symbols that C code must be able to assign to,

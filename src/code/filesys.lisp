@@ -268,17 +268,17 @@
 (defun native-file-kind (namestring)
   (multiple-value-bind (existsp errno ino mode)
       #!-win32
-      (sb!unix:unix-lstat namestring)
+      (sb-unix:unix-lstat namestring)
       #!+win32
-      (sb!unix:unix-stat namestring)
+      (sb-unix:unix-stat namestring)
     (declare (ignore errno ino))
     (when existsp
-      (let ((ifmt (logand mode sb!unix:s-ifmt)))
+      (let ((ifmt (logand mode sb-unix:s-ifmt)))
        (case ifmt
-         (#.sb!unix:s-ifreg :file)
-         (#.sb!unix:s-ifdir :directory)
+         (#.sb-unix:s-ifreg :file)
+         (#.sb-unix:s-ifdir :directory)
          #!-win32
-         (#.sb!unix:s-iflnk :symlink)
+         (#.sb-unix:s-iflnk :symlink)
          (t :special))))))
 
 ;;;; TRUENAME, PROBE-FILE, FILE-AUTHOR, FILE-WRITE-DATE.
@@ -384,7 +384,7 @@
              ;; *DEFAULT-PATHNAME-DEFAULTS*, since PATHNAME may be a
              ;; relative pathname.
              (multiple-value-bind (realpath errno)
-                 (sb!unix:unix-realpath
+                 (sb-unix:unix-realpath
                   (native-namestring
                    (make-pathname
                     :name :unspecific
@@ -408,11 +408,11 @@
              ;; pipes or sockets on Linux
              (multiple-value-bind (linkp ignore ino mode nlink uid gid rdev
                                          size atime mtime)
-                 (sb!unix:unix-lstat filename)
+                 (sb-unix:unix-lstat filename)
                (declare (ignore ignore ino mode nlink gid rdev size atime))
                (cond
-                 ((and (or (= errno sb!unix:enoent)
-                           (= errno sb!unix:eloop)
+                 ((and (or (= errno sb-unix:enoent)
+                           (= errno sb-unix:eloop)
                            realpath-failed)
                        linkp)
                   (case query-for
@@ -428,7 +428,7 @@
                           (if (directory-pathname-p pathname)
                               (parse (car (last (pathname-directory pathname))))
                               pathname)))))
-                    (:author (sb!unix:uid-username uid))
+                    (:author (sb-unix:uid-username uid))
                     (:write-date (+ unix-to-universal-time mtime))))
                  ;; The file doesn't exist; maybe error.
                  (errorp
@@ -436,21 +436,21 @@
                                       pathname errno query-for))))))
     (binding* ((filename (native-namestring pathname :as-file t))
                ((existsp errno nil mode nil uid nil nil nil nil mtime)
-                (sb!unix:unix-stat filename)))
+                (sb-unix:unix-stat filename)))
       (if existsp
           (case query-for
             (:existence
-             (parse filename :as-directory (eql (logand mode sb!unix:s-ifmt)
-                                                sb!unix:s-ifdir)))
+             (parse filename :as-directory (eql (logand mode sb-unix:s-ifmt)
+                                                sb-unix:s-ifdir)))
             (:truename
              ;; Note: in case the file is stat'able, POSIX
              ;; realpath(3) gets us a canonical absolute filename,
              ;; even if the post-merge PATHNAME is not absolute
-             (parse (or (sb!unix:unix-realpath filename)
+             (parse (or (sb-unix:unix-realpath filename)
                         (resolve-problematic-symlink filename errno t))
-                    :as-directory (eql (logand mode sb!unix:s-ifmt)
-                                       sb!unix:s-ifdir)))
-            (:author (sb!unix:uid-username uid))
+                    :as-directory (eql (logand mode sb-unix:s-ifmt)
+                                       sb-unix:s-ifdir)))
+            (:author (sb-unix:uid-username uid))
             (:write-date (+ unix-to-universal-time mtime)))
           (resolve-problematic-symlink filename errno nil)))))
 
@@ -511,7 +511,7 @@ file, then the associated file is renamed."
              :format-control "~S can't be created."
              :format-arguments (list new-name)))
     (multiple-value-bind (res error)
-        (sb!unix:unix-rename original-namestring new-namestring)
+        (sb-unix:unix-rename original-namestring new-namestring)
       (unless res
         (error 'simple-file-error
                :pathname new-name
@@ -536,7 +536,7 @@ per standard Unix unlink() behaviour."
     (when (streamp file)
       (close file))
     (multiple-value-bind (res err)
-        #!-win32 (sb!unix:unix-unlink namestring)
+        #!-win32 (sb-unix:unix-unlink namestring)
         #!+win32 (or (sb!win32::native-delete-file namestring)
                      (values nil (sb!win32:get-last-error)))
         (unless res
@@ -648,9 +648,9 @@ exist or if is a file or a symbolic link."
   #!-win32
   (defun user-homedir-namestring (&optional username)
     (if username
-        (sb!unix:user-homedir username)
+        (sb-unix:user-homedir username)
         (or (not-empty (posix-getenv "HOME"))
-            (not-empty (sb!unix:uid-homedir (sb!unix:unix-getuid)))
+            (not-empty (sb-unix:uid-homedir (sb-unix:unix-getuid)))
             (lose))))
 
   #!+win32
@@ -829,9 +829,9 @@ filenames."
           ((one-iter ()
              (tagbody
               :next
-                (let ((ent (sb!unix:unix-readdir dp nil)))
+                (let ((ent (sb-unix:unix-readdir dp nil)))
                   (when ent
-                    (let ((name (sb!unix:unix-dirent-name ent)))
+                    (let ((name (sb-unix:unix-dirent-name ent)))
                       (when name
                         (cond ((equal "." name)
                                (go :next))
@@ -841,11 +841,11 @@ filenames."
                                (return-from one-iter name))))))))))
         (unwind-protect
              (progn
-               (setf dp (sb!unix:unix-opendir namestring errorp))
+               (setf dp (sb-unix:unix-opendir namestring errorp))
                (when dp
                  (funcall function #'one-iter)))
           (when dp
-            (sb!unix:unix-closedir dp nil)))))))
+            (sb-unix:unix-closedir dp nil)))))))
 
 ;;; This is our core directory access interface that we use to implement
 ;;; DIRECTORY.
@@ -1247,7 +1247,7 @@ Experimental: interface subject to change."
                     (format *standard-output*
                             "~&creating directory: ~A~%"
                             namestring))
-                  (sb!unix:unix-mkdir namestring mode)
+                  (sb-unix:unix-mkdir namestring mode)
                   (unless (directory-pathname-p (probe-file newpath))
                     (restart-case
                         (error

@@ -114,7 +114,7 @@ Experimental."
   (declare (type sb-kernel:internal-time time))
   (multiple-value-bind (sec frac)
       (truncate time sb-xc:internal-time-units-per-second)
-    (values sec (* frac sb!unix::micro-seconds-per-internal-time-unit))))
+    (values sec (* frac sb-unix::micro-seconds-per-internal-time-unit))))
 
 (defun signal-timeout (datum &rest arguments)
   "Signals a timeout condition while inhibiting further timeouts due to

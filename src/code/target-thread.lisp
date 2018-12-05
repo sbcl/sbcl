@@ -590,7 +590,7 @@ HOLDING-MUTEX-P."
                         (multiple-value-bind (sec nsec)
                             (truncate (* 1000 sleep) (expt 10 9))
                           (with-interrupts
-                            (sb!unix:nanosleep sec nsec))))
+                            (sb-unix:nanosleep sec nsec))))
                        (t
                         (return-from %%wait-for nil))))))))
 
@@ -1486,11 +1486,11 @@ session."
 
 (defun make-listener-thread (tty-name)
   (aver (probe-file tty-name))
-  (let* ((in (sb!unix:unix-open (namestring tty-name) sb!unix:o_rdwr #o666))
-         (out (sb!unix:unix-dup in))
-         (err (sb!unix:unix-dup in)))
+  (let* ((in (sb-unix:unix-open (namestring tty-name) sb-unix:o_rdwr #o666))
+         (out (sb-unix:unix-dup in))
+         (err (sb-unix:unix-dup in)))
     (labels ((thread-repl ()
-               (sb!unix::unix-setsid)
+               (sb-unix::unix-setsid)
                (let* ((sb-impl::*stdin*
                        (make-fd-stream in :input t :buffering :line
                                        :dual-channel-p t))
@@ -1566,7 +1566,7 @@ session."
             (without-interrupts
               (unwind-protect
                    (with-local-interrupts
-                     (sb!unix::unblock-deferrable-signals)
+                     (sb-unix::unblock-deferrable-signals)
                      (setf (thread-result thread)
                            (prog1
                                (multiple-value-list
@@ -1717,7 +1717,7 @@ subject to change."
     ;; OS's point of view the signal we are in the handler for is no
     ;; longer pending, so the signal will not be lost.
     (when (thread-interruptions *current-thread*)
-      (kill-safely (thread-os-thread *current-thread*) sb!unix:sigpipe))
+      (kill-safely (thread-os-thread *current-thread*) sb-unix:sigpipe))
     (when interruption
       (funcall interruption))))
 

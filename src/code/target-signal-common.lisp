@@ -8,7 +8,7 @@
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 
-(in-package "SB!UNIX")
+(in-package "SB-UNIX")
 
 ;;; CMU CL comment:
 ;;;   Magically converted by the compiler into a break instruction.

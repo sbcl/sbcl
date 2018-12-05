@@ -69,7 +69,7 @@
   (setf *default-pathname-defaults* (make-trivial-default-pathname))
   (init-var-ignoring-errors
    *default-pathname-defaults*
-   (parse-native-namestring (sb!unix:posix-getcwd/))
+   (parse-native-namestring (sb-unix:posix-getcwd/))
    :default *default-pathname-defaults*
    :explanation "with the current directory")
   (/show0 "setting *CORE-PATHNAME*")

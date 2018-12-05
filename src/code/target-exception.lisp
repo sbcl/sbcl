@@ -122,7 +122,7 @@
                   context-sap exception-record-sap code)))))
 
 
-(in-package "SB!UNIX")
+(in-package "SB-UNIX")
 
 (defun sb-kernel:signal-cold-init-or-reinit ()
   "Enable all the default signals that Lisp knows how to deal with."

@@ -129,7 +129,7 @@ main(int argc, char __attribute__((unused)) *argv[])
     defconstant ("rtld-now", RTLD_NOW);
     defconstant ("rtld-global", RTLD_GLOBAL);
 
-    printf("(in-package \"SB!UNIX\")\n\n");
+    printf("(in-package \"SB-UNIX\")\n\n");
 
     printf(";;; select()\n");
     defconstant("fd-setsize", FD_SETSIZE);

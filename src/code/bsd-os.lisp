@@ -16,17 +16,17 @@
   (name (* int))
   (namelen unsigned-int)
   (oldp (* t))
-  (oldlenp (* sb!unix:size-t))
+  (oldlenp (* sb-unix:size-t))
   (newp (* t))
-  (newlen sb!unix:size-t))
+  (newlen sb-unix:size-t))
 
 #!+darwin
 (define-alien-routine ("sysctlbyname" %sysctlbyname) int
   (name c-string)
   (oldp (* t))
-  (oldlenp (* sb!unix:size-t))
+  (oldlenp (* sb-unix:size-t))
   (newp (* t))
-  (newlen sb!unix:size-t))
+  (newlen sb-unix:size-t))
 
 (defun sysctl (type &rest name)
   "Retrieves an integer or string value with the given name."
@@ -34,7 +34,7 @@
     (when (> name-len ctl-maxname)
       (error "sysctl name ~S is too long" name))
     (with-alien ((name-array (array int #.ctl-maxname))
-                 (result-len sb!unix:size-t))
+                 (result-len sb-unix:size-t))
       (dotimes (off name-len)
         (setf (deref name-array off) (elt name off)))
       (ecase type
@@ -51,12 +51,12 @@
              (if (minusp (%sysctl (cast name-array (* int)) name-len
                                   result (addr result-len) nil 0))
                  (free-alien result)
-                 (sb!unix::newcharstar-string result)))))))))
+                 (sb-unix::newcharstar-string result)))))))))
 
 #!+darwin
 (defun sysctlbyname (type name)
   "Retrieves an integer or string value with the given name."
-  (with-alien ((result-len sb!unix:size-t))
+  (with-alien ((result-len sb-unix:size-t))
     (ecase type
       (:int
        (with-alien ((result int))
@@ -69,7 +69,7 @@
          (with-alien ((result (* char) (make-alien char result-len)))
            (if (minusp (%sysctlbyname name result (addr result-len) nil 0))
                (free-alien result)
-               (sb!unix::newcharstar-string result))))))))
+               (sb-unix::newcharstar-string result))))))))
 
 (defun software-type ()
   "Return a string describing the supporting software."
@@ -87,7 +87,7 @@
 (defun get-system-info ()
   (multiple-value-bind (err? utime stime maxrss ixrss idrss
                              isrss minflt majflt)
-                       (sb!unix:unix-getrusage sb!unix:rusage_self)
+                       (sb-unix:unix-getrusage sb-unix:rusage_self)
     (declare (ignore maxrss ixrss idrss isrss minflt))
     (unless err?
       (simple-perror "Unix system call getrusage() failed" :errno utime))

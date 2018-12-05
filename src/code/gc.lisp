@@ -361,7 +361,7 @@ Note: currently changes to this value are lost when saving core."
   (when (and (not *gc-inhibit*)
              (or #!+sb-thread *stop-for-gc-pending*
                  *gc-pending*))
-    (sb!unix::receive-pending-interrupt)))
+    (sb-unix::receive-pending-interrupt)))
 
 ;;;; GENCGC specifics
 ;;;;

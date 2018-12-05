@@ -355,7 +355,7 @@
                                                     "nl_langinfo"
                                                     (function (c-string :external-format :latin-1)
                                                               int))
-                                                   sb!unix:codeset)
+                                                   sb-unix:codeset)
                                                   "LATIN-1")
                                               "KEYWORD")
                              #!+win32 (sb!win32::ansi-codepage)))

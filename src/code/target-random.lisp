@@ -107,7 +107,7 @@ See SB-EXT:SEED-RANDOM-STATE for a SBCL extension to this functionality."
   ;; [ADDRESS-BASED-COUNTER-VAL in 'target-sxhash' could be used here]
   (/show0 "No /dev/urandom, using randomness from time and pid")
   (+ (get-internal-real-time)
-     (ash (sb!unix:unix-getpid) 32)))
+     (ash (sb-unix:unix-getpid) 32)))
 
 #!-win32
 (defun os-random-seed ()

@@ -145,7 +145,7 @@ format."
   (multiple-value-bind (seconds-west daylight)
       (if time-zone
           (values (* time-zone 60 60) nil)
-          (sb!unix::get-timezone (truncate-to-unix-range universal-time)))
+          (sb-unix::get-timezone (truncate-to-unix-range universal-time)))
     (declare (fixnum seconds-west))
     (multiple-value-bind (weeks secs)
         (truncate (+ (- universal-time seconds-west) seconds-offset)
@@ -232,12 +232,12 @@ format."
     (if time-zone
         (setf encoded-time (+ second (* (+ minute (* (+ hours time-zone) 60)) 60)))
         (let* ((secwest-guess
-                 (sb!unix::get-timezone
+                 (sb-unix::get-timezone
                   (truncate-to-unix-range (* hours 60 60))))
                (guess (+ second (* 60 (+ minute (* hours 60)))
                          secwest-guess))
                (secwest
-                 (sb!unix::get-timezone
+                 (sb-unix::get-timezone
                   (truncate-to-unix-range guess))))
           (setf encoded-time (+ guess (- secwest secwest-guess)))))
     encoded-time))
