@@ -210,7 +210,7 @@
   sb-c::combination
   numeric-type
   defstruct-description
-  sb!format::format-directive
+  sb-format::format-directive
   package
   form-tracking-stream
   ansi-stream))

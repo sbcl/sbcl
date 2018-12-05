@@ -1211,7 +1211,7 @@ NOTE: This interface is experimental and subject to change."
   (let ((*package* *keyword-package*))
     (write symbol :stream stream :escape t))))
 
-(declaim (special sb!pretty:*pprint-quote-with-syntactic-sugar*))
+(declaim (special sb-pretty:*pprint-quote-with-syntactic-sugar*))
 (sb-cold:preserving-host-function
 (defun print-type-specifier (stream type-specifier &optional colon at)
   (declare (ignore colon at))
@@ -1226,7 +1226,7 @@ NOTE: This interface is experimental and subject to change."
   ;; like CL:FUNCTION, CL:INTEGER, etc. to be printed without package
   ;; prefix but forces printing with package prefix for other
   ;; specifiers.
-  (let ((sb!pretty:*pprint-quote-with-syntactic-sugar* nil)
+  (let ((sb-pretty:*pprint-quote-with-syntactic-sugar* nil)
         (*package* *cl-package*))
     (prin1 type-specifier stream))))
 
@@ -1427,7 +1427,7 @@ NOTE: This interface is experimental and subject to change."
   ;; I don't think this is callable during cross-compilation, is it?
   ;; Anyway, the format string tokenizer can not handle APPLY on its own.
   (apply #'format stream
-         (sb!format:tokens "~#[~;~
+         (sb-format:tokens "~#[~;~
              Use ~/sb-ext:print-symbol-with-prefix/ instead.~;~
              Use ~/sb-ext:print-symbol-with-prefix/ or ~
              ~/sb-ext:print-symbol-with-prefix/ instead.~:;~

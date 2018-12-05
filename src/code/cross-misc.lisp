@@ -247,4 +247,4 @@
   (declare (ignore index lexenv))
   (eval form))
 
-(defmacro sb!format:tokens (string) string)
+(defmacro sb-format:tokens (string) string)

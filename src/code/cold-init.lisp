@@ -268,7 +268,7 @@
     (setf *standard-readtable* *readtable*))
   (setf *readtable* (copy-readtable *standard-readtable*))
   (setf sb-debug:*debug-readtable* (copy-readtable *standard-readtable*))
-  (sb!pretty:!pprint-cold-init)
+  (sb-pretty:!pprint-cold-init)
   (setq *print-level* nil *print-length* nil) ; restore defaults
 
   ;; Enable normal (post-cold-init) behavior of INFINITE-ERROR-PROTECT.

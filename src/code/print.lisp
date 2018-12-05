@@ -50,7 +50,7 @@
    style conditional newlines are turned on, and all indentations are
    turned off. If NIL, never use miser mode.")
 (defvar *print-pprint-dispatch*
-  (sb!pretty::make-pprint-dispatch-table) ; for type-correctness
+  (sb-pretty::make-pprint-dispatch-table) ; for type-correctness
   "The pprint-dispatch-table that controls how to pretty-print objects.")
 (!defvar *suppress-print-errors* nil
   "Suppress printer errors when the condition is of the type designated by this
@@ -73,7 +73,7 @@ variable: an unreadable object representing the error is printed instead.")
         (*print-level* nil)
         (*print-lines* nil)
         (*print-miser-width* nil)
-        (*print-pprint-dispatch* sb!pretty::*standard-pprint-dispatch-table*)
+        (*print-pprint-dispatch* sb-pretty::*standard-pprint-dispatch-table*)
         (*print-pretty* nil)
         (*print-radix* nil)
         (*print-readably* t)
@@ -190,7 +190,7 @@ variable: an unreadable object representing the error is printed instead.")
          (and *print-pretty* (pprint-dispatch object))
        (if pretty
            (with-simple-output-to-string (stream)
-              (sb!pretty::with-pretty-stream (stream)
+              (sb-pretty::with-pretty-stream (stream)
                 (funcall fun stream object)))
            (let ((buffer-size (approx-chars-in-repr object)))
              (let* ((string (make-string buffer-size :element-type 'base-char))
@@ -306,7 +306,7 @@ variable: an unreadable object representing the error is printed instead.")
              (multiple-value-bind (fun pretty)
                  (and *print-pretty* (pprint-dispatch object))
                (if pretty
-                   (sb!pretty::with-pretty-stream (stream)
+                   (sb-pretty::with-pretty-stream (stream)
                      (funcall fun stream object))
                    (output-ugly-object stream object))))
            (handle-it (stream)
@@ -500,7 +500,7 @@ variable: an unreadable object representing the error is printed instead.")
 (defun !printer-cold-init ()
 ;; The dispatch table will be changed later, so this doesn't really matter
 ;; except if a full call to WRITE wants to read the current binding.
-(setq *print-pprint-dispatch* (sb!pretty::make-pprint-dispatch-table))
+(setq *print-pprint-dispatch* (sb-pretty::make-pprint-dispatch-table))
 (setq *digit-bases* (make-array 128 ; FIXME
                                 :element-type '(unsigned-byte 8)
                                 :initial-element 36)

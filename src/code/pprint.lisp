@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!PRETTY")
+(in-package "SB-PRETTY")
 
 #!-sb-fluid (declaim (inline index-posn posn-index posn-column))
 (defun index-posn (index stream)
@@ -993,17 +993,21 @@ line break."
 (defun pprint-lambda (stream list &rest noise)
   (declare (ignore noise))
   (funcall (formatter
+            ;; META: I disagree with the claim that we are not ANSI-compliant.
+            ;; The time at which INTERN occurs does not seem to me to lie within
+            ;; the scope of what is meant by "equivalent" with respect to behavior
+            ;; of the format control.
             ;; KLUDGE: This format string, and other format strings which also
-            ;; refer to SB!PRETTY, rely on the current SBCL not-quite-ANSI
+            ;; refer to SB-PRETTY, rely on the current SBCL not-quite-ANSI
             ;; behavior of FORMATTER in order to make code which survives the
-            ;; transition when SB!PRETTY is renamed to SB-PRETTY after cold
-            ;; init. (ANSI says that the FORMATTER functions should be
+            ;; transition when SB-PRETTY is renamed.
+            ;; (ANSI says that the FORMATTER functions should be
             ;; equivalent to the format string, but the SBCL FORMATTER
             ;; functions contain references to package objects, not package
             ;; names, so they keep right on going if the packages are renamed.)
             ;; If our FORMATTER behavior is ever made more compliant, the code
             ;; here will have to change. -- WHN 19991207
-            "~:<~^~W~^~3I ~:_~/SB!PRETTY:PPRINT-LAMBDA-LIST/~1I~@{ ~_~W~}~:>")
+            "~:<~^~W~^~3I ~:_~/SB-PRETTY:PPRINT-LAMBDA-LIST/~1I~@{ ~_~W~}~:>")
            stream
            list))
 
@@ -1020,7 +1024,7 @@ line break."
            (and (consp (cddr list))
                 (not (eq :in (third list)))))
       (funcall (formatter
-                "~:<~^~W~^ ~@_~:<~@{~:<~^~W~^~3I ~:_~/SB!PRETTY:PPRINT-LAMBDA-LIST/~1I~:@_~@{~W~^ ~_~}~:>~^ ~_~}~:>~1I~@:_~@{~W~^ ~_~}~:>")
+                "~:<~^~W~^ ~@_~:<~@{~:<~^~W~^~3I ~:_~/SB-PRETTY:PPRINT-LAMBDA-LIST/~1I~:@_~@{~W~^ ~_~}~:>~^ ~_~}~:>~1I~@:_~@{~W~^ ~_~}~:>")
                stream
                list)
       ;; for printing function names like (flet foo)
@@ -1140,14 +1144,14 @@ line break."
 (defun pprint-case (stream list &rest noise)
   (declare (ignore noise))
   (funcall (formatter
-            "~:<~^~W~^ ~3I~:_~W~1I~@{ ~_~:<~^~:/SB!PRETTY:PPRINT-FILL/~^~@{ ~_~W~}~:>~}~:>")
+            "~:<~^~W~^ ~3I~:_~W~1I~@{ ~_~:<~^~:/SB-PRETTY:PPRINT-FILL/~^~@{ ~_~W~}~:>~}~:>")
            stream
            list))
 
 (defun pprint-defun (stream list &rest noise)
   (declare (ignore noise))
   (funcall (formatter
-            "~:<~^~W~^ ~@_~:I~W~^ ~:_~/SB!PRETTY:PPRINT-LAMBDA-LIST/~1I~@{ ~_~W~}~:>")
+            "~:<~^~W~^ ~@_~:I~W~^ ~:_~/SB-PRETTY:PPRINT-LAMBDA-LIST/~1I~@{ ~_~W~}~:>")
            stream
            list))
 
@@ -1158,7 +1162,7 @@ line break."
            (consp (third list)))
       (pprint-defun stream list)
       (funcall (formatter
-                "~:<~^~W~^ ~@_~:I~W~^ ~W~^ ~:_~/SB!PRETTY:PPRINT-LAMBDA-LIST/~1I~@{ ~_~W~}~:>")
+                "~:<~^~W~^ ~@_~:I~W~^ ~W~^ ~:_~/SB-PRETTY:PPRINT-LAMBDA-LIST/~1I~@{ ~_~W~}~:>")
                stream
                list)))
 
@@ -1172,7 +1176,7 @@ line break."
 (defun pprint-destructuring-bind (stream list &rest noise)
   (declare (ignore noise))
   (funcall (formatter
-            "~:<~^~W~^~3I ~_~:/SB!PRETTY:PPRINT-LAMBDA-LIST/~^ ~_~W~^~1I~@{ ~_~W~}~:>")
+            "~:<~^~W~^~3I ~_~:/SB-PRETTY:PPRINT-LAMBDA-LIST/~^ ~_~W~^~1I~@{ ~_~W~}~:>")
            stream list))
 
 (defun pprint-do (stream list &rest noise)

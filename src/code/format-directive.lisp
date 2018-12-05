@@ -7,7 +7,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!FORMAT")
+(in-package "SB-FORMAT")
 
 (define-condition format-error (error reference-condition)
   ((complaint :reader format-error-complaint :initarg :complaint)

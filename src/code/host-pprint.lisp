@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!PRETTY")
+(in-package "SB-PRETTY")
 
 ;; This comes early so that fndb can use PPRINT-DISPATCH-TABLE as
 ;; a type-specifier.

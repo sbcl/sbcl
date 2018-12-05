@@ -1251,7 +1251,7 @@ longer than permitted by the deadline."))
 ;;; to have the TOKENS macro insert the literal string within the expression
 ;;; when the entire point is to AVOID inserting that exact string.
 (define-load-time-global *decl-type-conflict-error-reporter*
-    (sb!format:tokens "Symbol ~/sb-ext:print-symbol-with-prefix/ cannot ~
+    (sb-format:tokens "Symbol ~/sb-ext:print-symbol-with-prefix/ cannot ~
      be both the name of a type and the name of a declaration"))
 (define-condition declaration-type-conflict-error (reference-condition
                                                    simple-error)

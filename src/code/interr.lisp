@@ -211,7 +211,7 @@
                    (info :variable :type symbol)
                  (if (and defined
                           (not (ctypep value type)))
-                     (still-bad (sb!format:tokens
+                     (still-bad (sb-format:tokens
                                  "Type mismatch when restarting unbound symbol error:~@
                                  ~s is not of type ~/sb-impl:print-type/")
                                 value type)

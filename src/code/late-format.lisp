@@ -7,7 +7,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!FORMAT")
+(in-package "SB-FORMAT")
 
 ;;;; TOKENIZE-CONTROL-STRING
 
@@ -414,7 +414,7 @@
       (let ((symbol
              (without-package-locks
                  (package-symbolicate
-                  (load-time-value (find-package "SB!FORMAT") t)
+                  (load-time-value (find-package "SB-FORMAT") t)
                   "FORMAT-ARG"
                   (write-to-string (incf *format-gensym-counter*)
                                    :pretty nil :base 10 :radix nil)))))

@@ -843,7 +843,7 @@ and no value was provided for it." name))))))))))
                         (when (and unwinnage-fun
                                    (not (csubtypep (leaf-type var) type)))
                           (funcall unwinnage-fun
-                                   (sb!format:tokens
+                                   (sb-format:tokens
                                       "Assignment to argument: ~S~%  ~
                                        prevents use of assertion from function ~
                                        type ~A:~% ~/sb-impl:print-type/~%")

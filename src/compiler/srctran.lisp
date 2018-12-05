@@ -4549,17 +4549,17 @@
   (flet ((maybe-replace (control)
            (binding* ((string (lvar-value control))
                       ((symbols new-string)
-                       (sb!format::extract-user-fun-directives string)))
+                       (sb-format::extract-user-fun-directives string)))
              (when (or symbols (and new-string (string/= string new-string)))
                (change-ref-leaf
                 (lvar-use control)
                 (find-constant
                  (cond ((not symbols) new-string)
                        ((fasl-output-p *compile-object*)
-                        (sb!format::make-fmt-control-proxy new-string symbols))
+                        (sb-format::make-fmt-control-proxy new-string symbols))
                        #-sb-xc-host ; no such object as a FMT-CONTROL
                        (t
-                        (sb!format::make-fmt-control new-string symbols)))))))))
+                        (sb-format::make-fmt-control new-string symbols)))))))))
     (when (list-of-length-at-least-p combination-args (1+ arg-n))
       (let* ((args (nthcdr arg-n combination-args))
              (control (pop args)))
@@ -4568,9 +4568,9 @@
             (binding* ((string (lvar-value control))
                        (*compiler-error-context* node)
                        ((min max)
-                        (handler-case (sb!format:%compiler-walk-format-string
+                        (handler-case (sb-format:%compiler-walk-format-string
                                        string args)
-                          (sb!format:format-error (c)
+                          (sb-format:format-error (c)
                             (compiler-warn "~A" c)))
                         :exit-if-null)
                        (nargs (length args)))
@@ -4638,11 +4638,11 @@
 
 ;; Can these appear in the expansion of FORMATTER?
 #+sb-xc-host
-(dolist (fun '(sb!format::format-error
-               sb!format::format-error-at
-               sb!format::format-error-at*))
+(dolist (fun '(sb-format::format-error
+               sb-format::format-error-at
+               sb-format::format-error-at*))
   (setf (fun-info-optimizer (fun-info-or-lose fun))
-        (let ((arg-n (if (eq fun 'sb!format::format-error) 0 2))
+        (let ((arg-n (if (eq fun 'sb-format::format-error) 0 2))
               (fun fun))
           (lambda (node) (check-format-args node fun arg-n nil)))))
 
@@ -4669,10 +4669,10 @@
          ;; FIXME: instead of checking the condition report, define a
          ;; dedicated condition class
          (expr (handler-case ; in case %formatter wants to signal an error
-                   (sb!format::%formatter control argc nil)
+                   (sb-format::%formatter control argc nil)
                  ;; otherwise, let the macro complain
-                 (sb!format:format-error (c)
-                   (if (string= (sb!format::format-error-complaint c)
+                 (sb-format:format-error (c)
+                   (if (string= (sb-format::format-error-complaint c)
                                 "No package named ~S")
                        ;; "~/apackage:afun/" might become legal later.
                        ;; To put it in perspective, "~/f" (no closing slash)
@@ -4710,9 +4710,9 @@
    (loop for directive in control
          always
          (or (stringp directive)
-             (and (sb!format::format-directive-p directive)
-                  (let ((char (sb!format::directive-character directive))
-                        (params (sb!format::directive-params directive)))
+             (and (sb-format::format-directive-p directive)
+                  (let ((char (sb-format::directive-character directive))
+                        (params (sb-format::directive-params directive)))
                      (and (char= char #\A)
                           (null params)
                           (pop args))))))
@@ -4721,8 +4721,8 @@
 (deftransform format ((stream control &rest args) (null (constant-arg string) &rest string))
   (let ((tokenized
           (handler-case
-              (sb!format::tokenize-control-string (coerce (lvar-value control) 'simple-string))
-            (sb!format:format-error ()
+              (sb-format::tokenize-control-string (coerce (lvar-value control) 'simple-string))
+            (sb-format:format-error ()
               (give-up-ir1-transform)))))
     (unless (concatenate-format-p tokenized args)
       (give-up-ir1-transform))
@@ -4756,14 +4756,14 @@
       (when (and (stringp x) (stringp y))
         (multiple-value-bind (min1 max1)
             (handler-case
-                (sb!format:%compiler-walk-format-string x args)
-              (sb!format:format-error (c)
+                (sb-format:%compiler-walk-format-string x args)
+              (sb-format:format-error (c)
                 (compiler-warn "~A" c)))
           (when min1
             (multiple-value-bind (min2 max2)
                 (handler-case
-                    (sb!format:%compiler-walk-format-string y args)
-                  (sb!format:format-error (c)
+                    (sb-format:%compiler-walk-format-string y args)
+                  (sb-format:format-error (c)
                     (compiler-warn "~A" c)))
               (when min2
                 (let ((nargs (length args)))

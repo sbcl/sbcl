@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!FORMAT")
+(in-package "SB-FORMAT")
 
 ;;;; FORMAT
 
@@ -864,7 +864,7 @@
     (write-string spaces stream :end n)))
 
 (defun format-relative-tab (stream colrel colinc)
-  (if (sb!pretty:pretty-stream-p stream)
+  (if (sb-pretty:pretty-stream-p stream)
       (pprint-tab :line-relative colrel colinc stream)
       (let* ((cur (sb-impl::charpos stream))
              (spaces (if (and cur (plusp colinc))
@@ -873,7 +873,7 @@
         (output-spaces stream spaces))))
 
 (defun format-absolute-tab (stream colnum colinc)
-  (if (sb!pretty:pretty-stream-p stream)
+  (if (sb-pretty:pretty-stream-p stream)
       (pprint-tab :line colnum colinc stream)
       (let ((cur (sb-impl::charpos stream)))
         (cond ((null cur)

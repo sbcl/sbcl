@@ -109,7 +109,7 @@
                   sb-pcl::%method-function
                   sb-pcl::standard-instance sb-pcl::standard-funcallable-instance
                   funcallable-instance generic-function
-                  sb!format::fmt-control
+                  sb-format::fmt-control
                   #!+sb-eval sb!eval:interpreted-function
                   #!+sb-fasteval sb!interpreter:interpreted-function
                   weak-pointer simd-pack))
@@ -133,7 +133,7 @@
                   condition restart style-warning step-condition
                   class sb-pcl::condition-class error
                   hash-table sb-thread:mutex
-                  sb!pretty:pprint-dispatch-table
+                  sb-pretty:pprint-dispatch-table
                   compiler-note
                   deprecation-condition
                   early-deprecation-warning

@@ -1311,11 +1311,11 @@
   ())
 
 (defknown copy-pprint-dispatch
-  (&optional (or sb!pretty:pprint-dispatch-table null))
-  sb!pretty:pprint-dispatch-table
+  (&optional (or sb-pretty:pprint-dispatch-table null))
+  sb-pretty:pprint-dispatch-table
   ())
 (defknown pprint-dispatch
-  (t &optional (or sb!pretty:pprint-dispatch-table null))
+  (t &optional (or sb-pretty:pprint-dispatch-table null))
   (values function-designator boolean)
   ())
 (defknown (pprint-fill pprint-linear)
@@ -1341,7 +1341,7 @@
   ())
 (defknown set-pprint-dispatch
   (type-specifier (function-designator (t t) * :no-function-conversion t)
-   &optional real sb!pretty:pprint-dispatch-table)
+   &optional real sb-pretty:pprint-dispatch-table)
   null
   (call))
 
@@ -1452,16 +1452,16 @@
                   (or string function) &rest t)
   (or string null)
     ())
-(defknown sb!format::format-error* (string list &rest t &key &allow-other-keys)
+(defknown sb-format::format-error* (string list &rest t &key &allow-other-keys)
     nil)
-(defknown sb!format::format-error (string &rest t) nil)
-(defknown sb!format::format-error-at* ((or null string) (or null index) string list
+(defknown sb-format::format-error (string &rest t) nil)
+(defknown sb-format::format-error-at* ((or null string) (or null index) string list
                                        &rest t &key &allow-other-keys)
     nil)
-(defknown sb!format::format-error-at ((or null string) (or null index) string
+(defknown sb-format::format-error-at ((or null string) (or null index) string
                                       &rest t)
     nil)
-(defknown sb!format::args-exhausted (string integer) nil)
+(defknown sb-format::args-exhausted (string integer) nil)
 
 (defknown (y-or-n-p yes-or-no-p) (&optional (or string null function) &rest t) boolean
   ())
@@ -2040,8 +2040,8 @@
            sb-impl::case-frob-capitalize-first-out sb-impl::case-frob-capitalize-first-sout
            sb-impl::case-frob-capitalize-aux-out sb-impl::case-frob-capitalize-aux-sout
            sb-impl::case-frob-misc
-           sb!pretty::pretty-out sb!pretty::pretty-misc) * *)
-(defknown sb!pretty::pretty-sout * * (recursive))
+           sb-pretty::pretty-out sb-pretty::pretty-misc) * *)
+(defknown sb-pretty::pretty-sout * * (recursive))
 
 ;;;; PCL
 

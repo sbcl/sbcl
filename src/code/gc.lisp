@@ -330,9 +330,9 @@ guaranteed to be collected."
   (cond ((eql 0 gen)
          ;; Drop strings because the hash is pointer-hash
          ;; but there is no automatic cache rehashing after GC.
-         (sb!format::tokenize-control-string-cache-clear))
+         (sb-format::tokenize-control-string-cache-clear))
         ((eql 1 gen)
-         (sb!format::tokenize-control-string-cache-clear)
+         (sb-format::tokenize-control-string-cache-clear)
          (ctype-of-cache-clear))
         (t
          (drop-all-hash-caches)))
