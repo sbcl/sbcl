@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!KERNEL")
+(in-package "SB-KERNEL")
 
 (!defvar *break-on-signals* nil
   "When (TYPEP condition *BREAK-ON-SIGNALS*) is true, then calls to SIGNAL will

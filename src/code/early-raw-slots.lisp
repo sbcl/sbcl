@@ -7,7 +7,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!KERNEL")
+(in-package "SB-KERNEL")
 
 ;;; STRUCTURE-OBJECT supports placement of raw bits within the object
 ;;; to allow representation of native word and float-point types directly.

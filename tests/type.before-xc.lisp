@@ -13,10 +13,10 @@
 ;;;; more information.
 
 (unless (find-package "BEFORE-XC-TESTS")
-  (make-package "BEFORE-XC-TESTS" :use '("SB-XC" "SB!KERNEL" "SB!INT")))
+  (make-package "BEFORE-XC-TESTS" :use '("SB-XC" "SB-KERNEL" "SB!INT")))
 (do-external-symbols (s "SB-XC") ; Import all symbols from SB-XC, then use CL
   (shadowing-import s "BEFORE-XC-TESTS"))
-(import '(sb!kernel::type-union2) "BEFORE-XC-TESTS")
+(import '(sb-kernel::type-union2) "BEFORE-XC-TESTS")
 (cl:use-package '("COMMON-LISP") "BEFORE-XC-TESTS")
 
 (in-package "BEFORE-XC-TESTS")
@@ -312,7 +312,7 @@
   (assert win))
 ;; Used to run out of stack.
 (multiple-value-bind (yes win)
-    (handler-bind ((sb!kernel::cross-type-giving-up #'muffle-warning))
+    (handler-bind ((sb-kernel::cross-type-giving-up #'muffle-warning))
       (subtypep 'null '(or unk0 unk1)))
   (assert (not yes))
   (assert (not win)))

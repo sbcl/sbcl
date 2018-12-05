@@ -441,7 +441,7 @@
                                      collect (cond ((eq spec current-or)
                                                     or-part)
                                                    ((typep spec '(cons (eql or)))
-                                                    (sb!kernel::%type-union (cdr spec)))
+                                                    (sb-kernel::%type-union (cdr spec)))
                                                    (t
                                                     spec))))
                              (check (arg param &optional

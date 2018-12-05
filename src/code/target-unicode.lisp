@@ -529,10 +529,10 @@ disappears when accents are placed on top of it. and NIL otherwise"
                                 (t
                                  (push char chars)
                                  (setf previous-combining-class combining-class))))))
-      (sb!kernel:with-array-data ((string string) (start) (end)
+      (sb-kernel:with-array-data ((string string) (start) (end)
                                   :check-fill-pointer t)
         (let ((calback (if filter
-                           (let ((filter (sb!kernel:%coerce-callable-to-fun filter)))
+                           (let ((filter (sb-kernel:%coerce-callable-to-fun filter)))
                              (lambda (char)
                                (when (funcall filter char)
                                  (callback char))))

@@ -43,7 +43,7 @@
     ;;
     ;; doesn't go beyond the INTERNAL-TIME range due to rounding
     ;; errors.
-    (floor (ash 1 (1- sb!kernel::internal-time-bits))
+    (floor (ash 1 (1- sb-kernel::internal-time-bits))
            sb-xc:internal-time-units-per-second)))
 
 (declaim (inline seconds-to-maybe-internal-time))
@@ -111,7 +111,7 @@ Experimental."
 (declaim (inline decode-internal-time))
 (defun decode-internal-time (time)
   "Returns internal time value TIME decoded into seconds and microseconds."
-  (declare (type sb!kernel:internal-time time))
+  (declare (type sb-kernel:internal-time time))
   (multiple-value-bind (sec frac)
       (truncate time sb-xc:internal-time-units-per-second)
     (values sec (* frac sb!unix::micro-seconds-per-internal-time-unit))))
@@ -174,7 +174,7 @@ CONDITION, or return NIL if the restart is not found."
 ABS-SEC and ABS-USEC and current real time.
 
 If ABS-SEC and ABS-USEC are in the past, 0 0 is returned."
-  (declare (type sb!kernel:internal-seconds abs-sec)
+  (declare (type sb-kernel:internal-seconds abs-sec)
            (type (mod 1000000) abs-usec))
   (binding* (((now-sec now-usec)
               (decode-internal-time (get-internal-real-time)))
@@ -197,9 +197,9 @@ If ABS-SEC and ABS-USEC are in the past, 0 0 is returned."
 ;;; If SECONDS is NIL and there is no *DEADLINE* all returned values
 ;;; are NIL.
 (declaim (ftype (function ((or null (real 0)))
-                          (values (or null sb!kernel:internal-seconds)
+                          (values (or null sb-kernel:internal-seconds)
                                   (or null (mod 1000000))
-                                  (or null sb!kernel:internal-seconds)
+                                  (or null sb-kernel:internal-seconds)
                                   (or null (mod 1000000))
                                   t))
                 decode-timeout))

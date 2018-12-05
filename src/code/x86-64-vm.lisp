@@ -156,7 +156,7 @@
     (if (= trap-number invalid-arg-count-trap)
         (values #.(error-number-or-lose 'invalid-arg-count-error)
                 '(#.arg-count-sc))
-        (sb!kernel::decode-internal-error-args (sap+ pc 1) trap-number))))
+        (sb-kernel::decode-internal-error-args (sap+ pc 1) trap-number))))
 
 
 #!+immobile-code

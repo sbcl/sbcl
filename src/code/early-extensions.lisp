@@ -601,7 +601,7 @@ NOTE: This interface is experimental and subject to change."
     ;; in VALUES-SPECIFIER-TYPE. It's because SET calls VALUES-SPECIFIER-TYPE.
     (macrolet ((set! (symbol value)
                  `(#+sb-xc-host set
-                   #-sb-xc-host sb!kernel:%set-symbol-global-value
+                   #-sb-xc-host sb-kernel:%set-symbol-global-value
                    ,symbol ,value))
                (reset-stats ()
                  ;; If statistics gathering is not not compiled-in,
@@ -1344,15 +1344,15 @@ NOTE: This interface is experimental and subject to change."
     ;; things like this function.
     (block nil
       (handler-bind
-          ((sb!kernel::parse-deprecated-type
+          ((sb-kernel::parse-deprecated-type
              (lambda (condition)
-               (let ((type-specifier (sb!kernel::parse-deprecated-type-specifier
+               (let ((type-specifier (sb-kernel::parse-deprecated-type-specifier
                                       condition)))
                  (aver (symbolp type-specifier))
                  (unless (memq type-specifier seen)
                    (push type-specifier seen)
                    (check-deprecated-thing 'type type-specifier)))))
-           ((or error sb!kernel:parse-unknown-type)
+           ((or error sb-kernel:parse-unknown-type)
              (lambda (condition)
                (declare (ignore condition))
                (return))))
@@ -1660,7 +1660,7 @@ to :INTERPRET, an interpreter will be used.")
                                 (length cache))))
                   short-name))))))
 
-(in-package "SB!KERNEL")
+(in-package "SB-KERNEL")
 
 (defun fp-zero-p (x)
   (typecase x

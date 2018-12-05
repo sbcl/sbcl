@@ -158,7 +158,7 @@
            (,shift 0)
            (,acc 0)
            (,prev 0))
-       #-sb-xc-host (declare (notinline sb!kernel:%ldb)) ; lp#1573398
+       #-sb-xc-host (declare (notinline sb-kernel:%ldb)) ; lp#1573398
        (declare (type (mod ,sb-vm:n-word-bits) ,shift)
                 (type word ,acc ,prev))
        (loop

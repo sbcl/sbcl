@@ -243,7 +243,7 @@ evaluated as a PROGN."
                            ,@(when doc (list doc)) ,@lambda-guts))
            (dxable-args (extract-dx-args lambda-list decls))
            (inline-thing
-            (or (sb!kernel::defstruct-generated-defn-p name lambda-list body)
+            (or (sb-kernel::defstruct-generated-defn-p name lambda-list body)
                 (when (save-inline-expansion-p name)
                   ;; we want to attempt to inline, so complain if we can't
                   (acond ((sb-c:maybe-inline-syntactic-closure lambda env)

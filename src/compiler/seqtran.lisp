@@ -424,7 +424,7 @@
                      (when variant
                        (write-char #\- s)
                        (write-string (symbol-name variant) s)))
-                   (load-time-value (find-package "SB!KERNEL") t))
+                   (load-time-value (find-package "SB-KERNEL") t))
       (bug "Unknown list item seek transform: name=~S, key-functions=~S variant=~S"
            function-name key-functions variant)))
 
@@ -631,7 +631,7 @@
          (basher-name (format nil "UB~D-BASH-FILL" n-bits))
          (basher (or (find-symbol basher-name
                                   (load-time-value
-                                   (find-package "SB!KERNEL") t))
+                                   (find-package "SB-KERNEL") t))
                      (abort-ir1-transform
                       "Unknown fill basher, please report to sbcl-devel: ~A"
                       basher-name)))
@@ -962,7 +962,7 @@
                 (let* ((n-element-bits (sb-vm:saetp-n-bits saetp))
                        (bash-function (intern (format nil "UB~D-BASH-COPY"
                                                       n-element-bits)
-                                              (find-package "SB!KERNEL"))))
+                                              (find-package "SB-KERNEL"))))
                   `(funcall (function ,bash-function) seq2 start2
                     seq1 start1 replace-len)))
                (t
@@ -1075,7 +1075,7 @@
                   index)
                  *)))
   (loop for i = 1 then (* i 2)
-     for name = (intern (format nil "UB~D-BASH-COPY" i) "SB!KERNEL")
+     for name = (intern (format nil "UB~D-BASH-COPY" i) "SB-KERNEL")
      collect `(deftransform ,name ,arglist
                 (frob-bash-transform src src-offset
                                      dst dst-offset length

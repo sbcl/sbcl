@@ -50,8 +50,8 @@
     (when (get s :sb-xc-globaldb-info)
       (remf (symbol-plist s) :sb-xc-globaldb-info)))
   (fill (symbol-value 'sb-impl::*info-types*) nil)
-  (clrhash (symbol-value 'sb!kernel::*forward-referenced-layouts*))
-  (setf (symbol-value 'sb!kernel:*type-system-initialized*) nil)
+  (clrhash (symbol-value 'sb-kernel::*forward-referenced-layouts*))
+  (setf (symbol-value 'sb-kernel:*type-system-initialized*) nil)
   (makunbound 'sb-c::*backend-primitive-type-names*)
   (makunbound 'sb-c::*backend-primitive-type-aliases*)
 

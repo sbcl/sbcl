@@ -116,5 +116,5 @@
   (let* ((pc (context-pc context))
          (trap-number (sap-ref-8 pc 3)))
     (declare (type system-area-pointer pc))
-    (sb!kernel::decode-internal-error-args (sap+ pc 4) trap-number)))
+    (sb-kernel::decode-internal-error-args (sap+ pc 4) trap-number)))
 ) ; end PROGN

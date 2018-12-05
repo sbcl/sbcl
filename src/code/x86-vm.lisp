@@ -121,7 +121,7 @@
   (let* ((pc (context-pc context))
          (trap-number (sap-ref-8 pc 0)))
     (declare (type system-area-pointer pc))
-    (sb!kernel::decode-internal-error-args (sap+ pc 1) trap-number)))
+    (sb-kernel::decode-internal-error-args (sap+ pc 1) trap-number)))
 
 ;;; This is used in error.lisp to insure that floating-point exceptions
 ;;; are properly trapped. The compiler translates this to a VOP.

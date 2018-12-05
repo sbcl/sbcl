@@ -100,7 +100,7 @@
 ;;; Parse TYPE as an alien type specifier and return the resultant
 ;;; ALIEN-TYPE structure.
 (defun parse-alien-type (type env)
-  (declare (type sb!kernel:lexenv-designator env))
+  (declare (type sb-kernel:lexenv-designator env))
   (if (consp type)
       (let ((translator (info :alien-type :translator (car type))))
         (unless translator
@@ -124,7 +124,7 @@
                 type)))))
 
 (defun auxiliary-alien-type (kind name env)
-  (declare (type sb!kernel:lexenv-designator env))
+  (declare (type sb-kernel:lexenv-designator env))
   (flet ((aux-defn-matches (x)
            (and (eq (first x) kind) (eq (second x) name))))
     (let ((in-auxiliaries
@@ -135,7 +135,7 @@
           (info :alien-type kind name)))))
 
 (defun (setf auxiliary-alien-type) (new-value kind name env)
-  (declare (type sb!kernel:lexenv-designator env))
+  (declare (type sb-kernel:lexenv-designator env))
   (flet ((aux-defn-matches (x)
            (and (eq (first x) kind) (eq (second x) name))))
     (when (find-if #'aux-defn-matches *new-auxiliary-types*)
@@ -774,7 +774,7 @@
   (let ((bits (alien-mem-block-type-bits type)))
     (unless bits
       (error "can't deposit aliens of type ~S (unknown size)" type))
-    `(sb!kernel:system-area-ub8-copy ,value 0 ,sap
+    `(sb-kernel:system-area-ub8-copy ,value 0 ,sap
       (truncate ,offset sb-vm:n-byte-bits)
       ',(truncate bits sb-vm:n-byte-bits))))
 
@@ -862,7 +862,7 @@
 ;;; MAKE-ALIEN-RECORD-TYPE to %MAKE-ALIEN-RECORD-TYPE and use
 ;;; ENSURE-ALIEN-RECORD-TYPE instead. --NS 20040729
 (defun parse-alien-record-type (kind name fields env)
-  (declare (type sb!kernel:lexenv-designator env))
+  (declare (type sb-kernel:lexenv-designator env))
   (flet ((frob-type (type new-fields alignment bits)
            (setf (alien-record-type-fields type) new-fields
                  (alien-record-type-alignment type) alignment

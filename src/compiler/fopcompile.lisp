@@ -189,7 +189,7 @@
                   ;; would say "yes".
                   (or (member function '(sb-impl::%defun
                                          sb!pcl::!trivial-defmethod
-                                         sb!kernel::%defstruct))
+                                         sb-kernel::%defstruct))
                       (and (eq function 'sb-c::%defconstant)
                            ;; %DEFCONSTANT is fopcompilable only if the value
                            ;; is trivially a compile-time constant,
@@ -205,7 +205,7 @@
                                              :sb-cold-funcall-handler/for-value)))
                       (and (eq function 'setf)
                            (fopcompilable-p (%macroexpand form *lexenv*)))
-                      (and (eq function 'sb!kernel:%svset)
+                      (and (eq function 'sb-kernel:%svset)
                            (destructuring-bind (thing index value) (cdr form)
                              (and (symbolp thing)
                                   (integerp index)

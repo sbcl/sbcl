@@ -11,7 +11,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!KERNEL")
+(in-package "SB-KERNEL")
 
 ;;; This is for generating runtime/genesis/constants.h
 ;;; (The strings are only used in C code and are relatively unimportant)
@@ -235,7 +235,7 @@
                             (t
                              (prog1 (sap-ref-8 sap 0)
                                (setf sap (sap+ sap 1)))))))
-    (let ((length (sb!kernel::error-length error-number)))
+    (let ((length (sb-kernel::error-length error-number)))
       (declare (type (unsigned-byte 8) length))
       (values error-number
               (loop repeat length with index = 0

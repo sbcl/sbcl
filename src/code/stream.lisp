@@ -632,7 +632,7 @@
                                sb-vm:*specialized-array-element-type-properties*
                                :key #'sb-vm:saetp-specifier)))
                        (bash-function (intern (format nil "UB~D-BASH-COPY" n-character-array-bits)
-                                              (find-package "SB!KERNEL"))))
+                                              (find-package "SB-KERNEL"))))
                   bash-function)
                 ibuf +ansi-stream-in-buffer-extra+
                 ibuf start
@@ -1501,7 +1501,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
   (declare (type simple-string string)
            (type index start end))
   #!+sb-unicode
-  (when (and (typep string 'sb!kernel:simple-character-string)
+  (when (and (typep string 'sb-kernel:simple-character-string)
              (eq (string-output-stream-element-type stream) 'base-char))
     (do ((i (1- end) (1- i))) ((< i start))
       (declare (optimize (sb-c::insert-array-bounds-checks 0)))
@@ -1521,7 +1521,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
      :more
        (when (plusp here)
          (string-dispatch
-              (simple-character-string simple-base-string sb!kernel::simple-array-nil)
+              (simple-character-string simple-base-string sb-kernel::simple-array-nil)
               string
             (replace buffer string :start1 pointer :start2 start :end2 stop))
          (setf (string-output-stream-pointer stream) (+ here pointer)))

@@ -322,7 +322,7 @@
   (declare (ignore trap-number))
   (let* ((inst (sap-ref-32 sap (- offset 4)))
          (error-number (ldb (byte 8 13) inst))
-         (length (sb!kernel::error-length error-number))
+         (length (sb-kernel::error-length error-number))
          (index offset))
     (declare (type sb!sys:system-area-pointer sap)
              (type (unsigned-byte 8) length))

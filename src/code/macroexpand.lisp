@@ -55,7 +55,7 @@
     ;;   technique, as it would call COMPILE once per macro usage.
     (if (compiled-function-p fun)
         fun
-        (error 'sb!kernel::macroexpand-hook-type-error
+        (error 'sb-kernel::macroexpand-hook-type-error
                :datum hook
                :expected-type 'compiled-function))))
 

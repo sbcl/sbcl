@@ -151,7 +151,7 @@
 ;;; !DEF-VM-SUPPORT-ROUTINE and DEFUN-CACHED.
 (/show0 "primtype.lisp 188")
 (defun primitive-type (type)
-  (sb!kernel::maybe-reparse-specifier! type)
+  (sb-kernel::maybe-reparse-specifier! type)
   (primitive-type-aux type))
 (/show0 "primtype.lisp 191")
 (defun-cached (primitive-type-aux

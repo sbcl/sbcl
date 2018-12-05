@@ -10,5 +10,5 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!KERNEL")
+(in-package "SB-KERNEL")
 (define-alien-routine reset-control-stack-guard-page void)

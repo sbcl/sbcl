@@ -103,7 +103,7 @@
     (declare (type system-area-pointer pc))
     (cond ((= op (logior (ash 3 10) (ash 6 5)))
            (let ((trap-number (sap-ref-8 pc 3)))
-             (sb!kernel::decode-internal-error-args (sap+ pc 4) trap-number)))
+             (sb-kernel::decode-internal-error-args (sap+ pc 4) trap-number)))
           ((and (= (ldb (byte 6 10) op) 3) ;; twi
                 (or (= regnum #.(sc+offset-offset arg-count-sc))
                     (= (ldb (byte 5 5) op) 24))) ;; :ne

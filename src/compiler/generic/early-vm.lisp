@@ -92,7 +92,7 @@
 ;;; And it'll be a fixnum on 64-bit targets.
 ;;; The result from querying get-internal-run-time with multiple cores
 ;;; running full tilt will exhaust this faster, but it's still plenty enough.
-(defconstant sb!kernel::internal-time-bits 61)
+(defconstant sb-kernel::internal-time-bits 61)
 
 (defconstant most-positive-exactly-single-float-fixnum
   (min (expt 2 single-float-digits) sb-xc:most-positive-fixnum))

@@ -12,7 +12,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!KERNEL")
+(in-package "SB-KERNEL")
 ;;; FIXME: Perhaps this belongs in the %SYS package like some other
 ;;; cold load stuff.
 

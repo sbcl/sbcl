@@ -765,7 +765,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
                                          sb-vm:n-machine-word-bits)
     (setf (deref (slot fd-set 'fds-bits) word)
           (logand (deref (slot fd-set 'fds-bits) word)
-                  (sb!kernel:word-logical-not
+                  (sb-kernel:word-logical-not
                    (truly-the (unsigned-byte #.sb-vm:n-machine-word-bits)
                               (ash 1 bit)))))))
 
@@ -1110,9 +1110,9 @@ the UNIX epoch (January 1st 1970.)"
         (c-sec 0)
         (c-msec 0)
         (now 0))
-    (declare (type sb!kernel:internal-seconds e-sec c-sec)
-             (type sb!kernel:internal-seconds e-msec c-msec)
-             (type sb!kernel:internal-time now))
+    (declare (type sb-kernel:internal-seconds e-sec c-sec)
+             (type sb-kernel:internal-seconds e-msec c-msec)
+             (type sb-kernel:internal-time now))
     (defun reinit-internal-real-time ()
       (setf (values e-sec e-msec) (system-real-time-values)
             c-sec 0

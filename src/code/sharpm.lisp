@@ -414,7 +414,7 @@
         #'(lambda (decoding-error)
             (declare (ignorable decoding-error))
             (style-warn
-             'sb!kernel::character-decoding-error-in-dispatch-macro-char-comment
+             'sb-kernel::character-decoding-error-in-dispatch-macro-char-comment
              :sub-char sub-char :position (file-position stream) :stream stream)
             (invoke-restart 'attempt-resync))))
     (let ((stream (in-stream-from-designator stream)))

@@ -7,7 +7,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!KERNEL")
+(in-package "SB-KERNEL")
 
 ;;; (Note that when cross-compiling, SB-XC:TYPEP is interpreted as a
 ;;; test that the host Lisp object OBJECT translates to a target SBCL

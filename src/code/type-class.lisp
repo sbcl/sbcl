@@ -14,7 +14,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!KERNEL")
+(in-package "SB-KERNEL")
 
 (!begin-collecting-cold-init-forms)
 
@@ -742,7 +742,7 @@
   (alignment nil :type (or null unsigned-byte)))
 (!set-load-form-method alien-type (:xc :target))
 
-(in-package "SB!KERNEL")
+(in-package "SB-KERNEL")
 (defstruct (alien-type-type
             (:include ctype
                       (class-info (type-class-or-lose 'alien)))

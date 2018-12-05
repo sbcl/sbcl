@@ -2431,7 +2431,7 @@
               ,@(loop for member in (member-type-members type)
                       when (characterp member)
                       collect (char-code member)))))
-          ((sb!kernel::character-set-type-p type)
+          ((sb-kernel::character-set-type-p type)
            (specifier-type
             `(or
               ,@(loop for (low . high)
@@ -2699,10 +2699,10 @@
 ;;; Rightward ASH
 
 ;;; Assert correctness of build order. (Need not be exhaustive)
-#!-(vop-translates sb!kernel:%ash/right)
+#!-(vop-translates sb-kernel:%ash/right)
 (eval-when (:compile-toplevel) #!+x86-64 (error "Expected %ASH/RIGHT vop"))
 
-#!+(vop-translates sb!kernel:%ash/right)
+#!+(vop-translates sb-kernel:%ash/right)
 (progn
   (defun %ash/right (integer amount)
     (ash integer (- amount)))
@@ -3341,7 +3341,7 @@
                `(ash (%multiply-high (logandc2 x ,(1- (ash 1 shift1))) ,m)
                      ,(- (+ shift1 shift2)))))))))
 
-#!-(vop-translates sb!kernel:%multiply-high)
+#!-(vop-translates sb-kernel:%multiply-high)
 (progn
 ;;; Assert correctness of build order. (Need not be exhaustive)
 (eval-when (:compile-toplevel) #!+x86-64 (error "Expected %MULTIPLY-HIGH vop"))
@@ -3699,7 +3699,7 @@
       ((same-leaf-ref-p x y) t)
       ((not (types-equal-or-intersect (lvar-type x) (lvar-type y)))
        nil)
-      #!+(vop-translates sb!kernel:%instance-ref-eq)
+      #!+(vop-translates sb-kernel:%instance-ref-eq)
       ;; Reduce (eq (%instance-ref x i) Y) to 1 instruction
       ;; if possible, but do not defer the memory load unless doing
       ;; so can have no effect, i.e. Y is a constant or provably not

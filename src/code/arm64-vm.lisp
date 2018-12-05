@@ -83,7 +83,7 @@
     (declare (type system-area-pointer pc))
     (if (= trap-number invalid-arg-count-trap)
         (values error-number '(#.arg-count-sc) trap-number)
-        (sb!kernel::decode-internal-error-args (sap+ pc 4) trap-number error-number))))
+        (sb-kernel::decode-internal-error-args (sap+ pc 4) trap-number error-number))))
 ) ; end PROGN
 
 ;;; Undo the effects of XEP-ALLOCATE-FRAME

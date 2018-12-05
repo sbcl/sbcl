@@ -206,7 +206,7 @@
                                                          (length object))))
                ((cons-type-p type)
                 (multiple-value-bind (min exactp)
-                    (sb!kernel::cons-type-length-info type)
+                    (sb-kernel::cons-type-length-info type)
                   (let ((length (length object)))
                     (if exactp
                         (unless (= length min)
@@ -227,7 +227,7 @@
                                                              (length object))))
                    ((cons-type-p type)
                     (multiple-value-bind (min exactp)
-                        (sb!kernel::cons-type-length-info type)
+                        (sb-kernel::cons-type-length-info type)
                       (let ((length (length object)))
                         (if exactp
                             (unless (= length min)

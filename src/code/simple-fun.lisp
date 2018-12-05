@@ -581,7 +581,7 @@
 (flet ((unpack-tlf-num+offset (integer &aux (bytepos 0))
          (flet ((unpack-1 ()
                   (let ((shift 0) (acc 0))
-                    (declare (notinline sb!kernel:%ldb)) ; lp#1573398
+                    (declare (notinline sb-kernel:%ldb)) ; lp#1573398
                     (loop
                      (let ((byte (ldb (byte 8 bytepos) integer)))
                        (incf bytepos 8)

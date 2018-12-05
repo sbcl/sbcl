@@ -470,7 +470,7 @@
   ;; valid value at this code-location. (unexported).
   (%live-set :unparsed :type (or simple-bit-vector (member :unparsed)))
   ;; (unexported) To see SB-C::LOCATION-KIND, do
-  ;; (SB!KERNEL:TYPEXPAND 'SB-C::LOCATION-KIND).
+  ;; (SB-KERNEL:TYPEXPAND 'SB-C::LOCATION-KIND).
   (kind :unparsed :type (or (member :unparsed) sb-c::location-kind))
   (step-info :unparsed :type (or (member :unparsed :foo) simple-string))
   (context :unparsed))
@@ -1389,14 +1389,14 @@ register."
      (bogus-debug-fun-%name debug-fun))))
 
 (defun interrupted-frame-error (frame)
-  (declare (special sb!kernel::*current-internal-error*))
+  (declare (special sb-kernel::*current-internal-error*))
   (when (and (compiled-frame-p frame)
              (compiled-frame-escaped frame)
-             sb!kernel::*current-internal-error*
+             sb-kernel::*current-internal-error*
              (array-in-bounds-p sb-c:+backend-internal-errors+
-                                sb!kernel::*current-internal-error*))
+                                sb-kernel::*current-internal-error*))
     (cadr (svref sb-c:+backend-internal-errors+
-                 sb!kernel::*current-internal-error*))))
+                 sb-kernel::*current-internal-error*))))
 
 (defun all-args-available-p (frame)
   (let ((error (interrupted-frame-error frame))
@@ -2401,7 +2401,7 @@ register."
        (escaped-float-value complex-double-float))
       #!+long-float
       (#.sb-vm:complex-long-reg-sc-number
-       (escaped-float-value sb!kernel::complex-long-float))
+       (escaped-float-value sb-kernel::complex-long-float))
       (#.sb-vm:single-stack-sc-number
        (with-nfp (nfp)
          (sap-ref-single nfp (number-stack-offset))))

@@ -25,7 +25,7 @@
 ;;;; XSET-LIST-SIZE is true only for XSETs whose data is stored into a
 ;;;; list -- XSET-COUNT returns the real value.
 
-(in-package "SB!KERNEL")
+(in-package "SB-KERNEL")
 
 (defstruct (xset (:constructor alloc-xset) (:copier nil) (:predicate nil))
   (list-size 0 :type index)

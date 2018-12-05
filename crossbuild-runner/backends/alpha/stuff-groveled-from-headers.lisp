@@ -144,7 +144,7 @@
           (tv-sec (signed 64))
           (tv-nsec (signed 64))))
 
-(in-package "SB!KERNEL")
+(in-package "SB-KERNEL")
 
 ;;; Our runtime types
 (define-alien-type os-vm-size-t (unsigned 64))

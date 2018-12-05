@@ -271,7 +271,7 @@
   (inst jmp :e undefined)
 
   (inst pop (ea n-word-bytes rbp-tn))
-  (emit-error-break nil error-trap (error-number-or-lose 'sb!kernel::object-not-callable-error)
+  (emit-error-break nil error-trap (error-number-or-lose 'sb-kernel::object-not-callable-error)
                     (list fun)))
 
 

@@ -1165,7 +1165,7 @@ and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
 
 ;;; This calls DEBUG-LOOP, performing some simple initializations
 ;;; before doing so. INVOKE-DEBUGGER calls this to actually get into
-;;; the debugger. SB!KERNEL::ERROR-ERROR calls this in emergencies
+;;; the debugger. SB-KERNEL::ERROR-ERROR calls this in emergencies
 ;;; to get into a debug prompt as quickly as possible with as little
 ;;; risk as possible for stepping on whatever is causing recursive
 ;;; errors.
@@ -1825,7 +1825,7 @@ forms that explicitly control this kind of evaluation.")
         ;; But they may call other code through SATISFIES
         ;; declaration, check that the interrupt is actually in the XEP.
         (and (sb!di::compiled-frame-escaped frame)
-             sb!kernel::*interr-current-bsp*)
+             sb-kernel::*interr-current-bsp*)
         (let* ((compiled-debug-fun (and
                                     (typep debug-fun 'sb!di::compiled-debug-fun)
                                     (sb!di::compiled-debug-fun-compiler-debug-fun debug-fun)))

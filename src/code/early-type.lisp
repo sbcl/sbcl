@@ -7,7 +7,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!KERNEL")
+(in-package "SB-KERNEL")
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; The following macros expand into either constructor calls,

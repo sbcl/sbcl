@@ -11,7 +11,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!KERNEL")
+(in-package "SB-KERNEL")
 
 (define-condition defmacro-lambda-list-bind-error (error)
   ((kind :reader defmacro-lambda-list-bind-error-kind

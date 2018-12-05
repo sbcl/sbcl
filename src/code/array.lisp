@@ -287,7 +287,7 @@
       ;; Do things the hard way after falling through the tagbody.
       (let* ((ctype (type-or-nil-if-unknown type))
              (ctype (and ctype
-                         (sb!kernel::replace-hairy-type ctype))))
+                         (sb-kernel::replace-hairy-type ctype))))
         (typecase ctype
           (null (result simple-vector-widetag))
           (union-type
@@ -1829,7 +1829,7 @@ function to be removed without further warning."
                  (svref ,',table-name ,tag)))
              ,@args))))))
 
-(defun sb!kernel::check-array-shape (array dimensions)
+(defun sb-kernel::check-array-shape (array dimensions)
   (when (let ((dimensions dimensions))
           (dotimes (i (array-rank array))
             (unless (eql (array-dimension array i) (pop dimensions))

@@ -72,7 +72,7 @@
   (setf (sb-xc:macro-function 'sb-xc:defmacro)
         (lambda (form env)
           (declare (ignore env))
-          ;; Since SB!KERNEL:LEXENV isn't compatible with the host,
+          ;; Since SB-KERNEL:LEXENV isn't compatible with the host,
           ;; just pass NIL. The expansion correctly captures a non-null
           ;; environment, but the expander doesn't need it.
           (funcall real-expander form nil)))

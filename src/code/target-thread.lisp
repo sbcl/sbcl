@@ -1578,7 +1578,7 @@ session."
                                   (when *exit-in-process*
                                     (sb-impl::call-exit-hooks))))
                              #!+sb-safepoint
-                             (sb!kernel::gc-safepoint))))
+                             (sb-kernel::gc-safepoint))))
                 ;; we're going down, can't handle interrupts
                 ;; sanely anymore. gc remains enabled.
                 (block-deferrable-signals)

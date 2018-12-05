@@ -45,7 +45,7 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (define-alien-type-translator void ()
-    (parse-alien-type '(values) (sb!kernel:make-null-lexenv))))
+    (parse-alien-type '(values) (sb-kernel:make-null-lexenv))))
 
 
 (defun default-c-string-external-format ()
@@ -70,5 +70,5 @@
                         until (zerop (sap-ref-8 sap offset))
                         finally (return offset))))
       (let ((result (make-string length :element-type 'base-char)))
-        (sb!kernel:copy-ub8-from-system-area sap 0 result 0 length)
+        (sb-kernel:copy-ub8-from-system-area sap 0 result 0 length)
         result))))

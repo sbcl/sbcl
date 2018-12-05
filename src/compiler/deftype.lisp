@@ -20,7 +20,7 @@
        ;; because if they didn't, they wouldn't be constant.
        (declare (sb-c::lambda-list ()))
        (if (cdr whole)
-           (error 'sb!kernel::arg-count-error
+           (error 'sb-kernel::arg-count-error
                   :kind 'deftype :name (car whole) :args (cdr whole)
                   :lambda-list '() :minimum 0 :maximum 0)
            expansion))

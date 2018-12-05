@@ -28,7 +28,7 @@
     (move res cfp-tn)))
 
 (define-vop (read-control-stack)
-  (:translate sb!kernel:stack-ref)
+  (:translate sb-kernel:stack-ref)
   (:policy :fast-safe)
   (:args (sap :scs (sap-reg))
          (offset :scs (any-reg)))
@@ -39,7 +39,7 @@
     (inst ldr result (@ sap offset))))
 
 (define-vop (write-control-stack)
-  (:translate sb!kernel:%set-stack-ref)
+  (:translate sb-kernel:%set-stack-ref)
   (:policy :fast-safe)
   (:args (sap :scs (sap-reg))
          (offset :scs (any-reg))

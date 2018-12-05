@@ -343,7 +343,7 @@ allocated by MAKE-ALIEN, MAKE-ALIEN-STRING or malloc(3)."
                                    :null-terminate null-terminate))
          (count (length octets))
          (buf (%make-alien count)))
-    (sb!kernel:copy-ub8-to-system-area octets 0 buf 0 count)
+    (sb-kernel:copy-ub8-to-system-area octets 0 buf 0 count)
     (values buf count)))
 
 (defun make-alien-string (string &rest rest

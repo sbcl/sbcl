@@ -420,7 +420,7 @@
                                                        (length s2)))))
          (if (cons-type-p type)
              (multiple-value-bind (min exactp)
-                 (sb!kernel::cons-type-length-info type)
+                 (sb-kernel::cons-type-length-info type)
                (let ((length (+ (length s1) (length s2))))
                  (if exactp
                      (unless (= length min)

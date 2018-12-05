@@ -21,7 +21,7 @@
           (element-type 'character)
           (not-null nil))
   (make-alien-c-string-type
-   :to (parse-alien-type 'char (sb!kernel:make-null-lexenv))
+   :to (parse-alien-type 'char (sb-kernel:make-null-lexenv))
    :element-type element-type
    :external-format external-format
    :not-null not-null))
@@ -79,7 +79,7 @@
 
 (declaim (ftype (sfunction (t) nil) null-error))
 (defun null-error (type)
-  #-sb-xc-host(declare (optimize sb!kernel:allow-non-returning-tail-call))
+  #-sb-xc-host(declare (optimize sb-kernel:allow-non-returning-tail-call))
   (aver (alien-c-string-type-not-null type))
   (error 'type-error
          :expected-type `(alien ,(unparse-alien-type type))

@@ -165,7 +165,7 @@
     two-arg-and two-arg-ior two-arg-xor two-arg-eqv
 
     eql
-    sb!kernel:%negate)
+    sb-kernel:%negate)
   #'equalp)
 
 

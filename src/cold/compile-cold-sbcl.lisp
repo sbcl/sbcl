@@ -23,7 +23,7 @@
 (defun code-deletion-note-p (x)
   (eq (type-of x) 'sb!ext:code-deletion-note))
 (setq sb-c::*handled-conditions*
-      `((,(sb!kernel:specifier-type
+      `((,(sb-kernel:specifier-type
            '(or (satisfies unable-to-optimize-note-p)
                 (satisfies code-deletion-note-p)))
          . muffle-warning)))
@@ -114,7 +114,7 @@
 ;; make it think it has, otherwise it fails more-or-less immediately.
 (setf (sb-xc:macro-function 'sb!int:quasiquote)
       (lambda (form env)
-        (the sb!kernel:lexenv-designator env)
+        (the sb-kernel:lexenv-designator env)
         (sb-impl::expand-quasiquote (second form) t)))
 
 (setq sb-c::*track-full-called-fnames* :minimal) ; Change this as desired

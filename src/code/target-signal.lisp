@@ -83,7 +83,7 @@
                                        (:default sig-dfl)
                                        (:ignore sig-ign)
                                        (t
-                                        (sb!kernel:get-lisp-obj-address
+                                        (sb-kernel:get-lisp-obj-address
                                          #'run-handler)))
                                      synchronous)))
         (cond ((= result sig-dfl) :default)
@@ -91,7 +91,7 @@
               (t ;; MAKE-LISP-OBJ returns 2 values, which gets
                  ;; "too complex to check". We don't want the second value.
                (values (the (or function fixnum)
-                         (sb!kernel:make-lisp-obj result)))))))))
+                         (sb-kernel:make-lisp-obj result)))))))))
 
 (defun default-interrupt (signal)
   (enable-interrupt signal :default))
@@ -152,14 +152,14 @@
 ) ; end MACROLET
 
 (defun sigint-handler (signal info
-                       sb!kernel:*current-internal-error-context*)
+                       sb-kernel:*current-internal-error-context*)
   (declare (ignore signal info))
   (flet ((interrupt-it ()
-           ;; SB!KERNEL:*CURRENT-INTERNAL-ERROR-CONTEXT* will
+           ;; SB-KERNEL:*CURRENT-INTERNAL-ERROR-CONTEXT* will
            ;; either be bound in this thread by SIGINT-HANDLER or
            ;; in the target thread by SIGPIPE-HANDLER.
            (with-alien ((context (* os-context-t)
-                                 sb!kernel:*current-internal-error-context*))
+                                 sb-kernel:*current-internal-error-context*))
              (with-interrupts
                (let ((int (make-condition 'interactive-interrupt
                                           :context context
@@ -203,7 +203,7 @@
 ;;; queue. The handler (RUN_INTERRUPTION) just returns if there is
 ;;; nothing to do so it's safe to receive spurious SIGPIPEs coming
 ;;; from the kernel.
-(defun sigpipe-handler (signal code sb!kernel:*current-internal-error-context*)
+(defun sigpipe-handler (signal code sb-kernel:*current-internal-error-context*)
   (declare (ignore signal code))
   (sb!thread::run-interruption))
 
@@ -212,7 +212,7 @@
   (declare (ignore signal code context))
   (sb-impl::get-processes-status-changes))
 
-(defun sb!kernel:signal-cold-init-or-reinit ()
+(defun sb-kernel:signal-cold-init-or-reinit ()
   "Enable all the default signals that Lisp knows how to deal with."
   (enable-interrupt sigint #'sigint-handler)
   (enable-interrupt sigterm #'sigterm-handler)

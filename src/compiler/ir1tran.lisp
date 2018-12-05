@@ -372,7 +372,7 @@
                     (when (emit-make-load-form value)
                       #+sb-xc-host
                       (aver (eql (layout-bitmap (%instance-layout value))
-                                 sb!kernel::+layout-all-tagged+))
+                                 sb-kernel::+layout-all-tagged+))
                       (do-instance-tagged-slot (i value)
                         (grovel (%instance-ref value i)))))
                    (t
@@ -1021,7 +1021,7 @@
                               ;; KLUDGE: packages we're not interested in
                               ;; stepping.
                               (mapcar #'find-package '(sb-c sb!int sb-impl
-                                                       sb!kernel sb!pcl))
+                                                       sb-kernel sb!pcl))
                              t))))))
     (and *allow-instrumenting*
          (policy *lexenv* (= insert-step-conditions 3))

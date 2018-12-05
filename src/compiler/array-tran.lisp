@@ -588,7 +588,7 @@
                  ;; i.e. (LET* ((#:D0 (THE (EQL <n>) dimension0)) ...)
                  ;; but it seems preferable to imply that the initial contents
                  ;; are wrongly shaped rather than that the array is.
-                 `(sb!kernel::check-array-shape ,alloc-form ',data-dims))
+                 `(sb-kernel::check-array-shape ,alloc-form ',data-dims))
                 (t ; could not parse the data
                  `(fill-array ,(car contents) ,alloc-form)))))))
 

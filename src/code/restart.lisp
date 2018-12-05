@@ -7,7 +7,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!KERNEL")
+(in-package "SB-KERNEL")
 
 #!+stack-allocatable-fixed-objects
 (declaim (inline make-restart)) ;; to allow DX-allocation

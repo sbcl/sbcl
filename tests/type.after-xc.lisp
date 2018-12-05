@@ -12,7 +12,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package "SB!KERNEL")
+(in-package "SB-KERNEL")
 
 (/show "beginning tests/type.after-xc.lisp")
 

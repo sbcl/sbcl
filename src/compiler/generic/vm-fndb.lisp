@@ -170,7 +170,7 @@
 (defknown (%array-rank= widetag=) (t t) boolean
   (flushable))
 
-(defknown sb!kernel::check-array-shape (simple-array list)
+(defknown sb-kernel::check-array-shape (simple-array list)
   (simple-array)
   (flushable)
   :result-arg 0)
@@ -205,11 +205,11 @@
 #.`(progn
      ,@(map 'list
             (lambda (rsd)
-              (let* ((reader (sb!kernel::raw-slot-data-accessor-name rsd))
+              (let* ((reader (sb-kernel::raw-slot-data-accessor-name rsd))
                      (name (copy-seq (string reader)))
                      (writer (intern (replace name "-SET/"
                                               :start1 (search "-REF/" name))))
-                     (type (sb!kernel::raw-slot-data-raw-type rsd)))
+                     (type (sb-kernel::raw-slot-data-raw-type rsd)))
                 `(progn
                    (defknown ,reader (instance index) ,type
                      (flushable always-translatable))
@@ -221,7 +221,7 @@
                             (,reader instance index))
                           (defun ,writer (instance index new-value)
                             (,writer instance index new-value))))))
-            sb!kernel::*raw-slot-data*))
+            sb-kernel::*raw-slot-data*))
 
 #!+compare-and-swap-vops
 (defknown %raw-instance-atomic-incf/word (instance index sb-vm:word) sb-vm:word
@@ -420,22 +420,22 @@
             `(progn
               ,@(loop for i = 1 then (* i 2)
                       collect `(defknown ,(intern (format nil "UB~D-BASH-COPY" i)
-                                                  (find-package "SB!KERNEL"))
+                                                  (find-package "SB-KERNEL"))
                                 ((simple-unboxed-array (*)) index (simple-unboxed-array (*)) index index)
                                 (values)
                                 ())
                       collect `(defknown ,(intern (format nil "SYSTEM-AREA-UB~D-COPY" i)
-                                                  (find-package "SB!KERNEL"))
+                                                  (find-package "SB-KERNEL"))
                                 (system-area-pointer index system-area-pointer index index)
                                 (values)
                                 ())
                       collect `(defknown ,(intern (format nil "COPY-UB~D-TO-SYSTEM-AREA" i)
-                                                  (find-package "SB!KERNEL"))
+                                                  (find-package "SB-KERNEL"))
                                 ((simple-unboxed-array (*)) index system-area-pointer index index)
                                 (values)
                                 ())
                       collect `(defknown ,(intern (format nil "COPY-UB~D-FROM-SYSTEM-AREA" i)
-                                                  (find-package "SB!KERNEL"))
+                                                  (find-package "SB-KERNEL"))
                                 (system-area-pointer index (simple-unboxed-array (*)) index index)
                                 (values)
                                 ())

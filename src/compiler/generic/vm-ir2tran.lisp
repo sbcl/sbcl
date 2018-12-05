@@ -107,15 +107,15 @@
                                   name dx-p (+ sb-vm:instance-slots-offset slot) lowtag))
                             ,@(map 'list
                                (lambda (rsd)
-                                 `(,(sb!kernel::raw-slot-data-raw-type rsd)
-                                   (vop ,(sb!kernel::raw-slot-data-init-vop rsd)
+                                 `(,(sb-kernel::raw-slot-data-raw-type rsd)
+                                   (vop ,(sb-kernel::raw-slot-data-init-vop rsd)
                                         node block object arg-tn slot)))
                                (symbol-value rsd-list)))))
                     (make-case #!+(vop-named sb-vm::raw-instance-init/word)
-                               sb!kernel::*raw-slot-data*))))))
+                               sb-kernel::*raw-slot-data*))))))
            (:dd
             (vop init-slot node block object
-                 (emit-constant (sb!kernel::dd-layout-or-lose slot))
+                 (emit-constant (sb-kernel::dd-layout-or-lose slot))
                  name dx-p
                  ;; Layout has no index if compact headers.
                  (or #!+compact-instance-header :layout sb-vm:instance-slots-offset)
@@ -196,7 +196,7 @@
            (words (+ (dd-length c-dd) words)))
       #!+compact-instance-header
       (progn (aver (= type sb-vm:instance-widetag))
-             (emit-constant (setq type (sb!kernel::dd-layout-or-lose c-dd))))
+             (emit-constant (setq type (sb-kernel::dd-layout-or-lose c-dd))))
       (emit-fixed-alloc node block name words type lowtag result lvar)
       (emit-inits node block name result lowtag
                   `(#!-compact-instance-header (:dd . ,c-dd) ,@c-slot-specs) args)

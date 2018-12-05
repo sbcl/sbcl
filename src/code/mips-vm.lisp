@@ -85,5 +85,5 @@
          (offset (if (logbitp 31 cause) 4 0))
          (trap-number (ldb (byte 8 6) (sap-ref-32 pc offset))))
     (declare (type system-area-pointer pc))
-    (sb!kernel::decode-internal-error-args (sap+ pc (+ offset 4)) trap-number)))
+    (sb-kernel::decode-internal-error-args (sap+ pc (+ offset 4)) trap-number)))
 ) ; end PROGN

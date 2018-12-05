@@ -11,7 +11,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!KERNEL")
+(in-package "SB-KERNEL")
 
 ;;; a utility for SIGNAL, ERROR, CERROR, WARN, COMPILER-NOTIFY and
 ;;; INVOKE-DEBUGGER: Parse the hairy argument conventions into a

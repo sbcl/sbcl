@@ -333,7 +333,7 @@
               ;; In an elfinated core, the range that is reserved for
               ;; compilation to memory says it is all associated with
               ;; the symbol "lisp_jit_code" which is not useful.
-              (unless (sb!kernel:immobile-space-addr-p addr)
+              (unless (sb-kernel:immobile-space-addr-p addr)
                 (maybe-note-assembler-routine addr nil dstate))
               ;; Show the absolute address and maybe the contents.
               (note (format nil "[#x~x]~@[ = #x~x~]"

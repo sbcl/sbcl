@@ -899,7 +899,7 @@
       ;; ERROR. To ingrain that knowledge into the CHECK-DS-foo
       ;; functions is a bit of a hack, but to do otherwise
       ;; changes how DS-BIND has to expand.
-      (compiler-error 'sb!kernel::arg-count-error
+      (compiler-error 'sb-kernel::arg-count-error
                       :kind "special operator" :name name
                       :args input :lambda-list lambda-list
                       :minimum min :maximum max))
@@ -914,7 +914,7 @@
              :args input :lambda-list lambda-list
              :minimum min :maximum max))
      (t
-      (error 'sb!kernel::arg-count-error
+      (error 'sb-kernel::arg-count-error
              :kind kind :name name
              :args input :lambda-list lambda-list
              :minimum min :maximum max)))))
@@ -956,7 +956,7 @@
       ;; but COERCE-TO-LIST is an inline function not yet defined, and
       ;; its subsequent definition would signal an inlining failure warning.
       (declare (notinline coerce))
-      (error 'sb!kernel::defmacro-lambda-list-broken-key-list-error
+      (error 'sb-kernel::defmacro-lambda-list-broken-key-list-error
              :kind kind :name name
              :problem problem
              :info (if (eq problem :unknown-keyword)

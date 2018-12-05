@@ -266,7 +266,7 @@
       ((<= nvals 1)
        (note-this-location vop :single-value-return)
        (cond
-         ((<= (sb!kernel:values-type-max-value-count type)
+         ((<= (sb-kernel:values-type-max-value-count type)
               register-arg-count)
           (when (and (named-type-p type)
                      (eq nil (named-type-name type)))
@@ -274,13 +274,13 @@
             ;; ends right here leavig the :SINGLE-VALUE-RETURN note
             ;; dangling. Let's emit a NOP.
             (inst nop)))
-         ((not (sb!kernel:values-type-may-be-single-value-p type))
+         ((not (sb-kernel:values-type-may-be-single-value-p type))
           (inst mov rsp-tn rbx-tn))
          (t
           (inst cmov :c rsp-tn rbx-tn))))
       ((<= nvals register-arg-count)
        (note-this-location vop :unknown-return)
-       (when (sb!kernel:values-type-may-be-single-value-p type)
+       (when (sb-kernel:values-type-may-be-single-value-p type)
          (let ((regs-defaulted (gen-label)))
            (inst jmp :c regs-defaulted)
            ;; Default the unsupplied registers.
@@ -301,7 +301,7 @@
            (inst mov rbx-tn rsp-tn)
            (emit-label regs-defaulted)))
        (when (< register-arg-count
-                (sb!kernel:values-type-max-value-count type))
+                (sb-kernel:values-type-max-value-count type))
          (inst mov rsp-tn rbx-tn)))
       (t
        (collect ((defaults))
@@ -378,7 +378,7 @@
         (stack-values (gen-label))
         (done (gen-label))
         (unused-count-p (eq (tn-kind count) :unused)))
-    (when (sb!kernel:values-type-may-be-single-value-p type)
+    (when (sb-kernel:values-type-may-be-single-value-p type)
       (inst jmp :c variable-values)
       (cond ((location= start (first *register-arg-tns*))
              (inst push (first *register-arg-tns*))
@@ -391,7 +391,7 @@
       (emit-label variable-values))
     ;; The stack frame is burnt and RETurned from if there are no
     ;; stack values. In this case quickly reallocate sufficient space.
-    (when (<= (sb!kernel:values-type-min-value-count type)
+    (when (<= (sb-kernel:values-type-min-value-count type)
               register-arg-count)
       (inst cmp nargs (fixnumize register-arg-count))
       (inst jmp :g stack-values)
@@ -412,7 +412,7 @@
     (loop
       for arg in *register-arg-tns*
       for i downfrom -1
-      for j below (sb!kernel:values-type-max-value-count type)
+      for j below (sb-kernel:values-type-max-value-count type)
       do (storew arg args i))
     (move start args)
     (unless unused-count-p

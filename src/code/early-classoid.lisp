@@ -11,7 +11,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!KERNEL")
+(in-package "SB-KERNEL")
 
 ;;;; DEFSTRUCT-DESCRIPTION
 
@@ -417,7 +417,7 @@
   #+sb-xc-host
   (specifier-type 'function)
   #-sb-xc-host
-  (let* ((fdefn (sb!kernel::find-fdefn name))
+  (let* ((fdefn (sb-kernel::find-fdefn name))
          (fun (and fdefn (fdefn-fun fdefn))))
     (if fun
         (handler-bind ((style-warning #'muffle-warning))

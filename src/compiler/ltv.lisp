@@ -38,7 +38,7 @@
             #+sb-xc-host
             ((cons (eql find-classoid-cell) (cons (cons (eql quote))))
              (aver (eq (getf (cddr form) :create) t))
-             'sb!kernel::classoid-cell))
+             'sb-kernel::classoid-cell))
           (fopcompile form nil t)
           (values (sb!fasl::dump-pop *compile-object*) (specifier-type it)))
          (t

@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!KERNEL")
+(in-package "SB-KERNEL")
 
 (define-condition cross-type-warning (warning)
   ((call :initarg :call :reader cross-type-warning-call)
@@ -299,7 +299,7 @@
                     (warn-and-give-up))))
             ((target-type-is-in '(stream instance sb-impl::string-output-stream
                                   broadcast-stream file-stream))
-             ;; Neither target CL:STREAM nor target SB!KERNEL:INSTANCE
+             ;; Neither target CL:STREAM nor target SB-KERNEL:INSTANCE
              ;; is implemented as a STRUCTURE-OBJECT, so they'll fall
              ;; through the tests above. We don't want to assume too
              ;; much about them here, but at least we know enough

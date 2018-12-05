@@ -11,7 +11,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!KERNEL")
+(in-package "SB-KERNEL")
 
 (!begin-collecting-cold-init-forms)
 
@@ -1104,7 +1104,7 @@ between the ~A definition and the ~A definition"
      #.(loop for x across sb-vm:*specialized-array-element-type-properties*
              unless (member (sb-vm::saetp-specifier x) '(t character base-char nil bit))
              collect
-             ;; I'm not sure if it's an accident that there are distinct SB!KERNEL
+             ;; I'm not sure if it's an accident that there are distinct SB-KERNEL
              ;; versus SB-VM symbols for the specialized arrays. The former are types
              ;; in the language, and the latter are primitive object types,
              ;; but istm they should be designated by the same symbols.

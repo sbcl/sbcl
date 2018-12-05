@@ -129,20 +129,20 @@
 
 (defconstant-eqx +c-callable-fdefns+
   '(sub-gc
-    sb!kernel::post-gc
+    sb-kernel::post-gc
     internal-error
-    sb!kernel::control-stack-exhausted-error
-    sb!kernel::binding-stack-exhausted-error
-    sb!kernel::alien-stack-exhausted-error
-    sb!kernel::heap-exhausted-error
-    sb!kernel::undefined-alien-variable-error
-    sb!kernel::memory-fault-error
-    sb!kernel::unhandled-trap-error
+    sb-kernel::control-stack-exhausted-error
+    sb-kernel::binding-stack-exhausted-error
+    sb-kernel::alien-stack-exhausted-error
+    sb-kernel::heap-exhausted-error
+    sb-kernel::undefined-alien-variable-error
+    sb-kernel::memory-fault-error
+    sb-kernel::unhandled-trap-error
     ;; On these it's called through the internal errors mechanism
     #!-(or arm arm64 x86-64) undefined-alien-fun-error
     sb!di::handle-breakpoint
     sb!di::handle-single-step-trap
-    #!+win32 sb!kernel::handle-win32-exception
+    #!+win32 sb-kernel::handle-win32-exception
     #!+sb-thruption sb!thread::run-interruption
     enter-alien-callback
     #!+sb-thread sb!thread::enter-foreign-callback
@@ -221,7 +221,7 @@
     ;;; However there is no efficiency gain if we have #!+immobile-space.
     #!-immobile-space ,@'(
      ;; arbitrary object that changes after each GC
-     sb!kernel::*gc-epoch*
+     sb-kernel::*gc-epoch*
      ;; Dispatch tables for generic array access
      %%data-vector-reffers%%
      %%data-vector-reffers/check-bounds%%

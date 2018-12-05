@@ -632,7 +632,7 @@
 (defun set-header-data (object data)
   (write-header-data+tag object data (ldb (byte sb-vm:n-widetag-bits 0)
                                           (read-bits-wordindexed object 0)))
-  object) ; return the object itself, like SB!KERNEL:SET-HEADER-DATA
+  object) ; return the object itself, like SB-KERNEL:SET-HEADER-DATA
 
 (defun get-header-data (object)
   (ash (read-bits-wordindexed object 0) (- sb-vm:n-widetag-bits)))
@@ -1061,15 +1061,15 @@ core and return a descriptor to it."
 ;;; in a cold defstruct-description. INDEX is a DSD-INDEX.
 ;;; Return the host's accessor name for the host image of that slot.
 (defun dsd-accessor-from-cold-slots (cold-dd-slots desired-index)
-  (let* ((bits-slot (get-dsd-index defstruct-slot-description sb!kernel::bits))
+  (let* ((bits-slot (get-dsd-index defstruct-slot-description sb-kernel::bits))
          (accessor-fun-name-slot
-          (get-dsd-index defstruct-slot-description sb!kernel::accessor-name)))
+          (get-dsd-index defstruct-slot-description sb-kernel::accessor-name)))
     (do ((list cold-dd-slots (cold-cdr list)))
         ((cold-null list))
       (when (= (ash (descriptor-fixnum
                      (read-wordindexed (cold-car list)
                                        (+ sb-vm:instance-slots-offset bits-slot)))
-                    (- sb!kernel::+dsd-index-shift+))
+                    (- sb-kernel::+dsd-index-shift+))
                desired-index)
         (return
          (warm-symbol
@@ -1079,7 +1079,7 @@ core and return a descriptor to it."
 
 (defun cold-dsd-index (cold-dsd dsd-layout)
   (ash (descriptor-fixnum (read-slot cold-dsd dsd-layout :bits))
-       (- sb!kernel::+dsd-index-shift+)))
+       (- sb-kernel::+dsd-index-shift+)))
 
 (defun cold-dsd-raw-type (cold-dsd dsd-layout)
   (1- (ldb (byte 3 0) (descriptor-fixnum (read-slot cold-dsd dsd-layout :bits)))))
@@ -1179,7 +1179,7 @@ core and return a descriptor to it."
          (values)))
     (when (and (logtest flags +structure-layout-flag+)
                (> (descriptor-fixnum depthoid) 2))
-      (loop with dsd-index = (get-dsd-index sb!kernel::layout sb!kernel::depth2-ancestor)
+      (loop with dsd-index = (get-dsd-index sb-kernel::layout sb-kernel::depth2-ancestor)
             for i from 2 to (min (1- (descriptor-fixnum depthoid)) 4)
             do (write-wordindexed result
                                   (+ sb-vm:instance-slots-offset dsd-index)
@@ -1210,7 +1210,7 @@ core and return a descriptor to it."
        #+nil (format t "~&; PREDICATE-FOR-SPECIALIZER: no classoid for ~S~%"
                      type-name)
        (case type-name
-         (condition 'sb!kernel::!condition-p))))))
+         (condition 'sb-kernel::!condition-p))))))
 
 ;;; Convert SPECIFIER (equivalently OBJ) to its representation as a ctype
 ;;; in the cold core.
@@ -1231,14 +1231,14 @@ core and return a descriptor to it."
        (or *built-in-classoid-nullified-slots*
            (setq *built-in-classoid-nullified-slots*
                  (append (get-exceptional-slots 'ctype)
-                         (list (cons (index 'built-in-classoid 'sb!kernel::subclasses)
+                         (list (cons (index 'built-in-classoid 'sb-kernel::subclasses)
                                      *nil-descriptor*)
                                (cons (index 'built-in-classoid 'layout)
                                      *nil-descriptor*))))))
       (t
        (or *ctype-nullified-slots*
            (setq *ctype-nullified-slots*
-                 (list (cons (index 'ctype 'sb!kernel::class-info)
+                 (list (cons (index 'ctype 'sb-kernel::class-info)
                              *nil-descriptor*))))))))
 
 (defun ctype-to-core (specifier obj)
@@ -1246,7 +1246,7 @@ core and return a descriptor to it."
   (if (classoid-p obj)
       (let* ((cell (cold-find-classoid-cell (classoid-name obj) :create t))
              (cold-classoid
-              (read-slot cell (find-layout 'sb!kernel::classoid-cell) :classoid)))
+              (read-slot cell (find-layout 'sb-kernel::classoid-cell) :classoid)))
         (unless (cold-null cold-classoid)
           (return-from ctype-to-core cold-classoid)))
       ;; CTYPEs can't be TYPE=-hashed, but specifiers can be EQUAL-hashed.
@@ -1263,16 +1263,16 @@ core and return a descriptor to it."
                    (ctype (ctype-to-core (type-specifier obj) obj))))
                (get-exceptional-slots (type-of obj)))))
     (let ((type-class-vector
-           (cold-symbol-value 'sb!kernel::*type-classes*))
-          (index (position (sb!kernel::type-class-info obj)
-                           sb!kernel::*type-classes*)))
+           (cold-symbol-value 'sb-kernel::*type-classes*))
+          (index (position (sb-kernel::type-class-info obj)
+                           sb-kernel::*type-classes*)))
       ;; Push this instance into the list of fixups for its type class
       (cold-svset type-class-vector index
                   (cold-cons result (cold-svref type-class-vector index))))
     (if (classoid-p obj)
         ;; Place this classoid into its clasoid-cell.
         (let ((cell (cold-find-classoid-cell (classoid-name obj) :create t)))
-          (write-slots cell (find-layout 'sb!kernel::classoid-cell)
+          (write-slots cell (find-layout 'sb-kernel::classoid-cell)
                        :classoid result))
         ;; Otherwise put it in the general cache
         (setf (gethash specifier *ctype-cache*) result))
@@ -1285,7 +1285,7 @@ core and return a descriptor to it."
          (result (allocate-struct *dynamic* target-layout))
          (cold-dd-slots (dd-slots-from-core host-type)))
     (aver (eql (layout-bitmap (find-layout host-type))
-               sb!kernel::+layout-all-tagged+))
+               sb-kernel::+layout-all-tagged+))
     ;; Dump the slots.
     (do ((len (cold-layout-length target-layout))
          (index sb-vm:instance-data-start (1+ index)))
@@ -1316,7 +1316,7 @@ core and return a descriptor to it."
   ;; This assertion is due to the fact that MAKE-COLD-LAYOUT does not
   ;; know how to set any raw slots.
   (aver (eql (layout-bitmap *host-layout-of-layout*)
-             sb!kernel::+layout-all-tagged+))
+             sb-kernel::+layout-all-tagged+))
   (setq *layout-layout* (make-fixnum-descriptor 0))
   (flet ((chill-layout (name &rest inherits)
            ;; Check that the number of specified INHERITS matches
@@ -1336,7 +1336,7 @@ core and return a descriptor to it."
       (dolist (layout (list t-layout s-o-layout *layout-layout*))
         (set-instance-layout layout *layout-layout*))
       (chill-layout 'function t-layout)
-      (chill-layout 'sb!kernel::classoid-cell t-layout s-o-layout)
+      (chill-layout 'sb-kernel::classoid-cell t-layout s-o-layout)
       (chill-layout 'package t-layout s-o-layout)
       (let* ((sequence (chill-layout 'sequence t-layout))
              (list     (chill-layout 'list t-layout sequence))
@@ -1361,8 +1361,8 @@ core and return a descriptor to it."
 (defun cold-find-classoid-cell (name &key create)
   (aver (eq create t))
   (or (gethash name *classoid-cells*)
-      (let ((layout (gethash 'sb!kernel::classoid-cell *cold-layouts*))
-            (host-layout (find-layout 'sb!kernel::classoid-cell)))
+      (let ((layout (gethash 'sb-kernel::classoid-cell *cold-layouts*))
+            (host-layout (find-layout 'sb-kernel::classoid-cell)))
         (setf (gethash name *classoid-cells*)
               (write-slots (allocate-struct *dynamic* layout
                                             (layout-length host-layout))
@@ -1467,7 +1467,7 @@ core and return a descriptor to it."
 ;;; Make sure that the symbol has an appropriate package. In
 ;;; particular, catch the so-easy-to-make error of typing something
 ;;; like SB-KERNEL:%BYTE-BLT in cold sources when what you really
-;;; need is SB!KERNEL:%BYTE-BLT.
+;;; need is SB-KERNEL:%BYTE-BLT.
 (defun package-ok-for-target-symbol-p (package)
   (let ((package-name (package-name package)))
     (or
@@ -1742,7 +1742,7 @@ core and return a descriptor to it."
                      (sort-cold-layouts))))
 
   #!+sb-thread
-  (let ((bindings sb!kernel::*!thread-initial-bindings*))
+  (let ((bindings sb-kernel::*!thread-initial-bindings*))
     ;; Assign the initialization vector for create_thread_struct()
     (cold-set 'sb!thread::*thread-initial-bindings*
               (vector-in-core
@@ -2004,7 +2004,7 @@ core and return a descriptor to it."
 
 (defun attach-classoid-cells-to-symbols (hashtable)
   (let ((num (sb-c::meta-info-number (sb-c::meta-info :type :classoid-cell)))
-        (layout (gethash 'sb!kernel::classoid-cell *cold-layouts*)))
+        (layout (gethash 'sb-kernel::classoid-cell *cold-layouts*)))
     (when (plusp (hash-table-count *classoid-cells*))
       (aver layout))
     ;; Iteration order is immaterial. The symbols will get sorted later.
@@ -2377,7 +2377,7 @@ core and return a descriptor to it."
     ;; Raw slots can not possibly work because dump-struct uses
     ;; %RAW-INSTANCE-REF/WORD which does not exist in the cross-compiler.
     ;; Remove this assertion if that problem is somehow circumvented.
-    (unless (eql bitmap sb!kernel::+layout-all-tagged+)
+    (unless (eql bitmap sb-kernel::+layout-all-tagged+)
       (error "Raw slots not working in genesis."))
     (loop for index downfrom (1- size) to sb-vm:instance-data-start
           for val = (pop-stack) then (pop-stack)
@@ -2663,7 +2663,7 @@ core and return a descriptor to it."
           (case fun
             (sb-impl::%defun (apply #'cold-fset args))
             (sb!pcl::!trivial-defmethod (apply #'cold-defmethod args))
-            (sb!kernel::%defstruct
+            (sb-kernel::%defstruct
              (push args *known-structure-classoids*)
              (push (apply #'cold-list (cold-intern 'defstruct) args)
                    *!cold-toplevels*))
@@ -3170,7 +3170,7 @@ core and return a descriptor to it."
 (defun write-errnames-h (stream)
   ;; C code needs strings for describe_internal_error()
   (format stream "#define INTERNAL_ERROR_NAMES ~{\\~%~S~^, ~}~2%"
-          (map 'list 'sb!kernel::!c-stringify-internal-error
+          (map 'list 'sb-kernel::!c-stringify-internal-error
                sb-c:+backend-internal-errors+))
   (format stream "#define INTERNAL_ERROR_NARGS {~{~S~^, ~}}~2%"
           (map 'list #'cddr sb-c:+backend-internal-errors+)))
@@ -3737,9 +3737,9 @@ III. initially undefined function references (alphabetically):
                (sb-cold:read-from-file "common-lisp-exports.lisp-expr"))
         (cold-intern (intern exported-name *cl-package*) :access :external))
 
-      ;; Create SB!KERNEL::*TYPE-CLASSES* as an array of NIL
-      (cold-set (cold-intern 'sb!kernel::*type-classes*)
-                (vector-in-core (make-list (length sb!kernel::*type-classes*))))
+      ;; Create SB-KERNEL::*TYPE-CLASSES* as an array of NIL
+      (cold-set (cold-intern 'sb-kernel::*type-classes*)
+                (vector-in-core (make-list (length sb-kernel::*type-classes*))))
 
       ;; Cold load.
       (dolist (file-name object-file-names)

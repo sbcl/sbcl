@@ -43,7 +43,7 @@
 
 ;;; ANSI defines that program syntax errors should be of type
 ;;; PROGRAM-ERROR.  Therefore...
-(define-condition arg-count-program-error (sb!kernel::arg-count-error
+(define-condition arg-count-program-error (sb-kernel::arg-count-error
                                            program-error)
   ())
 

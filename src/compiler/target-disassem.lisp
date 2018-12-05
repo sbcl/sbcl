@@ -2187,7 +2187,7 @@
                              (t
                               (incf index)
                               (sap-ref-8 sap offset))))
-         (length (sb!kernel::error-length error-number)))
+         (length (sb-kernel::error-length error-number)))
     (declare (type system-area-pointer sap)
              (type (unsigned-byte 8) length))
     (cond (length-only

@@ -98,7 +98,7 @@
 
 (declaim (type list cl:/ cl:// cl:/// cl:*features* cl:*modules*))
 
-(declaim (type sb!kernel:type-specifier cl:*break-on-signals*))
+(declaim (type sb-kernel:type-specifier cl:*break-on-signals*))
 
 (declaim (type package cl:*package*))
 

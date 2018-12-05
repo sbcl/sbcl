@@ -41,7 +41,7 @@
 ;; compiler/main and code/deftypes-for-target.
 
 ;; This is 8 words: header, layout, trampoline, fin-fun, info[4]
-(sb!kernel::!defstruct-with-alternate-metaclass
+(sb-kernel::!defstruct-with-alternate-metaclass
  interpreted-function
  :slot-names (%proto-fn env frame cookie)
  :constructor %make-interpreted-function

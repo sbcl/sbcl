@@ -582,7 +582,7 @@
 ;;; issues) even for byte moves. In SBCL, we're converting to byte
 ;;; moves as problems are discovered with the old code, and this is
 ;;; currently (ca. sbcl-0.6.12.30) the main interface for code in
-;;; SB!KERNEL and SB!SYS (e.g. i/o code). It's not clear that it's the
+;;; SB-KERNEL and SB!SYS (e.g. i/o code). It's not clear that it's the
 ;;; ideal interface, though, and it probably deserves some thought.
 (deftransform %byte-blt ((src src-start dst dst-start dst-end)
                          ((or (simple-unboxed-array (*)) system-area-pointer)

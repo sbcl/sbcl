@@ -341,7 +341,7 @@
              (compiler-notify "can't open-code test of unknown type ~S"
                               (type-specifier type)))
            `(let ((object ,object)
-                  (cache (load-time-value (cons #'sb!kernel::cached-typep ',spec)
+                  (cache (load-time-value (cons #'sb-kernel::cached-typep ',spec)
                                           t)))
               (truly-the (values t &optional)
                          (funcall (truly-the function (car (truly-the cons cache)))
@@ -502,7 +502,7 @@
           ((group-vector-length-type-tests object types))
           (t
            (multiple-value-bind (widetags more-types)
-               (sb!kernel::widetags-from-union-type types)
+               (sb-kernel::widetags-from-union-type types)
              (if widetags
                  `(or (%other-pointer-subtype-p ,object ',widetags)
                       (typep ,object '(or ,@(mapcar #'type-specifier more-types))))
@@ -898,9 +898,9 @@
                       ;; object with an invalid layout to a structure
                       ;; type test.
                       ,(let ((ancestor-slot (case depthoid
-                                             (2 'sb!kernel::layout-depth2-ancestor)
-                                             (3 'sb!kernel::layout-depth3-ancestor)
-                                             (4 'sb!kernel::layout-depth4-ancestor))))
+                                             (2 'sb-kernel::layout-depth2-ancestor)
+                                             (3 'sb-kernel::layout-depth3-ancestor)
+                                             (4 'sb-kernel::layout-depth4-ancestor))))
                          (if ancestor-slot
                              (if abstract-base-p
                                  `(or (eq (,ancestor-slot ,n-layout) ,layout)
@@ -975,7 +975,7 @@
                                       :test #'type=))))
                 (when pred `(not (,pred ,object)))))
            #+sb-xc-host
-           (sb!kernel::cross-type-warning
+           (sb-kernel::cross-type-warning
              nil))
          (typecase ctype
            (hairy-type
@@ -1060,7 +1060,7 @@
                    dimensions-removed)
                (dolist (type types)
                  (unless (or (hairy-type-p type)
-                             (sb!kernel::negation-type-p type))
+                             (sb-kernel::negation-type-p type))
                    (multiple-value-bind (type et upgraded dimensions) (simplify type)
                      (push type array-types)
                      (push et element-types)

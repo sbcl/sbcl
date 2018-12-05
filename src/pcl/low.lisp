@@ -64,7 +64,7 @@
            (setf ,drops (random-fixnum)
                  ,drop-pos sb-vm:n-positive-fixnum-bits))))))
 
-(import 'sb!kernel:funcallable-instance-p) ; why?
+(import 'sb-kernel:funcallable-instance-p) ; why?
 
 (defun set-funcallable-instance-function (fin new-value)
   (declare (type function new-value)

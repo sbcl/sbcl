@@ -152,11 +152,11 @@
 ;;; when given a signaling NaN.
 (deftransform float-sign ((float &optional float2)
                           (single-float &optional single-float) *)
-  #!+(vop-translates sb!kernel:single-float-copysign)
+  #!+(vop-translates sb-kernel:single-float-copysign)
   (if float2
       `(single-float-copysign float float2)
       `(single-float-sign float))
-  #!-(vop-translates sb!kernel:single-float-copysign)
+  #!-(vop-translates sb-kernel:single-float-copysign)
   (if float2
       (let ((temp (gensym)))
         `(let ((,temp (abs float2)))

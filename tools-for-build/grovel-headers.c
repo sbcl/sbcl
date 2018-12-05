@@ -372,7 +372,7 @@ main(int argc, char __attribute__((unused)) *argv[])
     printf("\n");
 #endif
 
-    printf("(in-package \"SB!KERNEL\")\n\n");
+    printf("(in-package \"SB-KERNEL\")\n\n");
 #ifdef LISP_FEATURE_GENCGC
     printf(";;; GENCGC related\n");
     DEFTYPE("page-index-t", page_index_t);

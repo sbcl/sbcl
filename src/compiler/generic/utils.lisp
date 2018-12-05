@@ -161,7 +161,7 @@
 #!+sb-safepoint
 (define-vop (insert-safepoint)
   (:policy :fast-safe)
-  (:translate sb!kernel::gc-safepoint)
+  (:translate sb-kernel::gc-safepoint)
   (:generator 0
     (emit-safepoint)))
 

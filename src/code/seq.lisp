@@ -179,7 +179,7 @@
                        ,other-form))
                     (t
                      (sb-c::%type-check-error/c
-                      ,sequence 'sb!kernel::object-not-sequence-error nil)))))))
+                      ,sequence 'sb-kernel::object-not-sequence-error nil)))))))
 
 ;;; Like SEQ-DISPATCH-CHECKING, but also assert that OTHER-FORM produces
 ;;; a sequence. This assumes that the containing function declares its
@@ -417,7 +417,7 @@
                   (sequence-type-length-mismatch-error type length)))
              ((cons-type-p type)
               (multiple-value-bind (min exactp)
-                  (sb!kernel::cons-type-length-info type)
+                  (sb-kernel::cons-type-length-info type)
                 (if exactp
                     (unless (= length min)
                       (sequence-type-length-mismatch-error type length))
@@ -1075,7 +1075,7 @@ many elements are copied."
                '())
               ((cons-type-p type)
                (multiple-value-bind (min exactp)
-                   (sb!kernel::cons-type-length-info type)
+                   (sb-kernel::cons-type-length-info type)
                  (let ((length (reduce #'+ sequences :key #'length)))
                    (if exactp
                        (unless (= length min)

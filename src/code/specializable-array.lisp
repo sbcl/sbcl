@@ -7,7 +7,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!KERNEL")
+(in-package "SB-KERNEL")
 
 ;;; ANSI doesn't guarantee the existence of specialized vectors
 ;;; other than T, BIT, CHARACTER.

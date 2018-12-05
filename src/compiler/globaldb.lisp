@@ -292,7 +292,7 @@
   :type-spec (or null deprecation-info))
 
 (declaim (ftype (sfunction (t) ctype)
-                specifier-type ctype-of sb!kernel::ctype-of-array))
+                specifier-type ctype-of sb-kernel::ctype-of-array))
 
 ;;; the ASSUMED-TYPE for this function, if we have to infer the type
 ;;; due to not having a declaration or definition

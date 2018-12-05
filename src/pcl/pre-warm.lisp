@@ -95,7 +95,7 @@
 #+sb-xc-host
 (flet ((create-fake-classoid (name fun-p)
          (let* ((classoid (make-standard-classoid :name name))
-                (cell (sb!kernel::make-classoid-cell name classoid))
+                (cell (sb-kernel::make-classoid-cell name classoid))
                 (layout
                  (make-layout
                   :classoid classoid

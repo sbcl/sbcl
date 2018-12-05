@@ -1624,7 +1624,7 @@
 (defknown sb-impl::%failed-aver (t) nil)
 (defknown bug (t &rest t) nil) ; never returns
 (defknown simple-reader-error (stream string &rest t) nil)
-(defknown sb!kernel:reader-eof-error (stream string) nil)
+(defknown sb-kernel:reader-eof-error (stream string) nil)
 
 
 ;;;; from the "Miscellaneous" Chapter:
@@ -2008,7 +2008,7 @@
 ;;; and if such a definition were needed, it would not need to "call"
 ;;; itself inline, but could be a no-op, because the compiler inserts a
 ;;; use of the VOP in the function prologue anyway.
-(defknown sb!kernel::gc-safepoint () (values) ())
+(defknown sb-kernel::gc-safepoint () (values) ())
 
 ;;;; atomic ops
 (defknown %compare-and-swap-svref (simple-vector index t t) t

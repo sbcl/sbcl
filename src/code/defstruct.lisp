@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!KERNEL")
+(in-package "SB-KERNEL")
 
 (/show0 "code/defstruct.lisp 15")
 
@@ -399,7 +399,7 @@
   (multiple-value-bind (forms name)
       (!expander-for-defstruct
        (etypecase env
-         (sb!kernel:lexenv (sb-c::null-lexenv-p env))
+         (sb-kernel:lexenv (sb-c::null-lexenv-p env))
          ;; a LOCALLY environment would be fine,
          ;; but is not an important case to handle.
          #!+sb-fasteval (sb!interpreter:basic-env nil)

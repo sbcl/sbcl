@@ -300,7 +300,7 @@
   (etypecase y
     (ctype
        (awhen (lambda-var-ctype-constraints x)
-         (dolist (con (gethash (sb!kernel::type-class-info y) it) nil)
+         (dolist (con (gethash (sb-kernel::type-class-info y) it) nil)
            (when (and (eq (constraint-kind con) kind)
                       (eq (constraint-not-p con) not-p)
                       (type= (constraint-y con) y))
@@ -345,7 +345,7 @@
       (ctype
        (let ((index (ensure-hash (lambda-var-ctype-constraints x)))
              (vec   (ensure-vec  (lambda-var-inheritable-constraints x))))
-         (push con (gethash (sb!kernel::type-class-info y) index))
+         (push con (gethash (sb-kernel::type-class-info y) index))
          (vector-push-extend con vec)))
       (lvar
        (let ((index (ensure-hash (lambda-var-eq-constraints x))))
@@ -979,7 +979,7 @@
                      (eq sb!pcl::**boot-state** 'sb!pcl::complete)
                      (block nil
                        (let ((standard-object (find-classoid 'standard-object)))
-                         (sb!kernel::map-type
+                         (sb-kernel::map-type
                           (lambda (type)
                             (when (and (classoid-p type)
                                        (csubtypep type standard-object))

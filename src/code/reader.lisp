@@ -794,7 +794,7 @@ standard Lisp readtable when NIL."
         #'(lambda (decoding-error)
             (declare (ignorable decoding-error))
             (style-warn
-             'sb!kernel::character-decoding-error-in-macro-char-comment
+             'sb-kernel::character-decoding-error-in-macro-char-comment
              :position (file-position stream) :stream stream)
             (invoke-restart 'attempt-resync))))
     (let ((stream (in-stream-from-designator stream)))

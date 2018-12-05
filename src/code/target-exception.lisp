@@ -55,7 +55,7 @@
      (cons +exception-flt-denormal-operand+  'floating-point-exception)
      (cons +exception-flt-stack-check+       'floating-point-exception)
      ;; Stack overflow
-     (cons +exception-stack-overflow+        'sb!kernel::control-stack-exhausted)
+     (cons +exception-stack-overflow+        'sb-kernel::control-stack-exhausted)
      ;; Various
      (cons-name +exception-single-step+)
      (cons +exception-access-violation+ 'memory-fault-error)
@@ -95,11 +95,11 @@
 ;;; Actual exception handler. We hit something the runtime doesn't
 ;;; want to or know how to deal with (that is, not a sigtrap or gc wp
 ;;; violation), so it calls us here.
-(defun sb!kernel:handle-win32-exception (context-sap exception-record-sap)
+(defun sb-kernel:handle-win32-exception (context-sap exception-record-sap)
   (let* ((record (deref (sap-alien exception-record-sap (* (struct exception-record)))))
          (code (slot record 'exception-code))
          (condition-name (cdr (assoc code *exception-code-map*)))
-         (sb!debug:*stack-top-hint* (sb!kernel:find-interrupted-frame)))
+         (sb!debug:*stack-top-hint* (sb-kernel:find-interrupted-frame)))
     (cond ((stringp condition-name)
            (error condition-name))
           ((and condition-name
@@ -124,7 +124,7 @@
 
 (in-package "SB!UNIX")
 
-(defun sb!kernel:signal-cold-init-or-reinit ()
+(defun sb-kernel:signal-cold-init-or-reinit ()
   "Enable all the default signals that Lisp knows how to deal with."
   (unblock-deferrable-signals)
   (values))

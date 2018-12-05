@@ -194,7 +194,7 @@
   (declare (optimize (speed 3) (safety 0)))
   #!+(and compact-instance-header x86-64)
   (values (%primitive layout-of x
-                      (load-time-value sb!kernel::**built-in-class-codes** t)))
+                      (load-time-value sb-kernel::**built-in-class-codes** t)))
   #!-(and compact-instance-header x86-64)
   (cond ((%instancep x) (%instance-layout x))
         ((funcallable-instance-p x) (%funcallable-instance-layout x))
@@ -204,7 +204,7 @@
         (t
          ;; Note that WIDETAG-OF is slightly suboptimal here and could be
          ;; improved - we've already ruled out some of the lowtags.
-         (svref (load-time-value sb!kernel::**built-in-class-codes** t)
+         (svref (load-time-value sb-kernel::**built-in-class-codes** t)
                 (widetag-of x)))))
 
 (declaim (inline classoid-of))
@@ -249,8 +249,8 @@
            ((eq (symbol-package object) *keyword-package*) 'keyword)
            (t 'symbol)))
     ((or array complex #!+sb-simd-pack simd-pack)
-     (let ((sb!kernel::*unparse-allow-negation* nil))
-       (declare (special sb!kernel::*unparse-allow-negation*)) ; forward ref
+     (let ((sb-kernel::*unparse-allow-negation* nil))
+       (declare (special sb-kernel::*unparse-allow-negation*)) ; forward ref
        (type-specifier (ctype-of object))))
     (t
      (let* ((classoid (classoid-of object))
@@ -411,7 +411,7 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
                   `(let ((x-el (%instance-ref x i))
                          (y-el (%instance-ref y i)))
                      (or (eq x-el y-el) (equalp x-el y-el)))))
-         (if (eql (layout-bitmap layout-x) sb!kernel::+layout-all-tagged+)
+         (if (eql (layout-bitmap layout-x) sb-kernel::+layout-all-tagged+)
              (loop for i of-type index from sb-vm:instance-data-start
                    below (layout-length layout-x)
                    always (slot-ref-equalp))

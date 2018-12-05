@@ -14,7 +14,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!KERNEL")
+(in-package "SB-KERNEL")
 
 (/show0 "late-type.lisp 19")
 
@@ -3427,7 +3427,7 @@ used for a COMPLEX component.~:@>"
                      (mapcar (lambda (x) (specifier-type-r context x))
                              type-specifiers))))
     (if (union-type-p type)
-        (sb!kernel::simplify-array-unions type)
+        (sb-kernel::simplify-array-unions type)
         type)))
 
 ;;;; CONS types

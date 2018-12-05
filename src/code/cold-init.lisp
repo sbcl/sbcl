@@ -108,7 +108,7 @@
   ;; Ensure that *CURRENT-THREAD* and *HANDLER-CLUSTERS* have sane values.
   ;; create_thread_struct() assigned NIL/unbound-marker respectively.
   (sb!thread::init-initial-thread)
-  (show-and-call sb!kernel::!target-error-cold-init)
+  (show-and-call sb-kernel::!target-error-cold-init)
 
   ;; Putting data in a synchronized hashtable (*PACKAGE-NAMES*)
   ;; requires that the main thread be properly initialized.
@@ -127,7 +127,7 @@
 
   ;; *RAW-SLOT-DATA* is essentially a compile-time constant
   ;; but isn't dumpable as such because it has functions in it.
-  (show-and-call sb!kernel::!raw-slot-data-init)
+  (show-and-call sb-kernel::!raw-slot-data-init)
 
   ;; Must be done before any non-opencoded array references are made.
   (show-and-call sb-vm::!hairy-data-vector-reffer-init)
@@ -148,7 +148,7 @@
   ;; named function requires consing immobile space code.
   #!+immobile-code (setq sb-vm::*immobile-space-mutex*
                          (sb!thread:make-mutex :name "Immobile space"))
-  (!with-init-wrappers (show-and-call sb!kernel::!primordial-type-cold-init))
+  (!with-init-wrappers (show-and-call sb-kernel::!primordial-type-cold-init))
   (show-and-call !world-lock-cold-init)
   (show-and-call !classes-cold-init)
   (show-and-call !early-type-cold-init)
@@ -165,7 +165,7 @@
   ;; Must be done before toplevel forms are invoked
   ;; because a toplevel defstruct will need to add itself
   ;; to the subclasses of STRUCTURE-OBJECT.
-  (show-and-call sb!kernel::!set-up-structure-object-class)
+  (show-and-call sb-kernel::!set-up-structure-object-class)
 
   (dolist (x *!cold-defconstants*)
     (destructuring-bind (name source-loc &optional docstring) x
@@ -205,7 +205,7 @@
            (aver (eq (code-header-ref object index) (make-unbound-marker)))
            (setf (code-header-ref object index) (svref *!load-time-values* value))))
         ((cons (eql defstruct))
-         (apply 'sb!kernel::%defstruct (cdr toplevel-thing)))
+         (apply 'sb-kernel::%defstruct (cdr toplevel-thing)))
         (t
          (!cold-lose "bogus operation in *!COLD-TOPLEVELS*")))))
   (/show0 "done with loop over cold toplevel forms and fixups")
@@ -272,7 +272,7 @@
   (setq *print-level* nil *print-length* nil) ; restore defaults
 
   ;; Enable normal (post-cold-init) behavior of INFINITE-ERROR-PROTECT.
-  (setf sb!kernel::*maximum-error-depth* 10)
+  (setf sb-kernel::*maximum-error-depth* 10)
   (/show0 "enabling internal errors")
   (setf (extern-alien "internal_errors_enabled" int) 1)
 

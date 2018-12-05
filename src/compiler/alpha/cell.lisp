@@ -307,7 +307,7 @@
   ;; would probably be nice to restore GENGC support so that the Alpha
   ;; doesn't have to crawl along with stop'n'copy. When we do, the CMU
   ;; CL code below will need updating to the SBCL way of looking at
-  ;; things, e.g. at least using "SB-KERNEL" or "SB!KERNEL" instead of
+  ;; things, e.g. at least using "SB-KERNEL" or "SB-KERNEL" instead of
   ;; :KERNEL. -- WHN 2001-05-08
   (error "This code is stale as of sbcl-0.6.12."))
 

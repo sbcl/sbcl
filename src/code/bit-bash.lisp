@@ -161,17 +161,17 @@
          (max-word-offset (ceiling max-bytes bytes-per-word))
          (word-offset `(integer 0 ,max-word-offset))
          (fix-sap-and-offset-name (intern (format nil "FIX-SAP-AND-OFFSET-UB~D" bitsize)))
-         (constant-bash-name (intern (format nil "CONSTANT-UB~D-BASH" bitsize) (find-package "SB!KERNEL")))
-         (array-fill-name (intern (format nil "UB~D-BASH-FILL" bitsize) (find-package "SB!KERNEL")))
-         (system-area-fill-name (intern (format nil "SYSTEM-AREA-UB~D-FILL" bitsize) (find-package "SB!KERNEL")))
-         (unary-bash-name (intern (format nil "UNARY-UB~D-BASH" bitsize) (find-package "SB!KERNEL")))
-         (array-copy-name (intern (format nil "UB~D-BASH-COPY" bitsize) (find-package "SB!KERNEL")))
-         (system-area-copy-name (intern (format nil "SYSTEM-AREA-UB~D-COPY" bitsize) (find-package "SB!KERNEL")))
+         (constant-bash-name (intern (format nil "CONSTANT-UB~D-BASH" bitsize) (find-package "SB-KERNEL")))
+         (array-fill-name (intern (format nil "UB~D-BASH-FILL" bitsize) (find-package "SB-KERNEL")))
+         (system-area-fill-name (intern (format nil "SYSTEM-AREA-UB~D-FILL" bitsize) (find-package "SB-KERNEL")))
+         (unary-bash-name (intern (format nil "UNARY-UB~D-BASH" bitsize) (find-package "SB-KERNEL")))
+         (array-copy-name (intern (format nil "UB~D-BASH-COPY" bitsize) (find-package "SB-KERNEL")))
+         (system-area-copy-name (intern (format nil "SYSTEM-AREA-UB~D-COPY" bitsize) (find-package "SB-KERNEL")))
          (array-copy-to-system-area-name
-          (intern (format nil "COPY-UB~D-TO-SYSTEM-AREA" bitsize) (find-package "SB!KERNEL")))
+          (intern (format nil "COPY-UB~D-TO-SYSTEM-AREA" bitsize) (find-package "SB-KERNEL")))
          (system-area-copy-to-array-name
           (intern (format nil "COPY-UB~D-FROM-SYSTEM-AREA" bitsize)
-                  (find-package "SB!KERNEL"))))
+                  (find-package "SB-KERNEL"))))
     `(progn
       (declaim (inline ,constant-bash-name ,unary-bash-name))
       ;; Fill DST with VALUE starting at DST-OFFSET and continuing

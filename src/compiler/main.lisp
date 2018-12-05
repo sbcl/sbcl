@@ -2068,7 +2068,7 @@ SPEED and COMPILATION-SPEED optimization values, and the
                    (fasl-note-handle-for-constant
                     constant
                     (cond ((typep creation-form
-                                  '(cons (eql sb!kernel::new-instance)
+                                  '(cons (eql sb-kernel::new-instance)
                                          (cons symbol null)))
                            (dump-object (cadr creation-form) fasl)
                            (dump-fop 'sb!fasl::fop-allocate-instance fasl)

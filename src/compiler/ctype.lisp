@@ -218,7 +218,7 @@
                                             (dsd-type slot)))
                           ;; Find uses of nil-returning functions as defaults,
                           ;; like ERROR and MISSING-ARG.
-                          (and (sb!kernel::dd-null-lexenv-p dd)
+                          (and (sb-kernel::dd-null-lexenv-p dd)
                                (listp initform)
                                (let ((f (car initform)))
                                  ;; Don't examine :function :type of macros!

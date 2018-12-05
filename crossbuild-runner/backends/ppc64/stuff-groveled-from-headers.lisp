@@ -147,7 +147,7 @@
           (tv-sec (signed 64))
           (tv-nsec (signed 64))))
 
-(in-package "SB!KERNEL")
+(in-package "SB-KERNEL")
 
 ;;; GENCGC related
 (define-alien-type page-index-t (signed 64))
