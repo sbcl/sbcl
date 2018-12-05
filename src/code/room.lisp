@@ -540,7 +540,31 @@ We could try a few things to mitigate this:
                                     ,extra))))))
                  (map-objects-in-range fun start (range-end page-bytes-used)
                                        (< page-index initial-next-free-page))
-                 (setf start (range-end gencgc-card-bytes) span 0)))))))))
+                 ;; In a certain rare situation, we must restart the next loop iteration
+                 ;; at exactly PAGE-INDEX instead of 1+ PAGE-INDEX.
+                 ;; Normally the contents of PAGE-INDEX are always included in the
+                 ;; current range. But what if it contributed 0 bytes to the range?
+                 ;;
+                 ;;     N : #x8000 bytes used
+                 ;;   N+1 : #x0100 bytes used
+                 ;;   N+2 : 0 bytes used        <- PAGE-INDEX now points here
+                 ;;   N+3 : initially 0 bytes, then gets some bytes
+                 ;;
+                 ;; We invoked the map function with page_address(N) for #x8100 bytes.
+                 ;; Suppose that function consed a partly unboxed object starting on
+                 ;; page N+2 extending to page N+3, and that NEXT-FREE-PAGE was greater
+                 ;; than both to begin with, so the termination condition isn't in play.
+                 ;; In the best case scenario, resuming the scan at page N+3 (mid-object)
+                 ;; would read valid widetags, but in the worst case scenario, we get
+                 ;; random bits. Page N+2 needs a fighting chance to be the start of
+                 ;; a range, so go back 1 page if the current page had zero bytes used
+                 ;; and the span exceeded 1. That is, always make forward progress.
+                 (setq start (range-end (cond ((and (zerop page-bytes-used) (plusp span))
+                                               (decf page-index)
+                                               0)
+                                              (t
+                                               gencgc-card-bytes)))
+                       span 0)))))))))
 
   (do-rest-arg ((space) spaces)
     (if (eq space :dynamic)
