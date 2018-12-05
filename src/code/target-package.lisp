@@ -581,6 +581,12 @@ Experimental: interface subject to change."
 (defvar *package* (error "*PACKAGE* should be initialized in cold load!")
   "the current package")
 
+(define-condition bootstrap-package-not-found (condition)
+  ((name :initarg :name :reader bootstrap-package-name)))
+(defun debootstrap-package (&optional condition)
+  (declare (ignore condition))
+  (bug "No such thing as DEBOOTSTRAP-PACKAGE"))
+
 (defun find-package (package-designator)
   "If PACKAGE-DESIGNATOR is a package, it is returned. Otherwise PACKAGE-DESIGNATOR
 must be a string designator, in which case the package it names is located and returned.
