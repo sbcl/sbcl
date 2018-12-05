@@ -1901,3 +1901,16 @@
    `(lambda (x)
      (float-sign 5.0d0 (the double-float x)))
    ((3d0) 3d0)))
+
+(with-test (:name :typep-word)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (typep x 'sb-vm:word))
+   ((1) t)
+   (((1- (expt 2 sb-vm:n-word-bits))) t)
+   (((expt 2 sb-vm:n-word-bits)) nil)
+   ((-1) nil)
+   (('a) nil)
+   ((()) nil)
+   (((1- most-negative-fixnum)) nil)))

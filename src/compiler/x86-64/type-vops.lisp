@@ -276,7 +276,7 @@
               (values not-target target)
               (values target not-target))
         ;; Is it a fixnum?
-        (inst mov :dword temp value)
+        (inst mov temp value)
         (inst test :byte temp fixnum-tag-mask)
         (inst jmp :e fixnum)
 
