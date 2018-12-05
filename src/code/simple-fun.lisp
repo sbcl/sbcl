@@ -244,7 +244,7 @@
   (let ((internal-type (sb-vm::%%simple-fun-type func)))
     ;; For backward-compatibility we expand SFUNCTION -> FUNCTION.
     (if (and (listp internal-type) (eq (car internal-type) 'sfunction))
-        (sb!ext:typexpand-1 internal-type)
+        (sb-ext:typexpand-1 internal-type)
         internal-type)))
 
 (defun %fun-type (function)

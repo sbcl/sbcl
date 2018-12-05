@@ -68,7 +68,7 @@
                 cl:///)))
     `(progn
        (declaim (special ,@list)
-                (sb!ext:always-bound ,@list))
+                (sb-ext:always-bound ,@list))
        (eval-when (:compile-toplevel :load-toplevel)
          (dolist (symbol ',list)
            (declare (notinline (setf sb!int:info))) ; skirt failure-to-inline warning

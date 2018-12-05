@@ -49,7 +49,7 @@
   (check-variable-name name :signal-via signal-via)
   (flet ((lose (kind)
            (funcall signal-via
-                    (sb!format:tokens "~@<~/sb!ext:print-symbol-with-prefix/ names a ~
+                    (sb!format:tokens "~@<~/sb-ext:print-symbol-with-prefix/ names a ~
                                ~A, and cannot be used in ~A.~:@>")
                     name kind context)))
     (let ((kind (info :variable :kind name)))

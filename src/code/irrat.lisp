@@ -706,7 +706,7 @@
 ;;;;   Raymond Toy at <email address deleted during 2002 spam avalanche>.
 
 ;;; FIXME: In SBCL, the floating point infinity constants like
-;;; SB!EXT:DOUBLE-FLOAT-POSITIVE-INFINITY aren't available as
+;;; SB-EXT:DOUBLE-FLOAT-POSITIVE-INFINITY aren't available as
 ;;; constants at cross-compile time, because the cross-compilation
 ;;; host might not have support for floating point infinities. Thus,
 ;;; they're effectively implemented as special variable references,

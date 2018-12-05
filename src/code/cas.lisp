@@ -268,12 +268,12 @@ been defined. (See SB-EXT:CAS for more information.)
            (error "Invalid first argument to ~S: ~S" name specified-place))
          (compute-newval (old) ; used only if no atomic inc vop
            `(logand (,(case name (atomic-incf '+) (atomic-decf '-)) ,old
-                     (the sb-vm:signed-word ,diff)) sb!ext:most-positive-word))
+                     (the sb-vm:signed-word ,diff)) sb-ext:most-positive-word))
          (compute-delta () ; used only with atomic inc vop
            `(logand ,(case name
                        (atomic-incf `(the sb-vm:signed-word ,diff))
                        (atomic-decf `(- (the sb-vm:signed-word ,diff))))
-                    sb!ext:most-positive-word)))
+                    sb-ext:most-positive-word)))
     (declare (ignorable #'compute-newval #'compute-delta))
     (when (and (symbolp place)
                (eq (info :variable :kind place) :global)

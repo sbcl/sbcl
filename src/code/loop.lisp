@@ -323,7 +323,7 @@ code to be loaded.
 (defun loop-make-desetq (var-val-pairs)
   (if var-val-pairs (cons 'loop-desetq var-val-pairs)))
 
-(sb!ext:defglobal *loop-desetq-temporary*
+(sb-ext:defglobal *loop-desetq-temporary*
         (make-symbol "LOOP-DESETQ-TEMP"))
 
 (sb-xc:defmacro loop-desetq (&environment env &rest var-val-pairs)
@@ -1831,7 +1831,7 @@ code to be loaded.
 
 ;;;; ANSI LOOP
 
-(sb!ext:define-load-time-global *loop-ansi-universe*
+(sb-ext:define-load-time-global *loop-ansi-universe*
   (let ((w (!make-standard-loop-universe
              :keywords '((named (loop-do-named))
                          (initially (loop-do-initially))

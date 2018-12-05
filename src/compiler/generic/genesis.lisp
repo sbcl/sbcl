@@ -270,7 +270,7 @@
 (defun descriptor= (a b) (eql (descriptor-bits a) (descriptor-bits b)))
 
 (defun make-random-descriptor (bits)
-  (make-descriptor (logand bits sb!ext:most-positive-word)))
+  (make-descriptor (logand bits sb-ext:most-positive-word)))
 
 (declaim (inline descriptor-lowtag))
 (defun descriptor-lowtag (des)
@@ -610,7 +610,7 @@
   (defun write-wordindexed/raw (address index bits)
     (declare (type descriptor address) (type sb-vm:word index)
              (type (or sb-vm:word sb-vm:signed-word) bits))
-    (write-bits (logand bits sb!ext:most-positive-word))))
+    (write-bits (logand bits sb-ext:most-positive-word))))
 
 ;;;; allocating images of primitive objects in the cold core
 
@@ -1784,7 +1784,7 @@ core and return a descriptor to it."
   ;; the added-on bits. What I've done is somewhat of a fragile kludge.
   (let (syms)
     (with-package-iterator (iter '("SB-PCL" "SB-MOP" "SB!GRAY" "SB-SEQUENCE"
-                                   "SB!PROFILE" "SB!EXT" "SB-VM"
+                                   "SB!PROFILE" "SB-EXT" "SB-VM"
                                    "SB-C" "SB!FASL" "SB-DEBUG")
                                  :external)
       (loop

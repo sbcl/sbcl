@@ -36,7 +36,7 @@ WITH-CAS-LOCK can be entered recursively."
 (defmacro %with-cas-lock ((place) &body body &environment env)
   (with-unique-names (owner self)
     (multiple-value-bind (vars vals old new cas-form read-form)
-        (sb!ext:get-cas-expansion place env)
+        (sb-ext:get-cas-expansion place env)
       `(let* (,@(mapcar #'list vars vals)
               (,owner (progn
                         (barrier (:read))
@@ -54,7 +54,7 @@ WITH-CAS-LOCK can be entered recursively."
                                               (not (setf ,owner ,cas-form)))
                                     return t
                                     else
-                                    do (sb!ext:spin-loop-hint))
+                                    do (sb-ext:spin-loop-hint))
                         do (thread-yield)))
                 ,@body)
            (unless (eq ,owner ,self)
@@ -215,8 +215,8 @@ an error in that case."
 ;; A thread is eligible for gc iff it has finished and there are no
 ;; more references to it. This list is supposed to keep a reference to
 ;; all running threads.
-(sb!ext:define-load-time-global *all-threads* ())
-(sb!ext:define-load-time-global *all-threads-lock* (make-mutex :name "all threads lock"))
+(sb-ext:define-load-time-global *all-threads* ())
+(sb-ext:define-load-time-global *all-threads-lock* (make-mutex :name "all threads lock"))
 
 (defvar *default-alloc-signal* nil)
 
@@ -254,9 +254,9 @@ created and old ones may exit at any time."
   #!-sb-thread
   0)
 
-(sb!ext:define-load-time-global *stack-addr-table* nil)
-(sb!ext:define-load-time-global *initial-thread* nil)
-(sb!ext:define-load-time-global *make-thread-lock* nil)
+(sb-ext:define-load-time-global *stack-addr-table* nil)
+(sb-ext:define-load-time-global *initial-thread* nil)
+(sb-ext:define-load-time-global *make-thread-lock* nil)
 
 (defun note-stack-range (thread table)
   (let ((start (get-lisp-obj-address sb-vm:*control-stack-start*))
@@ -315,7 +315,7 @@ See also: ABORT-THREAD and SB-EXT:EXIT."
                                      but exit was not allowed.~:@>"
                     :format-arguments (list values)
                     :thread self))
-           (sb!ext:exit :code 0))
+           (sb-ext:exit :code 0))
           (t
            (throw '%return-from-thread (values-list values))))))
 
@@ -344,7 +344,7 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
              (error 'simple-thread-error
                     :format-control "~@<Tried to abort initial thread, but ~
                                      exit was not allowed.~:@>"))
-           (sb!ext:exit :code 1))
+           (sb-ext:exit :code 1))
           (t
            ;; We /could/ use TOPLEVEL-CATCHER or %END-OF-THE-WORLD as well, but
            ;; this seems tidier. Those to are a bit too overloaded already.
@@ -426,7 +426,7 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
 
 #!+(and sb-thread sb-futex)
 (progn
-  (locally (declare (sb!ext:muffle-conditions sb!ext:compiler-note))
+  (locally (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
     (define-structure-slot-addressor mutex-state-address
         :structure mutex
         :slot state))
@@ -443,9 +443,9 @@ this function returns), it is intended for informative purposes. For
 testing whether the current thread is holding a mutex see
 HOLDING-MUTEX-P."
   ;; Make sure to get the current value.
-  (sb!ext:compare-and-swap (mutex-%owner mutex) nil nil))
+  (sb-ext:compare-and-swap (mutex-%owner mutex) nil nil))
 
-(sb!ext:define-load-time-global **deadlock-lock** nil)
+(sb-ext:define-load-time-global **deadlock-lock** nil)
 
 #!+(or (not sb-thread) sb-futex)
 (defstruct (waitqueue (:copier nil) (:constructor make-waitqueue (&key name)))
@@ -608,7 +608,7 @@ HOLDING-MUTEX-P."
                (signal-deadline)
                (go :restart)))))))
 
-(defmacro sb!ext:wait-for (test-form &key timeout)
+(defmacro sb-ext:wait-for (test-form &key timeout)
   "Wait until TEST-FORM evaluates to true, then return its primary value.
 If TIMEOUT is provided, waits at most approximately TIMEOUT seconds before
 returning NIL.
@@ -654,13 +654,13 @@ returns NIL each time."
     #!-(and sb-thread sb-futex)
     (and (not old)
          ;; Don't even bother to try to CAS if it looks bad.
-         (not (sb!ext:compare-and-swap (mutex-%owner mutex) nil new-owner)))
+         (not (sb-ext:compare-and-swap (mutex-%owner mutex) nil new-owner)))
     #!+(and sb-thread sb-futex)
     ;; From the Mutex 2 algorithm from "Futexes are Tricky" by Ulrich Drepper.
-    (when (eql +lock-free+ (sb!ext:compare-and-swap (mutex-state mutex)
+    (when (eql +lock-free+ (sb-ext:compare-and-swap (mutex-state mutex)
                                                     +lock-free+
                                                     +lock-taken+))
-      (let ((prev (sb!ext:compare-and-swap (mutex-%owner mutex) nil new-owner)))
+      (let ((prev (sb-ext:compare-and-swap (mutex-%owner mutex) nil new-owner)))
         (when prev
           (bug "Old owner in free mutex: ~S" prev))
         t))))
@@ -668,7 +668,7 @@ returns NIL each time."
 #!+sb-thread
 (defun %%wait-for-mutex (mutex new-owner to-sec to-usec stop-sec stop-usec)
   (declare (type mutex mutex) (optimize (speed 3)))
-  (declare (sb!ext:muffle-conditions sb!ext:compiler-note))
+  (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
   #!-sb-futex
   (declare (ignore to-sec to-usec))
   #!-sb-futex
@@ -677,12 +677,12 @@ returns NIL each time."
                  when (and (progn
                              (barrier (:read))
                              (not (mutex-%owner mutex)))
-                           (not (sb!ext:compare-and-swap (mutex-%owner mutex) nil
+                           (not (sb-ext:compare-and-swap (mutex-%owner mutex) nil
                                                          new-owner)))
                  do (return-from cas t)
                  else
                  do
-                    (sb!ext:spin-loop-hint))
+                    (sb-ext:spin-loop-hint))
            ;; Check for pending interrupts.
            (with-interrupts nil)))
     (declare (dynamic-extent #'cas))
@@ -692,12 +692,12 @@ returns NIL each time."
   ;; "Futexes are Tricky" by Ulrich Drepper.
   (flet ((maybe (old)
            (when (eql +lock-free+ old)
-             (let ((prev (sb!ext:compare-and-swap (mutex-%owner mutex)
+             (let ((prev (sb-ext:compare-and-swap (mutex-%owner mutex)
                                                   nil new-owner)))
                (when prev
                  (bug "Old owner in free mutex: ~S" prev))
                (return-from %%wait-for-mutex t)))))
-    (prog ((old (sb!ext:compare-and-swap (mutex-state mutex)
+    (prog ((old (sb-ext:compare-and-swap (mutex-state mutex)
                                          +lock-free+ +lock-taken+)))
        ;; Got it right off the bat?
        (maybe old)
@@ -705,7 +705,7 @@ returns NIL each time."
        ;; Mark it as contested, and sleep. (Exception: it was just released.)
        (when (or (eql +lock-contested+ old)
                  (not (eql +lock-free+
-                           (sb!ext:compare-and-swap
+                           (sb-ext:compare-and-swap
                             (mutex-state mutex) +lock-taken+ +lock-contested+))))
          (when (eql 1 (with-pinned-objects (mutex)
                         (futex-wait (mutex-state-address mutex)
@@ -719,7 +719,7 @@ returns NIL each time."
            (return-from %%wait-for-mutex nil)))
        ;; Try to get it, still marking it as contested.
        (maybe
-        (sb!ext:compare-and-swap (mutex-state mutex) +lock-free+ +lock-contested+))
+        (sb-ext:compare-and-swap (mutex-state mutex) +lock-free+ +lock-contested+))
        ;; Update timeout if necessary.
        (when stop-sec
          (setf (values to-sec to-usec)
@@ -729,7 +729,7 @@ returns NIL each time."
 
 #!+sb-thread
 (defun %wait-for-mutex (mutex self timeout to-sec to-usec stop-sec stop-usec deadlinep)
-  (declare (sb!ext:muffle-conditions sb!ext:compiler-note))
+  (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
   (with-deadlocks (self mutex timeout)
     (with-interrupts (check-deadlock))
     (tagbody
@@ -810,7 +810,7 @@ IF-NOT-OWNER is :FORCE)."
   (declare (type mutex mutex))
   ;; Order matters: set owner to NIL before releasing state.
   (let* ((self *current-thread*)
-         (old-owner (sb!ext:compare-and-swap (mutex-%owner mutex) self nil)))
+         (old-owner (sb-ext:compare-and-swap (mutex-%owner mutex) self nil)))
     (unless (eq self old-owner)
       (ecase if-not-owner
         ((:punt) (return-from release-mutex nil))
@@ -826,15 +826,15 @@ IF-NOT-OWNER is :FORCE)."
       ;; FIXME: once ATOMIC-INCF supports struct slots with word sized
       ;; unsigned-byte type this can be used:
       ;;
-      ;;     (let ((old (sb!ext:atomic-incf (mutex-state mutex) -1)))
+      ;;     (let ((old (sb-ext:atomic-incf (mutex-state mutex) -1)))
       ;;       (unless (eql old +lock-free+)
       ;;         (setf (mutex-state mutex) +lock-free+)
       ;;         (with-pinned-objects (mutex)
       ;;           (futex-wake (mutex-state-address mutex) 1))))
-      (let ((old (sb!ext:compare-and-swap (mutex-state mutex)
+      (let ((old (sb-ext:compare-and-swap (mutex-state mutex)
                                           +lock-taken+ +lock-free+)))
         (when (eql old +lock-contested+)
-          (sb!ext:compare-and-swap (mutex-state mutex)
+          (sb-ext:compare-and-swap (mutex-state mutex)
                                    +lock-contested+ +lock-free+)
           (with-pinned-objects (mutex)
             (futex-wake (mutex-state-address mutex) 1))))
@@ -885,7 +885,7 @@ IF-NOT-OWNER is :FORCE)."
                              (setf (waitqueue-%head queue) (cdr head)))
                          (car head)))
           while next
-          do (when (eq queue (sb!ext:compare-and-swap
+          do (when (eq queue (sb-ext:compare-and-swap
                               (thread-waiting-for next) queue nil))
                (decf n)))
     nil))
@@ -898,7 +898,7 @@ IF-NOT-OWNER is :FORCE)."
       (documentation 'make-waitqueue 'function) "Create a waitqueue.")
 
 #!+(and sb-thread sb-futex)
-(locally (declare (sb!ext:muffle-conditions sb!ext:compiler-note))
+(locally (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
   (define-structure-slot-addressor waitqueue-token-address
       :structure waitqueue
       :slot token))
@@ -909,7 +909,7 @@ IF-NOT-OWNER is :FORCE)."
   #!-sb-thread
   (declare (ignore queue mutex to-sec to-usec stop-sec stop-usec deadlinep))
   #!-sb-thread
-  (sb!ext:wait-for nil :timeout timeout) ; Yeah...
+  (sb-ext:wait-for nil :timeout timeout) ; Yeah...
   #!+sb-thread
   (let ((me *current-thread*))
     (barrier (:read))
@@ -1201,7 +1201,7 @@ WAIT-ON-SEMAPHORE or TRY-SEMAPHORE."
                 ;; in parallel using ATOMIC-DECF. No danger over
                 ;; overflow, since there it at most one increment per
                 ;; thread waiting on the semaphore.
-                (sb!ext:atomic-incf (semaphore-waitcount semaphore))
+                (sb-ext:atomic-incf (semaphore-waitcount semaphore))
                 (loop until (>= (setf old-count (semaphore-%count semaphore)) n)
                    do (multiple-value-bind (wakeup-p remaining-sec remaining-usec)
                           (%condition-wait
@@ -1218,7 +1218,7 @@ WAIT-ON-SEMAPHORE or TRY-SEMAPHORE."
                 (success (- old-count n)))
            ;; Need to use ATOMIC-DECF as we may unwind without the
            ;; lock being held!
-           (sb!ext:atomic-decf (semaphore-waitcount semaphore))))))))
+           (sb-ext:atomic-decf (semaphore-waitcount semaphore))))))))
 
 (declaim (ftype (sfunction (semaphore &key
                                       (:n (integer 1))
@@ -1342,7 +1342,7 @@ on this semaphore, then N of them is woken up."
     (when *session*
       (%delete-thread-from-session thread *session*))))
 
-(defvar sb!ext:*invoke-debugger-hook* nil
+(defvar sb-ext:*invoke-debugger-hook* nil
   "This is either NIL or a designator for a function of two arguments,
    to be run when the debugger is about to be entered.  The function is
    run with *INVOKE-DEBUGGER-HOOK* bound to NIL to minimize recursive
@@ -1360,13 +1360,13 @@ on this semaphore, then N of them is woken up."
   (with-deadline (:seconds nil :override t)
     (sb-impl::finalizer-thread-stop)
     (grab-mutex *make-thread-lock*)
-    (let ((timeout sb!ext:*exit-timeout*)
+    (let ((timeout sb-ext:*exit-timeout*)
           (code *exit-in-process*)
           (current *current-thread*)
           (joinees nil)
           (main nil))
       ;; Don't invoke the debugger on errors in cleanup forms in unwind-protect
-      (setf sb!ext:*invoke-debugger-hook*
+      (setf sb-ext:*invoke-debugger-hook*
             (lambda (c h)
               (sb-debug::debugger-disabled-hook c h :quit nil)
               (abort-thread :allow-exit t)))
@@ -1699,7 +1699,7 @@ subject to change."
   (terminate-thread thread))
 
 #-sb-xc-host
-(declaim (sb!ext:deprecated
+(declaim (sb-ext:deprecated
           :late ("SBCL" "1.2.15")
           (function destroy-thread :replacement terminate-thread)))
 
@@ -1882,7 +1882,7 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
 #!+sb-thread
 (progn
 
-  (sb!ext:define-load-time-global sb-vm::*free-tls-index* 0)
+  (sb-ext:define-load-time-global sb-vm::*free-tls-index* 0)
   ;; Keep in sync with 'compiler/generic/parms.lisp'
   #!+ppc ; only PPC uses a separate symbol for the TLS index lock
   (!define-load-time-global sb-vm::*tls-index-lock* 0)

@@ -285,7 +285,7 @@
                   (load file))
     (abort ()
       :report "Abort building SBCL."
-      (sb!ext:exit :code 1))))
+      (sb-ext:exit :code 1))))
 
 ;;; Remember where cold artifacts went, and put the warm ones there too
 ;;; because it looks nicer not to scatter them throughout the source tree.

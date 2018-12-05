@@ -42,7 +42,7 @@ stale value, use MUTEX-OWNER instead."
 
 (defsetf mutex-value set-mutex-value)
 
-(declaim (sb!ext:deprecated :final ("SBCL" "1.2.15") #'set-mutex-value))
+(declaim (sb-ext:deprecated :final ("SBCL" "1.2.15") #'set-mutex-value))
 
 ;;; SPINLOCK no longer exists as a type -- provided for backwards compatibility.
 
@@ -50,7 +50,7 @@ stale value, use MUTEX-OWNER instead."
   "Spinlock type."
   'mutex)
 
-(declaim (sb!ext:deprecated
+(declaim (sb-ext:deprecated
           :late ("SBCL" "1.0.53.11") (type spinlock :replacement mutex)))
 
 (define-deprecated-function :early "1.0.53.11" make-spinlock make-mutex (&key name)
@@ -79,7 +79,7 @@ stale value, use MUTEX-OWNER instead."
   `(with-mutex (,lock)
      ,@body))
 
-(declaim (sb!ext:deprecated
+(declaim (sb-ext:deprecated
           :early ("SBCL" "1.0.53.11")
           (function with-recursive-spinlock :replacement with-recursive-lock)
           (function with-spinlock :replacement with-mutex)))

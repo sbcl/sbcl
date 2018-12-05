@@ -115,7 +115,7 @@ guaranteed to never be modified, so it can be put in read-only storage."
                            (error (condition)
                              (compiler-error "(during EVAL of LOAD-TIME-VALUE)~%~A"
                                              condition)))))
-                  (if (eq sb!ext:*evaluator-mode* :compile)
+                  (if (eq sb-ext:*evaluator-mode* :compile)
                       ;; This call to EVAL actually means compile+eval.
                       (eval-it 'eval form)
                       (eval-it 'funcall (compile nil `(lambda () ,form)))))))

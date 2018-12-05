@@ -21,7 +21,7 @@
 ;; such a thing. It should be (TYPEP X 'CODE-DELETION-NOTE).
 ;; Do as I say, not as I do.
 (defun code-deletion-note-p (x)
-  (eq (type-of x) 'sb!ext:code-deletion-note))
+  (eq (type-of x) 'sb-ext:code-deletion-note))
 (setq sb-c::*handled-conditions*
       `((,(sb-kernel:specifier-type
            '(or (satisfies unable-to-optimize-note-p)
@@ -37,7 +37,7 @@
        ;; CLISP's pretty-printer is fragile and tends to cause stack
        ;; corruption or fail internal assertions, as of 2003-04-20; we
        ;; therefore turn off as many notes as possible.
-       (sb!ext:inhibit-warnings #-clisp 2 #+clisp 3)
+       (sb-ext:inhibit-warnings #-clisp 2 #+clisp 3)
        ;; SAFETY = SPEED (and < 3) should provide reasonable safety,
        ;; but might skip some unreasonably expensive stuff
        ;; (e.g. %DETECT-STACK-EXHAUSTION in sbcl-0.7.2).
@@ -85,7 +85,7 @@
         ;; redefine our functions anyway; and developers can
         ;; fend for themselves.)
         #!-sb-fluid
-        (sb!ext:*derive-function-types* t)
+        (sb-ext:*derive-function-types* t)
         ;; Let the target know that we're the cross-compiler.
         (*features* (cons :sb-xc *features*))
         ;; We need to tweak the readtable..
@@ -127,7 +127,7 @@
             compute-applicable-methods
             slot-makunbound
             make-load-form-saving-slots
-            sb!ext:run-program
+            sb-ext:run-program
             sb-vm::remove-static-links)
           ;; CLOS implementation
           '(sb-mop:class-finalized-p

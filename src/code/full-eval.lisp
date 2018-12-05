@@ -155,7 +155,7 @@
                  (sb-c::process-unmuffle-conditions-decl
                   declaration
                   (sb-c::lexenv-handled-conditions lexenv))))
-          ((disable-package-locks sb!ext:enable-package-locks)
+          ((disable-package-locks sb-ext:enable-package-locks)
            (setf (sb-c::lexenv-disabled-package-locks lexenv)
                  (sb-c::process-package-lock-decl
                   declaration

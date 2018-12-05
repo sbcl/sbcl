@@ -702,7 +702,7 @@
                             ;; and it doesn't upset the compiler in the least -
                             ;; it still uses unboxed reads and compares throughout.
                             (when (eql end-mask 0)
-                              (setq end-mask sb!ext:most-positive-word)
+                              (setq end-mask sb-ext:most-positive-word)
                               (decf last-word)) ; make it an inclusive bound
                             (loop
                               (when (> word-offset last-word)
