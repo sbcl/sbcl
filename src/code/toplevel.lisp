@@ -320,7 +320,7 @@ any non-negative real number."
       (if (eq t script)
           (load-script *stdin*)
           (with-open-file (f (native-pathname script) :element-type :default)
-            (sb!fasl::maybe-skip-shebang-line f)
+            (sb-fasl::maybe-skip-shebang-line f)
             (load-script f))))))
 
 ;; Errors while processing the command line cause the system to EXIT,
@@ -484,7 +484,7 @@ any non-negative real number."
                        (cond (stream
                               (dx-flet ((thunk ()
                                           (load-as-source stream :context kind)))
-                                (sb!fasl::call-with-load-bindings #'thunk stream)))
+                                (sb-fasl::call-with-load-bindings #'thunk stream)))
                              (specified-pathname
                               (cerror "Ignore missing init file"
                                       "The specified ~A file ~A was not found."

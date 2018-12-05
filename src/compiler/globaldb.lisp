@@ -90,16 +90,16 @@
 #-sb-xc
 (setf (get '!%define-info-type :sb-cold-funcall-handler/for-effect)
       (lambda (category kind type-spec checker validator default id)
-        ;; The SB!FASL: symbols are poor style, but the lesser evil.
+        ;; The SB-FASL: symbols are poor style, but the lesser evil.
         ;; If exported, then they'll stick around in the target image.
         ;; Perhaps SB-COLD should re-export some of these.
-        (declare (special sb!fasl::*dynamic* sb!fasl::*cold-layouts*))
-        (let ((layout (gethash 'meta-info sb!fasl::*cold-layouts*)))
-          (sb!fasl::cold-svset
-           (sb!fasl::cold-symbol-value '*info-types*)
+        (declare (special sb-fasl::*dynamic* sb-fasl::*cold-layouts*))
+        (let ((layout (gethash 'meta-info sb-fasl::*cold-layouts*)))
+          (sb-fasl::cold-svset
+           (sb-fasl::cold-symbol-value '*info-types*)
            id
-           (sb!fasl::write-slots
-            (sb!fasl::allocate-struct sb!fasl::*dynamic* layout)
+           (sb-fasl::write-slots
+            (sb-fasl::allocate-struct sb-fasl::*dynamic* layout)
             'meta-info ; give the type name in lieu of layout
             :category category :kind kind :type-spec type-spec
             :type-checker checker :validate-function validator

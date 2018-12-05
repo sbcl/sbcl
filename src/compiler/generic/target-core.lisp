@@ -103,7 +103,7 @@
       (macrolet ((pop-fop-stack () `(prog1 (svref fop-stack top) (decf top))))
         (dotimes (i (pop-fop-stack) (setf (svref fop-stack 0) top))
           (multiple-value-bind (offset kind flavor)
-              (sb!fasl::!unpack-fixup-info (pop-fop-stack))
+              (sb-fasl::!unpack-fixup-info (pop-fop-stack))
             (fixup code-obj offset (pop-fop-stack) kind flavor
                    #'find-layout preserved nil))))
       (finish-fixups code-obj preserved)))

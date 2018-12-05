@@ -295,7 +295,7 @@ Experimental."
                        (search "*!INITIAL-SYMBOLS*" line)
                        (search "*!INITIAL-ASSEMBLER-ROUTINES*" line)
                        (search "*!LOAD-TIME-VALUES*" line)
-                       (search "(SB!FASL:*!COLD-" line)
+                       (search "(SB-FASL:*!COLD-" line)
                        (search "#S(SB-C::RESTART-LOCATION" line))
              (let ((form (read-from-string line)))
                (destructuring-bind (obj typespec xc-winp xc-certainp) form

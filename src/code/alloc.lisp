@@ -463,7 +463,7 @@
   ;; This uses ATOMIC-INCF to get automatic wraparound, not because atomicity
   ;; makes things deterministic per se. If multiple threads are allocating
   ;; code objects, the order is unpredictable.
-  (let ((serialno (atomic-incf sb!fasl::*code-serialno*)))
+  (let ((serialno (atomic-incf sb-fasl::*code-serialno*)))
     ;; FIXME: remove this use of WITHOUT-GCing and use pseudo-atomic.
     (without-gcing
       (block nil

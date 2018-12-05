@@ -9,8 +9,8 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!FASL")
-;;; KLUDGE: Even though we're IN-PACKAGE SB!FASL, some of the code in
+(in-package "SB-FASL")
+;;; KLUDGE: Even though we're IN-PACKAGE SB-FASL, some of the code in
 ;;; here is awfully chummy with the SB-C package. CMU CL didn't have
 ;;; any separation between the two packages, and a lot of tight
 ;;; coupling remains. -- WHN 2001-06-04

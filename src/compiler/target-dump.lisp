@@ -11,7 +11,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!FASL")
+(in-package "SB-FASL")
 
 ;;; Dump the first N bytes of VEC out to FILE. VEC is some sort of unboxed
 ;;; vector-like thing that we can BLT from.

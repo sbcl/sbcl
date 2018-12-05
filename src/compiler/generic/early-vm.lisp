@@ -147,19 +147,19 @@
 (defmacro !with-bigvec-or-sap (&body body)
   `(macrolet #-sb-xc-host ()
              #+sb-xc-host
-             ((code-instructions (code) `(sb!fasl::descriptor-mem ,code))
+             ((code-instructions (code) `(sb-fasl::descriptor-mem ,code))
               (sap-int (sap)
                 ;; KLUDGE: SAP is a bigvec; it doesn't know its address.
                 ;; Note that this shadows the uncallable stub function for SAP-INT
                 ;; that placates the host when compiling 'compiler/*/move.lisp'.
                 (declare (ignore sap))
                 `(locally
-                     (declare (notinline sb!fasl::descriptor-gspace)) ; fwd ref
-                   (sb!fasl::gspace-byte-address
-                    (sb!fasl::descriptor-gspace code)))) ; use CODE, not SAP
-              (sap-ref-8 (sap offset) `(sb!fasl::bvref-8 ,sap ,offset))
-              (sap-ref-32 (sap offset) `(sb!fasl::bvref-32 ,sap ,offset))
-              (sap-ref-word (sap offset) `(sb!fasl::bvref-word ,sap ,offset)))
+                     (declare (notinline sb-fasl::descriptor-gspace)) ; fwd ref
+                   (sb-fasl::gspace-byte-address
+                    (sb-fasl::descriptor-gspace code)))) ; use CODE, not SAP
+              (sap-ref-8 (sap offset) `(sb-fasl::bvref-8 ,sap ,offset))
+              (sap-ref-32 (sap offset) `(sb-fasl::bvref-32 ,sap ,offset))
+              (sap-ref-word (sap offset) `(sb-fasl::bvref-word ,sap ,offset)))
      ,@body))
 
 #!+sb-safepoint

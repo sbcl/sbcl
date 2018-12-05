@@ -1023,8 +1023,8 @@ expansion happened."
 (setf (get '!specifier-type :sb-cold-funcall-handler/for-value)
       (lambda (arg)
         (let ((specifier
-               (if (symbolp arg) arg (sb!fasl::host-object-from-core arg))))
-          (sb!fasl::ctype-to-core specifier (specifier-type specifier)))))
+               (if (symbolp arg) arg (sb-fasl::host-object-from-core arg))))
+          (sb-fasl::ctype-to-core specifier (specifier-type specifier)))))
 
 (setf (info :function :where-from '!specifier-type) :declared) ; lie
 ) ; end PROGN

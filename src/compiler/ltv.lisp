@@ -40,7 +40,7 @@
              (aver (eq (getf (cddr form) :create) t))
              'sb-kernel::classoid-cell))
           (fopcompile form nil t)
-          (values (sb!fasl::dump-pop *compile-object*) (specifier-type it)))
+          (values (sb-fasl::dump-pop *compile-object*) (specifier-type it)))
          (t
           (let ((lambda (compile-load-time-stuff form t)))
             (values (fasl-dump-load-time-value-lambda lambda *compile-object*

@@ -1,6 +1,6 @@
 ;;;; FOP definitions
 
-(in-package "SB!FASL")
+(in-package "SB-FASL")
 
 ;;; Bind STACK-VAR and PTR-VAR to the start of a subsequence of
 ;;; the fop stack of length COUNT, then execute BODY.

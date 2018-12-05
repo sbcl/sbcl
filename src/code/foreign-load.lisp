@@ -193,7 +193,7 @@ is never in the linkage-table."
               (if datap
                   undefined-alien-address
                   (or
-                   (sb!fasl::get-asm-routine 'sb-vm::undefined-alien-tramp)
+                   (sb-fasl::get-asm-routine 'sb-vm::undefined-alien-tramp)
                    (find-foreign-symbol-address "undefined_alien_function"))))
              (addr
               (setf (gethash symbol symbols) t)

@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!FASL")
+(in-package "SB-FASL")
 
 ;;;; fast-read operations
 ;;;;

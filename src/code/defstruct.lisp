@@ -2166,7 +2166,7 @@ or they must be declared locally notinline at each call site.~@:>"
                   (canonical-p (cdr init-form)
                                (dd-slots (layout-info (%instance-layout constant)))
                                constant))
-             (values 'sb!fasl::fop-struct nil))
+             (values 'sb-fasl::fop-struct nil))
             (t
              (values creation-form init-form))))))
 

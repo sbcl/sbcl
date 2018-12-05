@@ -215,7 +215,7 @@
                       (and (eq function 'setq)
                            (setq-fopcompilable-p (cdr form)))
 
-                      (eq function 'sb!fasl::setq-no-questions-asked))))))))
+                      (eq function 'sb-fasl::setq-no-questions-asked))))))))
 
 (defun let-fopcompilable-p (operator args)
   (when (>= (length args) 1)
@@ -293,7 +293,7 @@
                       (grovel (row-major-aref value i))))
                    (instance
                     (case (%make-load-form value)
-                      (sb!fasl::fop-struct
+                      (sb-fasl::fop-struct
                          ;; FIXME: Why is this needed? If the constant
                          ;; is deemed fopcompilable, then when we dump
                          ;; it we bind *dump-only-valid-structures* to
@@ -351,7 +351,7 @@
                          (cond (handle
                                 (setf (lambda-var-ever-used lambda-var) t)
                                 (when for-value-p
-                                  (sb!fasl::dump-push handle fasl)))
+                                  (sb-fasl::dump-push handle fasl)))
                                (t
                                 ;; Undefined variable. Signal a warning, and
                                 ;; treat it as a special variable reference, like
@@ -405,7 +405,7 @@
                            (loop for (arg . next) on args
                              do (fopcompile arg path
                                             (if next nil for-value-p)))))
-                      ((setq #+sb-xc-host sb!fasl::setq-no-questions-asked)
+                      ((setq #+sb-xc-host sb-fasl::setq-no-questions-asked)
                        (if (and for-value-p (endp args))
                            (fopcompile nil path t)
                            (loop for (name value . next) on args by #'cddr
@@ -433,7 +433,7 @@
                                                    orig-lexenv
                                                    *lexenv*)))
                                  (fopcompile value path t))
-                               (let* ((obj (sb!fasl::dump-pop fasl))
+                               (let* ((obj (sb-fasl::dump-pop fasl))
                                       (var (make-lambda-var
                                             :%source-name name
                                             :fop-value obj)))
@@ -469,7 +469,7 @@
                                (= 1 (length args))
                                for-value-p)
                           (fopcompile (first args) path t)
-                          (dump-fop 'sb!fasl::fop-package fasl))
+                          (dump-fop 'sb-fasl::fop-package fasl))
                          (t
                           (when (eq (info :function :where-from operator) :assumed)
                             (note-undefined-reference operator :function))
@@ -477,15 +477,15 @@
                           (dolist (arg args)
                             (fopcompile arg path t))
                           (if for-value-p
-                              (dump-fop 'sb!fasl::fop-funcall fasl)
-                              (dump-fop 'sb!fasl::fop-funcall-for-effect fasl))
+                              (dump-fop 'sb-fasl::fop-funcall fasl)
+                              (dump-fop 'sb-fasl::fop-funcall-for-effect fasl))
                           (let ((n-args (length args)))
                             ;; stub: FOP-FUNCALL isn't going to be usable
                             ;; to compile more than this, since its count
                             ;; is a single byte. Maybe we should just punt
                             ;; to the ordinary compiler in that case?
                             (aver (<= n-args 255))
-                            (sb!fasl::dump-byte n-args fasl))))))))))
+                            (sb-fasl::dump-byte n-args fasl))))))))))
            (t
             (bug "looks unFOPCOMPILEable: ~S" form))))))
 
@@ -494,7 +494,7 @@
           ;; Lambda forms are compiled with the real compiler
          (let ((handle (%compile form fasl :path path)))
            (when for-value-p
-             (sb!fasl::dump-push handle fasl))))
+             (sb-fasl::dump-push handle fasl))))
           ;; While function names are translated to a call to FDEFINITION.
         ((legal-fun-name-p form)
          (fopcompile `(fdefinition ',form) path for-value-p))
@@ -506,10 +506,10 @@
       args
     (let ((else-label (incf *fopcompile-label-counter*))
           (end-label (incf *fopcompile-label-counter*)))
-      (sb!fasl::dump-integer else-label fasl)
+      (sb-fasl::dump-integer else-label fasl)
       (fopcompile condition path t)
       ;; If condition was false, skip to the ELSE
-      (dump-fop 'sb!fasl::fop-skip-if-false fasl)
+      (dump-fop 'sb-fasl::fop-skip-if-false fasl)
       (fopcompile then path for-value-p)
       ;; The THEN branch will have produced a value even if we were
       ;; currently skipping to the ELSE branch (or over this whole
@@ -518,25 +518,25 @@
       ;; executed even when skipping over code. But this particular
       ;; value will be bogus, so we drop it.
       (when for-value-p
-        (dump-fop 'sb!fasl::fop-drop-if-skipping fasl))
+        (dump-fop 'sb-fasl::fop-drop-if-skipping fasl))
       ;; Now skip to the END
-      (sb!fasl::dump-integer end-label fasl)
-      (dump-fop 'sb!fasl::fop-skip fasl)
+      (sb-fasl::dump-integer end-label fasl)
+      (dump-fop 'sb-fasl::fop-skip fasl)
       ;; Start of the ELSE branch
-      (sb!fasl::dump-integer else-label fasl)
-      (dump-fop 'sb!fasl::fop-maybe-stop-skipping fasl)
+      (sb-fasl::dump-integer else-label fasl)
+      (dump-fop 'sb-fasl::fop-maybe-stop-skipping fasl)
       (fopcompile else path for-value-p)
       ;; As before
       (when for-value-p
-        (dump-fop 'sb!fasl::fop-drop-if-skipping fasl))
+        (dump-fop 'sb-fasl::fop-drop-if-skipping fasl))
       ;; End of IF
-      (sb!fasl::dump-integer end-label fasl)
-      (dump-fop 'sb!fasl::fop-maybe-stop-skipping fasl)
+      (sb-fasl::dump-integer end-label fasl)
+      (dump-fop 'sb-fasl::fop-maybe-stop-skipping fasl)
       ;; If we're still skipping, we must've triggered both of the
       ;; drop-if-skipping fops. To keep the stack balanced, push a
       ;; dummy value if needed.
       (when for-value-p
-        (dump-fop 'sb!fasl::fop-push-nil-if-skipping fasl)))))
+        (dump-fop 'sb-fasl::fop-push-nil-if-skipping fasl)))))
 
 (defun fopcompile-constant (fasl form for-value-p)
   (when for-value-p
@@ -544,5 +544,5 @@
     ;; structures: CONSTANT-FOPCOMPILABLE-P validates the structure
     ;; about to be dumped, not its load-form. Compare and contrast
     ;; with EMIT-MAKE-LOAD-FORM.
-    (let ((sb!fasl::*dump-only-valid-structures* nil))
+    (let ((sb-fasl::*dump-only-valid-structures* nil))
       (dump-object form fasl))))

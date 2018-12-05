@@ -26,7 +26,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!FASL")
+(in-package "SB-FASL")
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (use-package "SB-COREFILE")) ; not SB-COREFILE
@@ -1785,7 +1785,7 @@ core and return a descriptor to it."
   (let (syms)
     (with-package-iterator (iter '("SB-PCL" "SB-MOP" "SB!GRAY" "SB-SEQUENCE"
                                    "SB!PROFILE" "SB-EXT" "SB-VM"
-                                   "SB-C" "SB!FASL" "SB-DEBUG")
+                                   "SB-C" "SB-FASL" "SB-DEBUG")
                                  :external)
       (loop
          (multiple-value-bind (foundp sym accessibility package) (iter)
@@ -3001,7 +3001,7 @@ core and return a descriptor to it."
                             ;; We also propagate magic numbers
                             ;; related to file format,
                             ;; which live here instead of SB-VM.
-                            "SB!FASL"
+                            "SB-FASL"
                             ;; Home package of some constants which aren't
                             ;; in the target Lisp but are propagated to C.
                             "SB-COREFILE"))

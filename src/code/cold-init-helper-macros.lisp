@@ -62,7 +62,7 @@
 (macrolet ((def (wrapper real-name)
              `(defmacro ,wrapper (sym value &optional (doc nil doc-p))
                 `(progn (,',real-name ,sym ,value ,@(if doc-p (list doc)))
-                        #-sb-xc-host (sb!fasl::setq-no-questions-asked ,sym ,value)))))
+                        #-sb-xc-host (sb-fasl::setq-no-questions-asked ,sym ,value)))))
   (def !define-load-time-global define-load-time-global)
   (def !defparameter defparameter)
   (def !defvar defvar))
