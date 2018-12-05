@@ -26,14 +26,14 @@
   ;; all seemingly redundant moves, and then eliminate them before emission.
   ;; This way we can track movement of TNs into the same physical reg in a
   ;; different SC which will give useful information to a peephole optimizer.
-  (when (and (sb!x86-64-asm::register-p dst)
-             (sb!x86-64-asm::register-p src))
-    (let ((dst (sb!x86-64-asm::reg-id dst))
-          (src (sb!x86-64-asm::reg-id src)))
-      (aver (sb!x86-64-asm::is-gpr-id-p dst))
-      (aver (sb!x86-64-asm::is-gpr-id-p src))
-      (unless (= (sb!x86-64-asm::reg-id-num dst)
-                 (sb!x86-64-asm::reg-id-num src))
+  (when (and (sb-x86-64-asm::register-p dst)
+             (sb-x86-64-asm::register-p src))
+    (let ((dst (sb-x86-64-asm::reg-id dst))
+          (src (sb-x86-64-asm::reg-id src)))
+      (aver (sb-x86-64-asm::is-gpr-id-p dst))
+      (aver (sb-x86-64-asm::is-gpr-id-p src))
+      (unless (= (sb-x86-64-asm::reg-id-num dst)
+                 (sb-x86-64-asm::reg-id-num src))
         (inst mov dst src)))
     (return-from move))
   (unless (location= dst src)

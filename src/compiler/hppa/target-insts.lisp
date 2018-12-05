@@ -11,7 +11,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!HPPA-ASM")
+(in-package "SB-HPPA-ASM")
 
 (defun break-control (chunk inst stream dstate)
   (declare (ignore inst))

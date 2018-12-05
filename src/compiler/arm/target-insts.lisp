@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!ARM-ASM")
+(in-package "SB-ARM-ASM")
 
 (defun maybe-add-notes (dstate)
   (let* ((inst (sap-ref-int (dstate-segment-sap dstate)

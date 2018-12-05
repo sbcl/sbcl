@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!X86-64-ASM")
+(in-package "SB-X86-64-ASM")
 
 (defun print-ymmreg (value stream dstate)
   (let ((offset (etypecase value

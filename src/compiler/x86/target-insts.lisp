@@ -13,7 +13,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!X86-ASM")
+(in-package "SB-X86-ASM")
 
 ;;; Return the operand size based on the prefixes and width bit from
 ;;; the dstate.

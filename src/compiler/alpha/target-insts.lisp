@@ -11,7 +11,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!ALPHA-ASM")
+(in-package "SB-ALPHA-ASM")
 
 (defun bugchk-trap-control (chunk inst stream dstate)
   (declare (ignore inst))

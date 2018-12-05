@@ -1,4 +1,4 @@
-(in-package "SB!ARM64-ASM")
+(in-package "SB-ARM64-ASM")
 
 (defun current-instruction (dstate &optional (offset 0))
   (sap-ref-int (dstate-segment-sap dstate)

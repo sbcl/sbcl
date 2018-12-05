@@ -1,4 +1,4 @@
-(in-package "SB!X86-64-ASM")
+(in-package "SB-X86-64-ASM")
 
 (defun !make-avx2-id (index)
   (declare (type (mod 16) index))

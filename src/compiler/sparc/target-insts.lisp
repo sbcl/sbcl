@@ -11,7 +11,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!SPARC-ASM")
+(in-package "SB-SPARC-ASM")
 
 (defun sethi-arg-printer (value stream dstate)
     (format stream "%hi(#x~8,'0x)" (ash value 10))
