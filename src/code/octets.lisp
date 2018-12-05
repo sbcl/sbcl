@@ -15,7 +15,7 @@
 ;;; a decoding error error?  Or should we just give up on non-Unicode
 ;;; builds?
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 
 ;;;; conditions

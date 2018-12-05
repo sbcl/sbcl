@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 (macrolet ((def (name constructor access src-type &optional explicit-check)
              `(defun ,name (object type)
@@ -121,7 +121,7 @@
            (declare (optimize allow-non-returning-tail-call))
            (error 'simple-type-error
                   :format-control "~S can't be converted to type ~
-                                    ~/sb!impl:print-type-specifier/."
+                                    ~/sb-impl:print-type-specifier/."
                   :format-arguments (list object output-type-spec)
                   :datum object
                   :expected-type output-type-spec)))

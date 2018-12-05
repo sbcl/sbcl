@@ -574,13 +574,13 @@
      (prin1 number stream)
      nil)
     (t
-     (sb!impl::string-dispatch (single-float double-float)
+     (sb-impl::string-dispatch (single-float double-float)
          number
        (let ((spaceleft w))
          (when (and w (or atsign (minusp (float-sign number))))
            (decf spaceleft))
          (multiple-value-bind (str len lpoint tpoint)
-             (sb!impl::flonum-to-string (abs number) spaceleft d k)
+             (sb-impl::flonum-to-string (abs number) spaceleft d k)
            ;; if caller specifically requested no fraction digits, suppress the
            ;; optional trailing zero
            (when (and d (zerop d))
@@ -671,7 +671,7 @@
   (if (or (float-infinity-p number)
           (float-nan-p number))
       (prin1 number stream)
-      (multiple-value-bind (num expt) (sb!impl::scale-exponent (abs number))
+      (multiple-value-bind (num expt) (sb-impl::scale-exponent (abs number))
         (let* ((k (if (= num 1.0) (1- k) k))
                (expt (- expt k))
                (estr (decimal-string (abs expt)))
@@ -686,7 +686,7 @@
               (let* ((fdig (if d (if (plusp k) (1+ (- d k)) d) nil))
                      (fmin (if (minusp k) 1 fdig)))
                 (multiple-value-bind (fstr flen lpoint tpoint)
-                    (sb!impl::flonum-to-string num spaceleft fdig k fmin)
+                    (sb-impl::flonum-to-string num spaceleft fdig k fmin)
                   (when (and d (zerop d)) (setq tpoint nil))
                   (when w
                     (decf spaceleft flen)
@@ -744,7 +744,7 @@
   (if (or (float-infinity-p number)
           (float-nan-p number))
       (prin1 number stream)
-      (multiple-value-bind (ignore n) (sb!impl::scale-exponent (abs number))
+      (multiple-value-bind (ignore n) (sb-impl::scale-exponent (abs number))
         (declare (ignore ignore))
         ;; KLUDGE: Default d if omitted. The procedure is taken directly from
         ;; the definition given in the manual, and is not very efficient, since
@@ -752,7 +752,7 @@
         ;; improve on this. -- rtoy?? 1998??
         (unless d
           (multiple-value-bind (str len)
-              (sb!impl::flonum-to-string (abs number))
+              (sb-impl::flonum-to-string (abs number))
             (declare (ignore str))
             (let ((q (if (= len 1) 1 (1- len))))
               (setq d (max q (min n 7))))))
@@ -786,7 +786,7 @@
                           (if atsign "+" "")))
              (signlen (length signstr)))
         (multiple-value-bind (str strlen ig2 ig3 pointplace)
-            (sb!impl::flonum-to-string (abs number) nil d nil)
+            (sb-impl::flonum-to-string (abs number) nil d nil)
           (declare (ignore ig2 ig3 strlen))
           (when colon
             (write-string signstr stream))
@@ -866,7 +866,7 @@
 (defun format-relative-tab (stream colrel colinc)
   (if (sb!pretty:pretty-stream-p stream)
       (pprint-tab :line-relative colrel colinc stream)
-      (let* ((cur (sb!impl::charpos stream))
+      (let* ((cur (sb-impl::charpos stream))
              (spaces (if (and cur (plusp colinc))
                          (- (* (ceiling (+ cur colrel) colinc) colinc) cur)
                          colrel)))
@@ -875,7 +875,7 @@
 (defun format-absolute-tab (stream colnum colinc)
   (if (sb!pretty:pretty-stream-p stream)
       (pprint-tab :line colnum colinc stream)
-      (let ((cur (sb!impl::charpos stream)))
+      (let ((cur (sb-impl::charpos stream)))
         (cond ((null cur)
                (write-string "  " stream))
               ((< cur colnum)
@@ -1141,7 +1141,7 @@
               (when (and first-semi (directive-colonp first-semi))
                 (interpret-bind-defaults
                     ((extra 0)
-                     (len (or (sb!impl::line-length stream) 72)))
+                     (len (or (sb-impl::line-length stream) 72)))
                     (directive-params first-semi)
                   (setf newline-string
                         (with-simple-output-to-string (stream)
@@ -1178,7 +1178,7 @@
                      mincol))
          (padding (+ (- length chars) (* num-gaps minpad))))
     (when (and newline-prefix
-               (> (+ (or (sb!impl::charpos stream) 0)
+               (> (+ (or (sb-impl::charpos stream) 0)
                      length extra-space)
                   line-len))
       (write-string newline-prefix stream))

@@ -2156,7 +2156,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
     (let* ((symbol (lvar-value symbol))
            (kind (info :variable :kind symbol)))
       (when (and (eq kind :unknown)
-                 (sb!impl::package-lock-violation-p (symbol-package symbol) symbol))
+                 (sb-impl::package-lock-violation-p (symbol-package symbol) symbol))
         (let ((*compiler-error-context* node))
           (compiler-warn "violating package lock on ~/sb-ext:print-symbol-with-prefix/"
                          symbol))))))

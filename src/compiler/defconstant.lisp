@@ -7,7 +7,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 ;;; We need a mechanism different from the usual SYMBOL-VALUE during cross-
 ;;; compilation so we don't clobber the host Lisp's manifest constants.

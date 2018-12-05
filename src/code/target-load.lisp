@@ -131,7 +131,7 @@
    T on success."
   (flet ((load-stream (stream faslp)
            (when (and (fd-stream-p stream)
-                      (eq (sb!impl::fd-stream-fd-type stream) :directory))
+                      (eq (sb-impl::fd-stream-fd-type stream) :directory))
              (error 'simple-file-error
                     :pathname (pathname stream)
                     :format-control

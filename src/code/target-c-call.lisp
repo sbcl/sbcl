@@ -51,7 +51,7 @@
 (defun default-c-string-external-format ()
   (or *default-c-string-external-format*
       (setf *default-c-string-external-format*
-            (sb!impl::default-external-format))))
+            (sb-impl::default-external-format))))
 
 ;;; FIXME: %NATURALIZE-C-STRING (and the UTF8 siblings below) would
 ;;; appear to be vulnerable to the lisp string moving from underneath

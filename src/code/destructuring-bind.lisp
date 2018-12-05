@@ -7,7 +7,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 (macrolet (#+sb-xc-host ; Bootstrap NAMED-DS-BIND
            (named-ds-bind (name lambda-list expression &body body)

@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 ;;; Forward declarations
 
@@ -184,7 +184,7 @@
                             :start start :end end :key key :test test)))
     (values (if position (elt seq position) nil) position)))
 
-(defun sb!impl::split-seconds-for-sleep (&rest args)
+(defun sb-impl::split-seconds-for-sleep (&rest args)
   (declare (ignore args))
   (error "Can't call SPLIT-SECONDS-FOR-SLEEP"))
 

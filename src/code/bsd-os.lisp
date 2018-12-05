@@ -4,7 +4,7 @@
 ;;;; Carnegie Mellon University, and has been placed in the public
 ;;;; domain.
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 ;;;; Check that target machine features are set up consistently with
 ;;;; this file.

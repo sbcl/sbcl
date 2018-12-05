@@ -42,14 +42,14 @@
 (sb-xc:deftype byte-specifier () 'cons)
 
 ;;; PATHNAME pieces, as returned by the PATHNAME-xxx functions
-(sb-xc:deftype pathname-host () '(or sb!impl::host null))
+(sb-xc:deftype pathname-host () '(or sb-impl::host null))
 (sb-xc:deftype pathname-device ()
   '(or simple-string (member nil :unspecific :unc)))
 (sb-xc:deftype pathname-directory () 'list)
 (sb-xc:deftype pathname-name ()
-  '(or simple-string sb!impl::pattern (member nil :unspecific :wild)))
+  '(or simple-string sb-impl::pattern (member nil :unspecific :wild)))
 (sb-xc:deftype pathname-type ()
-  '(or simple-string sb!impl::pattern (member nil :unspecific :wild)))
+  '(or simple-string sb-impl::pattern (member nil :unspecific :wild)))
 (sb-xc:deftype pathname-version ()
   '(or integer (member nil :newest :wild :unspecific)))
 

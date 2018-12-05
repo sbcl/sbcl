@@ -911,11 +911,11 @@
                   ;; Conditionally insert a conditional trap:
                   (when step-instrumenting
                     (assemble ()
-                      ;; Get the symbol-value of SB!IMPL::*STEPPING*
+                      ;; Get the symbol-value of SB-IMPL::*STEPPING*
                       ;; KLUDGE: ... into LIP.  Either it's zero or it
                       ;; isn't, and even taking a stray interrupt and
                       ;; GC can't screw that up.
-                      (load-symbol-value lip sb!impl::*stepping*)
+                      (load-symbol-value lip sb-impl::*stepping*)
                       (inst cmp lip 0)
                       ;; If it's not 0, trap.
                       (inst b :eq step-done-label)
@@ -1161,7 +1161,7 @@
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 3
-    (load-symbol-value stepping sb!impl::*stepping*)
+    (load-symbol-value stepping sb-impl::*stepping*)
     ;; If it's not zero, trap.
     (inst cmp stepping 0)
     (inst b :eq DONE)

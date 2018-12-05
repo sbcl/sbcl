@@ -1,4 +1,4 @@
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 ;;;; COMPARE-AND-SWAP
 ;;;;

@@ -29,7 +29,7 @@ comments from CMU CL:
 (defun make-hash-table-like (table)
   "Make a hash-table with the same test as table."
   (declare (type hash-table table))
-  (make-hash-table :test (sb!impl::hash-table-kind table)))
+  (make-hash-table :test (sb-impl::hash-table-kind table)))
 
 (defun hash-difference (table1 table2)
   "Return a hash-table containing only the entries in Table1 whose key is not

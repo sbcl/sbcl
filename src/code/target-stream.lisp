@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 ;;; In the interest of ``once and only once'' this macro contains the
 ;;; framework necessary to implement a peek-char function, which has

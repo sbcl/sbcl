@@ -55,7 +55,7 @@
            (type (or index null) end))
   (let* ((end (or end (length string))))
     (unless (= start end)
-      (sb!impl::string-dispatch (simple-base-string
+      (sb-impl::string-dispatch (simple-base-string
                                  #!+sb-unicode
                                  (simple-array character (*)))
           string
@@ -890,7 +890,7 @@ line break."
          (output-ugly-object stream array))
         ((and *print-readably*
               (not (array-readably-printable-p array)))
-         (sb!impl::output-unreadable-array-readably array stream))
+         (sb-impl::output-unreadable-array-readably array stream))
         ((vectorp array)
          (pprint-vector stream array))
         (t
@@ -1455,7 +1455,7 @@ line break."
     (set-pprint-dispatch '(cons symbol)
                          'pprint-data-list -2)
     (set-pprint-dispatch 'cons 'pprint-fill -2)
-    (set-pprint-dispatch 'sb!impl::comma 'pprint-unquoting-comma -3)
+    (set-pprint-dispatch 'sb-impl::comma 'pprint-unquoting-comma -3)
     ;; cons cells with interesting things for the car
     (/show0 "doing SET-PPRINT-DISPATCH for CONS with interesting CAR")
 

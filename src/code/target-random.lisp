@@ -343,11 +343,11 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
   (declare (type (double-float (0d0)) arg)
            (type random-state state))
   (* arg
-     (- (sb!impl::make-double-float
+     (- (sb-impl::make-double-float
          (dpb (ash (random-chunk state)
                    (- sb-vm:double-float-digits n-random-chunk-bits 32))
               sb-vm:double-float-significand-byte
-              (sb!impl::double-float-high-bits 1d0))
+              (sb-impl::double-float-high-bits 1d0))
          (random-chunk state))
         1d0)))
 
@@ -358,12 +358,12 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
            (type random-state state))
   (let ((state-vector (random-state-state state)))
     (* arg
-       (- (sb!impl::make-double-float
+       (- (sb-impl::make-double-float
            (dpb (ash (sb-vm::random-mt19937 state-vector)
                      (- sb-vm:double-float-digits n-random-chunk-bits
                         sb-vm:n-word-bits))
                 sb-vm:double-float-significand-byte
-                (sb!impl::double-float-high-bits 1d0))
+                (sb-impl::double-float-high-bits 1d0))
            (sb-vm::random-mt19937 state-vector))
           1d0))))
 

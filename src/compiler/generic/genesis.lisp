@@ -1768,7 +1768,7 @@ core and return a descriptor to it."
   #!+64-bit
   (cold-set '*code-serialno* (make-fixnum-descriptor (1+ *code-serialno*)))
 
-  (dolist (symbol sb!impl::*cache-vector-symbols*)
+  (dolist (symbol sb-impl::*cache-vector-symbols*)
     (cold-set symbol *nil-descriptor*))
 
   ;; Put the C-callable fdefns into the static-fdefn vector if #!+immobile-code.
@@ -1797,7 +1797,7 @@ core and return a descriptor to it."
       (cold-intern sym)))
 
   (cold-set
-   'sb!impl::*!initial-symbols*
+   'sb-impl::*!initial-symbols*
    (list-to-core
     (mapcar
      (lambda (pkgcons)
@@ -2012,7 +2012,7 @@ core and return a descriptor to it."
                (setf (gethash symbol hashtable)
                      (packed-info-insert
                       (gethash symbol hashtable +nil-packed-infos+)
-                      sb!impl::+no-auxilliary-key+ num cold-classoid-cell)))
+                      sb-impl::+no-auxilliary-key+ num cold-classoid-cell)))
              *classoid-cells*))
   hashtable)
 
@@ -2661,7 +2661,7 @@ core and return a descriptor to it."
       (if (not args)
           (push fun *!cold-toplevels*)
           (case fun
-            (sb!impl::%defun (apply #'cold-fset args))
+            (sb-impl::%defun (apply #'cold-fset args))
             (sb!pcl::!trivial-defmethod (apply #'cold-defmethod args))
             (sb!kernel::%defstruct
              (push args *known-structure-classoids*)
@@ -3076,7 +3076,7 @@ core and return a descriptor to it."
                   nil)
             constants))
     ;; One more symbol that doesn't fit into the code above.
-    (let ((c 'sb!impl::+magic-hash-vector-value+))
+    (let ((c 'sb-impl::+magic-hash-vector-value+))
       (push (list (c-symbol-name c) 9 (symbol-value c) +c-literal-64bit+ nil)
             constants))
     ;; And still one more

@@ -322,11 +322,11 @@
   `(svref ,(let ((a (make-array 256)))
              (dovector (info sb-vm:*specialized-array-element-type-properties* a)
                (setf (aref a (sb-vm:saetp-typecode info))
-                     (package-symbolicate "SB!IMPL" "VECTOR-MAP-INTO/"
+                     (package-symbolicate "SB-IMPL" "VECTOR-MAP-INTO/"
                                           (sb-vm:saetp-primitive-type-name info)))))
           ,typecode)
   #-sb-xc-host
-  `(%fun-name (svref sb!impl::%%vector-map-into-funs%% ,typecode)))
+  `(%fun-name (svref sb-impl::%%vector-map-into-funs%% ,typecode)))
 
 (deftransform map-into ((result fun &rest seqs)
                         (vector * &rest *)
@@ -824,7 +824,7 @@
                                    (simple-base-string simple-base-string t t t t) *)
                 `(let* ((end1 (if (not end1) (length string1) end1))
                         (end2 (if (not end2) (length string2) end2))
-                        (index (sb!impl::%sp-string-compare
+                        (index (sb-impl::%sp-string-compare
                                 string1 start1 end1 string2 start2 end2)))
                   (if index
                       (cond ((= index end1)
@@ -883,7 +883,7 @@
              `(deftransform ,name ((string1 string2 start1 end1 start2 end2)
                                    (simple-base-string simple-base-string t t t t) *)
                 `(,',result-fun
-                  (sb!impl::%sp-string-compare
+                  (sb-impl::%sp-string-compare
                    string1 start1 (or end1 (length string1))
                    string2 start2 (or end2 (length string2)))))))
   (def string=* not) ; FIXME: this xform looks counterproductive.
@@ -939,7 +939,7 @@
 ;;; This transform is critical to the performance of string streams.  If
 ;;; you tweak it, make sure that you compare the disassembly, if not the
 ;;; performance of, the functions implementing string streams
-;;; (e.g. SB!IMPL::STRING-OUCH).
+;;; (e.g. SB-IMPL::STRING-OUCH).
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun !make-replace-transform (saetp sequence-type1 sequence-type2)
     `(deftransform replace ((seq1 seq2 &key (start1 0) (start2 0) end1 end2)
@@ -1541,7 +1541,7 @@
     (flet ((bad ()
              (let ((*compiler-error-context* node))
                (compiler-warn "Bad bounding indices ~s, ~s for ~
-                               ~/sb!impl:print-type/"
+                               ~/sb-impl:print-type/"
                               constant-start constant-end sequence-type))))
       (cond ((and index-length
                   (minusp index-length))
@@ -1650,7 +1650,7 @@
                        for var in vars
                        collect (if value
                                    (length value)
-                                   `(sb!impl::string-dispatch ((simple-array * (*))
+                                   `(sb-impl::string-dispatch ((simple-array * (*))
                                                                sequence)
                                                               ,var
                                       #-sb-xc-host
@@ -1693,7 +1693,7 @@
                                     `(incf (truly-the index .pos.) ,(length value)))))
                              (t
                               (prog1
-                                  `(sb!impl::string-dispatch
+                                  `(sb-impl::string-dispatch
                                        (#!+sb-unicode
                                         (simple-array character (*))
                                         (simple-array base-char (*))
@@ -2078,7 +2078,7 @@
                               :policy (> speed space))
   (if (eq '* (upgraded-element-type-specifier sequence))
       (let ((form
-             `(sb!impl::string-dispatch ((simple-array character (*))
+             `(sb-impl::string-dispatch ((simple-array character (*))
                                          (simple-array base-char (*))
                                          (simple-array nil (*)))
                   sequence
@@ -2291,14 +2291,14 @@
                         `(list* ,@variants ',tail)
                         `(list ,@variants)))))))))
 
-(deftransform sb!impl::|List| ((&rest elts))
+(deftransform sb-impl::|List| ((&rest elts))
   (transform-backq-list-or-list* 'list elts))
 
-(deftransform sb!impl::|List*| ((&rest elts))
+(deftransform sb-impl::|List*| ((&rest elts))
   (transform-backq-list-or-list* 'list* elts))
 
 ;; Merge adjacent constant values
-(deftransform sb!impl::|Append| ((&rest elts))
+(deftransform sb-impl::|Append| ((&rest elts))
   (let ((gensyms (make-gensym-list (length elts)))
         (acc nil)
         (ignored '())
@@ -2327,16 +2327,16 @@
          (append ,@arguments)))))
 
 (deftransform reverse ((sequence) (vector) * :important nil)
-  `(sb!impl::vector-reverse sequence))
+  `(sb-impl::vector-reverse sequence))
 
 (deftransform reverse ((sequence) (list) * :important nil)
-  `(sb!impl::list-reverse sequence))
+  `(sb-impl::list-reverse sequence))
 
 (deftransform nreverse ((sequence) (vector) * :important nil)
-  `(sb!impl::vector-nreverse sequence))
+  `(sb-impl::vector-nreverse sequence))
 
 (deftransform nreverse ((sequence) (list) * :important nil)
-  `(sb!impl::list-nreverse sequence))
+  `(sb-impl::list-nreverse sequence))
 
 (deftransforms (intersection nintersection)
     ((list1 list2 &key key test test-not))
@@ -2437,6 +2437,6 @@
         ((and (not test-not)
               (or (not test)
                   (lvar-fun-is test '(eql))))
-         `(sb!impl::tree-equal-eql list1 list2))
+         `(sb-impl::tree-equal-eql list1 list2))
         (t
          (give-up-ir1-transform))))

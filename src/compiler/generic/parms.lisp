@@ -165,7 +165,7 @@
     *in-without-gcing*
     *gc-inhibit*
     *gc-pending*
-    #!+sb-safepoint sb!impl::*in-safepoint*
+    #!+sb-safepoint sb-impl::*in-safepoint*
     #!+sb-thread *stop-for-gc-pending*
     ;; non-x86oid gencgc object pinning
     #!+(and gencgc (not (or x86 x86-64))) *pinned-objects*

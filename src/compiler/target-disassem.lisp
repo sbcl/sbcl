@@ -857,7 +857,7 @@
       (awhen (get symbol 'instruction-flavors)
         (setf (get symbol 'instruction-flavors)
               (collect-inst-variants symbol package it cache))))
-    (unless (sb!impl::!c-runtime-noinform-p)
+    (unless (sb-impl::!c-runtime-noinform-p)
       (format t "~&Disassembler: ~{~D printers, ~D prefilters, ~D labelers~}~%"
               (mapcar (lambda (x) (length (cdr x))) cache)))))
 

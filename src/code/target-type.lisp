@@ -145,7 +145,7 @@
       (function
        (if (funcallable-instance-p x)
            (classoid-of x)
-           (let ((type (sb!impl::%fun-type x)))
+           (let ((type (sb-impl::%fun-type x)))
              (if (typep type '(cons (eql function))) ; sanity test
                  (try-cache type)
                  (classoid-of x)))))

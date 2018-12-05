@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 (defmacro with-finalizer-store ((var) &body body)
   `(let ((mutex (hash-table-lock (finalizer-id-map **finalizer-store**))))

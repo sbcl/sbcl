@@ -126,7 +126,7 @@
   ;; Line length we should format to. Cached here so we don't have to keep
   ;; extracting it from the target stream.
   (line-length (or *print-right-margin*
-                   (sb!impl::line-length target)
+                   (sb-impl::line-length target)
                    default-line-length)
                :type column
                :read-only t)
@@ -145,7 +145,7 @@
   ;; The column the first character in the buffer will appear in. Normally
   ;; zero, but if we end up with a very long line with no breaks in it we
   ;; might have to output part of it. Then this will no longer be zero.
-  (buffer-start-column (or (sb!impl::charpos target) 0) :type column)
+  (buffer-start-column (or (sb-impl::charpos target) 0) :type column)
   ;; The line number we are currently on. Used for *PRINT-LINES*
   ;; abbreviations and to tell when sections have been split across
   ;; multiple lines.

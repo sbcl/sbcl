@@ -64,18 +64,18 @@
   #+sb-xc-host
   t
   #-sb-xc-host
-  (let ((external-format (sb!impl::get-external-format
+  (let ((external-format (sb-impl::get-external-format
                           ;; Can't use C-STRING-EXTERNAL-FORMAT here,
                           ;; since the meaning of :DEFAULT can change
                           ;; when *DEFAULT-C-STRING-EXTERNAL-FORMAT*
                           ;; changes.
                           (alien-c-string-type-external-format type))))
     (not (and external-format
-              (or (eq (first (sb!impl::ef-names external-format)) :ascii)
+              (or (eq (first (sb-impl::ef-names external-format)) :ascii)
                   ;; On non-SB-UNICODE all latin-1 codepoints will fit
                   ;; into a base-char, on SB-UNICODE they won't.
                   #!-sb-unicode
-                  (eq (first (sb!impl::ef-names external-format)) :latin-1))))))
+                  (eq (first (sb-impl::ef-names external-format)) :latin-1))))))
 
 (declaim (ftype (sfunction (t) nil) null-error))
 (defun null-error (type)

@@ -729,7 +729,7 @@
       (%make-simd-pack-type
        (dolist (pack-type *simd-pack-element-types*
                 (error "~S element type must be a subtype of ~
-                         ~{~/sb!impl:print-type-specifier/~#[~;, or ~
+                         ~{~/sb-impl:print-type-specifier/~#[~;, or ~
                          ~:;, ~]~}."
                        'simd-pack *simd-pack-element-types*))
          (when (csubtypep element-type (specifier-type pack-type))
@@ -777,7 +777,7 @@
 ;;; elsewhere: it improves the TYPE= and CSUBTYPEP functions,
 ;;; since EQ types are an immediate win.
 #-sb-xc-host
-(sb!impl::!define-hash-cache values-specifier-type
+(sb-impl::!define-hash-cache values-specifier-type
   ((orig equal-but-no-car-recursion)) ()
   :hash-function #'sxhash :hash-bits 10)
 
@@ -791,7 +791,7 @@
   (labels ((fail (spec) ; Q: Shouldn't this signal a TYPE-ERROR ?
              #-sb-xc-host(declare (optimize allow-non-returning-tail-call))
              (error "bad thing to be a type specifier: ~
-                      ~/sb!impl:print-type-specifier/"
+                      ~/sb-impl:print-type-specifier/"
                     spec))
            (instance-to-ctype (x)
              (flet ((translate (classoid)
@@ -891,7 +891,7 @@
   (let ((ctype (values-specifier-type-r context type-specifier)))
     (when (values-type-p ctype)
       (error "VALUES type illegal in this context:~% ~
-               ~/sb!impl:print-type-specifier/"
+               ~/sb-impl:print-type-specifier/"
              type-specifier))
     ctype))
 (defun specifier-type (type-specifier)

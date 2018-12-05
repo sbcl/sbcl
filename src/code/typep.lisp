@@ -198,7 +198,7 @@
          (error "Function types are not a legal argument to TYPEP:~%  ~S"
                 (type-specifier type))
          (and (functionp object)
-              (csubtypep (specifier-type (sb!impl::%fun-type object)) type))))))
+              (csubtypep (specifier-type (sb-impl::%fun-type object)) type))))))
 
 (defun cached-typep (cache object)
   (let* ((type (cdr cache))

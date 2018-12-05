@@ -405,7 +405,7 @@
     (let ((widetag (%other-pointer-widetag array)))
       (make-case))))
 
-(defun sb!impl::make-vector-like (vector length)
+(defun sb-impl::make-vector-like (vector length)
   (allocate-vector-with-widetag (array-underlying-widetag vector) length nil))
 
 ;; Complain in various ways about wrong :INITIAL-foo arguments,
@@ -561,7 +561,7 @@ of specialized arrays is supported."
   ;; is expensive, but probably worth the trouble as once we've allocated
   ;; the vector we have no way to get rid of it anymore...
   (when (eq t (upgraded-array-element-type element-type))
-    (error "Static arrays of type ~/sb!impl:print-type-specifier/ not supported."
+    (error "Static arrays of type ~/sb-impl:print-type-specifier/ not supported."
            element-type))
   (validate-array-initargs initial-element-p initial-element
                            initial-contents-p initial-contents nil) ; for effect
@@ -573,12 +573,12 @@ of specialized arrays is supported."
              length))
     (unless (every (lambda (x) (typep x element-type)) initial-contents)
       (error ":INITIAL-CONTENTS contains elements not of type ~
-               ~/sb!impl:print-type-specifier/."
+               ~/sb-impl:print-type-specifier/."
              element-type)))
   (when initial-element-p
     (unless (typep initial-element element-type)
       (error ":INITIAL-ELEMENT ~S is not of type ~
-               ~/sb!impl:print-type-specifier/."
+               ~/sb-impl:print-type-specifier/."
              initial-element element-type)))
   ;; STEP 2
   ;;
@@ -681,7 +681,7 @@ of specialized arrays is supported."
   (def !find-data-vector-reffer/check-bounds %%data-vector-reffers/check-bounds%%))
 
 ;;; Like DOVECTOR, but more magical -- can't use this on host.
-(defmacro sb!impl::do-vector-data ((elt vector &optional result) &body body)
+(defmacro sb-impl::do-vector-data ((elt vector &optional result) &body body)
   (multiple-value-bind (forms decls) (parse-body body nil)
     (with-unique-names (index vec start end ref)
       `(with-array-data ((,vec ,vector)
@@ -693,7 +693,7 @@ of specialized arrays is supported."
            (do ((,index ,start (1+ ,index)))
                ((>= ,index ,end)
                 (let ((,elt nil))
-                  ,@(sb!impl::filter-dolist-declarations decls)
+                  ,@(sb-impl::filter-dolist-declarations decls)
                   ,elt
                   ,result))
              (let ((,elt (funcall ,ref ,vec ,index)))
@@ -1296,8 +1296,8 @@ of specialized arrays is supported."
              (when (/= (array-underlying-widetag displaced-to) widetag)
                ;; See lp#1331299 again. Require exact match on upgraded type?
                (error "can't displace an array of type ~
-                        ~/sb!impl:print-type-specifier/ into another ~
-                        of type ~/sb!impl:print-type-specifier/"
+                        ~/sb-impl:print-type-specifier/ into another ~
+                        of type ~/sb-impl:print-type-specifier/"
                       element-type (array-element-type displaced-to)))
              (let ((displacement (or displaced-index-offset 0))
                    (array-size  (if (listp dimensions)
@@ -1575,7 +1575,7 @@ function to be removed without further warning."
          (unless (or (not initial-element-p)
                      (typep initial-element element-type))
            (error "~S can't be used to initialize an array of type ~
-                    ~/sb!impl:print-type-specifier/."
+                    ~/sb-impl:print-type-specifier/."
                   initial-element element-type))
          (let ((temp (if initial-element-p
                          (make-array new-length :initial-element initial-element)
@@ -1784,7 +1784,7 @@ function to be removed without further warning."
 ;;; Finally, the DISPATCH-FOO macro is defined which does the actual
 ;;; dispatching when called. It expects arguments that match PARAMS.
 ;;;
-(defmacro sb!impl::!define-array-dispatch (dispatch-name params &body body)
+(defmacro sb-impl::!define-array-dispatch (dispatch-name params &body body)
   (let ((table-name (symbolicate "%%" dispatch-name "-FUNS%%"))
         (error-name (symbolicate "HAIRY-" dispatch-name "-ERROR")))
     `(progn
@@ -1846,7 +1846,7 @@ function to be removed without further warning."
 
 ;;; Horrible kludge for the "static-vectors" system
 ;;; which uses an internal symbol in SB-IMPL.
-(import '%vector-widetag-and-n-bits-shift 'sb!impl)
+(import '%vector-widetag-and-n-bits-shift 'sb-impl)
 
 (defun make-weak-vector (length &key (initial-contents nil contents-p)
                                      (initial-element nil element-p))

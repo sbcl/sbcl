@@ -510,14 +510,14 @@
         (cond ((and (ref-p use) (constant-p (ref-leaf use)))
                (warn condition
                      :format-control "~:[This~;~:*~A~] is not a ~
-                       ~<~%~9T~:;~/sb!impl:print-type/:~>~% ~S"
+                       ~<~%~9T~:;~/sb-impl:print-type/:~>~% ~S"
                      :format-arguments
                      (list what atype (constant-value (ref-leaf use)))))
               (t
                (warn condition
                      :format-control
-                      "~:[Result~;~:*~A~] is a ~/sb!impl:print-type/, ~
-                       ~<~%~9T~:;not a ~/sb!impl:print-type/.~>"
+                      "~:[Result~;~:*~A~] is a ~/sb-impl:print-type/, ~
+                       ~<~%~9T~:;not a ~/sb-impl:print-type/.~>"
                      :format-arguments (list what dtype atype)))))))
   (values))
 
@@ -580,7 +580,7 @@
                  (when (policy cast (>= safety inhibit-warnings))
                    (compiler-notify
                     "type assertion too complex to check:~%~
-                    ~/sb!impl:print-type/."
+                    ~/sb-impl:print-type/."
                     (coerce-to-values (cast-asserted-type cast)))))
                (setf (cast-type-to-check cast) *wild-type*)
                (setf (cast-%type-check cast) nil)))))))

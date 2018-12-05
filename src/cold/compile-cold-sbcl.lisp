@@ -92,8 +92,8 @@
         (*readtable* (copy-readtable)))
     ;; ..in order to make backquotes expand into target code
     ;; instead of host code.
-    (set-macro-character #\` #'sb!impl::backquote-charmacro)
-    (set-macro-character #\, #'sb!impl::comma-charmacro)
+    (set-macro-character #\` #'sb-impl::backquote-charmacro)
+    (set-macro-character #\, #'sb-impl::comma-charmacro)
 
     ;; Warn about presence of #\Tab or #\Page in our quoted strings.
     ;; This is done here and not more broadly, per the comment above.
@@ -115,7 +115,7 @@
 (setf (sb-xc:macro-function 'sb!int:quasiquote)
       (lambda (form env)
         (the sb!kernel:lexenv-designator env)
-        (sb!impl::expand-quasiquote (second form) t)))
+        (sb-impl::expand-quasiquote (second form) t)))
 
 (setq sb-c::*track-full-called-fnames* :minimal) ; Change this as desired
 
@@ -231,15 +231,15 @@
             sb!interpreter::reconstruct-syntactic-closure-env)
           ;; Other
           '(sb!debug::find-interrupted-name-and-frame
-            sb!impl::encapsulate-generic-function
-            sb!impl::encapsulated-generic-function-p
-            sb!impl::get-processes-status-changes
-            sb!impl::step-form
-            sb!impl::step-values
-            sb!impl::stringify-package-designator
-            sb!impl::stringify-string-designator
-            sb!impl::stringify-string-designators
-            sb!impl::unencapsulate-generic-function)))
+            sb-impl::encapsulate-generic-function
+            sb-impl::encapsulated-generic-function-p
+            sb-impl::get-processes-status-changes
+            sb-impl::step-form
+            sb-impl::step-values
+            sb-impl::stringify-package-designator
+            sb-impl::stringify-string-designator
+            sb-impl::stringify-string-designators
+            sb-impl::unencapsulate-generic-function)))
   (setf (gethash sym sb-c::*undefined-fun-whitelist*) t))
 
 #+#.(cl:if (cl:find-package "HOST-SB-POSIX") '(and) '(or))

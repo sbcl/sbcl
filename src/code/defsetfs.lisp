@@ -35,7 +35,7 @@
 (defsetf breakpoint-info %set-breakpoint-info)
 
 ;;; from bignum.lisp
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 (defsetf %bignum-ref %bignum-set)
 
 ;;; from defstruct.lisp

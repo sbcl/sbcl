@@ -108,8 +108,8 @@
         do (format t "       ~S~%" spec)))
 
 ;; Print some information about how well the type operator caches performed
-(when sb!impl::*profile-hash-cache*
-  (sb!impl::show-hash-cache-statistics))
+(when sb-impl::*profile-hash-cache*
+  (sb-impl::show-hash-cache-statistics))
 #|
 Sample output
 -------------

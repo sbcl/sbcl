@@ -1273,7 +1273,7 @@
                          ,@(expand-directive-list (pop segments))))
                  ,(expand-bind-defaults
                       ((extra 0)
-                       (line-len '(or (sb!impl::line-length stream) 72)))
+                       (line-len '(or (sb-impl::line-length stream) 72)))
                       (directive-params first-semi)
                     `(setf extra-space ,extra line-len ,line-len))))
            ,@(mapcar (lambda (segment)

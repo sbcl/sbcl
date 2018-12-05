@@ -359,7 +359,7 @@ main(int argc, char __attribute__((unused)) *argv[])
 
 #ifdef LISP_FEATURE_BSD
     printf(";;; sysctl(3) names\n");
-    printf("(in-package \"SB!IMPL\")\n");
+    printf("(in-package \"SB-IMPL\")\n");
     defconstant("ctl-kern", CTL_KERN);
     defconstant("ctl-hw", CTL_HW);
     defconstant("ctl-maxname", CTL_MAXNAME);

@@ -282,8 +282,8 @@
                ;; seekable (doesn't really have a file)
                (or (not (typep stream 'file-stream))
                    (and (typep stream 'fd-stream)
-                        (or (not (sb!impl::fd-stream-bivalent-p stream))
-                            (not (sb!impl::fd-stream-file stream))))))
+                        (or (not (sb-impl::fd-stream-bivalent-p stream))
+                            (not (sb-impl::fd-stream-file stream))))))
     (let ((p (file-position stream)))
       (unwind-protect
            (let* ((header *fasl-header-string-start-string*)
@@ -468,7 +468,7 @@
                    (setf (%fasl-input-deprecated-stuff fasl-input) nil)
                    (loader-deprecation-warn
                     it
-                    (and (eq (svref stack 1) 'sb!impl::%defun) (svref stack 2))))
+                    (and (eq (svref stack 1) 'sb-impl::%defun) (svref stack 2))))
                  (when print
                    (load-fresh-line)
                    (prin1 result))))))))))))

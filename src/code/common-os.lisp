@@ -47,7 +47,7 @@
         *runtime-pathname* nil
         *core-pathname* nil
         *posix-argv* nil)
-  (sb!impl::%makunbound '*machine-version*))
+  (sb-impl::%makunbound '*machine-version*))
 
 (defun os-cold-init-or-reinit ()
   (/show0 "entering OS-COLD-INIT-OR-REINIT")

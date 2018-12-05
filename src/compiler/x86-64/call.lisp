@@ -1397,7 +1397,7 @@
   ;; register on -SB-THREAD. While this isn't critical for x86-64,
   ;; it's more serious for x86.
   #!+sb-thread (inst cmp :byte (thread-slot-ea thread-stepping-slot) 0)
-  #!-sb-thread (inst cmp :byte (static-symbol-value-ea 'sb!impl::*stepping*) 0))
+  #!-sb-thread (inst cmp :byte (static-symbol-value-ea 'sb-impl::*stepping*) 0))
 
 (define-vop (step-instrument-before-vop)
   (:policy :fast-safe)

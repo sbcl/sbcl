@@ -724,8 +724,8 @@ default-value-8
                 (insert-step-instrumenting (callable-tn)
                   ;; Conditionally insert a conditional trap:
                   (when step-instrumenting
-                    ;; Get the symbol-value of SB!IMPL::*STEPPING*
-                    (load-symbol-value stepping sb!impl::*stepping*)
+                    ;; Get the symbol-value of SB-IMPL::*STEPPING*
+                    (load-symbol-value stepping sb-impl::*stepping*)
                     (inst cmp stepping zero-tn)
                     ;; If it's not null, trap.
                     (inst b :eq step-done-label)
@@ -1178,7 +1178,7 @@ default-value-8
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 3
-    (load-symbol-value stepping sb!impl::*stepping*)
+    (load-symbol-value stepping sb-impl::*stepping*)
     (inst cmp stepping zero-tn)
     (inst b :eq DONE)
     (inst nop)

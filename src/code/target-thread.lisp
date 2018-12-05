@@ -269,7 +269,7 @@ created and old ones may exit at any time."
 
 (defun init-initial-thread ()
   (/show0 "Entering INIT-INITIAL-THREAD")
-  (setf sb!impl::*exit-lock* (make-mutex :name "Exit Lock")
+  (setf sb-impl::*exit-lock* (make-mutex :name "Exit Lock")
         *make-thread-lock* (make-mutex :name "Make-Thread Lock"))
   (let ((thread (%make-thread :name "main thread"
                               :%alive-p t)))
@@ -277,7 +277,7 @@ created and old ones may exit at any time."
           (thread-primitive-thread thread) (sap-int (current-thread-sap))
           *initial-thread* thread
           *current-thread* thread)
-    (setq sb!impl::*treap-random-state* (make-random-state *random-state*))
+    (setq sb-impl::*treap-random-state* (make-random-state *random-state*))
     (grab-mutex (thread-result-lock *initial-thread*))
     (note-stack-range thread nil)
     ;; Either *all-threads* is empty or it contains exactly one thread
@@ -400,7 +400,7 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
     `(let* ((,n-thread ,thread)
             (,n-lock ,lock)
             (,n-timeout ,(when timeoutp
-                           `(or ,timeout sb!impl::*deadline*)))
+                           `(or ,timeout sb-impl::*deadline*)))
             (,new (if ,n-timeout
                       ;; Using CONS tells the rest of the system there's a
                       ;; timeout in place, so it isn't considered a deadlock.
@@ -723,7 +723,7 @@ returns NIL each time."
        ;; Update timeout if necessary.
        (when stop-sec
          (setf (values to-sec to-usec)
-               (sb!impl::relative-decoded-times stop-sec stop-usec)))
+               (sb-impl::relative-decoded-times stop-sec stop-usec)))
        ;; Spin.
        (go :retry))))
 
@@ -971,7 +971,7 @@ IF-NOT-OWNER is :FORCE)."
           ;; already past the requested timeout.
           (when (and (eq :ok status) to-sec)
             (setf (values to-sec to-usec)
-                  (sb!impl::relative-decoded-times stop-sec stop-usec))
+                  (sb-impl::relative-decoded-times stop-sec stop-usec))
             (when (and (zerop to-sec) (not (plusp to-usec)))
               (setf status :timeout)))
           ;; If we ran into deadline, try to get the mutex before
@@ -1002,7 +1002,7 @@ IF-NOT-OWNER is :FORCE)."
         (:ok
          (if timeout
              (multiple-value-bind (sec usec)
-                 (sb!impl::relative-decoded-times stop-sec stop-usec)
+                 (sb-impl::relative-decoded-times stop-sec stop-usec)
                (values t sec usec))
              t))
         (:timeout
@@ -1358,7 +1358,7 @@ on this semaphore, then N of them is woken up."
   ;; being spawned, and guarantees that *ALL-THREADS*
   ;; is up to date.
   (with-deadline (:seconds nil :override t)
-    (sb!impl::finalizer-thread-stop)
+    (sb-impl::finalizer-thread-stop)
     (grab-mutex *make-thread-lock*)
     (let ((timeout sb!ext:*exit-timeout*)
           (code *exit-in-process*)
@@ -1392,7 +1392,7 @@ on this semaphore, then N of them is woken up."
                main
                (lambda ()
                  (setf *exit-in-process* (list code))
-                 (throw 'sb!impl::%end-of-the-world t)))
+                 (throw 'sb-impl::%end-of-the-world t)))
             (interrupt-thread-error ()))
           ;; Normally this never finishes, as once the main-thread unwinds we
           ;; exit with the right code, but if times out before that happens,
@@ -1491,23 +1491,23 @@ session."
          (err (sb!unix:unix-dup in)))
     (labels ((thread-repl ()
                (sb!unix::unix-setsid)
-               (let* ((sb!impl::*stdin*
+               (let* ((sb-impl::*stdin*
                        (make-fd-stream in :input t :buffering :line
                                        :dual-channel-p t))
-                      (sb!impl::*stdout*
+                      (sb-impl::*stdout*
                        (make-fd-stream out :output t :buffering :line
                                               :dual-channel-p t))
-                      (sb!impl::*stderr*
+                      (sb-impl::*stderr*
                        (make-fd-stream err :output t :buffering :line
                                               :dual-channel-p t))
-                      (sb!impl::*tty*
+                      (sb-impl::*tty*
                        (make-fd-stream err :input t :output t
                                               :buffering :line
                                               :dual-channel-p t))
-                      (sb!impl::*descriptor-handlers* nil))
+                      (sb-impl::*descriptor-handlers* nil))
                  (with-new-session ()
                    (unwind-protect
-                        (sb!impl::toplevel-repl nil)
+                        (sb-impl::toplevel-repl nil)
                      (flush-standard-output-streams))))))
       (make-thread #'thread-repl))))
 
@@ -1553,8 +1553,8 @@ session."
     ;; Using handling-end-of-the-world would be a bit tricky
     ;; due to other catches and interrupts, so we essentially
     ;; re-implement it here. Once and only once more.
-    (catch 'sb!impl::toplevel-catcher
-      (catch 'sb!impl::%end-of-the-world
+    (catch 'sb-impl::toplevel-catcher
+      (catch 'sb-impl::%end-of-the-world
         (catch '%abort-thread
           (restart-bind ((abort
                            (lambda ()
@@ -1576,7 +1576,7 @@ session."
                                         (apply real-function arguments)
                                         #'sb!di::catch-runaway-unwind))
                                   (when *exit-in-process*
-                                    (sb!impl::call-exit-hooks))))
+                                    (sb-impl::call-exit-hooks))))
                              #!+sb-safepoint
                              (sb!kernel::gc-safepoint))))
                 ;; we're going down, can't handle interrupts

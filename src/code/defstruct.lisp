@@ -444,7 +444,7 @@
                            ,(dd-length defstruct))
                           (eq ',name (aref (the ,ltype ,argname) ,name-index))))
                    (t (bug "Unhandled representation type in typed DEFSTRUCT: ~
-                            ~/sb!impl:print-type-specifier/."
+                            ~/sb-impl:print-type-specifier/."
                            ltype))))))))))
 
 ;;; Return a list of forms to create a copier function of a typed DEFSTRUCT.
@@ -641,7 +641,7 @@ requires exactly~;accepts at most~] one argument" keyword syntax-group)
                (subtypep 'symbol (dd-element-type dd))
              (when (and (not winp) certainp)
                (error ":NAMED option is incompatible with element ~
-                        type ~/sb!impl:print-type-specifier/"
+                        type ~/sb-impl:print-type-specifier/"
                       (dd-element-type dd))))
            (when (dd-predicate-name dd)
              (error ":PREDICATE cannot be used with :TYPE ~
@@ -1004,9 +1004,9 @@ unless :NAMED is also specified.")))
                     (layout-inherits super)
                     (vector super
                             (classoid-layout (find-classoid 'file-stream)))))
-      ((sb!impl::string-input-stream ; etc
-        sb!impl::string-output-stream
-        sb!impl::fill-pointer-output-stream)
+      ((sb-impl::string-input-stream ; etc
+        sb-impl::string-output-stream
+        sb-impl::fill-pointer-output-stream)
        (concatenate 'simple-vector
                     (layout-inherits super)
                     (vector super
@@ -1442,8 +1442,8 @@ or they must be declared locally notinline at each call site.~@:>"
           (case (dd-name info)
             ((ansi-stream
               fd-stream
-              sb!impl::string-input-stream sb!impl::string-output-stream
-              sb!impl::fill-pointer-output-stream)
+              sb-impl::string-input-stream sb-impl::string-output-stream
+              sb-impl::fill-pointer-output-stream)
              (list (layout-classoid (svref inherits (1- (length inherits))))
                    (layout-classoid (svref inherits (- (length inherits) 2)))))
             (t

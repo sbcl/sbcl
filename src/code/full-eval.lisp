@@ -30,13 +30,13 @@
 ;;; conditions both for the * SAME * evaluator. Wtf???
 ;;; I suppose it's worth mentioning that we could "fix" this naming problem
 ;;; by removing the older evaluator once and for all.
-(define-condition interpreted-program-error (program-error simple-condition sb!impl::encapsulated-condition)
+(define-condition interpreted-program-error (program-error simple-condition sb-impl::encapsulated-condition)
   ()
   (:report (lambda (condition stream)
              (if (slot-boundp condition 'condition)
                  (progn
                    (format stream "Error evaluating a form:~% ~A"
-                           (sb!impl::encapsulated-condition condition)))
+                           (sb-impl::encapsulated-condition condition)))
                  (format stream "Error evaluating a form:~% ~?"
                          (simple-condition-format-control condition)
                          (simple-condition-format-arguments condition))))))
@@ -1182,7 +1182,7 @@
 
 (defun eval-in-native-environment (form lexenv)
   (handler-bind
-      ((sb!impl::eval-error
+      ((sb-impl::eval-error
          (lambda (condition)
            (error 'interpreted-program-error
                   :condition (encapsulated-condition condition)

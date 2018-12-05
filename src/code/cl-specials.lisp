@@ -140,7 +140,7 @@
 ;;;; These have alternate definitions (in cross-misc) which rely on
 ;;;; the underlying host DEFVAR when building the cross-compiler.
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 (defmacro defglobal (name value &optional (doc nil docp))
   "Defines NAME as a global variable that is always bound. VALUE is evaluated

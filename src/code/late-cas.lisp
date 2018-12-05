@@ -1,4 +1,4 @@
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 (defcas car (cons) %compare-and-swap-car)
 (defcas cdr (cons) %compare-and-swap-cdr)

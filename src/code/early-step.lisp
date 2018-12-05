@@ -13,7 +13,7 @@
 ;;;; signalling forms into code compiled at high debug settings, and
 ;;;; having a handler for them at the toplevel.
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 ;; Used for controlling whether the stepper is enabled / disabled when
 ;; building without SB-THREAD. With SB-THREAD, a slot in the thread

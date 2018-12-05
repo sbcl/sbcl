@@ -566,7 +566,7 @@ between the ~A definition and the ~A definition"
                          name (classoid-name old) (classoid-name new))))))
             (:primitive
              (error "Cannot redefine standard type ~
-                     ~/sb!impl:print-type-specifier/." name))
+                     ~/sb-impl:print-type-specifier/." name))
             (:defined
              (warn "redefining DEFTYPE type to be a class: ~
                     ~/sb!ext:print-symbol-with-prefix/" name)
@@ -606,7 +606,7 @@ between the ~A definition and the ~A definition"
       (:defined)
       (:primitive
        (error "Attempt to remove :PRIMITIVE type: ~
-              ~/sb!impl:print-type-specifier/" name))
+              ~/sb-impl:print-type-specifier/" name))
       ((:forthcoming-defclass-type :instance)
        (when cell
          ;; Note: We cannot remove the classoid cell from the table,

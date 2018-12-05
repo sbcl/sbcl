@@ -353,7 +353,7 @@
   ;; without it signalling an error is more than likely to end in a
   ;; recursive error.
   (%primitive print "Thread local storage exhausted.")
-  (sb!impl::%halt))
+  (sb-impl::%halt))
 
 (deferr failed-aver-error (form)
   (bug "~@<failed AVER: ~2I~_~S~:>" form))

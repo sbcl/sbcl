@@ -11,7 +11,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 ;;; There seems to be no portable way to mask float traps, but we
 ;;; shouldn't encounter any float traps when cross-compiling SBCL

@@ -421,7 +421,7 @@
          (fun (and fdefn (fdefn-fun fdefn))))
     (if fun
         (handler-bind ((style-warning #'muffle-warning))
-          (specifier-type (sb!impl::%fun-type fun)))
+          (specifier-type (sb-impl::%fun-type fun)))
         (specifier-type 'function)))))
 
 ;;; The type specifier for this function, or a DEFSTRUCT-DESCRIPTION

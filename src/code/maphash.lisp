@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 ;;; an internal tag for marking empty slots, which needs to be defined
 ;;; no later than the compiler-macro for MAPHASH.

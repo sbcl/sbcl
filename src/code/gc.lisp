@@ -202,7 +202,7 @@ statistics are appended to it."
            (without-interrupts
              (sb!thread::without-thread-waiting-for
                  (:already-without-interrupts t)
-               (let ((sb!impl::*deadline* nil)
+               (let ((sb-impl::*deadline* nil)
                      (epoch *gc-epoch*))
                  (loop
                   ;; GCing must be done without-gcing to avoid
@@ -271,7 +271,7 @@ statistics are appended to it."
   ;; dying thread, so we still need the guard for that, but not
   ;; the guard for whether interupts are enabled.
   (when (sb!thread:thread-alive-p sb!thread:*current-thread*)
-    (let ((threadp #!+sb-thread (%instancep sb!impl::*finalizer-thread*)))
+    (let ((threadp #!+sb-thread (%instancep sb-impl::*finalizer-thread*)))
       (when threadp
         ;; It's OK to frob a condition variable regardless of
         ;; *allow-with-interrupts*, and probably OK to start a thread.

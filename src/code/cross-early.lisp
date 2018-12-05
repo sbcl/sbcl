@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 ;;; The STRUCTURE!OBJECT abstract class is the base of the hierarchy
 ;;; of objects that need to be identifiable as SBCL system objects

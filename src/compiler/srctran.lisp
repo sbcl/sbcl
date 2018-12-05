@@ -172,7 +172,7 @@
   (case (length lists)
     (0 nil)
     (1 (car lists))
-    (2 `(sb!impl::append2 ,@lists))
+    (2 `(sb-impl::append2 ,@lists))
     (t (values nil t))))
 
 (define-source-transform nconc (&rest lists)
@@ -218,7 +218,7 @@
 (defoptimizer (append derive-type) ((&rest args))
   (derive-append-type args))
 
-(defoptimizer (sb!impl::append2 derive-type) ((&rest args))
+(defoptimizer (sb-impl::append2 derive-type) ((&rest args))
   (derive-append-type args))
 
 (defoptimizer (nconc derive-type) ((&rest args))
@@ -254,13 +254,13 @@
 
 (define-source-transform gethash (&rest args)
   (case (length args)
-   (2 `(sb!impl::gethash3 ,@args nil))
-   (3 `(sb!impl::gethash3 ,@args))
+   (2 `(sb-impl::gethash3 ,@args nil))
+   (3 `(sb-impl::gethash3 ,@args))
    (t (values nil t))))
 (define-source-transform get (&rest args)
   (case (length args)
-   (2 `(sb!impl::get3 ,@args nil))
-   (3 `(sb!impl::get3 ,@args))
+   (2 `(sb-impl::get3 ,@args nil))
+   (3 `(sb-impl::get3 ,@args))
    (t (values nil t))))
 
 (defvar *default-nthcdr-open-code-limit* 6)
@@ -4889,7 +4889,7 @@
                          *universal-type*))))
         (recurse array-type)))))
 
-(define-source-transform sb!impl::sort-vector (vector start end predicate key)
+(define-source-transform sb-impl::sort-vector (vector start end predicate key)
   ;; Like CMU CL, we use HEAPSORT. However, other than that, this code
   ;; isn't really related to the CMU CL code, since instead of trying
   ;; to generalize the CMU CL code to allow START and END values, this
@@ -4966,7 +4966,7 @@
 
 (deftransform sort ((list predicate &key key)
                     (list * &rest t) *)
-  `(sb!impl::stable-sort-list list
+  `(sb-impl::stable-sort-list list
                               (%coerce-callable-to-fun predicate)
                               (if key (%coerce-callable-to-fun key) #'identity)))
 
@@ -4974,15 +4974,15 @@
                            ((or vector list) *))
   (let ((sequence-type (lvar-type sequence)))
     (cond ((csubtypep sequence-type (specifier-type 'list))
-           `(sb!impl::stable-sort-list sequence
+           `(sb-impl::stable-sort-list sequence
                                        (%coerce-callable-to-fun predicate)
                                        (if key (%coerce-callable-to-fun key) #'identity)))
           ((csubtypep sequence-type (specifier-type 'simple-vector))
-           `(sb!impl::stable-sort-simple-vector sequence
+           `(sb-impl::stable-sort-simple-vector sequence
                                                 (%coerce-callable-to-fun predicate)
                                                 (and key (%coerce-callable-to-fun key))))
           (t
-           `(sb!impl::stable-sort-vector sequence
+           `(sb-impl::stable-sort-vector sequence
                                          (%coerce-callable-to-fun predicate)
                                          (and key (%coerce-callable-to-fun key)))))))
 
@@ -5026,7 +5026,7 @@
 
 #!-(and win32 (not sb-thread))
 (deftransform sleep ((seconds) ((integer 0 #.(expt 10 8))))
-  `(if sb!impl::*deadline*
+  `(if sb-impl::*deadline*
        (locally (declare (notinline sleep)) (sleep seconds))
        (sb!unix:nanosleep seconds 0)))
 
@@ -5036,10 +5036,10 @@
                                          (not (satisfies float-infinity-p))))))
   (let ((seconds-value (lvar-value seconds)))
     (multiple-value-bind (seconds nano)
-        (sb!impl::split-seconds-for-sleep seconds-value)
+        (sb-impl::split-seconds-for-sleep seconds-value)
       (if (> seconds (expt 10 8))
           (give-up-ir1-transform)
-          `(if sb!impl::*deadline*
+          `(if sb-impl::*deadline*
                (locally (declare (notinline sleep)) (sleep seconds))
                (sb!unix:nanosleep ,seconds ,nano))))))
 
@@ -5067,11 +5067,11 @@
                                (and (csubtypep specifier (specifier-type 'character))
                                     (type-specifier specifier)))))))
    (if element-type
-       `(sb!impl::%make-string-output-stream
+       `(sb-impl::%make-string-output-stream
          ',element-type
          (function ,(case element-type
-                      (base-char 'sb!impl::string-ouch/base-char)
-                      (t 'sb!impl::string-ouch))))
+                      (base-char 'sb-impl::string-ouch/base-char)
+                      (t 'sb-impl::string-ouch))))
        (give-up-ir1-transform))))
 
 (flet ((xform (symbol match-kind fallback)

@@ -309,7 +309,7 @@
                    (cond (errorp
                           (format t "~&Immobile space exhausted~%")
                           (sb!debug:print-backtrace)
-                          (sb!impl::%halt))
+                          (sb-impl::%halt))
                          (t
                           (return-from allocate-immobile-bytes 0))))
                  (set-varyobj-space-free-pointer free-ptr)

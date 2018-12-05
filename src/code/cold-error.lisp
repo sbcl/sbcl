@@ -143,7 +143,7 @@
            (/show0 "*MAXIMUM-ERROR-DEPTH*=..")
            (/hexstr max)
            (/show0 "in INFINITE-ERROR-PROTECTOR, calling ERROR-ERROR")
-           (sb!impl::error-error "Help! "
+           (sb-impl::error-error "Help! "
                         cur
                         " nested errors. "
                         "SB-KERNEL:*MAXIMUM-ERROR-DEPTH* exceeded."))
@@ -159,7 +159,7 @@
 
   (/show0 "cold-printing ERROR arguments one by one..")
   #!+sb-show (dolist (argument arguments)
-               (sb!impl::cold-print argument))
+               (sb-impl::cold-print argument))
   (/show0 "done cold-printing ERROR arguments")
 
   (infinite-error-protect

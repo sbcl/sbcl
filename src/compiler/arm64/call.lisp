@@ -927,7 +927,7 @@
                   (when step-instrumenting
                     (assemble ()
                       #!-sb-thread
-                      (load-symbol-value tmp-tn sb!impl::*stepping*)
+                      (load-symbol-value tmp-tn sb-impl::*stepping*)
                       #!+sb-thread
                       (loadw tmp-tn thread-tn thread-stepping-slot)
                       (inst cbz tmp-tn step-done-label)
@@ -1170,7 +1170,7 @@
   (:vop-var vop)
   (:generator 3
     #!-sb-thread
-    (load-symbol-value tmp-tn sb!impl::*stepping*)
+    (load-symbol-value tmp-tn sb-impl::*stepping*)
     #!+sb-thread
     (loadw tmp-tn thread-tn thread-stepping-slot)
     (inst cbz tmp-tn DONE)

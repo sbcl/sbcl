@@ -89,9 +89,9 @@
                          defined-ftype declared-ftype)
                  (compiler-style-warn
                   "~@<The previously declared FTYPE~
-                   ~2I ~_~/sb!impl:print-type/~I ~_~
+                   ~2I ~_~/sb-impl:print-type/~I ~_~
                    conflicts with the definition type ~
-                   ~2I~_~/sb!impl:print-type/~:>"
+                   ~2I~_~/sb-impl:print-type/~:>"
                   declared-ftype defined-ftype))))
             (:defined
              (setf (info :function :type source-name) defined-ftype)))))))

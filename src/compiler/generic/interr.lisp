@@ -174,7 +174,7 @@
   sb-c:tn-ref
   index
   ctype
-  sb!impl::buffer
+  sb-impl::buffer
   sb-c::vop
   sb-c::basic-combination
   sb!sys:fd-stream

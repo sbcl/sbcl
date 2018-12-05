@@ -46,7 +46,7 @@
 
 (setf (condition-classoid-report (find-classoid 'condition))
       (lambda (cond stream)
-        (format stream "Condition ~/sb!impl:print-type-specifier/ was signalled."
+        (format stream "Condition ~/sb-impl:print-type-specifier/ was signalled."
                 (type-of cond))))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -567,7 +567,7 @@
        (format stream  "~@<The value ~
                       ~@:_~2@T~S ~
                       ~@:_is not of type ~
-                      ~@:_~2@T~/sb!impl:print-type-specifier/~@[ ~
+                      ~@:_~2@T~/sb-impl:print-type-specifier/~@[ ~
                       ~@:_~a~]~:@>"
                (type-error-datum condition)
                type
@@ -1073,7 +1073,7 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
      (let ((*print-array* nil))
        (format stream
                "~@<Displaced array originally of type ~
-                 ~/sb!impl:print-type-specifier/ has been invalidated ~
+                 ~/sb-impl:print-type-specifier/ has been invalidated ~
                  due its displaced-to array ~S having become too small ~
                  to hold it: the displaced array's dimensions have all ~
                  been set to zero to trap accesses to it.~:@>"
@@ -1196,7 +1196,7 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
      (let ((error-stream (stream-error-stream condition)))
        (format stream
                "READER-ERROR ~@[at ~W ~]on ~S:~%~?~%Original error: ~A"
-               (sb!impl::file-position-or-nil-for-error error-stream) error-stream
+               (sb-impl::file-position-or-nil-for-error error-stream) error-stream
                (simple-condition-format-control condition)
                (simple-condition-format-arguments condition)
                (reader-impossible-number-error-error condition))))))
@@ -1589,9 +1589,9 @@ the usual naming convention (names like *FOO*) for special variables"
      (format stream
              "~@<The new ~A proclamation for~@[ ~A~] ~
                ~/sb!ext:print-symbol-with-prefix/~
-               ~@:_~2@T~/sb!impl:print-type-specifier/~@:_~
+               ~@:_~2@T~/sb-impl:print-type-specifier/~@:_~
                does not match the old ~4:*~A~3* proclamation~
-               ~@:_~2@T~/sb!impl:print-type-specifier/~@:>"
+               ~@:_~2@T~/sb-impl:print-type-specifier/~@:>"
              (proclamation-mismatch-kind condition)
              (proclamation-mismatch-description condition)
              (proclamation-mismatch-name condition)

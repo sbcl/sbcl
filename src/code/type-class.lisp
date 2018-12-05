@@ -229,7 +229,7 @@
 ;;; in the hash, as well as the pseudorandom bits
 (defun new-type-hash ()
    #+sb-xc-host (ctype-random +ctype-hash-mask+)
-   #-sb-xc-host (sb!impl::quasi-random-address-based-hash
+   #-sb-xc-host (sb-impl::quasi-random-address-based-hash
                  *ctype-hash-state* +ctype-hash-mask+))
 
 (def!struct (ctype (:conc-name type-)
@@ -278,7 +278,7 @@
          (if (or symbol (eq metatype 'named))
              ;; symbol hashes don't use the package so  mix that in too
              (let* ((pkg-hash (acond ((symbol-package symbol)
-                                      (sxhash (sb!impl::package-%name it)))
+                                      (sxhash (sb-impl::package-%name it)))
                                      (t 0)))
                     (mixed (logxor pkg-hash (sxhash (symbol-name symbol)))))
                (logand (ecase metatype
@@ -288,7 +288,7 @@
                          (named    (lognot mixed)))
                        +ctype-hash-mask+))
              ;; anonymous classoid (do we support those?) or other metatype
-             (sb!impl::quasi-random-address-based-hash
+             (sb-impl::quasi-random-address-based-hash
               *ctype-hash-state* +ctype-hash-mask+))))
     (when saetp-index
       (setf (ldb (byte +ctype-saetp-index-bits+

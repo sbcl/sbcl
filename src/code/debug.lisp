@@ -838,8 +838,8 @@ the current thread are replaced with dummy objects which can safely escape."
                 ;; and the stream you're trying to watch), and any fix for
                 ;; that buggy arrangement will likely let this hack go away
                 ;; naturally.
-                (sb!impl::*circularity-hash-table* . nil)
-                (sb!impl::*circularity-counter* . nil)
+                (sb-impl::*circularity-hash-table* . nil)
+                (sb-impl::*circularity-counter* . nil)
                 (*readtable* *debug-readtable*))
             (progv
                 ;; (Why NREVERSE? PROGV makes the later entries have
@@ -886,7 +886,7 @@ the current thread are replaced with dummy objects which can safely escape."
 (defun invoke-debugger (condition)
   "Enter the debugger."
   (let ((*stack-top-hint* (resolve-stack-top-hint))
-        (sb!impl::*deadline* nil))
+        (sb-impl::*deadline* nil))
     ;; call *INVOKE-DEBUGGER-HOOK* first, so that *DEBUGGER-HOOK* is not
     ;; called when the debugger is disabled
     (run-hook '*invoke-debugger-hook* condition)
@@ -1732,7 +1732,7 @@ forms that explicitly control this kind of evaluation.")
       (format *debug-io* "~&Already single-stepping.~%")
       (let ((restart (find-restart 'continue *debug-condition*)))
         (cond (restart
-               (sb!impl::enable-stepping)
+               (sb-impl::enable-stepping)
                (invoke-restart restart))
               (t
                (format *debug-io* "~&Non-continuable error, cannot start stepping.~%"))))))
@@ -1754,7 +1754,7 @@ forms that explicitly control this kind of evaluation.")
 
 (!def-debug-command "OUT" ()
   (if (typep *debug-condition* 'step-condition)
-      (if sb!impl::*step-out*
+      (if sb-impl::*step-out*
           (let ((restart (find-restart 'step-out *debug-condition*)))
             (aver restart)
             (invoke-restart restart))

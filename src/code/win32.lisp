@@ -177,12 +177,12 @@
 (defun sb!unix:nanosleep (sec nsec)
   (let ((*allow-with-interrupts* *interrupts-enabled*))
     (without-interrupts
-      (let ((timer (sb!impl::os-create-wtimer)))
-        (sb!impl::os-set-wtimer timer sec nsec)
+      (let ((timer (sb-impl::os-create-wtimer)))
+        (sb-impl::os-set-wtimer timer sec nsec)
         (unwind-protect
              (do () ((with-local-interrupts
-                       (zerop (sb!impl::os-wait-for-wtimer timer)))))
-          (sb!impl::os-close-wtimer timer))))))
+                       (zerop (sb-impl::os-wait-for-wtimer timer)))))
+          (sb-impl::os-close-wtimer timer))))))
 
 (define-alien-routine ("win32_wait_object_or_signal" wait-object-or-signal)
     dword

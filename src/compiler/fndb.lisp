@@ -173,7 +173,7 @@
 ;;;; from the "Symbols" chapter:
 
 (defknown get (symbol t &optional t) t (flushable))
-(defknown sb!impl::get3 (symbol t t) t (flushable))
+(defknown sb-impl::get3 (symbol t t) t (flushable))
 (defknown remprop (symbol t) t)
 (defknown symbol-plist (symbol) list (flushable))
 (defknown getf (list t &optional t) t (foldable flushable))
@@ -571,7 +571,7 @@
                   collect
                   (intern (concatenate 'string "VECTOR-MAP-INTO/"
                                        (string (sb-vm:saetp-primitive-type-name info)))
-                          :sb!impl))
+                          :sb-impl))
     (simple-array index index function list)
     index
     (call))
@@ -809,18 +809,18 @@
   sequence
   (call)
   :derive-type #'result-type-first-arg)
-(defknown sb!impl::stable-sort-list (list function function) list
+(defknown sb-impl::stable-sort-list (list function function) list
   (call important-result))
-(defknown sb!impl::sort-vector (vector index index function (or function null))
+(defknown sb-impl::sort-vector (vector index index function (or function null))
   * ; SORT-VECTOR works through side-effect
   (call))
 
-(defknown sb!impl::stable-sort-vector
+(defknown sb-impl::stable-sort-vector
   (vector function (or function null))
   vector
   (call))
 
-(defknown sb!impl::stable-sort-simple-vector
+(defknown sb-impl::stable-sort-simple-vector
   (simple-vector function (or function null))
   simple-vector
   (call))
@@ -891,16 +891,16 @@
   (movable flushable))
 (defknown %make-list (index t) list (movable flushable))
 
-(defknown sb!impl::|List| (&rest t) list (movable flushable foldable))
-(defknown sb!impl::|List*| (t &rest t) t (movable flushable foldable))
-(defknown sb!impl::|Append| (&rest t) t (flushable foldable))
-(defknown sb!impl::|Vector| (&rest t) simple-vector (flushable foldable))
+(defknown sb-impl::|List| (&rest t) list (movable flushable foldable))
+(defknown sb-impl::|List*| (t &rest t) t (movable flushable foldable))
+(defknown sb-impl::|Append| (&rest t) t (flushable foldable))
+(defknown sb-impl::|Vector| (&rest t) simple-vector (flushable foldable))
 
 ;;; All but last must be of type LIST, but there seems to be no way to
 ;;; express that in this syntax.
 (defknown append (&rest t) t (flushable)
   :call-type-deriver #'append-call-type-deriver)
-(defknown sb!impl::append2 (list t) t (flushable)
+(defknown sb-impl::append2 (list t) t (flushable)
   :call-type-deriver #'append-call-type-deriver)
 
 (defknown copy-list (proper-or-dotted-list) list (flushable))
@@ -1039,7 +1039,7 @@
 (defknown hash-table-p (t) boolean (movable foldable flushable))
 (defknown gethash (t hash-table &optional t) (values t boolean)
   (flushable)) ; not FOLDABLE, since hash table contents can change
-(defknown sb!impl::gethash3 (t hash-table t) (values t boolean)
+(defknown sb-impl::gethash3 (t hash-table t) (values t boolean)
   (flushable)) ; not FOLDABLE, since hash table contents can change
 (defknown %puthash (t (modifying hash-table) t) t ()
   :derive-type #'result-type-last-arg)
@@ -1154,7 +1154,7 @@
   (movable foldable flushable))
 (defknown fill-pointer (complex-vector) index
     (unsafely-flushable))
-(defknown sb!impl::fill-pointer-error (t &optional t) nil)
+(defknown sb-impl::fill-pointer-error (t &optional t) nil)
 
 (defknown vector-push (t (modifying complex-vector)) (or index null) ())
 (defknown vector-push-extend (t (modifying complex-vector) &optional (and index (integer 1))) index
@@ -1256,10 +1256,10 @@
 (defknown make-two-way-stream (stream stream) stream (unsafely-flushable))
 (defknown make-echo-stream (stream stream) stream (flushable))
 (defknown make-string-input-stream (string &optional index sequence-end)
-  sb!impl::string-input-stream
+  sb-impl::string-input-stream
   (flushable))
 (defknown make-string-output-stream (&key (:element-type type-specifier))
-  sb!impl::string-output-stream
+  sb-impl::string-output-stream
   (flushable))
 (defknown get-output-stream-string (stream) simple-string ())
 (defknown streamp (t) boolean (movable foldable flushable))
@@ -1427,7 +1427,7 @@
            (unsafely-flushable)))
 
 (defknown (prin1-to-string princ-to-string) (t) simple-string (unsafely-flushable))
-(defknown sb!impl::stringify-object (t) simple-string)
+(defknown sb-impl::stringify-object (t) simple-string)
 
 (defknown write-char (character &optional stream-designator) character ()
   :derive-type #'result-type-first-arg)
@@ -1621,7 +1621,7 @@
   null)
 
 ;;; and analogous SBCL extension:
-(defknown sb!impl::%failed-aver (t) nil)
+(defknown sb-impl::%failed-aver (t) nil)
 (defknown bug (t &rest t) nil) ; never returns
 (defknown simple-reader-error (stream string &rest t) nil)
 (defknown sb!kernel:reader-eof-error (stream string) nil)
@@ -2029,17 +2029,17 @@
 ;;; Avoid a ton of FBOUNDP checks in the string stream constructors etc,
 ;;; by wiring in the needed functions instead of dereferencing their fdefns.
 (defknown (ill-in ill-bin ill-out ill-bout
-           sb!impl::string-inch sb!impl::string-in-misc
-           sb!impl::string-ouch sb!impl::string-sout sb!impl::string-out-misc
-           sb!impl::finite-base-string-ouch sb!impl::finite-base-string-out-misc
-           sb!impl::fill-pointer-ouch sb!impl::fill-pointer-sout
-           sb!impl::fill-pointer-misc
-           sb!impl::case-frob-upcase-out sb!impl::case-frob-upcase-sout
-           sb!impl::case-frob-downcase-out sb!impl::case-frob-downcase-sout
-           sb!impl::case-frob-capitalize-out sb!impl::case-frob-capitalize-sout
-           sb!impl::case-frob-capitalize-first-out sb!impl::case-frob-capitalize-first-sout
-           sb!impl::case-frob-capitalize-aux-out sb!impl::case-frob-capitalize-aux-sout
-           sb!impl::case-frob-misc
+           sb-impl::string-inch sb-impl::string-in-misc
+           sb-impl::string-ouch sb-impl::string-sout sb-impl::string-out-misc
+           sb-impl::finite-base-string-ouch sb-impl::finite-base-string-out-misc
+           sb-impl::fill-pointer-ouch sb-impl::fill-pointer-sout
+           sb-impl::fill-pointer-misc
+           sb-impl::case-frob-upcase-out sb-impl::case-frob-upcase-sout
+           sb-impl::case-frob-downcase-out sb-impl::case-frob-downcase-sout
+           sb-impl::case-frob-capitalize-out sb-impl::case-frob-capitalize-sout
+           sb-impl::case-frob-capitalize-first-out sb-impl::case-frob-capitalize-first-sout
+           sb-impl::case-frob-capitalize-aux-out sb-impl::case-frob-capitalize-aux-sout
+           sb-impl::case-frob-misc
            sb!pretty::pretty-out sb!pretty::pretty-misc) * *)
 (defknown sb!pretty::pretty-sout * * (recursive))
 
@@ -2047,7 +2047,7 @@
 
 (defknown sb!pcl::pcl-instance-p (t) boolean
   (movable foldable flushable))
-(defknown sb!impl::new-instance-hash-code ()
+(defknown sb-impl::new-instance-hash-code ()
   (and unsigned-byte fixnum (not (eql 0))))
 
 ;; FIXME: should T be be (OR INSTANCE FUNCALLABLE-INSTANCE) etc?

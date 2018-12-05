@@ -11,7 +11,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 (defglobal *core-pathname* nil
   "The absolute pathname of the running SBCL core.")
@@ -1441,7 +1441,7 @@ NOTE: This interface is experimental and subject to change."
   (format stream
            "The ~(~A~) ~/sb!ext:print-symbol-with-prefix/ has been ~
             deprecated as of ~@[~A ~]version ~A.~
-            ~@[~2%~/sb!impl::print-deprecation-replacements/~]"
+            ~@[~2%~/sb-impl::print-deprecation-replacements/~]"
           namespace name software version replacements))
 
 (defun setup-function-in-final-deprecation
@@ -1719,13 +1719,13 @@ to :INTERPRET, an interpreter will be used.")
      &body body)
   (multiple-value-bind (forms decls) (parse-body body nil)
     (if string
-        `(let ((,var (sb!impl::make-fill-pointer-output-stream ,string)))
+        `(let ((,var (sb-impl::make-fill-pointer-output-stream ,string)))
            ,@decls
            ,@forms)
         `(let ((,var #+sb-xc-host (make-string-output-stream)
-                     #-sb-xc-host (sb!impl::%make-string-output-stream
+                     #-sb-xc-host (sb-impl::%make-string-output-stream
                                    (or #!-sb-unicode 'character :default)
-                                   #'sb!impl::string-ouch)))
+                                   #'sb-impl::string-ouch)))
 
            ,@decls
            ,@forms

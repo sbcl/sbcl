@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 ;;; Declare each of the free space pointers (except dynamic) as an alien var
 (define-alien-variable ("read_only_space_free_pointer"

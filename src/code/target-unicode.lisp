@@ -233,7 +233,7 @@ with underscores replaced by dashes."
 
 (defun general-category (character)
   "Returns the general category of CHARACTER as it appears in UnicodeData.txt"
-  (svref-or-null *general-categories* (sb!impl::ucd-general-category character)))
+  (svref-or-null *general-categories* (sb-impl::ucd-general-category character)))
 
 (defun bidi-class (character)
   "Returns the bidirectional class of CHARACTER"
@@ -257,7 +257,7 @@ The only characters in Unicode with a decimal digit value are those
 that are part of a range of characters that encode the digits 0-9.
 Because of this, `(decimal-digit c) <=> (digit-char-p c 10)` in
 #+sb-unicode builds"
-  (sb!impl::ucd-decimal-digit character))
+  (sb-impl::ucd-decimal-digit character))
 
 (defun digit-value (character)
   "Returns the Unicode digit value of CHARACTER or NIL if it doesn't exist.

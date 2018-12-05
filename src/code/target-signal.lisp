@@ -191,7 +191,7 @@
 (defun sigalrm-handler (signal info context)
   (declare (ignore signal info context))
   (declare (type system-area-pointer context))
-  (sb!impl::run-expired-timers))
+  (sb-impl::run-expired-timers))
 
 (defun sigterm-handler (signal code context)
   (declare (ignore signal code context))
@@ -210,7 +210,7 @@
 ;;; the handler for SIGCHLD signals for RUN-PROGRAM
 (defun sigchld-handler  (signal code context)
   (declare (ignore signal code context))
-  (sb!impl::get-processes-status-changes))
+  (sb-impl::get-processes-status-changes))
 
 (defun sb!kernel:signal-cold-init-or-reinit ()
   "Enable all the default signals that Lisp knows how to deal with."

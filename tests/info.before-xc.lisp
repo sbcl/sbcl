@@ -22,7 +22,7 @@
 (assert (constantp 'sb-vm:vector-data-offset))
 (assert (integerp (symbol-value 'sb-vm:vector-data-offset)))
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 (let ((foo-iv (packed-info-insert +nil-packed-infos+ +no-auxilliary-key+
                                   5 "hi 5"))

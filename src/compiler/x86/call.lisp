@@ -1439,7 +1439,7 @@
       (inst cmp EA 0 :maybe-fs))
     #!+win32 (inst pop eax-tn))
   #!-sb-thread
-  (inst cmp (make-ea-for-symbol-value sb!impl::*stepping*) 0))
+  (inst cmp (make-ea-for-symbol-value sb-impl::*stepping*) 0))
 
 (define-vop (step-instrument-before-vop)
   (:policy :fast-safe)

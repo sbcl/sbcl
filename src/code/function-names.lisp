@@ -1,4 +1,4 @@
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 ;;;; generalized function names
 (!define-load-time-global *valid-fun-names-alist* nil)

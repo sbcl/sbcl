@@ -131,7 +131,7 @@
     (error "Cannot declare FTYPE of illegal function name ~S" name))
   (when (and (ctype-p type-oid)
              (not (csubtypep type-oid (specifier-type 'function))))
-    (error "Not a function type: ~/sb!impl:print-type/" type-oid))
+    (error "Not a function type: ~/sb-impl:print-type/" type-oid))
   (with-single-package-locked-error
       (:symbol name "globally declaring the FTYPE of ~A")
     (when (eq (info :function :where-from name) :declared)
@@ -202,7 +202,7 @@
            :format-arguments (list form state
                                    (rest (typexpand 'deprecation-state)))))
   (multiple-value-call #'values
-    state (sb!impl::normalize-deprecation-since since)))
+    state (sb-impl::normalize-deprecation-since since)))
 
 (defun process-deprecation-declaration (thing state software version)
   (destructuring-bind (namespace name &key replacement) thing
@@ -210,19 +210,19 @@
       (ecase namespace
         (function
          (when (eq state :final)
-           (sb!impl::setup-function-in-final-deprecation
+           (sb-impl::setup-function-in-final-deprecation
             software version name replacement))
          (setf (info :function :deprecated name) info))
         (variable
          (check-variable-name
           name :context "deprecated variable declaration" :signal-via #'error)
          (when (eq state :final)
-           (sb!impl::setup-variable-in-final-deprecation
+           (sb-impl::setup-variable-in-final-deprecation
             software version name replacement))
          (setf (info :variable :deprecated name) info))
         (type
          (when (eq state :final)
-           (sb!impl::setup-type-in-final-deprecation
+           (sb-impl::setup-type-in-final-deprecation
             software version name replacement))
          (setf (info :type :deprecated name) info))))))
 

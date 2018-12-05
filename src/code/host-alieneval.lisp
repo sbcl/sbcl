@@ -104,7 +104,7 @@
   (if (consp type)
       (let ((translator (info :alien-type :translator (car type))))
         (unless translator
-          (error "unknown alien type: ~/sb!impl:print-type-specifier/"
+          (error "unknown alien type: ~/sb-impl:print-type-specifier/"
                  type))
         (funcall translator type env))
       (ecase (info :alien-type :kind type)
@@ -112,15 +112,15 @@
          (let ((translator (info :alien-type :translator type)))
            (unless translator
              (error "no translator for primitive alien type ~
-                      ~/sb!impl:print-type-specifier/"
+                      ~/sb-impl:print-type-specifier/"
                     type))
            (funcall translator (list type) env)))
         (:defined
          (or (info :alien-type :definition type)
-             (error "no definition for alien type ~/sb!impl:print-type-specifier/"
+             (error "no definition for alien type ~/sb-impl:print-type-specifier/"
                     type)))
         (:unknown
-         (error "unknown alien type: ~/sb!impl:print-type-specifier/"
+         (error "unknown alien type: ~/sb-impl:print-type-specifier/"
                 type)))))
 
 (defun auxiliary-alien-type (kind name env)
@@ -197,14 +197,14 @@
   (defun %define-alien-type (name new source-location)
     (ecase (info :alien-type :kind name)
       (:primitive
-       (error "~/sb!impl:print-type-specifier/ is a built-in alien type."
+       (error "~/sb-impl:print-type-specifier/ is a built-in alien type."
               name))
       (:defined
        (let ((old (info :alien-type :definition name)))
          (unless (or (null old) (alien-type-= new old))
            (warn "redefining ~S to be:~% ~
-                   ~/sb!impl:print-type-specifier/,~%was~% ~
-                   ~/sb!impl:print-type-specifier/"
+                   ~/sb-impl:print-type-specifier/,~%was~% ~
+                   ~/sb-impl:print-type-specifier/"
                  name
                  (unparse-alien-type new)
                  (unparse-alien-type old)))))
@@ -221,7 +221,7 @@
 
 (defmethod print-object ((type alien-type) stream)
   (print-unreadable-object (type stream :type t)
-    (sb!impl:print-type-specifier stream (unparse-alien-type type))))
+    (sb-impl:print-type-specifier stream (unparse-alien-type type))))
 
 ;;;; the SAP type
 
@@ -372,7 +372,7 @@
 ;;;; default methods
 
 (defun missing-alien-operation-error (type operation)
-  (error "Cannot ~A aliens of type ~/sb!impl:print-type-specifier/."
+  (error "Cannot ~A aliens of type ~/sb-impl:print-type-specifier/."
          operation type))
 
 (define-alien-type-method (root :unparse) (type)
@@ -1155,7 +1155,7 @@
 (push '("SB-ALIEN" define-alien-type-class define-alien-type-method)
       *!removable-symbols*)
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 (defun extern-alien-name (name)
  (handler-case (coerce name 'base-string)

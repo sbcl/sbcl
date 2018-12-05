@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 ;;;; putting ourselves out of our misery when things become too much to bear
 
@@ -181,7 +181,7 @@
     (write `("Length(TLFs)=" ,(length *!cold-toplevels*)) :escape nil)
     (terpri))
   ;; only the basic external formats are present at this point.
-  (setq sb!impl::*default-external-format* :latin-1)
+  (setq sb-impl::*default-external-format* :latin-1)
 
   (!with-init-wrappers
     (loop with *package* = *package* ; rebind to self, as if by LOAD

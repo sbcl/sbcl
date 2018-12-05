@@ -595,8 +595,8 @@
 (define-source-transform coerce (x type &environment env)
   (if (and (sb-xc:constantp type env)
            (proper-list-p x)
-           (memq (car x) '(sb!impl::|List| list
-                           sb!impl::|Vector| vector)))
+           (memq (car x) '(sb-impl::|List| list
+                           sb-impl::|Vector| vector)))
       (let* ((type (constant-form-value type env))
              (length (1- (length x)))
              (ctype (careful-values-specifier-type type)))
@@ -773,7 +773,7 @@
                   (lvar-matches initial-contents
                                 ;; FIXME: probably don't need all 4 of these now?
                                 :fun-names '(list vector
-                                             sb!impl::|List| sb!impl::|Vector|)
+                                             sb-impl::|List| sb-impl::|Vector|)
                                 :arg-count c-length))
              (let ((parameters (eliminate-keywords))
                    (elt-vars (make-gensym-list c-length))

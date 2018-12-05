@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 ;;;; BUFFER
 ;;;;
@@ -1771,7 +1771,7 @@
     (when input-p
       (flet ((no-input-routine ()
                (error "could not find any input routine for ~
-                        ~/sb!impl:print-type-specifier/"
+                        ~/sb-impl:print-type-specifier/"
                       target-type)))
         (when (or (not character-stream-p) bivalent-stream-p)
           (setf (values bin-routine bin-type bin-size read-n-characters
@@ -1875,8 +1875,8 @@
                 ((subtypep output-type input-type)
                  output-type)
                 (t
-                 (error "Input type (~/sb!impl:print-type-specifier/) and
-                         output type (~/sb!impl:print-type-specifier/) ~
+                 (error "Input type (~/sb-impl:print-type-specifier/) and
+                         output type (~/sb-impl:print-type-specifier/) ~
                          are unrelated?"
                         input-type output-type))))))
 

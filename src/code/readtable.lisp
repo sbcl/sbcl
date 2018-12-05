@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 (sb-xc:deftype attribute-table ()
   '(simple-array (unsigned-byte 8) (#.base-char-code-limit)))

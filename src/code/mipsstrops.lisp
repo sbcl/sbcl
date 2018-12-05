@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 ;;; Compare the substrings specified by STRING1 and STRING2 and return
 ;;; NIL if the strings are STRING=, or the lowest index of STRING1 in

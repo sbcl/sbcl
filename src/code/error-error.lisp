@@ -7,7 +7,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 ;;; These specials are used by ERROR-ERROR to track the success of recovery
 ;;; attempts. Not to be confused with SB-KERNEL::*CURRENT-ERROR-DEPTH*.

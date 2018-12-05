@@ -17,7 +17,7 @@
 ;;;; of the foreign symbol, and for code the entries are jumps
 ;;;; to the real addresses.
 
-(in-package "SB!IMPL")
+(in-package "SB-IMPL")
 
 (define-alien-routine arch-write-linkage-table-entry void
   (table-address unsigned) (real-address unsigned) (datap int))
